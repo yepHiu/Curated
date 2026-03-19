@@ -1,0 +1,14 @@
+---
+description: Current repo facts and constraints
+alwaysApply: true
+---
+
+# Project Facts
+
+- Treat this repo as a `Vue 3 + TypeScript + Vite` frontend scaffold.
+- Package manager is `pnpm`; keep `pnpm-lock.yaml` authoritative.
+- UI stack is `shadcn-vue` with Tailwind CSS v4 and theme tokens in `src/style.css`.
+- Path alias `@` maps to `src`; prefer alias imports over long relative paths.
+- Shared utilities belong in `src/lib`; reusable UI belongs in `src/components` or `src/components/ui`.
+- The repo is still in an early scaffold stage, so prefer building structure and reusable boundaries over one-off feature code.
+- `components.json` uses the `shadcn-vue` schema; do not assume React `shadcn/ui` CLI behavior or file layout.

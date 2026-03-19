@@ -1,0 +1,28 @@
+---
+description: Vue, TypeScript, and shadcn-vue implementation standards
+globs: src/**/*.{ts,vue}
+alwaysApply: false
+---
+
+# Vue Frontend Standards
+
+- Use `Vue 3` SFCs with `<script setup lang="ts">`; prefer Composition API over Options API.
+- Keep TypeScript strict. Do not introduce `any`, silent casts, or ignored type errors unless clearly justified.
+- Prefer imports from `@/components`, `@/lib`, and `@/composables` instead of long relative paths.
+- Reuse `shadcn-vue` primitives from `src/components/ui` before creating new base components.
+- Put shared logic in `composables` or `src/lib`, and keep components focused on one responsibility.
+- Prefer Tailwind utilities and existing CSS variables; avoid inline styles and one-off hard-coded color values.
+- In `.vue` files, keep the order `script`, `template`, `style`; skip `<style>` when Tailwind is enough.
+- Use accessible HTML semantics and keep UI consistent with the neutral `shadcn-vue` style already in the project.
+
+Example:
+
+```vue
+<script setup lang="ts">
+import { Button } from '@/components/ui/button'
+</script>
+
+<template>
+  <Button variant="outline">Action</Button>
+</template>
+```

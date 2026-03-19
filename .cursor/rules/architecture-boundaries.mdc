@@ -1,0 +1,13 @@
+---
+description: Architecture boundaries between current frontend and future desktop stack
+alwaysApply: true
+---
+
+# Architecture Boundaries
+
+- `docs/jav-libary.md` describes the target product architecture, not the current implementation state.
+- Do not assume the repo already contains `Electron`, `Go`, `SQLite`, `mpv`, or a working desktop bridge.
+- When adding business code, keep the Vue layer decoupled from future desktop/runtime details.
+- Renderer-facing code should depend on a front-end service layer and typed contracts, not direct assumptions about IPC, HTTP, filesystems, or local databases.
+- Prefer defining domain models, DTOs, event types, and error codes before wiring real desktop integrations.
+- If a document mixes implemented facts with future plans, rewrite it to separate current state, target state, and pending decisions.

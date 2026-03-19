@@ -1,0 +1,13 @@
+---
+description: Keep docs aligned with implementation and planning status
+globs: docs/**/*.md
+alwaysApply: false
+---
+
+# Documentation Sync
+
+- Separate implemented facts from future plans and unresolved decisions.
+- When describing architecture, explicitly state whether it is current code, target design, or a phased recommendation.
+- If code and docs disagree, treat the codebase as the source of truth and document the gap clearly.
+- Keep project memory focused on durable facts, constraints, and staged decisions.
+- Put longer critiques, trade-offs, and design recommendations in dedicated review or architecture docs.
