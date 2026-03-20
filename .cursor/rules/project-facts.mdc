@@ -5,10 +5,15 @@ alwaysApply: true
 
 # Project Facts
 
-- Treat this repo as a `Vue 3 + TypeScript + Vite` frontend scaffold.
+- Treat this repo as a `Vue 3 + TypeScript + Vite` routed frontend prototype, not a blank scaffold.
 - Package manager is `pnpm`; keep `pnpm-lock.yaml` authoritative.
 - UI stack is `shadcn-vue` with Tailwind CSS v4 and theme tokens in `src/style.css`.
 - Path alias `@` maps to `src`; prefer alias imports over long relative paths.
+- App entry is `src/main.ts`, `src/App.vue` only renders the router, and the main shell lives in `src/layouts/AppShell.vue`.
+- Current top-level routes are `library`, `favorites`, `recent`, `tags`, `detail`, `player`, and `settings`.
+- Product-specific presentation components live in `src/components/jav-library`; shared primitives stay in `src/components/ui`.
+- Current domain types, mock data, and helper functions live in `src/lib/jav-library.ts`; treat them as prototype contracts until a real service layer exists.
 - Shared utilities belong in `src/lib`; reusable UI belongs in `src/components` or `src/components/ui`.
-- The repo is still in an early scaffold stage, so prefer building structure and reusable boundaries over one-off feature code.
+- The repo is still in an early prototype stage, so prefer reusable boundaries and typed contracts over one-off feature code.
+- `vue-router` and `vue-virtual-scroller` are already in use; do not regress the app back to local-state page switching or non-virtualized large poster grids.
 - `components.json` uses the `shadcn-vue` schema; do not assume React `shadcn/ui` CLI behavior or file layout.

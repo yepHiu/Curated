@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
-import type { Movie } from "@/lib/jav-library"
+import type { Movie } from "@/domain/movie/types"
 import {
   Card,
   CardContent,
@@ -18,20 +18,26 @@ interface MovieChunk {
 
 const props = defineProps<{
   movies: Movie[]
-  selectedMovieId: string
+  selectedMovieId?: string
 }>()
 
 const emit = defineEmits<{
   select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
+  toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 
-const CHUNK_SIZE = 64
+const CHUNK_SIZE = 48
+const MAX_COLUMNS = 8
+const ESTIMATED_CARD_HEIGHT = 280
+const ESTIMATED_GAP = 20
 
 const masonryColumnWidth = "10.5rem"
 const masonryGap = "1.25rem"
 const masonryMaxWidth = "calc(8 * 11.25rem + 7 * 1.25rem)"
+const estimatedChunkHeight =
+  Math.ceil(CHUNK_SIZE / MAX_COLUMNS) * (ESTIMATED_CARD_HEIGHT + ESTIMATED_GAP)
 
 const movieChunks = computed<MovieChunk[]>(() =>
   Array.from({ length: Math.ceil(props.movies.length / CHUNK_SIZE) }, (_, index) => ({
@@ -71,7 +77,7 @@ const getChunkDependencies = (chunk: MovieChunk) =>
     <DynamicScroller
       :items="movieChunks"
       key-field="id"
-      :min-item-size="2200"
+      :min-item-size="estimatedChunkHeight"
       :buffer="600"
       class="h-full min-h-0 overflow-y-auto pr-2"
       list-class="flex flex-col gap-5"
@@ -83,7 +89,7 @@ const getChunkDependencies = (chunk: MovieChunk) =>
           :active="active"
           :data-index="index"
           :size-dependencies="getChunkDependencies(getChunk(item))"
-          :min-size="2200"
+          :min-size="estimatedChunkHeight"
         >
           <div
             class="mx-auto w-full"
@@ -105,6 +111,7 @@ const getChunkDependencies = (chunk: MovieChunk) =>
                 @select="emit('select', $event)"
                 @open-details="emit('openDetails', $event)"
                 @open-player="emit('openPlayer', $event)"
+                @toggle-favorite="emit('toggleFavorite', $event)"
               />
             </div>
           </div>

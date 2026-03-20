@@ -1,0 +1,23 @@
+---
+description: Backend API contract rules for commands, events, DTOs, and errors
+globs: "{backend/internal/contracts/**/*.go,docs/backend-contract*.md,docs/backend-implementation-plan.md,docs/jav-libary.md}"
+alwaysApply: false
+---
+
+# Backend API Contracts
+
+- Keep backend-facing contracts transport-agnostic. Define commands, events, DTOs, and error codes before binding them to `stdio`, IPC, HTTP, or pipes.
+- Assume the public desktop chain is `Renderer -> preload -> Electron Main -> Go Backend`; do not design renderer-facing contracts around direct database, filesystem, or `mpv` access.
+- Use stable command names in `domain.action` form, such as `library.list`, `scan.start`, and `player.play`.
+- Use stable event names in `domain.state` form, such as `scan.progress`, `task.failed`, and `player.state_changed`.
+- Long-running work must return task-oriented results and emit progress events instead of blocking synchronous commands.
+- DTOs should reflect frontend consumption needs, not raw database rows or third-party SDK payloads.
+- Error responses should expose stable codes and retry hints; do not rely on free-form error strings alone.
+- `docs/film-scanner` may inform scraping flow design, but its CLI I/O must not become this project's formal contract.
+
+Example:
+
+```text
+Good: return `scan.start` => `{ taskId, status }`, then emit `task.progress` and `scan.completed`.
+Bad: return a raw scraper payload or a CLI-formatted text blob directly to renderer-facing consumers.
+```

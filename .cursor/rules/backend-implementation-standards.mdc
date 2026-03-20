@@ -1,0 +1,24 @@
+---
+description: Backend implementation standards for Go services and backend docs
+globs: "{backend/**/*.go,backend/**/*.sql,docs/backend*.md,docs/jav-libary.md}"
+alwaysApply: false
+---
+
+# Backend Implementation Standards
+
+- Treat backend work as future desktop/runtime architecture. Do not describe `Electron`, `Go`, `SQLite`, `mpv`, or a working bridge as already implemented unless the code exists.
+- Keep the renderer decoupled from backend internals. Backend-facing designs should assume `Renderer -> preload -> Electron Main -> Go Backend`, not direct renderer access to files, databases, or `mpv`.
+- Define typed contracts first: domain models, DTOs, command/event payloads, task statuses, and error codes should be specified before wiring transport details.
+- Prefer a modular Go backend under `backend/` with focused packages such as `contracts`, `library`, `scanner`, `scraper`, `assets`, `player`, `storage`, and `tasks`.
+- Treat scanning, scraping, poster download, thumbnail generation, and cache refresh as background tasks with persisted status, progress events, retry points, and structured logs.
+- Metadata scraping may reference `docs/film-scanner`, especially its file discovery, number extraction, `metatube-sdk-go` usage, cover download, and NFO generation flow.
+- Use `film-scanner` as a reference sample only. Do not copy its CLI-oriented architecture directly into this project; refactor reusable logic into service-layer modules suitable for desktop orchestration.
+- Database design should go beyond the MVP movie tables when needed: account for library paths, scan jobs, scan items, media assets, and timestamps/unique constraints.
+- When editing backend docs, clearly separate current repo facts, target backend architecture, and pending decisions.
+
+Example:
+
+```text
+Good: extract number parsing from a `film-scanner`-style flow into `backend/internal/scanner`, then emit task events and persist results.
+Bad: call `metatube-sdk-go` directly from renderer-facing code or document the CLI sample as the final production architecture.
+```

@@ -1,0 +1,18 @@
+---
+description: Project-specific frontend patterns for the JAV Library UI
+globs: src/**/*.{ts,vue}
+alwaysApply: false
+---
+
+# JAV Library Frontend Patterns
+
+- Keep the app as a routed SPA under `AppShell`; do not move page switching back into `App.vue`.
+- Use `vue-router` params and query state for page context such as selected movie, active library tab, and search keywords.
+- Preserve internal scrolling containers; avoid changes that make the whole shell scroll when only the content area should scroll.
+- Reuse existing page building blocks like `MovieCard`, `DetailPanel`, `PlayerPage`, `SettingsPage`, and routed `views` before creating parallel variants.
+- Library cards should stay compact, poster-first, and fully clickable; avoid reintroducing large action-heavy card footers unless explicitly requested.
+- When changing shared movie card sizing, keep library grid and `Related titles` visually consistent unless the task explicitly asks them to diverge.
+- Detail pages should follow the current media-library pattern: left poster, right metadata, clear hierarchy, and no oversized hero banners.
+- Player pages should stay video-first and low-chrome; avoid adding extra explanatory cards or secondary panels unless explicitly requested.
+- Settings pages should follow the current centered content band with top stats and vertically stacked setting cards; avoid wide admin-dashboard layouts unless requested.
+- Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit.

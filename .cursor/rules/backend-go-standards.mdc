@@ -1,0 +1,23 @@
+---
+description: Go package boundaries, errors, logs, and test rules for backend code
+globs: backend/**/*.go
+alwaysApply: false
+---
+
+# Backend Go Standards
+
+- Keep `cmd/javd` thin. Put business logic in focused packages under `backend/internal`.
+- Organize backend code by domain boundaries such as `contracts`, `library`, `scanner`, `scraper`, `assets`, `player`, `storage`, and `tasks`; avoid giant catch-all packages.
+- Do not let repository/storage code make business decisions, and do not let service logic leak raw storage models as public contracts.
+- Use explicit adapters around third-party dependencies like `metatube-sdk-go` and `mpv`; do not scatter direct calls across unrelated packages.
+- Return rich errors with context and map them to stable app error codes at the contract boundary.
+- Use structured logs with stable fields like `taskId`, `movieId`, `num`, and `path` for scan, scrape, asset, and player flows.
+- Treat parser logic, dedupe logic, DTO mapping, and task state transitions as testable units with direct coverage.
+- `docs/film-scanner` is a reference for reusable scanning/scraping ideas only, not a package layout to mirror.
+
+Example:
+
+```text
+Good: wrap `metatube-sdk-go` in `backend/internal/scraper/metatube`, then map results into internal DTOs.
+Bad: import the SDK from multiple service packages and pass provider payloads through unchanged.
+```

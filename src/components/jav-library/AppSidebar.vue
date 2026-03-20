@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import type { AppPage } from "@/lib/jav-library"
 import {
   Clock3,
   Heart,
@@ -10,10 +9,12 @@ import {
   Tags,
 } from "lucide-vue-next"
 import { RouterLink, useRoute } from "vue-router"
+import type { AppPage, LibraryMode } from "@/domain/library/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import { buildBrowseRouteTarget } from "@/lib/library-query"
 
 interface NavigationItem {
   label: string
@@ -33,11 +34,10 @@ const browseItems: NavigationItem[] = [
 
 const isActive = (page: AppPage) => route.name === page
 
-const getNavigationTarget = (page: AppPage) => {
-  return {
-    name: page,
-  }
-}
+const getNavigationTarget = (page: AppPage) =>
+  page === "settings"
+    ? { name: page }
+    : buildBrowseRouteTarget(page as LibraryMode, route.query)
 </script>
 
 <template>

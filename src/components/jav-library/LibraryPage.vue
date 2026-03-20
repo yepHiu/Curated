@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import type { LibraryMode, LibraryTab, Movie } from "@/lib/jav-library"
+import type { LibraryMode, LibraryTab } from "@/domain/library/types"
+import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -16,7 +17,7 @@ const props = defineProps<{
   mode: LibraryMode
   allMovies: Movie[]
   visibleMovies: Movie[]
-  selectedMovie: Movie
+  selectedMovie?: Movie
   activeTab: LibraryTab
 }>()
 
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId?: string]
+  toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 
 const popularTags = computed(() => {
@@ -94,10 +96,11 @@ const handleTabChange = (value: string | number) => {
     <div class="min-h-0 flex-1">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
-        :selected-movie-id="props.selectedMovie.id"
+        :selected-movie-id="props.selectedMovie?.id"
         @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
+        @toggle-favorite="emit('toggleFavorite', $event)"
       />
     </div>
   </div>

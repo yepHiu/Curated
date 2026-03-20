@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import type { Movie } from "@/lib/jav-library"
+import type { Movie } from "@/domain/movie/types"
 import {
   Card,
   CardContent,
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
+  toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 
 const visibleMovies = computed(() => props.movies.slice(0, 8))
@@ -34,6 +35,7 @@ const visibleMovies = computed(() => props.movies.slice(0, 8))
           @select="emit('select', $event)"
           @open-details="emit('openDetails', $event)"
           @open-player="emit('openPlayer', $event)"
+          @toggle-favorite="emit('toggleFavorite', $event)"
         />
       </div>
     </div>

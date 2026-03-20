@@ -1,0 +1,22 @@
+---
+description: Background task rules for scan, scrape, asset, and cache workflows
+globs: "{backend/internal/scanner/**/*.go,backend/internal/scraper/**/*.go,backend/internal/assets/**/*.go,backend/internal/tasks/**/*.go,docs/backend-task*.md,docs/backend-implementation-plan.md}"
+alwaysApply: false
+---
+
+# Backend Task Patterns
+
+- Model scanning, scraping, asset download, thumbnail generation, and cache refresh as background tasks instead of ad hoc blocking flows.
+- Reuse a shared task lifecycle: `pending`, `running`, `completed`, `partial_failed`, `failed`, `cancelled`.
+- Persist enough task state to support progress reporting, diagnostics, and retry, not just fire-and-forget execution.
+- Emit stable generic task events such as `task.started`, `task.progress`, `task.completed`, and `task.failed`, then add domain events only when they provide extra value.
+- Design idempotent flows for repeated scan, scrape, and asset work; avoid duplicate inserts, duplicate associations, and duplicate downloads.
+- Log task execution with stable correlation fields and record failure stage, input identity, and retryability.
+- Use `docs/film-scanner` for scan/scrape flow ideas, but refactor its linear CLI process into task-driven modules and evented orchestration.
+
+Example:
+
+```text
+Good: `scan.start` creates a task record, emits progress, stores skipped-file reasons, and schedules follow-up scrape work.
+Bad: a scan command walks the whole library synchronously and returns only a final text summary.
+```

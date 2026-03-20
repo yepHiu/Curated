@@ -1,178 +1,120 @@
 # 项目记忆：`jav-shadcn`
 
-## 1. 当前仓库事实
+## 1. 产品定位
 
-### 项目定位
+- 当前仓库是 `JAV-Library` 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
+- `docs/jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
+- 当前仓库已经包含前端原型和 `Go + SQLite` 后端雏形，但前后端仍未完成真实联通。
+- 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
 
-- 当前仓库本质上仍是一个基于 `Vue 3 + TypeScript + Vite 8` 的前端单页应用脚手架。
-- `docs/jav-libary.md` 描述的是目标产品蓝图，不代表当前仓库已经落地为完整桌面应用。
-- 当前阶段应将仓库视为“JAV-Library 的前端起步壳”，而不是已经具备 `Electron + Go + SQLite + mpv` 能力的成品。
+## 2. 当前代码事实
 
-### 当前技术栈
+### 技术栈
 
-- 框架：`vue@3`
+- 框架：`Vue 3`
 - 语言：`TypeScript`
-- 构建：`vite`
-- 样式：`tailwindcss@4` + `@tailwindcss/vite`
-- 动画：`tw-animate-css`
-- UI 体系：`shadcn-vue`
-- 基础依赖：
-  - `reka-ui`
-  - `class-variance-authority`
-  - `clsx`
-  - `tailwind-merge`
-  - `lucide-vue-next`
+- 构建：`Vite`
+- UI：`shadcn-vue`
+- 样式：`Tailwind CSS v4`
+- 虚拟列表：`vue-virtual-scroller`
 - 包管理器：`pnpm`
 
-### 已落地目录与入口
+### 已落地结构
 
 - 应用入口：`src/main.ts`
 - 根组件：`src/App.vue`
-- 全局样式与主题变量：`src/style.css`
-- UI 组件目录：`src/components/ui`
-- 工具函数：`src/lib/utils.ts`
-- 静态资源：`public`、`src/assets`
-- 文档目录：`docs`
+- 路由：`src/router/index.ts`
+- 布局壳：`src/layouts/AppShell.vue`
+- 产品组件：`src/components/jav-library`
+- UI 原子组件：`src/components/ui`
+- 主题样式：`src/style.css`
+- 原型数据与类型：`src/lib/jav-library.ts`
 
-### 当前运行状态
+### 当前交付状态
 
-- `src/main.ts` 仅挂载 `App.vue`。
-- `src/App.vue` 仍是按钮级演示页面，不代表真实业务结构。
-- 当前已确认存在的基础 UI 组件主要是 `src/components/ui/button`。
-- 仓库尚未看到 `vue-router`、`pinia`、API 请求层、业务模块目录、测试体系。
+- 应用已经是路由驱动的 SPA，而不是最初的单页按钮演示。
+- `App.vue` 仅承载 `RouterView`，页面切换统一由 `vue-router` 管理。
+- `AppShell` 已实现侧边栏、顶部搜索区和主内容区的稳定壳层。
+- 当前业务数据来自 `src/lib/jav-library.ts` 的 typed mock 数据，而不是真实服务层或本地数据库。
+- 项目已具备图库浏览、详情、播放器占位页、设置页等原型页面。
 
-## 2. 前端与 UI 约定
+### 当前前后端互联事实
 
-### `shadcn-vue` 事实
+- 当前前端页面直接消费 `src/lib/jav-library.ts` 导出的类型、列表和查询函数。
+- 仓库内尚未落地独立 `services` 层，因此页面与 mock 数据模块仍然是直接依赖关系。
+- 当前仓库内已存在 `Go Backend`、`SQLite`、扫描、搜刮和任务管理代码。
+- 当前尚未提供供前端消费的真实 HTTP API，前端也还没有 `web adapter`。
+- 当前没有 Electron `preload`、主进程桥接或桌面运行时接线代码。
+- 当前“播放器页”“设置页”“扫描相关设置”都只是前端原型，不代表播放、扫描、搜刮链路已经打通。
 
-- 配置文件：`components.json`
-- 配置 schema：`https://shadcn-vue.com/schema.json`
-- 风格：`new-york`
-- `baseColor`：`neutral`
-- 图标库：`lucide`
-- Tailwind 全局样式入口：`src/style.css`
-- 已启用 CSS Variables 主题方案
+## 3. 当前产品信息架构
 
-### 别名约定
+### 顶层页面
 
-- `@/*` -> `src/*`
-- `@/components` -> `src/components`
-- `@/components/ui` -> `src/components/ui`
-- `@/lib` -> `src/lib`
-- `@/lib/utils` -> `src/lib/utils`
-- `@/composables` -> `src/composables`
+- `library`
+- `favorites`
+- `recent`
+- `tags`
+- `detail/:id`
+- `player/:id?`
+- `settings`
 
-### 协作注意事项
+### 当前体验重点
 
-- 这是 `shadcn-vue` 项目，不要默认套用 React 版 `shadcn/ui` CLI 和目录假设。
-- 未来新增 UI 时，应优先复用 `src/components/ui` 与 `src/style.css` 中已有语义化主题变量。
-- 当前项目仍处于骨架阶段，优先补齐结构化能力，不适合直接零散堆砌业务页面。
+- 影片库页以封面浏览、搜索、标签化筛选和选中态为主。
+- 详情页强调单片信息、预览占位区和相关影片推荐。
+- 播放器页采用 video-first 原型布局，当前仍是 `mpv` 接入前的视觉占位。
+- 设置页围绕目录、扫描频率、播放偏好和手动任务入口组织。
 
-## 3. 目标产品架构愿景
+## 4. 已确认的产品实现方式
 
-根据 `docs/jav-libary.md`，目标产品愿景是一个桌面端 JAV 媒体库应用，目标架构包括：
+- `library / favorites / recent / tags` 共享同一套浏览页面模型，通过 route name 和 query 参数切换上下文。
+- 搜索词 `q`、标签页 `tab`、当前选中影片 `selected` 已作为 URL 状态存在。
+- 影片浏览体验已经偏向“媒体库 / 海报墙”而不是“后台表格管理”。
+- 库页已引入虚拟滚动能力，说明大规模海报浏览是明确方向。
+- 设置页目前是前端原型，但字段组织已经映射到未来扫描、搜刮、播放配置模型。
 
-- 宿主层：`Electron`
-- 前端渲染层：`Vue 3 + shadcn-vue`
-- 本地服务层：`Go Backend`
-- 数据持久化：`SQLite`
-- 播放能力：`mpv + FFmpeg`
-- 元数据能力：`metatube-sdk-go`
-- 日志能力：`zap`
+## 5. 当前尚未实现的能力
 
-目标产品侧的核心模块方向是合理的：
+- 尚未接入 `Electron` 主进程、`preload` 或桌面桥接。
+- 尚未打通前端到 `Go` 后端的真实 HTTP 调用链。
+- 尚未实现真实播放器控制和命名管道通信。
+- 后端虽已具备任务系统雏形，但前端尚未消费任务状态与事件。
+- 尚未形成完整的 `services`、前端后端 DTO 对齐、错误码消费和任务状态消费模型。
+- 尚未看到测试体系和真正的数据持久化链路。
 
-- `Library Manager` 负责影片库查询与用户操作
-- `Scanner Service` 负责目录扫描与入库
-- `Metadata Scraper` 负责元数据搜刮与图片缓存
-- `Player Controller` 负责控制 `mpv`
-- `Database Layer` 负责本地持久化
+## 6. 产品与架构边界
 
-## 4. 当前差距与关键风险
+- 前端页面可以提前表达未来桌面产品形态，但不能把未来能力当成当前事实。
+- Renderer 层应依赖前端服务接口和 typed contracts，而不是直接耦合 IPC、文件系统或数据库细节。
+- 文档必须持续区分三类信息：`当前原型事实`、`目标桌面架构`、`待决策事项`。
+- 若代码与文档冲突，应优先以代码现状修正文档记忆。
 
-### 当前差距
+### 前端互联要求
 
-- 仓库中尚未看到 `Electron` 运行时、主进程、`preload` 桥接层。
-- 仓库中尚未看到 `Go` 后端工程、进程管理、数据库实现或 `SQLite schema`。
-- 仓库中尚未看到播放器集成层、命名管道通信层、任务状态系统。
-- 现有前端也尚未形成页面骨架、服务层、领域模型、路由和状态管理。
+- 前端后续必须补齐 `services` 层，UI 组件和 `views` 不应直接依赖 HTTP 细节、Electron API 或数据库实现。
+- 前端服务接口应至少覆盖 `library`、`scan`、`scraper`、`player`、`settings` 五类领域能力。
+- 互联契约需优先定义 `DTO`、事件类型、错误码、任务状态枚举，再接真实 UI 调用链。
+- 第一阶段应先支持 `mock adapter` 与 `web adapter` 切换，后续再补 `desktop adapter`。
+- 前端不应同时感知 `HTTP`、`IPC`、命名管道等多套底层协议，只消费统一的前端服务抽象。
 
-### 关键风险判断
+## 7. 当前主要风险
 
-- 最大风险不是技术选型，而是“当前仓库事实”和“目标最终架构”容易被混淆。
-- 若直接按最终蓝图组织前端代码，容易在没有桥接协议和服务边界的前提下把 UI 与未来桌面能力耦合在一起。
-- 文档中存在 `HTTP / IPC`、`Electron IPC`、`mpv JSON IPC` 多种链路描述，但当前没有统一定义前端应依赖哪一层抽象。
-- 扫描、搜刮、缩略图生成、缓存刷新本质上都是后台任务，目前方案缺少任务状态、事件推送、失败重试和日志关联设计。
-- 数据结构偏向 MVP，尚未覆盖去重、扫描状态、资源缓存、来源追踪、播放历史等后续关键能力。
+- 最大风险仍然是把“产品蓝图”和“当前实现”混为一谈。
+- 现有原型已经具备较完整的页面形态，但底层仍是 mock 数据，容易让后续协作者误判为功能已打通。
+- 扫描、搜刮、缓存、播放、本地配置本质上都属于后台任务或桌面能力，目前还缺少统一协议。
+- 文案层面当前界面偏英文，设计文档偏中文，后续需要决定正式的产品语言策略。
 
-## 5. 推荐的演进原则
+## 8. 推荐的下一步产品优先级
 
-- 先建设前端应用骨架，再接入桌面能力。
-- UI 应只依赖统一的前端服务层，不直接感知 `Go`、`SQLite`、`mpv` 的具体通信细节。
-- Electron `preload` 层未来应作为 Renderer 的唯一桥接入口，避免前端混用多套调用方式。
-- 在真正接入后端前，应先定义好 `domain models`、`DTOs`、`event types`、`error codes`。
-- 设计文档必须区分“当前已实现”“未来目标”“待决策项”，避免把规划写成事实。
+1. 沉淀前端服务契约：影片库、扫描、搜刮、播放器、设置。
+2. 先补 `Go Backend` 的 HTTP API，让 Web 前端可直接联通真实后端。
+3. 定义任务状态与事件模型，支撑扫描和搜刮等异步流程。
+4. 将 mock 数据层逐步抽象成可替换的 `web adapter`。
+5. 在 Web 方案稳定后，再评估 `Electron`、真实播放器与桌面桥接。
 
-## 6. 建议的阶段化落地顺序
+## 9. 维护约定
 
-### 第一阶段：前端骨架
-
-优先补齐以下能力：
-
-1. `router`
-2. `views`
-3. `layouts`
-4. `services`
-5. `types`
-6. `stores`
-
-### 第二阶段：桥接协议设计
-
-- 定义前端服务接口
-- 定义事件订阅模型
-- 定义扫描、搜刮、播放、设置相关 DTO
-- 定义错误码与任务状态枚举
-
-### 第三阶段：桌面运行时接入
-
-- 接入 `Electron`
-- 增加主进程与 `preload`
-- 设计安全边界与调用白名单
-- 管理 `Go` 子进程生命周期
-
-### 第四阶段：后台任务系统
-
-- 扫描任务
-- 搜刮任务
-- 图片缓存任务
-- 日志与失败重试
-
-### 第五阶段：播放器与体验完善
-
-- 接入 `mpv`
-- 同步播放状态
-- 处理进度、暂停、结束事件
-- 完善详情页、播放器页和设置页联动
-
-## 7. 当前明确不应假设的能力
-
-- 不要假设仓库已经是 Electron 项目。
-- 不要假设 Renderer 可以直接调用本地数据库或本地文件系统能力。
-- 不要假设现有前端已经具备扫描、搜刮、播放、设置持久化能力。
-- 不要假设 React 版 `shadcn/ui` CLI 能直接驱动当前 `shadcn-vue` 配置。
-
-## 8. 下一轮开发的优先事项
-
-推荐优先顺序：
-
-1. 清理模板残留，修正 `README.md` 与应用标题。
-2. 建立前端应用目录骨架与页面路由。
-3. 定义面向未来桌面层的前端服务接口与类型。
-4. 先做可替换的 mock 数据流，再考虑真实桌面桥接。
-5. 在协议稳定后，再接入 `Electron`、`Go`、任务系统与播放器。
-
-## 9. 维护说明
-
-- 本文用于沉淀“当前仓库事实”和“长期演进判断”。
-- 当仓库真正引入 `Electron`、`Go`、`SQLite`、播放器桥接或新的目录骨架时，应优先更新本文。
-- 若设计文档与实际代码不一致，应以代码现状为事实，并在文档中明确标注差距。
+- 本文记录“稳定事实、产品判断、阶段边界”，不记录短期实现细节。
+- 当路由结构、页面骨架、数据来源方式或桌面集成状态发生变化时，应优先更新本文。
+- 若 `docs/jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。

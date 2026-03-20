@@ -5,44 +5,66 @@ import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getMovieById } from "@/lib/jav-library"
+import {
+  buildMovieRouteQuery,
+  getBrowseSourceMode,
+  getLibrarySearchQuery,
+  getSelectedMovieQuery,
+  isLibraryRouteName,
+  mergeLibraryQuery,
+} from "@/lib/library-query"
+import { useLibraryService } from "@/services/library-service"
 
 const route = useRoute()
 const router = useRouter()
+const libraryService = useLibraryService()
 
-const currentMovieId = computed(() => {
+const currentMovie = computed(() => {
   const routeMovieId = typeof route.params.id === "string" ? route.params.id : undefined
-  const selectedMovieId = typeof route.query.selected === "string" ? route.query.selected : undefined
+  const selectedMovieId = getSelectedMovieQuery(route.query)
+  const candidateId = routeMovieId ?? selectedMovieId
 
-  return getMovieById(routeMovieId ?? selectedMovieId).id
+  return candidateId ? libraryService.getMovieById(candidateId) : undefined
 })
 
-const isLibraryRoute = computed(() =>
-  route.name === "library" ||
-  route.name === "favorites" ||
-  route.name === "recent" ||
-  route.name === "tags",
-)
-
+const currentMovieId = computed(() => currentMovie.value?.id)
+const isLibraryRoute = computed(() => isLibraryRouteName(route.name))
+const isDetailRoute = computed(() => route.name === "detail")
 const isPlayerRoute = computed(() => route.name === "player")
 
 const showHeaderBack = computed(() => !isLibraryRoute.value)
 
-const headerBackTarget = computed(() =>
-  isPlayerRoute.value
-    ? {
-        name: "detail",
-        params: { id: currentMovieId.value },
-      }
-    : { name: "library" },
-)
+const headerBackTarget = computed(() => {
+  if (isPlayerRoute.value && currentMovieId.value) {
+    return {
+      name: "detail",
+      params: { id: currentMovieId.value },
+      query: buildMovieRouteQuery(
+        route.query,
+        getBrowseSourceMode(route.query),
+        currentMovieId.value,
+      ),
+    }
+  }
+
+  if (isDetailRoute.value) {
+    return {
+      name: getBrowseSourceMode(route.query),
+      query: mergeLibraryQuery(route.query, {
+        selected: currentMovieId.value,
+      }),
+    }
+  }
+
+  return { name: "library" }
+})
 
 const headerBackLabel = computed(() =>
-  isPlayerRoute.value ? "Back to details" : "Back to library",
+  isPlayerRoute.value && currentMovieId.value ? "Back to details" : "Back to library",
 )
 
 const headerSearchValue = computed({
-  get: () => (typeof route.query.q === "string" ? route.query.q : ""),
+  get: () => getLibrarySearchQuery(route.query),
   set: (value: string) => {
     if (!isLibraryRoute.value) {
       return
@@ -50,10 +72,9 @@ const headerSearchValue = computed({
 
     void router.replace({
       name: route.name ?? "library",
-      query: {
-        ...route.query,
+      query: mergeLibraryQuery(route.query, {
         q: value || undefined,
-      },
+      }),
     })
   },
 })
@@ -63,7 +84,7 @@ const headerSearchValue = computed({
   <div class="h-screen overflow-hidden bg-background text-foreground">
     <div class="h-full w-full px-3 py-3 lg:px-4 lg:py-4">
       <div class="grid h-full min-h-0 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <AppSidebar :current-movie-id="currentMovieId" />
+        <AppSidebar />
 
         <section
           class="flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/85 shadow-2xl shadow-black/10 backdrop-blur"

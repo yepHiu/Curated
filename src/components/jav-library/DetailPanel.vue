@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue"
 import { Heart, PlayCircle, Star } from "lucide-vue-next"
-import type { Movie } from "@/lib/jav-library"
+import type { Movie } from "@/domain/movie/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,9 +27,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   openPlayer: [movieId: string]
+  toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
-
-const isFavorite = ref(props.movie.isFavorite)
 
 const actorInitials = (name: string) =>
   name
@@ -39,6 +37,10 @@ const actorInitials = (name: string) =>
     .map((part) => part.charAt(0))
     .join("")
     .toUpperCase()
+
+const handleFavoriteChange = (nextValue: boolean) => {
+  emit("toggleFavorite", { movieId: props.movie.id, nextValue })
+}
 </script>
 
 <template>
@@ -63,11 +65,11 @@ const actorInitials = (name: string) =>
           </div>
 
           <Toggle
-            :pressed="isFavorite"
+            :pressed="props.movie.isFavorite"
             variant="outline"
             size="sm"
             class="absolute right-2.5 bottom-2.5 z-10 rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            @update:pressed="isFavorite = Boolean($event)"
+            @update:pressed="handleFavoriteChange(Boolean($event))"
           >
             <Heart />
           </Toggle>

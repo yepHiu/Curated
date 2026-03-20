@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS movies (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  code TEXT NOT NULL UNIQUE,
+  studio TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  runtime_minutes INTEGER NOT NULL DEFAULT 0,
+  rating REAL NOT NULL DEFAULT 0,
+  is_favorite INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  location TEXT NOT NULL UNIQUE,
+  resolution TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS library_paths (
+  id TEXT PRIMARY KEY,
+  path TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS scan_jobs (
+  task_id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  progress INTEGER NOT NULL DEFAULT 0,
+  message TEXT NOT NULL DEFAULT '',
+  error_code TEXT NOT NULL DEFAULT '',
+  error_message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  started_at TEXT NOT NULL DEFAULT '',
+  finished_at TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS media_assets (
+  id TEXT PRIMARY KEY,
+  movie_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  source_url TEXT NOT NULL DEFAULT '',
+  local_path TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (movie_id) REFERENCES movies(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_assets_movie_id ON media_assets(movie_id);

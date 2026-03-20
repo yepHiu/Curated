@@ -1,47 +1,13 @@
-export type AppPage =
-  | "library"
-  | "favorites"
-  | "recent"
-  | "tags"
-  | "detail"
-  | "player"
-  | "settings"
+import { computed, ref } from "vue"
+import type {
+  LibrarySetting,
+  LibraryStat,
+  ScanIntervalOption,
+} from "@/domain/library/types"
+import type { Movie } from "@/domain/movie/types"
+import type { LibraryService } from "@/services/contracts/library-service"
 
-export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | "tags">
-export type LibraryTab = "all" | "new" | "favorites" | "top-rated"
-
-export interface Movie {
-  id: string
-  title: string
-  code: string
-  studio: string
-  actors: string[]
-  tags: string[]
-  runtimeMinutes: number
-  rating: number
-  summary: string
-  isFavorite: boolean
-  addedAt: string
-  location: string
-  resolution: string
-  year: number
-  tone: string
-  coverClass: string
-}
-
-export interface LibraryStat {
-  label: string
-  value: string
-  detail: string
-}
-
-export interface LibrarySetting {
-  id: string
-  path: string
-  title: string
-}
-
-export const libraryStats: LibraryStat[] = [
+const libraryStats: readonly LibraryStat[] = [
   {
     label: "Movies Indexed",
     value: "2,184",
@@ -59,7 +25,7 @@ export const libraryStats: LibraryStat[] = [
   },
 ]
 
-export const libraryPaths: LibrarySetting[] = [
+const libraryPaths: readonly LibrarySetting[] = [
   {
     id: "library-a",
     path: "D:/Media/JAV/Main",
@@ -171,11 +137,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
 ]
 
 const codePrefixes = ["MKB", "SLD", "NVA", "HZK", "PRM", "LVS", "KTR", "AMR", "VLT", "NOA"]
-const storagePools = [
-  "D:/Media/JAV/Main",
-  "E:/Vault/JAV/New",
-  "F:/Offline/Collections",
-]
+const storagePools = ["D:/Media/JAV/Main", "E:/Vault/JAV/New", "F:/Offline/Collections"]
 
 const buildMovie = (index: number): Movie => {
   const seed = movieSeeds[index % movieSeeds.length]
@@ -203,60 +165,39 @@ const buildMovie = (index: number): Movie => {
   }
 }
 
-export const movies: Movie[] = Array.from({ length: 180 }, (_, index) => buildMovie(index))
+const moviesState = ref<Movie[]>(Array.from({ length: 180 }, (_, index) => buildMovie(index)))
 
-export const scanIntervals = [
+const scanIntervals: readonly ScanIntervalOption[] = [
   { label: "Every 30 minutes", value: "1800" },
   { label: "Every hour", value: "3600" },
   { label: "Every 6 hours", value: "21600" },
   { label: "Daily", value: "86400" },
 ]
 
-export const formatRuntime = (minutes: number) => {
-  const hours = Math.floor(minutes / 60)
-  const remainder = minutes % 60
+export const mockLibraryService: LibraryService = {
+  movies: computed(() => moviesState.value),
+  libraryStats,
+  libraryPaths,
+  scanIntervals,
+  getMovieById(movieId) {
+    return moviesState.value.find((movie) => movie.id === movieId)
+  },
+  getRelatedMovies(movieId, limit = 6) {
+    return moviesState.value.filter((movie) => movie.id !== movieId).slice(0, limit)
+  },
+  toggleFavorite(movieId, nextValue) {
+    const currentMovie = moviesState.value.find((movie) => movie.id === movieId)
 
-  return `${hours}h ${remainder}m`
-}
+    if (!currentMovie) {
+      return undefined
+    }
 
-export const formatAddedDate = (value: string) =>
-  new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value))
+    const targetValue = typeof nextValue === "boolean" ? nextValue : !currentMovie.isFavorite
 
-export const getMovieById = (movieId?: string) =>
-  movies.find((movie) => movie.id === movieId) ?? movies[0]
+    moviesState.value = moviesState.value.map((movie) =>
+      movie.id === movieId ? { ...movie, isFavorite: targetValue } : movie,
+    )
 
-export const getRelatedMovies = (movieId: string, limit = 6) =>
-  movies.filter((movie) => movie.id !== movieId).slice(0, limit)
-
-export const getLibraryModeTitle = (mode: LibraryMode) => {
-  switch (mode) {
-    case "favorites":
-      return {
-        title: "Favorite shelf",
-        description:
-          "A hand-picked collection for quick access to your best tagged titles and most polished metadata entries.",
-      }
-    case "recent":
-      return {
-        title: "Recent imports",
-        description:
-          "Freshly scanned files, recently scraped posters, and newly matched cast details in one focused queue.",
-      }
-    case "tags":
-      return {
-        title: "Tag explorer",
-        description:
-          "Browse the library by mood, category, and metadata clusters without leaving the main shell.",
-      }
-    default:
-      return {
-        title: "Discover your catalog",
-        description:
-          "A music-style browsing surface adapted for movies, with fast search, category tabs, and detail previews.",
-      }
-  }
+    return moviesState.value.find((movie) => movie.id === movieId)
+  },
 }

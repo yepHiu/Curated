@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Movie } from "@/lib/jav-library"
+import type { Movie } from "@/domain/movie/types"
 import {
   Card,
   CardContent,
@@ -19,12 +19,17 @@ const emit = defineEmits<{
   select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
+  toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
-    <DetailPanel :movie="movie" @open-player="emit('openPlayer', $event)" />
+    <DetailPanel
+      :movie="movie"
+      @open-player="emit('openPlayer', $event)"
+      @toggle-favorite="emit('toggleFavorite', $event)"
+    />
 
     <Card class="rounded-3xl border-border/70 bg-card/85">
       <CardHeader>
@@ -56,6 +61,7 @@ const emit = defineEmits<{
         @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
+        @toggle-favorite="emit('toggleFavorite', $event)"
       />
     </div>
   </div>

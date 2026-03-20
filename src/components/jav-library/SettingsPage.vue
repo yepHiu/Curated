@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { FolderPlus, RefreshCw, ScanSearch } from "lucide-vue-next"
-import { libraryPaths, libraryStats, scanIntervals } from "@/lib/jav-library"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -19,7 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { useLibraryService } from "@/services/library-service"
 
+const libraryService = useLibraryService()
 const scanInterval = ref("3600")
 const hardwareDecode = ref(true)
 const autoScrape = ref(true)
@@ -29,7 +30,7 @@ const autoScrape = ref(true)
   <div class="mx-auto flex max-w-[56rem] flex-col gap-6 pb-2">
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card
-        v-for="stat in libraryStats"
+        v-for="stat in libraryService.libraryStats"
         :key="stat.label"
         class="rounded-3xl border-border/70 bg-card/85"
       >
@@ -78,7 +79,7 @@ const autoScrape = ref(true)
 
             <div class="flex flex-col gap-3">
               <div
-                v-for="path in libraryPaths"
+                v-for="path in libraryService.libraryPaths"
                 :key="path.id"
                 class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
               >
@@ -114,7 +115,7 @@ const autoScrape = ref(true)
               <SelectContent>
                 <SelectGroup>
                   <SelectItem
-                    v-for="interval in scanIntervals"
+                    v-for="interval in libraryService.scanIntervals"
                     :key="interval.value"
                     :value="interval.value"
                   >

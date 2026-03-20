@@ -8,12 +8,12 @@ import {
   SkipForward,
   Volume2,
 } from "lucide-vue-next"
-import type { Movie } from "@/lib/jav-library"
-import { formatRuntime } from "@/lib/jav-library"
+import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Slider } from "@/components/ui/slider"
+import { formatRuntime } from "@/lib/formatters/movie"
 
 defineProps<{
   movie: Movie
