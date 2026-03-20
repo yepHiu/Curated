@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { useLibraryService } from "@/services/library-service"
+import { mockLibraryService } from "@/services/adapters/mock/mock-library-service"
 
 describe("mockLibraryService", () => {
   it("returns undefined for an unknown movie id", () => {
-    const libraryService = useLibraryService()
-
-    expect(libraryService.getMovieById("missing-movie")).toBeUndefined()
+    expect(mockLibraryService.getMovieById("missing-movie")).toBeUndefined()
   })
 
   it("toggles favorite state in the shared movie source", () => {
-    const libraryService = useLibraryService()
+    const libraryService = mockLibraryService
     const movieId = libraryService.movies.value[0]?.id
 
     expect(movieId).toBeTruthy()

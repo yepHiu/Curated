@@ -44,6 +44,12 @@ func NewService(logger *zap.Logger, cacheDir string, requestTimeout time.Duratio
 }
 
 func (s *Service) DownloadAll(ctx context.Context, metadata scraper.Metadata) ([]DownloadedAsset, error) {
+	destDir := filepath.Join(s.cacheDir, metadata.MovieID)
+	return s.DownloadAllTo(ctx, metadata, destDir)
+}
+
+// DownloadAllTo downloads cover, thumb, and preview images into destDir (e.g. library番号 folder).
+func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, destDir string) ([]DownloadedAsset, error) {
 	specs := make([]DownloadedAsset, 0, 2+len(metadata.PreviewImages))
 	if metadata.CoverURL != "" {
 		specs = append(specs, DownloadedAsset{Type: "cover", SourceURL: metadata.CoverURL})
@@ -60,7 +66,7 @@ func (s *Service) DownloadAll(ctx context.Context, metadata scraper.Metadata) ([
 
 	results := make([]DownloadedAsset, 0, len(specs))
 	for index, spec := range specs {
-		localPath, err := s.downloadOne(ctx, metadata.MovieID, metadata.Number, spec.Type, index+1, spec.SourceURL)
+		localPath, err := s.downloadOne(ctx, destDir, metadata.Number, spec.Type, index+1, spec.SourceURL)
 		if err != nil {
 			return results, err
 		}
@@ -71,13 +77,13 @@ func (s *Service) DownloadAll(ctx context.Context, metadata scraper.Metadata) ([
 	return results, nil
 }
 
-func (s *Service) downloadOne(ctx context.Context, movieID, number, assetType string, sequence int, sourceURL string) (string, error) {
-	if err := os.MkdirAll(filepath.Join(s.cacheDir, movieID), 0o755); err != nil {
+func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType string, sequence int, sourceURL string) (string, error) {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return "", err
 	}
 
 	fileName := buildFileName(assetType, sequence, sourceURL)
-	localPath := filepath.Join(s.cacheDir, movieID, fileName)
+	localPath := filepath.Join(destDir, fileName)
 
 	if info, err := os.Stat(localPath); err == nil && info.Size() > 0 {
 		return localPath, nil
@@ -110,7 +116,7 @@ func (s *Service) downloadOne(ctx context.Context, movieID, number, assetType st
 	}
 
 	s.logger.Info("asset downloaded",
-		zap.String("movieId", movieID),
+		zap.String("destDir", destDir),
 		zap.String("number", number),
 		zap.String("type", assetType),
 		zap.String("localPath", localPath),

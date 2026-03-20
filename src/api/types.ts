@@ -61,8 +61,13 @@ export interface PlayerSettingsDTO {
 
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
-  scanIntervalSeconds: number
   player: PlayerSettingsDTO
+  /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
+  organizeLibrary: boolean
+}
+
+export interface PatchSettingsBody {
+  organizeLibrary?: boolean
 }
 
 export interface TaskDTO {
@@ -88,4 +93,13 @@ export interface ListMoviesParams {
 
 export interface StartScanBody {
   paths?: string[]
+}
+
+export interface AddLibraryPathBody {
+  path: string
+  title?: string
+}
+
+export interface UpdateLibraryPathBody {
+  title: string
 }

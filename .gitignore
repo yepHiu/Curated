@@ -15,6 +15,13 @@ dist-ssr
 .env.*
 !.env.example
 backend/runtime/
+backend/*.exe
+backend/*.exe~
+
+# Local film-scanner artifacts (not part of app source)
+docs/film-scanner/film-scanner
+docs/film-scanner/videos_test.zip
+docs/film-scanner/videos_test/
 
 # Local media / test fixtures (do not commit large video binaries)
 *.mp4

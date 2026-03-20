@@ -3,9 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,32 +22,41 @@ type ScanStarter interface {
 	StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error)
 }
 
+// OrganizeLibraryController exposes runtime 整理库开关（与配置文件初始值同步，可被 PATCH 覆盖直至进程退出）。
+type OrganizeLibraryController interface {
+	OrganizeLibrary() bool
+	SetOrganizeLibrary(v bool)
+}
+
 type Handler struct {
-	cfg          config.Config
-	logger       *zap.Logger
-	store        *storage.SQLiteStore
-	library      *library.Service
-	tasks        *tasks.Manager
-	scanStarter  ScanStarter
+	cfg                 config.Config
+	logger              *zap.Logger
+	store               *storage.SQLiteStore
+	library             *library.Service
+	tasks               *tasks.Manager
+	scanStarter         ScanStarter
+	organizeLibraryCtl  OrganizeLibraryController
 }
 
 type Deps struct {
-	Cfg         config.Config
-	Logger      *zap.Logger
-	Store       *storage.SQLiteStore
-	Library     *library.Service
-	Tasks       *tasks.Manager
-	ScanStarter ScanStarter
+	Cfg                config.Config
+	Logger             *zap.Logger
+	Store              *storage.SQLiteStore
+	Library            *library.Service
+	Tasks              *tasks.Manager
+	ScanStarter        ScanStarter
+	OrganizeLibraryCtl OrganizeLibraryController
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
-		cfg:         deps.Cfg,
-		logger:      deps.Logger,
-		store:       deps.Store,
-		library:     deps.Library,
-		tasks:       deps.Tasks,
-		scanStarter: deps.ScanStarter,
+		cfg:                deps.Cfg,
+		logger:             deps.Logger,
+		store:              deps.Store,
+		library:            deps.Library,
+		tasks:              deps.Tasks,
+		scanStarter:        deps.ScanStarter,
+		organizeLibraryCtl: deps.OrganizeLibraryCtl,
 	}
 }
 
@@ -56,7 +66,12 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
+	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
+	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
+	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
+	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
+	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
 	mux.HandleFunc("GET /api/tasks/{taskId}", h.handleGetTaskStatus)
 
@@ -121,23 +136,189 @@ func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, movie)
 }
 
-func (h *Handler) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
-	libraryPaths := make([]contracts.LibraryPathDTO, 0, len(h.cfg.LibraryPaths))
-	for index, path := range h.cfg.LibraryPaths {
-		libraryPaths = append(libraryPaths, contracts.LibraryPathDTO{
-			ID:    fmt.Sprintf("library-%d", index+1),
-			Path:  path,
-			Title: fmt.Sprintf("Library path %d", index+1),
-		})
+// handleDeleteMovie removes the movie row and related DB rows in a transaction, then best-effort deletes
+// files on disk (see storage.DeleteMovie). Success returns 204 No Content; missing id returns 404.
+func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
+	movieID := r.PathValue("movieId")
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
 	}
 
+	err := h.store.DeleteMovie(r.Context(), movieID)
+	if err != nil {
+		if errors.Is(err, storage.ErrMovieNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("delete movie failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete movie")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	libraryPaths, err := h.store.ListLibraryPaths(r.Context())
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
+		return
+	}
+
+	org := h.cfg.OrganizeLibrary
+	if h.organizeLibraryCtl != nil {
+		org = h.organizeLibraryCtl.OrganizeLibrary()
+	}
 	writeJSON(w, http.StatusOK, contracts.SettingsDTO{
-		LibraryPaths:        libraryPaths,
-		ScanIntervalSeconds: h.cfg.ScanIntervalSeconds,
+		LibraryPaths: libraryPaths,
 		Player: contracts.PlayerSettingsDTO{
 			HardwareDecode: h.cfg.Player.HardwareDecode,
 		},
+		OrganizeLibrary: org,
 	})
+}
+
+func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.organizeLibraryCtl == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
+		return
+	}
+
+	var body contracts.PatchSettingsRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
+	if body.OrganizeLibrary == nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
+		return
+	}
+
+	h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary)
+
+	libraryPaths, err := h.store.ListLibraryPaths(r.Context())
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, contracts.SettingsDTO{
+		LibraryPaths: libraryPaths,
+		Player: contracts.PlayerSettingsDTO{
+			HardwareDecode: h.cfg.Player.HardwareDecode,
+		},
+		OrganizeLibrary: h.organizeLibraryCtl.OrganizeLibrary(),
+	})
+}
+
+func (h *Handler) handleAddLibraryPath(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+
+	var body contracts.AddLibraryPathRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
+	path := strings.TrimSpace(body.Path)
+	if path == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "path is required")
+		return
+	}
+
+	dto, err := h.store.AddLibraryPath(r.Context(), path, strings.TrimSpace(body.Title))
+	if err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotAbsolute) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "library path must be an absolute path")
+			return
+		}
+		if errors.Is(err, storage.ErrLibraryPathDuplicate) {
+			writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "library path already exists")
+			return
+		}
+		h.logger.Error("add library path failed", zap.Error(err))
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to add library path")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, dto)
+}
+
+func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "id is required")
+		return
+	}
+
+	if err := h.store.DeleteLibraryPath(r.Context(), id); err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path not found")
+			return
+		}
+		h.logger.Error("delete library path failed", zap.Error(err))
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete library path")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handlePatchLibraryPath(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "id is required")
+		return
+	}
+
+	var body contracts.UpdateLibraryPathRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
+	dto, err := h.store.UpdateLibraryPathTitle(r.Context(), id, body.Title)
+	if err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path not found")
+			return
+		}
+		h.logger.Error("update library path title failed", zap.Error(err))
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to update library path")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) handleStartScan(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +330,10 @@ func (h *Handler) handleStartScan(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.scanStarter.StartScan(r.Context(), request.Paths)
 	if err != nil {
+		if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+			writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "scan already in progress")
+			return
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to start scan")
 		return
 	}
@@ -213,7 +398,7 @@ func writeAppError(w http.ResponseWriter, status int, code string, message strin
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {

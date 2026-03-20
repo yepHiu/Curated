@@ -49,10 +49,16 @@ func main() {
 		logger.Fatal("failed to run sqlite migrations", logging.Error(err))
 	}
 
+	if err := store.SeedLibraryPathsIfEmpty(ctx, cfg.LibraryPaths); err != nil {
+		logger.Fatal("failed to seed library paths", logging.Error(err))
+	}
+
 	backendApp, err := app.New(ctx, cfg, logger, store)
 	if err != nil {
 		logger.Fatal("failed to initialize backend app", logging.Error(err))
 	}
+
+	backendApp.StartAutoScanLoop(ctx)
 
 	switch *mode {
 	case "http":

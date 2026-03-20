@@ -11,6 +11,7 @@ import {
   isLibraryRouteName,
   mergeLibraryQuery,
 } from "@/lib/library-query"
+import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { useLibraryService } from "@/services/library-service"
 
 const route = useRoute()
@@ -35,7 +36,9 @@ const queryFilteredMovies = computed(() => {
   }
 
   if (libraryMode.value === "recent") {
-    result = result.sort((left, right) => right.addedAt.localeCompare(left.addedAt))
+    result = result
+      .filter((movie) => isMovieRecentlyAdded(movie.addedAt))
+      .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
   }
 
   if (libraryMode.value === "tags") {

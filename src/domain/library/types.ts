@@ -22,8 +22,3 @@ export interface LibrarySetting {
   path: string
   title: string
 }
-
-export interface ScanIntervalOption {
-  label: string
-  value: string
-}

@@ -55,6 +55,22 @@ func (m *Manager) Progress(taskID string, progress int, message string) contract
 	})
 }
 
+// ProgressWithMetadata updates running progress and shallow-merges patch into task.Metadata (for scan UI counters, etc.).
+func (m *Manager) ProgressWithMetadata(taskID string, progress int, message string, patch map[string]any) contracts.TaskDTO {
+	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
+		task.Status = contracts.TaskRunning
+		task.Progress = progress
+		task.Message = message
+		if task.Metadata == nil {
+			task.Metadata = map[string]any{}
+		}
+		for k, v := range patch {
+			task.Metadata[k] = v
+		}
+		return task
+	})
+}
+
 func (m *Manager) Complete(taskID, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
 		task.Status = contracts.TaskCompleted

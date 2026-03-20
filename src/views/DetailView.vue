@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
+import { HttpClientError } from "@/api/http-client"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
-import { buildMovieRouteQuery, getBrowseSourceMode } from "@/lib/library-query"
+import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
 import type { Movie } from "@/domain/movie/types"
@@ -20,6 +21,8 @@ const movieId = computed(() =>
 
 const detailMovie = shallowRef<Movie | undefined>()
 const detailLoading = ref(false)
+const deleteBusy = ref(false)
+const deleteError = ref("")
 
 watch(
   () => movieId.value,
@@ -73,6 +76,29 @@ const openPlayer = async (nextMovieId: string) => {
 const toggleFavorite = (payload: { movieId: string; nextValue: boolean }) => {
   libraryService.toggleFavorite(payload.movieId, payload.nextValue)
 }
+
+const handleDeleteMovie = async (id: string) => {
+  deleteError.value = ""
+  deleteBusy.value = true
+  try {
+    await libraryService.deleteMovie(id)
+    await router.replace({
+      name: getBrowseSourceMode(route.query),
+      query: mergeLibraryQuery(route.query, { selected: undefined }),
+    })
+  } catch (err) {
+    const message =
+      err instanceof HttpClientError
+        ? (err.apiError?.message ?? err.message)
+        : err instanceof Error
+          ? err.message
+          : "删除失败"
+    deleteError.value = message
+    console.error("[DetailView] delete movie failed", err)
+  } finally {
+    deleteBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -83,15 +109,29 @@ const toggleFavorite = (payload: { movieId: string; nextValue: boolean }) => {
     >
       正在加载详情与预览图…
     </div>
-    <DetailPage
-      v-else-if="detailMovie"
-      :movie="detailMovie"
-      :related-movies="relatedMovies"
-      @select="selectMovie"
-      @open-details="openDetails"
-      @open-player="openPlayer"
-      @toggle-favorite="toggleFavorite"
-    />
+    <template v-else-if="detailMovie">
+      <p
+        v-if="deleteBusy"
+        class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+      >
+        正在删除影片…
+      </p>
+      <p
+        v-if="deleteError"
+        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ deleteError }}
+      </p>
+      <DetailPage
+        :movie="detailMovie"
+        :related-movies="relatedMovies"
+        @select="selectMovie"
+        @open-details="openDetails"
+        @open-player="openPlayer"
+        @toggle-favorite="toggleFavorite"
+        @delete-movie="handleDeleteMovie"
+      />
+    </template>
     <NotFoundState
       v-else
       title="未找到影片"

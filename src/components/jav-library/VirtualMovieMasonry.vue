@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, nextTick, ref } from "vue"
+import { useResizeObserver } from "@vueuse/core"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
 import type { Movie } from "@/domain/movie/types"
 import {
@@ -30,16 +31,69 @@ const emit = defineEmits<{
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 
-/** 单块卡片数过大时虚拟滚动几乎失效（一整块几十张 DOM）；12～16 较均衡 */
-const CHUNK_SIZE = 12
-/** 估算每行最少列数（用于虚拟列表高度粗算） */
-const MIN_COLUMNS_ESTIMATE = 3
+/**
+ * 虚拟块高度 = 固定行数 × 行高；块内卡片数 = 列数 × 行数，保证除最后一块外每块都是「整行满列」，
+ * 避免固定 12 张/块在 8 列下变成 8+4 后下一块另起网格造成「阶梯断行」。
+ */
+const ROWS_PER_CHUNK = 4
+/** 与 grid minmax 下限大致对齐（≈11.25rem），用于估算列数 */
+const MIN_TRACK_PX = 188
+/** 与 rowGap/columnGap 的 clamp 中间值接近 */
+const GAP_PX_ESTIMATE = 20
 /** 卡片略放大后虚拟行高略增 */
 const ESTIMATED_CARD_HEIGHT = 300
 const ESTIMATED_GAP = 22
 
-const estimatedChunkHeight =
-  Math.ceil(CHUNK_SIZE / MIN_COLUMNS_ESTIMATE) * (ESTIMATED_CARD_HEIGHT + ESTIMATED_GAP)
+const rootEl = ref<HTMLElement | null>(null)
+const containerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200)
+
+useResizeObserver(rootEl, (entries) => {
+  const w = entries[0]?.contentRect.width
+  if (w != null && w > 0) {
+    containerWidth.value = w
+  }
+})
+
+const columnCountFallback = computed(() =>
+  Math.max(1, Math.floor((containerWidth.value + GAP_PX_ESTIMATE) / (MIN_TRACK_PX + GAP_PX_ESTIMATE))),
+)
+
+/** 首块（或任意可见块）布局后从 getComputedStyle 读取，与 auto-fill 真实列数对齐 */
+const measuredGridColumns = ref(0)
+
+function parseGridColumnCount(el: HTMLElement): number {
+  const raw = getComputedStyle(el).gridTemplateColumns
+  if (!raw || raw === "none") return 0
+  const trimmed = raw.trim()
+  const repeatMatch = trimmed.match(/repeat\s*\(\s*(\d+)/i)
+  if (repeatMatch) {
+    return Math.max(1, parseInt(repeatMatch[1]!, 10))
+  }
+  const parts = trimmed.split(/\s+/).filter((p) => p.length > 0)
+  return parts.length
+}
+
+function onChunkGridRef(el: unknown) {
+  const node =
+    el && typeof el === "object" && el !== null && "$el" in el
+      ? (el as { $el: unknown }).$el
+      : el
+  if (!node || !(node instanceof HTMLElement)) return
+  void nextTick(() => {
+    const n = parseGridColumnCount(node)
+    if (n > 0 && measuredGridColumns.value !== n) {
+      measuredGridColumns.value = n
+    }
+  })
+}
+
+const effectiveColumnCount = computed(() =>
+  measuredGridColumns.value > 0 ? measuredGridColumns.value : columnCountFallback.value,
+)
+
+const chunkCapacity = computed(() => Math.max(1, effectiveColumnCount.value * ROWS_PER_CHUNK))
+
+const estimatedChunkHeight = ROWS_PER_CHUNK * (ESTIMATED_CARD_HEIGHT + ESTIMATED_GAP)
 
 /** 网格列最小宽度：窄屏不过小、随视口变宽、大屏有上限 */
 const GRID_COL_MIN = "clamp(11.25rem, 9vw + 8.75rem, 15rem)"
@@ -66,11 +120,12 @@ const movieChunks = computed<MovieChunk[]>(() => {
   if (total === 0) {
     return []
   }
+  const size = chunkCapacity.value
   const chunks: MovieChunk[] = []
-  for (let offset = 0; offset < total; offset += CHUNK_SIZE) {
-    const items = movies.slice(offset, offset + CHUNK_SIZE)
+  for (let offset = 0; offset < total; offset += size) {
+    const items = movies.slice(offset, offset + size)
     chunks.push({
-      id: `chunk-${offset}`,
+      id: `chunk-${offset}-${size}`,
       items,
       sizeKey: buildChunkSizeKey(items),
     })
@@ -97,7 +152,7 @@ const getChunk = (value: unknown): MovieChunk =>
 </script>
 
 <template>
-  <div v-if="props.movies.length" class="h-full min-h-0">
+  <div v-if="props.movies.length" ref="rootEl" class="h-full min-h-0">
     <DynamicScroller
       :items="movieChunks"
       key-field="id"
@@ -118,6 +173,7 @@ const getChunk = (value: unknown): MovieChunk =>
           <!-- 列宽 min 用 clamp 响应式；1fr 吃满行；卡片区 max-width 限制单卡上限并居中 -->
           <div
             class="grid w-full"
+            :ref="(el) => onChunkGridRef(el)"
             :style="{
               gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${GRID_COL_MIN}), 1fr))`,
               columnGap: GRID_GAP,

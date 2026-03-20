@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -40,8 +42,13 @@ type App struct {
 	assets  *assets.Service
 	tasks   *tasks.Manager
 
-	appCtx  context.Context
-	writeMu sync.Mutex
+	// organizeLibrary is toggled at runtime (Settings UI / PATCH); initialized from config file on startup.
+	organizeLibrary bool
+	organizeMu      sync.RWMutex
+
+	appCtx   context.Context
+	writeMu  sync.Mutex
+	scanning atomic.Bool
 }
 
 func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *storage.SQLiteStore) (*App, error) {
@@ -51,16 +58,31 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	}
 
 	return &App{
-		cfg:     cfg,
-		logger:  logger,
-		store:   store,
-		library: library.NewService(),
-		scanner: scanner.NewService(logger),
-		scraper: scraperService,
-		assets:  assets.NewService(logger, cfg.CacheDir, time.Duration(cfg.Assets.RequestTimeoutSeconds)*time.Second),
-		tasks:   tasks.NewManager(),
-		appCtx:  ctx,
+		cfg:             cfg,
+		logger:          logger,
+		store:           store,
+		library:         library.NewService(),
+		scanner:         scanner.NewService(logger),
+		scraper:         scraperService,
+		assets:          assets.NewService(logger, cfg.CacheDir, time.Duration(cfg.Assets.RequestTimeoutSeconds)*time.Second),
+		tasks:           tasks.NewManager(),
+		organizeLibrary: cfg.OrganizeLibrary,
+		appCtx:          ctx,
 	}, nil
+}
+
+// OrganizeLibrary returns whether scan/scrape should move files and write NFO/assets into 番号 folders.
+func (a *App) OrganizeLibrary() bool {
+	a.organizeMu.RLock()
+	defer a.organizeMu.RUnlock()
+	return a.organizeLibrary
+}
+
+// SetOrganizeLibrary updates runtime organize flag (HTTP Settings / API).
+func (a *App) SetOrganizeLibrary(v bool) {
+	a.organizeMu.Lock()
+	a.organizeLibrary = v
+	a.organizeMu.Unlock()
 }
 
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
@@ -158,21 +180,17 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 		return a.respondOK(output, command.ID, movie)
 
 	case contracts.CommandSettingsGet:
-		libraryPaths := make([]contracts.LibraryPathDTO, 0, len(a.cfg.LibraryPaths))
-		for index, path := range a.cfg.LibraryPaths {
-			libraryPaths = append(libraryPaths, contracts.LibraryPathDTO{
-				ID:    fmt.Sprintf("library-%d", index+1),
-				Path:  path,
-				Title: fmt.Sprintf("Library path %d", index+1),
-			})
+		libraryPaths, err := a.store.ListLibraryPaths(ctx)
+		if err != nil {
+			return a.respondError(output, command.ID, internalError("failed to list library paths", map[string]any{"cause": err.Error()}))
 		}
 
 		settings := contracts.SettingsDTO{
-			LibraryPaths:        libraryPaths,
-			ScanIntervalSeconds: a.cfg.ScanIntervalSeconds,
+			LibraryPaths: libraryPaths,
 			Player: contracts.PlayerSettingsDTO{
 				HardwareDecode: a.cfg.Player.HardwareDecode,
 			},
+			OrganizeLibrary: a.OrganizeLibrary(),
 		}
 		return a.respondOK(output, command.ID, settings)
 
@@ -182,15 +200,16 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			return a.respondError(output, command.ID, badRequest("invalid scan.start payload", map[string]any{"cause": err.Error()}))
 		}
 
-		paths := request.Paths
-		if len(paths) == 0 {
-			paths = append(paths, a.cfg.LibraryPaths...)
-		}
-
-		task := a.tasks.Create("scan.library", map[string]any{"paths": paths})
-		task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scanning %d library path(s)", len(paths)))
-		if err := a.store.SaveTask(ctx, task); err != nil {
-			return a.respondError(output, command.ID, internalError("failed to persist scan task", map[string]any{"cause": err.Error()}))
+		task, err := a.startLibraryScan(ctx, output, request.Paths)
+		if err != nil {
+			if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+				return a.respondError(output, command.ID, &contracts.AppError{
+					Code:      contracts.ErrorCodeConflict,
+					Message:   "scan already in progress",
+					Retryable: false,
+				})
+			}
+			return a.respondError(output, command.ID, internalError("failed to start scan", map[string]any{"cause": err.Error()}))
 		}
 
 		if err := a.emitEvent(output, contracts.EventTaskStarted, contracts.TaskEventDTO{Task: task}); err != nil {
@@ -199,8 +218,6 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 		if err := a.emitEvent(output, contracts.EventScanStarted, contracts.TaskEventDTO{Task: task}); err != nil {
 			return err
 		}
-
-		go a.runScan(ctx, output, task.TaskID, paths)
 
 		return a.respondOK(output, command.ID, task)
 
@@ -248,7 +265,14 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				progress = int(float64(processed) / float64(total) * 100)
 			}
 
-			task := a.tasks.Progress(taskID, progress, message)
+			patch := map[string]any{
+				"scanTotal":       total,
+				"scanProcessed":   processed,
+				"scanImported":    importedCount,
+				"scanUpdated":     updatedCount,
+				"scanSkipped":     skippedCount,
+			}
+			task := a.tasks.ProgressWithMetadata(taskID, progress, message, patch)
 			if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 				a.logger.Error("failed to persist task progress", zap.Error(saveErr), zap.String("taskId", taskID))
 			}
@@ -272,6 +296,29 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
 				return nil
+			}
+
+			if a.OrganizeLibrary() {
+				newPath, orgErr := library.OrganizeVideoFile(result.Path, result.Number)
+				if orgErr != nil {
+					skippedCount++
+					result.Status = "skipped"
+					if errors.Is(orgErr, library.ErrOrganizeConflict) {
+						result.Reason = "organize_conflict: " + orgErr.Error()
+					} else {
+						result.Reason = "organize_failed: " + orgErr.Error()
+					}
+					if err := a.store.SaveScanItem(ctx, result); err != nil {
+						return err
+					}
+					persistedResults = append(persistedResults, result)
+					if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
+						a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
+					}
+					return nil
+				}
+				result.Path = newPath
+				result.FileName = filepath.Base(newPath)
 			}
 
 			outcome, err := a.store.PersistScanMovie(ctx, result)
@@ -455,10 +502,21 @@ func (a *App) runScrape(parentCtx context.Context, output io.Writer, result cont
 		a.logger.Error("failed to emit metadata saved event", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
 
-	go a.runAssetDownload(parentCtx, output, metadata)
+	if a.OrganizeLibrary() {
+		nfoDir := filepath.Dir(result.Path)
+		if err := library.WriteMovieNFO(nfoDir, metadata); err != nil {
+			a.logger.Warn("failed to write movie.nfo", zap.Error(err), zap.String("taskId", task.TaskID), zap.String("dir", nfoDir))
+		}
+	}
+
+	assetDest := filepath.Join(a.cfg.CacheDir, metadata.MovieID)
+	if a.OrganizeLibrary() {
+		assetDest = filepath.Dir(result.Path)
+	}
+	go a.runAssetDownload(parentCtx, output, metadata, assetDest)
 }
 
-func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, metadata scraper.Metadata) {
+func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, metadata scraper.Metadata, destDir string) {
 	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Assets.TaskTimeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -472,7 +530,7 @@ func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, meta
 	}
 	_ = a.emitEvent(output, contracts.EventTaskStarted, contracts.TaskEventDTO{Task: task})
 
-	downloaded, err := a.assets.DownloadAll(ctx, metadata)
+	downloaded, err := a.assets.DownloadAllTo(ctx, metadata, destDir)
 	if err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeAssetDownload, err.Error())
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
@@ -604,30 +662,88 @@ func internalError(message string, details map[string]any) *contracts.AppError {
 	}
 }
 
-func (a *App) StartScan(_ context.Context, paths []string) (contracts.TaskDTO, error) {
-	if len(paths) == 0 {
-		paths = append(paths, a.cfg.LibraryPaths...)
+func (a *App) resolveScanPaths(ctx context.Context, paths []string) ([]string, error) {
+	if len(paths) > 0 {
+		return paths, nil
 	}
+	dbPaths, err := a.store.ListLibraryPathStrings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(dbPaths) > 0 {
+		return dbPaths, nil
+	}
+	return append([]string(nil), a.cfg.LibraryPaths...), nil
+}
+
+// StartAutoScanLoop runs periodic library scans until ctx is cancelled. No-op if AutoScanIntervalSeconds <= 0.
+func (a *App) StartAutoScanLoop(ctx context.Context) {
+	secs := a.cfg.AutoScanIntervalSeconds
+	if secs <= 0 {
+		return
+	}
+	interval := time.Duration(secs) * time.Second
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				_, err := a.StartScan(context.Background(), nil)
+				if err != nil {
+					if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+						a.logger.Debug("auto scan skipped: scan already in progress")
+						continue
+					}
+					a.logger.Warn("auto scan failed", zap.Error(err))
+				}
+			}
+		}
+	}()
+}
+
+func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error) {
+	return a.startLibraryScan(ctx, io.Discard, paths)
+}
+
+func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []string) (contracts.TaskDTO, error) {
+	if !a.scanning.CompareAndSwap(false, true) {
+		return contracts.TaskDTO{}, contracts.ErrScanAlreadyRunning
+	}
+
+	resolved, err := a.resolveScanPaths(ctx, paths)
+	if err != nil {
+		a.scanning.Store(false)
+		return contracts.TaskDTO{}, err
+	}
+	paths = resolved
 
 	task := a.tasks.Create("scan.library", map[string]any{"paths": paths})
 	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scanning %d library path(s)", len(paths)))
 	if err := a.store.SaveTask(a.appCtx, task); err != nil {
+		a.scanning.Store(false)
 		return contracts.TaskDTO{}, err
 	}
 
-	go a.runScan(a.appCtx, io.Discard, task.TaskID, paths)
+	go func() {
+		defer a.scanning.Store(false)
+		a.runScan(a.appCtx, output, task.TaskID, paths)
+	}()
 
 	return task, nil
 }
 
 func (a *App) HTTPHandler() http.Handler {
 	return server.NewHandler(server.Deps{
-		Cfg:         a.cfg,
-		Logger:      a.logger,
-		Store:       a.store,
-		Library:     a.library,
-		Tasks:       a.tasks,
-		ScanStarter: a,
+		Cfg:                a.cfg,
+		Logger:             a.logger,
+		Store:              a.store,
+		Library:            a.library,
+		Tasks:              a.tasks,
+		ScanStarter:        a,
+		OrganizeLibraryCtl: a,
 	}).Routes()
 }
 

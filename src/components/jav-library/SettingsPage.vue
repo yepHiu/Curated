@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue"
-import { FolderPlus, RefreshCw, ScanSearch } from "lucide-vue-next"
+import { computed, onMounted, ref, watch } from "vue"
+import { HttpClientError } from "@/api/http-client"
+import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
+import { pickLibraryDirectory } from "@/lib/pick-directory"
+import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import { FolderOpen, FolderPlus, Pencil, RefreshCw, ScanSearch, Trash2 } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -10,20 +14,215 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useLibraryService } from "@/services/library-service"
 
 const libraryService = useLibraryService()
-const scanInterval = ref("3600")
+const scanTaskTracker = useScanTaskTracker()
+/** Plain object services don't unwrap nested ComputedRefs in templates */
+const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const hardwareDecode = ref(true)
 const autoScrape = ref(true)
+
+const addPathDialogOpen = ref(false)
+const newPath = ref("")
+const newPathTitle = ref("")
+const addBusy = ref(false)
+const scanPathBusy = ref<string | null>(null)
+const fullScanBusy = ref(false)
+const pathAddError = ref("")
+const directoryHint = ref("")
+const pickDirectoryBusy = ref(false)
+const editingLibraryPathId = ref<string | null>(null)
+const editLibraryTitleDraft = ref("")
+const editTitleBusy = ref(false)
+const editTitleError = ref("")
+const scanFeedbackError = ref("")
+const organizeLibraryBusy = ref(false)
+const organizeLibraryError = ref("")
+
+const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
+
+const canSaveNewPath = computed(() => {
+  const t = newPath.value.trim()
+  return t.length > 0 && isAbsoluteLibraryPath(t)
+})
+
+onMounted(() => {
+  void libraryService.refreshSettings()
+})
+
+watch(addPathDialogOpen, (open) => {
+  if (!open) {
+    newPath.value = ""
+    newPathTitle.value = ""
+    pathAddError.value = ""
+    directoryHint.value = ""
+  }
+})
+
+function clearPathAddError() {
+  pathAddError.value = ""
+}
+
+function startEditLibraryTitle(path: { id: string; title: string }) {
+  editingLibraryPathId.value = path.id
+  editLibraryTitleDraft.value = path.title
+  editTitleError.value = ""
+}
+
+function cancelEditLibraryTitle() {
+  editingLibraryPathId.value = null
+  editLibraryTitleDraft.value = ""
+  editTitleError.value = ""
+}
+
+async function saveLibraryPathTitle(id: string) {
+  editTitleError.value = ""
+  editTitleBusy.value = true
+  try {
+    await libraryService.updateLibraryPathTitle(id, editLibraryTitleDraft.value)
+    cancelEditLibraryTitle()
+  } catch (err) {
+    console.error("[settings] update library title failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      editTitleError.value = err.apiError.message
+    } else {
+      editTitleError.value = "保存失败，请稍后重试。"
+    }
+  } finally {
+    editTitleBusy.value = false
+  }
+}
+
+async function browseForDirectory() {
+  directoryHint.value = ""
+  pickDirectoryBusy.value = true
+  try {
+    const outcome = await pickLibraryDirectory()
+    if (outcome.status === "ok") {
+      newPath.value = outcome.path
+      clearPathAddError()
+      return
+    }
+    if (outcome.status === "hint") {
+      directoryHint.value = outcome.message
+      if (outcome.suggestedTitle && !newPathTitle.value.trim()) {
+        newPathTitle.value = outcome.suggestedTitle
+      }
+      return
+    }
+    if (outcome.status === "unsupported") {
+      directoryHint.value =
+        "当前环境无法打开目录选择器，请手动粘贴绝对路径。集成桌面客户端后可使用系统原生文件夹对话框并自动填入路径。"
+    }
+  } finally {
+    pickDirectoryBusy.value = false
+  }
+}
+
+async function submitAddPath() {
+  pathAddError.value = ""
+  const trimmed = newPath.value.trim()
+  if (!isAbsoluteLibraryPath(trimmed)) {
+    pathAddError.value =
+      "请填写绝对路径：Windows 如 D:\\Media\\JAV；macOS/Linux 如 /Users/you/Videos/JAV；不要用相对路径如 folder\\sub。"
+    return
+  }
+  addBusy.value = true
+  try {
+    await libraryService.addLibraryPath(newPath.value, newPathTitle.value || undefined)
+    newPath.value = ""
+    newPathTitle.value = ""
+    addPathDialogOpen.value = false
+  } catch (err) {
+    console.error("[settings] add library path failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      pathAddError.value = err.apiError.message
+    }
+  } finally {
+    addBusy.value = false
+  }
+}
+
+async function removePath(id: string) {
+  try {
+    await libraryService.removeLibraryPath(id)
+  } catch (err) {
+    console.error("[settings] remove library path failed", err)
+  }
+}
+
+async function rescanPath(path: string) {
+  scanFeedbackError.value = ""
+  scanPathBusy.value = path
+  try {
+    const task = await libraryService.scanLibraryPaths([path])
+    if (task?.taskId) {
+      scanTaskTracker.start(task.taskId)
+    }
+  } catch (err) {
+    console.error("[settings] rescan path failed", err)
+    if (err instanceof HttpClientError && err.status === 409) {
+      scanFeedbackError.value = "已有扫描正在进行，请等待当前扫描结束后再试。"
+    } else if (err instanceof HttpClientError && err.apiError?.message) {
+      scanFeedbackError.value = err.apiError.message
+    } else {
+      scanFeedbackError.value = "扫描启动失败，请稍后重试。"
+    }
+  } finally {
+    scanPathBusy.value = null
+  }
+}
+
+async function onOrganizeLibraryChange(next: boolean) {
+  organizeLibraryError.value = ""
+  organizeLibraryBusy.value = true
+  try {
+    await libraryService.setOrganizeLibrary(next)
+  } catch (err) {
+    console.error("[settings] organize library toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      organizeLibraryError.value = err.apiError.message
+    } else {
+      organizeLibraryError.value = "保存失败，请稍后重试。"
+    }
+  } finally {
+    organizeLibraryBusy.value = false
+  }
+}
+
+async function runFullScan() {
+  scanFeedbackError.value = ""
+  fullScanBusy.value = true
+  try {
+    const task = await libraryService.scanLibraryPaths()
+    if (task?.taskId) {
+      scanTaskTracker.start(task.taskId)
+    }
+  } catch (err) {
+    console.error("[settings] full scan failed", err)
+    if (err instanceof HttpClientError && err.status === 409) {
+      scanFeedbackError.value = "已有扫描正在进行，请等待当前扫描结束后再试。"
+    } else if (err instanceof HttpClientError && err.apiError?.message) {
+      scanFeedbackError.value = err.apiError.message
+    } else {
+      scanFeedbackError.value = "扫描启动失败，请稍后重试。"
+    }
+  } finally {
+    fullScanBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -48,8 +247,14 @@ const autoScrape = ref(true)
       <div class="flex flex-col gap-1">
         <h2 class="text-3xl font-semibold tracking-tight">Library settings</h2>
         <p class="text-sm text-muted-foreground">
-          Paths, scan cadence, playback preferences, and metadata workflows in a centered
-          waterfall layout.
+          存储路径、播放与元数据相关选项；扫描仅通过手动触发（全库或单路径）。
+        </p>
+        <p
+          v-if="scanFeedbackError"
+          class="text-sm text-destructive"
+          role="alert"
+        >
+          {{ scanFeedbackError }}
         </p>
       </div>
     </div>
@@ -68,31 +273,193 @@ const autoScrape = ref(true)
               <div class="flex flex-col gap-1">
                 <p class="font-medium">Library paths</p>
                 <p class="text-sm text-muted-foreground">
-                  Add or rescan folders without leaving this screen.
+                  仅支持<strong class="text-foreground">绝对路径</strong>作为视频来源目录；可添加多个路径。示例：
+                  <span class="font-mono text-xs">D:\Media\JAV</span> 或
+                  <span class="font-mono text-xs">/home/user/Videos</span>。
                 </p>
               </div>
-              <Button class="rounded-2xl">
-                <FolderPlus data-icon="inline-start" />
-                Add path
-              </Button>
+              <Dialog v-model:open="addPathDialogOpen">
+                <DialogTrigger as-child>
+                  <Button type="button" class="rounded-2xl">
+                    <FolderPlus data-icon="inline-start" />
+                    Add path
+                  </Button>
+                </DialogTrigger>
+
+                <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>添加存储目录</DialogTitle>
+                    <DialogDescription>
+                      填写<strong>绝对路径</strong>作为视频来源；可点击「选择文件夹」打开系统目录界面（网页内通常需再复制地址栏路径）。
+                      示例：
+                      <span class="font-mono text-xs">D:\Media\JAV</span> 或
+                      <span class="font-mono text-xs">/home/user/Videos</span>。
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-2">
+                      <label class="text-sm font-medium" for="new-lib-path">绝对路径</label>
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                        <Input
+                          id="new-lib-path"
+                          v-model="newPath"
+                          class="rounded-xl sm:min-w-0 sm:flex-1"
+                          placeholder="D:\Media\JAV\Library"
+                          autocomplete="off"
+                          @input="clearPathAddError"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          class="rounded-2xl sm:shrink-0"
+                          :disabled="pickDirectoryBusy"
+                          @click="browseForDirectory"
+                        >
+                          <FolderOpen data-icon="inline-start" />
+                          {{ pickDirectoryBusy ? "选择中…" : "选择文件夹" }}
+                        </Button>
+                      </div>
+                      <p
+                        v-if="directoryHint"
+                        class="text-sm leading-relaxed text-muted-foreground"
+                      >
+                        {{ directoryHint }}
+                      </p>
+                      <p
+                        v-if="newPath.trim() && !isAbsoluteLibraryPath(newPath)"
+                        class="text-sm text-destructive"
+                      >
+                        当前输入不是绝对路径，请从盘符（Windows）或根目录
+                        <span class="font-mono">/</span>（Unix）开始填写。
+                      </p>
+                      <p v-if="pathAddError" class="text-sm text-destructive">
+                        {{ pathAddError }}
+                      </p>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                      <label class="text-sm font-medium" for="new-lib-title">标题（可选）</label>
+                      <Input
+                        id="new-lib-title"
+                        v-model="newPathTitle"
+                        class="rounded-xl"
+                        placeholder="显示名称"
+                        autocomplete="off"
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <DialogClose as-child>
+                      <Button type="button" variant="outline" class="rounded-2xl">
+                        取消
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="button"
+                      class="rounded-2xl"
+                      :disabled="addBusy || !canSaveNewPath"
+                      @click="submitAddPath"
+                    >
+                      {{ addBusy ? "保存中…" : "保存路径" }}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div class="flex flex-col gap-3">
               <div
-                v-for="path in libraryService.libraryPaths"
+                v-for="path in libraryPathsList"
                 :key="path.id"
                 class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
               >
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex flex-col gap-1">
-                    <p class="font-medium">{{ path.title }}</p>
-                    <p class="text-sm text-muted-foreground">{{ path.path }}</p>
+                <template v-if="editingLibraryPathId === path.id">
+                  <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-1">
+                      <p class="text-xs font-medium text-muted-foreground">路径（只读）</p>
+                      <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                      <label class="text-sm font-medium" :for="`edit-title-${path.id}`">显示标题</label>
+                      <Input
+                        :id="`edit-title-${path.id}`"
+                        v-model="editLibraryTitleDraft"
+                        class="rounded-xl"
+                        placeholder="显示名称"
+                        autocomplete="off"
+                        @keydown.enter.prevent="saveLibraryPathTitle(path.id)"
+                      />
+                      <p class="text-xs text-muted-foreground">
+                        留空并保存将使用路径中的文件夹名作为标题。
+                      </p>
+                      <p v-if="editTitleError" class="text-sm text-destructive">
+                        {{ editTitleError }}
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        class="rounded-2xl"
+                        :disabled="editTitleBusy"
+                        @click="saveLibraryPathTitle(path.id)"
+                      >
+                        {{ editTitleBusy ? "保存中…" : "保存标题" }}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-2xl"
+                        :disabled="editTitleBusy"
+                        @click="cancelEditLibraryTitle"
+                      >
+                        取消
+                      </Button>
+                    </div>
                   </div>
-                  <Button variant="secondary" class="rounded-2xl">
-                    <RefreshCw data-icon="inline-start" />
-                    Rescan
-                  </Button>
-                </div>
+                </template>
+                <template v-else>
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-1 flex-col gap-1">
+                      <p class="font-medium">{{ path.title }}</p>
+                      <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-2xl"
+                        @click="startEditLibraryTitle(path)"
+                      >
+                        <Pencil data-icon="inline-start" />
+                        改标题
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        class="rounded-2xl"
+                        :disabled="scanPathBusy === path.path"
+                        @click="rescanPath(path.path)"
+                      >
+                        <RefreshCw
+                          data-icon="inline-start"
+                          :class="scanPathBusy === path.path ? 'animate-spin' : ''"
+                        />
+                        Rescan
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        class="rounded-2xl"
+                        :aria-label="`Remove ${path.title}`"
+                        @click="removePath(path.id)"
+                      >
+                        <Trash2 class="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </CardContent>
@@ -100,37 +467,33 @@ const autoScrape = ref(true)
       </div>
 
       <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
-            <CardTitle>Scan cadence</CardTitle>
+            <CardTitle>库目录整理</CardTitle>
             <CardDescription>
-              Choose how often the scanner checks watched directories.
+              开启后，扫描识别番号会将视频移入
+              <span class="font-mono text-xs">父目录/番号/番号.扩展名</span>
+              ，并把 NFO、封面与预览图写入同一番号文件夹（会移动磁盘文件，请先备份）。
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4">
-            <Select v-model:model-value="scanInterval">
-              <SelectTrigger class="rounded-2xl bg-card/70">
-                <SelectValue placeholder="Select interval" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem
-                    v-for="interval in libraryService.scanIntervals"
-                    :key="interval.value"
-                    :value="interval.value"
-                  >
-                    {{ interval.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-
-            <div class="rounded-2xl border border-border/70 bg-background/50 p-4">
-              <p class="text-sm text-muted-foreground">Current mode</p>
-              <p class="mt-2 text-sm font-medium">
-                Scanner cadence is configured independently from metadata scraping.
-              </p>
+          <CardContent class="flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4">
+              <div class="flex flex-col gap-1">
+                <p class="font-medium">整理入库（organizeLibrary）</p>
+                <p class="text-sm text-muted-foreground">
+                  关闭时仅更新数据库路径，海报等仍下载到服务端 cache 目录。此处修改在内存中生效，重启 javd
+                  后仍以配置文件为准，除非再次在此打开。
+                </p>
+              </div>
+              <Switch
+                :checked="organizeLibrary"
+                :disabled="organizeLibraryBusy"
+                @update:checked="onOrganizeLibraryChange"
+              />
             </div>
+            <p v-if="organizeLibraryError" class="text-sm text-destructive">
+              {{ organizeLibraryError }}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -196,8 +559,16 @@ const autoScrape = ref(true)
                   Re-index all configured folders and refresh newly discovered files.
                 </p>
               </div>
-              <Button class="rounded-2xl">
-                <ScanSearch data-icon="inline-start" />
+              <Button
+                type="button"
+                class="rounded-2xl"
+                :disabled="fullScanBusy"
+                @click="runFullScan"
+              >
+                <ScanSearch
+                  data-icon="inline-start"
+                  :class="fullScanBusy ? 'animate-pulse' : ''"
+                />
                 Run
               </Button>
             </div>

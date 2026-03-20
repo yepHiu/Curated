@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Component } from "vue"
+import { computed } from "vue"
 import {
   Clock3,
   Heart,
@@ -15,6 +16,12 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
+import {
+  countUniqueTags,
+  formatSidebarCount,
+  isMovieRecentlyAdded,
+} from "@/lib/library-stats"
+import { useLibraryService } from "@/services/library-service"
 
 interface NavigationItem {
   label: string
@@ -24,13 +31,22 @@ interface NavigationItem {
 }
 
 const route = useRoute()
+const libraryService = useLibraryService()
 
-const browseItems: NavigationItem[] = [
-  { label: "All Movies", page: "library", icon: LibraryBig, hint: "2.1k" },
-  { label: "Favorites", page: "favorites", icon: Heart, hint: "246" },
-  { label: "Recently Added", page: "recent", icon: Clock3, hint: "48" },
-  { label: "Tags", page: "tags", icon: Tags, hint: "132" },
-]
+const browseItems = computed((): NavigationItem[] => {
+  const movies = libraryService.movies.value
+  const total = movies.length
+  const favorites = movies.filter((m) => m.isFavorite).length
+  const recent = movies.filter((m) => isMovieRecentlyAdded(m.addedAt)).length
+  const tagCount = countUniqueTags(movies)
+
+  return [
+    { label: "All Movies", page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
+    { label: "Favorites", page: "favorites", icon: Heart, hint: formatSidebarCount(favorites) },
+    { label: "Recently Added", page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
+    { label: "Tags", page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+  ]
+})
 
 const isActive = (page: AppPage) => route.name === page
 

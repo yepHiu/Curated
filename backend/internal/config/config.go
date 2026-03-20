@@ -12,9 +12,14 @@ type Config struct {
 	HttpAddr            string        `json:"httpAddr"`
 	DatabasePath        string        `json:"databasePath"`
 	CacheDir            string        `json:"cacheDir"`
-	LibraryPaths        []string      `json:"libraryPaths"`
-	ScanIntervalSeconds int           `json:"scanIntervalSeconds"`
-	Tasks               TaskConfig    `json:"tasks"`
+	LibraryPaths []string `json:"libraryPaths"`
+	// ScanIntervalSeconds is deprecated: kept in JSON for backward compatibility with older config files; ignored (no scheduled scan).
+	ScanIntervalSeconds int `json:"scanIntervalSeconds,omitempty"`
+	// OrganizeLibrary moves/renames video files into {parent}/{番号}/{番号}.ext and stores NFO/assets beside the video when enabled.
+	OrganizeLibrary bool `json:"organizeLibrary"`
+	// AutoScanIntervalSeconds runs a full library scan on this interval; 0 disables (manual POST /api/scans only).
+	AutoScanIntervalSeconds int `json:"autoScanIntervalSeconds"`
+	Tasks               TaskConfig `json:"tasks"`
 	Scraper             ScraperConfig `json:"scraper"`
 	Assets              AssetConfig   `json:"assets"`
 	Player              PlayerConfig  `json:"player"`
@@ -44,8 +49,7 @@ func Default() Config {
 		HttpAddr:            ":8080",
 		DatabasePath:        defaultDatabasePath(),
 		CacheDir:            defaultCacheDir(),
-		LibraryPaths:        defaultLibraryPaths(),
-		ScanIntervalSeconds: 3600,
+		LibraryPaths: defaultLibraryPaths(),
 		Tasks: TaskConfig{
 			ScanTimeoutSeconds: 600,
 		},

@@ -1,10 +1,7 @@
 import { computed, ref } from "vue"
-import type {
-  LibrarySetting,
-  LibraryStat,
-  ScanIntervalOption,
-} from "@/domain/library/types"
+import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const libraryStats: readonly LibraryStat[] = [
@@ -25,7 +22,9 @@ const libraryStats: readonly LibraryStat[] = [
   },
 ]
 
-const libraryPaths: readonly LibrarySetting[] = [
+const organizeLibraryMock = ref(false)
+
+const libraryPathsState = ref<LibrarySetting[]>([
   {
     id: "library-a",
     path: "D:/Media/JAV/Main",
@@ -41,7 +40,7 @@ const libraryPaths: readonly LibrarySetting[] = [
     path: "F:/Offline/Collections",
     title: "Cold storage",
   },
-]
+])
 
 const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
   {
@@ -174,18 +173,49 @@ const buildMovie = (index: number): Movie => {
 
 const moviesState = ref<Movie[]>(Array.from({ length: 180 }, (_, index) => buildMovie(index)))
 
-const scanIntervals: readonly ScanIntervalOption[] = [
-  { label: "Every 30 minutes", value: "1800" },
-  { label: "Every hour", value: "3600" },
-  { label: "Every 6 hours", value: "21600" },
-  { label: "Daily", value: "86400" },
-]
-
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value),
   libraryStats,
-  libraryPaths,
-  scanIntervals,
+  libraryPaths: computed(() => libraryPathsState.value),
+  organizeLibrary: computed(() => organizeLibraryMock.value),
+
+  async refreshSettings() {
+    // Mock: paths are in-memory only; no remote settings.
+  },
+
+  async setOrganizeLibrary(value: boolean) {
+    organizeLibraryMock.value = value
+  },
+
+  async addLibraryPath(path: string, title?: string) {
+    const trimmed = path.trim()
+    if (!trimmed) return
+    if (!isAbsoluteLibraryPath(trimmed)) {
+      throw new Error("library path must be an absolute path")
+    }
+    const id = `mock-${Date.now()}`
+    libraryPathsState.value = [
+      ...libraryPathsState.value,
+      { id, path: trimmed, title: (title?.trim() || trimmed) },
+    ]
+  },
+
+  async updateLibraryPathTitle(id: string, title: string) {
+    const t = title.trim()
+    libraryPathsState.value = libraryPathsState.value.map((p) =>
+      p.id === id ? { ...p, title: t || p.title } : p,
+    )
+  },
+
+  async removeLibraryPath(id: string) {
+    libraryPathsState.value = libraryPathsState.value.filter((p) => p.id !== id)
+  },
+
+  async scanLibraryPaths() {
+    // Mock: no backend scan.
+    return null
+  },
+
   getMovieById(movieId) {
     return moviesState.value.find((movie) => movie.id === movieId)
   },
@@ -206,5 +236,9 @@ export const mockLibraryService: LibraryService = {
     )
 
     return moviesState.value.find((movie) => movie.id === movieId)
+  },
+
+  async deleteMovie(movieId: string) {
+    moviesState.value = moviesState.value.filter((movie) => movie.id !== movieId)
   },
 }

@@ -1,6 +1,12 @@
 package contracts
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
+
+// ErrScanAlreadyRunning is returned when a library scan is requested while another is in progress.
+var ErrScanAlreadyRunning = errors.New("scan already running")
 
 type Command struct {
 	ID      string          `json:"id"`
@@ -116,10 +122,26 @@ type LibraryPathDTO struct {
 	Title string `json:"title"`
 }
 
+// AddLibraryPathRequest is the body for POST /api/library/paths.
+type AddLibraryPathRequest struct {
+	Path  string `json:"path"`
+	Title string `json:"title,omitempty"`
+}
+
+// UpdateLibraryPathRequest is the body for PATCH /api/library/paths/{id}.
+type UpdateLibraryPathRequest struct {
+	Title string `json:"title"`
+}
+
 type SettingsDTO struct {
-	LibraryPaths        []LibraryPathDTO  `json:"libraryPaths"`
-	ScanIntervalSeconds int               `json:"scanIntervalSeconds"`
-	Player              PlayerSettingsDTO `json:"player"`
+	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
+	Player          PlayerSettingsDTO `json:"player"`
+	OrganizeLibrary bool              `json:"organizeLibrary"`
+}
+
+// PatchSettingsRequest is the body for PATCH /api/settings (partial update).
+type PatchSettingsRequest struct {
+	OrganizeLibrary *bool `json:"organizeLibrary,omitempty"`
 }
 
 type PlayerSettingsDTO struct {
@@ -184,4 +206,5 @@ const (
 	ErrorCodeScraperInit   = "SCRAPER_INIT_FAILED"
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
+	ErrorCodeConflict      = "COMMON_CONFLICT"
 )

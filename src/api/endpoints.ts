@@ -1,9 +1,13 @@
 import { httpClient } from "./http-client"
 import type {
+  AddLibraryPathBody,
   HealthDTO,
+  LibraryPathDTO,
+  UpdateLibraryPathBody,
   ListMoviesParams,
   MovieDetailDTO,
   MoviesPageDTO,
+  PatchSettingsBody,
   SettingsDTO,
   StartScanBody,
   TaskDTO,
@@ -22,8 +26,28 @@ export const api = {
     return httpClient.get<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`)
   },
 
+  deleteMovie(movieId: string): Promise<void> {
+    return httpClient.delete(`/library/movies/${encodeURIComponent(movieId)}`)
+  },
+
   getSettings(): Promise<SettingsDTO> {
     return httpClient.get<SettingsDTO>("/settings")
+  },
+
+  patchSettings(body: PatchSettingsBody): Promise<SettingsDTO> {
+    return httpClient.patch<SettingsDTO>("/settings", body)
+  },
+
+  addLibraryPath(body: AddLibraryPathBody): Promise<LibraryPathDTO> {
+    return httpClient.post<LibraryPathDTO>("/library/paths", body)
+  },
+
+  deleteLibraryPath(id: string): Promise<void> {
+    return httpClient.delete(`/library/paths/${encodeURIComponent(id)}`)
+  },
+
+  updateLibraryPathTitle(id: string, body: UpdateLibraryPathBody): Promise<LibraryPathDTO> {
+    return httpClient.patch<LibraryPathDTO>(`/library/paths/${encodeURIComponent(id)}`, body)
   },
 
   startScan(body?: StartScanBody): Promise<TaskDTO> {

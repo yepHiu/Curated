@@ -25,6 +25,7 @@ const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
+  deleteMovie: [movieId: string]
 }>()
 </script>
 
@@ -34,6 +35,7 @@ const emit = defineEmits<{
       :movie="movie"
       @open-player="emit('openPlayer', $event)"
       @toggle-favorite="emit('toggleFavorite', $event)"
+      @delete-movie="emit('deleteMovie', $event)"
     />
 
     <Card class="rounded-3xl border-border/70 bg-card/85">

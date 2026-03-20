@@ -4,6 +4,7 @@ import { watchDebounced } from "@vueuse/core"
 import { LayoutDashboard, Search } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
+import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -143,5 +144,7 @@ watchDebounced(
         </section>
       </div>
     </div>
+
+    <ScanProgressDock />
   </div>
 </template>
