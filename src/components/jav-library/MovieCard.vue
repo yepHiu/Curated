@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Toggle } from "@/components/ui/toggle"
+import MediaStill from "@/components/jav-library/MediaStill.vue"
 
 const props = defineProps<{
   movie: Movie
@@ -26,6 +27,9 @@ const emit = defineEmits<{
 
 const visibleTags = computed(() => props.movie.tags.slice(0, 2))
 
+/** 列表优先用缩略图，减轻带宽；无则回落封面 */
+const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl || "")
+
 const handleOpenDetails = () => {
   emit("select", props.movie.id)
   emit("openDetails", props.movie.id)
@@ -38,7 +42,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
 
 <template>
   <Card
-    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-lg shadow-black/5 transition-transform duration-200 hover:-translate-y-1"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
   >
     <button
       type="button"
@@ -47,11 +51,22 @@ const handleFavoriteChange = (nextValue: boolean) => {
     >
       <div class="p-2.5 pb-0">
         <div
-          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-gradient-to-br p-2.5 aspect-[358/537]"
-          :class="movie.tone"
+          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 aspect-[358/537]"
+          :class="posterSrc ? 'bg-muted/30' : `bg-gradient-to-br p-2.5 ${movie.tone}`"
         >
+          <MediaStill
+            v-if="posterSrc"
+            :src="posterSrc"
+            :alt="movie.code"
+            class="absolute inset-0 z-0"
+          />
+          <div
+            class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/50 via-transparent to-black/25"
+            aria-hidden="true"
+          />
+
           <Badge
-            class="h-5 w-fit rounded-full bg-background/80 px-1.5 text-[10px] text-foreground hover:bg-background/80"
+            class="relative z-[2] m-2.5 h-5 w-fit rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
           >
             {{ movie.code }}
           </Badge>
@@ -61,7 +76,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
             :pressed="props.movie.isFavorite"
             variant="outline"
             size="sm"
-            class="absolute right-2.5 bottom-2.5 z-10 rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            class="absolute right-2.5 bottom-2.5 z-[2] rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             @update:pressed="handleFavoriteChange(Boolean($event))"
             @click.stop
           >

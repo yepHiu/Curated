@@ -21,7 +21,7 @@ const libraryMode = computed<LibraryMode>(() => {
   return isLibraryRouteName(route.name) ? route.name : "library"
 })
 
-const libraryMovies = computed(() => [...libraryService.movies.value])
+const libraryMovies = computed(() => libraryService.movies.value)
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
 const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))

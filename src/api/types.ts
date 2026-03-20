@@ -32,10 +32,14 @@ export interface MovieListItemDTO {
   location: string
   resolution: string
   year: number
+  coverUrl?: string
+  thumbUrl?: string
 }
 
 export interface MovieDetailDTO extends MovieListItemDTO {
   summary: string
+  previewImages?: string[]
+  previewVideoUrl?: string
 }
 
 export interface MoviesPageDTO {

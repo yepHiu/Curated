@@ -162,6 +162,13 @@ const buildMovie = (index: number): Movie => {
     location: `${storage}/${prefix}-${serial}.${index % 2 === 0 ? "mkv" : "mp4"}`,
     year: seed.year + yearOffset,
     tags: [...seed.tags, index % 6 === 0 ? "Trending" : "Catalog"],
+    thumbUrl: `https://picsum.photos/seed/jav-thumb-${prefix}-${serial}/280/400`,
+    coverUrl: `https://picsum.photos/seed/jav-cover-${prefix}-${serial}/560/840`,
+    previewImages: [
+      `https://picsum.photos/seed/jav-p1-${prefix}-${serial}/640/360`,
+      `https://picsum.photos/seed/jav-p2-${prefix}-${serial}/640/360`,
+      `https://picsum.photos/seed/jav-p3-${prefix}-${serial}/640/360`,
+    ],
   }
 }
 

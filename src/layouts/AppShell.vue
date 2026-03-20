@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
+import { watchDebounced } from "@vueuse/core"
 import { LayoutDashboard, Search } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
@@ -63,21 +64,43 @@ const headerBackLabel = computed(() =>
   isPlayerRoute.value && currentMovieId.value ? "Back to details" : "Back to library",
 )
 
-const headerSearchValue = computed({
-  get: () => getLibrarySearchQuery(route.query),
-  set: (value: string) => {
+/** 输入即时更新；同步到 URL 防抖，避免每键一次 router.replace 导致整库重算/重绘 */
+const searchDraft = ref("")
+
+watch(
+  [() => route.name, () => route.query.q],
+  () => {
     if (!isLibraryRoute.value) {
       return
     }
+    const next = getLibrarySearchQuery(route.query)
+    if (next !== searchDraft.value) {
+      searchDraft.value = next
+    }
+  },
+  { immediate: true },
+)
 
+watchDebounced(
+  searchDraft,
+  (value) => {
+    if (!isLibraryRoute.value) {
+      return
+    }
+    const normalized = value.trim()
+    const current = getLibrarySearchQuery(route.query)
+    if (normalized === current.trim()) {
+      return
+    }
     void router.replace({
       name: route.name ?? "library",
       query: mergeLibraryQuery(route.query, {
-        q: value || undefined,
+        q: normalized || undefined,
       }),
     })
   },
-})
+  { debounce: 280 },
+)
 </script>
 
 <template>
@@ -87,7 +110,7 @@ const headerSearchValue = computed({
         <AppSidebar />
 
         <section
-          class="flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/85 shadow-2xl shadow-black/10 backdrop-blur"
+          class="flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/92 shadow-xl shadow-black/8"
         >
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 lg:px-5">
             <div class="flex flex-wrap items-center gap-2">
@@ -106,7 +129,7 @@ const headerSearchValue = computed({
               >
                 <Search class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  v-model="headerSearchValue"
+                  v-model="searchDraft"
                   class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
                   placeholder="Search by code, title, actor, or tag"
                 />

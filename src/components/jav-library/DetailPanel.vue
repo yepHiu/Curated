@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { Heart, PlayCircle, Star } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Toggle } from "@/components/ui/toggle"
+import MediaStill from "@/components/jav-library/MediaStill.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -41,6 +43,9 @@ const actorInitials = (name: string) =>
 const handleFavoriteChange = (nextValue: boolean) => {
   emit("toggleFavorite", { movieId: props.movie.id, nextValue })
 }
+
+/** 详情页优先展示封面，其次缩略图 */
+const posterSrc = computed(() => props.movie.coverUrl || props.movie.thumbUrl || "")
 </script>
 
 <template>
@@ -50,16 +55,42 @@ const handleFavoriteChange = (nextValue: boolean) => {
       :class="
         props.compact
           ? 'lg:grid-cols-[minmax(11rem,12.5rem)_minmax(0,1fr)]'
-          : 'lg:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)]'
+          : 'lg:grid-cols-[minmax(18rem,30rem)_minmax(0,1fr)] xl:grid-cols-[minmax(20rem,34rem)_minmax(0,1fr)]'
       "
     >
-      <div class="mx-auto w-full" :class="props.compact ? 'max-w-[12.5rem]' : 'max-w-[15rem]'">
+      <div
+        class="mx-auto w-full shrink-0"
+        :class="
+          props.compact
+            ? 'max-w-[12.5rem]'
+            : 'w-full max-w-[min(100%,30rem)] xl:max-w-[min(100%,34rem)]'
+        "
+      >
+        <!-- 不锁死竖版比例：横版整碟封套 / 竖版封面都由图片 intrinsic 高度决定，避免上下黑边 -->
         <div
-          class="relative aspect-[358/537] overflow-hidden rounded-[1.5rem] border border-border/60 bg-gradient-to-br p-4"
-          :class="movie.tone"
+          class="relative isolate w-full overflow-hidden rounded-[1.5rem] border border-border/60"
+          :class="
+            posterSrc
+              ? 'bg-zinc-950/90'
+              : `aspect-[358/537] min-h-[14rem] bg-gradient-to-br p-4 ${movie.tone}`
+          "
         >
-          <div class="flex h-full flex-col justify-between">
-            <Badge class="w-fit rounded-full bg-background/80 text-foreground hover:bg-background/80">
+          <MediaStill
+            v-if="posterSrc"
+            :src="posterSrc"
+            :alt="`${movie.code} cover`"
+            layout="intrinsic"
+            class="relative z-0"
+          />
+          <div
+            class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/55 via-transparent to-black/30"
+            aria-hidden="true"
+          />
+
+          <div class="pointer-events-none absolute inset-x-0 top-0 z-[2] flex justify-start p-4">
+            <Badge
+              class="pointer-events-auto w-fit rounded-full border border-border/40 bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background/90"
+            >
               {{ movie.code }}
             </Badge>
           </div>
@@ -68,7 +99,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
             :pressed="props.movie.isFavorite"
             variant="outline"
             size="sm"
-            class="absolute right-2.5 bottom-2.5 z-10 rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            class="absolute right-2.5 bottom-2.5 z-[2] rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             @update:pressed="handleFavoriteChange(Boolean($event))"
           >
             <Heart />

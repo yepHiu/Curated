@@ -9,18 +9,21 @@ import (
 )
 
 type movieRow struct {
-	ID             string
-	Title          string
-	Code           string
-	Studio         string
-	Summary        string
-	RuntimeMinutes int
-	Rating         float64
-	IsFavorite     bool
-	AddedAt        string
-	Location       string
-	Resolution     string
-	Year           int
+	ID              string
+	Title           string
+	Code            string
+	Studio          string
+	Summary         string
+	RuntimeMinutes  int
+	Rating          float64
+	IsFavorite      bool
+	AddedAt         string
+	Location        string
+	Resolution      string
+	Year            int
+	CoverURL        string
+	ThumbURL        string
+	PreviewVideoURL string
 }
 
 func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMoviesRequest) (contracts.MoviesPageDTO, error) {
@@ -45,7 +48,8 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	args = append(args, limit, offset)
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year
+		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year,
+			cover_url, thumb_url, preview_video_url
 		FROM movies `+whereClause+`
 		ORDER BY added_at DESC, id ASC
 		LIMIT ? OFFSET ?`,
@@ -74,6 +78,9 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			&row.Location,
 			&row.Resolution,
 			&row.Year,
+			&row.CoverURL,
+			&row.ThumbURL,
+			&row.PreviewVideoURL,
 		); err != nil {
 			return contracts.MoviesPageDTO{}, err
 		}
@@ -110,6 +117,8 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			Location:       row.Location,
 			Resolution:     row.Resolution,
 			Year:           row.Year,
+			CoverURL:       row.CoverURL,
+			ThumbURL:       row.ThumbURL,
 		})
 	}
 
@@ -125,7 +134,8 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	var row movieRow
 	err := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year
+		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year,
+			cover_url, thumb_url, preview_video_url
 		FROM movies WHERE id = ?`,
 		movieID,
 	).Scan(
@@ -141,6 +151,9 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		&row.Location,
 		&row.Resolution,
 		&row.Year,
+		&row.CoverURL,
+		&row.ThumbURL,
+		&row.PreviewVideoURL,
 	)
 	if err != nil {
 		return contracts.MovieDetailDTO{}, err
@@ -151,6 +164,11 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		return contracts.MovieDetailDTO{}, err
 	}
 	tagsByMovie, err := s.lookupTags(ctx, []string{movieID})
+	if err != nil {
+		return contracts.MovieDetailDTO{}, err
+	}
+
+	previewsByMovie, err := s.lookupPreviewImageURLs(ctx, []string{movieID})
 	if err != nil {
 		return contracts.MovieDetailDTO{}, err
 	}
@@ -170,8 +188,12 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 			Location:       row.Location,
 			Resolution:     row.Resolution,
 			Year:           row.Year,
+			CoverURL:       row.CoverURL,
+			ThumbURL:       row.ThumbURL,
 		},
-		Summary: row.Summary,
+		Summary:         row.Summary,
+		PreviewImages:   previewsByMovie[movieID],
+		PreviewVideoURL: row.PreviewVideoURL,
 	}, nil
 }
 
@@ -219,6 +241,42 @@ func (s *SQLiteStore) lookupTags(ctx context.Context, movieIDs []string) (map[st
 		WHERE mt.movie_id IN (%s)
 		ORDER BY t.name ASC`,
 	)
+}
+
+// lookupPreviewImageURLs returns ordered sample/preview image source URLs per movie (from media_assets).
+func (s *SQLiteStore) lookupPreviewImageURLs(ctx context.Context, movieIDs []string) (map[string][]string, error) {
+	result := make(map[string][]string, len(movieIDs))
+	if len(movieIDs) == 0 {
+		return result, nil
+	}
+
+	placeholders := make([]string, 0, len(movieIDs))
+	args := make([]any, 0, len(movieIDs))
+	for _, movieID := range movieIDs {
+		placeholders = append(placeholders, "?")
+		args = append(args, movieID)
+	}
+
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+		`SELECT movie_id, source_url FROM media_assets
+		WHERE movie_id IN (%s) AND type = 'preview_image' AND source_url != ''
+		ORDER BY movie_id ASC, id ASC`,
+		strings.Join(placeholders, ", "),
+	), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var movieID, url string
+		if err := rows.Scan(&movieID, &url); err != nil {
+			return nil, err
+		}
+		result[movieID] = append(result[movieID], url)
+	}
+
+	return result, rows.Err()
 }
 
 func (s *SQLiteStore) lookupStringRelations(ctx context.Context, movieIDs []string, queryTemplate string) (map[string][]string, error) {

@@ -92,11 +92,15 @@ type MovieListItemDTO struct {
 	Location       string   `json:"location"`
 	Resolution     string   `json:"resolution"`
 	Year           int      `json:"year"`
+	CoverURL       string   `json:"coverUrl,omitempty"`
+	ThumbURL       string   `json:"thumbUrl,omitempty"`
 }
 
 type MovieDetailDTO struct {
 	MovieListItemDTO
-	Summary string `json:"summary"`
+	Summary         string   `json:"summary"`
+	PreviewImages   []string `json:"previewImages,omitempty"`
+	PreviewVideoURL string   `json:"previewVideoUrl,omitempty"`
 }
 
 type MoviesPageDTO struct {

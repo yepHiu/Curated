@@ -15,8 +15,8 @@ import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vu
 
 const props = defineProps<{
   mode: LibraryMode
-  allMovies: Movie[]
-  visibleMovies: Movie[]
+  allMovies: readonly Movie[]
+  visibleMovies: readonly Movie[]
   selectedMovie?: Movie
   activeTab: LibraryTab
 }>()

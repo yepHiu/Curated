@@ -46,10 +46,17 @@ export function mapMovieListItem(dto: MovieListItemDTO): Movie {
     summary: "",
     tone: TONE_POOL[hash % TONE_POOL.length],
     coverClass: COVER_CLASS_POOL[hash % COVER_CLASS_POOL.length],
+    coverUrl: dto.coverUrl,
+    thumbUrl: dto.thumbUrl,
   }
 }
 
 export function mapMovieDetail(dto: MovieDetailDTO): Movie {
   const base = mapMovieListItem(dto)
-  return { ...base, summary: dto.summary ?? "" }
+  return {
+    ...base,
+    summary: dto.summary ?? "",
+    previewImages: dto.previewImages ?? [],
+    previewVideoUrl: dto.previewVideoUrl,
+  }
 }

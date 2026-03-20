@@ -187,6 +187,15 @@ func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 		movie.Actors = append([]string{}, metadata.Actors...)
 		movie.Tags = append([]string{}, metadata.Tags...)
 		movie.Summary = coalesceSummary(metadata.Summary)
+		if metadata.CoverURL != "" {
+			movie.CoverURL = metadata.CoverURL
+		}
+		if metadata.ThumbURL != "" {
+			movie.ThumbURL = metadata.ThumbURL
+		}
+		if len(metadata.PreviewImages) > 0 {
+			movie.PreviewImages = append([]string{}, metadata.PreviewImages...)
+		}
 		s.movies[index] = movie
 		return
 	}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import type { Movie } from "@/domain/movie/types"
 import {
   Card,
@@ -9,11 +10,15 @@ import {
 } from "@/components/ui/card"
 import DetailPanel from "@/components/jav-library/DetailPanel.vue"
 import MovieGrid from "@/components/jav-library/MovieGrid.vue"
+import MediaStill from "@/components/jav-library/MediaStill.vue"
 
-defineProps<{
+const props = defineProps<{
   movie: Movie
   relatedMovies: Movie[]
 }>()
+
+const previewImages = computed(() => props.movie.previewImages?.slice(0, 18) ?? [])
+const hasPreviews = computed(() => previewImages.value.length > 0)
 
 const emit = defineEmits<{
   select: [movieId: string]
@@ -35,15 +40,34 @@ const emit = defineEmits<{
       <CardHeader>
         <CardTitle>Preview gallery</CardTitle>
         <CardDescription>
-          Placeholder surfaces for poster, thumb strip, and future frame captures.
+          来自元数据刮削的样本图；若源站限制外链，图片可能无法显示（可后续接后端代理）。
         </CardDescription>
       </CardHeader>
-      <CardContent class="grid max-w-[52rem] gap-4 md:grid-cols-3">
+      <CardContent
+        v-if="hasPreviews"
+        class="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        <div
+          v-for="(url, index) in previewImages"
+          :key="`${url}-${index}`"
+          class="relative aspect-[16/9] overflow-hidden rounded-[1.25rem] border border-border/70 bg-muted/30"
+        >
+          <MediaStill
+            :src="url"
+            :alt="`${movie.code} sample ${index + 1}`"
+            class="absolute inset-0 z-0"
+          />
+        </div>
+      </CardContent>
+      <CardContent v-else class="grid w-full gap-4 sm:grid-cols-3">
         <div
           v-for="index in 3"
           :key="index"
-          class="aspect-[16/9] rounded-[1.25rem] border border-border/70 bg-gradient-to-br from-primary/20 via-accent/40 to-card"
+          class="aspect-[16/9] rounded-[1.25rem] border border-dashed border-border/70 bg-muted/20"
         />
+        <p class="col-span-full text-sm text-muted-foreground">
+          当前条目没有样本图 URL（例如仅刮削到文本、或提供商未返回预览图）。
+        </p>
       </CardContent>
     </Card>
 
