@@ -354,6 +354,7 @@ interface AppErrorDto {
 - `GET /api/health`
 - `GET /api/library/movies`
 - `GET /api/library/movies/:movieId`
+- `PATCH /api/library/movies/:movieId`（`isFavorite`、`rating`：用户评分 0–5；`rating: null` 清除 `user_rating`）
 - `GET /api/settings`
 - `POST /api/scans`
 - `GET /api/tasks/:taskId`
@@ -363,6 +364,7 @@ interface AppErrorDto {
 - `GET /api/health` -> `system.health`
 - `GET /api/library/movies` -> `library.list`
 - `GET /api/library/movies/:movieId` -> `library.detail`
+- `PATCH /api/library/movies/:movieId` -> `library.update`（收藏与用户评分；列表/详情中 `rating` 为有效分 = `COALESCE(user_rating, metadata_rating)`）
 - `GET /api/settings` -> `settings.get`
 - `POST /api/scans` -> `scan.start`
 - `GET /api/tasks/:taskId` -> `scan.status`
@@ -438,15 +440,15 @@ Web 层不必强行暴露 stdio 命令壳，但建议保持统一语义：
 
 ### 第三优先级：写操作命令
 
-当前后端代码未完整实现，但建议优先排期：
+部分已落地（HTTP），其余仍建议排期：
 
-1. `library.update`
+1. `library.update`（Web：**`PATCH /api/library/movies/{id}`** 已实现 `isFavorite` 与用户评分 `rating`；SQLite 字段 `user_rating` 与刮削写入的 `rating` 元数据分离）
 2. `settings.update`
 
-`library.update` 最少应支持：
+`library.update` 仍待扩展的能力：
 
-- `toggleFavorite`
-- `rateMovie`
+- ~~`toggleFavorite`~~（已由 PATCH `isFavorite` 覆盖）
+- ~~`rateMovie`~~（已由 PATCH `rating` / `rating: null` 覆盖）
 - `addUserTag`
 - `removeUserTag`
 
@@ -458,8 +460,8 @@ Web 层不必强行暴露 stdio 命令壳，但建议保持统一语义：
 
 目标：
 
-- 收藏不再只改前端内存
-- 设置开关不再只是本地 `ref`
+- 收藏与用户评分持久化（Web：`libraryService.patchMovie` / `toggleFavorite` 已对接 PATCH）
+- 设置开关不再只是本地 `ref`（`organizeLibrary` 等已另有 PATCH）
 
 ### 第四优先级：播放器命令
 

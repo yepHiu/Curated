@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -15,7 +16,8 @@ type movieRow struct {
 	Studio          string
 	Summary         string
 	RuntimeMinutes  int
-	Rating          float64
+	MetadataRating  float64
+	UserRating      sql.NullFloat64
 	IsFavorite      bool
 	AddedAt         string
 	Location        string
@@ -48,7 +50,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	args = append(args, limit, offset)
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year,
+		`SELECT id, title, code, studio, summary, runtime_minutes, rating, user_rating, is_favorite, added_at, location, resolution, year,
 			cover_url, thumb_url, preview_video_url
 		FROM movies `+whereClause+`
 		ORDER BY added_at DESC, id ASC
@@ -72,7 +74,8 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			&row.Studio,
 			&row.Summary,
 			&row.RuntimeMinutes,
-			&row.Rating,
+			&row.MetadataRating,
+			&row.UserRating,
 			&row.IsFavorite,
 			&row.AddedAt,
 			&row.Location,
@@ -111,7 +114,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			Actors:         actorsByMovie[row.ID],
 			Tags:           tagsByMovie[row.ID],
 			RuntimeMinutes: row.RuntimeMinutes,
-			Rating:         row.Rating,
+			Rating:         effectiveRating(row.MetadataRating, row.UserRating),
 			IsFavorite:     row.IsFavorite,
 			AddedAt:        row.AddedAt,
 			Location:       row.Location,
@@ -134,7 +137,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	var row movieRow
 	err := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year,
+		`SELECT id, title, code, studio, summary, runtime_minutes, rating, user_rating, is_favorite, added_at, location, resolution, year,
 			cover_url, thumb_url, preview_video_url
 		FROM movies WHERE id = ?`,
 		movieID,
@@ -145,7 +148,8 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		&row.Studio,
 		&row.Summary,
 		&row.RuntimeMinutes,
-		&row.Rating,
+		&row.MetadataRating,
+		&row.UserRating,
 		&row.IsFavorite,
 		&row.AddedAt,
 		&row.Location,
@@ -182,7 +186,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 			Actors:         actorsByMovie[row.ID],
 			Tags:           tagsByMovie[row.ID],
 			RuntimeMinutes: row.RuntimeMinutes,
-			Rating:         row.Rating,
+			Rating:         effectiveRating(row.MetadataRating, row.UserRating),
 			IsFavorite:     row.IsFavorite,
 			AddedAt:        row.AddedAt,
 			Location:       row.Location,
@@ -191,9 +195,11 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 			CoverURL:       row.CoverURL,
 			ThumbURL:       row.ThumbURL,
 		},
-		Summary:         row.Summary,
-		PreviewImages:   previewsByMovie[movieID],
-		PreviewVideoURL: row.PreviewVideoURL,
+		Summary:          row.Summary,
+		PreviewImages:    previewsByMovie[movieID],
+		PreviewVideoURL:  row.PreviewVideoURL,
+		MetadataRating:   row.MetadataRating,
+		UserRating:       userRatingPtr(row.UserRating),
 	}, nil
 }
 

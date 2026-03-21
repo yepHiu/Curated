@@ -38,6 +38,7 @@ const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
+  updateUserRating: [payload: { movieId: string; value: number | null }]
   deleteMovie: [movieId: string]
   refreshMetadata: [movieId: string]
 }>()
@@ -50,6 +51,7 @@ const emit = defineEmits<{
       :metadata-refresh-busy="props.metadataRefreshBusy"
       @open-player="emit('openPlayer', $event)"
       @toggle-favorite="emit('toggleFavorite', $event)"
+      @update-user-rating="emit('updateUserRating', $event)"
       @delete-movie="emit('deleteMovie', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"
     />

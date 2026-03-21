@@ -10,6 +10,8 @@ alwaysApply: true
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
 - **后端**：`backend` 目录 `go run ./cmd/javd`，默认 **:8080**。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
+- **Mock 收藏/评分**：未启用 Web API 时数据在内存；收藏与用户评分会通过 **`localStorage`（`jav-library-movie-prefs`）** 在整页刷新后恢复。
+- **正式持久化**：**`VITE_USE_WEB_API=true`** 且后端运行，收藏与评分由 **`PATCH /api/library/movies/{id}`** 写入 SQLite。
 
 ## 常见操作（复述用户诉求时）
 

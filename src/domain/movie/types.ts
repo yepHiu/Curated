@@ -6,7 +6,12 @@ export interface Movie {
   actors: string[]
   tags: string[]
   runtimeMinutes: number
+  /** 列表/展示用有效评分（用户分优先，否则站点评分） */
   rating: number
+  /** 详情来自 API；列表项可能未带 */
+  metadataRating?: number
+  /** 用户评分；undefined 表示未加载或未设置，null 表示已清除覆盖 */
+  userRating?: number | null
   summary: string
   isFavorite: boolean
   addedAt: string

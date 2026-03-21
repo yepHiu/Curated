@@ -77,7 +77,9 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 
 	items := make([]contracts.MovieListItemDTO, 0, end-offset)
 	for _, movie := range filtered[offset:end] {
-		items = append(items, movie.MovieListItemDTO)
+		m := movie
+		syncEffectiveRating(&m)
+		items = append(items, m.MovieListItemDTO)
 	}
 
 	return contracts.MoviesPageDTO{
@@ -94,8 +96,37 @@ func (s *Service) GetMovie(movieID string) (contracts.MovieDetailDTO, error) {
 
 	for _, movie := range s.movies {
 		if movie.ID == movieID {
-			return movie, nil
+			m := movie
+			syncEffectiveRating(&m)
+			return m, nil
 		}
+	}
+	return contracts.MovieDetailDTO{}, errMovieNotFound
+}
+
+// PatchMovie updates in-memory seed movies (used when SQLite has no rows).
+func (s *Service) PatchMovie(movieID string, in contracts.PatchMovieInput) (contracts.MovieDetailDTO, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.movies {
+		if s.movies[i].ID != movieID {
+			continue
+		}
+		m := &s.movies[i]
+		if in.Favorite != nil {
+			m.IsFavorite = *in.Favorite
+		}
+		if in.UserRatingSet {
+			if in.UserRatingClear {
+				m.UserRating = nil
+			} else {
+				v := in.UserRating
+				m.UserRating = &v
+			}
+		}
+		syncEffectiveRating(m)
+		return *m, nil
 	}
 	return contracts.MovieDetailDTO{}, errMovieNotFound
 }
@@ -124,6 +155,7 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			if movie.Resolution == "" {
 				movie.Resolution = strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), ".")
 			}
+			syncEffectiveRating(&movie)
 			s.movies[index] = movie
 			return
 		}
@@ -145,7 +177,9 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
 			Year:           0,
 		},
-		Summary: "Metadata pending scrape.",
+		Summary:        "Metadata pending scrape.",
+		MetadataRating: 0,
+		UserRating:     nil,
 	})
 }
 
@@ -175,7 +209,7 @@ func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 			movie.RuntimeMinutes = metadata.RuntimeMinutes
 		}
 		if metadata.Rating > 0 {
-			movie.Rating = metadata.Rating
+			movie.MetadataRating = metadata.Rating
 		}
 		if metadata.ReleaseDate != "" && len(metadata.ReleaseDate) >= 4 {
 			if year := metadata.ReleaseDate[:4]; len(year) == 4 {
@@ -196,6 +230,7 @@ func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 		if len(metadata.PreviewImages) > 0 {
 			movie.PreviewImages = append([]string{}, metadata.PreviewImages...)
 		}
+		syncEffectiveRating(&movie)
 		s.movies[index] = movie
 		return
 	}
@@ -257,7 +292,9 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Resolution:     "2160p",
 				Year:           2025,
 			},
-			Summary: "A polished late-night feature with strong cast chemistry and metadata-rich presentation.",
+			Summary:        "A polished late-night feature with strong cast chemistry and metadata-rich presentation.",
+			MetadataRating: 4.8,
+			UserRating:     nil,
 		},
 		{
 			MovieListItemDTO: contracts.MovieListItemDTO{
@@ -275,7 +312,9 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Resolution:     "1080p",
 				Year:           2025,
 			},
-			Summary: "An elegant office-set release used to validate detail views, favorites, and list filtering.",
+			Summary:        "An elegant office-set release used to validate detail views, favorites, and list filtering.",
+			MetadataRating: 4.7,
+			UserRating:     nil,
 		},
 		{
 			MovieListItemDTO: contracts.MovieListItemDTO{
@@ -293,7 +332,9 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Resolution:     "2160p",
 				Year:           2026,
 			},
-			Summary: "A stylized catalog entry that exercises tag-heavy filtering and recent import ordering.",
+			Summary:        "A stylized catalog entry that exercises tag-heavy filtering and recent import ordering.",
+			MetadataRating: 4.5,
+			UserRating:     nil,
 		},
 		{
 			MovieListItemDTO: contracts.MovieListItemDTO{
@@ -311,7 +352,17 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Resolution:     "2160p",
 				Year:           2024,
 			},
-			Summary: "A high-rated longform title kept here as the default rich detail fixture for the backend scaffold.",
+			Summary:        "A high-rated longform title kept here as the default rich detail fixture for the backend scaffold.",
+			MetadataRating: 4.9,
+			UserRating:     nil,
 		},
 	}
+}
+
+func syncEffectiveRating(m *contracts.MovieDetailDTO) {
+	if m.UserRating != nil {
+		m.Rating = *m.UserRating
+		return
+	}
+	m.Rating = m.MetadataRating
 }

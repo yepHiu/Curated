@@ -7,6 +7,7 @@ import type {
   ListMoviesParams,
   MovieDetailDTO,
   MoviesPageDTO,
+  PatchMovieBody,
   PatchSettingsBody,
   SettingsDTO,
   StartScanBody,
@@ -24,6 +25,10 @@ export const api = {
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {
     return httpClient.get<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`)
+  },
+
+  patchMovie(movieId: string, body: PatchMovieBody): Promise<MovieDetailDTO> {
+    return httpClient.patch<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`, body)
   },
 
   deleteMovie(movieId: string): Promise<void> {

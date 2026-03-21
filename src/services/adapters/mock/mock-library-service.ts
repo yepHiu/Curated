@@ -1,7 +1,13 @@
 import { computed, ref } from "vue"
+import type { PatchMovieBody } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import {
+  loadMockMoviePrefs,
+  mergeMockPrefsIntoMovie,
+  upsertMockMoviePrefs,
+} from "@/lib/mock-movie-prefs-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const libraryStats: readonly LibraryStat[] = [
@@ -149,13 +155,16 @@ const buildMovie = (index: number): Movie => {
   const yearOffset = index % 3
   const storage = storagePools[index % storagePools.length]
 
+  const rating = Math.max(3.9, Number((seed.rating - ratingOffset).toFixed(1)))
   return {
     ...seed,
     id: `${prefix.toLowerCase()}-${serial}`,
     title: `${seed.title} ${index + 1}`,
     code: `${prefix}-${serial}`,
     runtimeMinutes: seed.runtimeMinutes + runtimeOffset,
-    rating: Math.max(3.9, Number((seed.rating - ratingOffset).toFixed(1))),
+    rating,
+    metadataRating: rating,
+    userRating: undefined,
     isFavorite: index % 4 === 0 ? true : seed.isFavorite,
     addedAt: `2026-${month}-${day}`,
     location: `${storage}/${prefix}-${serial}.${index % 2 === 0 ? "mkv" : "mp4"}`,
@@ -171,7 +180,50 @@ const buildMovie = (index: number): Movie => {
   }
 }
 
-const moviesState = ref<Movie[]>(Array.from({ length: 180 }, (_, index) => buildMovie(index)))
+loadMockMoviePrefs()
+
+const moviesState = ref<Movie[]>(
+  Array.from({ length: 180 }, (_, index) => mergeMockPrefsIntoMovie(buildMovie(index))),
+)
+
+function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | undefined {
+  const id = movieId.trim()
+  const idx = moviesState.value.findIndex((m) => m.id === id)
+  if (idx < 0) {
+    return undefined
+  }
+  const cur = moviesState.value[idx]
+  let next: Movie = { ...cur }
+  if (body.isFavorite !== undefined) {
+    next.isFavorite = body.isFavorite
+  }
+  if (body.rating !== undefined) {
+    if (body.rating === null) {
+      next.userRating = undefined
+      next.rating = next.metadataRating ?? cur.rating
+    } else {
+      next.userRating = body.rating
+      next.rating = body.rating
+      if (next.metadataRating === undefined) {
+        next.metadataRating = cur.rating
+      }
+    }
+  }
+  moviesState.value = moviesState.value.map((m, i) => (i === idx ? next : m))
+
+  const prefsPatch: { isFavorite?: boolean; userRating?: number | null } = {}
+  if (body.isFavorite !== undefined) {
+    prefsPatch.isFavorite = next.isFavorite
+  }
+  if (body.rating !== undefined) {
+    prefsPatch.userRating = body.rating === null ? null : body.rating
+  }
+  if (Object.keys(prefsPatch).length > 0) {
+    upsertMockMoviePrefs(id, prefsPatch)
+  }
+
+  return next
+}
 
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value),
@@ -234,23 +286,26 @@ export const mockLibraryService: LibraryService = {
   getRelatedMovies(movieId, limit = 6) {
     return moviesState.value.filter((movie) => movie.id !== movieId).slice(0, limit)
   },
-  toggleFavorite(movieId, nextValue) {
-    const currentMovie = moviesState.value.find((movie) => movie.id === movieId)
 
+  async patchMovie(movieId, body) {
+    return applyMockPatchMovie(movieId, body)
+  },
+
+  async toggleFavorite(movieId, nextValue) {
+    const id = movieId.trim()
+    const currentMovie = moviesState.value.find((movie) => movie.id === id)
     if (!currentMovie) {
       return undefined
     }
-
     const targetValue = typeof nextValue === "boolean" ? nextValue : !currentMovie.isFavorite
-
-    moviesState.value = moviesState.value.map((movie) =>
-      movie.id === movieId ? { ...movie, isFavorite: targetValue } : movie,
-    )
-
-    return moviesState.value.find((movie) => movie.id === movieId)
+    return applyMockPatchMovie(id, { isFavorite: targetValue })
   },
 
   async deleteMovie(movieId: string) {
     moviesState.value = moviesState.value.filter((movie) => movie.id !== movieId)
+  },
+
+  mergeMovieIntoCache() {
+    // Mock：无中央 HTTP 缓存；持久化由 localStorage 在 applyMockPatchMovie 中处理。
   },
 }

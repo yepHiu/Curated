@@ -1,10 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -77,6 +79,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
+	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
@@ -198,6 +201,126 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
+}
+
+func parsePatchMovieInput(body []byte) (contracts.PatchMovieInput, error) {
+	var in contracts.PatchMovieInput
+	if len(bytes.TrimSpace(body)) == 0 {
+		return in, errors.New("empty body")
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return in, err
+	}
+	if raw, ok := m["isFavorite"]; ok {
+		var b bool
+		if err := json.Unmarshal(raw, &b); err != nil {
+			return in, err
+		}
+		in.Favorite = &b
+	}
+	if raw, ok := m["rating"]; ok {
+		in.UserRatingSet = true
+		if string(bytes.TrimSpace(raw)) == "null" {
+			in.UserRatingClear = true
+		} else {
+			var v float64
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return in, err
+			}
+			in.UserRating = v
+		}
+	}
+	return in, nil
+}
+
+func patchMovieInputHasFields(in contracts.PatchMovieInput) bool {
+	if in.Favorite != nil {
+		return true
+	}
+	return in.UserRatingSet
+}
+
+func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if r.Body != nil {
+		_ = r.Body.Close()
+	}
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "failed to read body")
+		return
+	}
+
+	in, err := parsePatchMovieInput(body)
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		return
+	}
+	if !patchMovieInputHasFields(in) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no fields to update")
+		return
+	}
+	if in.UserRatingSet && !in.UserRatingClear && (in.UserRating < 0 || in.UserRating > 5) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, storage.ErrInvalidUserRating.Error())
+		return
+	}
+
+	err = h.store.PatchMovieUserPrefs(r.Context(), movieID, in)
+	if err != nil {
+		if errors.Is(err, storage.ErrMovieNotFoundForPatch) && h.library != nil {
+			movie, libErr := h.library.PatchMovie(movieID, in)
+			if library.IsNotFound(libErr) {
+				writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+				return
+			}
+			if libErr != nil {
+				if h.logger != nil {
+					h.logger.Warn("patch movie (in-memory) failed", zap.Error(libErr))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to patch movie")
+				return
+			}
+			writeJSON(w, http.StatusOK, movie)
+			return
+		}
+		if errors.Is(err, storage.ErrMovieNotFoundForPatch) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if errors.Is(err, storage.ErrInvalidUserRating) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("patch movie failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to patch movie")
+		return
+	}
+
+	movie, err := h.store.GetMovieDetail(r.Context(), movieID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("get movie after patch failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+	writeJSON(w, http.StatusOK, movie)
 }
 
 func (h *Handler) handleRefreshMovieMetadata(w http.ResponseWriter, r *http.Request) {

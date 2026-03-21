@@ -58,5 +58,7 @@ export function mapMovieDetail(dto: MovieDetailDTO): Movie {
     summary: dto.summary ?? "",
     previewImages: dto.previewImages ?? [],
     previewVideoUrl: dto.previewVideoUrl,
+    metadataRating: dto.metadataRating > 0 ? dto.metadataRating : undefined,
+    userRating: dto.userRating === undefined ? undefined : dto.userRating,
   }
 }

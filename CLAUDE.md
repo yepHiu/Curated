@@ -140,7 +140,8 @@ The backend exposes these HTTP endpoints:
 ```
 GET    /api/health              # Health check
 GET    /api/library/movies      # List movies (with query params: mode, q, limit, offset)
-GET    /api/library/movies/{id} # Get movie detail
+GET    /api/library/movies/{id} # Get movie detail (rating = effective; metadataRating + userRating on detail)
+PATCH  /api/library/movies/{id} # Partial update: isFavorite, rating (0–5 user score; null clears user_rating)
 DELETE /api/library/movies/{id} # Delete movie
 POST   /api/library/paths       # Add library path
 PATCH  /api/library/paths/{id}  # Update library path

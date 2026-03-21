@@ -9,12 +9,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go.uber.org/zap"
 
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
+	"jav-shadcn/backend/internal/library"
+	"jav-shadcn/backend/internal/scraper"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
 )
@@ -473,5 +476,218 @@ func TestHandleStreamMovie_NotFoundUnknownMovie(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandlePatchMovie_SQLiteFavoriteAndRating(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-RAT.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t-patch",
+		Path:     videoPath,
+		FileName: "PATCH-RAT.mp4",
+		Number:   "PATCH-RAT",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "PATCH-RAT",
+		Title:   "Patch Rating Title",
+		Summary: "S",
+		Studio:  "St",
+		Rating:  4.5,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:     config.Config{},
+		Logger:  zap.NewNop(),
+		Store:   store,
+		Library: library.NewService(),
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body := `{"isFavorite":true,"rating":4.25}`
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if !detail.IsFavorite || detail.Rating != 4.25 {
+		t.Fatalf("detail = %+v, want favorite=true rating=4.25", detail)
+	}
+	if detail.UserRating == nil || *detail.UserRating != 4.25 {
+		t.Fatalf("userRating = %v, want 4.25", detail.UserRating)
+	}
+	if detail.MetadataRating != 4.5 {
+		t.Fatalf("metadataRating = %v, want 4.5", detail.MetadataRating)
+	}
+}
+
+func TestHandlePatchMovie_ClearUserRating(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-CLR.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t-clr", Path: videoPath, FileName: "PATCH-CLR.mp4", Number: "PATCH-CLR",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID, Number: "PATCH-CLR", Title: "T", Summary: "S", Studio: "St", Rating: 3.0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PatchMovieUserPrefs(ctx, outcome.MovieID, contracts.PatchMovieInput{
+		UserRatingSet: true, UserRating: 1.0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(`{"rating":null}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Rating != 3.0 || detail.UserRating != nil {
+		t.Fatalf("after clear: rating=%v userRating=%v, want rating=3 userRating=nil", detail.Rating, detail.UserRating)
+	}
+}
+
+func TestHandlePatchMovie_InvalidRating(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-BAD.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t-bad", Path: videoPath, FileName: "PATCH-BAD.mp4", Number: "PATCH-BAD",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(`{"rating":5.01}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestHandlePatchMovie_InMemoryFallback(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/mkb-100", strings.NewReader(`{"isFavorite":false,"rating":2.5}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.IsFavorite || detail.Rating != 2.5 {
+		t.Fatalf("detail = %+v", detail)
 	}
 }

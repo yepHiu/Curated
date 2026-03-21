@@ -1,5 +1,6 @@
 import { computed, ref, type Ref } from "vue"
-import type { TaskDTO } from "@/api/types"
+import type { PatchMovieBody, TaskDTO } from "@/api/types"
+import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
@@ -54,6 +55,17 @@ const libraryStats: readonly LibraryStat[] = [
   { label: "Metadata Health", value: "—", detail: "Requires real scan" },
 ]
 
+function mergeMovieIntoListState(movie: Movie) {
+  const id = movie.id.trim()
+  if (!id) return
+  const idx = moviesState.value.findIndex((m) => m.id === id)
+  if (idx >= 0) {
+    moviesState.value = moviesState.value.map((m, i) => (i === idx ? { ...m, ...movie } : m))
+  } else {
+    moviesState.value = [...moviesState.value, movie]
+  }
+}
+
 async function refreshLibraryPathsFromApi() {
   try {
     const settings = await api.getSettings()
@@ -67,7 +79,7 @@ async function refreshLibraryPathsFromApi() {
 function createWebLibraryService(): LibraryService {
   void ensureLoaded()
 
-  return {
+  const impl: LibraryService = {
     movies: computed(() => moviesState.value),
     libraryStats,
     libraryPaths: computed(() => libraryPathsState.value),
@@ -135,11 +147,11 @@ function createWebLibraryService(): LibraryService {
       if (moviesState.value.some((m) => m.id === trimmed)) {
         return
       }
-      const detail = await loadMovieDetail(trimmed)
-      if (!detail) {
-        return
-      }
-      moviesState.value = [...moviesState.value, detail]
+      await loadMovieDetail(trimmed)
+    },
+
+    mergeMovieIntoCache(movie: Movie) {
+      mergeMovieIntoListState(movie)
     },
 
     getMovieById(movieId) {
@@ -150,15 +162,40 @@ function createWebLibraryService(): LibraryService {
       return moviesState.value.filter((m) => m.id !== movieId).slice(0, limit)
     },
 
-    toggleFavorite(movieId, nextValue) {
-      const movie = moviesState.value.find((m) => m.id === movieId)
-      if (!movie) return undefined
+    async patchMovie(movieId: string, body: PatchMovieBody) {
+      await ensureLoaded()
+      const id = movieId.trim()
+      if (!id) return undefined
 
-      const target = typeof nextValue === "boolean" ? nextValue : !movie.isFavorite
-      moviesState.value = moviesState.value.map((m) =>
-        m.id === movieId ? { ...m, isFavorite: target } : m,
-      )
-      return moviesState.value.find((m) => m.id === movieId)
+      let snapshot = moviesState.value.map((m) => ({ ...m }))
+      let existing = moviesState.value.find((m) => m.id === id)
+      if (!existing) {
+        await ensureMovieCached(id)
+        snapshot = moviesState.value.map((m) => ({ ...m }))
+        existing = moviesState.value.find((m) => m.id === id)
+      }
+
+      try {
+        const dto = await api.patchMovie(id, body)
+        const mapped = mapMovieDetail(dto)
+        const has = moviesState.value.some((m) => m.id === id)
+        if (has) {
+          moviesState.value = moviesState.value.map((m) => (m.id === id ? { ...m, ...mapped } : m))
+        } else {
+          moviesState.value = [...moviesState.value, mapped]
+        }
+        return moviesState.value.find((m) => m.id === id)
+      } catch (err) {
+        moviesState.value = snapshot
+        throw err
+      }
+    },
+
+    async toggleFavorite(movieId, nextValue) {
+      const id = movieId.trim()
+      const movie = moviesState.value.find((m) => m.id === id)
+      const target = typeof nextValue === "boolean" ? nextValue : !(movie?.isFavorite ?? false)
+      return await impl.patchMovie(id, { isFavorite: target })
     },
 
     async deleteMovie(movieId: string) {
@@ -166,13 +203,21 @@ function createWebLibraryService(): LibraryService {
       moviesState.value = moviesState.value.filter((m) => m.id !== movieId)
     },
   }
+
+  return impl
 }
 
 export async function loadMovieDetail(movieId: string): Promise<Movie | undefined> {
+  const id = movieId.trim()
+  if (!id) return undefined
   try {
-    const dto = await api.getMovie(movieId)
-    return mapMovieDetail(dto)
-  } catch {
+    const dto = await api.getMovie(id)
+    const mapped = mapMovieDetail(dto)
+    mergeMovieIntoListState(mapped)
+    return mapped
+  } catch (err) {
+    const extra = err instanceof HttpClientError ? ` status=${err.status}` : ""
+    console.error(`[web-library-service] loadMovieDetail failed${extra}`, id, err)
     return undefined
   }
 }

@@ -40,6 +40,10 @@ export interface MovieDetailDTO extends MovieListItemDTO {
   summary: string
   previewImages?: string[]
   previewVideoUrl?: string
+  /** 刮削/站点评分（movies.rating） */
+  metadataRating: number
+  /** 用户本地评分（movies.user_rating），无覆盖时省略 */
+  userRating?: number | null
 }
 
 export interface MoviesPageDTO {
@@ -102,4 +106,10 @@ export interface AddLibraryPathBody {
 
 export interface UpdateLibraryPathBody {
   title: string
+}
+
+/** PATCH /library/movies/{id}；rating 为 null 表示清除用户评分 */
+export interface PatchMovieBody {
+  isFavorite?: boolean
+  rating?: number | null
 }

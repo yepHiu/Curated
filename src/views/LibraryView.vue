@@ -140,8 +140,12 @@ const openPlayer = async (movieId?: string) => {
   })
 }
 
-const toggleFavorite = (payload: { movieId: string; nextValue: boolean }) => {
-  libraryService.toggleFavorite(payload.movieId, payload.nextValue)
+const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {
+  try {
+    await libraryService.toggleFavorite(payload.movieId, payload.nextValue)
+  } catch (err) {
+    console.error("[LibraryView] toggle favorite failed", err)
+  }
 }
 </script>
 

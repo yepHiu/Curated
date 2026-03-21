@@ -1,5 +1,5 @@
 import type { ComputedRef } from "vue"
-import type { TaskDTO } from "@/api/types"
+import type { PatchMovieBody, TaskDTO } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 
@@ -30,7 +30,17 @@ export interface LibraryService {
    */
   getMoviePlaybackUrl(movieId: string): string | null
   getRelatedMovies(movieId: string, limit?: number): Movie[]
-  toggleFavorite(movieId: string, nextValue?: boolean): Movie | undefined
+  /**
+   * 更新收藏与/或用户评分（Web：PATCH /api/library/movies/{id}；Mock：内存）。
+   * 失败时 Web 适配器会恢复列表快照并抛出错误。
+   */
+  patchMovie(movieId: string, body: PatchMovieBody): Promise<Movie | undefined>
+  /** 仅更新收藏；等价于 patchMovie(id, { isFavorite }) */
+  toggleFavorite(movieId: string, nextValue?: boolean): Promise<Movie | undefined>
   /** 删除影片（Web：请求后端并从本地列表移除；Mock：仅从内存列表移除） */
   deleteMovie(movieId: string): Promise<void>
+  /**
+   * Web：把详情合并进列表缓存（已存在则覆盖同 id）。Mock：空操作。
+   */
+  mergeMovieIntoCache(movie: Movie): void
 }

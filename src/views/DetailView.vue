@@ -27,12 +27,24 @@ function isTerminalTaskStatus(status: TaskDTO["status"]): boolean {
   )
 }
 
+function formatClientError(err: unknown, fallback: string) {
+  if (err instanceof HttpClientError) {
+    return err.apiError?.message?.trim() || err.message || fallback
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message
+  }
+  return fallback
+}
+
 const movieId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
 )
 
 const detailMovie = shallowRef<Movie | undefined>()
 const detailLoading = ref(false)
+const detailLoadError = ref("")
+const patchError = ref("")
 const deleteBusy = ref(false)
 const deleteError = ref("")
 const metadataRefreshBusy = ref(false)
@@ -42,14 +54,24 @@ watch(
   () => movieId.value,
   async (id) => {
     detailMovie.value = undefined
+    detailLoadError.value = ""
+    patchError.value = ""
     if (!id) {
       return
     }
     if (USE_WEB_API) {
       detailLoading.value = true
       try {
-        detailMovie.value =
-          (await loadMovieDetail(id)) ?? libraryService.getMovieById(id)
+        const loaded = await loadMovieDetail(id)
+        if (loaded) {
+          detailMovie.value = loaded
+        } else {
+          detailMovie.value = libraryService.getMovieById(id)
+          if (!detailMovie.value) {
+            detailLoadError.value =
+              "无法从服务器加载本片详情，请确认后端在运行（默认 :8080）且 Vite 已将 /api 代理到后端。"
+          }
+        }
       } finally {
         detailLoading.value = false
       }
@@ -109,10 +131,31 @@ const openPlayer = async (nextMovieId: string) => {
   })
 }
 
-const toggleFavorite = (payload: { movieId: string; nextValue: boolean }) => {
-  libraryService.toggleFavorite(payload.movieId, payload.nextValue)
-  if (detailMovie.value?.id === payload.movieId) {
-    detailMovie.value = { ...detailMovie.value, isFavorite: payload.nextValue }
+const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {
+  patchError.value = ""
+  try {
+    const updated = await libraryService.toggleFavorite(payload.movieId, payload.nextValue)
+    if (updated && detailMovie.value?.id === payload.movieId) {
+      detailMovie.value = updated
+    }
+  } catch (err) {
+    patchError.value = formatClientError(err, "更新收藏失败，请检查网络与后端日志。")
+    console.error("[DetailView] toggle favorite failed", err)
+  }
+}
+
+const updateUserRating = async (payload: { movieId: string; value: number | null }) => {
+  patchError.value = ""
+  try {
+    const updated = await libraryService.patchMovie(payload.movieId, {
+      rating: payload.value,
+    })
+    if (updated && detailMovie.value?.id === payload.movieId) {
+      detailMovie.value = updated
+    }
+  } catch (err) {
+    patchError.value = formatClientError(err, "更新评分失败，请检查网络与后端日志。")
+    console.error("[DetailView] update user rating failed", err)
   }
 }
 
@@ -176,6 +219,12 @@ const handleRefreshMetadata = async (id: string) => {
     </div>
     <template v-else-if="detailMovie">
       <p
+        v-if="patchError"
+        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ patchError }}
+      </p>
+      <p
         v-if="deleteBusy"
         class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
       >
@@ -201,6 +250,7 @@ const handleRefreshMetadata = async (id: string) => {
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"
+        @update-user-rating="updateUserRating"
         @delete-movie="handleDeleteMovie"
         @refresh-metadata="handleRefreshMetadata"
       />
@@ -208,7 +258,10 @@ const handleRefreshMetadata = async (id: string) => {
     <NotFoundState
       v-else
       title="未找到影片"
-      description="当前库中不存在该条目，或详情接口暂时不可用。"
+      :description="
+        detailLoadError ||
+        '当前库中不存在该条目，或详情接口暂时不可用。'
+      "
     />
   </div>
 </template>

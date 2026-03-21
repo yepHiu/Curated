@@ -116,6 +116,19 @@ type MovieDetailDTO struct {
 	Summary         string   `json:"summary"`
 	PreviewImages   []string `json:"previewImages,omitempty"`
 	PreviewVideoURL string   `json:"previewVideoUrl,omitempty"`
+	// MetadataRating is the scraper/site score (movies.rating). UserRating is the local override (movies.user_rating).
+	MetadataRating float64  `json:"metadataRating"`
+	UserRating     *float64 `json:"userRating,omitempty"`
+}
+
+// PatchMovieInput is the parsed body for PATCH /api/library/movies/{movieId}.
+// Favorite: non-nil updates is_favorite.
+// UserRatingSet: false = do not change user_rating; true + UserRatingClear = set NULL; true + !UserRatingClear = set UserRating (0–5).
+type PatchMovieInput struct {
+	Favorite        *bool
+	UserRatingSet   bool
+	UserRatingClear bool
+	UserRating      float64
 }
 
 type MoviesPageDTO struct {

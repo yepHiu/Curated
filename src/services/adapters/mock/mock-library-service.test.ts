@@ -10,7 +10,7 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.getMovieById("missing-movie")).toBeUndefined()
   })
 
-  it("toggles favorite state in the shared movie source", () => {
+  it("toggles favorite state in the shared movie source", async () => {
     const libraryService = mockLibraryService
     const movieId = libraryService.movies.value[0]?.id
 
@@ -22,11 +22,11 @@ describe("mockLibraryService", () => {
 
     const originalFavorite = libraryService.getMovieById(movieId)?.isFavorite ?? false
 
-    libraryService.toggleFavorite(movieId, !originalFavorite)
+    await libraryService.toggleFavorite(movieId, !originalFavorite)
 
     expect(libraryService.getMovieById(movieId)?.isFavorite).toBe(!originalFavorite)
 
-    libraryService.toggleFavorite(movieId, originalFavorite)
+    await libraryService.toggleFavorite(movieId, originalFavorite)
 
     expect(libraryService.getMovieById(movieId)?.isFavorite).toBe(originalFavorite)
   })

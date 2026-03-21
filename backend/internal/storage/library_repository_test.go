@@ -68,4 +68,28 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 	if movie.Summary != "Example Summary" || movie.Code != "ABC-123" {
 		t.Fatalf("unexpected movie detail: %+v", movie)
 	}
+	if movie.MetadataRating != 4.5 || movie.Rating != 4.5 || movie.UserRating != nil {
+		t.Fatalf("expected metadata rating 4.5 and no user override, got %+v", movie)
+	}
+
+	if err := store.PatchMovieUserPrefs(ctx, outcome.MovieID, contracts.PatchMovieInput{
+		UserRatingSet: true,
+		UserRating:    2.0,
+	}); err != nil {
+		t.Fatalf("patch user rating: %v", err)
+	}
+	movie, err = store.GetMovieDetail(ctx, outcome.MovieID)
+	if err != nil {
+		t.Fatalf("get after patch: %v", err)
+	}
+	if movie.Rating != 2.0 || movie.UserRating == nil || *movie.UserRating != 2.0 || movie.MetadataRating != 4.5 {
+		t.Fatalf("expected user override 2.0 and metadata 4.5, got %+v", movie)
+	}
+	page, err = store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil {
+		t.Fatalf("list after patch: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Rating != 2.0 {
+		t.Fatalf("list effective rating want 2.0, got %+v", page.Items[0])
+	}
 }
