@@ -54,6 +54,10 @@ export const api = {
     return httpClient.post<TaskDTO>("/scans", body)
   },
 
+  refreshMovieMetadata(movieId: string): Promise<TaskDTO> {
+    return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/scrape`)
+  },
+
   getTaskStatus(taskId: string): Promise<TaskDTO> {
     return httpClient.get<TaskDTO>(`/tasks/${encodeURIComponent(taskId)}`)
   },

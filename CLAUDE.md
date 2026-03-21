@@ -1,0 +1,206 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+JAV-Library is a desktop media library application for managing, browsing, scraping, and playing video collections. It consists of a Vue 3 frontend with a Go backend, using SQLite for persistence and metatube-sdk-go for metadata scraping.
+
+**Current Architecture Phase:** Web phase (Vue SPA + Go HTTP API). Future target is Electron desktop app with mpv player integration.
+
+## Tech Stack
+
+- **Frontend:** Vue 3 + TypeScript + Vite + Tailwind CSS v4 + shadcn-vue
+- **Backend:** Go 1.25+ with SQLite (modernc.org/sqlite), Zap logging
+- **Metadata:** metatube-sdk-go for adult video metadata scraping
+- **Testing:** Vitest (frontend), Go test (backend)
+
+## Commands
+
+### Frontend
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server (proxies /api to localhost:8080)
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Run linter
+pnpm lint
+
+# Run tests
+pnpm test
+
+# Run single test file
+pnpm vitest run src/path/to/file.test.ts
+
+# Type check only
+pnpm typecheck
+```
+
+### Backend
+
+```bash
+# Build the backend binary
+cd backend
+go build -o javd.exe ./cmd/javd
+
+# Run backend HTTP server (default mode)
+./javd.exe
+
+# Run with specific config
+./javd.exe -config path/to/config.yaml
+
+# Run in stdio mode (for future Electron bridge)
+./javd.exe -mode stdio
+
+# Run tests
+go test ./...
+
+# Run tests for specific package
+go test ./internal/storage/...
+
+# Run with verbose output
+go test -v ./internal/storage/...
+```
+
+### Full Stack Development
+
+```bash
+# Terminal 1: Start backend
+./backend/javd.exe
+
+# Terminal 2: Start frontend dev server
+pnpm dev
+```
+
+## Architecture
+
+### Frontend Structure (`src/`)
+
+```
+src/
+  api/              # HTTP client and endpoint definitions
+  components/
+    jav-library/    # Domain-specific components
+    ui/             # shadcn-vue UI components
+  composables/      # Vue composables (e.g., use-scan-task-tracker.ts)
+  domain/           # Domain types and logic
+    library/
+    movie/
+  lib/              # Utilities and typed mock data (jav-library.ts)
+  router/           # Vue Router configuration
+  services/         # Frontend service layer
+    adapters/       # Mock adapter, future HTTP/Electron adapters
+    contracts/      # Service interfaces
+  views/            # Page-level components
+```
+
+**Key Frontend Patterns:**
+- Use `@/` alias for imports from `src/`
+- shadcn-vue components are in `src/components/ui/`
+- Domain components are in `src/components/jav-library/`
+- Mock data and types are in `src/lib/jav-library.ts`
+- Service layer with adapter pattern for backend communication
+
+### Backend Structure (`backend/`)
+
+```
+backend/
+  cmd/javd/         # Application entry point
+  internal/
+    app/            # Application lifecycle and wiring
+    config/         # Configuration management
+    contracts/      # DTOs, error codes, shared interfaces
+    library/        # Library domain service
+    logging/        # Zap logger setup
+    scanner/        # File scanning service
+    scraper/        # Metadata scraping adapter
+    server/         # HTTP server and handlers
+    storage/        # SQLite repository layer
+      migrations/   # Database migrations
+    tasks/          # Async task management
+```
+
+**Key Backend Patterns:**
+- Clean architecture with repository pattern
+- Contracts define DTOs shared between layers
+- Storage layer handles all database access
+- Services contain business logic
+- Server layer handles HTTP transport
+
+### API Routes
+
+The backend exposes these HTTP endpoints:
+
+```
+GET    /api/health              # Health check
+GET    /api/library/movies      # List movies (with query params: mode, q, limit, offset)
+GET    /api/library/movies/{id} # Get movie detail
+DELETE /api/library/movies/{id} # Delete movie
+POST   /api/library/paths       # Add library path
+PATCH  /api/library/paths/{id}  # Update library path
+DELETE /api/library/paths/{id}  # Delete library path
+GET    /api/settings           # Get settings
+PATCH  /api/settings           # Update settings
+POST   /api/scans              # Start scan task
+GET    /api/tasks/{taskId}      # Get task status
+```
+
+## Key Documentation
+
+Reference these docs in `docs/` for detailed specifications:
+
+- `jav-libary.md` - Complete product design document (domain models, UI design, task system)
+- `backend-go-standards.md` - Go coding standards and directory structure
+- `backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
+- `film-scanner/CLAUDE.md` - Reference implementation for metadata scraping
+
+## Testing
+
+### Frontend Tests
+
+- Uses Vitest with jsdom environment
+- Test files: `*.test.ts` in `src/`
+- Vue components tested with `@vue/test-utils`
+
+### Backend Tests
+
+- Uses standard Go testing
+- Repository tests use in-memory SQLite
+- Test files: `*_test.go` alongside source files
+
+## Important Conventions
+
+### Video ID (番号) Parsing
+
+Video IDs are extracted from filenames using patterns like:
+- `ABC-123`, `ABC_123` → `ABC-123`
+- `abc123` → `ABC-123`
+- Supports special prefixes: `FC2`, `heyzo`, `tokyo-hot`, `1pondo`, `caribbeancom`
+
+### Error Codes
+
+Backend uses stable error codes (see `backend/internal/contracts/contracts.go`):
+- `COMMON_*` - General errors
+- `LIBRARY_*` - Library operations
+- `SCAN_*` - Scanning errors
+- `SCRAPER_*` - Metadata scraping errors
+- `PLAYER_*` - Player control errors
+- `SETTINGS_*` - Configuration errors
+
+### Database Migrations
+
+Migrations are in `backend/internal/storage/migrations/` and run automatically on startup.
+
+## Development Notes
+
+- The frontend Vite dev server proxies `/api` to `http://localhost:8080` (backend)
+- Backend supports three modes: `http` (default), `stdio`, `both`
+- Current state: Frontend uses mock adapter by default; HTTP adapter available for backend testing
+- Auto-scan loop runs in background when backend starts
+- Library organization (文件整理) can be toggled via settings API

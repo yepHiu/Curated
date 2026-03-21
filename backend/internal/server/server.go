@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -16,47 +17,56 @@ import (
 	"jav-shadcn/backend/internal/library"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
+	"jav-shadcn/backend/internal/version"
 )
 
 type ScanStarter interface {
 	StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error)
 }
 
-// OrganizeLibraryController exposes runtime 整理库开关（与配置文件初始值同步，可被 PATCH 覆盖直至进程退出）。
+// MovieMetadataRefresher starts an async single-movie metadata rescrape and returns the scrape task.
+type MovieMetadataRefresher interface {
+	StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error)
+}
+
+// OrganizeLibraryController exposes 整理库开关；值来自启动时合并的 library-config.cfg，PATCH 会写回该文件。
 type OrganizeLibraryController interface {
 	OrganizeLibrary() bool
-	SetOrganizeLibrary(v bool)
+	SetOrganizeLibrary(v bool) error
 }
 
 type Handler struct {
-	cfg                 config.Config
-	logger              *zap.Logger
-	store               *storage.SQLiteStore
-	library             *library.Service
-	tasks               *tasks.Manager
-	scanStarter         ScanStarter
-	organizeLibraryCtl  OrganizeLibraryController
+	cfg                    config.Config
+	logger                 *zap.Logger
+	store                  *storage.SQLiteStore
+	library                *library.Service
+	tasks                  *tasks.Manager
+	scanStarter            ScanStarter
+	organizeLibraryCtl     OrganizeLibraryController
+	movieMetadataRefresher MovieMetadataRefresher
 }
 
 type Deps struct {
-	Cfg                config.Config
-	Logger             *zap.Logger
-	Store              *storage.SQLiteStore
-	Library            *library.Service
-	Tasks              *tasks.Manager
-	ScanStarter        ScanStarter
-	OrganizeLibraryCtl OrganizeLibraryController
+	Cfg                    config.Config
+	Logger                 *zap.Logger
+	Store                  *storage.SQLiteStore
+	Library                *library.Service
+	Tasks                  *tasks.Manager
+	ScanStarter            ScanStarter
+	OrganizeLibraryCtl     OrganizeLibraryController
+	MovieMetadataRefresher MovieMetadataRefresher
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
-		cfg:                deps.Cfg,
-		logger:             deps.Logger,
-		store:              deps.Store,
-		library:            deps.Library,
-		tasks:              deps.Tasks,
-		scanStarter:        deps.ScanStarter,
-		organizeLibraryCtl: deps.OrganizeLibraryCtl,
+		cfg:                    deps.Cfg,
+		logger:                 deps.Logger,
+		store:                  deps.Store,
+		library:                deps.Library,
+		tasks:                  deps.Tasks,
+		scanStarter:            deps.ScanStarter,
+		organizeLibraryCtl:     deps.OrganizeLibraryCtl,
+		movieMetadataRefresher: deps.MovieMetadataRefresher,
 	}
 }
 
@@ -65,7 +75,9 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
+	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
@@ -81,7 +93,7 @@ func (h *Handler) Routes() http.Handler {
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, contracts.HealthDTO{
 		Name:         "javd",
-		Version:      "0.1.0",
+		Version:      version.Version,
 		Transport:    "http",
 		DatabasePath: h.cfg.DatabasePath,
 	})
@@ -123,7 +135,15 @@ func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
 
 	movie, err := h.store.GetMovieDetail(r.Context(), movieID)
 	if err != nil {
-		movie, err = h.library.GetMovie(movieID)
+		if errors.Is(err, sql.ErrNoRows) {
+			movie, err = h.library.GetMovie(movieID)
+		} else {
+			if h.logger != nil {
+				h.logger.Warn("get movie detail failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+			return
+		}
 	}
 	if err != nil {
 		if library.IsNotFound(err) {
@@ -136,6 +156,84 @@ func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, movie)
 }
 
+func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+
+	f, dispName, err := h.store.OpenMovieVideoFile(r.Context(), movieID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrMovieVideoNotFound):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		case errors.Is(err, storage.ErrMovieVideoNoLocation):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie has no video file")
+		case errors.Is(err, storage.ErrMovieVideoForbidden):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		case errors.Is(err, storage.ErrMovieVideoNotFile):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		default:
+			if h.logger != nil {
+				h.logger.Warn("open movie video stream failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open video file")
+		}
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	st, err := f.Stat()
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("stat movie video failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to read video file")
+		return
+	}
+
+	http.ServeContent(w, r, dispName, st.ModTime(), f)
+}
+
+func (h *Handler) handleRefreshMovieMetadata(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.movieMetadataRefresher == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata refresh not configured")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+
+	task, err := h.movieMetadataRefresher.StartMovieMetadataRefresh(r.Context(), movieID)
+	if err != nil {
+		switch {
+		case errors.Is(err, contracts.ErrScrapeMovieNotFound):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+		case errors.Is(err, contracts.ErrScrapeMovieNoCode), errors.Is(err, contracts.ErrScrapeMovieNoLocation):
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		default:
+			if h.logger != nil {
+				h.logger.Warn("start movie metadata refresh failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to start metadata refresh")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, task)
+}
+
 // handleDeleteMovie removes the movie row and related DB rows in a transaction, then best-effort deletes
 // files on disk (see storage.DeleteMovie). Success returns 204 No Content; missing id returns 404.
 func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +243,7 @@ func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.store.DeleteMovie(r.Context(), movieID)
+	err := h.store.DeleteMovie(r.Context(), movieID, strings.TrimSpace(h.cfg.CacheDir))
 	if err != nil {
 		if errors.Is(err, storage.ErrMovieNotFound) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
@@ -205,7 +303,13 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary)
+	if err := h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary); err != nil {
+		if h.logger != nil {
+			h.logger.Warn("failed to persist organizeLibrary", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+		return
+	}
 
 	libraryPaths, err := h.store.ListLibraryPaths(r.Context())
 	if err != nil {
@@ -325,7 +429,10 @@ func (h *Handler) handleStartScan(w http.ResponseWriter, r *http.Request) {
 	var request contracts.StartScanRequest
 	if r.Body != nil {
 		defer r.Body.Close()
-		_ = json.NewDecoder(r.Body).Decode(&request)
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
 	}
 
 	task, err := h.scanStarter.StartScan(r.Context(), request.Paths)

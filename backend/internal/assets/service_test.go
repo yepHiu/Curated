@@ -24,7 +24,7 @@ func TestDownloadAll(t *testing.T) {
 	defer server.Close()
 
 	cacheDir := filepath.Join(t.TempDir(), "cache")
-	service := NewService(zap.NewNop(), cacheDir, 5*time.Second)
+	service := NewService(zap.NewNop(), cacheDir, 5*time.Second, 0, 0)
 
 	results, err := service.DownloadAll(context.Background(), scraper.Metadata{
 		MovieID:       "abc-123",

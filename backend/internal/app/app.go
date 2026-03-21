@@ -28,9 +28,8 @@ import (
 	"jav-shadcn/backend/internal/server"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
+	"jav-shadcn/backend/internal/version"
 )
-
-const appVersion = "0.1.0"
 
 type App struct {
 	cfg     config.Config
@@ -42,32 +41,60 @@ type App struct {
 	assets  *assets.Service
 	tasks   *tasks.Manager
 
-	// organizeLibrary is toggled at runtime (Settings UI / PATCH); initialized from config file on startup.
-	organizeLibrary bool
-	organizeMu      sync.RWMutex
+	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
+	organizeLibrary     bool
+	organizeMu          sync.RWMutex
+	librarySettingsPath string // JSON file under config/ (organizeLibrary, future keys)
 
 	appCtx   context.Context
 	writeMu  sync.Mutex
 	scanning atomic.Bool
+
+	// scrapeSem limits concurrent scrape.movie pipelines (network + DB).
+	scrapeSem chan struct{}
 }
 
-func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *storage.SQLiteStore) (*App, error) {
+// New 构造并返回可运行的后端 App（依赖注入入口），由 cmd/javd 在加载配置、合并 library-config.cfg、
+// 打开数据库并完成迁移后调用。
+//
+// 参数说明：
+//   - ctx：应用生命周期 context，用于取消与超时，存入 App.appCtx。
+//   - cfg：已合并主配置与库设置文件的 config.Config（含 OrganizeLibrary、CacheDir、各类超时等）。
+//   - logger / store：日志与 SQLite 存储。
+//   - librarySettingsPath：持久化库行为开关的 JSON 文件路径（如 config/library-config.cfg），
+//     供 SetOrganizeLibrary 原子写回；可为空字符串但此时 PATCH 整理库开关会失败。
+//
+// 若 Metatube 刮削服务初始化失败，返回 (nil, err)。
+func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *storage.SQLiteStore, librarySettingsPath string) (*App, error) {
 	scraperService, err := metatube.NewService(logger, time.Duration(cfg.Scraper.RequestTimeoutSeconds)*time.Second)
 	if err != nil {
 		return nil, err
 	}
 
+	scrapeConc := cfg.Scraper.MaxConcurrent
+	if scrapeConc <= 0 {
+		scrapeConc = 4
+	}
+
 	return &App{
-		cfg:             cfg,
-		logger:          logger,
-		store:           store,
-		library:         library.NewService(),
-		scanner:         scanner.NewService(logger),
-		scraper:         scraperService,
-		assets:          assets.NewService(logger, cfg.CacheDir, time.Duration(cfg.Assets.RequestTimeoutSeconds)*time.Second),
-		tasks:           tasks.NewManager(),
-		organizeLibrary: cfg.OrganizeLibrary,
-		appCtx:          ctx,
+		cfg:                 cfg,
+		logger:              logger,
+		store:               store,
+		library:             library.NewService(),
+		scanner:             scanner.NewService(logger),
+		scraper:             scraperService,
+		assets: assets.NewService(
+			logger,
+			cfg.CacheDir,
+			time.Duration(cfg.Assets.RequestTimeoutSeconds)*time.Second,
+			cfg.Assets.MaxConcurrentDownloads,
+			cfg.Assets.MaxResponseBodyMB,
+		),
+		tasks:               tasks.NewManager(),
+		organizeLibrary:     cfg.OrganizeLibrary,
+		librarySettingsPath: strings.TrimSpace(librarySettingsPath),
+		appCtx:              ctx,
+		scrapeSem:           make(chan struct{}, scrapeConc),
 	}, nil
 }
 
@@ -78,11 +105,25 @@ func (a *App) OrganizeLibrary() bool {
 	return a.organizeLibrary
 }
 
-// SetOrganizeLibrary updates runtime organize flag (HTTP Settings / API).
-func (a *App) SetOrganizeLibrary(v bool) {
+// SetOrganizeLibrary persists organizeLibrary to library-config.cfg, then updates in-memory state.
+// Fails without mutating memory if the file cannot be written.
+func (a *App) SetOrganizeLibrary(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["organizeLibrary"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	a.organizeMu.Lock()
 	a.organizeLibrary = v
+	a.cfg.OrganizeLibrary = v
 	a.organizeMu.Unlock()
+	return nil
 }
 
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
@@ -135,7 +176,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 	case contracts.CommandSystemHealth:
 		return a.respondOK(output, command.ID, contracts.HealthDTO{
 			Name:         "javd",
-			Version:      appVersion,
+			Version:      version.Version,
 			Transport:    "stdio-jsonl",
 			DatabasePath: a.cfg.DatabasePath,
 		})
@@ -258,19 +299,34 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	skippedCount := 0
 	persistedResults := make([]contracts.ScanFileResultDTO, 0)
 
+	const (
+		minScanProgressInterval = 250 * time.Millisecond
+		scanProgressFileStep    = 50
+	)
+	var lastProgressEmit time.Time
+
 	summary, err := a.scanner.Scan(ctx, taskID, paths, scanner.Hooks{
 		OnProgress: func(processed, total int, message string) {
+			now := time.Now()
+			shouldEmit := processed == 0 || processed == total ||
+				now.Sub(lastProgressEmit) >= minScanProgressInterval ||
+				(processed > 0 && processed%scanProgressFileStep == 0)
+			if !shouldEmit {
+				return
+			}
+			lastProgressEmit = now
+
 			progress := 100
 			if total > 0 {
 				progress = int(float64(processed) / float64(total) * 100)
 			}
 
 			patch := map[string]any{
-				"scanTotal":       total,
-				"scanProcessed":   processed,
-				"scanImported":    importedCount,
-				"scanUpdated":     updatedCount,
-				"scanSkipped":     skippedCount,
+				"scanTotal":     total,
+				"scanProcessed": processed,
+				"scanImported":  importedCount,
+				"scanUpdated":   updatedCount,
+				"scanSkipped":   skippedCount,
 			}
 			task := a.tasks.ProgressWithMetadata(taskID, progress, message, patch)
 			if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
@@ -344,13 +400,13 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				if emitErr := a.emitEvent(output, contracts.EventScanFileImported, result); emitErr != nil {
 					a.logger.Error("failed to emit scan import event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
-				go a.runScrape(parentCtx, output, result)
+				a.enqueueScrape(parentCtx, output, result)
 			case "updated":
 				updatedCount++
 				if emitErr := a.emitEvent(output, contracts.EventScanFileUpdated, result); emitErr != nil {
 					a.logger.Error("failed to emit scan update event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
-				go a.runScrape(parentCtx, output, result)
+				a.enqueueScrape(parentCtx, output, result)
 			default:
 				skippedCount++
 				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
@@ -364,8 +420,8 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	})
 	if err != nil {
 		code := contracts.ErrorCodeScanWalk
-		if err == context.Canceled {
-			code = contracts.ErrorCodeScanStart
+		if errors.Is(err, context.Canceled) {
+			code = contracts.ErrorCodeScanCancelled
 		}
 		task := a.tasks.Fail(taskID, code, err.Error())
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
@@ -407,10 +463,17 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	}
 }
 
-func (a *App) runScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO) {
-	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
-	defer cancel()
+// enqueueScrape runs runScrape in a goroutine bounded by scrapeSem (config scraper.maxConcurrent).
+func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO) {
+	go func(r contracts.ScanFileResultDTO) {
+		a.scrapeSem <- struct{}{}
+		defer func() { <-a.scrapeSem }()
+		a.runScrape(parentCtx, output, r)
+	}(result)
+}
 
+// beginMovieScrapeTask creates and persists the scrape.movie task and emits task started.
+func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result contracts.ScanFileResultDTO) contracts.TaskDTO {
 	task := a.tasks.Create("scrape.movie", map[string]any{
 		"movieId": result.MovieID,
 		"number":  result.Number,
@@ -423,7 +486,11 @@ func (a *App) runScrape(parentCtx context.Context, output io.Writer, result cont
 	if err := a.emitEvent(output, contracts.EventTaskStarted, contracts.TaskEventDTO{Task: task}); err != nil {
 		a.logger.Error("failed to emit scraper task start", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
+	return task
+}
 
+// runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
+func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context, output io.Writer, task contracts.TaskDTO, result contracts.ScanFileResultDTO) {
 	metadata, err := a.scraper.Scrape(ctx, result.MovieID, result.Number)
 	if err != nil {
 		code := contracts.ErrorCodeScraperRun
@@ -514,6 +581,49 @@ func (a *App) runScrape(parentCtx context.Context, output io.Writer, result cont
 		assetDest = filepath.Dir(result.Path)
 	}
 	go a.runAssetDownload(parentCtx, output, metadata, assetDest)
+}
+
+func (a *App) runScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO) {
+	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
+	defer cancel()
+	task := a.beginMovieScrapeTask(ctx, output, result)
+	a.runMovieScrapeBody(ctx, parentCtx, output, task, result)
+}
+
+// StartMovieMetadataRefresh enqueues a single-movie rescrape (same pipeline as scan-triggered scrape).
+// It returns the scrape task immediately; work continues in a background goroutine.
+func (a *App) StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error) {
+	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return contracts.TaskDTO{}, contracts.ErrScrapeMovieNotFound
+	}
+	if err != nil {
+		return contracts.TaskDTO{}, err
+	}
+	if strings.TrimSpace(detail.Code) == "" {
+		return contracts.TaskDTO{}, contracts.ErrScrapeMovieNoCode
+	}
+	if strings.TrimSpace(detail.Location) == "" {
+		return contracts.TaskDTO{}, contracts.ErrScrapeMovieNoLocation
+	}
+
+	result := contracts.ScanFileResultDTO{
+		Path:     detail.Location,
+		FileName: filepath.Base(detail.Location),
+		Number:   detail.Code,
+		MovieID:  detail.ID,
+		Status:   "updated",
+	}
+
+	task := a.beginMovieScrapeTask(ctx, io.Discard, result)
+
+	go func() {
+		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
+		defer cancel()
+		a.runMovieScrapeBody(scrapeCtx, a.appCtx, io.Discard, task, result)
+	}()
+
+	return task, nil
 }
 
 func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, metadata scraper.Metadata, destDir string) {
@@ -737,13 +847,14 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 
 func (a *App) HTTPHandler() http.Handler {
 	return server.NewHandler(server.Deps{
-		Cfg:                a.cfg,
-		Logger:             a.logger,
-		Store:              a.store,
-		Library:            a.library,
-		Tasks:              a.tasks,
-		ScanStarter:        a,
-		OrganizeLibraryCtl: a,
+		Cfg:                    a.cfg,
+		Logger:                 a.logger,
+		Store:                  a.store,
+		Library:                a.library,
+		Tasks:                  a.tasks,
+		ScanStarter:            a,
+		OrganizeLibraryCtl:     a,
+		MovieMetadataRefresher: a,
 	}).Routes()
 }
 

@@ -1,19 +1,36 @@
 ---
-description: Current repo facts and constraints
+description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
-# Project Facts
+# Project Facts（当前实现）
 
-- Treat this repo as a `Vue 3 + TypeScript + Vite` routed frontend prototype, not a blank scaffold.
-- Package manager is `pnpm`; keep `pnpm-lock.yaml` authoritative.
-- UI stack is `shadcn-vue` with Tailwind CSS v4 and theme tokens in `src/style.css`.
-- Path alias `@` maps to `src`; prefer alias imports over long relative paths.
-- App entry is `src/main.ts`, `src/App.vue` only renders the router, and the main shell lives in `src/layouts/AppShell.vue`.
-- Current top-level routes are `library`, `favorites`, `recent`, `tags`, `detail`, `player`, and `settings`.
-- Product-specific presentation components live in `src/components/jav-library`; shared primitives stay in `src/components/ui`.
-- Current domain types, mock data, and helper functions live in `src/lib/jav-library.ts`; treat them as prototype contracts until a real service layer exists.
-- Shared utilities belong in `src/lib`; reusable UI belongs in `src/components` or `src/components/ui`.
-- The repo is still in an early prototype stage, so prefer reusable boundaries and typed contracts over one-off feature code.
-- `vue-router` and `vue-virtual-scroller` are already in use; do not regress the app back to local-state page switching or non-virtualized large poster grids.
-- `components.json` uses the `shadcn-vue` schema; do not assume React `shadcn/ui` CLI behavior or file layout.
+## 技术栈与包管理
+
+- 根目录：`Vue 3 + TypeScript + Vite`，UI 为 `shadcn-vue` + Tailwind CSS v4，主题变量在 `src/style.css`。
+- 包管理器：**pnpm**；以 `pnpm-lock.yaml` 为准。
+- 路径别名：`@` → `src`。
+
+## 后端（已实现）
+
+- Go 服务在 **`backend/`**，HTTP 入口：`cd backend && go run ./cmd/javd`；默认 **`httpAddr` `:8080`**（见 `backend/internal/config`）。
+- **SQLite** 应用库、扫描结果、任务等与 `config` 中的 `databasePath` 绑定；刮削侧另有 Metatube 引擎相关 SQLite（日志里可见 GORM）。
+- 主要逻辑：`backend/internal/app`（扫描、刮削、任务）、`server`（HTTP）、`storage`、`scanner`、`scraper`、`tasks`。
+- HTTP 路由前缀 **`/api`**（节选）：`health`、`library/movies`（列表/详情/删除）、**`GET library/movies/{movieId}/stream`**（主视频流，支持 Range）、**`POST library/movies/{movieId}/scrape`**（单部刷新元数据）、`library/paths`、`settings`、`scans`、`tasks/{taskId}`。
+
+## 前端结构
+
+- 入口：`src/main.ts`；`App.vue` 仅挂路由；主壳 **`src/layouts/AppShell.vue`**。
+- 路由含：`library`、`favorites`、`recent`、`tags`、`detail`、`player`、`settings` 等（见 `src/router`）。
+- 业务展示组件：**`src/components/jav-library`**；通用 UI：**`src/components/ui`**。
+- **领域类型**：`src/domain/**`；与后端对齐的 DTO/请求类型：**`src/api/types.ts`**；HTTP 封装：**`src/api/http-client.ts`**、**`src/api/endpoints.ts`**。
+- **服务层**：契约 **`src/services/contracts/library-service.ts`**；实现 **`src/services/adapters/web/web-library-service.ts`**（真实 API）与 **`mock/mock-library-service.ts`**（本地演示）。
+- 切换方式：环境变量 **`VITE_USE_WEB_API`**（如根目录 `.env` 中 `true`）→ Web 适配器；否则 Mock。
+- 长任务（扫描、单部刮削）：**`src/composables/use-scan-task-tracker.ts`** 轮询 **`GET /api/tasks/{taskId}`**；详情页在刮削完成后会 **`loadMovieDetail`** 刷新。
+- 开发时代理：`vite.config.ts` 将 **`/api` 代理到 `http://localhost:8080`**；前端请求基址默认为 **`/api`**（见 `http-client`），一般无需再配 `VITE_API_BASE_URL`。
+- `components.json` 为 **shadcn-vue**  schema，勿按 React shadcn 目录假设。
+
+## 其它约束
+
+- 已使用 **`vue-router`** 与 **`vue-virtual-scroller`**；大图海报列表勿退回非虚拟化或整页无路由切换。
+- 原型阶段仍优先：**可复用边界、类型契约、服务层**，避免一次性页面逻辑堆叠。

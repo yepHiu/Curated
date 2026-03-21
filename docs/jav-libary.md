@@ -711,8 +711,9 @@ UI 操作
 
 ### 8.6 当前状态
 
-- 当前 `PlayerPage` 已是 video-first 结构。
-- 当前控制按钮、进度条和音量条都是视觉原型。
+- 当前 `PlayerPage` 为 video-first 布局；在 **Web 阶段（`VITE_USE_WEB_API`）** 下，主视频通过 **`GET /api/library/movies/{movieId}/stream`** 输出字节流（支持 `Range`），前端使用 **`<video>`** 播放；解码由 **浏览器**完成，不兼容格式需在 UI 提示或依赖后续桌面 `mpv`。
+- 流路径会校验影片 `location` 是否落在已配置的 **library path** 之下，避免任意文件读取。
+- **目标设计**中的 `mpv + Electron` 控制链（§8.2–8.3）仍为桌面阶段方案，与上述 Web 播放可并存（后期可双模式）。
 
 ---
 

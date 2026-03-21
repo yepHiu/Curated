@@ -47,7 +47,7 @@ Phase 2: Vue Renderer -> preload -> Electron Main -> Go Backend
 - 影片库列表页仍读取 mock 列表，而不是真实 `library.list`。
 - 影片详情页仍读取 mock 详情，而不是真实 `library.detail`。
 - 设置页按钮未触发 `settings.get`、`scan.start`、`scan.status`。
-- 播放器页仍是视觉占位，未接入任何真实命令或状态事件。
+- 播放器页：已通过 **`GET /api/library/movies/{id}/stream` + `<video>`** 接入主文件播放（Web）；文档中的 **`player.play` / `player.command`（mpv IPC）** 仍为桌面阶段，尚未实现。
 
 ### 2.4 事件链路未打通
 

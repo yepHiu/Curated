@@ -36,10 +36,12 @@ const props = withDefaults(
     movie: Movie
     compact?: boolean
     showActions?: boolean
+    metadataRefreshBusy?: boolean
   }>(),
   {
     compact: false,
     showActions: true,
+    metadataRefreshBusy: false,
   },
 )
 
@@ -49,6 +51,7 @@ const emit = defineEmits<{
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   deleteMovie: [movieId: string]
+  refreshMetadata: [movieId: string]
 }>()
 
 const actorInitials = (name: string) =>
@@ -246,10 +249,15 @@ const posterSrc = computed(() => props.movie.coverUrl || props.movie.thumbUrl ||
         <div v-if="props.showActions" class="flex flex-wrap items-center gap-3">
           <Button class="rounded-2xl" @click="emit('openPlayer', movie.id)">
             <PlayCircle data-icon="inline-start" />
-            Play selected title
+            播放
           </Button>
-          <Button variant="secondary" class="rounded-2xl">
-            Refresh metadata
+          <Button
+            variant="secondary"
+            class="rounded-2xl"
+            :disabled="props.metadataRefreshBusy"
+            @click="emit('refreshMetadata', movie.id)"
+          >
+            {{ props.metadataRefreshBusy ? "正在提交…" : "刷新元数据" }}
           </Button>
         </div>
       </div>

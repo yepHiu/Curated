@@ -1,13 +1,25 @@
 ---
-description: Architecture boundaries between current frontend and future desktop stack
+description: 当前实现 vs 目标桌面架构边界
 alwaysApply: true
 ---
 
 # Architecture Boundaries
 
-- `docs/jav-libary.md` describes the target product architecture, not the current implementation state.
-- Do not assume the repo already contains `Electron`, `Go`, `SQLite`, `mpv`, or a working desktop bridge.
-- When adding business code, keep the Vue layer decoupled from future desktop/runtime details.
-- Renderer-facing code should depend on a front-end service layer and typed contracts, not direct assumptions about IPC, HTTP, filesystems, or local databases.
-- Prefer defining domain models, DTOs, event types, and error codes before wiring real desktop integrations.
-- If a document mixes implemented facts with future plans, rewrite it to separate current state, target state, and pending decisions.
+## 文档与真相
+
+- **`docs/jav-libary.md`** 描述的是**目标产品架构**；以**当前代码**为事实来源，文档与代码冲突时先改文档或标明「规划中」。
+- 在文档中区分：**已实现**、**目标态**、**待定**。
+
+## 当前仓库已具备（不要再说「还没有」）
+
+- **Go HTTP 后端**、**SQLite 应用库**、**扫描 / 刮削 / 任务**、**REST 式 `/api`** 等已在 `backend/` 落地。
+- 前端可通过 **`VITE_USE_WEB_API`** 走真实 HTTP，与上述后端对接。
+
+## 仍未当作已实现
+
+- **Electron**、**preload/Main 与渲染进程 IPC**、**mpv 播放器进程**、**桌面级文件/权限桥** 等：规划在文档中，**不要**在 Vue 里写死为已存在；业务代码仍经 **`library-service` 契约** 与 **`src/api`**，便于日后换传输层。
+
+## 编写业务代码时
+
+- 渲染层依赖**前端服务层 + 类型**，不直接假设「本地文件路径、IPC 名、DB 连接串」等桌面细节。
+- 需要新能力时：先 **DTO / 错误码 / 事件名**（可与 `backend/internal/contracts` 对齐），再接线 HTTP 或日后的 stdio/IPC。

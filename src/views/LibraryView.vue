@@ -3,6 +3,7 @@ import { computed, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import LibraryPage from "@/components/jav-library/LibraryPage.vue"
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
+import type { Movie } from "@/domain/movie/types"
 import {
   buildMovieRouteQuery,
   getLibrarySearchQuery,
@@ -12,6 +13,7 @@ import {
   mergeLibraryQuery,
 } from "@/lib/library-query"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
+import { movieSearchHaystack } from "@/lib/movie-search"
 import { useLibraryService } from "@/services/library-service"
 
 const route = useRoute()
@@ -29,32 +31,28 @@ const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))
 
 const queryFilteredMovies = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
-  let result = [...libraryMovies.value]
+  const mode = libraryMode.value
+  const raw = libraryMovies.value
 
-  if (libraryMode.value === "favorites") {
-    result = result.filter((movie) => movie.isFavorite)
-  }
-
-  if (libraryMode.value === "recent") {
-    result = result
+  let list: Movie[]
+  if (mode === "favorites") {
+    list = raw.filter((movie) => movie.isFavorite)
+  } else if (mode === "recent") {
+    list = raw
       .filter((movie) => isMovieRecentlyAdded(movie.addedAt))
+      .slice()
       .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
-  }
-
-  if (libraryMode.value === "tags") {
-    result = result.sort((left, right) => left.tags.join("").localeCompare(right.tags.join("")))
+  } else if (mode === "tags") {
+    list = raw.slice().sort((left, right) => left.tags.join("").localeCompare(right.tags.join("")))
+  } else {
+    list = [...raw]
   }
 
   if (!query) {
-    return result
+    return list
   }
 
-  return result.filter((movie) =>
-    [movie.title, movie.code, movie.studio, movie.actors.join(" "), movie.tags.join(" ")]
-      .join(" ")
-      .toLowerCase()
-      .includes(query),
-  )
+  return list.filter((movie) => movieSearchHaystack(movie).includes(query))
 })
 
 const visibleMovies = computed(() => {

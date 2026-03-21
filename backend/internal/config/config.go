@@ -32,11 +32,17 @@ type TaskConfig struct {
 type ScraperConfig struct {
 	RequestTimeoutSeconds int `json:"requestTimeoutSeconds"`
 	TaskTimeoutSeconds    int `json:"taskTimeoutSeconds"`
+	// MaxConcurrent limits parallel scrape.movie goroutines after scan (0 = default 4).
+	MaxConcurrent int `json:"maxConcurrent,omitempty"`
 }
 
 type AssetConfig struct {
 	RequestTimeoutSeconds int `json:"requestTimeoutSeconds"`
 	TaskTimeoutSeconds    int `json:"taskTimeoutSeconds"`
+	// MaxConcurrentDownloads limits parallel HTTP fetches per asset.download task (0 = default 3).
+	MaxConcurrentDownloads int `json:"maxConcurrentDownloads,omitempty"`
+	// MaxResponseBodyMB caps a single HTTP response body when saving an asset (0 = default 50).
+	MaxResponseBodyMB int `json:"maxResponseBodyMB,omitempty"`
 }
 
 type PlayerConfig struct {
@@ -56,14 +62,18 @@ func Default() Config {
 		Scraper: ScraperConfig{
 			RequestTimeoutSeconds: 45,
 			TaskTimeoutSeconds:    120,
+			MaxConcurrent:         4,
 		},
 		Assets: AssetConfig{
-			RequestTimeoutSeconds: 30,
-			TaskTimeoutSeconds:    180,
+			RequestTimeoutSeconds:  30,
+			TaskTimeoutSeconds:     180,
+			MaxConcurrentDownloads: 3,
+			MaxResponseBodyMB:      50,
 		},
 		Player: PlayerConfig{
 			HardwareDecode: true,
 		},
+		OrganizeLibrary: true,
 	}
 }
 
@@ -110,11 +120,20 @@ func Load(path string) (Config, error) {
 	if cfg.Scraper.TaskTimeoutSeconds <= 0 {
 		cfg.Scraper.TaskTimeoutSeconds = 120
 	}
+	if cfg.Scraper.MaxConcurrent <= 0 {
+		cfg.Scraper.MaxConcurrent = 4
+	}
 	if cfg.Assets.RequestTimeoutSeconds <= 0 {
 		cfg.Assets.RequestTimeoutSeconds = 30
 	}
 	if cfg.Assets.TaskTimeoutSeconds <= 0 {
 		cfg.Assets.TaskTimeoutSeconds = 180
+	}
+	if cfg.Assets.MaxConcurrentDownloads <= 0 {
+		cfg.Assets.MaxConcurrentDownloads = 3
+	}
+	if cfg.Assets.MaxResponseBodyMB <= 0 {
+		cfg.Assets.MaxResponseBodyMB = 50
 	}
 
 	return cfg, nil

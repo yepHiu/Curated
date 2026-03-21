@@ -48,7 +48,8 @@ const editLibraryTitleDraft = ref("")
 const editTitleBusy = ref(false)
 const editTitleError = ref("")
 const scanFeedbackError = ref("")
-const organizeLibraryBusy = ref(false)
+/** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
+const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
@@ -187,7 +188,7 @@ async function rescanPath(path: string) {
 
 async function onOrganizeLibraryChange(next: boolean) {
   organizeLibraryError.value = ""
-  organizeLibraryBusy.value = true
+  organizeLibrarySaving.value = true
   try {
     await libraryService.setOrganizeLibrary(next)
   } catch (err) {
@@ -198,7 +199,7 @@ async function onOrganizeLibraryChange(next: boolean) {
       organizeLibraryError.value = "保存失败，请稍后重试。"
     }
   } finally {
-    organizeLibraryBusy.value = false
+    organizeLibrarySaving.value = false
   }
 }
 
@@ -477,18 +478,28 @@ async function runFullScan() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="organizeLibrarySaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <p class="font-medium">整理入库（organizeLibrary）</p>
                 <p class="text-sm text-muted-foreground">
-                  关闭时仅更新数据库路径，海报等仍下载到服务端 cache 目录。此处修改在内存中生效，重启 javd
-                  后仍以配置文件为准，除非再次在此打开。
+                  关闭时仅更新数据库路径，海报等仍下载到服务端 cache 目录。开关会立即写入
+                  <span class="font-mono text-xs">config/library-config.cfg</span>
+                  ，重启 javd 后仍保持该值。
+                </p>
+                <p
+                  v-if="organizeLibrarySaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  正在同步到服务端…
                 </p>
               </div>
               <Switch
-                :checked="organizeLibrary"
-                :disabled="organizeLibraryBusy"
-                @update:checked="onOrganizeLibraryChange"
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="organizeLibrary"
+                @update:model-value="onOrganizeLibraryChange"
               />
             </div>
             <p v-if="organizeLibraryError" class="text-sm text-destructive">
@@ -514,7 +525,7 @@ async function runFullScan() {
                   A placeholder switch for future player preferences.
                 </p>
               </div>
-              <Switch v-model:checked="hardwareDecode" />
+              <Switch v-model="hardwareDecode" />
             </div>
 
             <div class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4">
@@ -524,7 +535,7 @@ async function runFullScan() {
                   Keep newly discovered titles enriched after each scan.
                 </p>
               </div>
-              <Switch v-model:checked="autoScrape" />
+              <Switch v-model="autoScrape" />
             </div>
           </CardContent>
         </Card>

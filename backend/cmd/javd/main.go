@@ -29,6 +29,11 @@ func main() {
 		exitWithInitError("failed to load config", err)
 	}
 
+	librarySettingsPath := config.DefaultLibrarySettingsPath()
+	if err := config.MergeLibrarySettingsFile(&cfg, librarySettingsPath); err != nil {
+		exitWithInitError("failed to merge library settings file", err)
+	}
+
 	logger, err := logging.New(cfg.LogLevel)
 	if err != nil {
 		exitWithInitError("failed to initialize logger", err)
@@ -53,7 +58,7 @@ func main() {
 		logger.Fatal("failed to seed library paths", logging.Error(err))
 	}
 
-	backendApp, err := app.New(ctx, cfg, logger, store)
+	backendApp, err := app.New(ctx, cfg, logger, store, librarySettingsPath)
 	if err != nil {
 		logger.Fatal("failed to initialize backend app", logging.Error(err))
 	}

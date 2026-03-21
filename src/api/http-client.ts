@@ -32,17 +32,25 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   return url.toString()
 }
 
+async function parseJsonBody<T>(response: Response): Promise<T> {
+  const text = await response.text()
+  if (!text.trim()) {
+    return undefined as T
+  }
+  return JSON.parse(text) as T
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let apiError: ApiError | undefined
     try {
-      apiError = await response.json()
+      apiError = await parseJsonBody<ApiError>(response)
     } catch {
       // response body was not JSON
     }
     throw new HttpClientError(response.status, apiError)
   }
-  return response.json()
+  return parseJsonBody<T>(response)
 }
 
 export const httpClient = {

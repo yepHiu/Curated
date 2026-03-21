@@ -10,6 +10,9 @@ import (
 	"jav-shadcn/backend/internal/scraper"
 )
 
+// ErrMovieNotFoundForMetadata is returned when SaveMovieMetadata updates zero rows (unknown movie id).
+var ErrMovieNotFoundForMetadata = errors.New("movie not found for metadata update")
+
 func (s *SQLiteStore) SaveMovieMetadata(ctx context.Context, metadata scraper.Metadata) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -19,7 +22,7 @@ func (s *SQLiteStore) SaveMovieMetadata(ctx context.Context, metadata scraper.Me
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.ExecContext(
+	res, err := tx.ExecContext(
 		ctx,
 		`UPDATE movies SET
 			title = ?,
@@ -56,6 +59,13 @@ func (s *SQLiteStore) SaveMovieMetadata(ctx context.Context, metadata scraper.Me
 	)
 	if err != nil {
 		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("%w (id=%s)", ErrMovieNotFoundForMetadata, metadata.MovieID)
 	}
 
 	if err := replaceMovieActors(ctx, tx, metadata.MovieID, metadata.Actors); err != nil {

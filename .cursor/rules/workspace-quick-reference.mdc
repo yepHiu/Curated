@@ -1,0 +1,24 @@
+---
+description: 日常开发速记（启动、环境、代理）— 供 AI 与用户对齐操作
+alwaysApply: true
+---
+
+# Workspace Quick Reference（项目记忆）
+
+## 一键心智模型
+
+- **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
+- **后端**：`backend` 目录 `go run ./cmd/javd`，默认 **:8080**。
+- **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
+
+## 常见操作（复述用户诉求时）
+
+- **重启前后端**：先释放 **5173 / 8080** 上旧进程（若占端口），再分别启动上述两条命令。
+- **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。
+
+## 规则索引
+
+- 实现细节与目录：**`project-facts.mdc`**。
+- 前后端分层与桌面未来边界：**`architecture-boundaries.mdc`**。
+- Vue 写法：**`vue-frontend-standards.mdc`**、**`jav-library-frontend-patterns.mdc`**。
+- Go/合约/文档：**`backend-go-standards.mdc`**、**`backend-api-contracts.mdc`**、**`docs-sync.mdc`**。

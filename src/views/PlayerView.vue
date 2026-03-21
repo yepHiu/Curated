@@ -1,15 +1,44 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import PlayerPage from "@/components/jav-library/PlayerPage.vue"
 import { useLibraryService } from "@/services/library-service"
+
+const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 
 const route = useRoute()
 const libraryService = useLibraryService()
 
 const movieId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
+)
+
+const hydrating = ref(false)
+
+watch(
+  movieId,
+  async (id) => {
+    if (!id) {
+      hydrating.value = false
+      return
+    }
+    if (libraryService.getMovieById(id)) {
+      hydrating.value = false
+      return
+    }
+    if (!USE_WEB_API) {
+      hydrating.value = false
+      return
+    }
+    hydrating.value = true
+    try {
+      await libraryService.ensureMovieCached(id)
+    } finally {
+      hydrating.value = false
+    }
+  },
+  { immediate: true },
 )
 
 const selectedMovie = computed(() =>
@@ -19,7 +48,13 @@ const selectedMovie = computed(() =>
 
 <template>
   <div class="h-full overflow-y-auto pr-2">
-    <PlayerPage v-if="selectedMovie" :movie="selectedMovie" />
+    <div
+      v-if="hydrating"
+      class="rounded-3xl border border-border/70 bg-card/80 p-8 text-sm text-muted-foreground"
+    >
+      正在加载播放目标…
+    </div>
+    <PlayerPage v-else-if="selectedMovie" :movie="selectedMovie" />
     <NotFoundState
       v-else
       title="Player target not found"

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,7 +16,29 @@ import (
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
 	"jav-shadcn/backend/internal/storage"
+	"jav-shadcn/backend/internal/tasks"
 )
+
+// testMovieMetadataRefresher registers a scrape.movie task in tm without running a real scraper.
+type testMovieMetadataRefresher struct {
+	tm *tasks.Manager
+}
+
+func (f *testMovieMetadataRefresher) StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error) {
+	_ = ctx
+	task := f.tm.Create("scrape.movie", map[string]any{"movieId": movieID})
+	return f.tm.Start(task.TaskID, "Scraping metadata (test)"), nil
+}
+
+type errMovieMetadataRefresher struct {
+	err error
+}
+
+func (e *errMovieMetadataRefresher) StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error) {
+	_ = ctx
+	_ = movieID
+	return contracts.TaskDTO{}, e.err
+}
 
 func TestHandleDeleteMovie_NotFound(t *testing.T) {
 	t.Parallel()
@@ -85,8 +109,19 @@ func TestHandleDeleteMovie_Success204(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cacheRoot := filepath.Join(root, "api-cache")
+	movieCacheDir := filepath.Join(cacheRoot, outcome.MovieID)
+	if err := os.MkdirAll(movieCacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieCacheDir, "poster.jpg"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	h := NewHandler(Deps{
-		Cfg:    config.Config{},
+		Cfg: config.Config{
+			CacheDir: cacheRoot,
+		},
 		Logger: zap.NewNop(),
 		Store:  store,
 	})
@@ -112,5 +147,331 @@ func TestHandleDeleteMovie_Success204(t *testing.T) {
 	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
 	if err == nil {
 		t.Fatal("expected movie gone from DB")
+	}
+	if _, err := os.Stat(movieCacheDir); !os.IsNotExist(err) {
+		t.Fatalf("asset cache dir should be removed after DELETE API: %v", err)
+	}
+}
+
+func TestHandleRefreshMovieMetadata_Accepted202AndTaskPoll(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "SRV-SCRAPE.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t-scrape",
+		Path:     videoPath,
+		FileName: "SRV-SCRAPE.mp4",
+		Number:   "SRV-SCRAPE",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tm := tasks.NewManager()
+	ref := &testMovieMetadataRefresher{tm: tm}
+	h := NewHandler(Deps{
+		Cfg:                    config.Config{},
+		Logger:                 zap.NewNop(),
+		Store:                  store,
+		Tasks:                  tm,
+		MovieMetadataRefresher: ref,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/"+outcome.MovieID+"/scrape", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", resp.StatusCode)
+	}
+	var task contracts.TaskDTO
+	if err := json.NewDecoder(resp.Body).Decode(&task); err != nil {
+		t.Fatal(err)
+	}
+	if task.TaskID == "" {
+		t.Fatal("expected taskId in body")
+	}
+	if task.Type != "scrape.movie" {
+		t.Fatalf("task type = %q, want scrape.movie", task.Type)
+	}
+
+	pollReq, err := http.NewRequest(http.MethodGet, srv.URL+"/api/tasks/"+task.TaskID, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pollResp, err := http.DefaultClient.Do(pollReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pollResp.Body.Close()
+	if pollResp.StatusCode != http.StatusOK {
+		t.Fatalf("poll status = %d, want 200", pollResp.StatusCode)
+	}
+	var polled contracts.TaskDTO
+	if err := json.NewDecoder(pollResp.Body).Decode(&polled); err != nil {
+		t.Fatal(err)
+	}
+	if polled.TaskID != task.TaskID {
+		t.Fatalf("polled task id = %q, want %q", polled.TaskID, task.TaskID)
+	}
+}
+
+func TestHandleRefreshMovieMetadata_NotFound404(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	tm := tasks.NewManager()
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tm,
+		MovieMetadataRefresher: &errMovieMetadataRefresher{
+			err: contracts.ErrScrapeMovieNotFound,
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/missing-id/scrape", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandleRefreshMovieMetadata_BadRequestWhenNotConfiguredUsesNilRefresher(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tasks.NewManager(),
+		// MovieMetadataRefresher nil
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/any/scrape", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+}
+
+func TestHandleRefreshMovieMetadata_ErrorsIsWrappedNotFound(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	tm := tasks.NewManager()
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tm,
+		MovieMetadataRefresher: &errMovieMetadataRefresher{
+			err: fmt.Errorf("wrapped: %w", contracts.ErrScrapeMovieNotFound),
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/x/scrape", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 for fmt.Errorf-wrapped sentinel", resp.StatusCode)
+	}
+}
+
+func TestHandleStreamMovie_OKAndRange(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libRoot := filepath.Join(root, "lib")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoPath := filepath.Join(libRoot, "PLAY-001.mp4")
+	content := []byte("fake-mp4-bytes-for-range-test")
+	if err := os.WriteFile(videoPath, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, libRoot, ""); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoPath,
+		FileName: "PLAY-001.mp4",
+		Number:   "PLAY-001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tasks.NewManager(),
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	fullURL := srv.URL + "/api/library/movies/" + outcome.MovieID + "/stream"
+	req, err := http.NewRequest(http.MethodGet, fullURL, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET stream status = %d, want 200", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != string(content) {
+		t.Fatalf("body mismatch")
+	}
+	if acceptRanges := resp.Header.Get("Accept-Ranges"); acceptRanges != "bytes" {
+		t.Fatalf("Accept-Ranges = %q, want bytes", acceptRanges)
+	}
+
+	req2, err := http.NewRequest(http.MethodGet, fullURL, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req2.Header.Set("Range", "bytes=4-7")
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusPartialContent {
+		t.Fatalf("Range status = %d, want 206", resp2.StatusCode)
+	}
+	partial, err := io.ReadAll(resp2.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(partial) != "-mp4" {
+		t.Fatalf("partial body = %q, want -mp4", string(partial))
+	}
+}
+
+func TestHandleStreamMovie_NotFoundUnknownMovie(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tasks.NewManager(),
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/library/movies/no-such-id/stream", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
 }

@@ -5,6 +5,6 @@ alwaysApply: true
 
 # Project Standards
 
-- This repo is currently a `Vue 3 + TypeScript + Vite` project using `shadcn-vue`.
-- Treat current implementation facts and future desktop architecture as separate layers.
-- Use the focused rules in `project-facts.mdc`, `architecture-boundaries.mdc`, and `vue-frontend-standards.mdc` as the primary guidance for edits.
+- This repo is a **`Vue 3 + TypeScript + Vite` + `shadcn-vue`** app at the repo root, with a **`Go` HTTP backend** under **`backend/`** (not a frontend-only scaffold).
+- Separate **current code facts** from **future desktop (Electron / IPC / mpv)** plans; see `architecture-boundaries.mdc`.
+- Primary rule handoff: **`workspace-quick-reference.mdc`** (daily ops) → **`project-facts.mdc`** (structure/API) → **`vue-frontend-standards.mdc`** / **`jav-library-frontend-patterns.mdc`** for UI → **`backend-*`** rules when touching Go.

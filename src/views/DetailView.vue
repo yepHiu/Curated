@@ -2,8 +2,10 @@
 import { computed, ref, shallowRef, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
+import type { TaskDTO } from "@/api/types"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
+import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
@@ -14,6 +16,16 @@ const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const scanTaskTracker = useScanTaskTracker()
+
+function isTerminalTaskStatus(status: TaskDTO["status"]): boolean {
+  return (
+    status === "completed" ||
+    status === "failed" ||
+    status === "cancelled" ||
+    status === "partial_failed"
+  )
+}
 
 const movieId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
@@ -23,6 +35,8 @@ const detailMovie = shallowRef<Movie | undefined>()
 const detailLoading = ref(false)
 const deleteBusy = ref(false)
 const deleteError = ref("")
+const metadataRefreshBusy = ref(false)
+const metadataRefreshError = ref("")
 
 watch(
   () => movieId.value,
@@ -46,6 +60,27 @@ watch(
   { immediate: true },
 )
 
+watch(scanTaskTracker.activeTask, async (task) => {
+  const id = movieId.value
+  if (!USE_WEB_API || !id || !task) return
+  if (!isTerminalTaskStatus(task.status)) return
+  if (task.type !== "scrape.movie") return
+  const mid =
+    task.metadata && typeof task.metadata.movieId === "string" ? task.metadata.movieId : undefined
+  if (mid !== id) return
+
+  if (task.status === "completed") {
+    metadataRefreshError.value = ""
+    const loaded = await loadMovieDetail(id)
+    if (loaded) {
+      detailMovie.value = loaded
+    }
+  } else if (task.status === "failed" || task.status === "partial_failed") {
+    metadataRefreshError.value =
+      task.errorMessage?.trim() || "元数据刮削失败，详情未更新"
+  }
+})
+
 const relatedMovies = computed(() =>
   detailMovie.value ? libraryService.getRelatedMovies(detailMovie.value.id) : [],
 )
@@ -54,6 +89,7 @@ const selectMovie = async (nextMovieId: string) => {
   await router.replace({
     name: "detail",
     params: { id: nextMovieId },
+    query: buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
   })
 }
 
@@ -75,6 +111,9 @@ const openPlayer = async (nextMovieId: string) => {
 
 const toggleFavorite = (payload: { movieId: string; nextValue: boolean }) => {
   libraryService.toggleFavorite(payload.movieId, payload.nextValue)
+  if (detailMovie.value?.id === payload.movieId) {
+    detailMovie.value = { ...detailMovie.value, isFavorite: payload.nextValue }
+  }
 }
 
 const handleDeleteMovie = async (id: string) => {
@@ -97,6 +136,32 @@ const handleDeleteMovie = async (id: string) => {
     console.error("[DetailView] delete movie failed", err)
   } finally {
     deleteBusy.value = false
+  }
+}
+
+const handleRefreshMetadata = async (id: string) => {
+  metadataRefreshError.value = ""
+  metadataRefreshBusy.value = true
+  try {
+    const task = await libraryService.refreshMovieMetadata(id)
+    if (!task?.taskId) {
+      metadataRefreshError.value = USE_WEB_API
+        ? "无法启动刷新任务"
+        : "本地演示模式不支持刷新元数据，请启用后端 API（VITE_USE_WEB_API）"
+      return
+    }
+    scanTaskTracker.start(task.taskId)
+  } catch (err) {
+    const message =
+      err instanceof HttpClientError
+        ? (err.apiError?.message ?? err.message)
+        : err instanceof Error
+          ? err.message
+          : "刷新失败"
+    metadataRefreshError.value = message
+    console.error("[DetailView] refresh metadata failed", err)
+  } finally {
+    metadataRefreshBusy.value = false
   }
 }
 </script>
@@ -122,14 +187,22 @@ const handleDeleteMovie = async (id: string) => {
       >
         {{ deleteError }}
       </p>
+      <p
+        v-if="metadataRefreshError"
+        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ metadataRefreshError }}
+      </p>
       <DetailPage
         :movie="detailMovie"
         :related-movies="relatedMovies"
+        :metadata-refresh-busy="metadataRefreshBusy"
         @select="selectMovie"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"
         @delete-movie="handleDeleteMovie"
+        @refresh-metadata="handleRefreshMetadata"
       />
     </template>
     <NotFoundState

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metatube-community/metatube-sdk-go/database"
 	"github.com/metatube-community/metatube-sdk-go/engine"
 	"github.com/metatube-community/metatube-sdk-go/engine/providerid"
 	"go.uber.org/zap"
@@ -14,9 +15,8 @@ import (
 )
 
 type Service struct {
-	logger         *zap.Logger
-	engine         *engine.Engine
-	requestTimeout time.Duration
+	logger *zap.Logger
+	engine *engine.Engine
 }
 
 func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, error) {
@@ -24,12 +24,22 @@ func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, err
 		requestTimeout = 45 * time.Second
 	}
 
-	eng := engine.Default()
+	db, err := database.Open(&database.Config{
+		DSN:                  "",
+		DisableAutomaticPing: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("metatube database open: %w", err)
+	}
+
+	eng := engine.New(db, engine.WithRequestTimeout(requestTimeout))
+	if err := eng.DBAutoMigrate(true); err != nil {
+		return nil, fmt.Errorf("metatube schema migrate: %w", err)
+	}
 
 	return &Service{
-		logger:         logger,
-		engine:         eng,
-		requestTimeout: requestTimeout,
+		logger: logger,
+		engine: eng,
 	}, nil
 }
 

@@ -8,6 +8,15 @@ import (
 // ErrScanAlreadyRunning is returned when a library scan is requested while another is in progress.
 var ErrScanAlreadyRunning = errors.New("scan already running")
 
+// ErrScrapeMovieNotFound is returned when a single-movie rescrape cannot find the movie in SQLite.
+var ErrScrapeMovieNotFound = errors.New("movie not found")
+
+// ErrScrapeMovieNoCode is returned when the movie row has an empty catalog code (番号).
+var ErrScrapeMovieNoCode = errors.New("movie has no catalog code")
+
+// ErrScrapeMovieNoLocation is returned when the movie row has an empty video path.
+var ErrScrapeMovieNoLocation = errors.New("movie has no video path")
+
 type Command struct {
 	ID      string          `json:"id"`
 	Type    string          `json:"type"`
@@ -203,6 +212,7 @@ const (
 	ErrorCodeLibraryFetch  = "LIBRARY_FETCH_FAILED"
 	ErrorCodeScanStart     = "SCAN_START_FAILED"
 	ErrorCodeScanWalk      = "SCAN_WALK_FAILED"
+	ErrorCodeScanCancelled = "SCAN_CANCELLED"
 	ErrorCodeScraperInit   = "SCRAPER_INIT_FAILED"
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"

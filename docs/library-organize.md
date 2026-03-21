@@ -1,11 +1,20 @@
 # 库目录整理与周期扫描
 
-## 配置（`javd` JSON）
+## 持久化：`config/library-config.cfg`
+
+与 `-config` 指向的服务端主配置（HTTP 地址、数据库路径等）**分开**存放。文件为 **JSON**，用于可持久化的「库行为」开关；后续可把更多设置项合并进同一文件（写入时保留未知键）。
 
 | 字段 | 说明 |
 |------|------|
-| `organizeLibrary` | `true` 时：扫描识别番号后，将视频移动到 `{视频所在目录}/{番号}/{番号}.扩展名`；刮削后的 **NFO** 与 **海报/预览图** 写入该番号目录。`false` 时保持旧行为（资产在 `cacheDir/{movieId}/`）。 |
-| Web Settings | 前端 **Settings → 库目录整理** 开关调用 `PATCH /api/settings`，在**进程内存**中覆盖上述行为；重启 `javd` 后恢复为配置文件中的值。 |
+| `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
+
+路径解析：在 `backend` 目录下启动时为 `../config/library-config.cfg`，否则为 `config/library-config.cfg`（相对当前工作目录）。
+
+## 配置（`javd` 主 JSON，`-config`）
+
+| 字段 | 说明 |
+|------|------|
+| `organizeLibrary` | 可选。若存在，先被读入主配置；启动时再由 `library-config.cfg` **覆盖**（若库设置文件含该键）。行为：`true` 时将视频整理到 `{父目录}/{番号}/{番号}.扩展名` 并写入 NFO/海报等到该番号目录；`false` 时资产在 `cacheDir/{movieId}/`。 |
 | `autoScanIntervalSeconds` | 大于 `0` 时，按该间隔（秒）对库路径自动执行一次与 `POST /api/scans` 相同的全量扫描。`0` 表示关闭。 |
 
 同一时间只允许 **一个** 库扫描在跑：手动 `POST /api/scans`、stdio `scan.start` 与周期扫描共用互斥；若已有扫描进行中再次触发，HTTP 返回 **409 Conflict**（`COMMON_CONFLICT`），stdio 返回对应错误响应。

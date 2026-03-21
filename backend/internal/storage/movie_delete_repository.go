@@ -15,8 +15,11 @@ var ErrMovieNotFound = errors.New("movie not found")
 
 // DeleteMovie removes a movie row, related join rows, then best-effort deletes files on disk:
 // primary video (movies.location), media_assets.local_path entries, and movie.nfo next to the video.
+// When assetCacheRoot is non-empty (typically cfg.CacheDir), the whole directory assetCacheRoot/movieID
+// is removed last — this clears downloaded posters/previews stored under the cache when organizeLibrary is off,
+// including orphans not recorded in media_assets.
 // Database deletion is transactional; file removal runs after commit. File errors are ignored (best-effort).
-func (s *SQLiteStore) DeleteMovie(ctx context.Context, movieID string) error {
+func (s *SQLiteStore) DeleteMovie(ctx context.Context, movieID string, assetCacheRoot string) error {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
 		return ErrMovieNotFound
@@ -89,6 +92,7 @@ func (s *SQLiteStore) DeleteMovie(ctx context.Context, movieID string) error {
 	for _, p := range paths {
 		_ = safeRemoveFileIfFile(p)
 	}
+	bestEffortRemoveMovieAssetCacheDir(assetCacheRoot, movieID)
 	return nil
 }
 
@@ -139,4 +143,53 @@ func safeRemoveFileIfFile(path string) error {
 		return nil
 	}
 	return os.Remove(clean)
+}
+
+func movieIDSafeForCacheSubdir(movieID string) bool {
+	if strings.TrimSpace(movieID) == "" {
+		return false
+	}
+	if movieID == "." || movieID == ".." {
+		return false
+	}
+	if strings.ContainsAny(movieID, `/\`) {
+		return false
+	}
+	return true
+}
+
+// bestEffortRemoveMovieAssetCacheDir deletes {cacheRoot}/{movieID} if it is a directory confined under cacheRoot.
+func bestEffortRemoveMovieAssetCacheDir(cacheRoot, movieID string) {
+	cacheRoot = strings.TrimSpace(cacheRoot)
+	if cacheRoot == "" || !movieIDSafeForCacheSubdir(movieID) {
+		return
+	}
+
+	rootAbs, err := filepath.Abs(filepath.Clean(cacheRoot))
+	if err != nil || rootAbs == "" || !filepath.IsAbs(rootAbs) {
+		return
+	}
+
+	target := filepath.Join(rootAbs, movieID)
+	targetAbs, err := filepath.Abs(filepath.Clean(target))
+	if err != nil {
+		return
+	}
+
+	rel, err := filepath.Rel(rootAbs, targetAbs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return
+	}
+
+	fi, err := os.Lstat(targetAbs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		return
+	}
+	if !fi.IsDir() {
+		return
+	}
+	_ = os.RemoveAll(targetAbs)
 }

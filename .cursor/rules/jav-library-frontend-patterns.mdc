@@ -6,6 +6,7 @@ alwaysApply: false
 
 # JAV Library Frontend Patterns
 
+- Data and mutations go through **`useLibraryService()`** / **`src/api`** (Web or Mock per `VITE_USE_WEB_API`); do not bypass the service layer for library actions from views.
 - Keep the app as a routed SPA under `AppShell`; do not move page switching back into `App.vue`.
 - Use `vue-router` params and query state for page context such as selected movie, active library tab, and search keywords.
 - Preserve internal scrolling containers; avoid changes that make the whole shell scroll when only the content area should scroll.

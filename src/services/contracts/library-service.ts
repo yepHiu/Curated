@@ -16,7 +16,19 @@ export interface LibraryService {
   removeLibraryPath(id: string): Promise<void>
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
+  /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
+  refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
   getMovieById(movieId?: string): Movie | undefined
+  /**
+   * Web：列表未包含该 id 时拉取单条并写入缓存（避免仅加载首页导致播放/详情找不到）。
+   * Mock：空操作。
+   */
+  ensureMovieCached(movieId: string): Promise<void>
+  /**
+   * Web：返回可赋给 video.src 的流地址；无后端或未启用 API 时返回 null。
+   * Mock：返回 null（或可选固定演示 URL）。
+   */
+  getMoviePlaybackUrl(movieId: string): string | null
   getRelatedMovies(movieId: string, limit?: number): Movie[]
   toggleFavorite(movieId: string, nextValue?: boolean): Movie | undefined
   /** 删除影片（Web：请求后端并从本地列表移除；Mock：仅从内存列表移除） */

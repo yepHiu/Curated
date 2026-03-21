@@ -24,7 +24,7 @@ func TestDeleteMovie_NotFound(t *testing.T) {
 	if err := store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	err = store.DeleteMovie(ctx, "missing-id")
+	err = store.DeleteMovie(ctx, "missing-id", "")
 	if !errors.Is(err, ErrMovieNotFound) {
 		t.Fatalf("expected ErrMovieNotFound, got %v", err)
 	}
@@ -79,7 +79,8 @@ func TestDeleteMovie_RemovesRowsAndFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.DeleteMovie(ctx, outcome.MovieID); err != nil {
+	cacheRoot := filepath.Join(root, "asset-cache")
+	if err := store.DeleteMovie(ctx, outcome.MovieID, cacheRoot); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(videoPath); !os.IsNotExist(err) {
@@ -95,5 +96,53 @@ func TestDeleteMovie_RemovesRowsAndFiles(t *testing.T) {
 	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("expected sql.ErrNoRows after delete, got %v", err)
+	}
+}
+
+func TestDeleteMovie_RemovesAssetCacheDirectory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "CACHE-DEL.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cacheRoot := filepath.Join(root, "cache")
+	movieCacheDir := filepath.Join(cacheRoot, "cache-del")
+	if err := os.MkdirAll(movieCacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	orphan := filepath.Join(movieCacheDir, "orphan.jpg")
+	if err := os.WriteFile(orphan, []byte("jpg"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-cache",
+		Path:     videoPath,
+		FileName: "CACHE-DEL.mp4",
+		Number:   "CACHE-DEL",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.MovieID != "cache-del" {
+		t.Fatalf("unexpected movie id %q", outcome.MovieID)
+	}
+
+	if err := store.DeleteMovie(ctx, outcome.MovieID, cacheRoot); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(movieCacheDir); !os.IsNotExist(err) {
+		t.Fatalf("asset cache dir should be removed: %v", err)
 	}
 }

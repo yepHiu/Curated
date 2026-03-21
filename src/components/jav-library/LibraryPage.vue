@@ -30,17 +30,20 @@ const emit = defineEmits<{
 }>()
 
 const popularTags = computed(() => {
-  const collectedTags: string[] = []
-
-  props.allMovies.forEach((movie) => {
-    movie.tags.forEach((tag) => {
-      if (collectedTags.indexOf(tag) === -1) {
-        collectedTags.push(tag)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const movie of props.allMovies) {
+    for (const tag of movie.tags) {
+      if (!seen.has(tag)) {
+        seen.add(tag)
+        out.push(tag)
+        if (out.length >= 8) {
+          return out
+        }
       }
-    })
-  })
-
-  return collectedTags.slice(0, 8)
+    }
+  }
+  return out
 })
 
 const handleTabChange = (value: string | number) => {

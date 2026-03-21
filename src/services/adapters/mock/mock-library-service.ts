@@ -216,6 +216,18 @@ export const mockLibraryService: LibraryService = {
     return null
   },
 
+  async refreshMovieMetadata() {
+    return null
+  },
+
+  getMoviePlaybackUrl() {
+    return null
+  },
+
+  async ensureMovieCached() {
+    // Mock 数据全在内存，无需远程补全。
+  },
+
   getMovieById(movieId) {
     return moviesState.value.find((movie) => movie.id === movieId)
   },

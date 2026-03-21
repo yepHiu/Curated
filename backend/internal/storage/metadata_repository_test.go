@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -85,5 +86,33 @@ func TestSaveMovieMetadata(t *testing.T) {
 	}
 	if assetCount != 4 {
 		t.Fatalf("expected 4 media assets, got %d", assetCount)
+	}
+}
+
+func TestSaveMovieMetadata_UnknownMovieID(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	err = store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: "no-such-movie",
+		Number:  "X-1",
+		Title:   "T",
+	})
+	if err == nil {
+		t.Fatal("expected error for unknown movie id")
+	}
+	if !errors.Is(err, ErrMovieNotFoundForMetadata) {
+		t.Fatalf("expected ErrMovieNotFoundForMetadata, got %v", err)
 	}
 }

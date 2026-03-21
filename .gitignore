@@ -25,6 +25,7 @@ docs/film-scanner/videos_test/
 
 # Local media / test fixtures (do not commit large video binaries)
 *.mp4
+videos_test/
 
 # Editor directories and files
 .vscode/*
