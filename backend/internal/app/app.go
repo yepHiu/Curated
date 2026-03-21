@@ -77,12 +77,12 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	}
 
 	return &App{
-		cfg:                 cfg,
-		logger:              logger,
-		store:               store,
-		library:             library.NewService(),
-		scanner:             scanner.NewService(logger),
-		scraper:             scraperService,
+		cfg:     cfg,
+		logger:  logger,
+		store:   store,
+		library: library.NewService(),
+		scanner: scanner.NewService(logger),
+		scraper: scraperService,
 		assets: assets.NewService(
 			logger,
 			cfg.CacheDir,
