@@ -7,6 +7,7 @@ alwaysApply: true
 
 ## 一键心智模型
 
+- **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
 - **后端**：`backend` 目录 `go run ./cmd/javd`，默认 **:8080**。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。

@@ -141,7 +141,7 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	if err != nil {
 		return "", err
 	}
-	request.Header.Set("User-Agent", "jav-shadcn-backend/0.1")
+	request.Header.Set("User-Agent", "Curated-backend/0.1")
 
 	response, err := s.client.Do(request)
 	if err != nil {

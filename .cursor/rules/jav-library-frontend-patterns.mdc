@@ -1,10 +1,10 @@
 ---
-description: Project-specific frontend patterns for the JAV Library UI
+description: Project-specific frontend patterns for Curated (media library UI)
 globs: src/**/*.{ts,vue}
 alwaysApply: false
 ---
 
-# JAV Library Frontend Patterns
+# Curated Frontend Patterns
 
 - Data and mutations go through **`useLibraryService()`** / **`src/api`** (Web or Mock per `VITE_USE_WEB_API`); do not bypass the service layer for library actions from views.
 - Keep the app as a routed SPA under `AppShell`; do not move page switching back into `App.vue`.
@@ -16,4 +16,4 @@ alwaysApply: false
 - Detail pages should follow the current media-library pattern: left poster, right metadata, clear hierarchy, and no oversized hero banners.
 - Player pages should stay video-first and low-chrome; avoid adding extra explanatory cards or secondary panels unless explicitly requested.
 - Settings pages should follow the current centered content band with top stats and vertically stacked setting cards; avoid wide admin-dashboard layouts unless requested.
-- Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit.
+- Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit. **Exception:** the official **Curated** brand pill in `AppSidebar` uses fixed pink/plum colors.

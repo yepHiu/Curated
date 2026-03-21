@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const visibleTags = computed(() => props.movie.tags.slice(0, 2))
+const userTagCount = computed(() => props.movie.userTags.length)
 
 /** 列表优先用缩略图，减轻带宽；无则回落封面 */
 const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl || "")
@@ -85,22 +86,30 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
       </div>
 
-      <CardContent class="flex h-[4.75rem] flex-col justify-between gap-1.5 p-2.5">
-        <div class="flex min-w-0 min-h-0 flex-col justify-start gap-0.5">
+      <CardContent class="flex min-h-[5.25rem] flex-col justify-between gap-1.5 p-2.5">
+        <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
           <CardTitle class="truncate text-[13px]">{{ movie.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
             {{ movie.actors.join(" · ") }}
           </CardDescription>
         </div>
 
-        <div class="flex h-5 items-start gap-1 overflow-hidden">
+        <!-- Badge 默认含 py-0.5 + 边框，高度常 > h-5；勿用固定矮行 + overflow-hidden 以免裁切 -->
+        <div class="flex min-h-6 items-center gap-1">
           <Badge
             v-for="tag in visibleTags"
             :key="tag"
             variant="secondary"
-            class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px]"
+            class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
           >
             {{ tag }}
+          </Badge>
+          <Badge
+            v-if="userTagCount > 0"
+            variant="outline"
+            class="shrink-0 rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary"
+          >
+            我的 {{ userTagCount }}
           </Badge>
         </div>
       </CardContent>

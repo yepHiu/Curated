@@ -11,6 +11,10 @@ export type MockMoviePrefs = {
   isFavorite?: boolean
   /** 缺省：不覆盖评分；number：用户分；null：已清除覆盖，用站点分 */
   userRating?: number | null
+  /** 出现时整表替换 Mock 中的用户标签 */
+  userTags?: string[]
+  /** 出现时整表替换 Mock 中的元数据标签（模拟 NFO 标签编辑） */
+  metadataTags?: string[]
 }
 
 export type MockPrefsMap = Record<string, MockMoviePrefs>
@@ -63,6 +67,12 @@ export function upsertMockMoviePrefs(movieId: string, patch: MockMoviePrefs) {
   if ("userRating" in patch) {
     merged.userRating = patch.userRating
   }
+  if ("userTags" in patch && Array.isArray(patch.userTags)) {
+    merged.userTags = [...patch.userTags]
+  }
+  if ("metadataTags" in patch && Array.isArray(patch.metadataTags)) {
+    merged.metadataTags = [...patch.metadataTags]
+  }
   next[id] = merged
   saveMockMoviePrefs(next)
 }
@@ -87,6 +97,12 @@ export function mergeMockPrefsIntoMovie(movie: Movie): Movie {
         next.metadataRating = movie.metadataRating ?? movie.rating
       }
     }
+  }
+  if (Array.isArray(p.userTags)) {
+    next.userTags = [...p.userTags]
+  }
+  if (Array.isArray(p.metadataTags)) {
+    next.tags = [...p.metadataTags]
   }
   return next
 }

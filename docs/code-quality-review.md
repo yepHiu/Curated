@@ -126,7 +126,7 @@
 #### 发现 8：仓库中仍存在脚手架残留文件与工程元数据噪音
 
 - `src/components/HelloWorld.vue` 未被使用。
-- `package.json` 的 `name` 仍是 `my-vue-app`。
+- `package.json` 的 `name` 仍为仓库标识 `jav-shadcn`；正式产品名为 **Curated**（见 `description` 与 `README`）。
 
 建议：
 

@@ -5,6 +5,6 @@ alwaysApply: true
 
 # Project Standards
 
-- This repo is a **`Vue 3 + TypeScript + Vite` + `shadcn-vue`** app at the repo root, with a **`Go` HTTP backend** under **`backend/`** (not a frontend-only scaffold).
+- **Product name: Curated** (repo directory / npm package id may remain `jav-shadcn`). This repo is a **`Vue 3 + TypeScript + Vite` + `shadcn-vue`** app at the repo root, with a **`Go` HTTP backend** under **`backend/`** (not a frontend-only scaffold).
 - Separate **current code facts** from **future desktop (Electron / IPC / mpv)** plans; see `architecture-boundaries.mdc`.
 - Primary rule handoff: **`workspace-quick-reference.mdc`** (daily ops) → **`project-facts.mdc`** (structure/API) → **`vue-frontend-standards.mdc`** / **`jav-library-frontend-patterns.mdc`** for UI → **`backend-*`** rules when touching Go.

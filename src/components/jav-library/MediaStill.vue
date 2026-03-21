@@ -32,7 +32,7 @@ watch(
     decoding="async"
     :class="
       layout === 'intrinsic'
-        ? 'pointer-events-none block h-auto w-full max-h-[min(85vh,120rem)] select-none object-contain align-top'
+        ? 'pointer-events-none block h-auto w-full max-h-none min-[480px]:max-h-[min(85vh,120rem)] select-none object-contain align-top'
         : [
             'pointer-events-none select-none',
             fit === 'cover' ? 'size-full object-cover' : 'size-full object-contain',

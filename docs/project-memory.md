@@ -1,8 +1,8 @@
-# 项目记忆：`jav-shadcn`
+# 项目记忆：`jav-shadcn`（产品名 **Curated**）
 
 ## 1. 产品定位
 
-- 当前仓库是 `JAV-Library` 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
+- 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
 - `docs/jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
 - 当前仓库已经包含前端原型和 `Go + SQLite` 后端雏形，但前后端仍未完成真实联通。
 - 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。

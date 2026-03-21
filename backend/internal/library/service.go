@@ -125,6 +125,12 @@ func (s *Service) PatchMovie(movieID string, in contracts.PatchMovieInput) (cont
 				m.UserRating = &v
 			}
 		}
+		if in.UserTagsSet {
+			m.UserTags = append([]string{}, in.UserTags...)
+		}
+		if in.MetadataTagsSet {
+			m.Tags = append([]string{}, in.MetadataTags...)
+		}
 		syncEffectiveRating(m)
 		return *m, nil
 	}
@@ -174,9 +180,9 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			IsFavorite:     false,
 			AddedAt:        time.Now().UTC().Format("2006-01-02"),
 			Location:       result.Path,
-			Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
-			Year:           0,
-		},
+				Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
+				Year: 0,
+			},
 		Summary:        "Metadata pending scrape.",
 		MetadataRating: 0,
 		UserRating:     nil,
@@ -220,6 +226,7 @@ func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 		}
 		movie.Actors = append([]string{}, metadata.Actors...)
 		movie.Tags = append([]string{}, metadata.Tags...)
+		// UserTags are local-only; scraper must not overwrite them.
 		movie.Summary = coalesceSummary(metadata.Summary)
 		if metadata.CoverURL != "" {
 			movie.CoverURL = metadata.CoverURL
@@ -263,6 +270,7 @@ func matchesQuery(movie contracts.MovieDetailDTO, query string) bool {
 		movie.Summary,
 		strings.Join(movie.Actors, " "),
 		strings.Join(movie.Tags, " "),
+		strings.Join(movie.UserTags, " "),
 	}
 
 	for _, field := range fields {
@@ -291,6 +299,7 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Location:       "D:/Media/JAV/Main/MKB-100.mkv",
 				Resolution:     "2160p",
 				Year:           2025,
+				ReleaseDate:    "2025-04-12",
 			},
 			Summary:        "A polished late-night feature with strong cast chemistry and metadata-rich presentation.",
 			MetadataRating: 4.8,
@@ -311,6 +320,7 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Location:       "E:/Vault/JAV/New/SLD-101.mp4",
 				Resolution:     "1080p",
 				Year:           2025,
+				ReleaseDate:    "2025-09-01",
 			},
 			Summary:        "An elegant office-set release used to validate detail views, favorites, and list filtering.",
 			MetadataRating: 4.7,
@@ -331,6 +341,7 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Location:       "D:/Media/JAV/Main/NVA-102.mkv",
 				Resolution:     "2160p",
 				Year:           2026,
+				ReleaseDate:    "2026-02-18",
 			},
 			Summary:        "A stylized catalog entry that exercises tag-heavy filtering and recent import ordering.",
 			MetadataRating: 4.5,
@@ -351,6 +362,7 @@ func seedMovies() []contracts.MovieDetailDTO {
 				Location:       "F:/Offline/Collections/PRM-103.mp4",
 				Resolution:     "2160p",
 				Year:           2024,
+				ReleaseDate:    "2024-10-05",
 			},
 			Summary:        "A high-rated longform title kept here as the default rich detail fixture for the backend scaffold.",
 			MetadataRating: 4.9,

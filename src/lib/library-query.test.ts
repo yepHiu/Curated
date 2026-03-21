@@ -3,8 +3,10 @@ import {
   buildBrowseRouteTarget,
   buildMovieRouteQuery,
   getBrowseSourceMode,
+  getLibraryActorExactQuery,
   getLibrarySearchQuery,
   getLibraryTabQuery,
+  getLibraryTagExactQuery,
   getSelectedMovieQuery,
   mergeLibraryQuery,
 } from "@/lib/library-query"
@@ -29,7 +31,7 @@ describe("library query helpers", () => {
       {
         q: "Rin",
         selected: "mkb-100",
-        tab: "favorites",
+        tab: "new",
       },
       {
         q: "",
@@ -46,14 +48,14 @@ describe("library query helpers", () => {
     const browseTarget = buildBrowseRouteTarget("recent", {
       q: "Mina",
       selected: "sld-101",
-      tab: "favorites",
+      tab: "new",
     })
 
     const movieQuery = buildMovieRouteQuery(
       {
         q: "Mina",
         selected: "sld-101",
-        tab: "favorites",
+        tab: "new",
       },
       "recent",
       "nva-102",
@@ -64,7 +66,7 @@ describe("library query helpers", () => {
       query: {
         q: "Mina",
         selected: "sld-101",
-        tab: "favorites",
+        tab: "new",
       },
     })
 
@@ -72,7 +74,48 @@ describe("library query helpers", () => {
       from: "recent",
       q: "Mina",
       selected: "nva-102",
-      tab: "favorites",
+      tab: "new",
+    })
+  })
+
+  it("maps removed or unknown tab query to all", () => {
+    expect(getLibraryTabQuery({ tab: "favorites" })).toBe("all")
+    expect(getLibraryTabQuery({ tab: "unknown" })).toBe("all")
+  })
+
+  it("reads exact tag filter and merges tag patch", () => {
+    expect(getLibraryTagExactQuery({ tag: "4K" })).toBe("4K")
+    expect(getLibraryTagExactQuery({})).toBe("")
+
+    const merged = mergeLibraryQuery({ q: "foo", tag: "old" }, { tag: "new", q: undefined })
+    expect(merged.tag).toBe("new")
+    expect(merged.q).toBeUndefined()
+  })
+
+  it("reads exact actor filter and merges actor patch", () => {
+    expect(getLibraryActorExactQuery({ actor: "Mina" })).toBe("Mina")
+    expect(getLibraryActorExactQuery({})).toBe("")
+
+    const merged = mergeLibraryQuery(
+      { q: "foo", actor: "old" },
+      { actor: "new", q: undefined },
+    )
+    expect(merged.actor).toBe("new")
+    expect(merged.q).toBeUndefined()
+  })
+
+  it("preserves actor in browse and movie route helpers", () => {
+    const q = { q: "x", actor: "Lead A", tab: "new" as const }
+    expect(buildBrowseRouteTarget("library", q)).toEqual({
+      name: "library",
+      query: { q: "x", actor: "Lead A", tab: "new" },
+    })
+    expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
+      from: "library",
+      q: "x",
+      actor: "Lead A",
+      selected: "id-1",
+      tab: "new",
     })
   })
 })

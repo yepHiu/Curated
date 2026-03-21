@@ -33,6 +33,12 @@ func (f *testMovieMetadataRefresher) StartMovieMetadataRefresh(ctx context.Conte
 	return f.tm.Start(task.TaskID, "Scraping metadata (test)"), nil
 }
 
+func (f *testMovieMetadataRefresher) StartMetadataRefreshForLibraryPaths(ctx context.Context, paths []string) (contracts.MetadataRefreshQueuedDTO, error) {
+	_ = ctx
+	_ = paths
+	return contracts.MetadataRefreshQueuedDTO{Queued: 0, Skipped: 0, InvalidPaths: nil}, nil
+}
+
 type errMovieMetadataRefresher struct {
 	err error
 }
@@ -41,6 +47,12 @@ func (e *errMovieMetadataRefresher) StartMovieMetadataRefresh(ctx context.Contex
 	_ = ctx
 	_ = movieID
 	return contracts.TaskDTO{}, e.err
+}
+
+func (e *errMovieMetadataRefresher) StartMetadataRefreshForLibraryPaths(ctx context.Context, paths []string) (contracts.MetadataRefreshQueuedDTO, error) {
+	_ = ctx
+	_ = paths
+	return contracts.MetadataRefreshQueuedDTO{}, e.err
 }
 
 func TestHandleDeleteMovie_NotFound(t *testing.T) {
@@ -609,6 +621,129 @@ func TestHandlePatchMovie_ClearUserRating(t *testing.T) {
 	}
 	if detail.Rating != 3.0 || detail.UserRating != nil {
 		t.Fatalf("after clear: rating=%v userRating=%v, want rating=3 userRating=nil", detail.Rating, detail.UserRating)
+	}
+}
+
+func TestHandlePatchMovie_UserTags(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-UT.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t-ut", Path: videoPath, FileName: "PATCH-UT.mp4", Number: "PATCH-UT",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID, Number: "PATCH-UT", Title: "T", Summary: "S", Studio: "St", Tags: []string{"NfoTag"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body := `{"userTags":["mine","local"]}`
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.UserTags) != 2 || detail.UserTags[0] != "local" || detail.UserTags[1] != "mine" {
+		t.Fatalf("userTags sorted = %#v", detail.UserTags)
+	}
+	if len(detail.Tags) != 1 || detail.Tags[0] != "NfoTag" {
+		t.Fatalf("nfo tags = %#v", detail.Tags)
+	}
+}
+
+func TestHandlePatchMovie_MetadataTags(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-MT.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t-mt", Path: videoPath, FileName: "PATCH-MT.mp4", Number: "PATCH-MT",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID, Number: "PATCH-MT", Title: "T", Summary: "S", Studio: "St",
+		Tags: []string{"KeepA", "DropB"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PatchMovieUserPrefs(ctx, outcome.MovieID, contracts.PatchMovieInput{
+		UserTagsSet: true,
+		UserTags:    []string{"user-only"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body := `{"metadataTags":["KeepA"]}`
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Tags) != 1 || detail.Tags[0] != "KeepA" {
+		t.Fatalf("metadata tags = %#v, want [KeepA]", detail.Tags)
+	}
+	if len(detail.UserTags) != 1 || detail.UserTags[0] != "user-only" {
+		t.Fatalf("user tags should be untouched, got %#v", detail.UserTags)
 	}
 }
 

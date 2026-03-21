@@ -1,4 +1,4 @@
-# JAV-Library 后端 Go 实现规范
+# Curated 后端 Go 实现规范
 
 ## 1. 目的
 

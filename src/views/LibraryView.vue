@@ -6,14 +6,17 @@ import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import {
   buildMovieRouteQuery,
+  getLibraryActorExactQuery,
   getLibrarySearchQuery,
   getLibraryTabQuery,
+  getLibraryTagExactQuery,
   getSelectedMovieQuery,
   isLibraryRouteName,
   mergeLibraryQuery,
 } from "@/lib/library-query"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
+import { compareByReleaseDateDesc } from "@/lib/movie-sort"
 import { useLibraryService } from "@/services/library-service"
 
 const route = useRoute()
@@ -26,6 +29,8 @@ const libraryMode = computed<LibraryMode>(() => {
 
 const libraryMovies = computed(() => libraryService.movies.value)
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
+const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
+const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
 const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
 const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))
 
@@ -48,19 +53,29 @@ const queryFilteredMovies = computed(() => {
     list = [...raw]
   }
 
-  if (!query) {
-    return list
+  if (query) {
+    list = list.filter((movie) => movieSearchHaystack(movie).includes(query))
   }
 
-  return list.filter((movie) => movieSearchHaystack(movie).includes(query))
+  const tagExact = tagExactQuery.value
+  if (tagExact) {
+    list = list.filter(
+      (movie) => movie.tags.includes(tagExact) || movie.userTags.includes(tagExact),
+    )
+  }
+
+  const actorExact = actorExactQuery.value
+  if (actorExact) {
+    list = list.filter((movie) => movie.actors.includes(actorExact))
+  }
+
+  return list
 })
 
 const visibleMovies = computed(() => {
   switch (activeTab.value) {
     case "new":
-      return queryFilteredMovies.value.filter((movie) => movie.year >= 2025)
-    case "favorites":
-      return queryFilteredMovies.value.filter((movie) => movie.isFavorite)
+      return queryFilteredMovies.value.slice().sort(compareByReleaseDateDesc)
     case "top-rated":
       return queryFilteredMovies.value.filter((movie) => movie.rating >= 4.6)
     default:
@@ -136,7 +151,10 @@ const openPlayer = async (movieId?: string) => {
   await router.push({
     name: "player",
     params: { id: nextMovieId },
-    query: buildMovieRouteQuery(route.query, libraryMode.value, nextMovieId),
+    query: {
+      ...buildMovieRouteQuery(route.query, libraryMode.value, nextMovieId),
+      autoplay: "1",
+    },
   })
 }
 
@@ -147,6 +165,29 @@ const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) 
     console.error("[LibraryView] toggle favorite failed", err)
   }
 }
+
+/** Tags 页标签云：与详情 `browseByTag` 一致 */
+const browseByExactTag = async (tag: string) => {
+  const t = tag.trim()
+  if (!t) return
+  await router.replace({
+    name: libraryMode.value,
+    query: mergeLibraryQuery(route.query, {
+      tag: t,
+      q: undefined,
+      actor: undefined,
+      tab: "all",
+      selected: undefined,
+    }),
+  })
+}
+
+const clearExactTagFilter = async () => {
+  await router.replace({
+    name: libraryMode.value,
+    query: mergeLibraryQuery(route.query, { tag: undefined }),
+  })
+}
 </script>
 
 <template>
@@ -156,10 +197,13 @@ const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) 
     :visible-movies="visibleMovies"
     :selected-movie="selectedMovie"
     :active-tab="activeTab"
+    :active-tag-filter="tagExactQuery"
     @update:active-tab="updateActiveTab"
     @select="selectMovie"
     @open-details="openDetails"
     @open-player="openPlayer"
     @toggle-favorite="toggleFavorite"
+    @browse-by-exact-tag="browseByExactTag"
+    @clear-exact-tag-filter="clearExactTagFilter"
   />
 </template>

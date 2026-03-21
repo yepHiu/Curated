@@ -1,11 +1,11 @@
 import type { ComputedRef } from "vue"
-import type { PatchMovieBody, TaskDTO } from "@/api/types"
+import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 
 export interface LibraryService {
   movies: ComputedRef<readonly Movie[]>
-  libraryStats: readonly LibraryStat[]
+  libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
   refreshSettings(): Promise<void>
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */
@@ -18,6 +18,11 @@ export interface LibraryService {
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
+  /**
+   * 按已配置的库根路径批量排队元数据刮削（不重新扫盘）。
+   * Web：POST /library/metadata-scrape；Mock：返回零计数演示结果。
+   */
+  refreshMetadataForLibraryPaths(paths: string[]): Promise<MetadataRefreshQueuedDTO>
   getMovieById(movieId?: string): Movie | undefined
   /**
    * Web：列表未包含该 id 时拉取单条并写入缓存（避免仅加载首页导致播放/详情找不到）。

@@ -17,9 +17,11 @@ const props = withDefaults(
   defineProps<{
     movie: Movie
     relatedMovies: Movie[]
+    /** 添加用户标签时的模糊联想候选（全库 userTags + 当前片元数据标签等） */
+    userTagSuggestions?: readonly string[]
     metadataRefreshBusy?: boolean
   }>(),
-  { metadataRefreshBusy: false },
+  { metadataRefreshBusy: false, userTagSuggestions: () => [] },
 )
 
 const previewImages = computed(() => props.movie.previewImages?.slice(0, 18) ?? [])
@@ -39,19 +41,27 @@ const emit = defineEmits<{
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   updateUserRating: [payload: { movieId: string; value: number | null }]
+  updateUserTags: [payload: { movieId: string; tags: string[] }]
+  browseByTag: [payload: { tag: string }]
+  browseByActor: [payload: { actor: string }]
+  updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
   refreshMetadata: [movieId: string]
 }>()
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex min-w-0 w-full flex-col gap-6">
     <DetailPanel
       :movie="movie"
+      :user-tag-suggestions="props.userTagSuggestions"
       :metadata-refresh-busy="props.metadataRefreshBusy"
       @open-player="emit('openPlayer', $event)"
-      @toggle-favorite="emit('toggleFavorite', $event)"
       @update-user-rating="emit('updateUserRating', $event)"
+      @update-user-tags="emit('updateUserTags', $event)"
+      @browse-by-tag="emit('browseByTag', $event)"
+      @browse-by-actor="emit('browseByActor', $event)"
+      @update-metadata-tags="emit('updateMetadataTags', $event)"
       @delete-movie="emit('deleteMovie', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"
     />

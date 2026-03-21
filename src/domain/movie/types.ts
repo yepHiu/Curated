@@ -4,7 +4,10 @@ export interface Movie {
   code: string
   studio: string
   actors: string[]
+  /** 元数据/刮削标签 */
   tags: string[]
+  /** 用户本地标签 */
+  userTags: string[]
   runtimeMinutes: number
   /** 列表/展示用有效评分（用户分优先，否则站点评分） */
   rating: number
@@ -18,6 +21,8 @@ export interface Movie {
   location: string
   resolution: string
   year: number
+  /** 发行日 YYYY-MM-DD（来自元数据 / API） */
+  releaseDate?: string
   tone: string
   coverClass: string
   /** 远程海报 URL（刮削元数据） */

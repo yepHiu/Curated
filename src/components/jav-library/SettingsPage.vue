@@ -4,7 +4,15 @@ import { HttpClientError } from "@/api/http-client"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
-import { FolderOpen, FolderPlus, Pencil, RefreshCw, ScanSearch, Trash2 } from "lucide-vue-next"
+import {
+  FolderOpen,
+  FolderPlus,
+  Pencil,
+  RefreshCw,
+  ScanSearch,
+  Sparkles,
+  Trash2,
+} from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -48,11 +56,43 @@ const editLibraryTitleDraft = ref("")
 const editTitleBusy = ref(false)
 const editTitleError = ref("")
 const scanFeedbackError = ref("")
+/** 按目录批量元数据刷新：成功摘要 */
+const metadataRefreshSuccess = ref("")
+/** 按目录批量元数据刷新：错误文案 */
+const metadataRefreshError = ref("")
+const metadataRefreshBusy = ref(false)
+/** 选中的库根路径（与后端配置的 path 字符串一致，用于 POST metadata-scrape） */
+const selectedMetadataRefreshPaths = ref<string[]>([])
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
+
+const dashboardStats = computed(() => libraryService.libraryStats.value)
+
+const hasMetadataPathSelection = computed(() => selectedMetadataRefreshPaths.value.length > 0)
+
+function isMetadataPathChecked(path: string) {
+  return selectedMetadataRefreshPaths.value.includes(path)
+}
+
+function toggleMetadataPathSelection(path: string) {
+  const cur = selectedMetadataRefreshPaths.value
+  if (cur.includes(path)) {
+    selectedMetadataRefreshPaths.value = cur.filter((p) => p !== path)
+  } else {
+    selectedMetadataRefreshPaths.value = [...cur, path]
+  }
+}
+
+function selectAllMetadataPaths() {
+  selectedMetadataRefreshPaths.value = libraryPathsList.value.map((p) => p.path)
+}
+
+function clearMetadataPathSelection() {
+  selectedMetadataRefreshPaths.value = []
+}
 
 const canSaveNewPath = computed(() => {
   const t = newPath.value.trim()
@@ -224,13 +264,46 @@ async function runFullScan() {
     fullScanBusy.value = false
   }
 }
+
+async function runMetadataRefreshForSelected() {
+  metadataRefreshSuccess.value = ""
+  metadataRefreshError.value = ""
+  const paths = selectedMetadataRefreshPaths.value
+  if (paths.length === 0) {
+    metadataRefreshError.value = "请勾选一个或多个存储目录。"
+    return
+  }
+  metadataRefreshBusy.value = true
+  try {
+    const dto = await libraryService.refreshMetadataForLibraryPaths(paths)
+    const parts: string[] = [
+      `已为 ${dto.queued} 部影片排队重新刮削元数据（后台执行，与详情页「刷新元数据」相同流水线）。`,
+    ]
+    if (dto.skipped > 0) {
+      parts.push(`跳过 ${dto.skipped} 条（读取详情或入队失败）。`)
+    }
+    if (dto.invalidPaths.length > 0) {
+      parts.push(`以下路径未在已配置库目录中匹配：${dto.invalidPaths.join("；")}`)
+    }
+    metadataRefreshSuccess.value = parts.join(" ")
+  } catch (err) {
+    console.error("[settings] metadata refresh by paths failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataRefreshError.value = err.apiError.message
+    } else {
+      metadataRefreshError.value = "批量刷新元数据失败，请确认后端已启动并重试。"
+    }
+  } finally {
+    metadataRefreshBusy.value = false
+  }
+}
 </script>
 
 <template>
   <div class="mx-auto flex max-w-[56rem] flex-col gap-6 pb-2">
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card
-        v-for="stat in libraryService.libraryStats"
+        v-for="stat in dashboardStats"
         :key="stat.label"
         class="rounded-3xl border-border/70 bg-card/85"
       >
@@ -266,7 +339,7 @@ async function runFullScan() {
           <CardHeader>
             <CardTitle>Storage directories</CardTitle>
             <CardDescription>
-              Multi-path library support is represented here as reusable card rows.
+              可配置多个库根目录。勾选目录后点击「刷新元数据」仅对已入库条目重新刮削（不重新扫盘）；「Rescan」会遍历磁盘并索引新文件。
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-4">
@@ -369,6 +442,56 @@ async function runFullScan() {
               </Dialog>
             </div>
 
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+            >
+              <div class="flex min-w-0 flex-col gap-1">
+                <p class="text-sm font-medium">按目录刷新元数据</p>
+                <p class="text-xs text-muted-foreground">
+                  在下方列表勾选库根目录后提交；仅对已入库条目排队刮削，不遍历磁盘。新文件请先使用 Rescan。
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="rounded-xl"
+                  @click="selectAllMetadataPaths"
+                >
+                  全选目录
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="rounded-xl"
+                  @click="clearMetadataPathSelection"
+                >
+                  清空选择
+                </Button>
+                <Button
+                  type="button"
+                  class="rounded-xl"
+                  :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
+                  @click="runMetadataRefreshForSelected"
+                >
+                  <Sparkles data-icon="inline-start" class="size-4" />
+                  {{ metadataRefreshBusy ? "提交中…" : "刷新元数据" }}
+                </Button>
+              </div>
+            </div>
+            <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
+              {{ metadataRefreshSuccess }}
+            </p>
+            <p
+              v-if="metadataRefreshError"
+              class="text-sm text-destructive"
+              role="alert"
+            >
+              {{ metadataRefreshError }}
+            </p>
+
             <div class="flex flex-col gap-3">
               <div
                 v-for="path in libraryPathsList"
@@ -421,9 +544,18 @@ async function runFullScan() {
                 </template>
                 <template v-else>
                   <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex min-w-0 flex-1 flex-col gap-1">
-                      <p class="font-medium">{{ path.title }}</p>
-                      <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
+                    <div class="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
+                        :checked="isMetadataPathChecked(path.path)"
+                        :aria-label="`将「${path.title}」纳入批量元数据刷新`"
+                        @change="toggleMetadataPathSelection(path.path)"
+                      />
+                      <div class="flex min-w-0 flex-1 flex-col gap-1">
+                        <p class="font-medium">{{ path.title }}</p>
+                        <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
+                      </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                       <Button

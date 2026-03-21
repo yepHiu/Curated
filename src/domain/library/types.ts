@@ -9,7 +9,7 @@ export type AppPage =
   | "not-found"
 
 export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | "tags">
-export type LibraryTab = "all" | "new" | "favorites" | "top-rated"
+export type LibraryTab = "all" | "new" | "top-rated"
 
 export interface LibraryStat {
   label: string

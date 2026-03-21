@@ -2,7 +2,7 @@ import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { LocationQuery, RouteRecordName } from "vue-router"
 
 const libraryModes = ["library", "favorites", "recent", "tags"] as const
-const libraryTabs = ["all", "new", "favorites", "top-rated"] as const
+const libraryTabs = ["all", "new", "top-rated"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
   Object.prototype.hasOwnProperty.call(value, key)
@@ -20,6 +20,14 @@ export const getBrowseSourceMode = (query: LocationQuery): LibraryMode =>
 export const getLibrarySearchQuery = (query: LocationQuery) =>
   typeof query.q === "string" ? query.q : ""
 
+/** 精确标签筛选（元数据或用户标签字段完全匹配）；与 `q` 可同时生效（交集） */
+export const getLibraryTagExactQuery = (query: LocationQuery) =>
+  typeof query.tag === "string" ? query.tag : ""
+
+/** 精确演员筛选（`actors` 数组元素完全匹配）；与 `q`、`tag` 可同时生效（交集） */
+export const getLibraryActorExactQuery = (query: LocationQuery) =>
+  typeof query.actor === "string" ? query.actor : ""
+
 export const getLibraryTabQuery = (query: LocationQuery): LibraryTab => {
   const value = typeof query.tab === "string" ? query.tab : "all"
   return libraryTabs.includes(value as LibraryTab) ? (value as LibraryTab) : "all"
@@ -31,19 +39,26 @@ export const getSelectedMovieQuery = (query: LocationQuery) =>
 export const getBrowseContextQuery = (query: LocationQuery) => ({
   from: getBrowseSourceMode(query),
   q: getLibrarySearchQuery(query) || undefined,
+  tag: getLibraryTagExactQuery(query).trim() || undefined,
+  actor: getLibraryActorExactQuery(query).trim() || undefined,
   tab: getLibraryTabQuery(query) === "all" ? undefined : getLibraryTabQuery(query),
   selected: getSelectedMovieQuery(query),
 })
 
 export const mergeLibraryQuery = (
   sourceQuery: LocationQuery,
-  patch: Partial<Record<"q" | "tab" | "selected" | "from", string | undefined>>,
+  patch: Partial<
+    Record<"q" | "tab" | "selected" | "from" | "tag" | "actor", string | undefined>
+  >,
 ) => {
   const nextQuery: LocationQuery = {
     ...sourceQuery,
   }
 
-  const applyValue = (key: "q" | "tab" | "selected" | "from", value: string | undefined) => {
+  const applyValue = (
+    key: "q" | "tab" | "selected" | "from" | "tag" | "actor",
+    value: string | undefined,
+  ) => {
     if (value) {
       nextQuery[key] = value
       return
@@ -68,6 +83,14 @@ export const mergeLibraryQuery = (
     applyValue("from", patch.from)
   }
 
+  if (hasOwnKey(patch, "tag")) {
+    applyValue("tag", patch.tag?.trim() || undefined)
+  }
+
+  if (hasOwnKey(patch, "actor")) {
+    applyValue("actor", patch.actor?.trim() || undefined)
+  }
+
   return nextQuery
 }
 
@@ -75,6 +98,8 @@ export const buildBrowseRouteTarget = (page: LibraryMode, currentQuery: Location
   name: page,
   query: mergeLibraryQuery(currentQuery, {
     q: getLibrarySearchQuery(currentQuery) || undefined,
+    tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
+    actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
     tab: getLibraryTabQuery(currentQuery),
     selected: getSelectedMovieQuery(currentQuery),
   }),
@@ -88,6 +113,8 @@ export const buildMovieRouteQuery = (
   mergeLibraryQuery(currentQuery, {
     from: sourceMode,
     q: getLibrarySearchQuery(currentQuery) || undefined,
+    tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
+    actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
     tab: getLibraryTabQuery(currentQuery),
     selected: selectedMovieId,
   })

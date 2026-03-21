@@ -24,7 +24,10 @@ export interface MovieListItemDTO {
   code: string
   studio: string
   actors: string[]
+  /** 元数据/刮削标签 */
   tags: string[]
+  /** 用户本地标签（与 tags 独立，刮削不覆盖） */
+  userTags?: string[]
   runtimeMinutes: number
   rating: number
   isFavorite: boolean
@@ -32,6 +35,8 @@ export interface MovieListItemDTO {
   location: string
   resolution: string
   year: number
+  /** 发行日 YYYY-MM-DD，无则省略 */
+  releaseDate?: string
   coverUrl?: string
   thumbUrl?: string
 }
@@ -99,6 +104,17 @@ export interface StartScanBody {
   paths?: string[]
 }
 
+/** POST /library/metadata-scrape — 仅允许已配置的库根路径 */
+export interface MetadataScrapeByPathsBody {
+  paths: string[]
+}
+
+export interface MetadataRefreshQueuedDTO {
+  queued: number
+  skipped: number
+  invalidPaths: string[]
+}
+
 export interface AddLibraryPathBody {
   path: string
   title?: string
@@ -108,8 +124,11 @@ export interface UpdateLibraryPathBody {
   title: string
 }
 
-/** PATCH /library/movies/{id}；rating 为 null 表示清除用户评分 */
+/** PATCH /library/movies/{id}；rating 为 null 表示清除用户评分；userTags / metadataTags 出现时整表替换对应标签（NFO 与「我的标签」互不影响） */
 export interface PatchMovieBody {
   isFavorite?: boolean
   rating?: number | null
+  userTags?: string[]
+  /** 元数据/NFO 类标签整表替换；空数组表示清空本地 NFO 标签（下次刮削会再写入） */
+  metadataTags?: string[]
 }

@@ -109,7 +109,7 @@ function buildChunkSizeKey(items: Movie[]): string {
   let key = ""
   for (let i = 0; i < items.length; i++) {
     const m = items[i]!
-    key += `${m.id}:${m.isFavorite ? 1 : 0}:${m.tags.length}:`
+    key += `${m.id}:${m.isFavorite ? 1 : 0}:${m.tags.length}:${m.userTags.length}:`
   }
   return key
 }

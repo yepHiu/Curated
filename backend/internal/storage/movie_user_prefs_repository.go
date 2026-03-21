@@ -46,25 +46,61 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 		}
 	}
 
-	if len(sets) == 0 {
+	if len(sets) == 0 && !patch.UserTagsSet && !patch.MetadataTagsSet {
 		return nil
 	}
 
-	sets = append(sets, "updated_at = ?")
-	args = append(args, nowUTC())
-	args = append(args, movieID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-	q := "UPDATE movies SET " + strings.Join(sets, ", ") + " WHERE id = ?"
-	res, err := s.db.ExecContext(ctx, q, args...)
-	if err != nil {
-		return err
+	if patch.UserTagsSet {
+		normalized, err := normalizeUserTagsForPatch(patch.UserTags)
+		if err != nil {
+			return err
+		}
+		if err := replaceMovieUserTagsTx(ctx, tx, movieID, normalized); err != nil {
+			return err
+		}
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
+
+	if patch.MetadataTagsSet {
+		normalized, err := normalizeUserTagsForPatch(patch.MetadataTags)
+		if err != nil {
+			return err
+		}
+		if err := replaceMovieMetadataTagsTx(ctx, tx, movieID, normalized); err != nil {
+			return err
+		}
 	}
-	if n == 0 {
-		return ErrMovieNotFoundForPatch
+
+	if len(sets) > 0 {
+		sets = append(sets, "updated_at = ?")
+		args = append(args, nowUTC())
+		args = append(args, movieID)
+
+		q := "UPDATE movies SET " + strings.Join(sets, ", ") + " WHERE id = ?"
+		res, err := tx.ExecContext(ctx, q, args...)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return ErrMovieNotFoundForPatch
+		}
+	} else if patch.UserTagsSet || patch.MetadataTagsSet {
+		// Tag replace paths already verified movie exists when they ran
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	return nil
 }

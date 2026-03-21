@@ -5,6 +5,8 @@ import type {
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListMoviesParams,
+  MetadataRefreshQueuedDTO,
+  MetadataScrapeByPathsBody,
   MovieDetailDTO,
   MoviesPageDTO,
   PatchMovieBody,
@@ -61,6 +63,10 @@ export const api = {
 
   refreshMovieMetadata(movieId: string): Promise<TaskDTO> {
     return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/scrape`)
+  },
+
+  startMetadataRefreshByPaths(body: MetadataScrapeByPathsBody): Promise<MetadataRefreshQueuedDTO> {
+    return httpClient.post<MetadataRefreshQueuedDTO>("/library/metadata-scrape", body)
   },
 
   getTaskStatus(taskId: string): Promise<TaskDTO> {

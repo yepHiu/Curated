@@ -1,4 +1,4 @@
-# JAV-Library 架构评审
+# Curated 架构评审
 
 ## 1. 评审结论
 

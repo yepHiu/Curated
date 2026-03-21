@@ -116,3 +116,71 @@ func TestSaveMovieMetadata_UnknownMovieID(t *testing.T) {
 		t.Fatalf("expected ErrMovieNotFoundForMetadata, got %v", err)
 	}
 }
+
+func TestSaveMovieMetadata_PreservesUserTags(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-1",
+		Path:     "D:/Media/JAV/Main/ABC-123.mp4",
+		FileName: "ABC-123.mp4",
+		Number:   "ABC-123",
+	})
+	if err != nil {
+		t.Fatalf("failed to persist scan movie: %v", err)
+	}
+
+	err = store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "ABC-123",
+		Title:   "First",
+		Summary: "S",
+		Studio:  "St",
+		Tags:    []string{"GenreA", "GenreB"},
+	})
+	if err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+
+	if err := store.PatchMovieUserPrefs(ctx, outcome.MovieID, contracts.PatchMovieInput{
+		UserTagsSet: true,
+		UserTags:    []string{"我的收藏", "待看"},
+	}); err != nil {
+		t.Fatalf("patch user tags: %v", err)
+	}
+
+	err = store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "ABC-123",
+		Title:   "Updated",
+		Summary: "S2",
+		Studio:  "St",
+		Tags:    []string{"OnlyNfo"},
+	})
+	if err != nil {
+		t.Fatalf("second save: %v", err)
+	}
+
+	detail, err := store.GetMovieDetail(ctx, outcome.MovieID)
+	if err != nil {
+		t.Fatalf("get detail: %v", err)
+	}
+	if len(detail.Tags) != 1 || detail.Tags[0] != "OnlyNfo" {
+		t.Fatalf("metadata tags = %#v, want [OnlyNfo]", detail.Tags)
+	}
+	if len(detail.UserTags) != 2 {
+		t.Fatalf("user tags = %#v, want 2 items", detail.UserTags)
+	}
+}

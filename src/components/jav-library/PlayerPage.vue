@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import {
   Maximize2,
   Pause,
@@ -7,6 +8,7 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
+  VolumeX,
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
@@ -14,14 +16,24 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { useLibraryService } from "@/services/library-service"
 
-const props = defineProps<{
-  movie: Movie
-}>()
+const props = withDefaults(
+  defineProps<{
+    movie: Movie
+    /** 为 true 时在首帧可播后尝试自动播放（通常由路由 `?autoplay=1` 驱动） */
+    autoplay?: boolean
+  }>(),
+  { autoplay: false },
+)
 
+const route = useRoute()
+const router = useRouter()
 const libraryService = useLibraryService()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const surfaceRef = ref<HTMLElement | null>(null)
+
+/** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
+const autoplayConsumedForMovieId = ref<string | null>(null)
 
 const playbackSrc = ref<string | null>(null)
 const playbackError = ref("")
@@ -29,6 +41,76 @@ const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const volume = ref([100])
+
+/** 播放中鼠标静止一段时间后隐藏控件与指针；移动鼠标恢复 */
+const IDLE_HIDE_MS = 5000
+const chromeVisible = ref(true)
+let idleHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearIdleHideTimer() {
+  if (idleHideTimer !== null) {
+    clearTimeout(idleHideTimer)
+    idleHideTimer = null
+  }
+}
+
+function scheduleChromeIdleHide() {
+  clearIdleHideTimer()
+  if (!playbackSrc.value || !isPlaying.value) {
+    chromeVisible.value = true
+    return
+  }
+  idleHideTimer = window.setTimeout(() => {
+    idleHideTimer = null
+    chromeVisible.value = false
+  }, IDLE_HIDE_MS)
+}
+
+function onChromePointerActivity() {
+  chromeVisible.value = true
+  scheduleChromeIdleHide()
+}
+
+function onChromePointerLeave() {
+  clearIdleHideTimer()
+  chromeVisible.value = true
+}
+
+const CHROME_LAYER_TRANSITION =
+  "transition-opacity duration-300 ease-out motion-reduce:transition-none"
+
+const chromeLayerVisibleClass = computed(() =>
+  chromeVisible.value
+    ? "pointer-events-auto opacity-100"
+    : "pointer-events-none opacity-0",
+)
+
+const surfaceCursorClass = computed(() =>
+  playbackSrc.value && isPlaying.value && !chromeVisible.value ? "cursor-none" : "",
+)
+
+/** 子层 cursor-pointer 会盖过父级 cursor-none，播放中隐藏 UI 时需一并关掉 */
+const videoAreaCursorClass = computed(() => {
+  if (!playbackSrc.value) return ""
+  if (isPlaying.value && !chromeVisible.value) return "cursor-none"
+  return "cursor-pointer"
+})
+
+watch(isPlaying, (playing) => {
+  if (!playing) {
+    clearIdleHideTimer()
+    chromeVisible.value = true
+  } else if (playbackSrc.value) {
+    scheduleChromeIdleHide()
+  }
+})
+
+watch(playbackSrc, (src) => {
+  if (!src) {
+    clearIdleHideTimer()
+    chromeVisible.value = true
+  }
+})
 
 function syncSrc() {
   playbackError.value = ""
@@ -38,6 +120,7 @@ function syncSrc() {
 watch(
   () => props.movie.id,
   async () => {
+    autoplayConsumedForMovieId.value = null
     syncSrc()
     await nextTick()
     videoRef.value?.load()
@@ -52,6 +135,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onPlaybackKeydown)
+  clearIdleHideTimer()
 })
 
 function formatClock(seconds: number): string {
@@ -69,6 +153,10 @@ const progressPercent = computed(() => {
   return (currentTime.value / duration.value) * 100
 })
 
+/** 滑块为 0% 时显示静音图标（与 M 键「仅静音、不改变滑块」区分，仍以滑块为准） */
+const volumePercent = computed(() => volume.value[0] ?? 0)
+const volumeIconIsMuted = computed(() => volumePercent.value <= 0)
+
 function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
@@ -80,6 +168,36 @@ function onLoadedMetadata() {
   if (!v) return
   duration.value = Number.isFinite(v.duration) ? v.duration : 0
   v.volume = (volume.value[0] ?? 100) / 100
+}
+
+function stripAutoplayFromRoute() {
+  if (route.query.autoplay !== "1") return
+  const nextQuery = { ...route.query }
+  delete nextQuery.autoplay
+  void router.replace({
+    name: "player",
+    params: { id: props.movie.id },
+    query: nextQuery,
+    hash: route.hash,
+  })
+}
+
+/** 从详情/资料库点「播放」进入本页时，在可播后自动 play；成功后去掉 ?autoplay=1 */
+async function onCanPlayForAutoplay() {
+  if (!props.autoplay || !playbackSrc.value) return
+  if (autoplayConsumedForMovieId.value === props.movie.id) return
+  const v = videoRef.value
+  if (!v) return
+
+  autoplayConsumedForMovieId.value = props.movie.id
+  try {
+    await v.play()
+    stripAutoplayFromRoute()
+  } catch {
+    autoplayConsumedForMovieId.value = null
+    playbackError.value =
+      "浏览器未允许自动播放，请再点一次画面或下方播放键。"
+  }
 }
 
 function onPlay() {
@@ -139,7 +257,8 @@ function onProgressBarClick(e: MouseEvent) {
   v.currentTime = ratio * duration.value
 }
 
-function onVolumeSlider(vols: number[]) {
+function onVolumeSlider(vols?: number[]) {
+  if (!vols?.length) return
   volume.value = vols
   const v = videoRef.value
   if (v) {
@@ -173,6 +292,9 @@ function onPlaybackKeydown(e: KeyboardEvent) {
   if (!playbackSrc.value) return
   if (e.ctrlKey || e.metaKey || e.altKey) return
   if (isTypingTarget(e.target)) return
+
+  /** 快捷键也视为活动，避免仅键盘操作时界面被永久隐藏 */
+  onChromePointerActivity()
 
   switch (e.code) {
     case "Space":
@@ -251,8 +373,16 @@ const noStreamHint = computed(() => {
     <div
       ref="surfaceRef"
       class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-gradient-to-br from-black via-zinc-950 to-card"
+      :class="surfaceCursorClass"
+      @mousedown="onChromePointerActivity"
+      @mousemove="onChromePointerActivity"
+      @mouseenter="onChromePointerActivity"
+      @mouseleave="onChromePointerLeave"
     >
-      <div class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5">
+      <div
+        class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5"
+        :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
+      >
         <div class="flex min-w-0 flex-col items-start gap-2 text-left">
           <Badge variant="secondary" class="rounded-full border border-border/60 bg-background/30">
             {{ movie.code }}
@@ -267,19 +397,22 @@ const noStreamHint = computed(() => {
       </div>
 
       <div
-        class="relative flex min-h-0 flex-1 cursor-pointer items-center justify-center p-4 sm:p-6 lg:p-8"
+        class="relative flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6 lg:p-8"
+        :class="videoAreaCursorClass"
         @click="onVideoSurfaceClick"
       >
         <video
           v-if="playbackSrc"
           ref="videoRef"
           class="h-full max-h-full w-full max-w-full object-contain"
+          :class="videoAreaCursorClass"
           playsinline
           preload="metadata"
           :src="playbackSrc"
           @click.stop="onVideoSurfaceClick"
           @timeupdate="onTimeUpdate"
           @loadedmetadata="onLoadedMetadata"
+          @canplay="onCanPlayForAutoplay"
           @play="onPlay"
           @pause="onPause"
           @error="onVideoError"
@@ -304,7 +437,10 @@ const noStreamHint = computed(() => {
         </div>
       </div>
 
-      <div class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/65 to-transparent p-4 sm:p-5">
+      <div
+        class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/65 to-transparent p-4 sm:p-5"
+        :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
+      >
         <div class="flex w-full flex-col gap-4">
           <div class="flex items-center justify-between gap-3 text-sm text-white/70">
             <span>{{ formatClock(currentTime) }}</span>
@@ -356,8 +492,12 @@ const noStreamHint = computed(() => {
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
-              <div class="flex min-w-[14rem] items-center gap-3 rounded-full bg-white/8 px-4 py-2 text-white/80 backdrop-blur">
-                <Volume2 />
+              <div
+                class="flex min-w-[14rem] items-center gap-3 rounded-full bg-white/8 px-4 py-2 text-white/80 backdrop-blur"
+                aria-label="音量"
+              >
+                <VolumeX v-if="volumeIconIsMuted" class="shrink-0" aria-hidden="true" />
+                <Volume2 v-else class="shrink-0" aria-hidden="true" />
                 <Slider
                   :model-value="volume"
                   :max="100"

@@ -590,6 +590,37 @@ func (a *App) runScrape(parentCtx context.Context, output io.Writer, result cont
 	a.runMovieScrapeBody(ctx, parentCtx, output, task, result)
 }
 
+func scanFileResultFromMovieDetail(detail contracts.MovieDetailDTO) (contracts.ScanFileResultDTO, error) {
+	if strings.TrimSpace(detail.Code) == "" {
+		return contracts.ScanFileResultDTO{}, contracts.ErrScrapeMovieNoCode
+	}
+	if strings.TrimSpace(detail.Location) == "" {
+		return contracts.ScanFileResultDTO{}, contracts.ErrScrapeMovieNoLocation
+	}
+	return contracts.ScanFileResultDTO{
+		Path:     detail.Location,
+		FileName: filepath.Base(detail.Location),
+		Number:   detail.Code,
+		MovieID:  detail.ID,
+		Status:   "updated",
+	}, nil
+}
+
+// startAsyncMovieMetadataScrape enqueues runMovieScrapeBody in a goroutine (same pipeline as scan-triggered scrape).
+func (a *App) startAsyncMovieMetadataScrape(ctx context.Context, detail contracts.MovieDetailDTO) (contracts.TaskDTO, error) {
+	result, err := scanFileResultFromMovieDetail(detail)
+	if err != nil {
+		return contracts.TaskDTO{}, err
+	}
+	task := a.beginMovieScrapeTask(ctx, io.Discard, result)
+	go func() {
+		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
+		defer cancel()
+		a.runMovieScrapeBody(scrapeCtx, a.appCtx, io.Discard, task, result)
+	}()
+	return task, nil
+}
+
 // StartMovieMetadataRefresh enqueues a single-movie rescrape (same pipeline as scan-triggered scrape).
 // It returns the scrape task immediately; work continues in a background goroutine.
 func (a *App) StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error) {
@@ -600,30 +631,86 @@ func (a *App) StartMovieMetadataRefresh(ctx context.Context, movieID string) (co
 	if err != nil {
 		return contracts.TaskDTO{}, err
 	}
-	if strings.TrimSpace(detail.Code) == "" {
-		return contracts.TaskDTO{}, contracts.ErrScrapeMovieNoCode
+	return a.startAsyncMovieMetadataScrape(ctx, detail)
+}
+
+// matchConfiguredLibraryPath returns the canonical configured path if req matches a library path (case-fold on Windows).
+func matchConfiguredLibraryPath(req string, configured []contracts.LibraryPathDTO) (canonical string, ok bool) {
+	reqClean := filepath.Clean(strings.TrimSpace(req))
+	if reqClean == "." || reqClean == "" {
+		return "", false
 	}
-	if strings.TrimSpace(detail.Location) == "" {
-		return contracts.TaskDTO{}, contracts.ErrScrapeMovieNoLocation
+	for _, c := range configured {
+		cp := filepath.Clean(strings.TrimSpace(c.Path))
+		if cp == "" || cp == "." {
+			continue
+		}
+		if strings.EqualFold(reqClean, cp) {
+			return cp, true
+		}
+	}
+	return "", false
+}
+
+// StartMetadataRefreshForLibraryPaths queues metadata rescrape for all indexed movies under the given paths.
+// Each requested path must match a configured library root; non-matching paths are listed in invalidPaths.
+func (a *App) StartMetadataRefreshForLibraryPaths(ctx context.Context, requestedPaths []string) (contracts.MetadataRefreshQueuedDTO, error) {
+	out := contracts.MetadataRefreshQueuedDTO{}
+	if len(requestedPaths) == 0 {
+		return out, nil
 	}
 
-	result := contracts.ScanFileResultDTO{
-		Path:     detail.Location,
-		FileName: filepath.Base(detail.Location),
-		Number:   detail.Code,
-		MovieID:  detail.ID,
-		Status:   "updated",
+	configured, err := a.store.ListLibraryPaths(ctx)
+	if err != nil {
+		return out, err
 	}
 
-	task := a.beginMovieScrapeTask(ctx, io.Discard, result)
+	resolvedRoots := make([]string, 0, len(requestedPaths))
+	seenRoot := make(map[string]struct{})
+	for _, raw := range requestedPaths {
+		p := strings.TrimSpace(raw)
+		if p == "" {
+			continue
+		}
+		canon, ok := matchConfiguredLibraryPath(p, configured)
+		if !ok {
+			out.InvalidPaths = append(out.InvalidPaths, raw)
+			continue
+		}
+		key := strings.ToLower(canon)
+		if _, dup := seenRoot[key]; dup {
+			continue
+		}
+		seenRoot[key] = struct{}{}
+		resolvedRoots = append(resolvedRoots, canon)
+	}
 
-	go func() {
-		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
-		defer cancel()
-		a.runMovieScrapeBody(scrapeCtx, a.appCtx, io.Discard, task, result)
-	}()
+	if len(resolvedRoots) == 0 {
+		return out, nil
+	}
 
-	return task, nil
+	ids, err := a.store.ListMovieIDsUnderLibraryRoots(ctx, resolvedRoots)
+	if err != nil {
+		return out, err
+	}
+
+	queued, skipped := 0, 0
+	for _, id := range ids {
+		detail, derr := a.store.GetMovieDetail(ctx, id)
+		if derr != nil {
+			skipped++
+			continue
+		}
+		_, serr := a.startAsyncMovieMetadataScrape(ctx, detail)
+		if serr != nil {
+			skipped++
+			continue
+		}
+		queued++
+	}
+	out.Queued = queued
+	out.Skipped = skipped
+	return out, nil
 }
 
 func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, metadata scraper.Metadata, destDir string) {

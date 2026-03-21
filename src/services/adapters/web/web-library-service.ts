@@ -1,10 +1,12 @@
 import { computed, ref, type Ref } from "vue"
-import type { PatchMovieBody, TaskDTO } from "@/api/types"
+import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
-import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
+import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+import { buildSettingsDashboardStats } from "@/lib/library-stats"
+import { playedMovieCount } from "@/lib/played-movies-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
@@ -49,12 +51,6 @@ async function ensureLoaded() {
   }
 }
 
-const libraryStats: readonly LibraryStat[] = [
-  { label: "Movies Indexed", value: "—", detail: "Connected to backend" },
-  { label: "Favorite Picks", value: "—", detail: "Synced from backend" },
-  { label: "Metadata Health", value: "—", detail: "Requires real scan" },
-]
-
 function mergeMovieIntoListState(movie: Movie) {
   const id = movie.id.trim()
   if (!id) return
@@ -81,7 +77,9 @@ function createWebLibraryService(): LibraryService {
 
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
-    libraryStats,
+    libraryStats: computed(() =>
+      buildSettingsDashboardStats(moviesState.value, playedMovieCount.value),
+    ),
     libraryPaths: computed(() => libraryPathsState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
 
@@ -134,6 +132,11 @@ function createWebLibraryService(): LibraryService {
       return await api.refreshMovieMetadata(movieId)
     },
 
+    async refreshMetadataForLibraryPaths(paths: string[]): Promise<MetadataRefreshQueuedDTO> {
+      const cleaned = paths.map((p) => p.trim()).filter(Boolean)
+      return await api.startMetadataRefreshByPaths({ paths: cleaned })
+    },
+
     getMoviePlaybackUrl(movieId: string): string | null {
       const id = movieId.trim()
       if (!id) return null
@@ -170,7 +173,7 @@ function createWebLibraryService(): LibraryService {
       let snapshot = moviesState.value.map((m) => ({ ...m }))
       let existing = moviesState.value.find((m) => m.id === id)
       if (!existing) {
-        await ensureMovieCached(id)
+        await loadMovieDetail(id)
         snapshot = moviesState.value.map((m) => ({ ...m }))
         existing = moviesState.value.find((m) => m.id === id)
       }

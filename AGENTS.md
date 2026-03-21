@@ -1,5 +1,7 @@
 # Agent / Cursor 说明
 
+**产品正式名称：Curated**（仓库目录 / `package.json` 的 `name` 等可能仍为 `jav-shadcn`）。
+
 本仓库的 **Cursor 规则与项目记忆** 集中在 **`.cursor/rules/*.mdc`**。
 
 | 优先级 | 文件 | 用途 |

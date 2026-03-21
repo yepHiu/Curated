@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import PlayerPage from "@/components/jav-library/PlayerPage.vue"
+import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -44,6 +45,17 @@ watch(
 const selectedMovie = computed(() =>
   movieId.value ? libraryService.getMovieById(movieId.value) : undefined,
 )
+
+watch(
+  [selectedMovie, hydrating],
+  ([movie, busy]) => {
+    if (busy || !movie) {
+      return
+    }
+    recordMoviePlayed(movie.id)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -54,7 +66,11 @@ const selectedMovie = computed(() =>
     >
       正在加载播放目标…
     </div>
-    <PlayerPage v-else-if="selectedMovie" :movie="selectedMovie" />
+    <PlayerPage
+      v-else-if="selectedMovie"
+      :movie="selectedMovie"
+      :autoplay="route.query.autoplay === '1'"
+    />
     <NotFoundState
       v-else
       title="Player target not found"

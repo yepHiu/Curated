@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Project Facts（当前实现）
 
+- **产品正式名称：Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
+
 ## 技术栈与包管理
 
 - 根目录：`Vue 3 + TypeScript + Vite`，UI 为 `shadcn-vue` + Tailwind CSS v4，主题变量在 `src/style.css`。

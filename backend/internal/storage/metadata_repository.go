@@ -110,8 +110,21 @@ func replaceMovieActors(ctx context.Context, tx *sql.Tx, movieID string, actors 
 	return nil
 }
 
+// replaceMovieMetadataTagsTx verifies the movie exists, then replaces only nfo-type tag links (same as scraper write path).
+func replaceMovieMetadataTagsTx(ctx context.Context, tx *sql.Tx, movieID string, tags []string) error {
+	var one int
+	switch err := tx.QueryRowContext(ctx, `SELECT 1 FROM movies WHERE id = ?`, movieID).Scan(&one); {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrMovieNotFoundForPatch
+	case err != nil:
+		return err
+	}
+	return replaceMovieTags(ctx, tx, movieID, tags)
+}
+
 func replaceMovieTags(ctx context.Context, tx *sql.Tx, movieID string, tags []string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_tags WHERE movie_id = ?`, movieID); err != nil {
+	// Only replace scraper/metadata (nfo) links; user tags stay on movie_tags.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_tags WHERE movie_id = ? AND tag_id IN (SELECT id FROM tags WHERE type = 'nfo')`, movieID); err != nil {
 		return err
 	}
 
@@ -192,7 +205,20 @@ func ensureTag(ctx context.Context, tx *sql.Tx, name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return lookupEntityID(ctx, tx, `SELECT id FROM tags WHERE name = ?`, name)
+	return lookupTagID(ctx, tx, name, "nfo")
+}
+
+func lookupTagID(ctx context.Context, tx *sql.Tx, name, tagType string) (int64, error) {
+	var id int64
+	err := tx.QueryRowContext(ctx, `SELECT id FROM tags WHERE name = ? AND type = ?`, name, tagType).Scan(&id)
+	switch {
+	case err == nil:
+		return id, nil
+	case errors.Is(err, sql.ErrNoRows):
+		return 0, fmt.Errorf("tag not found after insert: %s (%s)", name, tagType)
+	default:
+		return 0, err
+	}
 }
 
 func lookupEntityID(ctx context.Context, tx *sql.Tx, query string, value string) (int64, error) {

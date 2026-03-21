@@ -29,6 +29,7 @@ type ScanStarter interface {
 // MovieMetadataRefresher starts an async single-movie metadata rescrape and returns the scrape task.
 type MovieMetadataRefresher interface {
 	StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error)
+	StartMetadataRefreshForLibraryPaths(ctx context.Context, paths []string) (contracts.MetadataRefreshQueuedDTO, error)
 }
 
 // OrganizeLibraryController exposes 整理库开关；值来自启动时合并的 library-config.cfg，PATCH 会写回该文件。
@@ -81,6 +82,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
+	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
@@ -231,6 +233,22 @@ func parsePatchMovieInput(body []byte) (contracts.PatchMovieInput, error) {
 			in.UserRating = v
 		}
 	}
+	if raw, ok := m["userTags"]; ok {
+		in.UserTagsSet = true
+		var tags []string
+		if err := json.Unmarshal(raw, &tags); err != nil {
+			return in, err
+		}
+		in.UserTags = tags
+	}
+	if raw, ok := m["metadataTags"]; ok {
+		in.MetadataTagsSet = true
+		var tags []string
+		if err := json.Unmarshal(raw, &tags); err != nil {
+			return in, err
+		}
+		in.MetadataTags = tags
+	}
 	return in, nil
 }
 
@@ -238,7 +256,13 @@ func patchMovieInputHasFields(in contracts.PatchMovieInput) bool {
 	if in.Favorite != nil {
 		return true
 	}
-	return in.UserRatingSet
+	if in.UserRatingSet {
+		return true
+	}
+	if in.UserTagsSet {
+		return true
+	}
+	return in.MetadataTagsSet
 }
 
 func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +301,10 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.PatchMovieUserPrefs(r.Context(), movieID, in)
 	if err != nil {
+		if errors.Is(err, storage.ErrInvalidUserTags) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
 		if errors.Is(err, storage.ErrMovieNotFoundForPatch) && h.library != nil {
 			movie, libErr := h.library.PatchMovie(movieID, in)
 			if library.IsNotFound(libErr) {
@@ -355,6 +383,41 @@ func (h *Handler) handleRefreshMovieMetadata(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusAccepted, task)
+}
+
+func (h *Handler) handleMetadataScrapeByPaths(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.movieMetadataRefresher == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata refresh not configured")
+		return
+	}
+
+	var body contracts.StartMetadataRefreshByPathsRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+	if len(body.Paths) == 0 {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "paths must contain at least one entry")
+		return
+	}
+
+	dto, err := h.movieMetadataRefresher.StartMetadataRefreshForLibraryPaths(r.Context(), body.Paths)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("bulk metadata refresh failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to queue metadata refresh")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, dto)
 }
 
 // handleDeleteMovie removes the movie row and related DB rows in a transaction, then best-effort deletes

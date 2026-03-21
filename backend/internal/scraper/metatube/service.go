@@ -10,6 +10,7 @@ import (
 	"github.com/metatube-community/metatube-sdk-go/engine"
 	"github.com/metatube-community/metatube-sdk-go/engine/providerid"
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 
 	"jav-shadcn/backend/internal/scraper"
 )
@@ -122,14 +123,40 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string) (sc
 	}, nil
 }
 
+// formatReleaseDate 将 Metatube 的 datatypes.Date（底层 time.Time）规范为 UTC 日历日 YYYY-MM-DD。
+// 原先使用 fmt.Sprint 会得到 "2006-01-02 00:00:00 +0000 UTC" 等字符串，入库/展示容易误判为「日期错了」。
 func formatReleaseDate(value any) string {
-	formatted := strings.TrimSpace(fmt.Sprint(value))
-	switch formatted {
-	case "", "0001-01-01 00:00:00 +0000 UTC":
-		return ""
+	switch v := value.(type) {
+	case datatypes.Date:
+		return releaseDateFromTime(time.Time(v))
+	case time.Time:
+		return releaseDateFromTime(v)
 	default:
-		return formatted
+		s := strings.TrimSpace(fmt.Sprint(value))
+		if s == "" || strings.HasPrefix(s, "0001-01-01") {
+			return ""
+		}
+		// 兼容历史或异常路径里已存在的 "YYYY-MM-DD ..." 前缀
+		if i := strings.IndexByte(s, ' '); i == 10 {
+			head := s[:i]
+			if _, err := time.Parse("2006-01-02", head); err == nil {
+				return head
+			}
+		}
+		if len(s) == 10 {
+			if _, err := time.Parse("2006-01-02", s); err == nil {
+				return s
+			}
+		}
+		return s
 	}
+}
+
+func releaseDateFromTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
 }
 
 func cleanStrings(values []string) []string {

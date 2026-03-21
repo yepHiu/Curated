@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curated 架构与实现逻辑说明</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --border: #30363d;
+      --code-bg: #161b22;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.65;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1 { font-size: 1.75rem; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: #c9d1d9; }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; color: var(--muted); }
+    a { color: var(--accent); }
+    p, li { color: #c9d1d9; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    nav.toc ul { margin: 0; padding-left: 1.25rem; }
+    nav.toc li { margin: 0.35rem 0; }
+    code, pre {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.88em;
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      color: #d2a8ff;
+    }
+    pre .path { color: #79c0ff; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+    }
+    th { background: var(--panel); color: var(--muted); font-weight: 600; }
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+    .flow span {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+    .note {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: var(--muted);
+    }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--muted); }
+    figure.diagram {
+      margin: 1.25rem 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 0.75rem;
+      overflow-x: auto;
+    }
+    figure.diagram figcaption {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 0.85rem 0 0;
+      padding: 0 0.5rem;
+      text-align: center;
+      line-height: 1.45;
+    }
+    figure.diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+    .diagram-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #c9d1d9;
+      margin: 0 0 0.5rem 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Curated — 架构与实现逻辑</h1>
+  <p class="muted">正式产品名为 <strong>Curated</strong>；仓库目录与 Go module 等标识可能仍为 <code>jav-shadcn</code>。本文档依据当前代码整理「前端如何组织」「后端如何启动与路由」「数据从 SQLite / 内存到 UI 的流向」。可直接用浏览器打开本 HTML 阅读。</p>
+
+  <nav class="toc" aria-label="目录">
+    <strong>目录</strong>
+    <ul>
+      <li><a href="#diagrams">图示速览（图形化）</a></li>
+      <li><a href="#overview">1. 总览</a></li>
+      <li><a href="#frontend">2. 前端（Vue 3 + Vite）</a></li>
+      <li><a href="#backend">3. 后端（Go + SQLite）</a></li>
+      <li><a href="#api-contract">4. HTTP API 与契约</a></li>
+      <li><a href="#data-flow">5. 关键数据流</a></li>
+      <li><a href="#features">6. 功能模块与代码落点</a></li>
+      <li><a href="#dev">7. 本地开发与联调</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="diagrams">图示速览</h2>
+  <p class="muted">以下均为内嵌 SVG，无需外网即可显示；可缩放浏览器窗口查看。</p>
+
+  <p class="diagram-title">图 1 — 联调时的请求路径</p>
+  <figure class="diagram" aria-label="联调请求路径示意图">
+    <svg viewBox="0 0 820 120" xmlns="http://www.w3.org/2000/svg" role="img">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#58a6ff"/>
+        </marker>
+      </defs>
+      <rect x="8" y="28" width="120" height="64" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="68" y="58" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">浏览器</text>
+      <text x="68" y="76" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">Vue 应用</text>
+      <line x1="128" y1="60" x2="168" y2="60" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="168" y="22" width="150" height="76" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="243" y="52" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Vite 开发服</text>
+      <text x="243" y="70" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">:5173 · 代理 /api</text>
+      <text x="243" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">→ localhost:8080</text>
+      <line x1="318" y1="60" x2="358" y2="60" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="358" y="22" width="140" height="76" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="428" y="52" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Go javd</text>
+      <text x="428" y="70" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">HTTP :8080</text>
+      <text x="428" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">server.Handler</text>
+      <line x1="498" y1="60" x2="538" y2="60" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="538" y="18" width="270" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="673" y="48" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">SQLite + 磁盘</text>
+      <text x="673" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">jav-library.db · 视频/缓存目录</text>
+      <text x="673" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">扫描入库 · stream 读文件</text>
+    </svg>
+    <figcaption><code>VITE_USE_WEB_API=true</code> 时，前端请求 <code>/api/*</code> 由 Vite 转发到后端；播放流地址同样经代理访问真实文件。</figcaption>
+  </figure>
+
+  <p class="diagram-title">图 2 — 数据源：Web API 与 Mock 二选一</p>
+  <figure class="diagram" aria-label="Web 与 Mock 分支">
+    <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" role="img">
+      <defs>
+        <marker id="arr2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#58a6ff"/>
+        </marker>
+      </defs>
+      <rect x="280" y="12" width="240" height="44" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="400" y="40" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600" font-family="system-ui,sans-serif">useLibraryService()</text>
+      <line x1="400" y1="56" x2="400" y2="78" stroke="#8b949e" stroke-width="1.5"/>
+      <polygon points="400,88 388,78 412,78" fill="#8b949e"/>
+      <text x="400" y="72" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">VITE_USE_WEB_API</text>
+      <line x1="400" y1="88" x2="200" y2="130" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr2)"/>
+      <line x1="400" y1="88" x2="600" y2="130" stroke="#3fb950" stroke-width="2" marker-end="url(#arr2)"/>
+      <text x="250" y="118" text-anchor="middle" fill="#58a6ff" font-size="11" font-family="system-ui,sans-serif">=== "true"</text>
+      <text x="545" y="118" text-anchor="middle" fill="#3fb950" font-size="11" font-family="system-ui,sans-serif">否则</text>
+      <rect x="40" y="138" width="280" height="56" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="180" y="162" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">webLibraryService</text>
+      <text x="180" y="182" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">fetch → /api → Go + SQLite</text>
+      <rect x="480" y="138" width="280" height="56" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="620" y="162" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">mockLibraryService</text>
+      <text x="620" y="182" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">内存种子 · 可选 localStorage</text>
+    </svg>
+    <figcaption>页面只依赖统一门面，切换环境变量即可在「真实后端」与「纯前端演示」之间切换，无需改业务组件。</figcaption>
+  </figure>
+
+  <p class="diagram-title">图 3 — 前端内部分层（自上而下）</p>
+  <figure class="diagram" aria-label="前端分层示意图">
+    <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" role="img">
+      <rect x="60" y="8" width="600" height="36" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+      <text x="360" y="31" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Views / Layouts（LibraryView、DetailView、AppShell…）</text>
+      <rect x="80" y="52" width="560" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="360" y="75" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">业务组件 jav-library（DetailPanel、MovieGrid、PlayerPage…）</text>
+      <rect x="100" y="96" width="520" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="360" y="119" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Composables · domain 类型 · lib 工具</text>
+      <rect x="120" y="140" width="480" height="40" rx="6" fill="#1f2a3d" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="360" y="165" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600" font-family="system-ui,sans-serif">useLibraryService() 门面</text>
+      <rect x="40" y="188" width="310" height="64" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="195" y="218" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">adapters/web</text>
+      <text x="195" y="238" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">endpoints.ts · http-client</text>
+      <rect x="370" y="188" width="310" height="64" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="525" y="218" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">adapters/mock</text>
+      <text x="525" y="238" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">内存 + mock-movie-prefs-storage</text>
+    </svg>
+    <figcaption>UI 不直接写 fetch；统一通过服务层访问数据，便于测试与后续替换为桌面 IPC 等传输方式。</figcaption>
+  </figure>
+
+  <p class="diagram-title">图 4 — 后端 <code>javd</code> 进程内模块关系</p>
+  <figure class="diagram" aria-label="后端模块关系">
+    <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img">
+      <rect x="300" y="8" width="220" height="40" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="410" y="34" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="system-ui,sans-serif">cmd/javd/main.go</text>
+      <line x1="410" y1="48" x2="410" y2="68" stroke="#8b949e" stroke-width="1.5"/>
+      <rect x="200" y="68" width="420" height="100" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="410" y="92" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">internal/app.App</text>
+      <text x="230" y="118" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">SQLiteStore</text>
+      <text x="230" y="136" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">library.Service（内存种子）</text>
+      <text x="230" y="154" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">scanner · scraper · assets</text>
+      <text x="480" y="118" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">tasks.Manager</text>
+      <text x="480" y="136" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">organizeLibrary + 写回 cfg</text>
+      <text x="480" y="154" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">StartAutoScanLoop</text>
+      <line x1="410" y1="168" x2="410" y2="188" stroke="#8b949e" stroke-width="1.5"/>
+      <rect x="250" y="188" width="320" height="44" rx="8" fill="#1f2a3d" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="410" y="216" text-anchor="middle" fill="#58a6ff" font-size="13" font-family="system-ui,sans-serif">HTTPHandler() → server.NewHandler.Routes()</text>
+      <line x1="410" y1="232" x2="410" y2="248" stroke="#8b949e" stroke-width="1.5"/>
+      <rect x="120" y="248" width="580" height="44" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="410" y="276" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">/api/library/* · /api/settings · /api/scans · /api/tasks/* …</text>
+    </svg>
+    <figcaption>持久化与扫描刮削在 <code>App</code> 内协调；HTTP 层只通过注入的 <code>Handler</code> 暴露 REST 接口。</figcaption>
+  </figure>
+
+  <p class="diagram-title">图 5 — 列表 / 详情：先 SQLite，再回退内存库</p>
+  <figure class="diagram" aria-label="SQLite 与内存回退流程">
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img">
+      <defs>
+        <marker id="arr3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#58a6ff"/>
+        </marker>
+        <marker id="arrN" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#d29922"/>
+        </marker>
+      </defs>
+      <rect x="280" y="12" width="200" height="36" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+      <text x="380" y="35" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">GET 列表 / 详情</text>
+      <line x1="380" y1="48" x2="380" y2="72" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr3)"/>
+      <rect x="240" y="72" width="280" height="44" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="380" y="100" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">store.ListMovies / GetMovieDetail</text>
+      <line x1="380" y1="116" x2="380" y2="140" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr3)"/>
+      <polygon points="380,168 340,140 420,140" fill="#30363d" stroke="#8b949e" stroke-width="1.5"/>
+      <text x="380" y="130" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">有数据？</text>
+      <line x1="340" y1="154" x2="120" y2="200" stroke="#3fb950" stroke-width="2" marker-end="url(#arr3)"/>
+      <text x="200" y="188" fill="#3fb950" font-size="11" font-family="system-ui,sans-serif">是</text>
+      <line x1="420" y1="154" x2="640" y2="200" stroke="#d29922" stroke-width="2" marker-end="url(#arrN)"/>
+      <text x="545" y="188" fill="#d29922" font-size="11" font-family="system-ui,sans-serif">否（空或 NoRows）</text>
+      <rect x="40" y="208" width="200" height="56" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="140" y="232" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">返回 DB 结果</text>
+      <text x="140" y="250" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">JSON 响应</text>
+      <rect x="520" y="208" width="200" height="56" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+      <text x="620" y="232" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">library.Service</text>
+      <text x="620" y="250" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">内存种子数据</text>
+    </svg>
+    <figcaption>列表在 <code>Total==0</code> 时整体回退；详情在记录不存在时单条回退。<strong>视频流</strong>不经过此回退，仅打开 DB 中的文件路径。</figcaption>
+  </figure>
+
+  <p class="diagram-title">图 6 — PATCH 收藏 / 用户评分（简化）</p>
+  <figure class="diagram" aria-label="PATCH 流程">
+    <svg viewBox="0 0 760 100" xmlns="http://www.w3.org/2000/svg" role="img">
+      <defs>
+        <marker id="arr4" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#a371f7"/>
+        </marker>
+      </defs>
+      <rect x="10" y="28" width="130" height="44" rx="6" fill="#161b22" stroke="#a371f7" stroke-width="1.5"/>
+      <text x="75" y="56" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">DetailPanel</text>
+      <line x1="140" y1="50" x2="175" y2="50" stroke="#a371f7" stroke-width="2" marker-end="url(#arr4)"/>
+      <rect x="175" y="28" width="150" height="44" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="250" y="52" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">patchMovie()</text>
+      <line x1="325" y1="50" x2="360" y2="50" stroke="#a371f7" stroke-width="2" marker-end="url(#arr4)"/>
+      <rect x="360" y="22" width="200" height="56" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="460" y="46" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">PATCH /api/library/movies/{id}</text>
+      <text x="460" y="64" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui,sans-serif">body: isFavorite, rating</text>
+      <line x1="560" y1="50" x2="595" y2="50" stroke="#a371f7" stroke-width="2" marker-end="url(#arr4)"/>
+      <rect x="595" y="28" width="155" height="44" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="672" y="56" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui,sans-serif">SQLite 更新 → DTO</text>
+    </svg>
+    <figcaption>若 DB 中无法 PATCH 且内存种子中存在该片，则回退到 <code>library.PatchMovie</code>（与列表/详情策略一致）。</figcaption>
+  </figure>
+
+  <h2 id="overview">1. 总览</h2>
+  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程 <code>javd</code> 提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削与资源缓存。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
+  <div class="flow">
+    <span>浏览器</span> → <span>Vite 开发服务器（可选代理 <code>/api</code>）</span> → <span>Go <code>javd</code> :8080</span> → <span>SQLite + 文件系统</span>
+  </div>
+  <p>前端通过环境变量 <code>VITE_USE_WEB_API</code> 在两种数据源间切换：</p>
+  <ul>
+    <li><strong><code>true</code></strong>：调用 <code>/api/...</code>，经 Vite 代理到后端。</li>
+    <li><strong>非 <code>true</code></strong>：使用内存 Mock 服务，无需后端。</li>
+  </ul>
+
+  <h2 id="frontend">2. 前端（Vue 3 + Vite）</h2>
+
+  <h3>2.1 入口与路由</h3>
+  <ul>
+    <li><span class="path">src/main.ts</span>：创建应用、挂载 <code>router</code>、引入全局样式（含 Tailwind v4 / shadcn 主题）。</li>
+    <li><span class="path">src/App.vue</span>：根组件，通常承载 <code>router-view</code>。</li>
+    <li><span class="path">src/router/index.ts</span>：使用 <strong>Hash 路由</strong>（<code>createWebHashHistory</code>），子路由挂在 <span class="path">layouts/AppShell.vue</span> 下：
+      <ul>
+        <li><code>/library</code>、<code>/favorites</code>、<code>/recent</code>、<code>/tags</code> → 同一 <span class="path">views/LibraryView.vue</span>（通过路由名区分模式）。</li>
+        <li><code>/detail/:id</code> → <span class="path">views/DetailView.vue</span></li>
+        <li><code>/player/:id?</code> → <span class="path">views/PlayerView.vue</span></li>
+        <li><code>/settings</code> → <span class="path">views/SettingsView.vue</span></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>2.2 分层：视图 → 组件 → 服务 → API</h3>
+  <table>
+    <thead><tr><th>层级</th><th>职责</th><th>典型路径</th></tr></thead>
+    <tbody>
+      <tr><td>Views</td><td>页面级状态、组合子组件、调用 composable / service</td><td><code>src/views/*.vue</code></td></tr>
+      <tr><td>Layouts</td><td>侧栏、顶栏、全局壳</td><td><code>src/layouts/AppShell.vue</code></td></tr>
+      <tr><td>业务组件</td><td>影片网格、详情面板、播放器页、设置页等</td><td><code>src/components/jav-library/*.vue</code></td></tr>
+      <tr><td>UI 组件</td><td>shadcn-vue 封装（Button、Dialog、Tabs…）</td><td><code>src/components/ui/**</code></td></tr>
+      <tr><td>Composables</td><td>可复用逻辑（如扫描任务轮询）</td><td><code>src/composables/*.ts</code></td></tr>
+      <tr><td>领域类型</td><td>前端领域模型（与 DTO 对齐）</td><td><code>src/domain/**</code></td></tr>
+      <tr><td>服务门面</td><td>统一出口：<code>useLibraryService()</code></td><td><code>src/services/library-service.ts</code></td></tr>
+      <tr><td>适配器</td><td>Web 实现 / Mock 实现</td><td><code>src/services/adapters/web/</code>、<code>mock/</code></td></tr>
+      <tr><td>HTTP 客户端</td><td>封装 fetch、错误类型、Base URL</td><td><code>src/api/http-client.ts</code>、<code>endpoints.ts</code></td></tr>
+    </tbody>
+  </table>
+  <p><strong>核心逻辑</strong>：<span class="path">src/services/library-service.ts</span> 根据 <code>import.meta.env.VITE_USE_WEB_API === "true"</code> 导出 <code>webLibraryService</code> 或 <code>mockLibraryService</code>。页面与组件只依赖 <code>useLibraryService()</code>，从而与「是否连后端」解耦。</p>
+
+  <h3>2.3 Web 适配器</h3>
+  <p><span class="path">src/services/adapters/web/web-library-service.ts</span> 将 UI 需要的操作映射为 <span class="path">src/api/endpoints.ts</span> 中的方法（如 <code>listMovies</code>、<code>getMovie</code>、<code>patchMovie</code>、<code>startScan</code>、<code>getTaskStatus</code> 等），并在适当时合并列表缓存、处理播放地址（见 <span class="path">src/api/playback-url.ts</span>）。</p>
+  <p><span class="path">src/api/http-client.ts</span> 中 <code>BASE_URL</code> 默认为 <code>/api</code>，也可通过 <code>VITE_API_BASE_URL</code> 覆盖。</p>
+
+  <h3>2.4 Mock 适配器</h3>
+  <p><span class="path">src/services/adapters/mock/mock-library-service.ts</span> 使用内存种子数据模拟列表、详情、扫描任务等。收藏与用户评分等偏好可经 <span class="path">src/lib/mock-movie-prefs-storage.ts</span> 写入 <code>localStorage</code>，刷新后仍保留（与真实后端 SQLite 持久化行为对应，便于离线演示）。</p>
+
+  <h2 id="backend">3. 后端（Go + SQLite）</h2>
+
+  <h3>3.1 进程入口</h3>
+  <p><span class="path">backend/cmd/javd/main.go</span> 流程概要：</p>
+  <ol>
+    <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code>）。</li>
+    <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（如 <code>organizeLibrary</code>）。</li>
+    <li>打开 SQLite：<code>storage.NewSQLiteStore(cfg.DatabasePath)</code>，执行 <code>Migrate</code>，必要时 <code>SeedLibraryPathsIfEmpty</code>。</li>
+    <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存等；启动自动扫描循环 <code>StartAutoScanLoop</code>。</li>
+    <li><code>http</code> 模式下 <code>server.ListenAndServe</code> 挂载 <code>backendApp.HTTPHandler()</code>。</li>
+  </ol>
+
+  <h3>3.2 应用对象 <code>App</code></h3>
+  <p><span class="path">backend/internal/app/app.go</span> 中的 <code>App</code> 持有：</p>
+  <ul>
+    <li><code>store *storage.SQLiteStore</code>：影片、路径、任务、用户偏好等持久化。</li>
+    <li><code>library *library.Service</code>：<strong>内存种子服务</strong>（开发/演示用数据集）。</li>
+    <li><code>scanner</code>、<code>scraper</code>（Metatube）、<code>assets</code>（缓存下载）、<code>tasks.Manager</code> 等。</li>
+  </ul>
+  <p><code>HTTPHandler()</code> 构造 <span class="path">server.Handler</span>，注入上述依赖。</p>
+
+  <h3>3.3 HTTP 路由层</h3>
+  <p><span class="path">backend/internal/server/server.go</span> 中 <code>Routes()</code> 注册 REST 风格接口（前缀均为 <code>/api</code>），主要包括：</p>
+  <ul>
+    <li><code>GET /api/health</code> — 健康检查（含 <code>databasePath</code> 等）。</li>
+    <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>limit</code>、<code>offset</code>）。</li>
+    <li><code>GET /api/library/movies/{movieId}</code> — 详情。</li>
+    <li><code>PATCH /api/library/movies/{movieId}</code> — 更新收藏与用户评分（JSON 字段见下文）。</li>
+    <li><code>GET .../stream</code> — 视频文件流（<code>http.ServeContent</code>，支持 Range）。</li>
+    <li><code>POST .../scrape</code> — 触发单部影片元数据重刮。</li>
+    <li><code>DELETE .../{movieId}</code> — 删除影片记录及相关缓存策略由存储层实现。</li>
+    <li><code>GET/PATCH /api/settings</code> — 设置 DTO。</li>
+    <li><code>POST/PATCH/DELETE /api/library/paths</code> — 库路径 CRUD。</li>
+    <li><code>POST /api/scans</code>、<code>GET /api/tasks/{taskId}</code> — 扫描与任务状态。</li>
+  </ul>
+  <p>中间层对响应做 CORS 包装，便于浏览器开发联调。</p>
+
+  <h3>3.4 SQLite 与内存回退（重要）</h3>
+  <p>列表与详情在 HTTP 层采用<strong>「数据库优先 + 空则回退内存库」</strong>策略（便于 DB 尚无数据时 UI 仍有演示数据）：</p>
+  <ul>
+    <li><strong>列表</strong>：先 <code>store.ListMovies</code>；若 <code>result.Total == 0</code>，再调用 <code>library.ListMovies</code>。</li>
+    <li><strong>详情</strong>：先 <code>store.GetMovieDetail</code>；若 <code>sql.ErrNoRows</code>，再 <code>library.GetMovie</code>。</li>
+    <li><strong>PATCH</strong>：先 <code>store.PatchMovieUserPrefs</code>；若返回「影片不存在于 DB 的可 PATCH 集合」且内存库存在该片，则 <code>library.PatchMovie</code>。</li>
+  </ul>
+  <p class="note"><strong>注意</strong>：<code>GET .../stream</code> 仅走 SQLite（打开磁盘上的视频文件），不走内存种子库；真实播放依赖扫描入库后的文件路径。</p>
+
+  <h3>3.5 扫描、刮削与任务</h3>
+  <p>扫描由 <code>App</code> 协调：<code>scanner</code> 遍历配置的库路径，解析番号、写库；若开启整理（<code>organizeLibrary</code>），会按规则移动/组织文件。刮削通过 Metatube SDK 拉取元数据，<code>assets</code> 可把封面等缓存到 <code>cacheDir</code>。长时间操作通过 <code>tasks.Manager</code> 生成 <code>taskId</code>，前端轮询 <code>GET /api/tasks/{taskId}</code> 展示进度（如 <span class="path">ScanProgressDock.vue</span>、<span class="path">use-scan-task-tracker.ts</span>）。</p>
+
+  <h2 id="api-contract">4. HTTP API 与契约</h2>
+  <p>前后端共享的 DTO 与错误码在 Go 侧 <span class="path">backend/internal/contracts/</span> 定义；前端 TypeScript 类型在 <span class="path">src/api/types.ts</span> 等与之一致（字段命名一般为 camelCase JSON）。</p>
+  <h3>4.1 PATCH 影片（收藏与评分）</h3>
+  <p>请求体解析逻辑在 <code>parsePatchMovieInput</code>：</p>
+  <ul>
+    <li><code>isFavorite</code>：可选布尔。</li>
+    <li><code>rating</code>：表示<strong>用户评分</strong>；支持数字 0–5，或 <code>null</code> 表示清除用户评分。</li>
+  </ul>
+  <p>数据库存储用户评分字段（如 <code>user_rating</code>），与刮削得到的元数据评分（如 <code>rating</code>）区分；列表/详情响应中会合成「有效展示分」等逻辑（见存储层与 <code>library.Service</code> 中的 <code>syncEffectiveRating</code> 一类处理）。</p>
+
+  <h2 id="data-flow">5. 关键数据流</h2>
+  <h3>5.1 打开资料库页</h3>
+  <div class="flow">
+    <span>LibraryView</span> → <span>useLibraryService().listMovies</span> → <span>Web: api.listMovies</span> / <span>Mock: 内存</span> → <span>虚拟列表/瀑布流组件渲染</span>
+  </div>
+  <h3>5.2 打开详情</h3>
+  <div class="flow">
+    <span>DetailView</span> → <span>getMovie / loadMovieDetail</span> → <span>DetailPanel</span>（封面、标签、<code>MovieRatingStars</code>、收藏等）
+  </div>
+  <h3>5.3 修改收藏或评分</h3>
+  <div class="flow">
+    <span>UI 事件</span> → <span>patchMovie / toggleFavorite</span> → <span>PATCH /api/library/movies/{id}</span> → <span>SQLite 更新</span> → <span>返回完整 MovieDetailDTO</span> → <span>前端合并列表缓存</span>
+  </div>
+  <h3>5.4 播放</h3>
+  <p>前端根据影片 ID 构造指向 <code>/api/library/movies/{id}/stream</code> 的 URL（开发环境仍走 Vite 代理）。播放器组件发起媒体请求，由 Go <code>ServeContent</code> 按文件实际路径读出并支持断点续传。</p>
+
+  <h2 id="features">6. 功能模块与代码落点</h2>
+  <table>
+    <thead><tr><th>功能</th><th>前端</th><th>后端</th></tr></thead>
+    <tbody>
+      <tr><td>影片列表 / 虚拟滚动</td><td><code>LibraryView</code>、<code>VirtualMovieMasonry</code>、<code>MovieGrid</code>、<code>library-query.ts</code></td><td><code>store.ListMovies</code></td></tr>
+      <tr><td>搜索 / 模式</td><td><code>movie-search.ts</code>、路由 <code>mode</code> query</td><td><code>ListMoviesRequest</code></td></tr>
+      <tr><td>详情与预览图</td><td><code>DetailPanel</code>、<code>PreviewImageViewer</code></td><td><code>GetMovieDetail</code></td></tr>
+      <tr><td>用户评分 / 收藏</td><td><code>MovieRatingStars</code>、Mock <code>mock-movie-prefs-storage</code></td><td><code>PatchMovieUserPrefs</code>、迁移 SQL</td></tr>
+      <tr><td>设置与库路径</td><td><code>SettingsView</code>、<code>SettingsPage</code></td><td><code>handleGetSettings</code>、paths CRUD</td></tr>
+      <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
+      <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="dev">7. 本地开发与联调</h2>
+  <ul>
+    <li>后端：<code>cd backend && go run ./cmd/javd</code>，默认 <code>:8080</code>；数据库路径见配置与 <code>GET /api/health</code>。</li>
+    <li>前端：<code>pnpm dev</code>；<span class="path">vite.config.ts</span> 将 <code>/api</code> 代理到 <code>http://localhost:8080</code>。</li>
+    <li>联调：根目录 <code>.env</code> 中 <code>VITE_USE_WEB_API=true</code>（或等价环境变量）。</li>
+  </ul>
+
+  <footer>
+    <p>文档生成自仓库结构说明，若代码变更请以实际源文件为准。相关设计文档见 <code>docs/</code> 下其他 Markdown。</p>
+  </footer>
+</body>
+</html>

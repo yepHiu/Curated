@@ -1,4 +1,4 @@
-# JAV-Library 后端接口契约约束
+# Curated 后端接口契约约束
 
 ## 1. 目的
 
@@ -50,6 +50,16 @@ Phase 2: Renderer -> preload -> Electron Main -> Go Backend
 - 例如 `POST /api/scans` 对应 `scan.start`
 - 例如 `GET /api/tasks/:taskId` 对应 `scan.status`
 
+### 3.1 扫描与元数据刷新（HTTP）
+
+三者语义不同，前端与自动化脚本勿混用：
+
+| 端点 | 作用 |
+|------|------|
+| `POST /api/scans` | 遍历磁盘路径，索引新文件/更新路径；对 **imported/updated** 的文件会排队刮削；**skipped** 的已存在条目不会因此重刮。 |
+| `POST /api/library/movies/{id}/scrape` | 单部影片：按库中 `location`/`code` 异步重跑 Metatube 刮削并写回库（`scrape.movie` 任务）。 |
+| `POST /api/library/metadata-scrape` | 批量：请求体 `{ "paths": string[] }` 中每一项须为**已配置的库根路径**（与 `GET /api/settings` 中 `libraryPaths[].path` 在规范化后匹配，大小写不敏感比较盘符路径）。后端查出主文件路径落在这些根下的已入库影片，为每部排队与单部刷新相同的刮削流水线。响应 `202` + `MetadataRefreshQueuedDTO`：`queued`、`skipped`、`invalidPaths`（未匹配任何已配置根的路径原样列出）。 |
+
 ## 4. 事件设计约束
 
 事件用于承载异步状态变化，命名建议使用“领域.状态”格式，例如：
@@ -90,6 +100,13 @@ DTO 应按前端消费场景划分，而不是按数据库表一比一暴露。
 - `SettingsDto`
 - `PlayerStateDto`
 - `AppErrorDto`
+
+**影片标签（已实现）**
+
+- `tags`：元数据/刮削来源（库内 `tags.type = 'nfo'`），单部刷新或写入元数据时**仅替换**此类关联，不影响用户标签。
+- `userTags`：用户本地标签（`tags.type = 'user'`），与 `tags` 分离；可与元数据标签**同名共存**（库内按 `(name, type)` 唯一）。
+- `PATCH /api/library/movies/{movieId}` 请求体可带 `userTags: string[]`：**出现该字段即整表替换**该片用户标签（空数组表示清空）。校验：每标签最多 64 字符（Unicode 码点）、每片最多 64 个；去重与 trim 由后端完成。
+- 同一路由可带 `metadataTags: string[]`：**出现即整表替换**该片 NFO/元数据标签（空数组表示清空本地 NFO 标签；**不**影响 `userTags`）。校验规则与 `userTags` 相同。再次执行元数据刮削仍会按站方结果重写 NFO 类关联。
 
 DTO 设计要求：
 

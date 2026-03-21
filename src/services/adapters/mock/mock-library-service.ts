@@ -1,7 +1,9 @@
 import { computed, ref } from "vue"
-import type { PatchMovieBody } from "@/api/types"
-import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
+import type { MetadataRefreshQueuedDTO, PatchMovieBody } from "@/api/types"
+import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+import { buildSettingsDashboardStats } from "@/lib/library-stats"
+import { playedMovieCount } from "@/lib/played-movies-storage"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   loadMockMoviePrefs,
@@ -9,24 +11,6 @@ import {
   upsertMockMoviePrefs,
 } from "@/lib/mock-movie-prefs-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
-
-const libraryStats: readonly LibraryStat[] = [
-  {
-    label: "Movies Indexed",
-    value: "2,184",
-    detail: "Across local and removable libraries",
-  },
-  {
-    label: "Favorite Picks",
-    value: "246",
-    detail: "Curated for quick rewatch sessions",
-  },
-  {
-    label: "Metadata Health",
-    value: "98%",
-    detail: "Poster, cast, and tags fully matched",
-  },
-]
 
 const organizeLibraryMock = ref(false)
 
@@ -169,6 +153,8 @@ const buildMovie = (index: number): Movie => {
     addedAt: `2026-${month}-${day}`,
     location: `${storage}/${prefix}-${serial}.${index % 2 === 0 ? "mkv" : "mp4"}`,
     year: seed.year + yearOffset,
+    releaseDate: `${seed.year + yearOffset}-${month}-${day}`,
+    userTags: [],
     tags: [...seed.tags, index % 6 === 0 ? "Trending" : "Catalog"],
     thumbUrl: `https://picsum.photos/seed/jav-thumb-${prefix}-${serial}/280/400`,
     coverUrl: `https://picsum.photos/seed/jav-cover-${prefix}-${serial}/560/840`,
@@ -209,14 +195,31 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
       }
     }
   }
+  if (body.userTags !== undefined) {
+    next.userTags = [...body.userTags]
+  }
+  if (body.metadataTags !== undefined) {
+    next.tags = [...body.metadataTags]
+  }
   moviesState.value = moviesState.value.map((m, i) => (i === idx ? next : m))
 
-  const prefsPatch: { isFavorite?: boolean; userRating?: number | null } = {}
+  const prefsPatch: {
+    isFavorite?: boolean
+    userRating?: number | null
+    userTags?: string[]
+    metadataTags?: string[]
+  } = {}
   if (body.isFavorite !== undefined) {
     prefsPatch.isFavorite = next.isFavorite
   }
   if (body.rating !== undefined) {
     prefsPatch.userRating = body.rating === null ? null : body.rating
+  }
+  if (body.userTags !== undefined) {
+    prefsPatch.userTags = next.userTags
+  }
+  if (body.metadataTags !== undefined) {
+    prefsPatch.metadataTags = next.tags
   }
   if (Object.keys(prefsPatch).length > 0) {
     upsertMockMoviePrefs(id, prefsPatch)
@@ -227,7 +230,9 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value),
-  libraryStats,
+  libraryStats: computed(() =>
+    buildSettingsDashboardStats(moviesState.value, playedMovieCount.value),
+  ),
   libraryPaths: computed(() => libraryPathsState.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
 
@@ -270,6 +275,10 @@ export const mockLibraryService: LibraryService = {
 
   async refreshMovieMetadata() {
     return null
+  },
+
+  async refreshMetadataForLibraryPaths(): Promise<MetadataRefreshQueuedDTO> {
+    return { queued: 0, skipped: 0, invalidPaths: [] }
   },
 
   getMoviePlaybackUrl() {

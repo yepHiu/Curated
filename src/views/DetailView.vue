@@ -7,6 +7,7 @@ import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
+import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
 import type { Movie } from "@/domain/movie/types"
@@ -107,6 +108,11 @@ const relatedMovies = computed(() =>
   detailMovie.value ? libraryService.getRelatedMovies(detailMovie.value.id) : [],
 )
 
+/** 全库 userTags ∪ 当前片元数据 tags，供「我的标签」输入联想 */
+const userTagSuggestionPool = computed(() =>
+  buildUserTagSuggestionPool(libraryService.movies.value, detailMovie.value?.tags ?? []),
+)
+
 const selectMovie = async (nextMovieId: string) => {
   await router.replace({
     name: "detail",
@@ -127,7 +133,10 @@ const openPlayer = async (nextMovieId: string) => {
   await router.push({
     name: "player",
     params: { id: nextMovieId },
-    query: buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
+    query: {
+      ...buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
+      autoplay: "1",
+    },
   })
 }
 
@@ -157,6 +166,70 @@ const updateUserRating = async (payload: { movieId: string; value: number | null
     patchError.value = formatClientError(err, "更新评分失败，请检查网络与后端日志。")
     console.error("[DetailView] update user rating failed", err)
   }
+}
+
+const updateUserTags = async (payload: { movieId: string; tags: string[] }) => {
+  patchError.value = ""
+  try {
+    const updated = await libraryService.patchMovie(payload.movieId, {
+      userTags: payload.tags,
+    })
+    if (updated && detailMovie.value?.id === payload.movieId) {
+      detailMovie.value = updated
+    }
+  } catch (err) {
+    patchError.value = formatClientError(err, "更新用户标签失败，请检查网络与后端日志。")
+    console.error("[DetailView] update user tags failed", err)
+  }
+}
+
+const updateMetadataTags = async (payload: { movieId: string; tags: string[] }) => {
+  patchError.value = ""
+  try {
+    const updated = await libraryService.patchMovie(payload.movieId, {
+      metadataTags: payload.tags,
+    })
+    if (updated && detailMovie.value?.id === payload.movieId) {
+      detailMovie.value = updated
+    }
+  } catch (err) {
+    patchError.value = formatClientError(err, "更新元数据标签失败，请检查网络与后端日志。")
+    console.error("[DetailView] update metadata tags failed", err)
+  }
+}
+
+const browseByTag = async (payload: { tag: string }) => {
+  const tag = payload.tag.trim()
+  if (!tag) {
+    return
+  }
+  await router.push({
+    name: getBrowseSourceMode(route.query),
+    query: mergeLibraryQuery(route.query, {
+      tag,
+      q: undefined,
+      actor: undefined,
+      tab: "all",
+      selected: undefined,
+    }),
+  })
+}
+
+const browseByActor = async (payload: { actor: string }) => {
+  const actor = payload.actor.trim()
+  if (!actor) {
+    return
+  }
+  await router.push({
+    name: getBrowseSourceMode(route.query),
+    query: mergeLibraryQuery(route.query, {
+      actor,
+      q: undefined,
+      tag: undefined,
+      tab: "all",
+      selected: undefined,
+    }),
+  })
 }
 
 const handleDeleteMovie = async (id: string) => {
@@ -210,7 +283,7 @@ const handleRefreshMetadata = async (id: string) => {
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto pr-2">
+  <div class="h-full min-w-0 w-full overflow-y-auto pr-2">
     <div
       v-if="detailLoading"
       class="rounded-3xl border border-border/70 bg-card/80 p-8 text-sm text-muted-foreground"
@@ -245,12 +318,17 @@ const handleRefreshMetadata = async (id: string) => {
       <DetailPage
         :movie="detailMovie"
         :related-movies="relatedMovies"
+        :user-tag-suggestions="userTagSuggestionPool"
         :metadata-refresh-busy="metadataRefreshBusy"
         @select="selectMovie"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"
         @update-user-rating="updateUserRating"
+        @update-user-tags="updateUserTags"
+        @browse-by-tag="browseByTag"
+        @browse-by-actor="browseByActor"
+        @update-metadata-tags="updateMetadataTags"
         @delete-movie="handleDeleteMovie"
         @refresh-metadata="handleRefreshMetadata"
       />

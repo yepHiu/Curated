@@ -68,6 +68,19 @@ type StartScanRequest struct {
 	Paths []string `json:"paths,omitempty"`
 }
 
+// StartMetadataRefreshByPathsRequest is the body for POST /api/library/metadata-scrape.
+// Each path must match a configured library root (after filepath.Clean); see MetadataRefreshQueuedDTO.invalidPaths.
+type StartMetadataRefreshByPathsRequest struct {
+	Paths []string `json:"paths"`
+}
+
+// MetadataRefreshQueuedDTO is returned when bulk metadata rescrape jobs are queued.
+type MetadataRefreshQueuedDTO struct {
+	Queued       int      `json:"queued"`
+	Skipped      int      `json:"skipped"`
+	InvalidPaths []string `json:"invalidPaths"`
+}
+
 type GetTaskStatusRequest struct {
 	TaskID string `json:"taskId"`
 }
@@ -100,6 +113,7 @@ type MovieListItemDTO struct {
 	Studio         string   `json:"studio"`
 	Actors         []string `json:"actors"`
 	Tags           []string `json:"tags"`
+	UserTags       []string `json:"userTags,omitempty"`
 	RuntimeMinutes int      `json:"runtimeMinutes"`
 	Rating         float64  `json:"rating"`
 	IsFavorite     bool     `json:"isFavorite"`
@@ -107,6 +121,7 @@ type MovieListItemDTO struct {
 	Location       string   `json:"location"`
 	Resolution     string   `json:"resolution"`
 	Year           int      `json:"year"`
+	ReleaseDate    string   `json:"releaseDate,omitempty"`
 	CoverURL       string   `json:"coverUrl,omitempty"`
 	ThumbURL       string   `json:"thumbUrl,omitempty"`
 }
@@ -124,11 +139,17 @@ type MovieDetailDTO struct {
 // PatchMovieInput is the parsed body for PATCH /api/library/movies/{movieId}.
 // Favorite: non-nil updates is_favorite.
 // UserRatingSet: false = do not change user_rating; true + UserRatingClear = set NULL; true + !UserRatingClear = set UserRating (0–5).
+// UserTagsSet: true replaces all user tags for the movie (UserTags may be empty to clear).
+// MetadataTagsSet: true replaces all scraper/NFO (type=nfo) tags for the movie; does not touch user tags. Empty list clears NFO tags locally until next scrape.
 type PatchMovieInput struct {
-	Favorite        *bool
-	UserRatingSet   bool
-	UserRatingClear bool
-	UserRating      float64
+	Favorite           *bool
+	UserRatingSet      bool
+	UserRatingClear    bool
+	UserRating         float64
+	UserTagsSet        bool
+	UserTags           []string
+	MetadataTagsSet    bool
+	MetadataTags       []string
 }
 
 type MoviesPageDTO struct {
