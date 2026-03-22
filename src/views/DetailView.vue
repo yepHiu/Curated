@@ -225,6 +225,7 @@ const browseByTag = async (payload: { tag: string }) => {
       tag,
       q: undefined,
       actor: undefined,
+      studio: undefined,
       tab: "all",
       selected: undefined,
     }),
@@ -242,6 +243,25 @@ const browseByActor = async (payload: { actor: string }) => {
       actor,
       q: undefined,
       tag: undefined,
+      studio: undefined,
+      tab: "all",
+      selected: undefined,
+    }),
+  })
+}
+
+const browseByStudio = async (payload: { studio: string }) => {
+  const studio = payload.studio.trim()
+  if (!studio) {
+    return
+  }
+  await router.push({
+    name: getBrowseSourceMode(route.query),
+    query: mergeLibraryQuery(route.query, {
+      studio,
+      q: undefined,
+      tag: undefined,
+      actor: undefined,
       tab: "all",
       selected: undefined,
     }),
@@ -344,6 +364,7 @@ const handleRefreshMetadata = async (id: string) => {
         @update-user-tags="updateUserTags"
         @browse-by-tag="browseByTag"
         @browse-by-actor="browseByActor"
+        @browse-by-studio="browseByStudio"
         @update-metadata-tags="updateMetadataTags"
         @delete-movie="handleDeleteMovie"
         @refresh-metadata="handleRefreshMetadata"

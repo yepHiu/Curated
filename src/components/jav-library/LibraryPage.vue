@@ -31,6 +31,8 @@ const props = defineProps<{
   activeTagFilter?: string
   /** 当前 URL 精确演员筛选（`actor=`） */
   activeActorFilter?: string
+  /** 当前 URL 精确厂商筛选（`studio=`） */
+  activeStudioFilter?: string
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +45,7 @@ const emit = defineEmits<{
   browseByExactTag: [tag: string]
   clearExactTagFilter: []
   clearExactActorFilter: []
+  clearExactStudioFilter: []
 }>()
 
 const { t, locale } = useI18n()
@@ -80,6 +83,7 @@ const userTagsHiddenCount = computed(() =>
 
 const activeTagTrimmed = computed(() => props.activeTagFilter?.trim() ?? "")
 const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
+const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 
 const handleTabChange = (value: string | number) => {
   emit("update:activeTab", String(value) as LibraryTab)
@@ -103,6 +107,23 @@ function isChipActive(tag: string): boolean {
       :actor-name="activeActorTrimmed"
       @clear-filter="emit('clearExactActorFilter')"
     />
+    <div
+      v-if="activeStudioTrimmed"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/85 px-4 py-3 shadow-sm shadow-black/5"
+    >
+      <p class="min-w-0 text-sm text-muted-foreground">
+        {{ t("library.filterActive") }}<span class="font-medium text-foreground">{{ activeStudioTrimmed }}</span>
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        class="shrink-0 rounded-xl"
+        @click="emit('clearExactStudioFilter')"
+      >
+        {{ t("library.clearFilter") }}
+      </Button>
+    </div>
     <Card
       v-if="props.mode === 'tags'"
       class="rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"

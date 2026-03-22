@@ -335,6 +335,7 @@
     "ariaRemoveMyTag": "タグ {tag} を削除",
     "cast": "出演",
     "ariaFilterActor": "出演者で絞り込み：{actor}",
+    "ariaFilterStudio": "メーカーで絞り込み：{studio}",
     "play": "再生",
     "coverAlt": "{code} カバー"
   }

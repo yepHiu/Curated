@@ -101,6 +101,8 @@ const emit = defineEmits<{
   browseByTag: [payload: { tag: string }]
   /** 在资料库中按演员精确筛选（URL `actor`，与列表页搜索框展示同源） */
   browseByActor: [payload: { actor: string }]
+  /** 在资料库中按厂商精确筛选（URL `studio`） */
+  browseByStudio: [payload: { studio: string }]
   /** 整表替换元数据/NFO 标签（删除单个时传过滤后的数组） */
   updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
@@ -289,6 +291,14 @@ function browseByActorName(actor: string) {
   emit("browseByActor", { actor: a })
 }
 
+function browseByStudioName(studio: string) {
+  const s = studio.trim()
+  if (!s) {
+    return
+  }
+  emit("browseByStudio", { studio: s })
+}
+
 function removeMetadataTag(tag: string) {
   emit("updateMetadataTags", {
     movieId: props.movie.id,
@@ -401,7 +411,20 @@ function pickUserTagSuggestion(tag: string) {
               {{ movie.title }}
             </CardTitle>
             <CardDescription class="text-sm text-muted-foreground sm:text-base">
-              {{ movie.studio }} · {{ movie.year }} · {{ movie.resolution }}
+              <template v-if="movie.studio.trim()">
+                <button
+                  type="button"
+                  class="inline cursor-pointer border-0 bg-transparent p-0 align-baseline text-primary underline-offset-2 hover:underline"
+                  :aria-label="t('detailPanel.ariaFilterStudio', { studio: movie.studio })"
+                  @click="browseByStudioName(movie.studio)"
+                >
+                  {{ movie.studio }}
+                </button>
+              </template>
+              <template v-else>
+                <span>—</span>
+              </template>
+              <span aria-hidden="true"> · {{ movie.year }} · {{ movie.resolution }}</span>
             </CardDescription>
           </div>
 

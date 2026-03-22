@@ -5,6 +5,7 @@ import {
   getBrowseSourceMode,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
+  getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
@@ -114,6 +115,33 @@ describe("library query helpers", () => {
       from: "library",
       q: "x",
       actor: "Lead A",
+      selected: "id-1",
+      tab: "new",
+    })
+  })
+
+  it("reads exact studio filter and merges studio patch", () => {
+    expect(getLibraryStudioExactQuery({ studio: "Foo" })).toBe("Foo")
+    expect(getLibraryStudioExactQuery({})).toBe("")
+
+    const merged = mergeLibraryQuery(
+      { q: "foo", studio: "old" },
+      { studio: "new", q: undefined },
+    )
+    expect(merged.studio).toBe("new")
+    expect(merged.q).toBeUndefined()
+  })
+
+  it("preserves studio in browse and movie route helpers", () => {
+    const q = { q: "x", studio: "ACME", tab: "new" as const }
+    expect(buildBrowseRouteTarget("library", q)).toEqual({
+      name: "library",
+      query: { q: "x", studio: "ACME", tab: "new" },
+    })
+    expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
+      from: "library",
+      q: "x",
+      studio: "ACME",
       selected: "id-1",
       tab: "new",
     })

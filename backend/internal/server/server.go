@@ -169,6 +169,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		Mode:   query.Get("mode"),
 		Query:  query.Get("q"),
 		Actor:  query.Get("actor"),
+		Studio: query.Get("studio"),
 		Limit:  limit,
 		Offset: offset,
 	}

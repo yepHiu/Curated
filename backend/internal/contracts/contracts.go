@@ -61,6 +61,7 @@ type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`
 	Actor  string `json:"actor,omitempty"`
+	Studio string `json:"studio,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
 	Offset int    `json:"offset,omitempty"`
 }

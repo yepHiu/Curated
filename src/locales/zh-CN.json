@@ -335,6 +335,7 @@
     "ariaRemoveMyTag": "移除标签 {tag}",
     "cast": "演员",
     "ariaFilterActor": "在资料库中筛选演员：{actor}",
+    "ariaFilterStudio": "在资料库中按厂商筛选：{studio}",
     "play": "播放",
     "coverAlt": "{code} 封面"
   }

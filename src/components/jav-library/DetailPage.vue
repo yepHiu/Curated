@@ -48,6 +48,7 @@ const emit = defineEmits<{
   updateUserTags: [payload: { movieId: string; tags: string[] }]
   browseByTag: [payload: { tag: string }]
   browseByActor: [payload: { actor: string }]
+  browseByStudio: [payload: { studio: string }]
   updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
   refreshMetadata: [movieId: string]
@@ -66,6 +67,7 @@ const emit = defineEmits<{
       @update-user-tags="emit('updateUserTags', $event)"
       @browse-by-tag="emit('browseByTag', $event)"
       @browse-by-actor="emit('browseByActor', $event)"
+      @browse-by-studio="emit('browseByStudio', $event)"
       @update-metadata-tags="emit('updateMetadataTags', $event)"
       @delete-movie="emit('deleteMovie', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"

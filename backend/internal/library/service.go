@@ -33,6 +33,7 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 	query := strings.TrimSpace(strings.ToLower(request.Query))
 
 	actorExact := strings.TrimSpace(request.Actor)
+	studioExact := strings.TrimSpace(request.Studio)
 	for _, movie := range s.movies {
 		if request.Mode == "favorites" && !movie.IsFavorite {
 			continue
@@ -44,6 +45,10 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 		}
 
 		if actorExact != "" && !slices.Contains(movie.Actors, actorExact) {
+			continue
+		}
+
+		if studioExact != "" && strings.TrimSpace(eff.Studio) != studioExact {
 			continue
 		}
 

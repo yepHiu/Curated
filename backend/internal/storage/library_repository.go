@@ -285,6 +285,11 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		args = append(args, actor)
 	}
 
+	if studio := strings.TrimSpace(request.Studio); studio != "" {
+		clauses = append(clauses, `TRIM(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) = ?`)
+		args = append(args, studio)
+	}
+
 	if len(clauses) == 0 {
 		return "", args
 	}

@@ -21,6 +21,7 @@ import {
   getCuratedFrameSearchQuery,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
+  getLibraryStudioExactQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
   isLibraryRouteName,
@@ -297,6 +298,7 @@ function applyLibrarySuggestActor(canonical: string) {
       actor: canonical,
       q: undefined,
       tag: undefined,
+      studio: undefined,
     }),
   })
 }
@@ -309,6 +311,7 @@ function applyLibrarySuggestTag(canonical: string) {
       tag: canonical,
       q: undefined,
       actor: undefined,
+      studio: undefined,
     }),
   })
 }
@@ -321,6 +324,7 @@ function applyLibrarySuggestCode(code: string) {
       q: code,
       tag: undefined,
       actor: undefined,
+      studio: undefined,
     }),
   })
 }
@@ -393,7 +397,13 @@ onKeyStroke("Escape", (e) => {
 })
 
 watch(
-  [() => route.name, () => route.query.q, () => route.query.tag, () => route.query.actor],
+  [
+    () => route.name,
+    () => route.query.q,
+    () => route.query.tag,
+    () => route.query.actor,
+    () => route.query.studio,
+  ],
   () => {
     if (!isLibraryRoute.value) {
       return
@@ -401,7 +411,8 @@ watch(
     const qPart = getLibrarySearchQuery(route.query)
     const tagPart = getLibraryTagExactQuery(route.query).trim()
     const actorPart = getLibraryActorExactQuery(route.query).trim()
-    const next = qPart || tagPart || actorPart
+    const studioPart = getLibraryStudioExactQuery(route.query).trim()
+    const next = qPart || tagPart || actorPart || studioPart
     if (next !== searchDraft.value) {
       searchDraft.value = next
     }
@@ -419,10 +430,19 @@ watchDebounced(
     const currentQ = getLibrarySearchQuery(route.query).trim()
     const currentTag = getLibraryTagExactQuery(route.query).trim()
     const currentActor = getLibraryActorExactQuery(route.query).trim()
+    const currentStudio = getLibraryStudioExactQuery(route.query).trim()
     if (
-      normalized === currentQ &&
-      !currentTag &&
-      !currentActor
+      (normalized === currentQ && !currentTag && !currentActor && !currentStudio) ||
+      (currentActor !== "" &&
+        normalized === currentActor &&
+        currentQ === "" &&
+        !currentTag &&
+        !currentStudio) ||
+      (currentStudio !== "" &&
+        normalized === currentStudio &&
+        currentQ === "" &&
+        !currentTag &&
+        !currentActor)
     ) {
       return
     }
@@ -432,6 +452,7 @@ watchDebounced(
         q: normalized || undefined,
         tag: undefined,
         actor: undefined,
+        studio: undefined,
       }),
     })
   },
@@ -450,6 +471,7 @@ function clearLibrarySearch() {
       q: undefined,
       tag: undefined,
       actor: undefined,
+      studio: undefined,
     }),
   })
 }

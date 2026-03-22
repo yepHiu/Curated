@@ -335,6 +335,7 @@
     "ariaRemoveMyTag": "Remove tag {tag}",
     "cast": "Cast",
     "ariaFilterActor": "Filter library by actor: {actor}",
+    "ariaFilterStudio": "Filter library by studio: {studio}",
     "play": "Play",
     "coverAlt": "{code} cover"
   }

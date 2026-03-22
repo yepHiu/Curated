@@ -46,6 +46,19 @@ export const getLibraryActorExactQuery = (query: LocationQuery): string => {
   return ""
 }
 
+/** 精确厂商筛选（展示用 `studio`，与用户覆盖一致）；与 `q`、`tag`、`actor` 可同时生效（交集） */
+export const getLibraryStudioExactQuery = (query: LocationQuery): string => {
+  const raw = query.studio
+  if (typeof raw === "string") {
+    return raw
+  }
+  if (Array.isArray(raw)) {
+    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
+    return first ?? ""
+  }
+  return ""
+}
+
 export const getLibraryTabQuery = (query: LocationQuery): LibraryTab => {
   const value = typeof query.tab === "string" ? query.tab : "all"
   return libraryTabs.includes(value as LibraryTab) ? (value as LibraryTab) : "all"
@@ -59,6 +72,7 @@ export const getBrowseContextQuery = (query: LocationQuery) => ({
   q: getLibrarySearchQuery(query) || undefined,
   tag: getLibraryTagExactQuery(query).trim() || undefined,
   actor: getLibraryActorExactQuery(query).trim() || undefined,
+  studio: getLibraryStudioExactQuery(query).trim() || undefined,
   tab: getLibraryTabQuery(query) === "all" ? undefined : getLibraryTabQuery(query),
   selected: getSelectedMovieQuery(query),
 })
@@ -66,7 +80,7 @@ export const getBrowseContextQuery = (query: LocationQuery) => ({
 export const mergeLibraryQuery = (
   sourceQuery: LocationQuery,
   patch: Partial<
-    Record<"q" | "tab" | "selected" | "from" | "tag" | "actor", string | undefined>
+    Record<"q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio", string | undefined>
   >,
 ) => {
   const nextQuery: LocationQuery = {
@@ -74,7 +88,7 @@ export const mergeLibraryQuery = (
   }
 
   const applyValue = (
-    key: "q" | "tab" | "selected" | "from" | "tag" | "actor",
+    key: "q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio",
     value: string | undefined,
   ) => {
     if (value) {
@@ -109,6 +123,10 @@ export const mergeLibraryQuery = (
     applyValue("actor", patch.actor?.trim() || undefined)
   }
 
+  if (hasOwnKey(patch, "studio")) {
+    applyValue("studio", patch.studio?.trim() || undefined)
+  }
+
   return nextQuery
 }
 
@@ -118,6 +136,7 @@ export const buildBrowseRouteTarget = (page: LibraryMode, currentQuery: Location
     q: getLibrarySearchQuery(currentQuery) || undefined,
     tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
     actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
+    studio: getLibraryStudioExactQuery(currentQuery).trim() || undefined,
     tab: getLibraryTabQuery(currentQuery),
     selected: getSelectedMovieQuery(currentQuery),
   }),
@@ -133,6 +152,7 @@ export const buildMovieRouteQuery = (
     q: getLibrarySearchQuery(currentQuery) || undefined,
     tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
     actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
+    studio: getLibraryStudioExactQuery(currentQuery).trim() || undefined,
     tab: getLibraryTabQuery(currentQuery),
     selected: selectedMovieId,
   })

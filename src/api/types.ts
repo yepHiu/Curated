@@ -125,6 +125,8 @@ export interface ListMoviesParams {
   q?: string
   /** 精确演员名，与路由 `actor` 一致 */
   actor?: string
+  /** 精确厂商名，与路由 `studio` 一致 */
+  studio?: string
   limit?: number
   offset?: number
 }

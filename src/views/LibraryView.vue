@@ -8,6 +8,7 @@ import {
   buildMovieRouteQuery,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
+  getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
@@ -32,6 +33,7 @@ const libraryMovies = computed(() => libraryService.movies.value)
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
 const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
+const studioExactQuery = computed(() => getLibraryStudioExactQuery(route.query).trim())
 /** 小写 -> 库内规范演员名（用于 q 与演员名匹配） */
 const actorCanonicalByLower = computed(() => {
   const m = new Map<string, string>()
@@ -106,6 +108,11 @@ const queryFilteredMovies = computed(() => {
     list = list.filter((movie) => movie.actors.includes(actorFromParam))
   } else if (actorViaQ) {
     list = list.filter((movie) => movie.actors.includes(actorViaQ))
+  }
+
+  const studioExact = studioExactQuery.value
+  if (studioExact) {
+    list = list.filter((movie) => movie.studio.trim() === studioExact)
   }
 
   return list
@@ -208,6 +215,7 @@ const browseByExactTag = async (tag: string) => {
       tag: t,
       q: undefined,
       actor: undefined,
+      studio: undefined,
       tab: "all",
       selected: undefined,
     }),
@@ -231,6 +239,13 @@ const clearExactActorFilter = async () => {
     query: mergeLibraryQuery(route.query, patch),
   })
 }
+
+const clearExactStudioFilter = async () => {
+  await router.replace({
+    name: libraryMode.value,
+    query: mergeLibraryQuery(route.query, { studio: undefined }),
+  })
+}
 </script>
 
 <template>
@@ -242,6 +257,7 @@ const clearExactActorFilter = async () => {
     :active-tab="activeTab"
     :active-tag-filter="tagExactQuery"
     :active-actor-filter="actorProfileDisplayName"
+    :active-studio-filter="studioExactQuery"
     @update:active-tab="updateActiveTab"
     @select="selectMovie"
     @open-details="openDetails"
@@ -250,5 +266,6 @@ const clearExactActorFilter = async () => {
     @browse-by-exact-tag="browseByExactTag"
     @clear-exact-tag-filter="clearExactTagFilter"
     @clear-exact-actor-filter="clearExactActorFilter"
+    @clear-exact-studio-filter="clearExactStudioFilter"
   />
 </template>
