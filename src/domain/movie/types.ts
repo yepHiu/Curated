@@ -32,4 +32,17 @@ export interface Movie {
   /** 详情页样本图 / 预览图 */
   previewImages?: string[]
   previewVideoUrl?: string
+  /** 演员名 -> 头像 URL（Web API 详情；刮削演员资料后才有） */
+  actorAvatarUrls?: Record<string, string>
+  /**
+   * Mock：首次用户编辑展示字段前快照，用于 PATCH 清除覆盖时恢复底稿（Web API 由 SQLite 底列承担）。
+   */
+  displayScrapeFallback?: {
+    title: string
+    studio: string
+    summary: string
+    releaseDate?: string
+    runtimeMinutes: number
+    year: number
+  }
 }

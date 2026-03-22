@@ -13,6 +13,6 @@
 | 按需 | `vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc` | 前端实现 |
 | 按需 | `backend-go-standards.mdc`、`backend-api-contracts.mdc` 等 | 后端与合约 |
 
-修改架构或新增重要端点后，请同步更新 **`project-facts.mdc`**（必要时 **`workspace-quick-reference.mdc`**）。
+修改架构或新增重要端点后，请同步更新 **`project-facts.mdc`**（必要时 **`workspace-quick-reference.mdc`**）、**`README.md`** 配置与 API 摘要、**`docs/library-organize.md`**（若涉及 **`library-config.cfg`**）、**`CLAUDE.md`** API 列表，以及 **`docs/architecture-and-implementation.html`**（实现说明与功能对照表）。
 
 **Mock / Web 与收藏、评分**：Mock 模式下收藏与用户评分通过 **`localStorage`（`jav-library-movie-prefs`）** 跨页面刷新保留；写入 SQLite 的持久化需 **`VITE_USE_WEB_API=true`** 并运行后端（见 **`workspace-quick-reference.mdc`**）。

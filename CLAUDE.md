@@ -156,13 +156,16 @@ POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
 POST   /api/library/paths                   # Add library path
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
-GET    /api/settings                       # Get settings
-PATCH  /api/settings                       # Update settings
+GET    /api/settings                       # Get settings (libraryPaths, player, organizeLibrary, autoLibraryWatch, metadataMovieProvider[s], …)
+PATCH  /api/settings                       # Partial update: organizeLibrary, autoLibraryWatch, metadataMovieProvider (persisted to config/library-config.cfg where applicable)
 POST   /api/scans                          # Start scan task
+GET    /api/tasks/recent                   # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
 ```
 
 **Async Task Pattern:** Long-running operations (scan, scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
+
+**Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged.
 
 ## Architecture Boundaries
 
@@ -233,5 +236,5 @@ Migrations are in `backend/internal/storage/migrations/` and run automatically o
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - Auto-scan loop runs in background when backend starts
-- Library organization (文件整理) can be toggled via settings API
+- Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status

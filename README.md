@@ -21,7 +21,7 @@
 │   ├── cmd/javd/           # 守护进程入口（HTTP / stdio / both）
 │   └── internal/           # 配置、存储、扫描、刮削、任务、HTTP 路由等
 ├── config/
-│   └── library-config.cfg  # 库行为 JSON（如 organizeLibrary），与主配置合并
+│   └── library-config.cfg  # 库行为 JSON（organizeLibrary、metadataMovieProvider、autoLibraryWatch 等），与主配置合并
 ├── docs/                   # 产品设计、整理规则等文档
 └── package.json            # 前端脚本与依赖（包管理：pnpm）
 ```
@@ -77,9 +77,9 @@ pnpm dev
 - **缓存目录**：`backend/runtime/cache`
 - **默认扫描目录**：`videos_test`、`docs/film-scanner/videos_test`（可按需在 JSON 配置里改 `libraryPaths`）
 
-主配置 JSON 可包含例如：`logLevel`、`httpAddr`、`databasePath`、`cacheDir`、`libraryPaths`、`autoScanIntervalSeconds`、`organizeLibrary`、刮削/资源/任务超时等。
+主配置 JSON 可包含例如：`logLevel`、`httpAddr`、`databasePath`、`cacheDir`、`libraryPaths`、`autoScanIntervalSeconds`、`organizeLibrary`、**`libraryWatchEnabled`** / **`libraryWatchDebounceMs`**（目录监听总开关与防抖）、刮削/资源/任务超时等。
 
-`config/library-config.cfg` 为额外 JSON，用于合并 **库级开关**（如 `organizeLibrary`），启动时会与主配置合并。
+`config/library-config.cfg` 为额外 JSON，用于合并 **库级开关**（`organizeLibrary`、`metadataMovieProvider`、**`autoLibraryWatch`** 等），启动时会与主配置合并；其中 **`autoLibraryWatch`** 与设置页「自动刮削」对应：为 `false` 时不因 **fsnotify 监听**排队扫描（手动/周期全库扫描仍可进行）。
 
 ## HTTP API（摘要）
 
@@ -94,9 +94,10 @@ pnpm dev
 | DELETE | `/api/library/movies/{id}` | 删除影片记录 |
 | GET | `/api/library/movies/{id}/stream` | 视频流 |
 | POST | `/api/library/movies/{id}/scrape` | 单部重新刮削（异步任务） |
-| GET/PATCH | `/api/settings` | 读取/更新设置 |
+| GET/PATCH | `/api/settings` | 读取/更新设置（`PATCH` 可含 `organizeLibrary`、`autoLibraryWatch`、`metadataMovieProvider` 等，库级项写回 `library-config.cfg`） |
 | POST/PATCH/DELETE | `/api/library/paths` … | 媒体库路径管理 |
 | POST | `/api/scans` | 触发扫描 |
+| GET | `/api/tasks/recent` | 近期已完成任务（供前端 Toast 等） |
 | GET | `/api/tasks/{taskId}` | 任务状态 |
 
 前后端 DTO 与错误约定可参考 `backend/internal/contracts/contracts.go` 与 `src/api/types.ts`。

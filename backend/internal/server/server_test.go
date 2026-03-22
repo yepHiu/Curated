@@ -39,6 +39,12 @@ func (f *testMovieMetadataRefresher) StartMetadataRefreshForLibraryPaths(ctx con
 	return contracts.MetadataRefreshQueuedDTO{Queued: 0, Skipped: 0, InvalidPaths: nil}, nil
 }
 
+func (f *testMovieMetadataRefresher) StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error) {
+	_ = ctx
+	task := f.tm.Create("scrape.actor", map[string]any{"actorName": actorName})
+	return f.tm.Start(task.TaskID, "Scraping actor profile (test)"), nil
+}
+
 type errMovieMetadataRefresher struct {
 	err error
 }
@@ -204,6 +210,7 @@ func TestHandleRefreshMovieMetadata_Accepted202AndTaskPoll(t *testing.T) {
 		Store:                  store,
 		Tasks:                  tm,
 		MovieMetadataRefresher: ref,
+		ActorProfileRefresher:  ref,
 	})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
@@ -747,6 +754,89 @@ func TestHandlePatchMovie_MetadataTags(t *testing.T) {
 	}
 }
 
+func TestHandlePatchMovie_DisplayOverrides(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "PATCH-DO.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t-do", Path: videoPath, FileName: "PATCH-DO.mp4", Number: "PATCH-DO",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID, Number: "PATCH-DO", Title: "BaseTitle", Summary: "BaseSum", Studio: "BaseStudio",
+		RuntimeMinutes: 60, Rating: 3, ReleaseDate: "2019-06-15",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	patchBody := `{"userTitle":"User T","userStudio":"User St","userSummary":"User Sum","userReleaseDate":"2022-03-04","userRuntimeMinutes":99}`
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(patchBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var detail contracts.MovieDetailDTO
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Title != "User T" || detail.Studio != "User St" || detail.Summary != "User Sum" {
+		t.Fatalf("display fields = %#v %#v %#v", detail.Title, detail.Studio, detail.Summary)
+	}
+	if detail.ReleaseDate != "2022-03-04" || detail.Year != 2022 || detail.RuntimeMinutes != 99 {
+		t.Fatalf("release/year/runtime = %s %d %d", detail.ReleaseDate, detail.Year, detail.RuntimeMinutes)
+	}
+
+	clearBody := `{"userTitle":null,"userStudio":null,"userSummary":null,"userReleaseDate":null,"userRuntimeMinutes":null}`
+	req2, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/movies/"+outcome.MovieID, strings.NewReader(clearBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("clear status = %d, want 200", resp2.StatusCode)
+	}
+	if err := json.NewDecoder(resp2.Body).Decode(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Title != "BaseTitle" || detail.Studio != "BaseStudio" || detail.Summary != "BaseSum" {
+		t.Fatalf("after clear = %#v %#v %#v", detail.Title, detail.Studio, detail.Summary)
+	}
+	if detail.RuntimeMinutes != 60 {
+		t.Fatalf("runtime = %d, want 60", detail.RuntimeMinutes)
+	}
+}
+
 func TestHandlePatchMovie_InvalidRating(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -824,5 +914,177 @@ func TestHandlePatchMovie_InMemoryFallback(t *testing.T) {
 	}
 	if detail.IsFavorite || detail.Rating != 2.5 {
 		t.Fatalf("detail = %+v", detail)
+	}
+}
+
+type errActorProfileRefresher struct {
+	err error
+}
+
+func (e *errActorProfileRefresher) StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error) {
+	_ = ctx
+	_ = actorName
+	return contracts.TaskDTO{}, e.err
+}
+
+func TestHandleGetActorProfile_MissingName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/library/actors/profile", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestHandleGetActorProfile_NotFound(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/library/actors/profile?name=NoSuchActor", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandleScrapeActorProfile_NotConfigured(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/actors/scrape?name=Anyone", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+}
+
+func TestHandleScrapeActorProfile_NotFound(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:                   config.Config{},
+		Logger:                zap.NewNop(),
+		Store:                 store,
+		ActorProfileRefresher: &errActorProfileRefresher{err: contracts.ErrActorNotFound},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/actors/scrape?name=Ghost", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandleGetRecentTasks(t *testing.T) {
+	t.Parallel()
+	tm := tasks.NewManager()
+	x := tm.Create("scan.library", map[string]any{"trigger": "fsnotify"})
+	tm.Start(x.TaskID, "scan")
+	tm.Complete(x.TaskID, "ok")
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  nil,
+		Tasks:  tm,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/tasks/recent?limit=5", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var body contracts.RecentTasksDTO
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Tasks) != 1 || body.Tasks[0].TaskID != x.TaskID {
+		t.Fatalf("unexpected body: %+v", body.Tasks)
 	}
 }

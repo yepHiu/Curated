@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { HttpClientError } from "@/api/http-client"
@@ -60,7 +60,6 @@ const scanTaskTracker = useScanTaskTracker()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const hardwareDecode = ref(true)
-const autoScrape = ref(true)
 
 const addPathDialogOpen = ref(false)
 const newPath = ref("")
@@ -86,8 +85,34 @@ const selectedMetadataRefreshPaths = ref<string[]>([])
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
+const autoLibraryWatchSaving = ref(false)
+const autoLibraryWatchError = ref("")
+const metadataMovieSaving = ref(false)
+const metadataMovieError = ref("")
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
+const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
+
+const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
+const metadataMovieProviders = computed(() => [...libraryService.metadataMovieProviders.value])
+const metadataMovieOrphan = computed(() => {
+  const cur = metadataMovieProvider.value
+  if (!cur) return ""
+  return metadataMovieProviders.value.some((p) => p.toLowerCase() === cur.toLowerCase()) ? "" : cur
+})
+const metadataMovieSelectOptions = computed(() => {
+  const list = metadataMovieProviders.value
+  const o = metadataMovieOrphan.value
+  if (o) {
+    const rest = list.filter((p) => p.toLowerCase() !== o.toLowerCase())
+    return [o, ...rest]
+  }
+  return list
+})
+const canPickSpecifiedMetadata = computed(() => metadataMovieSelectOptions.value.length > 0)
+const metadataMovieMode = computed<"auto" | "specified">(() =>
+  metadataMovieProvider.value === "" ? "auto" : "specified",
+)
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
 
@@ -171,6 +196,16 @@ const canSaveNewPath = computed(() => {
   return t.length > 0 && isAbsoluteLibraryPath(t)
 })
 
+/** 选文件夹后的说明与「保存」状态合并为一条，避免重复段落 */
+const directoryHintDisplay = computed(() => {
+  const h = directoryHint.value.trim()
+  if (!h) return ""
+  if (!canSaveNewPath.value) {
+    return `${h}\n\n${t("settings.pickFolderHintSaveSuffix")}`
+  }
+  return h
+})
+
 onMounted(() => {
   void libraryService.refreshSettings()
   let mode = getCuratedFrameSaveMode()
@@ -244,6 +279,8 @@ async function browseForDirectory() {
       if (outcome.suggestedTitle && !newPathTitle.value.trim()) {
         newPathTitle.value = outcome.suggestedTitle
       }
+      await nextTick()
+      document.getElementById("new-lib-path")?.focus()
       return
     }
     if (outcome.status === "unsupported") {
@@ -263,7 +300,10 @@ async function submitAddPath() {
   }
   addBusy.value = true
   try {
-    await libraryService.addLibraryPath(newPath.value, newPathTitle.value || undefined)
+    const scanTask = await libraryService.addLibraryPath(newPath.value, newPathTitle.value || undefined)
+    if (scanTask?.taskId) {
+      scanTaskTracker.start(scanTask.taskId)
+    }
     newPath.value = ""
     newPathTitle.value = ""
     addPathDialogOpen.value = false
@@ -321,6 +361,87 @@ async function onOrganizeLibraryChange(next: boolean) {
     }
   } finally {
     organizeLibrarySaving.value = false
+  }
+}
+
+async function onAutoLibraryWatchChange(next: boolean) {
+  autoLibraryWatchError.value = ""
+  autoLibraryWatchSaving.value = true
+  try {
+    await libraryService.setAutoLibraryWatch(next)
+  } catch (err) {
+    console.error("[settings] auto library watch toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      autoLibraryWatchError.value = err.apiError.message
+    } else {
+      autoLibraryWatchError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    autoLibraryWatchSaving.value = false
+  }
+}
+
+async function onMetadataMovieModeAuto() {
+  if (metadataMovieMode.value === "auto") return
+  metadataMovieError.value = ""
+  metadataMovieSaving.value = true
+  try {
+    await libraryService.setMetadataMovieProvider("")
+  } catch (err) {
+    console.error("[settings] metadata movie provider (auto) failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataMovieError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      metadataMovieError.value = err.message
+    } else {
+      metadataMovieError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    metadataMovieSaving.value = false
+  }
+}
+
+async function onMetadataMovieModeSpecified() {
+  if (!canPickSpecifiedMetadata.value) return
+  if (metadataMovieMode.value === "specified") return
+  metadataMovieError.value = ""
+  metadataMovieSaving.value = true
+  try {
+    const first = metadataMovieSelectOptions.value[0]
+    if (first) {
+      await libraryService.setMetadataMovieProvider(first)
+    }
+  } catch (err) {
+    console.error("[settings] metadata movie provider (specified) failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataMovieError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      metadataMovieError.value = err.message
+    } else {
+      metadataMovieError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    metadataMovieSaving.value = false
+  }
+}
+
+async function onMetadataMovieSelect(next: unknown) {
+  if (typeof next !== "string" || next === metadataMovieProvider.value) return
+  metadataMovieError.value = ""
+  metadataMovieSaving.value = true
+  try {
+    await libraryService.setMetadataMovieProvider(next)
+  } catch (err) {
+    console.error("[settings] metadata movie provider select failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataMovieError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      metadataMovieError.value = err.message
+    } else {
+      metadataMovieError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    metadataMovieSaving.value = false
   }
 }
 
@@ -498,10 +619,10 @@ async function runMetadataRefreshForSelected() {
                         </Button>
                       </div>
                       <p
-                        v-if="directoryHint"
-                        class="text-sm leading-relaxed text-muted-foreground"
+                        v-if="directoryHintDisplay"
+                        class="text-sm leading-relaxed text-muted-foreground whitespace-pre-line"
                       >
-                        {{ directoryHint }}
+                        {{ directoryHintDisplay }}
                       </p>
                       <p
                         v-if="newPath.trim() && !isAbsoluteLibraryPath(newPath)"
@@ -535,6 +656,9 @@ async function runMetadataRefreshForSelected() {
                       type="button"
                       class="rounded-2xl"
                       :disabled="addBusy || !canSaveNewPath"
+                      :title="
+                        addBusy || canSaveNewPath ? undefined : t('settings.savePathDisabledTitle')
+                      "
                       @click="submitAddPath"
                     >
                       {{ addBusy ? t("common.saving") : t("settings.savePath") }}
@@ -699,6 +823,108 @@ async function runMetadataRefreshForSelected() {
                 </template>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div class="mb-6 break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+          <CardHeader>
+            <CardTitle>{{ t("settings.metadataMovieProviderTitle") }}</CardTitle>
+            <CardDescription>
+              {{ t("settings.metadataMovieProviderDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-4">
+            <fieldset
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="metadataMovieSaving"
+            >
+              <legend class="px-1 text-sm font-medium">{{ t("settings.metadataMovieProviderMode") }}</legend>
+              <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
+                <input
+                  class="mt-1 size-4 shrink-0 accent-primary"
+                  type="radio"
+                  name="metadata-movie-mode"
+                  value="auto"
+                  :disabled="metadataMovieSaving"
+                  :checked="metadataMovieMode === 'auto'"
+                  @change="onMetadataMovieModeAuto"
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
+                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                    {{ t("settings.metadataMovieProviderAutoHint") }}
+                  </span>
+                </span>
+              </label>
+              <label
+                class="flex items-start gap-3 rounded-xl p-2"
+                :class="
+                  canPickSpecifiedMetadata
+                    ? 'cursor-pointer hover:bg-muted/40'
+                    : 'cursor-not-allowed opacity-60'
+                "
+              >
+                <input
+                  class="mt-1 size-4 shrink-0 accent-primary"
+                  type="radio"
+                  name="metadata-movie-mode"
+                  value="specified"
+                  :checked="metadataMovieMode === 'specified'"
+                  :disabled="metadataMovieSaving || !canPickSpecifiedMetadata"
+                  @change="onMetadataMovieModeSpecified"
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium">{{ t("settings.metadataMovieProviderSpecified") }}</span>
+                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                    {{ t("settings.metadataMovieProviderSpecifiedHint") }}
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+
+            <div
+              v-if="metadataMovieMode === 'specified' && canPickSpecifiedMetadata"
+              class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/20 p-4"
+            >
+              <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
+              <Select
+                :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
+                :disabled="metadataMovieSaving"
+                @update:model-value="onMetadataMovieSelect"
+              >
+                <SelectTrigger class="w-full max-w-md rounded-2xl">
+                  <SelectValue :placeholder="t('settings.metadataMovieProviderSelectPh')" />
+                </SelectTrigger>
+                <SelectContent class="rounded-xl border-border/70">
+                  <SelectItem
+                    v-for="p in metadataMovieSelectOptions"
+                    :key="p"
+                    class="rounded-lg"
+                    :value="p"
+                  >
+                    {{ p }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p
+              v-if="!canPickSpecifiedMetadata"
+              class="text-sm text-muted-foreground"
+            >
+              {{ t("settings.metadataMovieProviderNoList") }}
+            </p>
+            <p
+              v-if="metadataMovieSaving"
+              class="text-xs text-muted-foreground motion-safe:animate-pulse"
+            >
+              {{ t("settings.metadataMovieProviderSyncing") }}
+            </p>
+            <p v-if="metadataMovieError" class="text-sm text-destructive">
+              {{ metadataMovieError }}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -873,15 +1099,31 @@ async function runMetadataRefreshForSelected() {
               <Switch v-model="hardwareDecode" />
             </div>
 
-            <div class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="autoLibraryWatchSaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <p class="font-medium">{{ t("settings.autoScrape") }}</p>
                 <p class="text-sm text-muted-foreground">
                   {{ t("settings.autoScrapeHint") }}
                 </p>
+                <p
+                  v-if="autoLibraryWatchSaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.autoLibraryWatchSyncing") }}
+                </p>
               </div>
-              <Switch v-model="autoScrape" />
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="autoLibraryWatch"
+                @update:model-value="onAutoLibraryWatchChange"
+              />
             </div>
+            <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
+              {{ autoLibraryWatchError }}
+            </p>
           </CardContent>
         </Card>
       </div>

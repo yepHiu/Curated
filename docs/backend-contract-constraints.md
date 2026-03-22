@@ -60,6 +60,12 @@ Phase 2: Renderer -> preload -> Electron Main -> Go Backend
 | `POST /api/library/movies/{id}/scrape` | 单部影片：按库中 `location`/`code` 异步重跑 Metatube 刮削并写回库（`scrape.movie` 任务）。 |
 | `POST /api/library/metadata-scrape` | 批量：请求体 `{ "paths": string[] }` 中每一项须为**已配置的库根路径**（与 `GET /api/settings` 中 `libraryPaths[].path` 在规范化后匹配，大小写不敏感比较盘符路径）。后端查出主文件路径落在这些根下的已入库影片，为每部排队与单部刷新相同的刮削流水线。响应 `202` + `MetadataRefreshQueuedDTO`：`queued`、`skipped`、`invalidPaths`（未匹配任何已配置根的路径原样列出）。 |
 
+### 3.2 设置（HTTP）
+
+- `GET /api/settings`：返回 `SettingsDTO`（含 `libraryPaths`、`player`、`organizeLibrary`、**`autoLibraryWatch`**、`metadataMovieProvider`、`metadataMovieProviders` 等）。
+- `PATCH /api/settings`：**部分更新**；请求体可含 `organizeLibrary`、`autoLibraryWatch`、`metadataMovieProvider` 等（未出现的字段不变）。其中 **`organizeLibrary`**、**`autoLibraryWatch`**、**`metadataMovieProvider`** 的持久化落在 **`config/library-config.cfg`**（原子合并写入）。
+- **`autoLibraryWatch`**：仅约束**目录监听**触发的防抖扫描 enqueue；不改变用户主动 `POST /api/scans` 或周期全库扫描行为。与主配置 **`libraryWatchEnabled`** 同时为「允许」时，后端才运行 fsnotify 循环。
+
 ## 4. 事件设计约束
 
 事件用于承载异步状态变化，命名建议使用“领域.状态”格式，例如：

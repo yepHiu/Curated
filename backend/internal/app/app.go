@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +23,7 @@ import (
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
 	"jav-shadcn/backend/internal/library"
+	"jav-shadcn/backend/internal/librarywatch"
 	"jav-shadcn/backend/internal/scanner"
 	"jav-shadcn/backend/internal/scraper"
 	"jav-shadcn/backend/internal/scraper/metatube"
@@ -42,8 +44,13 @@ type App struct {
 	tasks   *tasks.Manager
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
-	organizeLibrary     bool
-	organizeMu          sync.RWMutex
+	organizeLibrary bool
+	organizeMu      sync.RWMutex
+	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
+	autoLibraryWatch   bool
+	autoLibraryWatchMu sync.RWMutex
+	// metadataMovieMu protects cfg.MetadataMovieProvider (library-config.cfg) during concurrent scrapes.
+	metadataMovieMu     sync.RWMutex
 	librarySettingsPath string // JSON file under config/ (organizeLibrary, future keys)
 
 	appCtx   context.Context
@@ -52,6 +59,14 @@ type App struct {
 
 	// scrapeSem limits concurrent scrape.movie pipelines (network + DB).
 	scrapeSem chan struct{}
+
+	watchScanMu      sync.Mutex
+	watchScanPending map[string]struct{}
+	watchScanDrainMu sync.Mutex
+	libWatchMu       sync.Mutex
+	libWatch         *librarywatch.Watcher
+	watchLoopCancel  context.CancelFunc
+	watchLoopSession uint64 // bumped on each Start/Stop; goroutine clears cancel only if still current
 }
 
 // New 构造并返回可运行的后端 App（依赖注入入口），由 cmd/javd 在加载配置、合并 library-config.cfg、
@@ -92,10 +107,78 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		),
 		tasks:               tasks.NewManager(),
 		organizeLibrary:     cfg.OrganizeLibrary,
+		autoLibraryWatch:    cfg.AutoLibraryWatch,
 		librarySettingsPath: strings.TrimSpace(librarySettingsPath),
 		appCtx:              ctx,
 		scrapeSem:           make(chan struct{}, scrapeConc),
+		watchScanPending:    make(map[string]struct{}),
 	}, nil
+}
+
+// ReloadLibraryWatches re-reads library roots from the database and rebuilds directory watches.
+func (a *App) ReloadLibraryWatches(ctx context.Context) error {
+	a.libWatchMu.Lock()
+	w := a.libWatch
+	a.libWatchMu.Unlock()
+	if w == nil {
+		return nil
+	}
+	return w.Reload(ctx)
+}
+
+// EnqueueLibraryWatchScanRoots queues library roots for a debounced fsnotify-driven scan.
+func (a *App) EnqueueLibraryWatchScanRoots(roots []string) {
+	if !a.AutoLibraryWatch() {
+		return
+	}
+	if len(roots) == 0 {
+		return
+	}
+	a.watchScanMu.Lock()
+	for _, r := range roots {
+		r = filepath.Clean(strings.TrimSpace(r))
+		if r != "" {
+			a.watchScanPending[r] = struct{}{}
+		}
+	}
+	a.watchScanMu.Unlock()
+	go a.tryDrainWatchScanQueue()
+}
+
+func (a *App) tryDrainWatchScanQueue() {
+	a.watchScanDrainMu.Lock()
+	defer a.watchScanDrainMu.Unlock()
+
+	a.watchScanMu.Lock()
+	if len(a.watchScanPending) == 0 {
+		a.watchScanMu.Unlock()
+		return
+	}
+	roots := make([]string, 0, len(a.watchScanPending))
+	for r := range a.watchScanPending {
+		roots = append(roots, r)
+	}
+	slices.Sort(roots)
+	a.watchScanPending = make(map[string]struct{})
+	a.watchScanMu.Unlock()
+
+	_, err := a.startLibraryScan(a.appCtx, io.Discard, roots, map[string]any{"trigger": "fsnotify"})
+	if err != nil {
+		if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+			a.watchScanMu.Lock()
+			for _, r := range roots {
+				a.watchScanPending[r] = struct{}{}
+			}
+			a.watchScanMu.Unlock()
+			return
+		}
+		a.logger.Warn("library watch: failed to start scan", zap.Error(err))
+		a.watchScanMu.Lock()
+		for _, r := range roots {
+			a.watchScanPending[r] = struct{}{}
+		}
+		a.watchScanMu.Unlock()
+	}
 }
 
 // OrganizeLibrary returns whether scan/scrape should move files and write NFO/assets into 番号 folders.
@@ -124,6 +207,132 @@ func (a *App) SetOrganizeLibrary(v bool) error {
 	a.cfg.OrganizeLibrary = v
 	a.organizeMu.Unlock()
 	return nil
+}
+
+// AutoLibraryWatch reports whether directory watching may queue scans for new files under library roots.
+func (a *App) AutoLibraryWatch() bool {
+	a.autoLibraryWatchMu.RLock()
+	defer a.autoLibraryWatchMu.RUnlock()
+	return a.autoLibraryWatch
+}
+
+// SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
+func (a *App) SetAutoLibraryWatch(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["autoLibraryWatch"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.autoLibraryWatchMu.Lock()
+	a.autoLibraryWatch = v
+	a.cfg.AutoLibraryWatch = v
+	a.autoLibraryWatchMu.Unlock()
+	if v && a.cfg.LibraryWatchOn() {
+		return a.EnsureLibraryWatchRunning()
+	}
+	a.StopLibraryWatchLoop()
+	return nil
+}
+
+// EnsureLibraryWatchRunning starts the fsnotify Run loop when yaml LibraryWatchOn and AutoLibraryWatch are true.
+func (a *App) EnsureLibraryWatchRunning() error {
+	if !a.cfg.LibraryWatchOn() {
+		return nil
+	}
+	if !a.AutoLibraryWatch() {
+		return nil
+	}
+	a.libWatchMu.Lock()
+	if a.watchLoopCancel != nil {
+		a.libWatchMu.Unlock()
+		return nil
+	}
+	if a.libWatch == nil {
+		lw, err := librarywatch.New(librarywatch.Options{
+			Enabled:  true,
+			Debounce: a.cfg.LibraryWatchDebounce(),
+			Logger:   a.logger,
+			Lister:   a.store,
+			Queue:    a,
+		})
+		if err != nil {
+			a.libWatchMu.Unlock()
+			return err
+		}
+		a.libWatch = lw
+	}
+	w := a.libWatch
+	a.watchLoopSession++
+	sess := a.watchLoopSession
+	watchCtx, cancel := context.WithCancel(a.appCtx)
+	a.watchLoopCancel = cancel
+	a.libWatchMu.Unlock()
+
+	go func(sess uint64) {
+		err := w.Run(watchCtx)
+		a.libWatchMu.Lock()
+		if a.watchLoopSession == sess {
+			a.watchLoopCancel = nil
+		}
+		a.libWatchMu.Unlock()
+		if err != nil && !errors.Is(err, context.Canceled) {
+			a.logger.Warn("library fsnotify watcher exited", zap.Error(err))
+		}
+	}(sess)
+
+	return nil
+}
+
+// StopLibraryWatchLoop cancels the active fsnotify Run context (watcher instance is kept for Reload / restart).
+func (a *App) StopLibraryWatchLoop() {
+	a.libWatchMu.Lock()
+	cancel := a.watchLoopCancel
+	a.watchLoopCancel = nil
+	a.watchLoopSession++
+	a.libWatchMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// MetadataMovieProvider returns the Metatube movie provider name for scrapes, or "" for automatic (all sources).
+func (a *App) MetadataMovieProvider() string {
+	a.metadataMovieMu.RLock()
+	defer a.metadataMovieMu.RUnlock()
+	return strings.TrimSpace(a.cfg.MetadataMovieProvider)
+}
+
+// SetMetadataMovieProvider persists the provider name to library-config.cfg (empty = automatic) and updates memory.
+func (a *App) SetMetadataMovieProvider(name string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	trimmed := strings.TrimSpace(name)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["metadataMovieProvider"] = trimmed
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.metadataMovieMu.Lock()
+	a.cfg.MetadataMovieProvider = trimmed
+	a.metadataMovieMu.Unlock()
+	return nil
+}
+
+// ListMetadataMovieProviders returns registered Metatube movie provider names (sorted), or nil if scraper is not Metatube.
+func (a *App) ListMetadataMovieProviders() []string {
+	ms, ok := a.scraper.(*metatube.Service)
+	if !ok {
+		return nil
+	}
+	return ms.ListMovieProviderNames()
 }
 
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
@@ -231,7 +440,10 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			Player: contracts.PlayerSettingsDTO{
 				HardwareDecode: a.cfg.Player.HardwareDecode,
 			},
-			OrganizeLibrary: a.OrganizeLibrary(),
+			OrganizeLibrary:        a.OrganizeLibrary(),
+			AutoLibraryWatch:       a.AutoLibraryWatch(),
+			MetadataMovieProvider:  a.MetadataMovieProvider(),
+			MetadataMovieProviders: a.ListMetadataMovieProviders(),
 		}
 		return a.respondOK(output, command.ID, settings)
 
@@ -241,7 +453,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			return a.respondError(output, command.ID, badRequest("invalid scan.start payload", map[string]any{"cause": err.Error()}))
 		}
 
-		task, err := a.startLibraryScan(ctx, output, request.Paths)
+		task, err := a.startLibraryScan(ctx, output, request.Paths, nil)
 		if err != nil {
 			if errors.Is(err, contracts.ErrScanAlreadyRunning) {
 				return a.respondError(output, command.ID, &contracts.AppError{
@@ -400,13 +612,13 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				if emitErr := a.emitEvent(output, contracts.EventScanFileImported, result); emitErr != nil {
 					a.logger.Error("failed to emit scan import event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
-				a.enqueueScrape(parentCtx, output, result)
+				a.enqueueScrape(parentCtx, output, result, taskID)
 			case "updated":
 				updatedCount++
 				if emitErr := a.emitEvent(output, contracts.EventScanFileUpdated, result); emitErr != nil {
 					a.logger.Error("failed to emit scan update event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
-				a.enqueueScrape(parentCtx, output, result)
+				a.enqueueScrape(parentCtx, output, result, taskID)
 			default:
 				skippedCount++
 				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
@@ -464,21 +676,25 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 }
 
 // enqueueScrape runs runScrape in a goroutine bounded by scrapeSem (config scraper.maxConcurrent).
-func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO) {
-	go func(r contracts.ScanFileResultDTO) {
+func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO, parentScanTaskID string) {
+	go func(r contracts.ScanFileResultDTO, parent string) {
 		a.scrapeSem <- struct{}{}
 		defer func() { <-a.scrapeSem }()
-		a.runScrape(parentCtx, output, r)
-	}(result)
+		a.runScrape(parentCtx, output, r, parent)
+	}(result, parentScanTaskID)
 }
 
 // beginMovieScrapeTask creates and persists the scrape.movie task and emits task started.
-func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result contracts.ScanFileResultDTO) contracts.TaskDTO {
-	task := a.tasks.Create("scrape.movie", map[string]any{
+func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result contracts.ScanFileResultDTO, parentScanTaskID string) contracts.TaskDTO {
+	md := map[string]any{
 		"movieId": result.MovieID,
 		"number":  result.Number,
 		"path":    result.Path,
-	})
+	}
+	if parentScanTaskID != "" {
+		md["parentScanTaskId"] = parentScanTaskID
+	}
+	task := a.tasks.Create("scrape.movie", md)
 	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scraping metadata for %s", result.Number))
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist scraper task", zap.Error(err), zap.String("taskId", task.TaskID))
@@ -491,7 +707,8 @@ func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result
 
 // runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
 func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context, output io.Writer, task contracts.TaskDTO, result contracts.ScanFileResultDTO) {
-	metadata, err := a.scraper.Scrape(ctx, result.MovieID, result.Number)
+	scrapeOpts := scraper.MovieScrapeOptions{Provider: a.MetadataMovieProvider()}
+	metadata, err := a.scraper.Scrape(ctx, result.MovieID, result.Number, scrapeOpts)
 	if err != nil {
 		code := contracts.ErrorCodeScraperRun
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -583,10 +800,10 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	go a.runAssetDownload(parentCtx, output, metadata, assetDest)
 }
 
-func (a *App) runScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO) {
+func (a *App) runScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO, parentScanTaskID string) {
 	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
 	defer cancel()
-	task := a.beginMovieScrapeTask(ctx, output, result)
+	task := a.beginMovieScrapeTask(ctx, output, result, parentScanTaskID)
 	a.runMovieScrapeBody(ctx, parentCtx, output, task, result)
 }
 
@@ -612,7 +829,7 @@ func (a *App) startAsyncMovieMetadataScrape(ctx context.Context, detail contract
 	if err != nil {
 		return contracts.TaskDTO{}, err
 	}
-	task := a.beginMovieScrapeTask(ctx, io.Discard, result)
+	task := a.beginMovieScrapeTask(ctx, io.Discard, result, "")
 	go func() {
 		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
 		defer cancel()
@@ -632,6 +849,66 @@ func (a *App) StartMovieMetadataRefresh(ctx context.Context, movieID string) (co
 		return contracts.TaskDTO{}, err
 	}
 	return a.startAsyncMovieMetadataScrape(ctx, detail)
+}
+
+func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, actorName string) {
+	profile, err := a.scraper.ScrapeActor(ctx, actorName)
+	if err != nil {
+		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
+		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
+			a.logger.Error("failed to persist failed actor scrape task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
+		}
+		return
+	}
+
+	task = a.tasks.Progress(task.TaskID, 80, "Saving actor profile")
+	if err := a.store.SaveTask(ctx, task); err != nil {
+		a.logger.Error("failed to persist actor scrape progress", zap.Error(err), zap.String("taskId", task.TaskID))
+	}
+
+	if err := a.store.UpdateActorProfile(ctx, profile); err != nil {
+		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
+		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
+			a.logger.Error("failed to persist failed actor scrape task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
+		}
+		return
+	}
+
+	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Actor profile saved: %s", actorName))
+	if err := a.store.SaveTask(ctx, task); err != nil {
+		a.logger.Error("failed to persist completed actor scrape task", zap.Error(err), zap.String("taskId", task.TaskID))
+	}
+}
+
+// StartActorProfileScrape enqueues Metatube actor lookup for an existing library actor row (exact name).
+func (a *App) StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error) {
+	actorName = strings.TrimSpace(actorName)
+	if actorName == "" {
+		return contracts.TaskDTO{}, fmt.Errorf("actor name is required")
+	}
+	exists, err := a.store.ActorNameExists(ctx, actorName)
+	if err != nil {
+		return contracts.TaskDTO{}, err
+	}
+	if !exists {
+		return contracts.TaskDTO{}, contracts.ErrActorNotFound
+	}
+
+	task := a.tasks.Create("scrape.actor", map[string]any{"actorName": actorName})
+	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scraping actor profile: %s", actorName))
+	if err := a.store.SaveTask(ctx, task); err != nil {
+		return contracts.TaskDTO{}, err
+	}
+
+	go func(t contracts.TaskDTO, name string) {
+		a.scrapeSem <- struct{}{}
+		defer func() { <-a.scrapeSem }()
+		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
+		defer cancel()
+		a.runActorScrapeBody(scrapeCtx, t, name)
+	}(task, actorName)
+
+	return task, nil
 }
 
 // matchConfiguredLibraryPath returns the canonical configured path if req matches a library path (case-fold on Windows).
@@ -902,10 +1179,11 @@ func (a *App) StartAutoScanLoop(ctx context.Context) {
 }
 
 func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error) {
-	return a.startLibraryScan(ctx, io.Discard, paths)
+	return a.startLibraryScan(ctx, io.Discard, paths, nil)
 }
 
-func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []string) (contracts.TaskDTO, error) {
+// startLibraryScan starts a library scan task. extraMeta is merged into task metadata (e.g. trigger: fsnotify).
+func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []string, extraMeta map[string]any) (contracts.TaskDTO, error) {
 	if !a.scanning.CompareAndSwap(false, true) {
 		return contracts.TaskDTO{}, contracts.ErrScanAlreadyRunning
 	}
@@ -917,7 +1195,11 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 	}
 	paths = resolved
 
-	task := a.tasks.Create("scan.library", map[string]any{"paths": paths})
+	meta := map[string]any{"paths": paths}
+	for k, v := range extraMeta {
+		meta[k] = v
+	}
+	task := a.tasks.Create("scan.library", meta)
 	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scanning %d library path(s)", len(paths)))
 	if err := a.store.SaveTask(a.appCtx, task); err != nil {
 		a.scanning.Store(false)
@@ -925,7 +1207,10 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 	}
 
 	go func() {
-		defer a.scanning.Store(false)
+		defer func() {
+			a.scanning.Store(false)
+			a.tryDrainWatchScanQueue()
+		}()
 		a.runScan(a.appCtx, output, task.TaskID, paths)
 	}()
 
@@ -941,7 +1226,11 @@ func (a *App) HTTPHandler() http.Handler {
 		Tasks:                  a.tasks,
 		ScanStarter:            a,
 		OrganizeLibraryCtl:     a,
+		AutoLibraryWatchCtl:    a,
+		MetadataScrapeCtl:      a,
 		MovieMetadataRefresher: a,
+		ActorProfileRefresher:  a,
+		LibraryWatchReloader:   a,
 	}).Routes()
 }
 

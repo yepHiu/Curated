@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,10 +34,33 @@ type MovieMetadataRefresher interface {
 	StartMetadataRefreshForLibraryPaths(ctx context.Context, paths []string) (contracts.MetadataRefreshQueuedDTO, error)
 }
 
+// ActorProfileRefresher starts an async actor profile scrape (Metatube) for an existing library actor name.
+type ActorProfileRefresher interface {
+	StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error)
+}
+
 // OrganizeLibraryController exposes 整理库开关；值来自启动时合并的 library-config.cfg，PATCH 会写回该文件。
 type OrganizeLibraryController interface {
 	OrganizeLibrary() bool
 	SetOrganizeLibrary(v bool) error
+}
+
+// AutoLibraryWatchController exposes whether fsnotify-driven library scans are allowed (library-config.cfg).
+type AutoLibraryWatchController interface {
+	AutoLibraryWatch() bool
+	SetAutoLibraryWatch(v bool) error
+}
+
+// MetadataScrapeSettings exposes Metatube movie provider preference (empty = auto) and the list of valid provider names.
+type MetadataScrapeSettings interface {
+	MetadataMovieProvider() string
+	SetMetadataMovieProvider(name string) error
+	ListMetadataMovieProviders() []string
+}
+
+// LibraryWatchReloader rebuilds fsnotify watches after library roots change.
+type LibraryWatchReloader interface {
+	ReloadLibraryWatches(ctx context.Context) error
 }
 
 type Handler struct {
@@ -46,7 +71,11 @@ type Handler struct {
 	tasks                  *tasks.Manager
 	scanStarter            ScanStarter
 	organizeLibraryCtl     OrganizeLibraryController
+	autoLibraryWatchCtl    AutoLibraryWatchController
+	metadataScrapeCtl      MetadataScrapeSettings
 	movieMetadataRefresher MovieMetadataRefresher
+	actorProfileRefresher  ActorProfileRefresher
+	libraryWatchReloader   LibraryWatchReloader
 }
 
 type Deps struct {
@@ -57,7 +86,11 @@ type Deps struct {
 	Tasks                  *tasks.Manager
 	ScanStarter            ScanStarter
 	OrganizeLibraryCtl     OrganizeLibraryController
+	AutoLibraryWatchCtl    AutoLibraryWatchController
+	MetadataScrapeCtl      MetadataScrapeSettings
 	MovieMetadataRefresher MovieMetadataRefresher
+	ActorProfileRefresher  ActorProfileRefresher
+	LibraryWatchReloader   LibraryWatchReloader
 }
 
 func NewHandler(deps Deps) *Handler {
@@ -69,7 +102,11 @@ func NewHandler(deps Deps) *Handler {
 		tasks:                  deps.Tasks,
 		scanStarter:            deps.ScanStarter,
 		organizeLibraryCtl:     deps.OrganizeLibraryCtl,
+		autoLibraryWatchCtl:    deps.AutoLibraryWatchCtl,
+		metadataScrapeCtl:      deps.MetadataScrapeCtl,
 		movieMetadataRefresher: deps.MovieMetadataRefresher,
+		actorProfileRefresher:  deps.ActorProfileRefresher,
+		libraryWatchReloader:   deps.LibraryWatchReloader,
 	}
 }
 
@@ -80,6 +117,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
 	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
+	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
+	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
@@ -92,6 +131,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
+	mux.HandleFunc("GET /api/tasks/recent", h.handleGetRecentTasks)
 	mux.HandleFunc("GET /api/tasks/{taskId}", h.handleGetTaskStatus)
 
 	mux.HandleFunc("GET /api/playback/progress", h.handleListPlaybackProgress)
@@ -128,6 +168,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 	request := contracts.ListMoviesRequest{
 		Mode:   query.Get("mode"),
 		Query:  query.Get("q"),
+		Actor:  query.Get("actor"),
 		Limit:  limit,
 		Offset: offset,
 	}
@@ -141,6 +182,59 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		result = h.library.ListMovies(request)
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handleGetActorProfile(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
+		return
+	}
+	profile, err := h.store.GetActorProfile(r.Context(), name)
+	if err != nil {
+		if errors.Is(err, contracts.ErrActorNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "actor not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("get actor profile failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load actor profile")
+		return
+	}
+	writeJSON(w, http.StatusOK, profile)
+}
+
+func (h *Handler) handleScrapeActorProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.actorProfileRefresher == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "actor profile scrape not configured")
+		return
+	}
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
+		return
+	}
+	task, err := h.actorProfileRefresher.StartActorProfileScrape(r.Context(), name)
+	if err != nil {
+		switch {
+		case errors.Is(err, contracts.ErrActorNotFound):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "actor not found")
+		case strings.Contains(err.Error(), "actor name is required"):
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		default:
+			if h.logger != nil {
+				h.logger.Warn("start actor profile scrape failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to start actor profile scrape")
+		}
+		return
+	}
+	writeJSON(w, http.StatusAccepted, task)
 }
 
 func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +355,85 @@ func parsePatchMovieInput(body []byte) (contracts.PatchMovieInput, error) {
 		}
 		in.MetadataTags = tags
 	}
+	if err := parsePatchOptionalStringField(m, "userTitle", &in.UserTitleSet, &in.UserTitleClear, &in.UserTitle); err != nil {
+		return in, err
+	}
+	if err := parsePatchOptionalStringField(m, "userStudio", &in.UserStudioSet, &in.UserStudioClear, &in.UserStudio); err != nil {
+		return in, err
+	}
+	if err := parsePatchOptionalStringField(m, "userSummary", &in.UserSummarySet, &in.UserSummaryClear, &in.UserSummary); err != nil {
+		return in, err
+	}
+	if err := parsePatchOptionalStringField(m, "userReleaseDate", &in.UserReleaseDateSet, &in.UserReleaseDateClear, &in.UserReleaseDate); err != nil {
+		return in, err
+	}
+	if raw, ok := m["userRuntimeMinutes"]; ok {
+		in.UserRuntimeMinutesSet = true
+		t := bytes.TrimSpace(raw)
+		if len(t) == 0 || string(t) == "null" {
+			in.UserRuntimeMinutesClear = true
+		} else {
+			var f float64
+			if err := json.Unmarshal(raw, &f); err != nil {
+				return in, err
+			}
+			if math.IsNaN(f) || math.IsInf(f, 0) || f < 0 || f > 99999 || f != math.Trunc(f) {
+				return in, errors.New("invalid userRuntimeMinutes")
+			}
+			in.UserRuntimeMinutes = int(f)
+		}
+	}
 	return in, nil
+}
+
+func parsePatchOptionalStringField(
+	m map[string]json.RawMessage,
+	key string,
+	set *bool,
+	clear *bool,
+	out *string,
+) error {
+	raw, ok := m[key]
+	if !ok {
+		return nil
+	}
+	*set = true
+	t := bytes.TrimSpace(raw)
+	if len(t) == 0 || string(t) == "null" {
+		*clear = true
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return err
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		*clear = true
+		return nil
+	}
+	*out = s
+	return nil
+}
+
+var patchUserReleaseDateRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+func validatePatchMovieDisplay(in contracts.PatchMovieInput) error {
+	const maxSummary = 120_000
+	if in.UserSummarySet && !in.UserSummaryClear && len(in.UserSummary) > maxSummary {
+		return errors.New("userSummary too long")
+	}
+	if in.UserReleaseDateSet && !in.UserReleaseDateClear && in.UserReleaseDate != "" {
+		if !patchUserReleaseDateRx.MatchString(in.UserReleaseDate) {
+			return errors.New("userReleaseDate must be YYYY-MM-DD")
+		}
+	}
+	if in.UserRuntimeMinutesSet && !in.UserRuntimeMinutesClear {
+		if in.UserRuntimeMinutes < 0 || in.UserRuntimeMinutes > 99999 {
+			return errors.New("userRuntimeMinutes out of range")
+		}
+	}
+	return nil
 }
 
 func patchMovieInputHasFields(in contracts.PatchMovieInput) bool {
@@ -274,7 +446,13 @@ func patchMovieInputHasFields(in contracts.PatchMovieInput) bool {
 	if in.UserTagsSet {
 		return true
 	}
-	return in.MetadataTagsSet
+	if in.MetadataTagsSet {
+		return true
+	}
+	if in.UserTitleSet || in.UserStudioSet || in.UserSummarySet || in.UserReleaseDateSet || in.UserRuntimeMinutesSet {
+		return true
+	}
+	return false
 }
 
 func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
@@ -308,6 +486,10 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.UserRatingSet && !in.UserRatingClear && (in.UserRating < 0 || in.UserRating > 5) {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, storage.ErrInvalidUserRating.Error())
+		return
+	}
+	if err := validatePatchMovieDisplay(in); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 		return
 	}
 
@@ -457,24 +639,55 @@ func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
-	libraryPaths, err := h.store.ListLibraryPaths(r.Context())
+func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, error) {
+	libraryPaths, err := h.store.ListLibraryPaths(ctx)
 	if err != nil {
-		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
-		return
+		return contracts.SettingsDTO{}, err
 	}
-
 	org := h.cfg.OrganizeLibrary
 	if h.organizeLibraryCtl != nil {
 		org = h.organizeLibraryCtl.OrganizeLibrary()
 	}
-	writeJSON(w, http.StatusOK, contracts.SettingsDTO{
-		LibraryPaths: libraryPaths,
-		Player: contracts.PlayerSettingsDTO{
-			HardwareDecode: h.cfg.Player.HardwareDecode,
-		},
-		OrganizeLibrary: org,
-	})
+	autoWatch := h.cfg.AutoLibraryWatch
+	if h.autoLibraryWatchCtl != nil {
+		autoWatch = h.autoLibraryWatchCtl.AutoLibraryWatch()
+	}
+	dto := contracts.SettingsDTO{
+		LibraryPaths:           libraryPaths,
+		Player:                 contracts.PlayerSettingsDTO{HardwareDecode: h.cfg.Player.HardwareDecode},
+		OrganizeLibrary:        org,
+		AutoLibraryWatch:       autoWatch,
+		MetadataMovieProviders: []string{},
+	}
+	if h.metadataScrapeCtl != nil {
+		dto.MetadataMovieProvider = h.metadataScrapeCtl.MetadataMovieProvider()
+		if list := h.metadataScrapeCtl.ListMetadataMovieProviders(); list != nil {
+			dto.MetadataMovieProviders = list
+		}
+	}
+	return dto, nil
+}
+
+func movieProviderNameAllowed(want string, allowed []string) bool {
+	if strings.TrimSpace(want) == "" {
+		return true
+	}
+	lw := strings.ToLower(strings.TrimSpace(want))
+	for _, a := range allowed {
+		if strings.ToLower(strings.TrimSpace(a)) == lw {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	dto, err := h.buildSettingsDTO(r.Context())
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
@@ -482,7 +695,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -496,32 +709,67 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
 
-	if err := h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary); err != nil {
-		if h.logger != nil {
-			h.logger.Warn("failed to persist organizeLibrary", zap.Error(err))
+	if body.OrganizeLibrary != nil {
+		if h.organizeLibraryCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "organize library settings not available")
+			return
 		}
-		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-		return
+		if err := h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist organizeLibrary", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
 	}
 
-	libraryPaths, err := h.store.ListLibraryPaths(r.Context())
+	if body.AutoLibraryWatch != nil {
+		if h.autoLibraryWatchCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "auto library watch settings not available")
+			return
+		}
+		if err := h.autoLibraryWatchCtl.SetAutoLibraryWatch(*body.AutoLibraryWatch); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist autoLibraryWatch", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.MetadataMovieProvider != nil {
+		if h.metadataScrapeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata scrape settings not available")
+			return
+		}
+		name := strings.TrimSpace(*body.MetadataMovieProvider)
+		if name != "" {
+			allowed := h.metadataScrapeCtl.ListMetadataMovieProviders()
+			if len(allowed) == 0 || !movieProviderNameAllowed(name, allowed) {
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "unknown metadataMovieProvider")
+				return
+			}
+		}
+		if err := h.metadataScrapeCtl.SetMetadataMovieProvider(name); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist metadataMovieProvider", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
 		return
 	}
-
-	writeJSON(w, http.StatusOK, contracts.SettingsDTO{
-		LibraryPaths: libraryPaths,
-		Player: contracts.PlayerSettingsDTO{
-			HardwareDecode: h.cfg.Player.HardwareDecode,
-		},
-		OrganizeLibrary: h.organizeLibraryCtl.OrganizeLibrary(),
-	})
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) handleAddLibraryPath(w http.ResponseWriter, r *http.Request) {
@@ -560,7 +808,24 @@ func (h *Handler) handleAddLibraryPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, dto)
+	h.reloadLibraryWatchIfAny(r.Context())
+
+	resp := contracts.AddLibraryPathResponse{LibraryPathDTO: dto}
+	if h.scanStarter != nil {
+		if task, err := h.scanStarter.StartScan(r.Context(), []string{dto.Path}); err != nil {
+			if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+				if h.logger != nil {
+					h.logger.Warn("add library path: initial scan skipped (scan already in progress)", zap.String("path", dto.Path))
+				}
+			} else if h.logger != nil {
+				h.logger.Warn("add library path: failed to start initial scan", zap.Error(err), zap.String("path", dto.Path))
+			}
+		} else {
+			resp.ScanTask = &task
+		}
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request) {
@@ -585,6 +850,7 @@ func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.reloadLibraryWatchIfAny(r.Context())
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -659,6 +925,30 @@ func (h *Handler) handleGetTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, task)
+}
+
+func (h *Handler) handleGetRecentTasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	limit := 30
+	if q := strings.TrimSpace(r.URL.Query().Get("limit")); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	tasks := h.tasks.ListRecentFinished(limit)
+	writeJSON(w, http.StatusOK, contracts.RecentTasksDTO{Tasks: tasks})
+}
+
+func (h *Handler) reloadLibraryWatchIfAny(ctx context.Context) {
+	if h.libraryWatchReloader == nil {
+		return
+	}
+	if err := h.libraryWatchReloader.ReloadLibraryWatches(ctx); err != nil && h.logger != nil {
+		h.logger.Warn("library watch reload failed", zap.Error(err))
+	}
 }
 
 func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logger *zap.Logger) error {

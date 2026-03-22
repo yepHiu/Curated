@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import type { PatchMovieBody } from "@/api/types"
 import type { Movie } from "@/domain/movie/types"
 import {
   Card,
@@ -50,6 +51,7 @@ const emit = defineEmits<{
   updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
   refreshMetadata: [movieId: string]
+  patchMovieDisplay: [body: PatchMovieBody, done: (err?: unknown) => void]
 }>()
 </script>
 
@@ -67,6 +69,7 @@ const emit = defineEmits<{
       @update-metadata-tags="emit('updateMetadataTags', $event)"
       @delete-movie="emit('deleteMovie', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"
+      @patch-movie-display="(body, done) => emit('patchMovieDisplay', body, done)"
     />
 
     <Card class="rounded-3xl border-border/70 bg-card/85">

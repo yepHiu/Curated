@@ -17,16 +17,34 @@ export const isLibraryRouteName = (
 export const getBrowseSourceMode = (query: LocationQuery): LibraryMode =>
   isLibraryMode(query.from) ? query.from : "library"
 
-export const getLibrarySearchQuery = (query: LocationQuery) =>
-  typeof query.q === "string" ? query.q : ""
+export const getLibrarySearchQuery = (query: LocationQuery): string => {
+  const raw = query.q
+  if (typeof raw === "string") {
+    return raw
+  }
+  if (Array.isArray(raw)) {
+    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
+    return first ?? ""
+  }
+  return ""
+}
 
 /** 精确标签筛选（元数据或用户标签字段完全匹配）；与 `q` 可同时生效（交集） */
 export const getLibraryTagExactQuery = (query: LocationQuery) =>
   typeof query.tag === "string" ? query.tag : ""
 
 /** 精确演员筛选（`actors` 数组元素完全匹配）；与 `q`、`tag` 可同时生效（交集） */
-export const getLibraryActorExactQuery = (query: LocationQuery) =>
-  typeof query.actor === "string" ? query.actor : ""
+export const getLibraryActorExactQuery = (query: LocationQuery): string => {
+  const raw = query.actor
+  if (typeof raw === "string") {
+    return raw
+  }
+  if (Array.isArray(raw)) {
+    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
+    return first ?? ""
+  }
+  return ""
+}
 
 export const getLibraryTabQuery = (query: LocationQuery): LibraryTab => {
   const value = typeof query.tab === "string" ? query.tab : "all"

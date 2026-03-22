@@ -26,3 +26,11 @@ import { Button } from '@/components/ui/button'
   <Button variant="outline">Action</Button>
 </template>
 ```
+
+## Form controls (`Input`, dialogs, `<textarea>`)
+
+- **Explicit imports:** In `<script setup>`, always `import { Input } from '@/components/ui/input'` when using `<Input>`; do not rely on implicit or unclear component resolution.
+- **Dark theme / Tailwind `dark:`:** The app uses a **dark palette on `:root`** in `src/style.css`; `html` typically has **no** `class="dark"`. The project defines `@custom-variant dark (&:is(.dark *))`, so utilities prefixed with `dark:` only apply **inside a `.dark` ancestor**. Do **not** depend on `dark:*` alone for form contrast unless you also wrap that subtree in `.dark` or change the variant—prefer always-on tokens (`border-border/…`, `bg-muted/…`, `text-foreground`) on fields.
+- **Default field visibility:** On `bg-background`, cards, and **Dialog** surfaces, text inputs must stay **visibly bounded** (clear border + subtle fill). Use the shared **`Input`** primitive in `src/components/ui/input/Input.vue` and keep its defaults aligned with that goal (`min-h-10`, comfortable vertical padding, `border-border/60`, `bg-muted/40`, `text-foreground`). Avoid primary dialogs that use only `bg-transparent` + very faint borders for main data entry.
+- **Consistency:** In one form (e.g. movie edit, settings dialogs), match **`<Input>`** and **`<textarea>`** styling (same border + muted fill language) so fields don’t look like different components.
+- **Overrides:** Top-bar search and similar may pass extra `class` (e.g. `h-10`, `rounded-2xl`, `bg-background/70`); `cn()` merge preserves overrides—when customizing, **do not** remove readable border/background unless the parent provides an equally clear container.

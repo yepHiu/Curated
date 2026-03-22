@@ -65,6 +65,12 @@ func main() {
 
 	backendApp.StartAutoScanLoop(ctx)
 
+	if cfg.LibraryWatchOn() {
+		if werr := backendApp.EnsureLibraryWatchRunning(); werr != nil {
+			logger.Fatal("failed to init library fsnotify watcher", logging.Error(werr))
+		}
+	}
+
 	switch *mode {
 	case "http":
 		if err := server.ListenAndServe(ctx, cfg.HttpAddr, backendApp.HTTPHandler(), logger); err != nil {

@@ -20,6 +20,25 @@ func TestMergeLibrarySettingsFile_MissingFile_NoChangeToDefault(t *testing.T) {
 	if !cfg.OrganizeLibrary {
 		t.Fatal("expected organizeLibrary still true")
 	}
+	if !cfg.AutoLibraryWatch {
+		t.Fatal("expected AutoLibraryWatch still true (default)")
+	}
+}
+
+func TestMergeLibrarySettingsFile_AutoLibraryWatchFalse(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"autoLibraryWatch": false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AutoLibraryWatch {
+		t.Fatal("expected autoLibraryWatch false from file")
+	}
 }
 
 func TestMergeLibrarySettingsFile_ExplicitFalse(t *testing.T) {
@@ -35,6 +54,47 @@ func TestMergeLibrarySettingsFile_ExplicitFalse(t *testing.T) {
 	}
 	if cfg.OrganizeLibrary {
 		t.Fatal("expected false from file")
+	}
+}
+
+func TestMergeLibrarySettingsFile_MetadataMovieProvider(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"metadataMovieProvider": "  Fanza  "}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.MetadataMovieProvider, "Fanza"; got != want {
+		t.Fatalf("MetadataMovieProvider = %q, want %q", got, want)
+	}
+}
+
+func TestWriteLibrarySettingsMerge_MetadataMovieProvider(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"organizeLibrary": true, "metadataMovieProvider": "old"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["metadataMovieProvider"] = "new"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.MetadataMovieProvider, "new"; got != want {
+		t.Fatalf("MetadataMovieProvider = %q, want %q", got, want)
+	}
+	if !cfg.OrganizeLibrary {
+		t.Fatal("expected organizeLibrary preserved true")
 	}
 }
 

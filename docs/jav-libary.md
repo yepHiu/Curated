@@ -282,7 +282,8 @@ interface SettingsService {
 
 #### 当前状态
 
-- 当前设置页已出现扫描相关入口和周期设置，但它们仍然只是前端占位。
+- **已实现（代码为准）**：后端 **`POST /api/scans`**、周期 **`autoScanIntervalSeconds`**、**fsnotify** 库根监听（主配置 **`libraryWatchEnabled`** + 持久化 **`autoLibraryWatch`**，见 **`config/library-config.cfg`**）；设置页可触发路径/全库扫描并与任务轮询联动。监听触发的扫描在任务元数据中常带 **`trigger: fsnotify`**。
+- **仍为占位或简化的 UI**：例如部分「维护」按钮、硬件解码等仍可能未接后端或未完整实现；以具体页面与 `README.md` / `project-facts` 为准。
 
 #### 目标设计
 

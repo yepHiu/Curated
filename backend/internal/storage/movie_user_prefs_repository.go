@@ -46,6 +46,47 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 		}
 	}
 
+	if patch.UserTitleSet {
+		if patch.UserTitleClear {
+			sets = append(sets, "user_title = NULL")
+		} else {
+			sets = append(sets, "user_title = ?")
+			args = append(args, patch.UserTitle)
+		}
+	}
+	if patch.UserStudioSet {
+		if patch.UserStudioClear {
+			sets = append(sets, "user_studio = NULL")
+		} else {
+			sets = append(sets, "user_studio = ?")
+			args = append(args, patch.UserStudio)
+		}
+	}
+	if patch.UserSummarySet {
+		if patch.UserSummaryClear {
+			sets = append(sets, "user_summary = NULL")
+		} else {
+			sets = append(sets, "user_summary = ?")
+			args = append(args, patch.UserSummary)
+		}
+	}
+	if patch.UserReleaseDateSet {
+		if patch.UserReleaseDateClear {
+			sets = append(sets, "user_release_date = NULL")
+		} else {
+			sets = append(sets, "user_release_date = ?")
+			args = append(args, patch.UserReleaseDate)
+		}
+	}
+	if patch.UserRuntimeMinutesSet {
+		if patch.UserRuntimeMinutesClear {
+			sets = append(sets, "user_runtime_minutes = NULL")
+		} else {
+			sets = append(sets, "user_runtime_minutes = ?")
+			args = append(args, patch.UserRuntimeMinutes)
+		}
+	}
+
 	if len(sets) == 0 && !patch.UserTagsSet && !patch.MetadataTagsSet {
 		return nil
 	}

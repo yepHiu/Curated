@@ -90,6 +90,10 @@ onUnmounted(() => {
 const isEmpty = computed(() => listWithUrls.value.length === 0)
 
 const noActorLabel = computed(() => t("curated.noActor"))
+const noMovieLabel = computed(() => t("curated.noMovie"))
+
+/** 无 movieId 时归入同一组，避免 Map 用空串作 key 歧义 */
+const UNKNOWN_MOVIE_KEY = "__curated_no_movie__"
 
 const actorGroups = computed(() => {
   const none = noActorLabel.value
@@ -108,6 +112,59 @@ const actorGroups = computed(() => {
   return [...m.entries()].sort(([a], [b]) =>
     a.localeCompare(b, locale.value, { numeric: true }),
   )
+})
+
+interface MovieGroupSection {
+  movieKey: string
+  heading: string
+  sub: string
+  items: RowWithUrl[]
+}
+
+const movieGroups = computed((): MovieGroupSection[] => {
+  void locale.value
+  const none = noMovieLabel.value
+  const m = new Map<string, RowWithUrl[]>()
+  for (const item of listWithUrls.value) {
+    const mid = item.row.movieId.trim()
+    const key = mid || UNKNOWN_MOVIE_KEY
+    if (!m.has(key)) {
+      m.set(key, [])
+    }
+    m.get(key)!.push(item)
+  }
+  for (const arr of m.values()) {
+    arr.sort((x, y) => y.row.capturedAt.localeCompare(x.row.capturedAt))
+  }
+  const entries = [...m.entries()].sort(([, ia], [, ib]) => {
+    const ca = ia[0]?.row.capturedAt ?? ""
+    const cb = ib[0]?.row.capturedAt ?? ""
+    return cb.localeCompare(ca)
+  })
+  return entries.map(([movieKey, items]) => {
+    const r = items[0]!.row
+    const code = r.code.trim()
+    const title = r.title.trim()
+    const isUnknown = movieKey === UNKNOWN_MOVIE_KEY
+    if (isUnknown) {
+      const line = [code, title].filter(Boolean).join(code && title ? " · " : "")
+      return { movieKey, heading: none, sub: line, items }
+    }
+    if (code) {
+      return {
+        movieKey,
+        heading: code,
+        sub: title && title !== code ? title : "",
+        items,
+      }
+    }
+    return {
+      movieKey,
+      heading: title || movieKey,
+      sub: "",
+      items,
+    }
+  })
 })
 
 const dialogOpen = ref(false)
@@ -348,6 +405,7 @@ function formatCapturedAt(iso: string) {
       <TabsList class="h-auto w-fit flex-wrap rounded-2xl bg-muted/60 p-1">
         <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
         <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
+        <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="timeline" class="mt-0 outline-none">
@@ -404,6 +462,63 @@ function formatCapturedAt(iso: string) {
               <div
                 v-for="item in items"
                 :key="`${actor}-${item.row.id}`"
+                class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+              >
+                <button
+                  type="button"
+                  class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @click="openDialog(item)"
+                >
+                  <div class="relative aspect-video w-full bg-black/80">
+                    <img
+                      :src="item.url"
+                      :alt="item.row.code"
+                      class="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div class="space-y-1 p-3">
+                    <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
+                    <p class="text-xs text-muted-foreground">
+                      {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
+                    </p>
+                  </div>
+                </button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  class="absolute top-2 right-2 z-10 size-9 rounded-xl border border-border/60 bg-background/90 text-destructive opacity-100 shadow-md backdrop-blur-sm transition-opacity hover:bg-destructive/10 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                  :title="t('curated.deleteCard')"
+                  :aria-label="t('curated.deleteCardAria')"
+                  @click.stop="openDeleteConfirmForCard(item)"
+                >
+                  <Trash2 class="size-4" />
+                </Button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="movies" class="mt-0 outline-none">
+        <div class="flex flex-col gap-8">
+          <section v-for="g in movieGroups" :key="g.movieKey">
+            <div class="mb-3">
+              <h2 class="text-lg font-semibold">{{ g.heading }}</h2>
+              <p
+                v-if="g.sub"
+                class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
+              >
+                {{ g.sub }}
+              </p>
+            </div>
+            <div
+              class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+            >
+              <div
+                v-for="item in g.items"
+                :key="`${g.movieKey}-${item.row.id}`"
                 class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
               >
                 <button
@@ -619,7 +734,7 @@ function formatCapturedAt(iso: string) {
         <p v-if="deleteFrameError" class="text-sm text-destructive" role="alert">
           {{ deleteFrameError }}
         </p>
-        <DialogFooter class="gap-2 sm:gap-0">
+        <DialogFooter class="gap-3">
           <DialogClose as-child>
             <Button type="button" variant="outline" class="rounded-2xl" :disabled="deleteFrameBusy">
               {{ t("curated.cancel") }}

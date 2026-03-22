@@ -32,11 +32,45 @@ const libraryMovies = computed(() => libraryService.movies.value)
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
 const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
+/** 小写 -> 库内规范演员名（用于 q 与演员名匹配） */
+const actorCanonicalByLower = computed(() => {
+  const m = new Map<string, string>()
+  for (const movie of libraryMovies.value) {
+    for (const raw of movie.actors) {
+      const name = raw.trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      if (!m.has(key)) {
+        m.set(key, name)
+      }
+    }
+  }
+  return m
+})
+
+/** 未带 `actor=` 时，若整段 `q` 与某演员名一致（忽略大小写），视为按演员浏览 */
+const actorResolvedFromSearch = computed(() => {
+  if (actorExactQuery.value) {
+    return ""
+  }
+  const q = searchQuery.value.trim()
+  if (!q) {
+    return ""
+  }
+  return actorCanonicalByLower.value.get(q.toLowerCase()) ?? ""
+})
+
+/** 演员资料卡标题：URL `actor` 优先，否则为 `q` 解析出的演员名 */
+const actorProfileDisplayName = computed(
+  () => actorExactQuery.value || actorResolvedFromSearch.value,
+)
+
 const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
 const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))
 
 const queryFilteredMovies = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
+  const qRaw = searchQuery.value.trim()
+  const queryLower = qRaw.toLowerCase()
   const mode = libraryMode.value
   const raw = libraryMovies.value
 
@@ -54,8 +88,10 @@ const queryFilteredMovies = computed(() => {
     list = [...raw]
   }
 
-  if (query) {
-    list = list.filter((movie) => movieSearchHaystack(movie).includes(query))
+  const actorViaQ = actorResolvedFromSearch.value
+  const useQAsActorOnly = Boolean(actorViaQ)
+  if (queryLower && !useQAsActorOnly) {
+    list = list.filter((movie) => movieSearchHaystack(movie).includes(queryLower))
   }
 
   const tagExact = tagExactQuery.value
@@ -65,9 +101,11 @@ const queryFilteredMovies = computed(() => {
     )
   }
 
-  const actorExact = actorExactQuery.value
-  if (actorExact) {
-    list = list.filter((movie) => movie.actors.includes(actorExact))
+  const actorFromParam = actorExactQuery.value
+  if (actorFromParam) {
+    list = list.filter((movie) => movie.actors.includes(actorFromParam))
+  } else if (actorViaQ) {
+    list = list.filter((movie) => movie.actors.includes(actorViaQ))
   }
 
   return list
@@ -182,6 +220,17 @@ const clearExactTagFilter = async () => {
     query: mergeLibraryQuery(route.query, { tag: undefined }),
   })
 }
+
+const clearExactActorFilter = async () => {
+  const patch: Partial<Record<"q" | "actor", string | undefined>> = { actor: undefined }
+  if (actorResolvedFromSearch.value && searchQuery.value.trim() !== "") {
+    patch.q = undefined
+  }
+  await router.replace({
+    name: libraryMode.value,
+    query: mergeLibraryQuery(route.query, patch),
+  })
+}
 </script>
 
 <template>
@@ -192,6 +241,7 @@ const clearExactTagFilter = async () => {
     :selected-movie="selectedMovie"
     :active-tab="activeTab"
     :active-tag-filter="tagExactQuery"
+    :active-actor-filter="actorProfileDisplayName"
     @update:active-tab="updateActiveTab"
     @select="selectMovie"
     @open-details="openDetails"
@@ -199,5 +249,6 @@ const clearExactTagFilter = async () => {
     @toggle-favorite="toggleFavorite"
     @browse-by-exact-tag="browseByExactTag"
     @clear-exact-tag-filter="clearExactTagFilter"
+    @clear-exact-actor-filter="clearExactActorFilter"
   />
 </template>

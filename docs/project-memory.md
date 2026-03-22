@@ -43,7 +43,8 @@
 ### 当前前后端互联事实
 
 - 已落地 **library-service 契约**（`src/services/contracts/library-service.ts`）与 **Web / Mock 双适配器**。
-- **Go Backend** 提供 `/api` 下健康检查、影片列表/详情/PATCH/删除、**视频流 Range**、库路径、设置、扫描、任务等（摘要见 `README.md`）。
+- **Go Backend** 提供 `/api` 下健康检查、影片列表/详情/PATCH/删除、**视频流 Range**、库路径、设置（含 **`organizeLibrary`** / **`autoLibraryWatch`** / 元数据源等）、扫描、**`tasks/recent`** 与按 id 任务查询等（摘要见 `README.md`）。
+- **库行为 JSON**：`config/library-config.cfg` 与 **`PATCH /api/settings`** 同步；**`autoLibraryWatch`**（默认开）控制是否在主配置允许时启用 **fsnotify** 监听并在新文件事件后排队防抖扫描，**不**关闭手动或周期全库扫描。
 - **无 Electron** `preload`、主进程桥接或 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
 - **观看进度与历史列表**仅存 **`localStorage`**，**未**写入 SQLite；与产品文档 §6.5 中服务端 `play_history` 表仍为「待决策/未落地」关系。
 
@@ -72,7 +73,7 @@
 - 影片库页以封面浏览、搜索、标签/演员筛选和选中态为主。
 - 详情页强调单片信息、预览与相关推荐；支持用户标签、评分等与 API 联动（Web 模式）。
 - 播放器页为 video-first；Web API 模式下主片源来自后端 **stream**（浏览器解码）。
-- **观看历史**侧栏入口 + 按日分组瀑布列布局；设置页围绕目录、扫描、刮削与库行为等组织。
+- **观看历史**侧栏入口 + 按日分组瀑布列布局；设置页围绕目录、扫描、刮削、**整理入库**与**监听触发的自动扫描**（`autoLibraryWatch`）等组织。
 
 ## 4. 已确认的产品实现方式
 
@@ -120,8 +121,37 @@
 4. 将 mock 数据层逐步抽象成可替换的 `web adapter`。
 5. 在 Web 方案稳定后，再评估 `Electron`、真实播放器与桌面桥接。
 
-## 9. 维护约定
+## 9. 表单与文本输入（项目要求）
+
+以下为 **Curated 前端** 对常用输入控件的**持久约定**（与 `src/components/ui/input/Input.vue`、弹窗表单实现保持一致）。
+
+### 组件与导入
+
+- 使用 shadcn-vue 封装的 **`Input`** 时，在对应 SFC 的 `<script setup>` 中**必须显式**编写：`import { Input } from '@/components/ui/input'`，不要依赖隐式解析。
+
+### 深色界面与 `dark:` 工具类
+
+- 主题色主要写在 **`src/style.css` 的 `:root`**（及 `.dark` 中与 `:root` 同步的一套变量），页面根节点**不一定**挂 `class="dark"`。
+- Tailwind 自定义变体 **`dark:`** 仅在 **`.dark` 祖先**下生效（`@custom-variant dark (&:is(.dark *))`）。因此**不能**单靠 `dark:bg-*` / `dark:border-*` 保证输入框在弹窗、卡片上的可见性。
+- 表单控件应优先使用**不依赖 `dark:`** 的 token：`border-border/60`、`bg-muted/40`、`text-foreground`、`placeholder:text-muted-foreground` 等，保证在默认深色背景下边框与填充仍清晰。
+
+### 可读性与尺寸
+
+- 单行输入需有足够**最小高度与内边距**（例如 `min-h-10`、`py-2` 量级），避免在对话框里显得过扁、难点击。
+- 弹窗内同一表单中，**`<Input>` 与 `<textarea>`** 应采用**一致的边框 + 浅底**语言，避免一个清晰可见、另一个与背景融在一起。
+
+### 局部覆盖
+
+- 顶栏搜索等场景可对 `Input` 追加 `class`（如 `h-10`、`rounded-2xl`、`bg-background/70`）；合并类名时**不要**在无意中去掉对比度所依赖的边框或背景，除非外层已提供同等清晰的容器样式。
+
+### 规则索引
+
+- Cursor 细则：**`.cursor/rules/vue-frontend-standards.mdc`**（章节 *Form controls*）。
+- 业务页面习惯说明：**`.cursor/rules/jav-library-frontend-patterns.mdc`**（Dialog / form fields）。
+
+## 10. 维护约定
 
 - 本文记录“稳定事实、产品判断、阶段边界”，不记录短期实现细节。
 - 当路由结构、页面骨架、数据来源方式或桌面集成状态发生变化时，应优先更新本文。
 - 若 `docs/jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
+- 调整全局 `Input` 默认样式或主题变量时，同步检查 **§9 表单与文本输入** 与 **`vue-frontend-standards.mdc`** 是否仍一致。

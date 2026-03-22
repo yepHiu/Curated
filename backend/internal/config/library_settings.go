@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const librarySettingsFileName = "library-config.cfg"
@@ -34,13 +35,44 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		return err
 	}
 	if v, ok := m["organizeLibrary"]; ok {
-		b, err := parseJSONBool(v)
+		b, err := parseJSONBool(v, "organizeLibrary")
 		if err != nil {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 		cfg.OrganizeLibrary = b
 	}
+	if v, ok := m["autoLibraryWatch"]; ok {
+		b, err := parseJSONBool(v, "autoLibraryWatch")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.AutoLibraryWatch = b
+	}
+	if v, ok := m["metadataMovieProvider"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.MetadataMovieProvider = s
+	}
 	return nil
+}
+
+func parseJSONStringTrim(v any) (string, error) {
+	switch x := v.(type) {
+	case string:
+		return strings.TrimSpace(x), nil
+	case nil:
+		return "", nil
+	case float64:
+		// unlikely in hand-edited JSON; tolerate numeric as empty
+		if x == 0 {
+			return "", nil
+		}
+		return "", fmt.Errorf("metadataMovieProvider: invalid number %v", x)
+	default:
+		return "", fmt.Errorf("metadataMovieProvider: unsupported type %T", x)
+	}
 }
 
 // WriteLibrarySettingsMerge reads the existing JSON object (or starts empty), lets mutator update it,
@@ -107,7 +139,7 @@ func readLibrarySettingsMap(path string) (map[string]any, error) {
 	return m, nil
 }
 
-func parseJSONBool(v any) (bool, error) {
+func parseJSONBool(v any, key string) (bool, error) {
 	switch x := v.(type) {
 	case bool:
 		return x, nil
@@ -118,7 +150,7 @@ func parseJSONBool(v any) (bool, error) {
 		case "false", "0":
 			return false, nil
 		default:
-			return false, fmt.Errorf("organizeLibrary: invalid string %q", x)
+			return false, fmt.Errorf("%s: invalid string %q", key, x)
 		}
 	case float64:
 		// JSON numbers unmarshaled into map[string]any
@@ -128,8 +160,8 @@ func parseJSONBool(v any) (bool, error) {
 		if x == 1 {
 			return true, nil
 		}
-		return false, fmt.Errorf("organizeLibrary: invalid number %v", x)
+		return false, fmt.Errorf("%s: invalid number %v", key, x)
 	default:
-		return false, fmt.Errorf("organizeLibrary: unsupported type %T", v)
+		return false, fmt.Errorf("%s: unsupported type %T", key, v)
 	}
 }

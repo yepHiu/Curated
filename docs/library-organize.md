@@ -7,8 +7,19 @@
 | 字段 | 说明 |
 |------|------|
 | `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
+| `metadataMovieProvider` | 影片 Metatube 源；空字符串表示自动。由设置页或 `PATCH /api/settings` 更新。 |
+| `autoLibraryWatch` | 默认 **`true`**。为 **`true`** 且主配置允许目录监听时，库根下新文件经 **fsnotify** 防抖后会触发与 **`POST /api/scans`** 同类的扫描链（任务元数据常带 `trigger: fsnotify`），并可能对新增条目排队刮削。为 **`false`** 时**不**因监听排队扫描；**手动扫描、周期 `autoScanIntervalSeconds` 全库扫描**不受影响。由设置页「自动刮削元数据」或 `PATCH /api/settings` 的 `autoLibraryWatch` 更新。 |
 
 路径解析：在 `backend` 目录下启动时为 `../config/library-config.cfg`，否则为 `config/library-config.cfg`（相对当前工作目录）。
+
+## 目录监听（fsnotify）与主配置
+
+| 主配置字段 | 说明 |
+|------------|------|
+| `libraryWatchEnabled` | `null`/省略视为**开启**监听；显式 `false` 时**不**启动 fsnotify（与 `autoLibraryWatch` 无关，总闸在 yaml）。 |
+| `libraryWatchDebounceMs` | 合并监听事件的防抖毫秒数；`0` 使用默认（约 1500ms）。 |
+
+增删改库路径后，HTTP 层会尝试 **`ReloadLibraryWatches`**，使监听目录与数据库中的根路径一致。
 
 ## 配置（`javd` 主 JSON，`-config`）
 

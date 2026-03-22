@@ -15,9 +15,15 @@ const moviesState: Ref<Movie[]> = ref([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
+const autoLibraryWatchState = ref(true)
+const metadataMovieProviderState = ref("")
+const metadataMovieProvidersState = ref<string[]>([])
 /** 忽略过期的 PATCH 响应，避免快速连点时状态被旧请求写乱 */
 let organizeLibrarySaveSeq = 0
+let autoLibraryWatchSaveSeq = 0
+let metadataMovieProviderSaveSeq = 0
 let loaded = false
+let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
 
 /** 单次请求条数；多页拉取直至 total 或达到上限，避免首屏只看见前 200 条 */
 const LIST_BATCH_SIZE = 500
@@ -27,25 +33,29 @@ function mapLibraryPathsFromSettings(paths: { id: string; path: string; title: s
   return paths.map((p) => ({ id: p.id, path: p.path, title: p.title }))
 }
 
+async function fetchAllMoviesFromApi(): Promise<Movie[]> {
+  const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0 })
+  const all: Movie[] = first.items.map(mapMovieListItem)
+  let offset = all.length
+  const { total } = first
+
+  while (offset < total && all.length < MAX_MOVIES_PREFETCH) {
+    const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset })
+    const batch = page.items.map(mapMovieListItem)
+    if (batch.length === 0) {
+      break
+    }
+    all.push(...batch)
+    offset += batch.length
+  }
+
+  return all
+}
+
 async function ensureLoaded() {
   if (loaded) return
   try {
-    const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0 })
-    const all: Movie[] = first.items.map(mapMovieListItem)
-    let offset = all.length
-    const { total } = first
-
-    while (offset < total && all.length < MAX_MOVIES_PREFETCH) {
-      const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset })
-      const batch = page.items.map(mapMovieListItem)
-      if (batch.length === 0) {
-        break
-      }
-      all.push(...batch)
-      offset += batch.length
-    }
-
-    moviesState.value = all
+    moviesState.value = await fetchAllMoviesFromApi()
     loaded = true
   } catch (err) {
     console.error("[web-library-service] failed to load movies", err)
@@ -68,6 +78,11 @@ async function refreshLibraryPathsFromApi() {
     const settings = await api.getSettings()
     libraryPathsState.value = mapLibraryPathsFromSettings(settings.libraryPaths)
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
+    autoLibraryWatchState.value = settings.autoLibraryWatch !== false
+    metadataMovieProviderState.value = settings.metadataMovieProvider?.trim() ?? ""
+    metadataMovieProvidersState.value = Array.isArray(settings.metadataMovieProviders)
+      ? [...settings.metadataMovieProviders]
+      : []
   } catch (err) {
     console.error("[web-library-service] failed to load settings", err)
   }
@@ -84,9 +99,30 @@ function createWebLibraryService(): LibraryService {
     }),
     libraryPaths: computed(() => libraryPathsState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
+    autoLibraryWatch: computed(() => autoLibraryWatchState.value),
+    metadataMovieProvider: computed(() => metadataMovieProviderState.value),
+    metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
 
     async refreshSettings() {
       await refreshLibraryPathsFromApi()
+    },
+
+    async reloadMoviesFromApi() {
+      if (reloadMoviesDebounce) {
+        clearTimeout(reloadMoviesDebounce)
+        reloadMoviesDebounce = null
+      }
+      reloadMoviesDebounce = setTimeout(() => {
+        reloadMoviesDebounce = null
+        void (async () => {
+          try {
+            moviesState.value = await fetchAllMoviesFromApi()
+            loaded = true
+          } catch (err) {
+            console.error("[web-library-service] failed to reload movies", err)
+          }
+        })()
+      }, 450)
     },
 
     async setOrganizeLibrary(value: boolean) {
@@ -109,11 +145,56 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
-    async addLibraryPath(path: string, title?: string) {
+    async setAutoLibraryWatch(value: boolean) {
+      const seq = ++autoLibraryWatchSaveSeq
+      autoLibraryWatchState.value = value
+      try {
+        const next = await api.patchSettings({ autoLibraryWatch: value })
+        if (seq === autoLibraryWatchSaveSeq) {
+          autoLibraryWatchState.value = next.autoLibraryWatch !== false
+        }
+      } catch (err) {
+        if (seq === autoLibraryWatchSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // 拉取失败时保留当前 UI 值，由上层错误提示处理
+          }
+        }
+        throw err
+      }
+    },
+
+    async setMetadataMovieProvider(name: string) {
+      const trimmed = name.trim()
+      const seq = ++metadataMovieProviderSaveSeq
+      metadataMovieProviderState.value = trimmed
+      try {
+        const next = await api.patchSettings({ metadataMovieProvider: trimmed })
+        if (seq === metadataMovieProviderSaveSeq) {
+          metadataMovieProviderState.value = next.metadataMovieProvider?.trim() ?? ""
+          if (Array.isArray(next.metadataMovieProviders)) {
+            metadataMovieProvidersState.value = [...next.metadataMovieProviders]
+          }
+        }
+      } catch (err) {
+        if (seq === metadataMovieProviderSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
       const trimmed = path.trim()
-      if (!trimmed) return
-      await api.addLibraryPath({ path: trimmed, title: title?.trim() || undefined })
+      if (!trimmed) return null
+      const res = await api.addLibraryPath({ path: trimmed, title: title?.trim() || undefined })
       await refreshLibraryPathsFromApi()
+      return res.scanTask ?? null
     },
 
     async updateLibraryPathTitle(id: string, title: string) {

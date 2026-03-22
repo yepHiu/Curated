@@ -22,6 +22,10 @@ import {
   parseResumeSecondsFromQuery,
   saveProgress,
 } from "@/lib/playback-progress-storage"
+import {
+  getPlayerAudioPrefs,
+  savePlayerAudioPrefs,
+} from "@/lib/player-volume-storage"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -54,7 +58,10 @@ const playbackError = ref("")
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
-const volume = ref([100])
+const initialAudio = getPlayerAudioPrefs()
+const volume = ref([initialAudio.volumePercent])
+/** 与 video.muted 同步，用于 UI 与持久化（音量滑块为 0 时不使用静音标志） */
+const playbackMuted = ref(initialAudio.muted)
 
 const curatedShutterActive = ref(false)
 const curatedPlusOne = ref(false)
@@ -215,9 +222,18 @@ const progressPercent = computed(() => {
   return (currentTime.value / duration.value) * 100
 })
 
-/** 滑块为 0% 时显示静音图标（与 M 键「仅静音、不改变滑块」区分，仍以滑块为准） */
+/** 实际记忆的音量档位（静音时仍保留，用于取消静音后恢复） */
 const volumePercent = computed(() => volume.value[0] ?? 0)
-const volumeIconIsMuted = computed(() => volumePercent.value <= 0)
+/** 静音时滑块与百分比显示为 0，避免与「有声但静音」状态不一致 */
+const volumeSliderDisplay = computed(() =>
+  playbackMuted.value ? [0] : volume.value,
+)
+const volumePercentLabel = computed(() =>
+  playbackMuted.value ? 0 : volumePercent.value,
+)
+const volumeIconIsMuted = computed(
+  () => volumePercent.value <= 0 || playbackMuted.value,
+)
 
 function onTimeUpdate() {
   const v = videoRef.value
@@ -233,7 +249,9 @@ function onLoadedMetadata() {
   const v = videoRef.value
   if (!v) return
   duration.value = Number.isFinite(v.duration) ? v.duration : 0
-  v.volume = (volume.value[0] ?? 100) / 100
+  const pct = volume.value[0] ?? 100
+  v.volume = pct / 100
+  v.muted = pct > 0 && playbackMuted.value
 
   const dur = duration.value
   if (resumeAppliedForMovieId.value === props.movie.id) return
@@ -344,18 +362,40 @@ function onProgressBarClick(e: MouseEvent) {
 
 function onVolumeSlider(vols?: number[]) {
   if (!vols?.length) return
-  volume.value = vols
+  const pct = Math.max(0, Math.min(100, Math.round(vols[0] ?? 100)))
+  // 静音时滑块展示为 0，忽略同步产生的 [0]，避免把底层音量清零
+  if (playbackMuted.value && pct === 0) {
+    return
+  }
+  volume.value = [pct]
+  if (pct === 0) {
+    playbackMuted.value = false
+  }
   const v = videoRef.value
   if (v) {
-    v.volume = (vols[0] ?? 100) / 100
-    if (v.volume > 0) v.muted = false
+    v.volume = pct / 100
+    if (v.volume > 0) {
+      v.muted = false
+      playbackMuted.value = false
+    } else {
+      v.muted = false
+    }
   }
+  savePlayerAudioPrefs({
+    volumePercent: pct,
+    muted: playbackMuted.value,
+  })
 }
 
 function toggleMute() {
   const v = videoRef.value
   if (!v) return
   v.muted = !v.muted
+  playbackMuted.value = v.muted
+  savePlayerAudioPrefs({
+    volumePercent: volume.value[0] ?? 100,
+    muted: playbackMuted.value,
+  })
 }
 
 function adjustVolume(delta: number) {
@@ -455,7 +495,7 @@ async function runCuratedCapture() {
   curatedPlusOneTimer = window.setTimeout(() => {
     curatedPlusOne.value = false
     curatedPlusOneTimer = null
-  }, 850)
+  }, 800)
 }
 
 async function toggleFullscreen() {
@@ -627,12 +667,21 @@ const noStreamHint = computed(() => {
 
             <div class="relative flex justify-center justify-self-center">
               <div class="relative inline-flex items-center">
-                <span
-                  v-if="curatedPlusOne"
-                  class="pointer-events-none absolute left-full ml-2 text-sm font-bold text-primary drop-shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-500"
+                <Transition
+                  enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+                  enter-from-class="opacity-0 scale-95 motion-reduce:scale-100"
+                  enter-to-class="opacity-100 scale-100"
+                  leave-active-class="transition duration-400 ease-in motion-reduce:transition-none"
+                  leave-from-class="opacity-100 scale-100"
+                  leave-to-class="opacity-0 scale-95 motion-reduce:scale-100"
                 >
-                  +1
-                </span>
+                  <span
+                    v-if="curatedPlusOne"
+                    class="pointer-events-none absolute left-full ml-2 inline-block text-sm font-bold text-primary drop-shadow-md"
+                  >
+                    +1
+                  </span>
+                </Transition>
                 <Button
                   type="button"
                   class="rounded-full border-0 bg-primary px-5 py-2 text-sm font-semibold tracking-wide text-primary-foreground hover:bg-primary/88 sm:px-6"
@@ -649,20 +698,32 @@ const noStreamHint = computed(() => {
               class="flex flex-wrap items-center justify-center gap-3 sm:col-start-3 sm:justify-end"
             >
               <div
-                class="flex min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-3 rounded-full bg-white/8 px-4 py-2 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial"
+                class="flex min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 py-2 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4"
+                role="group"
                 :aria-label="t('player.volumeAria')"
               >
-                <VolumeX v-if="volumeIconIsMuted" class="shrink-0" aria-hidden="true" />
-                <Volume2 v-else class="shrink-0" aria-hidden="true" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  class="size-9 shrink-0 rounded-full text-white hover:bg-white/15"
+                  :disabled="!playbackSrc"
+                  :aria-pressed="volumeIconIsMuted"
+                  :aria-label="volumeIconIsMuted ? t('player.ariaUnmute') : t('player.ariaMute')"
+                  @click="toggleMute"
+                >
+                  <VolumeX v-if="volumeIconIsMuted" class="size-5 shrink-0" aria-hidden="true" />
+                  <Volume2 v-else class="size-5 shrink-0" aria-hidden="true" />
+                </Button>
                 <Slider
-                  :model-value="volume"
+                  :model-value="volumeSliderDisplay"
                   :max="100"
                   :step="1"
                   class="flex-1"
                   :disabled="!playbackSrc"
                   @update:model-value="onVolumeSlider"
                 />
-                <span class="w-10 shrink-0 text-right text-sm">{{ volume[0] }}%</span>
+                <span class="w-10 shrink-0 text-right text-sm">{{ volumePercentLabel }}%</span>
               </div>
 
               <Button

@@ -25,6 +25,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elliotchance/orderedmap/v3 v3.1.0 // indirect
 	github.com/esimov/pigo v1.4.7-0.20240801095032-7465ed14de47 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gen2brain/jpegli v0.3.4 // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/glebarez/sqlite v1.11.0 // indirect

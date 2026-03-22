@@ -62,5 +62,9 @@ export function mapMovieDetail(dto: MovieDetailDTO): Movie {
     previewVideoUrl: dto.previewVideoUrl,
     metadataRating: dto.metadataRating > 0 ? dto.metadataRating : undefined,
     userRating: dto.userRating === undefined ? undefined : dto.userRating,
+    actorAvatarUrls:
+      dto.actorAvatarUrls && Object.keys(dto.actorAvatarUrls).length > 0
+        ? { ...dto.actorAvatarUrls }
+        : undefined,
   }
 }

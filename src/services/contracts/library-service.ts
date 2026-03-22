@@ -8,10 +8,20 @@ export interface LibraryService {
   libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
   refreshSettings(): Promise<void>
+  /** Web：自 API 重新拉取全库列表（扫描/监听入库后更新计数与海报）；Mock：空操作 */
+  reloadMoviesFromApi(): Promise<void>
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */
   organizeLibrary: ComputedRef<boolean>
   setOrganizeLibrary(value: boolean): Promise<void>
-  addLibraryPath(path: string, title?: string): Promise<void>
+  /** 库目录监听触发的自动扫描/刮削；mock 为本地状态 */
+  autoLibraryWatch: ComputedRef<boolean>
+  setAutoLibraryWatch(value: boolean): Promise<void>
+  /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
+  metadataMovieProvider: ComputedRef<string>
+  metadataMovieProviders: ComputedRef<readonly string[]>
+  setMetadataMovieProvider(name: string): Promise<void>
+  /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
+  addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>
   removeLibraryPath(id: string): Promise<void>
   /** Returns task when web scan started; mock returns null. */

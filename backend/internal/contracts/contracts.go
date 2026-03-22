@@ -3,6 +3,7 @@ package contracts
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 )
 
 // ErrScanAlreadyRunning is returned when a library scan is requested while another is in progress.
@@ -16,6 +17,9 @@ var ErrScrapeMovieNoCode = errors.New("movie has no catalog code")
 
 // ErrScrapeMovieNoLocation is returned when the movie row has an empty video path.
 var ErrScrapeMovieNoLocation = errors.New("movie has no video path")
+
+// ErrActorNotFound is returned when no actors row exists for the given display name.
+var ErrActorNotFound = errors.New("actor not found")
 
 type Command struct {
 	ID      string          `json:"id"`
@@ -56,8 +60,22 @@ type HealthDTO struct {
 type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`
+	Actor  string `json:"actor,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
 	Offset int    `json:"offset,omitempty"`
+}
+
+// ActorProfileDTO is returned by GET /api/library/actors/profile.
+type ActorProfileDTO struct {
+	Name             string `json:"name"`
+	AvatarURL        string `json:"avatarUrl,omitempty"`
+	Summary          string `json:"summary,omitempty"`
+	Homepage         string `json:"homepage,omitempty"`
+	Provider         string `json:"provider,omitempty"`
+	ProviderActorID  string `json:"providerActorId,omitempty"`
+	Height           int    `json:"height,omitempty"`
+	Birthday         string `json:"birthday,omitempty"`
+	ProfileUpdatedAt string `json:"profileUpdatedAt,omitempty"`
 }
 
 type GetMovieDetailRequest struct {
@@ -134,6 +152,14 @@ type MovieDetailDTO struct {
 	// MetadataRating is the scraper/site score (movies.rating). UserRating is the local override (movies.user_rating).
 	MetadataRating float64  `json:"metadataRating"`
 	UserRating     *float64 `json:"userRating,omitempty"`
+	// ActorAvatarURLs maps library actor display name (actors.name) -> actors.avatar URL after profile scrape.
+	ActorAvatarURLs map[string]string `json:"actorAvatarUrls,omitempty"`
+	// User*Override: in-memory seed only (json:"-"); SQLite applies overrides in SQL. EffectiveXXX for API = merge in EffectiveMovieDetailDTO.
+	UserTitleOverride          *string `json:"-"`
+	UserStudioOverride         *string `json:"-"`
+	UserSummaryOverride        *string `json:"-"`
+	UserReleaseDateOverride    *string `json:"-"`
+	UserRuntimeMinutesOverride *int    `json:"-"`
 }
 
 // PatchMovieInput is the parsed body for PATCH /api/library/movies/{movieId}.
@@ -141,15 +167,83 @@ type MovieDetailDTO struct {
 // UserRatingSet: false = do not change user_rating; true + UserRatingClear = set NULL; true + !UserRatingClear = set UserRating (0–5).
 // UserTagsSet: true replaces all user tags for the movie (UserTags may be empty to clear).
 // MetadataTagsSet: true replaces all scraper/NFO (type=nfo) tags for the movie; does not touch user tags. Empty list clears NFO tags locally until next scrape.
+// UserTitleSet etc.: JSON null or "" clears the user_* override (revert to scraped column). Non-empty string sets override.
+// UserRuntimeMinutesSet + UserRuntimeMinutesClear (JSON null): clear runtime override. Otherwise set minutes (>= 0).
 type PatchMovieInput struct {
-	Favorite           *bool
-	UserRatingSet      bool
-	UserRatingClear    bool
-	UserRating         float64
-	UserTagsSet        bool
-	UserTags           []string
-	MetadataTagsSet    bool
-	MetadataTags       []string
+	Favorite        *bool
+	UserRatingSet   bool
+	UserRatingClear bool
+	UserRating      float64
+	UserTagsSet     bool
+	UserTags        []string
+	MetadataTagsSet bool
+	MetadataTags    []string
+
+	UserTitleSet            bool
+	UserTitleClear          bool
+	UserTitle               string
+	UserStudioSet           bool
+	UserStudioClear         bool
+	UserStudio              string
+	UserSummarySet          bool
+	UserSummaryClear        bool
+	UserSummary             string
+	UserReleaseDateSet      bool
+	UserReleaseDateClear    bool
+	UserReleaseDate         string
+	UserRuntimeMinutesSet   bool
+	UserRuntimeMinutesClear bool
+	UserRuntimeMinutes      int
+}
+
+// EffectiveMovieDetailDTO returns a copy with title/studio/summary/release/runtime/year merged from User*Override (in-memory library).
+func EffectiveMovieDetailDTO(m MovieDetailDTO) MovieDetailDTO {
+	out := m
+	if s := ptrTrimString(m.UserTitleOverride); s != "" {
+		out.Title = s
+	}
+	if s := ptrTrimString(m.UserStudioOverride); s != "" {
+		out.Studio = s
+	}
+	if s := ptrTrimString(m.UserSummaryOverride); s != "" {
+		out.Summary = s
+	}
+	if s := ptrTrimString(m.UserReleaseDateOverride); s != "" {
+		out.ReleaseDate = s
+		if y, ok := yearPrefixFromReleaseDate(s); ok {
+			out.Year = y
+		}
+	}
+	if m.UserRuntimeMinutesOverride != nil {
+		out.RuntimeMinutes = *m.UserRuntimeMinutesOverride
+	}
+	return out
+}
+
+func ptrTrimString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(*p)
+}
+
+func yearPrefixFromReleaseDate(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) < 4 {
+		return 0, false
+	}
+	y := 0
+	for i := 0; i < 4; i++ {
+		c := s[i]
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		y = y*10 + int(c-'0')
+	}
+	if y < 1800 || y > 3000 {
+		return 0, false
+	}
+	return y, true
 }
 
 type MoviesPageDTO struct {
@@ -171,6 +265,12 @@ type AddLibraryPathRequest struct {
 	Title string `json:"title,omitempty"`
 }
 
+// AddLibraryPathResponse is returned by POST /api/library/paths (path fields + optional initial scan task).
+type AddLibraryPathResponse struct {
+	LibraryPathDTO
+	ScanTask *TaskDTO `json:"scanTask,omitempty"`
+}
+
 // UpdateLibraryPathRequest is the body for PATCH /api/library/paths/{id}.
 type UpdateLibraryPathRequest struct {
 	Title string `json:"title"`
@@ -180,11 +280,17 @@ type SettingsDTO struct {
 	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
 	Player          PlayerSettingsDTO `json:"player"`
 	OrganizeLibrary bool              `json:"organizeLibrary"`
+	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
+	AutoLibraryWatch       bool     `json:"autoLibraryWatch"`
+	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
+	MetadataMovieProviders []string `json:"metadataMovieProviders"`
 }
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary *bool `json:"organizeLibrary,omitempty"`
+	OrganizeLibrary       *bool   `json:"organizeLibrary,omitempty"`
+	AutoLibraryWatch      *bool   `json:"autoLibraryWatch,omitempty"`
+	MetadataMovieProvider *string `json:"metadataMovieProvider,omitempty"`
 }
 
 type PlayerSettingsDTO struct {
@@ -260,6 +366,11 @@ type TaskDTO struct {
 	ErrorCode    string         `json:"errorCode,omitempty"`
 	ErrorMessage string         `json:"errorMessage,omitempty"`
 	Metadata     map[string]any `json:"metadata,omitempty"`
+}
+
+// RecentTasksDTO is returned by GET /api/tasks/recent (in-memory tasks only).
+type RecentTasksDTO struct {
+	Tasks []TaskDTO `json:"tasks"`
 }
 
 type TaskEventDTO struct {

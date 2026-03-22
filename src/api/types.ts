@@ -49,6 +49,8 @@ export interface MovieDetailDTO extends MovieListItemDTO {
   metadataRating: number
   /** 用户本地评分（movies.user_rating），无覆盖时省略 */
   userRating?: number | null
+  /** 演员展示名 -> 头像 URL（SQLite actors.avatar，依赖演员资料刮削） */
+  actorAvatarUrls?: Record<string, string>
 }
 
 export interface MoviesPageDTO {
@@ -73,10 +75,19 @@ export interface SettingsDTO {
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
+  /** 为 true 时库根目录监听新文件并防抖触发扫描（及后续刮削）；与主配置 libraryWatchEnabled 共同生效 */
+  autoLibraryWatch: boolean
+  /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
+  metadataMovieProvider: string
+  /** 当前引擎可用的影片源名（排序），供指定模式选择 */
+  metadataMovieProviders: string[]
 }
 
 export interface PatchSettingsBody {
   organizeLibrary?: boolean
+  autoLibraryWatch?: boolean
+  /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
+  metadataMovieProvider?: string
 }
 
 export interface TaskDTO {
@@ -93,9 +104,27 @@ export interface TaskDTO {
   metadata?: Record<string, unknown>
 }
 
+export interface RecentTasksDTO {
+  tasks: TaskDTO[]
+}
+
+export interface ActorProfileDTO {
+  name: string
+  avatarUrl?: string
+  summary?: string
+  homepage?: string
+  provider?: string
+  providerActorId?: string
+  height?: number
+  birthday?: string
+  profileUpdatedAt?: string
+}
+
 export interface ListMoviesParams {
   mode?: string
   q?: string
+  /** 精确演员名，与路由 `actor` 一致 */
+  actor?: string
   limit?: number
   offset?: number
 }
@@ -120,6 +149,11 @@ export interface AddLibraryPathBody {
   title?: string
 }
 
+/** POST /library/paths：与 LibraryPathDTO 同字段，成功启动初次扫描时带 scanTask */
+export interface AddLibraryPathResultDTO extends LibraryPathDTO {
+  scanTask?: TaskDTO
+}
+
 export interface UpdateLibraryPathBody {
   title: string
 }
@@ -131,6 +165,14 @@ export interface PatchMovieBody {
   userTags?: string[]
   /** 元数据/NFO 类标签整表替换；空数组表示清空本地 NFO 标签（下次刮削会再写入） */
   metadataTags?: string[]
+  /** 展示用标题覆盖；null 或省略且配合清空语义时由后端清除 user_title，恢复刮削值 */
+  userTitle?: string | null
+  userStudio?: string | null
+  userSummary?: string | null
+  /** YYYY-MM-DD；null 清除 user_release_date */
+  userReleaseDate?: string | null
+  /** 分钟；null 清除 user_runtime_minutes */
+  userRuntimeMinutes?: number | null
 }
 
 /** GET /playback/progress */

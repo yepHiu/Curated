@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -96,6 +97,42 @@ func (m *Manager) Get(taskID string) (contracts.TaskDTO, bool) {
 	task, ok := m.tasks[taskID]
 	m.mu.RUnlock()
 	return task, ok
+}
+
+// ListRecentFinished returns terminal tasks with a non-empty FinishedAt, newest first.
+func (m *Manager) ListRecentFinished(limit int) []contracts.TaskDTO {
+	if limit <= 0 {
+		limit = 30
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	m.mu.RLock()
+	out := make([]contracts.TaskDTO, 0, len(m.tasks))
+	for _, t := range m.tasks {
+		switch t.Status {
+		case contracts.TaskCompleted, contracts.TaskFailed, contracts.TaskPartialFailed, contracts.TaskCancelled:
+			if t.FinishedAt != "" {
+				out = append(out, t)
+			}
+		default:
+		}
+	}
+	m.mu.RUnlock()
+
+	slices.SortFunc(out, func(a, b contracts.TaskDTO) int {
+		if a.FinishedAt > b.FinishedAt {
+			return -1
+		}
+		if a.FinishedAt < b.FinishedAt {
+			return 1
+		}
+		return 0
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }
 
 func (m *Manager) update(taskID string, mutate func(contracts.TaskDTO) contracts.TaskDTO) contracts.TaskDTO {

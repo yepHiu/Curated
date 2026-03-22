@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import { ChevronDown } from "lucide-vue-next"
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ActorProfileCard from "@/components/jav-library/ActorProfileCard.vue"
 import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vue"
 import {
   aggregateMetadataTagCounts,
@@ -27,6 +29,8 @@ const props = defineProps<{
   activeTab: LibraryTab
   /** 当前 URL 精确标签筛选（用于高亮） */
   activeTagFilter?: string
+  /** 当前 URL 精确演员筛选（`actor=`） */
+  activeActorFilter?: string
 }>()
 
 const emit = defineEmits<{
@@ -38,20 +42,44 @@ const emit = defineEmits<{
   /** 与详情页点标签一致：写入 `tag`、清除 `q`/`actor` */
   browseByExactTag: [tag: string]
   clearExactTagFilter: []
+  clearExactActorFilter: []
 }>()
 
 const { t, locale } = useI18n()
-const TAG_SECTION_LIMIT = 36
+/** 折叠时各区块默认展示的标签个数（其余用「展开」） */
+const TAG_PREVIEW_COUNT = 14
 
 const metadataTagRanked = computed(() =>
-  aggregateMetadataTagCounts(props.allMovies, locale.value).slice(0, TAG_SECTION_LIMIT),
+  aggregateMetadataTagCounts(props.allMovies, locale.value),
 )
 
-const userTagRanked = computed(() =>
-  aggregateUserTagCounts(props.allMovies, locale.value).slice(0, TAG_SECTION_LIMIT),
+const userTagRanked = computed(() => aggregateUserTagCounts(props.allMovies, locale.value))
+
+const metaTagsExpanded = ref(false)
+const userTagsExpanded = ref(false)
+
+const visibleMetaTags = computed(() => {
+  const all = metadataTagRanked.value
+  if (metaTagsExpanded.value || all.length <= TAG_PREVIEW_COUNT) return all
+  return all.slice(0, TAG_PREVIEW_COUNT)
+})
+
+const visibleUserTags = computed(() => {
+  const all = userTagRanked.value
+  if (userTagsExpanded.value || all.length <= TAG_PREVIEW_COUNT) return all
+  return all.slice(0, TAG_PREVIEW_COUNT)
+})
+
+const metaTagsHiddenCount = computed(() =>
+  Math.max(0, metadataTagRanked.value.length - TAG_PREVIEW_COUNT),
+)
+
+const userTagsHiddenCount = computed(() =>
+  Math.max(0, userTagRanked.value.length - TAG_PREVIEW_COUNT),
 )
 
 const activeTagTrimmed = computed(() => props.activeTagFilter?.trim() ?? "")
+const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 
 const handleTabChange = (value: string | number) => {
   emit("update:activeTab", String(value) as LibraryTab)
@@ -70,6 +98,11 @@ function isChipActive(tag: string): boolean {
 
 <template>
   <div class="flex h-full min-h-0 flex-col gap-7">
+    <ActorProfileCard
+      v-if="activeActorTrimmed"
+      :actor-name="activeActorTrimmed"
+      @clear-filter="emit('clearExactActorFilter')"
+    />
     <Card
       v-if="props.mode === 'tags'"
       class="rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
@@ -102,9 +135,31 @@ function isChipActive(tag: string): boolean {
       </CardHeader>
       <CardContent class="flex flex-col gap-6">
         <section class="flex flex-col gap-2">
-          <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {{ t("library.metaTags") }}
-          </p>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {{ t("library.metaTags") }}
+            </p>
+            <Button
+              v-if="metaTagsHiddenCount > 0"
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="h-8 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+              :aria-expanded="metaTagsExpanded"
+              @click="metaTagsExpanded = !metaTagsExpanded"
+            >
+              {{
+                metaTagsExpanded
+                  ? t("library.tagsShowLess")
+                  : t("library.tagsShowMore", { count: metaTagsHiddenCount })
+              }}
+              <ChevronDown
+                class="size-3.5 opacity-70 transition-transform duration-200"
+                :class="metaTagsExpanded ? 'rotate-180' : ''"
+                aria-hidden="true"
+              />
+            </Button>
+          </div>
           <p
             v-if="metadataTagRanked.length === 0"
             class="text-sm text-muted-foreground"
@@ -113,7 +168,7 @@ function isChipActive(tag: string): boolean {
           </p>
           <div v-else class="flex flex-wrap gap-2">
             <Badge
-              v-for="row in metadataTagRanked"
+              v-for="row in visibleMetaTags"
               :key="`meta-${row.tag}`"
               as-child
               :variant="isChipActive(row.tag) ? 'default' : 'secondary'"
@@ -144,9 +199,31 @@ function isChipActive(tag: string): boolean {
         </section>
 
         <section class="flex flex-col gap-2">
-          <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {{ t("library.userTags") }}
-          </p>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {{ t("library.userTags") }}
+            </p>
+            <Button
+              v-if="userTagsHiddenCount > 0"
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="h-8 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+              :aria-expanded="userTagsExpanded"
+              @click="userTagsExpanded = !userTagsExpanded"
+            >
+              {{
+                userTagsExpanded
+                  ? t("library.tagsShowLess")
+                  : t("library.tagsShowMore", { count: userTagsHiddenCount })
+              }}
+              <ChevronDown
+                class="size-3.5 opacity-70 transition-transform duration-200"
+                :class="userTagsExpanded ? 'rotate-180' : ''"
+                aria-hidden="true"
+              />
+            </Button>
+          </div>
           <p
             v-if="userTagRanked.length === 0"
             class="text-sm text-muted-foreground"
@@ -155,7 +232,7 @@ function isChipActive(tag: string): boolean {
           </p>
           <div v-else class="flex flex-wrap gap-2">
             <Badge
-              v-for="row in userTagRanked"
+              v-for="row in visibleUserTags"
               :key="`user-${row.tag}`"
               as-child
               :variant="isChipActive(row.tag) ? 'default' : 'secondary'"

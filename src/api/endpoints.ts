@@ -1,6 +1,8 @@
 import { httpClient } from "./http-client"
 import type {
+  ActorProfileDTO,
   AddLibraryPathBody,
+  AddLibraryPathResultDTO,
   CreateCuratedFrameBody,
   CuratedFramesListDTO,
   HealthDTO,
@@ -19,6 +21,7 @@ import type {
   PutPlaybackProgressBody,
   SettingsDTO,
   StartScanBody,
+  RecentTasksDTO,
   TaskDTO,
 } from "./types"
 
@@ -37,6 +40,15 @@ export const api = {
 
   listMovies(params?: ListMoviesParams): Promise<MoviesPageDTO> {
     return httpClient.get<MoviesPageDTO>("/library/movies", params as Record<string, string | number | undefined>)
+  },
+
+  getActorProfile(name: string): Promise<ActorProfileDTO> {
+    return httpClient.get<ActorProfileDTO>("/library/actors/profile", { name })
+  },
+
+  scrapeActorProfile(name: string): Promise<TaskDTO> {
+    const q = new URLSearchParams({ name })
+    return httpClient.post<TaskDTO>(`/library/actors/scrape?${q.toString()}`)
   },
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {
@@ -59,8 +71,8 @@ export const api = {
     return httpClient.patch<SettingsDTO>("/settings", body)
   },
 
-  addLibraryPath(body: AddLibraryPathBody): Promise<LibraryPathDTO> {
-    return httpClient.post<LibraryPathDTO>("/library/paths", body)
+  addLibraryPath(body: AddLibraryPathBody): Promise<AddLibraryPathResultDTO> {
+    return httpClient.post<AddLibraryPathResultDTO>("/library/paths", body)
   },
 
   deleteLibraryPath(id: string): Promise<void> {
@@ -85,6 +97,12 @@ export const api = {
 
   getTaskStatus(taskId: string): Promise<TaskDTO> {
     return httpClient.get<TaskDTO>(`/tasks/${encodeURIComponent(taskId)}`)
+  },
+
+  getRecentTasks(limit?: number): Promise<RecentTasksDTO> {
+    return httpClient.get<RecentTasksDTO>("/tasks/recent", {
+      limit: limit ?? undefined,
+    } as Record<string, string | number | undefined>)
   },
 
   listPlaybackProgress(): Promise<PlaybackProgressListDTO> {

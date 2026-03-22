@@ -5,24 +5,33 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
-	LogLevel            string        `json:"logLevel"`
-	HttpAddr            string        `json:"httpAddr"`
-	DatabasePath        string        `json:"databasePath"`
-	CacheDir            string        `json:"cacheDir"`
+	LogLevel     string   `json:"logLevel"`
+	HttpAddr     string   `json:"httpAddr"`
+	DatabasePath string   `json:"databasePath"`
+	CacheDir     string   `json:"cacheDir"`
 	LibraryPaths []string `json:"libraryPaths"`
 	// ScanIntervalSeconds is deprecated: kept in JSON for backward compatibility with older config files; ignored (no scheduled scan).
 	ScanIntervalSeconds int `json:"scanIntervalSeconds,omitempty"`
 	// OrganizeLibrary moves/renames video files into {parent}/{番号}/{番号}.ext and stores NFO/assets beside the video when enabled.
 	OrganizeLibrary bool `json:"organizeLibrary"`
+	// AutoLibraryWatch: when true (default), fsnotify on library roots may queue debounced scans (and follow-on scrape). Persisted in library-config.cfg.
+	AutoLibraryWatch bool `json:"autoLibraryWatch"`
+	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
+	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// AutoScanIntervalSeconds runs a full library scan on this interval; 0 disables (manual POST /api/scans only).
 	AutoScanIntervalSeconds int `json:"autoScanIntervalSeconds"`
-	Tasks               TaskConfig `json:"tasks"`
-	Scraper             ScraperConfig `json:"scraper"`
-	Assets              AssetConfig   `json:"assets"`
-	Player              PlayerConfig  `json:"player"`
+	// LibraryWatchEnabled: nil = default on (fsnotify on library roots); explicit false disables.
+	LibraryWatchEnabled *bool `json:"libraryWatchEnabled,omitempty"`
+	// LibraryWatchDebounceMs merges fsnotify events before starting a scan; 0 = default 1500ms.
+	LibraryWatchDebounceMs int           `json:"libraryWatchDebounceMs,omitempty"`
+	Tasks                  TaskConfig    `json:"tasks"`
+	Scraper                ScraperConfig `json:"scraper"`
+	Assets                 AssetConfig   `json:"assets"`
+	Player                 PlayerConfig  `json:"player"`
 }
 
 type TaskConfig struct {
@@ -51,10 +60,10 @@ type PlayerConfig struct {
 
 func Default() Config {
 	return Config{
-		LogLevel:            "info",
-		HttpAddr:            ":8080",
-		DatabasePath:        defaultDatabasePath(),
-		CacheDir:            defaultCacheDir(),
+		LogLevel:     "info",
+		HttpAddr:     ":8080",
+		DatabasePath: defaultDatabasePath(),
+		CacheDir:     defaultCacheDir(),
 		LibraryPaths: defaultLibraryPaths(),
 		Tasks: TaskConfig{
 			ScanTimeoutSeconds: 600,
@@ -73,7 +82,8 @@ func Default() Config {
 		Player: PlayerConfig{
 			HardwareDecode: true,
 		},
-		OrganizeLibrary: true,
+		OrganizeLibrary:  true,
+		AutoLibraryWatch: true,
 	}
 }
 
@@ -170,4 +180,21 @@ func defaultDatabasePath() string {
 	}
 
 	return filepath.FromSlash("backend/runtime/jav-library.db")
+}
+
+// LibraryWatchOn reports whether fsnotify-based library watching should run.
+func (c Config) LibraryWatchOn() bool {
+	if c.LibraryWatchEnabled == nil {
+		return true
+	}
+	return *c.LibraryWatchEnabled
+}
+
+// LibraryWatchDebounce returns debounce duration for coalescing watch events before scan.
+func (c Config) LibraryWatchDebounce() time.Duration {
+	ms := c.LibraryWatchDebounceMs
+	if ms <= 0 {
+		ms = 1500
+	}
+	return time.Duration(ms) * time.Millisecond
 }

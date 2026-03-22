@@ -3,7 +3,7 @@ import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
-import type { TaskDTO } from "@/api/types"
+import type { PatchMovieBody, TaskDTO } from "@/api/types"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
@@ -194,6 +194,26 @@ const updateMetadataTags = async (payload: { movieId: string; tags: string[] }) 
   }
 }
 
+const patchMovieDisplay = async (body: PatchMovieBody, done: (err?: unknown) => void) => {
+  const id = detailMovie.value?.id
+  if (!id) {
+    done(new Error("no movie"))
+    return
+  }
+  patchError.value = ""
+  try {
+    const updated = await libraryService.patchMovie(id, body)
+    if (updated && detailMovie.value?.id === id) {
+      detailMovie.value = updated
+    }
+    done()
+  } catch (err) {
+    patchError.value = formatClientError(err, t("detail.errMovieEdit"))
+    console.error("[DetailView] patch movie display failed", err)
+    done(err)
+  }
+}
+
 const browseByTag = async (payload: { tag: string }) => {
   const tag = payload.tag.trim()
   if (!tag) {
@@ -327,6 +347,7 @@ const handleRefreshMetadata = async (id: string) => {
         @update-metadata-tags="updateMetadataTags"
         @delete-movie="handleDeleteMovie"
         @refresh-metadata="handleRefreshMetadata"
+        @patch-movie-display="patchMovieDisplay"
       />
     </template>
     <NotFoundState

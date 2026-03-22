@@ -32,12 +32,18 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 	filtered := make([]contracts.MovieDetailDTO, 0, len(s.movies))
 	query := strings.TrimSpace(strings.ToLower(request.Query))
 
+	actorExact := strings.TrimSpace(request.Actor)
 	for _, movie := range s.movies {
 		if request.Mode == "favorites" && !movie.IsFavorite {
 			continue
 		}
 
-		if query != "" && !matchesQuery(movie, query) {
+		eff := contracts.EffectiveMovieDetailDTO(movie)
+		if query != "" && !matchesQuery(eff, query) {
+			continue
+		}
+
+		if actorExact != "" && !slices.Contains(movie.Actors, actorExact) {
 			continue
 		}
 
@@ -77,7 +83,7 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 
 	items := make([]contracts.MovieListItemDTO, 0, end-offset)
 	for _, movie := range filtered[offset:end] {
-		m := movie
+		m := contracts.EffectiveMovieDetailDTO(movie)
 		syncEffectiveRating(&m)
 		items = append(items, m.MovieListItemDTO)
 	}
@@ -96,7 +102,7 @@ func (s *Service) GetMovie(movieID string) (contracts.MovieDetailDTO, error) {
 
 	for _, movie := range s.movies {
 		if movie.ID == movieID {
-			m := movie
+			m := contracts.EffectiveMovieDetailDTO(movie)
 			syncEffectiveRating(&m)
 			return m, nil
 		}
@@ -131,8 +137,50 @@ func (s *Service) PatchMovie(movieID string, in contracts.PatchMovieInput) (cont
 		if in.MetadataTagsSet {
 			m.Tags = append([]string{}, in.MetadataTags...)
 		}
+		if in.UserTitleSet {
+			if in.UserTitleClear {
+				m.UserTitleOverride = nil
+			} else {
+				s := in.UserTitle
+				m.UserTitleOverride = &s
+			}
+		}
+		if in.UserStudioSet {
+			if in.UserStudioClear {
+				m.UserStudioOverride = nil
+			} else {
+				s := in.UserStudio
+				m.UserStudioOverride = &s
+			}
+		}
+		if in.UserSummarySet {
+			if in.UserSummaryClear {
+				m.UserSummaryOverride = nil
+			} else {
+				s := in.UserSummary
+				m.UserSummaryOverride = &s
+			}
+		}
+		if in.UserReleaseDateSet {
+			if in.UserReleaseDateClear {
+				m.UserReleaseDateOverride = nil
+			} else {
+				s := in.UserReleaseDate
+				m.UserReleaseDateOverride = &s
+			}
+		}
+		if in.UserRuntimeMinutesSet {
+			if in.UserRuntimeMinutesClear {
+				m.UserRuntimeMinutesOverride = nil
+			} else {
+				v := in.UserRuntimeMinutes
+				m.UserRuntimeMinutesOverride = &v
+			}
+		}
 		syncEffectiveRating(m)
-		return *m, nil
+		out := contracts.EffectiveMovieDetailDTO(*m)
+		syncEffectiveRating(&out)
+		return out, nil
 	}
 	return contracts.MovieDetailDTO{}, errMovieNotFound
 }

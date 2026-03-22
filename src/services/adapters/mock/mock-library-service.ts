@@ -1,5 +1,5 @@
 import { computed, ref } from "vue"
-import type { MetadataRefreshQueuedDTO, PatchMovieBody } from "@/api/types"
+import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
@@ -14,6 +14,10 @@ import {
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const organizeLibraryMock = ref(false)
+const autoLibraryWatchMock = ref(true)
+const metadataMovieProviderMock = ref("")
+/** Mock 无引擎枚举，列表为空＝仅自动模式 */
+const metadataMovieProvidersMock = ref<string[]>([])
 
 const libraryPathsState = ref<LibrarySetting[]>([
   {
@@ -208,6 +212,71 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
   if (body.metadataTags !== undefined) {
     next.tags = [...body.metadataTags]
   }
+
+  const touchDisplayFallback = () => {
+    if (!next.displayScrapeFallback) {
+      next.displayScrapeFallback = {
+        title: cur.title,
+        studio: cur.studio,
+        summary: cur.summary,
+        releaseDate: cur.releaseDate,
+        runtimeMinutes: cur.runtimeMinutes,
+        year: cur.year,
+      }
+    }
+  }
+
+  if (body.userTitle !== undefined) {
+    if (body.userTitle === null || body.userTitle === "") {
+      const fb = next.displayScrapeFallback
+      next.title = fb?.title ?? cur.title
+    } else {
+      touchDisplayFallback()
+      next.title = body.userTitle
+    }
+  }
+  if (body.userStudio !== undefined) {
+    if (body.userStudio === null || body.userStudio === "") {
+      const fb = next.displayScrapeFallback
+      next.studio = fb?.studio ?? cur.studio
+    } else {
+      touchDisplayFallback()
+      next.studio = body.userStudio
+    }
+  }
+  if (body.userSummary !== undefined) {
+    if (body.userSummary === null || body.userSummary === "") {
+      const fb = next.displayScrapeFallback
+      next.summary = fb?.summary ?? cur.summary
+    } else {
+      touchDisplayFallback()
+      next.summary = body.userSummary
+    }
+  }
+  if (body.userReleaseDate !== undefined) {
+    if (body.userReleaseDate === null || body.userReleaseDate === "") {
+      const fb = next.displayScrapeFallback
+      next.releaseDate = fb?.releaseDate
+      next.year = fb?.year ?? cur.year
+    } else {
+      touchDisplayFallback()
+      next.releaseDate = body.userReleaseDate
+      const y = parseInt(body.userReleaseDate.slice(0, 4), 10)
+      if (!Number.isNaN(y) && y >= 1800 && y <= 3000) {
+        next.year = y
+      }
+    }
+  }
+  if (body.userRuntimeMinutes !== undefined) {
+    if (body.userRuntimeMinutes === null) {
+      const fb = next.displayScrapeFallback
+      next.runtimeMinutes = fb?.runtimeMinutes ?? cur.runtimeMinutes
+    } else {
+      touchDisplayFallback()
+      next.runtimeMinutes = body.userRuntimeMinutes
+    }
+  }
+
   moviesState.value = moviesState.value.map((m, i) => (i === idx ? next : m))
 
   const prefsPatch: {
@@ -246,18 +315,43 @@ export const mockLibraryService: LibraryService = {
   ),
   libraryPaths: computed(() => libraryPathsState.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
+  autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
+  metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
+  metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
 
   async refreshSettings() {
     // Mock: paths are in-memory only; no remote settings.
+  },
+
+  async reloadMoviesFromApi() {
+    // Mock: 列表为本地种子，无远端同步。
   },
 
   async setOrganizeLibrary(value: boolean) {
     organizeLibraryMock.value = value
   },
 
-  async addLibraryPath(path: string, title?: string) {
+  async setAutoLibraryWatch(value: boolean) {
+    autoLibraryWatchMock.value = value
+  },
+
+  async setMetadataMovieProvider(name: string) {
+    const trimmed = name.trim()
+    if (trimmed !== "" && metadataMovieProvidersMock.value.length === 0) {
+      throw new Error("Mock mode has no provider list; use Web API to pick a source.")
+    }
+    if (
+      trimmed !== "" &&
+      !metadataMovieProvidersMock.value.some((p) => p.toLowerCase() === trimmed.toLowerCase())
+    ) {
+      throw new Error("Unknown metadata provider in mock.")
+    }
+    metadataMovieProviderMock.value = trimmed
+  },
+
+  async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
     const trimmed = path.trim()
-    if (!trimmed) return
+    if (!trimmed) return null
     if (!isAbsoluteLibraryPath(trimmed)) {
       throw new Error("library path must be an absolute path")
     }
@@ -266,6 +360,7 @@ export const mockLibraryService: LibraryService = {
       ...libraryPathsState.value,
       { id, path: trimmed, title: (title?.trim() || trimmed) },
     ]
+    return null
   },
 
   async updateLibraryPathTitle(id: string, title: string) {

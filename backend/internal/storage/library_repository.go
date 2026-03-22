@@ -44,7 +44,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	whereClause, args := buildMovieFilters(request)
 
 	var total int
-	countQuery := "SELECT COUNT(*) FROM movies " + whereClause
+	countQuery := "SELECT COUNT(*) FROM movies m " + whereClause
 	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		return contracts.MoviesPageDTO{}, err
 	}
@@ -52,10 +52,9 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	args = append(args, limit, offset)
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, user_rating, is_favorite, added_at, location, resolution, year,
-			release_date, cover_url, thumb_url, preview_video_url
-		FROM movies `+whereClause+`
-		ORDER BY added_at DESC, id ASC
+		movieSelectEffectiveColumns+`
+		FROM movies m `+whereClause+`
+		ORDER BY m.added_at DESC, m.id ASC
 		LIMIT ? OFFSET ?`,
 		args...,
 	)
@@ -142,9 +141,8 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 	var row movieRow
 	err := s.db.QueryRowContext(
 		ctx,
-		`SELECT id, title, code, studio, summary, runtime_minutes, rating, user_rating, is_favorite, added_at, location, resolution, year,
-			release_date, cover_url, thumb_url, preview_video_url
-		FROM movies WHERE id = ?`,
+		movieSelectEffectiveColumns+`
+		FROM movies m WHERE m.id = ?`,
 		movieID,
 	).Scan(
 		&row.ID,
@@ -183,6 +181,11 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		return contracts.MovieDetailDTO{}, err
 	}
 
+	actorAvatars, err := s.lookupActorAvatarURLsByMovieID(ctx, movieID)
+	if err != nil {
+		return contracts.MovieDetailDTO{}, err
+	}
+
 	return contracts.MovieDetailDTO{
 		MovieListItemDTO: contracts.MovieListItemDTO{
 			ID:             row.ID,
@@ -206,24 +209,80 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		Summary:          row.Summary,
 		PreviewImages:    previewsByMovie[movieID],
 		PreviewVideoURL:  row.PreviewVideoURL,
-		MetadataRating:   row.MetadataRating,
-		UserRating:       userRatingPtr(row.UserRating),
+		MetadataRating:    row.MetadataRating,
+		UserRating:        userRatingPtr(row.UserRating),
+		ActorAvatarURLs:   actorAvatars,
 	}, nil
 }
+
+func (s *SQLiteStore) lookupActorAvatarURLsByMovieID(ctx context.Context, movieID string) (map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.name, a.avatar FROM movie_actors ma
+		INNER JOIN actors a ON a.id = ma.actor_id
+		WHERE ma.movie_id = ?
+		ORDER BY a.name ASC`, movieID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]string)
+	for rows.Next() {
+		var name, avatar string
+		if err := rows.Scan(&name, &avatar); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(avatar) != "" {
+			out[name] = strings.TrimSpace(avatar)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// movieSelectEffectiveColumns selects list/detail fields with user_* display overrides applied (alias m).
+const movieSelectEffectiveColumns = `
+SELECT m.id,
+	COALESCE(NULLIF(TRIM(m.user_title), ''), m.title) AS title,
+	m.code,
+	COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio) AS studio,
+	COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary) AS summary,
+	COALESCE(m.user_runtime_minutes, m.runtime_minutes) AS runtime_minutes,
+	m.rating, m.user_rating, m.is_favorite, m.added_at, m.location, m.resolution,
+	CASE
+		WHEN NULLIF(TRIM(m.user_release_date), '') IS NOT NULL
+			AND LENGTH(TRIM(m.user_release_date)) >= 4
+			AND CAST(SUBSTR(TRIM(m.user_release_date), 1, 4) AS INTEGER) BETWEEN 1800 AND 3000
+		THEN CAST(SUBSTR(TRIM(m.user_release_date), 1, 4) AS INTEGER)
+		ELSE m.year
+	END AS year,
+	COALESCE(NULLIF(TRIM(m.user_release_date), ''), m.release_date) AS release_date,
+	m.cover_url, m.thumb_url, m.preview_video_url`
 
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	clauses := make([]string, 0, 2)
 	args := make([]any, 0, 4)
 
 	if request.Mode == "favorites" {
-		clauses = append(clauses, "is_favorite = 1")
+		clauses = append(clauses, "m.is_favorite = 1")
 	}
 
 	query := strings.TrimSpace(strings.ToLower(request.Query))
 	if query != "" {
 		like := "%" + query + "%"
-		clauses = append(clauses, `(LOWER(title) LIKE ? OR LOWER(code) LIKE ? OR LOWER(studio) LIKE ? OR LOWER(summary) LIKE ?)`)
+		clauses = append(clauses, `(LOWER(COALESCE(NULLIF(TRIM(m.user_title), ''), m.title)) LIKE ? OR LOWER(m.code) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary)) LIKE ?)`)
 		args = append(args, like, like, like, like)
+	}
+
+	if actor := strings.TrimSpace(request.Actor); actor != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM movie_actors ma
+			INNER JOIN actors act ON act.id = ma.actor_id
+			WHERE ma.movie_id = m.id AND act.name = ?
+		)`)
+		args = append(args, actor)
 	}
 
 	if len(clauses) == 0 {

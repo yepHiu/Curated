@@ -9,6 +9,7 @@ import {
   Clapperboard,
   History,
   LibraryBig,
+  RefreshCw,
   Settings2,
   Sparkles,
   Tags,
@@ -31,6 +32,7 @@ import {
   formatSidebarCount,
   isMovieRecentlyAdded,
 } from "@/lib/library-stats"
+import { useBackendHealth } from "@/composables/use-backend-health"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -60,6 +62,39 @@ interface NavigationItem {
 const { t, locale } = useI18n()
 const route = useRoute()
 const libraryService = useLibraryService()
+const { useWebApi: backendUseWebApi, status: backendStatus, probing: backendProbing, checkNow: checkBackendHealth } =
+  useBackendHealth()
+
+const backendStatusText = computed(() => {
+  void locale.value
+  switch (backendStatus.value) {
+    case "mock":
+      return t("nav.backendMock")
+    case "checking":
+      return t("nav.backendChecking")
+    case "online":
+      return t("nav.backendOnline")
+    case "offline":
+      return t("nav.backendOffline")
+    default:
+      return ""
+  }
+})
+
+const backendDotClass = computed(() => {
+  switch (backendStatus.value) {
+    case "checking":
+      return "bg-muted-foreground/55 animate-pulse"
+    case "online":
+      return "bg-emerald-500 shadow-[0_0_10px_rgb(52_211_153_/_0.35)]"
+    case "offline":
+      return "bg-destructive"
+    case "mock":
+      return "bg-amber-500/90"
+    default:
+      return "bg-muted-foreground/40"
+  }
+})
 
 const curatedFrameCount = ref(0)
 
@@ -255,6 +290,72 @@ const getNavigationTarget = (page: AppPage) => {
       class="my-3 shrink-0 bg-sidebar-border/80"
       :class="props.compact ? 'w-10' : ''"
     />
+
+    <!-- 后端在线检测（紧贴设置项上方） -->
+    <section
+      v-if="!props.compact"
+      class="mb-2 flex min-w-0 flex-col gap-2"
+    >
+      <span
+        class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
+      >
+        {{ t("nav.backendLabel") }}
+      </span>
+      <div
+        class="flex min-w-0 items-center gap-2 rounded-2xl border border-border/50 bg-background/35 px-3 py-2"
+        role="status"
+        :aria-label="`${t('nav.backendLabel')}：${backendStatusText}`"
+        :aria-live="backendUseWebApi ? 'polite' : 'off'"
+      >
+        <span
+          class="size-2 shrink-0 rounded-full"
+          :class="backendDotClass"
+          aria-hidden="true"
+        />
+        <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {{ backendStatusText }}
+        </span>
+        <Button
+          v-if="backendUseWebApi"
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="size-8 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+          :title="t('nav.backendRecheck')"
+          :aria-label="t('nav.backendRecheck')"
+          :disabled="backendProbing"
+          @click="checkBackendHealth"
+        >
+          <RefreshCw class="size-4" :class="{ 'animate-spin': backendProbing }" />
+        </Button>
+      </div>
+    </section>
+    <div
+      v-else
+      class="mb-2 flex w-full shrink-0 items-center justify-center gap-1"
+      role="status"
+      :aria-label="`${t('nav.backendLabel')}：${backendStatusText}`"
+      :aria-live="backendUseWebApi ? 'polite' : 'off'"
+    >
+      <span
+        class="size-2.5 shrink-0 rounded-full"
+        :class="backendDotClass"
+        :title="backendStatusText"
+      />
+      <Button
+        v-if="backendUseWebApi"
+        type="button"
+        variant="ghost"
+        size="icon"
+        class="size-7 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+        :title="t('nav.backendRecheck')"
+        :aria-label="t('nav.backendRecheck')"
+        :disabled="backendProbing"
+        @click="checkBackendHealth"
+      >
+        <RefreshCw class="size-3.5" :class="{ 'animate-spin': backendProbing }" />
+      </Button>
+    </div>
 
     <Button
       v-if="!props.compact"

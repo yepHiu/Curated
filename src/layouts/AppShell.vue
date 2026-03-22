@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
+import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
 import { LayoutDashboard, Menu, Search, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
+import AppToastHost from "@/components/jav-library/AppToastHost.vue"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import {
+  buildLibrarySearchSuggestions,
+  librarySearchSuggestionsHasAny,
+} from "@/lib/library-search-suggestions"
 import {
   buildMovieRouteQuery,
   getBrowseSourceMode,
@@ -20,7 +27,10 @@ import {
   mergeCuratedFramesQuery,
   mergeLibraryQuery,
 } from "@/lib/library-query"
+import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
 import { useLibraryService } from "@/services/library-service"
+
+useLibraryWatchToasts()
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -57,13 +67,6 @@ watch(
   },
   { flush: "sync" },
 )
-
-onKeyStroke("Escape", (e) => {
-  if (mobileSidebarOpen.value && !isLgUp.value) {
-    e.preventDefault()
-    mobileSidebarOpen.value = false
-  }
-})
 
 onBeforeUnmount(() => {
   document.body.style.overflow = ""
@@ -137,6 +140,258 @@ const headerBackLabel = computed(() => {
 /** 输入即时更新；同步到 URL 防抖，避免每键一次 router.replace 导致整库重算/重绘 */
 const searchDraft = ref("")
 
+const librarySearchRootRef = ref<HTMLElement | null>(null)
+const librarySuggestionsOpen = ref(false)
+const debouncedSuggestNeedle = ref("")
+
+watchDebounced(
+  searchDraft,
+  (v) => {
+    debouncedSuggestNeedle.value = v
+  },
+  { debounce: 150 },
+)
+
+const librarySuggestGroups = computed(() =>
+  buildLibrarySearchSuggestions(debouncedSuggestNeedle.value, libraryService.movies.value),
+)
+
+/** 下拉列表渲染行：分组标题 + 可选条目（含扁平下标供键盘高亮） */
+type LibrarySuggestRow =
+  | { rowType: "header"; title: "actors" | "tags" | "codes" }
+  | {
+      rowType: "item"
+      kind: "actor" | "tag" | "code"
+      flatIndex: number
+      label: string
+      canonical?: string
+      code?: string
+    }
+
+const librarySuggestRows = computed((): LibrarySuggestRow[] => {
+  const g = librarySuggestGroups.value
+  if (!librarySearchSuggestionsHasAny(g)) {
+    return []
+  }
+  const rows: LibrarySuggestRow[] = []
+  let flatIndex = 0
+  if (g.actors.length) {
+    rows.push({ rowType: "header", title: "actors" })
+    for (const s of g.actors) {
+      rows.push({
+        rowType: "item",
+        kind: "actor",
+        flatIndex: flatIndex++,
+        label: s.canonical,
+        canonical: s.canonical,
+      })
+    }
+  }
+  if (g.tags.length) {
+    rows.push({ rowType: "header", title: "tags" })
+    for (const s of g.tags) {
+      rows.push({
+        rowType: "item",
+        kind: "tag",
+        flatIndex: flatIndex++,
+        label: s.canonical,
+        canonical: s.canonical,
+      })
+    }
+  }
+  if (g.codes.length) {
+    rows.push({ rowType: "header", title: "codes" })
+    for (const s of g.codes) {
+      rows.push({
+        rowType: "item",
+        kind: "code",
+        flatIndex: flatIndex++,
+        label: s.code,
+        code: s.code,
+      })
+    }
+  }
+  return rows
+})
+
+const librarySuggestItemCount = computed(
+  () => librarySuggestRows.value.filter((r) => r.rowType === "item").length,
+)
+
+const librarySuggestHighlightIndex = ref(-1)
+
+watch(debouncedSuggestNeedle, () => {
+  librarySuggestHighlightIndex.value = -1
+})
+
+watch(librarySuggestionsOpen, (open) => {
+  if (!open) {
+    librarySuggestHighlightIndex.value = -1
+  }
+})
+
+watch(librarySuggestItemCount, (n) => {
+  if (n === 0) {
+    librarySuggestHighlightIndex.value = -1
+    return
+  }
+  if (librarySuggestHighlightIndex.value >= n) {
+    librarySuggestHighlightIndex.value = n - 1
+  }
+})
+
+watch(librarySuggestHighlightIndex, async (idx) => {
+  if (idx < 0 || !librarySearchRootRef.value) {
+    return
+  }
+  await nextTick()
+  librarySearchRootRef.value
+    .querySelector<HTMLElement>(`[data-suggest-idx="${idx}"]`)
+    ?.scrollIntoView({ block: "nearest" })
+})
+
+function suggestTitleKey(section: "actors" | "tags" | "codes") {
+  if (section === "actors") {
+    return "shell.searchSuggestActors"
+  }
+  if (section === "tags") {
+    return "shell.searchSuggestTags"
+  }
+  return "shell.searchSuggestCodes"
+}
+
+watch(searchDraft, (v) => {
+  if (!v.trim()) {
+    librarySuggestionsOpen.value = false
+  }
+})
+
+watch(isLibraryRoute, (lib) => {
+  if (!lib) {
+    librarySuggestionsOpen.value = false
+  }
+})
+
+onClickOutside(librarySearchRootRef, () => {
+  librarySuggestionsOpen.value = false
+})
+
+function onLibrarySearchFocus() {
+  debouncedSuggestNeedle.value = searchDraft.value
+  if (searchDraft.value.trim()) {
+    librarySuggestionsOpen.value = true
+  }
+}
+
+function onLibrarySearchInput() {
+  if (searchDraft.value.trim()) {
+    librarySuggestionsOpen.value = true
+  }
+}
+
+function applyLibrarySuggestActor(canonical: string) {
+  librarySuggestionsOpen.value = false
+  void router.replace({
+    name: route.name ?? "library",
+    query: mergeLibraryQuery(route.query, {
+      actor: canonical,
+      q: undefined,
+      tag: undefined,
+    }),
+  })
+}
+
+function applyLibrarySuggestTag(canonical: string) {
+  librarySuggestionsOpen.value = false
+  void router.replace({
+    name: route.name ?? "library",
+    query: mergeLibraryQuery(route.query, {
+      tag: canonical,
+      q: undefined,
+      actor: undefined,
+    }),
+  })
+}
+
+function applyLibrarySuggestCode(code: string) {
+  librarySuggestionsOpen.value = false
+  void router.replace({
+    name: route.name ?? "library",
+    query: mergeLibraryQuery(route.query, {
+      q: code,
+      tag: undefined,
+      actor: undefined,
+    }),
+  })
+}
+
+function applyLibrarySuggestRow(row: Extract<LibrarySuggestRow, { rowType: "item" }>) {
+  if (row.kind === "actor" && row.canonical) {
+    applyLibrarySuggestActor(row.canonical)
+  } else if (row.kind === "tag" && row.canonical) {
+    applyLibrarySuggestTag(row.canonical)
+  } else if (row.kind === "code" && row.code) {
+    applyLibrarySuggestCode(row.code)
+  }
+}
+
+function onLibrarySearchKeydown(e: KeyboardEvent) {
+  if (!librarySuggestionsOpen.value || !searchDraft.value.trim()) {
+    return
+  }
+  const n = librarySuggestItemCount.value
+  if (n === 0) {
+    return
+  }
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault()
+    if (librarySuggestHighlightIndex.value < 0) {
+      librarySuggestHighlightIndex.value = 0
+    } else {
+      librarySuggestHighlightIndex.value = Math.min(librarySuggestHighlightIndex.value + 1, n - 1)
+    }
+    return
+  }
+
+  if (e.key === "ArrowUp") {
+    e.preventDefault()
+    if (librarySuggestHighlightIndex.value <= 0) {
+      librarySuggestHighlightIndex.value = -1
+    } else {
+      librarySuggestHighlightIndex.value -= 1
+    }
+    return
+  }
+
+  if (e.key === "Enter") {
+    const idx = librarySuggestHighlightIndex.value
+    if (idx < 0) {
+      return
+    }
+    const row = librarySuggestRows.value.find(
+      (r): r is Extract<LibrarySuggestRow, { rowType: "item" }> =>
+        r.rowType === "item" && r.flatIndex === idx,
+    )
+    if (row) {
+      e.preventDefault()
+      applyLibrarySuggestRow(row)
+    }
+  }
+}
+
+onKeyStroke("Escape", (e) => {
+  if (librarySuggestionsOpen.value && isLibraryRoute.value) {
+    e.preventDefault()
+    librarySuggestionsOpen.value = false
+    return
+  }
+  if (mobileSidebarOpen.value && !isLgUp.value) {
+    e.preventDefault()
+    mobileSidebarOpen.value = false
+  }
+})
+
 watch(
   [() => route.name, () => route.query.q, () => route.query.tag, () => route.query.actor],
   () => {
@@ -185,6 +440,7 @@ watchDebounced(
 
 function clearLibrarySearch() {
   searchDraft.value = ""
+  librarySuggestionsOpen.value = false
   if (!isLibraryRoute.value) {
     return
   }
@@ -287,26 +543,97 @@ function clearCuratedFramesSearch() {
             <div class="flex flex-1 justify-center px-0 lg:px-3">
               <div
                 v-if="isLibraryRoute"
+                ref="librarySearchRootRef"
                 class="relative w-full max-w-lg"
               >
-                <Search class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+                <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
                 <Input
                   v-model="searchDraft"
                   class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
                   :class="searchDraft.trim() ? 'pr-10' : ''"
                   :placeholder="t('shell.searchLibraryPlaceholder')"
+                  autocomplete="off"
+                  role="combobox"
+                  :aria-expanded="librarySuggestionsOpen && !!searchDraft.trim()"
+                  :aria-activedescendant="
+                    librarySuggestHighlightIndex >= 0
+                      ? `library-search-suggest-${librarySuggestHighlightIndex}`
+                      : undefined
+                  "
+                  aria-autocomplete="list"
+                  aria-controls="library-search-suggest-list"
+                  @focus="onLibrarySearchFocus"
+                  @input="onLibrarySearchInput"
+                  @keydown="onLibrarySearchKeydown"
                 />
                 <Button
                   v-if="searchDraft.trim()"
                   type="button"
                   variant="ghost"
                   size="icon"
-                  class="absolute top-1/2 right-1.5 size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="absolute top-1/2 right-1.5 z-[1] size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
                   :aria-label="t('shell.clearSearch')"
                   @click="clearLibrarySearch"
                 >
                   <X class="size-4" />
                 </Button>
+                <div
+                  v-show="librarySuggestionsOpen && searchDraft.trim()"
+                  id="library-search-suggest-list"
+                  class="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-lg shadow-black/15"
+                  role="listbox"
+                  :aria-label="t('shell.searchSuggestPanel')"
+                >
+                  <ScrollArea class="max-h-72">
+                    <div class="p-1.5">
+                      <template
+                        v-if="librarySearchSuggestionsHasAny(librarySuggestGroups)"
+                      >
+                        <template
+                          v-for="(row, ri) in librarySuggestRows"
+                          :key="
+                            row.rowType === 'header'
+                              ? `h-${row.title}-${ri}`
+                              : `i-${row.flatIndex}`
+                          "
+                        >
+                          <Separator
+                            v-if="row.rowType === 'header' && ri > 0"
+                            class="my-1.5"
+                          />
+                          <p
+                            v-if="row.rowType === 'header'"
+                            class="px-2 pb-1 text-xs font-medium text-muted-foreground"
+                          >
+                            {{ t(suggestTitleKey(row.title)) }}
+                          </p>
+                          <button
+                            v-else
+                            :id="`library-search-suggest-${row.flatIndex}`"
+                            type="button"
+                            :data-suggest-idx="row.flatIndex"
+                            class="flex w-full rounded-xl px-2 py-2 text-left text-sm transition-colors hover:bg-muted"
+                            :class="
+                              librarySuggestHighlightIndex === row.flatIndex ? 'bg-muted' : ''
+                            "
+                            role="option"
+                            :aria-selected="librarySuggestHighlightIndex === row.flatIndex"
+                            @mousedown.prevent
+                            @click="applyLibrarySuggestRow(row)"
+                          >
+                            {{ row.label }}
+                          </button>
+                        </template>
+                      </template>
+                      <p
+                        v-else
+                        class="px-2 py-3 text-sm text-muted-foreground"
+                      >
+                        {{ t("shell.searchSuggestEmpty") }}
+                      </p>
+                    </div>
+                  </ScrollArea>
+                </div>
               </div>
               <div
                 v-else-if="isCuratedFramesRoute"
@@ -342,6 +669,7 @@ function clearCuratedFramesSearch() {
     </div>
 
     <ScanProgressDock />
+    <AppToastHost />
 
     <Teleport to="body">
       <div
