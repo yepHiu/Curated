@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
   Maximize2,
@@ -14,6 +15,13 @@ import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import { recordMoviePlayed } from "@/lib/played-movies-storage"
+import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
+import {
+  getProgress,
+  parseResumeSecondsFromQuery,
+  saveProgress,
+} from "@/lib/playback-progress-storage"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -25,6 +33,7 @@ const props = withDefaults(
   { autoplay: false },
 )
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
@@ -34,6 +43,11 @@ const surfaceRef = ref<HTMLElement | null>(null)
 
 /** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
 const autoplayConsumedForMovieId = ref<string | null>(null)
+/** 每条片源只应用一次 URL / 本地续播 seek，避免重复跳转 */
+const resumeAppliedForMovieId = ref<string | null>(null)
+
+const PROGRESS_SAVE_INTERVAL_MS = 4000
+let lastProgressSaveAt = 0
 
 const playbackSrc = ref<string | null>(null)
 const playbackError = ref("")
@@ -41,6 +55,12 @@ const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const volume = ref([100])
+
+const curatedShutterActive = ref(false)
+const curatedPlusOne = ref(false)
+const curatedCaptureError = ref("")
+let curatedPlusOneTimer: ReturnType<typeof setTimeout> | null = null
+let curatedShutterTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 播放中鼠标静止一段时间后隐藏控件与指针；移动鼠标恢复 */
 const IDLE_HIDE_MS = 5000
@@ -117,10 +137,35 @@ function syncSrc() {
   playbackSrc.value = libraryService.getMoviePlaybackUrl(props.movie.id)
 }
 
+function flushPlaybackProgress() {
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return
+  const durRaw = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : duration.value
+  const dur = Number.isFinite(durRaw) && durRaw > 0 ? durRaw : 0
+  const pos = v.currentTime
+  if (!Number.isFinite(pos) || pos < 0) return
+  saveProgress(props.movie.id, pos, dur)
+  recordMoviePlayed(props.movie.id)
+}
+
+function stripTFromRoute() {
+  if (route.query.t === undefined || route.query.t === null || route.query.t === "") return
+  const nextQuery = { ...route.query }
+  delete nextQuery.t
+  void router.replace({
+    name: "player",
+    params: { id: props.movie.id },
+    query: nextQuery,
+    hash: route.hash,
+  })
+}
+
 watch(
   () => props.movie.id,
   async () => {
     autoplayConsumedForMovieId.value = null
+    resumeAppliedForMovieId.value = null
+    lastProgressSaveAt = 0
     syncSrc()
     await nextTick()
     videoRef.value?.load()
@@ -128,14 +173,31 @@ watch(
   { immediate: true },
 )
 
+function onVisibilityChange() {
+  if (document.visibilityState === "hidden") {
+    flushPlaybackProgress()
+  }
+}
+
+function onWindowBeforeUnload() {
+  flushPlaybackProgress()
+}
+
 onMounted(() => {
   syncSrc()
   window.addEventListener("keydown", onPlaybackKeydown)
+  document.addEventListener("visibilitychange", onVisibilityChange)
+  window.addEventListener("beforeunload", onWindowBeforeUnload)
 })
 
 onUnmounted(() => {
+  flushPlaybackProgress()
   window.removeEventListener("keydown", onPlaybackKeydown)
+  document.removeEventListener("visibilitychange", onVisibilityChange)
+  window.removeEventListener("beforeunload", onWindowBeforeUnload)
   clearIdleHideTimer()
+  if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
+  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
 })
 
 function formatClock(seconds: number): string {
@@ -161,6 +223,10 @@ function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
   currentTime.value = v.currentTime
+  const now = Date.now()
+  if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
+  lastProgressSaveAt = now
+  flushPlaybackProgress()
 }
 
 function onLoadedMetadata() {
@@ -168,6 +234,21 @@ function onLoadedMetadata() {
   if (!v) return
   duration.value = Number.isFinite(v.duration) ? v.duration : 0
   v.volume = (volume.value[0] ?? 100) / 100
+
+  const dur = duration.value
+  if (resumeAppliedForMovieId.value === props.movie.id) return
+  if (dur <= 0) return
+
+  const fromQuery = parseResumeSecondsFromQuery(route.query.t)
+  const stored = getProgress(props.movie.id)?.positionSec
+  const targetSec = fromQuery !== undefined ? fromQuery : stored
+  if (targetSec === undefined) return
+
+  const clamped = Math.min(Math.max(0, targetSec), Math.max(0, dur - 0.25))
+  v.currentTime = clamped
+  currentTime.value = v.currentTime
+  resumeAppliedForMovieId.value = props.movie.id
+  stripTFromRoute()
 }
 
 function stripAutoplayFromRoute() {
@@ -195,8 +276,7 @@ async function onCanPlayForAutoplay() {
     stripAutoplayFromRoute()
   } catch {
     autoplayConsumedForMovieId.value = null
-    playbackError.value =
-      "浏览器未允许自动播放，请再点一次画面或下方播放键。"
+    playbackError.value = t("player.autoplayBlocked")
   }
 }
 
@@ -206,18 +286,23 @@ function onPlay() {
 
 function onPause() {
   isPlaying.value = false
+  flushPlaybackProgress()
+}
+
+function onVideoEnded() {
+  flushPlaybackProgress()
+  isPlaying.value = false
 }
 
 function onVideoError() {
   const v = videoRef.value
   const code = v?.error?.code
   if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-    playbackError.value =
-      "当前浏览器无法解码该视频格式，可尝试转为 MP4（H.264 + AAC）或使用后续桌面版播放器。"
+    playbackError.value = t("player.decodeError")
   } else if (code != null) {
-    playbackError.value = "无法播放该视频，请检查文件是否存在或已被移动。"
+    playbackError.value = t("player.errFileMissing")
   } else {
-    playbackError.value = "播放出错，请稍后重试。"
+    playbackError.value = t("player.errGeneric")
   }
 }
 
@@ -231,7 +316,7 @@ async function togglePlayPause() {
       v.pause()
     }
   } catch {
-    playbackError.value = "无法开始播放（浏览器可能阻止自动播放，请再试一次）。"
+    playbackError.value = t("player.playStartError")
   }
 }
 
@@ -334,9 +419,43 @@ function onPlaybackKeydown(e: KeyboardEvent) {
         void document.exitFullscreen()
       }
       break
+    case "KeyC":
+      e.preventDefault()
+      void runCuratedCapture()
+      break
     default:
       break
   }
+}
+
+async function runCuratedCapture() {
+  curatedCaptureError.value = ""
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) {
+    curatedCaptureError.value = t("player.captureNoVideo")
+    return
+  }
+  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
+  if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
+
+  curatedShutterActive.value = true
+  curatedShutterTimer = window.setTimeout(() => {
+    curatedShutterActive.value = false
+    curatedShutterTimer = null
+  }, 600)
+
+  const result = await saveCuratedCaptureFromVideo(v, props.movie)
+  if (!result.ok) {
+    curatedCaptureError.value = result.reason
+    curatedShutterActive.value = false
+    return
+  }
+
+  curatedPlusOne.value = true
+  curatedPlusOneTimer = window.setTimeout(() => {
+    curatedPlusOne.value = false
+    curatedPlusOneTimer = null
+  }, 850)
 }
 
 async function toggleFullscreen() {
@@ -361,10 +480,9 @@ const fileBasename = computed(() => {
 })
 
 const noStreamHint = computed(() => {
+  void locale.value
   if (playbackSrc.value) return ""
-  return import.meta.env.VITE_USE_WEB_API === "true"
-    ? "无法解析播放地址，请确认已登录同一后端且该片在库中。"
-    : "本地演示模式无法播放主视频，请在 .env 中启用 VITE_USE_WEB_API 并连接后端。"
+  return import.meta.env.VITE_USE_WEB_API === "true" ? t("player.errNoSrc") : t("player.mockNoPlay")
 })
 </script>
 
@@ -401,6 +519,11 @@ const noStreamHint = computed(() => {
         :class="videoAreaCursorClass"
         @click="onVideoSurfaceClick"
       >
+        <div
+          class="pointer-events-none absolute inset-4 z-[5] rounded-2xl sm:inset-6 lg:inset-8"
+          :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
+          aria-hidden="true"
+        />
         <video
           v-if="playbackSrc"
           ref="videoRef"
@@ -415,6 +538,7 @@ const noStreamHint = computed(() => {
           @canplay="onCanPlayForAutoplay"
           @play="onPlay"
           @pause="onPause"
+          @ended="onVideoEnded"
           @error="onVideoError"
         />
 
@@ -422,7 +546,7 @@ const noStreamHint = computed(() => {
           v-else
           class="pointer-events-none flex max-w-lg flex-col items-center gap-3 px-4 text-center text-white/80"
         >
-          <p class="text-lg font-semibold text-white">暂无在线片源</p>
+          <p class="text-lg font-semibold text-white">{{ t("player.noOnlineSrc") }}</p>
           <p class="text-sm text-white/65">
             {{ noStreamHint }}
           </p>
@@ -444,14 +568,14 @@ const noStreamHint = computed(() => {
         <div class="flex w-full flex-col gap-4">
           <div class="flex items-center justify-between gap-3 text-sm text-white/70">
             <span>{{ formatClock(currentTime) }}</span>
-            <span>{{ duration > 0 ? formatClock(duration) : "—" }}</span>
+            <span>{{ duration > 0 ? formatClock(duration) : "\u2014" }}</span>
           </div>
 
           <div
             class="relative h-2.5 w-full cursor-pointer rounded-full bg-white/10"
             role="button"
             tabindex="0"
-            aria-label="播放进度"
+            :aria-label="t('player.progressAria')"
             @click="onProgressBarClick"
           >
             <div
@@ -460,8 +584,18 @@ const noStreamHint = computed(() => {
             />
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
+          <p
+            v-if="curatedCaptureError"
+            class="text-center text-xs text-amber-300/95"
+          >
+            {{ curatedCaptureError }}
+          </p>
+
+          <!-- 底栏：播放控制 | Curated（与音量同一行）| 音量 + 全屏 -->
+          <div
+            class="grid w-full items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-x-4"
+          >
+            <div class="flex items-center justify-center gap-2 sm:justify-start">
               <Button
                 variant="secondary"
                 size="icon"
@@ -491,10 +625,32 @@ const noStreamHint = computed(() => {
               </Button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="relative flex justify-center justify-self-center">
+              <div class="relative inline-flex items-center">
+                <span
+                  v-if="curatedPlusOne"
+                  class="pointer-events-none absolute left-full ml-2 text-sm font-bold text-primary drop-shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-500"
+                >
+                  +1
+                </span>
+                <Button
+                  type="button"
+                  class="rounded-full border-0 bg-primary px-5 py-2 text-sm font-semibold tracking-wide text-primary-foreground hover:bg-primary/88 sm:px-6"
+                  :disabled="!playbackSrc"
+                  :aria-label="t('player.ariaCurated')"
+                  @click="runCuratedCapture"
+                >
+                  {{ t("player.curatedLabel") }}
+                </Button>
+              </div>
+            </div>
+
+            <div
+              class="flex flex-wrap items-center justify-center gap-3 sm:col-start-3 sm:justify-end"
+            >
               <div
-                class="flex min-w-[14rem] items-center gap-3 rounded-full bg-white/8 px-4 py-2 text-white/80 backdrop-blur"
-                aria-label="音量"
+                class="flex min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-3 rounded-full bg-white/8 px-4 py-2 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial"
+                :aria-label="t('player.volumeAria')"
               >
                 <VolumeX v-if="volumeIconIsMuted" class="shrink-0" aria-hidden="true" />
                 <Volume2 v-else class="shrink-0" aria-hidden="true" />
@@ -506,17 +662,17 @@ const noStreamHint = computed(() => {
                   :disabled="!playbackSrc"
                   @update:model-value="onVolumeSlider"
                 />
-                <span class="w-10 text-right text-sm">{{ volume[0] }}%</span>
+                <span class="w-10 shrink-0 text-right text-sm">{{ volume[0] }}%</span>
               </div>
 
               <Button
                 variant="secondary"
-                class="rounded-2xl bg-white/10 text-white hover:bg-white/20"
+                class="shrink-0 rounded-2xl bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
                 @click="toggleFullscreen"
               >
                 <Maximize2 data-icon="inline-start" />
-                全屏
+                {{ t("player.fullscreen") }}
               </Button>
             </div>
           </div>
@@ -525,10 +681,42 @@ const noStreamHint = computed(() => {
             v-if="playbackSrc"
             class="text-center text-[10px] leading-relaxed text-white/40 sm:text-xs"
           >
-            单击画面 播放/暂停 · 快捷键：空格 / K · ← / J 后退 10 秒 · → / L 前进 10 秒 · F 全屏 · Esc 退出全屏 · M 静音 · ↑ / ↓ 音量
+            {{ t("player.hintBar") }}
           </p>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.curated-shutter-ring {
+  animation: curated-shutter-inset 0.55s ease-out forwards;
+  box-shadow: inset 0 0 0 10px hsl(var(--primary) / 0.5);
+}
+
+@keyframes curated-shutter-inset {
+  from {
+    box-shadow: inset 0 0 0 14px hsl(var(--primary) / 0.55);
+    opacity: 1;
+  }
+  to {
+    box-shadow: inset 0 0 0 0 transparent;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curated-shutter-ring {
+    animation: curated-shutter-minimal 0.2s ease-out forwards;
+  }
+  @keyframes curated-shutter-minimal {
+    from {
+      opacity: 0.85;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+</style>

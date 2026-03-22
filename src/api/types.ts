@@ -132,3 +132,60 @@ export interface PatchMovieBody {
   /** 元数据/NFO 类标签整表替换；空数组表示清空本地 NFO 标签（下次刮削会再写入） */
   metadataTags?: string[]
 }
+
+/** GET /playback/progress */
+export interface PlaybackProgressItemDTO {
+  movieId: string
+  positionSec: number
+  durationSec: number
+  updatedAt: string
+}
+
+export interface PlaybackProgressListDTO {
+  items: PlaybackProgressItemDTO[]
+}
+
+/** PUT /playback/progress/{movieId} */
+export interface PutPlaybackProgressBody {
+  positionSec: number
+  durationSec: number
+}
+
+/** GET /curated-frames（无图像字节，图用 GET /curated-frames/{id}/image） */
+export interface CuratedFrameItemDTO {
+  id: string
+  movieId: string
+  title: string
+  code: string
+  actors: string[]
+  positionSec: number
+  capturedAt: string
+  tags: string[]
+}
+
+export interface CuratedFramesListDTO {
+  items: CuratedFrameItemDTO[]
+}
+
+/** POST /curated-frames */
+export interface CreateCuratedFrameBody {
+  id: string
+  movieId: string
+  title: string
+  code: string
+  actors: string[]
+  positionSec: number
+  capturedAt: string
+  tags?: string[]
+  imageBase64: string
+}
+
+/** PATCH /curated-frames/{id}/tags */
+export interface PatchCuratedFrameTagsBody {
+  tags: string[]
+}
+
+/** GET /library/played-movies */
+export interface PlayedMoviesListDTO {
+  movieIds: string[]
+}

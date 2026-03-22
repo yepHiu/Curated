@@ -5,6 +5,8 @@ interface Window {
   javLibrary?: {
     pickDirectory?: () => Promise<{ path: string } | null | undefined>
   }
+  /** File System Access API（Chromium）；类型定义可能未随 lib 一并更新 */
+  showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>
 }
 
 interface ImportMetaEnv {

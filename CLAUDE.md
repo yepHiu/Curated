@@ -71,12 +71,17 @@ go test -v ./internal/storage/...
 ### Full Stack Development
 
 ```bash
-# Terminal 1: Start backend
-./backend/javd.exe
+# Terminal 1: Start backend (from repo root or backend/)
+cd backend && go run ./cmd/javd
+# Or use pre-built binary: ./backend/javd.exe
 
 # Terminal 2: Start frontend dev server
 pnpm dev
 ```
+
+**Environment Variables:**
+- `VITE_USE_WEB_API=true` - Use real backend API (set in root `.env` by default)
+- `VITE_API_BASE_URL` - Override API base URL (default: `/api`)
 
 ## Architecture
 
@@ -106,6 +111,9 @@ src/
 - Domain components are in `src/components/jav-library/`
 - Mock data and types are in `src/lib/jav-library.ts`
 - Service layer with adapter pattern for backend communication
+- Routes: `library`, `favorites`, `recent`, `tags`, `history`, `detail/:id`, `player/:id`, `settings`
+- Playback progress: stored in browser `localStorage` only (key: `jav-library-playback-progress-v1`), not synced to backend
+- History page: `src/views/HistoryView.vue` displays watch history grouped by date (local browser only)
 
 ### Backend Structure (`backend/`)
 
@@ -138,19 +146,40 @@ backend/
 The backend exposes these HTTP endpoints:
 
 ```
-GET    /api/health              # Health check
-GET    /api/library/movies      # List movies (with query params: mode, q, limit, offset)
-GET    /api/library/movies/{id} # Get movie detail (rating = effective; metadataRating + userRating on detail)
-PATCH  /api/library/movies/{id} # Partial update: isFavorite, rating (0–5 user score; null clears user_rating)
-DELETE /api/library/movies/{id} # Delete movie
-POST   /api/library/paths       # Add library path
-PATCH  /api/library/paths/{id}  # Update library path
-DELETE /api/library/paths/{id}  # Delete library path
-GET    /api/settings           # Get settings
-PATCH  /api/settings           # Update settings
-POST   /api/scans              # Start scan task
-GET    /api/tasks/{taskId}      # Get task status
+GET    /api/health                          # Health check
+GET    /api/library/movies                  # List movies (query: mode, q, limit, offset)
+GET    /api/library/movies/{id}             # Get movie detail
+PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags
+DELETE /api/library/movies/{id}             # Delete movie
+GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
+POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
+POST   /api/library/paths                   # Add library path
+PATCH  /api/library/paths/{id}              # Update library path
+DELETE /api/library/paths/{id}              # Delete library path
+GET    /api/settings                       # Get settings
+PATCH  /api/settings                       # Update settings
+POST   /api/scans                          # Start scan task
+GET    /api/tasks/{taskId}                  # Get task status
 ```
+
+**Async Task Pattern:** Long-running operations (scan, scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
+
+## Architecture Boundaries
+
+**Implemented (Current State):**
+- Go HTTP backend with SQLite database
+- File scanning, metadata scraping, task system
+- REST API at `/api`
+- Frontend connects via HTTP when `VITE_USE_WEB_API=true`
+- Playback uses HTML5 `<video>` with HTTP Range streaming
+
+**Not Yet Implemented (Documented as Targets):**
+- Electron shell, preload script, main process IPC
+- mpv player integration with named pipes
+- Desktop file system bridge
+- Server-side playback history (currently localStorage-only)
+
+**Design Principle:** Frontend code should not assume Electron/mpv exists. All business logic goes through the service layer (`useLibraryService()`, `src/api/`) to allow swapping transport (HTTP now, IPC later).
 
 ## Key Documentation
 
@@ -202,6 +231,7 @@ Migrations are in `backend/internal/storage/migrations/` and run automatically o
 
 - The frontend Vite dev server proxies `/api` to `http://localhost:8080` (backend)
 - Backend supports three modes: `http` (default), `stdio`, `both`
-- Current state: Frontend uses mock adapter by default; HTTP adapter available for backend testing
+- Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - Auto-scan loop runs in background when backend starts
 - Library organization (文件整理) can be toggled via settings API
+- Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status

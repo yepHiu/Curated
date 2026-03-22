@@ -118,3 +118,23 @@ export const buildMovieRouteQuery = (
     tab: getLibraryTabQuery(currentQuery),
     selected: selectedMovieId,
   })
+
+/** 萃取帧库专用搜索（与影片库 `q` 隔离） */
+export const getCuratedFrameSearchQuery = (query: LocationQuery) =>
+  typeof query.cfq === "string" ? query.cfq : ""
+
+export const mergeCuratedFramesQuery = (
+  sourceQuery: LocationQuery,
+  patch: Partial<{ cfq: string | undefined }>,
+) => {
+  const nextQuery: LocationQuery = { ...sourceQuery }
+  if (hasOwnKey(patch, "cfq")) {
+    const t = patch.cfq?.trim()
+    if (t) {
+      nextQuery.cfq = t
+    } else {
+      delete nextQuery.cfq
+    }
+  }
+  return nextQuery
+}

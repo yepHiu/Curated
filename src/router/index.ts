@@ -32,6 +32,16 @@ const router = createRouter({
           component: () => import("@/views/LibraryView.vue"),
         },
         {
+          path: "history",
+          name: "history",
+          component: () => import("@/views/HistoryView.vue"),
+        },
+        {
+          path: "curated-frames",
+          name: "curated-frames",
+          component: () => import("@/views/CuratedFramesView.vue"),
+        },
+        {
           path: "detail/:id",
           name: "detail",
           component: () => import("@/views/DetailView.vue"),

@@ -16,7 +16,7 @@
 
 ```text
 .
-├── src/                    # 前端源码（页面、组件、API 客户端、服务适配器）
+├── src/                    # 前端源码（页面、组件、API、library-service 契约与 Web/Mock 适配器）
 ├── backend/
 │   ├── cmd/javd/           # 守护进程入口（HTTP / stdio / both）
 │   └── internal/           # 配置、存储、扫描、刮削、任务、HTTP 路由等
@@ -101,6 +101,12 @@ pnpm dev
 
 前后端 DTO 与错误约定可参考 `backend/internal/contracts/contracts.go` 与 `src/api/types.ts`。
 
+## 观看历史与续播（前端）
+
+- 侧栏 **History** → 路由 `history`（[`src/views/HistoryView.vue`](src/views/HistoryView.vue)），按本地日期分组展示曾播放条目。
+- **续播进度**保存在浏览器 **`localStorage`**（`jav-library-playback-progress-v1`），**不写数据库**；详情/资料库进播放器可带 `?t=`，从历史进播放器带 `?from=history` 以便顶栏返回。
+- 实现概要见 [`docs/project-memory.md`](docs/project-memory.md) 中「观看进度与历史」。
+
 ## 前端脚本
 
 ```bash
@@ -122,7 +128,8 @@ go test ./...
 ## 文档
 
 - [`docs/jav-libary.md`](docs/jav-libary.md)：产品设计、目标架构与边界
-- [`docs/project-memory.md`](docs/project-memory.md)：当前实现事实与阶段判断
+- [`docs/project-memory.md`](docs/project-memory.md)：当前实现事实与阶段判断（含 Mock/Web 双模式与观看进度说明）
+- [`docs/architecture-and-implementation.html`](docs/architecture-and-implementation.html)：架构与数据流说明（浏览器可直接打开）
 - [`docs/library-organize.md`](docs/library-organize.md)：媒体库整理相关说明
 
 ## 说明

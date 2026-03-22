@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import { computed } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Clapperboard,
+  History,
   LibraryBig,
   Settings2,
   Sparkles,
@@ -17,6 +20,12 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
+import { countCuratedFrames } from "@/lib/curated-frames/db"
+import { curatedFramesRevision } from "@/lib/curated-frames/revision"
+import {
+  listSortedByUpdatedDesc,
+  playbackProgressRevision,
+} from "@/lib/playback-progress-storage"
 import {
   countUniqueTags,
   formatSidebarCount,
@@ -48,28 +57,73 @@ interface NavigationItem {
   hint?: string
 }
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const libraryService = useLibraryService()
 
+const curatedFrameCount = ref(0)
+
+async function refreshCuratedFrameCount() {
+  try {
+    curatedFrameCount.value = await countCuratedFrames()
+  } catch {
+    curatedFrameCount.value = 0
+  }
+}
+
+watch(curatedFramesRevision, () => {
+  void refreshCuratedFrameCount()
+})
+
+onMounted(() => {
+  void refreshCuratedFrameCount()
+})
+
 const browseItems = computed((): NavigationItem[] => {
+  void locale.value
+  void playbackProgressRevision.value
+  void curatedFramesRevision.value
   const movies = libraryService.movies.value
   const total = movies.length
   const recent = movies.filter((m) => isMovieRecentlyAdded(m.addedAt)).length
   const tagCount = countUniqueTags(movies)
 
+  const historyTotal = listSortedByUpdatedDesc().length
+  const framesTotal = curatedFrameCount.value
+
   return [
-    { label: "All Movies", page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
-    { label: "Recently Added", page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
-    { label: "Tags", page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+    { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
+    { label: t("nav.recent"), page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
+    { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+    {
+      label: t("nav.history"),
+      page: "history",
+      icon: History,
+      hint: historyTotal > 0 ? formatSidebarCount(historyTotal) : undefined,
+    },
+    {
+      label: t("nav.curatedFrames"),
+      page: "curated-frames",
+      icon: Clapperboard,
+      hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
+    },
   ]
 })
 
 const isActive = (page: AppPage) => route.name === page
 
-const getNavigationTarget = (page: AppPage) =>
-  page === "settings"
-    ? { name: page }
-    : buildBrowseRouteTarget(page as LibraryMode, route.query)
+const getNavigationTarget = (page: AppPage) => {
+  if (page === "settings") {
+    return { name: page }
+  }
+  if (page === "history") {
+    return { name: "history" }
+  }
+  if (page === "curated-frames") {
+    return { name: "curated-frames" }
+  }
+  return buildBrowseRouteTarget(page as LibraryMode, route.query)
+}
 </script>
 
 <template>
@@ -98,8 +152,8 @@ const getNavigationTarget = (page: AppPage) =>
           variant="ghost"
           size="icon"
           class="rounded-xl"
-          title="收起侧栏"
-          aria-label="收起侧栏"
+          :title="t('nav.collapseSidebar')"
+          :aria-label="t('nav.collapseSidebar')"
           @click="emit('toggleCompact')"
         >
           <ChevronLeft class="size-5" />
@@ -118,8 +172,8 @@ const getNavigationTarget = (page: AppPage) =>
         variant="ghost"
         size="icon-lg"
         class="shrink-0 rounded-xl"
-        title="展开侧栏"
-        aria-label="展开侧栏"
+        :title="t('nav.expandSidebar')"
+        :aria-label="t('nav.expandSidebar')"
         @click="emit('toggleCompact')"
       >
         <ChevronRight class="size-5" />
@@ -144,7 +198,7 @@ const getNavigationTarget = (page: AppPage) =>
           <span
             class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
           >
-            Browse
+            {{ t("nav.browse") }}
           </span>
           <Button
             v-for="item in browseItems"
@@ -178,7 +232,7 @@ const getNavigationTarget = (page: AppPage) =>
     >
       <nav
         class="flex flex-col items-center gap-2 py-1"
-        aria-label="Browse"
+        :aria-label="t('nav.browse')"
       >
         <RouterLink
           v-for="item in browseItems"
@@ -213,13 +267,13 @@ const getNavigationTarget = (page: AppPage) =>
         class="flex w-full items-center gap-2"
       >
         <Settings2 data-icon="inline-start" />
-        <span>Settings</span>
+        <span>{{ t("nav.settings") }}</span>
       </RouterLink>
     </Button>
     <RouterLink
       v-else
       :to="getNavigationTarget('settings')"
-      title="Settings"
+      :title="t('nav.settings')"
       class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
       :class="
         isActive('settings')

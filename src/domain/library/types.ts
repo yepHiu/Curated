@@ -3,6 +3,8 @@ export type AppPage =
   | "favorites"
   | "recent"
   | "tags"
+  | "history"
+  | "curated-frames"
   | "detail"
   | "player"
   | "settings"
@@ -12,9 +14,9 @@ export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | 
 export type LibraryTab = "all" | "new" | "top-rated"
 
 export interface LibraryStat {
-  label: string
+  labelKey: string
   value: string
-  detail: string
+  detailKey: string
 }
 
 export interface LibrarySetting {

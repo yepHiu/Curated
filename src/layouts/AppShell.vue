@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
 import { LayoutDashboard, Menu, Search, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
@@ -10,15 +11,18 @@ import { Input } from "@/components/ui/input"
 import {
   buildMovieRouteQuery,
   getBrowseSourceMode,
+  getCuratedFrameSearchQuery,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
   isLibraryRouteName,
+  mergeCuratedFramesQuery,
   mergeLibraryQuery,
 } from "@/lib/library-query"
 import { useLibraryService } from "@/services/library-service"
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
@@ -83,6 +87,7 @@ const currentMovie = computed(() => {
 
 const currentMovieId = computed(() => currentMovie.value?.id)
 const isLibraryRoute = computed(() => isLibraryRouteName(route.name))
+const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const isDetailRoute = computed(() => route.name === "detail")
 const isPlayerRoute = computed(() => route.name === "player")
 
@@ -90,6 +95,12 @@ const showHeaderBack = computed(() => !isLibraryRoute.value)
 
 const headerBackTarget = computed(() => {
   if (isPlayerRoute.value && currentMovieId.value) {
+    if (route.query.from === "history") {
+      return { name: "history" }
+    }
+    if (route.query.from === "curated-frames") {
+      return { name: "curated-frames" }
+    }
     return {
       name: "detail",
       params: { id: currentMovieId.value },
@@ -113,9 +124,15 @@ const headerBackTarget = computed(() => {
   return { name: "library" }
 })
 
-const headerBackLabel = computed(() =>
-  isPlayerRoute.value && currentMovieId.value ? "Back to details" : "Back to library",
-)
+const headerBackLabel = computed(() => {
+  void locale.value
+  if (isPlayerRoute.value && currentMovieId.value) {
+    if (route.query.from === "history") return t("shell.backHistory")
+    if (route.query.from === "curated-frames") return t("shell.backCurated")
+    return t("shell.backDetail")
+  }
+  return t("shell.backLibrary")
+})
 
 /** 输入即时更新；同步到 URL 防抖，避免每键一次 router.replace 导致整库重算/重绘 */
 const searchDraft = ref("")
@@ -180,6 +197,55 @@ function clearLibrarySearch() {
     }),
   })
 }
+
+/** 萃取帧库专用顶栏搜索（`cfq`） */
+const searchDraftFrames = ref("")
+
+watch(
+  [() => route.name, () => route.query.cfq],
+  () => {
+    if (!isCuratedFramesRoute.value) {
+      return
+    }
+    const part = getCuratedFrameSearchQuery(route.query)
+    if (part !== searchDraftFrames.value) {
+      searchDraftFrames.value = part
+    }
+  },
+  { immediate: true },
+)
+
+watchDebounced(
+  searchDraftFrames,
+  (value) => {
+    if (!isCuratedFramesRoute.value) {
+      return
+    }
+    const normalized = value.trim()
+    const current = getCuratedFrameSearchQuery(route.query).trim()
+    if (normalized === current) {
+      return
+    }
+    void router.replace({
+      name: "curated-frames",
+      query: mergeCuratedFramesQuery(route.query, {
+        cfq: normalized || undefined,
+      }),
+    })
+  },
+  { debounce: 280 },
+)
+
+function clearCuratedFramesSearch() {
+  searchDraftFrames.value = ""
+  if (!isCuratedFramesRoute.value) {
+    return
+  }
+  void router.replace({
+    name: "curated-frames",
+    query: mergeCuratedFramesQuery(route.query, { cfq: undefined }),
+  })
+}
 </script>
 
 <template>
@@ -205,7 +271,7 @@ function clearLibrarySearch() {
                 variant="secondary"
                 size="icon"
                 class="shrink-0 rounded-2xl lg:hidden"
-                aria-label="打开导航菜单"
+                :aria-label="t('shell.openMenu')"
                 @click="mobileSidebarOpen = true"
               >
                 <Menu class="size-5" />
@@ -228,7 +294,7 @@ function clearLibrarySearch() {
                   v-model="searchDraft"
                   class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
                   :class="searchDraft.trim() ? 'pr-10' : ''"
-                  placeholder="Search by code, title, actor, or tag"
+                  :placeholder="t('shell.searchLibraryPlaceholder')"
                 />
                 <Button
                   v-if="searchDraft.trim()"
@@ -236,8 +302,31 @@ function clearLibrarySearch() {
                   variant="ghost"
                   size="icon"
                   class="absolute top-1/2 right-1.5 size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="清除搜索"
+                  :aria-label="t('shell.clearSearch')"
                   @click="clearLibrarySearch"
+                >
+                  <X class="size-4" />
+                </Button>
+              </div>
+              <div
+                v-else-if="isCuratedFramesRoute"
+                class="relative w-full max-w-lg"
+              >
+                <Search class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  v-model="searchDraftFrames"
+                  class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
+                  :class="searchDraftFrames.trim() ? 'pr-10' : ''"
+                  :placeholder="t('shell.searchCuratedPlaceholder')"
+                />
+                <Button
+                  v-if="searchDraftFrames.trim()"
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  class="absolute top-1/2 right-1.5 size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  :aria-label="t('shell.clearCuratedSearch')"
+                  @click="clearCuratedFramesSearch"
                 >
                   <X class="size-4" />
                 </Button>
@@ -266,7 +355,7 @@ function clearLibrarySearch() {
           class="absolute inset-0 bg-black/50 transition-opacity duration-200"
           :class="mobileSidebarOpen ? 'opacity-100' : 'opacity-0'"
           tabindex="-1"
-          aria-label="关闭导航菜单"
+          :aria-label="t('shell.closeMenu')"
           @click="mobileSidebarOpen = false"
         />
         <aside
@@ -274,7 +363,7 @@ function clearLibrarySearch() {
           :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
           role="dialog"
           aria-modal="true"
-          aria-label="导航"
+          :aria-label="t('shell.navDialog')"
         >
           <div class="min-h-0 flex-1 overflow-hidden p-3 pt-4">
             <AppSidebar />

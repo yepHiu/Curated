@@ -321,6 +321,7 @@
     <li><span class="path">src/router/index.ts</span>：使用 <strong>Hash 路由</strong>（<code>createWebHashHistory</code>），子路由挂在 <span class="path">layouts/AppShell.vue</span> 下：
       <ul>
         <li><code>/library</code>、<code>/favorites</code>、<code>/recent</code>、<code>/tags</code> → 同一 <span class="path">views/LibraryView.vue</span>（通过路由名区分模式）。</li>
+        <li><code>/history</code> → <span class="path">views/HistoryView.vue</span>（观看历史：按本地日期分组；数据见 2.5）。</li>
         <li><code>/detail/:id</code> → <span class="path">views/DetailView.vue</span></li>
         <li><code>/player/:id?</code> → <span class="path">views/PlayerView.vue</span></li>
         <li><code>/settings</code> → <span class="path">views/SettingsView.vue</span></li>
@@ -351,6 +352,15 @@
 
   <h3>2.4 Mock 适配器</h3>
   <p><span class="path">src/services/adapters/mock/mock-library-service.ts</span> 使用内存种子数据模拟列表、详情、扫描任务等。收藏与用户评分等偏好可经 <span class="path">src/lib/mock-movie-prefs-storage.ts</span> 写入 <code>localStorage</code>，刷新后仍保留（与真实后端 SQLite 持久化行为对应，便于离线演示）。</p>
+
+  <h3>2.5 观看进度与历史（仅浏览器，非 API）</h3>
+  <ul>
+    <li><span class="path">src/lib/playback-progress-storage.ts</span>：每条影片的播放位置、时长、更新时间，键名 <code>jav-library-playback-progress-v1</code>。</li>
+    <li><span class="path">src/lib/player-route.ts</span>：构造进播放器时的 query（如 <code>?t=</code> 续播、<code>from=history</code> 返回栈）。</li>
+    <li><span class="path">src/lib/playback-history-groups.ts</span>：历史页按本地日历日分组标题（今天 / 昨天 / …）。</li>
+    <li><span class="path">src/components/jav-library/PlaybackHistoryCard.vue</span>：历史列表卡片（文案 + 海报 + 底栏进度条）。</li>
+    <li><strong>不与 SQLite 同步</strong>；服务端 <code>play_history</code> 仍为产品文档中的待决策项。</li>
+  </ul>
 
   <h2 id="backend">3. 后端（Go + SQLite）</h2>
 
@@ -424,8 +434,9 @@
   <div class="flow">
     <span>UI 事件</span> → <span>patchMovie / toggleFavorite</span> → <span>PATCH /api/library/movies/{id}</span> → <span>SQLite 更新</span> → <span>返回完整 MovieDetailDTO</span> → <span>前端合并列表缓存</span>
   </div>
-  <h3>5.4 播放</h3>
-  <p>前端根据影片 ID 构造指向 <code>/api/library/movies/{id}/stream</code> 的 URL（开发环境仍走 Vite 代理）。播放器组件发起媒体请求，由 Go <code>ServeContent</code> 按文件实际路径读出并支持断点续传。</p>
+  <h3>5.4 播放与续播</h3>
+  <p>前端根据影片 ID 构造指向 <code>/api/library/movies/{id}/stream</code> 的 URL（开发环境仍走 Vite 代理）。播放器组件发起媒体请求，由 Go <code>ServeContent</code> 按文件实际路径读出并支持 HTTP Range。</p>
+  <p><strong>续播（前端）</strong>：<span class="path">PlayerPage.vue</span> 在 <code>loadedmetadata</code> 后按路由 <code>?t=</code> 或 <code>localStorage</code> 写入的位置 seek；播放中节流回写进度。详情/资料库进播放器可由 <code>buildPlayerRouteFromBrowse</code> 附带 <code>t</code>；历史页进播放器带 <code>from=history</code>，顶栏返回历史（<span class="path">AppShell.vue</span>）。</p>
 
   <h2 id="features">6. 功能模块与代码落点</h2>
   <table>
@@ -438,6 +449,7 @@
       <tr><td>设置与库路径</td><td><code>SettingsView</code>、<code>SettingsPage</code></td><td><code>handleGetSettings</code>、paths CRUD</td></tr>
       <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
       <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
+      <tr><td>观看历史 / 续播</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code></td><td>—（未落库）</td></tr>
     </tbody>
   </table>
 

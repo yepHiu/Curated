@@ -1,6 +1,8 @@
 import { httpClient } from "./http-client"
 import type {
   AddLibraryPathBody,
+  CreateCuratedFrameBody,
+  CuratedFramesListDTO,
   HealthDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
@@ -9,8 +11,12 @@ import type {
   MetadataScrapeByPathsBody,
   MovieDetailDTO,
   MoviesPageDTO,
+  PatchCuratedFrameTagsBody,
   PatchMovieBody,
   PatchSettingsBody,
+  PlayedMoviesListDTO,
+  PlaybackProgressListDTO,
+  PutPlaybackProgressBody,
   SettingsDTO,
   StartScanBody,
   TaskDTO,
@@ -19,6 +25,14 @@ import type {
 export const api = {
   health(): Promise<HealthDTO> {
     return httpClient.get<HealthDTO>("/health")
+  },
+
+  listPlayedMovies(): Promise<PlayedMoviesListDTO> {
+    return httpClient.get<PlayedMoviesListDTO>("/library/played-movies")
+  },
+
+  recordPlayedMovie(movieId: string): Promise<void> {
+    return httpClient.post<void>(`/library/played-movies/${encodeURIComponent(movieId)}`)
   },
 
   listMovies(params?: ListMoviesParams): Promise<MoviesPageDTO> {
@@ -71,5 +85,33 @@ export const api = {
 
   getTaskStatus(taskId: string): Promise<TaskDTO> {
     return httpClient.get<TaskDTO>(`/tasks/${encodeURIComponent(taskId)}`)
+  },
+
+  listPlaybackProgress(): Promise<PlaybackProgressListDTO> {
+    return httpClient.get<PlaybackProgressListDTO>("/playback/progress")
+  },
+
+  putPlaybackProgress(movieId: string, body: PutPlaybackProgressBody): Promise<void> {
+    return httpClient.put(`/playback/progress/${encodeURIComponent(movieId)}`, body)
+  },
+
+  deletePlaybackProgress(movieId: string): Promise<void> {
+    return httpClient.delete(`/playback/progress/${encodeURIComponent(movieId)}`)
+  },
+
+  listCuratedFrames(): Promise<CuratedFramesListDTO> {
+    return httpClient.get<CuratedFramesListDTO>("/curated-frames")
+  },
+
+  createCuratedFrame(body: CreateCuratedFrameBody): Promise<void> {
+    return httpClient.post<void>("/curated-frames", body)
+  },
+
+  patchCuratedFrameTags(id: string, body: PatchCuratedFrameTagsBody): Promise<void> {
+    return httpClient.patch<void>(`/curated-frames/${encodeURIComponent(id)}/tags`, body)
+  },
+
+  deleteCuratedFrame(id: string): Promise<void> {
+    return httpClient.delete(`/curated-frames/${encodeURIComponent(id)}`)
   },
 }

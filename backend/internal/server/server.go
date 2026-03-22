@@ -77,6 +77,8 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
+	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
+	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
@@ -91,6 +93,16 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
 	mux.HandleFunc("GET /api/tasks/{taskId}", h.handleGetTaskStatus)
+
+	mux.HandleFunc("GET /api/playback/progress", h.handleListPlaybackProgress)
+	mux.HandleFunc("PUT /api/playback/progress/{movieId}", h.handlePutPlaybackProgress)
+	mux.HandleFunc("DELETE /api/playback/progress/{movieId}", h.handleDeletePlaybackProgress)
+
+	mux.HandleFunc("GET /api/curated-frames", h.handleListCuratedFrames)
+	mux.HandleFunc("POST /api/curated-frames", h.handlePostCuratedFrame)
+	mux.HandleFunc("GET /api/curated-frames/{id}/image", h.handleGetCuratedFrameImage)
+	mux.HandleFunc("PATCH /api/curated-frames/{id}/tags", h.handlePatchCuratedFrameTags)
+	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)
 
 	return withCORS(mux)
 }

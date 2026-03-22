@@ -35,7 +35,7 @@ export interface TagCountEntry {
 }
 
 /** 元数据/NFO 标签：按影片命中次数聚合，次数降序 */
-export function aggregateMetadataTagCounts(movies: readonly Movie[]): TagCountEntry[] {
+export function aggregateMetadataTagCounts(movies: readonly Movie[], locale: string): TagCountEntry[] {
   const map = new Map<string, number>()
   for (const m of movies) {
     for (const tag of m.tags) {
@@ -48,12 +48,12 @@ export function aggregateMetadataTagCounts(movies: readonly Movie[]): TagCountEn
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count
-      return a.tag.localeCompare(b.tag, "zh-CN", { numeric: true })
+      return a.tag.localeCompare(b.tag, locale, { numeric: true })
     })
 }
 
 /** 用户标签：按影片命中次数聚合，次数降序 */
-export function aggregateUserTagCounts(movies: readonly Movie[]): TagCountEntry[] {
+export function aggregateUserTagCounts(movies: readonly Movie[], locale: string): TagCountEntry[] {
   const map = new Map<string, number>()
   for (const m of movies) {
     for (const tag of m.userTags) {
@@ -66,34 +66,34 @@ export function aggregateUserTagCounts(movies: readonly Movie[]): TagCountEntry[
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count
-      return a.tag.localeCompare(b.tag, "zh-CN", { numeric: true })
+      return a.tag.localeCompare(b.tag, locale, { numeric: true })
     })
 }
 
-const zhNumber = (n: number) => n.toLocaleString("zh-CN")
-
-/** 设置页顶部三张统计卡（入库数、标签种类、本机曾播放去重部数） */
+/** 设置页顶部三张统计卡（入库数、标签种类、已播放去重部数）；文案 key 由 i18n 解析 */
 export function buildSettingsDashboardStats(
   movies: readonly Movie[],
   playedUniqueCount: number,
+  locale: string,
 ): LibraryStat[] {
   const movieCount = movies.length
   const tagKinds = countUniqueTags(movies)
+  const fmt = (n: number) => n.toLocaleString(locale)
   return [
     {
-      label: "入库影片",
-      value: zhNumber(movieCount),
-      detail: "当前前端已加载的库条目数量（与列表缓存一致）。",
+      labelKey: "stats.moviesInLibrary",
+      value: fmt(movieCount),
+      detailKey: "stats.moviesInLibraryDetail",
     },
     {
-      label: "标签种类",
-      value: zhNumber(tagKinds),
-      detail: "元数据标签与用户标签合并去重后的种类数。",
+      labelKey: "stats.tagKinds",
+      value: fmt(tagKinds),
+      detailKey: "stats.tagKindsDetail",
     },
     {
-      label: "已播放影片",
-      value: zhNumber(playedUniqueCount),
-      detail: "曾进入播放页的去重部数，仅保存在本机浏览器。",
+      labelKey: "stats.playedMovies",
+      value: fmt(playedUniqueCount),
+      detailKey: "stats.playedMoviesDetail",
     },
   ]
 }

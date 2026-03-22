@@ -2,6 +2,7 @@ import { computed, ref } from "vue"
 import type { MetadataRefreshQueuedDTO, PatchMovieBody } from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+import { i18n } from "@/i18n"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { playedMovieCount } from "@/lib/played-movies-storage"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
@@ -38,6 +39,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "Velvet North",
     actors: ["Mina Kaze", "Rin Asuka"],
     tags: ["Romance", "4K", "Late Night"],
+    userTags: [],
     runtimeMinutes: 134,
     rating: 4.8,
     summary:
@@ -53,6 +55,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "Studio Garnet",
     actors: ["Airi Sena"],
     tags: ["Drama", "Office", "High Rating"],
+    userTags: [],
     runtimeMinutes: 126,
     rating: 4.7,
     summary:
@@ -68,6 +71,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "Moonlight Works",
     actors: ["Yua Mori", "Nao Shin"],
     tags: ["Sci-Fi", "Stylized", "New"],
+    userTags: [],
     runtimeMinutes: 118,
     rating: 4.5,
     summary:
@@ -83,6 +87,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "North Pier",
     actors: ["Emi Kisaragi"],
     tags: ["Travel", "Outdoor", "Recently Added"],
+    userTags: [],
     runtimeMinutes: 142,
     rating: 4.2,
     summary:
@@ -98,6 +103,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "Golden Frame",
     actors: ["Sora Minami", "Miu Arata"],
     tags: ["Character", "Favorites", "Longform"],
+    userTags: [],
     runtimeMinutes: 151,
     rating: 4.9,
     summary:
@@ -113,6 +119,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
     studio: "Afterglow",
     actors: ["Kanna Rei"],
     tags: ["Moody", "Slow Burn", "Archive"],
+    userTags: [],
     runtimeMinutes: 129,
     rating: 4.1,
     summary:
@@ -231,7 +238,11 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value),
   libraryStats: computed(() =>
-    buildSettingsDashboardStats(moviesState.value, playedMovieCount.value),
+    buildSettingsDashboardStats(
+      moviesState.value,
+      playedMovieCount.value,
+      i18n.global.locale.value as string,
+    ),
   ),
   libraryPaths: computed(() => libraryPathsState.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),

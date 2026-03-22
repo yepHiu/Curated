@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
 import type { TaskDTO } from "@/api/types"
@@ -7,6 +8,7 @@ import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
+import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
@@ -14,6 +16,7 @@ import type { Movie } from "@/domain/movie/types"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
@@ -69,8 +72,7 @@ watch(
         } else {
           detailMovie.value = libraryService.getMovieById(id)
           if (!detailMovie.value) {
-            detailLoadError.value =
-              "无法从服务器加载本片详情，请确认后端在运行（默认 :8080）且 Vite 已将 /api 代理到后端。"
+            detailLoadError.value = t("detail.loadError")
           }
         }
       } finally {
@@ -99,8 +101,7 @@ watch(scanTaskTracker.activeTask, async (task) => {
       detailMovie.value = loaded
     }
   } else if (task.status === "failed" || task.status === "partial_failed") {
-    metadataRefreshError.value =
-      task.errorMessage?.trim() || "元数据刮削失败，详情未更新"
+    metadataRefreshError.value = task.errorMessage?.trim() || t("detail.scrapeFailed")
   }
 })
 
@@ -130,14 +131,9 @@ const openDetails = async (nextMovieId: string) => {
 }
 
 const openPlayer = async (nextMovieId: string) => {
-  await router.push({
-    name: "player",
-    params: { id: nextMovieId },
-    query: {
-      ...buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
-      autoplay: "1",
-    },
-  })
+  await router.push(
+    buildPlayerRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
+  )
 }
 
 const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {
@@ -148,7 +144,7 @@ const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) 
       detailMovie.value = updated
     }
   } catch (err) {
-    patchError.value = formatClientError(err, "更新收藏失败，请检查网络与后端日志。")
+    patchError.value = formatClientError(err, t("detail.errFavorite"))
     console.error("[DetailView] toggle favorite failed", err)
   }
 }
@@ -163,7 +159,7 @@ const updateUserRating = async (payload: { movieId: string; value: number | null
       detailMovie.value = updated
     }
   } catch (err) {
-    patchError.value = formatClientError(err, "更新评分失败，请检查网络与后端日志。")
+    patchError.value = formatClientError(err, t("detail.errRating"))
     console.error("[DetailView] update user rating failed", err)
   }
 }
@@ -178,7 +174,7 @@ const updateUserTags = async (payload: { movieId: string; tags: string[] }) => {
       detailMovie.value = updated
     }
   } catch (err) {
-    patchError.value = formatClientError(err, "更新用户标签失败，请检查网络与后端日志。")
+    patchError.value = formatClientError(err, t("detail.errUserTags"))
     console.error("[DetailView] update user tags failed", err)
   }
 }
@@ -193,7 +189,7 @@ const updateMetadataTags = async (payload: { movieId: string; tags: string[] }) 
       detailMovie.value = updated
     }
   } catch (err) {
-    patchError.value = formatClientError(err, "更新元数据标签失败，请检查网络与后端日志。")
+    patchError.value = formatClientError(err, t("detail.errMetadataTags"))
     console.error("[DetailView] update metadata tags failed", err)
   }
 }
@@ -247,7 +243,7 @@ const handleDeleteMovie = async (id: string) => {
         ? (err.apiError?.message ?? err.message)
         : err instanceof Error
           ? err.message
-          : "删除失败"
+          : t("detail.deleteFailGeneric")
     deleteError.value = message
     console.error("[DetailView] delete movie failed", err)
   } finally {
@@ -262,8 +258,8 @@ const handleRefreshMetadata = async (id: string) => {
     const task = await libraryService.refreshMovieMetadata(id)
     if (!task?.taskId) {
       metadataRefreshError.value = USE_WEB_API
-        ? "无法启动刷新任务"
-        : "本地演示模式不支持刷新元数据，请启用后端 API（VITE_USE_WEB_API）"
+        ? t("detail.refreshTaskFail")
+        : t("detail.refreshMockMode")
       return
     }
     scanTaskTracker.start(task.taskId)
@@ -273,7 +269,7 @@ const handleRefreshMetadata = async (id: string) => {
         ? (err.apiError?.message ?? err.message)
         : err instanceof Error
           ? err.message
-          : "刷新失败"
+          : t("detail.refreshFailGeneric")
     metadataRefreshError.value = message
     console.error("[DetailView] refresh metadata failed", err)
   } finally {
@@ -288,7 +284,7 @@ const handleRefreshMetadata = async (id: string) => {
       v-if="detailLoading"
       class="rounded-3xl border border-border/70 bg-card/80 p-8 text-sm text-muted-foreground"
     >
-      正在加载详情与预览图…
+      {{ t("detail.loadingDetail") }}
     </div>
     <template v-else-if="detailMovie">
       <p
@@ -301,7 +297,7 @@ const handleRefreshMetadata = async (id: string) => {
         v-if="deleteBusy"
         class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
       >
-        正在删除影片…
+        {{ t("detail.deletingMovie") }}
       </p>
       <p
         v-if="deleteError"
@@ -335,11 +331,8 @@ const handleRefreshMetadata = async (id: string) => {
     </template>
     <NotFoundState
       v-else
-      title="未找到影片"
-      :description="
-        detailLoadError ||
-        '当前库中不存在该条目，或详情接口暂时不可用。'
-      "
+      :title="t('detail.notFoundTitle')"
+      :description="detailLoadError || t('detail.notFoundDescFallback')"
     />
   </div>
 </template>

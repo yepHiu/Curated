@@ -5,6 +5,7 @@ import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+import { i18n } from "@/i18n"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { playedMovieCount } from "@/lib/played-movies-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
@@ -77,9 +78,10 @@ function createWebLibraryService(): LibraryService {
 
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
-    libraryStats: computed(() =>
-      buildSettingsDashboardStats(moviesState.value, playedMovieCount.value),
-    ),
+    libraryStats: computed(() => {
+      const loc = i18n.global.locale.value as string
+      return buildSettingsDashboardStats(moviesState.value, playedMovieCount.value, loc)
+    }),
     libraryPaths: computed(() => libraryPathsState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
 

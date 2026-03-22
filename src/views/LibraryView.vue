@@ -14,6 +14,7 @@ import {
   isLibraryRouteName,
   mergeLibraryQuery,
 } from "@/lib/library-query"
+import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
 import { compareByReleaseDateDesc } from "@/lib/movie-sort"
@@ -148,14 +149,7 @@ const openPlayer = async (movieId?: string) => {
     return
   }
 
-  await router.push({
-    name: "player",
-    params: { id: nextMovieId },
-    query: {
-      ...buildMovieRouteQuery(route.query, libraryMode.value, nextMovieId),
-      autoplay: "1",
-    },
-  })
+  await router.push(buildPlayerRouteFromBrowse(nextMovieId, route.query, libraryMode.value))
 }
 
 const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {

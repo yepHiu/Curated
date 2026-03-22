@@ -11,6 +11,10 @@ import {
 } from "@/components/ui/card"
 import { Toggle } from "@/components/ui/toggle"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
+import {
+  getProgress,
+  playbackProgressRevision,
+} from "@/lib/playback-progress-storage"
 
 const props = defineProps<{
   movie: Movie
@@ -30,6 +34,16 @@ const userTagCount = computed(() => props.movie.userTags.length)
 
 /** 列表优先用缩略图，减轻带宽；无则回落封面 */
 const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl || "")
+
+/** 与 PlaybackHistoryCard 相同算法；依赖 revision 以便播放器回写进度后卡片更新 */
+const progressPercent = computed(() => {
+  void playbackProgressRevision.value
+  const row = getProgress(props.movie.id)
+  if (!row) return null
+  const dur = row.durationSec
+  if (!dur || dur <= 0) return null
+  return Math.min(100, Math.max(0, (row.positionSec / dur) * 100))
+})
 
 const handleOpenDetails = () => {
   emit("select", props.movie.id)
@@ -83,6 +97,17 @@ const handleFavoriteChange = (nextValue: boolean) => {
           >
             <Heart />
           </Toggle>
+
+          <div
+            v-if="progressPercent != null"
+            class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50"
+            aria-hidden="true"
+          >
+            <div
+              class="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+              :style="{ width: `${progressPercent}%` }"
+            />
+          </div>
         </div>
       </div>
 

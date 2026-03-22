@@ -191,6 +191,63 @@ type PlayerSettingsDTO struct {
 	HardwareDecode bool `json:"hardwareDecode"`
 }
 
+// PlaybackProgressItemDTO is one row in GET /api/playback/progress.
+type PlaybackProgressItemDTO struct {
+	MovieID     string  `json:"movieId"`
+	PositionSec float64 `json:"positionSec"`
+	DurationSec float64 `json:"durationSec"`
+	UpdatedAt   string  `json:"updatedAt"`
+}
+
+type PlaybackProgressListDTO struct {
+	Items []PlaybackProgressItemDTO `json:"items"`
+}
+
+// PutPlaybackProgressBody is the JSON body for PUT /api/playback/progress/{movieId}.
+type PutPlaybackProgressBody struct {
+	PositionSec float64 `json:"positionSec"`
+	DurationSec float64 `json:"durationSec"`
+}
+
+// CuratedFrameItemDTO is list metadata (no image); use GET /api/curated-frames/{id}/image for bytes.
+type CuratedFrameItemDTO struct {
+	ID          string   `json:"id"`
+	MovieID     string   `json:"movieId"`
+	Title       string   `json:"title"`
+	Code        string   `json:"code"`
+	Actors      []string `json:"actors"`
+	PositionSec float64  `json:"positionSec"`
+	CapturedAt  string   `json:"capturedAt"`
+	Tags        []string `json:"tags"`
+}
+
+type CuratedFramesListDTO struct {
+	Items []CuratedFrameItemDTO `json:"items"`
+}
+
+// CreateCuratedFrameBody is the JSON body for POST /api/curated-frames (image as standard base64, no data: prefix).
+type CreateCuratedFrameBody struct {
+	ID          string   `json:"id"`
+	MovieID     string   `json:"movieId"`
+	Title       string   `json:"title"`
+	Code        string   `json:"code"`
+	Actors      []string `json:"actors"`
+	PositionSec float64  `json:"positionSec"`
+	CapturedAt  string   `json:"capturedAt"`
+	Tags        []string `json:"tags"`
+	ImageBase64 string   `json:"imageBase64"`
+}
+
+// PatchCuratedFrameTagsBody is the JSON body for PATCH /api/curated-frames/{id}/tags.
+type PatchCuratedFrameTagsBody struct {
+	Tags []string `json:"tags"`
+}
+
+// PlayedMoviesListDTO is returned by GET /api/library/played-movies.
+type PlayedMoviesListDTO struct {
+	MovieIDs []string `json:"movieIds"`
+}
+
 type TaskDTO struct {
 	TaskID       string         `json:"taskId"`
 	Type         string         `json:"type"`

@@ -4,7 +4,7 @@
 
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
 - `docs/jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
-- 当前仓库已经包含前端原型和 `Go + SQLite` 后端雏形，但前后端仍未完成真实联通。
+- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** + Vite 代理 **`/api` → `:8080`** 联通真实 HTTP API（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
 
 ## 2. 当前代码事实
@@ -28,24 +28,24 @@
 - 产品组件：`src/components/jav-library`
 - UI 原子组件：`src/components/ui`
 - 主题样式：`src/style.css`
-- 原型数据与类型：`src/lib/jav-library.ts`
+- 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
+- 播放进度（仅浏览器，非服务端）：`src/lib/playback-progress-storage.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
+- 已播计数（localStorage）：`src/lib/played-movies-storage.ts`
 
 ### 当前交付状态
 
 - 应用已经是路由驱动的 SPA，而不是最初的单页按钮演示。
 - `App.vue` 仅承载 `RouterView`，页面切换统一由 `vue-router` 管理。
 - `AppShell` 已实现侧边栏、顶部搜索区和主内容区的稳定壳层。
-- 当前业务数据来自 `src/lib/jav-library.ts` 的 typed mock 数据，而不是真实服务层或本地数据库。
-- 项目已具备图库浏览、详情、播放器占位页、设置页等原型页面。
+- **数据源**：环境变量 **`VITE_USE_WEB_API`** 为 `true` 时，页面通过 **`src/services/adapters/web`** 与 **`src/api/*`** 消费后端 HTTP API；否则使用 **`mock`** 适配器与 `jav-library` 假数据。
+- 已具备：图库浏览（含虚拟滚动）、详情、**HTML5 视频播放**（接后端 stream 时）、**观看历史**（`history` 路由）、设置与扫描/刮削任务轮询等；部分能力在 Mock 模式下为降级表现。
 
 ### 当前前后端互联事实
 
-- 当前前端页面直接消费 `src/lib/jav-library.ts` 导出的类型、列表和查询函数。
-- 仓库内尚未落地独立 `services` 层，因此页面与 mock 数据模块仍然是直接依赖关系。
-- 当前仓库内已存在 `Go Backend`、`SQLite`、扫描、搜刮和任务管理代码。
-- 当前尚未提供供前端消费的真实 HTTP API，前端也还没有 `web adapter`。
-- 当前没有 Electron `preload`、主进程桥接或桌面运行时接线代码。
-- 当前“播放器页”“设置页”“扫描相关设置”都只是前端原型，不代表播放、扫描、搜刮链路已经打通。
+- 已落地 **library-service 契约**（`src/services/contracts/library-service.ts`）与 **Web / Mock 双适配器**。
+- **Go Backend** 提供 `/api` 下健康检查、影片列表/详情/PATCH/删除、**视频流 Range**、库路径、设置、扫描、任务等（摘要见 `README.md`）。
+- **无 Electron** `preload`、主进程桥接或 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
+- **观看进度与历史列表**仅存 **`localStorage`**，**未**写入 SQLite；与产品文档 §6.5 中服务端 `play_history` 表仍为「待决策/未落地」关系。
 
 ## 3. 当前产品信息架构
 
@@ -55,20 +55,28 @@
 - `favorites`
 - `recent`
 - `tags`
+- `history`（观看历史：按本地日期分组，数据见下）
 - `detail/:id`
 - `player/:id?`
 - `settings`
 
+### 观看进度与历史（前端事实）
+
+- **续播进度**（当前时间、时长、`updatedAt`）保存在 **`localStorage`** 键 **`jav-library-playback-progress-v1`**；**不与后端同步**。清除站点数据、换浏览器或隐私模式会丢失。
+- **路由**：`history` → [`src/views/HistoryView.vue`](src/views/HistoryView.vue)；按本地日历日分组（今天/昨天/日期）；卡片 [`PlaybackHistoryCard.vue`](src/components/jav-library/PlaybackHistoryCard.vue)（左文案、右海报 **`coverUrl` 优先**、`object-cover` 裁切、底栏进度条）。
+- **续播**：`PlayerPage` 在 `loadedmetadata` 后根据 **`?t=`**（优先）或本地存储 seek；`timeupdate` 节流写入；pause/ended/隐藏页签/unmount 补写。
+- 从资料库/详情进入播放器：[`buildPlayerRouteFromBrowse`](src/lib/player-route.ts) 可在有效进度下附带 **`?t=`**；从历史进入附带 **`?from=history`**，`AppShell` 顶栏返回历史而非详情。
+
 ### 当前体验重点
 
-- 影片库页以封面浏览、搜索、标签化筛选和选中态为主。
-- 详情页强调单片信息、预览占位区和相关影片推荐。
-- 播放器页采用 video-first 原型布局，当前仍是 `mpv` 接入前的视觉占位。
-- 设置页围绕目录、扫描频率、播放偏好和手动任务入口组织。
+- 影片库页以封面浏览、搜索、标签/演员筛选和选中态为主。
+- 详情页强调单片信息、预览与相关推荐；支持用户标签、评分等与 API 联动（Web 模式）。
+- 播放器页为 video-first；Web API 模式下主片源来自后端 **stream**（浏览器解码）。
+- **观看历史**侧栏入口 + 按日分组瀑布列布局；设置页围绕目录、扫描、刮削与库行为等组织。
 
 ## 4. 已确认的产品实现方式
 
-- `library / favorites / recent / tags` 共享同一套浏览页面模型，通过 route name 和 query 参数切换上下文。
+- `library / favorites / recent / tags` 共享同一套浏览页面模型，通过 route name 和 query 参数切换上下文；**`history` 为独立路由**，不混入 `LibraryMode` 查询拼装。
 - 搜索词 `q`、标签页 `tab`、当前选中影片 `selected` 已作为 URL 状态存在。
 - 影片浏览体验已经偏向“媒体库 / 海报墙”而不是“后台表格管理”。
 - 库页已引入虚拟滚动能力，说明大规模海报浏览是明确方向。
@@ -77,11 +85,9 @@
 ## 5. 当前尚未实现的能力
 
 - 尚未接入 `Electron` 主进程、`preload` 或桌面桥接。
-- 尚未打通前端到 `Go` 后端的真实 HTTP 调用链。
-- 尚未实现真实播放器控制和命名管道通信。
-- 后端虽已具备任务系统雏形，但前端尚未消费任务状态与事件。
-- 尚未形成完整的 `services`、前端后端 DTO 对齐、错误码消费和任务状态消费模型。
-- 尚未看到测试体系和真正的数据持久化链路。
+- 尚未实现 **mpv** 与命名管道 / IPC 的桌面播放闭环（Web 阶段为 `<video>` + HTTP Range）。
+- **服务端**观看进度表 / `play_history` API、多设备同步进度：**未实现**（当前仅前端 localStorage）。
+- 测试覆盖与运维观测仍偏薄；部分边界错误与任务事件仍待产品化收敛。
 
 ## 6. 产品与架构边界
 
@@ -101,7 +107,8 @@
 ## 7. 当前主要风险
 
 - 最大风险仍然是把“产品蓝图”和“当前实现”混为一谈。
-- 现有原型已经具备较完整的页面形态，但底层仍是 mock 数据，容易让后续协作者误判为功能已打通。
+- **Mock 与 Web API 双模式**并存：未读 `.env` / 文档时易误判“是否已接后端”。
+- **观看进度仅存本机**：用户可能误以为换电脑或清缓存后仍能续播。
 - 扫描、搜刮、缓存、播放、本地配置本质上都属于后台任务或桌面能力，目前还缺少统一协议。
 - 文案层面当前界面偏英文，设计文档偏中文，后续需要决定正式的产品语言策略。
 

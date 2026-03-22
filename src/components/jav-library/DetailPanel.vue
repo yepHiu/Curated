@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useFocusWithin } from "@vueuse/core"
 import { computed, nextTick, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { MoreVertical, PlayCircle, Plus, RefreshCw, Star, X } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -32,6 +33,8 @@ import { Separator } from "@/components/ui/separator"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -170,25 +173,25 @@ async function onUserTagAddButtonClick() {
 
 function addUserTag() {
   userTagFormError.value = ""
-  const t = newUserTagDraft.value.trim()
-  if (!t) {
+  const tagText = newUserTagDraft.value.trim()
+  if (!tagText) {
     return
   }
-  if ([...t].length > maxUserTagRunes) {
-    userTagFormError.value = `单个标签最多 ${maxUserTagRunes} 个字符`
+  if ([...tagText].length > maxUserTagRunes) {
+    userTagFormError.value = t("curated.tagMaxRunes", { n: maxUserTagRunes })
     return
   }
-  if (props.movie.userTags.includes(t)) {
+  if (props.movie.userTags.includes(tagText)) {
     newUserTagDraft.value = ""
     return
   }
   if (props.movie.userTags.length >= maxUserTags) {
-    userTagFormError.value = `最多 ${maxUserTags} 个用户标签`
+    userTagFormError.value = t("curated.tagMaxCount", { n: maxUserTags })
     return
   }
   emit("updateUserTags", {
     movieId: props.movie.id,
-    tags: [...props.movie.userTags, t],
+    tags: [...props.movie.userTags, tagText],
   })
   newUserTagDraft.value = ""
 }
@@ -260,7 +263,7 @@ function pickUserTagSuggestion(tag: string) {
           <MediaStill
             v-if="posterSrc"
             :src="posterSrc"
-            :alt="`${movie.code} cover`"
+            :alt="t('detailPanel.coverAlt', { code: movie.code })"
             layout="intrinsic"
             class="relative z-0"
           />
@@ -279,25 +282,25 @@ function pickUserTagSuggestion(tag: string) {
         </div>
 
         <div class="mt-3 rounded-2xl border border-border/70 bg-background/50 p-3">
-          <p class="text-xs text-muted-foreground">评分</p>
+          <p class="text-xs text-muted-foreground">{{ t("detailPanel.rating") }}</p>
           <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
             <Star class="size-4 shrink-0 text-primary" aria-hidden="true" />
-            <span>综合 {{ movie.rating.toFixed(1) }}/5</span>
+            <span>{{ t("detailPanel.combined", { n: movie.rating.toFixed(1) }) }}</span>
             <span
               v-if="siteRatingLabel !== null"
               class="text-xs font-normal text-muted-foreground"
             >
-              · 站点 {{ siteRatingLabel }}/5
+              {{ t("detailPanel.siteDot", { n: siteRatingLabel }) }}
             </span>
             <span
               v-if="hasUserRatingOverride"
               class="text-[0.65rem] font-normal text-primary/90"
             >
-              已用本地分
+              {{ t("detailPanel.usingLocalRating") }}
             </span>
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-muted-foreground">我的</span>
+            <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
             <MovieRatingStars
               :model-value="starDisplayValue"
               @commit="commitUserRatingFromStars"
@@ -310,7 +313,7 @@ function pickUserTagSuggestion(tag: string) {
               :disabled="!hasUserRatingOverride"
               @click="clearUserRating"
             >
-              清除
+              {{ t("detailPanel.clearLocalRating") }}
             </Button>
           </div>
         </div>
@@ -339,7 +342,7 @@ function pickUserTagSuggestion(tag: string) {
                 variant="ghost"
                 size="icon"
                 class="shrink-0 rounded-xl"
-                aria-label="更多操作"
+                :aria-label="t('detailPanel.moreActions')"
               >
                 <MoreVertical />
               </Button>
@@ -355,13 +358,17 @@ function pickUserTagSuggestion(tag: string) {
                     :class="props.metadataRefreshBusy ? 'animate-spin' : ''"
                     aria-hidden="true"
                   />
-                  {{ props.metadataRefreshBusy ? "正在提交刮削…" : "刷新元数据" }}
+                  {{
+                    props.metadataRefreshBusy
+                      ? t("detailPanel.scrapeSubmitting")
+                      : t("detailPanel.refreshMetadata")
+                  }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   @click="deleteConfirmOpen = true"
                 >
-                  删除影片
+                  {{ t("detailPanel.deleteMovie") }}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -370,16 +377,15 @@ function pickUserTagSuggestion(tag: string) {
           <Dialog v-model:open="deleteConfirmOpen">
             <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>删除影片</DialogTitle>
+                <DialogTitle>{{ t("detailPanel.deleteMovie") }}</DialogTitle>
                 <DialogDescription class="text-pretty">
-                  将从资料库中移除该片的记录（演员、标签、媒体资源等关联数据）。系统会尝试删除本地主视频、已下载的刮削文件，以及同目录下的
-                  <span class="font-mono text-xs">movie.nfo</span>。若文件正被占用或路径异常，可能需稍后手动清理磁盘。
+                  {{ t("detailPanel.deleteMovieConfirm") }}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter class="gap-2 sm:gap-0">
                 <DialogClose as-child>
                   <Button type="button" variant="outline" class="rounded-2xl">
-                    取消
+                    {{ t("common.cancel") }}
                   </Button>
                 </DialogClose>
                 <Button
@@ -388,7 +394,7 @@ function pickUserTagSuggestion(tag: string) {
                   class="rounded-2xl"
                   @click="confirmDeleteMovie"
                 >
-                  确认删除
+                  {{ t("detailPanel.confirmDeleteMovie") }}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -399,12 +405,14 @@ function pickUserTagSuggestion(tag: string) {
 
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
-            <p class="text-sm font-medium">元数据标签</p>
+            <p class="text-sm font-medium">{{ t("detailPanel.metadataTags") }}</p>
             <p class="text-xs text-muted-foreground">
-              点击文字可筛选同名影片；「×」仅从本地库移除该 NFO 标签（不影响「我的标签」）。重新刮削元数据可能再次写入站方标签。
+              {{ t("detailPanel.metadataTagsHint") }}
             </p>
           </div>
-          <p v-if="movie.tags.length === 0" class="text-sm text-muted-foreground">暂无刮削标签</p>
+          <p v-if="movie.tags.length === 0" class="text-sm text-muted-foreground">
+            {{ t("detailPanel.noMetadataTags") }}
+          </p>
           <div v-else class="flex flex-wrap gap-2">
             <Badge
               v-for="tag in movie.tags"
@@ -417,7 +425,7 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   type="button"
                   class="min-w-0 max-w-[12rem] cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  :aria-label="`在资料库中搜索：${tag}`"
+                  :aria-label="t('detailPanel.ariaSearchInLibrary', { tag })"
                   @click="browseByTagLabel(tag)"
                 >
                   {{ tag }}
@@ -425,7 +433,7 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   type="button"
                   class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-                  :aria-label="`从库中移除 NFO 标签 ${tag}`"
+                  :aria-label="t('detailPanel.ariaRemoveNfoTag', { tag })"
                   @click.stop="removeMetadataTag(tag)"
                 >
                   <X class="size-3.5" />
@@ -436,9 +444,9 @@ function pickUserTagSuggestion(tag: string) {
         </div>
 
         <div class="flex flex-col gap-3">
-          <p class="text-sm font-medium">我的标签</p>
+          <p class="text-sm font-medium">{{ t("detailPanel.myTags") }}</p>
           <p class="text-xs text-muted-foreground">
-            仅保存在本地库中，重新刮削元数据不会覆盖；与上方元数据标签可同名共存。点击标签文字按<strong>同名</strong>在资料库中筛选。
+            {{ t("detailPanel.myTagsHint") }}
           </p>
           <div class="flex flex-wrap items-center gap-2">
             <Badge
@@ -452,7 +460,7 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   type="button"
                   class="min-w-0 max-w-[12rem] cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  :aria-label="`在资料库中搜索：${tag}`"
+                  :aria-label="t('detailPanel.ariaSearchInLibrary', { tag })"
                   @click="browseByTagLabel(tag)"
                 >
                   {{ tag }}
@@ -460,7 +468,7 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   type="button"
                   class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-                  :aria-label="`移除标签 ${tag}`"
+                  :aria-label="t('detailPanel.ariaRemoveMyTag', { tag })"
                   @click.stop="removeUserTag(tag)"
                 >
                   <X class="size-3.5" />
@@ -476,7 +484,7 @@ function pickUserTagSuggestion(tag: string) {
                 @click="onUserTagAddButtonClick"
               >
                 <Plus data-icon="inline-start" />
-                添加
+                {{ t("common.add") }}
               </Button>
               <div
                 v-if="userTagInputOpen"
@@ -492,7 +500,7 @@ function pickUserTagSuggestion(tag: string) {
                     type="text"
                     maxlength="64"
                     autocomplete="off"
-                    placeholder="新标签…"
+                    :placeholder="t('detailPanel.newTagPlaceholder')"
                     class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0"
                     @keydown.enter.prevent="addUserTag"
                   />
@@ -501,7 +509,7 @@ function pickUserTagSuggestion(tag: string) {
                     variant="ghost"
                     size="icon"
                     class="size-8 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="取消添加标签"
+                    :aria-label="t('detailPanel.ariaCancelTagInput')"
                     @click="cancelUserTagInput"
                   >
                     <X class="size-4" />
@@ -511,7 +519,7 @@ function pickUserTagSuggestion(tag: string) {
                   v-if="showUserTagSuggestions"
                   class="absolute top-full left-0 z-50 mt-1 max-h-60 w-full min-w-[min(100%,12rem)] overflow-y-auto rounded-2xl border border-border/80 bg-popover/98 py-1 text-popover-foreground shadow-lg backdrop-blur-sm"
                   role="listbox"
-                  aria-label="标签建议"
+                  :aria-label="t('detailPanel.tagSuggestAria')"
                 >
                   <li v-for="s in filteredUserTagSuggestions" :key="s">
                     <button
@@ -533,7 +541,7 @@ function pickUserTagSuggestion(tag: string) {
         <Separator />
 
         <div class="flex flex-col gap-3">
-          <p class="text-sm font-medium">Cast</p>
+          <p class="text-sm font-medium">{{ t("detailPanel.cast") }}</p>
           <div class="flex flex-wrap gap-3">
             <div
               v-for="actor in movie.actors"
@@ -543,7 +551,7 @@ function pickUserTagSuggestion(tag: string) {
               <button
                 type="button"
                 class="flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl py-0.5 text-left transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                :aria-label="`在资料库中筛选演员：${actor}`"
+                :aria-label="t('detailPanel.ariaFilterActor', { actor })"
                 @click="browseByActorName(actor)"
               >
                 <Avatar class="size-10 shrink-0 border border-border/70">
@@ -560,7 +568,7 @@ function pickUserTagSuggestion(tag: string) {
         <div v-if="props.showActions" class="flex flex-wrap items-center gap-3">
           <Button class="rounded-2xl" @click="emit('openPlayer', movie.id)">
             <PlayCircle data-icon="inline-start" />
-            播放
+            {{ t("detailPanel.play") }}
           </Button>
         </div>
       </div>

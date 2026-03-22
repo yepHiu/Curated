@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import type { Movie } from "@/domain/movie/types"
 import {
   Card,
@@ -12,6 +13,8 @@ import DetailPanel from "@/components/jav-library/DetailPanel.vue"
 import MovieGrid from "@/components/jav-library/MovieGrid.vue"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import PreviewImageViewer from "@/components/jav-library/PreviewImageViewer.vue"
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -68,9 +71,9 @@ const emit = defineEmits<{
 
     <Card class="rounded-3xl border-border/70 bg-card/85">
       <CardHeader>
-        <CardTitle>Preview gallery</CardTitle>
+        <CardTitle>{{ t("detailPage.previewGalleryTitle") }}</CardTitle>
         <CardDescription>
-          来自元数据刮削的样本图；点击缩略图打开查看器浏览大图，支持左右键切换。若源站限制外链，图片可能无法显示（可后续接后端代理）。
+          {{ t("detailPage.previewHelp") }}
         </CardDescription>
       </CardHeader>
       <CardContent
@@ -86,10 +89,10 @@ const emit = defineEmits<{
         >
           <MediaStill
             :src="url"
-            :alt="`${movie.code} 样本图 ${index + 1}`"
+            :alt="t('detailPage.previewAlt', { code: movie.code, n: index + 1 })"
             class="absolute inset-0 z-0"
           />
-          <span class="sr-only">在查看器中打开第 {{ index + 1 }} 张预览图</span>
+          <span class="sr-only">{{ t("detailPage.previewSrOpen", { n: index + 1 }) }}</span>
         </button>
       </CardContent>
       <CardContent v-else class="grid w-full gap-4 sm:grid-cols-3">
@@ -99,7 +102,7 @@ const emit = defineEmits<{
           class="aspect-[16/9] rounded-[1.25rem] border border-dashed border-border/70 bg-muted/20"
         />
         <p class="col-span-full text-sm text-muted-foreground">
-          当前条目没有样本图 URL（例如仅刮削到文本、或提供商未返回预览图）。
+          {{ t("detailPage.previewEmpty") }}
         </p>
       </CardContent>
     </Card>
@@ -114,9 +117,9 @@ const emit = defineEmits<{
 
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1">
-        <h3 class="text-xl font-semibold">Related titles</h3>
+        <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>
         <p class="text-sm text-muted-foreground">
-          More cards using the same movie grid system and selection contract.
+          {{ t("detailPage.relatedDesc") }}
         </p>
       </div>
 
