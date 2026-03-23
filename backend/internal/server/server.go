@@ -122,6 +122,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
+	mux.HandleFunc("GET /api/library/movies/{movieId}/comment", h.handleGetMovieComment)
+	mux.HandleFunc("PUT /api/library/movies/{movieId}/comment", h.handlePutMovieComment)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
@@ -391,6 +393,78 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
+}
+
+func (h *Handler) handleGetMovieComment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	ok, err := h.store.MovieRowExists(r.Context(), movieID)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("movie comment get: exists check failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+	if !ok {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+		return
+	}
+	dto, err := h.store.GetMovieComment(r.Context(), movieID)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("get movie comment failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load comment")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handlePutMovieComment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid body")
+		return
+	}
+	var in contracts.PutMovieCommentBody
+	if err := json.Unmarshal(body, &in); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid JSON")
+		return
+	}
+	dto, err := h.store.UpsertMovieComment(r.Context(), movieID, in.Body)
+	if err != nil {
+		if errors.Is(err, storage.ErrMovieNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if errors.Is(err, storage.ErrMovieCommentTooLong) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "comment body too long")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("put movie comment failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save comment")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func parsePatchMovieInput(body []byte) (contracts.PatchMovieInput, error) {

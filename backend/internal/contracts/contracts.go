@@ -68,15 +68,16 @@ type ListMoviesRequest struct {
 
 // ActorProfileDTO is returned by GET /api/library/actors/profile.
 type ActorProfileDTO struct {
-	Name             string `json:"name"`
-	AvatarURL        string `json:"avatarUrl,omitempty"`
-	Summary          string `json:"summary,omitempty"`
-	Homepage         string `json:"homepage,omitempty"`
-	Provider         string `json:"provider,omitempty"`
-	ProviderActorID  string `json:"providerActorId,omitempty"`
-	Height           int    `json:"height,omitempty"`
-	Birthday         string `json:"birthday,omitempty"`
-	ProfileUpdatedAt string `json:"profileUpdatedAt,omitempty"`
+	Name             string   `json:"name"`
+	AvatarURL        string   `json:"avatarUrl,omitempty"`
+	Summary          string   `json:"summary,omitempty"`
+	Homepage         string   `json:"homepage,omitempty"`
+	Provider         string   `json:"provider,omitempty"`
+	ProviderActorID  string   `json:"providerActorId,omitempty"`
+	Height           int      `json:"height,omitempty"`
+	Birthday         string   `json:"birthday,omitempty"`
+	ProfileUpdatedAt string   `json:"profileUpdatedAt,omitempty"`
+	UserTags         []string `json:"userTags,omitempty"`
 }
 
 // ActorListItemDTO is one row in GET /api/library/actors (library display name + stats + actor-only user tags).
@@ -105,6 +106,20 @@ type ListActorsResponse struct {
 // PatchActorUserTagsBody is the JSON body for PATCH /api/library/actors/tags?name=.
 type PatchActorUserTagsBody struct {
 	UserTags []string `json:"userTags"`
+}
+
+// MaxMovieCommentRunes is the maximum length (Unicode scalars) for PUT /library/movies/{id}/comment body.
+const MaxMovieCommentRunes = 10000
+
+// MovieCommentDTO is returned by GET /api/library/movies/{movieId}/comment (empty body when none saved).
+type MovieCommentDTO struct {
+	Body      string `json:"body"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// PutMovieCommentBody is the JSON body for PUT /api/library/movies/{movieId}/comment.
+type PutMovieCommentBody struct {
+	Body string `json:"body"`
 }
 
 type GetMovieDetailRequest struct {

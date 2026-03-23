@@ -118,6 +118,8 @@ export interface ActorProfileDTO {
   height?: number
   birthday?: string
   profileUpdatedAt?: string
+  /** 演员维度用户标签，与 ActorListItemDTO.userTags 同源 */
+  userTags?: string[]
 }
 
 /** GET /library/actors 单行；userTags 为演员维度用户标签，与影片 tag 无关 */
@@ -216,6 +218,19 @@ export interface PlaybackProgressListDTO {
 export interface PutPlaybackProgressBody {
   positionSec: number
   durationSec: number
+}
+
+/** 与后端 contracts.MaxMovieCommentRunes 一致 */
+export const MAX_MOVIE_COMMENT_RUNES = 10000
+
+/** GET/PUT /library/movies/{movieId}/comment（每部一条可覆盖） */
+export interface MovieCommentDTO {
+  body: string
+  updatedAt: string
+}
+
+export interface PutMovieCommentBody {
+  body: string
 }
 
 /** GET /curated-frames（无图像字节，图用 GET /curated-frames/{id}/image） */

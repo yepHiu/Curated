@@ -10,10 +10,15 @@ import {
 } from "@/components/ui/card"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
 
-const props = defineProps<{
-  movies: Movie[]
-  selectedMovieId: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    movies: Movie[]
+    selectedMovieId: string
+    /** 最多展示张数；详情推荐区由父组件切片时可仍用默认 */
+    maxVisible?: number
+  }>(),
+  { maxVisible: 8 },
+)
 
 const emit = defineEmits<{
   select: [movieId: string]
@@ -22,7 +27,7 @@ const emit = defineEmits<{
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
 }>()
 
-const visibleMovies = computed(() => props.movies.slice(0, 8))
+const visibleMovies = computed(() => props.movies.slice(0, props.maxVisible))
 </script>
 
 <template>

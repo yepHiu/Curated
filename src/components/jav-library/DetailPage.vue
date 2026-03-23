@@ -14,6 +14,8 @@ import DetailPanel from "@/components/jav-library/DetailPanel.vue"
 import MovieGrid from "@/components/jav-library/MovieGrid.vue"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import PreviewImageViewer from "@/components/jav-library/PreviewImageViewer.vue"
+import MovieCommentSection from "@/components/jav-library/MovieCommentSection.vue"
+import { useRelatedVisibleCount } from "@/composables/use-related-visible-count"
 
 const { t } = useI18n()
 
@@ -30,6 +32,13 @@ const props = withDefaults(
 
 const previewImages = computed(() => props.movie.previewImages?.slice(0, 18) ?? [])
 const hasPreviews = computed(() => previewImages.value.length > 0)
+
+const layoutRootRef = ref<HTMLElement | null>(null)
+const { visibleCount } = useRelatedVisibleCount(layoutRootRef)
+
+const relatedMoviesForGrid = computed(() =>
+  props.relatedMovies.slice(0, visibleCount.value),
+)
 
 const previewViewerOpen = ref(false)
 const previewViewerStartIndex = ref(0)
@@ -57,7 +66,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex min-w-0 w-full flex-col gap-6">
+  <div ref="layoutRootRef" class="flex min-w-0 w-full flex-col gap-6">
     <DetailPanel
       :movie="movie"
       :user-tag-suggestions="props.userTagSuggestions"
@@ -120,6 +129,8 @@ const emit = defineEmits<{
       :movie-code="movie.code"
     />
 
+    <MovieCommentSection :movie-id="movie.id" />
+
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1">
         <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>
@@ -129,7 +140,7 @@ const emit = defineEmits<{
       </div>
 
       <MovieGrid
-        :movies="relatedMovies"
+        :movies="relatedMoviesForGrid"
         :selected-movie-id="movie.id"
         @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"

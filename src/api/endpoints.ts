@@ -14,6 +14,7 @@ import type {
   ListMoviesParams,
   MetadataRefreshQueuedDTO,
   MetadataScrapeByPathsBody,
+  MovieCommentDTO,
   MovieDetailDTO,
   MoviesPageDTO,
   PatchCuratedFrameTagsBody,
@@ -21,6 +22,7 @@ import type {
   PatchSettingsBody,
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
+  PutMovieCommentBody,
   PutPlaybackProgressBody,
   SettingsDTO,
   StartScanBody,
@@ -65,6 +67,14 @@ export const api = {
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {
     return httpClient.get<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`)
+  },
+
+  getMovieComment(movieId: string): Promise<MovieCommentDTO> {
+    return httpClient.get<MovieCommentDTO>(`/library/movies/${encodeURIComponent(movieId)}/comment`)
+  },
+
+  putMovieComment(movieId: string, body: PutMovieCommentBody): Promise<MovieCommentDTO> {
+    return httpClient.put<MovieCommentDTO>(`/library/movies/${encodeURIComponent(movieId)}/comment`, body)
   },
 
   patchMovie(movieId: string, body: PatchMovieBody): Promise<MovieDetailDTO> {
@@ -122,7 +132,7 @@ export const api = {
   },
 
   putPlaybackProgress(movieId: string, body: PutPlaybackProgressBody): Promise<void> {
-    return httpClient.put(`/playback/progress/${encodeURIComponent(movieId)}`, body)
+    return httpClient.put<void>(`/playback/progress/${encodeURIComponent(movieId)}`, body)
   },
 
   deletePlaybackProgress(movieId: string): Promise<void> {

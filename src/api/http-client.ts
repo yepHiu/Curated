@@ -86,7 +86,7 @@ export const httpClient = {
     return handleResponse<T>(response)
   },
 
-  async put(path: string, body?: unknown): Promise<void> {
+  async put<T = void>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(buildUrl(path), {
       method: "PUT",
       headers: {
@@ -95,15 +95,7 @@ export const httpClient = {
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
-    if (!response.ok) {
-      let apiError: ApiError | undefined
-      try {
-        apiError = await parseJsonBody<ApiError>(response)
-      } catch {
-        // response body was not JSON
-      }
-      throw new HttpClientError(response.status, apiError)
-    }
+    return handleResponse<T>(response)
   },
 
   async delete(path: string): Promise<void> {

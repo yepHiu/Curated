@@ -12,6 +12,7 @@ import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
+import { sampleRandomMovies } from "@/lib/random-sample"
 import { playedMovieCount } from "@/lib/played-movies-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
@@ -250,7 +251,9 @@ function createWebLibraryService(): LibraryService {
     },
 
     getRelatedMovies(movieId, limit = 6) {
-      return moviesState.value.filter((m) => m.id !== movieId).slice(0, limit)
+      const id = movieId.trim()
+      const pool = moviesState.value.filter((m) => m.id !== id)
+      return sampleRandomMovies(pool, limit, id || "_")
     },
 
     async patchMovie(movieId: string, body: PatchMovieBody) {

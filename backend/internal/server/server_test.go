@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1154,5 +1155,121 @@ func TestHandleGetRecentTasks(t *testing.T) {
 	}
 	if len(body.Tasks) != 1 || body.Tasks[0].TaskID != x.TaskID {
 		t.Fatalf("unexpected body: %+v", body.Tasks)
+	}
+}
+
+func TestHandleMovieComment_GetNotFoundMovie(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/library/movies/missing-id/comment", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandleMovieComment_PutGet(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID: "t", Path: "D:/Media/JAV/CMT-1.mp4", FileName: "CMT-1.mp4", Number: "CMT-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mid := outcome.MovieID
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	getURL := srv.URL + "/api/library/movies/" + mid + "/comment"
+	req, err := http.NewRequest(http.MethodGet, getURL, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get status = %d body=%s", resp.StatusCode, string(b))
+	}
+	var empty contracts.MovieCommentDTO
+	if err := json.Unmarshal(b, &empty); err != nil {
+		t.Fatal(err)
+	}
+	if empty.Body != "" {
+		t.Fatalf("want empty body, got %q", empty.Body)
+	}
+
+	putBody := []byte(`{"body":"hello comment"}`)
+	req2, err := http.NewRequest(http.MethodPut, getURL, bytes.NewReader(putBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b2, _ := io.ReadAll(resp2.Body)
+	_ = resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("put status = %d body=%s", resp2.StatusCode, string(b2))
+	}
+	var saved contracts.MovieCommentDTO
+	if err := json.Unmarshal(b2, &saved); err != nil {
+		t.Fatal(err)
+	}
+	if saved.Body != "hello comment" {
+		t.Fatalf("saved body = %q", saved.Body)
+	}
+
+	resp3, err := http.DefaultClient.Get(getURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b3, _ := io.ReadAll(resp3.Body)
+	_ = resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		t.Fatalf("get2 status = %d", resp3.StatusCode)
+	}
+	var got contracts.MovieCommentDTO
+	if err := json.Unmarshal(b3, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Body != "hello comment" {
+		t.Fatalf("get2 body = %q", got.Body)
 	}
 }

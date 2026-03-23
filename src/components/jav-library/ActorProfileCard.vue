@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { useRouter } from "vue-router"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type { ActorProfileDTO, TaskDTO } from "@/api/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { pushAppToast } from "@/composables/use-app-toast"
+import { mergeActorsQuery } from "@/lib/actors-route-query"
 
 const useWeb = import.meta.env.VITE_USE_WEB_API === "true"
 
@@ -26,6 +29,13 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
+
+function goFilterByActorTag(tag: string) {
+  const x = tag.trim()
+  if (!x) return
+  void router.push({ name: "actors", query: mergeActorsQuery({}, { actorTag: x }) })
+}
 
 const profile = ref<ActorProfileDTO | null>(null)
 const initialLoading = ref(false)
@@ -284,6 +294,29 @@ onUnmounted(() => {
             >
               {{ profile.summary }}
             </p>
+          </div>
+          <div v-if="profile.userTags?.length" class="space-y-2">
+            <p class="text-xs font-medium text-muted-foreground">
+              {{ t("library.actorProfileUserTags") }}
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge
+                v-for="tag in profile.userTags"
+                :key="`profile-actor-tag-${tag}`"
+                variant="outline"
+                as-child
+                class="rounded-full border-primary/35 bg-primary/5 px-0 text-foreground"
+              >
+                <button
+                  type="button"
+                  class="max-w-[12rem] cursor-pointer truncate rounded-[inherit] px-2.5 py-1 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  :aria-label="t('actors.ariaFilterActorTag', { tag })"
+                  @click="goFilterByActorTag(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </Badge>
+            </div>
           </div>
           <dl
             v-if="profile.birthday || (profile.height && profile.height > 0) || profile.homepage"

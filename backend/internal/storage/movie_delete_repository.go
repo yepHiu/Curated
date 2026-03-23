@@ -72,6 +72,9 @@ func (s *SQLiteStore) DeleteMovie(ctx context.Context, movieID string, assetCach
 	if _, err := tx.ExecContext(ctx, `DELETE FROM scan_items WHERE movie_id = ?`, movieID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM library_movie_comments WHERE movie_id = ?`, movieID); err != nil {
+		return err
+	}
 	res, err := tx.ExecContext(ctx, `DELETE FROM movies WHERE id = ?`, movieID)
 	if err != nil {
 		return err

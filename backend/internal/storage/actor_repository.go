@@ -19,6 +19,7 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 	}
 	var (
 		dto              contracts.ActorProfileDTO
+		actorID          int64
 		avatar           sql.NullString
 		summary          sql.NullString
 		homepage         sql.NullString
@@ -29,9 +30,10 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 		profileUpdatedAt sql.NullString
 	)
 	err := s.db.QueryRowContext(ctx, `
-		SELECT name, avatar, summary, homepage, provider, provider_actor_id, height, birthday, profile_updated_at
+		SELECT id, name, avatar, summary, homepage, provider, provider_actor_id, height, birthday, profile_updated_at
 		FROM actors WHERE name = ?`, name,
 	).Scan(
+		&actorID,
 		&dto.Name,
 		&avatar,
 		&summary,
@@ -56,6 +58,11 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 	dto.Height = height
 	dto.Birthday = birthday.String
 	dto.ProfileUpdatedAt = profileUpdatedAt.String
+	tagsByID, err := s.loadActorUserTagsForIDs(ctx, []int64{actorID})
+	if err != nil {
+		return contracts.ActorProfileDTO{}, err
+	}
+	dto.UserTags = tagsByID[actorID]
 	return dto, nil
 }
 

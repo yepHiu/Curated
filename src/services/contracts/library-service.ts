@@ -51,6 +51,10 @@ export interface LibraryService {
    * Mock：返回 null（或可选固定演示 URL）。
    */
   getMoviePlaybackUrl(movieId: string): string | null
+  /**
+   * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。
+   * 顺序与选集由 `movieId` 派生种子决定，同一影片在候选集合不变时可复现，避免界面无意义跳动。
+   */
   getRelatedMovies(movieId: string, limit?: number): Movie[]
   /**
    * 更新收藏与/或用户评分（Web：PATCH /api/library/movies/{id}；Mock：内存）。

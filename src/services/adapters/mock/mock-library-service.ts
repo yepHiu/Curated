@@ -12,6 +12,7 @@ import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { playedMovieCount } from "@/lib/played-movies-storage"
+import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   loadMockMoviePrefs,
@@ -427,7 +428,9 @@ export const mockLibraryService: LibraryService = {
     return moviesState.value.find((movie) => movie.id === movieId)
   },
   getRelatedMovies(movieId, limit = 6) {
-    return moviesState.value.filter((movie) => movie.id !== movieId).slice(0, limit)
+    const id = movieId.trim()
+    const pool = moviesState.value.filter((movie) => movie.id !== id)
+    return sampleRandomMovies(pool, limit, id || "_")
   },
 
   async patchMovie(movieId, body) {
