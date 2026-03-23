@@ -76,6 +76,10 @@
   --sidebar-accent-foreground: #f8f7fb;
   --sidebar-border: rgb(255 255 255 / 10%);
   --sidebar-ring: rgb(254 98 142 / 45%);
+  /* 全局滚动条（与深色界面协调，低存在感） */
+  --scrollbar-track: rgb(255 255 255 / 6%);
+  --scrollbar-thumb: rgb(255 255 255 / 20%);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 32%);
 }
 
 .dark {
@@ -110,11 +114,35 @@
   --sidebar-accent-foreground: #f8f7fb;
   --sidebar-border: rgb(255 255 255 / 10%);
   --sidebar-ring: rgb(254 98 142 / 45%);
+  --scrollbar-track: rgb(255 255 255 / 6%);
+  --scrollbar-thumb: rgb(255 255 255 / 20%);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 32%);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: var(--radius);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: var(--scrollbar-thumb);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
   }
 
   html {

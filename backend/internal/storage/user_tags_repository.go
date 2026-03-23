@@ -16,7 +16,8 @@ var ErrInvalidUserTags = errors.New("invalid user tags")
 const maxUserTagsPerMovie = 64
 const maxUserTagRunes = 64
 
-func normalizeUserTagsForPatch(raw []string) ([]string, error) {
+// NormalizeUserTagsForPatch trims, dedupes, validates length/count (shared by movie and actor user tags).
+func NormalizeUserTagsForPatch(raw []string) ([]string, error) {
 	if raw == nil {
 		raw = []string{}
 	}

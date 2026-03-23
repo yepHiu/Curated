@@ -1,0 +1,48 @@
+---
+description: Curated UI layering, design tokens, surfaces checklist; index to vue/jav-library rules
+globs: src/**/*.{vue,css}
+alwaysApply: false
+---
+
+# UI Component Spec（Curated）
+
+人读详解与维护约定：**[`docs/frontend-ui-spec.md`](docs/frontend-ui-spec.md)**（仓库根相对路径）。表单控件细节：**[`vue-frontend-standards.mdc`](vue-frontend-standards.mdc)**。业务页面体验：**[`jav-library-frontend-patterns.mdc`](jav-library-frontend-patterns.mdc)**。
+
+## 分层（MUST）
+
+- **`src/components/ui`**：`shadcn-vue` 基元与通用复合件（Button、Card、Dialog、Input…）。不放影片/库领域逻辑。
+- **`src/components/jav-library`**：Curated 领域 UI（`MovieCard`、`DetailPanel`、`PlayerPage`…）。组合 `ui`，经 **`useLibraryService()`** / **`src/api`** 取数，不绕过服务层。
+- **`src/views`** + **`src/layouts/AppShell.vue`**：路由级页面与壳层；以组合 `jav-library` / `ui` 为主，避免在 view 里堆叠一次性大块业务逻辑。
+
+## 视觉令牌（MUST / SHOULD）
+
+- **MUST** 使用语义 Tailwind / 主题类：`bg-background`、`text-foreground`、`border-border`、`bg-card`、`text-card-foreground`、`bg-muted`、`text-muted-foreground`、`primary`、`destructive`、`ring` 等。CSS 变量事实源：**`src/style.css`**（`:root` 已为深色主界面）。
+- **MUST NOT** 在业务组件中随意写死 `#rrggbb` 或任意 `rgb()` 作为主色/背景（难以随主题维护）。
+- **例外（已约定）**：侧栏 **Curated** 品牌字标/色块可用固定粉紫系，见 **`jav-library-frontend-patterns.mdc`**（`AppSidebar`）。
+
+## 深色与 `dark:`（MUST 理解）
+
+- 默认主题在 **`:root`**；`html` 往往 **无** `class="dark"`。项目定义 `@custom-variant dark (&:is(.dark *))`，故 **`dark:*` 仅作用于 `.dark` 祖先内部**。
+- 主界面表单与卡片对比度：**不要**单靠 `dark:*`；用 **`border-border/…`、`bg-muted/…`、`text-foreground`** 等始终生效的令牌。详见 **`vue-frontend-standards.mdc`**「Form controls」。
+
+## 表单与对话框（MUST）
+
+- 使用 **`<Input>`** 时 **`import { Input } from '@/components/ui/input'`**（显式导入）。
+- 同一表单内 **`<Input>` 与 `<textarea>`** 边框与弱填充语言一致（Dialog / Card 表面可读）。不得把主输入做成「透明底 + 极淡边」导致看不清。
+
+## 产品面速查（SHOULD）
+
+- **浏览**（`library` / `favorites` / `recent` / `tags`）：海报优先、卡片紧凑；整张可点进详情；网格与「相关推荐」尺寸变更时保持一致，除非任务明确要求分叉。
+- **详情**：左海报右元数据，层次清晰；避免巨型 hero 营销布局。
+- **播放**：video-first、低干扰控件；勿加与视频竞争注意力的说明卡片（除非明确要求）。
+- **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。
+- **壳层**：保留 **`AppShell`** 内滚动：内容区滚动，避免整页壳跟着滚。
+
+## 交互与可访问性（SHOULD）
+
+- 可点击海报/卡片主区域用 **`button type="button"`** 或明确 `role` + 键盘可操作；保留 **`focus-visible`** 样式（勿 `outline-none` 且无替代）。
+-  meaningful 图片提供 **`alt`**（如番号）；装饰性渐变层 **`aria-hidden="true"`**。
+
+## 变更同步
+
+修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/frontend-ui-spec.md`** 与本文件相关条目。

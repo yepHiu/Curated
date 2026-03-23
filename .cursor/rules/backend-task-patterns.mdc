@@ -1,6 +1,6 @@
 ---
 description: Background task rules for scan, scrape, asset, and cache workflows
-globs: "{backend/internal/scanner/**/*.go,backend/internal/scraper/**/*.go,backend/internal/assets/**/*.go,backend/internal/tasks/**/*.go,docs/backend-task*.md,docs/backend-implementation-plan.md}"
+globs: "{backend/internal/scanner/**/*.go,backend/internal/scraper/**/*.go,backend/internal/assets/**/*.go,backend/internal/tasks/**/*.go,docs/backend-task*.md,docs/plan/backend-implementation-plan.md}"
 alwaysApply: false
 ---
 

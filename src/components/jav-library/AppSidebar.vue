@@ -13,6 +13,7 @@ import {
   Settings2,
   Sparkles,
   Tags,
+  Users,
 } from "lucide-vue-next"
 import { RouterLink, useRoute } from "vue-router"
 import type { AppPage, LibraryMode } from "@/domain/library/types"
@@ -122,6 +123,14 @@ const browseItems = computed((): NavigationItem[] => {
   const total = movies.length
   const recent = movies.filter((m) => isMovieRecentlyAdded(m.addedAt)).length
   const tagCount = countUniqueTags(movies)
+  const actorSet = new Set<string>()
+  for (const m of movies) {
+    for (const raw of m.actors) {
+      const a = raw.trim()
+      if (a) actorSet.add(a)
+    }
+  }
+  const actorCount = actorSet.size
 
   const historyTotal = listSortedByUpdatedDesc().length
   const framesTotal = curatedFrameCount.value
@@ -130,6 +139,12 @@ const browseItems = computed((): NavigationItem[] => {
     { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
     { label: t("nav.recent"), page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
     { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+    {
+      label: t("nav.actors"),
+      page: "actors",
+      icon: Users,
+      hint: actorCount > 0 ? formatSidebarCount(actorCount) : undefined,
+    },
     {
       label: t("nav.history"),
       page: "history",
@@ -156,6 +171,9 @@ const getNavigationTarget = (page: AppPage) => {
   }
   if (page === "curated-frames") {
     return { name: "curated-frames" }
+  }
+  if (page === "actors") {
+    return { name: "actors" }
   }
   return buildBrowseRouteTarget(page as LibraryMode, route.query)
 }
@@ -296,11 +314,6 @@ const getNavigationTarget = (page: AppPage) => {
       v-if="!props.compact"
       class="mb-2 flex min-w-0 flex-col gap-2"
     >
-      <span
-        class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
-      >
-        {{ t("nav.backendLabel") }}
-      </span>
       <div
         class="flex min-w-0 items-center gap-2 rounded-2xl border border-border/50 bg-background/35 px-3 py-2"
         role="status"

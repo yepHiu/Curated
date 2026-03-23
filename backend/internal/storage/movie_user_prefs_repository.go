@@ -100,7 +100,7 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 	}()
 
 	if patch.UserTagsSet {
-		normalized, err := normalizeUserTagsForPatch(patch.UserTags)
+		normalized, err := NormalizeUserTagsForPatch(patch.UserTags)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 	}
 
 	if patch.MetadataTagsSet {
-		normalized, err := normalizeUserTagsForPatch(patch.MetadataTags)
+		normalized, err := NormalizeUserTagsForPatch(patch.MetadataTags)
 		if err != nil {
 			return err
 		}

@@ -15,7 +15,28 @@
     "backendOnline": "Backend online",
     "backendOffline": "Backend offline",
     "backendMock": "Demo mode (no API)",
-    "backendRecheck": "Recheck backend"
+    "backendRecheck": "Recheck backend",
+    "actors": "Actors"
+  },
+  "actors": {
+    "title": "Actors",
+    "subtitle": "Browse by actor. Tags here are actor-only user tags, not movie tags.",
+    "searchLabel": "Search name",
+    "searchPlaceholder": "Name or actor tag contains…",
+    "actorTagLabel": "Filter by actor tag",
+    "actorTagPlaceholder": "Exact actor tag",
+    "sortName": "By name",
+    "sortMovieCount": "By movie count",
+    "empty": "No matching actors.",
+    "loading": "Loading…",
+    "loadMore": "Load more",
+    "loadError": "Failed to load actors",
+    "movieCount": "{n} movies",
+    "ariaFilterActorTag": "Filter list by actor tag “{tag}”",
+    "filteredByTag": "Filtered by actor tag “{tag}”.",
+    "clearTagFilter": "Show all actors",
+    "ariaClearTagFilter": "Clear actor tag filter and show all actors",
+    "tagsSaveError": "Save failed"
   },
   "toasts": {
     "libraryWatchScanDone": "Library watch: scan finished — {message}",

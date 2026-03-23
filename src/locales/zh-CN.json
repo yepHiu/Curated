@@ -15,7 +15,28 @@
     "backendOnline": "后端在线",
     "backendOffline": "后端离线",
     "backendMock": "演示模式（无后端）",
-    "backendRecheck": "重新检测后端"
+    "backendRecheck": "重新检测后端",
+    "actors": "演员"
+  },
+  "actors": {
+    "title": "演员库",
+    "subtitle": "按演员浏览片单；标签为演员专属用户标签，与影片标签无关。",
+    "searchLabel": "搜索演员名",
+    "searchPlaceholder": "名字或演员标签包含…",
+    "actorTagLabel": "按演员标签筛选",
+    "actorTagPlaceholder": "精确匹配某个演员标签",
+    "sortName": "按姓名",
+    "sortMovieCount": "按参演数",
+    "empty": "没有匹配的演员。",
+    "loading": "加载中…",
+    "loadMore": "加载更多",
+    "loadError": "加载演员列表失败",
+    "movieCount": "参演 {n} 部",
+    "ariaFilterActorTag": "按演员标签「{tag}」筛选列表",
+    "filteredByTag": "当前按演员标签「{tag}」筛选。",
+    "clearTagFilter": "显示全部演员",
+    "ariaClearTagFilter": "清除演员标签筛选，显示全部演员",
+    "tagsSaveError": "保存失败"
   },
   "toasts": {
     "libraryWatchScanDone": "库目录监听：扫描完成 — {message}",

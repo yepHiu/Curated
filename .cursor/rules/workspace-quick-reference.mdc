@@ -24,5 +24,6 @@ alwaysApply: true
 
 - 实现细节与目录：**`project-facts.mdc`**。
 - 前后端分层与桌面未来边界：**`architecture-boundaries.mdc`**。
+- UI 分层与设计令牌：**`ui-component-spec.mdc`**；人读 **`docs/frontend-ui-spec.md`**。
 - Vue 写法：**`vue-frontend-standards.mdc`**、**`jav-library-frontend-patterns.mdc`**。
 - Go/合约/文档：**`backend-go-standards.mdc`**、**`backend-api-contracts.mdc`**、**`docs-sync.mdc`**。

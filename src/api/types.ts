@@ -120,6 +120,29 @@ export interface ActorProfileDTO {
   profileUpdatedAt?: string
 }
 
+/** GET /library/actors 单行；userTags 为演员维度用户标签，与影片 tag 无关 */
+export interface ActorListItemDTO {
+  name: string
+  avatarUrl?: string
+  movieCount: number
+  userTags?: string[]
+}
+
+export interface ActorsListDTO {
+  total: number
+  actors: ActorListItemDTO[]
+}
+
+export interface ListActorsParams {
+  /** 子串匹配演员名或演员用户标签（不区分大小写） */
+  q?: string
+  /** 精确匹配演员用户标签（勿与影片路由 tag= 混用） */
+  actorTag?: string
+  sort?: "name" | "movieCount"
+  limit?: number
+  offset?: number
+}
+
 export interface ListMoviesParams {
   mode?: string
   q?: string

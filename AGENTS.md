@@ -10,8 +10,12 @@
 | 高 | `project-facts.mdc` | 前后端目录、API 概览、分层 |
 | 高 | `architecture-boundaries.mdc` | 已实现 vs 目标桌面架构 |
 | 中 | `project-standards.mdc` | 规则索引入口 |
-| 按需 | `vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc` | 前端实现 |
+| 按需 | `ui-component-spec.mdc`、`vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc` | 前端 UI 与实现 |
 | 按需 | `backend-go-standards.mdc`、`backend-api-contracts.mdc` 等 | 后端与合约 |
+
+**UI 设计规范（代码级）**：`docs/frontend-ui-spec.md`。
+
+**规划类文档**：任务规划、实施计划等 Markdown 放在 **`docs/plan/`**（无则创建该目录）。
 
 修改架构或新增重要端点后，请同步更新 **`project-facts.mdc`**（必要时 **`workspace-quick-reference.mdc`**）、**`README.md`** 配置与 API 摘要、**`docs/library-organize.md`**（若涉及 **`library-config.cfg`**）、**`CLAUDE.md`** API 列表，以及 **`docs/architecture-and-implementation.html`**（实现说明与功能对照表）。
 

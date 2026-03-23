@@ -1,5 +1,12 @@
 import { computed, ref } from "vue"
-import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
+import type {
+  ActorListItemDTO,
+  ActorsListDTO,
+  ListActorsParams,
+  MetadataRefreshQueuedDTO,
+  PatchMovieBody,
+  TaskDTO,
+} from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
@@ -18,6 +25,27 @@ const autoLibraryWatchMock = ref(true)
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
+
+/** Mock：演员用户标签（与影片 userTags 隔离） */
+const mockActorUserTags = ref<Map<string, string[]>>(new Map())
+
+function mockActorsFromMovies(): ActorListItemDTO[] {
+  const counts = new Map<string, number>()
+  for (const m of moviesState.value) {
+    for (const raw of m.actors) {
+      const a = raw.trim()
+      if (!a) continue
+      counts.set(a, (counts.get(a) ?? 0) + 1)
+    }
+  }
+  const names = [...counts.keys()].sort((x, y) => x.localeCompare(y))
+  return names.map((name) => ({
+    name,
+    avatarUrl: "",
+    movieCount: counts.get(name) ?? 0,
+    userTags: [...(mockActorUserTags.value.get(name) ?? [])].sort((x, y) => x.localeCompare(y)),
+  }))
+}
 
 const libraryPathsState = ref<LibrarySetting[]>([
   {
@@ -422,5 +450,57 @@ export const mockLibraryService: LibraryService = {
 
   mergeMovieIntoCache() {
     // Mock：无中央 HTTP 缓存；持久化由 localStorage 在 applyMockPatchMovie 中处理。
+  },
+
+  async listActors(params?: ListActorsParams): Promise<ActorsListDTO> {
+    let rows = mockActorsFromMovies().filter((r) => r.movieCount > 0)
+    const q = params?.q?.trim().toLowerCase() ?? ""
+    if (q) {
+      rows = rows.filter((r) => {
+        if (r.name.toLowerCase().includes(q)) {
+          return true
+        }
+        return (r.userTags ?? []).some((t) => t.toLowerCase().includes(q))
+      })
+    }
+    const actorTag = params?.actorTag?.trim() ?? ""
+    if (actorTag) {
+      rows = rows.filter((r) => (r.userTags ?? []).some((t) => t === actorTag))
+    }
+    if (params?.sort === "movieCount") {
+      rows = [...rows].sort(
+        (a, b) => b.movieCount - a.movieCount || a.name.localeCompare(b.name),
+      )
+    }
+    const total = rows.length
+    const limit = params?.limit && params.limit > 0 ? params.limit : 50
+    const offset = params?.offset && params.offset > 0 ? params.offset : 0
+    const slice = rows.slice(offset, offset + limit)
+    return { total, actors: slice }
+  },
+
+  async patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
+    const n = name.trim()
+    if (!n) {
+      throw new Error("actor name is required")
+    }
+    if (!mockActorsFromMovies().some((r) => r.name === n)) {
+      throw new Error("actor not found")
+    }
+    const normalized = [
+      ...new Set(
+        userTags
+          .map((t) => t.trim())
+          .filter((t) => t !== ""),
+      ),
+    ].sort((x, y) => x.localeCompare(y))
+    const next = new Map(mockActorUserTags.value)
+    next.set(n, normalized)
+    mockActorUserTags.value = next
+    const row = mockActorsFromMovies().find((r) => r.name === n)
+    if (!row) {
+      throw new Error("actor not found")
+    }
+    return row
   },
 }

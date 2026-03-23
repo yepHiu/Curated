@@ -6,6 +6,7 @@ alwaysApply: false
 
 # Documentation Sync
 
+- **Plan 文档路径**：新的规划 / 实施计划类 Markdown 写入 **`docs/plan/`**；目录缺失时先创建 **`docs/plan`** 再添加文件。
 - Separate implemented facts from future plans and unresolved decisions.
 - When describing architecture, explicitly state whether it is current code, target design, or a phased recommendation.
 - If code and docs disagree, treat the codebase as the source of truth and document the gap clearly.

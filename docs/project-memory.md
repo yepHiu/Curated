@@ -28,6 +28,7 @@
 - 产品组件：`src/components/jav-library`
 - UI 原子组件：`src/components/ui`
 - 主题样式：`src/style.css`
+- **UI 设计规范（代码级）**：[`docs/frontend-ui-spec.md`](frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
 - 播放进度（仅浏览器，非服务端）：`src/lib/playback-progress-storage.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
 - 已播计数（localStorage）：`src/lib/played-movies-storage.ts`
@@ -56,6 +57,7 @@
 - `favorites`
 - `recent`
 - `tags`
+- `actors`（演员库：[`ActorsView.vue`](../src/views/ActorsView.vue)；API **`GET/PATCH /api/library/actors…`**；路由 query **`actorsQ`** / **`actorTag`**）
 - `history`（观看历史：按本地日期分组，数据见下）
 - `detail/:id`
 - `player/:id?`
@@ -77,7 +79,7 @@
 
 ## 4. 已确认的产品实现方式
 
-- `library / favorites / recent / tags` 共享同一套浏览页面模型，通过 route name 和 query 参数切换上下文；**`history` 为独立路由**，不混入 `LibraryMode` 查询拼装。
+- `library / favorites / recent / tags` 共享同一套浏览页面模型，通过 route name 和 query 参数切换上下文；**`actors` 与 `history` 为独立路由**，不混入 `LibraryMode` 查询拼装。
 - 搜索词 `q`、标签页 `tab`、当前选中影片 `selected` 已作为 URL 状态存在。
 - 影片浏览体验已经偏向“媒体库 / 海报墙”而不是“后台表格管理”。
 - 库页已引入虚拟滚动能力，说明大规模海报浏览是明确方向。

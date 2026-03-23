@@ -117,8 +117,10 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
 	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
+	mux.HandleFunc("GET /api/library/actors", h.handleListActors)
 	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
+	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
@@ -236,6 +238,85 @@ func (h *Handler) handleScrapeActorProfile(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusAccepted, task)
+}
+
+func (h *Handler) handleListActors(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	if limit <= 0 {
+		limit = 50
+	}
+	req := contracts.ListActorsRequest{
+		Q:        strings.TrimSpace(q.Get("q")),
+		ActorTag: strings.TrimSpace(q.Get("actorTag")),
+		Sort:     strings.TrimSpace(q.Get("sort")),
+		Limit:    limit,
+		Offset:   offset,
+	}
+	result, err := h.store.ListActors(r.Context(), req)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("list actors failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list actors")
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handlePatchActorUserTags(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if r.Body != nil {
+		_ = r.Body.Close()
+	}
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "failed to read body")
+		return
+	}
+	var in contracts.PatchActorUserTagsBody
+	if err := json.Unmarshal(body, &in); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		return
+	}
+	err = h.store.ReplaceActorUserTagsByName(r.Context(), name, in.UserTags)
+	if err != nil {
+		if errors.Is(err, contracts.ErrActorNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "actor not found")
+			return
+		}
+		if errors.Is(err, storage.ErrInvalidUserTags) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("patch actor user tags failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to update actor tags")
+		return
+	}
+	item, err := h.store.ActorListItemByName(r.Context(), name)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("load actor after tag patch failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load actor")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {

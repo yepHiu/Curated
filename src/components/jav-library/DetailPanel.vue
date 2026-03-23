@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useFocusWithin } from "@vueuse/core"
-import { computed, nextTick, ref, watch } from "vue"
+import { useFocusWithin, onClickOutside } from "@vueuse/core"
+import { computed, nextTick, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { MoreVertical, Pencil, PlayCircle, Plus, RefreshCw, Star, X } from "lucide-vue-next"
 import type { PatchMovieBody } from "@/api/types"
@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
+import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 
 const { t } = useI18n()
@@ -71,7 +72,11 @@ const userTagFormError = ref("")
 /** 是否展开「添加标签」内联输入（与标签同一行） */
 const userTagInputOpen = ref(false)
 const newUserTagInputRef = ref<HTMLInputElement | null>(null)
+/** 「添加」+ 内联输入条，用于点击外部时收起（避免仅输入框 ref 把「添加」算作外部） */
+const userTagInlineZoneRef = ref<HTMLElement | null>(null)
 const userTagSuggestRootRef = ref<HTMLElement | null>(null)
+const userTagSuggestListRef = ref<HTMLElement | null>(null)
+const tagSuggestDomId = useId()
 const { focused: userTagSuggestRowFocused } = useFocusWithin(userTagSuggestRootRef)
 
 const filteredUserTagSuggestions = computed(() =>
@@ -243,9 +248,9 @@ async function onUserTagAddButtonClick() {
   addUserTag()
 }
 
-function addUserTag() {
+function addUserTagWithValue(raw: string) {
   userTagFormError.value = ""
-  const tagText = newUserTagDraft.value.trim()
+  const tagText = raw.trim()
   if (!tagText) {
     return
   }
@@ -267,6 +272,25 @@ function addUserTag() {
   })
   newUserTagDraft.value = ""
 }
+
+function addUserTag() {
+  addUserTagWithValue(newUserTagDraft.value)
+}
+
+const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
+  showSuggestions: showUserTagSuggestions,
+  suggestions: filteredUserTagSuggestions,
+  listRootRef: userTagSuggestListRef,
+  commitTag: (tag) => addUserTagWithValue(tag),
+  commitDraft: () => addUserTag(),
+})
+
+onClickOutside(userTagInlineZoneRef, () => {
+  if (!userTagInputOpen.value) {
+    return
+  }
+  cancelUserTagInput()
+})
 
 function removeUserTag(tag: string) {
   emit("updateUserTags", {
@@ -695,7 +719,7 @@ function pickUserTagSuggestion(tag: string) {
               </span>
             </Badge>
 
-            <div class="flex max-w-full flex-wrap items-center gap-2">
+            <div ref="userTagInlineZoneRef" class="flex max-w-full flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="secondary"
@@ -719,9 +743,16 @@ function pickUserTagSuggestion(tag: string) {
                     type="text"
                     maxlength="64"
                     autocomplete="off"
+                    role="combobox"
+                    :aria-expanded="showUserTagSuggestions"
+                    :aria-activedescendant="
+                      highlightIndex >= 0 ? `${tagSuggestDomId}-opt-${highlightIndex}` : undefined
+                    "
+                    aria-autocomplete="list"
+                    :aria-controls="showUserTagSuggestions ? `${tagSuggestDomId}-list` : undefined"
                     :placeholder="t('detailPanel.newTagPlaceholder')"
                     class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0"
-                    @keydown.enter.prevent="addUserTag"
+                    @keydown="onTagSuggestKeydown"
                   />
                   <Button
                     type="button"
@@ -736,15 +767,21 @@ function pickUserTagSuggestion(tag: string) {
                 </div>
                 <ul
                   v-if="showUserTagSuggestions"
+                  :id="`${tagSuggestDomId}-list`"
+                  ref="userTagSuggestListRef"
                   class="absolute top-full left-0 z-50 mt-1 max-h-60 w-full min-w-[min(100%,12rem)] overflow-y-auto rounded-2xl border border-border/80 bg-popover/98 py-1 text-popover-foreground shadow-lg backdrop-blur-sm"
                   role="listbox"
                   :aria-label="t('detailPanel.tagSuggestAria')"
                 >
-                  <li v-for="s in filteredUserTagSuggestions" :key="s">
+                  <li v-for="(s, si) in filteredUserTagSuggestions" :key="s">
                     <button
+                      :id="`${tagSuggestDomId}-opt-${si}`"
                       type="button"
                       role="option"
+                      :data-tag-suggest-idx="si"
                       class="w-full truncate px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                      :class="highlightIndex === si ? 'bg-muted' : ''"
+                      :aria-selected="highlightIndex === si"
                       @mousedown.prevent="pickUserTagSuggestion(s)"
                     >
                       {{ s }}

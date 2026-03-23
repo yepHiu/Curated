@@ -7,4 +7,5 @@ alwaysApply: true
 
 - **Product name: Curated** (repo directory / npm package id may remain `jav-shadcn`). This repo is a **`Vue 3 + TypeScript + Vite` + `shadcn-vue`** app at the repo root, with a **`Go` HTTP backend** under **`backend/`** (not a frontend-only scaffold).
 - Separate **current code facts** from **future desktop (Electron / IPC / mpv)** plans; see `architecture-boundaries.mdc`.
-- Primary rule handoff: **`workspace-quick-reference.mdc`** (daily ops) → **`project-facts.mdc`** (structure/API) → **`vue-frontend-standards.mdc`** (incl. **Form controls** / `Input`) / **`jav-library-frontend-patterns.mdc`** for UI → **`backend-*`** rules when touching Go.
+- Primary rule handoff: **`workspace-quick-reference.mdc`** (daily ops) → **`project-facts.mdc`** (structure/API) → **`ui-component-spec.mdc`** (UI layering, tokens, surfaces) → **`vue-frontend-standards.mdc`** (incl. **Form controls** / `Input`) / **`jav-library-frontend-patterns.mdc`** (library UX) → **`backend-*`** rules when touching Go.
+- **Planning docs**: 后续任务规划、实施计划、路线图等 Markdown **plan** 文档统一放在 **`docs/plan/`**；若目录不存在则创建后再写入（勿把 plan 散落在 `docs/` 根目录，除非与既有固定文档路径冲突时再在规则中说明例外）。

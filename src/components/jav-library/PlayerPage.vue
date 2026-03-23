@@ -698,7 +698,7 @@ const noStreamHint = computed(() => {
               class="flex flex-wrap items-center justify-center gap-3 sm:col-start-3 sm:justify-end"
             >
               <div
-                class="flex min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 py-2 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4"
+                class="flex h-9 min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4"
                 role="group"
                 :aria-label="t('player.volumeAria')"
               >
@@ -723,12 +723,12 @@ const noStreamHint = computed(() => {
                   :disabled="!playbackSrc"
                   @update:model-value="onVolumeSlider"
                 />
-                <span class="w-10 shrink-0 text-right text-sm">{{ volumePercentLabel }}%</span>
+                <span class="w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercentLabel }}%</span>
               </div>
 
               <Button
                 variant="secondary"
-                class="shrink-0 rounded-2xl bg-white/10 text-white hover:bg-white/20"
+                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
                 @click="toggleFullscreen"
               >

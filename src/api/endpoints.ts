@@ -1,6 +1,8 @@
 import { httpClient } from "./http-client"
 import type {
+  ActorListItemDTO,
   ActorProfileDTO,
+  ActorsListDTO,
   AddLibraryPathBody,
   AddLibraryPathResultDTO,
   CreateCuratedFrameBody,
@@ -8,6 +10,7 @@ import type {
   HealthDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
+  ListActorsParams,
   ListMoviesParams,
   MetadataRefreshQueuedDTO,
   MetadataScrapeByPathsBody,
@@ -44,6 +47,15 @@ export const api = {
 
   getActorProfile(name: string): Promise<ActorProfileDTO> {
     return httpClient.get<ActorProfileDTO>("/library/actors/profile", { name })
+  },
+
+  listActors(params?: ListActorsParams): Promise<ActorsListDTO> {
+    return httpClient.get<ActorsListDTO>("/library/actors", params as Record<string, string | number | undefined>)
+  },
+
+  patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
+    const q = new URLSearchParams({ name })
+    return httpClient.patch<ActorListItemDTO>(`/library/actors/tags?${q.toString()}`, { userTags })
   },
 
   scrapeActorProfile(name: string): Promise<TaskDTO> {

@@ -1,5 +1,12 @@
 import type { ComputedRef } from "vue"
-import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
+import type {
+  ActorListItemDTO,
+  ActorsListDTO,
+  ListActorsParams,
+  MetadataRefreshQueuedDTO,
+  PatchMovieBody,
+  TaskDTO,
+} from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 
@@ -58,4 +65,8 @@ export interface LibraryService {
    * Web：把详情合并进列表缓存（已存在则覆盖同 id）。Mock：空操作。
    */
   mergeMovieIntoCache(movie: Movie): void
+  /** Web：GET /library/actors；Mock：由内存影片聚合 */
+  listActors(params?: ListActorsParams): Promise<ActorsListDTO>
+  /** Web：PATCH /library/actors/tags；Mock：内存 Map */
+  patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO>
 }

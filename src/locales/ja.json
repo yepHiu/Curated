@@ -15,7 +15,28 @@
     "backendOnline": "バックエンド接続中",
     "backendOffline": "バックエンド未接続",
     "backendMock": "デモ（API なし）",
-    "backendRecheck": "再接続を確認"
+    "backendRecheck": "再接続を確認",
+    "actors": "出演者"
+  },
+  "actors": {
+    "title": "出演者ライブラリ",
+    "subtitle": "出演者別に閲覧。ここでのタグは出演者用ユーザータグで、作品タグとは別です。",
+    "searchLabel": "名前検索",
+    "searchPlaceholder": "名前または出演者タグに含む…",
+    "actorTagLabel": "出演者タグで絞り込み",
+    "actorTagPlaceholder": "タグの完全一致",
+    "sortName": "名前順",
+    "sortMovieCount": "出演数順",
+    "empty": "該当する出演者がありません。",
+    "loading": "読み込み中…",
+    "loadMore": "さらに読み込む",
+    "loadError": "出演者一覧の取得に失敗しました",
+    "movieCount": "出演 {n} 本",
+    "ariaFilterActorTag": "出演者タグ「{tag}」で一覧を絞り込む",
+    "filteredByTag": "出演者タグ「{tag}」で絞り込み中。",
+    "clearTagFilter": "すべての出演者を表示",
+    "ariaClearTagFilter": "出演者タグの絞り込みを解除して全員を表示",
+    "tagsSaveError": "保存に失敗しました"
   },
   "toasts": {
     "libraryWatchScanDone": "ライブラリ監視：スキャン完了 — {message}",

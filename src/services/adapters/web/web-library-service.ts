@@ -1,5 +1,10 @@
 import { computed, ref, type Ref } from "vue"
-import type { MetadataRefreshQueuedDTO, PatchMovieBody, TaskDTO } from "@/api/types"
+import type {
+  ListActorsParams,
+  MetadataRefreshQueuedDTO,
+  PatchMovieBody,
+  TaskDTO,
+} from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
@@ -287,6 +292,14 @@ function createWebLibraryService(): LibraryService {
     async deleteMovie(movieId: string) {
       await api.deleteMovie(movieId)
       moviesState.value = moviesState.value.filter((m) => m.id !== movieId)
+    },
+
+    async listActors(params?: ListActorsParams) {
+      return await api.listActors(params)
+    },
+
+    async patchActorUserTags(name: string, userTags: string[]) {
+      return await api.patchActorUserTags(name.trim(), userTags)
     },
   }
 

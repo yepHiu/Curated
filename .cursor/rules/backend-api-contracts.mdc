@@ -1,6 +1,6 @@
 ---
 description: Backend API contract rules for commands, events, DTOs, and errors
-globs: "{backend/internal/contracts/**/*.go,docs/backend-contract*.md,docs/backend-implementation-plan.md,docs/jav-libary.md}"
+globs: "{backend/internal/contracts/**/*.go,docs/backend-contract*.md,docs/plan/backend-implementation-plan.md,docs/jav-libary.md}"
 alwaysApply: false
 ---
 

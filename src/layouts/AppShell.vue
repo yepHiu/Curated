@@ -16,6 +16,11 @@ import {
   librarySearchSuggestionsHasAny,
 } from "@/lib/library-search-suggestions"
 import {
+  ACTORS_SEARCH_QUERY_KEY,
+  getActorsSearchQuery,
+  mergeActorsQuery,
+} from "@/lib/actors-route-query"
+import {
   buildMovieRouteQuery,
   getBrowseSourceMode,
   getCuratedFrameSearchQuery,
@@ -91,11 +96,13 @@ const currentMovie = computed(() => {
 
 const currentMovieId = computed(() => currentMovie.value?.id)
 const isLibraryRoute = computed(() => isLibraryRouteName(route.name))
+const isActorsRoute = computed(() => route.name === "actors")
+const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRoute.value)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const isDetailRoute = computed(() => route.name === "detail")
 const isPlayerRoute = computed(() => route.name === "player")
 
-const showHeaderBack = computed(() => !isLibraryRoute.value)
+const showHeaderBack = computed(() => !isPrimaryBrowseRoute.value)
 
 const headerBackTarget = computed(() => {
   if (isPlayerRoute.value && currentMovieId.value) {
@@ -524,6 +531,57 @@ function clearCuratedFramesSearch() {
     query: mergeCuratedFramesQuery(route.query, { cfq: undefined }),
   })
 }
+
+/** 演员库顶栏搜索（`actorsQ`） */
+const searchDraftActors = ref("")
+
+watch(
+  [() => route.name, () => route.query[ACTORS_SEARCH_QUERY_KEY]],
+  () => {
+    if (!isActorsRoute.value) {
+      return
+    }
+    const part = getActorsSearchQuery(route.query)
+    if (part !== searchDraftActors.value) {
+      searchDraftActors.value = part
+    }
+  },
+  { immediate: true },
+)
+
+watchDebounced(
+  searchDraftActors,
+  (value) => {
+    if (!isActorsRoute.value) {
+      return
+    }
+    const normalized = value.trim()
+    const current = getActorsSearchQuery(route.query).trim()
+    if (normalized === current) {
+      return
+    }
+    void router.replace({
+      name: "actors",
+      query: mergeActorsQuery(route.query, {
+        [ACTORS_SEARCH_QUERY_KEY]: normalized || undefined,
+      }),
+    })
+  },
+  { debounce: 280 },
+)
+
+function clearActorsSearch() {
+  searchDraftActors.value = ""
+  if (!isActorsRoute.value) {
+    return
+  }
+  void router.replace({
+    name: "actors",
+    query: mergeActorsQuery(route.query, {
+      [ACTORS_SEARCH_QUERY_KEY]: undefined,
+    }),
+  })
+}
 </script>
 
 <template>
@@ -541,7 +599,10 @@ function clearCuratedFramesSearch() {
         <section
           class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/92 shadow-xl shadow-black/8"
         >
-          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 lg:px-5">
+          <!-- min-h 与中间栏 h-10 搜索框 + 上下 py-4 对齐，避免仅「返回」时顶栏变矮（如观看历史） -->
+          <div
+            class="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 lg:px-5"
+          >
             <div class="flex flex-wrap items-center gap-2">
               <Button
                 v-if="!isLgUp"
@@ -676,6 +737,30 @@ function clearCuratedFramesSearch() {
                   class="absolute top-1/2 right-1.5 size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
                   :aria-label="t('shell.clearCuratedSearch')"
                   @click="clearCuratedFramesSearch"
+                >
+                  <X class="size-4" />
+                </Button>
+              </div>
+              <div
+                v-else-if="isActorsRoute"
+                class="relative w-full max-w-lg"
+              >
+                <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  v-model="searchDraftActors"
+                  class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
+                  :class="searchDraftActors.trim() ? 'pr-10' : ''"
+                  :placeholder="t('actors.searchPlaceholder')"
+                  autocomplete="off"
+                />
+                <Button
+                  v-if="searchDraftActors.trim()"
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  class="absolute top-1/2 right-1.5 z-[1] size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  :aria-label="t('shell.clearSearch')"
+                  @click="clearActorsSearch"
                 >
                   <X class="size-4" />
                 </Button>

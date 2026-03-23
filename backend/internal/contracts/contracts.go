@@ -79,6 +79,34 @@ type ActorProfileDTO struct {
 	ProfileUpdatedAt string `json:"profileUpdatedAt,omitempty"`
 }
 
+// ActorListItemDTO is one row in GET /api/library/actors (library display name + stats + actor-only user tags).
+type ActorListItemDTO struct {
+	Name       string   `json:"name"`
+	AvatarURL  string   `json:"avatarUrl,omitempty"`
+	MovieCount int      `json:"movieCount"`
+	UserTags   []string `json:"userTags,omitempty"`
+}
+
+// ListActorsRequest is the query for GET /api/library/actors.
+type ListActorsRequest struct {
+	Q         string // substring match on actors.name or actor_user_tags.tag (case-insensitive)
+	ActorTag  string // exact match on actor_user_tags.tag
+	Sort      string // "name" (default) or "movieCount"
+	Limit     int
+	Offset    int
+}
+
+// ListActorsResponse is returned by GET /api/library/actors.
+type ListActorsResponse struct {
+	Total  int                `json:"total"`
+	Actors []ActorListItemDTO `json:"actors"`
+}
+
+// PatchActorUserTagsBody is the JSON body for PATCH /api/library/actors/tags?name=.
+type PatchActorUserTagsBody struct {
+	UserTags []string `json:"userTags"`
+}
+
 type GetMovieDetailRequest struct {
 	MovieID string `json:"movieId"`
 }

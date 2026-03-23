@@ -4,6 +4,8 @@ globs: src/**/*.{ts,vue}
 alwaysApply: false
 ---
 
+总览与设计令牌、分层见 **`ui-component-spec.mdc`**；人读长文见 **`docs/frontend-ui-spec.md`**。
+
 # Curated Frontend Patterns
 
 - Data and mutations go through **`useLibraryService()`** / **`src/api`** (Web or Mock per `VITE_USE_WEB_API`); do not bypass the service layer for library actions from views.

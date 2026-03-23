@@ -3,6 +3,7 @@ export type AppPage =
   | "favorites"
   | "recent"
   | "tags"
+  | "actors"
   | "history"
   | "curated-frames"
   | "detail"

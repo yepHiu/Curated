@@ -4,6 +4,8 @@ globs: src/**/*.{ts,vue}
 alwaysApply: false
 ---
 
+总览与设计令牌、业务面清单见 **`ui-component-spec.mdc`**；人读长文见 **`docs/frontend-ui-spec.md`**。
+
 # Vue Frontend Standards
 
 - Use `Vue 3` SFCs with `<script setup lang="ts">`; prefer Composition API over Options API.
