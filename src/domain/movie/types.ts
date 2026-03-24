@@ -34,6 +34,8 @@ export interface Movie {
   previewVideoUrl?: string
   /** 演员名 -> 头像 URL（Web API 详情；刮削演员资料后才有） */
   actorAvatarUrls?: Record<string, string>
+  /** 在回收站时为 RFC3339；正常库中省略 */
+  trashedAt?: string
   /**
    * Mock：首次用户编辑展示字段前快照，用于 PATCH 清除覆盖时恢复底稿（Web API 由 SQLite 底列承担）。
    */

@@ -13,6 +13,7 @@ import {
   Settings2,
   Sparkles,
   Tags,
+  Trash2,
   Users,
 } from "lucide-vue-next"
 import { RouterLink, useRoute } from "vue-router"
@@ -120,6 +121,7 @@ const browseItems = computed((): NavigationItem[] => {
   void playbackProgressRevision.value
   void curatedFramesRevision.value
   const movies = libraryService.movies.value
+  const trashTotal = libraryService.trashedMovies.value.length
   const total = movies.length
   const recent = movies.filter((m) => isMovieRecentlyAdded(m.addedAt)).length
   const tagCount = countUniqueTags(movies)
@@ -139,6 +141,12 @@ const browseItems = computed((): NavigationItem[] => {
     { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
     { label: t("nav.recent"), page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
     { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+    {
+      label: t("nav.trash"),
+      page: "trash",
+      icon: Trash2,
+      hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
+    },
     {
       label: t("nav.actors"),
       page: "actors",

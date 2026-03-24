@@ -1,0 +1,1 @@
+ALTER TABLE movies ADD COLUMN trashed_at TEXT NOT NULL DEFAULT '';

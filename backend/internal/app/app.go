@@ -23,6 +23,8 @@ import (
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
 	"jav-shadcn/backend/internal/library"
+	"jav-shadcn/backend/internal/library/moviecode"
+	"jav-shadcn/backend/internal/library/movieroot"
 	"jav-shadcn/backend/internal/librarywatch"
 	"jav-shadcn/backend/internal/scanner"
 	"jav-shadcn/backend/internal/scraper"
@@ -46,6 +48,9 @@ type App struct {
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
 	organizeMu      sync.RWMutex
+	// extendedLibraryImport: first-scan layout detection on newly added library roots (library-config.cfg).
+	extendedLibraryImport bool
+	extendedImportMu      sync.RWMutex
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
@@ -105,13 +110,14 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			cfg.Assets.MaxConcurrentDownloads,
 			cfg.Assets.MaxResponseBodyMB,
 		),
-		tasks:               tasks.NewManager(),
-		organizeLibrary:     cfg.OrganizeLibrary,
-		autoLibraryWatch:    cfg.AutoLibraryWatch,
-		librarySettingsPath: strings.TrimSpace(librarySettingsPath),
-		appCtx:              ctx,
-		scrapeSem:           make(chan struct{}, scrapeConc),
-		watchScanPending:    make(map[string]struct{}),
+		tasks:                 tasks.NewManager(),
+		organizeLibrary:       cfg.OrganizeLibrary,
+		extendedLibraryImport: cfg.ExtendedLibraryImport,
+		autoLibraryWatch:      cfg.AutoLibraryWatch,
+		librarySettingsPath:   strings.TrimSpace(librarySettingsPath),
+		appCtx:                ctx,
+		scrapeSem:             make(chan struct{}, scrapeConc),
+		watchScanPending:      make(map[string]struct{}),
 	}, nil
 }
 
@@ -206,6 +212,32 @@ func (a *App) SetOrganizeLibrary(v bool) error {
 	a.organizeLibrary = v
 	a.cfg.OrganizeLibrary = v
 	a.organizeMu.Unlock()
+	return nil
+}
+
+// ExtendedLibraryImport reports whether first-scan import layout detection is enabled (library-config.cfg).
+func (a *App) ExtendedLibraryImport() bool {
+	a.extendedImportMu.RLock()
+	defer a.extendedImportMu.RUnlock()
+	return a.extendedLibraryImport
+}
+
+// SetExtendedLibraryImport persists extendedLibraryImport to library-config.cfg and updates in-memory state.
+func (a *App) SetExtendedLibraryImport(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["extendedLibraryImport"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.extendedImportMu.Lock()
+	a.extendedLibraryImport = v
+	a.cfg.ExtendedLibraryImport = v
+	a.extendedImportMu.Unlock()
 	return nil
 }
 
@@ -400,9 +432,6 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 		if err != nil {
 			return a.respondError(output, command.ID, internalError("failed to list movies", map[string]any{"cause": err.Error()}))
 		}
-		if result.Total == 0 {
-			result = a.library.ListMovies(request)
-		}
 		return a.respondOK(output, command.ID, result)
 
 	case contracts.CommandLibraryDetail:
@@ -416,12 +445,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 
 		movie, err := a.store.GetMovieDetail(ctx, request.MovieID)
 		if err != nil {
-			if err == sql.ErrNoRows {
-				movie, err = a.library.GetMovie(request.MovieID)
-			}
-		}
-		if err != nil {
-			if err == sql.ErrNoRows || library.IsNotFound(err) {
+			if errors.Is(err, sql.ErrNoRows) {
 				return a.respondError(output, command.ID, notFound("movie was not found", map[string]any{"movieId": request.MovieID}))
 			}
 			return a.respondError(output, command.ID, internalError("failed to load movie", map[string]any{"movieId": request.MovieID}))
@@ -441,6 +465,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 				HardwareDecode: a.cfg.Player.HardwareDecode,
 			},
 			OrganizeLibrary:        a.OrganizeLibrary(),
+			ExtendedLibraryImport:  a.ExtendedLibraryImport(),
 			AutoLibraryWatch:       a.AutoLibraryWatch(),
 			MetadataMovieProvider:  a.MetadataMovieProvider(),
 			MetadataMovieProviders: a.ListMetadataMovieProviders(),
@@ -517,6 +542,16 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	)
 	var lastProgressEmit time.Time
 
+	libraryPathRows, listErr := a.store.ListLibraryPaths(ctx)
+	if listErr != nil {
+		task := a.tasks.Fail(taskID, contracts.ErrorCodeInternal, listErr.Error())
+		_ = a.store.SaveTask(ctx, task)
+		_ = a.emitEvent(output, contracts.EventTaskFailed, contracts.TaskEventDTO{Task: task})
+		return
+	}
+	extendedSnapshot := a.ExtendedLibraryImport()
+	seenMovieRoots := make(map[string]struct{})
+
 	summary, err := a.scanner.Scan(ctx, taskID, paths, scanner.Hooks{
 		OnProgress: func(processed, total int, message string) {
 			now := time.Now()
@@ -588,6 +623,29 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				result.Path = newPath
 				result.FileName = filepath.Base(newPath)
 			}
+
+			lp := movieroot.ResolveConfiguredLibraryPath(result.Path, libraryPathRows)
+			pending := lp != nil && lp.FirstLibraryScanPending
+			kind, _ := movieroot.ClassifyVideoRoot(result.Path, result.Number, extendedSnapshot, pending)
+			if extendedSnapshot && pending {
+				result.ImportLayout = string(kind)
+			}
+
+			rootKey := strings.ToLower(filepath.Clean(filepath.Dir(result.Path))) + "\x00" + moviecode.NormalizeForStorageID(result.Number)
+			if _, dup := seenMovieRoots[rootKey]; dup {
+				skippedCount++
+				result.Status = "skipped"
+				result.Reason = "duplicate_movie_root"
+				if err := a.store.SaveScanItem(ctx, result); err != nil {
+					return err
+				}
+				persistedResults = append(persistedResults, result)
+				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
+					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
+				}
+				return nil
+			}
+			seenMovieRoots[rootKey] = struct{}{}
 
 			outcome, err := a.store.PersistScanMovie(ctx, result)
 			if err != nil {
@@ -672,6 +730,10 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		Summary: summary,
 	}); err != nil {
 		a.logger.Error("failed to emit scan completion", zap.Error(err), zap.String("taskId", taskID))
+	}
+
+	if clearErr := a.store.ClearFirstLibraryScanPendingAfterScan(ctx, paths); clearErr != nil {
+		a.logger.Warn("failed to clear first_library_scan_pending", zap.Error(clearErr), zap.String("taskId", taskID))
 	}
 }
 
@@ -1219,18 +1281,18 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 
 func (a *App) HTTPHandler() http.Handler {
 	return server.NewHandler(server.Deps{
-		Cfg:                    a.cfg,
-		Logger:                 a.logger,
-		Store:                  a.store,
-		Library:                a.library,
-		Tasks:                  a.tasks,
-		ScanStarter:            a,
-		OrganizeLibraryCtl:     a,
-		AutoLibraryWatchCtl:    a,
-		MetadataScrapeCtl:      a,
-		MovieMetadataRefresher: a,
-		ActorProfileRefresher:  a,
-		LibraryWatchReloader:   a,
+		Cfg:                      a.cfg,
+		Logger:                   a.logger,
+		Store:                    a.store,
+		Tasks:                    a.tasks,
+		ScanStarter:              a,
+		OrganizeLibraryCtl:       a,
+		ExtendedLibraryImportCtl: a,
+		AutoLibraryWatchCtl:      a,
+		MetadataScrapeCtl:        a,
+		MovieMetadataRefresher:   a,
+		ActorProfileRefresher:    a,
+		LibraryWatchReloader:     a,
 	}).Routes()
 }
 

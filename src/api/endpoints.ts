@@ -81,8 +81,14 @@ export const api = {
     return httpClient.patch<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`, body)
   },
 
-  deleteMovie(movieId: string): Promise<void> {
-    return httpClient.delete(`/library/movies/${encodeURIComponent(movieId)}`)
+  deleteMovie(movieId: string, opts?: { permanent?: boolean }): Promise<void> {
+    const q =
+      opts?.permanent === true ? `?${new URLSearchParams({ permanent: "true" }).toString()}` : ""
+    return httpClient.delete(`/library/movies/${encodeURIComponent(movieId)}${q}`)
+  },
+
+  restoreMovie(movieId: string): Promise<void> {
+    return httpClient.post<void>(`/library/movies/${encodeURIComponent(movieId)}/restore`)
   },
 
   getSettings(): Promise<SettingsDTO> {

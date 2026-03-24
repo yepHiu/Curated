@@ -286,6 +286,7 @@ function isChipActive(tag: string): boolean {
     </Card>
 
     <Tabs
+      v-if="props.mode !== 'trash'"
       :model-value="props.activeTab"
       class="gap-5"
       @update:model-value="handleTabChange"
@@ -307,6 +308,8 @@ function isChipActive(tag: string): boolean {
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
         :selected-movie-id="props.selectedMovie?.id"
+        :empty-title="props.mode === 'trash' ? t('library.trashEmptyTitle') : undefined"
+        :empty-description="props.mode === 'trash' ? t('library.trashEmptyDesc') : undefined"
         @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"

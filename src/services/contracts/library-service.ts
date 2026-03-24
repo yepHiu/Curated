@@ -12,6 +12,8 @@ import type { Movie } from "@/domain/movie/types"
 
 export interface LibraryService {
   movies: ComputedRef<readonly Movie[]>
+  /** 回收站列表（Web：mode=trash；Mock：带 trashedAt 的条目） */
+  trashedMovies: ComputedRef<readonly Movie[]>
   libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
   refreshSettings(): Promise<void>
@@ -20,6 +22,9 @@ export interface LibraryService {
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */
   organizeLibrary: ComputedRef<boolean>
   setOrganizeLibrary(value: boolean): Promise<void>
+  /** 新库根首次扫描时的扩展导入识别（Curated / 外部整理）；默认关，与 organizeLibrary 独立 */
+  extendedLibraryImport: ComputedRef<boolean>
+  setExtendedLibraryImport(value: boolean): Promise<void>
   /** 库目录监听触发的自动扫描/刮削；mock 为本地状态 */
   autoLibraryWatch: ComputedRef<boolean>
   setAutoLibraryWatch(value: boolean): Promise<void>
@@ -63,8 +68,12 @@ export interface LibraryService {
   patchMovie(movieId: string, body: PatchMovieBody): Promise<Movie | undefined>
   /** 仅更新收藏；等价于 patchMovie(id, { isFavorite }) */
   toggleFavorite(movieId: string, nextValue?: boolean): Promise<Movie | undefined>
-  /** 删除影片（Web：请求后端并从本地列表移除；Mock：仅从内存列表移除） */
+  /** 移入回收站（Web：DELETE 无 permanent；Mock：标记 trashedAt） */
   deleteMovie(movieId: string): Promise<void>
+  /** 从回收站恢复（Web：POST …/restore；Mock：清除 trashedAt） */
+  restoreMovie(movieId: string): Promise<void>
+  /** 永久删除（须已在回收站；Web：DELETE ?permanent=true） */
+  deleteMoviePermanently(movieId: string): Promise<void>
   /**
    * Web：把详情合并进列表缓存（已存在则覆盖同 id）。Mock：空操作。
    */

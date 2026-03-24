@@ -16,9 +16,14 @@ import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-
 
 const useWeb = import.meta.env.VITE_USE_WEB_API === "true"
 
-const props = defineProps<{
-  movieId: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    movieId: string
+    /** 回收站中仅展示，不可保存 */
+    readonly?: boolean
+  }>(),
+  { readonly: false },
+)
 
 const { t, locale } = useI18n()
 
@@ -81,6 +86,9 @@ async function load() {
 }
 
 async function save() {
+  if (props.readonly) {
+    return
+  }
   const id = props.movieId.trim()
   if (!id) {
     return
@@ -122,7 +130,9 @@ watch(
     <CardHeader>
       <CardTitle>{{ t("detailPage.commentTitle") }}</CardTitle>
       <CardDescription class="text-pretty">
-        {{ t("detailPage.commentHint") }}
+        {{
+          props.readonly ? t("detailPage.commentReadonlyTrashHint") : t("detailPage.commentHint")
+        }}
       </CardDescription>
     </CardHeader>
     <CardContent class="flex flex-col gap-3">
@@ -144,7 +154,8 @@ watch(
           id="movie-comment-body"
           v-model="draft"
           rows="6"
-          :disabled="saving"
+          :disabled="saving || props.readonly"
+          :readonly="props.readonly"
           :placeholder="t('detailPage.commentPlaceholder')"
           class="text-foreground placeholder:text-muted-foreground flex min-h-[140px] w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-sm shadow-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -162,7 +173,7 @@ watch(
         >
           {{ saveError }}
         </p>
-        <div class="flex justify-end">
+        <div v-if="!props.readonly" class="flex justify-end">
           <Button
             type="button"
             class="rounded-xl"

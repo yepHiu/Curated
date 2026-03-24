@@ -28,6 +28,7 @@ type movieRow struct {
 	CoverURL        string
 	ThumbURL        string
 	PreviewVideoURL string
+	TrashedAt       string
 }
 
 func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMoviesRequest) (contracts.MoviesPageDTO, error) {
@@ -50,11 +51,15 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	}
 
 	args = append(args, limit, offset)
+	orderBy := "ORDER BY m.added_at DESC, m.id ASC"
+	if strings.EqualFold(strings.TrimSpace(request.Mode), "trash") {
+		orderBy = "ORDER BY m.trashed_at DESC, m.id ASC"
+	}
 	rows, err := s.db.QueryContext(
 		ctx,
 		movieSelectEffectiveColumns+`
 		FROM movies m `+whereClause+`
-		ORDER BY m.added_at DESC, m.id ASC
+		`+orderBy+`
 		LIMIT ? OFFSET ?`,
 		args...,
 	)
@@ -86,6 +91,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			&row.CoverURL,
 			&row.ThumbURL,
 			&row.PreviewVideoURL,
+			&row.TrashedAt,
 		); err != nil {
 			return contracts.MoviesPageDTO{}, err
 		}
@@ -108,7 +114,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 
 	items := make([]contracts.MovieListItemDTO, 0, len(records))
 	for _, row := range records {
-		items = append(items, contracts.MovieListItemDTO{
+		item := contracts.MovieListItemDTO{
 			ID:             row.ID,
 			Title:          row.Title,
 			Code:           row.Code,
@@ -126,7 +132,11 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			ReleaseDate:    row.ReleaseDate,
 			CoverURL:       row.CoverURL,
 			ThumbURL:       row.ThumbURL,
-		})
+		}
+		if strings.TrimSpace(row.TrashedAt) != "" {
+			item.TrashedAt = strings.TrimSpace(row.TrashedAt)
+		}
+		items = append(items, item)
 	}
 
 	return contracts.MoviesPageDTO{
@@ -162,6 +172,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		&row.CoverURL,
 		&row.ThumbURL,
 		&row.PreviewVideoURL,
+		&row.TrashedAt,
 	)
 	if err != nil {
 		return contracts.MovieDetailDTO{}, err
@@ -186,26 +197,30 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		return contracts.MovieDetailDTO{}, err
 	}
 
+	listDTO := contracts.MovieListItemDTO{
+		ID:             row.ID,
+		Title:          row.Title,
+		Code:           row.Code,
+		Studio:         row.Studio,
+		Actors:         actorsByMovie[row.ID],
+		Tags:           metaTags[row.ID],
+		UserTags:       userTagsByMovie[row.ID],
+		RuntimeMinutes: row.RuntimeMinutes,
+		Rating:         effectiveRating(row.MetadataRating, row.UserRating),
+		IsFavorite:     row.IsFavorite,
+		AddedAt:        row.AddedAt,
+		Location:       row.Location,
+		Resolution:     row.Resolution,
+		Year:           row.Year,
+		ReleaseDate:    row.ReleaseDate,
+		CoverURL:       row.CoverURL,
+		ThumbURL:       row.ThumbURL,
+	}
+	if strings.TrimSpace(row.TrashedAt) != "" {
+		listDTO.TrashedAt = strings.TrimSpace(row.TrashedAt)
+	}
 	return contracts.MovieDetailDTO{
-		MovieListItemDTO: contracts.MovieListItemDTO{
-			ID:             row.ID,
-			Title:          row.Title,
-			Code:           row.Code,
-			Studio:         row.Studio,
-			Actors:         actorsByMovie[row.ID],
-			Tags:           metaTags[row.ID],
-			UserTags:       userTagsByMovie[row.ID],
-			RuntimeMinutes: row.RuntimeMinutes,
-			Rating:         effectiveRating(row.MetadataRating, row.UserRating),
-			IsFavorite:     row.IsFavorite,
-			AddedAt:        row.AddedAt,
-			Location:       row.Location,
-			Resolution:     row.Resolution,
-			Year:           row.Year,
-			ReleaseDate:    row.ReleaseDate,
-			CoverURL:       row.CoverURL,
-			ThumbURL:       row.ThumbURL,
-		},
+		MovieListItemDTO: listDTO,
 		Summary:          row.Summary,
 		PreviewImages:    previewsByMovie[movieID],
 		PreviewVideoURL:  row.PreviewVideoURL,
@@ -259,11 +274,19 @@ SELECT m.id,
 		ELSE m.year
 	END AS year,
 	COALESCE(NULLIF(TRIM(m.user_release_date), ''), m.release_date) AS release_date,
-	m.cover_url, m.thumb_url, m.preview_video_url`
+	m.cover_url, m.thumb_url, m.preview_video_url,
+	IFNULL(m.trashed_at, '') AS trashed_at`
 
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
-	clauses := make([]string, 0, 2)
-	args := make([]any, 0, 4)
+	clauses := make([]string, 0, 4)
+	args := make([]any, 0, 8)
+
+	mode := strings.TrimSpace(strings.ToLower(request.Mode))
+	if mode == "trash" {
+		clauses = append(clauses, sqlMovieTrashedClause)
+	} else {
+		clauses = append(clauses, sqlMovieActiveClause)
+	}
 
 	if request.Mode == "favorites" {
 		clauses = append(clauses, "m.is_favorite = 1")
@@ -288,10 +311,6 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	if studio := strings.TrimSpace(request.Studio); studio != "" {
 		clauses = append(clauses, `TRIM(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) = ?`)
 		args = append(args, studio)
-	}
-
-	if len(clauses) == 0 {
-		return "", args
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args
@@ -461,7 +480,8 @@ func (s *SQLiteStore) ListMovieIDsUnderLibraryRoots(ctx context.Context, roots [
 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, location, code FROM movies
-		 WHERE TRIM(COALESCE(location, '')) != '' AND TRIM(COALESCE(code, '')) != ''`)
+		 WHERE TRIM(COALESCE(location, '')) != '' AND TRIM(COALESCE(code, '')) != ''
+		   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')`)
 	if err != nil {
 		return nil, err
 	}

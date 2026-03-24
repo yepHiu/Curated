@@ -18,7 +18,6 @@ import (
 
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/library"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
 	"jav-shadcn/backend/internal/version"
@@ -45,6 +44,12 @@ type OrganizeLibraryController interface {
 	SetOrganizeLibrary(v bool) error
 }
 
+// ExtendedLibraryImportController toggles first-scan layout detection for newly added library roots (library-config.cfg).
+type ExtendedLibraryImportController interface {
+	ExtendedLibraryImport() bool
+	SetExtendedLibraryImport(v bool) error
+}
+
 // AutoLibraryWatchController exposes whether fsnotify-driven library scans are allowed (library-config.cfg).
 type AutoLibraryWatchController interface {
 	AutoLibraryWatch() bool
@@ -64,49 +69,49 @@ type LibraryWatchReloader interface {
 }
 
 type Handler struct {
-	cfg                    config.Config
-	logger                 *zap.Logger
-	store                  *storage.SQLiteStore
-	library                *library.Service
-	tasks                  *tasks.Manager
-	scanStarter            ScanStarter
-	organizeLibraryCtl     OrganizeLibraryController
-	autoLibraryWatchCtl    AutoLibraryWatchController
-	metadataScrapeCtl      MetadataScrapeSettings
-	movieMetadataRefresher MovieMetadataRefresher
-	actorProfileRefresher  ActorProfileRefresher
-	libraryWatchReloader   LibraryWatchReloader
+	cfg                      config.Config
+	logger                   *zap.Logger
+	store                    *storage.SQLiteStore
+	tasks                    *tasks.Manager
+	scanStarter              ScanStarter
+	organizeLibraryCtl       OrganizeLibraryController
+	extendedLibraryImportCtl ExtendedLibraryImportController
+	autoLibraryWatchCtl      AutoLibraryWatchController
+	metadataScrapeCtl        MetadataScrapeSettings
+	movieMetadataRefresher   MovieMetadataRefresher
+	actorProfileRefresher    ActorProfileRefresher
+	libraryWatchReloader     LibraryWatchReloader
 }
 
 type Deps struct {
-	Cfg                    config.Config
-	Logger                 *zap.Logger
-	Store                  *storage.SQLiteStore
-	Library                *library.Service
-	Tasks                  *tasks.Manager
-	ScanStarter            ScanStarter
-	OrganizeLibraryCtl     OrganizeLibraryController
-	AutoLibraryWatchCtl    AutoLibraryWatchController
-	MetadataScrapeCtl      MetadataScrapeSettings
-	MovieMetadataRefresher MovieMetadataRefresher
-	ActorProfileRefresher  ActorProfileRefresher
-	LibraryWatchReloader   LibraryWatchReloader
+	Cfg                      config.Config
+	Logger                   *zap.Logger
+	Store                    *storage.SQLiteStore
+	Tasks                    *tasks.Manager
+	ScanStarter              ScanStarter
+	OrganizeLibraryCtl       OrganizeLibraryController
+	ExtendedLibraryImportCtl ExtendedLibraryImportController
+	AutoLibraryWatchCtl      AutoLibraryWatchController
+	MetadataScrapeCtl        MetadataScrapeSettings
+	MovieMetadataRefresher   MovieMetadataRefresher
+	ActorProfileRefresher    ActorProfileRefresher
+	LibraryWatchReloader     LibraryWatchReloader
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
-		cfg:                    deps.Cfg,
-		logger:                 deps.Logger,
-		store:                  deps.Store,
-		library:                deps.Library,
-		tasks:                  deps.Tasks,
-		scanStarter:            deps.ScanStarter,
-		organizeLibraryCtl:     deps.OrganizeLibraryCtl,
-		autoLibraryWatchCtl:    deps.AutoLibraryWatchCtl,
-		metadataScrapeCtl:      deps.MetadataScrapeCtl,
-		movieMetadataRefresher: deps.MovieMetadataRefresher,
-		actorProfileRefresher:  deps.ActorProfileRefresher,
-		libraryWatchReloader:   deps.LibraryWatchReloader,
+		cfg:                      deps.Cfg,
+		logger:                   deps.Logger,
+		store:                    deps.Store,
+		tasks:                    deps.Tasks,
+		scanStarter:              deps.ScanStarter,
+		organizeLibraryCtl:       deps.OrganizeLibraryCtl,
+		extendedLibraryImportCtl: deps.ExtendedLibraryImportCtl,
+		autoLibraryWatchCtl:      deps.AutoLibraryWatchCtl,
+		metadataScrapeCtl:        deps.MetadataScrapeCtl,
+		movieMetadataRefresher:   deps.MovieMetadataRefresher,
+		actorProfileRefresher:    deps.ActorProfileRefresher,
+		libraryWatchReloader:     deps.LibraryWatchReloader,
 	}
 }
 
@@ -126,6 +131,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/library/movies/{movieId}/comment", h.handlePutMovieComment)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/restore", h.handleRestoreMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
@@ -182,9 +188,6 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list movies")
 		return
-	}
-	if result.Total == 0 {
-		result = h.library.ListMovies(request)
 	}
 	writeJSON(w, http.StatusOK, result)
 }
@@ -331,19 +334,11 @@ func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
 	movie, err := h.store.GetMovieDetail(r.Context(), movieID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			movie, err = h.library.GetMovie(movieID)
-		} else {
-			if h.logger != nil {
-				h.logger.Warn("get movie detail failed", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
-			return
-		}
-	}
-	if err != nil {
-		if library.IsNotFound(err) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
 			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("get movie detail failed", zap.Error(err))
 		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
 		return
@@ -436,6 +431,18 @@ func (h *Handler) handlePutMovieComment(w http.ResponseWriter, r *http.Request) 
 	movieID := strings.TrimSpace(r.PathValue("movieId"))
 	if movieID == "" {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	trashed, terr := h.store.IsMovieTrashed(r.Context(), movieID)
+	if terr != nil {
+		if h.logger != nil {
+			h.logger.Warn("put movie comment: trashed check failed", zap.Error(terr))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+	if trashed {
+		writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "movie is in trash")
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
@@ -622,6 +629,19 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	trashed, terr := h.store.IsMovieTrashed(r.Context(), movieID)
+	if terr != nil {
+		if h.logger != nil {
+			h.logger.Warn("patch movie: trashed check failed", zap.Error(terr))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+	if trashed {
+		writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "movie is in trash")
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if r.Body != nil {
 		_ = r.Body.Close()
@@ -653,22 +673,6 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidUserTags) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
-			return
-		}
-		if errors.Is(err, storage.ErrMovieNotFoundForPatch) && h.library != nil {
-			movie, libErr := h.library.PatchMovie(movieID, in)
-			if library.IsNotFound(libErr) {
-				writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
-				return
-			}
-			if libErr != nil {
-				if h.logger != nil {
-					h.logger.Warn("patch movie (in-memory) failed", zap.Error(libErr))
-				}
-				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to patch movie")
-				return
-			}
-			writeJSON(w, http.StatusOK, movie)
 			return
 		}
 		if errors.Is(err, storage.ErrMovieNotFoundForPatch) {
@@ -713,6 +717,18 @@ func (h *Handler) handleRefreshMovieMetadata(w http.ResponseWriter, r *http.Requ
 	movieID := strings.TrimSpace(r.PathValue("movieId"))
 	if movieID == "" {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	trashed, terr := h.store.IsMovieTrashed(r.Context(), movieID)
+	if terr != nil {
+		if h.logger != nil {
+			h.logger.Warn("refresh metadata: trashed check failed", zap.Error(terr))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+	if trashed {
+		writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "movie is in trash")
 		return
 	}
 
@@ -770,28 +786,82 @@ func (h *Handler) handleMetadataScrapeByPaths(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusAccepted, dto)
 }
 
-// handleDeleteMovie removes the movie row and related DB rows in a transaction, then best-effort deletes
-// files on disk (see storage.DeleteMovie). Success returns 204 No Content; missing id returns 404.
-func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
-	movieID := r.PathValue("movieId")
+// handleRestoreMovie clears trashed_at. 204 on success; 404 if missing; 400 if not in trash.
+func (h *Handler) handleRestoreMovie(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
 	if movieID == "" {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
 		return
 	}
+	err := h.store.RestoreMovie(r.Context(), movieID)
+	if err != nil {
+		if errors.Is(err, storage.ErrMovieNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if errors.Is(err, storage.ErrMovieNotInTrash) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movie is not in trash")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("restore movie failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to restore movie")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
-	err := h.store.DeleteMovie(r.Context(), movieID, strings.TrimSpace(h.cfg.CacheDir))
+// handleDeleteMovie without ?permanent=true moves the movie to trash (204). With permanent=true,
+// removes DB rows and on-disk files only if already trashed (see storage.DeleteMoviePermanently).
+func (h *Handler) handleDeleteMovie(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	permanent := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("permanent")), "true")
+	if permanent {
+		err := h.store.DeleteMoviePermanently(r.Context(), movieID, strings.TrimSpace(h.cfg.CacheDir))
+		if err != nil {
+			if errors.Is(err, storage.ErrMovieNotFound) {
+				writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+				return
+			}
+			if errors.Is(err, storage.ErrMovieNotInTrash) {
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movie must be in trash before permanent delete")
+				return
+			}
+			if h.logger != nil {
+				h.logger.Warn("permanent delete movie failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete movie")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err := h.store.TrashMovie(r.Context(), movieID)
 	if err != nil {
 		if errors.Is(err, storage.ErrMovieNotFound) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
 			return
 		}
 		if h.logger != nil {
-			h.logger.Warn("delete movie failed", zap.Error(err))
+			h.logger.Warn("trash movie failed", zap.Error(err))
 		}
-		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete movie")
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to move movie to trash")
 		return
 	}
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -808,10 +878,15 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.autoLibraryWatchCtl != nil {
 		autoWatch = h.autoLibraryWatchCtl.AutoLibraryWatch()
 	}
+	extImp := h.cfg.ExtendedLibraryImport
+	if h.extendedLibraryImportCtl != nil {
+		extImp = h.extendedLibraryImportCtl.ExtendedLibraryImport()
+	}
 	dto := contracts.SettingsDTO{
 		LibraryPaths:           libraryPaths,
 		Player:                 contracts.PlayerSettingsDTO{HardwareDecode: h.cfg.Player.HardwareDecode},
 		OrganizeLibrary:        org,
+		ExtendedLibraryImport:  extImp,
 		AutoLibraryWatch:       autoWatch,
 		MetadataMovieProviders: []string{},
 	}
@@ -851,7 +926,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -865,7 +940,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -878,6 +953,20 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist organizeLibrary", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.ExtendedLibraryImport != nil {
+		if h.extendedLibraryImportCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "extended library import settings not available")
+			return
+		}
+		if err := h.extendedLibraryImportCtl.SetExtendedLibraryImport(*body.ExtendedLibraryImport); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist extendedLibraryImport", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
 			return
@@ -996,7 +1085,8 @@ func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.store.DeleteLibraryPath(r.Context(), id); err != nil {
+	pruned, err := h.store.DeleteLibraryPathAndPruneOrphanMovies(r.Context(), id)
+	if err != nil {
 		if errors.Is(err, storage.ErrLibraryPathNotFound) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path not found")
 			return
@@ -1004,6 +1094,9 @@ func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request
 		h.logger.Error("delete library path failed", zap.Error(err))
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete library path")
 		return
+	}
+	if pruned > 0 {
+		h.logger.Info("library path removed; pruned orphan movies", zap.String("id", id), zap.Int("prunedMovies", pruned))
 	}
 
 	h.reloadLibraryWatchIfAny(r.Context())

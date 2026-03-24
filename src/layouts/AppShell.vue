@@ -29,7 +29,7 @@ import {
   getLibraryStudioExactQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
-  isLibraryRouteName,
+  isLibraryBrowseRoute,
   mergeCuratedFramesQuery,
   mergeLibraryQuery,
 } from "@/lib/library-query"
@@ -95,7 +95,7 @@ const currentMovie = computed(() => {
 })
 
 const currentMovieId = computed(() => currentMovie.value?.id)
-const isLibraryRoute = computed(() => isLibraryRouteName(route.name))
+const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
 const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRoute.value)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")

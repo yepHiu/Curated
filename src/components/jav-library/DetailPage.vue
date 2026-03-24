@@ -30,6 +30,8 @@ const props = withDefaults(
   { metadataRefreshBusy: false, userTagSuggestions: () => [] },
 )
 
+const commentReadonly = computed(() => Boolean(props.movie.trashedAt?.trim()))
+
 const previewImages = computed(() => props.movie.previewImages?.slice(0, 18) ?? [])
 const hasPreviews = computed(() => previewImages.value.length > 0)
 
@@ -60,6 +62,8 @@ const emit = defineEmits<{
   browseByStudio: [payload: { studio: string }]
   updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
+  restoreMovie: [movieId: string]
+  deleteMoviePermanently: [movieId: string]
   refreshMetadata: [movieId: string]
   patchMovieDisplay: [body: PatchMovieBody, done: (err?: unknown) => void]
 }>()
@@ -79,6 +83,8 @@ const emit = defineEmits<{
       @browse-by-studio="emit('browseByStudio', $event)"
       @update-metadata-tags="emit('updateMetadataTags', $event)"
       @delete-movie="emit('deleteMovie', $event)"
+      @restore-movie="emit('restoreMovie', $event)"
+      @delete-movie-permanently="emit('deleteMoviePermanently', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"
       @patch-movie-display="(body, done) => emit('patchMovieDisplay', body, done)"
     />
@@ -129,7 +135,7 @@ const emit = defineEmits<{
       :movie-code="movie.code"
     />
 
-    <MovieCommentSection :movie-id="movie.id" />
+    <MovieCommentSection :movie-id="movie.id" :readonly="commentReadonly" />
 
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1">

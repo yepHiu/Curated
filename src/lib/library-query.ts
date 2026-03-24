@@ -1,7 +1,7 @@
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
-import type { LocationQuery, RouteRecordName } from "vue-router"
+import type { LocationQuery, RouteLocationNormalizedLoaded, RouteRecordName } from "vue-router"
 
-const libraryModes = ["library", "favorites", "recent", "tags"] as const
+const libraryModes = ["library", "favorites", "recent", "tags", "trash"] as const
 const libraryTabs = ["all", "new", "top-rated"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
@@ -13,6 +13,41 @@ export const isLibraryMode = (value: unknown): value is LibraryMode =>
 export const isLibraryRouteName = (
   value: RouteRecordName | null | undefined,
 ): value is LibraryMode => isLibraryMode(value)
+
+/**
+ * 资料库五态（library / favorites / recent / tags / trash）路由解析。
+ * 在 route.name 尚未就绪或与 path 短暂不一致时，用 path 末段兜底，避免回收站误用主库列表（例如刷出 Mock 种子）。
+ */
+export function resolveLibraryMode(
+  route: Pick<RouteLocationNormalizedLoaded, "name" | "path">,
+): LibraryMode {
+  if (isLibraryRouteName(route.name)) {
+    return route.name
+  }
+  const parts = route.path.replace(/\/+$/, "").split("/").filter(Boolean)
+  if (parts.length === 0) {
+    return "library"
+  }
+  const seg = parts[parts.length - 1]!
+  if (isLibraryMode(seg)) {
+    return seg
+  }
+  return "library"
+}
+
+/** 是否处于资料库五态浏览（与 LibraryView 一致），用于壳层搜索等；比仅用 route.name 更耐短暂未就绪。 */
+export function isLibraryBrowseRoute(
+  route: Pick<RouteLocationNormalizedLoaded, "name" | "path">,
+): boolean {
+  if (isLibraryRouteName(route.name)) {
+    return true
+  }
+  const parts = route.path.replace(/\/+$/, "").split("/").filter(Boolean)
+  if (parts.length === 0) {
+    return true
+  }
+  return isLibraryMode(parts[parts.length - 1]!)
+}
 
 export const getBrowseSourceMode = (query: LocationQuery): LibraryMode =>
   isLibraryMode(query.from) ? query.from : "library"

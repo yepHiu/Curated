@@ -21,7 +21,7 @@ type Service struct {
 
 func NewService() *Service {
 	return &Service{
-		movies: seedMovies(),
+		movies: nil,
 	}
 }
 
@@ -111,81 +111,6 @@ func (s *Service) GetMovie(movieID string) (contracts.MovieDetailDTO, error) {
 			syncEffectiveRating(&m)
 			return m, nil
 		}
-	}
-	return contracts.MovieDetailDTO{}, errMovieNotFound
-}
-
-// PatchMovie updates in-memory seed movies (used when SQLite has no rows).
-func (s *Service) PatchMovie(movieID string, in contracts.PatchMovieInput) (contracts.MovieDetailDTO, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i := range s.movies {
-		if s.movies[i].ID != movieID {
-			continue
-		}
-		m := &s.movies[i]
-		if in.Favorite != nil {
-			m.IsFavorite = *in.Favorite
-		}
-		if in.UserRatingSet {
-			if in.UserRatingClear {
-				m.UserRating = nil
-			} else {
-				v := in.UserRating
-				m.UserRating = &v
-			}
-		}
-		if in.UserTagsSet {
-			m.UserTags = append([]string{}, in.UserTags...)
-		}
-		if in.MetadataTagsSet {
-			m.Tags = append([]string{}, in.MetadataTags...)
-		}
-		if in.UserTitleSet {
-			if in.UserTitleClear {
-				m.UserTitleOverride = nil
-			} else {
-				s := in.UserTitle
-				m.UserTitleOverride = &s
-			}
-		}
-		if in.UserStudioSet {
-			if in.UserStudioClear {
-				m.UserStudioOverride = nil
-			} else {
-				s := in.UserStudio
-				m.UserStudioOverride = &s
-			}
-		}
-		if in.UserSummarySet {
-			if in.UserSummaryClear {
-				m.UserSummaryOverride = nil
-			} else {
-				s := in.UserSummary
-				m.UserSummaryOverride = &s
-			}
-		}
-		if in.UserReleaseDateSet {
-			if in.UserReleaseDateClear {
-				m.UserReleaseDateOverride = nil
-			} else {
-				s := in.UserReleaseDate
-				m.UserReleaseDateOverride = &s
-			}
-		}
-		if in.UserRuntimeMinutesSet {
-			if in.UserRuntimeMinutesClear {
-				m.UserRuntimeMinutesOverride = nil
-			} else {
-				v := in.UserRuntimeMinutes
-				m.UserRuntimeMinutesOverride = &v
-			}
-		}
-		syncEffectiveRating(m)
-		out := contracts.EffectiveMovieDetailDTO(*m)
-		syncEffectiveRating(&out)
-		return out, nil
 	}
 	return contracts.MovieDetailDTO{}, errMovieNotFound
 }
@@ -333,95 +258,6 @@ func matchesQuery(movie contracts.MovieDetailDTO, query string) bool {
 	}
 
 	return false
-}
-
-func seedMovies() []contracts.MovieDetailDTO {
-	return []contracts.MovieDetailDTO{
-		{
-			MovieListItemDTO: contracts.MovieListItemDTO{
-				ID:             "mkb-100",
-				Title:          "Midnight Kiss Broadcast",
-				Code:           "MKB-100",
-				Studio:         "Velvet North",
-				Actors:         []string{"Mina Kaze", "Rin Asuka"},
-				Tags:           []string{"Romance", "4K", "Late Night"},
-				RuntimeMinutes: 134,
-				Rating:         4.8,
-				IsFavorite:     true,
-				AddedAt:        "2026-01-03",
-				Location:       "D:/Media/JAV/Main/MKB-100.mkv",
-				Resolution:     "2160p",
-				Year:           2025,
-				ReleaseDate:    "2025-04-12",
-			},
-			Summary:        "A polished late-night feature with strong cast chemistry and metadata-rich presentation.",
-			MetadataRating: 4.8,
-			UserRating:     nil,
-		},
-		{
-			MovieListItemDTO: contracts.MovieListItemDTO{
-				ID:             "sld-101",
-				Title:          "Silk Line Directive",
-				Code:           "SLD-101",
-				Studio:         "Studio Garnet",
-				Actors:         []string{"Airi Sena"},
-				Tags:           []string{"Drama", "Office", "High Rating"},
-				RuntimeMinutes: 126,
-				Rating:         4.7,
-				IsFavorite:     true,
-				AddedAt:        "2026-01-14",
-				Location:       "E:/Vault/JAV/New/SLD-101.mp4",
-				Resolution:     "1080p",
-				Year:           2025,
-				ReleaseDate:    "2025-09-01",
-			},
-			Summary:        "An elegant office-set release used to validate detail views, favorites, and list filtering.",
-			MetadataRating: 4.7,
-			UserRating:     nil,
-		},
-		{
-			MovieListItemDTO: contracts.MovieListItemDTO{
-				ID:             "nva-102",
-				Title:          "Neon Velvet Archive",
-				Code:           "NVA-102",
-				Studio:         "Moonlight Works",
-				Actors:         []string{"Yua Mori", "Nao Shin"},
-				Tags:           []string{"Sci-Fi", "Stylized", "New"},
-				RuntimeMinutes: 118,
-				Rating:         4.5,
-				IsFavorite:     false,
-				AddedAt:        "2026-02-11",
-				Location:       "D:/Media/JAV/Main/NVA-102.mkv",
-				Resolution:     "2160p",
-				Year:           2026,
-				ReleaseDate:    "2026-02-18",
-			},
-			Summary:        "A stylized catalog entry that exercises tag-heavy filtering and recent import ordering.",
-			MetadataRating: 4.5,
-			UserRating:     nil,
-		},
-		{
-			MovieListItemDTO: contracts.MovieListItemDTO{
-				ID:             "prm-103",
-				Title:          "Private Room Memoir",
-				Code:           "PRM-103",
-				Studio:         "Golden Frame",
-				Actors:         []string{"Sora Minami", "Miu Arata"},
-				Tags:           []string{"Character", "Favorites", "Longform"},
-				RuntimeMinutes: 151,
-				Rating:         4.9,
-				IsFavorite:     true,
-				AddedAt:        "2026-03-08",
-				Location:       "F:/Offline/Collections/PRM-103.mp4",
-				Resolution:     "2160p",
-				Year:           2024,
-				ReleaseDate:    "2024-10-05",
-			},
-			Summary:        "A high-rated longform title kept here as the default rich detail fixture for the backend scaffold.",
-			MetadataRating: 4.9,
-			UserRating:     nil,
-		},
-	}
 }
 
 func syncEffectiveRating(m *contracts.MovieDetailDTO) {

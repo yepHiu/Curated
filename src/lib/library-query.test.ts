@@ -10,9 +10,47 @@ import {
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
   mergeLibraryQuery,
+  isLibraryBrowseRoute,
+  resolveLibraryMode,
 } from "@/lib/library-query"
 
 describe("library query helpers", () => {
+  it("resolveLibraryMode falls back to path when name is missing", () => {
+    expect(
+      resolveLibraryMode({
+        name: undefined,
+        path: "/trash",
+      }),
+    ).toBe("trash")
+    expect(
+      resolveLibraryMode({
+        name: undefined,
+        path: "/library",
+      }),
+    ).toBe("library")
+    expect(
+      resolveLibraryMode({
+        name: "trash",
+        path: "/trash",
+      }),
+    ).toBe("trash")
+  })
+
+  it("isLibraryBrowseRoute is true for trash path even when name is missing", () => {
+    expect(
+      isLibraryBrowseRoute({
+        name: undefined,
+        path: "/trash",
+      }),
+    ).toBe(true)
+    expect(
+      isLibraryBrowseRoute({
+        name: undefined,
+        path: "/settings",
+      }),
+    ).toBe(false)
+  })
+
   it("normalizes browse query values", () => {
     const query = {
       from: "favorites",
@@ -21,6 +59,7 @@ describe("library query helpers", () => {
       tab: "top-rated",
     }
 
+    expect(getBrowseSourceMode({ from: "trash" })).toBe("trash")
     expect(getBrowseSourceMode(query)).toBe("favorites")
     expect(getLibrarySearchQuery(query)).toBe("MKB")
     expect(getSelectedMovieQuery(query)).toBe("mkb-100")

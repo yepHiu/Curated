@@ -85,12 +85,15 @@ const selectedMetadataRefreshPaths = ref<string[]>([])
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
+const extendedLibraryImportSaving = ref(false)
+const extendedLibraryImportError = ref("")
 const autoLibraryWatchSaving = ref(false)
 const autoLibraryWatchError = ref("")
 const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
+const extendedLibraryImport = computed(() => libraryService.extendedLibraryImport.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
 
 const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
@@ -361,6 +364,23 @@ async function onOrganizeLibraryChange(next: boolean) {
     }
   } finally {
     organizeLibrarySaving.value = false
+  }
+}
+
+async function onExtendedLibraryImportChange(next: boolean) {
+  extendedLibraryImportError.value = ""
+  extendedLibraryImportSaving.value = true
+  try {
+    await libraryService.setExtendedLibraryImport(next)
+  } catch (err) {
+    console.error("[settings] extended library import toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      extendedLibraryImportError.value = err.apiError.message
+    } else {
+      extendedLibraryImportError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    extendedLibraryImportSaving.value = false
   }
 }
 
@@ -962,6 +982,44 @@ async function runMetadataRefreshForSelected() {
             </div>
             <p v-if="organizeLibraryError" class="text-sm text-destructive">
               {{ organizeLibraryError }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div class="mb-6 break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+          <CardHeader>
+            <CardTitle>{{ t("settings.extendedImportTitle") }}</CardTitle>
+            <CardDescription>
+              {{ t("settings.extendedImportDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-3">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="extendedLibraryImportSaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="font-medium">{{ t("settings.extendedImportSwitch") }}</p>
+                <p class="text-sm text-muted-foreground">
+                  {{ t("settings.extendedImportHint") }}
+                </p>
+                <p
+                  v-if="extendedLibraryImportSaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.extendedImportSyncing") }}
+                </p>
+              </div>
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="extendedLibraryImport"
+                @update:model-value="onExtendedLibraryImportChange"
+              />
+            </div>
+            <p v-if="extendedLibraryImportError" class="text-sm text-destructive">
+              {{ extendedLibraryImportError }}
             </p>
           </CardContent>
         </Card>

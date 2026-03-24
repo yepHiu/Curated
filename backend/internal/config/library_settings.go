@@ -55,6 +55,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.MetadataMovieProvider = s
 	}
+	if v, ok := m["extendedLibraryImport"]; ok {
+		b, err := parseJSONBool(v, "extendedLibraryImport")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.ExtendedLibraryImport = b
+	}
 	return nil
 }
 

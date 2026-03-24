@@ -90,11 +90,11 @@ type ActorListItemDTO struct {
 
 // ListActorsRequest is the query for GET /api/library/actors.
 type ListActorsRequest struct {
-	Q         string // substring match on actors.name or actor_user_tags.tag (case-insensitive)
-	ActorTag  string // exact match on actor_user_tags.tag
-	Sort      string // "name" (default) or "movieCount"
-	Limit     int
-	Offset    int
+	Q        string // substring match on actors.name or actor_user_tags.tag (case-insensitive)
+	ActorTag string // exact match on actor_user_tags.tag
+	Sort     string // "name" (default) or "movieCount"
+	Limit    int
+	Offset   int
 }
 
 // ListActorsResponse is returned by GET /api/library/actors.
@@ -148,13 +148,14 @@ type GetTaskStatusRequest struct {
 }
 
 type ScanFileResultDTO struct {
-	TaskID   string `json:"taskId"`
-	Path     string `json:"path"`
-	FileName string `json:"fileName"`
-	Number   string `json:"number,omitempty"`
-	MovieID  string `json:"movieId,omitempty"`
-	Status   string `json:"status"`
-	Reason   string `json:"reason,omitempty"`
+	TaskID       string `json:"taskId"`
+	Path         string `json:"path"`
+	FileName     string `json:"fileName"`
+	Number       string `json:"number,omitempty"`
+	MovieID      string `json:"movieId,omitempty"`
+	Status       string `json:"status"`
+	Reason       string `json:"reason,omitempty"`
+	ImportLayout string `json:"importLayout,omitempty"` // loose | curated | external (extended first-scan only)
 }
 
 type ScanSummaryDTO struct {
@@ -186,6 +187,8 @@ type MovieListItemDTO struct {
 	ReleaseDate    string   `json:"releaseDate,omitempty"`
 	CoverURL       string   `json:"coverUrl,omitempty"`
 	ThumbURL       string   `json:"thumbUrl,omitempty"`
+	// TrashedAt is RFC3339 when the movie is in the recycle bin; omitted when active.
+	TrashedAt string `json:"trashedAt,omitempty"`
 }
 
 type MovieDetailDTO struct {
@@ -298,9 +301,10 @@ type MoviesPageDTO struct {
 }
 
 type LibraryPathDTO struct {
-	ID    string `json:"id"`
-	Path  string `json:"path"`
-	Title string `json:"title"`
+	ID                      string `json:"id"`
+	Path                    string `json:"path"`
+	Title                   string `json:"title"`
+	FirstLibraryScanPending bool   `json:"firstLibraryScanPending"`
 }
 
 // AddLibraryPathRequest is the body for POST /api/library/paths.
@@ -324,6 +328,8 @@ type SettingsDTO struct {
 	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
 	Player          PlayerSettingsDTO `json:"player"`
 	OrganizeLibrary bool              `json:"organizeLibrary"`
+	// ExtendedLibraryImport: when true, first scan under a newly added library root may classify curated/external layouts (library-config.cfg).
+	ExtendedLibraryImport bool `json:"extendedLibraryImport"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch       bool     `json:"autoLibraryWatch"`
 	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
@@ -333,6 +339,7 @@ type SettingsDTO struct {
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
 	OrganizeLibrary       *bool   `json:"organizeLibrary,omitempty"`
+	ExtendedLibraryImport *bool   `json:"extendedLibraryImport,omitempty"`
 	AutoLibraryWatch      *bool   `json:"autoLibraryWatch,omitempty"`
 	MetadataMovieProvider *string `json:"metadataMovieProvider,omitempty"`
 }

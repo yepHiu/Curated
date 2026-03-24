@@ -167,8 +167,8 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 		`SELECT COUNT(DISTINCT a.id) FROM actors a
 		 INNER JOIN movie_actors ma ON ma.actor_id = a.id
 		 INNER JOIN movies m ON m.id = ma.movie_id
-		 WHERE %s`,
-		whereClause,
+		 WHERE %s AND %s`,
+		whereClause, sqlMovieActiveClause,
 	)
 	var total int
 	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
@@ -180,11 +180,11 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 		FROM actors a
 		INNER JOIN movie_actors ma ON ma.actor_id = a.id
 		INNER JOIN movies m ON m.id = ma.movie_id
-		WHERE %s
+		WHERE %s AND %s
 		GROUP BY a.id, a.name, a.avatar
 		HAVING COUNT(DISTINCT ma.movie_id) > 0
 		ORDER BY %s
-		LIMIT ? OFFSET ?`, whereClause, orderSQL)
+		LIMIT ? OFFSET ?`, whereClause, sqlMovieActiveClause, orderSQL)
 
 	argsWithPaging := append(append([]any{}, args...), limit, offset)
 	rows, err := s.db.QueryContext(ctx, listQuery, argsWithPaging...)

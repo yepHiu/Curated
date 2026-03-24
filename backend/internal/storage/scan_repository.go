@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"jav-shadcn/backend/internal/contracts"
+	"jav-shadcn/backend/internal/library/moviecode"
 )
 
 type ScanPersistOutcome struct {
@@ -97,7 +98,7 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 
 	switch {
 	case errors.Is(queryErr, sql.ErrNoRows):
-		movieID = makeMovieID(result.Number)
+		movieID = moviecode.NormalizeForStorageID(result.Number)
 		now := nowUTC()
 		addedAt := time.Now().UTC().Format("2006-01-02")
 
@@ -182,11 +183,4 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 
 func nowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)
-}
-
-func makeMovieID(number string) string {
-	id := strings.ToLower(number)
-	id = strings.ReplaceAll(id, " ", "-")
-	id = strings.ReplaceAll(id, "_", "-")
-	return id
 }

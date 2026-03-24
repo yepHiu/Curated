@@ -12,8 +12,8 @@ import {
   getLibraryTabQuery,
   getLibraryTagExactQuery,
   getSelectedMovieQuery,
-  isLibraryRouteName,
   mergeLibraryQuery,
+  resolveLibraryMode,
 } from "@/lib/library-query"
 import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
@@ -25,11 +25,11 @@ const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
 
-const libraryMode = computed<LibraryMode>(() => {
-  return isLibraryRouteName(route.name) ? route.name : "library"
-})
+const libraryMode = computed<LibraryMode>(() => resolveLibraryMode(route))
 
-const libraryMovies = computed(() => libraryService.movies.value)
+const libraryMovies = computed(() =>
+  libraryMode.value === "trash" ? libraryService.trashedMovies.value : libraryService.movies.value,
+)
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
 const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
@@ -77,7 +77,9 @@ const queryFilteredMovies = computed(() => {
   const raw = libraryMovies.value
 
   let list: Movie[]
-  if (mode === "favorites") {
+  if (mode === "trash") {
+    list = [...raw]
+  } else if (mode === "favorites") {
     list = raw.filter((movie) => movie.isFavorite)
   } else if (mode === "recent") {
     list = raw

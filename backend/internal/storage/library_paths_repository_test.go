@@ -3,8 +3,12 @@ package storage
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
+
+	"jav-shadcn/backend/internal/contracts"
+	"jav-shadcn/backend/internal/scraper"
 )
 
 func TestLibraryPathsSeedListDelete(t *testing.T) {
@@ -112,5 +116,207 @@ func TestLibraryPathsEmptySeed(t *testing.T) {
 	n, _ := store.GetLibraryPathCount(ctx)
 	if n != 0 {
 		t.Fatalf("expected 0 rows, got %d", n)
+	}
+}
+
+func TestDeleteLibraryPathAndPruneOrphanMovies_RemovesOnlyUncovered(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	alpha := filepath.Join(root, "alpha")
+	beta := filepath.Join(root, "beta")
+	if err := os.MkdirAll(alpha, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(beta, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoAlpha := filepath.Join(alpha, "ABC-100.mp4")
+	if err := os.WriteFile(videoAlpha, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewSQLiteStore(filepath.Join(root, "prune.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	alphaDTO, err := store.AddLibraryPath(ctx, alpha, "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, beta, "B"); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoAlpha,
+		FileName: "ABC-100.mp4",
+		Number:   "ABC-100",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "ABC-100",
+		Title:   "T",
+		Summary: "S",
+		Studio:  "St",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil || page.Total != 1 {
+		t.Fatalf("before prune: %v total=%d", err, page.Total)
+	}
+
+	pruned, err := store.DeleteLibraryPathAndPruneOrphanMovies(ctx, alphaDTO.ID)
+	if err != nil || pruned != 1 {
+		t.Fatalf("prune: err=%v pruned=%d", err, pruned)
+	}
+	page, err = store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil || page.Total != 0 {
+		t.Fatalf("after prune alpha: %v total=%d", err, page.Total)
+	}
+
+	n, _ := store.GetLibraryPathCount(ctx)
+	if n != 1 {
+		t.Fatalf("expected 1 library path (beta), got %d", n)
+	}
+	if _, err := os.Stat(videoAlpha); err != nil {
+		t.Fatalf("removing library path must not delete media files on disk: %v", err)
+	}
+}
+
+func TestDeleteLibraryPathAndPruneOrphanMovies_NestedRootKeepsMovie(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	parent := filepath.Join(root, "lib")
+	child := filepath.Join(root, "lib", "nested")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	video := filepath.Join(child, "XYZ-200.mp4")
+	if err := os.WriteFile(video, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewSQLiteStore(filepath.Join(root, "nested.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.AddLibraryPath(ctx, parent, "P"); err != nil {
+		t.Fatal(err)
+	}
+	childDTO, err := store.AddLibraryPath(ctx, child, "C")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     video,
+		FileName: "XYZ-200.mp4",
+		Number:   "XYZ-200",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "XYZ-200",
+		Title:   "T",
+		Summary: "S",
+		Studio:  "St",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	pruned, err := store.DeleteLibraryPathAndPruneOrphanMovies(ctx, childDTO.ID)
+	if err != nil || pruned != 0 {
+		t.Fatalf("nested child delete should not prune (still under parent): err=%v pruned=%d", err, pruned)
+	}
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil || page.Total != 1 {
+		t.Fatalf("movie should remain: %v total=%d", err, page.Total)
+	}
+}
+
+func TestDeleteLibraryPathAndPruneOrphanMovies_DeleteOtherRootUnchanged(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	alpha := filepath.Join(root, "alpha")
+	beta := filepath.Join(root, "beta")
+	if err := os.MkdirAll(alpha, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(beta, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoAlpha := filepath.Join(alpha, "M-1.mp4")
+	if err := os.WriteFile(videoAlpha, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewSQLiteStore(filepath.Join(root, "other.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.AddLibraryPath(ctx, alpha, "A"); err != nil {
+		t.Fatal(err)
+	}
+	betaDTO, err := store.AddLibraryPath(ctx, beta, "B")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoAlpha,
+		FileName: "M-1.mp4",
+		Number:   "M-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "M-1",
+		Title:   "T",
+		Summary: "S",
+		Studio:  "St",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	pruned, err := store.DeleteLibraryPathAndPruneOrphanMovies(ctx, betaDTO.ID)
+	if err != nil || pruned != 0 {
+		t.Fatalf("deleting unrelated root: err=%v pruned=%d", err, pruned)
+	}
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil || page.Total != 1 {
+		t.Fatalf("movie under alpha intact: %v total=%d", err, page.Total)
 	}
 }

@@ -51,6 +51,10 @@ const detailLoadError = ref("")
 const patchError = ref("")
 const deleteBusy = ref(false)
 const deleteError = ref("")
+const restoreBusy = ref(false)
+const restoreError = ref("")
+const permanentDeleteBusy = ref(false)
+const permanentDeleteError = ref("")
 const metadataRefreshBusy = ref(false)
 const metadataRefreshError = ref("")
 
@@ -285,9 +289,49 @@ const handleDeleteMovie = async (id: string) => {
           ? err.message
           : t("detail.deleteFailGeneric")
     deleteError.value = message
-    console.error("[DetailView] delete movie failed", err)
+    console.error("[DetailView] move to trash failed", err)
   } finally {
     deleteBusy.value = false
+  }
+}
+
+const handleRestoreMovie = async (id: string) => {
+  restoreError.value = ""
+  restoreBusy.value = true
+  try {
+    await libraryService.restoreMovie(id)
+    if (USE_WEB_API) {
+      const loaded = await loadMovieDetail(id)
+      if (loaded) {
+        detailMovie.value = loaded
+      } else {
+        detailMovie.value = libraryService.getMovieById(id)
+      }
+    } else {
+      detailMovie.value = libraryService.getMovieById(id)
+    }
+  } catch (err) {
+    restoreError.value = formatClientError(err, t("detail.restoreFailGeneric"))
+    console.error("[DetailView] restore movie failed", err)
+  } finally {
+    restoreBusy.value = false
+  }
+}
+
+const handleDeleteMoviePermanently = async (id: string) => {
+  permanentDeleteError.value = ""
+  permanentDeleteBusy.value = true
+  try {
+    await libraryService.deleteMoviePermanently(id)
+    await router.replace({
+      name: "trash",
+      query: mergeLibraryQuery(route.query, { selected: undefined }),
+    })
+  } catch (err) {
+    permanentDeleteError.value = formatClientError(err, t("detail.permanentDeleteFailGeneric"))
+    console.error("[DetailView] permanent delete failed", err)
+  } finally {
+    permanentDeleteBusy.value = false
   }
 }
 
@@ -337,13 +381,37 @@ const handleRefreshMetadata = async (id: string) => {
         v-if="deleteBusy"
         class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
       >
-        {{ t("detail.deletingMovie") }}
+        {{ t("detail.movingToTrash") }}
       </p>
       <p
         v-if="deleteError"
         class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ deleteError }}
+      </p>
+      <p
+        v-if="restoreBusy"
+        class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+      >
+        {{ t("detail.restoringMovie") }}
+      </p>
+      <p
+        v-if="restoreError"
+        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ restoreError }}
+      </p>
+      <p
+        v-if="permanentDeleteBusy"
+        class="mb-3 rounded-2xl border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+      >
+        {{ t("detail.permanentDeletingMovie") }}
+      </p>
+      <p
+        v-if="permanentDeleteError"
+        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ permanentDeleteError }}
       </p>
       <p
         v-if="metadataRefreshError"
@@ -367,6 +435,8 @@ const handleRefreshMetadata = async (id: string) => {
         @browse-by-studio="browseByStudio"
         @update-metadata-tags="updateMetadataTags"
         @delete-movie="handleDeleteMovie"
+        @restore-movie="handleRestoreMovie"
+        @delete-movie-permanently="handleDeleteMoviePermanently"
         @refresh-metadata="handleRefreshMetadata"
         @patch-movie-display="patchMovieDisplay"
       />

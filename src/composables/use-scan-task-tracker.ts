@@ -1,7 +1,13 @@
 import { ref, shallowRef } from "vue"
 import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
+import { pushAppToast } from "@/composables/use-app-toast"
+import { i18n } from "@/i18n"
 import { useLibraryService } from "@/services/library-service"
+
+function isFsnotifyLibraryScan(task: TaskDTO): boolean {
+  return task.type === "scan.library" && task.metadata?.trigger === "fsnotify"
+}
 
 const POLL_MS = 500
 
@@ -48,6 +54,15 @@ async function poll() {
     if (isTerminalStatus(t.status)) {
       stopPolling()
       if (t.type === "scan.library") {
+        if (!isFsnotifyLibraryScan(t)) {
+          const msg = t.message ?? ""
+          const tr = i18n.global.t
+          if (t.status === "completed") {
+            pushAppToast(tr("toasts.manualLibraryScanDone", { message: msg }), { variant: "success" })
+          } else {
+            pushAppToast(tr("toasts.manualLibraryScanFailed", { message: msg }), { variant: "destructive" })
+          }
+        }
         void libraryService.reloadMoviesFromApi()
       }
       clearDismissTimer()

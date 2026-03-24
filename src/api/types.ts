@@ -39,6 +39,8 @@ export interface MovieListItemDTO {
   releaseDate?: string
   coverUrl?: string
   thumbUrl?: string
+  /** 回收站条目为 RFC3339；在库中通常省略 */
+  trashedAt?: string
 }
 
 export interface MovieDetailDTO extends MovieListItemDTO {
@@ -64,6 +66,8 @@ export interface LibraryPathDTO {
   id: string
   path: string
   title: string
+  /** 新添加的库根在首次成功扫描完成前为 true */
+  firstLibraryScanPending?: boolean
 }
 
 export interface PlayerSettingsDTO {
@@ -75,6 +79,10 @@ export interface SettingsDTO {
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
+  /**
+   * 开启后，在新加入的库根「第一次成功扫描」时，会尝试识别 Curated 清单或外部整理目录布局（仅标注，不改动已有库路径的默认行为）。
+   */
+  extendedLibraryImport: boolean
   /** 为 true 时库根目录监听新文件并防抖触发扫描（及后续刮削）；与主配置 libraryWatchEnabled 共同生效 */
   autoLibraryWatch: boolean
   /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
@@ -85,6 +93,7 @@ export interface SettingsDTO {
 
 export interface PatchSettingsBody {
   organizeLibrary?: boolean
+  extendedLibraryImport?: boolean
   autoLibraryWatch?: boolean
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string

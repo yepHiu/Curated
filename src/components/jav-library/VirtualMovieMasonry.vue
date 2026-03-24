@@ -3,13 +3,7 @@ import { computed, nextTick, ref } from "vue"
 import { useResizeObserver } from "@vueuse/core"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
 import type { Movie } from "@/domain/movie/types"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
 
 interface MovieChunk {
@@ -19,10 +13,19 @@ interface MovieChunk {
   sizeKey: string
 }
 
-const props = defineProps<{
-  movies: readonly Movie[]
-  selectedMovieId?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    movies: readonly Movie[]
+    selectedMovieId?: string
+    emptyTitle?: string
+    emptyDescription?: string
+  }>(),
+  {
+    emptyTitle: "No matches found",
+    emptyDescription:
+      "Try another query or switch to a different library tab.",
+  },
+)
 
 const emit = defineEmits<{
   select: [movieId: string]
@@ -205,13 +208,10 @@ const getChunk = (value: unknown): MovieChunk =>
 
   <Card v-else class="rounded-3xl border-border/70 bg-card/80">
     <CardHeader>
-      <CardTitle>No matches found</CardTitle>
+      <CardTitle>{{ props.emptyTitle }}</CardTitle>
       <CardDescription>
-        Try another query or switch to a different library tab.
+        {{ props.emptyDescription }}
       </CardDescription>
     </CardHeader>
-    <CardContent class="text-sm text-muted-foreground">
-      The current filters do not return any movies in this route view.
-    </CardContent>
   </Card>
 </template>

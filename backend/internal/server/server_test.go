@@ -17,7 +17,6 @@ import (
 
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/library"
 	"jav-shadcn/backend/internal/scraper"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
@@ -103,7 +102,7 @@ func TestHandleDeleteMovie_NotFound(t *testing.T) {
 	}
 }
 
-func TestHandleDeleteMovie_Success204(t *testing.T) {
+func TestHandleDeleteMovie_SoftTrashThenPermanent204(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	videoPath := filepath.Join(root, "SRV-DEL.mp4")
@@ -150,7 +149,154 @@ func TestHandleDeleteMovie_Success204(t *testing.T) {
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
-	req, err := http.NewRequest(http.MethodDelete, srv.URL+"/api/library/movies/"+outcome.MovieID, http.NoBody)
+	reqSoft, err := http.NewRequest(http.MethodDelete, srv.URL+"/api/library/movies/"+outcome.MovieID, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respSoft, err := http.DefaultClient.Do(reqSoft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer respSoft.Body.Close()
+	if respSoft.StatusCode != http.StatusNoContent {
+		t.Fatalf("soft delete status = %d, want 204", respSoft.StatusCode)
+	}
+
+	trashed, terr := store.IsMovieTrashed(ctx, outcome.MovieID)
+	if terr != nil {
+		t.Fatal(terr)
+	}
+	if !trashed {
+		t.Fatal("expected movie in trash after soft DELETE")
+	}
+	if _, err := os.Stat(movieCacheDir); err != nil {
+		t.Fatalf("cache dir should still exist after soft delete: %v", err)
+	}
+
+	reqPerm, err := http.NewRequest(
+		http.MethodDelete,
+		srv.URL+"/api/library/movies/"+outcome.MovieID+"?permanent=true",
+		http.NoBody,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respPerm, err := http.DefaultClient.Do(reqPerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer respPerm.Body.Close()
+	if respPerm.StatusCode != http.StatusNoContent {
+		t.Fatalf("permanent delete status = %d, want 204", respPerm.StatusCode)
+	}
+
+	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
+	if err == nil {
+		t.Fatal("expected movie gone from DB after permanent delete")
+	}
+	if _, err := os.Stat(movieCacheDir); !os.IsNotExist(err) {
+		t.Fatalf("asset cache dir should be removed after permanent DELETE API: %v", err)
+	}
+}
+
+func TestHandleDeleteMovie_PermanentWithoutTrash400(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "SRV-PERM.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoPath,
+		FileName: "SRV-PERM.mp4",
+		Number:   "SRV-PERM",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(
+		http.MethodDelete,
+		srv.URL+"/api/library/movies/"+outcome.MovieID+"?permanent=true",
+		http.NoBody,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
+	if err != nil {
+		t.Fatalf("movie should still exist: %v", err)
+	}
+}
+
+func TestHandleRestoreMovie_204(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	videoPath := filepath.Join(root, "SRV-RS.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoPath,
+		FileName: "SRV-RS.mp4",
+		Number:   "SRV-RS",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.TrashMovie(ctx, outcome.MovieID); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/"+outcome.MovieID+"/restore", http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,16 +308,12 @@ func TestHandleDeleteMovie_Success204(t *testing.T) {
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204", resp.StatusCode)
 	}
-	if cl := resp.Header.Get("Content-Length"); cl != "" && cl != "0" {
-		// 204 typically has no body; some stacks still set Content-Length: 0
+	ok, err := store.IsMovieTrashed(ctx, outcome.MovieID)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
-	if err == nil {
-		t.Fatal("expected movie gone from DB")
-	}
-	if _, err := os.Stat(movieCacheDir); !os.IsNotExist(err) {
-		t.Fatalf("asset cache dir should be removed after DELETE API: %v", err)
+	if ok {
+		t.Fatal("expected movie restored (not trashed)")
 	}
 }
 
@@ -536,10 +678,9 @@ func TestHandlePatchMovie_SQLiteFavoriteAndRating(t *testing.T) {
 	}
 
 	h := NewHandler(Deps{
-		Cfg:     config.Config{},
-		Logger:  zap.NewNop(),
-		Store:   store,
-		Library: library.NewService(),
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
 	})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
@@ -606,7 +747,7 @@ func TestHandlePatchMovie_ClearUserRating(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
@@ -660,7 +801,7 @@ func TestHandlePatchMovie_UserTags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
@@ -725,7 +866,7 @@ func TestHandlePatchMovie_MetadataTags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
@@ -784,7 +925,7 @@ func TestHandlePatchMovie_DisplayOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
@@ -880,7 +1021,7 @@ func TestHandlePatchMovie_InvalidRating(t *testing.T) {
 	}
 }
 
-func TestHandlePatchMovie_InMemoryFallback(t *testing.T) {
+func TestHandlePatchMovie_NotFoundWhenMovieMissing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
@@ -892,7 +1033,7 @@ func TestHandlePatchMovie_InMemoryFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, Library: library.NewService()})
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
@@ -906,15 +1047,8 @@ func TestHandlePatchMovie_InMemoryFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	var detail contracts.MovieDetailDTO
-	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
-		t.Fatal(err)
-	}
-	if detail.IsFavorite || detail.Rating != 2.5 {
-		t.Fatalf("detail = %+v", detail)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
 }
 
@@ -1271,5 +1405,69 @@ func TestHandleMovieComment_PutGet(t *testing.T) {
 	}
 	if got.Body != "hello comment" {
 		t.Fatalf("get2 body = %q", got.Body)
+	}
+}
+
+type stubOrganizeCtl struct{}
+
+func (stubOrganizeCtl) OrganizeLibrary() bool         { return true }
+func (stubOrganizeCtl) SetOrganizeLibrary(bool) error { return nil }
+
+type stubExtendedImportCtl struct{ v bool }
+
+func (s stubExtendedImportCtl) ExtendedLibraryImport() bool { return s.v }
+func (stubExtendedImportCtl) SetExtendedLibraryImport(bool) error {
+	return nil
+}
+
+type stubAutoWatchCtl struct{}
+
+func (stubAutoWatchCtl) AutoLibraryWatch() bool         { return true }
+func (stubAutoWatchCtl) SetAutoLibraryWatch(bool) error { return nil }
+
+type stubMetadataCtl struct{}
+
+func (stubMetadataCtl) MetadataMovieProvider() string         { return "" }
+func (stubMetadataCtl) SetMetadataMovieProvider(string) error { return nil }
+func (stubMetadataCtl) ListMetadataMovieProviders() []string  { return nil }
+
+func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:                      config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:                   zap.NewNop(),
+		Store:                    store,
+		OrganizeLibraryCtl:       stubOrganizeCtl{},
+		ExtendedLibraryImportCtl: stubExtendedImportCtl{v: true},
+		AutoLibraryWatchCtl:      stubAutoWatchCtl{},
+		MetadataScrapeCtl:        stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !dto.ExtendedLibraryImport {
+		t.Fatal("expected extendedLibraryImport true from controller")
 	}
 }

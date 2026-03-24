@@ -3,6 +3,7 @@ export type AppPage =
   | "favorites"
   | "recent"
   | "tags"
+  | "trash"
   | "actors"
   | "history"
   | "curated-frames"
@@ -11,7 +12,7 @@ export type AppPage =
   | "settings"
   | "not-found"
 
-export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | "tags">
+export type LibraryMode = Extract<AppPage, "library" | "favorites" | "recent" | "tags" | "trash">
 export type LibraryTab = "all" | "new" | "top-rated"
 
 export interface LibraryStat {
@@ -24,4 +25,6 @@ export interface LibrarySetting {
   id: string
   path: string
   title: string
+  /** 来自后端：新库根首次扫描完成前为 true */
+  firstLibraryScanPending?: boolean
 }

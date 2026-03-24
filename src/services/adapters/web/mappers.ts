@@ -50,6 +50,7 @@ export function mapMovieListItem(dto: MovieListItemDTO): Movie {
     coverClass: COVER_CLASS_POOL[hash % COVER_CLASS_POOL.length],
     coverUrl: dto.coverUrl,
     thumbUrl: dto.thumbUrl,
+    trashedAt: dto.trashedAt?.trim() || undefined,
   }
 }
 

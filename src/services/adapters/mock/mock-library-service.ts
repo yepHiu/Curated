@@ -14,6 +14,20 @@ import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { playedMovieCount } from "@/lib/played-movies-storage"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+
+function normalizeMockLibraryPath(p: string): string {
+  return p.trim().replace(/\\/g, "/")
+}
+
+/** Mirrors backend pathHasLibraryRoot for mock path strings (case-insensitive prefix). */
+function mockPathHasLibraryRoot(loc: string, root: string): boolean {
+  const l = normalizeMockLibraryPath(loc)
+  const r = normalizeMockLibraryPath(root)
+  if (!l || !r || r === ".") return false
+  if (l.toLowerCase() === r.toLowerCase()) return true
+  const prefix = r.endsWith("/") ? r.toLowerCase() : `${r.toLowerCase()}/`
+  return l.length >= prefix.length && l.slice(0, prefix.length).toLowerCase() === prefix
+}
 import {
   loadMockMoviePrefs,
   mergeMockPrefsIntoMovie,
@@ -22,6 +36,7 @@ import {
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const organizeLibraryMock = ref(false)
+const extendedLibraryImportMock = ref(false)
 const autoLibraryWatchMock = ref(true)
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
@@ -33,6 +48,7 @@ const mockActorUserTags = ref<Map<string, string[]>>(new Map())
 function mockActorsFromMovies(): ActorListItemDTO[] {
   const counts = new Map<string, number>()
   for (const m of moviesState.value) {
+    if (m.trashedAt?.trim()) continue
     for (const raw of m.actors) {
       const a = raw.trim()
       if (!a) continue
@@ -334,16 +350,23 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 }
 
 export const mockLibraryService: LibraryService = {
-  movies: computed(() => moviesState.value),
+  movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
+  trashedMovies: computed(() =>
+    moviesState.value
+      .filter((m) => Boolean(m.trashedAt?.trim()))
+      .slice()
+      .sort((a, b) => (b.trashedAt ?? "").localeCompare(a.trashedAt ?? "")),
+  ),
   libraryStats: computed(() =>
     buildSettingsDashboardStats(
-      moviesState.value,
+      moviesState.value.filter((m) => !m.trashedAt?.trim()),
       playedMovieCount.value,
       i18n.global.locale.value as string,
     ),
   ),
   libraryPaths: computed(() => libraryPathsState.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
+  extendedLibraryImport: computed(() => extendedLibraryImportMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
@@ -358,6 +381,10 @@ export const mockLibraryService: LibraryService = {
 
   async setOrganizeLibrary(value: boolean) {
     organizeLibraryMock.value = value
+  },
+
+  async setExtendedLibraryImport(value: boolean) {
+    extendedLibraryImportMock.value = value
   },
 
   async setAutoLibraryWatch(value: boolean) {
@@ -400,7 +427,17 @@ export const mockLibraryService: LibraryService = {
   },
 
   async removeLibraryPath(id: string) {
+    const removed = libraryPathsState.value.find((p) => p.id === id)
     libraryPathsState.value = libraryPathsState.value.filter((p) => p.id !== id)
+    if (!removed) return
+    const removedRoot = normalizeMockLibraryPath(removed.path)
+    const remainingRoots = libraryPathsState.value.map((p) => normalizeMockLibraryPath(p.path))
+    moviesState.value = moviesState.value.filter((m) => {
+      const loc = normalizeMockLibraryPath(m.location)
+      if (!loc) return true
+      if (!mockPathHasLibraryRoot(loc, removedRoot)) return true
+      return remainingRoots.some((r) => mockPathHasLibraryRoot(loc, r))
+    })
   },
 
   async scanLibraryPaths() {
@@ -429,7 +466,9 @@ export const mockLibraryService: LibraryService = {
   },
   getRelatedMovies(movieId, limit = 6) {
     const id = movieId.trim()
-    const pool = moviesState.value.filter((movie) => movie.id !== id)
+    const pool = moviesState.value.filter(
+      (movie) => movie.id !== id && !movie.trashedAt?.trim(),
+    )
     return sampleRandomMovies(pool, limit, id || "_")
   },
 
@@ -448,7 +487,25 @@ export const mockLibraryService: LibraryService = {
   },
 
   async deleteMovie(movieId: string) {
-    moviesState.value = moviesState.value.filter((movie) => movie.id !== movieId)
+    const id = movieId.trim()
+    const idx = moviesState.value.findIndex((m) => m.id === id)
+    if (idx < 0) return
+    const ts = new Date().toISOString()
+    moviesState.value = moviesState.value.map((m, i) =>
+      i === idx ? { ...m, trashedAt: ts } : m,
+    )
+  },
+
+  async restoreMovie(movieId: string) {
+    const id = movieId.trim()
+    moviesState.value = moviesState.value.map((m) =>
+      m.id === id ? { ...m, trashedAt: undefined } : m,
+    )
+  },
+
+  async deleteMoviePermanently(movieId: string) {
+    const id = movieId.trim()
+    moviesState.value = moviesState.value.filter((m) => m.id !== id)
   },
 
   mergeMovieIntoCache() {

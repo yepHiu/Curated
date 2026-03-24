@@ -25,6 +25,22 @@ func TestMergeLibrarySettingsFile_MissingFile_NoChangeToDefault(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_ExtendedLibraryImportTrue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"extendedLibraryImport": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.ExtendedLibraryImport {
+		t.Fatal("expected extendedLibraryImport true from file")
+	}
+}
+
 func TestMergeLibrarySettingsFile_AutoLibraryWatchFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

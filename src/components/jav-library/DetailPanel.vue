@@ -57,6 +57,9 @@ const props = withDefaults(
 )
 
 const deleteConfirmOpen = ref(false)
+const permanentDeleteConfirmOpen = ref(false)
+
+const isTrashed = computed(() => Boolean(props.movie.trashedAt?.trim()))
 const movieEditOpen = ref(false)
 const movieEditSaving = ref(false)
 const movieEditError = ref("")
@@ -111,6 +114,8 @@ const emit = defineEmits<{
   /** 整表替换元数据/NFO 标签（删除单个时传过滤后的数组） */
   updateMetadataTags: [payload: { movieId: string; tags: string[] }]
   deleteMovie: [movieId: string]
+  restoreMovie: [movieId: string]
+  deleteMoviePermanently: [movieId: string]
   refreshMetadata: [movieId: string]
   patchMovieDisplay: [body: PatchMovieBody, done: (err?: unknown) => void]
 }>()
@@ -219,6 +224,11 @@ function clearUserRating() {
 const confirmDeleteMovie = () => {
   deleteConfirmOpen.value = false
   emit("deleteMovie", props.movie.id)
+}
+
+const confirmPermanentDeleteMovie = () => {
+  permanentDeleteConfirmOpen.value = false
+  emit("deleteMoviePermanently", props.movie.id)
 }
 
 /** 详情页优先展示封面，其次缩略图 */
@@ -403,27 +413,38 @@ function pickUserTagSuggestion(tag: string) {
               {{ t("detailPanel.usingLocalRating") }}
             </span>
           </p>
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
-            <MovieRatingStars
-              :model-value="starDisplayValue"
-              @commit="commitUserRatingFromStars"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              class="h-7 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
-              :disabled="!hasUserRatingOverride"
-              @click="clearUserRating"
-            >
-              {{ t("detailPanel.clearLocalRating") }}
-            </Button>
-          </div>
+          <template v-if="!isTrashed">
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
+              <MovieRatingStars
+                :model-value="starDisplayValue"
+                @commit="commitUserRatingFromStars"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="h-7 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                :disabled="!hasUserRatingOverride"
+                @click="clearUserRating"
+              >
+                {{ t("detailPanel.clearLocalRating") }}
+              </Button>
+            </div>
+          </template>
+          <p v-else class="mt-2 text-xs text-muted-foreground">
+            {{ t("detailPanel.ratingLockedInTrash") }}
+          </p>
         </div>
       </div>
 
       <div class="flex min-w-0 max-w-full flex-col gap-5">
+        <p
+          v-if="isTrashed"
+          class="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+        >
+          {{ t("detailPanel.inTrashBanner") }}
+        </p>
         <div class="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div class="min-w-0 max-w-full flex-1">
             <CardTitle
@@ -452,7 +473,7 @@ function pickUserTagSuggestion(tag: string) {
             </CardDescription>
           </div>
 
-          <DropdownMenu>
+          <DropdownMenu v-if="!isTrashed">
             <DropdownMenuTrigger as-child>
               <Button
                 type="button"
@@ -492,7 +513,34 @@ function pickUserTagSuggestion(tag: string) {
                   variant="destructive"
                   @click="deleteConfirmOpen = true"
                 >
-                  {{ t("detailPanel.deleteMovie") }}
+                  {{ t("detailPanel.moveToTrash") }}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu v-else>
+            <DropdownMenuTrigger as-child>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                class="shrink-0 rounded-xl"
+                :aria-label="t('detailPanel.moreActions')"
+              >
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="min-w-[11rem]">
+              <DropdownMenuGroup>
+                <DropdownMenuItem @click="emit('restoreMovie', movie.id)">
+                  {{ t("detailPanel.restoreMovie") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  @click="permanentDeleteConfirmOpen = true"
+                >
+                  {{ t("detailPanel.deleteMoviePermanently") }}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -620,9 +668,9 @@ function pickUserTagSuggestion(tag: string) {
           <Dialog v-model:open="deleteConfirmOpen">
             <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{{ t("detailPanel.deleteMovie") }}</DialogTitle>
+                <DialogTitle>{{ t("detailPanel.moveToTrash") }}</DialogTitle>
                 <DialogDescription class="text-pretty">
-                  {{ t("detailPanel.deleteMovieConfirm") }}
+                  {{ t("detailPanel.moveToTrashConfirm") }}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter class="gap-3">
@@ -637,7 +685,33 @@ function pickUserTagSuggestion(tag: string) {
                   class="rounded-2xl"
                   @click="confirmDeleteMovie"
                 >
-                  {{ t("detailPanel.confirmDeleteMovie") }}
+                  {{ t("detailPanel.confirmMoveToTrash") }}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog v-model:open="permanentDeleteConfirmOpen">
+            <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{{ t("detailPanel.deleteMoviePermanently") }}</DialogTitle>
+                <DialogDescription class="text-pretty">
+                  {{ t("detailPanel.deleteMoviePermanentlyConfirm") }}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter class="gap-3">
+                <DialogClose as-child>
+                  <Button type="button" variant="outline" class="rounded-2xl">
+                    {{ t("common.cancel") }}
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  class="rounded-2xl"
+                  @click="confirmPermanentDeleteMovie"
+                >
+                  {{ t("detailPanel.confirmDeletePermanently") }}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -674,6 +748,7 @@ function pickUserTagSuggestion(tag: string) {
                   {{ tag }}
                 </button>
                 <button
+                  v-if="!isTrashed"
                   type="button"
                   class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                   :aria-label="t('detailPanel.ariaRemoveNfoTag', { tag })"
@@ -709,6 +784,7 @@ function pickUserTagSuggestion(tag: string) {
                   {{ tag }}
                 </button>
                 <button
+                  v-if="!isTrashed"
                   type="button"
                   class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                   :aria-label="t('detailPanel.ariaRemoveMyTag', { tag })"
@@ -719,7 +795,11 @@ function pickUserTagSuggestion(tag: string) {
               </span>
             </Badge>
 
-            <div ref="userTagInlineZoneRef" class="flex max-w-full flex-wrap items-center gap-2">
+            <div
+              v-if="!isTrashed"
+              ref="userTagInlineZoneRef"
+              class="flex max-w-full flex-wrap items-center gap-2"
+            >
               <Button
                 type="button"
                 variant="secondary"

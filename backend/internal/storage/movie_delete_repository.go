@@ -13,6 +13,90 @@ import (
 // ErrMovieNotFound is returned when deleting a non-existent movie id.
 var ErrMovieNotFound = errors.New("movie not found")
 
+// deleteMovieDatabase removes the movie row and related join rows in one transaction.
+// It returns paths that DeleteMovie may remove on disk afterward (nil if movie was missing).
+func (s *SQLiteStore) deleteMovieDatabase(ctx context.Context, movieID string) (diskCleanupPaths []string, err error) {
+	movieID = strings.TrimSpace(movieID)
+	if movieID == "" {
+		return nil, ErrMovieNotFound
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var location string
+	err = tx.QueryRowContext(ctx, `SELECT location FROM movies WHERE id = ?`, movieID).Scan(&location)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrMovieNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.QueryContext(ctx,
+		`SELECT local_path FROM media_assets WHERE movie_id = ? AND local_path != ''`, movieID)
+	if err != nil {
+		return nil, err
+	}
+	assetPaths := make([]string, 0)
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		if strings.TrimSpace(p) != "" {
+			assetPaths = append(assetPaths, p)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_actors WHERE movie_id = ?`, movieID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_tags WHERE movie_id = ?`, movieID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM media_assets WHERE movie_id = ?`, movieID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM scan_items WHERE movie_id = ?`, movieID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM library_movie_comments WHERE movie_id = ?`, movieID); err != nil {
+		return nil, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM movies WHERE id = ?`, movieID)
+	if err != nil {
+		return nil, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, ErrMovieNotFound
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return collectMovieFilePaths(location, assetPaths), nil
+}
+
+// DeleteMovieRecordsOnly removes a movie and related rows from the database only; it does not delete
+// media files, NFO, or the app cache directory. Use when unbinding library content (e.g. removing a library path).
+func (s *SQLiteStore) DeleteMovieRecordsOnly(ctx context.Context, movieID string) error {
+	_, err := s.deleteMovieDatabase(ctx, movieID)
+	return err
+}
+
 // DeleteMovie removes a movie row, related join rows, then best-effort deletes files on disk:
 // primary video (movies.location), media_assets.local_path entries, and movie.nfo next to the video.
 // When assetCacheRoot is non-empty (typically cfg.CacheDir), the whole directory assetCacheRoot/movieID
@@ -20,82 +104,15 @@ var ErrMovieNotFound = errors.New("movie not found")
 // including orphans not recorded in media_assets.
 // Database deletion is transactional; file removal runs after commit. File errors are ignored (best-effort).
 func (s *SQLiteStore) DeleteMovie(ctx context.Context, movieID string, assetCacheRoot string) error {
-	movieID = strings.TrimSpace(movieID)
-	if movieID == "" {
-		return ErrMovieNotFound
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
+	id := strings.TrimSpace(movieID)
+	paths, err := s.deleteMovieDatabase(ctx, id)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	var location string
-	err = tx.QueryRowContext(ctx, `SELECT location FROM movies WHERE id = ?`, movieID).Scan(&location)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrMovieNotFound
-	}
-	if err != nil {
-		return err
-	}
-
-	rows, err := tx.QueryContext(ctx,
-		`SELECT local_path FROM media_assets WHERE movie_id = ? AND local_path != ''`, movieID)
-	if err != nil {
-		return err
-	}
-	assetPaths := make([]string, 0)
-	for rows.Next() {
-		var p string
-		if err := rows.Scan(&p); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		if strings.TrimSpace(p) != "" {
-			assetPaths = append(assetPaths, p)
-		}
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-
-	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_actors WHERE movie_id = ?`, movieID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM movie_tags WHERE movie_id = ?`, movieID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM media_assets WHERE movie_id = ?`, movieID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM scan_items WHERE movie_id = ?`, movieID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM library_movie_comments WHERE movie_id = ?`, movieID); err != nil {
-		return err
-	}
-	res, err := tx.ExecContext(ctx, `DELETE FROM movies WHERE id = ?`, movieID)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrMovieNotFound
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	paths := collectMovieFilePaths(location, assetPaths)
 	for _, p := range paths {
 		_ = safeRemoveFileIfFile(p)
 	}
-	bestEffortRemoveMovieAssetCacheDir(assetCacheRoot, movieID)
+	bestEffortRemoveMovieAssetCacheDir(assetCacheRoot, id)
 	return nil
 }
 
