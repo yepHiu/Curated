@@ -83,6 +83,16 @@ pnpm dev
 - `VITE_USE_WEB_API=true` - Use real backend API (set in root `.env` by default)
 - `VITE_API_BASE_URL` - Override API base URL (default: `/api`)
 
+### Library Behavior Configuration
+
+Library-specific settings are persisted to `config/library-config.cfg` (JSON) and merged on startup:
+
+- **`organizeLibrary`** - Whether to organize library files into structured folders
+- **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
+- **`metadataMovieProvider`** - Primary metadata provider for movie scraping
+
+Update via `PATCH /api/settings`; changes are written atomically to the config file.
+
 ## Architecture
 
 ### Frontend Structure (`src/`)
@@ -111,9 +121,9 @@ src/
 - Domain components are in `src/components/jav-library/`
 - Mock data and types are in `src/lib/jav-library.ts`
 - Service layer with adapter pattern for backend communication
-- Routes: `library`, `favorites`, `recent`, `tags`, `history`, `detail/:id`, `player/:id`, `settings`
-- Playback progress: stored in browser `localStorage` only (key: `jav-library-playback-progress-v1`), not synced to backend
-- History page: `src/views/HistoryView.vue` displays watch history grouped by date (local browser only)
+- Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `settings`
+- Playback progress: dual storage (backend SQLite in Web API mode, `localStorage` in Mock mode)
+- History page: `src/views/HistoryView.vue` displays watch history grouped by date
 
 ### Backend Structure (`backend/`)
 
@@ -147,23 +157,39 @@ The backend exposes these HTTP endpoints:
 
 ```
 GET    /api/health                          # Health check
-GET    /api/library/movies                  # List movies (query: mode, q, limit, offset)
+GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags
 DELETE /api/library/movies/{id}             # Delete movie
 GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
 POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
+GET    /api/library/movies/{id}/comment     # Get user comment for movie
+PUT    /api/library/movies/{id}/comment     # Upsert user comment for movie
+GET    /api/library/actors                  # List actors (query: q, actorTag, sort, limit, offset)
+GET    /api/library/actors/profile          # Get actor profile (query: name)
+PATCH  /api/library/actors/tags             # Update actor user tags (query: name)
+POST   /api/library/actors/scrape           # Scrape actor metadata (async task)
+GET    /api/library/played-movies           # List played movies with timestamps
+POST   /api/library/played-movies/{id}      # Mark movie as played
 POST   /api/library/paths                   # Add library path
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
-GET    /api/settings                       # Get settings (libraryPaths, player, organizeLibrary, autoLibraryWatch, metadataMovieProvider[s], …)
-PATCH  /api/settings                       # Partial update: organizeLibrary, autoLibraryWatch, metadataMovieProvider (persisted to config/library-config.cfg where applicable)
-POST   /api/scans                          # Start scan task
-GET    /api/tasks/recent                   # Recently finished tasks (for UI toasts)
+GET    /api/settings                        # Get settings
+PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
+POST   /api/scans                           # Start scan task
+GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
+GET    /api/playback/progress               # List all playback progress
+PUT    /api/playback/progress/{movieId}     # Update playback progress
+DELETE /api/playback/progress/{movieId}     # Delete playback progress
+GET    /api/curated-frames                  # List curated frames
+POST   /api/curated-frames                  # Create curated frame
+GET    /api/curated-frames/{id}/image       # Get curated frame image
+PATCH  /api/curated-frames/{id}             # Update frame tags
+DELETE /api/curated-frames/{id}             # Delete curated frame
 ```
 
-**Async Task Pattern:** Long-running operations (scan, scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
+**Async Task Pattern:** Long-running operations (scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
 
 **Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged.
 
@@ -188,10 +214,18 @@ GET    /api/tasks/{taskId}                  # Get task status
 
 Reference these docs in `docs/` for detailed specifications:
 
-- `jav-libary.md` - Complete product design document (domain models, UI design, task system)
+- `jav-library.md` - Complete product design document (domain models, UI design, task system)
 - `backend-go-standards.md` - Go coding standards and directory structure
 - `backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
+- `frontend-ui-spec.md` - Frontend UI design tokens and component specifications
+- `project-memory.md` - Current implementation facts and architectural decisions
 - `film-scanner/CLAUDE.md` - Reference implementation for metadata scraping
+
+Additional guidance in `.cursor/rules/`:
+- `architecture-boundaries.mdc` - Current vs target architecture
+- `backend-task-patterns.mdc` - Background task design
+- `jav-library-frontend-patterns.mdc` - Frontend patterns
+- `project-facts.mdc` - Detailed project implementation facts
 
 ## Testing
 
@@ -229,6 +263,61 @@ Backend uses stable error codes (see `backend/internal/contracts/contracts.go`):
 ### Database Migrations
 
 Migrations are in `backend/internal/storage/migrations/` and run automatically on startup.
+
+### Backend Task System
+
+All long-running operations (scan, scrape, asset download) are modeled as background tasks:
+
+- **Task lifecycle:** `pending` → `running` → `completed` | `partial_failed` | `failed` | `cancelled`
+- **Task types:** `scan.library`, `scrape.movie`, `scrape.actor`
+- **Polling:** Frontend polls `GET /api/tasks/{taskId}` for progress updates
+- **Recent tasks:** `GET /api/tasks/recent` returns recently completed tasks for UI toast notifications
+- **Idempotency:** Tasks are designed to be safely retryable without duplicates
+
+### Playback Progress Sync
+
+Playback progress has dual storage depending on mode:
+
+- **Web API mode (`VITE_USE_WEB_API=true`):** Synced to backend SQLite via `GET/PUT/DELETE /api/playback/progress`
+- **Mock mode:** Stored in browser `localStorage` (key: `jav-library-playback-progress-v1`)
+
+### Movie Comments
+
+User comments/notes per movie:
+
+- **Web API mode:** Stored in backend via `GET/PUT /api/library/movies/{id}/comment` (table `library_movie_comments`)
+- **Mock mode:** Stored in `localStorage` (key: `jav-library-movie-comment-v1`)
+
+### Curated Frames
+
+Frame extraction and management:
+
+- **Web API mode:** `POST/GET/PATCH/DELETE /api/curated-frames` with `GET /api/curated-frames/{id}/image`
+- **Mock mode:** Stored in IndexedDB
+
+## Frontend Patterns
+
+### Service Layer Usage
+
+All data access and mutations go through the service layer:
+
+```typescript
+// Use the library service composable
+const service = useLibraryService()
+const movies = await service.getMovies({ limit: 50 })
+```
+
+Do not bypass the service layer for library actions.
+
+### shadcn-vue Components
+
+- Use `@/components/ui/input` `Input` component for form text fields (with explicit import)
+- Follow dark mode contrast guidelines for form controls on dark surfaces
+- Use existing theme tokens; avoid raw color values
+
+### Actor Profile Card
+
+When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the `LibraryPage` displays an `ActorProfileCard` at the top showing actor info from `GET /api/library/actors/profile` with scrape capability via `POST /api/library/actors/scrape`.
 
 ## Development Notes
 
