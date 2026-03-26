@@ -1427,9 +1427,11 @@ func (stubAutoWatchCtl) SetAutoLibraryWatch(bool) error { return nil }
 
 type stubMetadataCtl struct{}
 
-func (stubMetadataCtl) MetadataMovieProvider() string         { return "" }
-func (stubMetadataCtl) SetMetadataMovieProvider(string) error { return nil }
-func (stubMetadataCtl) ListMetadataMovieProviders() []string  { return nil }
+func (stubMetadataCtl) MetadataMovieProvider() string               { return "" }
+func (stubMetadataCtl) SetMetadataMovieProvider(string) error       { return nil }
+func (stubMetadataCtl) MetadataMovieProviderChain() []string        { return nil }
+func (stubMetadataCtl) SetMetadataMovieProviderChain([]string) error { return nil }
+func (stubMetadataCtl) ListMetadataMovieProviders() []string        { return nil }
 
 func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	t.Parallel()

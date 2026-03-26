@@ -111,6 +111,8 @@ const emit = defineEmits<{
             :src="url"
             :alt="t('detailPage.previewAlt', { code: movie.code, n: index + 1 })"
             class="absolute inset-0 z-0"
+            loading="eager"
+            :fetch-priority="index < 8 ? 'high' : undefined"
           />
           <span class="sr-only">{{ t("detailPage.previewSrOpen", { n: index + 1 }) }}</span>
         </button>

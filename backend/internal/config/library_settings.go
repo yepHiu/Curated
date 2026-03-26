@@ -55,12 +55,24 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.MetadataMovieProvider = s
 	}
+	if v, ok := m["metadataMovieProviderChain"]; ok {
+		chain, err := parseJSONStringSlice(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.MetadataMovieProviderChain = chain
+	}
 	if v, ok := m["extendedLibraryImport"]; ok {
 		b, err := parseJSONBool(v, "extendedLibraryImport")
 		if err != nil {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 		cfg.ExtendedLibraryImport = b
+	}
+	if v, ok := m["proxy"]; ok {
+		if err := parseProxyConfig(v, &cfg.Proxy); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
 	}
 	return nil
 }
@@ -79,6 +91,38 @@ func parseJSONStringTrim(v any) (string, error) {
 		return "", fmt.Errorf("metadataMovieProvider: invalid number %v", x)
 	default:
 		return "", fmt.Errorf("metadataMovieProvider: unsupported type %T", x)
+	}
+}
+
+// parseJSONStringSlice parses a JSON value as []string, filtering out non-string elements.
+func parseJSONStringSlice(v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	switch x := v.(type) {
+	case []any:
+		out := make([]string, 0, len(x))
+		for _, elem := range x {
+			switch s := elem.(type) {
+			case string:
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					out = append(out, trimmed)
+				}
+			default:
+				// skip non-string elements
+			}
+		}
+		return out, nil
+	case []string:
+		out := make([]string, 0, len(x))
+		for _, s := range x {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("metadataMovieProviderChain: expected array of strings, got %T", v)
 	}
 }
 
@@ -171,4 +215,44 @@ func parseJSONBool(v any, key string) (bool, error) {
 	default:
 		return false, fmt.Errorf("%s: unsupported type %T", key, v)
 	}
+}
+
+// parseProxyConfig parses a JSON object into ProxyConfig.
+func parseProxyConfig(v any, cfg *ProxyConfig) error {
+	if v == nil {
+		return nil
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("proxy: expected object, got %T", v)
+	}
+	if enabled, ok := m["enabled"]; ok {
+		b, err := parseJSONBool(enabled, "proxy.enabled")
+		if err != nil {
+			return err
+		}
+		cfg.Enabled = b
+	}
+	if url, ok := m["url"]; ok {
+		s, err := parseJSONStringTrim(url)
+		if err != nil {
+			return fmt.Errorf("proxy.url: %w", err)
+		}
+		cfg.URL = s
+	}
+	if username, ok := m["username"]; ok {
+		s, err := parseJSONStringTrim(username)
+		if err != nil {
+			return fmt.Errorf("proxy.username: %w", err)
+		}
+		cfg.Username = s
+	}
+	if password, ok := m["password"]; ok {
+		s, err := parseJSONStringTrim(password)
+		if err != nil {
+			return fmt.Errorf("proxy.password: %w", err)
+		}
+		cfg.Password = s
+	}
+	return nil
 }

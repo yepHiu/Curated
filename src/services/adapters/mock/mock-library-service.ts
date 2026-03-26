@@ -41,6 +41,10 @@ const autoLibraryWatchMock = ref(true)
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
+/** Mock：有序的 Provider 列表 */
+const metadataMovieProviderChainMock = ref<string[]>([])
+/** Mock：HTTP 代理配置 */
+const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
 
 /** Mock：演员用户标签（与影片 userTags 隔离） */
 const mockActorUserTags = ref<Map<string, string[]>>(new Map())
@@ -370,6 +374,12 @@ export const mockLibraryService: LibraryService = {
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
+  metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
+  proxy: computed(() => proxyMock.value),
+
+  async setProxy(config: import("@/api/types").ProxySettingsDTO) {
+    proxyMock.value = { ...config }
+  },
 
   async refreshSettings() {
     // Mock: paths are in-memory only; no remote settings.
@@ -403,6 +413,16 @@ export const mockLibraryService: LibraryService = {
       throw new Error("Unknown metadata provider in mock.")
     }
     metadataMovieProviderMock.value = trimmed
+    // Clear chain when setting single provider
+    metadataMovieProviderChainMock.value = []
+  },
+
+  async setMetadataMovieProviderChain(chain: string[]) {
+    const filtered = chain.map((p) => p.trim()).filter(Boolean)
+    // In mock mode, we accept any non-empty strings since there's no real provider list
+    metadataMovieProviderChainMock.value = filtered
+    // Clear single provider when setting chain
+    metadataMovieProviderMock.value = ""
   },
 
   async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {

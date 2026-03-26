@@ -585,8 +585,8 @@ function clearActorsSearch() {
 </script>
 
 <template>
-  <div class="h-screen overflow-hidden bg-background text-foreground">
-    <div class="h-full w-full px-3 py-3 lg:px-4 lg:py-4">
+  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 lg:px-4 lg:py-4">
       <div :class="shellGridClass">
         <AppSidebar
           v-if="isLgUp"

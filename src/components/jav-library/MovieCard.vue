@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import { Heart } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,7 @@ import {
   getProgress,
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
+import { getMovieImageVersion } from "@/lib/image-version"
 
 const props = defineProps<{
   movie: Movie
@@ -34,6 +35,18 @@ const userTagCount = computed(() => props.movie.userTags.length)
 
 /** 列表优先用缩略图，减轻带宽；无则回落封面 */
 const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl || "")
+
+/** 图片版本号 - 用于强制刷新重新搜刮后的海报 */
+const imageVersion = computed(() => getMovieImageVersion(props.movie.id))
+
+/** 渐变叠层仅在海报解码完成后显示，避免盖住骨架屏（见 MediaStill 内 Skeleton） */
+const posterImageLoaded = ref(false)
+watch(
+  () => `${props.movie.id}\0${posterSrc.value}`,
+  () => {
+    posterImageLoaded.value = false
+  },
+)
 
 /** 与 PlaybackHistoryCard 相同算法；依赖 revision 以便播放器回写进度后卡片更新 */
 const progressPercent = computed(() => {
@@ -73,9 +86,14 @@ const handleFavoriteChange = (nextValue: boolean) => {
             v-if="posterSrc"
             :src="posterSrc"
             :alt="movie.code"
-            class="absolute inset-0 z-0"
+            :version="imageVersion"
+            class="absolute inset-0 z-[1]"
+            loading="eager"
+            @load="posterImageLoaded = true"
+            @error="posterImageLoaded = false"
           />
           <div
+            v-if="posterImageLoaded"
             class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/50 via-transparent to-black/25"
             aria-hidden="true"
           />

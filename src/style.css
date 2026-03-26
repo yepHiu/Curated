@@ -145,19 +145,25 @@
     background-color: var(--scrollbar-thumb-hover);
   }
 
+  /* 锁定视口高度，避免壳层内溢出把文档撑高导致「整页滚动 + 底部空白」 */
   html {
     color-scheme: dark;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
     background-image:
       radial-gradient(circle at top, rgb(254 98 142 / 0.14), transparent 28%),
       linear-gradient(180deg, rgb(255 255 255 / 0.02), transparent 18%);
   }
 
   #app {
-    min-height: 100vh;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 }

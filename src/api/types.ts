@@ -89,6 +89,17 @@ export interface SettingsDTO {
   metadataMovieProvider: string
   /** 当前引擎可用的影片源名（排序），供指定模式选择 */
   metadataMovieProviders: string[]
+  /** 有序的 Provider 列表；优先于 metadataMovieProvider 使用。空数组表示自动（全源） */
+  metadataMovieProviderChain: string[]
+  /** HTTP 代理配置 */
+  proxy: ProxySettingsDTO
+}
+
+export interface ProxySettingsDTO {
+  enabled: boolean
+  url?: string
+  username?: string
+  password?: string
 }
 
 export interface PatchSettingsBody {
@@ -97,6 +108,10 @@ export interface PatchSettingsBody {
   autoLibraryWatch?: boolean
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string
+  /** 有序的 Provider 列表。发送空数组表示清除（自动模式）。优先级高于 metadataMovieProvider */
+  metadataMovieProviderChain?: string[]
+  /** 代理配置；发送则替换当前配置 */
+  proxy?: ProxySettingsDTO
 }
 
 export interface TaskDTO {
@@ -221,6 +236,30 @@ export interface PlaybackProgressItemDTO {
 
 export interface PlaybackProgressListDTO {
   items: PlaybackProgressItemDTO[]
+}
+
+/** Provider health status */
+export type ProviderHealthStatus = "ok" | "degraded" | "fail"
+
+/** GET /api/providers/ping or POST /api/providers/ping-all single item */
+export interface ProviderHealthDTO {
+  name: string
+  status: ProviderHealthStatus
+  latencyMs: number
+  message?: string
+}
+
+/** POST /api/providers/ping request body */
+export interface PingProviderRequest {
+  name: string
+}
+
+/** POST /api/providers/ping-all response */
+export interface PingAllProvidersResponse {
+  providers: ProviderHealthDTO[]
+  total: number
+  ok: number
+  fail: number
 }
 
 /** PUT /playback/progress/{movieId} */

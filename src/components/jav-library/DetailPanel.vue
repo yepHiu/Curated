@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
+import { getMovieImageVersion } from "@/lib/image-version"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 
@@ -234,6 +235,9 @@ const confirmPermanentDeleteMovie = () => {
 /** 详情页优先展示封面，其次缩略图 */
 const posterSrc = computed(() => props.movie.coverUrl || props.movie.thumbUrl || "")
 
+/** 图片版本号 - 用于强制刷新重新搜刮后的海报 */
+const imageVersion = computed(() => getMovieImageVersion(props.movie.id))
+
 const maxUserTags = 64
 const maxUserTagRunes = 64
 
@@ -379,7 +383,10 @@ function pickUserTagSuggestion(tag: string) {
             :src="posterSrc"
             :alt="t('detailPanel.coverAlt', { code: movie.code })"
             layout="intrinsic"
+            :version="imageVersion"
             class="relative z-0"
+            loading="eager"
+            fetch-priority="high"
           />
           <div
             class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/55 via-transparent to-black/30"

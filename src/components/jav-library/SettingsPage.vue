@@ -2,20 +2,27 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
+import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
+import type { ProviderHealthDTO, ProviderHealthStatus, ProxySettingsDTO } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
+  Activity,
   FolderOpen,
   FolderPlus,
+  GripVertical,
   ImageDown,
   Pencil,
+  Plus,
   RefreshCw,
   ScanSearch,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-vue-next"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -92,6 +99,51 @@ const autoLibraryWatchError = ref("")
 const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
+const proxyEnabledDraft = ref(false)
+const proxyUrlDraft = ref("")
+const proxyUsernameDraft = ref("")
+const proxyPasswordDraft = ref("")
+const proxySaving = ref(false)
+const proxyError = ref("")
+
+function syncProxyDraftFromService() {
+  const p = libraryService.proxy.value
+  proxyEnabledDraft.value = Boolean(p.enabled)
+  proxyUrlDraft.value = (p.url ?? "").trim()
+  proxyUsernameDraft.value = (p.username ?? "").trim()
+  proxyPasswordDraft.value = p.password ?? ""
+}
+
+async function saveProxySettings() {
+  proxyError.value = ""
+  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
+    proxyError.value = t("settings.proxyUrlRequired")
+    return
+  }
+  proxySaving.value = true
+  try {
+    const body: ProxySettingsDTO = {
+      enabled: proxyEnabledDraft.value,
+      url: proxyUrlDraft.value.trim() || undefined,
+      username: proxyUsernameDraft.value.trim() || undefined,
+      password: proxyPasswordDraft.value || undefined,
+    }
+    await libraryService.setProxy(body)
+    syncProxyDraftFromService()
+  } catch (err) {
+    console.error("[settings] save proxy failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      proxyError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      proxyError.value = err.message
+    } else {
+      proxyError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    proxySaving.value = false
+  }
+}
+
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
 const extendedLibraryImport = computed(() => libraryService.extendedLibraryImport.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
@@ -113,9 +165,174 @@ const metadataMovieSelectOptions = computed(() => {
   return list
 })
 const canPickSpecifiedMetadata = computed(() => metadataMovieSelectOptions.value.length > 0)
-const metadataMovieMode = computed<"auto" | "specified">(() =>
-  metadataMovieProvider.value === "" ? "auto" : "specified",
+/** 有站点列表，或已有保存的链时，允许进入「多源链式」并展示链管理（避免仅有链配置却无列表时整块 UI 被隐藏） */
+const canUseMetadataChainMode = computed(
+  () => canPickSpecifiedMetadata.value || libraryService.metadataMovieProviderChain.value.length > 0,
 )
+const metadataMovieMode = computed<"auto" | "specified" | "chain">(() => {
+  const chain = libraryService.metadataMovieProviderChain.value
+  if (chain.length > 0) return "chain"
+  return metadataMovieProvider.value === "" ? "auto" : "specified"
+})
+
+/**
+ * 刮削策略在界面上的选中态：须与「用户当前点的单选项」一致。
+ * 仅用服务端推导的 metadataMovieMode 时，在「已指定站点 + 链尚未保存」场景下会一直是 specified，
+ * 导致多源链面板永远不出现。
+ */
+const metadataMovieModeUi = ref<"auto" | "specified" | "chain">(metadataMovieMode.value)
+
+function syncMetadataMovieModeUiFromServer() {
+  metadataMovieModeUi.value = metadataMovieMode.value
+}
+
+// Provider Chain management
+const providerChainDraft = ref<string[]>([])
+const availableProvidersForChain = computed(() => {
+  const all = metadataMovieProviders.value
+  const selected = new Set(providerChainDraft.value.map((p) => p.toLowerCase()))
+  return all.filter((p) => !selected.has(p.toLowerCase()))
+})
+const selectedProviderToAdd = ref<string>("")
+const metadataMovieChainSaving = ref(false)
+const metadataMovieChainError = ref("")
+
+const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+const providerHealthByName = ref<Record<string, ProviderHealthDTO>>({})
+const providerPingAllBusy = ref(false)
+const providerPingOneName = ref<string | null>(null)
+const providerHealthPingAllSummary = ref("")
+const providerHealthPingError = ref("")
+
+function healthForProvider(name: string): ProviderHealthDTO | undefined {
+  const map = providerHealthByName.value
+  if (map[name]) return map[name]
+  const lower = name.toLowerCase()
+  for (const [k, v] of Object.entries(map)) {
+    if (k.toLowerCase() === lower) return v
+  }
+  return undefined
+}
+
+function providerHealthStatusClass(status: ProviderHealthStatus): string {
+  if (status === "ok") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+  if (status === "degraded") return "border-amber-500/40 bg-amber-500/10 text-amber-100"
+  return "border-destructive/40 bg-destructive/10 text-destructive"
+}
+
+function providerHealthStatusLabel(status: ProviderHealthStatus): string {
+  if (status === "ok") return t("settings.providerHealthStatusOk")
+  if (status === "degraded") return t("settings.providerHealthStatusDegraded")
+  return t("settings.providerHealthStatusFail")
+}
+
+async function pingAllMetadataProviders() {
+  if (!useWebApi) return
+  providerHealthPingError.value = ""
+  providerHealthPingAllSummary.value = ""
+  providerPingAllBusy.value = true
+  try {
+    const res = await api.pingAllProviders()
+    const next: Record<string, ProviderHealthDTO> = { ...providerHealthByName.value }
+    for (const p of res.providers) {
+      next[p.name] = p
+    }
+    providerHealthByName.value = next
+    providerHealthPingAllSummary.value = t("settings.providerHealthPingAllSummary", {
+      total: res.total,
+      ok: res.ok,
+      fail: res.fail,
+    })
+  } catch (err) {
+    console.error("[settings] ping all providers failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      providerHealthPingError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      providerHealthPingError.value = err.message
+    } else {
+      providerHealthPingError.value = t("settings.providerHealthPingError")
+    }
+  } finally {
+    providerPingAllBusy.value = false
+  }
+}
+
+async function pingOneMetadataProvider(name: string) {
+  if (!useWebApi || !name.trim()) return
+  providerHealthPingError.value = ""
+  providerPingOneName.value = name
+  try {
+    const dto = await api.pingProvider(name.trim())
+    providerHealthByName.value = { ...providerHealthByName.value, [dto.name]: dto }
+  } catch (err) {
+    console.error("[settings] ping provider failed", name, err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      providerHealthPingError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      providerHealthPingError.value = err.message
+    } else {
+      providerHealthPingError.value = t("settings.providerHealthPingError")
+    }
+  } finally {
+    providerPingOneName.value = null
+  }
+}
+
+function initProviderChainDraft() {
+  providerChainDraft.value = [...libraryService.metadataMovieProviderChain.value]
+}
+
+function moveProviderInChain(index: number, direction: "up" | "down") {
+  const draft = [...providerChainDraft.value]
+  if (direction === "up" && index > 0) {
+    ;[draft[index - 1], draft[index]] = [draft[index], draft[index - 1]]
+  } else if (direction === "down" && index < draft.length - 1) {
+    ;[draft[index], draft[index + 1]] = [draft[index + 1], draft[index]]
+  }
+  providerChainDraft.value = draft
+}
+
+function removeProviderFromChain(index: number) {
+  providerChainDraft.value = providerChainDraft.value.filter((_, i) => i !== index)
+}
+
+function addProviderToChain() {
+  const name = selectedProviderToAdd.value.trim()
+  if (!name) return
+  if (providerChainDraft.value.some((p) => p.toLowerCase() === name.toLowerCase())) {
+    return
+  }
+  providerChainDraft.value = [...providerChainDraft.value, name]
+  selectedProviderToAdd.value = ""
+}
+
+async function saveProviderChain() {
+  metadataMovieChainError.value = ""
+  metadataMovieChainSaving.value = true
+  try {
+    await libraryService.setMetadataMovieProviderChain(providerChainDraft.value)
+    syncMetadataMovieModeUiFromServer()
+  } catch (err) {
+    console.error("[settings] save provider chain failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataMovieChainError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      metadataMovieChainError.value = err.message
+    } else {
+      metadataMovieChainError.value = t("settings.errSaveTitle")
+    }
+  } finally {
+    metadataMovieChainSaving.value = false
+  }
+}
+
+async function onMetadataMovieModeChain() {
+  if (metadataMovieModeUi.value === "chain") return
+  metadataMovieModeUi.value = "chain"
+  metadataMovieChainError.value = ""
+  metadataMovieError.value = ""
+  initProviderChainDraft()
+}
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
 
@@ -209,8 +426,11 @@ const directoryHintDisplay = computed(() => {
   return h
 })
 
-onMounted(() => {
-  void libraryService.refreshSettings()
+onMounted(async () => {
+  await libraryService.refreshSettings()
+  syncMetadataMovieModeUiFromServer()
+  initProviderChainDraft()
+  syncProxyDraftFromService()
   let mode = getCuratedFrameSaveMode()
   if (mode === "directory" && !supportsFileSystemAccess()) {
     mode = "app"
@@ -402,11 +622,12 @@ async function onAutoLibraryWatchChange(next: boolean) {
 }
 
 async function onMetadataMovieModeAuto() {
-  if (metadataMovieMode.value === "auto") return
+  if (metadataMovieModeUi.value === "auto") return
   metadataMovieError.value = ""
   metadataMovieSaving.value = true
   try {
     await libraryService.setMetadataMovieProvider("")
+    syncMetadataMovieModeUiFromServer()
   } catch (err) {
     console.error("[settings] metadata movie provider (auto) failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -423,7 +644,7 @@ async function onMetadataMovieModeAuto() {
 
 async function onMetadataMovieModeSpecified() {
   if (!canPickSpecifiedMetadata.value) return
-  if (metadataMovieMode.value === "specified") return
+  if (metadataMovieModeUi.value === "specified") return
   metadataMovieError.value = ""
   metadataMovieSaving.value = true
   try {
@@ -431,6 +652,7 @@ async function onMetadataMovieModeSpecified() {
     if (first) {
       await libraryService.setMetadataMovieProvider(first)
     }
+    syncMetadataMovieModeUiFromServer()
   } catch (err) {
     console.error("[settings] metadata movie provider (specified) failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -451,6 +673,7 @@ async function onMetadataMovieSelect(next: unknown) {
   metadataMovieSaving.value = true
   try {
     await libraryService.setMetadataMovieProvider(next)
+    syncMetadataMovieModeUiFromServer()
   } catch (err) {
     console.error("[settings] metadata movie provider select failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -856,9 +1079,53 @@ async function runMetadataRefreshForSelected() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-4">
+            <div
+              v-if="useWebApi"
+              class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/15 p-4"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium">{{ t("settings.providerHealthTitle") }}</p>
+                  <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{ t("settings.providerHealthHint") }}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="shrink-0 rounded-xl"
+                  :disabled="providerPingAllBusy || providerPingOneName != null"
+                  @click="pingAllMetadataProviders"
+                >
+                  <RefreshCw
+                    class="mr-1.5 size-4"
+                    :class="{ 'motion-safe:animate-spin': providerPingAllBusy }"
+                  />
+                  {{
+                    providerPingAllBusy
+                      ? t("settings.providerHealthPinging")
+                      : t("settings.providerHealthPingAll")
+                  }}
+                </Button>
+              </div>
+              <p v-if="providerHealthPingAllSummary" class="text-xs text-muted-foreground">
+                {{ providerHealthPingAllSummary }}
+              </p>
+              <p v-if="providerHealthPingError" class="text-sm text-destructive">
+                {{ providerHealthPingError }}
+              </p>
+            </div>
+            <p
+              v-else
+              class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-sm text-muted-foreground"
+            >
+              {{ t("settings.providerHealthMockHint") }}
+            </p>
+
             <fieldset
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
-              :aria-busy="metadataMovieSaving"
+              :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
             >
               <legend class="px-1 text-sm font-medium">{{ t("settings.metadataMovieProviderMode") }}</legend>
               <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
@@ -868,7 +1135,7 @@ async function runMetadataRefreshForSelected() {
                   name="metadata-movie-mode"
                   value="auto"
                   :disabled="metadataMovieSaving"
-                  :checked="metadataMovieMode === 'auto'"
+                  :checked="metadataMovieModeUi === 'auto'"
                   @change="onMetadataMovieModeAuto"
                 />
                 <span class="min-w-0 flex-1">
@@ -891,7 +1158,7 @@ async function runMetadataRefreshForSelected() {
                   type="radio"
                   name="metadata-movie-mode"
                   value="specified"
-                  :checked="metadataMovieMode === 'specified'"
+                  :checked="metadataMovieModeUi === 'specified'"
                   :disabled="metadataMovieSaving || !canPickSpecifiedMetadata"
                   @change="onMetadataMovieModeSpecified"
                 />
@@ -902,36 +1169,272 @@ async function runMetadataRefreshForSelected() {
                   </span>
                 </span>
               </label>
+              <label
+                class="flex items-start gap-3 rounded-xl p-2"
+                :class="
+                  canUseMetadataChainMode
+                    ? 'cursor-pointer hover:bg-muted/40'
+                    : 'cursor-not-allowed opacity-60'
+                "
+              >
+                <input
+                  class="mt-1 size-4 shrink-0 accent-primary"
+                  type="radio"
+                  name="metadata-movie-mode"
+                  value="chain"
+                  :checked="metadataMovieModeUi === 'chain'"
+                  :disabled="metadataMovieSaving || metadataMovieChainSaving || !canUseMetadataChainMode"
+                  @change="onMetadataMovieModeChain"
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
+                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                    {{ t("settings.metadataMovieProviderChainHint") }}
+                  </span>
+                </span>
+              </label>
             </fieldset>
 
+            <!-- Single Provider Selection -->
             <div
-              v-if="metadataMovieMode === 'specified' && canPickSpecifiedMetadata"
+              v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
               class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/20 p-4"
             >
               <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
-              <Select
-                :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
-                :disabled="metadataMovieSaving"
-                @update:model-value="onMetadataMovieSelect"
+              <div class="flex flex-wrap items-start gap-2">
+                <Select
+                  class="min-w-0 flex-1"
+                  :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
+                  :disabled="metadataMovieSaving"
+                  @update:model-value="onMetadataMovieSelect"
+                >
+                  <SelectTrigger class="w-full max-w-md rounded-2xl">
+                    <SelectValue :placeholder="t('settings.metadataMovieProviderSelectPh')" />
+                  </SelectTrigger>
+                  <SelectContent class="rounded-xl border-border/70">
+                    <SelectItem
+                      v-for="p in metadataMovieSelectOptions"
+                      :key="p"
+                      class="rounded-lg"
+                      :value="p"
+                    >
+                      {{ p }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  v-if="useWebApi"
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  class="size-10 shrink-0 rounded-xl"
+                  :disabled="
+                    providerPingAllBusy ||
+                    providerPingOneName != null ||
+                    !(metadataMovieProvider || metadataMovieSelectOptions[0])
+                  "
+                  :aria-label="t('settings.providerHealthPingCurrentAria')"
+                  @click="
+                    pingOneMetadataProvider(
+                      metadataMovieProvider || metadataMovieSelectOptions[0] || '',
+                    )
+                  "
+                >
+                  <Activity
+                    class="size-4"
+                    :class="{
+                      'motion-safe:animate-pulse':
+                        providerPingOneName ===
+                        (metadataMovieProvider || metadataMovieSelectOptions[0] || ''),
+                    }"
+                  />
+                </Button>
+              </div>
+              <div
+                v-if="useWebApi && healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')"
+                class="flex flex-wrap items-center gap-2"
               >
-                <SelectTrigger class="w-full max-w-md rounded-2xl">
-                  <SelectValue :placeholder="t('settings.metadataMovieProviderSelectPh')" />
-                </SelectTrigger>
-                <SelectContent class="rounded-xl border-border/70">
-                  <SelectItem
-                    v-for="p in metadataMovieSelectOptions"
-                    :key="p"
-                    class="rounded-lg"
-                    :value="p"
+                <Badge
+                  variant="outline"
+                  class="text-xs font-normal"
+                  :class="
+                    providerHealthStatusClass(
+                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
+                    )
+                  "
+                >
+                  {{
+                    providerHealthStatusLabel(
+                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
+                    )
+                  }}
+                  ·
+                  {{
+                    healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.latencyMs
+                  }}ms
+                </Badge>
+                <span
+                  v-if="healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message"
+                  class="text-xs text-muted-foreground"
+                >
+                  {{ healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Provider Chain Management（与 canPickSpecifiedMetadata 解耦：无站点列表时仍显示已保存的链） -->
+            <div
+              v-if="metadataMovieModeUi === 'chain'"
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4"
+            >
+              <p
+                v-if="!canPickSpecifiedMetadata"
+                class="rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/95"
+              >
+                {{ t("settings.metadataMovieProviderChainNoList") }}
+              </p>
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
+                <span class="text-xs text-muted-foreground">
+                  {{ providerChainDraft.length }} {{ t("settings.providersSelected") }}
+                </span>
+              </div>
+
+              <!-- Provider Chain List -->
+              <div class="flex flex-col gap-2">
+                <div
+                  v-for="(provider, index) in providerChainDraft"
+                  :key="provider + index"
+                  class="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2"
+                >
+                  <GripVertical class="size-4 shrink-0 text-muted-foreground" />
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ provider }}</span>
+                  <div
+                    v-if="useWebApi && healthForProvider(provider)"
+                    class="flex min-w-0 flex-wrap items-center gap-1.5"
                   >
-                    {{ p }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                    <Badge
+                      variant="outline"
+                      class="text-[0.65rem] font-normal"
+                      :class="providerHealthStatusClass(healthForProvider(provider)!.status)"
+                    >
+                      {{ providerHealthStatusLabel(healthForProvider(provider)!.status) }}
+                      · {{ healthForProvider(provider)!.latencyMs }}ms
+                    </Badge>
+                  </div>
+                  <Button
+                    v-if="useWebApi"
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    class="size-8 shrink-0 rounded-lg"
+                    :disabled="providerPingAllBusy || providerPingOneName === provider"
+                    :aria-label="t('settings.providerHealthPingOneAria', { name: provider })"
+                    @click="pingOneMetadataProvider(provider)"
+                  >
+                    <Activity
+                      class="size-4"
+                      :class="{ 'motion-safe:animate-pulse': providerPingOneName === provider }"
+                    />
+                  </Button>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="size-7 rounded-lg"
+                      :disabled="index === 0"
+                      @click="moveProviderInChain(index, 'up')"
+                    >
+                      <span class="sr-only">{{ t("common.moveUp") }}</span>
+                      <span class="text-xs">↑</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="size-7 rounded-lg"
+                      :disabled="index === providerChainDraft.length - 1"
+                      @click="moveProviderInChain(index, 'down')"
+                    >
+                      <span class="sr-only">{{ t("common.moveDown") }}</span>
+                      <span class="text-xs">↓</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="size-7 rounded-lg text-destructive hover:text-destructive"
+                      @click="removeProviderFromChain(index)"
+                    >
+                      <X class="size-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <!-- Empty State -->
+                <div
+                  v-if="providerChainDraft.length === 0"
+                  class="rounded-xl border border-dashed border-border/60 bg-background/30 px-3 py-6 text-center text-sm text-muted-foreground"
+                >
+                  {{ t("settings.metadataMovieProviderChainEmpty") }}
+                </div>
+              </div>
+
+              <!-- Add Provider -->
+              <div v-if="availableProvidersForChain.length > 0" class="flex items-center gap-2 pt-2">
+                <Select v-model="selectedProviderToAdd">
+                  <SelectTrigger class="h-9 flex-1 rounded-xl text-sm">
+                    <SelectValue :placeholder="t('settings.selectProviderToAdd')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="p in availableProvidersForChain"
+                      :key="p"
+                      :value="p"
+                    >
+                      {{ p }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-9 rounded-xl px-3"
+                  :disabled="!selectedProviderToAdd"
+                  @click="addProviderToChain"
+                >
+                  <Plus class="mr-1 size-4" />
+                  {{ t("common.add") }}
+                </Button>
+              </div>
+
+              <!-- Save Chain Button -->
+              <div class="flex items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  class="rounded-xl"
+                  :disabled="metadataMovieChainSaving"
+                  @click="saveProviderChain"
+                >
+                  {{ metadataMovieChainSaving ? t("common.saving") : t("common.save") }}
+                </Button>
+              </div>
+
+              <p
+                v-if="metadataMovieChainSaving"
+                class="text-xs text-muted-foreground motion-safe:animate-pulse"
+              >
+                {{ t("settings.metadataMovieProviderSyncing") }}
+              </p>
+              <p v-if="metadataMovieChainError" class="text-sm text-destructive">
+                {{ metadataMovieChainError }}
+              </p>
             </div>
 
             <p
-              v-if="!canPickSpecifiedMetadata"
+              v-if="!canPickSpecifiedMetadata && metadataMovieModeUi !== 'chain'"
               class="text-sm text-muted-foreground"
             >
               {{ t("settings.metadataMovieProviderNoList") }}
@@ -944,6 +1447,96 @@ async function runMetadataRefreshForSelected() {
             </p>
             <p v-if="metadataMovieError" class="text-sm text-destructive">
               {{ metadataMovieError }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div class="mb-6 break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+          <CardHeader>
+            <CardTitle>{{ t("settings.proxyTitle") }}</CardTitle>
+            <CardDescription>
+              {{ t("settings.proxyDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-4">
+            <p
+              v-if="!useWebApi"
+              class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
+            >
+              {{ t("settings.proxyMockHint") }}
+            </p>
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="proxySaving"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="font-medium">{{ t("settings.proxyEnabled") }}</p>
+                <p class="text-sm text-muted-foreground">
+                  {{ t("settings.proxyEnabledHint") }}
+                </p>
+              </div>
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="proxyEnabledDraft"
+                :disabled="proxySaving"
+                @update:model-value="proxyEnabledDraft = $event"
+              />
+            </div>
+            <div
+              v-if="proxyEnabledDraft"
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4"
+            >
+              <div class="flex flex-col gap-1.5">
+                <p class="text-sm font-medium">{{ t("settings.proxyUrl") }}</p>
+                <Input
+                  v-model="proxyUrlDraft"
+                  type="url"
+                  autocomplete="off"
+                  class="rounded-xl border-border/70"
+                  :placeholder="t('settings.proxyUrlPlaceholder')"
+                  :disabled="proxySaving"
+                />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
+                <Input
+                  v-model="proxyUsernameDraft"
+                  autocomplete="off"
+                  class="rounded-xl border-border/70"
+                  :disabled="proxySaving"
+                />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
+                <Input
+                  v-model="proxyPasswordDraft"
+                  type="password"
+                  autocomplete="new-password"
+                  class="rounded-xl border-border/70"
+                  :disabled="proxySaving"
+                />
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                class="rounded-xl"
+                :disabled="proxySaving"
+                @click="saveProxySettings"
+              >
+                {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
+              </Button>
+            </div>
+            <p
+              v-if="proxySaving"
+              class="text-xs text-muted-foreground motion-safe:animate-pulse"
+            >
+              {{ t("settings.proxySyncing") }}
+            </p>
+            <p v-if="proxyError" class="text-sm text-destructive">
+              {{ proxyError }}
             </p>
           </CardContent>
         </Card>

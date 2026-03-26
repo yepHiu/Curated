@@ -5,6 +5,7 @@ import type {
   ListActorsParams,
   MetadataRefreshQueuedDTO,
   PatchMovieBody,
+  ProxySettingsDTO,
   TaskDTO,
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
@@ -31,7 +32,14 @@ export interface LibraryService {
   /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
   metadataMovieProvider: ComputedRef<string>
   metadataMovieProviders: ComputedRef<readonly string[]>
+  /** 有序的 Provider 列表；空数组表示自动（全源） */
+  metadataMovieProviderChain: ComputedRef<readonly string[]>
   setMetadataMovieProvider(name: string): Promise<void>
+  /** 设置有序的 Provider 列表；空数组表示自动（全源） */
+  setMetadataMovieProviderChain(chain: string[]): Promise<void>
+  /** HTTP 代理配置 */
+  proxy: ComputedRef<ProxySettingsDTO>
+  setProxy(config: ProxySettingsDTO): Promise<void>
   /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>

@@ -137,22 +137,19 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string, opt
 	default:
 	}
 
-	prefer := strings.TrimSpace(opts.Provider)
 	isFC2 := mtnum.IsFC2(mtnum.Trim(number))
-	if isFC2 && prefer != "" && !isFC2MovieProviderName(prefer) {
-		s.logger.Warn("FC2 number: ignoring non-FC2 metadata provider; using FC2-only sources",
-			zap.String("number", number),
-			zap.String("movieId", movieID),
-			zap.String("ignoredProvider", prefer),
-		)
-		prefer = ""
-	}
 
-	if prefer != "" {
-		s.logger.Info("scraping metadata",
+	// Determine provider chain to use
+	chain := s.resolveProviderChain(opts, isFC2)
+	hasChain := len(chain) > 0
+
+	// Log scraping strategy
+	if hasChain {
+		s.logger.Info("scraping metadata with provider chain",
 			zap.String("number", number),
 			zap.String("movieId", movieID),
-			zap.String("metadataProvider", prefer),
+			zap.Strings("chain", chain),
+			zap.Bool("fc2", isFC2),
 		)
 	} else if isFC2 {
 		s.logger.Info("scraping metadata",
@@ -164,6 +161,115 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string, opt
 		s.logger.Info("scraping metadata", zap.String("number", number), zap.String("movieId", movieID), zap.String("metadataProvider", "auto"))
 	}
 
+	// Try providers in sequence if chain is specified
+	if hasChain {
+		return s.scrapeWithChain(ctx, movieID, number, chain)
+	}
+
+	// Fall back to original logic (single provider or auto)
+	return s.scrapeSingleOrAuto(ctx, movieID, number, opts.Provider, isFC2)
+}
+
+// resolveProviderChain determines the effective provider chain from options and FC2 status.
+func (s *Service) resolveProviderChain(opts scraper.MovieScrapeOptions, isFC2 bool) []string {
+	// Clean and filter chain
+	var chain []string
+	for _, p := range opts.ProviderChain {
+		if name := strings.TrimSpace(p); name != "" {
+			chain = append(chain, name)
+		}
+	}
+
+	if len(chain) == 0 {
+		// Fall back to single provider if specified
+		if single := strings.TrimSpace(opts.Provider); single != "" {
+			chain = []string{single}
+		}
+	}
+
+	// For FC2 content, filter to FC2-only providers
+	if isFC2 && len(chain) > 0 {
+		var fc2Chain []string
+		for _, name := range chain {
+			if isFC2MovieProviderName(name) {
+				fc2Chain = append(fc2Chain, name)
+			}
+		}
+		if len(fc2Chain) == 0 {
+			// Chain has no FC2 providers, ignore chain and use default FC2 providers
+			return nil
+		}
+		return fc2Chain
+	}
+
+	return chain
+}
+
+// scrapeWithChain tries each provider in the chain sequentially until one succeeds.
+func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, chain []string) (scraper.Metadata, error) {
+	var lastErr error
+	for i, providerName := range chain {
+		select {
+		case <-ctx.Done():
+			return scraper.Metadata{}, ctx.Err()
+		default:
+		}
+
+		if _, err := s.engine.GetMovieProviderByName(providerName); err != nil {
+			lastErr = fmt.Errorf("unknown provider %q", providerName)
+			s.logger.Warn("skipping unknown provider in chain",
+				zap.String("provider", providerName),
+				zap.Int("index", i),
+			)
+			continue
+		}
+
+		s.logger.Info("trying provider in chain",
+			zap.String("number", number),
+			zap.String("provider", providerName),
+			zap.Int("index", i),
+			zap.Int("total", len(chain)),
+		)
+
+		results, err := s.engine.SearchMovie(number, providerName, false)
+		if err != nil {
+			lastErr = err
+			s.logger.Warn("search failed in chain",
+				zap.String("number", number),
+				zap.String("provider", providerName),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		first := firstValidMovieSearchResult(results)
+		if first == nil {
+			lastErr = fmt.Errorf("no results from %s", providerName)
+			s.logger.Warn("no results from provider in chain",
+				zap.String("number", number),
+				zap.String("provider", providerName),
+			)
+			continue
+		}
+
+		// Found a valid result
+		s.logger.Info("search result selected from chain",
+			zap.String("number", number),
+			zap.String("provider", first.Provider),
+			zap.String("providerMovieId", first.ID),
+			zap.String("title", first.Title),
+			zap.Int("tried", i+1),
+		)
+
+		return s.fetchMovieInfo(ctx, movieID, number, first)
+	}
+
+	// All providers in chain failed
+	return scraper.Metadata{}, fmt.Errorf("all providers in chain failed for %s: %w", number, lastErr)
+}
+
+// scrapeSingleOrAuto handles single provider or automatic (all sources) scraping.
+func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefer string, isFC2 bool) (scraper.Metadata, error) {
 	var (
 		results []*model.MovieSearchResult
 		err     error
@@ -203,9 +309,14 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string, opt
 		zap.Int("totalResults", len(results)),
 	)
 
-	pid, err := providerid.New(first.Provider, first.ID)
+	return s.fetchMovieInfo(ctx, movieID, number, first)
+}
+
+// fetchMovieInfo fetches detailed movie info from a search result.
+func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, result *model.MovieSearchResult) (scraper.Metadata, error) {
+	pid, err := providerid.New(result.Provider, result.ID)
 	if err != nil {
-		return scraper.Metadata{}, fmt.Errorf("invalid provider result for %s: provider=%s id=%s: %w", number, first.Provider, first.ID, err)
+		return scraper.Metadata{}, fmt.Errorf("invalid provider result for %s: provider=%s id=%s: %w", number, result.Provider, result.ID, err)
 	}
 
 	select {
@@ -216,7 +327,7 @@ func (s *Service) Scrape(ctx context.Context, movieID string, number string, opt
 
 	info, err := s.engine.GetMovieInfoByProviderID(pid, true)
 	if err != nil {
-		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, first.Provider, err)
+		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, result.Provider, err)
 	}
 
 	s.logger.Info("metadata fetched",
@@ -450,4 +561,40 @@ func cleanStrings(values []string) []string {
 	}
 
 	return cleaned
+}
+
+// ListProviders returns sorted Metatube movie provider names.
+func (s *Service) ListProviders() []string {
+	return s.ListMovieProviderNames()
+}
+
+// CheckProviderHealth pings a single provider and returns its health status.
+// It performs a lightweight search to verify the provider is responsive.
+func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status string, latencyMs int64, err error) {
+	start := time.Now()
+
+	_, err = s.engine.GetMovieProviderByName(name)
+	if err != nil {
+		return "fail", time.Since(start).Milliseconds(), fmt.Errorf("provider not found: %w", err)
+	}
+
+	// Use a lightweight search to check provider health
+	// Search for a known popular ID that should exist on most providers
+	testKeyword := "SSIS"
+
+	// Try to search using the provider
+	results, searchErr := s.engine.SearchMovie(testKeyword, name, false)
+	latency := time.Since(start).Milliseconds()
+
+	if searchErr != nil {
+		return "fail", latency, searchErr
+	}
+
+	// If we got any valid results, consider the provider healthy
+	if len(results) > 0 {
+		return "ok", latency, nil
+	}
+
+	// No results but no error - provider is responsive but maybe the test keyword returned nothing
+	return "ok", latency, nil
 }

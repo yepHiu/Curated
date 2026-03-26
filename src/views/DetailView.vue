@@ -12,6 +12,7 @@ import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
+import { bumpMovieImageVersion } from "@/lib/image-version"
 import type { Movie } from "@/domain/movie/types"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -100,6 +101,8 @@ watch(scanTaskTracker.activeTask, async (task) => {
 
   if (task.status === "completed") {
     metadataRefreshError.value = ""
+    // 递增图片版本号，强制刷新海报/缩略图缓存
+    bumpMovieImageVersion(id)
     const loaded = await loadMovieDetail(id)
     if (loaded) {
       detailMovie.value = loaded

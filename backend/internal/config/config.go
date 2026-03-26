@@ -24,6 +24,8 @@ type Config struct {
 	ExtendedLibraryImport bool `json:"extendedLibraryImport,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
+	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.
+	MetadataMovieProviderChain []string `json:"metadataMovieProviderChain,omitempty"`
 	// AutoScanIntervalSeconds runs a full library scan on this interval; 0 disables (manual POST /api/scans only).
 	AutoScanIntervalSeconds int `json:"autoScanIntervalSeconds"`
 	// LibraryWatchEnabled: nil = default on (fsnotify on library roots); explicit false disables.
@@ -34,6 +36,8 @@ type Config struct {
 	Scraper                ScraperConfig `json:"scraper"`
 	Assets                 AssetConfig   `json:"assets"`
 	Player                 PlayerConfig  `json:"player"`
+	// Proxy configures HTTP/SOCKS5 proxy for outbound metadata scraping requests. Persisted in library-config.cfg.
+	Proxy ProxyConfig `json:"proxy,omitempty"`
 }
 
 type TaskConfig struct {
@@ -58,6 +62,17 @@ type AssetConfig struct {
 
 type PlayerConfig struct {
 	HardwareDecode bool `json:"hardwareDecode"`
+}
+
+type ProxyConfig struct {
+	// Enabled toggles HTTP proxy for outbound scraper and metadata requests.
+	Enabled bool `json:"enabled"`
+	// URL is the proxy URL (e.g., http://proxy.example.com:8080 or socks5://proxy:1080).
+	URL string `json:"url,omitempty"`
+	// Username for proxy authentication (optional).
+	Username string `json:"username,omitempty"`
+	// Password for proxy authentication (optional).
+	Password string `json:"password,omitempty"`
 }
 
 func Default() Config {

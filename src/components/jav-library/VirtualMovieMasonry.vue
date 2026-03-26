@@ -47,6 +47,11 @@ const GAP_PX_ESTIMATE = 20
 const ESTIMATED_CARD_HEIGHT = 300
 const ESTIMATED_GAP = 22
 
+/** 虚拟滚动缓冲区：上下各多渲染的块数，防止快速滚动白屏（与文档「上下各缓冲 5」对齐） */
+const BUFFER_CHUNKS = 5
+/** 虚拟滚动缓冲区像素：额外像素缓冲，与块数缓冲叠加使用 */
+const BUFFER_PX = 600
+
 const rootEl = ref<HTMLElement | null>(null)
 const containerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200)
 
@@ -160,7 +165,8 @@ const getChunk = (value: unknown): MovieChunk =>
       :items="movieChunks"
       key-field="id"
       :min-item-size="estimatedChunkHeight"
-      :buffer="220"
+      :buffer="BUFFER_PX"
+      :pool-size="BUFFER_CHUNKS * 2 + 5"
       class="h-full min-h-0 overflow-y-auto pr-2"
       list-class="flex flex-col gap-5"
       item-class="pb-5"

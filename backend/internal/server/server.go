@@ -60,7 +60,21 @@ type AutoLibraryWatchController interface {
 type MetadataScrapeSettings interface {
 	MetadataMovieProvider() string
 	SetMetadataMovieProvider(name string) error
+	MetadataMovieProviderChain() []string
+	SetMetadataMovieProviderChain(chain []string) error
 	ListMetadataMovieProviders() []string
+}
+
+// ProviderHealthChecker provides health check capabilities for metadata providers.
+type ProviderHealthChecker interface {
+	ListProviders() []string
+	CheckProviderHealth(ctx context.Context, name string) (status string, latencyMs int64, err error)
+}
+
+// ProxyController exposes and updates HTTP proxy configuration (library-config.cfg).
+type ProxyController interface {
+	Proxy() config.ProxyConfig
+	SetProxy(cfg config.ProxyConfig) error
 }
 
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
@@ -78,6 +92,8 @@ type Handler struct {
 	extendedLibraryImportCtl ExtendedLibraryImportController
 	autoLibraryWatchCtl      AutoLibraryWatchController
 	metadataScrapeCtl        MetadataScrapeSettings
+	providerHealthChecker    ProviderHealthChecker
+	proxyCtl                 ProxyController
 	movieMetadataRefresher   MovieMetadataRefresher
 	actorProfileRefresher    ActorProfileRefresher
 	libraryWatchReloader     LibraryWatchReloader
@@ -93,6 +109,8 @@ type Deps struct {
 	ExtendedLibraryImportCtl ExtendedLibraryImportController
 	AutoLibraryWatchCtl      AutoLibraryWatchController
 	MetadataScrapeCtl        MetadataScrapeSettings
+	ProviderHealthChecker    ProviderHealthChecker
+	ProxyCtl                 ProxyController
 	MovieMetadataRefresher   MovieMetadataRefresher
 	ActorProfileRefresher    ActorProfileRefresher
 	LibraryWatchReloader     LibraryWatchReloader
@@ -109,6 +127,8 @@ func NewHandler(deps Deps) *Handler {
 		extendedLibraryImportCtl: deps.ExtendedLibraryImportCtl,
 		autoLibraryWatchCtl:      deps.AutoLibraryWatchCtl,
 		metadataScrapeCtl:        deps.MetadataScrapeCtl,
+		providerHealthChecker:    deps.ProviderHealthChecker,
+		proxyCtl:                 deps.ProxyCtl,
 		movieMetadataRefresher:   deps.MovieMetadataRefresher,
 		actorProfileRefresher:    deps.ActorProfileRefresher,
 		libraryWatchReloader:     deps.LibraryWatchReloader,
@@ -153,6 +173,9 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/curated-frames/{id}/image", h.handleGetCuratedFrameImage)
 	mux.HandleFunc("PATCH /api/curated-frames/{id}/tags", h.handlePatchCuratedFrameTags)
 	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)
+
+	mux.HandleFunc("POST /api/providers/ping", h.handlePingProvider)
+	mux.HandleFunc("POST /api/providers/ping-all", h.handlePingAllProviders)
 
 	return withCORS(mux)
 }
@@ -892,8 +915,18 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	}
 	if h.metadataScrapeCtl != nil {
 		dto.MetadataMovieProvider = h.metadataScrapeCtl.MetadataMovieProvider()
+		dto.MetadataMovieProviderChain = h.metadataScrapeCtl.MetadataMovieProviderChain()
 		if list := h.metadataScrapeCtl.ListMetadataMovieProviders(); list != nil {
 			dto.MetadataMovieProviders = list
+		}
+	}
+	if h.proxyCtl != nil {
+		p := h.proxyCtl.Proxy()
+		dto.Proxy = contracts.ProxySettingsDTO{
+			Enabled:  p.Enabled,
+			URL:      p.URL,
+			Username: p.Username,
+			Password: p.Password,
 		}
 	}
 	return dto, nil
@@ -940,7 +973,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.Proxy == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1005,6 +1038,59 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				h.logger.Warn("failed to persist metadataMovieProvider", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.MetadataMovieProviderChain != nil {
+		if h.metadataScrapeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata scrape settings not available")
+			return
+		}
+		chain := *body.MetadataMovieProviderChain
+		// Validate chain providers
+		if len(chain) > 0 {
+			allowed := h.metadataScrapeCtl.ListMetadataMovieProviders()
+			for _, name := range chain {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				if len(allowed) == 0 || !movieProviderNameAllowed(name, allowed) {
+					writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "unknown provider in chain: "+name)
+					return
+				}
+			}
+		}
+		if err := h.metadataScrapeCtl.SetMetadataMovieProviderChain(chain); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist metadataMovieProviderChain", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.Proxy != nil {
+		if h.proxyCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "proxy settings not available")
+			return
+		}
+		cfg := config.ProxyConfig{
+			Enabled:  body.Proxy.Enabled,
+			URL:      strings.TrimSpace(body.Proxy.URL),
+			Username: strings.TrimSpace(body.Proxy.Username),
+			Password: body.Proxy.Password,
+		}
+		if cfg.Enabled && cfg.URL == "" {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "proxy URL is required when enabled")
+			return
+		}
+		if err := h.proxyCtl.SetProxy(cfg); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist proxy settings", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save proxy settings")
 			return
 		}
 	}
@@ -1236,6 +1322,82 @@ func writeAppError(w http.ResponseWriter, status int, code string, message strin
 		Code:      code,
 		Message:   message,
 		Retryable: status >= 500,
+	})
+}
+
+func (h *Handler) handlePingProvider(w http.ResponseWriter, r *http.Request) {
+	var req contracts.PingProviderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Warn("invalid ping provider request body", zap.Error(err))
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "Invalid request body")
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "Provider name is required")
+		return
+	}
+
+	// Verify provider exists
+	found := false
+	for _, p := range h.providerHealthChecker.ListProviders() {
+		if strings.EqualFold(p, name) {
+			found = true
+			name = p // Use the canonical name from the list
+			break
+		}
+	}
+	if !found {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeProviderNotFound, "Provider not found: "+name)
+		return
+	}
+
+	status, latencyMs, err := h.providerHealthChecker.CheckProviderHealth(r.Context(), name)
+	if err != nil {
+		h.logger.Warn("provider health check failed", zap.String("provider", name), zap.Error(err))
+	}
+
+	dto := contracts.ProviderHealthDTO{
+		Name:      name,
+		Status:    contracts.ProviderHealthStatus(status),
+		LatencyMs: latencyMs,
+	}
+	if err != nil {
+		dto.Message = err.Error()
+	}
+
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handlePingAllProviders(w http.ResponseWriter, r *http.Request) {
+	providers := h.providerHealthChecker.ListProviders()
+	results := make([]contracts.ProviderHealthDTO, 0, len(providers))
+
+	okCount := 0
+	failCount := 0
+
+	for _, name := range providers {
+		status, latencyMs, err := h.providerHealthChecker.CheckProviderHealth(r.Context(), name)
+		dto := contracts.ProviderHealthDTO{
+			Name:      name,
+			Status:    contracts.ProviderHealthStatus(status),
+			LatencyMs: latencyMs,
+		}
+		if err != nil {
+			dto.Message = err.Error()
+			failCount++
+		} else if status == "ok" {
+			okCount++
+		}
+		results = append(results, dto)
+	}
+
+	writeJSON(w, http.StatusOK, contracts.PingAllProvidersResponse{
+		Providers: results,
+		Total:     len(providers),
+		OK:        okCount,
+		Fail:      failCount,
 	})
 }
 

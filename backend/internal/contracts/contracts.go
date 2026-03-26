@@ -334,6 +334,19 @@ type SettingsDTO struct {
 	AutoLibraryWatch       bool     `json:"autoLibraryWatch"`
 	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
 	MetadataMovieProviders []string `json:"metadataMovieProviders"`
+	// MetadataMovieProviderChain: ordered list of providers to try in sequence; empty = auto (all sources).
+	// When set, overrides MetadataMovieProvider for new scrapes.
+	MetadataMovieProviderChain []string `json:"metadataMovieProviderChain"`
+	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
+	Proxy ProxySettingsDTO `json:"proxy"`
+}
+
+// ProxySettingsDTO is the proxy configuration for SettingsDTO.
+type ProxySettingsDTO struct {
+	Enabled  bool   `json:"enabled"`
+	URL      string `json:"url,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
@@ -342,6 +355,10 @@ type PatchSettingsRequest struct {
 	ExtendedLibraryImport *bool   `json:"extendedLibraryImport,omitempty"`
 	AutoLibraryWatch      *bool   `json:"autoLibraryWatch,omitempty"`
 	MetadataMovieProvider *string `json:"metadataMovieProvider,omitempty"`
+	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
+	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
+	// Proxy: nil = no change; non-nil object replaces current proxy config.
+	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
 }
 
 type PlayerSettingsDTO struct {
@@ -470,4 +487,38 @@ const (
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
 	ErrorCodeConflict      = "COMMON_CONFLICT"
+
+	// Provider health check errors
+	ErrorCodeProviderNotFound   = "PROVIDER_NOT_FOUND"
+	ErrorCodeProviderPingFailed = "PROVIDER_PING_FAILED"
 )
+
+// ProviderHealthStatus indicates the availability status of a metadata provider.
+type ProviderHealthStatus string
+
+const (
+	ProviderHealthOK       ProviderHealthStatus = "ok"
+	ProviderHealthDegraded ProviderHealthStatus = "degraded"
+	ProviderHealthFail     ProviderHealthStatus = "fail"
+)
+
+// ProviderHealthDTO is the result of pinging a single provider.
+type ProviderHealthDTO struct {
+	Name      string               `json:"name"`
+	Status    ProviderHealthStatus `json:"status"`
+	LatencyMs int64                `json:"latencyMs"`
+	Message   string               `json:"message,omitempty"`
+}
+
+// PingProviderRequest is the body for POST /api/providers/ping.
+type PingProviderRequest struct {
+	Name string `json:"name"`
+}
+
+// PingAllProvidersResponse is returned by POST /api/providers/ping-all.
+type PingAllProvidersResponse struct {
+	Providers []ProviderHealthDTO `json:"providers"`
+	Total     int                 `json:"total"`
+	OK        int                 `json:"ok"`
+	Fail      int                 `json:"fail"`
+}

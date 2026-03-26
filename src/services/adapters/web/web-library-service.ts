@@ -3,6 +3,7 @@ import type {
   ListActorsParams,
   MetadataRefreshQueuedDTO,
   PatchMovieBody,
+  ProxySettingsDTO,
   TaskDTO,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
@@ -27,13 +28,21 @@ const extendedLibraryImportState = ref(false)
 const autoLibraryWatchState = ref(true)
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
+const metadataMovieProviderChainState = ref<string[]>([])
+const proxyState = ref<ProxySettingsDTO>({ enabled: false })
 /** 忽略过期的 PATCH 响应，避免快速连点时状态被旧请求写乱 */
 let organizeLibrarySaveSeq = 0
 let extendedLibraryImportSaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
+let metadataMovieProviderChainSaveSeq = 0
+let proxySaveSeq = 0
 let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
+
+/** 并发「全量资料库列表」拉取合并为单次 in-flight，避免 ensure / reload / 多入口重复请求 */
+let fullLibraryListsPromise: Promise<{ active: Movie[]; trashed: Movie[] }> | null = null
+const pendingMovieDetailLoads = new Map<string, Promise<Movie | undefined>>()
 
 /** 单次请求条数；多页拉取直至 total 或达到上限，避免首屏只看见前 200 条 */
 const LIST_BATCH_SIZE = 500
@@ -88,16 +97,25 @@ async function fetchAllTrashedMoviesFromApi(): Promise<Movie[]> {
   return all
 }
 
+async function loadFullLibraryLists(): Promise<{ active: Movie[]; trashed: Movie[] }> {
+  if (fullLibraryListsPromise) {
+    return fullLibraryListsPromise
+  }
+  fullLibraryListsPromise = Promise.all([fetchAllMoviesFromApi(), fetchAllTrashedMoviesFromApi()])
+    .then(([active, trashed]) => ({ active, trashed }))
+    .finally(() => {
+      fullLibraryListsPromise = null
+    })
+  return fullLibraryListsPromise
+}
+
 async function reloadMoviesFromApiImmediate() {
   if (reloadMoviesDebounce) {
     clearTimeout(reloadMoviesDebounce)
     reloadMoviesDebounce = null
   }
   try {
-    const [active, trashed] = await Promise.all([
-      fetchAllMoviesFromApi(),
-      fetchAllTrashedMoviesFromApi(),
-    ])
+    const { active, trashed } = await loadFullLibraryLists()
     moviesState.value = active
     trashedMoviesState.value = trashed
     loaded = true
@@ -109,10 +127,7 @@ async function reloadMoviesFromApiImmediate() {
 async function ensureLoaded() {
   if (loaded) return
   try {
-    const [active, trashed] = await Promise.all([
-      fetchAllMoviesFromApi(),
-      fetchAllTrashedMoviesFromApi(),
-    ])
+    const { active, trashed } = await loadFullLibraryLists()
     moviesState.value = active
     trashedMoviesState.value = trashed
     loaded = true
@@ -157,6 +172,10 @@ async function refreshLibraryPathsFromApi() {
     metadataMovieProvidersState.value = Array.isArray(settings.metadataMovieProviders)
       ? [...settings.metadataMovieProviders]
       : []
+    metadataMovieProviderChainState.value = Array.isArray(settings.metadataMovieProviderChain)
+      ? [...settings.metadataMovieProviderChain]
+      : []
+    proxyState.value = settings.proxy ?? { enabled: false }
   } catch (err) {
     console.error("[web-library-service] failed to load settings", err)
   }
@@ -178,6 +197,28 @@ function createWebLibraryService(): LibraryService {
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
+    metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
+    proxy: computed(() => proxyState.value),
+
+    async setProxy(config: ProxySettingsDTO) {
+      const seq = ++proxySaveSeq
+      proxyState.value = { ...config }
+      try {
+        const next = await api.patchSettings({ proxy: config })
+        if (seq === proxySaveSeq) {
+          proxyState.value = next.proxy ?? { enabled: false }
+        }
+      } catch (err) {
+        if (seq === proxySaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
 
     async refreshSettings() {
       await refreshLibraryPathsFromApi()
@@ -265,9 +306,39 @@ function createWebLibraryService(): LibraryService {
           if (Array.isArray(next.metadataMovieProviders)) {
             metadataMovieProvidersState.value = [...next.metadataMovieProviders]
           }
+          if (Array.isArray(next.metadataMovieProviderChain)) {
+            metadataMovieProviderChainState.value = [...next.metadataMovieProviderChain]
+          }
         }
       } catch (err) {
         if (seq === metadataMovieProviderSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async setMetadataMovieProviderChain(chain: string[]) {
+      const filtered = chain.map(p => p.trim()).filter(Boolean)
+      const seq = ++metadataMovieProviderChainSaveSeq
+      metadataMovieProviderChainState.value = filtered
+      try {
+        const next = await api.patchSettings({ metadataMovieProviderChain: filtered })
+        if (seq === metadataMovieProviderChainSaveSeq) {
+          metadataMovieProviderChainState.value = Array.isArray(next.metadataMovieProviderChain)
+            ? [...next.metadataMovieProviderChain]
+            : []
+          metadataMovieProviderState.value = next.metadataMovieProvider?.trim() ?? ""
+          if (Array.isArray(next.metadataMovieProviders)) {
+            metadataMovieProvidersState.value = [...next.metadataMovieProviders]
+          }
+        }
+      } catch (err) {
+        if (seq === metadataMovieProviderChainSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {
@@ -424,16 +495,26 @@ function createWebLibraryService(): LibraryService {
 export async function loadMovieDetail(movieId: string): Promise<Movie | undefined> {
   const id = movieId.trim()
   if (!id) return undefined
-  try {
-    const dto = await api.getMovie(id)
-    const mapped = mapMovieDetail(dto)
-    mergeMovieIntoListState(mapped)
-    return mapped
-  } catch (err) {
-    const extra = err instanceof HttpClientError ? ` status=${err.status}` : ""
-    console.error(`[web-library-service] loadMovieDetail failed${extra}`, id, err)
-    return undefined
+  const existing = pendingMovieDetailLoads.get(id)
+  if (existing) {
+    return existing
   }
+  const promise = (async (): Promise<Movie | undefined> => {
+    try {
+      const dto = await api.getMovie(id)
+      const mapped = mapMovieDetail(dto)
+      mergeMovieIntoListState(mapped)
+      return mapped
+    } catch (err) {
+      const extra = err instanceof HttpClientError ? ` status=${err.status}` : ""
+      console.error(`[web-library-service] loadMovieDetail failed${extra}`, id, err)
+      return undefined
+    } finally {
+      pendingMovieDetailLoads.delete(id)
+    }
+  })()
+  pendingMovieDetailLoads.set(id, promise)
+  return promise
 }
 
 export const webLibraryService = createWebLibraryService()

@@ -54,9 +54,10 @@ type App struct {
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
-	// metadataMovieMu protects cfg.MetadataMovieProvider (library-config.cfg) during concurrent scrapes.
-	metadataMovieMu     sync.RWMutex
-	librarySettingsPath string // JSON file under config/ (organizeLibrary, future keys)
+	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
+	metadataMovieMu              sync.RWMutex
+	metadataMovieProviderChain   []string // ordered list of providers to try in sequence
+	librarySettingsPath          string   // JSON file under config/ (organizeLibrary, future keys)
 
 	appCtx   context.Context
 	writeMu  sync.Mutex
@@ -110,14 +111,15 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			cfg.Assets.MaxConcurrentDownloads,
 			cfg.Assets.MaxResponseBodyMB,
 		),
-		tasks:                 tasks.NewManager(),
-		organizeLibrary:       cfg.OrganizeLibrary,
-		extendedLibraryImport: cfg.ExtendedLibraryImport,
-		autoLibraryWatch:      cfg.AutoLibraryWatch,
-		librarySettingsPath:   strings.TrimSpace(librarySettingsPath),
-		appCtx:                ctx,
-		scrapeSem:             make(chan struct{}, scrapeConc),
-		watchScanPending:      make(map[string]struct{}),
+		tasks:                      tasks.NewManager(),
+		organizeLibrary:            cfg.OrganizeLibrary,
+		extendedLibraryImport:      cfg.ExtendedLibraryImport,
+		autoLibraryWatch:           cfg.AutoLibraryWatch,
+		metadataMovieProviderChain: cfg.MetadataMovieProviderChain,
+		librarySettingsPath:        strings.TrimSpace(librarySettingsPath),
+		appCtx:                     ctx,
+		scrapeSem:                  make(chan struct{}, scrapeConc),
+		watchScanPending:           make(map[string]struct{}),
 	}, nil
 }
 
@@ -333,13 +335,28 @@ func (a *App) StopLibraryWatchLoop() {
 }
 
 // MetadataMovieProvider returns the Metatube movie provider name for scrapes, or "" for automatic (all sources).
+// If MetadataMovieProviderChain is non-empty, returns chain[0]; otherwise returns the legacy single provider.
 func (a *App) MetadataMovieProvider() string {
 	a.metadataMovieMu.RLock()
 	defer a.metadataMovieMu.RUnlock()
+	if len(a.metadataMovieProviderChain) > 0 {
+		return strings.TrimSpace(a.metadataMovieProviderChain[0])
+	}
 	return strings.TrimSpace(a.cfg.MetadataMovieProvider)
 }
 
+// MetadataMovieProviderChain returns the ordered list of providers to try in sequence.
+// Empty slice means "auto" (all sources).
+func (a *App) MetadataMovieProviderChain() []string {
+	a.metadataMovieMu.RLock()
+	defer a.metadataMovieMu.RUnlock()
+	out := make([]string, len(a.metadataMovieProviderChain))
+	copy(out, a.metadataMovieProviderChain)
+	return out
+}
+
 // SetMetadataMovieProvider persists the provider name to library-config.cfg (empty = automatic) and updates memory.
+// Also clears the provider chain to avoid confusion.
 func (a *App) SetMetadataMovieProvider(name string) error {
 	path := a.librarySettingsPath
 	if path == "" {
@@ -348,12 +365,52 @@ func (a *App) SetMetadataMovieProvider(name string) error {
 	trimmed := strings.TrimSpace(name)
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
 		m["metadataMovieProvider"] = trimmed
+		// Clear chain when setting single provider to avoid confusion
+		delete(m, "metadataMovieProviderChain")
 		return nil
 	}); err != nil {
 		return err
 	}
 	a.metadataMovieMu.Lock()
 	a.cfg.MetadataMovieProvider = trimmed
+	a.metadataMovieProviderChain = nil
+	a.metadataMovieMu.Unlock()
+	return nil
+}
+
+// SetMetadataMovieProviderChain persists the ordered provider list to library-config.cfg and updates memory.
+// Empty slice means "auto". Also clears the single provider field.
+func (a *App) SetMetadataMovieProviderChain(chain []string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	// Filter and trim
+	filtered := make([]string, 0, len(chain))
+	for _, p := range chain {
+		if s := strings.TrimSpace(p); s != "" {
+			filtered = append(filtered, s)
+		}
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		if len(filtered) == 0 {
+			delete(m, "metadataMovieProviderChain")
+			delete(m, "metadataMovieProvider")
+		} else {
+			m["metadataMovieProviderChain"] = filtered
+			// Clear single provider when setting chain to avoid confusion
+			delete(m, "metadataMovieProvider")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.metadataMovieMu.Lock()
+	a.metadataMovieProviderChain = filtered
+	a.cfg.MetadataMovieProviderChain = filtered
+	if len(filtered) > 0 {
+		a.cfg.MetadataMovieProvider = ""
+	}
 	a.metadataMovieMu.Unlock()
 	return nil
 }
@@ -365,6 +422,44 @@ func (a *App) ListMetadataMovieProviders() []string {
 		return nil
 	}
 	return ms.ListMovieProviderNames()
+}
+
+// Proxy returns the current HTTP proxy configuration.
+func (a *App) Proxy() config.ProxyConfig {
+	return a.cfg.Proxy
+}
+
+// SetProxy persists the proxy configuration to library-config.cfg and updates memory.
+func (a *App) SetProxy(p config.ProxyConfig) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		if !p.Enabled {
+			// When disabled, store enabled=false but keep other fields for UI convenience
+			m["proxy"] = map[string]any{
+				"enabled": false,
+			}
+		} else {
+			proxyMap := map[string]any{
+				"enabled": true,
+				"url":     p.URL,
+			}
+			if p.Username != "" {
+				proxyMap["username"] = p.Username
+			}
+			if p.Password != "" {
+				proxyMap["password"] = p.Password
+			}
+			m["proxy"] = proxyMap
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.cfg.Proxy = p
+	return nil
 }
 
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
@@ -769,7 +864,10 @@ func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result
 
 // runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
 func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context, output io.Writer, task contracts.TaskDTO, result contracts.ScanFileResultDTO) {
-	scrapeOpts := scraper.MovieScrapeOptions{Provider: a.MetadataMovieProvider()}
+	scrapeOpts := scraper.MovieScrapeOptions{
+		Provider:      a.MetadataMovieProvider(),
+		ProviderChain: a.MetadataMovieProviderChain(),
+	}
 	metadata, err := a.scraper.Scrape(ctx, result.MovieID, result.Number, scrapeOpts)
 	if err != nil {
 		code := contracts.ErrorCodeScraperRun
@@ -1290,6 +1388,8 @@ func (a *App) HTTPHandler() http.Handler {
 		ExtendedLibraryImportCtl: a,
 		AutoLibraryWatchCtl:      a,
 		MetadataScrapeCtl:        a,
+		ProviderHealthChecker:    a.scraper,
+		ProxyCtl:                 a,
 		MovieMetadataRefresher:   a,
 		ActorProfileRefresher:    a,
 		LibraryWatchReloader:     a,

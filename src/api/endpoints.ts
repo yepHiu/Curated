@@ -160,4 +160,12 @@ export const api = {
   deleteCuratedFrame(id: string): Promise<void> {
     return httpClient.delete(`/curated-frames/${encodeURIComponent(id)}`)
   },
+
+  pingProvider(name: string): Promise<import("./types").ProviderHealthDTO> {
+    return httpClient.post<import("./types").ProviderHealthDTO>("/providers/ping", { name })
+  },
+
+  pingAllProviders(): Promise<import("./types").PingAllProvidersResponse> {
+    return httpClient.post<import("./types").PingAllProvidersResponse>("/providers/ping-all")
+  },
 }
