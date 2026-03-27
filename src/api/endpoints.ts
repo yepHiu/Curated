@@ -1,4 +1,23 @@
 import { httpClient } from "./http-client"
+
+function filenameFromContentDisposition(h: string | null): string {
+  if (!h) {
+    return "curated-export.webp"
+  }
+  const star = /filename\*=UTF-8''([^;\s]+)/i.exec(h)
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1])
+    } catch {
+      return star[1]
+    }
+  }
+  const q = /filename="([^"]+)"/i.exec(h)
+  if (q?.[1]) {
+    return q[1]
+  }
+  return "curated-export.webp"
+}
 import type {
   ActorListItemDTO,
   ActorProfileDTO,
@@ -18,10 +37,13 @@ import type {
   MovieDetailDTO,
   MoviesPageDTO,
   PatchCuratedFrameTagsBody,
+  PostCuratedFramesExportBody,
   PatchMovieBody,
   PatchSettingsBody,
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
+  ProxyJavBusPingRequestBody,
+  ProxyJavBusPingResponse,
   PutMovieCommentBody,
   PutPlaybackProgressBody,
   SettingsDTO,
@@ -161,11 +183,24 @@ export const api = {
     return httpClient.delete(`/curated-frames/${encodeURIComponent(id)}`)
   },
 
+  async postCuratedFramesExport(body: PostCuratedFramesExportBody): Promise<{ blob: Blob; filename: string }> {
+    const { blob, contentDisposition } = await httpClient.postBlob("/curated-frames/export", body)
+    return { blob, filename: filenameFromContentDisposition(contentDisposition) }
+  },
+
   pingProvider(name: string): Promise<import("./types").ProviderHealthDTO> {
     return httpClient.post<import("./types").ProviderHealthDTO>("/providers/ping", { name })
   },
 
   pingAllProviders(): Promise<import("./types").PingAllProvidersResponse> {
     return httpClient.post<import("./types").PingAllProvidersResponse>("/providers/ping-all")
+  },
+
+  pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse> {
+    return httpClient.post<ProxyJavBusPingResponse>("/proxy/ping-javbus", body ?? {})
+  },
+
+  pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse> {
+    return httpClient.post<ProxyJavBusPingResponse>("/proxy/ping-google", body ?? {})
   },
 }

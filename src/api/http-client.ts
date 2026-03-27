@@ -53,6 +53,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return parseJsonBody<T>(response)
 }
 
+async function handleErrorResponse(response: Response): Promise<never> {
+  let apiError: ApiError | undefined
+  try {
+    const text = await response.text()
+    if (text.trim()) {
+      apiError = JSON.parse(text) as ApiError
+    }
+  } catch {
+    // ignore
+  }
+  throw new HttpClientError(response.status, apiError)
+}
+
 export const httpClient = {
   async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
     const response = await fetch(buildUrl(path, params), {
@@ -111,6 +124,28 @@ export const httpClient = {
         // response body was not JSON
       }
       throw new HttpClientError(response.status, apiError)
+    }
+  },
+
+  async postBlob(
+    path: string,
+    body?: unknown,
+  ): Promise<{ blob: Blob; contentDisposition: string | null }> {
+    const response = await fetch(buildUrl(path), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "image/webp,application/zip,application/json;q=0.1,*/*;q=0.05",
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+    if (!response.ok) {
+      await handleErrorResponse(response)
+    }
+    const blob = await response.blob()
+    return {
+      blob,
+      contentDisposition: response.headers.get("Content-Disposition"),
     }
   },
 }

@@ -2,7 +2,9 @@ package metatube
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +26,9 @@ import (
 // Metatube movie providers dedicated to FC2 PPV IDs (order: higher official priority first).
 // Keep in sync with github.com/metatube-community/metatube-sdk-go/engine/register.go for your version.
 var fc2MovieProviderNames = []string{"FC2", "fc2hub"}
+
+// providerHealthMaxLatencyMs: health probe round-trip above this is reported as fail (not merely slow).
+const providerHealthMaxLatencyMs int64 = 5000
 
 func isFC2MovieProviderName(name string) bool {
 	switch strings.TrimSpace(name) {
@@ -568,6 +573,23 @@ func (s *Service) ListProviders() []string {
 	return s.ListMovieProviderNames()
 }
 
+// isTransientHealthProbeErr matches errors that often succeed on retry (e.g. AVBASE GetBuildID GET https://www.avbase.net/).
+func isTransientHealthProbeErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "eof") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "timeout") && strings.Contains(msg, "client")
+}
+
 // CheckProviderHealth pings a single provider and returns its health status.
 // It performs a lightweight search to verify the provider is responsive.
 func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status string, latencyMs int64, err error) {
@@ -582,12 +604,33 @@ func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status 
 	// Search for a known popular ID that should exist on most providers
 	testKeyword := "SSIS"
 
-	// Try to search using the provider
-	results, searchErr := s.engine.SearchMovie(testKeyword, name, false)
+	const maxAttempts = 3
+	var results []*model.MovieSearchResult
+	var searchErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "fail", time.Since(start).Milliseconds(), ctx.Err()
+			case <-time.After(400 * time.Millisecond):
+			}
+		}
+		results, searchErr = s.engine.SearchMovie(testKeyword, name, false)
+		if searchErr == nil {
+			break
+		}
+		if !isTransientHealthProbeErr(searchErr) || attempt == maxAttempts-1 {
+			break
+		}
+	}
 	latency := time.Since(start).Milliseconds()
 
 	if searchErr != nil {
 		return "fail", latency, searchErr
+	}
+
+	if latency > providerHealthMaxLatencyMs {
+		return "fail", latency, fmt.Errorf("latency %dms exceeds %dms threshold", latency, providerHealthMaxLatencyMs)
 	}
 
 	// If we got any valid results, consider the provider healthy

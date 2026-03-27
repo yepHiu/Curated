@@ -5,11 +5,18 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 type Config struct {
 	LogLevel     string   `json:"logLevel"`
+	// LogDir, if non-empty, enables daily rotated log files under this directory (e.g. "logs" or "runtime/logs").
+	LogDir string `json:"logDir,omitempty"`
+	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default "javd" when LogDir is set.
+	LogFilePrefix string `json:"logFilePrefix,omitempty"`
+	// LogMaxAgeDays removes rotated files older than this many days; 0 means default 7 when file logging is enabled.
+	LogMaxAgeDays int `json:"logMaxAgeDays,omitempty"`
 	HttpAddr     string   `json:"httpAddr"`
 	DatabasePath string   `json:"databasePath"`
 	CacheDir     string   `json:"cacheDir"`
@@ -134,6 +141,14 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = "info"
+	}
+	if strings.TrimSpace(cfg.LogDir) != "" {
+		if cfg.LogFilePrefix == "" {
+			cfg.LogFilePrefix = "javd"
+		}
+		if cfg.LogMaxAgeDays <= 0 {
+			cfg.LogMaxAgeDays = 7
+		}
 	}
 	if cfg.HttpAddr == "" {
 		cfg.HttpAddr = ":8080"

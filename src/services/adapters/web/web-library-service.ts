@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from "vue"
+import { computed, ref, watch, type Ref } from "vue"
 import type {
   ListActorsParams,
   MetadataRefreshQueuedDTO,
@@ -12,9 +12,9 @@ import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
+import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
-import { playedMovieCount } from "@/lib/played-movies-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
@@ -30,6 +30,8 @@ const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
+/** 设置页概览第三卡：萃取帧条数（GET /curated-frames 列表长度） */
+const curatedFramesCountState = ref(0)
 /** 忽略过期的 PATCH 响应，避免快速连点时状态被旧请求写乱 */
 let organizeLibrarySaveSeq = 0
 let extendedLibraryImportSaveSeq = 0
@@ -109,6 +111,19 @@ async function loadFullLibraryLists(): Promise<{ active: Movie[]; trashed: Movie
   return fullLibraryListsPromise
 }
 
+async function refreshCuratedFramesCountFromApi() {
+  try {
+    const { items } = await api.listCuratedFrames()
+    curatedFramesCountState.value = items.length
+  } catch {
+    curatedFramesCountState.value = 0
+  }
+}
+
+watch(curatedFramesRevision, () => {
+  void refreshCuratedFramesCountFromApi()
+})
+
 async function reloadMoviesFromApiImmediate() {
   if (reloadMoviesDebounce) {
     clearTimeout(reloadMoviesDebounce)
@@ -119,6 +134,7 @@ async function reloadMoviesFromApiImmediate() {
     moviesState.value = active
     trashedMoviesState.value = trashed
     loaded = true
+    void refreshCuratedFramesCountFromApi()
   } catch (err) {
     console.error("[web-library-service] failed to reload movies", err)
   }
@@ -131,6 +147,7 @@ async function ensureLoaded() {
     moviesState.value = active
     trashedMoviesState.value = trashed
     loaded = true
+    void refreshCuratedFramesCountFromApi()
   } catch (err) {
     console.error("[web-library-service] failed to load movies", err)
   }
@@ -189,7 +206,7 @@ function createWebLibraryService(): LibraryService {
     trashedMovies: computed(() => trashedMoviesState.value),
     libraryStats: computed(() => {
       const loc = i18n.global.locale.value as string
-      return buildSettingsDashboardStats(moviesState.value, playedMovieCount.value, loc)
+      return buildSettingsDashboardStats(moviesState.value, curatedFramesCountState.value, loc)
     }),
     libraryPaths: computed(() => libraryPathsState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),

@@ -102,6 +102,18 @@ export interface ProxySettingsDTO {
   password?: string
 }
 
+/** POST /api/proxy/ping-javbus | ping-google — optional body to test draft proxy without saving */
+export interface ProxyJavBusPingRequestBody {
+  proxy?: ProxySettingsDTO
+}
+
+export interface ProxyJavBusPingResponse {
+  ok: boolean
+  latencyMs: number
+  httpStatus?: number
+  message?: string
+}
+
 export interface PatchSettingsBody {
   organizeLibrary?: boolean
   extendedLibraryImport?: boolean
@@ -313,6 +325,13 @@ export interface CreateCuratedFrameBody {
 /** PATCH /curated-frames/{id}/tags */
 export interface PatchCuratedFrameTagsBody {
   tags: string[]
+}
+
+/** POST /curated-frames/export → WebP 单文件或 ZIP */
+export interface PostCuratedFramesExportBody {
+  ids: string[]
+  /** 按演员分组导出时传入；须属于每帧的 actors */
+  actorName?: string
 }
 
 /** GET /library/played-movies */

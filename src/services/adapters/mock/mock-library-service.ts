@@ -1,4 +1,4 @@
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 import type {
   ActorListItemDTO,
   ActorsListDTO,
@@ -10,8 +10,9 @@ import type {
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
+import { countCuratedFrames } from "@/lib/curated-frames/db"
+import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
-import { playedMovieCount } from "@/lib/played-movies-storage"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 
@@ -45,6 +46,22 @@ const metadataMovieProvidersMock = ref<string[]>([])
 const metadataMovieProviderChainMock = ref<string[]>([])
 /** Mock：HTTP 代理配置 */
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
+
+/** 设置页概览第三卡：萃取帧条数（IndexedDB） */
+const curatedFramesCountState = ref(0)
+
+async function refreshCuratedFramesCountMock() {
+  try {
+    curatedFramesCountState.value = await countCuratedFrames()
+  } catch {
+    curatedFramesCountState.value = 0
+  }
+}
+
+watch(curatedFramesRevision, () => {
+  void refreshCuratedFramesCountMock()
+})
+void refreshCuratedFramesCountMock()
 
 /** Mock：演员用户标签（与影片 userTags 隔离） */
 const mockActorUserTags = ref<Map<string, string[]>>(new Map())
@@ -364,7 +381,7 @@ export const mockLibraryService: LibraryService = {
   libraryStats: computed(() =>
     buildSettingsDashboardStats(
       moviesState.value.filter((m) => !m.trashedAt?.trim()),
-      playedMovieCount.value,
+      curatedFramesCountState.value,
       i18n.global.locale.value as string,
     ),
   ),

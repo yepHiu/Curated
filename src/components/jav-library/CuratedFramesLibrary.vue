@@ -3,7 +3,9 @@ import { useFocusWithin, onClickOutside } from "@vueuse/core"
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { Camera, PlayCircle, Plus, Trash2, X } from "lucide-vue-next"
+import { api } from "@/api/endpoints"
+import type { PostCuratedFramesExportBody } from "@/api/types"
+import { Camera, Download, PlayCircle, Plus, Trash2, X } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,11 +34,157 @@ import {
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { curatedFrameImageUrl } from "@/lib/curated-frame-image-url"
+import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+
+const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+
+/** 为 true 时卡片上显示导出多选勾选框 */
+const multiSelectMode = ref(false)
+
+const mainTab = ref<"timeline" | "actors" | "movies">("timeline")
+
+type ExportSelectionBucket = "none" | "anonymous" | "named"
+const exportSelectionBucket = ref<ExportSelectionBucket>("none")
+const namedActorForExport = ref<string | null>(null)
+const selectedFrameIds = ref<string[]>([])
+const exportToolbarError = ref("")
+const exportBusy = ref(false)
+const dialogOpenedFromActor = ref<string | null>(null)
+const dialogExportError = ref("")
+
+function isFrameSelected(id: string) {
+  return selectedFrameIds.value.includes(id)
+}
+
+function clearExportSelection() {
+  selectedFrameIds.value = []
+  exportSelectionBucket.value = "none"
+  namedActorForExport.value = null
+  exportToolbarError.value = ""
+}
+
+function exitMultiSelectMode() {
+  multiSelectMode.value = false
+  clearExportSelection()
+}
+
+watch(mainTab, () => {
+  multiSelectMode.value = false
+  clearExportSelection()
+})
+
+function toggleFrameSelection(id: string, sectionActor?: string) {
+  exportToolbarError.value = ""
+  const idx = selectedFrameIds.value.indexOf(id)
+  if (idx >= 0) {
+    selectedFrameIds.value = selectedFrameIds.value.filter((x) => x !== id)
+    if (selectedFrameIds.value.length === 0) {
+      exportSelectionBucket.value = "none"
+      namedActorForExport.value = null
+    }
+    return
+  }
+  if (selectedFrameIds.value.length >= 20) {
+    exportToolbarError.value = t("curated.exportSelectMax")
+    return
+  }
+
+  if (mainTab.value === "actors" && sectionActor !== undefined) {
+    const anonymous = sectionActor === noActorLabel.value
+    if (exportSelectionBucket.value === "none") {
+      exportSelectionBucket.value = anonymous ? "anonymous" : "named"
+      if (!anonymous) {
+        namedActorForExport.value = sectionActor
+      }
+    } else if (exportSelectionBucket.value === "anonymous") {
+      if (!anonymous) {
+        exportToolbarError.value = t("curated.exportActorMixed")
+        return
+      }
+    } else if (namedActorForExport.value !== sectionActor || anonymous) {
+      exportToolbarError.value = t("curated.exportActorMixed")
+      return
+    }
+  }
+
+  selectedFrameIds.value = [...selectedFrameIds.value, id]
+}
+
+function selectAllVisibleUpTo20() {
+  clearExportSelection()
+  const cap = listWithUrls.value.slice(0, 20)
+  selectedFrameIds.value = cap.map((x) => x.row.id)
+}
+
+function actorNameForExportRequest(): string | undefined {
+  if (mainTab.value !== "actors") {
+    return undefined
+  }
+  if (exportSelectionBucket.value !== "named" || !namedActorForExport.value) {
+    return undefined
+  }
+  return namedActorForExport.value
+}
+
+async function runExport(ids: string[], actorName?: string) {
+  exportBusy.value = true
+  exportToolbarError.value = ""
+  const body: PostCuratedFramesExportBody = { ids }
+  if (actorName !== undefined && actorName !== "") {
+    body.actorName = actorName
+  }
+  try {
+    const { blob, filename } = await api.postCuratedFramesExport(body)
+    triggerDownloadBlob(blob, filename)
+  } catch (err) {
+    console.error("[curated-frames] export failed", err)
+    exportToolbarError.value = t("curated.exportFailed")
+  } finally {
+    exportBusy.value = false
+  }
+}
+
+async function exportSelectedFrames() {
+  if (selectedFrameIds.value.length === 0) {
+    return
+  }
+  await runExport(selectedFrameIds.value, actorNameForExportRequest())
+}
+
+async function exportSingleFromDialog() {
+  if (!selected.value) {
+    return
+  }
+  dialogExportError.value = ""
+  exportBusy.value = true
+  try {
+    let actorName: string | undefined
+    const from = dialogOpenedFromActor.value
+    if (
+      from &&
+      from !== noActorLabel.value &&
+      selected.value.actors.some((a) => a.trim() === from)
+    ) {
+      actorName = from
+    }
+    const body: PostCuratedFramesExportBody = { ids: [selected.value.id] }
+    if (actorName !== undefined && actorName !== "") {
+      body.actorName = actorName
+    }
+    const { blob, filename } = await api.postCuratedFramesExport(body)
+    triggerDownloadBlob(blob, filename)
+  } catch (err) {
+    console.error("[curated-frames] export dialog failed", err)
+    dialogExportError.value = t("curated.exportFailed")
+  } finally {
+    exportBusy.value = false
+  }
+}
 
 const maxFrameTags = 64
 const maxFrameTagRunes = 64
@@ -210,9 +358,11 @@ function resetTagInputState() {
   userTagInputOpen.value = false
 }
 
-function openDialog(item: RowWithUrl) {
+function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   const { imageBlob, ...meta } = item.row
   void imageBlob
+  dialogOpenedFromActor.value = fromActorSection
+  dialogExportError.value = ""
   selected.value = meta
   selectedImageUrl.value = item.url
   dialogTags.value = [...item.row.tags]
@@ -417,6 +567,67 @@ function formatCapturedAt(iso: string) {
     </div>
 
     <div
+      v-if="useWebApi && !isEmpty"
+      class="flex flex-col gap-2 rounded-2xl border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center"
+    >
+      <template v-if="!multiSelectMode">
+        <p class="text-sm text-muted-foreground">{{ t("curated.multiSelectHint") }}</p>
+        <Button type="button" variant="secondary" size="sm" class="rounded-xl" @click="multiSelectMode = true">
+          {{ t("curated.multiSelectEnter") }}
+        </Button>
+      </template>
+      <template v-else>
+        <p class="text-sm text-muted-foreground">
+          {{
+            t("curated.exportSelectedCount", {
+              n: selectedFrameIds.length,
+              max: 20,
+            })
+          }}
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" class="rounded-xl" @click="exitMultiSelectMode">
+            {{ t("curated.multiSelectExit") }}
+          </Button>
+          <Button
+            v-if="mainTab !== 'actors'"
+            type="button"
+            variant="secondary"
+            size="sm"
+            class="rounded-xl"
+            :disabled="listWithUrls.length === 0"
+            @click="selectAllVisibleUpTo20"
+          >
+            {{ t("curated.selectVisible") }}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="rounded-xl"
+            :disabled="selectedFrameIds.length === 0"
+            @click="clearExportSelection"
+          >
+            {{ t("curated.clearSelection") }}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            class="rounded-xl"
+            :disabled="selectedFrameIds.length === 0 || exportBusy"
+            @click="exportSelectedFrames"
+          >
+            <Download data-icon="inline-start" class="size-4" />
+            {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}
+          </Button>
+        </div>
+        <p v-if="exportToolbarError" class="w-full text-sm text-destructive" role="alert">
+          {{ exportToolbarError }}
+        </p>
+      </template>
+    </div>
+
+    <div
       v-if="isEmpty"
       class="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-16 text-center"
     >
@@ -424,7 +635,7 @@ function formatCapturedAt(iso: string) {
       <p class="text-sm text-muted-foreground">{{ t("curated.empty") }}</p>
     </div>
 
-    <Tabs v-else default-value="timeline" class="w-full gap-4">
+    <Tabs v-else v-model="mainTab" class="w-full gap-4">
       <TabsList class="h-auto w-fit flex-wrap rounded-2xl bg-muted/60 p-1">
         <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
         <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
@@ -440,6 +651,20 @@ function formatCapturedAt(iso: string) {
             :key="item.row.id"
             class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
           >
+            <label
+              v-if="useWebApi && multiSelectMode"
+              class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+              :title="t('curated.exportToggleAria')"
+              @click.stop
+            >
+              <input
+                type="checkbox"
+                class="size-4 cursor-pointer rounded accent-primary"
+                :checked="isFrameSelected(item.row.id)"
+                :aria-label="t('curated.exportToggleAria')"
+                @change="toggleFrameSelection(item.row.id)"
+              />
+            </label>
             <button
               type="button"
               class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -487,10 +712,24 @@ function formatCapturedAt(iso: string) {
                 :key="`${actor}-${item.row.id}`"
                 class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
               >
+                <label
+                  v-if="useWebApi && multiSelectMode"
+                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+                  :title="t('curated.exportToggleAria')"
+                  @click.stop
+                >
+                  <input
+                    type="checkbox"
+                    class="size-4 cursor-pointer rounded accent-primary"
+                    :checked="isFrameSelected(item.row.id)"
+                    :aria-label="t('curated.exportToggleAria')"
+                    @change="toggleFrameSelection(item.row.id, actor)"
+                  />
+                </label>
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @click="openDialog(item)"
+                  @click="openDialog(item, actor)"
                 >
                   <div class="relative aspect-video w-full bg-black/80">
                     <img
@@ -544,6 +783,20 @@ function formatCapturedAt(iso: string) {
                 :key="`${g.movieKey}-${item.row.id}`"
                 class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
               >
+                <label
+                  v-if="useWebApi && multiSelectMode"
+                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+                  :title="t('curated.exportToggleAria')"
+                  @click.stop
+                >
+                  <input
+                    type="checkbox"
+                    class="size-4 cursor-pointer rounded accent-primary"
+                    :checked="isFrameSelected(item.row.id)"
+                    :aria-label="t('curated.exportToggleAria')"
+                    @change="toggleFrameSelection(item.row.id)"
+                  />
+                </label>
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -739,7 +992,20 @@ function formatCapturedAt(iso: string) {
               <p v-if="userTagFormError" class="text-sm text-destructive">{{ userTagFormError }}</p>
             </div>
 
+            <p v-if="dialogExportError" class="text-sm text-destructive" role="alert">{{ dialogExportError }}</p>
+
             <div class="mt-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                v-if="useWebApi"
+                type="button"
+                variant="secondary"
+                class="flex-1 rounded-2xl sm:min-w-[12rem]"
+                :disabled="exportBusy"
+                @click="exportSingleFromDialog"
+              >
+                <Download data-icon="inline-start" class="size-4" />
+                {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}
+              </Button>
               <Button class="flex-1 rounded-2xl sm:min-w-[12rem]" @click="playFromFrame">
                 <PlayCircle data-icon="inline-start" />
                 {{ t("curated.playFromTime") }}

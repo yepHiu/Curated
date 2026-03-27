@@ -10,10 +10,13 @@ interface Props extends PrimitiveProps {
   variant?: ButtonVariants["variant"]
   size?: ButtonVariants["size"]
   class?: HTMLAttributes["class"]
+  /** Default `button` avoids implicit submit inside forms (e.g. settings page scroll jump). */
+  type?: "button" | "submit" | "reset"
 }
 
 const props = withDefaults(defineProps<Props>(), {
   as: "button",
+  type: "button",
 })
 </script>
 
@@ -24,6 +27,7 @@ const props = withDefaults(defineProps<Props>(), {
     :data-size="size"
     :as="as"
     :as-child="asChild"
+    :type="as === 'button' || as === undefined ? type : undefined"
     :class="cn(buttonVariants({ variant, size }), props.class)"
   >
     <slot />

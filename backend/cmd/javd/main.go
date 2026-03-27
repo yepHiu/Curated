@@ -5,15 +5,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+
+	"go.uber.org/zap"
 
 	"jav-shadcn/backend/internal/app"
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/logging"
 	"jav-shadcn/backend/internal/server"
 	"jav-shadcn/backend/internal/storage"
+	"jav-shadcn/backend/internal/version"
 )
 
 func main() {
@@ -34,13 +39,39 @@ func main() {
 		exitWithInitError("failed to merge library settings file", err)
 	}
 
-	logger, err := logging.New(cfg.LogLevel)
+	logger, err := logging.New(cfg.LogLevel, logging.FileSink{
+		LogDir:     cfg.LogDir,
+		FilePrefix: cfg.LogFilePrefix,
+		MaxAgeDays: cfg.LogMaxAgeDays,
+	})
 	if err != nil {
 		exitWithInitError("failed to initialize logger", err)
 	}
 	defer func() {
 		_ = logger.Sync()
 	}()
+
+	startupFields := []zap.Field{
+		zap.String("version", version.Version),
+		zap.String("httpAddr", cfg.HttpAddr),
+		zap.String("databasePath", cfg.DatabasePath),
+		zap.Int("libraryPathsConfigured", len(cfg.LibraryPaths)),
+		zap.Bool("libraryWatchEnabled", cfg.LibraryWatchOn()),
+		zap.Int("autoScanIntervalSeconds", cfg.AutoScanIntervalSeconds),
+	}
+	if strings.TrimSpace(cfg.LogDir) != "" {
+		startupFields = append(startupFields, zap.String("logDir", cfg.LogDir))
+	}
+	if cfg.Proxy.Enabled && strings.TrimSpace(cfg.Proxy.URL) != "" {
+		if u, perr := url.Parse(strings.TrimSpace(cfg.Proxy.URL)); perr == nil {
+			startupFields = append(startupFields, zap.String("proxyURL", u.Redacted()))
+		} else {
+			startupFields = append(startupFields, zap.Bool("proxyEnabled", true))
+		}
+	} else {
+		startupFields = append(startupFields, zap.Bool("proxyEnabled", false))
+	}
+	logger.Info("javd starting", startupFields...)
 
 	store, err := storage.NewSQLiteStore(cfg.DatabasePath)
 	if err != nil {

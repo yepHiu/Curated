@@ -70,10 +70,10 @@ export function aggregateUserTagCounts(movies: readonly Movie[], locale: string)
     })
 }
 
-/** 设置页顶部三张统计卡（入库数、标签种类、已播放去重部数）；文案 key 由 i18n 解析 */
+/** 设置页顶部三张统计卡（入库数、标签种类、萃取帧条数）；文案 key 由 i18n 解析 */
 export function buildSettingsDashboardStats(
   movies: readonly Movie[],
-  playedUniqueCount: number,
+  curatedFramesCount: number,
   locale: string,
 ): LibraryStat[] {
   const movieCount = movies.length
@@ -91,9 +91,9 @@ export function buildSettingsDashboardStats(
       detailKey: "stats.tagKindsDetail",
     },
     {
-      labelKey: "stats.playedMovies",
-      value: fmt(playedUniqueCount),
-      detailKey: "stats.playedMoviesDetail",
+      labelKey: "stats.curatedFramesCount",
+      value: fmt(curatedFramesCount),
+      detailKey: "stats.curatedFramesDetail",
     },
   ]
 }

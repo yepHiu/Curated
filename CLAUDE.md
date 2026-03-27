@@ -90,6 +90,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
+- **`proxy`** - Outbound HTTP proxy for javd (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
 Update via `PATCH /api/settings`; changes are written atomically to the config file.
 
@@ -136,6 +137,7 @@ backend/
     contracts/      # DTOs, error codes, shared interfaces
     library/        # Library domain service
     logging/        # Zap logger setup
+    proxyenv/       # Sync library proxy config to HTTP_PROXY/HTTPS_PROXY for outbound HTTP
     scanner/        # File scanning service
     scraper/        # Metadata scraping adapter
     server/         # HTTP server and handlers
@@ -176,6 +178,8 @@ PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 GET    /api/settings                        # Get settings
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
+POST   /api/proxy/ping-javbus              # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
+POST   /api/proxy/ping-google              # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
 POST   /api/scans                           # Start scan task
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
@@ -184,8 +188,9 @@ PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
 GET    /api/curated-frames                  # List curated frames
 POST   /api/curated-frames                  # Create curated frame
+POST   /api/curated-frames/export          # Export 1–20 frames as WebP (EXIF JSON) or ZIP
 GET    /api/curated-frames/{id}/image       # Get curated frame image
-PATCH  /api/curated-frames/{id}             # Update frame tags
+PATCH  /api/curated-frames/{id}/tags        # Update frame tags
 DELETE /api/curated-frames/{id}             # Delete curated frame
 ```
 

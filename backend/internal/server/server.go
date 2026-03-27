@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
+	"jav-shadcn/backend/internal/proxyenv"
 	"jav-shadcn/backend/internal/storage"
 	"jav-shadcn/backend/internal/tasks"
 	"jav-shadcn/backend/internal/version"
@@ -173,11 +175,15 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/curated-frames/{id}/image", h.handleGetCuratedFrameImage)
 	mux.HandleFunc("PATCH /api/curated-frames/{id}/tags", h.handlePatchCuratedFrameTags)
 	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)
+	mux.HandleFunc("POST /api/curated-frames/export", h.handlePostCuratedFramesExport)
 
 	mux.HandleFunc("POST /api/providers/ping", h.handlePingProvider)
 	mux.HandleFunc("POST /api/providers/ping-all", h.handlePingAllProviders)
 
-	return withCORS(mux)
+	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
+	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
+
+	return WithAccessLog(h.logger, withCORS(mux))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -209,6 +215,9 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.store.ListMovies(r.Context(), request)
 	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("list movies failed", zap.Error(err))
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list movies")
 		return
 	}
@@ -948,6 +957,9 @@ func movieProviderNameAllowed(want string, allowed []string) bool {
 func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("build settings dto failed", zap.Error(err))
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
 		return
 	}
@@ -1097,6 +1109,9 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 
 	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("build settings dto failed after patch", zap.Error(err))
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list library paths")
 		return
 	}
@@ -1240,6 +1255,9 @@ func (h *Handler) handleStartScan(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "scan already in progress")
 			return
 		}
+		if h.logger != nil {
+			h.logger.Warn("start scan failed", zap.Error(err))
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to start scan")
 		return
 	}
@@ -1297,12 +1315,21 @@ func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logg
 
 	go func() {
 		<-ctx.Done()
+		if logger != nil {
+			logger.Info("HTTP server shutdown initiated")
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil && logger != nil {
+			logger.Warn("HTTP server shutdown error", zap.Error(err))
+		} else if logger != nil {
+			logger.Info("HTTP server stopped")
+		}
 	}()
 
-	logger.Info("HTTP server listening", zap.String("addr", addr))
+	if logger != nil {
+		logger.Info("HTTP server listening", zap.String("addr", addr))
+	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}
@@ -1398,6 +1425,99 @@ func (h *Handler) handlePingAllProviders(w http.ResponseWriter, r *http.Request)
 		Total:     len(providers),
 		OK:        okCount,
 		Fail:      failCount,
+	})
+}
+
+func (h *Handler) handleProxyPingJavbus(w http.ResponseWriter, r *http.Request) {
+	h.handleProxyPingURL(w, r, "https://www.javbus.com/")
+}
+
+func (h *Handler) handleProxyPingGoogle(w http.ResponseWriter, r *http.Request) {
+	h.handleProxyPingURL(w, r, "https://www.google.com/")
+}
+
+// handleProxyPingURL GETs targetURL using optional body.proxy or persisted proxy (same contract as ping-javbus).
+func (h *Handler) handleProxyPingURL(w http.ResponseWriter, r *http.Request, targetURL string) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "Method not allowed")
+		return
+	}
+
+	var req contracts.ProxyJavBusPingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		h.logger.Warn("invalid proxy outbound ping body", zap.Error(err))
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "Invalid request body")
+		return
+	}
+
+	var cfg config.ProxyConfig
+	if req.Proxy != nil {
+		cfg = config.ProxyConfig{
+			Enabled:  req.Proxy.Enabled,
+			URL:      strings.TrimSpace(req.Proxy.URL),
+			Username: strings.TrimSpace(req.Proxy.Username),
+			Password: req.Proxy.Password,
+		}
+	} else {
+		if h.proxyCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "proxy settings not available")
+			return
+		}
+		cfg = h.proxyCtl.Proxy()
+	}
+
+	if cfg.Enabled && strings.TrimSpace(cfg.URL) == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "Proxy URL is required when proxy is enabled")
+		return
+	}
+
+	// 与设置页「测试 JavBus / Google 连通」一致：超过 5s 即视为超时失败
+	const proxyOutboundPingTimeout = 5 * time.Second
+	client, err := proxyenv.NewHTTPClientForProxy(cfg, proxyOutboundPingTimeout)
+	if err != nil {
+		writeJSON(w, http.StatusOK, contracts.ProxyJavBusPingResponse{
+			OK:      false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), proxyOutboundPingTimeout)
+	defer cancel()
+
+	start := time.Now()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	if err != nil {
+		writeJSON(w, http.StatusOK, contracts.ProxyJavBusPingResponse{OK: false, Message: err.Error()})
+		return
+	}
+	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	httpReq.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
+
+	resp, err := client.Do(httpReq)
+	latencyMs := time.Since(start).Milliseconds()
+	if err != nil {
+		writeJSON(w, http.StatusOK, contracts.ProxyJavBusPingResponse{
+			OK:        false,
+			LatencyMs: latencyMs,
+			Message:   err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+	_, _ = io.CopyN(io.Discard, resp.Body, 64*1024)
+
+	ok := resp.StatusCode < 500
+	msg := ""
+	if !ok {
+		msg = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+
+	writeJSON(w, http.StatusOK, contracts.ProxyJavBusPingResponse{
+		OK:         ok,
+		LatencyMs:  latencyMs,
+		HTTPStatus: resp.StatusCode,
+		Message:    msg,
 	})
 }
 

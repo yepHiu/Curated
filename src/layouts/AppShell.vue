@@ -32,6 +32,7 @@ import {
   isLibraryBrowseRoute,
   mergeCuratedFramesQuery,
   mergeLibraryQuery,
+  resolveLibraryMode,
 } from "@/lib/library-query"
 import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
 import { useLibraryService } from "@/services/library-service"
@@ -96,6 +97,10 @@ const currentMovie = computed(() => {
 
 const currentMovieId = computed(() => currentMovie.value?.id)
 const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
+/** 回收站不显示资料库顶栏搜索 */
+const showLibraryBrowseSearch = computed(
+  () => isLibraryRoute.value && resolveLibraryMode(route) !== "trash",
+)
 const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRoute.value)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
@@ -392,7 +397,7 @@ function onLibrarySearchKeydown(e: KeyboardEvent) {
 }
 
 onKeyStroke("Escape", (e) => {
-  if (librarySuggestionsOpen.value && isLibraryRoute.value) {
+  if (librarySuggestionsOpen.value && showLibraryBrowseSearch.value) {
     e.preventDefault()
     librarySuggestionsOpen.value = false
     return
@@ -415,6 +420,10 @@ watch(
     if (!isLibraryRoute.value) {
       return
     }
+    if (!showLibraryBrowseSearch.value) {
+      searchDraft.value = ""
+      return
+    }
     const qPart = getLibrarySearchQuery(route.query)
     const tagPart = getLibraryTagExactQuery(route.query).trim()
     const actorPart = getLibraryActorExactQuery(route.query).trim()
@@ -430,7 +439,7 @@ watch(
 watchDebounced(
   searchDraft,
   (value) => {
-    if (!isLibraryRoute.value) {
+    if (!showLibraryBrowseSearch.value) {
       return
     }
     const normalized = value.trim()
@@ -469,7 +478,7 @@ watchDebounced(
 function clearLibrarySearch() {
   searchDraft.value = ""
   librarySuggestionsOpen.value = false
-  if (!isLibraryRoute.value) {
+  if (!showLibraryBrowseSearch.value) {
     return
   }
   void router.replace({
@@ -625,7 +634,7 @@ function clearActorsSearch() {
 
             <div class="flex flex-1 justify-center px-0 lg:px-3">
               <div
-                v-if="isLibraryRoute"
+                v-if="showLibraryBrowseSearch"
                 ref="librarySearchRootRef"
                 class="relative w-full max-w-lg"
               >

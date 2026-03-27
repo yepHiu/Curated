@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type { ProviderHealthDTO, ProviderHealthStatus, ProxySettingsDTO } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
+import { useSettingsScrollPreserve } from "@/composables/use-settings-scroll-preserve"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   Activity,
+  ChevronDown,
   FolderOpen,
+  Info,
   FolderPlus,
   GripVertical,
   ImageDown,
+  Loader2,
   Pencil,
   Plus,
   RefreshCw,
@@ -60,10 +65,12 @@ import {
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
 import { useLibraryService } from "@/services/library-service"
+import SettingsPageNav from "@/components/jav-library/SettingsPageNav.vue"
 
 const { t, locale } = useI18n()
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
+const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const hardwareDecode = ref(true)
@@ -105,6 +112,19 @@ const proxyUsernameDraft = ref("")
 const proxyPasswordDraft = ref("")
 const proxySaving = ref(false)
 const proxyError = ref("")
+const proxyJavbusBusy = ref(false)
+const proxyJavbusResult = ref("")
+const proxyJavbusResultOk = ref<boolean | null>(null)
+const proxyGoogleBusy = ref(false)
+const proxyGoogleResult = ref("")
+const proxyGoogleResultOk = ref<boolean | null>(null)
+
+const proxyOutboundPingBusy = computed(
+  () => proxyJavbusBusy.value || proxyGoogleBusy.value,
+)
+
+/** 代理用户名/密码折叠；有已保存认证信息时默认展开 */
+const proxyAuthExpanded = ref(false)
 
 function syncProxyDraftFromService() {
   const p = libraryService.proxy.value
@@ -112,6 +132,11 @@ function syncProxyDraftFromService() {
   proxyUrlDraft.value = (p.url ?? "").trim()
   proxyUsernameDraft.value = (p.username ?? "").trim()
   proxyPasswordDraft.value = p.password ?? ""
+  const hasAuth =
+    !!(p.username?.trim() || (p.password ?? "").length > 0)
+  if (hasAuth) {
+    proxyAuthExpanded.value = true
+  }
 }
 
 async function saveProxySettings() {
@@ -120,16 +145,22 @@ async function saveProxySettings() {
     proxyError.value = t("settings.proxyUrlRequired")
     return
   }
-  proxySaving.value = true
+  const body: ProxySettingsDTO = {
+    enabled: proxyEnabledDraft.value,
+    url: proxyUrlDraft.value.trim() || undefined,
+    username: proxyUsernameDraft.value.trim() || undefined,
+    password: proxyPasswordDraft.value || undefined,
+  }
   try {
-    const body: ProxySettingsDTO = {
-      enabled: proxyEnabledDraft.value,
-      url: proxyUrlDraft.value.trim() || undefined,
-      username: proxyUsernameDraft.value.trim() || undefined,
-      password: proxyPasswordDraft.value || undefined,
-    }
-    await libraryService.setProxy(body)
-    syncProxyDraftFromService()
+    await withPreservedScroll(async () => {
+      proxySaving.value = true
+      try {
+        await libraryService.setProxy(body)
+        syncProxyDraftFromService()
+      } finally {
+        proxySaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] save proxy failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -139,9 +170,113 @@ async function saveProxySettings() {
     } else {
       proxyError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    proxySaving.value = false
   }
+}
+
+async function testProxyJavbus() {
+  proxyError.value = ""
+  proxyJavbusResult.value = ""
+  proxyJavbusResultOk.value = null
+  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
+    proxyError.value = t("settings.proxyUrlRequired")
+    return
+  }
+  if (!useWebApi) {
+    return
+  }
+  await withPreservedScroll(async () => {
+    proxyJavbusBusy.value = true
+      try {
+        const body = {
+          proxy: {
+            enabled: proxyEnabledDraft.value,
+            url: proxyUrlDraft.value.trim() || undefined,
+            username: proxyUsernameDraft.value.trim() || undefined,
+            password: proxyPasswordDraft.value || undefined,
+          } satisfies ProxySettingsDTO,
+        }
+        const res = await api.pingProxyJavbus(body)
+        if (res.ok) {
+          proxyJavbusResultOk.value = true
+          proxyJavbusResult.value = t("settings.proxyPingJavbusOk", {
+            ms: res.latencyMs,
+            status: res.httpStatus ?? "—",
+          })
+        } else {
+          proxyJavbusResultOk.value = false
+          const detail = res.message?.trim() || t("settings.proxyPingJavbusFailUnknown")
+          proxyJavbusResult.value = t("settings.proxyPingJavbusFail", { message: detail })
+        }
+      } catch (err) {
+        proxyJavbusResultOk.value = false
+        if (err instanceof HttpClientError && err.apiError?.message) {
+          proxyJavbusResult.value = t("settings.proxyPingJavbusFail", {
+            message: err.apiError.message,
+          })
+        } else if (err instanceof Error) {
+          proxyJavbusResult.value = t("settings.proxyPingJavbusFail", { message: err.message })
+        } else {
+          proxyJavbusResult.value = t("settings.proxyPingJavbusFail", {
+            message: t("settings.proxyPingJavbusFailUnknown"),
+          })
+        }
+      } finally {
+        proxyJavbusBusy.value = false
+      }
+    })
+}
+
+async function testProxyGoogle() {
+  proxyError.value = ""
+  proxyGoogleResult.value = ""
+  proxyGoogleResultOk.value = null
+  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
+    proxyError.value = t("settings.proxyUrlRequired")
+    return
+  }
+  if (!useWebApi) {
+    return
+  }
+  await withPreservedScroll(async () => {
+    proxyGoogleBusy.value = true
+      try {
+        const body = {
+          proxy: {
+            enabled: proxyEnabledDraft.value,
+            url: proxyUrlDraft.value.trim() || undefined,
+            username: proxyUsernameDraft.value.trim() || undefined,
+            password: proxyPasswordDraft.value || undefined,
+          } satisfies ProxySettingsDTO,
+        }
+        const res = await api.pingProxyGoogle(body)
+        if (res.ok) {
+          proxyGoogleResultOk.value = true
+          proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
+            ms: res.latencyMs,
+            status: res.httpStatus ?? "—",
+          })
+        } else {
+          proxyGoogleResultOk.value = false
+          const detail = res.message?.trim() || t("settings.proxyPingJavbusFailUnknown")
+          proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
+        }
+      } catch (err) {
+        proxyGoogleResultOk.value = false
+        if (err instanceof HttpClientError && err.apiError?.message) {
+          proxyGoogleResult.value = t("settings.proxyPingJavbusFail", {
+            message: err.apiError.message,
+          })
+        } else if (err instanceof Error) {
+          proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: err.message })
+        } else {
+          proxyGoogleResult.value = t("settings.proxyPingJavbusFail", {
+            message: t("settings.proxyPingJavbusFailUnknown"),
+          })
+        }
+      } finally {
+        proxyGoogleBusy.value = false
+      }
+    })
 }
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
@@ -198,6 +333,8 @@ const metadataMovieChainSaving = ref(false)
 const metadataMovieChainError = ref("")
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+const viteMode = import.meta.env.MODE
+const isViteDev = import.meta.env.DEV
 const providerHealthByName = ref<Record<string, ProviderHealthDTO>>({})
 const providerPingAllBusy = ref(false)
 const providerPingOneName = ref<string | null>(null)
@@ -230,18 +367,24 @@ async function pingAllMetadataProviders() {
   if (!useWebApi) return
   providerHealthPingError.value = ""
   providerHealthPingAllSummary.value = ""
-  providerPingAllBusy.value = true
   try {
-    const res = await api.pingAllProviders()
-    const next: Record<string, ProviderHealthDTO> = { ...providerHealthByName.value }
-    for (const p of res.providers) {
-      next[p.name] = p
-    }
-    providerHealthByName.value = next
-    providerHealthPingAllSummary.value = t("settings.providerHealthPingAllSummary", {
-      total: res.total,
-      ok: res.ok,
-      fail: res.fail,
+    await withPreservedScroll(async () => {
+      providerPingAllBusy.value = true
+      try {
+        const res = await api.pingAllProviders()
+        const next: Record<string, ProviderHealthDTO> = { ...providerHealthByName.value }
+        for (const p of res.providers) {
+          next[p.name] = p
+        }
+        providerHealthByName.value = next
+        providerHealthPingAllSummary.value = t("settings.providerHealthPingAllSummary", {
+          total: res.total,
+          ok: res.ok,
+          fail: res.fail,
+        })
+      } finally {
+        providerPingAllBusy.value = false
+      }
     })
   } catch (err) {
     console.error("[settings] ping all providers failed", err)
@@ -252,18 +395,22 @@ async function pingAllMetadataProviders() {
     } else {
       providerHealthPingError.value = t("settings.providerHealthPingError")
     }
-  } finally {
-    providerPingAllBusy.value = false
   }
 }
 
 async function pingOneMetadataProvider(name: string) {
   if (!useWebApi || !name.trim()) return
   providerHealthPingError.value = ""
-  providerPingOneName.value = name
   try {
-    const dto = await api.pingProvider(name.trim())
-    providerHealthByName.value = { ...providerHealthByName.value, [dto.name]: dto }
+    await withPreservedScroll(async () => {
+      providerPingOneName.value = name
+      try {
+        const dto = await api.pingProvider(name.trim())
+        providerHealthByName.value = { ...providerHealthByName.value, [dto.name]: dto }
+      } finally {
+        providerPingOneName.value = null
+      }
+    })
   } catch (err) {
     console.error("[settings] ping provider failed", name, err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -273,8 +420,6 @@ async function pingOneMetadataProvider(name: string) {
     } else {
       providerHealthPingError.value = t("settings.providerHealthPingError")
     }
-  } finally {
-    providerPingOneName.value = null
   }
 }
 
@@ -283,17 +428,21 @@ function initProviderChainDraft() {
 }
 
 function moveProviderInChain(index: number, direction: "up" | "down") {
-  const draft = [...providerChainDraft.value]
-  if (direction === "up" && index > 0) {
-    ;[draft[index - 1], draft[index]] = [draft[index], draft[index - 1]]
-  } else if (direction === "down" && index < draft.length - 1) {
-    ;[draft[index], draft[index + 1]] = [draft[index + 1], draft[index]]
-  }
-  providerChainDraft.value = draft
+  withSyncPreservedScroll(() => {
+    const draft = [...providerChainDraft.value]
+    if (direction === "up" && index > 0) {
+      ;[draft[index - 1], draft[index]] = [draft[index], draft[index - 1]]
+    } else if (direction === "down" && index < draft.length - 1) {
+      ;[draft[index], draft[index + 1]] = [draft[index + 1], draft[index]]
+    }
+    providerChainDraft.value = draft
+  })
 }
 
 function removeProviderFromChain(index: number) {
-  providerChainDraft.value = providerChainDraft.value.filter((_, i) => i !== index)
+  withSyncPreservedScroll(() => {
+    providerChainDraft.value = providerChainDraft.value.filter((_, i) => i !== index)
+  })
 }
 
 function addProviderToChain() {
@@ -302,16 +451,36 @@ function addProviderToChain() {
   if (providerChainDraft.value.some((p) => p.toLowerCase() === name.toLowerCase())) {
     return
   }
-  providerChainDraft.value = [...providerChainDraft.value, name]
-  selectedProviderToAdd.value = ""
+  withSyncPreservedScroll(() => {
+    providerChainDraft.value = [...providerChainDraft.value, name]
+    selectedProviderToAdd.value = ""
+  })
+}
+
+function providerChainsEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
 }
 
 async function saveProviderChain() {
+  if (providerChainsEqual(providerChainDraft.value, libraryService.metadataMovieProviderChain.value)) {
+    metadataMovieChainError.value = ""
+    return
+  }
   metadataMovieChainError.value = ""
-  metadataMovieChainSaving.value = true
   try {
-    await libraryService.setMetadataMovieProviderChain(providerChainDraft.value)
-    syncMetadataMovieModeUiFromServer()
+    await withPreservedScroll(async () => {
+      metadataMovieChainSaving.value = true
+      try {
+        await libraryService.setMetadataMovieProviderChain(providerChainDraft.value)
+        syncMetadataMovieModeUiFromServer()
+      } finally {
+        metadataMovieChainSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] save provider chain failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -321,17 +490,29 @@ async function saveProviderChain() {
     } else {
       metadataMovieChainError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    metadataMovieChainSaving.value = false
   }
 }
 
-async function onMetadataMovieModeChain() {
+watchDebounced(
+  providerChainDraft,
+  async () => {
+    if (metadataMovieModeUi.value !== "chain") return
+    if (providerChainsEqual(providerChainDraft.value, libraryService.metadataMovieProviderChain.value)) {
+      return
+    }
+    await saveProviderChain()
+  },
+  { deep: true, debounce: 450 },
+)
+
+function onMetadataMovieModeChain() {
   if (metadataMovieModeUi.value === "chain") return
-  metadataMovieModeUi.value = "chain"
-  metadataMovieChainError.value = ""
-  metadataMovieError.value = ""
-  initProviderChainDraft()
+  withSyncPreservedScroll(() => {
+    metadataMovieModeUi.value = "chain"
+    metadataMovieChainError.value = ""
+    metadataMovieError.value = ""
+    initProviderChainDraft()
+  })
 }
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
@@ -427,7 +608,7 @@ const directoryHintDisplay = computed(() => {
 })
 
 onMounted(async () => {
-  await libraryService.refreshSettings()
+  await withPreservedScroll(() => libraryService.refreshSettings())
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
   syncProxyDraftFromService()
@@ -471,10 +652,16 @@ function cancelEditLibraryTitle() {
 
 async function saveLibraryPathTitle(id: string) {
   editTitleError.value = ""
-  editTitleBusy.value = true
   try {
-    await libraryService.updateLibraryPathTitle(id, editLibraryTitleDraft.value)
-    cancelEditLibraryTitle()
+    await withPreservedScroll(async () => {
+      editTitleBusy.value = true
+      try {
+        await libraryService.updateLibraryPathTitle(id, editLibraryTitleDraft.value)
+        cancelEditLibraryTitle()
+      } finally {
+        editTitleBusy.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] update library title failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -482,8 +669,6 @@ async function saveLibraryPathTitle(id: string) {
     } else {
       editTitleError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    editTitleBusy.value = false
   }
 }
 
@@ -521,28 +706,35 @@ async function submitAddPath() {
     pathAddError.value = t("settings.errAbsoluteRequired")
     return
   }
-  addBusy.value = true
   try {
-    const scanTask = await libraryService.addLibraryPath(newPath.value, newPathTitle.value || undefined)
-    if (scanTask?.taskId) {
-      scanTaskTracker.start(scanTask.taskId)
-    }
-    newPath.value = ""
-    newPathTitle.value = ""
-    addPathDialogOpen.value = false
+    await withPreservedScroll(async () => {
+      addBusy.value = true
+      try {
+        const scanTask = await libraryService.addLibraryPath(
+          newPath.value,
+          newPathTitle.value || undefined,
+        )
+        if (scanTask?.taskId) {
+          scanTaskTracker.start(scanTask.taskId)
+        }
+        newPath.value = ""
+        newPathTitle.value = ""
+        addPathDialogOpen.value = false
+      } finally {
+        addBusy.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] add library path failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
       pathAddError.value = err.apiError.message
     }
-  } finally {
-    addBusy.value = false
   }
 }
 
 async function removePath(id: string) {
   try {
-    await libraryService.removeLibraryPath(id)
+    await withPreservedScroll(() => libraryService.removeLibraryPath(id))
   } catch (err) {
     console.error("[settings] remove library path failed", err)
   }
@@ -550,12 +742,18 @@ async function removePath(id: string) {
 
 async function rescanPath(path: string) {
   scanFeedbackError.value = ""
-  scanPathBusy.value = path
   try {
-    const task = await libraryService.scanLibraryPaths([path])
-    if (task?.taskId) {
-      scanTaskTracker.start(task.taskId)
-    }
+    await withPreservedScroll(async () => {
+      scanPathBusy.value = path
+      try {
+        const task = await libraryService.scanLibraryPaths([path])
+        if (task?.taskId) {
+          scanTaskTracker.start(task.taskId)
+        }
+      } finally {
+        scanPathBusy.value = null
+      }
+    })
   } catch (err) {
     console.error("[settings] rescan path failed", err)
     if (err instanceof HttpClientError && err.status === 409) {
@@ -565,16 +763,20 @@ async function rescanPath(path: string) {
     } else {
       scanFeedbackError.value = t("settings.errScanStart")
     }
-  } finally {
-    scanPathBusy.value = null
   }
 }
 
 async function onOrganizeLibraryChange(next: boolean) {
   organizeLibraryError.value = ""
-  organizeLibrarySaving.value = true
   try {
-    await libraryService.setOrganizeLibrary(next)
+    await withPreservedScroll(async () => {
+      organizeLibrarySaving.value = true
+      try {
+        await libraryService.setOrganizeLibrary(next)
+      } finally {
+        organizeLibrarySaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] organize library toggle failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -582,16 +784,20 @@ async function onOrganizeLibraryChange(next: boolean) {
     } else {
       organizeLibraryError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    organizeLibrarySaving.value = false
   }
 }
 
 async function onExtendedLibraryImportChange(next: boolean) {
   extendedLibraryImportError.value = ""
-  extendedLibraryImportSaving.value = true
   try {
-    await libraryService.setExtendedLibraryImport(next)
+    await withPreservedScroll(async () => {
+      extendedLibraryImportSaving.value = true
+      try {
+        await libraryService.setExtendedLibraryImport(next)
+      } finally {
+        extendedLibraryImportSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] extended library import toggle failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -599,16 +805,20 @@ async function onExtendedLibraryImportChange(next: boolean) {
     } else {
       extendedLibraryImportError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    extendedLibraryImportSaving.value = false
   }
 }
 
 async function onAutoLibraryWatchChange(next: boolean) {
   autoLibraryWatchError.value = ""
-  autoLibraryWatchSaving.value = true
   try {
-    await libraryService.setAutoLibraryWatch(next)
+    await withPreservedScroll(async () => {
+      autoLibraryWatchSaving.value = true
+      try {
+        await libraryService.setAutoLibraryWatch(next)
+      } finally {
+        autoLibraryWatchSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] auto library watch toggle failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -616,18 +826,22 @@ async function onAutoLibraryWatchChange(next: boolean) {
     } else {
       autoLibraryWatchError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    autoLibraryWatchSaving.value = false
   }
 }
 
 async function onMetadataMovieModeAuto() {
   if (metadataMovieModeUi.value === "auto") return
   metadataMovieError.value = ""
-  metadataMovieSaving.value = true
   try {
-    await libraryService.setMetadataMovieProvider("")
-    syncMetadataMovieModeUiFromServer()
+    await withPreservedScroll(async () => {
+      metadataMovieSaving.value = true
+      try {
+        await libraryService.setMetadataMovieProvider("")
+        syncMetadataMovieModeUiFromServer()
+      } finally {
+        metadataMovieSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] metadata movie provider (auto) failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -637,8 +851,6 @@ async function onMetadataMovieModeAuto() {
     } else {
       metadataMovieError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    metadataMovieSaving.value = false
   }
 }
 
@@ -646,13 +858,19 @@ async function onMetadataMovieModeSpecified() {
   if (!canPickSpecifiedMetadata.value) return
   if (metadataMovieModeUi.value === "specified") return
   metadataMovieError.value = ""
-  metadataMovieSaving.value = true
+  const first = metadataMovieSelectOptions.value[0]
   try {
-    const first = metadataMovieSelectOptions.value[0]
-    if (first) {
-      await libraryService.setMetadataMovieProvider(first)
-    }
-    syncMetadataMovieModeUiFromServer()
+    await withPreservedScroll(async () => {
+      metadataMovieSaving.value = true
+      try {
+        if (first) {
+          await libraryService.setMetadataMovieProvider(first)
+        }
+        syncMetadataMovieModeUiFromServer()
+      } finally {
+        metadataMovieSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] metadata movie provider (specified) failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -662,18 +880,22 @@ async function onMetadataMovieModeSpecified() {
     } else {
       metadataMovieError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    metadataMovieSaving.value = false
   }
 }
 
 async function onMetadataMovieSelect(next: unknown) {
   if (typeof next !== "string" || next === metadataMovieProvider.value) return
   metadataMovieError.value = ""
-  metadataMovieSaving.value = true
   try {
-    await libraryService.setMetadataMovieProvider(next)
-    syncMetadataMovieModeUiFromServer()
+    await withPreservedScroll(async () => {
+      metadataMovieSaving.value = true
+      try {
+        await libraryService.setMetadataMovieProvider(next)
+        syncMetadataMovieModeUiFromServer()
+      } finally {
+        metadataMovieSaving.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] metadata movie provider select failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -683,19 +905,23 @@ async function onMetadataMovieSelect(next: unknown) {
     } else {
       metadataMovieError.value = t("settings.errSaveTitle")
     }
-  } finally {
-    metadataMovieSaving.value = false
   }
 }
 
 async function runFullScan() {
   scanFeedbackError.value = ""
-  fullScanBusy.value = true
   try {
-    const task = await libraryService.scanLibraryPaths()
-    if (task?.taskId) {
-      scanTaskTracker.start(task.taskId)
-    }
+    await withPreservedScroll(async () => {
+      fullScanBusy.value = true
+      try {
+        const task = await libraryService.scanLibraryPaths()
+        if (task?.taskId) {
+          scanTaskTracker.start(task.taskId)
+        }
+      } finally {
+        fullScanBusy.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] full scan failed", err)
     if (err instanceof HttpClientError && err.status === 409) {
@@ -705,8 +931,6 @@ async function runFullScan() {
     } else {
       scanFeedbackError.value = t("settings.errScanStart")
     }
-  } finally {
-    fullScanBusy.value = false
   }
 }
 
@@ -718,17 +942,23 @@ async function runMetadataRefreshForSelected() {
     metadataRefreshError.value = t("settings.errMetadataSelect")
     return
   }
-  metadataRefreshBusy.value = true
   try {
-    const dto = await libraryService.refreshMetadataForLibraryPaths(paths)
-    const parts: string[] = [t("settings.metadataQueued", { n: dto.queued })]
-    if (dto.skipped > 0) {
-      parts.push(t("settings.metadataSkipped", { n: dto.skipped }))
-    }
-    if (dto.invalidPaths.length > 0) {
-      parts.push(t("settings.metadataInvalid", { paths: dto.invalidPaths.join("；") }))
-    }
-    metadataRefreshSuccess.value = parts.join(" ")
+    await withPreservedScroll(async () => {
+      metadataRefreshBusy.value = true
+      try {
+        const dto = await libraryService.refreshMetadataForLibraryPaths(paths)
+        const parts: string[] = [t("settings.metadataQueued", { n: dto.queued })]
+        if (dto.skipped > 0) {
+          parts.push(t("settings.metadataSkipped", { n: dto.skipped }))
+        }
+        if (dto.invalidPaths.length > 0) {
+          parts.push(t("settings.metadataInvalid", { paths: dto.invalidPaths.join("；") }))
+        }
+        metadataRefreshSuccess.value = parts.join(" ")
+      } finally {
+        metadataRefreshBusy.value = false
+      }
+    })
   } catch (err) {
     console.error("[settings] metadata refresh by paths failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -736,14 +966,19 @@ async function runMetadataRefreshForSelected() {
     } else {
       metadataRefreshError.value = t("settings.errMetadataBatch")
     }
-  } finally {
-    metadataRefreshBusy.value = false
   }
 }
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-[56rem] flex-col gap-6 pb-2">
+  <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-start lg:gap-8">
+    <SettingsPageNav />
+    <div class="min-w-0 flex flex-1 flex-col gap-6">
+    <section
+      id="settings-section-overview"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navOverview')"
+    >
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card
         v-for="stat in dashboardStats"
@@ -759,7 +994,13 @@ async function runMetadataRefreshForSelected() {
         </CardContent>
       </Card>
     </div>
+    </section>
 
+    <section
+      id="settings-section-general"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navGeneral')"
+    >
     <Card class="rounded-3xl border-border/70 bg-card/85">
       <CardHeader
         class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0"
@@ -784,7 +1025,13 @@ async function runMetadataRefreshForSelected() {
         </Select>
       </CardHeader>
     </Card>
+    </section>
 
+    <section
+      id="settings-section-library"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navLibrary')"
+    >
     <div class="flex flex-col gap-2 px-1">
       <div class="flex flex-col gap-1">
         <h2 class="text-3xl font-semibold tracking-tight">{{ t("settings.pageTitle") }}</h2>
@@ -801,7 +1048,7 @@ async function runMetadataRefreshForSelected() {
       </div>
     </div>
 
-    <div class="w-full columns-1 gap-6">
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
@@ -1073,6 +1320,52 @@ async function runMetadataRefreshForSelected() {
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
+            <CardTitle>{{ t("settings.organizeTitle") }}</CardTitle>
+            <CardDescription>
+              {{ t("settings.organizeDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-3">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="organizeLibrarySaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="font-medium">{{ t("settings.organizeSwitch") }}</p>
+                <p class="text-sm text-muted-foreground">
+                  {{ t("settings.organizeHint") }}
+                </p>
+                <p
+                  v-if="organizeLibrarySaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.organizeSyncing") }}
+                </p>
+              </div>
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="organizeLibrary"
+                @update:model-value="onOrganizeLibraryChange"
+              />
+            </div>
+            <p v-if="organizeLibraryError" class="text-sm text-destructive">
+              {{ organizeLibraryError }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      </div>
+    </section>
+
+    <section
+      id="settings-section-metadata"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navMetadata')"
+    >
+      <div class="w-full columns-1 gap-6">
+      <div class="mb-6 break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+          <CardHeader>
             <CardTitle>{{ t("settings.metadataMovieProviderTitle") }}</CardTitle>
             <CardDescription>
               {{ t("settings.metadataMovieProviderDesc") }}
@@ -1121,6 +1414,32 @@ async function runMetadataRefreshForSelected() {
               class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-sm text-muted-foreground"
             >
               {{ t("settings.providerHealthMockHint") }}
+            </p>
+
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              :aria-busy="autoLibraryWatchSaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="font-medium">{{ t("settings.autoScrape") }}</p>
+                <p class="text-sm text-muted-foreground">
+                  {{ t("settings.autoScrapeHint") }}
+                </p>
+                <p
+                  v-if="autoLibraryWatchSaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.autoLibraryWatchSyncing") }}
+                </p>
+              </div>
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="autoLibraryWatch"
+                @update:model-value="onAutoLibraryWatchChange"
+              />
+            </div>
+            <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
+              {{ autoLibraryWatchError }}
             </p>
 
             <fieldset
@@ -1410,11 +1729,15 @@ async function runMetadataRefreshForSelected() {
                 </Button>
               </div>
 
-              <!-- Save Chain Button -->
-              <div class="flex items-center gap-2 pt-2">
+              <!-- Manual save：与自动保存相同；无变更时为 no-op -->
+              <div class="flex flex-col gap-2 pt-2">
+                <p class="text-xs text-muted-foreground">
+                  {{ t("settings.metadataMovieProviderChainAutoSave") }}
+                </p>
                 <Button
                   type="button"
-                  class="rounded-xl"
+                  variant="secondary"
+                  class="w-fit rounded-xl"
                   :disabled="metadataMovieChainSaving"
                   @click="saveProviderChain"
                 >
@@ -1448,10 +1771,31 @@ async function runMetadataRefreshForSelected() {
             <p v-if="metadataMovieError" class="text-sm text-destructive">
               {{ metadataMovieError }}
             </p>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
+              <div class="flex flex-col gap-1">
+                <p class="font-medium">{{ t("settings.triggerScrape") }}</p>
+                <p class="text-sm text-muted-foreground">
+                  {{ t("settings.triggerScrapeHint") }}
+                </p>
+              </div>
+              <Button type="button" class="rounded-2xl">
+                <RefreshCw data-icon="inline-start" />
+                {{ t("common.run") }}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
+      </div>
+    </section>
 
+    <section
+      id="settings-section-network"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navNetwork')"
+    >
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
@@ -1499,36 +1843,131 @@ async function runMetadataRefreshForSelected() {
                   :disabled="proxySaving"
                 />
               </div>
-              <div class="flex flex-col gap-1.5">
-                <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
-                <Input
-                  v-model="proxyUsernameDraft"
-                  autocomplete="off"
-                  class="rounded-xl border-border/70"
+              <div class="flex flex-col gap-2">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/30 px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
                   :disabled="proxySaving"
-                />
-              </div>
-              <div class="flex flex-col gap-1.5">
-                <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
-                <Input
-                  v-model="proxyPasswordDraft"
-                  type="password"
-                  autocomplete="new-password"
-                  class="rounded-xl border-border/70"
-                  :disabled="proxySaving"
-                />
+                  :aria-expanded="proxyAuthExpanded"
+                  @click="proxyAuthExpanded = !proxyAuthExpanded"
+                >
+                  <span>{{ t("settings.proxyAuthToggle") }}</span>
+                  <ChevronDown
+                    class="size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-safe:transition-transform"
+                    :class="proxyAuthExpanded ? 'rotate-180' : ''"
+                    aria-hidden="true"
+                  />
+                </button>
+                <div
+                  v-show="proxyAuthExpanded"
+                  class="flex flex-col gap-3 border-t border-border/50 pt-3"
+                >
+                  <div class="flex flex-col gap-1.5">
+                    <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
+                    <Input
+                      v-model="proxyUsernameDraft"
+                      autocomplete="off"
+                      class="rounded-xl border-border/70"
+                      :disabled="proxySaving"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
+                    <Input
+                      v-model="proxyPasswordDraft"
+                      type="password"
+                      autocomplete="new-password"
+                      class="rounded-xl border-border/70"
+                      :disabled="proxySaving"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
+            <p
+              v-if="useWebApi"
+              class="text-xs text-muted-foreground"
+            >
+              {{ t("settings.proxyPingJavbusHint") }}
+            </p>
+            <p
+              v-if="useWebApi"
+              class="text-xs text-muted-foreground"
+            >
+              {{ t("settings.proxyPingGoogleHint") }}
+            </p>
             <div class="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 class="rounded-xl"
-                :disabled="proxySaving"
+                :disabled="proxySaving || proxyOutboundPingBusy"
                 @click="saveProxySettings"
               >
                 {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
               </Button>
+              <Button
+                v-if="useWebApi"
+                type="button"
+                variant="outline"
+                class="rounded-xl"
+                :disabled="proxySaving || proxyOutboundPingBusy"
+                :aria-busy="proxyJavbusBusy"
+                @click="testProxyJavbus"
+              >
+                <Loader2
+                  v-if="proxyJavbusBusy"
+                  class="mr-2 size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                {{
+                  proxyJavbusBusy
+                    ? t("settings.proxyPingJavbusTesting")
+                    : t("settings.proxyPingJavbus")
+                }}
+              </Button>
+              <Button
+                v-if="useWebApi"
+                type="button"
+                variant="outline"
+                class="rounded-xl"
+                :disabled="proxySaving || proxyOutboundPingBusy"
+                :aria-busy="proxyGoogleBusy"
+                @click="testProxyGoogle"
+              >
+                <Loader2
+                  v-if="proxyGoogleBusy"
+                  class="mr-2 size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                {{
+                  proxyGoogleBusy
+                    ? t("settings.proxyPingGoogleTesting")
+                    : t("settings.proxyPingGoogle")
+                }}
+              </Button>
             </div>
+            <p
+              v-if="proxyJavbusResult && proxyJavbusResultOk !== null"
+              class="text-sm"
+              :class="
+                proxyJavbusResultOk
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-destructive'
+              "
+            >
+              {{ proxyJavbusResult }}
+            </p>
+            <p
+              v-if="proxyGoogleResult && proxyGoogleResultOk !== null"
+              class="text-sm"
+              :class="
+                proxyGoogleResultOk
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-destructive'
+              "
+            >
+              {{ proxyGoogleResult }}
+            </p>
             <p
               v-if="proxySaving"
               class="text-xs text-muted-foreground motion-safe:animate-pulse"
@@ -1541,45 +1980,15 @@ async function runMetadataRefreshForSelected() {
           </CardContent>
         </Card>
       </div>
-
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
-          <CardHeader>
-            <CardTitle>{{ t("settings.organizeTitle") }}</CardTitle>
-            <CardDescription>
-              {{ t("settings.organizeDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3">
-            <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
-              :aria-busy="organizeLibrarySaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="font-medium">{{ t("settings.organizeSwitch") }}</p>
-                <p class="text-sm text-muted-foreground">
-                  {{ t("settings.organizeHint") }}
-                </p>
-                <p
-                  v-if="organizeLibrarySaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.organizeSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="organizeLibrary"
-                @update:model-value="onOrganizeLibraryChange"
-              />
-            </div>
-            <p v-if="organizeLibraryError" class="text-sm text-destructive">
-              {{ organizeLibraryError }}
-            </p>
-          </CardContent>
-        </Card>
       </div>
+    </section>
 
+    <section
+      id="settings-section-libraryBehavior"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navLibraryBehavior')"
+    >
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
@@ -1617,7 +2026,15 @@ async function runMetadataRefreshForSelected() {
           </CardContent>
         </Card>
       </div>
+      </div>
+    </section>
 
+    <section
+      id="settings-section-curated"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navCurated')"
+    >
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
           <CardHeader>
@@ -1730,7 +2147,15 @@ async function runMetadataRefreshForSelected() {
           </CardContent>
         </Card>
       </div>
+      </div>
+    </section>
 
+    <section
+      id="settings-section-playback"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navPlayback')"
+    >
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85">
           <CardHeader>
@@ -1749,36 +2174,18 @@ async function runMetadataRefreshForSelected() {
               </div>
               <Switch v-model="hardwareDecode" />
             </div>
-
-            <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
-              :aria-busy="autoLibraryWatchSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="font-medium">{{ t("settings.autoScrape") }}</p>
-                <p class="text-sm text-muted-foreground">
-                  {{ t("settings.autoScrapeHint") }}
-                </p>
-                <p
-                  v-if="autoLibraryWatchSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoLibraryWatchSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoLibraryWatch"
-                @update:model-value="onAutoLibraryWatchChange"
-              />
-            </div>
-            <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
-              {{ autoLibraryWatchError }}
-            </p>
           </CardContent>
         </Card>
       </div>
+      </div>
+    </section>
 
+    <section
+      id="settings-section-maintenance"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navMaintenance')"
+    >
+      <div class="w-full columns-1 gap-6">
       <div class="mb-6 break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85">
           <CardHeader>
@@ -1788,19 +2195,6 @@ async function runMetadataRefreshForSelected() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3">
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
-                <p class="font-medium">{{ t("settings.triggerScrape") }}</p>
-                <p class="text-sm text-muted-foreground">
-                  {{ t("settings.triggerScrapeHint") }}
-                </p>
-              </div>
-              <Button class="rounded-2xl">
-                <RefreshCw data-icon="inline-start" />
-                {{ t("common.run") }}
-              </Button>
-            </div>
-
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
               <div class="flex flex-col gap-1">
                 <p class="font-medium">{{ t("settings.triggerFullScan") }}</p>
@@ -1851,6 +2245,51 @@ async function runMetadataRefreshForSelected() {
           </CardContent>
         </Card>
       </div>
+      </div>
+    </section>
+
+    <section
+      id="settings-section-about"
+      class="scroll-mt-6 space-y-6"
+      :aria-label="t('settings.navAbout')"
+    >
+      <Card class="rounded-3xl border-border/70 bg-card/85">
+        <CardHeader class="flex flex-row items-start gap-3 space-y-0 pb-2">
+          <Info
+            class="mt-0.5 size-5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <div class="min-w-0 flex-1 space-y-1">
+            <CardTitle>{{ t("settings.aboutCardTitle") }}</CardTitle>
+            <CardDescription>{{ t("settings.aboutCardDesc") }}</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent class="space-y-3 text-sm leading-6 text-muted-foreground">
+          <p>{{ t("settings.aboutIntro") }}</p>
+          <div
+            class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3 text-muted-foreground"
+            role="status"
+          >
+            <p class="font-medium text-foreground">
+              {{ t("settings.aboutDataModeLabel") }}
+            </p>
+            <p class="mt-1.5">
+              {{
+                useWebApi
+                  ? t("settings.aboutDataModeWebApi")
+                  : t("settings.aboutDataModeMock")
+              }}
+            </p>
+          </div>
+          <p class="text-xs text-muted-foreground/90">
+            {{ t("settings.aboutBuildEnv", { env: viteMode }) }}
+          </p>
+          <p v-if="isViteDev" class="text-xs text-muted-foreground/90">
+            {{ t("settings.aboutDevProxyHint") }}
+          </p>
+        </CardContent>
+      </Card>
+    </section>
     </div>
   </div>
 </template>

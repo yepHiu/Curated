@@ -21,3 +21,7 @@ Example:
 Good: return `scan.start` => `{ taskId, status }`, then emit `task.progress` and `scan.completed`.
 Bad: return a raw scraper payload or a CLI-formatted text blob directly to renderer-facing consumers.
 ```
+
+## Curated frames export (HTTP)
+
+- **`POST /api/curated-frames/export`**：Body `{ ids: string[], actorName?: string }`（`ids` 去重后 1～20）。可选 **`actorName`** 须属于每帧的 `actors`，用于文件名中的演员段；省略时用首演员或 `unknown`。响应：单张 **`image/webp`**（含 EXIF UserComment JSON）；多张 **`application/zip`**。错误码含 **`CURATED_EXPORT_ACTOR_MISMATCH`**（演员与帧不匹配）。

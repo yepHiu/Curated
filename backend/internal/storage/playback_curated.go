@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -155,6 +157,61 @@ func (s *SQLiteStore) GetCuratedFrameImage(ctx context.Context, id string) ([]by
 		return nil, err
 	}
 	return blob, nil
+}
+
+// ErrCuratedFrameNotFound is returned when a curated frame id does not exist.
+var ErrCuratedFrameNotFound = errors.New("curated frame not found")
+
+// CuratedFrameExportRow is metadata plus PNG/JPEG image bytes for WebP export.
+type CuratedFrameExportRow struct {
+	CuratedFrameMeta
+	ImageBlob []byte
+}
+
+// ListCuratedFramesForExport returns rows in the same order as ids (after caller dedupes).
+func (s *SQLiteStore) ListCuratedFramesForExport(ctx context.Context, ids []string) ([]CuratedFrameExportRow, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(ids))
+	ph = ph[:len(ph)-1]
+	q := fmt.Sprintf(`
+		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob
+		FROM curated_frames WHERE id IN (%s)
+	`, ph)
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	byID := make(map[string]CuratedFrameExportRow, len(ids))
+	for rows.Next() {
+		var r CuratedFrameExportRow
+		var actorsJSON, tagsJSON string
+		if err := rows.Scan(&r.ID, &r.MovieID, &r.Title, &r.Code, &actorsJSON, &r.PositionSec, &r.CapturedAt, &tagsJSON, &r.ImageBlob); err != nil {
+			return nil, err
+		}
+		_ = scanCuratedMeta(actorsJSON, tagsJSON, &r.CuratedFrameMeta)
+		byID[r.ID] = r
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]CuratedFrameExportRow, 0, len(ids))
+	for _, id := range ids {
+		r, ok := byID[id]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrCuratedFrameNotFound, id)
+		}
+		out = append(out, r)
+	}
+	return out, nil
 }
 
 func (s *SQLiteStore) UpdateCuratedFrameTags(ctx context.Context, id string, tags []string) error {

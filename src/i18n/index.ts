@@ -16,6 +16,8 @@ export const i18n = createI18n({
     en,
     ja,
     "zh-CN": zhCN,
+    /** 与浏览器 `navigator.language` 的 `zh` 对齐，避免回退到 en 时出现缺键警告 */
+    zh: zhCN,
   },
 })
 

@@ -349,6 +349,20 @@ type ProxySettingsDTO struct {
 	Password string `json:"password,omitempty"`
 }
 
+// ProxyJavBusPingRequest is the body for POST /api/proxy/ping-javbus and POST /api/proxy/ping-google.
+// When Proxy is nil, the server uses the currently persisted proxy config.
+type ProxyJavBusPingRequest struct {
+	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
+}
+
+// ProxyJavBusPingResponse reports outbound reachability for proxy ping endpoints (JavBus, Google, etc.).
+type ProxyJavBusPingResponse struct {
+	OK         bool   `json:"ok"`
+	LatencyMs  int64  `json:"latencyMs"`
+	HTTPStatus int    `json:"httpStatus,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
+
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
 	OrganizeLibrary       *bool   `json:"organizeLibrary,omitempty"`
@@ -415,6 +429,12 @@ type CreateCuratedFrameBody struct {
 // PatchCuratedFrameTagsBody is the JSON body for PATCH /api/curated-frames/{id}/tags.
 type PatchCuratedFrameTagsBody struct {
 	Tags []string `json:"tags"`
+}
+
+// PostCuratedFramesExportBody is the JSON body for POST /api/curated-frames/export.
+type PostCuratedFramesExportBody struct {
+	IDs       []string `json:"ids"`
+	ActorName string   `json:"actorName,omitempty"`
 }
 
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.
@@ -487,6 +507,9 @@ const (
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
 	ErrorCodeConflict      = "COMMON_CONFLICT"
+
+	// Curated frames export
+	ErrorCodeCuratedExportActorMismatch = "CURATED_EXPORT_ACTOR_MISMATCH"
 
 	// Provider health check errors
 	ErrorCodeProviderNotFound   = "PROVIDER_NOT_FOUND"

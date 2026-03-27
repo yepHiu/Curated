@@ -78,7 +78,8 @@ const queryFilteredMovies = computed(() => {
 
   let list: Movie[]
   if (mode === "trash") {
-    list = [...raw]
+    // 回收站不按搜索 / 标签 / 演员 / 厂商筛选，仅展示全部已删除条目
+    return [...raw]
   } else if (mode === "favorites") {
     list = raw.filter((movie) => movie.isFavorite)
   } else if (mode === "recent") {
@@ -120,8 +121,13 @@ const queryFilteredMovies = computed(() => {
   return list
 })
 
+/** 回收站不使用 tab 子筛选（顶栏无「全部/新片/高分」） */
+const effectiveTab = computed<LibraryTab>(() =>
+  libraryMode.value === "trash" ? "all" : activeTab.value,
+)
+
 const visibleMovies = computed(() => {
-  switch (activeTab.value) {
+  switch (effectiveTab.value) {
     case "new":
       return queryFilteredMovies.value.slice().sort(compareByReleaseDateDesc)
     case "top-rated":
@@ -248,6 +254,15 @@ const clearExactStudioFilter = async () => {
     query: mergeLibraryQuery(route.query, { studio: undefined }),
   })
 }
+
+/** 回收站不展示 URL 带入的演员 / 标签 / 厂商筛选条（与无搜索一致） */
+const activeTagForPage = computed(() => (libraryMode.value === "trash" ? "" : tagExactQuery.value))
+const activeActorForPage = computed(() =>
+  libraryMode.value === "trash" ? "" : actorProfileDisplayName.value,
+)
+const activeStudioForPage = computed(() =>
+  libraryMode.value === "trash" ? "" : studioExactQuery.value,
+)
 </script>
 
 <template>
@@ -256,10 +271,10 @@ const clearExactStudioFilter = async () => {
     :all-movies="libraryMovies"
     :visible-movies="visibleMovies"
     :selected-movie="selectedMovie"
-    :active-tab="activeTab"
-    :active-tag-filter="tagExactQuery"
-    :active-actor-filter="actorProfileDisplayName"
-    :active-studio-filter="studioExactQuery"
+    :active-tab="effectiveTab"
+    :active-tag-filter="activeTagForPage"
+    :active-actor-filter="activeActorForPage"
+    :active-studio-filter="activeStudioForPage"
     @update:active-tab="updateActiveTab"
     @select="selectMovie"
     @open-details="openDetails"

@@ -140,12 +140,11 @@ const browseItems = computed((): NavigationItem[] => {
   return [
     { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
     { label: t("nav.recent"), page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
-    { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
     {
-      label: t("nav.trash"),
-      page: "trash",
-      icon: Trash2,
-      hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
+      label: t("nav.curatedFrames"),
+      page: "curated-frames",
+      icon: Clapperboard,
+      hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
     },
     {
       label: t("nav.actors"),
@@ -153,6 +152,7 @@ const browseItems = computed((): NavigationItem[] => {
       icon: Users,
       hint: actorCount > 0 ? formatSidebarCount(actorCount) : undefined,
     },
+    { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
     {
       label: t("nav.history"),
       page: "history",
@@ -160,10 +160,10 @@ const browseItems = computed((): NavigationItem[] => {
       hint: historyTotal > 0 ? formatSidebarCount(historyTotal) : undefined,
     },
     {
-      label: t("nav.curatedFrames"),
-      page: "curated-frames",
-      icon: Clapperboard,
-      hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
+      label: t("nav.trash"),
+      page: "trash",
+      icon: Trash2,
+      hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
     },
   ]
 })
@@ -347,7 +347,10 @@ const getNavigationTarget = (page: AppPage) => {
           :disabled="backendProbing"
           @click="checkBackendHealth"
         >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': backendProbing }" />
+          <RefreshCw
+            class="size-4"
+            :class="{ 'motion-safe:animate-spin': backendProbing }"
+          />
         </Button>
       </div>
     </section>
@@ -374,7 +377,10 @@ const getNavigationTarget = (page: AppPage) => {
         :disabled="backendProbing"
         @click="checkBackendHealth"
       >
-        <RefreshCw class="size-3.5" :class="{ 'animate-spin': backendProbing }" />
+        <RefreshCw
+          class="size-3.5"
+          :class="{ 'motion-safe:animate-spin': backendProbing }"
+        />
       </Button>
     </div>
 

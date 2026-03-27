@@ -26,6 +26,7 @@ import (
 	"jav-shadcn/backend/internal/library/moviecode"
 	"jav-shadcn/backend/internal/library/movieroot"
 	"jav-shadcn/backend/internal/librarywatch"
+	"jav-shadcn/backend/internal/proxyenv"
 	"jav-shadcn/backend/internal/scanner"
 	"jav-shadcn/backend/internal/scraper"
 	"jav-shadcn/backend/internal/scraper/metatube"
@@ -55,9 +56,9 @@ type App struct {
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
-	metadataMovieMu              sync.RWMutex
-	metadataMovieProviderChain   []string // ordered list of providers to try in sequence
-	librarySettingsPath          string   // JSON file under config/ (organizeLibrary, future keys)
+	metadataMovieMu            sync.RWMutex
+	metadataMovieProviderChain []string // ordered list of providers to try in sequence
+	librarySettingsPath        string   // JSON file under config/ (organizeLibrary, future keys)
 
 	appCtx   context.Context
 	writeMu  sync.Mutex
@@ -87,6 +88,8 @@ type App struct {
 //
 // 若 Metatube 刮削服务初始化失败，返回 (nil, err)。
 func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *storage.SQLiteStore, librarySettingsPath string) (*App, error) {
+	proxyenv.Sync(cfg.Proxy, logger)
+
 	scraperService, err := metatube.NewService(logger, time.Duration(cfg.Scraper.RequestTimeoutSeconds)*time.Second)
 	if err != nil {
 		return nil, err
@@ -97,7 +100,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		scrapeConc = 4
 	}
 
-	return &App{
+	app := &App{
 		cfg:     cfg,
 		logger:  logger,
 		store:   store,
@@ -120,7 +123,17 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		appCtx:                     ctx,
 		scrapeSem:                  make(chan struct{}, scrapeConc),
 		watchScanPending:           make(map[string]struct{}),
-	}, nil
+	}
+
+	// 与设置页「保存代理设置」相同：持久化写回 + proxyenv.Sync。进程重启后仅依赖启动时第一次 Sync
+	// 时，部分出站路径可能仍不按 HTTP_PROXY 生效；此处再应用一次，避免必须手动再点保存。
+	if app.librarySettingsPath != "" && cfg.Proxy.Enabled && strings.TrimSpace(cfg.Proxy.URL) != "" {
+		if err := app.SetProxy(cfg.Proxy); err != nil {
+			logger.Warn("startup: reapply proxy settings failed", zap.Error(err))
+		}
+	}
+
+	return app, nil
 }
 
 // ReloadLibraryWatches re-reads library roots from the database and rebuilds directory watches.
@@ -459,6 +472,7 @@ func (a *App) SetProxy(p config.ProxyConfig) error {
 		return err
 	}
 	a.cfg.Proxy = p
+	proxyenv.Sync(p, a.logger)
 	return nil
 }
 
@@ -626,6 +640,7 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	ctx, cancel := context.WithTimeout(parentCtx, time.Duration(a.cfg.Tasks.ScanTimeoutSeconds)*time.Second)
 	defer cancel()
 
+	scanStarted := time.Now()
 	importedCount := 0
 	updatedCount := 0
 	skippedCount := 0
@@ -827,6 +842,15 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		a.logger.Error("failed to emit scan completion", zap.Error(err), zap.String("taskId", taskID))
 	}
 
+	a.logger.Info("scan.library completed",
+		zap.String("taskId", taskID),
+		zap.Int64("duration_ms", time.Since(scanStarted).Milliseconds()),
+		zap.Int("filesDiscovered", summary.FilesDiscovered),
+		zap.Int("imported", importedCount),
+		zap.Int("updated", updatedCount),
+		zap.Int("skipped", skippedCount),
+	)
+
 	if clearErr := a.store.ClearFirstLibraryScanPendingAfterScan(ctx, paths); clearErr != nil {
 		a.logger.Warn("failed to clear first_library_scan_pending", zap.Error(clearErr), zap.String("taskId", taskID))
 	}
@@ -864,6 +888,7 @@ func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result
 
 // runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
 func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context, output io.Writer, task contracts.TaskDTO, result contracts.ScanFileResultDTO) {
+	scrapeStarted := time.Now()
 	scrapeOpts := scraper.MovieScrapeOptions{
 		Provider:      a.MetadataMovieProvider(),
 		ProviderChain: a.MetadataMovieProviderChain(),
@@ -927,6 +952,12 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed scraper task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
+	a.logger.Info("scrape.movie completed",
+		zap.String("taskId", task.TaskID),
+		zap.String("movieId", result.MovieID),
+		zap.String("number", result.Number),
+		zap.Int64("duration_ms", time.Since(scrapeStarted).Milliseconds()),
+	)
 	if err := a.emitEvent(output, contracts.EventTaskCompleted, contracts.TaskEventDTO{Task: task}); err != nil {
 		a.logger.Error("failed to emit scraper completion", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
@@ -1012,6 +1043,7 @@ func (a *App) StartMovieMetadataRefresh(ctx context.Context, movieID string) (co
 }
 
 func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, actorName string) {
+	actorScrapeStarted := time.Now()
 	profile, err := a.scraper.ScrapeActor(ctx, actorName)
 	if err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
@@ -1038,6 +1070,11 @@ func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, ac
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed actor scrape task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
+	a.logger.Info("scrape.actor completed",
+		zap.String("taskId", task.TaskID),
+		zap.String("actorName", actorName),
+		zap.Int64("duration_ms", time.Since(actorScrapeStarted).Milliseconds()),
+	)
 }
 
 // StartActorProfileScrape enqueues Metatube actor lookup for an existing library actor row (exact name).
@@ -1325,14 +1362,19 @@ func (a *App) StartAutoScanLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, err := a.StartScan(context.Background(), nil)
+				task, err := a.StartScan(context.Background(), nil)
 				if err != nil {
 					if errors.Is(err, contracts.ErrScanAlreadyRunning) {
 						a.logger.Debug("auto scan skipped: scan already in progress")
 						continue
 					}
 					a.logger.Warn("auto scan failed", zap.Error(err))
+					continue
 				}
+				a.logger.Info("auto scan started",
+					zap.String("taskId", task.TaskID),
+					zap.Int("intervalSeconds", secs),
+				)
 			}
 		}
 	}()
@@ -1365,6 +1407,25 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 		a.scanning.Store(false)
 		return contracts.TaskDTO{}, err
 	}
+
+	trigger := "manual"
+	if extraMeta != nil {
+		if v, ok := extraMeta["trigger"]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				trigger = s
+			}
+		}
+	}
+	pathsPreview := strings.Join(paths, ", ")
+	if len(pathsPreview) > 200 {
+		pathsPreview = pathsPreview[:200] + "..."
+	}
+	a.logger.Info("scan.library started",
+		zap.String("taskId", task.TaskID),
+		zap.String("trigger", trigger),
+		zap.Int("pathCount", len(paths)),
+		zap.String("pathsPreview", pathsPreview),
+	)
 
 	go func() {
 		defer func() {
