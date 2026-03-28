@@ -317,6 +317,28 @@ func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefe
 	return s.fetchMovieInfo(ctx, movieID, number, first)
 }
 
+// effectivePosterURLs merges Metatube's thumb/cover vs big_* fields (some providers only fill the latter).
+func effectivePosterURLs(info *model.MovieInfo) (coverURL, thumbURL string) {
+	if info == nil {
+		return "", ""
+	}
+	cover := strings.TrimSpace(info.CoverURL)
+	if cover == "" {
+		cover = strings.TrimSpace(info.BigCoverURL)
+	}
+	thumb := strings.TrimSpace(info.ThumbURL)
+	if thumb == "" {
+		thumb = strings.TrimSpace(info.BigThumbURL)
+	}
+	switch {
+	case thumb == "" && cover != "":
+		thumb = cover
+	case cover == "" && thumb != "":
+		cover = thumb
+	}
+	return cover, thumb
+}
+
 // fetchMovieInfo fetches detailed movie info from a search result.
 func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, result *model.MovieSearchResult) (scraper.Metadata, error) {
 	pid, err := providerid.New(result.Provider, result.ID)
@@ -335,6 +357,7 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, result.Provider, err)
 	}
 
+	coverURL, thumbURL := effectivePosterURLs(info)
 	s.logger.Info("metadata fetched",
 		zap.String("number", number),
 		zap.String("title", info.Title),
@@ -342,7 +365,8 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 		zap.Int("actors", len(info.Actors)),
 		zap.Int("genres", len(info.Genres)),
 		zap.Int("previewImages", len(info.PreviewImages)),
-		zap.String("coverURL", info.CoverURL),
+		zap.String("coverURL", coverURL),
+		zap.String("thumbURL", thumbURL),
 	)
 
 	return scraper.Metadata{
@@ -361,8 +385,8 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 		RuntimeMinutes:  info.Runtime,
 		Rating:          info.Score,
 		ReleaseDate:     formatReleaseDate(info.ReleaseDate),
-		CoverURL:        info.CoverURL,
-		ThumbURL:        info.ThumbURL,
+		CoverURL:        coverURL,
+		ThumbURL:        thumbURL,
 		PreviewVideoURL: info.PreviewVideoURL,
 		PreviewImages:   cleanStrings(info.PreviewImages),
 	}, nil
