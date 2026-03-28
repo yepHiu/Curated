@@ -17,6 +17,13 @@ import {
   isSettingsSectionSlug,
   settingsSectionDomId,
 } from "@/lib/settings-nav"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
 const props = defineProps<{
@@ -188,30 +195,39 @@ onBeforeUnmount(() => {
     class="w-full shrink-0 lg:sticky lg:top-3 lg:w-52 lg:self-start"
     :aria-label="t('settings.navAriaLabel')"
   >
-    <!-- 窄屏：横向滚动 -->
-    <div
-      class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
-    >
-      <button
-        v-for="item in navItems"
-        :key="item.slug"
-        type="button"
-        class="shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
-        :class="
-          cn(
-            activeSlug === item.slug
-              ? 'border-primary/60 bg-primary/15 text-foreground'
-              : 'border-border/70 bg-card/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-          )
+    <!-- 窄屏：下拉跳转（减少横向 Chip 拥挤） -->
+    <div class="flex flex-col gap-2 lg:hidden">
+      <label class="sr-only" for="settings-nav-jump">{{ t("settings.navJumpTo") }}</label>
+      <Select
+        id="settings-nav-jump"
+        :model-value="activeSlug"
+        @update:model-value="
+          (v) => v != null && scrollToSlug(v as SettingsSectionSlug, true)
         "
-        @click="scrollToSlug(item.slug, true)"
       >
-        {{ t(item.labelKey) }}
-      </button>
+        <SelectTrigger
+          class="h-10 w-full rounded-xl border-border/70 bg-card/80"
+          :aria-label="t('settings.navJumpTo')"
+        >
+          <SelectValue :placeholder="t('settings.navJumpTo')" />
+        </SelectTrigger>
+        <SelectContent class="max-h-[min(24rem,70vh)] rounded-xl border-border/70">
+          <SelectItem
+            v-for="item in navItems"
+            :key="`jump-${item.slug}`"
+            class="rounded-lg"
+            :value="item.slug"
+          >
+            {{ t(item.labelKey) }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <!-- 宽屏：纵向 -->
-    <div class="hidden flex-col gap-1 border-border/60 lg:flex lg:border-r lg:pr-4">
+    <div
+      class="hidden flex-col gap-1 border-border/60 text-muted-foreground/90 lg:flex lg:border-r lg:pr-4"
+    >
       <button
         v-for="item in navItems"
         :key="`desktop-${item.slug}`"

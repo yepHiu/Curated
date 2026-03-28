@@ -332,6 +332,7 @@
     "aboutDataModeMock": "デモモード（Web API 無効）：ブラウザ内モック。一部機能は利用できないか、バックエンドと異なります。",
     "aboutBuildEnv": "フロントエンドビルド：{env}",
     "aboutDevProxyHint": "開発時は Vite が /api を http://localhost:8080 にプロキシすることが多いです。実データには javd を起動してください。",
+    "navJumpTo": "セクションへ移動…",
     "navAriaLabel": "設定セクション",
     "navOverview": "概要",
     "navGeneral": "一般",

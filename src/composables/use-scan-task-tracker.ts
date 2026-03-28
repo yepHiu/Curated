@@ -1,7 +1,7 @@
 import { ref, shallowRef } from "vue"
 import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
-import { pushAppToast } from "@/composables/use-app-toast"
+import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
 import { i18n } from "@/i18n"
 import { useLibraryService } from "@/services/library-service"
 
@@ -57,11 +57,12 @@ async function poll() {
         if (!isFsnotifyLibraryScan(t)) {
           const msg = t.message ?? ""
           const tr = i18n.global.t
-          if (t.status === "completed") {
-            pushAppToast(tr("toasts.manualLibraryScanDone", { message: msg }), { variant: "success" })
-          } else {
-            pushAppToast(tr("toasts.manualLibraryScanFailed", { message: msg }), { variant: "destructive" })
-          }
+          pushAppToast(
+            t.status === "completed"
+              ? tr("toasts.manualLibraryScanDone", { message: msg })
+              : tr("toasts.manualLibraryScanFailed", { message: msg }),
+            { variant: taskTerminalToastVariant(t.status) },
+          )
         }
         void libraryService.reloadMoviesFromApi()
       }

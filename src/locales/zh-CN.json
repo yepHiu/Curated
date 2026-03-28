@@ -332,6 +332,7 @@
     "aboutDataModeMock": "演示模式（未启用 Web API）：使用浏览器内 Mock 数据，部分能力不可用或与后端不一致。",
     "aboutBuildEnv": "前端构建模式：{env}",
     "aboutDevProxyHint": "开发时 Vite 通常将 /api 代理到 http://localhost:8080；请同时运行 javd 以使用真实库。",
+    "navJumpTo": "跳转到分区…",
     "navAriaLabel": "设置分区导航",
     "navOverview": "概览",
     "navGeneral": "通用",

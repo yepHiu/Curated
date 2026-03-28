@@ -1,4 +1,5 @@
 import { createApp } from "vue"
+import "vue-sonner/style.css"
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css"
 import App from "./App.vue"
 import { i18n } from "@/i18n"

@@ -167,3 +167,10 @@
     overflow: hidden;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster],
+  [data-sonner-toast] {
+    transition-duration: 0.01ms !important;
+  }
+}

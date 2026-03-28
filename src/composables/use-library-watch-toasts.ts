@@ -2,7 +2,7 @@ import { onBeforeUnmount, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { api } from "@/api/endpoints"
 import type { TaskDTO } from "@/api/types"
-import { pushAppToast } from "@/composables/use-app-toast"
+import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
@@ -89,7 +89,7 @@ export function useLibraryWatchToasts() {
         needsMovieReload = true
         const msg = task.message ?? ""
         pushAppToast(t("toasts.libraryWatchScanDone", { message: msg }), {
-          variant: task.status === "completed" ? "success" : "destructive",
+          variant: taskTerminalToastVariant(task.status),
         })
       }
 
@@ -108,7 +108,7 @@ export function useLibraryWatchToasts() {
         needsMovieReload = true
         const msg = task.message ?? ""
         pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
-          variant: task.status === "completed" ? "success" : "destructive",
+          variant: taskTerminalToastVariant(task.status),
         })
       }
 

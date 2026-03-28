@@ -979,11 +979,14 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navOverview')"
     >
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navOverview") }}
+    </h2>
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card
         v-for="stat in dashboardStats"
         :key="stat.labelKey"
-        class="rounded-3xl border-border/70 bg-card/85"
+        class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5"
       >
         <CardHeader class="gap-1">
           <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
@@ -1001,7 +1004,10 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navGeneral')"
     >
-    <Card class="rounded-3xl border-border/70 bg-card/85">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navGeneral") }}
+    </h2>
+    <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
       <CardHeader
         class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0"
       >
@@ -1048,9 +1054,9 @@ async function runMetadataRefreshForSelected() {
       </div>
     </div>
 
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.storageCardTitle") }}</CardTitle>
             <CardDescription>
@@ -1317,8 +1323,8 @@ async function runMetadataRefreshForSelected() {
         </Card>
       </div>
 
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.organizeTitle") }}</CardTitle>
             <CardDescription>
@@ -1362,9 +1368,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navMetadata')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navMetadata") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.metadataMovieProviderTitle") }}</CardTitle>
             <CardDescription>
@@ -1795,9 +1804,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navNetwork')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navNetwork") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.proxyTitle") }}</CardTitle>
             <CardDescription>
@@ -1988,9 +2000,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navLibraryBehavior')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navLibraryBehavior") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.extendedImportTitle") }}</CardTitle>
             <CardDescription>
@@ -2034,9 +2049,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navCurated')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navCurated") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.curatedCardTitle") }}</CardTitle>
             <CardDescription>
@@ -2155,9 +2173,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navPlayback')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navPlayback") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.playbackCardTitle") }}</CardTitle>
             <CardDescription>
@@ -2185,9 +2206,12 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navMaintenance')"
     >
-      <div class="w-full columns-1 gap-6">
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navMaintenance") }}
+    </h2>
+      <div class="flex w-full flex-col gap-6">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.manualCardTitle") }}</CardTitle>
             <CardDescription>
@@ -2232,8 +2256,8 @@ async function runMetadataRefreshForSelected() {
         </Card>
       </div>
 
-      <div class="mb-6 break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85">
+      <div class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader>
             <CardTitle>{{ t("settings.configCardTitle") }}</CardTitle>
             <CardDescription>
@@ -2253,7 +2277,10 @@ async function runMetadataRefreshForSelected() {
       class="scroll-mt-6 space-y-6"
       :aria-label="t('settings.navAbout')"
     >
-      <Card class="rounded-3xl border-border/70 bg-card/85">
+    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
+      {{ t("settings.navAbout") }}
+    </h2>
+      <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
         <CardHeader class="flex flex-row items-start gap-3 space-y-0 pb-2">
           <Info
             class="mt-0.5 size-5 shrink-0 text-muted-foreground"

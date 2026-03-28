@@ -1,19 +1,20 @@
-import { ref, type Ref } from "vue"
+import { toast } from "vue-sonner"
+import type { TaskDTO } from "@/api/types"
 
-export type AppToastVariant = "default" | "success" | "destructive"
+export type AppToastVariant = "default" | "success" | "destructive" | "warning"
 
-const toastOpen: Ref<boolean> = ref(false)
-const toastMessage: Ref<string> = ref("")
-const toastVariant: Ref<AppToastVariant> = ref("default")
-
-let hideTimer: ReturnType<typeof setTimeout> | null = null
-
-export function useAppToastHost() {
-  return {
-    toastOpen,
-    toastMessage,
-    toastVariant,
+/** Maps terminal task status to toast severity (scan / watch / scrape toasts). */
+export function taskTerminalToastVariant(status: TaskDTO["status"]): AppToastVariant {
+  if (status === "completed") {
+    return "success"
   }
+  if (status === "partial_failed") {
+    return "warning"
+  }
+  if (status === "cancelled") {
+    return "default"
+  }
+  return "destructive"
 }
 
 export function pushAppToast(
@@ -21,16 +22,25 @@ export function pushAppToast(
   options?: { variant?: AppToastVariant; durationMs?: number },
 ): void {
   const variant = options?.variant ?? "default"
-  const durationMs = options?.durationMs ?? 4500
-  if (hideTimer) {
-    clearTimeout(hideTimer)
-    hideTimer = null
+  const duration = options?.durationMs ?? 4500
+  const base = {
+    duration,
+    closeButton: true,
+    dismissible: true,
+  } as const
+
+  switch (variant) {
+    case "success":
+      toast.success(message, base)
+      break
+    case "destructive":
+      toast.error(message, { ...base, important: true })
+      break
+    case "warning":
+      toast.warning(message, base)
+      break
+    default:
+      toast.info(message, base)
+      break
   }
-  toastMessage.value = message
-  toastVariant.value = variant
-  toastOpen.value = true
-  hideTimer = setTimeout(() => {
-    toastOpen.value = false
-    hideTimer = null
-  }, durationMs)
 }

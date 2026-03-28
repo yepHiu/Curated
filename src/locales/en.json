@@ -332,6 +332,7 @@
     "aboutDataModeMock": "Demo mode (Web API off): in-browser mock data; some features differ or are unavailable vs. a real backend.",
     "aboutBuildEnv": "Front-end build: {env}",
     "aboutDevProxyHint": "In dev, Vite usually proxies /api to http://localhost:8080; run javd alongside for a real library.",
+    "navJumpTo": "Jump to section…",
     "navAriaLabel": "Settings sections",
     "navOverview": "Overview",
     "navGeneral": "General",
