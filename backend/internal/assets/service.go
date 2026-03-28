@@ -16,6 +16,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"jav-shadcn/backend/internal/browserheaders"
 	"jav-shadcn/backend/internal/scraper"
 )
 
@@ -141,7 +142,8 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	if err != nil {
 		return "", err
 	}
-	request.Header.Set("User-Agent", "Curated-backend/0.1")
+	request.Header.Set("User-Agent", browserheaders.UserAgentChrome120)
+	request.Header.Set("Accept", browserheaders.AcceptLikeChrome)
 
 	response, err := s.client.Do(request)
 	if err != nil {

@@ -52,3 +52,23 @@ func TestWithAccessLog_HealthIsDebug(t *testing.T) {
 		t.Fatalf("expected debug for /api/health, got %v", entries[0].Level)
 	}
 }
+
+func TestWithAccessLog_TasksRecentIsDebug(t *testing.T) {
+	core, obs := observer.New(zap.DebugLevel)
+	logger := zap.New(core)
+
+	h := WithAccessLog(logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/recent", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	entries := obs.All()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(entries))
+	}
+	if entries[0].Level != zap.DebugLevel {
+		t.Fatalf("expected debug for /api/tasks/recent, got %v", entries[0].Level)
+	}
+}

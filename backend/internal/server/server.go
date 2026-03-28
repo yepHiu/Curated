@@ -17,6 +17,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"jav-shadcn/backend/internal/browserheaders"
 	"jav-shadcn/backend/internal/config"
 	"jav-shadcn/backend/internal/contracts"
 	"jav-shadcn/backend/internal/proxyenv"
@@ -148,6 +149,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
+	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
+	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/{kind}", h.handleGetMovieAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/comment", h.handleGetMovieComment)
 	mux.HandleFunc("PUT /api/library/movies/{movieId}/comment", h.handlePutMovieComment)
@@ -221,6 +224,7 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list movies")
 		return
 	}
+	h.enrichMovieListItemsLocalPosters(r.Context(), result.Items)
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -375,6 +379,7 @@ func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
 		return
 	}
+	h.enrichMovieDetailLocalPosters(r.Context(), &movie)
 	writeJSON(w, http.StatusOK, movie)
 }
 
@@ -734,6 +739,7 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
 		return
 	}
+	h.enrichMovieDetailLocalPosters(r.Context(), &movie)
 	writeJSON(w, http.StatusOK, movie)
 }
 
@@ -1491,8 +1497,8 @@ func (h *Handler) handleProxyPingURL(w http.ResponseWriter, r *http.Request, tar
 		writeJSON(w, http.StatusOK, contracts.ProxyJavBusPingResponse{OK: false, Message: err.Error()})
 		return
 	}
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	httpReq.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
+	httpReq.Header.Set("User-Agent", browserheaders.UserAgentChrome120)
+	httpReq.Header.Set("Accept", browserheaders.AcceptLikeChrome)
 
 	resp, err := client.Do(httpReq)
 	latencyMs := time.Since(start).Milliseconds()

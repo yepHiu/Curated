@@ -23,8 +23,14 @@ func accessLogQuiet(r *http.Request) bool {
 	if r.Method == http.MethodGet && r.URL.Path == "/api/health" {
 		return true
 	}
+	if r.Method == http.MethodGet && r.URL.Path == "/api/tasks/recent" {
+		return true
+	}
 	p := r.URL.Path
 	if strings.Contains(p, "/api/library/movies/") && strings.HasSuffix(p, "/stream") {
+		return true
+	}
+	if strings.Contains(p, "/api/library/movies/") && strings.Contains(p, "/asset/") {
 		return true
 	}
 	if strings.Contains(p, "/api/curated-frames/") && strings.HasSuffix(p, "/image") {
@@ -34,7 +40,7 @@ func accessLogQuiet(r *http.Request) bool {
 }
 
 // WithAccessLog wraps the handler to record one HTTP access line per request (method, path, status, duration, remote).
-// Noisy routes (health, video stream, frame image) use Debug; others use Info.
+// Noisy routes (health, tasks/recent polling, video stream, frame image) use Debug; others use Info.
 func WithAccessLog(logger *zap.Logger, next http.Handler) http.Handler {
 	if logger == nil {
 		return next
