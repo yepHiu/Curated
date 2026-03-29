@@ -3,6 +3,7 @@ import type {
   ActorListItemDTO,
   ActorsListDTO,
   ListActorsParams,
+  MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   PatchMovieBody,
   ProxySettingsDTO,
@@ -34,9 +35,13 @@ export interface LibraryService {
   metadataMovieProviders: ComputedRef<readonly string[]>
   /** 有序的 Provider 列表；空数组表示自动（全源） */
   metadataMovieProviderChain: ComputedRef<readonly string[]>
+  /** 后端当前生效的刮削策略（切换模式时可保留链列表供再次启用） */
+  metadataMovieScrapeMode: ComputedRef<MetadataMovieScrapeMode>
   setMetadataMovieProvider(name: string): Promise<void>
   /** 设置有序的 Provider 列表；空数组表示自动（全源） */
   setMetadataMovieProviderChain(chain: string[]): Promise<void>
+  /** 仅切换 auto | specified | chain，不删除已保存的 provider / chain 配置 */
+  setMetadataMovieScrapeMode(mode: MetadataMovieScrapeMode): Promise<void>
   /** HTTP 代理配置 */
   proxy: ComputedRef<ProxySettingsDTO>
   setProxy(config: ProxySettingsDTO): Promise<void>

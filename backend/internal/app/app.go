@@ -347,15 +347,49 @@ func (a *App) StopLibraryWatchLoop() {
 	}
 }
 
-// MetadataMovieProvider returns the Metatube movie provider name for scrapes, or "" for automatic (all sources).
-// If MetadataMovieProviderChain is non-empty, returns chain[0]; otherwise returns the legacy single provider.
+// MetadataMovieProvider returns the persisted single-provider name for settings UI (not chain[0]).
+// Effective scrape provider is chosen by movieScrapeOptionsForRun using MetadataMovieScrapeMode.
 func (a *App) MetadataMovieProvider() string {
 	a.metadataMovieMu.RLock()
 	defer a.metadataMovieMu.RUnlock()
-	if len(a.metadataMovieProviderChain) > 0 {
-		return strings.TrimSpace(a.metadataMovieProviderChain[0])
-	}
 	return strings.TrimSpace(a.cfg.MetadataMovieProvider)
+}
+
+func (a *App) effectiveMetadataMovieScrapeModeLocked() string {
+	m := strings.TrimSpace(strings.ToLower(a.cfg.MetadataMovieScrapeMode))
+	if m == "auto" || m == "specified" || m == "chain" {
+		return m
+	}
+	if len(a.metadataMovieProviderChain) > 0 {
+		return "chain"
+	}
+	if strings.TrimSpace(a.cfg.MetadataMovieProvider) != "" {
+		return "specified"
+	}
+	return "auto"
+}
+
+// MetadataMovieScrapeMode returns auto | specified | chain for API/settings UI.
+func (a *App) MetadataMovieScrapeMode() string {
+	a.metadataMovieMu.RLock()
+	defer a.metadataMovieMu.RUnlock()
+	return a.effectiveMetadataMovieScrapeModeLocked()
+}
+
+func (a *App) movieScrapeOptionsForRun() scraper.MovieScrapeOptions {
+	a.metadataMovieMu.RLock()
+	defer a.metadataMovieMu.RUnlock()
+	mode := a.effectiveMetadataMovieScrapeModeLocked()
+	switch mode {
+	case "chain":
+		ch := make([]string, len(a.metadataMovieProviderChain))
+		copy(ch, a.metadataMovieProviderChain)
+		return scraper.MovieScrapeOptions{Provider: "", ProviderChain: ch}
+	case "specified":
+		return scraper.MovieScrapeOptions{Provider: strings.TrimSpace(a.cfg.MetadataMovieProvider), ProviderChain: nil}
+	default:
+		return scraper.MovieScrapeOptions{Provider: "", ProviderChain: nil}
+	}
 }
 
 // MetadataMovieProviderChain returns the ordered list of providers to try in sequence.
@@ -368,25 +402,28 @@ func (a *App) MetadataMovieProviderChain() []string {
 	return out
 }
 
-// SetMetadataMovieProvider persists the provider name to library-config.cfg (empty = automatic) and updates memory.
-// Also clears the provider chain to avoid confusion.
+// SetMetadataMovieProvider persists the single provider and sets scrape mode to auto or specified.
+// Does not remove metadataMovieProviderChain from disk so users can switch back to chain mode without re-entering the list.
 func (a *App) SetMetadataMovieProvider(name string) error {
 	path := a.librarySettingsPath
 	if path == "" {
 		return fmt.Errorf("library settings path not configured")
 	}
 	trimmed := strings.TrimSpace(name)
+	mode := "auto"
+	if trimmed != "" {
+		mode = "specified"
+	}
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
 		m["metadataMovieProvider"] = trimmed
-		// Clear chain when setting single provider to avoid confusion
-		delete(m, "metadataMovieProviderChain")
+		m["metadataMovieScrapeMode"] = mode
 		return nil
 	}); err != nil {
 		return err
 	}
 	a.metadataMovieMu.Lock()
 	a.cfg.MetadataMovieProvider = trimmed
-	a.metadataMovieProviderChain = nil
+	a.cfg.MetadataMovieScrapeMode = mode
 	a.metadataMovieMu.Unlock()
 	return nil
 }
@@ -409,10 +446,11 @@ func (a *App) SetMetadataMovieProviderChain(chain []string) error {
 		if len(filtered) == 0 {
 			delete(m, "metadataMovieProviderChain")
 			delete(m, "metadataMovieProvider")
+			m["metadataMovieScrapeMode"] = "auto"
 		} else {
 			m["metadataMovieProviderChain"] = filtered
-			// Clear single provider when setting chain to avoid confusion
 			delete(m, "metadataMovieProvider")
+			m["metadataMovieScrapeMode"] = "chain"
 		}
 		return nil
 	}); err != nil {
@@ -421,9 +459,35 @@ func (a *App) SetMetadataMovieProviderChain(chain []string) error {
 	a.metadataMovieMu.Lock()
 	a.metadataMovieProviderChain = filtered
 	a.cfg.MetadataMovieProviderChain = filtered
-	if len(filtered) > 0 {
+	if len(filtered) == 0 {
 		a.cfg.MetadataMovieProvider = ""
+		a.cfg.MetadataMovieScrapeMode = "auto"
+	} else {
+		a.cfg.MetadataMovieProvider = ""
+		a.cfg.MetadataMovieScrapeMode = "chain"
 	}
+	a.metadataMovieMu.Unlock()
+	return nil
+}
+
+// SetMetadataMovieScrapeMode persists auto | specified | chain without changing saved provider or chain lists.
+func (a *App) SetMetadataMovieScrapeMode(mode string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	normalized := strings.TrimSpace(strings.ToLower(mode))
+	if normalized != "auto" && normalized != "specified" && normalized != "chain" {
+		return fmt.Errorf("invalid metadataMovieScrapeMode %q", mode)
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["metadataMovieScrapeMode"] = normalized
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.metadataMovieMu.Lock()
+	a.cfg.MetadataMovieScrapeMode = normalized
 	a.metadataMovieMu.Unlock()
 	return nil
 }
@@ -574,11 +638,13 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			Player: contracts.PlayerSettingsDTO{
 				HardwareDecode: a.cfg.Player.HardwareDecode,
 			},
-			OrganizeLibrary:        a.OrganizeLibrary(),
-			ExtendedLibraryImport:  a.ExtendedLibraryImport(),
-			AutoLibraryWatch:       a.AutoLibraryWatch(),
-			MetadataMovieProvider:  a.MetadataMovieProvider(),
-			MetadataMovieProviders: a.ListMetadataMovieProviders(),
+			OrganizeLibrary:              a.OrganizeLibrary(),
+			ExtendedLibraryImport:        a.ExtendedLibraryImport(),
+			AutoLibraryWatch:             a.AutoLibraryWatch(),
+			MetadataMovieProvider:        a.MetadataMovieProvider(),
+			MetadataMovieProviders:       a.ListMetadataMovieProviders(),
+			MetadataMovieProviderChain:   a.MetadataMovieProviderChain(),
+			MetadataMovieScrapeMode:      a.MetadataMovieScrapeMode(),
 		}
 		return a.respondOK(output, command.ID, settings)
 
@@ -890,10 +956,7 @@ func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result
 // runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
 func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context, output io.Writer, task contracts.TaskDTO, result contracts.ScanFileResultDTO) {
 	scrapeStarted := time.Now()
-	scrapeOpts := scraper.MovieScrapeOptions{
-		Provider:      a.MetadataMovieProvider(),
-		ProviderChain: a.MetadataMovieProviderChain(),
-	}
+	scrapeOpts := a.movieScrapeOptionsForRun()
 	metadata, err := a.scraper.Scrape(ctx, result.MovieID, result.Number, scrapeOpts)
 	if err != nil {
 		code := contracts.ErrorCodeScraperRun

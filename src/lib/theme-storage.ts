@@ -33,9 +33,35 @@ export function isDarkForPreference(pref: ThemePreference): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
 }
 
-export function applyThemeToDocument(pref: ThemePreference): void {
+export type ApplyThemeToDocumentOptions = {
+  /** 使用 View Transitions API（需浏览器支持；首屏与减少动画偏好下应关闭） */
+  viewTransition?: boolean
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return true
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+}
+
+export function applyThemeToDocument(
+  pref: ThemePreference,
+  options?: ApplyThemeToDocumentOptions,
+): void {
   if (typeof document === "undefined") return
   const root = document.documentElement
-  if (isDarkForPreference(pref)) root.classList.add("dark")
-  else root.classList.remove("dark")
+  const apply = () => {
+    if (isDarkForPreference(pref)) root.classList.add("dark")
+    else root.classList.remove("dark")
+  }
+
+  const useVt =
+    options?.viewTransition === true &&
+    typeof document.startViewTransition === "function" &&
+    !prefersReducedMotion()
+
+  if (useVt) {
+    document.startViewTransition(apply)
+  } else {
+    apply()
+  }
 }

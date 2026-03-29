@@ -1,9 +1,11 @@
 import { computed, ref, watch, type Ref } from "vue"
 import type {
   ListActorsParams,
+  MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   PatchMovieBody,
   ProxySettingsDTO,
+  SettingsDTO,
   TaskDTO,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
@@ -29,6 +31,7 @@ const autoLibraryWatchState = ref(true)
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
+const metadataMovieScrapeModeState = ref<MetadataMovieScrapeMode>("auto")
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
 /** 设置页概览第三卡：萃取帧条数（GET /curated-frames 列表长度） */
 const curatedFramesCountState = ref(0)
@@ -38,6 +41,7 @@ let extendedLibraryImportSaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
+let metadataMovieScrapeModeSaveSeq = 0
 let proxySaveSeq = 0
 let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
@@ -178,6 +182,29 @@ function mergeMovieIntoListState(movie: Movie) {
   trashedMoviesState.value = trashedMoviesState.value.filter((m) => m.id !== id)
 }
 
+function resolveMetadataMovieScrapeMode(
+  s: Pick<SettingsDTO, "metadataMovieScrapeMode" | "metadataMovieProvider" | "metadataMovieProviderChain">,
+): MetadataMovieScrapeMode {
+  const raw = s.metadataMovieScrapeMode?.trim().toLowerCase()
+  if (raw === "auto" || raw === "specified" || raw === "chain") {
+    return raw
+  }
+  const chain = Array.isArray(s.metadataMovieProviderChain) ? s.metadataMovieProviderChain : []
+  if (chain.length > 0) return "chain"
+  return (s.metadataMovieProvider ?? "").trim() === "" ? "auto" : "specified"
+}
+
+function applyMetadataMovieSettingsFromDTO(next: SettingsDTO) {
+  metadataMovieProviderState.value = next.metadataMovieProvider?.trim() ?? ""
+  metadataMovieProvidersState.value = Array.isArray(next.metadataMovieProviders)
+    ? [...next.metadataMovieProviders]
+    : []
+  metadataMovieProviderChainState.value = Array.isArray(next.metadataMovieProviderChain)
+    ? [...next.metadataMovieProviderChain]
+    : []
+  metadataMovieScrapeModeState.value = resolveMetadataMovieScrapeMode(next)
+}
+
 async function refreshLibraryPathsFromApi() {
   try {
     const settings = await api.getSettings()
@@ -185,13 +212,7 @@ async function refreshLibraryPathsFromApi() {
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     extendedLibraryImportState.value = Boolean(settings.extendedLibraryImport)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
-    metadataMovieProviderState.value = settings.metadataMovieProvider?.trim() ?? ""
-    metadataMovieProvidersState.value = Array.isArray(settings.metadataMovieProviders)
-      ? [...settings.metadataMovieProviders]
-      : []
-    metadataMovieProviderChainState.value = Array.isArray(settings.metadataMovieProviderChain)
-      ? [...settings.metadataMovieProviderChain]
-      : []
+    applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
   } catch (err) {
     console.error("[web-library-service] failed to load settings", err)
@@ -215,6 +236,7 @@ function createWebLibraryService(): LibraryService {
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
+    metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeState.value),
     proxy: computed(() => proxyState.value),
 
     async setProxy(config: ProxySettingsDTO) {
@@ -319,13 +341,7 @@ function createWebLibraryService(): LibraryService {
       try {
         const next = await api.patchSettings({ metadataMovieProvider: trimmed })
         if (seq === metadataMovieProviderSaveSeq) {
-          metadataMovieProviderState.value = next.metadataMovieProvider?.trim() ?? ""
-          if (Array.isArray(next.metadataMovieProviders)) {
-            metadataMovieProvidersState.value = [...next.metadataMovieProviders]
-          }
-          if (Array.isArray(next.metadataMovieProviderChain)) {
-            metadataMovieProviderChainState.value = [...next.metadataMovieProviderChain]
-          }
+          applyMetadataMovieSettingsFromDTO(next)
         }
       } catch (err) {
         if (seq === metadataMovieProviderSaveSeq) {
@@ -346,16 +362,30 @@ function createWebLibraryService(): LibraryService {
       try {
         const next = await api.patchSettings({ metadataMovieProviderChain: filtered })
         if (seq === metadataMovieProviderChainSaveSeq) {
-          metadataMovieProviderChainState.value = Array.isArray(next.metadataMovieProviderChain)
-            ? [...next.metadataMovieProviderChain]
-            : []
-          metadataMovieProviderState.value = next.metadataMovieProvider?.trim() ?? ""
-          if (Array.isArray(next.metadataMovieProviders)) {
-            metadataMovieProvidersState.value = [...next.metadataMovieProviders]
-          }
+          applyMetadataMovieSettingsFromDTO(next)
         }
       } catch (err) {
         if (seq === metadataMovieProviderChainSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async setMetadataMovieScrapeMode(mode: MetadataMovieScrapeMode) {
+      const seq = ++metadataMovieScrapeModeSaveSeq
+      metadataMovieScrapeModeState.value = mode
+      try {
+        const next = await api.patchSettings({ metadataMovieScrapeMode: mode })
+        if (seq === metadataMovieScrapeModeSaveSeq) {
+          applyMetadataMovieSettingsFromDTO(next)
+        }
+      } catch (err) {
+        if (seq === metadataMovieScrapeModeSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {

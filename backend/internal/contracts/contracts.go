@@ -335,9 +335,11 @@ type SettingsDTO struct {
 	AutoLibraryWatch       bool     `json:"autoLibraryWatch"`
 	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
 	MetadataMovieProviders []string `json:"metadataMovieProviders"`
-	// MetadataMovieProviderChain: ordered list of providers to try in sequence; empty = auto (all sources).
-	// When set, overrides MetadataMovieProvider for new scrapes.
+	// MetadataMovieProviderChain: ordered provider priority list (may be non-empty while UI mode is auto/specified).
 	MetadataMovieProviderChain []string `json:"metadataMovieProviderChain"`
+	// MetadataMovieScrapeMode: auto | specified | chain — which strategy the backend uses for new scrapes.
+	// Saved chain/specifier lists may remain in cfg when switching mode so the UI can restore them.
+	MetadataMovieScrapeMode string `json:"metadataMovieScrapeMode"`
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
 }
@@ -372,6 +374,8 @@ type PatchSettingsRequest struct {
 	MetadataMovieProvider *string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
+	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
+	MetadataMovieScrapeMode *string `json:"metadataMovieScrapeMode,omitempty"`
 	// Proxy: nil = no change; non-nil object replaces current proxy config.
 	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
 }

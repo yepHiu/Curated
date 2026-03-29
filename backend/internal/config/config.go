@@ -33,6 +33,8 @@ type Config struct {
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.
 	MetadataMovieProviderChain []string `json:"metadataMovieProviderChain,omitempty"`
+	// MetadataMovieScrapeMode is auto | specified | chain; empty means infer from legacy chain/provider (pre-migration configs).
+	MetadataMovieScrapeMode string `json:"metadataMovieScrapeMode,omitempty"`
 	// AutoScanIntervalSeconds runs a full library scan on this interval; 0 disables (manual POST /api/scans only).
 	AutoScanIntervalSeconds int `json:"autoScanIntervalSeconds"`
 	// LibraryWatchEnabled: nil = default on (fsnotify on library roots); explicit false disables.

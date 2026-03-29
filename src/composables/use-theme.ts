@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import {
   applyThemeToDocument,
   getStoredThemePreference,
@@ -16,6 +16,8 @@ const themePreference = ref<ThemePreference>(readInitialPreference())
 
 let watchStarted = false
 let systemListenerAttached = false
+/** 首屏与同步 watch 完成前不跑主题过渡，避免加载时闪一下 */
+let themeViewTransitionAllowed = false
 
 function attachSystemColorSchemeListener(): void {
   if (systemListenerAttached || typeof window === "undefined") return
@@ -23,7 +25,9 @@ function attachSystemColorSchemeListener(): void {
   const mq = window.matchMedia("(prefers-color-scheme: dark)")
   mq.addEventListener("change", () => {
     if (themePreference.value === "system") {
-      applyThemeToDocument("system")
+      applyThemeToDocument("system", {
+        viewTransition: themeViewTransitionAllowed,
+      })
     }
   })
 }
@@ -35,7 +39,7 @@ function startWatch(): void {
     themePreference,
     (p) => {
       setStoredThemePreference(p)
-      applyThemeToDocument(p)
+      applyThemeToDocument(p, { viewTransition: themeViewTransitionAllowed })
     },
     { flush: "sync", immediate: true },
   )
@@ -50,6 +54,9 @@ export function useTheme() {
   onMounted(() => {
     themePreference.value = getStoredThemePreference()
     applyThemeToDocument(themePreference.value)
+    void nextTick(() => {
+      themeViewTransitionAllowed = true
+    })
     attachSystemColorSchemeListener()
   })
 

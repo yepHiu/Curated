@@ -103,6 +103,12 @@ import {
   type SettingsSectionSlug,
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
+import { cn } from "@/lib/utils"
+
+/** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
+const SETTINGS_CONTROL_H32_CLASS =
+  "[&_[data-slot=button]]:!h-8 [&_[data-slot=button]]:!min-h-8 [&_[data-slot=button]]:!max-h-8 [&_[data-slot=button][data-size=icon]]:!size-8 [&_[data-slot=button][data-size=icon-sm]]:!size-8 [&_[data-slot=button][data-size=icon-lg]]:!size-8 [&_[data-slot=select-trigger]]:!h-8 [&_[data-slot=select-trigger]]:!min-h-8 [&_[data-slot=select-trigger]]:!max-h-8 [&_[data-slot=select-trigger]]:!py-0 [&_[data-slot=tabs-trigger]]:!h-8 [&_[data-slot=tabs-trigger]]:!min-h-8 [&_[data-slot=tabs-trigger]]:!max-h-8 [&_[data-slot=tabs-trigger]]:!py-0"
+
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
 
@@ -422,11 +428,7 @@ const canPickSpecifiedMetadata = computed(() => metadataMovieSelectOptions.value
 const canUseMetadataChainMode = computed(
   () => canPickSpecifiedMetadata.value || libraryService.metadataMovieProviderChain.value.length > 0,
 )
-const metadataMovieMode = computed<"auto" | "specified" | "chain">(() => {
-  const chain = libraryService.metadataMovieProviderChain.value
-  if (chain.length > 0) return "chain"
-  return metadataMovieProvider.value === "" ? "auto" : "specified"
-})
+const metadataMovieMode = computed(() => libraryService.metadataMovieScrapeMode.value)
 
 /**
  * 刮削策略在界面上的选中态：须与「用户当前点的单选项」一致。
@@ -731,14 +733,27 @@ watchDebounced(
   { deep: true, debounce: 450 },
 )
 
-function onMetadataMovieModeChain() {
+async function onMetadataMovieModeChain() {
   if (metadataMovieModeUi.value === "chain") return
-  withSyncPreservedScroll(() => {
-    metadataMovieModeUi.value = "chain"
-    metadataMovieChainError.value = ""
-    metadataMovieError.value = ""
-    initProviderChainDraft()
-  })
+  metadataMovieChainError.value = ""
+  metadataMovieError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      await libraryService.setMetadataMovieScrapeMode("chain")
+      metadataMovieModeUi.value = "chain"
+      initProviderChainDraft()
+      syncMetadataMovieModeUiFromServer()
+    })
+  } catch (err) {
+    console.error("[settings] metadata scrape mode (chain) failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      metadataMovieChainError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      metadataMovieChainError.value = err.message
+    } else {
+      metadataMovieChainError.value = t("settings.errSaveTitle")
+    }
+  }
 }
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
@@ -1232,7 +1247,12 @@ async function runMetadataRefreshForSelected() {
 <template>
   <Tabs
     v-model="activeSlug"
-    class="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-8"
+    :class="
+      cn(
+        'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-8',
+        SETTINGS_CONTROL_H32_CLASS,
+      )
+    "
   >
     <nav
       class="w-full shrink-0 lg:max-h-[calc(100dvh-10.5rem)] lg:w-52 lg:overflow-y-auto lg:overscroll-contain lg:self-start"
@@ -1458,7 +1478,9 @@ async function runMetadataRefreshForSelected() {
                   </Button>
                 </DialogTrigger>
 
-                <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
+                <DialogContent
+                  :class="cn('rounded-3xl border-border/70 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+                >
                   <DialogHeader>
                     <DialogTitle>{{ t("settings.addPathDialogTitle") }}</DialogTitle>
                     <DialogDescription>
@@ -1541,7 +1563,9 @@ async function runMetadataRefreshForSelected() {
               </Dialog>
 
               <Dialog v-model:open="removePathDialogOpen">
-                <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
+                <DialogContent
+                  :class="cn('rounded-3xl border-border/70 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+                >
                   <DialogHeader>
                     <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
                     <DialogDescription>
@@ -1872,7 +1896,6 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navMetadata')"
     >
     <h2 class="sr-only">{{ t("settings.navMetadata") }}</h2>
-      <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
@@ -1893,7 +1916,7 @@ async function runMetadataRefreshForSelected() {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/25 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      class="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/25 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       <HelpCircle class="size-[1.05rem]" aria-hidden="true" />
                       <span class="sr-only">{{
@@ -1998,11 +2021,8 @@ async function runMetadataRefreshForSelected() {
               {{ autoLibraryWatchError }}
             </p>
 
-            <div
-              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
-            >
             <fieldset
-              class="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/60 p-3 dark:bg-background/40"
+              class="flex flex-col gap-2 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
               :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
             >
               <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
@@ -2015,7 +2035,7 @@ async function runMetadataRefreshForSelected() {
                     <TooltipTrigger as-child>
                       <button
                         type="button"
-                        class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
                         <Info class="size-4" aria-hidden="true" />
                         <span class="sr-only">{{
@@ -2109,7 +2129,7 @@ async function runMetadataRefreshForSelected() {
             <!-- Single Provider Selection -->
             <div
               v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
-              class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/20 p-4"
+              class="flex flex-col gap-2 rounded-xl border border-border/50 bg-muted/10 p-3"
             >
               <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
               <div class="flex flex-wrap items-start gap-2">
@@ -2196,7 +2216,7 @@ async function runMetadataRefreshForSelected() {
             <!-- Provider Chain Management（与 canPickSpecifiedMetadata 解耦：无站点列表时仍显示已保存的链） -->
             <div
               v-if="metadataMovieModeUi === 'chain'"
-              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4"
+              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
             >
               <p
                 v-if="!canPickSpecifiedMetadata"
@@ -2367,7 +2387,6 @@ async function runMetadataRefreshForSelected() {
                 {{ metadataMovieChainError }}
               </p>
             </div>
-            </div>
 
             <p
               v-if="!canPickSpecifiedMetadata && metadataMovieModeUi !== 'chain'"
@@ -2428,7 +2447,6 @@ async function runMetadataRefreshForSelected() {
             </p>
           </CardContent>
         </Card>
-      </div>
       </div>
     </section>
     </TabsContent>
@@ -2501,7 +2519,7 @@ async function runMetadataRefreshForSelected() {
               <div class="flex flex-col gap-2">
                 <button
                   type="button"
-                  class="flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/30 px-3 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
+                  class="flex h-8 min-h-8 w-full max-h-8 items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/30 px-3 py-0 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
                   :disabled="proxySaving"
                   :aria-expanded="proxyAuthExpanded"
                   @click="proxyAuthExpanded = !proxyAuthExpanded"
@@ -2697,7 +2715,7 @@ async function runMetadataRefreshForSelected() {
                     <TooltipTrigger as-child>
                       <button
                         type="button"
-                        class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
                         <Info class="size-4" aria-hidden="true" />
                         <span class="sr-only">{{
@@ -3019,7 +3037,7 @@ async function runMetadataRefreshForSelected() {
     <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
       <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-        <CardHeader class="space-y-3 pb-2">
+        <CardHeader class="space-y-4 pb-2">
           <CardTitle class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xl font-semibold tracking-tight">
             <span class="flex min-w-0 items-center gap-3">
               <span
@@ -3031,12 +3049,15 @@ async function runMetadataRefreshForSelected() {
               <span class="min-w-0">{{ t("settings.aboutCardTitle") }}</span>
             </span>
           </CardTitle>
-          <CardDescription
-            v-if="isViteDev"
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
-          >
-            {{ t("settings.aboutCardDesc") }}
-          </CardDescription>
+          <div class="flex w-full justify-center pt-1">
+            <div
+              class="font-curated inline-flex w-fit max-w-full items-center gap-2.5 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
+              title="Curated"
+            >
+              <Sparkles class="size-6 shrink-0 text-primary sm:size-7" aria-hidden="true" />
+              <span class="truncate">Curated</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent class="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
           <!-- 开发：版本号、数据模式、前端构建模式 -->

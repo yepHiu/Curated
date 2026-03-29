@@ -77,6 +77,9 @@ export interface PlayerSettingsDTO {
   hardwareDecode: boolean
 }
 
+/** 与后端 library-config.cfg / GET settings 一致：决定新刮削使用的策略；链与单源列表可保留在切换模式时 */
+export type MetadataMovieScrapeMode = "auto" | "specified" | "chain"
+
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
   player: PlayerSettingsDTO
@@ -94,6 +97,8 @@ export interface SettingsDTO {
   metadataMovieProviders: string[]
   /** 有序的 Provider 列表；优先于 metadataMovieProvider 使用。空数组表示自动（全源） */
   metadataMovieProviderChain: string[]
+  /** 当前生效的刮削策略（旧后端可能缺省，由前端按链/单源推断） */
+  metadataMovieScrapeMode?: MetadataMovieScrapeMode
   /** HTTP 代理配置 */
   proxy: ProxySettingsDTO
 }
@@ -125,6 +130,8 @@ export interface PatchSettingsBody {
   metadataMovieProvider?: string
   /** 有序的 Provider 列表。发送空数组表示清除（自动模式）。优先级高于 metadataMovieProvider */
   metadataMovieProviderChain?: string[]
+  /** 仅切换生效策略，不删除已保存的链或单源字段 */
+  metadataMovieScrapeMode?: MetadataMovieScrapeMode
   /** 代理配置；发送则替换当前配置 */
   proxy?: ProxySettingsDTO
 }

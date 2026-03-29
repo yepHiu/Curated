@@ -61,10 +61,37 @@ const previewViewerOpen = ref(false)
 const previewViewerStartIndex = ref(0)
 
 function openPreviewViewer(galleryIndex: number) {
-  const url = previewImages.value[galleryIndex]?.trim()
-  if (!url) return
-  const idx = viewerImages.value.indexOf(url)
-  previewViewerStartIndex.value = idx >= 0 ? idx : 0
+  const poster = (props.movie.coverUrl || props.movie.thumbUrl || "").trim()
+  const previews = previewImages.value
+  const raw = previews[galleryIndex]?.trim()
+  if (!raw) return
+
+  const idxByUrl = viewerImages.value.indexOf(raw)
+  if (idxByUrl >= 0) {
+    previewViewerStartIndex.value = idxByUrl
+    previewViewerOpen.value = true
+    return
+  }
+
+  if (poster && raw === poster) {
+    previewViewerStartIndex.value = 0
+    previewViewerOpen.value = true
+    return
+  }
+
+  let viewerIdx = poster ? 1 : 0
+  for (let i = 0; i < previews.length; i++) {
+    const s = previews[i]?.trim()
+    if (!s || (poster && s === poster)) continue
+    if (i === galleryIndex) {
+      previewViewerStartIndex.value = viewerIdx
+      previewViewerOpen.value = true
+      return
+    }
+    viewerIdx++
+  }
+
+  previewViewerStartIndex.value = 0
   previewViewerOpen.value = true
 }
 
@@ -167,12 +194,7 @@ const emit = defineEmits<{
     <MovieCommentSection :movie-id="movie.id" :readonly="commentReadonly" />
 
     <div class="flex flex-col gap-4">
-      <div class="flex flex-col gap-1">
-        <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>
-        <p class="text-sm text-muted-foreground">
-          {{ t("detailPage.relatedDesc") }}
-        </p>
-      </div>
+      <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>
 
       <MovieGrid
         :movies="relatedMoviesForGrid"

@@ -566,12 +566,7 @@ function pickUserTagSuggestion(tag: string) {
         </p>
 
         <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-1">
-            <p class="text-sm font-medium">{{ t("detailPanel.metadataTags") }}</p>
-            <p class="text-xs text-muted-foreground">
-              {{ t("detailPanel.metadataTagsHint") }}
-            </p>
-          </div>
+          <p class="text-sm font-medium">{{ t("detailPanel.metadataTags") }}</p>
           <p v-if="movie.tags.length === 0" class="text-sm text-muted-foreground">
             {{ t("detailPanel.noMetadataTags") }}
           </p>
@@ -608,9 +603,6 @@ function pickUserTagSuggestion(tag: string) {
 
         <div class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("detailPanel.myTags") }}</p>
-          <p class="text-xs text-muted-foreground">
-            {{ t("detailPanel.myTagsHint") }}
-          </p>
           <div class="flex flex-wrap items-center gap-2">
             <Badge
               v-for="tag in movie.userTags"

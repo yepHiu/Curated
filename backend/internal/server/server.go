@@ -66,6 +66,8 @@ type MetadataScrapeSettings interface {
 	SetMetadataMovieProvider(name string) error
 	MetadataMovieProviderChain() []string
 	SetMetadataMovieProviderChain(chain []string) error
+	MetadataMovieScrapeMode() string
+	SetMetadataMovieScrapeMode(mode string) error
 	ListMetadataMovieProviders() []string
 }
 
@@ -979,6 +981,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.metadataScrapeCtl != nil {
 		dto.MetadataMovieProvider = h.metadataScrapeCtl.MetadataMovieProvider()
 		dto.MetadataMovieProviderChain = h.metadataScrapeCtl.MetadataMovieProviderChain()
+		dto.MetadataMovieScrapeMode = h.metadataScrapeCtl.MetadataMovieScrapeMode()
 		if list := h.metadataScrapeCtl.ListMetadataMovieProviders(); list != nil {
 			dto.MetadataMovieProviders = list
 		}
@@ -1039,7 +1042,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.Proxy == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1131,6 +1134,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.metadataScrapeCtl.SetMetadataMovieProviderChain(chain); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist metadataMovieProviderChain", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.MetadataMovieScrapeMode != nil {
+		if h.metadataScrapeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata scrape settings not available")
+			return
+		}
+		mode := strings.TrimSpace(strings.ToLower(*body.MetadataMovieScrapeMode))
+		if mode != "auto" && mode != "specified" && mode != "chain" {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid metadataMovieScrapeMode")
+			return
+		}
+		if err := h.metadataScrapeCtl.SetMetadataMovieScrapeMode(mode); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist metadataMovieScrapeMode", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
 			return
