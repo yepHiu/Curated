@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/scraper"
 )
 
 // GetActorProfile loads one row from actors by exact name (library display name).

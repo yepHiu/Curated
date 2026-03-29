@@ -18,6 +18,6 @@ alwaysApply: false
 - Detail pages should follow the current media-library pattern: left poster, right metadata, clear hierarchy, and no oversized hero banners.
 - Player pages should stay video-first and low-chrome; avoid adding extra explanatory cards or secondary panels unless explicitly requested.
 - Settings pages should follow the current centered content band with top stats and vertically stacked setting cards; avoid wide admin-dashboard layouts unless requested.
-- Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit. **Exception:** the official **Curated** brand pill in `AppSidebar` uses fixed pink/plum colors.
+- Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit. **Exception:** the **Curated** wordmark in `AppSidebar` uses `text-primary` and `font-curated` (Outfit via `--font-curated` in `src/style.css`).
 - **Dialog / form fields** (detail edit, settings paths, etc.): use **`Input`** from `@/components/ui/input` with **explicit import**; follow **`vue-frontend-standards.mdc`** for contrast, `dark:` caveats, and keeping inputs + textareas visually consistent on dark surfaces.
 - **Global notifications**: use **`pushAppToast`** from `@/composables/use-app-toast` (backed by **vue-sonner** via shadcn **`Toaster`** in `AppShell`); do not add parallel toast systems.

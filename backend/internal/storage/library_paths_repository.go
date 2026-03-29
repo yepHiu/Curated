@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 // ErrLibraryPathDuplicate is returned when inserting a path that already exists.

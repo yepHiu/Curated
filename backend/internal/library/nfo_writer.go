@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/scraper"
 )
 
 // WriteMovieNFO writes a Kodi-oriented movie.nfo into dir (番号目录，与视频同级).

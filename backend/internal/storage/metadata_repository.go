@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/scraper"
 )
 
 // ErrMovieNotFoundForMetadata is returned when SaveMovieMetadata updates zero rows (unknown movie id).

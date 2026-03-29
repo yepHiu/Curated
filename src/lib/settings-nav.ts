@@ -5,7 +5,6 @@ export type SettingsSectionSlug =
   | "library"
   | "metadata"
   | "network"
-  | "libraryBehavior"
   | "curated"
   | "playback"
   | "maintenance"
@@ -21,7 +20,6 @@ export const SETTINGS_NAV_ITEMS: { slug: SettingsSectionSlug; labelKey: string }
   { slug: "library", labelKey: "settings.navLibrary" },
   { slug: "metadata", labelKey: "settings.navMetadata" },
   { slug: "network", labelKey: "settings.navNetwork" },
-  { slug: "libraryBehavior", labelKey: "settings.navLibraryBehavior" },
   { slug: "curated", labelKey: "settings.navCurated" },
   { slug: "playback", labelKey: "settings.navPlayback" },
   { slug: "maintenance", labelKey: "settings.navMaintenance" },

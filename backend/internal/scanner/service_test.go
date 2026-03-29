@@ -8,7 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 func TestScan(t *testing.T) {

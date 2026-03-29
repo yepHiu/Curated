@@ -5,7 +5,6 @@ import { useI18n } from "vue-i18n"
 import {
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Clapperboard,
   History,
   LibraryBig,
@@ -29,11 +28,7 @@ import {
   listSortedByUpdatedDesc,
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
-import {
-  countUniqueTags,
-  formatSidebarCount,
-  isMovieRecentlyAdded,
-} from "@/lib/library-stats"
+import { countUniqueTags, formatSidebarCount } from "@/lib/library-stats"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { useLibraryService } from "@/services/library-service"
 
@@ -59,6 +54,11 @@ interface NavigationItem {
   page: AppPage
   icon: Component
   hint?: string
+}
+
+interface SidebarNavGroups {
+  browse: NavigationItem[]
+  yours: NavigationItem[]
 }
 
 const { t, locale } = useI18n()
@@ -116,14 +116,13 @@ onMounted(() => {
   void refreshCuratedFrameCount()
 })
 
-const browseItems = computed((): NavigationItem[] => {
+const sidebarNavGroups = computed((): SidebarNavGroups => {
   void locale.value
   void playbackProgressRevision.value
   void curatedFramesRevision.value
   const movies = libraryService.movies.value
   const trashTotal = libraryService.trashedMovies.value.length
   const total = movies.length
-  const recent = movies.filter((m) => isMovieRecentlyAdded(m.addedAt)).length
   const tagCount = countUniqueTags(movies)
   const actorSet = new Set<string>()
   for (const m of movies) {
@@ -137,35 +136,38 @@ const browseItems = computed((): NavigationItem[] => {
   const historyTotal = listSortedByUpdatedDesc().length
   const framesTotal = curatedFrameCount.value
 
-  return [
-    { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
-    { label: t("nav.recent"), page: "recent", icon: Clock3, hint: formatSidebarCount(recent) },
-    {
-      label: t("nav.curatedFrames"),
-      page: "curated-frames",
-      icon: Clapperboard,
-      hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
-    },
-    {
-      label: t("nav.actors"),
-      page: "actors",
-      icon: Users,
-      hint: actorCount > 0 ? formatSidebarCount(actorCount) : undefined,
-    },
-    { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
-    {
-      label: t("nav.history"),
-      page: "history",
-      icon: History,
-      hint: historyTotal > 0 ? formatSidebarCount(historyTotal) : undefined,
-    },
-    {
-      label: t("nav.trash"),
-      page: "trash",
-      icon: Trash2,
-      hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
-    },
-  ]
+  return {
+    browse: [
+      { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
+      {
+        label: t("nav.actors"),
+        page: "actors",
+        icon: Users,
+        hint: actorCount > 0 ? formatSidebarCount(actorCount) : undefined,
+      },
+      { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
+      {
+        label: t("nav.trash"),
+        page: "trash",
+        icon: Trash2,
+        hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
+      },
+    ],
+    yours: [
+      {
+        label: t("nav.curatedFrames"),
+        page: "curated-frames",
+        icon: Clapperboard,
+        hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
+      },
+      {
+        label: t("nav.history"),
+        page: "history",
+        icon: History,
+        hint: historyTotal > 0 ? formatSidebarCount(historyTotal) : undefined,
+      },
+    ],
+  }
 })
 
 const isActive = (page: AppPage) => route.name === page
@@ -189,7 +191,7 @@ const getNavigationTarget = (page: AppPage) => {
 
 <template>
   <aside
-    class="flex h-full min-h-0 w-full min-w-0 flex-col rounded-3xl border border-border/70 bg-sidebar/95 text-sidebar-foreground shadow-2xl shadow-black/20 backdrop-blur"
+    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden rounded-3xl border border-border/70 bg-sidebar/95 text-sidebar-foreground shadow-2xl shadow-black/20 backdrop-blur transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
     :class="props.compact ? 'items-center px-2 py-3' : 'p-4'"
   >
     <!-- 桌面完整：标题 + 可选收起 -->
@@ -197,16 +199,16 @@ const getNavigationTarget = (page: AppPage) => {
       v-if="!props.compact"
       class="flex items-center justify-between gap-2 px-2 py-3"
     >
-      <div class="flex min-w-0 flex-col gap-2">
+      <div class="flex min-w-0 items-center">
         <div
-          class="font-curated inline-flex w-fit max-w-full items-center gap-2 rounded-full bg-[#2d1b2d] px-3.5 py-2.5 text-lg font-semibold tracking-wide text-[#FF6B9B] shadow-inner shadow-black/20 sm:text-xl"
+          class="font-curated inline-flex w-fit max-w-full items-center gap-2 px-1 py-1 text-lg font-semibold tracking-wide text-primary sm:text-xl"
           title="Curated"
         >
-          <Sparkles class="size-5 shrink-0 text-[#FF6B9B] sm:size-[1.35rem]" aria-hidden="true" />
+          <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
           <span class="truncate">Curated</span>
         </div>
       </div>
-      <div class="flex shrink-0 items-center gap-1 self-start pt-0.5">
+      <div class="flex shrink-0 items-center gap-1">
         <Button
           v-if="props.showCollapseToggle"
           type="button"
@@ -240,10 +242,10 @@ const getNavigationTarget = (page: AppPage) => {
         <ChevronRight class="size-5" />
       </Button>
       <div
-        class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#2d1b2d] text-[#FF6B9B]"
+        class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-primary"
         title="Curated"
       >
-        <Sparkles class="size-5 text-[#FF6B9B]" />
+        <Sparkles class="size-5 text-primary" />
       </div>
     </div>
 
@@ -262,7 +264,35 @@ const getNavigationTarget = (page: AppPage) => {
             {{ t("nav.browse") }}
           </span>
           <Button
-            v-for="item in browseItems"
+            v-for="item in sidebarNavGroups.browse"
+            :key="item.page"
+            as-child
+            :variant="isActive(item.page) ? 'secondary' : 'ghost'"
+            class="w-full justify-between rounded-2xl px-3"
+          >
+            <RouterLink :to="getNavigationTarget(item.page)">
+              <span class="flex min-w-0 items-center gap-2 truncate">
+                <component :is="item.icon" data-icon="inline-start" />
+                <span class="truncate">{{ item.label }}</span>
+              </span>
+              <Badge
+                v-if="item.hint"
+                variant="secondary"
+                class="rounded-full border border-border/60 bg-background/60"
+              >
+                {{ item.hint }}
+              </Badge>
+            </RouterLink>
+          </Button>
+        </section>
+        <section class="flex flex-col gap-2">
+          <span
+            class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
+          >
+            {{ t("nav.yours") }}
+          </span>
+          <Button
+            v-for="item in sidebarNavGroups.yours"
             :key="item.page"
             as-child
             :variant="isActive(item.page) ? 'secondary' : 'ghost'"
@@ -291,25 +321,50 @@ const getNavigationTarget = (page: AppPage) => {
       v-if="props.compact"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-y-auto"
     >
-      <nav
-        class="flex flex-col items-center gap-2 py-1"
-        :aria-label="t('nav.browse')"
-      >
-        <RouterLink
-          v-for="item in browseItems"
-          :key="item.page"
-          :to="getNavigationTarget(item.page)"
-          :title="item.label"
-          class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-          :class="
-            isActive(item.page)
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : ''
-          "
+      <div class="flex flex-col gap-3 py-1">
+        <nav
+          class="flex flex-col items-center gap-2"
+          :aria-label="t('nav.browse')"
         >
-          <component :is="item.icon" class="size-5 shrink-0" />
-        </RouterLink>
-      </nav>
+          <RouterLink
+            v-for="item in sidebarNavGroups.browse"
+            :key="item.page"
+            :to="getNavigationTarget(item.page)"
+            :title="item.label"
+            class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
+            :class="
+              isActive(item.page)
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : ''
+            "
+          >
+            <component :is="item.icon" class="size-5 shrink-0" />
+          </RouterLink>
+        </nav>
+        <div
+          class="mx-auto h-px w-8 shrink-0 bg-sidebar-border/80"
+          aria-hidden="true"
+        />
+        <nav
+          class="flex flex-col items-center gap-2"
+          :aria-label="t('nav.yours')"
+        >
+          <RouterLink
+            v-for="item in sidebarNavGroups.yours"
+            :key="item.page"
+            :to="getNavigationTarget(item.page)"
+            :title="item.label"
+            class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
+            :class="
+              isActive(item.page)
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : ''
+            "
+          >
+            <component :is="item.icon" class="size-5 shrink-0" />
+          </RouterLink>
+        </nav>
+      </div>
     </div>
 
     <Separator

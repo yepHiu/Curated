@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 func TestResolveConfiguredLibraryPath(t *testing.T) {

@@ -26,7 +26,7 @@ func TestNew_FileDirCreation(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nested", "logs")
 	logger, err := New("info", FileSink{
 		LogDir:     dir,
-		FilePrefix: "javd",
+		FilePrefix: "curated",
 		MaxAgeDays: 7,
 	})
 	if err != nil {

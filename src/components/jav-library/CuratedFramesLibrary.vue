@@ -653,7 +653,7 @@ function formatCapturedAt(iso: string) {
           >
             <label
               v-if="useWebApi && multiSelectMode"
-              class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+              class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
               :title="t('curated.exportToggleAria')"
               @click.stop
             >
@@ -714,7 +714,7 @@ function formatCapturedAt(iso: string) {
               >
                 <label
                   v-if="useWebApi && multiSelectMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
                   :title="t('curated.exportToggleAria')"
                   @click.stop
                 >
@@ -785,7 +785,7 @@ function formatCapturedAt(iso: string) {
               >
                 <label
                   v-if="useWebApi && multiSelectMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-black/40 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
+                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
                   :title="t('curated.exportToggleAria')"
                   @click.stop
                 >

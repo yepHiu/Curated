@@ -15,11 +15,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/config"
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/scraper"
-	"jav-shadcn/backend/internal/storage"
-	"jav-shadcn/backend/internal/tasks"
+	"curated-backend/internal/config"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/scraper"
+	"curated-backend/internal/storage"
+	"curated-backend/internal/tasks"
 )
 
 // testMovieMetadataRefresher registers a scrape.movie task in tm without running a real scraper.
@@ -82,6 +82,47 @@ func TestHandleDeleteMovie_NotFound(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	req, err := http.NewRequest(http.MethodDelete, srv.URL+"/api/library/movies/does-not-exist", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+	var appErr contracts.AppError
+	if err := json.NewDecoder(resp.Body).Decode(&appErr); err != nil {
+		t.Fatal(err)
+	}
+	if appErr.Code != contracts.ErrorCodeNotFound {
+		t.Fatalf("error code = %q, want %q", appErr.Code, contracts.ErrorCodeNotFound)
+	}
+}
+
+func TestHandleRevealMovie_NotFound(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "reveal.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/no-such-movie/reveal", http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}

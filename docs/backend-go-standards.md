@@ -10,7 +10,7 @@
 
 ```text
 backend/
-  cmd/javd/
+  cmd/curated/
   internal/
     app/
     config/
@@ -27,7 +27,7 @@ backend/
 
 约束如下：
 
-- `cmd/javd` 只负责启动和装配，不堆业务逻辑
+- `cmd/curated` 只负责启动和装配，不堆业务逻辑
 - `internal/contracts` 负责命令、事件、DTO、错误码
 - `internal/storage` 负责数据库访问与 migration
 - 业务模块按领域分包，不创建巨型 `service` 或 `utils`

@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/datatypes"
 
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/scraper"
 )
 
 // Metatube movie providers dedicated to FC2 PPV IDs (order: higher official priority first).

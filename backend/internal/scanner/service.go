@@ -12,7 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 // errNoPathsConfigured 在 Scan 收到空路径列表时返回。

@@ -17,10 +17,14 @@ const props = withDefaults(
   defineProps<{
     movies: readonly Movie[]
     selectedMovieId?: string
+    batchMode?: boolean
+    batchSelectedIds?: readonly string[]
     emptyTitle?: string
     emptyDescription?: string
   }>(),
   {
+    batchMode: false,
+    batchSelectedIds: () => [],
     emptyTitle: "No matches found",
     emptyDescription:
       "Try another query or switch to a different library tab.",
@@ -32,7 +36,11 @@ const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
+  contextMenu: [payload: { event: MouseEvent; movie: Movie }]
+  toggleBatchSelect: [movieId: string]
 }>()
+
+const batchSelectedSet = computed(() => new Set(props.batchSelectedIds ?? []))
 
 /**
  * 虚拟块高度 = 固定行数 × 行高；块内卡片数 = 列数 × 行数，保证除最后一块外每块都是「整行满列」，
@@ -198,11 +206,15 @@ const getChunk = (value: unknown): MovieChunk =>
               <MovieCard
                 :movie="movie"
                 :selected="movie.id === props.selectedMovieId"
+                :batch-mode="props.batchMode"
+                :batch-checked="batchSelectedSet.has(movie.id)"
                 :show-favorite="false"
                 @select="emit('select', $event)"
                 @open-details="emit('openDetails', $event)"
                 @open-player="emit('openPlayer', $event)"
                 @toggle-favorite="emit('toggleFavorite', $event)"
+                @context-menu="emit('contextMenu', { event: $event, movie })"
+                @toggle-batch-select="emit('toggleBatchSelect', $event)"
               />
               </div>
             </div>

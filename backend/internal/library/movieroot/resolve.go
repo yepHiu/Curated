@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 // ResolveConfiguredLibraryPath returns the longest configured library root that contains filePath.

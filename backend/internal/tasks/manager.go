@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 type Manager struct {

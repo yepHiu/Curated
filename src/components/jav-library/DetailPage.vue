@@ -35,6 +35,21 @@ const commentReadonly = computed(() => Boolean(props.movie.trashedAt?.trim()))
 const previewImages = computed(() => props.movie.previewImages?.slice(0, 18) ?? [])
 const hasPreviews = computed(() => previewImages.value.length > 0)
 
+/** 查看器内顺序：海报（封面优先）→ 样本图，去重 */
+const viewerImages = computed(() => {
+  const poster = (props.movie.coverUrl || props.movie.thumbUrl || "").trim()
+  const out: string[] = []
+  if (poster) out.push(poster)
+  for (const u of previewImages.value) {
+    const s = (u || "").trim()
+    if (!s || s === poster) continue
+    out.push(s)
+  }
+  return out
+})
+
+const hasViewerImages = computed(() => viewerImages.value.length > 0)
+
 const layoutRootRef = ref<HTMLElement | null>(null)
 const { visibleCount } = useRelatedVisibleCount(layoutRootRef)
 
@@ -45,8 +60,17 @@ const relatedMoviesForGrid = computed(() =>
 const previewViewerOpen = ref(false)
 const previewViewerStartIndex = ref(0)
 
-function openPreviewViewer(index: number) {
-  previewViewerStartIndex.value = index
+function openPreviewViewer(galleryIndex: number) {
+  const url = previewImages.value[galleryIndex]?.trim()
+  if (!url) return
+  const idx = viewerImages.value.indexOf(url)
+  previewViewerStartIndex.value = idx >= 0 ? idx : 0
+  previewViewerOpen.value = true
+}
+
+function openPosterInViewer() {
+  if (!hasViewerImages.value) return
+  previewViewerStartIndex.value = 0
   previewViewerOpen.value = true
 }
 
@@ -65,6 +89,7 @@ const emit = defineEmits<{
   restoreMovie: [movieId: string]
   deleteMoviePermanently: [movieId: string]
   refreshMetadata: [movieId: string]
+  revealInFileManager: [movieId: string]
   patchMovieDisplay: [body: PatchMovieBody, done: (err?: unknown) => void]
 }>()
 </script>
@@ -86,7 +111,9 @@ const emit = defineEmits<{
       @restore-movie="emit('restoreMovie', $event)"
       @delete-movie-permanently="emit('deleteMoviePermanently', $event)"
       @refresh-metadata="emit('refreshMetadata', $event)"
+      @reveal-in-file-manager="emit('revealInFileManager', $event)"
       @patch-movie-display="(body, done) => emit('patchMovieDisplay', body, done)"
+      @open-poster-viewer="openPosterInViewer"
     />
 
     <Card class="rounded-3xl border-border/70 bg-card/85">
@@ -130,9 +157,9 @@ const emit = defineEmits<{
     </Card>
 
     <PreviewImageViewer
-      v-if="hasPreviews"
+      v-if="hasViewerImages"
       v-model:open="previewViewerOpen"
-      :images="previewImages"
+      :images="viewerImages"
       :initial-index="previewViewerStartIndex"
       :movie-code="movie.code"
     />

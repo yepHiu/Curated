@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "vue-sonner"
 import { cn } from "@/lib/utils"
 
 const props = withDefaults(defineProps<ToasterProps>(), {
-  theme: "dark",
+  theme: undefined,
   position: "bottom-center",
   closeButton: true,
   visibleToasts: 4,

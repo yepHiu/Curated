@@ -20,32 +20,32 @@ var (
 	ErrMovieVideoNotFile = errors.New("video path is not a regular file")
 )
 
-// OpenMovieVideoFile opens the on-disk primary video for a movie after validating it lies under
-// a configured library path (same roots as GET /api/settings libraryPaths).
-func (s *SQLiteStore) OpenMovieVideoFile(ctx context.Context, movieID string) (*os.File, string, error) {
+// ResolvePrimaryVideoPath returns the absolute path to the movie's primary video after the same
+// validation as OpenMovieVideoFile (library roots, regular file, exists).
+func (s *SQLiteStore) ResolvePrimaryVideoPath(ctx context.Context, movieID string) (string, error) {
 	detail, err := s.GetMovieDetail(ctx, movieID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, "", ErrMovieVideoNotFound
+		return "", ErrMovieVideoNotFound
 	}
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	loc := strings.TrimSpace(detail.Location)
 	if loc == "" {
-		return nil, "", ErrMovieVideoNoLocation
+		return "", ErrMovieVideoNoLocation
 	}
 
 	absVideo, err := filepath.Abs(filepath.Clean(loc))
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 
 	roots, err := s.ListLibraryPaths(ctx)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	if len(roots) == 0 {
-		return nil, "", ErrMovieVideoForbidden
+		return "", ErrMovieVideoForbidden
 	}
 
 	allowed := false
@@ -64,18 +64,29 @@ func (s *SQLiteStore) OpenMovieVideoFile(ctx context.Context, movieID string) (*
 		}
 	}
 	if !allowed {
-		return nil, "", ErrMovieVideoForbidden
+		return "", ErrMovieVideoForbidden
 	}
 
 	st, err := os.Stat(absVideo)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, "", ErrMovieVideoNotFound
+			return "", ErrMovieVideoNotFound
 		}
-		return nil, "", err
+		return "", err
 	}
 	if !st.Mode().IsRegular() {
-		return nil, "", ErrMovieVideoNotFile
+		return "", ErrMovieVideoNotFile
+	}
+
+	return absVideo, nil
+}
+
+// OpenMovieVideoFile opens the on-disk primary video for a movie after validating it lies under
+// a configured library path (same roots as GET /api/settings libraryPaths).
+func (s *SQLiteStore) OpenMovieVideoFile(ctx context.Context, movieID string) (*os.File, string, error) {
+	absVideo, err := s.ResolvePrimaryVideoPath(ctx, movieID)
+	if err != nil {
+		return nil, "", err
 	}
 
 	f, err := os.Open(absVideo)

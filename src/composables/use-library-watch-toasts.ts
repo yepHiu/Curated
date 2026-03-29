@@ -3,6 +3,7 @@ import { useI18n } from "vue-i18n"
 import { api } from "@/api/endpoints"
 import type { TaskDTO } from "@/api/types"
 import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
+import { bumpMovieImageVersion } from "@/lib/image-version"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
@@ -60,12 +61,23 @@ function parentScanId(task: TaskDTO): string {
 }
 
 /** Polls GET /api/tasks/recent and shows toasts for fsnotify-driven scan + linked scrape completions. */
+/** 仅处理本会话开始后结束的任务，避免首次拉 recent 时对历史 asset.download 全员 bump */
+let libraryWatchAppMountedAtMs = 0
+
+function taskFinishedAfterSessionStart(task: TaskDTO): boolean {
+  const raw = task.finishedAt?.trim()
+  if (!raw) return false
+  const ms = Date.parse(raw)
+  return Number.isFinite(ms) && ms >= libraryWatchAppMountedAtMs
+}
+
 export function useLibraryWatchToasts() {
   const { t } = useI18n()
   const libraryService = useLibraryService()
   let timer: ReturnType<typeof setInterval> | null = null
   const seenToastIds = readSeenToastIds()
   const fsnotifyScanParents = new Set<string>()
+  const bumpedAssetDownloadTaskIds = new Set<string>()
 
   function markToastSeen(taskId: string) {
     seenToastIds.add(taskId)
@@ -116,6 +128,22 @@ export function useLibraryWatchToasts() {
         void libraryService.reloadMoviesFromApi()
       }
 
+      for (const task of tasks) {
+        if (
+          !isTerminalStatus(task.status) ||
+          task.type !== "asset.download" ||
+          task.status !== "completed"
+        ) {
+          continue
+        }
+        if (bumpedAssetDownloadTaskIds.has(task.taskId)) continue
+        if (!taskFinishedAfterSessionStart(task)) continue
+        const mid = task.metadata?.movieId
+        if (typeof mid !== "string" || !mid) continue
+        bumpedAssetDownloadTaskIds.add(task.taskId)
+        bumpMovieImageVersion(mid)
+      }
+
       if (fsnotifyScanParents.size > 300) {
         fsnotifyScanParents.clear()
       }
@@ -128,6 +156,7 @@ export function useLibraryWatchToasts() {
     if (!USE_WEB) {
       return
     }
+    libraryWatchAppMountedAtMs = Date.now() - 15_000
     void poll()
     timer = setInterval(() => void poll(), POLL_MS)
   })

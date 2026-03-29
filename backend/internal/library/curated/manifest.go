@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"jav-shadcn/backend/internal/library/moviecode"
+	"curated-backend/internal/library/moviecode"
 )
 
 const ManifestFileName = "Curated.json"

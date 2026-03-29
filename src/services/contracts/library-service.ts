@@ -48,6 +48,8 @@ export interface LibraryService {
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
+  /** Web：请求后端在系统文件管理器中显示该片主视频；Mock 会拒绝。 */
+  revealMovieInFileManager(movieId: string): Promise<void>
   /**
    * 按已配置的库根路径批量排队元数据刮削（不重新扫盘）。
    * Web：POST /library/metadata-scrape；Mock：返回零计数演示结果。

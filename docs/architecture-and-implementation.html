@@ -160,13 +160,13 @@
       <text x="243" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">→ localhost:8080</text>
       <line x1="318" y1="60" x2="358" y2="60" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
       <rect x="358" y="22" width="140" height="76" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="428" y="52" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Go javd</text>
+      <text x="428" y="52" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Go Curated</text>
       <text x="428" y="70" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">HTTP :8080</text>
       <text x="428" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">server.Handler</text>
       <line x1="498" y1="60" x2="538" y2="60" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
       <rect x="538" y="18" width="270" height="84" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
       <text x="673" y="48" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">SQLite + 磁盘</text>
-      <text x="673" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">jav-library.db · 视频/缓存目录</text>
+      <text x="673" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-family="system-ui,sans-serif">curated.db · 视频/缓存目录</text>
       <text x="673" y="88" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui,sans-serif">扫描入库 · stream 读文件</text>
     </svg>
     <figcaption><code>VITE_USE_WEB_API=true</code> 时，前端请求 <code>/api/*</code> 由 Vite 转发到后端；播放流地址同样经代理访问真实文件。</figcaption>
@@ -205,7 +205,7 @@
       <rect x="60" y="8" width="600" height="36" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
       <text x="360" y="31" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Views / Layouts（LibraryView、DetailView、AppShell…）</text>
       <rect x="80" y="52" width="560" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="360" y="75" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">业务组件 jav-library（DetailPanel、MovieGrid、PlayerPage…）</text>
+      <text x="360" y="75" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Curated 领域组件 jav-library（DetailPanel、MovieGrid、PlayerPage…）</text>
       <rect x="100" y="96" width="520" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
       <text x="360" y="119" text-anchor="middle" fill="#c9d1d9" font-size="13" font-family="system-ui,sans-serif">Composables · domain 类型 · lib 工具</text>
       <rect x="120" y="140" width="480" height="40" rx="6" fill="#1f2a3d" stroke="#58a6ff" stroke-width="1.5"/>
@@ -220,11 +220,11 @@
     <figcaption>UI 不直接写 fetch；统一通过服务层访问数据，便于测试与后续替换为桌面 IPC 等传输方式。</figcaption>
   </figure>
 
-  <p class="diagram-title">图 4 — 后端 <code>javd</code> 进程内模块关系</p>
+  <p class="diagram-title">图 4 — 后端 Curated 进程内模块关系</p>
   <figure class="diagram" aria-label="后端模块关系">
     <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img">
       <rect x="300" y="8" width="220" height="40" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
-      <text x="410" y="34" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="system-ui,sans-serif">cmd/javd/main.go</text>
+      <text x="410" y="34" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="system-ui,sans-serif">cmd/curated/main.go</text>
       <line x1="410" y1="48" x2="410" y2="68" stroke="#8b949e" stroke-width="1.5"/>
       <rect x="200" y="68" width="420" height="100" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
       <text x="410" y="92" text-anchor="middle" fill="#c9d1d9" font-size="12" font-family="system-ui,sans-serif">internal/app.App</text>
@@ -302,9 +302,9 @@
   </figure>
 
   <h2 id="overview">1. 总览</h2>
-  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程 <code>javd</code> 提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削与资源缓存。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
+  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削与资源缓存。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
   <div class="flow">
-    <span>浏览器</span> → <span>Vite 开发服务器（可选代理 <code>/api</code>）</span> → <span>Go <code>javd</code> :8080</span> → <span>SQLite + 文件系统</span>
+    <span>浏览器</span> → <span>Vite 开发服务器（可选代理 <code>/api</code>）</span> → <span>Go Curated 后端 :8080</span> → <span>SQLite + 文件系统</span>
   </div>
   <p>前端通过环境变量 <code>VITE_USE_WEB_API</code> 在两种数据源间切换：</p>
   <ul>
@@ -365,7 +365,7 @@
   <h2 id="backend">3. 后端（Go + SQLite）</h2>
 
   <h3>3.1 进程入口</h3>
-  <p><span class="path">backend/cmd/javd/main.go</span> 流程概要：</p>
+  <p><span class="path">backend/cmd/curated/main.go</span> 流程概要：</p>
   <ol>
     <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code>）。</li>
     <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>autoLibraryWatch</code> 等）。</li>
@@ -456,7 +456,7 @@
 
   <h2 id="dev">7. 本地开发与联调</h2>
   <ul>
-    <li>后端：<code>cd backend && go run ./cmd/javd</code>，默认 <code>:8080</code>；数据库路径见配置与 <code>GET /api/health</code>。</li>
+    <li>后端：<code>cd backend && go run ./cmd/curated</code>，默认 <code>:8080</code>；数据库路径见配置与 <code>GET /api/health</code>。</li>
     <li>前端：<code>pnpm dev</code>；<span class="path">vite.config.ts</span> 将 <code>/api</code> 代理到 <code>http://localhost:8080</code>。</li>
     <li>联调：根目录 <code>.env</code> 中 <code>VITE_USE_WEB_API=true</code>（或等价环境变量）。</li>
   </ul>

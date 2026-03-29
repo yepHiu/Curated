@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Backend Go Standards
 
-- Keep `cmd/javd` thin. Put business logic in focused packages under `backend/internal`.
+- Keep `cmd/curated` thin. Put business logic in focused packages under `backend/internal`.
 - Organize backend code by domain boundaries such as `contracts`, `library`, `scanner`, `scraper`, `assets`, `player`, `storage`, and `tasks`; avoid giant catch-all packages.
 - Do not let repository/storage code make business decisions, and do not let service logic leak raw storage models as public contracts.
 - Use explicit adapters around third-party dependencies like `metatube-sdk-go` and `mpv`; do not scatter direct calls across unrelated packages.

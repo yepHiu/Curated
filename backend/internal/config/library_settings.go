@@ -12,9 +12,12 @@ import (
 
 const librarySettingsFileName = "library-config.cfg"
 
-// DefaultLibrarySettingsPath returns the path to the JSON file under repo config/ that stores
-// persistent library UI settings (e.g. organizeLibrary). Resolution matches defaultDatabasePath cwd rules.
+// DefaultLibrarySettingsPath returns library-config.cfg: release builds use
+// <curatedDataRoot>/config/library-config.cfg; dev builds use repo-relative paths (same rules as defaultDatabasePath).
 func DefaultLibrarySettingsPath() string {
+	if root := curatedDataRoot(); root != "" {
+		return filepath.Join(root, "config", librarySettingsFileName)
+	}
 	cwd, err := os.Getwd()
 	if err == nil && filepath.Base(cwd) == "backend" {
 		return filepath.FromSlash("../config/" + librarySettingsFileName)

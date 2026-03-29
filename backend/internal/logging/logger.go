@@ -50,7 +50,7 @@ func New(level string, sink FileSink) (*zap.Logger, error) {
 	if dir := strings.TrimSpace(sink.LogDir); dir != "" {
 		prefix := strings.TrimSpace(sink.FilePrefix)
 		if prefix == "" {
-			prefix = "javd"
+			prefix = "curated"
 		}
 		maxAgeDays := sink.MaxAgeDays
 		if maxAgeDays <= 0 {

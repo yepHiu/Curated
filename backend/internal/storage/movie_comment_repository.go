@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 // ErrMovieCommentTooLong is returned when comment body exceeds MaxMovieCommentRunes.

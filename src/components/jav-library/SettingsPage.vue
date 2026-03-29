@@ -1,30 +1,55 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue"
+import {
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type Ref,
+} from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
+import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
-import type { ProviderHealthDTO, ProviderHealthStatus, ProxySettingsDTO } from "@/api/types"
+import type { HealthDTO, ProviderHealthDTO, ProviderHealthStatus, ProxySettingsDTO } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
-import { useSettingsScrollPreserve } from "@/composables/use-settings-scroll-preserve"
+import {
+  SETTINGS_SCROLL_EL_KEY,
+  SETTINGS_SCROLL_ROOT_ID,
+  useSettingsScrollPreserve,
+} from "@/composables/use-settings-scroll-preserve"
+import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   Activity,
+  BookOpen,
   ChevronDown,
+  Database,
+  FolderInput,
   FolderOpen,
+  Globe,
+  HelpCircle,
   Info,
   FolderPlus,
   GripVertical,
   ImageDown,
+  Languages,
+  LayoutDashboard,
+  Layers,
   Loader2,
   Pencil,
+  PlayCircle,
   Plus,
   RefreshCw,
   ScanSearch,
   Sparkles,
   Trash2,
+  Wrench,
   X,
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +80,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "reka-ui"
 import {
   getStoredDirectoryHandle,
   setStoredDirectoryHandle,
@@ -65,9 +98,91 @@ import {
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
 import { useLibraryService } from "@/services/library-service"
-import SettingsPageNav from "@/components/jav-library/SettingsPageNav.vue"
-
+import {
+  SETTINGS_NAV_ITEMS,
+  type SettingsSectionSlug,
+  isSettingsSectionSlug,
+} from "@/lib/settings-nav"
 const { t, locale } = useI18n()
+const { themePreference, setThemePreference } = useTheme()
+
+function setThemeFromSelect(v: unknown) {
+  if (v === "light" || v === "dark" || v === "system") {
+    setThemePreference(v)
+  }
+}
+const route = useRoute()
+const router = useRouter()
+const settingsScrollElRef = inject<Ref<HTMLElement | null>>(SETTINGS_SCROLL_EL_KEY, ref(null))
+const settingsNavItems = SETTINGS_NAV_ITEMS
+const activeSlug = ref<SettingsSectionSlug>("overview")
+
+function bindSettingsScrollRoot(el: unknown) {
+  if (!settingsScrollElRef) return
+  if (el == null) {
+    settingsScrollElRef.value = null
+    return
+  }
+  settingsScrollElRef.value = el instanceof HTMLElement ? el : null
+}
+
+onBeforeUnmount(() => {
+  if (settingsScrollElRef) settingsScrollElRef.value = null
+})
+
+function scrollSettingsRootToTop() {
+  const el =
+    settingsScrollElRef.value ??
+    (document.getElementById(SETTINGS_SCROLL_ROOT_ID) as HTMLElement | null)
+  if (el) el.scrollTop = 0
+}
+
+function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
+  const raw = route.query.section
+  const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined
+  if (s === "libraryBehavior") {
+    router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
+    return "library"
+  }
+  if (s && isSettingsSectionSlug(s)) return s
+  return "overview"
+}
+
+function setSettingsTabFromSelect(v: unknown) {
+  if (typeof v === "string" && isSettingsSectionSlug(v)) {
+    activeSlug.value = v
+  }
+}
+
+watch(activeSlug, (slug) => {
+  void nextTick(() => scrollSettingsRootToTop())
+  if (route.query.section !== slug) {
+    router.replace({ query: { ...route.query, section: slug } }).catch(() => {})
+  }
+})
+
+watch(
+  () => route.query.section,
+  (raw) => {
+    const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined
+    if (!s) {
+      if (activeSlug.value !== "overview") {
+        activeSlug.value = "overview"
+      }
+      return
+    }
+    if (s === "libraryBehavior") {
+      router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
+      if (activeSlug.value !== "library") activeSlug.value = "library"
+      return
+    }
+    if (!isSettingsSectionSlug(s)) return
+    if (s !== activeSlug.value) {
+      activeSlug.value = s
+    }
+  },
+)
+
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
@@ -76,6 +191,9 @@ const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const hardwareDecode = ref(true)
 
 const addPathDialogOpen = ref(false)
+const removePathDialogOpen = ref(false)
+const removePathPending = ref<{ id: string; title: string; path: string } | null>(null)
+const removePathBusy = ref(false)
 const newPath = ref("")
 const newPathTitle = ref("")
 const addBusy = ref(false)
@@ -335,6 +453,37 @@ const metadataMovieChainError = ref("")
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const viteMode = import.meta.env.MODE
 const isViteDev = import.meta.env.DEV
+const aboutHealth = ref<HealthDTO | null>(null)
+const aboutHealthLoading = ref(false)
+const aboutHealthError = ref("")
+
+async function loadAboutHealth() {
+  if (!useWebApi) return
+  aboutHealthLoading.value = true
+  aboutHealthError.value = ""
+  try {
+    aboutHealth.value = await api.health()
+  } catch (err) {
+    aboutHealth.value = null
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      aboutHealthError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      aboutHealthError.value = err.message
+    } else {
+      aboutHealthError.value = t("settings.aboutVersionFetchFailed")
+    }
+  } finally {
+    aboutHealthLoading.value = false
+  }
+}
+
+/** 与后端 `version.Display()` 一致；旧接口无 `channel` 时不要出现 `0.1.0-` 尾缀 */
+function formatAboutBackendVersion(h: HealthDTO): string {
+  const ch = typeof h.channel === "string" ? h.channel.trim() : ""
+  if (ch) return `${h.version}-${ch}`
+  return h.version
+}
+
 const providerHealthByName = ref<Record<string, ProviderHealthDTO>>({})
 const providerPingAllBusy = ref(false)
 const providerPingOneName = ref<string | null>(null)
@@ -427,16 +576,93 @@ function initProviderChainDraft() {
   providerChainDraft.value = [...libraryService.metadataMovieProviderChain.value]
 }
 
-function moveProviderInChain(index: number, direction: "up" | "down") {
+const chainDragFromIndex = ref<number | null>(null)
+
+function reorderProviderChainDrag(from: number, to: number) {
+  if (from === to || from < 0 || to < 0) return
+  const draft = [...providerChainDraft.value]
+  if (from >= draft.length || to >= draft.length) return
   withSyncPreservedScroll(() => {
-    const draft = [...providerChainDraft.value]
-    if (direction === "up" && index > 0) {
-      ;[draft[index - 1], draft[index]] = [draft[index], draft[index - 1]]
-    } else if (direction === "down" && index < draft.length - 1) {
-      ;[draft[index], draft[index + 1]] = [draft[index + 1], draft[index]]
-    }
-    providerChainDraft.value = draft
+    const next = [...draft]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    providerChainDraft.value = next
   })
+}
+
+function onChainDragStart(e: DragEvent, index: number) {
+  chainDragFromIndex.value = index
+  e.dataTransfer?.setData("text/plain", String(index))
+  e.dataTransfer!.effectAllowed = "move"
+}
+
+function onChainDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+}
+
+function onChainDrop(toIndex: number) {
+  const from = chainDragFromIndex.value
+  if (from == null) return
+  reorderProviderChainDrag(from, toIndex)
+  chainDragFromIndex.value = null
+}
+
+function onChainDragEnd() {
+  chainDragFromIndex.value = null
+}
+
+function providerChainRowPinging(name: string): boolean {
+  return providerPingAllBusy.value || providerPingOneName.value === name
+}
+
+function providerHealthDotClass(status: ProviderHealthStatus): string {
+  if (status === "ok") return "bg-emerald-500 shadow-sm ring-1 ring-emerald-500/40"
+  if (status === "degraded") return "bg-amber-500 shadow-sm ring-1 ring-amber-500/40"
+  return "bg-destructive shadow-sm ring-1 ring-destructive/40"
+}
+
+const triggerScrapeCardBusy = ref(false)
+const triggerScrapeCardSuccess = ref("")
+const triggerScrapeCardError = ref("")
+
+async function runTriggerScrapeAllLibraryRoots() {
+  triggerScrapeCardSuccess.value = ""
+  triggerScrapeCardError.value = ""
+  if (!useWebApi) {
+    triggerScrapeCardError.value = t("settings.triggerScrapeMockHint")
+    return
+  }
+  const paths = libraryPathsList.value.map((p) => p.path.trim()).filter(Boolean)
+  if (paths.length === 0) {
+    triggerScrapeCardError.value = t("settings.triggerScrapeNoPaths")
+    return
+  }
+  try {
+    await withPreservedScroll(async () => {
+      triggerScrapeCardBusy.value = true
+      try {
+        const dto = await libraryService.refreshMetadataForLibraryPaths(paths)
+        const parts: string[] = [t("settings.metadataQueued", { n: dto.queued })]
+        if (dto.skipped > 0) {
+          parts.push(t("settings.metadataSkipped", { n: dto.skipped }))
+        }
+        if (dto.invalidPaths.length > 0) {
+          parts.push(t("settings.metadataInvalid", { paths: dto.invalidPaths.join("；") }))
+        }
+        triggerScrapeCardSuccess.value = parts.join(" ")
+      } finally {
+        triggerScrapeCardBusy.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] trigger scrape all roots failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      triggerScrapeCardError.value = err.apiError.message
+    } else {
+      triggerScrapeCardError.value = t("settings.errMetadataBatch")
+    }
+  }
 }
 
 function removeProviderFromChain(index: number) {
@@ -608,6 +834,13 @@ const directoryHintDisplay = computed(() => {
 })
 
 onMounted(async () => {
+  activeSlug.value = resolveSettingsSlugFromRoute()
+  const rawInit = route.query.section
+  const sInit =
+    typeof rawInit === "string" ? rawInit : Array.isArray(rawInit) ? rawInit[0] : undefined
+  if (sInit && sInit !== "libraryBehavior" && !isSettingsSectionSlug(sInit)) {
+    router.replace({ query: { ...route.query, section: "overview" } }).catch(() => {})
+  }
   await withPreservedScroll(() => libraryService.refreshSettings())
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
@@ -619,6 +852,9 @@ onMounted(async () => {
   }
   curatedSaveMode.value = mode
   void refreshCuratedExportDirLabel()
+  if (useWebApi) {
+    void loadAboutHealth()
+  }
 })
 
 watch(curatedSaveMode, (mode) => {
@@ -732,11 +968,34 @@ async function submitAddPath() {
   }
 }
 
-async function removePath(id: string) {
+function openRemovePathConfirm(entry: { id: string; title: string; path: string }) {
+  removePathPending.value = entry
+  removePathDialogOpen.value = true
+}
+
+watch(removePathDialogOpen, (open) => {
+  if (!open) {
+    removePathPending.value = null
+    removePathBusy.value = false
+  }
+})
+
+async function confirmRemoveLibraryPath() {
+  const pending = removePathPending.value
+  if (!pending) {
+    return
+  }
+  removePathBusy.value = true
   try {
-    await withPreservedScroll(() => libraryService.removeLibraryPath(id))
+    await withPreservedScroll(() => libraryService.removeLibraryPath(pending.id))
+    if (editingLibraryPathId.value === pending.id) {
+      editingLibraryPathId.value = null
+    }
+    removePathDialogOpen.value = false
   } catch (err) {
     console.error("[settings] remove library path failed", err)
+  } finally {
+    removePathBusy.value = false
   }
 }
 
@@ -971,99 +1230,217 @@ async function runMetadataRefreshForSelected() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-start lg:gap-8">
-    <SettingsPageNav />
-    <div class="min-w-0 flex flex-1 flex-col gap-6">
+  <Tabs
+    v-model="activeSlug"
+    class="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-8"
+  >
+    <nav
+      class="w-full shrink-0 lg:max-h-[calc(100dvh-10.5rem)] lg:w-52 lg:overflow-y-auto lg:overscroll-contain lg:self-start"
+      :aria-label="t('settings.navAriaLabel')"
+    >
+      <div class="flex flex-col gap-2 lg:hidden">
+        <label class="sr-only" for="settings-nav-jump">{{ t("settings.navJumpTo") }}</label>
+        <Select
+          id="settings-nav-jump"
+          :model-value="activeSlug"
+          @update:model-value="setSettingsTabFromSelect"
+        >
+          <SelectTrigger
+            class="h-10 w-full rounded-xl border-border/70 bg-card/80"
+            :aria-label="t('settings.navJumpTo')"
+          >
+            <SelectValue :placeholder="t('settings.navJumpTo')" />
+          </SelectTrigger>
+          <SelectContent class="max-h-[min(24rem,70vh)] rounded-xl border-border/70">
+            <SelectItem
+              v-for="item in settingsNavItems"
+              :key="`jump-${item.slug}`"
+              class="rounded-lg"
+              :value="item.slug"
+            >
+              {{ t(item.labelKey) }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <TabsList
+        class="hidden h-auto min-h-0 w-full flex-col gap-1 border-0 bg-transparent p-0 text-muted-foreground/90 lg:flex lg:border-r lg:border-border/60 lg:pr-4"
+      >
+        <TabsTrigger
+          v-for="item in settingsNavItems"
+          :key="`desk-${item.slug}`"
+          :value="item.slug"
+          class="h-auto w-full cursor-pointer flex-initial justify-start rounded-xl border border-transparent px-3 py-2 text-left shadow-none transition-[background-color,color,box-shadow] duration-150 data-[state=inactive]:shadow-none data-[state=inactive]:hover:bg-muted/55 data-[state=inactive]:hover:text-foreground dark:data-[state=inactive]:hover:bg-muted/20 data-[state=active]:border-transparent data-[state=active]:bg-primary/12 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:hover:bg-primary/18 dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-primary/12 dark:data-[state=active]:text-foreground dark:data-[state=active]:hover:bg-primary/20"
+        >
+          {{ t(item.labelKey) }}
+        </TabsTrigger>
+      </TabsList>
+    </nav>
+
+    <div
+      :id="SETTINGS_SCROLL_ROOT_ID"
+      :ref="bindSettingsScrollRoot"
+      class="min-h-0 min-w-0 flex flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable]"
+    >
+    <TabsContent value="overview" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-overview"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navOverview')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navOverview") }}
-    </h2>
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <Card
-        v-for="stat in dashboardStats"
-        :key="stat.labelKey"
-        class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5"
-      >
-        <CardHeader class="gap-1">
-          <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
-          <CardTitle class="text-2xl">{{ stat.value }}</CardTitle>
+    <h2 class="sr-only">{{ t("settings.navOverview") }}</h2>
+    <div class="flex w-full flex-col gap-6">
+    <div class="break-inside-avoid">
+      <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <CardHeader class="space-y-3 pb-2">
+          <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+            <span
+              class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+              aria-hidden="true"
+            >
+              <LayoutDashboard class="size-[1.15rem]" />
+            </span>
+            {{ t("settings.navOverview") }}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p class="text-sm text-muted-foreground">{{ t(stat.detailKey) }}</p>
+        <CardContent class="flex flex-col gap-4 pt-2">
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Card
+              v-for="stat in dashboardStats"
+              :key="stat.labelKey"
+              class="rounded-2xl border-border/60 bg-background/40 shadow-none"
+            >
+              <CardHeader class="gap-1">
+                <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
+                <CardTitle class="text-2xl">{{ stat.value }}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p class="text-sm text-muted-foreground">{{ t(stat.detailKey) }}</p>
+              </CardContent>
+            </Card>
+          </div>
         </CardContent>
       </Card>
     </div>
+    </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="general" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-general"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navGeneral')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navGeneral") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navGeneral") }}</h2>
+    <div class="flex w-full flex-col gap-6">
+    <div class="break-inside-avoid">
     <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-      <CardHeader
-        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0"
-      >
-        <div class="min-w-0 flex-1 space-y-1">
-          <CardTitle>{{ t("settings.language") }}</CardTitle>
-          <CardDescription>{{ t("settings.languageHint") }}</CardDescription>
-        </div>
-        <Select v-model="locale">
-          <SelectTrigger
-            size="sm"
-            class="h-8 w-full min-w-[9.5rem] shrink-0 rounded-xl border-border/70 sm:ml-4 sm:w-40"
-            :aria-label="t('settings.language')"
+      <CardHeader class="space-y-3 pb-2">
+        <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+          <span
+            class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+            aria-hidden="true"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end" class="rounded-xl border-border/70">
-            <SelectItem value="zh-CN">{{ t("settings.langZh") }}</SelectItem>
-            <SelectItem value="en">{{ t("settings.langEn") }}</SelectItem>
-            <SelectItem value="ja">{{ t("settings.langJa") }}</SelectItem>
-          </SelectContent>
-        </Select>
+            <Languages class="size-[1.15rem]" />
+          </span>
+          {{ t("settings.navGeneral") }}
+        </CardTitle>
+        <CardDescription
+          class="text-xs leading-relaxed text-pretty text-muted-foreground"
+        >
+          {{ t("settings.languageHint") }}
+        </CardDescription>
       </CardHeader>
+      <CardContent class="flex flex-col gap-4 pt-2">
+        <div
+          class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p class="text-sm font-medium text-foreground">{{ t("settings.language") }}</p>
+          <Select v-model="locale">
+            <SelectTrigger
+              size="sm"
+              class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/70 sm:w-44"
+              :aria-label="t('settings.language')"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end" class="rounded-xl border-border/70">
+              <SelectItem value="zh-CN">{{ t("settings.langZh") }}</SelectItem>
+              <SelectItem value="en">{{ t("settings.langEn") }}</SelectItem>
+              <SelectItem value="ja">{{ t("settings.langJa") }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div
+          class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="min-w-0 space-y-1">
+            <p class="text-sm font-medium text-foreground">{{ t("settings.appearance") }}</p>
+            <p class="text-xs leading-relaxed text-muted-foreground">
+              {{ t("settings.appearanceHint") }}
+            </p>
+          </div>
+          <Select
+            :model-value="themePreference"
+            @update:model-value="setThemeFromSelect"
+          >
+            <SelectTrigger
+              size="sm"
+              class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/70 sm:w-44"
+              :aria-label="t('settings.appearance')"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end" class="rounded-xl border-border/70">
+              <SelectItem value="light">{{ t("settings.themeLight") }}</SelectItem>
+              <SelectItem value="dark">{{ t("settings.themeDark") }}</SelectItem>
+              <SelectItem value="system">{{ t("settings.themeSystem") }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
     </Card>
+    </div>
+    </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="library" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-library"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navLibrary')"
     >
-    <div class="flex flex-col gap-2 px-1">
-      <div class="flex flex-col gap-1">
-        <h2 class="text-3xl font-semibold tracking-tight">{{ t("settings.pageTitle") }}</h2>
-        <p class="text-sm text-muted-foreground">
-          {{ t("settings.pageSubtitle") }}
-        </p>
+    <h2 class="sr-only">{{ t("settings.navLibrary") }}</h2>
+      <div class="flex w-full flex-col gap-6">
         <p
           v-if="scanFeedbackError"
-          class="text-sm text-destructive"
+          class="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           role="alert"
         >
           {{ scanFeedbackError }}
         </p>
-      </div>
-    </div>
-
-      <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.storageCardTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Database class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.storageCardTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.storageCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4">
+          <CardContent class="flex flex-col gap-4 pt-2">
             <div class="flex items-center justify-between gap-3">
               <div class="flex flex-col gap-1">
                 <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
@@ -1158,6 +1535,56 @@ async function runMetadataRefreshForSelected() {
                       @click="submitAddPath"
                     >
                       {{ addBusy ? t("common.saving") : t("settings.savePath") }}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog v-model:open="removePathDialogOpen">
+                <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
+                    <DialogDescription>
+                      <div class="space-y-2">
+                        <p class="text-pretty">
+                          {{
+                            t("settings.removePathConfirmDesc", {
+                              title: removePathPending?.title ?? "—",
+                            })
+                          }}
+                        </p>
+                        <p
+                          v-if="removePathPending?.path"
+                          class="break-all font-mono text-xs text-muted-foreground"
+                        >
+                          {{ removePathPending.path }}
+                        </p>
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter class="gap-3">
+                    <DialogClose as-child>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-2xl"
+                        :disabled="removePathBusy"
+                      >
+                        {{ t("common.cancel") }}
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      class="rounded-2xl"
+                      :disabled="removePathBusy || !removePathPending"
+                      @click="confirmRemoveLibraryPath"
+                    >
+                      {{
+                        removePathBusy
+                          ? t("settings.removePathConfirmWorking")
+                          : t("settings.removePathConfirmAction")
+                      }}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -1310,7 +1737,7 @@ async function runMetadataRefreshForSelected() {
                         size="icon"
                         class="rounded-2xl"
                         :aria-label="t('settings.removePathAria', { title: path.title })"
-                        @click="removePath(path.id)"
+                        @click="openRemovePathConfirm(path)"
                       >
                         <Trash2 class="size-4" />
                       </Button>
@@ -1325,20 +1752,30 @@ async function runMetadataRefreshForSelected() {
 
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.organizeTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Layers class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.organizeTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.organizeDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-3">
+          <CardContent class="flex flex-col gap-4 pt-2">
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="organizeLibrarySaving"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="font-medium">{{ t("settings.organizeSwitch") }}</p>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.organizeSwitch") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.organizeHint") }}
                 </p>
                 <p
@@ -1360,27 +1797,135 @@ async function runMetadataRefreshForSelected() {
           </CardContent>
         </Card>
       </div>
+
+      <div id="settings-section-libraryBehavior" class="break-inside-avoid">
+        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <FolderInput class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.extendedImportTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
+              {{ t("settings.extendedImportDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-4 pt-2">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              :aria-busy="extendedLibraryImportSaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.extendedImportSwitch") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.extendedImportHint") }}
+                </p>
+                <p
+                  v-if="extendedLibraryImportSaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.extendedImportSyncing") }}
+                </p>
+              </div>
+              <TooltipProvider :delay-duration="500">
+                <TooltipRoot>
+                  <TooltipTrigger as-child>
+                    <Switch
+                      class="motion-safe:transition-colors motion-safe:duration-200"
+                      :model-value="extendedLibraryImport"
+                      :aria-label="t('settings.extendedImportSwitch')"
+                      @update:model-value="onExtendedLibraryImportChange"
+                    />
+                  </TooltipTrigger>
+                  <TooltipPortal>
+                    <TooltipContent
+                      side="left"
+                      :side-offset="8"
+                      class="z-50 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/70 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+                    >
+                      {{ t("settings.extendedImportSwitchTooltip") }}
+                    </TooltipContent>
+                  </TooltipPortal>
+                </TooltipRoot>
+              </TooltipProvider>
+            </div>
+            <p v-if="extendedLibraryImportError" class="text-sm text-destructive">
+              {{ extendedLibraryImportError }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
       </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="metadata" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-metadata"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navMetadata')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navMetadata") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navMetadata") }}</h2>
       <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.metadataMovieProviderTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle
+              class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xl font-semibold tracking-tight"
+            >
+              <span class="flex min-w-0 items-center gap-3">
+                <span
+                  class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                  aria-hidden="true"
+                >
+                  <Sparkles class="size-[1.15rem]" />
+                </span>
+                <span class="min-w-0">{{ t("settings.metadataMovieProviderTitle") }}</span>
+              </span>
+              <TooltipProvider :delay-duration="280">
+                <TooltipRoot>
+                  <TooltipTrigger as-child>
+                    <button
+                      type="button"
+                      class="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/25 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <HelpCircle class="size-[1.05rem]" aria-hidden="true" />
+                      <span class="sr-only">{{
+                        t("settings.metadataMovieProviderHelpAria")
+                      }}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipPortal>
+                    <TooltipContent
+                      side="bottom"
+                      align="start"
+                      :side-offset="8"
+                      class="z-50 max-w-[min(22rem,calc(100vw-2rem))] space-y-2 rounded-xl border border-border/70 bg-popover px-3 py-2.5 text-left text-popover-foreground shadow-lg"
+                    >
+                      <p class="text-xs leading-relaxed text-pretty">
+                        {{ t("settings.metadataMovieProviderHelpP1") }}
+                      </p>
+                      <p class="text-xs leading-relaxed text-pretty text-muted-foreground">
+                        {{ t("settings.metadataMovieProviderHelpP2") }}
+                      </p>
+                    </TooltipContent>
+                  </TooltipPortal>
+                </TooltipRoot>
+              </TooltipProvider>
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.metadataMovieProviderDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4">
+          <CardContent class="flex flex-col gap-4 pt-2">
             <div
               v-if="useWebApi"
               class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/15 p-4"
@@ -1426,12 +1971,14 @@ async function runMetadataRefreshForSelected() {
             </p>
 
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="autoLibraryWatchSaving"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="font-medium">{{ t("settings.autoScrape") }}</p>
-                <p class="text-sm text-muted-foreground">
+                <p class="text-sm font-semibold text-foreground">{{
+                  t("settings.autoScrape")
+                }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.autoScrapeHint") }}
                 </p>
                 <p
@@ -1451,14 +1998,48 @@ async function runMetadataRefreshForSelected() {
               {{ autoLibraryWatchError }}
             </p>
 
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
+            >
             <fieldset
-              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
+              class="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/60 p-3 dark:bg-background/40"
               :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
             >
-              <legend class="px-1 text-sm font-medium">{{ t("settings.metadataMovieProviderMode") }}</legend>
-              <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
+              <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
+              <div class="mb-0.5 flex items-center gap-2 px-0.5">
+                <span class="text-sm font-medium text-foreground">{{
+                  t("settings.metadataMovieProviderMode")
+                }}</span>
+                <TooltipProvider :delay-duration="280">
+                  <TooltipRoot>
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <Info class="size-4" aria-hidden="true" />
+                        <span class="sr-only">{{
+                          t("settings.metadataMovieProviderModeAria")
+                        }}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipPortal>
+                      <TooltipContent
+                        side="top"
+                        :side-offset="6"
+                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/70 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+                      >
+                        {{ t("settings.metadataMovieProviderModeTooltip") }}
+                      </TooltipContent>
+                    </TooltipPortal>
+                  </TooltipRoot>
+                </TooltipProvider>
+              </div>
+              <label
+                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+              >
                 <input
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="metadata-movie-mode"
                   value="auto"
@@ -1467,22 +2048,22 @@ async function runMetadataRefreshForSelected() {
                   @change="onMetadataMovieModeAuto"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.metadataMovieProviderAutoHint") }}
                   </span>
                 </span>
               </label>
               <label
-                class="flex items-start gap-3 rounded-xl p-2"
+                class="flex items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors"
                 :class="
                   canPickSpecifiedMetadata
-                    ? 'cursor-pointer hover:bg-muted/40'
+                    ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
                     : 'cursor-not-allowed opacity-60'
                 "
               >
                 <input
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="metadata-movie-mode"
                   value="specified"
@@ -1491,22 +2072,24 @@ async function runMetadataRefreshForSelected() {
                   @change="onMetadataMovieModeSpecified"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.metadataMovieProviderSpecified") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{
+                    t("settings.metadataMovieProviderSpecified")
+                  }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.metadataMovieProviderSpecifiedHint") }}
                   </span>
                 </span>
               </label>
               <label
-                class="flex items-start gap-3 rounded-xl p-2"
+                class="flex items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors"
                 :class="
                   canUseMetadataChainMode
-                    ? 'cursor-pointer hover:bg-muted/40'
+                    ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
                     : 'cursor-not-allowed opacity-60'
                 "
               >
                 <input
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="metadata-movie-mode"
                   value="chain"
@@ -1515,8 +2098,8 @@ async function runMetadataRefreshForSelected() {
                   @change="onMetadataMovieModeChain"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.metadataMovieProviderChainHint") }}
                   </span>
                 </span>
@@ -1621,9 +2204,14 @@ async function runMetadataRefreshForSelected() {
               >
                 {{ t("settings.metadataMovieProviderChainNoList") }}
               </p>
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
-                <span class="text-xs text-muted-foreground">
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
+                  <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{ t("settings.metadataMovieProviderChainDragHint") }}
+                  </p>
+                </div>
+                <span class="shrink-0 text-xs text-muted-foreground">
                   {{ providerChainDraft.length }} {{ t("settings.providersSelected") }}
                 </span>
               </div>
@@ -1632,24 +2220,60 @@ async function runMetadataRefreshForSelected() {
               <div class="flex flex-col gap-2">
                 <div
                   v-for="(provider, index) in providerChainDraft"
-                  :key="provider + index"
-                  class="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2"
+                  :key="provider + '-' + index"
+                  class="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-2 py-2 transition-[opacity,box-shadow] sm:px-3"
+                  :class="{
+                    'opacity-55': chainDragFromIndex === index,
+                    'ring-2 ring-primary/25 ring-offset-2 ring-offset-background':
+                      chainDragFromIndex === index,
+                  }"
+                  draggable="true"
+                  @dragstart="onChainDragStart($event, index)"
+                  @dragover="onChainDragOver"
+                  @drop.prevent="onChainDrop(index)"
+                  @dragend="onChainDragEnd"
                 >
-                  <GripVertical class="size-4 shrink-0 text-muted-foreground" />
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ provider }}</span>
-                  <div
-                    v-if="useWebApi && healthForProvider(provider)"
-                    class="flex min-w-0 flex-wrap items-center gap-1.5"
+                  <span
+                    class="inline-flex cursor-grab touch-none items-center rounded-md p-1 text-muted-foreground active:cursor-grabbing"
+                    :aria-label="t('settings.metadataMovieProviderChainDragHandleAria')"
                   >
-                    <Badge
-                      variant="outline"
-                      class="text-[0.65rem] font-normal"
-                      :class="providerHealthStatusClass(healthForProvider(provider)!.status)"
+                    <GripVertical class="size-4 shrink-0" aria-hidden="true" />
+                  </span>
+                  <div
+                    class="flex shrink-0 items-center gap-1.5"
+                    :title="
+                      useWebApi && healthForProvider(provider)
+                        ? providerHealthStatusLabel(healthForProvider(provider)!.status) +
+                          ' · ' +
+                          healthForProvider(provider)!.latencyMs +
+                          'ms'
+                        : undefined
+                    "
+                  >
+                    <Loader2
+                      v-if="useWebApi && providerChainRowPinging(provider)"
+                      class="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span
+                      v-else-if="useWebApi && healthForProvider(provider)"
+                      class="size-2.5 shrink-0 rounded-full"
+                      :class="providerHealthDotClass(healthForProvider(provider)!.status)"
+                      aria-hidden="true"
+                    />
+                    <span
+                      v-else
+                      class="size-2.5 shrink-0 rounded-full bg-muted-foreground/25"
+                      aria-hidden="true"
+                    />
+                    <span
+                      v-if="useWebApi && healthForProvider(provider) && !providerChainRowPinging(provider)"
+                      class="w-[3.25rem] shrink-0 tabular-nums text-[0.65rem] text-muted-foreground"
                     >
-                      {{ providerHealthStatusLabel(healthForProvider(provider)!.status) }}
-                      · {{ healthForProvider(provider)!.latencyMs }}ms
-                    </Badge>
+                      {{ healthForProvider(provider)!.latencyMs }}ms
+                    </span>
                   </div>
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ provider }}</span>
                   <Button
                     v-if="useWebApi"
                     type="button"
@@ -1665,39 +2289,18 @@ async function runMetadataRefreshForSelected() {
                       :class="{ 'motion-safe:animate-pulse': providerPingOneName === provider }"
                     />
                   </Button>
-                  <div class="flex shrink-0 items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      class="size-7 rounded-lg"
-                      :disabled="index === 0"
-                      @click="moveProviderInChain(index, 'up')"
-                    >
-                      <span class="sr-only">{{ t("common.moveUp") }}</span>
-                      <span class="text-xs">↑</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      class="size-7 rounded-lg"
-                      :disabled="index === providerChainDraft.length - 1"
-                      @click="moveProviderInChain(index, 'down')"
-                    >
-                      <span class="sr-only">{{ t("common.moveDown") }}</span>
-                      <span class="text-xs">↓</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      class="size-7 rounded-lg text-destructive hover:text-destructive"
-                      @click="removeProviderFromChain(index)"
-                    >
-                      <X class="size-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    class="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                    :aria-label="
+                      t('settings.metadataMovieProviderRemoveFromChainAria', { name: provider })
+                    "
+                    @click="removeProviderFromChain(index)"
+                  >
+                    <X class="size-4" />
+                  </Button>
                 </div>
 
                 <!-- Empty State -->
@@ -1745,8 +2348,8 @@ async function runMetadataRefreshForSelected() {
                 </p>
                 <Button
                   type="button"
-                  variant="secondary"
-                  class="w-fit rounded-xl"
+                  variant="default"
+                  class="w-fit rounded-xl font-medium"
                   :disabled="metadataMovieChainSaving"
                   @click="saveProviderChain"
                 >
@@ -1763,6 +2366,7 @@ async function runMetadataRefreshForSelected() {
               <p v-if="metadataMovieChainError" class="text-sm text-destructive">
                 {{ metadataMovieChainError }}
               </p>
+            </div>
             </div>
 
             <p
@@ -1781,42 +2385,81 @@ async function runMetadataRefreshForSelected() {
               {{ metadataMovieError }}
             </p>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
-                <p class="font-medium">{{ t("settings.triggerScrape") }}</p>
-                <p class="text-sm text-muted-foreground">
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0 flex flex-col gap-1">
+                <p class="text-sm font-semibold">{{ t("settings.triggerScrape") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.triggerScrapeHint") }}
                 </p>
               </div>
-              <Button type="button" class="rounded-2xl">
-                <RefreshCw data-icon="inline-start" />
-                {{ t("common.run") }}
+              <Button
+                type="button"
+                variant="default"
+                class="h-11 shrink-0 rounded-2xl px-5 font-medium"
+                :disabled="triggerScrapeCardBusy"
+                @click="runTriggerScrapeAllLibraryRoots"
+              >
+                <RefreshCw
+                  data-icon="inline-start"
+                  class="size-4"
+                  :class="{ 'motion-safe:animate-spin': triggerScrapeCardBusy }"
+                />
+                {{
+                  triggerScrapeCardBusy
+                    ? t("settings.triggerScrapeRunning")
+                    : t("settings.triggerScrapeRunButton")
+                }}
               </Button>
             </div>
+            <p
+              v-if="triggerScrapeCardSuccess"
+              class="text-sm text-primary"
+            >
+              {{ triggerScrapeCardSuccess }}
+            </p>
+            <p
+              v-if="triggerScrapeCardError"
+              class="text-sm text-destructive"
+              role="alert"
+            >
+              {{ triggerScrapeCardError }}
+            </p>
           </CardContent>
         </Card>
       </div>
       </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="network" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-network"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navNetwork')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navNetwork") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
       <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.proxyTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Globe class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.proxyTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.proxyDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4">
+          <CardContent class="flex flex-col gap-4 pt-2">
             <p
               v-if="!useWebApi"
               class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
@@ -1824,12 +2467,12 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.proxyMockHint") }}
             </p>
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="proxySaving"
             >
-              <div class="min-w-0 flex-1">
-                <p class="font-medium">{{ t("settings.proxyEnabled") }}</p>
-                <p class="text-sm text-muted-foreground">
+              <div class="min-w-0 flex-1 space-y-1">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyEnabled") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.proxyEnabledHint") }}
                 </p>
               </div>
@@ -1994,123 +2637,139 @@ async function runMetadataRefreshForSelected() {
       </div>
       </div>
     </section>
+    </TabsContent>
 
-    <section
-      id="settings-section-libraryBehavior"
-      class="scroll-mt-6 space-y-6"
-      :aria-label="t('settings.navLibraryBehavior')"
-    >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navLibraryBehavior") }}
-    </h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.extendedImportTitle") }}</CardTitle>
-            <CardDescription>
-              {{ t("settings.extendedImportDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3">
-            <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
-              :aria-busy="extendedLibraryImportSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="font-medium">{{ t("settings.extendedImportSwitch") }}</p>
-                <p class="text-sm text-muted-foreground">
-                  {{ t("settings.extendedImportHint") }}
-                </p>
-                <p
-                  v-if="extendedLibraryImportSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.extendedImportSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="extendedLibraryImport"
-                @update:model-value="onExtendedLibraryImportChange"
-              />
-            </div>
-            <p v-if="extendedLibraryImportError" class="text-sm text-destructive">
-              {{ extendedLibraryImportError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
-    </section>
-
+    <TabsContent value="curated" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-curated"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navCurated')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navCurated") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navCurated") }}</h2>
       <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.curatedCardTitle") }}</CardTitle>
-            <CardDescription>
-              {{ t("settings.curatedCardDesc") }}
+          <CardHeader class="space-y-4 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <ImageDown class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.curatedCardTitle") }}
+            </CardTitle>
+            <CardDescription class="space-y-3 text-foreground">
+              <p class="text-xs leading-relaxed text-muted-foreground">
+                {{ t("settings.curatedCardDescShort") }}
+              </p>
+              <div
+                class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-medium text-foreground/95"
+              >
+                <span class="font-normal text-muted-foreground">{{
+                  t("settings.curatedCardHow")
+                }}</span>
+                <kbd
+                  class="pointer-events-none inline-flex h-7 min-w-7 select-none items-center justify-center rounded-lg border border-border bg-muted px-2 font-mono text-xs font-semibold text-foreground shadow-sm"
+                >
+                  C
+                </kbd>
+                <span class="font-normal text-muted-foreground">{{
+                  t("settings.curatedCardOr")
+                }}</span>
+                <span
+                  class="inline-flex items-center rounded-lg border border-border/80 bg-background px-2.5 py-1 text-xs font-semibold tracking-wide text-foreground shadow-xs"
+                >
+                  {{ t("player.curatedLabel") }}
+                </span>
+              </div>
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4">
-            <fieldset class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <legend class="px-1 text-sm font-medium">{{ t("settings.savePolicy") }}</legend>
-              <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
+          <CardContent class="flex flex-col gap-4 pt-2">
+            <fieldset class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/50 p-3">
+              <legend class="sr-only">{{ t("settings.savePolicy") }}</legend>
+              <div class="mb-0.5 flex items-center gap-2 px-0.5">
+                <span class="text-sm font-medium text-foreground">{{
+                  t("settings.savePolicy")
+                }}</span>
+                <TooltipProvider :delay-duration="280">
+                  <TooltipRoot>
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <Info class="size-4" aria-hidden="true" />
+                        <span class="sr-only">{{
+                          t("settings.curatedStorageTechAria")
+                        }}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipPortal>
+                      <TooltipContent
+                        side="top"
+                        :side-offset="6"
+                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/70 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+                      >
+                        {{ t("settings.curatedStorageTechTooltip") }}
+                      </TooltipContent>
+                    </TooltipPortal>
+                  </TooltipRoot>
+                </TooltipProvider>
+              </div>
+              <label
+                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+              >
                 <input
                   v-model="curatedSaveMode"
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="curated-save-mode"
                   value="app"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.curatedApp") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{ t("settings.curatedApp") }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.curatedAppHint") }}
                   </span>
                 </span>
               </label>
-              <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
+              <label
+                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+              >
                 <input
                   v-model="curatedSaveMode"
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="curated-save-mode"
                   value="download"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.curatedDownload") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{ t("settings.curatedDownload") }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.curatedDownloadHint") }}
                   </span>
                 </span>
               </label>
-              <label class="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-muted/40">
+              <label
+                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+              >
                 <input
                   v-model="curatedSaveMode"
-                  class="mt-1 size-4 shrink-0 accent-primary"
+                  class="mt-0.5 size-4 shrink-0 accent-primary"
                   type="radio"
                   name="curated-save-mode"
                   value="directory"
                   :disabled="!supportsFileSystemAccess()"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="font-medium">{{ t("settings.curatedDir") }}</span>
-                  <span class="mt-0.5 block text-sm text-muted-foreground">
+                  <span class="text-sm font-medium">{{ t("settings.curatedDir") }}</span>
+                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                     {{ t("settings.curatedDirHint") }}
                   </span>
                   <span
                     v-if="!supportsFileSystemAccess()"
-                    class="mt-1 block text-xs text-amber-600 dark:text-amber-500"
+                    class="mt-1 block text-xs text-amber-700 dark:text-amber-400"
                   >
                     {{ t("settings.curatedDirUnsupported") }}
                   </span>
@@ -2139,7 +2798,13 @@ async function runMetadataRefreshForSelected() {
                   @click="pickCuratedExportDirectory"
                 >
                   <FolderOpen data-icon="inline-start" />
-                  {{ curatedExportPickBusy ? t("settings.picking") : t("settings.pickExportFolder") }}
+                  {{
+                    curatedExportPickBusy
+                      ? t("settings.picking")
+                      : curatedExportDirLabel
+                        ? t("settings.changeExportFolder")
+                        : t("settings.pickExportFolder")
+                  }}
                 </Button>
                 <Button
                   v-if="curatedExportDirLabel"
@@ -2152,44 +2817,90 @@ async function runMetadataRefreshForSelected() {
                   {{ t("settings.clearExportFolder") }}
                 </Button>
               </div>
+              <div
+                v-if="curatedExportDirLabel"
+                class="flex flex-col gap-2 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                  {{ t("settings.curatedReauthorizeHelp") }}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 shrink-0 rounded-xl px-3 text-xs font-medium"
+                  :disabled="curatedExportPickBusy"
+                  @click="pickCuratedExportDirectory"
+                >
+                  {{ t("settings.curatedReauthorizeExport") }}
+                </Button>
+              </div>
             </div>
 
             <p v-if="curatedExportError" class="text-sm text-destructive" role="alert">
               {{ curatedExportError }}
             </p>
 
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              <ImageDown class="mr-1 inline size-3.5 align-text-bottom opacity-70" aria-hidden="true" />
-              {{ t("settings.curatedCorsNote") }}
-            </p>
+            <div
+              class="rounded-2xl border border-sky-500/20 border-l-[3px] border-l-sky-500/55 bg-sky-500/[0.07] px-4 py-3 dark:border-sky-400/15 dark:border-l-sky-400/50 dark:bg-sky-950/40"
+              role="note"
+            >
+              <p class="text-sm font-medium text-sky-950 dark:text-sky-100">
+                {{ t("settings.curatedCorsTitle") }}
+              </p>
+              <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                {{ t("settings.curatedCorsNote") }}
+              </p>
+              <a
+                class="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline"
+                href="https://developer.mozilla.org/en-US/docs/Web/HTML/Cross-origin_images_and_canvas"
+                target="_blank"
+                rel="noopener noreferrer"
+                :aria-label="t('settings.curatedCorsLearnAria')"
+              >
+                {{ t("settings.curatedCorsLearnMore") }}
+              </a>
+            </div>
           </CardContent>
         </Card>
       </div>
       </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="playback" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-playback"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navPlayback')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navPlayback") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navPlayback") }}</h2>
       <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.playbackCardTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <PlayCircle class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.playbackCardTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.playbackCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
-                <p class="font-medium">{{ t("settings.hardwareDecode") }}</p>
-                <p class="text-sm text-muted-foreground">
+          <CardContent class="flex flex-col gap-4 pt-2">
+            <div
+              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="text-sm font-medium text-foreground">{{ t("settings.hardwareDecode") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.hardwareDecodeHint") }}
                 </p>
               </div>
@@ -2200,55 +2911,70 @@ async function runMetadataRefreshForSelected() {
       </div>
       </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="maintenance" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-maintenance"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navMaintenance')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navMaintenance") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navMaintenance") }}</h2>
       <div class="flex w-full flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.manualCardTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Wrench class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.manualCardTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.manualCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-3">
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
-                <p class="font-medium">{{ t("settings.triggerFullScan") }}</p>
-                <p class="text-sm text-muted-foreground">
+          <CardContent class="flex flex-col gap-4 pt-2">
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0 flex flex-col gap-1">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.triggerFullScan") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.triggerFullScanHint") }}
                 </p>
               </div>
               <Button
                 type="button"
-                class="rounded-2xl"
+                class="h-11 shrink-0 rounded-2xl px-5 font-medium"
                 :disabled="fullScanBusy"
                 @click="runFullScan"
               >
                 <ScanSearch
                   data-icon="inline-start"
+                  class="size-4"
                   :class="fullScanBusy ? 'animate-pulse' : ''"
                 />
                 {{ t("common.run") }}
               </Button>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4">
-              <div class="flex flex-col gap-1">
-                <p class="font-medium">{{ t("settings.rebuildCache") }}</p>
-                <p class="text-sm text-muted-foreground">
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0 flex flex-col gap-1">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.rebuildCache") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.rebuildCacheHint") }}
                 </p>
               </div>
-              <Button variant="secondary" class="rounded-2xl">
-                <RefreshCw data-icon="inline-start" />
+              <Button variant="secondary" class="h-11 shrink-0 rounded-2xl px-5 font-medium">
+                <RefreshCw data-icon="inline-start" class="size-4" />
                 {{ t("common.run") }}
               </Button>
             </div>
@@ -2258,65 +2984,130 @@ async function runMetadataRefreshForSelected() {
 
       <div class="break-inside-avoid">
         <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-          <CardHeader>
-            <CardTitle>{{ t("settings.configCardTitle") }}</CardTitle>
-            <CardDescription>
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <BookOpen class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.configCardTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
               {{ t("settings.configCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="text-sm leading-6 text-muted-foreground">
+          <CardContent class="pt-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm sm:leading-6">
             {{ t("settings.configCardBody") }}
           </CardContent>
         </Card>
       </div>
       </div>
     </section>
+    </TabsContent>
 
+    <TabsContent value="about" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-about"
-      class="scroll-mt-6 space-y-6"
+      class="space-y-6"
       :aria-label="t('settings.navAbout')"
     >
-    <h2 class="px-1 text-lg font-semibold tracking-tight text-foreground">
-      {{ t("settings.navAbout") }}
-    </h2>
+    <h2 class="sr-only">{{ t("settings.navAbout") }}</h2>
+    <div class="flex w-full flex-col gap-6">
+    <div class="break-inside-avoid">
       <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
-        <CardHeader class="flex flex-row items-start gap-3 space-y-0 pb-2">
-          <Info
-            class="mt-0.5 size-5 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <div class="min-w-0 flex-1 space-y-1">
-            <CardTitle>{{ t("settings.aboutCardTitle") }}</CardTitle>
-            <CardDescription>{{ t("settings.aboutCardDesc") }}</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm leading-6 text-muted-foreground">
-          <p>{{ t("settings.aboutIntro") }}</p>
-          <div
-            class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3 text-muted-foreground"
-            role="status"
+        <CardHeader class="space-y-3 pb-2">
+          <CardTitle class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xl font-semibold tracking-tight">
+            <span class="flex min-w-0 items-center gap-3">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Info class="size-[1.15rem]" />
+              </span>
+              <span class="min-w-0">{{ t("settings.aboutCardTitle") }}</span>
+            </span>
+          </CardTitle>
+          <CardDescription
+            v-if="isViteDev"
+            class="text-xs leading-relaxed text-pretty text-muted-foreground"
           >
-            <p class="font-medium text-foreground">
-              {{ t("settings.aboutDataModeLabel") }}
+            {{ t("settings.aboutCardDesc") }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
+          <!-- 开发：版本号、数据模式、前端构建模式 -->
+          <template v-if="isViteDev">
+            <dl class="space-y-4">
+              <div class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+                <dt class="font-medium text-foreground">
+                  {{ t("settings.aboutVersionLabel") }}
+                </dt>
+                <dd class="mt-1.5">
+                  <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
+                  <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-2">
+                    <Loader2 class="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
+                    {{ t("settings.aboutVersionLoading") }}
+                  </span>
+                  <span v-else-if="aboutHealthError" class="text-destructive">{{ aboutHealthError }}</span>
+                  <span v-else-if="aboutHealth" class="font-mono text-foreground/90">
+                    {{ formatAboutBackendVersion(aboutHealth) }}
+                  </span>
+                  <span v-else>—</span>
+                </dd>
+              </div>
+              <div class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+                <dt class="font-medium text-foreground">
+                  {{ t("settings.aboutDataModeLabel") }}
+                </dt>
+                <dd class="mt-1.5">
+                  {{
+                    useWebApi
+                      ? t("settings.aboutDataModeWebApi")
+                      : t("settings.aboutDataModeMock")
+                  }}
+                </dd>
+              </div>
+              <div class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+                <dt class="font-medium text-foreground">
+                  {{ t("settings.aboutFrontendBuildLabel") }}
+                </dt>
+                <dd class="mt-1.5">
+                  {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
+                </dd>
+              </div>
+            </dl>
+            <p class="text-xs text-muted-foreground/90">
+              {{ t("settings.aboutDevProxyHint") }}
             </p>
-            <p class="mt-1.5">
-              {{
-                useWebApi
-                  ? t("settings.aboutDataModeWebApi")
-                  : t("settings.aboutDataModeMock")
-              }}
-            </p>
-          </div>
-          <p class="text-xs text-muted-foreground/90">
-            {{ t("settings.aboutBuildEnv", { env: viteMode }) }}
-          </p>
-          <p v-if="isViteDev" class="text-xs text-muted-foreground/90">
-            {{ t("settings.aboutDevProxyHint") }}
-          </p>
+          </template>
+          <!-- 生产：仅版本号 -->
+          <template v-else>
+            <div class="rounded-2xl border border-border/70 bg-background/50 px-4 py-3">
+              <p class="font-medium text-foreground">
+                {{ t("settings.aboutVersionLabel") }}
+              </p>
+              <p class="mt-1.5 font-mono text-sm text-foreground/90">
+                <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
+                <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-2 font-sans text-muted-foreground">
+                  <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
+                  {{ t("settings.aboutVersionLoading") }}
+                </span>
+                <span v-else-if="aboutHealthError" class="font-sans text-destructive">{{ aboutHealthError }}</span>
+                <span v-else-if="aboutHealth">{{ formatAboutBackendVersion(aboutHealth) }}</span>
+                <span v-else>—</span>
+              </p>
+            </div>
+          </template>
         </CardContent>
       </Card>
-    </section>
     </div>
-  </div>
+    </div>
+    </section>
+    </TabsContent>
+    </div>
+  </Tabs>
 </template>

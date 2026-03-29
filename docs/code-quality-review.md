@@ -206,7 +206,7 @@ src/
 ```text
 backend/
   cmd/
-    javd/
+    curated/
   internal/
     contracts/
     app/

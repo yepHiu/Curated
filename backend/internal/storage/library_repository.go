@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 type movieRow struct {

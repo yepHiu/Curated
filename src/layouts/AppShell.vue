@@ -2,12 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
-import { LayoutDashboard, Menu, Search, X } from "lucide-vue-next"
+import { LayoutDashboard, Menu, Moon, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import { Toaster } from "@/components/ui/sonner"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -35,14 +36,22 @@ import {
   resolveLibraryMode,
 } from "@/lib/library-query"
 import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
+import { useTheme } from "@/composables/use-theme"
 import { useLibraryService } from "@/services/library-service"
 
 useLibraryWatchToasts()
 
+const { resolvedMode, setThemePreference } = useTheme()
+
+function onShellAppearanceSwitch(useDark: boolean) {
+  setThemePreference(useDark ? "dark" : "light")
+}
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+
+const isDev = import.meta.env.DEV
 
 /** 与 Tailwind lg 对齐：以下视为「窄屏」，侧栏自动收起，用抽屉进入导航 */
 const isLgUp = useMediaQuery("(min-width: 1024px)")
@@ -80,7 +89,8 @@ onBeforeUnmount(() => {
 })
 
 const shellGridClass = computed(() => {
-  const base = "grid h-full min-h-0 gap-4 grid-cols-1"
+  const base =
+    "grid h-full min-h-0 gap-4 grid-cols-1 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
   if (!isLgUp.value) {
     return base
   }
@@ -597,13 +607,17 @@ function clearActorsSearch() {
   <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 lg:px-4 lg:py-4">
       <div :class="shellGridClass">
-        <AppSidebar
+        <div
           v-if="isLgUp"
-          class="min-h-0"
-          :compact="desktopSidebarCollapsed"
-          show-collapse-toggle
-          @toggle-compact="desktopSidebarCollapsed = !desktopSidebarCollapsed"
-        />
+          class="min-h-0 min-w-0 overflow-hidden"
+        >
+          <AppSidebar
+            class="min-h-0"
+            :compact="desktopSidebarCollapsed"
+            show-collapse-toggle
+            @toggle-compact="desktopSidebarCollapsed = !desktopSidebarCollapsed"
+          />
+        </div>
 
         <section
           class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/92 shadow-xl shadow-black/8"
@@ -775,6 +789,26 @@ function clearActorsSearch() {
                 </Button>
               </div>
             </div>
+
+            <div
+              class="flex shrink-0 items-center gap-1.5 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
+              :title="t('shell.themeToggleHint')"
+            >
+              <Sun
+                class="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Switch
+                :model-value="resolvedMode === 'dark'"
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :aria-label="t('shell.themeToggleAria')"
+                @update:model-value="onShellAppearanceSwitch"
+              />
+              <Moon
+                class="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
           </div>
 
           <div class="min-h-0 min-w-0 flex-1 overflow-hidden p-4 lg:p-5 xl:p-6">
@@ -785,7 +819,7 @@ function clearActorsSearch() {
     </div>
 
     <ScanProgressDock />
-    <Toaster />
+    <Toaster :theme="resolvedMode" />
 
     <Teleport to="body">
       <div
@@ -815,5 +849,13 @@ function clearActorsSearch() {
         </aside>
       </div>
     </Teleport>
+
+    <span
+      v-if="isDev"
+      class="pointer-events-none fixed bottom-3 right-3 z-[90] select-none rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-widest text-amber-800 shadow-sm dark:border-amber-400/35 dark:bg-amber-400/10 dark:text-amber-300"
+      aria-hidden="true"
+    >
+      dev
+    </span>
   </div>
 </template>

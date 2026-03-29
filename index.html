@@ -5,12 +5,36 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" href="/Curated-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Curated</title>
+    <script>
+      ;(function () {
+        try {
+          var k = "curated-ui-theme"
+          var t = localStorage.getItem(k)
+          var pref =
+            t === "light" || t === "dark" || t === "system" ? t : null
+          if (pref === null) {
+            pref = "dark"
+            try {
+              localStorage.setItem(k, "dark")
+            } catch (e) {}
+          }
+          var dark =
+            pref === "dark" ||
+            (pref === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches)
+          if (dark) document.documentElement.classList.add("dark")
+          else document.documentElement.classList.remove("dark")
+        } catch (e) {
+          document.documentElement.classList.add("dark")
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref } from "vue"
+import { onBeforeUnmount, provide, ref, watch } from "vue"
 import SettingsPage from "@/components/jav-library/SettingsPage.vue"
 import {
   noteSettingsScrollPosition,
   resetSettingsScrollSnapshot,
   SETTINGS_SCROLL_EL_KEY,
-  SETTINGS_SCROLL_ROOT_ID,
 } from "@/composables/use-settings-scroll-preserve"
 
 const settingsScrollEl = ref<HTMLElement | null>(null)
@@ -13,15 +12,19 @@ provide(SETTINGS_SCROLL_EL_KEY, settingsScrollEl)
 
 let detachScrollListener: (() => void) | undefined
 
-onMounted(() => {
-  const root =
-    settingsScrollEl.value ?? (document.getElementById(SETTINGS_SCROLL_ROOT_ID) as HTMLElement | null)
-  if (!root) return
-  const onScroll = () => noteSettingsScrollPosition(root)
-  root.addEventListener("scroll", onScroll, { passive: true })
-  noteSettingsScrollPosition(root)
-  detachScrollListener = () => root.removeEventListener("scroll", onScroll)
-})
+watch(
+  settingsScrollEl,
+  (el) => {
+    detachScrollListener?.()
+    detachScrollListener = undefined
+    if (!el) return
+    const onScroll = () => noteSettingsScrollPosition(el)
+    el.addEventListener("scroll", onScroll, { passive: true })
+    noteSettingsScrollPosition(el)
+    detachScrollListener = () => el.removeEventListener("scroll", onScroll)
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   detachScrollListener?.()
@@ -30,11 +33,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    :id="SETTINGS_SCROLL_ROOT_ID"
-    ref="settingsScrollEl"
-    class="h-full min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain pr-2 [overflow-anchor:none]"
-  >
+  <div class="h-full min-h-0 min-w-0 overflow-hidden pr-2">
     <SettingsPage />
   </div>
 </template>

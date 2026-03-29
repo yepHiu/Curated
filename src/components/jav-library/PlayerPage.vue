@@ -530,7 +530,7 @@ const noStreamHint = computed(() => {
   <div class="flex h-full min-h-0 flex-col p-1 sm:p-2">
     <div
       ref="surfaceRef"
-      class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-gradient-to-br from-black via-zinc-950 to-card"
+      class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-gradient-to-br from-black via-zinc-950 to-black"
       :class="surfaceCursorClass"
       @mousedown="onChromePointerActivity"
       @mousemove="onChromePointerActivity"
@@ -542,7 +542,7 @@ const noStreamHint = computed(() => {
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
       >
         <div class="flex min-w-0 flex-col items-start gap-2 text-left">
-          <Badge variant="secondary" class="rounded-full border border-border/60 bg-background/30">
+          <Badge variant="secondary" class="rounded-full border border-white/20 bg-white/10 text-white">
             {{ movie.code }}
           </Badge>
           <div class="flex min-w-0 flex-col gap-1">

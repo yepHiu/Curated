@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/storage"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/storage"
 )
 
 func posterLocalAPIPath(movieID, kind string) string {
@@ -110,6 +110,8 @@ func (h *Handler) handleGetMovieAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := kind + pickImageExtFromPath(f.Name())
+	// Same URL after rescrape must revalidate: browsers otherwise keep stale bytes (paths are stable).
+	w.Header().Set("Cache-Control", "private, no-cache")
 	http.ServeContent(w, r, name, st.ModTime(), f)
 }
 
@@ -155,6 +157,7 @@ func (h *Handler) handleGetMoviePreviewAsset(w http.ResponseWriter, r *http.Requ
 	}
 
 	name := "preview-" + strconv.Itoa(seq) + pickImageExtFromPath(f.Name())
+	w.Header().Set("Cache-Control", "private, no-cache")
 	http.ServeContent(w, r, name, st.ModTime(), f)
 }
 

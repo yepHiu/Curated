@@ -141,6 +141,10 @@ export const api = {
     return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/scrape`)
   },
 
+  revealMovieInFileManager(movieId: string): Promise<void> {
+    return httpClient.post<void>(`/library/movies/${encodeURIComponent(movieId)}/reveal`)
+  },
+
   startMetadataRefreshByPaths(body: MetadataScrapeByPathsBody): Promise<MetadataRefreshQueuedDTO> {
     return httpClient.post<MetadataRefreshQueuedDTO>("/library/metadata-scrape", body)
   },

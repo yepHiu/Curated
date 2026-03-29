@@ -12,9 +12,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/config"
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/storage"
+	"curated-backend/internal/config"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/storage"
 )
 
 // Metatube 引擎在 DSN 为空时使用固定内存库；并行 test 会并发 DBAutoMigrate 导致冲突。

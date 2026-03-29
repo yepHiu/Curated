@@ -302,7 +302,7 @@ type Scraper interface {
 ```text
 backend/
   cmd/
-    javd/
+    curated/
   internal/
     app/
     config/
@@ -320,7 +320,7 @@ backend/
 
 目录职责建议：
 
-- `cmd/javd`：程序入口
+- `cmd/curated`：程序入口
 - `internal/app`：应用装配和启动流程
 - `internal/contracts`：命令、事件、DTO、错误码
 - `internal/storage`：数据库访问与 migration

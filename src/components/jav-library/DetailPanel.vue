@@ -2,7 +2,18 @@
 import { useFocusWithin, onClickOutside } from "@vueuse/core"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { MoreVertical, Pencil, PlayCircle, Plus, RefreshCw, Star, X } from "lucide-vue-next"
+import {
+  AlertTriangle,
+  FolderOpen,
+  MoreVertical,
+  Pencil,
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  Star,
+  Trash2,
+  X,
+} from "lucide-vue-next"
 import type { PatchMovieBody } from "@/api/types"
 import type { Movie } from "@/domain/movie/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,25 +26,18 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
+import MovieDeleteConfirmDialog from "@/components/jav-library/MovieDeleteConfirmDialog.vue"
+import MovieEditDialog from "@/components/jav-library/MovieEditDialog.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
+import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { getMovieImageVersion } from "@/lib/image-version"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
@@ -61,16 +65,17 @@ const deleteConfirmOpen = ref(false)
 const permanentDeleteConfirmOpen = ref(false)
 
 const isTrashed = computed(() => Boolean(props.movie.trashedAt?.trim()))
-const movieEditOpen = ref(false)
-const movieEditSaving = ref(false)
-const movieEditError = ref("")
-const editDraftTitle = ref("")
-const editDraftStudio = ref("")
-const editDraftSummary = ref("")
-const editDraftRelease = ref("")
-const editDraftRuntime = ref("")
 
-const releaseDateInputRx = /^\d{4}-\d{2}-\d{2}$/
+const summaryDisplay = computed(() =>
+  formatMovieSummaryForDisplay(props.movie.summary ?? ""),
+)
+
+const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+const canRevealInFileManager = computed(
+  () => useWebApi && Boolean(props.movie.location?.trim()) && !isTrashed.value,
+)
+
+const movieEditOpen = ref(false)
 const newUserTagDraft = ref("")
 const userTagFormError = ref("")
 /** 是否展开「添加标签」内联输入（与标签同一行） */
@@ -118,7 +123,10 @@ const emit = defineEmits<{
   restoreMovie: [movieId: string]
   deleteMoviePermanently: [movieId: string]
   refreshMetadata: [movieId: string]
+  revealInFileManager: [movieId: string]
   patchMovieDisplay: [body: PatchMovieBody, done: (err?: unknown) => void]
+  /** 在详情页用全屏查看器打开海报（与样本图查看器一致） */
+  openPosterViewer: []
 }>()
 
 watch(
@@ -128,59 +136,11 @@ watch(
     userTagFormError.value = ""
     userTagInputOpen.value = false
     movieEditOpen.value = false
-    movieEditError.value = ""
   },
 )
 
-function openMovieEditDialog() {
-  movieEditError.value = ""
-  editDraftTitle.value = props.movie.title
-  editDraftStudio.value = props.movie.studio
-  editDraftSummary.value = props.movie.summary
-  editDraftRelease.value = props.movie.releaseDate?.trim() ?? ""
-  editDraftRuntime.value =
-    props.movie.runtimeMinutes > 0 ? String(props.movie.runtimeMinutes) : ""
-  movieEditOpen.value = true
-}
-
-function buildMovieDisplayPatchBody(): PatchMovieBody {
-  const rt = editDraftRuntime.value.trim()
-  return {
-    userTitle: editDraftTitle.value.trim() === "" ? null : editDraftTitle.value.trim(),
-    userStudio: editDraftStudio.value.trim() === "" ? null : editDraftStudio.value.trim(),
-    userSummary: editDraftSummary.value.trim() === "" ? null : editDraftSummary.value.trim(),
-    userReleaseDate:
-      editDraftRelease.value.trim() === "" ? null : editDraftRelease.value.trim(),
-    userRuntimeMinutes: rt === "" ? null : Number.parseInt(editDraftRuntime.value, 10),
-  }
-}
-
-function submitMovieEditDialog() {
-  movieEditError.value = ""
-  const rd = editDraftRelease.value.trim()
-  if (rd !== "" && !releaseDateInputRx.test(rd)) {
-    movieEditError.value = t("detailPanel.movieEditInvalidRelease")
-    return
-  }
-  const rt = editDraftRuntime.value.trim()
-  if (rt !== "") {
-    const n = Number.parseInt(rt, 10)
-    if (Number.isNaN(n) || n < 0 || n > 99999) {
-      movieEditError.value = t("detailPanel.movieEditInvalidRuntime")
-      return
-    }
-  }
-  const body = buildMovieDisplayPatchBody()
-  movieEditSaving.value = true
-  emit("patchMovieDisplay", body, (err?: unknown) => {
-    movieEditSaving.value = false
-    if (err) {
-      movieEditError.value =
-        err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieEditSaveFailed")
-      return
-    }
-    movieEditOpen.value = false
-  })
+function patchMovieDisplayFromEdit(body: PatchMovieBody, done: (err?: unknown) => void) {
+  emit("patchMovieDisplay", body, done)
 }
 
 function actorAvatarSrc(name: string): string {
@@ -220,16 +180,6 @@ function commitUserRatingFromStars(value: number) {
 
 function clearUserRating() {
   emit("updateUserRating", { movieId: props.movie.id, value: null })
-}
-
-const confirmDeleteMovie = () => {
-  deleteConfirmOpen.value = false
-  emit("deleteMovie", props.movie.id)
-}
-
-const confirmPermanentDeleteMovie = () => {
-  permanentDeleteConfirmOpen.value = false
-  emit("deleteMoviePermanently", props.movie.id)
 }
 
 /** 详情页优先展示封面，其次缩略图 */
@@ -393,7 +343,15 @@ function pickUserTagSuggestion(tag: string) {
             aria-hidden="true"
           />
 
-          <div class="pointer-events-none absolute inset-x-0 top-0 z-[2] flex justify-start p-4">
+          <button
+            v-if="posterSrc"
+            type="button"
+            class="absolute inset-0 z-[2] cursor-pointer rounded-[1.5rem] border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+            :aria-label="t('detailPanel.coverViewerAria', { code: movie.code })"
+            @click="emit('openPosterViewer')"
+          />
+
+          <div class="pointer-events-none absolute inset-x-0 top-0 z-[3] flex justify-start p-4">
             <Badge
               class="pointer-events-auto w-fit rounded-full border border-border/40 bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background/90"
             >
@@ -446,12 +404,19 @@ function pickUserTagSuggestion(tag: string) {
       </div>
 
       <div class="flex min-w-0 max-w-full flex-col gap-5">
-        <p
+        <div
           v-if="isTrashed"
-          class="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+          class="flex gap-3 rounded-2xl border border-border/70 border-l-[3px] border-l-amber-600/45 bg-muted/25 px-4 py-3 text-sm font-medium leading-relaxed text-foreground dark:border-l-amber-500/40 dark:bg-muted/20"
+          role="status"
         >
-          {{ t("detailPanel.inTrashBanner") }}
-        </p>
+          <AlertTriangle
+            class="mt-0.5 size-5 shrink-0 text-amber-700/90 dark:text-amber-500/80"
+            aria-hidden="true"
+          />
+          <p class="min-w-0 flex-1 text-pretty text-foreground/95">
+            {{ t("detailPanel.inTrashBanner") }}
+          </p>
+        </div>
         <div class="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div class="min-w-0 max-w-full flex-1">
             <CardTitle
@@ -494,7 +459,7 @@ function pickUserTagSuggestion(tag: string) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="min-w-[11rem]">
               <DropdownMenuGroup>
-                <DropdownMenuItem @click="openMovieEditDialog">
+                <DropdownMenuItem @click="movieEditOpen = true">
                   <Pencil
                     class="size-4 shrink-0"
                     aria-hidden="true"
@@ -517,9 +482,30 @@ function pickUserTagSuggestion(tag: string) {
                   }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  :disabled="!canRevealInFileManager"
+                  :title="
+                    !useWebApi
+                      ? t('detailPanel.revealInFileManagerMockHint')
+                      : !movie.location?.trim()
+                        ? t('detailPanel.revealInFileManagerNoPath')
+                        : undefined
+                  "
+                  @click="emit('revealInFileManager', movie.id)"
+                >
+                  <FolderOpen
+                    class="size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  {{ t("detailPanel.revealInFileManager") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   variant="destructive"
                   @click="deleteConfirmOpen = true"
                 >
+                  <Trash2
+                    class="size-4 shrink-0"
+                    aria-hidden="true"
+                  />
                   {{ t("detailPanel.moveToTrash") }}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
@@ -553,179 +539,31 @@ function pickUserTagSuggestion(tag: string) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Dialog v-model:open="movieEditOpen">
-            <DialogContent class="max-h-[min(90vh,40rem)] overflow-y-auto rounded-3xl border-border/70 sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{{ t("detailPanel.editMovieTitle") }}</DialogTitle>
-                <DialogDescription class="text-pretty">
-                  {{ t("detailPanel.editMovieDesc") }}
-                </DialogDescription>
-              </DialogHeader>
-              <div class="flex flex-col gap-4 py-2">
-                <p
-                  v-if="movieEditError"
-                  class="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                >
-                  {{ movieEditError }}
-                </p>
-                <div class="grid gap-2">
-                  <span class="text-sm font-medium text-muted-foreground">
-                    {{ t("detailPanel.readOnlyCode") }}
-                  </span>
-                  <p class="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                    {{ movie.code }}
-                  </p>
-                </div>
-                <div class="grid gap-2">
-                  <span class="text-sm font-medium text-muted-foreground">
-                    {{ t("detailPanel.readOnlyLocation") }}
-                  </span>
-                  <p class="max-h-24 overflow-y-auto rounded-xl border border-border/60 bg-muted/30 px-3 py-2 font-mono text-xs break-all">
-                    {{ movie.location }}
-                  </p>
-                </div>
-                <div class="grid gap-2">
-                  <label
-                    class="text-sm font-medium"
-                    for="movie-edit-title"
-                  >{{ t("detailPanel.fieldTitle") }}</label>
-                  <Input
-                    id="movie-edit-title"
-                    v-model="editDraftTitle"
-                    class="rounded-xl text-sm"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="grid gap-2">
-                  <label
-                    class="text-sm font-medium"
-                    for="movie-edit-studio"
-                  >{{ t("detailPanel.fieldStudio") }}</label>
-                  <Input
-                    id="movie-edit-studio"
-                    v-model="editDraftStudio"
-                    class="rounded-xl text-sm"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="grid gap-2">
-                  <label
-                    class="text-sm font-medium"
-                    for="movie-edit-summary"
-                  >{{ t("detailPanel.fieldSummary") }}</label>
-                  <textarea
-                    id="movie-edit-summary"
-                    v-model="editDraftSummary"
-                    rows="5"
-                    class="text-foreground placeholder:text-muted-foreground flex min-h-[120px] w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-sm shadow-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
-                <div class="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                  <div class="grid gap-2">
-                    <label
-                      class="text-sm font-medium"
-                      for="movie-edit-release"
-                    >{{ t("detailPanel.fieldReleaseDate") }}</label>
-                    <Input
-                      id="movie-edit-release"
-                      v-model="editDraftRelease"
-                      class="rounded-xl text-sm"
-                      placeholder="YYYY-MM-DD"
-                      autocomplete="off"
-                    />
-                  </div>
-                  <div class="grid gap-2">
-                    <label
-                      class="text-sm font-medium"
-                      for="movie-edit-runtime"
-                    >{{ t("detailPanel.fieldRuntimeMinutes") }}</label>
-                    <Input
-                      id="movie-edit-runtime"
-                      v-model="editDraftRuntime"
-                      class="rounded-xl text-sm"
-                      inputmode="numeric"
-                      autocomplete="off"
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter class="gap-3">
-                <DialogClose as-child>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    class="rounded-2xl"
-                    :disabled="movieEditSaving"
-                  >
-                    {{ t("common.cancel") }}
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="button"
-                  class="rounded-2xl"
-                  :disabled="movieEditSaving"
-                  @click="submitMovieEditDialog"
-                >
-                  {{ movieEditSaving ? t("detailPanel.movieEditSaving") : t("detailPanel.saveMovieEdit") }}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <MovieEditDialog
+            v-model:open="movieEditOpen"
+            :movie="movie"
+            :patch-movie-display="patchMovieDisplayFromEdit"
+          />
 
-          <Dialog v-model:open="deleteConfirmOpen">
-            <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{{ t("detailPanel.moveToTrash") }}</DialogTitle>
-                <DialogDescription class="text-pretty">
-                  {{ t("detailPanel.moveToTrashConfirm") }}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter class="gap-3">
-                <DialogClose as-child>
-                  <Button type="button" variant="outline" class="rounded-2xl">
-                    {{ t("common.cancel") }}
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  class="rounded-2xl"
-                  @click="confirmDeleteMovie"
-                >
-                  {{ t("detailPanel.confirmMoveToTrash") }}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <MovieDeleteConfirmDialog
+            v-model:open="deleteConfirmOpen"
+            variant="trash"
+            @confirm="emit('deleteMovie', movie.id)"
+          />
 
-          <Dialog v-model:open="permanentDeleteConfirmOpen">
-            <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{{ t("detailPanel.deleteMoviePermanently") }}</DialogTitle>
-                <DialogDescription class="text-pretty">
-                  {{ t("detailPanel.deleteMoviePermanentlyConfirm") }}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter class="gap-3">
-                <DialogClose as-child>
-                  <Button type="button" variant="outline" class="rounded-2xl">
-                    {{ t("common.cancel") }}
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  class="rounded-2xl"
-                  @click="confirmPermanentDeleteMovie"
-                >
-                  {{ t("detailPanel.confirmDeletePermanently") }}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <MovieDeleteConfirmDialog
+            v-model:open="permanentDeleteConfirmOpen"
+            variant="permanent"
+            @confirm="emit('deleteMoviePermanently', movie.id)"
+          />
         </div>
 
-        <p class="text-sm leading-6 text-muted-foreground">{{ movie.summary }}</p>
+        <p
+          v-if="summaryDisplay"
+          class="text-pretty text-sm leading-6 text-muted-foreground"
+        >
+          {{ summaryDisplay }}
+        </p>
 
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-1">
@@ -743,12 +581,12 @@ function pickUserTagSuggestion(tag: string) {
               :key="`meta-${tag}`"
               variant="secondary"
               as-child
-              class="rounded-full border border-border/60 bg-secondary/70 pl-2 pr-1"
+              class="h-[29px] max-h-[29px] min-h-[29px] rounded-full border border-border/60 bg-secondary/70 py-0 pl-2 pr-1"
             >
-              <span class="inline-flex max-w-full items-center gap-0.5 rounded-[inherit] py-0.5 pl-1">
+              <span class="inline-flex h-full max-w-full items-center gap-0.5 rounded-[inherit] py-0 pl-1">
                 <button
                   type="button"
-                  class="min-w-0 max-w-[12rem] cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  class="flex h-full min-w-0 max-w-[12rem] cursor-pointer items-center truncate rounded-md px-1.5 text-left text-xs font-medium transition hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   :aria-label="t('detailPanel.ariaSearchInLibrary', { tag })"
                   @click="browseByTagLabel(tag)"
                 >
@@ -757,11 +595,11 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   v-if="!isTrashed"
                   type="button"
-                  class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                  class="inline-flex size-[1.375rem] shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                   :aria-label="t('detailPanel.ariaRemoveNfoTag', { tag })"
                   @click.stop="removeMetadataTag(tag)"
                 >
-                  <X class="size-3.5" />
+                  <X class="size-3" />
                 </button>
               </span>
             </Badge>
@@ -779,12 +617,12 @@ function pickUserTagSuggestion(tag: string) {
               :key="`user-${tag}`"
               variant="outline"
               as-child
-              class="group rounded-full border-primary/35 bg-primary/5 pl-2 pr-1 text-foreground"
+              class="group h-[29px] max-h-[29px] min-h-[29px] rounded-full border-primary/35 bg-primary/5 py-0 pl-2 pr-1 text-foreground"
             >
-              <span class="inline-flex max-w-full items-center gap-0.5 rounded-[inherit] py-0.5 pl-1">
+              <span class="inline-flex h-full max-w-full items-center gap-0.5 rounded-[inherit] py-0 pl-1">
                 <button
                   type="button"
-                  class="min-w-0 max-w-[12rem] cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  class="flex h-full min-w-0 max-w-[12rem] cursor-pointer items-center truncate rounded-md px-1.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   :aria-label="t('detailPanel.ariaSearchInLibrary', { tag })"
                   @click="browseByTagLabel(tag)"
                 >
@@ -793,11 +631,11 @@ function pickUserTagSuggestion(tag: string) {
                 <button
                   v-if="!isTrashed"
                   type="button"
-                  class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                  class="inline-flex size-[1.375rem] shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                   :aria-label="t('detailPanel.ariaRemoveMyTag', { tag })"
                   @click.stop="removeUserTag(tag)"
                 >
-                  <X class="size-3.5" />
+                  <X class="size-3" />
                 </button>
               </span>
             </Badge>
@@ -810,10 +648,10 @@ function pickUserTagSuggestion(tag: string) {
               <Button
                 type="button"
                 variant="secondary"
-                class="shrink-0 rounded-2xl"
+                class="h-[29px] shrink-0 rounded-2xl px-3 py-0 text-xs leading-none"
                 @click="onUserTagAddButtonClick"
               >
-                <Plus data-icon="inline-start" />
+                <Plus class="size-3.5 shrink-0" data-icon="inline-start" />
                 {{ t("common.add") }}
               </Button>
               <div

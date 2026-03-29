@@ -3,7 +3,7 @@ package proxyenv
 import (
 	"testing"
 
-	"jav-shadcn/backend/internal/config"
+	"curated-backend/internal/config"
 )
 
 func TestNewHTTPClientForProxy_direct(t *testing.T) {

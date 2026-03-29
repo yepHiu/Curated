@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { Heart } from "lucide-vue-next"
+import { useI18n } from "vue-i18n"
+import { Heart, Star } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -17,21 +18,73 @@ import {
 } from "@/lib/playback-progress-storage"
 import { getMovieImageVersion } from "@/lib/image-version"
 
-const props = defineProps<{
-  movie: Movie
-  selected?: boolean
-  showFavorite?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    movie: Movie
+    selected?: boolean
+    showFavorite?: boolean
+    batchMode?: boolean
+    batchChecked?: boolean
+  }>(),
+  {
+    batchMode: false,
+    batchChecked: false,
+  },
+)
 
 const emit = defineEmits<{
   select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
+  contextMenu: [event: MouseEvent]
+  toggleBatchSelect: [movieId: string]
 }>()
 
-const visibleTags = computed(() => props.movie.tags.slice(0, 2))
-const userTagCount = computed(() => props.movie.userTags.length)
+const { t } = useI18n()
+
+const MAX_CARD_TAGS = 3
+
+type CardTagEntry = { text: string; source: "user" | "metadata" }
+
+/**
+ * 先铺用户标签（去重），未满 3 个再用 NFO/元数据标签补足（跳过已与已展示重复的标签）。
+ * 槽位用尽后未展示的标签计入 overflow（含多出来的用户标签与元数据标签）。
+ */
+const cardTagsDisplay = computed(() => {
+  const user = props.movie.userTags
+  const meta = props.movie.tags
+  let slots = MAX_CARD_TAGS
+  const occupied = new Set<string>()
+  const tags: CardTagEntry[] = []
+  let overflow = 0
+
+  for (const t of user) {
+    if (slots <= 0) {
+      overflow++
+      continue
+    }
+    if (occupied.has(t)) continue
+    occupied.add(t)
+    tags.push({ text: t, source: "user" })
+    slots--
+  }
+  for (const t of meta) {
+    if (occupied.has(t)) continue
+    if (slots <= 0) {
+      overflow++
+      continue
+    }
+    occupied.add(t)
+    tags.push({ text: t, source: "metadata" })
+    slots--
+  }
+
+  return { tags, overflow }
+})
+
+/** 列表有效分满档（0–5 制，含浮点） */
+const isFullRating = computed(() => props.movie.rating >= 4.99)
 
 /** 列表优先用缩略图，减轻带宽；无则回落封面 */
 const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl || "")
@@ -58,9 +111,25 @@ const progressPercent = computed(() => {
   return Math.min(100, Math.max(0, (row.positionSec / dur) * 100))
 })
 
+const fullStarBadgePositionClass = computed(() => {
+  const hasFav = props.showFavorite !== false
+  const hasProg = progressPercent.value != null
+  const h = hasFav ? "right-[3.25rem]" : "right-2.5"
+  const v = hasProg ? "bottom-3" : "bottom-2.5"
+  return `${h} ${v}`
+})
+
 const handleOpenDetails = () => {
+  if (props.batchMode) {
+    emit("toggleBatchSelect", props.movie.id)
+    return
+  }
   emit("select", props.movie.id)
   emit("openDetails", props.movie.id)
+}
+
+function onBatchCheckboxChange() {
+  emit("toggleBatchSelect", props.movie.id)
 }
 
 const handleFavoriteChange = (nextValue: boolean) => {
@@ -76,12 +145,26 @@ const handleFavoriteChange = (nextValue: boolean) => {
       type="button"
       class="flex w-full flex-col text-left focus-visible:outline-none"
       @click="handleOpenDetails"
+      @contextmenu.prevent="emit('contextMenu', $event)"
     >
       <div class="p-2.5 pb-0">
         <div
           class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 aspect-[358/537]"
           :class="posterSrc ? 'bg-muted/30' : `bg-gradient-to-br p-2.5 ${movie.tone}`"
         >
+          <label
+            v-if="props.batchMode"
+            class="absolute top-2 right-2 z-[4] flex cursor-pointer items-center justify-center rounded-md border border-border/45 bg-background/25 p-1.5 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
+            @click.stop
+          >
+            <input
+              type="checkbox"
+              class="size-4 cursor-pointer rounded accent-primary"
+              :checked="props.batchChecked"
+              :aria-label="t('library.batchCardToggleAria')"
+              @change="onBatchCheckboxChange"
+            />
+          </label>
           <MediaStill
             v-if="posterSrc"
             :src="posterSrc"
@@ -103,6 +186,20 @@ const handleFavoriteChange = (nextValue: boolean) => {
           >
             {{ movie.code }}
           </Badge>
+
+          <div
+            v-if="isFullRating"
+            class="pointer-events-none absolute z-[2] flex items-center gap-0.5 rounded-full border border-primary/35 bg-background/88 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary shadow-sm backdrop-blur-sm"
+            :class="fullStarBadgePositionClass"
+            role="img"
+            :aria-label="t('library.ratingFiveStarsBadgeAria')"
+          >
+            <span aria-hidden="true">5</span>
+            <Star
+              class="size-3 shrink-0 fill-primary text-primary"
+              aria-hidden="true"
+            />
+          </div>
 
           <Toggle
             v-if="props.showFavorite !== false"
@@ -140,19 +237,23 @@ const handleFavoriteChange = (nextValue: boolean) => {
         <!-- Badge 默认含 py-0.5 + 边框，高度常 > h-5；勿用固定矮行 + overflow-hidden 以免裁切 -->
         <div class="flex min-h-6 items-center gap-1">
           <Badge
-            v-for="tag in visibleTags"
-            :key="tag"
-            variant="secondary"
-            class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
+            v-for="(item, i) in cardTagsDisplay.tags"
+            :key="`${i}-${item.text}`"
+            :variant="item.source === 'user' ? 'outline' : 'secondary'"
+            :class="
+              item.source === 'user'
+                ? 'max-w-[4.75rem] truncate rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
+                : 'max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
+            "
           >
-            {{ tag }}
+            {{ item.text }}
           </Badge>
           <Badge
-            v-if="userTagCount > 0"
+            v-if="cardTagsDisplay.overflow > 0"
             variant="outline"
-            class="shrink-0 rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary"
+            class="shrink-0 rounded-full border-muted-foreground/35 px-1.5 text-[10px] leading-tight text-muted-foreground"
           >
-            我的 {{ userTagCount }}
+            +{{ cardTagsDisplay.overflow }}
           </Badge>
         </div>
       </CardContent>

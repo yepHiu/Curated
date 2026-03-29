@@ -17,13 +17,14 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/browserheaders"
-	"jav-shadcn/backend/internal/config"
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/proxyenv"
-	"jav-shadcn/backend/internal/storage"
-	"jav-shadcn/backend/internal/tasks"
-	"jav-shadcn/backend/internal/version"
+	"curated-backend/internal/browserheaders"
+	"curated-backend/internal/config"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/proxyenv"
+	"curated-backend/internal/shellopen"
+	"curated-backend/internal/storage"
+	"curated-backend/internal/tasks"
+	"curated-backend/internal/version"
 )
 
 type ScanStarter interface {
@@ -152,6 +153,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/{kind}", h.handleGetMovieAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/reveal", h.handleRevealMovieInFileManager)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/comment", h.handleGetMovieComment)
 	mux.HandleFunc("PUT /api/library/movies/{movieId}/comment", h.handlePutMovieComment)
 	mux.HandleFunc("GET /api/library/movies/{movieId}", h.handleGetMovie)
@@ -191,8 +193,9 @@ func (h *Handler) Routes() http.Handler {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, contracts.HealthDTO{
-		Name:         "javd",
-		Version:      version.Version,
+		Name:         "curated",
+		Version:      version.Stamp(),
+		Channel:      version.Channel,
 		Transport:    "http",
 		DatabasePath: h.cfg.DatabasePath,
 	})
@@ -425,6 +428,51 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
+}
+
+func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+
+	absPath, err := h.store.ResolvePrimaryVideoPath(r.Context(), movieID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrMovieVideoNotFound):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		case errors.Is(err, storage.ErrMovieVideoNoLocation):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie has no video file")
+		case errors.Is(err, storage.ErrMovieVideoForbidden):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		case errors.Is(err, storage.ErrMovieVideoNotFile):
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie or video file not found")
+		default:
+			if h.logger != nil {
+				h.logger.Warn("resolve primary video for reveal failed", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to resolve video path")
+		}
+		return
+	}
+
+	// Use a detached timeout — not r.Context(): when the 204 is sent the request context
+	// is often cancelled immediately and would kill the explorer child from exec.CommandContext.
+	revealCtx, revealCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer revealCancel()
+	if err := shellopen.RevealInFileManager(revealCtx, absPath); err != nil {
+		if h.logger != nil {
+			h.logger.Warn("reveal in file manager failed", zap.Error(err), zap.String("path", absPath))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager: "+err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleGetMovieComment(w http.ResponseWriter, r *http.Request) {

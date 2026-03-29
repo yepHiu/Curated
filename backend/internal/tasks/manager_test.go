@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 func TestProgressWithMetadata_MergesPatch(t *testing.T) {

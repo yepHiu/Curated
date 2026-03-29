@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 var (

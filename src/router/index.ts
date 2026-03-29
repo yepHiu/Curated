@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from "vue-router"
+import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -24,7 +24,13 @@ const router = createRouter({
         {
           path: "recent",
           name: "recent",
-          component: () => import("@/views/LibraryView.vue"),
+          redirect: (to) => {
+            const query: LocationQuery = { ...to.query }
+            if (query.from === "recent") {
+              delete query.from
+            }
+            return { name: "library", query }
+          },
         },
         {
           path: "tags",

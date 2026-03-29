@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/scraper"
 )
 
 func TestWriteMovieNFO(t *testing.T) {

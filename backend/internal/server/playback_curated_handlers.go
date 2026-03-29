@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/storage"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/storage"
 )
 
 const maxCuratedImageBytes = 12 << 20 // 12 MiB raw PNG/JPEG

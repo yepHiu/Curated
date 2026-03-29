@@ -13,7 +13,10 @@ export interface ApiError {
 
 export interface HealthDTO {
   name: string
+  /** 构建戳：`YYYYMMDD.HHMMSS`（UTC，来自 Git vcs.time 或 CI `-X BuildStamp`）；无则可能 `git.<hash>` / `unknown` */
   version: string
+  /** 构建通道：`dev` / `release`；旧后端可能缺省 */
+  channel?: string
   transport: string
   databasePath: string
 }

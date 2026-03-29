@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/library/moviecode"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/library/moviecode"
 )
 
 type ScanPersistOutcome struct {

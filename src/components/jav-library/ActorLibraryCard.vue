@@ -333,12 +333,12 @@ function pickUserTagSuggestion(s: string) {
           :key="`actor-tag-${tag}`"
           variant="outline"
           as-child
-          class="group rounded-full border-primary/35 bg-primary/5 pl-2 pr-1 text-foreground"
+          class="group h-[29px] max-h-[29px] min-h-[29px] rounded-full border-primary/35 bg-primary/5 px-0 py-0 pl-2 pr-1 text-foreground"
         >
-          <span class="inline-flex max-w-full items-center gap-0.5 rounded-[inherit] py-0.5 pl-1">
+          <span class="inline-flex h-full max-w-full items-center gap-0.5 rounded-[inherit] pl-1">
             <button
               type="button"
-              class="min-w-0 max-w-[12rem] cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40"
+              class="flex h-full min-h-0 max-w-[12rem] cursor-pointer items-center truncate rounded-md px-1.5 text-left text-xs font-medium transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40"
               :aria-label="t('actors.ariaFilterActorTag', { tag })"
               :disabled="patching"
               @click="onTagLabelClick(tag)"
@@ -347,7 +347,7 @@ function pickUserTagSuggestion(s: string) {
             </button>
             <button
               type="button"
-              class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
+              class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
               :aria-label="t('detailPanel.ariaRemoveMyTag', { tag })"
               :disabled="patching"
               @click.stop="removeUserTag(tag)"
@@ -361,7 +361,7 @@ function pickUserTagSuggestion(s: string) {
           <Button
             type="button"
             variant="secondary"
-            class="shrink-0 rounded-2xl disabled:pointer-events-none disabled:opacity-40"
+            class="h-[29px] min-h-[29px] max-h-[29px] shrink-0 rounded-2xl px-2.5 py-0 text-xs has-[>svg]:px-2 disabled:pointer-events-none disabled:opacity-40 [&_svg:not([class*='size-'])]:size-3.5"
             :disabled="patching"
             @click="onUserTagAddButtonClick"
           >
@@ -374,7 +374,7 @@ function pickUserTagSuggestion(s: string) {
             class="relative max-w-full min-w-[min(100%,12rem)]"
           >
             <div
-              class="flex h-9 w-full items-center gap-0.5 rounded-2xl border border-border/80 bg-background/80 pl-3 pr-0.5 shadow-sm"
+              class="flex h-[29px] max-h-[29px] min-h-[29px] w-full items-center gap-0.5 rounded-2xl border border-border/80 bg-background/80 pl-3 pr-0.5 shadow-sm"
             >
               <input
                 ref="newUserTagInputRef"
@@ -390,7 +390,7 @@ function pickUserTagSuggestion(s: string) {
                 aria-autocomplete="list"
                 :aria-controls="showUserTagSuggestions ? `${tagSuggestDomId}-list` : undefined"
                 :placeholder="t('detailPanel.newTagPlaceholder')"
-                class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0 disabled:opacity-50"
+                class="placeholder:text-muted-foreground h-full min-h-0 min-w-0 flex-1 border-0 bg-transparent px-0 text-xs shadow-none outline-none focus-visible:ring-0 disabled:opacity-50"
                 :disabled="patching"
                 @keydown="onTagSuggestKeydown"
               />
@@ -398,7 +398,7 @@ function pickUserTagSuggestion(s: string) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                class="size-8 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="size-[25px] shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-3.5"
                 :aria-label="t('detailPanel.ariaCancelTagInput')"
                 :disabled="patching"
                 @click="cancelUserTagInput"

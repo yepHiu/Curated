@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"jav-shadcn/backend/internal/library/curated"
-	"jav-shadcn/backend/internal/library/moviecode"
+	"curated-backend/internal/library/curated"
+	"curated-backend/internal/library/moviecode"
 )
 
 // LayoutKind describes how a video file sits on disk relative to a 番号 folder.

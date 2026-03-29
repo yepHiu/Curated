@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/config"
+	"curated-backend/internal/config"
 )
 
 const (

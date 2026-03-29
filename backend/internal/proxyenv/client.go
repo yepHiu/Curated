@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"jav-shadcn/backend/internal/config"
+	"curated-backend/internal/config"
 )
 
 const defaultOutboundTestTimeout = 20 * time.Second

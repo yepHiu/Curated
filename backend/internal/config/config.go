@@ -10,17 +10,17 @@ import (
 )
 
 type Config struct {
-	LogLevel     string   `json:"logLevel"`
+	LogLevel string `json:"logLevel"`
 	// LogDir, if non-empty, enables daily rotated log files under this directory (e.g. "logs" or "runtime/logs").
 	LogDir string `json:"logDir,omitempty"`
-	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default "javd" when LogDir is set.
+	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default "curated" when LogDir is set.
 	LogFilePrefix string `json:"logFilePrefix,omitempty"`
 	// LogMaxAgeDays removes rotated files older than this many days; 0 means default 7 when file logging is enabled.
-	LogMaxAgeDays int `json:"logMaxAgeDays,omitempty"`
-	HttpAddr     string   `json:"httpAddr"`
-	DatabasePath string   `json:"databasePath"`
-	CacheDir     string   `json:"cacheDir"`
-	LibraryPaths []string `json:"libraryPaths"`
+	LogMaxAgeDays int      `json:"logMaxAgeDays,omitempty"`
+	HttpAddr      string   `json:"httpAddr"`
+	DatabasePath  string   `json:"databasePath"`
+	CacheDir      string   `json:"cacheDir"`
+	LibraryPaths  []string `json:"libraryPaths"`
 	// ScanIntervalSeconds is deprecated: kept in JSON for backward compatibility with older config files; ignored (no scheduled scan).
 	ScanIntervalSeconds int `json:"scanIntervalSeconds,omitempty"`
 	// OrganizeLibrary moves/renames video files into {parent}/{番号}/{番号}.ext and stores NFO/assets beside the video when enabled.
@@ -144,7 +144,7 @@ func Load(path string) (Config, error) {
 	}
 	if strings.TrimSpace(cfg.LogDir) != "" {
 		if cfg.LogFilePrefix == "" {
-			cfg.LogFilePrefix = "javd"
+			cfg.LogFilePrefix = "curated"
 		}
 		if cfg.LogMaxAgeDays <= 0 {
 			cfg.LogMaxAgeDays = 7
@@ -182,6 +182,9 @@ func Load(path string) (Config, error) {
 }
 
 func defaultLibraryPaths() []string {
+	if root := curatedDataRoot(); root != "" {
+		return nil
+	}
 	cwd, err := os.Getwd()
 	if err == nil && filepath.Base(cwd) == "backend" {
 		return []string{
@@ -197,6 +200,9 @@ func defaultLibraryPaths() []string {
 }
 
 func defaultCacheDir() string {
+	if root := curatedDataRoot(); root != "" {
+		return filepath.Join(root, "cache")
+	}
 	cwd, err := os.Getwd()
 	if err == nil && filepath.Base(cwd) == "backend" {
 		return filepath.FromSlash("runtime/cache")
@@ -206,12 +212,15 @@ func defaultCacheDir() string {
 }
 
 func defaultDatabasePath() string {
+	if root := curatedDataRoot(); root != "" {
+		return filepath.Join(root, "data", "curated.db")
+	}
 	cwd, err := os.Getwd()
 	if err == nil && filepath.Base(cwd) == "backend" {
-		return filepath.FromSlash("runtime/jav-library.db")
+		return filepath.FromSlash("runtime/curated.db")
 	}
 
-	return filepath.FromSlash("backend/runtime/jav-library.db")
+	return filepath.FromSlash("backend/runtime/curated.db")
 }
 
 // LibraryWatchOn reports whether fsnotify-based library watching should run.

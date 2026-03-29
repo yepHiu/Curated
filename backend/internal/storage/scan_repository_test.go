@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 func TestPersistScanMovie(t *testing.T) {

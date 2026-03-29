@@ -14,9 +14,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/curatedexport"
-	"jav-shadcn/backend/internal/storage"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/curatedexport"
+	"curated-backend/internal/storage"
 )
 
 const maxCuratedExportFrames = 20

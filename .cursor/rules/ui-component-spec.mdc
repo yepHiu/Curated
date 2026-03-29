@@ -18,7 +18,7 @@ alwaysApply: false
 
 - **MUST** 使用语义 Tailwind / 主题类：`bg-background`、`text-foreground`、`border-border`、`bg-card`、`text-card-foreground`、`bg-muted`、`text-muted-foreground`、`primary`、`destructive`、`ring` 等。CSS 变量事实源：**`src/style.css`**（`:root` 已为深色主界面）。
 - **MUST NOT** 在业务组件中随意写死 `#rrggbb` 或任意 `rgb()` 作为主色/背景（难以随主题维护）。
-- **例外（已约定）**：侧栏 **Curated** 品牌字标/色块可用固定粉紫系，见 **`jav-library-frontend-patterns.mdc`**（`AppSidebar`）。
+- **例外（已约定）**：侧栏 **Curated** 字标使用 **`text-primary`** + **`font-curated`**（`--font-curated` / Outfit），见 **`AppSidebar.vue`** 与 **`jav-library-frontend-patterns.mdc`**。
 
 ## 深色与 `dark:`（MUST 理解）
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"jav-shadcn/backend/internal/contracts"
+	"curated-backend/internal/contracts"
 )
 
 func TestMovieComment_UpsertAndGet(t *testing.T) {

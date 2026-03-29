@@ -16,8 +16,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/browserheaders"
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/browserheaders"
+	"curated-backend/internal/scraper"
 )
 
 type DownloadedAsset struct {
@@ -89,10 +89,16 @@ func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, 
 	sem := make(chan struct{}, s.maxConcurrent)
 	var wg sync.WaitGroup
 
+	previewIndex := 0
 	for i, spec := range specs {
 		i, spec := i, spec
+		seq := i + 1
+		if spec.Type == "preview_image" {
+			previewIndex++
+			seq = previewIndex
+		}
 		wg.Add(1)
-		go func() {
+		go func(i int, spec DownloadedAsset, seq int) {
 			defer wg.Done()
 			select {
 			case sem <- struct{}{}:
@@ -101,14 +107,14 @@ func (s *Service) DownloadAllTo(ctx context.Context, metadata scraper.Metadata, 
 				errs[i] = ctx.Err()
 				return
 			}
-			localPath, err := s.downloadOne(ctx, destDir, metadata.Number, spec.Type, i+1, spec.SourceURL)
+			localPath, err := s.downloadOne(ctx, destDir, metadata.Number, spec.Type, seq, spec.SourceURL)
 			if err != nil {
 				errs[i] = err
 				return
 			}
 			spec.LocalPath = localPath
 			results[i] = spec
-		}()
+		}(i, spec, seq)
 	}
 
 	wg.Wait()
@@ -134,8 +140,12 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	fileName := buildFileName(assetType, sequence, sourceURL)
 	localPath := filepath.Join(destDir, fileName)
 
-	if info, err := os.Stat(localPath); err == nil && info.Size() > 0 {
-		return localPath, nil
+	// Previews: stable names (preview-01.jpg, …); skip re-download when we already have bytes
+	// so rescrapes stay cheap. Cover/thumb always re-fetch so poster matches new source_url.
+	if assetType == "preview_image" {
+		if info, err := os.Stat(localPath); err == nil && info.Size() > 0 {
+			return localPath, nil
+		}
 	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
@@ -155,21 +165,35 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 		return "", fmt.Errorf("unexpected asset response status %d for %s", response.StatusCode, sourceURL)
 	}
 
-	file, err := os.Create(localPath)
+	tmpFile, err := os.CreateTemp(destDir, ".asset-dl-*")
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	tmpPath := tmpFile.Name()
+	cleanupTmp := true
+	defer func() {
+		if cleanupTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
 
 	limited := http.MaxBytesReader(nil, response.Body, s.maxResponseBody)
-	if _, err := io.Copy(file, limited); err != nil {
-		_ = os.Remove(localPath)
+	if _, err := io.Copy(tmpFile, limited); err != nil {
+		_ = tmpFile.Close()
 		var mbe *http.MaxBytesError
 		if errors.As(err, &mbe) {
 			return "", fmt.Errorf("asset response exceeds max size (%d bytes) for %s", s.maxResponseBody, sourceURL)
 		}
 		return "", err
 	}
+	if err := tmpFile.Close(); err != nil {
+		return "", err
+	}
+
+	if err := replaceFileAtomically(tmpPath, localPath); err != nil {
+		return "", err
+	}
+	cleanupTmp = false
 
 	s.logger.Info("asset downloaded",
 		zap.String("destDir", destDir),
@@ -178,6 +202,21 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 		zap.String("localPath", localPath),
 	)
 	return localPath, nil
+}
+
+// replaceFileAtomically moves tmpPath to finalPath. On failure, finalPath is left unchanged
+// (so a partial download never truncates an existing good file).
+func replaceFileAtomically(tmpPath, finalPath string) error {
+	if err := os.Rename(tmpPath, finalPath); err == nil {
+		return nil
+	}
+	if err := os.Remove(finalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("replace asset file: %w", err)
+	}
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		return fmt.Errorf("replace asset file: %w", err)
+	}
+	return nil
 }
 
 func buildFileName(assetType string, sequence int, sourceURL string) string {

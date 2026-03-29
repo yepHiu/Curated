@@ -19,21 +19,21 @@ import (
 
 	"net/http"
 
-	"jav-shadcn/backend/internal/assets"
-	"jav-shadcn/backend/internal/config"
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/library"
-	"jav-shadcn/backend/internal/library/moviecode"
-	"jav-shadcn/backend/internal/library/movieroot"
-	"jav-shadcn/backend/internal/librarywatch"
-	"jav-shadcn/backend/internal/proxyenv"
-	"jav-shadcn/backend/internal/scanner"
-	"jav-shadcn/backend/internal/scraper"
-	"jav-shadcn/backend/internal/scraper/metatube"
-	"jav-shadcn/backend/internal/server"
-	"jav-shadcn/backend/internal/storage"
-	"jav-shadcn/backend/internal/tasks"
-	"jav-shadcn/backend/internal/version"
+	"curated-backend/internal/assets"
+	"curated-backend/internal/config"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/library"
+	"curated-backend/internal/library/moviecode"
+	"curated-backend/internal/library/movieroot"
+	"curated-backend/internal/librarywatch"
+	"curated-backend/internal/proxyenv"
+	"curated-backend/internal/scanner"
+	"curated-backend/internal/scraper"
+	"curated-backend/internal/scraper/metatube"
+	"curated-backend/internal/server"
+	"curated-backend/internal/storage"
+	"curated-backend/internal/tasks"
+	"curated-backend/internal/version"
 )
 
 type App struct {
@@ -76,7 +76,7 @@ type App struct {
 	watchLoopSession uint64 // bumped on each Start/Stop; goroutine clears cancel only if still current
 }
 
-// New 构造并返回可运行的后端 App（依赖注入入口），由 cmd/javd 在加载配置、合并 library-config.cfg、
+// New 构造并返回可运行的后端 App（依赖注入入口），由 cmd/curated 在加载配置、合并 library-config.cfg、
 // 打开数据库并完成迁移后调用。
 //
 // 参数说明：
@@ -525,8 +525,9 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 	switch command.Type {
 	case contracts.CommandSystemHealth:
 		return a.respondOK(output, command.ID, contracts.HealthDTO{
-			Name:         "javd",
-			Version:      version.Version,
+			Name:         "curated",
+			Version:      version.Stamp(),
+			Channel:      version.Channel,
 			Transport:    "stdio-jsonl",
 			DatabasePath: a.cfg.DatabasePath,
 		})

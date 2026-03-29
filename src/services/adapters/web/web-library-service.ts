@@ -393,6 +393,10 @@ function createWebLibraryService(): LibraryService {
       return await api.refreshMovieMetadata(movieId)
     },
 
+    async revealMovieInFileManager(movieId: string): Promise<void> {
+      await api.revealMovieInFileManager(movieId)
+    },
+
     async refreshMetadataForLibraryPaths(paths: string[]): Promise<MetadataRefreshQueuedDTO> {
       const cleaned = paths.map((p) => p.trim()).filter(Boolean)
       return await api.startMetadataRefreshByPaths({ paths: cleaned })

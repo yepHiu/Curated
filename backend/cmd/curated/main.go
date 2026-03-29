@@ -13,12 +13,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/app"
-	"jav-shadcn/backend/internal/config"
-	"jav-shadcn/backend/internal/logging"
-	"jav-shadcn/backend/internal/server"
-	"jav-shadcn/backend/internal/storage"
-	"jav-shadcn/backend/internal/version"
+	"curated-backend/internal/app"
+	"curated-backend/internal/config"
+	"curated-backend/internal/logging"
+	"curated-backend/internal/server"
+	"curated-backend/internal/storage"
+	"curated-backend/internal/version"
 )
 
 func main() {
@@ -52,7 +52,8 @@ func main() {
 	}()
 
 	startupFields := []zap.Field{
-		zap.String("version", version.Version),
+		zap.String("buildStamp", version.Stamp()),
+		zap.String("channel", version.Channel),
 		zap.String("httpAddr", cfg.HttpAddr),
 		zap.String("databasePath", cfg.DatabasePath),
 		zap.Int("libraryPathsConfigured", len(cfg.LibraryPaths)),
@@ -71,7 +72,7 @@ func main() {
 	} else {
 		startupFields = append(startupFields, zap.Bool("proxyEnabled", false))
 	}
-	logger.Info("javd starting", startupFields...)
+	logger.Info("Curated backend starting", startupFields...)
 
 	store, err := storage.NewSQLiteStore(cfg.DatabasePath)
 	if err != nil {

@@ -1,8 +1,9 @@
-module jav-shadcn/backend
+module curated-backend
 
 go 1.25.4
 
 require (
+	github.com/deepteams/webp v1.2.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
@@ -23,7 +24,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.24.0 // indirect
 	github.com/corona10/goimagehash v1.1.0 // indirect
-	github.com/deepteams/webp v1.2.1 // indirect
 	github.com/disintegration/imaging v1.6.3-0.20201218193011-d40f48ce0f09 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

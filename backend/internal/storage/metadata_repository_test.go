@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/scraper"
 )
 
 func TestSaveMovieMetadata(t *testing.T) {

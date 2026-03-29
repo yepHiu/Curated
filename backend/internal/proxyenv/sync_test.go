@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"jav-shadcn/backend/internal/config"
+	"curated-backend/internal/config"
 )
 
 func TestSync_disabled_clearsEnv(t *testing.T) {

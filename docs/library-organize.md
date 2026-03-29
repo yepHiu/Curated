@@ -21,7 +21,7 @@
 
 增删改库路径后，HTTP 层会尝试 **`ReloadLibraryWatches`**，使监听目录与数据库中的根路径一致。
 
-## 配置（`javd` 主 JSON，`-config`）
+## 配置（Curated 后端主 JSON，`-config`）
 
 | 字段 | 说明 |
 |------|------|

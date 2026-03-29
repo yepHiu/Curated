@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { ChevronDown } from "lucide-vue-next"
+import { CheckSquare, ChevronDown, ListChecks, X } from "lucide-vue-next"
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { Badge } from "@/components/ui/badge"
@@ -27,12 +27,17 @@ const props = defineProps<{
   visibleMovies: readonly Movie[]
   selectedMovie?: Movie
   activeTab: LibraryTab
+  batchMode?: boolean
+  /** 多选 id 列表（来自父级 Set 快照，用于卡片勾选态） */
+  batchSelectedIds?: readonly string[]
   /** 当前 URL 精确标签筛选（用于高亮） */
   activeTagFilter?: string
   /** 当前 URL 精确演员筛选（`actor=`） */
   activeActorFilter?: string
   /** 当前 URL 精确厂商筛选（`studio=`） */
   activeStudioFilter?: string
+  /** 演员资料卡「用户标签」联想候选（影片 userTags 等，与演员库卡同源） */
+  actorUserTagSuggestions?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -41,11 +46,16 @@ const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId?: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
+  contextMenu: [payload: { event: MouseEvent; movie: Movie }]
   /** 与详情页点标签一致：写入 `tag`、清除 `q`/`actor` */
   browseByExactTag: [tag: string]
   clearExactTagFilter: []
   clearExactActorFilter: []
   clearExactStudioFilter: []
+  enterBatchMode: []
+  exitBatchMode: []
+  selectAllVisibleInBatch: []
+  toggleBatchSelect: [movieId: string]
 }>()
 
 const { t, locale } = useI18n()
@@ -85,6 +95,8 @@ const activeTagTrimmed = computed(() => props.activeTagFilter?.trim() ?? "")
 const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 
+const batchModeOn = computed(() => props.batchMode === true)
+
 const handleTabChange = (value: string | number) => {
   emit("update:activeTab", String(value) as LibraryTab)
 }
@@ -101,10 +113,11 @@ function isChipActive(tag: string): boolean {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col gap-7">
+  <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-7">
     <ActorProfileCard
       v-if="activeActorTrimmed"
       :actor-name="activeActorTrimmed"
+      :user-tag-suggestions="props.actorUserTagSuggestions ?? []"
       @clear-filter="emit('clearExactActorFilter')"
     />
     <div
@@ -285,35 +298,119 @@ function isChipActive(tag: string): boolean {
       </CardContent>
     </Card>
 
-    <Tabs
-      v-if="props.mode !== 'trash'"
-      :model-value="props.activeTab"
-      class="gap-5"
-      @update:model-value="handleTabChange"
+    <div
+      v-if="props.mode === 'trash'"
+      class="flex flex-wrap items-center justify-end gap-2"
     >
-      <TabsList class="h-auto w-fit flex-wrap rounded-2xl bg-muted/60 p-1">
-        <TabsTrigger value="all" class="rounded-xl px-4 py-2">
-          {{ t("library.tabAll") }}
-        </TabsTrigger>
-        <TabsTrigger value="new" class="rounded-xl px-4 py-2">
-          {{ t("library.tabNew") }}
-        </TabsTrigger>
-        <TabsTrigger value="top-rated" class="rounded-xl px-4 py-2">
-          {{ t("library.tabTop") }}
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
+      <template v-if="!batchModeOn">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          class="shrink-0 gap-1.5 rounded-xl"
+          @click="emit('enterBatchMode')"
+        >
+          <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+          {{ t("library.batchManage") }}
+        </Button>
+      </template>
+      <template v-else>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          class="shrink-0 gap-1.5 rounded-xl"
+          @click="emit('selectAllVisibleInBatch')"
+        >
+          <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+          {{ t("library.batchSelectVisible") }}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="shrink-0 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+          @click="emit('exitBatchMode')"
+        >
+          <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+          {{ t("library.batchExitToolbar") }}
+        </Button>
+      </template>
+    </div>
+
+    <div
+      v-else
+      class="flex flex-wrap items-center justify-between gap-3"
+    >
+      <Tabs
+        :model-value="props.activeTab"
+        class="min-w-0 flex-1 gap-5"
+        @update:model-value="handleTabChange"
+      >
+        <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
+          <TabsTrigger value="all" class="rounded-xl px-4 py-2">
+            {{ t("library.tabAll") }}
+          </TabsTrigger>
+          <TabsTrigger value="new" class="rounded-xl px-4 py-2">
+            {{ t("library.tabNew") }}
+          </TabsTrigger>
+          <TabsTrigger value="top-rated" class="rounded-xl px-4 py-2">
+            {{ t("library.tabTop") }}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <div class="flex shrink-0 flex-wrap items-center gap-2">
+        <template v-if="!batchModeOn">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="gap-1.5 rounded-xl"
+            @click="emit('enterBatchMode')"
+          >
+            <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+            {{ t("library.batchManage") }}
+          </Button>
+        </template>
+        <template v-else>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="gap-1.5 rounded-xl"
+            @click="emit('selectAllVisibleInBatch')"
+          >
+            <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+            {{ t("library.batchSelectVisible") }}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            @click="emit('exitBatchMode')"
+          >
+            <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+            {{ t("library.batchExitToolbar") }}
+          </Button>
+        </template>
+      </div>
+    </div>
 
     <div class="min-h-0 flex-1">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
         :selected-movie-id="props.selectedMovie?.id"
+        :batch-mode="batchModeOn"
+        :batch-selected-ids="props.batchSelectedIds ?? []"
         :empty-title="props.mode === 'trash' ? t('library.trashEmptyTitle') : undefined"
         :empty-description="props.mode === 'trash' ? t('library.trashEmptyDesc') : undefined"
         @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
         @toggle-favorite="emit('toggleFavorite', $event)"
+        @context-menu="emit('contextMenu', $event)"
+        @toggle-batch-select="emit('toggleBatchSelect', $event)"
       />
     </div>
   </div>

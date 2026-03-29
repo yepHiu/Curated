@@ -47,16 +47,16 @@ pnpm typecheck
 ```bash
 # Build the backend binary
 cd backend
-go build -o javd.exe ./cmd/javd
+go build -o curated.exe ./cmd/curated
 
 # Run backend HTTP server (default mode)
-./javd.exe
+./curated.exe
 
 # Run with specific config
-./javd.exe -config path/to/config.yaml
+./curated.exe -config path/to/config.yaml
 
 # Run in stdio mode (for future Electron bridge)
-./javd.exe -mode stdio
+./curated.exe -mode stdio
 
 # Run tests
 go test ./...
@@ -72,8 +72,8 @@ go test -v ./internal/storage/...
 
 ```bash
 # Terminal 1: Start backend (from repo root or backend/)
-cd backend && go run ./cmd/javd
-# Or use pre-built binary: ./backend/javd.exe
+cd backend && go run ./cmd/curated
+# Or use pre-built binary: ./backend/curated.exe
 
 # Terminal 2: Start frontend dev server
 pnpm dev
@@ -90,7 +90,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
-- **`proxy`** - Outbound HTTP proxy for javd (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
+- **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
 Update via `PATCH /api/settings`; changes are written atomically to the config file.
 
@@ -130,7 +130,7 @@ src/
 
 ```
 backend/
-  cmd/javd/         # Application entry point
+  cmd/curated/      # Application entry point (Go module: curated-backend)
   internal/
     app/            # Application lifecycle and wiring
     config/         # Configuration management
@@ -164,6 +164,7 @@ GET    /api/library/movies/{id}             # Get movie detail
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags
 DELETE /api/library/movies/{id}             # Delete movie
 GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
+POST   /api/library/movies/{id}/reveal    # Open OS file manager at primary video (server machine; path rules same as stream)
 POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
 GET    /api/library/movies/{id}/comment     # Get user comment for movie
 PUT    /api/library/movies/{id}/comment     # Upsert user comment for movie

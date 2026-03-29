@@ -6,6 +6,7 @@ import { HttpClientError } from "@/api/http-client"
 import type { PatchMovieBody, TaskDTO } from "@/api/types"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
+import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
 import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
@@ -363,6 +364,21 @@ const handleRefreshMetadata = async (id: string) => {
     metadataRefreshBusy.value = false
   }
 }
+
+const handleRevealInFileManager = async (id: string) => {
+  try {
+    await libraryService.revealMovieInFileManager(id)
+    pushAppToast(t("detail.revealSuccess"), { variant: "success", durationMs: 3200 })
+  } catch (err) {
+    if (err instanceof Error && err.message === "MOCK_REVEAL_NOT_SUPPORTED") {
+      pushAppToast(t("detail.revealMockMode"), { variant: "warning" })
+      return
+    }
+    const message = formatClientError(err, t("detail.revealFailGeneric"))
+    pushAppToast(message, { variant: "destructive" })
+    console.error("[DetailView] reveal in file manager failed", err)
+  }
+}
 </script>
 
 <template>
@@ -441,6 +457,7 @@ const handleRefreshMetadata = async (id: string) => {
         @restore-movie="handleRestoreMovie"
         @delete-movie-permanently="handleDeleteMoviePermanently"
         @refresh-metadata="handleRefreshMetadata"
+        @reveal-in-file-manager="handleRevealInFileManager"
         @patch-movie-display="patchMovieDisplay"
       />
     </template>

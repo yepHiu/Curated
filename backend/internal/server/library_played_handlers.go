@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/storage"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/storage"
 )
 
 func (h *Handler) handleListPlayedMovies(w http.ResponseWriter, r *http.Request) {

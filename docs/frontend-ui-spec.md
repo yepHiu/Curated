@@ -22,7 +22,7 @@ Cursor / Agent 速查规则：[`.cursor/rules/ui-component-spec.mdc`](../.cursor
 - **语义色与圆角**：`:root` 与 `.dark` 中定义 `--background`、`--foreground`、`--card`、`--primary`、`--border`、`--muted` 等；Tailwind v4 在 `@theme inline` 中映射为 `--color-*`，供 `bg-background`、`text-foreground` 等使用。
 - **默认外观**：当前 **`:root` 即为深色主界面**（`html` 上未必有 `class="dark"`）。`body` 使用 `bg-background text-foreground`，并带有轻微背景渐变。
 - **深色变体**：`@custom-variant dark (&:is(.dark *))` 表示 **`dark:` 前缀类仅在 `.dark` 祖先内生效**。主界面不要依赖「全局 `dark:`」来撑表单对比度。
-- **品牌字体**：`--font-curated`（Fredoka）用于侧栏 Curated 字标等局部。
+- **品牌字体**：`--font-curated`（**Outfit**；`index.html` 经 Google Fonts 加载）用于侧栏 Curated 字标等局部，Tailwind 类名 **`font-curated`**（见 `AppSidebar.vue`）。
 - **滚动条**：`--scrollbar-track` / `--scrollbar-thumb` / `--scrollbar-thumb-hover` 在 `@layer base` 中统一应用。
 
 ### 2.2 实现时优先使用的类名（示例）
@@ -38,7 +38,7 @@ Cursor / Agent 速查规则：[`.cursor/rules/ui-component-spec.mdc`](../.cursor
 | 危险操作 | `destructive` |
 | 聚焦环 | `ring`、`focus-visible:ring-*` |
 
-**避免**：在业务组件里随意新增硬编码 `#` / 任意 `rgb()` 作为主背景或主文本色（难以与主题同步）。**已约定例外**：侧栏 Curated 品牌 pill 的固定粉紫色（见 `AppSidebar.vue`）。
+**避免**：在业务组件里随意新增硬编码 `#` / 任意 `rgb()` 作为主背景或主文本色（难以与主题同步）。**已约定例外**：侧栏 Curated 字标使用主题 **`text-primary`** 与 **`font-curated`**（Outfit），见 `AppSidebar.vue`。
 
 ---
 

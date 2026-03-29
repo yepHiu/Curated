@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"jav-shadcn/backend/internal/contracts"
-	"jav-shadcn/backend/internal/scraper"
+	"curated-backend/internal/contracts"
+	"curated-backend/internal/scraper"
 )
 
 var errMovieNotFound = errors.New("movie not found")

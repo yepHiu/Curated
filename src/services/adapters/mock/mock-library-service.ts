@@ -486,6 +486,10 @@ export const mockLibraryService: LibraryService = {
     return null
   },
 
+  async revealMovieInFileManager() {
+    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
+  },
+
   async refreshMetadataForLibraryPaths(): Promise<MetadataRefreshQueuedDTO> {
     return { queued: 0, skipped: 0, invalidPaths: [] }
   },
