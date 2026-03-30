@@ -1564,7 +1564,7 @@ async function runMetadataRefreshForSelected() {
         <CardHeader class="space-y-3 pb-2">
           <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
             <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
               aria-hidden="true"
             >
               <LayoutDashboard class="size-[1.15rem]" />
@@ -1604,20 +1604,17 @@ async function runMetadataRefreshForSelected() {
     <h2 class="sr-only">{{ t("settings.navGeneral") }}</h2>
     <div class="flex w-full flex-col gap-8">
     <div class="space-y-4">
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {{ t("settings.generalSubsectionLocaleAppearance") }}
-      </h3>
     <div class="break-inside-avoid">
     <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="space-y-3 pb-2">
         <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
           <span
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
             aria-hidden="true"
           >
             <Languages class="size-4" />
           </span>
-          {{ t("settings.navGeneral") }}
+          {{ t("settings.generalSubsectionLocaleAppearance") }}
         </CardTitle>
         <CardDescription
           class="text-xs leading-relaxed text-pretty text-muted-foreground"
@@ -1677,16 +1674,12 @@ async function runMetadataRefreshForSelected() {
     </div>
     </div>
     <div id="settings-section-logging" class="flex flex-col gap-6">
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {{ t("settings.generalSubsectionLogs") }}
-      </h3>
-      <div class="flex flex-col gap-6">
       <div class="break-inside-avoid">
         <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
           <CardHeader class="space-y-2 pb-0">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <ScrollText class="size-4" />
@@ -1823,7 +1816,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Activity class="size-4" />
@@ -1868,7 +1861,6 @@ async function runMetadataRefreshForSelected() {
       </div>
     </div>
     </div>
-    </div>
     </section>
     </TabsContent>
 
@@ -1892,7 +1884,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Database class="size-[1.15rem]" />
@@ -1909,12 +1901,6 @@ async function runMetadataRefreshForSelected() {
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
-                <p
-                  v-if="!libraryPathsBatchMode"
-                  class="text-xs leading-relaxed text-muted-foreground"
-                >
-                  {{ t("settings.metadataEnterBatchHint") }}
-                </p>
               </div>
               <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <template v-if="!libraryPathsBatchMode">
@@ -2248,7 +2234,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Layers class="size-[1.15rem]" />
@@ -2296,7 +2282,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <FolderInput class="size-[1.15rem]" />
@@ -2373,7 +2359,7 @@ async function runMetadataRefreshForSelected() {
             >
               <span class="flex min-w-0 items-center gap-2.5">
                 <span
-                  class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                  class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                   aria-hidden="true"
                 >
                   <Sparkles class="size-4" />
@@ -2933,7 +2919,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Globe class="size-[1.15rem]" />
@@ -3146,7 +3132,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-4 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <ImageDown class="size-[1.15rem]" />
@@ -3375,7 +3361,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <PlayCircle class="size-[1.15rem]" />
@@ -3420,7 +3406,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Wrench class="size-[1.15rem]" />
@@ -3481,7 +3467,7 @@ async function runMetadataRefreshForSelected() {
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <BookOpen class="size-[1.15rem]" />
@@ -3517,7 +3503,7 @@ async function runMetadataRefreshForSelected() {
           <CardTitle class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight">
             <span class="flex min-w-0 items-center gap-3">
               <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/10 text-muted-foreground"
+                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
                 aria-hidden="true"
               >
                 <Info class="size-[1.15rem]" />
