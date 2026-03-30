@@ -18,7 +18,8 @@ export type LibraryTab = "all" | "new" | "top-rated"
 export interface LibraryStat {
   labelKey: string
   value: string
-  detailKey: string
+  /** 概览卡副说明；省略则不渲染说明段落 */
+  detailKey?: string
 }
 
 export interface LibrarySetting {

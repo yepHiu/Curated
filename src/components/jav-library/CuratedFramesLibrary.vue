@@ -15,7 +15,6 @@ import {
   Trash2,
   X,
 } from "lucide-vue-next"
-import CuratedFramesBatchActionBar from "@/components/jav-library/CuratedFramesBatchActionBar.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -693,10 +692,26 @@ function formatCapturedAt(iso: string) {
     return iso
   }
 }
+
+defineExpose({
+  batchMode,
+  isEmpty,
+  selectedFrameIds,
+  exportBusy,
+  batchShowSelectVisible,
+  exportToolbarError,
+  exitBatchMode,
+  clearExportSelection,
+  selectAllVisibleUpTo20,
+  exportSelectedWebp: () => exportSelectedAsFormat("webp"),
+  exportSelectedPng: () => exportSelectedAsFormat("png"),
+})
 </script>
 
 <template>
-  <div class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-3 sm:px-6">
+  <div
+    class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-3 sm:px-6"
+  >
     <div class="flex flex-col gap-2 pt-2">
       <h1 class="text-2xl font-semibold tracking-tight">{{ t("curated.title") }}</h1>
       <p class="text-sm text-muted-foreground">
@@ -1004,20 +1019,6 @@ function formatCapturedAt(iso: string) {
       </TabsContent>
       </div>
     </Tabs>
-
-    <CuratedFramesBatchActionBar
-      v-if="batchMode && !isEmpty"
-      :selected-count="selectedFrameIds.length"
-      :export-busy="exportBusy"
-      :show-select-visible="batchShowSelectVisible"
-      :use-web-api="useWebApi"
-      :export-error="exportToolbarError"
-      @exit="exitBatchMode"
-      @clear-selection="clearExportSelection"
-      @select-all-visible="selectAllVisibleUpTo20"
-      @export-webp="exportSelectedAsFormat('webp')"
-      @export-png="exportSelectedAsFormat('png')"
-    />
 
     <Dialog :open="dialogOpen" @update:open="handleDialogOpenChange">
       <!-- 覆盖 DialogContent 默认 sm:max-w-lg，否则整窗约 512px 宽，左侧预览会被压成一条 -->

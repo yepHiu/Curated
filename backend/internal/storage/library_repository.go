@@ -224,9 +224,9 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		Summary:          row.Summary,
 		PreviewImages:    previewsByMovie[movieID],
 		PreviewVideoURL:  row.PreviewVideoURL,
-		MetadataRating:    row.MetadataRating,
-		UserRating:        userRatingPtr(row.UserRating),
-		ActorAvatarURLs:   actorAvatars,
+		MetadataRating:   row.MetadataRating,
+		UserRating:       userRatingPtr(row.UserRating),
+		ActorAvatarURLs:  actorAvatars,
 	}, nil
 }
 

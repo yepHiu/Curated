@@ -29,18 +29,20 @@ import {
   Activity,
   BookOpen,
   ChevronDown,
+  CheckSquare,
   Database,
   FolderInput,
   FolderOpen,
-  Globe,
-  HelpCircle,
-  Info,
   FolderPlus,
+  Globe,
   GripVertical,
+  HelpCircle,
   ImageDown,
+  Info,
   Languages,
   LayoutDashboard,
   Layers,
+  ListChecks,
   Loader2,
   Pencil,
   PlayCircle,
@@ -115,6 +117,9 @@ import { cn } from "@/lib/utils"
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
 const SETTINGS_CONTROL_H32_CLASS =
   "[&_[data-slot=button]]:!h-8 [&_[data-slot=button]]:!min-h-8 [&_[data-slot=button]]:!max-h-8 [&_[data-slot=button][data-size=icon]]:!size-8 [&_[data-slot=button][data-size=icon-sm]]:!size-8 [&_[data-slot=button][data-size=icon-lg]]:!size-8 [&_[data-slot=select-trigger]]:!h-8 [&_[data-slot=select-trigger]]:!min-h-8 [&_[data-slot=select-trigger]]:!max-h-8 [&_[data-slot=select-trigger]]:!py-0 [&_[data-slot=tabs-trigger]]:!h-8 [&_[data-slot=tabs-trigger]]:!min-h-8 [&_[data-slot=tabs-trigger]]:!max-h-8 [&_[data-slot=tabs-trigger]]:!py-0"
+/** 资料库路径行：铅笔 / 扫描 / 移除 三枚图标按钮，统一 36×36 圆角矩形（覆盖上方全局 icon size-8） */
+const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
+  "[&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!size-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!min-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!min-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!max-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!max-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!rounded-lg"
 
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
@@ -230,6 +235,8 @@ const metadataRefreshError = ref("")
 const metadataRefreshBusy = ref(false)
 /** 选中的库根路径（与后端配置的 path 字符串一致，用于 POST metadata-scrape） */
 const selectedMetadataRefreshPaths = ref<string[]>([])
+/** 资料库路径：与资料库页一致的「批量管理」模式（显示勾选与批量操作条） */
+const libraryPathsBatchMode = ref(false)
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
@@ -1057,6 +1064,17 @@ function clearMetadataPathSelection() {
   selectedMetadataRefreshPaths.value = []
 }
 
+function enterLibraryPathsBatchMode() {
+  libraryPathsBatchMode.value = true
+}
+
+function exitLibraryPathsBatchMode() {
+  libraryPathsBatchMode.value = false
+  clearMetadataPathSelection()
+  metadataRefreshSuccess.value = ""
+  metadataRefreshError.value = ""
+}
+
 const canSaveNewPath = computed(() => {
   const t = newPath.value.trim()
   return t.length > 0 && isAbsoluteLibraryPath(t)
@@ -1484,6 +1502,7 @@ async function runMetadataRefreshForSelected() {
       cn(
         'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-6',
         SETTINGS_CONTROL_H32_CLASS,
+        SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS,
       )
     "
   >
@@ -1564,7 +1583,7 @@ async function runMetadataRefreshForSelected() {
                 <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
                 <CardTitle class="text-2xl">{{ stat.value }}</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent v-if="stat.detailKey">
                 <p class="text-sm text-muted-foreground">{{ t(stat.detailKey) }}</p>
               </CardContent>
             </Card>
@@ -1887,15 +1906,247 @@ async function runMetadataRefreshForSelected() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-2">
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
-                <p class="text-sm text-muted-foreground">
-                  {{ t("settings.libraryPathsHint") }}
-                  <span class="font-mono text-xs">D:\Media\JAV</span> 或
-                  <span class="font-mono text-xs">/home/user/Videos</span>。
+                <p
+                  v-if="!libraryPathsBatchMode"
+                  class="text-xs leading-relaxed text-muted-foreground"
+                >
+                  {{ t("settings.metadataEnterBatchHint") }}
                 </p>
               </div>
+              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <template v-if="!libraryPathsBatchMode">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="gap-1.5 rounded-xl"
+                    @click="enterLibraryPathsBatchMode"
+                  >
+                    <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+                    {{ t("library.batchManage") }}
+                  </Button>
+                </template>
+                <template v-else>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="gap-1.5 rounded-xl"
+                    :disabled="libraryPathsList.length === 0"
+                    @click="selectAllMetadataPaths"
+                  >
+                    <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+                    {{ t("settings.selectAllPaths") }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="gap-1.5 rounded-xl"
+                    @click="clearMetadataPathSelection"
+                  >
+                    {{ t("settings.clearSelection") }}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    class="gap-1.5 rounded-xl"
+                    :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
+                    @click="runMetadataRefreshForSelected"
+                  >
+                    <Sparkles class="size-4 shrink-0" aria-hidden="true" />
+                    {{
+                      metadataRefreshBusy ? t("settings.submitting") : t("settings.refreshMetadata")
+                    }}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    @click="exitLibraryPathsBatchMode"
+                  >
+                    <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+                    {{ t("library.batchExitToolbar") }}
+                  </Button>
+                </template>
+              </div>
+            </div>
+
+            <Dialog v-model:open="removePathDialogOpen">
+                <DialogContent
+                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+                >
+                  <DialogHeader>
+                    <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
+                    <DialogDescription>
+                      <div class="space-y-2">
+                        <p class="text-pretty">
+                          {{
+                            t("settings.removePathConfirmDesc", {
+                              title: removePathPending?.title ?? "—",
+                            })
+                          }}
+                        </p>
+                        <p
+                          v-if="removePathPending?.path"
+                          class="break-all font-mono text-xs text-muted-foreground"
+                        >
+                          {{ removePathPending.path }}
+                        </p>
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter class="gap-3">
+                    <DialogClose as-child>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-2xl"
+                        :disabled="removePathBusy"
+                      >
+                        {{ t("common.cancel") }}
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      class="rounded-2xl"
+                      :disabled="removePathBusy || !removePathPending"
+                      @click="confirmRemoveLibraryPath"
+                    >
+                      {{
+                        removePathBusy
+                          ? t("settings.removePathConfirmWorking")
+                          : t("settings.removePathConfirmAction")
+                      }}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+            <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
+              {{ metadataRefreshSuccess }}
+            </p>
+            <p
+              v-if="metadataRefreshError"
+              class="text-sm text-destructive"
+              role="alert"
+            >
+              {{ metadataRefreshError }}
+            </p>
+
+            <div class="flex flex-col gap-3">
+              <div
+                v-for="path in libraryPathsList"
+                :key="path.id"
+                class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+              >
+                <template v-if="editingLibraryPathId === path.id">
+                  <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-3">
+                      <p class="text-xs font-medium text-muted-foreground">{{ t("settings.pathReadonly") }}</p>
+                      <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
+                    </div>
+                    <div class="flex flex-col gap-3">
+                      <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
+                        t("settings.pathTitleLabel")
+                      }}</label>
+                      <Input
+                        :id="`edit-title-${path.id}`"
+                        v-model="editLibraryTitleDraft"
+                        class="rounded-xl"
+                        :placeholder="t('settings.displayName')"
+                        autocomplete="off"
+                        @keydown.enter.prevent="saveLibraryPathTitle(path.id)"
+                      />
+                      <p class="text-xs text-muted-foreground">
+                        {{ t("settings.editTitleHint") }}
+                      </p>
+                      <p v-if="editTitleError" class="text-sm text-destructive">
+                        {{ editTitleError }}
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                      <Button
+                        type="button"
+                        class="rounded-2xl"
+                        :disabled="editTitleBusy"
+                        @click="saveLibraryPathTitle(path.id)"
+                      >
+                        {{ editTitleBusy ? t("common.saving") : t("settings.saveTitle") }}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        class="rounded-2xl"
+                        :disabled="editTitleBusy"
+                        @click="cancelEditLibraryTitle"
+                      >
+                        {{ t("common.cancel") }}
+                      </Button>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        v-if="libraryPathsBatchMode"
+                        type="checkbox"
+                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
+                        :checked="isMetadataPathChecked(path.path)"
+                        :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
+                        @change="toggleMetadataPathSelection(path.path)"
+                      />
+                      <div class="flex min-w-0 flex-1 flex-col gap-3">
+                        <p class="font-medium">{{ path.title }}</p>
+                        <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
+                      </div>
+                    </div>
+                    <div class="library-path-toolbar flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        :aria-label="t('settings.editTitle')"
+                        @click="startEditLibraryTitle(path)"
+                      >
+                        <Pencil class="size-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        :disabled="scanPathBusy === path.path"
+                        :aria-label="t('settings.rescan')"
+                        @click="rescanPath(path.path)"
+                      >
+                        <RefreshCw
+                          class="size-4"
+                          :class="scanPathBusy === path.path ? 'animate-spin' : ''"
+                          aria-hidden="true"
+                        />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        :aria-label="t('settings.removePathAria', { title: path.title })"
+                        @click="openRemovePathConfirm(path)"
+                      >
+                        <Trash2 class="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap justify-start gap-2 pt-1">
               <Dialog v-model:open="addPathDialogOpen">
                 <DialogTrigger as-child>
                   <Button type="button" class="rounded-2xl">
@@ -1987,214 +2238,6 @@ async function runMetadataRefreshForSelected() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-
-              <Dialog v-model:open="removePathDialogOpen">
-                <DialogContent
-                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                >
-                  <DialogHeader>
-                    <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
-                    <DialogDescription>
-                      <div class="space-y-2">
-                        <p class="text-pretty">
-                          {{
-                            t("settings.removePathConfirmDesc", {
-                              title: removePathPending?.title ?? "—",
-                            })
-                          }}
-                        </p>
-                        <p
-                          v-if="removePathPending?.path"
-                          class="break-all font-mono text-xs text-muted-foreground"
-                        >
-                          {{ removePathPending.path }}
-                        </p>
-                      </div>
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter class="gap-3">
-                    <DialogClose as-child>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="removePathBusy"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      class="rounded-2xl"
-                      :disabled="removePathBusy || !removePathPending"
-                      @click="confirmRemoveLibraryPath"
-                    >
-                      {{
-                        removePathBusy
-                          ? t("settings.removePathConfirmWorking")
-                          : t("settings.removePathConfirmAction")
-                      }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div
-              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-            >
-              <div class="flex min-w-0 flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.metadataSectionTitle") }}</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ t("settings.metadataSectionHint") }}
-                </p>
-              </div>
-              <div class="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="rounded-xl"
-                  @click="selectAllMetadataPaths"
-                >
-                  {{ t("settings.selectAllPaths") }}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="rounded-xl"
-                  @click="clearMetadataPathSelection"
-                >
-                  {{ t("settings.clearSelection") }}
-                </Button>
-                <Button
-                  type="button"
-                  class="rounded-xl"
-                  :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
-                  @click="runMetadataRefreshForSelected"
-                >
-                  <Sparkles data-icon="inline-start" class="size-4" />
-                  {{ metadataRefreshBusy ? t("settings.submitting") : t("settings.refreshMetadata") }}
-                </Button>
-              </div>
-            </div>
-            <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
-              {{ metadataRefreshSuccess }}
-            </p>
-            <p
-              v-if="metadataRefreshError"
-              class="text-sm text-destructive"
-              role="alert"
-            >
-              {{ metadataRefreshError }}
-            </p>
-
-            <div class="flex flex-col gap-3">
-              <div
-                v-for="path in libraryPathsList"
-                :key="path.id"
-                class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-              >
-                <template v-if="editingLibraryPathId === path.id">
-                  <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-3">
-                      <p class="text-xs font-medium text-muted-foreground">{{ t("settings.pathReadonly") }}</p>
-                      <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
-                        t("settings.pathTitleLabel")
-                      }}</label>
-                      <Input
-                        :id="`edit-title-${path.id}`"
-                        v-model="editLibraryTitleDraft"
-                        class="rounded-xl"
-                        :placeholder="t('settings.displayName')"
-                        autocomplete="off"
-                        @keydown.enter.prevent="saveLibraryPathTitle(path.id)"
-                      />
-                      <p class="text-xs text-muted-foreground">
-                        {{ t("settings.editTitleHint") }}
-                      </p>
-                      <p v-if="editTitleError" class="text-sm text-destructive">
-                        {{ editTitleError }}
-                      </p>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="saveLibraryPathTitle(path.id)"
-                      >
-                        {{ editTitleBusy ? t("common.saving") : t("settings.saveTitle") }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="cancelEditLibraryTitle"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex min-w-0 flex-1 items-start gap-3">
-                      <input
-                        type="checkbox"
-                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
-                        :checked="isMetadataPathChecked(path.path)"
-                        :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
-                        @change="toggleMetadataPathSelection(path.path)"
-                      />
-                      <div class="flex min-w-0 flex-1 flex-col gap-3">
-                        <p class="font-medium">{{ path.title }}</p>
-                        <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
-                      </div>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        @click="startEditLibraryTitle(path)"
-                      >
-                        <Pencil data-icon="inline-start" />
-                        {{ t("settings.editTitle") }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        class="rounded-2xl"
-                        :disabled="scanPathBusy === path.path"
-                        @click="rescanPath(path.path)"
-                      >
-                        <RefreshCw
-                          data-icon="inline-start"
-                          :class="scanPathBusy === path.path ? 'animate-spin' : ''"
-                        />
-                        {{ t("settings.rescan") }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        class="rounded-2xl"
-                        :aria-label="t('settings.removePathAria', { title: path.title })"
-                        @click="openRemovePathConfirm(path)"
-                      >
-                        <Trash2 class="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </template>
-              </div>
             </div>
           </CardContent>
         </Card>

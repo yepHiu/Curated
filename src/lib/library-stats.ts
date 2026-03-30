@@ -70,7 +70,7 @@ export function aggregateUserTagCounts(movies: readonly Movie[], locale: string)
     })
 }
 
-/** 设置页顶部三张统计卡（入库数、标签种类、萃取帧条数）；文案 key 由 i18n 解析 */
+/** 设置页顶部三张统计卡（入库数、标签种类、萃取帧条数）；仅标题 + 数值，无副说明 */
 export function buildSettingsDashboardStats(
   movies: readonly Movie[],
   curatedFramesCount: number,
@@ -83,17 +83,14 @@ export function buildSettingsDashboardStats(
     {
       labelKey: "stats.moviesInLibrary",
       value: fmt(movieCount),
-      detailKey: "stats.moviesInLibraryDetail",
     },
     {
       labelKey: "stats.tagKinds",
       value: fmt(tagKinds),
-      detailKey: "stats.tagKindsDetail",
     },
     {
       labelKey: "stats.curatedFramesCount",
       value: fmt(curatedFramesCount),
-      detailKey: "stats.curatedFramesDetail",
     },
   ]
 }

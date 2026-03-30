@@ -67,7 +67,7 @@
   },
   "history": {
     "title": "視聴履歴",
-    "subtitle": "視聴時刻でグループ化。API 有効時はサーバー SQLite に保存、それ以外はブラウザに保存。",
+    "subtitle": "視聴時刻でグループ表示。Curated のライブラリに接続して使う場合は再生位置が保存され、後から続きを再生できます。ライブラリ未接続でブラウザのみの場合は、このブラウザ内にだけ保存されます。",
     "empty": "まだありません。プレイヤーで少し再生するとここに表示されます。",
     "goLibrary": "ライブラリへ",
     "today": "今日",
@@ -78,7 +78,7 @@
     "subtitle": "プレイヤーで「Curated」を押すか {key} で現在フレームを保存。撮影時刻順。上部検索（このライブラリのみ）。カードまたは詳細から削除。",
     "keyHint": "C",
     "empty": "キュレートフレームはまだありません。プレイヤーから保存してください。",
-    "tabTimeline": "タイムライン",
+    "tabTimeline": "撮影日時順",
     "tabActors": "出演者別",
     "tabMovies": "作品別",
     "noActor": "（出演者なし）",
@@ -135,13 +135,10 @@
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",
-    "moviesInLibraryDetail": "フロントで読み込んだエントリ数（リストキャッシュと一致）。",
     "tagKinds": "タグ種類",
-    "tagKindsDetail": "メタデータタグとユーザータグをマージして重複除去した種類数。",
     "playedMovies": "再生した作品",
     "playedMoviesDetail": "プレイヤーを開いたユニーク作品数。API 時は SQLite（library_played_movies）、それ以外はブラウザのみ。",
-    "curatedFramesCount": "萃取フレーム",
-    "curatedFramesDetail": "萃取フレーム庫の件数。API 時はサーバー SQLite、それ以外は IndexedDB。"
+    "curatedFramesCount": "萃取フレーム"
   },
   "library": {
     "tagBrowseTitle": "タグで閲覧",
@@ -270,6 +267,7 @@
     "savePathDisabledTitle": "保存するには有効な絶対パス（ドライブ文字または先頭の /）を入力してください",
     "metadataSectionTitle": "ディレクトリ別メタデータ更新",
     "metadataSectionHint": "下のリストでルートを選択して送信。インデックス済みのみキューに入り、ディスクは走査しません。新規ファイルは先に再スキャン。",
+    "metadataEnterBatchHint": "ディレクトリ単位でメタデータを更新する場合は「一括管理」を押し、ルートを選んで「メタデータ更新」を実行してください。",
     "selectAllPaths": "すべて選択",
     "clearSelection": "選択解除",
     "refreshMetadata": "メタデータ更新",

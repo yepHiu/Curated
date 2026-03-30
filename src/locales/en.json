@@ -67,7 +67,7 @@
   },
   "history": {
     "title": "Watch history",
-    "subtitle": "Grouped by watch time; with the API enabled, progress is stored in the server SQLite database, otherwise in the browser.",
+    "subtitle": "Grouped by watch time. When your library is connected to Curated, playback progress is kept so you can resume later; if you are only using the app in the browser without the library, progress stays in this browser only.",
     "empty": "No entries yet. Watch for a moment in the player and they will appear here.",
     "goLibrary": "Go to library",
     "today": "Today",
@@ -78,7 +78,7 @@
     "subtitle": "In the player, click Curated or press {key} to capture the current frame; sorted by capture time. Use the top search (this library only). Delete from the card or detail.",
     "keyHint": "C",
     "empty": "No curated frames yet. Capture some from the player.",
-    "tabTimeline": "Timeline",
+    "tabTimeline": "By capture time",
     "tabActors": "By actor",
     "tabMovies": "By movie",
     "noActor": "(No actor)",
@@ -135,13 +135,10 @@
   },
   "stats": {
     "moviesInLibrary": "Movies in library",
-    "moviesInLibraryDetail": "Number of library items loaded in the frontend (same as list cache).",
     "tagKinds": "Tag kinds",
-    "tagKindsDetail": "Unique tags after merging metadata and user tags.",
     "playedMovies": "Played movies",
     "playedMoviesDetail": "Distinct titles that opened the player; with API, stored in SQLite (library_played_movies), else browser-only.",
-    "curatedFramesCount": "Curated frames",
-    "curatedFramesDetail": "Entries in the curated-frames library; with API, server SQLite; otherwise IndexedDB."
+    "curatedFramesCount": "Curated frames"
   },
   "library": {
     "tagBrowseTitle": "Browse by tag",
@@ -270,6 +267,7 @@
     "savePathDisabledTitle": "Enter a valid absolute path (drive or leading /) before saving",
     "metadataSectionTitle": "Refresh metadata by directory",
     "metadataSectionHint": "Select one or more roots below; only queued scrape for indexed items, no disk walk. For new files use Rescan first.",
+    "metadataEnterBatchHint": "To refresh metadata by directory, choose Batch manage, select roots below, then Refresh metadata.",
     "selectAllPaths": "Select all",
     "clearSelection": "Clear selection",
     "refreshMetadata": "Refresh metadata",

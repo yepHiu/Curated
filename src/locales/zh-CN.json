@@ -67,18 +67,18 @@
   },
   "history": {
     "title": "观看历史",
-    "subtitle": "按观看时间分组；启用后端 API 时进度保存在服务端本地库（SQLite），否则保存在浏览器。",
+    "subtitle": "按观看时间分组展示。已连接并正常使用本机资料库时，续看进度会保留；若当前只是浏览器里单独使用、未连资料库，则进度只记在本浏览器。",
     "empty": "暂无记录。在播放器中观看片刻后，会出现在这里。",
     "goLibrary": "去资料库",
     "today": "今天",
     "yesterday": "昨天"
   },
   "curated": {
-    "title": "Curated Frame · 萃取帧",
-    "subtitle": "在播放器中点击「Curated」或按 {key} 截取当前画面；按截取时间排序，可使用顶栏搜索（仅检索本库）。卡片角标或详情内可删除萃取帧。",
+    "title": "萃取帧",
+    "subtitle": "在播放页点击工具栏里的「Curated」或按键盘 {key}，即可截取当前画面并保存到这里。本页默认按截取时间从新到旧排列；可用顶部搜索框只搜索本页的萃取帧。需要删除时，可在卡片角标或详情里操作。",
     "keyHint": "C",
     "empty": "暂无萃取帧，去播放页截取几张吧。",
-    "tabTimeline": "时间线",
+    "tabTimeline": "按截取时间",
     "tabActors": "按演员",
     "tabMovies": "按影片",
     "noActor": "（无演员）",
@@ -135,13 +135,10 @@
   },
   "stats": {
     "moviesInLibrary": "入库影片",
-    "moviesInLibraryDetail": "当前前端已加载的库条目数量（与列表缓存一致）。",
     "tagKinds": "标签种类",
-    "tagKindsDetail": "元数据标签与用户标签合并去重后的种类数。",
     "playedMovies": "已播放影片",
     "playedMoviesDetail": "曾进入播放页的去重部数；启用后端 API 时写入 SQLite（library_played_movies），否则保存在本机浏览器。",
-    "curatedFramesCount": "萃取帧",
-    "curatedFramesDetail": "萃取帧库中的条目数；启用后端 API 时为服务端 SQLite，否则为本机 IndexedDB。"
+    "curatedFramesCount": "萃取帧"
   },
   "library": {
     "tagBrowseTitle": "标签浏览",
@@ -270,6 +267,7 @@
     "savePathDisabledTitle": "请先填写有效的绝对路径（盘符或 / 开头）后再保存",
     "metadataSectionTitle": "按目录刷新元数据",
     "metadataSectionHint": "在下方列表勾选库根目录后提交；仅对已入库条目排队刮削，不遍历磁盘。新文件请先使用重新扫描。",
+    "metadataEnterBatchHint": "需要按目录批量刷新元数据时，请点击「批量管理」，勾选目录后提交「刷新元数据」。",
     "selectAllPaths": "全选目录",
     "clearSelection": "清空选择",
     "refreshMetadata": "刷新元数据",
