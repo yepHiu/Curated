@@ -47,6 +47,7 @@ import {
   Plus,
   RefreshCw,
   ScanSearch,
+  ScrollText,
   Sparkles,
   Trash2,
   Wrench,
@@ -93,6 +94,12 @@ import {
   setStoredDirectoryHandle,
   supportsFileSystemAccess,
 } from "@/lib/curated-frames/db"
+import {
+  CLIENT_LOG_LEVEL_OPTIONS,
+  getClientLogLevelName,
+  setClientLogLevel,
+  type ClientLogLevelName,
+} from "@/lib/app-logger"
 import {
   getCuratedFrameSaveMode,
   setCuratedFrameSaveMode,
@@ -150,6 +157,10 @@ function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
     router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
     return "library"
   }
+  if (s === "logging") {
+    router.replace({ query: { ...route.query, section: "general" } }).catch(() => {})
+    return "general"
+  }
   if (s && isSettingsSectionSlug(s)) return s
   return "overview"
 }
@@ -180,6 +191,11 @@ watch(
     if (s === "libraryBehavior") {
       router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
       if (activeSlug.value !== "library") activeSlug.value = "library"
+      return
+    }
+    if (s === "logging") {
+      router.replace({ query: { ...route.query, section: "general" } }).catch(() => {})
+      if (activeSlug.value !== "general") activeSlug.value = "general"
       return
     }
     if (!isSettingsSectionSlug(s)) return
@@ -260,6 +276,127 @@ function syncProxyDraftFromService() {
     !!(p.username?.trim() || (p.password ?? "").length > 0)
   if (hasAuth) {
     proxyAuthExpanded.value = true
+  }
+}
+
+const BACKEND_LOG_LEVEL_OPTIONS = ["trace", "debug", "info", "warn", "error"] as const
+
+/** 日志保留天数：0=模块默认约 7 天；另含 1/5/10/30 预设；其它已保存值会多出一项「当前 n 天」 */
+const BACKEND_LOG_MAX_AGE_PRESET_VALUES = ["0", "1", "5", "10", "30"] as const
+
+const backendLogDirDraft = ref("")
+const backendLogMaxAgeDaysChoice = ref("0")
+const backendLogLevelDraft = ref("info")
+const backendLogSaving = ref(false)
+const backendLogError = ref("")
+const backendLogDirPickHint = ref("")
+const pickBackendLogDirBusy = ref(false)
+
+const clientLogLevelUi = ref<ClientLogLevelName>(getClientLogLevelName())
+
+function syncBackendLogMaxAgeDaysChoiceFromDto(d: number | undefined) {
+  if (d === undefined || d <= 0) {
+    backendLogMaxAgeDaysChoice.value = "0"
+    return
+  }
+  backendLogMaxAgeDaysChoice.value = String(d)
+}
+
+const backendLogMaxAgeSelectItems = computed(() => {
+  void locale.value
+  const base: { value: string; label: string }[] = [
+    { value: "0", label: t("settings.backendLogMaxAgeOptDefault") },
+    { value: "1", label: t("settings.backendLogMaxAgeOpt1") },
+    { value: "5", label: t("settings.backendLogMaxAgeOpt5") },
+    { value: "10", label: t("settings.backendLogMaxAgeOpt10") },
+    { value: "30", label: t("settings.backendLogMaxAgeOpt30") },
+  ]
+  const cur = backendLogMaxAgeDaysChoice.value
+  if ((BACKEND_LOG_MAX_AGE_PRESET_VALUES as readonly string[]).includes(cur)) {
+    return base
+  }
+  const n = Number.parseInt(cur, 10)
+  if (Number.isFinite(n) && n > 0) {
+    return [
+      ...base,
+      { value: cur, label: t("settings.backendLogMaxAgeOptCustom", { n }) },
+    ]
+  }
+  return base
+})
+
+function syncBackendLogDraftFromService() {
+  const b = libraryService.backendLog.value
+  backendLogDirDraft.value = (b.logDir ?? "").trim()
+  syncBackendLogMaxAgeDaysChoiceFromDto(b.logMaxAgeDays)
+  const lvl = (b.logLevel ?? "info").trim() || "info"
+  backendLogLevelDraft.value = (BACKEND_LOG_LEVEL_OPTIONS as readonly string[]).includes(lvl)
+    ? lvl
+    : "info"
+}
+
+function onClientLogLevelSelect(v: unknown) {
+  if (typeof v === "string" && (CLIENT_LOG_LEVEL_OPTIONS as readonly string[]).includes(v)) {
+    setClientLogLevel(v as ClientLogLevelName)
+    clientLogLevelUi.value = v as ClientLogLevelName
+  }
+}
+
+async function pickBackendLogDirectory() {
+  backendLogDirPickHint.value = ""
+  backendLogError.value = ""
+  pickBackendLogDirBusy.value = true
+  try {
+    const outcome = await pickLibraryDirectory()
+    if (outcome.status === "ok") {
+      backendLogDirDraft.value = outcome.path
+      return
+    }
+    if (outcome.status === "hint") {
+      backendLogDirPickHint.value = outcome.message
+      await nextTick()
+      document.getElementById("backend-log-dir")?.focus()
+      return
+    }
+    if (outcome.status === "unsupported") {
+      backendLogDirPickHint.value = t("settings.errPickUnsupported")
+    }
+  } finally {
+    pickBackendLogDirBusy.value = false
+  }
+}
+
+async function saveBackendLogSettings() {
+  backendLogError.value = ""
+  backendLogDirPickHint.value = ""
+  const maxAge = Number.parseInt(backendLogMaxAgeDaysChoice.value, 10)
+  if (!Number.isFinite(maxAge) || maxAge < 0) {
+    backendLogError.value = t("settings.backendLogMaxAgeInvalid")
+    return
+  }
+  try {
+    await withPreservedScroll(async () => {
+      backendLogSaving.value = true
+      try {
+        await libraryService.patchBackendLog({
+          logDir: backendLogDirDraft.value.trim(),
+          logMaxAgeDays: maxAge,
+          logLevel: backendLogLevelDraft.value.trim() || "info",
+        })
+        syncBackendLogDraftFromService()
+      } finally {
+        backendLogSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] save backend log failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      backendLogError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      backendLogError.value = err.message
+    } else {
+      backendLogError.value = t("settings.errSaveTitle")
+    }
   }
 }
 
@@ -853,13 +990,20 @@ onMounted(async () => {
   const rawInit = route.query.section
   const sInit =
     typeof rawInit === "string" ? rawInit : Array.isArray(rawInit) ? rawInit[0] : undefined
-  if (sInit && sInit !== "libraryBehavior" && !isSettingsSectionSlug(sInit)) {
+  if (
+    sInit &&
+    sInit !== "libraryBehavior" &&
+    sInit !== "logging" &&
+    !isSettingsSectionSlug(sInit)
+  ) {
     router.replace({ query: { ...route.query, section: "overview" } }).catch(() => {})
   }
   await withPreservedScroll(() => libraryService.refreshSettings())
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
   syncProxyDraftFromService()
+  syncBackendLogDraftFromService()
+  clientLogLevelUi.value = getClientLogLevelName()
   let mode = getCuratedFrameSaveMode()
   if (mode === "directory" && !supportsFileSystemAccess()) {
     mode = "app"
@@ -1249,7 +1393,7 @@ async function runMetadataRefreshForSelected() {
     v-model="activeSlug"
     :class="
       cn(
-        'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 pb-2 lg:flex-row lg:items-stretch lg:gap-8',
+        'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-3 pb-2 lg:flex-row lg:items-stretch lg:gap-3',
         SETTINGS_CONTROL_H32_CLASS,
       )
     "
@@ -1258,7 +1402,7 @@ async function runMetadataRefreshForSelected() {
       class="w-full shrink-0 lg:max-h-[calc(100dvh-10.5rem)] lg:w-52 lg:overflow-y-auto lg:overscroll-contain lg:self-start"
       :aria-label="t('settings.navAriaLabel')"
     >
-      <div class="flex flex-col gap-2 lg:hidden">
+      <div class="flex flex-col gap-3 lg:hidden">
         <label class="sr-only" for="settings-nav-jump">{{ t("settings.navJumpTo") }}</label>
         <Select
           id="settings-nav-jump"
@@ -1285,7 +1429,7 @@ async function runMetadataRefreshForSelected() {
       </div>
 
       <TabsList
-        class="hidden h-auto min-h-0 w-full flex-col gap-1 border-0 bg-transparent p-0 text-muted-foreground/90 lg:flex lg:border-r lg:border-border/60 lg:pr-4"
+        class="hidden h-auto min-h-0 w-full flex-col gap-3 border-0 bg-transparent p-0 text-muted-foreground/90 lg:flex lg:border-r lg:border-border/60 lg:pr-4"
       >
         <TabsTrigger
           v-for="item in settingsNavItems"
@@ -1306,13 +1450,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="overview" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-overview"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navOverview')"
     >
     <h2 class="sr-only">{{ t("settings.navOverview") }}</h2>
-    <div class="flex w-full flex-col gap-6">
+    <div class="flex w-full flex-col gap-3">
     <div class="break-inside-avoid">
-      <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+      <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
         <CardHeader class="space-y-3 pb-2">
           <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
             <span
@@ -1324,14 +1468,14 @@ async function runMetadataRefreshForSelected() {
             {{ t("settings.navOverview") }}
           </CardTitle>
         </CardHeader>
-        <CardContent class="flex flex-col gap-4 pt-2">
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <CardContent class="flex flex-col gap-3 pt-2">
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Card
               v-for="stat in dashboardStats"
               :key="stat.labelKey"
               class="rounded-2xl border-border/60 bg-background/40 shadow-none"
             >
-              <CardHeader class="gap-1">
+              <CardHeader class="gap-3">
                 <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
                 <CardTitle class="text-2xl">{{ stat.value }}</CardTitle>
               </CardHeader>
@@ -1350,13 +1494,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="general" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-general"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navGeneral')"
     >
     <h2 class="sr-only">{{ t("settings.navGeneral") }}</h2>
-    <div class="flex w-full flex-col gap-6">
+    <div class="flex w-full flex-col gap-3">
     <div class="break-inside-avoid">
-    <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+    <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
       <CardHeader class="space-y-3 pb-2">
         <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
           <span
@@ -1373,7 +1517,7 @@ async function runMetadataRefreshForSelected() {
           {{ t("settings.languageHint") }}
         </CardDescription>
       </CardHeader>
-      <CardContent class="flex flex-col gap-4 pt-2">
+      <CardContent class="flex flex-col gap-3 pt-2">
         <div
           class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
@@ -1423,6 +1567,180 @@ async function runMetadataRefreshForSelected() {
       </CardContent>
     </Card>
     </div>
+    <div id="settings-section-logging" class="flex flex-col gap-3">
+      <div class="break-inside-avoid">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+          <CardHeader class="space-y-2 pb-0">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <ScrollText class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.backendLogTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
+              {{ t("settings.backendLogDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-3 pt-0">
+            <p
+              v-if="!useWebApi"
+              class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
+            >
+              {{ t("settings.backendLogMockHint") }}
+            </p>
+            <div class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4">
+              <div class="flex flex-col gap-3">
+                <p class="text-sm font-medium">{{ t("settings.backendLogDir") }}</p>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Input
+                    id="backend-log-dir"
+                    v-model="backendLogDirDraft"
+                    type="text"
+                    autocomplete="off"
+                    class="min-w-0 rounded-xl border-border/70 sm:flex-1"
+                    :placeholder="t('settings.backendLogDirPlaceholder')"
+                    :disabled="backendLogSaving || pickBackendLogDirBusy"
+                    @input="backendLogDirPickHint = ''"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    class="rounded-2xl sm:shrink-0"
+                    :disabled="backendLogSaving || pickBackendLogDirBusy"
+                    @click="pickBackendLogDirectory"
+                  >
+                    <FolderOpen data-icon="inline-start" aria-hidden="true" />
+                    {{
+                      pickBackendLogDirBusy ? t("settings.picking") : t("settings.pickFolder")
+                    }}
+                  </Button>
+                </div>
+                <p
+                  v-if="backendLogDirPickHint"
+                  class="whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
+                >
+                  {{ backendLogDirPickHint }}
+                </p>
+              </div>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="flex min-w-0 flex-col gap-3">
+                  <p class="text-sm font-medium">{{ t("settings.backendLogMaxAge") }}</p>
+                  <Select
+                    v-model="backendLogMaxAgeDaysChoice"
+                    :disabled="backendLogSaving"
+                  >
+                    <SelectTrigger
+                      class="h-9 w-full min-w-0 rounded-xl border-border/70"
+                      :aria-label="t('settings.backendLogMaxAge')"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent class="rounded-xl border-border/70">
+                      <SelectItem
+                        v-for="item in backendLogMaxAgeSelectItems"
+                        :key="`blog-maxage-${item.value}`"
+                        class="rounded-lg"
+                        :value="item.value"
+                      >
+                        {{ item.label }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex min-w-0 flex-col gap-3">
+                  <p class="text-sm font-medium">{{ t("settings.backendLogLevel") }}</p>
+                  <Select
+                    v-model="backendLogLevelDraft"
+                    :disabled="backendLogSaving"
+                  >
+                    <SelectTrigger
+                      class="h-9 w-full min-w-0 rounded-xl border-border/70"
+                      :aria-label="t('settings.backendLogLevel')"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent class="rounded-xl border-border/70">
+                      <SelectItem
+                        v-for="lvl in BACKEND_LOG_LEVEL_OPTIONS"
+                        :key="`blog-${lvl}`"
+                        class="rounded-lg"
+                        :value="lvl"
+                      >
+                        {{ lvl }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <Button
+              type="button"
+              class="w-fit rounded-xl"
+              :disabled="backendLogSaving"
+              @click="saveBackendLogSettings"
+            >
+              {{ backendLogSaving ? t("common.saving") : t("settings.backendLogSave") }}
+            </Button>
+            <p v-if="backendLogError" class="text-sm text-destructive">
+              {{ backendLogError }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      <div class="break-inside-avoid">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+          <CardHeader class="space-y-3 pb-2">
+            <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
+              <span
+                class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
+                aria-hidden="true"
+              >
+                <Activity class="size-[1.15rem]" />
+              </span>
+              {{ t("settings.clientLogTitle") }}
+            </CardTitle>
+            <CardDescription
+              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            >
+              {{ t("settings.clientLogDesc") }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-3 pt-2">
+            <div
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p class="text-sm font-medium text-foreground">{{ t("settings.clientLogLevel") }}</p>
+              <Select
+                :model-value="clientLogLevelUi"
+                @update:model-value="onClientLogLevelSelect"
+              >
+                <SelectTrigger
+                  class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/70 sm:w-44"
+                  :aria-label="t('settings.clientLogLevel')"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent class="rounded-xl border-border/70">
+                  <SelectItem
+                    v-for="lvl in CLIENT_LOG_LEVEL_OPTIONS"
+                    :key="`clog-${lvl}`"
+                    class="rounded-lg"
+                    :value="lvl"
+                  >
+                    {{ lvl }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
     </div>
     </section>
     </TabsContent>
@@ -1430,11 +1748,11 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="library" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-library"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navLibrary')"
     >
     <h2 class="sr-only">{{ t("settings.navLibrary") }}</h2>
-      <div class="flex w-full flex-col gap-6">
+      <div class="flex w-full flex-col gap-3">
         <p
           v-if="scanFeedbackError"
           class="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -1443,7 +1761,7 @@ async function runMetadataRefreshForSelected() {
           {{ scanFeedbackError }}
         </p>
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -1460,9 +1778,9 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.storageCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div class="flex items-center justify-between gap-3">
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-3">
                 <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
                 <p class="text-sm text-muted-foreground">
                   {{ t("settings.libraryPathsHint") }}
@@ -1490,10 +1808,10 @@ async function runMetadataRefreshForSelected() {
                     </DialogDescription>
                   </DialogHeader>
 
-                  <div class="flex flex-col gap-4">
-                    <div class="flex flex-col gap-2">
+                  <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-3">
                       <label class="text-sm font-medium" for="new-lib-path">{{ t("settings.absolutePath") }}</label>
-                      <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
                         <Input
                           id="new-lib-path"
                           v-model="newPath"
@@ -1529,7 +1847,7 @@ async function runMetadataRefreshForSelected() {
                         {{ pathAddError }}
                       </p>
                     </div>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-3">
                       <label class="text-sm font-medium" for="new-lib-title">{{ t("settings.optionalPathTitle") }}</label>
                       <Input
                         id="new-lib-title"
@@ -1618,13 +1936,13 @@ async function runMetadataRefreshForSelected() {
             <div
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
             >
-              <div class="flex min-w-0 flex-col gap-1">
+              <div class="flex min-w-0 flex-col gap-3">
                 <p class="text-sm font-medium">{{ t("settings.metadataSectionTitle") }}</p>
                 <p class="text-xs text-muted-foreground">
                   {{ t("settings.metadataSectionHint") }}
                 </p>
               </div>
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="flex flex-wrap items-center gap-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -1673,11 +1991,11 @@ async function runMetadataRefreshForSelected() {
               >
                 <template v-if="editingLibraryPathId === path.id">
                   <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-1">
+                    <div class="flex flex-col gap-3">
                       <p class="text-xs font-medium text-muted-foreground">{{ t("settings.pathReadonly") }}</p>
                       <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
                     </div>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-3">
                       <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
                         t("settings.pathTitleLabel")
                       }}</label>
@@ -1696,7 +2014,7 @@ async function runMetadataRefreshForSelected() {
                         {{ editTitleError }}
                       </p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-3">
                       <Button
                         type="button"
                         class="rounded-2xl"
@@ -1727,12 +2045,12 @@ async function runMetadataRefreshForSelected() {
                         :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
                         @change="toggleMetadataPathSelection(path.path)"
                       />
-                      <div class="flex min-w-0 flex-1 flex-col gap-1">
+                      <div class="flex min-w-0 flex-1 flex-col gap-3">
                         <p class="font-medium">{{ path.title }}</p>
                         <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
                       </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-3">
                       <Button
                         type="button"
                         variant="outline"
@@ -1775,7 +2093,7 @@ async function runMetadataRefreshForSelected() {
       </div>
 
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -1792,12 +2110,12 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.organizeDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="organizeLibrarySaving"
             >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.organizeSwitch") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.organizeHint") }}
@@ -1823,7 +2141,7 @@ async function runMetadataRefreshForSelected() {
       </div>
 
       <div id="settings-section-libraryBehavior" class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -1840,12 +2158,12 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.extendedImportDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="extendedLibraryImportSaving"
             >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.extendedImportSwitch") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.extendedImportHint") }}
@@ -1892,15 +2210,15 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="metadata" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-metadata"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navMetadata')"
     >
     <h2 class="sr-only">{{ t("settings.navMetadata") }}</h2>
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle
-              class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xl font-semibold tracking-tight"
+              class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight"
             >
               <span class="flex min-w-0 items-center gap-3">
                 <span
@@ -1948,12 +2266,12 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.metadataMovieProviderDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div
               v-if="useWebApi"
-              class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/15 p-4"
+              class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4"
             >
-              <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="min-w-0">
                   <p class="text-sm font-medium">{{ t("settings.providerHealthTitle") }}</p>
                   <p class="mt-0.5 text-xs text-muted-foreground">
@@ -1994,10 +2312,10 @@ async function runMetadataRefreshForSelected() {
             </p>
 
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="autoLibraryWatchSaving"
             >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">{{
                   t("settings.autoScrape")
                 }}</p>
@@ -2022,11 +2340,11 @@ async function runMetadataRefreshForSelected() {
             </p>
 
             <fieldset
-              class="flex flex-col gap-2 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
+              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
               :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
             >
               <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
-              <div class="mb-0.5 flex items-center gap-2 px-0.5">
+              <div class="mb-0.5 flex items-center gap-3 px-0.5">
                 <span class="text-sm font-medium text-foreground">{{
                   t("settings.metadataMovieProviderMode")
                 }}</span>
@@ -2056,7 +2374,7 @@ async function runMetadataRefreshForSelected() {
                 </TooltipProvider>
               </div>
               <label
-                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
               >
                 <input
                   class="mt-0.5 size-4 shrink-0 accent-primary"
@@ -2075,7 +2393,7 @@ async function runMetadataRefreshForSelected() {
                 </span>
               </label>
               <label
-                class="flex items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors"
+                class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
                 :class="
                   canPickSpecifiedMetadata
                     ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
@@ -2101,7 +2419,7 @@ async function runMetadataRefreshForSelected() {
                 </span>
               </label>
               <label
-                class="flex items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors"
+                class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
                 :class="
                   canUseMetadataChainMode
                     ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
@@ -2129,10 +2447,10 @@ async function runMetadataRefreshForSelected() {
             <!-- Single Provider Selection -->
             <div
               v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
-              class="flex flex-col gap-2 rounded-xl border border-border/50 bg-muted/10 p-3"
+              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
             >
               <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
-              <div class="flex flex-wrap items-start gap-2">
+              <div class="flex flex-wrap items-start gap-3">
                 <Select
                   class="min-w-0 flex-1"
                   :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
@@ -2183,7 +2501,7 @@ async function runMetadataRefreshForSelected() {
               </div>
               <div
                 v-if="useWebApi && healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')"
-                class="flex flex-wrap items-center gap-2"
+                class="flex flex-wrap items-center gap-3"
               >
                 <Badge
                   variant="outline"
@@ -2224,7 +2542,7 @@ async function runMetadataRefreshForSelected() {
               >
                 {{ t("settings.metadataMovieProviderChainNoList") }}
               </p>
-              <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
                   <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
                   <p class="mt-0.5 text-xs text-muted-foreground">
@@ -2237,11 +2555,11 @@ async function runMetadataRefreshForSelected() {
               </div>
 
               <!-- Provider Chain List -->
-              <div class="flex flex-col gap-2">
+              <div class="flex flex-col gap-3">
                 <div
                   v-for="(provider, index) in providerChainDraft"
                   :key="provider + '-' + index"
-                  class="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-2 py-2 transition-[opacity,box-shadow] sm:px-3"
+                  class="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-background/50 px-2 py-2 transition-[opacity,box-shadow] sm:px-3"
                   :class="{
                     'opacity-55': chainDragFromIndex === index,
                     'ring-2 ring-primary/25 ring-offset-2 ring-offset-background':
@@ -2260,7 +2578,7 @@ async function runMetadataRefreshForSelected() {
                     <GripVertical class="size-4 shrink-0" aria-hidden="true" />
                   </span>
                   <div
-                    class="flex shrink-0 items-center gap-1.5"
+                    class="flex shrink-0 items-center gap-3"
                     :title="
                       useWebApi && healthForProvider(provider)
                         ? providerHealthStatusLabel(healthForProvider(provider)!.status) +
@@ -2333,7 +2651,7 @@ async function runMetadataRefreshForSelected() {
               </div>
 
               <!-- Add Provider -->
-              <div v-if="availableProvidersForChain.length > 0" class="flex items-center gap-2 pt-2">
+              <div v-if="availableProvidersForChain.length > 0" class="flex items-center gap-3 pt-2">
                 <Select v-model="selectedProviderToAdd">
                   <SelectTrigger class="h-9 flex-1 rounded-xl text-sm">
                     <SelectValue :placeholder="t('settings.selectProviderToAdd')" />
@@ -2362,7 +2680,7 @@ async function runMetadataRefreshForSelected() {
               </div>
 
               <!-- Manual save：与自动保存相同；无变更时为 no-op -->
-              <div class="flex flex-col gap-2 pt-2">
+              <div class="flex flex-col gap-3 pt-2">
                 <p class="text-xs text-muted-foreground">
                   {{ t("settings.metadataMovieProviderChainAutoSave") }}
                 </p>
@@ -2407,7 +2725,7 @@ async function runMetadataRefreshForSelected() {
             <div
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div class="min-w-0 flex flex-col gap-1">
+              <div class="min-w-0 flex flex-col gap-3">
                 <p class="text-sm font-semibold">{{ t("settings.triggerScrape") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.triggerScrapeHint") }}
@@ -2454,13 +2772,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="network" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-network"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navNetwork')"
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
-      <div class="flex w-full flex-col gap-6">
+      <div class="flex w-full flex-col gap-3">
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -2477,7 +2795,7 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.proxyDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <p
               v-if="!useWebApi"
               class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
@@ -2485,7 +2803,7 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.proxyMockHint") }}
             </p>
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
               :aria-busy="proxySaving"
             >
               <div class="min-w-0 flex-1 space-y-1">
@@ -2505,7 +2823,7 @@ async function runMetadataRefreshForSelected() {
               v-if="proxyEnabledDraft"
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4"
             >
-              <div class="flex flex-col gap-1.5">
+              <div class="flex flex-col gap-3">
                 <p class="text-sm font-medium">{{ t("settings.proxyUrl") }}</p>
                 <Input
                   v-model="proxyUrlDraft"
@@ -2516,10 +2834,10 @@ async function runMetadataRefreshForSelected() {
                   :disabled="proxySaving"
                 />
               </div>
-              <div class="flex flex-col gap-2">
+              <div class="flex flex-col gap-3">
                 <button
                   type="button"
-                  class="flex h-8 min-h-8 w-full max-h-8 items-center justify-between gap-2 rounded-xl border border-border/60 bg-background/30 px-3 py-0 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
+                  class="flex h-8 min-h-8 w-full max-h-8 items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/30 px-3 py-0 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
                   :disabled="proxySaving"
                   :aria-expanded="proxyAuthExpanded"
                   @click="proxyAuthExpanded = !proxyAuthExpanded"
@@ -2535,7 +2853,7 @@ async function runMetadataRefreshForSelected() {
                   v-show="proxyAuthExpanded"
                   class="flex flex-col gap-3 border-t border-border/50 pt-3"
                 >
-                  <div class="flex flex-col gap-1.5">
+                  <div class="flex flex-col gap-3">
                     <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
                     <Input
                       v-model="proxyUsernameDraft"
@@ -2544,7 +2862,7 @@ async function runMetadataRefreshForSelected() {
                       :disabled="proxySaving"
                     />
                   </div>
-                  <div class="flex flex-col gap-1.5">
+                  <div class="flex flex-col gap-3">
                     <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
                     <Input
                       v-model="proxyPasswordDraft"
@@ -2569,7 +2887,7 @@ async function runMetadataRefreshForSelected() {
             >
               {{ t("settings.proxyPingGoogleHint") }}
             </p>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
                 class="rounded-xl"
@@ -2660,13 +2978,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="curated" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-curated"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navCurated')"
     >
     <h2 class="sr-only">{{ t("settings.navCurated") }}</h2>
-      <div class="flex w-full flex-col gap-6">
+      <div class="flex w-full flex-col gap-3">
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-4 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -2682,7 +3000,7 @@ async function runMetadataRefreshForSelected() {
                 {{ t("settings.curatedCardDescShort") }}
               </p>
               <div
-                class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-medium text-foreground/95"
+                class="flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/95"
               >
                 <span class="font-normal text-muted-foreground">{{
                   t("settings.curatedCardHow")
@@ -2703,10 +3021,10 @@ async function runMetadataRefreshForSelected() {
               </div>
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
-            <fieldset class="flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/50 p-3">
+          <CardContent class="flex flex-col gap-3 pt-2">
+            <fieldset class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-3">
               <legend class="sr-only">{{ t("settings.savePolicy") }}</legend>
-              <div class="mb-0.5 flex items-center gap-2 px-0.5">
+              <div class="mb-0.5 flex items-center gap-3 px-0.5">
                 <span class="text-sm font-medium text-foreground">{{
                   t("settings.savePolicy")
                 }}</span>
@@ -2736,7 +3054,7 @@ async function runMetadataRefreshForSelected() {
                 </TooltipProvider>
               </div>
               <label
-                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
               >
                 <input
                   v-model="curatedSaveMode"
@@ -2753,7 +3071,7 @@ async function runMetadataRefreshForSelected() {
                 </span>
               </label>
               <label
-                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
               >
                 <input
                   v-model="curatedSaveMode"
@@ -2770,7 +3088,7 @@ async function runMetadataRefreshForSelected() {
                 </span>
               </label>
               <label
-                class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
               >
                 <input
                   v-model="curatedSaveMode"
@@ -2807,7 +3125,7 @@ async function runMetadataRefreshForSelected() {
                     : t("settings.exportNone")
                 }}
               </p>
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap gap-3">
                 <Button
                   type="button"
                   variant="secondary"
@@ -2837,7 +3155,7 @@ async function runMetadataRefreshForSelected() {
               </div>
               <div
                 v-if="curatedExportDirLabel"
-                class="flex flex-col gap-2 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                class="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
               >
                 <p class="text-xs leading-relaxed text-muted-foreground">
                   {{ t("settings.curatedReauthorizeHelp") }}
@@ -2889,13 +3207,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="playback" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-playback"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navPlayback')"
     >
     <h2 class="sr-only">{{ t("settings.navPlayback") }}</h2>
-      <div class="flex w-full flex-col gap-6">
+      <div class="flex w-full flex-col gap-3">
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -2912,11 +3230,11 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.playbackCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div
-              class="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-background/50 p-4"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/50 p-4"
             >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="text-sm font-medium text-foreground">{{ t("settings.hardwareDecode") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.hardwareDecodeHint") }}
@@ -2934,13 +3252,13 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="maintenance" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-maintenance"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navMaintenance')"
     >
     <h2 class="sr-only">{{ t("settings.navMaintenance") }}</h2>
-      <div class="flex w-full flex-col gap-6">
+      <div class="flex w-full flex-col gap-3">
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -2957,11 +3275,11 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.manualCardDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-4 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-2">
             <div
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/15 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div class="min-w-0 flex flex-col gap-1">
+              <div class="min-w-0 flex flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.triggerFullScan") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.triggerFullScanHint") }}
@@ -2985,7 +3303,7 @@ async function runMetadataRefreshForSelected() {
             <div
               class="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div class="min-w-0 flex flex-col gap-1">
+              <div class="min-w-0 flex flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.rebuildCache") }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.rebuildCacheHint") }}
@@ -3001,7 +3319,7 @@ async function runMetadataRefreshForSelected() {
       </div>
 
       <div class="break-inside-avoid">
-        <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+        <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
           <CardHeader class="space-y-3 pb-2">
             <CardTitle class="flex items-center gap-3 text-xl font-semibold tracking-tight">
               <span
@@ -3030,15 +3348,15 @@ async function runMetadataRefreshForSelected() {
     <TabsContent value="about" class="mt-0 min-w-0 flex-1 outline-none">
     <section
       id="settings-section-about"
-      class="space-y-6"
+      class="space-y-3"
       :aria-label="t('settings.navAbout')"
     >
     <h2 class="sr-only">{{ t("settings.navAbout") }}</h2>
-    <div class="flex w-full flex-col gap-6">
+    <div class="flex w-full flex-col gap-3">
     <div class="break-inside-avoid">
-      <Card class="rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
+      <Card class="gap-3 rounded-3xl border-border/70 bg-card/85 shadow-sm shadow-black/5">
         <CardHeader class="space-y-4 pb-2">
-          <CardTitle class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xl font-semibold tracking-tight">
+          <CardTitle class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight">
             <span class="flex min-w-0 items-center gap-3">
               <span
                 class="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-primary shadow-sm"
@@ -3051,7 +3369,7 @@ async function runMetadataRefreshForSelected() {
           </CardTitle>
           <div class="flex w-full justify-center pt-1">
             <div
-              class="font-curated inline-flex w-fit max-w-full items-center gap-2.5 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
+              class="font-curated inline-flex w-fit max-w-full items-center gap-3 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
               title="Curated"
             >
               <Sparkles class="size-6 shrink-0 text-primary sm:size-7" aria-hidden="true" />
@@ -3069,7 +3387,7 @@ async function runMetadataRefreshForSelected() {
                 </dt>
                 <dd class="mt-1.5">
                   <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                  <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-2">
+                  <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3">
                     <Loader2 class="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
                     {{ t("settings.aboutVersionLoading") }}
                   </span>
@@ -3113,7 +3431,7 @@ async function runMetadataRefreshForSelected() {
               </p>
               <p class="mt-1.5 font-mono text-sm text-foreground/90">
                 <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-2 font-sans text-muted-foreground">
+                <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3 font-sans text-muted-foreground">
                   <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
                   {{ t("settings.aboutVersionLoading") }}
                 </span>

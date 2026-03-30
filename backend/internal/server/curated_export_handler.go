@@ -38,18 +38,18 @@ func dedupeCuratedExportIDs(ids []string) []string {
 	return out
 }
 
-func contentDispositionAttachment(filename string) string {
-	var asciiFallback strings.Builder
+func contentDispositionAttachment(filename, asciiFallback string) string {
+	var ascii strings.Builder
 	for _, r := range filename {
 		if r < 0x80 && r != '"' && r != '\\' && r != '\r' && r != '\n' {
-			asciiFallback.WriteRune(r)
+			ascii.WriteRune(r)
 		} else {
-			asciiFallback.WriteByte('_')
+			ascii.WriteByte('_')
 		}
 	}
-	fb := asciiFallback.String()
+	fb := ascii.String()
 	if fb == "" || !utf8.ValidString(filename) {
-		fb = "curated-export.webp"
+		fb = asciiFallback
 	}
 	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, fb, url.PathEscape(filename))
 }
@@ -76,6 +76,15 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 	}
 	if len(ids) > maxCuratedExportFrames {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, fmt.Sprintf("at most %d frames per export", maxCuratedExportFrames))
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(req.Format))
+	if format == "" {
+		format = "webp"
+	}
+	if format != "webp" && format != "png" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `format must be "webp" or "png"`)
 		return
 	}
 
@@ -122,25 +131,46 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 			FrameID:     row.ID,
 			MovieID:     row.MovieID,
 		}
-		webpBytes, err := curatedexport.EncodePNGToWebP(row.ImageBlob, meta, 82)
-		if err != nil {
-			h.logger.Error("curated frame webp encode", zap.String("id", row.ID), zap.Error(err))
-			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid or unsupported frame image")
-			return
+		var outBytes []byte
+		var fname string
+		switch format {
+		case "png":
+			pngBytes, err := curatedexport.EncodePNGWithCuratedMetaITxt(row.ImageBlob, meta)
+			if err != nil {
+				h.logger.Error("curated frame png itxt", zap.String("id", row.ID), zap.Error(err))
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid or unsupported frame image")
+				return
+			}
+			outBytes = pngBytes
+			fname = curatedexport.ExportPNGFilename(actorForName, row.Code, row.PositionSec, row.ID, usedNames)
+		default:
+			webpBytes, err := curatedexport.EncodePNGToWebP(row.ImageBlob, meta, 82)
+			if err != nil {
+				h.logger.Error("curated frame webp encode", zap.String("id", row.ID), zap.Error(err))
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid or unsupported frame image")
+				return
+			}
+			outBytes = webpBytes
+			fname = curatedexport.ExportWebPFilename(actorForName, row.Code, row.PositionSec, row.ID, usedNames)
 		}
-		fname := curatedexport.ExportWebPFilename(actorForName, row.Code, row.PositionSec, row.ID, usedNames)
-		files = append(files, outFile{name: fname, data: webpBytes})
+		files = append(files, outFile{name: fname, data: outBytes})
 	}
 
 	if len(files) == 1 {
-		w.Header().Set("Content-Type", "image/webp")
-		w.Header().Set("Content-Disposition", contentDispositionAttachment(files[0].name))
+		ct := "image/webp"
+		fallback := "curated-export.webp"
+		if format == "png" {
+			ct = "image/png"
+			fallback = "curated-export.png"
+		}
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("Content-Disposition", contentDispositionAttachment(files[0].name, fallback))
 		_, _ = w.Write(files[0].data)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", contentDispositionAttachment("curated-frames-export.zip"))
+	w.Header().Set("Content-Disposition", contentDispositionAttachment("curated-frames-export.zip", "curated-frames-export.zip"))
 
 	zw := zip.NewWriter(w)
 	for _, f := range files {

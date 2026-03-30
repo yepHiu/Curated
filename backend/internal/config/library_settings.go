@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.uber.org/zap/zapcore"
 )
 
 const librarySettingsFileName = "library-config.cfg"
@@ -87,7 +89,64 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 	}
+	if v, ok := m["logDir"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: logDir: %w", path, err)
+		}
+		cfg.LogDir = s
+	}
+	if v, ok := m["logFilePrefix"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: logFilePrefix: %w", path, err)
+		}
+		cfg.LogFilePrefix = s
+	}
+	if v, ok := m["logMaxAgeDays"]; ok {
+		n, err := parseJSONIntNonNegative(v, "logMaxAgeDays")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.LogMaxAgeDays = n
+	}
+	if v, ok := m["logLevel"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: logLevel: %w", path, err)
+		}
+		if s != "" {
+			var zl zapcore.Level
+			if err := zl.UnmarshalText([]byte(s)); err != nil {
+				return fmt.Errorf("library settings %q: invalid logLevel %q", path, s)
+			}
+			cfg.LogLevel = s
+		}
+	}
 	return nil
+}
+
+func parseJSONIntNonNegative(v any, key string) (int, error) {
+	switch x := v.(type) {
+	case float64:
+		if x < 0 || x != float64(int(x)) {
+			return 0, fmt.Errorf("%s: invalid number %v", key, x)
+		}
+		return int(x), nil
+	case int:
+		if x < 0 {
+			return 0, fmt.Errorf("%s: invalid number %v", key, x)
+		}
+		return x, nil
+	case json.Number:
+		i64, err := x.Int64()
+		if err != nil || i64 < 0 {
+			return 0, fmt.Errorf("%s: invalid number %v", key, v)
+		}
+		return int(i64), nil
+	default:
+		return 0, fmt.Errorf("%s: unsupported type %T", key, v)
+	}
 }
 
 func parseJSONStringTrim(v any) (string, error) {

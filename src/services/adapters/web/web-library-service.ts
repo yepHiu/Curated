@@ -1,8 +1,10 @@
 import { computed, ref, watch, type Ref } from "vue"
 import type {
+  BackendLogSettingsDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  PatchBackendLogBody,
   PatchMovieBody,
   ProxySettingsDTO,
   SettingsDTO,
@@ -33,6 +35,10 @@ const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
 const metadataMovieScrapeModeState = ref<MetadataMovieScrapeMode>("auto")
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
+const backendLogState = ref<BackendLogSettingsDTO>({
+  logDir: "",
+  logLevel: "info",
+})
 /** 设置页概览第三卡：萃取帧条数（GET /curated-frames 列表长度） */
 const curatedFramesCountState = ref(0)
 /** 忽略过期的 PATCH 响应，避免快速连点时状态被旧请求写乱 */
@@ -43,6 +49,7 @@ let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
 let proxySaveSeq = 0
+let backendLogSaveSeq = 0
 let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
 
@@ -214,6 +221,10 @@ async function refreshLibraryPathsFromApi() {
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
+    backendLogState.value = settings.backendLog ?? {
+      logDir: "",
+      logLevel: "info",
+    }
   } catch (err) {
     console.error("[web-library-service] failed to load settings", err)
   }
@@ -238,6 +249,7 @@ function createWebLibraryService(): LibraryService {
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
     metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeState.value),
     proxy: computed(() => proxyState.value),
+    backendLog: computed(() => backendLogState.value),
 
     async setProxy(config: ProxySettingsDTO) {
       const seq = ++proxySaveSeq
@@ -386,6 +398,42 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === metadataMovieScrapeModeSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async patchBackendLog(patch: PatchBackendLogBody) {
+      const seq = ++backendLogSaveSeq
+      const prev = backendLogState.value
+      const merged: BackendLogSettingsDTO = {
+        logDir: patch.logDir !== undefined ? patch.logDir : prev.logDir,
+        logFilePrefix:
+          patch.logFilePrefix !== undefined ? patch.logFilePrefix : prev.logFilePrefix,
+        logMaxAgeDays:
+          patch.logMaxAgeDays !== undefined ? patch.logMaxAgeDays : prev.logMaxAgeDays,
+        logLevel: patch.logLevel !== undefined ? patch.logLevel : prev.logLevel,
+      }
+      backendLogState.value = { ...merged }
+      try {
+        // 不传 logFilePrefix：由后端/logging 默认前缀（curated），避免设置页覆盖手写 cfg
+        const next = await api.patchSettings({
+          backendLog: {
+            logDir: merged.logDir ?? "",
+            logMaxAgeDays: merged.logMaxAgeDays ?? 0,
+            logLevel: (merged.logLevel ?? "info").trim() || "info",
+          },
+        })
+        if (seq === backendLogSaveSeq) {
+          backendLogState.value = next.backendLog ?? merged
+        }
+      } catch (err) {
+        if (seq === backendLogSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {

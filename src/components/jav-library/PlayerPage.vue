@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import {
   Maximize2,
   Pause,
+  PictureInPicture2,
   Play,
   SkipBack,
   SkipForward,
@@ -62,6 +63,39 @@ const initialAudio = getPlayerAudioPrefs()
 const volume = ref([initialAudio.volumePercent])
 /** 与 video.muted 同步，用于 UI 与持久化（音量滑块为 0 时不使用静音标志） */
 const playbackMuted = ref(initialAudio.muted)
+
+/** 浏览器原生画中画（Document Picture-in-Picture 除外） */
+const pipSupported = ref(false)
+const isPipActive = ref(false)
+
+function refreshPipSupport() {
+  try {
+    pipSupported.value =
+      typeof document !== "undefined" &&
+      document.pictureInPictureEnabled === true &&
+      typeof HTMLVideoElement !== "undefined" &&
+      typeof HTMLVideoElement.prototype.requestPictureInPicture === "function"
+  } catch {
+    pipSupported.value = false
+  }
+}
+
+function syncPipActiveFromDocument() {
+  const v = videoRef.value
+  isPipActive.value = Boolean(v && document.pictureInPictureElement === v)
+}
+
+function onVideoEnterPictureInPicture() {
+  isPipActive.value = true
+}
+
+function onVideoLeavePictureInPicture() {
+  isPipActive.value = false
+}
+
+function onDocumentPictureInPictureChange() {
+  syncPipActiveFromDocument()
+}
 
 const curatedShutterActive = ref(false)
 const curatedPlusOne = ref(false)
@@ -132,12 +166,21 @@ watch(isPlaying, (playing) => {
   }
 })
 
-watch(playbackSrc, (src) => {
-  if (!src) {
-    clearIdleHideTimer()
-    chromeVisible.value = true
-  }
-})
+watch(
+  playbackSrc,
+  async (src) => {
+    if (!src) {
+      clearIdleHideTimer()
+      chromeVisible.value = true
+      isPipActive.value = false
+      return
+    }
+    await nextTick()
+    refreshPipSupport()
+    syncPipActiveFromDocument()
+  },
+  { immediate: true },
+)
 
 function syncSrc() {
   playbackError.value = ""
@@ -192,6 +235,8 @@ function onWindowBeforeUnload() {
 
 onMounted(() => {
   syncSrc()
+  refreshPipSupport()
+  document.addEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   window.addEventListener("keydown", onPlaybackKeydown)
   document.addEventListener("visibilitychange", onVisibilityChange)
   window.addEventListener("beforeunload", onWindowBeforeUnload)
@@ -199,10 +244,16 @@ onMounted(() => {
 
 onUnmounted(() => {
   flushPlaybackProgress()
+  document.removeEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   window.removeEventListener("keydown", onPlaybackKeydown)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
   clearIdleHideTimer()
+  if (document.pictureInPictureElement) {
+    void document.exitPictureInPicture().catch(() => {
+      // ignore
+    })
+  }
   if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
 })
@@ -441,6 +492,12 @@ function onPlaybackKeydown(e: KeyboardEvent) {
       e.preventDefault()
       void toggleFullscreen()
       break
+    case "KeyP":
+      if (pipSupported.value) {
+        e.preventDefault()
+        void togglePictureInPicture()
+      }
+      break
     case "KeyM":
       e.preventDefault()
       toggleMute()
@@ -512,6 +569,21 @@ async function toggleFullscreen() {
   }
 }
 
+async function togglePictureInPicture() {
+  onChromePointerActivity()
+  const v = videoRef.value
+  if (!v || !playbackSrc.value || !pipSupported.value) return
+  try {
+    if (document.pictureInPictureElement === v) {
+      await document.exitPictureInPicture()
+    } else {
+      await v.requestPictureInPicture()
+    }
+  } catch {
+    // 需用户手势或编解码器不支持时可能失败，静默处理
+  }
+}
+
 const fileBasename = computed(() => {
   const loc = props.movie.location?.trim() ?? ""
   if (!loc) return ""
@@ -580,6 +652,8 @@ const noStreamHint = computed(() => {
           @pause="onPause"
           @ended="onVideoEnded"
           @error="onVideoError"
+          @enterpictureinpicture="onVideoEnterPictureInPicture"
+          @leavepictureinpicture="onVideoLeavePictureInPicture"
         />
 
         <div
@@ -725,6 +799,19 @@ const noStreamHint = computed(() => {
                 />
                 <span class="w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercentLabel }}%</span>
               </div>
+
+              <Button
+                v-if="pipSupported"
+                variant="secondary"
+                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
+                :disabled="!playbackSrc"
+                :aria-pressed="isPipActive"
+                :aria-label="isPipActive ? t('player.ariaPipExit') : t('player.ariaPipEnter')"
+                @click="togglePictureInPicture"
+              >
+                <PictureInPicture2 class="size-4 shrink-0" data-icon="inline-start" aria-hidden="true" />
+                {{ isPipActive ? t("player.pipExit") : t("player.pip") }}
+              </Button>
 
               <Button
                 variant="secondary"

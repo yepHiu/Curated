@@ -2,9 +2,11 @@ import type { ComputedRef } from "vue"
 import type {
   ActorListItemDTO,
   ActorsListDTO,
+  BackendLogSettingsDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  PatchBackendLogBody,
   PatchMovieBody,
   ProxySettingsDTO,
   TaskDTO,
@@ -45,6 +47,9 @@ export interface LibraryService {
   /** HTTP 代理配置 */
   proxy: ComputedRef<ProxySettingsDTO>
   setProxy(config: ProxySettingsDTO): Promise<void>
+  /** 后端日志目录与级别（Web：library-config.cfg；Mock：内存） */
+  backendLog: ComputedRef<BackendLogSettingsDTO>
+  patchBackendLog(patch: PatchBackendLogBody): Promise<void>
   /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>

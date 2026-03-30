@@ -82,6 +82,7 @@ pnpm dev
 **Environment Variables:**
 - `VITE_USE_WEB_API=true` - Use real backend API (set in root `.env` by default)
 - `VITE_API_BASE_URL` - Override API base URL (default: `/api`)
+- `VITE_LOG_LEVEL` - Optional default for browser `loglevel` (`trace`|`debug`|`info`|`warn`|`error`|`silent`); overridden by `localStorage['curated-client-log-level']` when set (Settings → Logging)
 
 ### Library Behavior Configuration
 
@@ -90,6 +91,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
+- **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or default `curated` applies); **restart the backend** for new log directory/level to apply to file sinks
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
 Update via `PATCH /api/settings`; changes are written atomically to the config file.

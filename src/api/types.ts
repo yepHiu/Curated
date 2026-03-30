@@ -101,6 +101,8 @@ export interface SettingsDTO {
   metadataMovieScrapeMode?: MetadataMovieScrapeMode
   /** HTTP 代理配置 */
   proxy: ProxySettingsDTO
+  /** 后端进程日志（文件 + 级别）；重启后端后作用于 Zap */
+  backendLog: BackendLogSettingsDTO
 }
 
 export interface ProxySettingsDTO {
@@ -108,6 +110,22 @@ export interface ProxySettingsDTO {
   url?: string
   username?: string
   password?: string
+}
+
+/** 后端日志目录与级别（library-config.cfg）；空 logDir 表示仅控制台 */
+export interface BackendLogSettingsDTO {
+  logDir: string
+  logFilePrefix?: string
+  logMaxAgeDays?: number
+  logLevel?: string
+}
+
+/** PATCH backendLog 的字段；省略表示不修改 */
+export interface PatchBackendLogBody {
+  logDir?: string
+  logFilePrefix?: string
+  logMaxAgeDays?: number
+  logLevel?: string
 }
 
 /** POST /api/proxy/ping-javbus | ping-google — optional body to test draft proxy without saving */
@@ -134,6 +152,8 @@ export interface PatchSettingsBody {
   metadataMovieScrapeMode?: MetadataMovieScrapeMode
   /** 代理配置；发送则替换当前配置 */
   proxy?: ProxySettingsDTO
+  /** 合并写入后端日志设置 */
+  backendLog?: PatchBackendLogBody
 }
 
 export interface TaskDTO {
@@ -337,11 +357,13 @@ export interface PatchCuratedFrameTagsBody {
   tags: string[]
 }
 
-/** POST /curated-frames/export → WebP 单文件或 ZIP */
+/** POST /curated-frames/export → WebP/PNG 单文件或 ZIP */
 export interface PostCuratedFramesExportBody {
   ids: string[]
   /** 按演员分组导出时传入；须属于每帧的 actors */
   actorName?: string
+  /** 默认 webp；png 为带 iTXt 元数据的 PNG */
+  format?: "webp" | "png"
 }
 
 /** GET /library/played-movies */

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"net/http"
 
@@ -540,6 +541,78 @@ func (a *App) SetProxy(p config.ProxyConfig) error {
 	return nil
 }
 
+// BackendLogSettings returns current backend log fields (merged config + library-config.cfg).
+func (a *App) BackendLogSettings() contracts.BackendLogSettingsDTO {
+	return contracts.BackendLogSettingsDTO{
+		LogDir:        a.cfg.LogDir,
+		LogFilePrefix: a.cfg.LogFilePrefix,
+		LogMaxAgeDays: a.cfg.LogMaxAgeDays,
+		LogLevel:      a.cfg.LogLevel,
+	}
+}
+
+// SetBackendLogPatch merges patch into current values, persists to library-config.cfg, and updates memory.
+// Changing logDir/logLevel takes effect after backend restart.
+func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	nextDir := a.cfg.LogDir
+	nextPrefix := a.cfg.LogFilePrefix
+	nextMaxAge := a.cfg.LogMaxAgeDays
+	nextLevel := a.cfg.LogLevel
+	if p.LogDir != nil {
+		nextDir = strings.TrimSpace(*p.LogDir)
+	}
+	if p.LogFilePrefix != nil {
+		nextPrefix = strings.TrimSpace(*p.LogFilePrefix)
+	}
+	if p.LogMaxAgeDays != nil {
+		nextMaxAge = *p.LogMaxAgeDays
+		if nextMaxAge < 0 {
+			return fmt.Errorf("logMaxAgeDays must be non-negative")
+		}
+	}
+	if p.LogLevel != nil {
+		lvl := strings.TrimSpace(*p.LogLevel)
+		if lvl == "" {
+			lvl = "info"
+		}
+		var zl zapcore.Level
+		if err := zl.UnmarshalText([]byte(lvl)); err != nil {
+			return fmt.Errorf("invalid logLevel: %w", err)
+		}
+		nextLevel = lvl
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		if strings.TrimSpace(nextDir) == "" {
+			delete(m, "logDir")
+		} else {
+			m["logDir"] = nextDir
+		}
+		if strings.TrimSpace(nextPrefix) == "" {
+			delete(m, "logFilePrefix")
+		} else {
+			m["logFilePrefix"] = nextPrefix
+		}
+		if nextMaxAge <= 0 {
+			delete(m, "logMaxAgeDays")
+		} else {
+			m["logMaxAgeDays"] = nextMaxAge
+		}
+		m["logLevel"] = nextLevel
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.cfg.LogDir = nextDir
+	a.cfg.LogFilePrefix = nextPrefix
+	a.cfg.LogMaxAgeDays = nextMaxAge
+	a.cfg.LogLevel = nextLevel
+	return nil
+}
+
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -633,6 +706,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			return a.respondError(output, command.ID, internalError("failed to list library paths", map[string]any{"cause": err.Error()}))
 		}
 
+		p := a.Proxy()
 		settings := contracts.SettingsDTO{
 			LibraryPaths: libraryPaths,
 			Player: contracts.PlayerSettingsDTO{
@@ -645,6 +719,13 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			MetadataMovieProviders:       a.ListMetadataMovieProviders(),
 			MetadataMovieProviderChain:   a.MetadataMovieProviderChain(),
 			MetadataMovieScrapeMode:      a.MetadataMovieScrapeMode(),
+			Proxy: contracts.ProxySettingsDTO{
+				Enabled:  p.Enabled,
+				URL:      p.URL,
+				Username: p.Username,
+				Password: p.Password,
+			},
+			BackendLog: a.BackendLogSettings(),
 		}
 		return a.respondOK(output, command.ID, settings)
 
@@ -1515,6 +1596,7 @@ func (a *App) HTTPHandler() http.Handler {
 		MetadataScrapeCtl:        a,
 		ProviderHealthChecker:    a.scraper,
 		ProxyCtl:                 a,
+		BackendLogCtl:            a,
 		MovieMetadataRefresher:   a,
 		ActorProfileRefresher:    a,
 		LibraryWatchReloader:     a,

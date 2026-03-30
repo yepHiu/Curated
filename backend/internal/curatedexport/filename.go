@@ -24,8 +24,7 @@ func SanitizePathSegment(s string) string {
 	return t
 }
 
-// ExportWebPFilename builds curated-{actor}-{code}-{sec}s.webp with optional id suffix for ZIP uniqueness.
-func ExportWebPFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}) string {
+func exportCuratedFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}, ext string) string {
 	safeActor := SanitizePathSegment(actorForName)
 	if safeActor == "" {
 		safeActor = "unknown"
@@ -39,7 +38,7 @@ func ExportWebPFilename(actorForName, code string, positionSec float64, frameID 
 		sec = 0
 	}
 	base := fmt.Sprintf("curated-%s-%s-%ds", safeActor, safeCode, sec)
-	name := base + ".webp"
+	name := base + ext
 	if used != nil {
 		if _, ok := used[name]; ok {
 			suffix := frameID
@@ -49,9 +48,19 @@ func ExportWebPFilename(actorForName, code string, positionSec float64, frameID 
 			if suffix == "" {
 				suffix = "x"
 			}
-			name = base + "-" + suffix + ".webp"
+			name = base + "-" + suffix + ext
 		}
 		used[name] = struct{}{}
 	}
 	return name
+}
+
+// ExportWebPFilename builds curated-{actor}-{code}-{sec}s.webp with optional id suffix for ZIP uniqueness.
+func ExportWebPFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}) string {
+	return exportCuratedFilename(actorForName, code, positionSec, frameID, used, ".webp")
+}
+
+// ExportPNGFilename builds curated-{actor}-{code}-{sec}s.png with optional id suffix for ZIP uniqueness.
+func ExportPNGFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}) string {
+	return exportCuratedFilename(actorForName, code, positionSec, frameID, used, ".png")
 }

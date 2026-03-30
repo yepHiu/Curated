@@ -144,6 +144,45 @@ func TestWriteLibrarySettingsMerge_PreservesUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_BackendLog(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	raw := `{"logDir": " D:\\logs ", "logFilePrefix": "app", "logMaxAgeDays": 14, "logLevel": "debug"}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.LogDir, `D:\logs`; got != want {
+		t.Fatalf("LogDir = %q, want %q", got, want)
+	}
+	if got, want := cfg.LogFilePrefix, "app"; got != want {
+		t.Fatalf("LogFilePrefix = %q, want %q", got, want)
+	}
+	if got, want := cfg.LogMaxAgeDays, 14; got != want {
+		t.Fatalf("LogMaxAgeDays = %d, want %d", got, want)
+	}
+	if got, want := cfg.LogLevel, "debug"; got != want {
+		t.Fatalf("LogLevel = %q, want %q", got, want)
+	}
+}
+
+func TestMergeLibrarySettingsFile_InvalidLogLevel(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"logLevel": "not-a-level"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err == nil {
+		t.Fatal("expected error for invalid logLevel")
+	}
+}
+
 func TestWriteLibrarySettingsMerge_CreatesFile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

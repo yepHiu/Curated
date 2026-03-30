@@ -9,6 +9,10 @@
 | `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
 | `metadataMovieProvider` | 影片 Metatube 源；空字符串表示自动。由设置页或 `PATCH /api/settings` 更新。 |
 | `autoLibraryWatch` | 默认 **`true`**。为 **`true`** 且主配置允许目录监听时，库根下新文件经 **fsnotify** 防抖后会触发与 **`POST /api/scans`** 同类的扫描链（任务元数据常带 `trigger: fsnotify`），并可能对新增条目排队刮削。为 **`false`** 时**不**因监听排队扫描；**手动扫描、周期 `autoScanIntervalSeconds` 全库扫描**不受影响。由设置页「自动刮削元数据」或 `PATCH /api/settings` 的 `autoLibraryWatch` 更新。 |
+| `logDir` | 非空时后端启动后按日向该目录轮转写日志文件（与主配置 `logDir` 同源字段，由本文件合并覆盖）。空或省略表示仅控制台。由设置页 **通用** 或 `PATCH /api/settings` 的 `backendLog` 更新；**重启后端**后 Zap 才按新目录/级别落盘。 |
+| `logFilePrefix` | 日志文件名前缀，默认行为见 `internal/logging`（省略或空则使用 `curated`）。设置页不写入该键，需手写本文件或主配置。 |
+| `logMaxAgeDays` | 日志文件保留天数；`0` 或省略时由日志模块使用默认（7 天）。 |
+| `logLevel` | Zap 级别（如 `debug`/`info`/`warn`/`error`）；非法值会导致启动合并失败。 |
 
 路径解析：在 `backend` 目录下启动时为 `../config/library-config.cfg`，否则为 `config/library-config.cfg`（相对当前工作目录）。
 

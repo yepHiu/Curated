@@ -2,9 +2,11 @@ import { computed, ref, watch } from "vue"
 import type {
   ActorListItemDTO,
   ActorsListDTO,
+  BackendLogSettingsDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  PatchBackendLogBody,
   PatchMovieBody,
   TaskDTO,
 } from "@/api/types"
@@ -48,6 +50,7 @@ const metadataMovieProviderChainMock = ref<string[]>([])
 const metadataMovieScrapeModeMock = ref<MetadataMovieScrapeMode>("auto")
 /** Mock：HTTP 代理配置 */
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
+const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
 
 /** 设置页概览第三卡：萃取帧条数（IndexedDB） */
 const curatedFramesCountState = ref(0)
@@ -396,9 +399,22 @@ export const mockLibraryService: LibraryService = {
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
   metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeMock.value),
   proxy: computed(() => proxyMock.value),
+  backendLog: computed(() => backendLogMock.value),
 
   async setProxy(config: import("@/api/types").ProxySettingsDTO) {
     proxyMock.value = { ...config }
+  },
+
+  async patchBackendLog(patch: PatchBackendLogBody) {
+    const prev = backendLogMock.value
+    backendLogMock.value = {
+      logDir: patch.logDir !== undefined ? patch.logDir : prev.logDir,
+      logFilePrefix:
+        patch.logFilePrefix !== undefined ? patch.logFilePrefix : prev.logFilePrefix,
+      logMaxAgeDays:
+        patch.logMaxAgeDays !== undefined ? patch.logMaxAgeDays : prev.logMaxAgeDays,
+      logLevel: patch.logLevel !== undefined ? patch.logLevel : prev.logLevel,
+    }
   },
 
   async refreshSettings() {

@@ -1476,6 +1476,34 @@ func (stubMetadataCtl) MetadataMovieScrapeMode() string              { return "a
 func (stubMetadataCtl) SetMetadataMovieScrapeMode(string) error    { return nil }
 func (stubMetadataCtl) ListMetadataMovieProviders() []string         { return nil }
 
+type stubBackendLogCtl struct {
+	v contracts.BackendLogSettingsDTO
+}
+
+func (s *stubBackendLogCtl) BackendLogSettings() contracts.BackendLogSettingsDTO {
+	return s.v
+}
+
+func (s *stubBackendLogCtl) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
+	if p.LogDir != nil {
+		s.v.LogDir = strings.TrimSpace(*p.LogDir)
+	}
+	if p.LogFilePrefix != nil {
+		s.v.LogFilePrefix = strings.TrimSpace(*p.LogFilePrefix)
+	}
+	if p.LogMaxAgeDays != nil {
+		s.v.LogMaxAgeDays = *p.LogMaxAgeDays
+	}
+	if p.LogLevel != nil {
+		l := strings.TrimSpace(*p.LogLevel)
+		if l == "" {
+			l = "info"
+		}
+		s.v.LogLevel = l
+	}
+	return nil
+}
+
 func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -1514,5 +1542,61 @@ func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	}
 	if !dto.ExtendedLibraryImport {
 		t.Fatal("expected extendedLibraryImport true from controller")
+	}
+}
+
+func TestHandlePatchSettings_BackendLog(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	logCtl := &stubBackendLogCtl{v: contracts.BackendLogSettingsDTO{LogLevel: "info"}}
+	h := NewHandler(Deps{
+		Cfg:                config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:             zap.NewNop(),
+		Store:              store,
+		BackendLogCtl:      logCtl,
+		OrganizeLibraryCtl: stubOrganizeCtl{},
+		AutoLibraryWatchCtl: stubAutoWatchCtl{},
+		MetadataScrapeCtl:   stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	dir := filepath.Join(root, "logs")
+	body := fmt.Sprintf(`{"backendLog":{"logDir":%q,"logMaxAgeDays":3,"logLevel":"warn"}}`, dir)
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if dto.BackendLog.LogDir != dir {
+		t.Fatalf("BackendLog.LogDir = %q, want %q", dto.BackendLog.LogDir, dir)
+	}
+	if dto.BackendLog.LogMaxAgeDays != 3 {
+		t.Fatalf("BackendLog.LogMaxAgeDays = %d, want 3", dto.BackendLog.LogMaxAgeDays)
+	}
+	if dto.BackendLog.LogLevel != "warn" {
+		t.Fatalf("BackendLog.LogLevel = %q, want warn", dto.BackendLog.LogLevel)
 	}
 }

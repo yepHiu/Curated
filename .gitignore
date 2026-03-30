@@ -38,3 +38,7 @@ videos_test/
 *.njsproj
 *.sln
 *.sw?
+
+
+# logfile
+log/

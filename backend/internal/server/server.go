@@ -83,6 +83,12 @@ type ProxyController interface {
 	SetProxy(cfg config.ProxyConfig) error
 }
 
+// BackendLogSettingsController exposes and updates backend log paths/level (library-config.cfg); restart applies to Zap.
+type BackendLogSettingsController interface {
+	BackendLogSettings() contracts.BackendLogSettingsDTO
+	SetBackendLogPatch(p contracts.PatchBackendLogSettings) error
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
@@ -100,6 +106,7 @@ type Handler struct {
 	metadataScrapeCtl        MetadataScrapeSettings
 	providerHealthChecker    ProviderHealthChecker
 	proxyCtl                 ProxyController
+	backendLogCtl            BackendLogSettingsController
 	movieMetadataRefresher   MovieMetadataRefresher
 	actorProfileRefresher    ActorProfileRefresher
 	libraryWatchReloader     LibraryWatchReloader
@@ -117,6 +124,7 @@ type Deps struct {
 	MetadataScrapeCtl        MetadataScrapeSettings
 	ProviderHealthChecker    ProviderHealthChecker
 	ProxyCtl                 ProxyController
+	BackendLogCtl            BackendLogSettingsController
 	MovieMetadataRefresher   MovieMetadataRefresher
 	ActorProfileRefresher    ActorProfileRefresher
 	LibraryWatchReloader     LibraryWatchReloader
@@ -135,6 +143,7 @@ func NewHandler(deps Deps) *Handler {
 		metadataScrapeCtl:        deps.MetadataScrapeCtl,
 		providerHealthChecker:    deps.ProviderHealthChecker,
 		proxyCtl:                 deps.ProxyCtl,
+		backendLogCtl:            deps.BackendLogCtl,
 		movieMetadataRefresher:   deps.MovieMetadataRefresher,
 		actorProfileRefresher:    deps.ActorProfileRefresher,
 		libraryWatchReloader:     deps.LibraryWatchReloader,
@@ -995,7 +1004,17 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 			Password: p.Password,
 		}
 	}
+	if h.backendLogCtl != nil {
+		dto.BackendLog = h.backendLogCtl.BackendLogSettings()
+	}
 	return dto, nil
+}
+
+func patchBackendLogHasChanges(p *contracts.PatchBackendLogSettings) bool {
+	if p == nil {
+		return false
+	}
+	return p.LogDir != nil || p.LogFilePrefix != nil || p.LogMaxAgeDays != nil || p.LogLevel != nil
 }
 
 func movieProviderNameAllowed(want string, allowed []string) bool {
@@ -1028,7 +1047,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1042,7 +1061,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1179,6 +1198,20 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				h.logger.Warn("failed to persist proxy settings", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save proxy settings")
+			return
+		}
+	}
+
+	if body.BackendLog != nil && patchBackendLogHasChanges(body.BackendLog) {
+		if h.backendLogCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "backend log settings not available")
+			return
+		}
+		if err := h.backendLogCtl.SetBackendLogPatch(*body.BackendLog); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist backend log settings", zap.Error(err))
+			}
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 			return
 		}
 	}

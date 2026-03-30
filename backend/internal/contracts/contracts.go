@@ -342,6 +342,24 @@ type SettingsDTO struct {
 	MetadataMovieScrapeMode string `json:"metadataMovieScrapeMode"`
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
+	// BackendLog: file/console log settings persisted in library-config.cfg; restart backend to apply to Zap sinks.
+	BackendLog BackendLogSettingsDTO `json:"backendLog"`
+}
+
+// BackendLogSettingsDTO mirrors config log fields exposed in settings (library-config.cfg).
+type BackendLogSettingsDTO struct {
+	LogDir        string `json:"logDir"`
+	LogFilePrefix string `json:"logFilePrefix,omitempty"`
+	LogMaxAgeDays int    `json:"logMaxAgeDays,omitempty"`
+	LogLevel      string `json:"logLevel,omitempty"`
+}
+
+// PatchBackendLogSettings is a partial update for backendLog; nil pointer = leave unchanged.
+type PatchBackendLogSettings struct {
+	LogDir        *string `json:"logDir,omitempty"`
+	LogFilePrefix *string `json:"logFilePrefix,omitempty"`
+	LogMaxAgeDays *int    `json:"logMaxAgeDays,omitempty"`
+	LogLevel      *string `json:"logLevel,omitempty"`
 }
 
 // ProxySettingsDTO is the proxy configuration for SettingsDTO.
@@ -378,6 +396,8 @@ type PatchSettingsRequest struct {
 	MetadataMovieScrapeMode *string `json:"metadataMovieScrapeMode,omitempty"`
 	// Proxy: nil = no change; non-nil object replaces current proxy config.
 	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
+	// BackendLog: nil = no change; non-empty partial fields merge into current and persist.
+	BackendLog *PatchBackendLogSettings `json:"backendLog,omitempty"`
 }
 
 type PlayerSettingsDTO struct {
@@ -440,6 +460,8 @@ type PatchCuratedFrameTagsBody struct {
 type PostCuratedFramesExportBody struct {
 	IDs       []string `json:"ids"`
 	ActorName string   `json:"actorName,omitempty"`
+	// Format is "webp" (default) or "png".
+	Format string `json:"format,omitempty"`
 }
 
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.

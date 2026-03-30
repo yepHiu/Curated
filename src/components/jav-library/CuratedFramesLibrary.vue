@@ -5,7 +5,17 @@ import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { api } from "@/api/endpoints"
 import type { PostCuratedFramesExportBody } from "@/api/types"
-import { Camera, Download, PlayCircle, Plus, Trash2, X } from "lucide-vue-next"
+import {
+  Camera,
+  CheckSquare,
+  Download,
+  ListChecks,
+  PlayCircle,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-vue-next"
+import CuratedFramesBatchActionBar from "@/components/jav-library/CuratedFramesBatchActionBar.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,6 +46,7 @@ import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { curatedFrameImageUrl } from "@/lib/curated-frame-image-url"
 import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
+import { pushAppToast } from "@/composables/use-app-toast"
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -43,8 +54,8 @@ const router = useRouter()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 
-/** 为 true 时卡片上显示导出多选勾选框 */
-const multiSelectMode = ref(false)
+/** 与资料库「批量管理」一致：勾选卡片并配合底部工具栏导出 */
+const batchMode = ref(false)
 
 const mainTab = ref<"timeline" | "actors" | "movies">("timeline")
 
@@ -68,13 +79,13 @@ function clearExportSelection() {
   exportToolbarError.value = ""
 }
 
-function exitMultiSelectMode() {
-  multiSelectMode.value = false
+function exitBatchMode() {
+  batchMode.value = false
   clearExportSelection()
 }
 
 watch(mainTab, () => {
-  multiSelectMode.value = false
+  batchMode.value = false
   clearExportSelection()
 })
 
@@ -89,7 +100,7 @@ function toggleFrameSelection(id: string, sectionActor?: string) {
     }
     return
   }
-  if (selectedFrameIds.value.length >= 20) {
+  if (selectedFrameIds.value.length >= batchExportMax) {
     exportToolbarError.value = t("curated.exportSelectMax")
     return
   }
@@ -115,10 +126,134 @@ function toggleFrameSelection(id: string, sectionActor?: string) {
   selectedFrameIds.value = [...selectedFrameIds.value, id]
 }
 
+const batchExportMax = 20
+
 function selectAllVisibleUpTo20() {
   clearExportSelection()
-  const cap = listWithUrls.value.slice(0, 20)
+  const cap = listWithUrls.value.slice(0, batchExportMax)
   selectedFrameIds.value = cap.map((x) => x.row.id)
+}
+
+/** 「按演员」某分组内全选（与单选勾选同一导出桶规则） */
+function selectAllInActorSection(actorLabel: string) {
+  exportToolbarError.value = ""
+  const entry = actorGroups.value.find(([a]) => a === actorLabel)
+  if (!entry) {
+    return
+  }
+  const [, items] = entry
+  const ids = [...new Set(items.map((x) => x.row.id))]
+  let chosen = ids
+  if (chosen.length > batchExportMax) {
+    chosen = ids.slice(0, batchExportMax)
+    pushAppToast(t("curated.batchSelectGroupCapped", { max: batchExportMax }), { variant: "warning" })
+  }
+  selectedFrameIds.value = chosen
+  const anonymous = actorLabel === noActorLabel.value
+  exportSelectionBucket.value = anonymous ? "anonymous" : "named"
+  namedActorForExport.value = anonymous ? null : actorLabel
+}
+
+/** 「按影片」某分组内全选 */
+function selectAllInMovieSection(movieKey: string) {
+  exportToolbarError.value = ""
+  const g = movieGroups.value.find((x) => x.movieKey === movieKey)
+  if (!g) {
+    return
+  }
+  const ids = [...new Set(g.items.map((x) => x.row.id))]
+  let chosen = ids
+  if (chosen.length > batchExportMax) {
+    chosen = ids.slice(0, batchExportMax)
+    pushAppToast(t("curated.batchSelectGroupCapped", { max: batchExportMax }), { variant: "warning" })
+  }
+  selectedFrameIds.value = chosen
+  exportSelectionBucket.value = "none"
+  namedActorForExport.value = null
+}
+
+function getCappedUniqueIdsForGroupItems(items: RowWithUrl[]): string[] {
+  return [...new Set(items.map((x) => x.row.id))].slice(0, batchExportMax)
+}
+
+/** 分组头勾选：与「全选本组」一致，按导出上限截断 */
+function isGroupHeaderFullySelected(items: RowWithUrl[]): boolean {
+  const target = getCappedUniqueIdsForGroupItems(items)
+  if (target.length === 0) {
+    return false
+  }
+  const sel = selectedFrameIds.value
+  if (sel.length !== target.length) {
+    return false
+  }
+  const tset = new Set(target)
+  return sel.every((id) => tset.has(id))
+}
+
+/** 取消分组头勾选后，在「按演员」下根据仍选中的 id 推断导出桶 */
+function reconcileActorsTabExportBucket() {
+  if (mainTab.value !== "actors") {
+    return
+  }
+  const sel = selectedFrameIds.value
+  if (sel.length === 0) {
+    exportSelectionBucket.value = "none"
+    namedActorForExport.value = null
+    return
+  }
+  const selSet = new Set(sel)
+  const candidates: string[] = []
+  for (const [label, groupItems] of actorGroups.value) {
+    const gids = new Set(groupItems.map((x) => x.row.id))
+    if ([...selSet].every((id) => gids.has(id))) {
+      candidates.push(label)
+    }
+  }
+  if (candidates.length === 0) {
+    exportSelectionBucket.value = "none"
+    namedActorForExport.value = null
+    return
+  }
+  const prefer = namedActorForExport.value
+  let label = candidates[0]!
+  if (prefer && candidates.includes(prefer)) {
+    label = prefer
+  }
+  const anonymous = label === noActorLabel.value
+  exportSelectionBucket.value = anonymous ? "anonymous" : "named"
+  namedActorForExport.value = anonymous ? null : label
+}
+
+function onActorGroupHeaderCheckboxChange(actor: string, items: RowWithUrl[], ev: Event) {
+  const checked = (ev.target as HTMLInputElement).checked
+  exportToolbarError.value = ""
+  if (checked) {
+    selectAllInActorSection(actor)
+    return
+  }
+  const groupIds = new Set(items.map((x) => x.row.id))
+  selectedFrameIds.value = selectedFrameIds.value.filter((id) => !groupIds.has(id))
+  if (selectedFrameIds.value.length === 0) {
+    exportSelectionBucket.value = "none"
+    namedActorForExport.value = null
+  } else {
+    reconcileActorsTabExportBucket()
+  }
+}
+
+function onMovieGroupHeaderCheckboxChange(movieKey: string, items: RowWithUrl[], ev: Event) {
+  const checked = (ev.target as HTMLInputElement).checked
+  exportToolbarError.value = ""
+  if (checked) {
+    selectAllInMovieSection(movieKey)
+    return
+  }
+  const groupIds = new Set(items.map((x) => x.row.id))
+  selectedFrameIds.value = selectedFrameIds.value.filter((id) => !groupIds.has(id))
+  if (selectedFrameIds.value.length === 0) {
+    exportSelectionBucket.value = "none"
+    namedActorForExport.value = null
+  }
 }
 
 function actorNameForExportRequest(): string | undefined {
@@ -131,10 +266,19 @@ function actorNameForExportRequest(): string | undefined {
   return namedActorForExport.value
 }
 
-async function runExport(ids: string[], actorName?: string) {
+async function runExport(
+  ids: string[],
+  actorName: string | undefined,
+  format: "webp" | "png",
+  errorTarget: "toolbar" | "dialog",
+) {
   exportBusy.value = true
-  exportToolbarError.value = ""
-  const body: PostCuratedFramesExportBody = { ids }
+  if (errorTarget === "toolbar") {
+    exportToolbarError.value = ""
+  } else {
+    dialogExportError.value = ""
+  }
+  const body: PostCuratedFramesExportBody = { ids, format }
   if (actorName !== undefined && actorName !== "") {
     body.actorName = actorName
   }
@@ -143,47 +287,38 @@ async function runExport(ids: string[], actorName?: string) {
     triggerDownloadBlob(blob, filename)
   } catch (err) {
     console.error("[curated-frames] export failed", err)
-    exportToolbarError.value = t("curated.exportFailed")
+    const msg = t("curated.exportFailed")
+    if (errorTarget === "toolbar") {
+      exportToolbarError.value = msg
+    } else {
+      dialogExportError.value = msg
+    }
   } finally {
     exportBusy.value = false
   }
 }
 
-async function exportSelectedFrames() {
+async function exportSelectedAsFormat(format: "webp" | "png") {
   if (selectedFrameIds.value.length === 0) {
     return
   }
-  await runExport(selectedFrameIds.value, actorNameForExportRequest())
+  await runExport(selectedFrameIds.value, actorNameForExportRequest(), format, "toolbar")
 }
 
-async function exportSingleFromDialog() {
+async function exportSingleFromDialog(format: "webp" | "png") {
   if (!selected.value) {
     return
   }
-  dialogExportError.value = ""
-  exportBusy.value = true
-  try {
-    let actorName: string | undefined
-    const from = dialogOpenedFromActor.value
-    if (
-      from &&
-      from !== noActorLabel.value &&
-      selected.value.actors.some((a) => a.trim() === from)
-    ) {
-      actorName = from
-    }
-    const body: PostCuratedFramesExportBody = { ids: [selected.value.id] }
-    if (actorName !== undefined && actorName !== "") {
-      body.actorName = actorName
-    }
-    const { blob, filename } = await api.postCuratedFramesExport(body)
-    triggerDownloadBlob(blob, filename)
-  } catch (err) {
-    console.error("[curated-frames] export dialog failed", err)
-    dialogExportError.value = t("curated.exportFailed")
-  } finally {
-    exportBusy.value = false
+  let actorName: string | undefined
+  const from = dialogOpenedFromActor.value
+  if (
+    from &&
+    from !== noActorLabel.value &&
+    selected.value.actors.some((a) => a.trim() === from)
+  ) {
+    actorName = from
   }
+  await runExport([selected.value.id], actorName, format, "dialog")
 }
 
 const maxFrameTags = 64
@@ -237,6 +372,9 @@ onUnmounted(() => {
 })
 
 const isEmpty = computed(() => listWithUrls.value.length === 0)
+
+/** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
+const batchShowSelectVisible = computed(() => mainTab.value !== "actors")
 
 const noActorLabel = computed(() => t("curated.noActor"))
 const noMovieLabel = computed(() => t("curated.noMovie"))
@@ -558,73 +696,12 @@ function formatCapturedAt(iso: string) {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-3 pb-8 sm:px-6">
+  <div class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-3 sm:px-6">
     <div class="flex flex-col gap-2 pt-2">
       <h1 class="text-2xl font-semibold tracking-tight">{{ t("curated.title") }}</h1>
       <p class="text-sm text-muted-foreground">
         {{ t("curated.subtitle", { key: t("curated.keyHint") }) }}
       </p>
-    </div>
-
-    <div
-      v-if="useWebApi && !isEmpty"
-      class="flex flex-col gap-2 rounded-2xl border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center"
-    >
-      <template v-if="!multiSelectMode">
-        <p class="text-sm text-muted-foreground">{{ t("curated.multiSelectHint") }}</p>
-        <Button type="button" variant="secondary" size="sm" class="rounded-xl" @click="multiSelectMode = true">
-          {{ t("curated.multiSelectEnter") }}
-        </Button>
-      </template>
-      <template v-else>
-        <p class="text-sm text-muted-foreground">
-          {{
-            t("curated.exportSelectedCount", {
-              n: selectedFrameIds.length,
-              max: 20,
-            })
-          }}
-        </p>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" class="rounded-xl" @click="exitMultiSelectMode">
-            {{ t("curated.multiSelectExit") }}
-          </Button>
-          <Button
-            v-if="mainTab !== 'actors'"
-            type="button"
-            variant="secondary"
-            size="sm"
-            class="rounded-xl"
-            :disabled="listWithUrls.length === 0"
-            @click="selectAllVisibleUpTo20"
-          >
-            {{ t("curated.selectVisible") }}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="rounded-xl"
-            :disabled="selectedFrameIds.length === 0"
-            @click="clearExportSelection"
-          >
-            {{ t("curated.clearSelection") }}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            class="rounded-xl"
-            :disabled="selectedFrameIds.length === 0 || exportBusy"
-            @click="exportSelectedFrames"
-          >
-            <Download data-icon="inline-start" class="size-4" />
-            {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}
-          </Button>
-        </div>
-        <p v-if="exportToolbarError" class="w-full text-sm text-destructive" role="alert">
-          {{ exportToolbarError }}
-        </p>
-      </template>
     </div>
 
     <div
@@ -635,13 +712,60 @@ function formatCapturedAt(iso: string) {
       <p class="text-sm text-muted-foreground">{{ t("curated.empty") }}</p>
     </div>
 
-    <Tabs v-else v-model="mainTab" class="w-full gap-4">
-      <TabsList class="h-auto w-fit flex-wrap rounded-2xl bg-muted/60 p-1">
-        <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
-        <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
-        <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
-      </TabsList>
+    <Tabs
+      v-else
+      v-model="mainTab"
+      class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
+    >
+      <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
+          <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
+          <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
+          <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
+        </TabsList>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <template v-if="!batchMode">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="gap-1.5 rounded-xl"
+              @click="batchMode = true"
+            >
+              <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+              {{ t("library.batchManage") }}
+            </Button>
+          </template>
+          <template v-else>
+            <Button
+              v-if="batchShowSelectVisible"
+              type="button"
+              variant="outline"
+              size="sm"
+              class="gap-1.5 rounded-xl"
+              :disabled="listWithUrls.length === 0"
+              @click="selectAllVisibleUpTo20"
+            >
+              <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+              {{ t("library.batchSelectVisible") }}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              @click="exitBatchMode"
+            >
+              <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+              {{ t("library.batchExitToolbar") }}
+            </Button>
+          </template>
+        </div>
+      </div>
 
+      <div
+        class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
+      >
       <TabsContent value="timeline" class="mt-0 outline-none">
         <div
           class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
@@ -652,7 +776,7 @@ function formatCapturedAt(iso: string) {
             class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
           >
             <label
-              v-if="useWebApi && multiSelectMode"
+              v-if="batchMode"
               class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
               :title="t('curated.exportToggleAria')"
               @click.stop
@@ -703,7 +827,28 @@ function formatCapturedAt(iso: string) {
       <TabsContent value="actors" class="mt-0 outline-none">
         <div class="flex flex-col gap-8">
           <section v-for="[actor, items] in actorGroups" :key="actor">
-            <h2 class="mb-3 text-lg font-semibold">{{ actor }}</h2>
+            <div class="mb-3">
+              <label
+                v-if="batchMode"
+                class="flex cursor-pointer items-start gap-2.5"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
+                  :disabled="items.length === 0"
+                  :checked="isGroupHeaderFullySelected(items)"
+                  :aria-label="t('curated.batchSelectActorGroup')"
+                  @change="onActorGroupHeaderCheckboxChange(actor, items, $event)"
+                />
+                <span class="min-w-0 text-lg font-semibold leading-snug">{{ actor }}</span>
+              </label>
+              <h2
+                v-else
+                class="text-lg font-semibold"
+              >
+                {{ actor }}
+              </h2>
+            </div>
             <div
               class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
             >
@@ -713,7 +858,7 @@ function formatCapturedAt(iso: string) {
                 class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
               >
                 <label
-                  v-if="useWebApi && multiSelectMode"
+                  v-if="batchMode"
                   class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
                   :title="t('curated.exportToggleAria')"
                   @click.stop
@@ -767,13 +912,37 @@ function formatCapturedAt(iso: string) {
         <div class="flex flex-col gap-8">
           <section v-for="g in movieGroups" :key="g.movieKey">
             <div class="mb-3">
-              <h2 class="text-lg font-semibold">{{ g.heading }}</h2>
-              <p
-                v-if="g.sub"
-                class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
+              <label
+                v-if="batchMode"
+                class="flex cursor-pointer items-start gap-2.5"
               >
-                {{ g.sub }}
-              </p>
+                <input
+                  type="checkbox"
+                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
+                  :disabled="g.items.length === 0"
+                  :checked="isGroupHeaderFullySelected(g.items)"
+                  :aria-label="t('curated.batchSelectMovieGroup')"
+                  @change="onMovieGroupHeaderCheckboxChange(g.movieKey, g.items, $event)"
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="block text-lg font-semibold leading-snug">{{ g.heading }}</span>
+                  <p
+                    v-if="g.sub"
+                    class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
+                  >
+                    {{ g.sub }}
+                  </p>
+                </span>
+              </label>
+              <template v-else>
+                <h2 class="text-lg font-semibold">{{ g.heading }}</h2>
+                <p
+                  v-if="g.sub"
+                  class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
+                >
+                  {{ g.sub }}
+                </p>
+              </template>
             </div>
             <div
               class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
@@ -784,7 +953,7 @@ function formatCapturedAt(iso: string) {
                 class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
               >
                 <label
-                  v-if="useWebApi && multiSelectMode"
+                  v-if="batchMode"
                   class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
                   :title="t('curated.exportToggleAria')"
                   @click.stop
@@ -833,7 +1002,22 @@ function formatCapturedAt(iso: string) {
           </section>
         </div>
       </TabsContent>
+      </div>
     </Tabs>
+
+    <CuratedFramesBatchActionBar
+      v-if="batchMode && !isEmpty"
+      :selected-count="selectedFrameIds.length"
+      :export-busy="exportBusy"
+      :show-select-visible="batchShowSelectVisible"
+      :use-web-api="useWebApi"
+      :export-error="exportToolbarError"
+      @exit="exitBatchMode"
+      @clear-selection="clearExportSelection"
+      @select-all-visible="selectAllVisibleUpTo20"
+      @export-webp="exportSelectedAsFormat('webp')"
+      @export-png="exportSelectedAsFormat('png')"
+    />
 
     <Dialog :open="dialogOpen" @update:open="handleDialogOpenChange">
       <!-- 覆盖 DialogContent 默认 sm:max-w-lg，否则整窗约 512px 宽，左侧预览会被压成一条 -->
@@ -994,31 +1178,57 @@ function formatCapturedAt(iso: string) {
 
             <p v-if="dialogExportError" class="text-sm text-destructive" role="alert">{{ dialogExportError }}</p>
 
-            <div class="mt-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button
+            <div
+              class="mt-auto flex shrink-0 flex-col gap-4 border-t border-border/60 pt-5"
+            >
+              <div
                 v-if="useWebApi"
-                type="button"
-                variant="secondary"
-                class="flex-1 rounded-2xl sm:min-w-[12rem]"
-                :disabled="exportBusy"
-                @click="exportSingleFromDialog"
+                class="grid grid-cols-2 gap-2"
               >
-                <Download data-icon="inline-start" class="size-4" />
-                {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}
-              </Button>
-              <Button class="flex-1 rounded-2xl sm:min-w-[12rem]" @click="playFromFrame">
-                <PlayCircle data-icon="inline-start" />
-                {{ t("curated.playFromTime") }}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                class="rounded-2xl border-destructive/50 text-destructive hover:bg-destructive/10 sm:flex-1"
-                @click="openDeleteConfirmFromDialog"
-              >
-                <Trash2 data-icon="inline-start" class="size-4" />
-                {{ t("curated.deleteThisFrame") }}
-              </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
+                  :disabled="exportBusy"
+                  @click="exportSingleFromDialog('webp')"
+                >
+                  <Download class="size-4 shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
+                  :disabled="exportBusy"
+                  @click="exportSingleFromDialog('png')"
+                >
+                  <Download class="size-4 shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportPng") }}</span>
+                </Button>
+              </div>
+              <div class="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  class="h-10 w-full justify-center gap-1.5 rounded-xl"
+                  @click="playFromFrame"
+                >
+                  <PlayCircle class="size-4 shrink-0" aria-hidden="true" />
+                  {{ t("curated.playFromTime") }}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="h-10 w-full justify-center gap-1.5 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10"
+                  @click="openDeleteConfirmFromDialog"
+                >
+                  <Trash2 class="size-4 shrink-0" aria-hidden="true" />
+                  {{ t("curated.deleteThisFrame") }}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
