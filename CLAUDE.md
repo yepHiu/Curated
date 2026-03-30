@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-- **Frontend:** Vue 3 + TypeScript + Vite + Tailwind CSS v4 + shadcn-vue
+- **Frontend:** Vue 3 + TypeScript + Vite + Tailwind CSS v4 + shadcn-vue + vue-i18n
 - **Backend:** Go 1.25+ with SQLite (modernc.org/sqlite), Zap logging
 - **Metadata:** metatube-sdk-go for adult video metadata scraping
 - **Testing:** Vitest (frontend), Go test (backend)
@@ -106,11 +106,12 @@ src/
   components/
     jav-library/    # Domain-specific components
     ui/             # shadcn-vue UI components
-  composables/      # Vue composables (e.g., use-scan-task-tracker.ts)
+  composables/      # Vue composables (e.g., use-scan-task-tracker.ts, use-app-toast.ts)
   domain/           # Domain types and logic
     library/
     movie/
   lib/              # Utilities and typed mock data (jav-library.ts)
+  locales/          # i18n translation files (en.json, ja.json, zh-CN.json)
   router/           # Vue Router configuration
   services/         # Frontend service layer
     adapters/       # Mock adapter, future HTTP/Electron adapters
@@ -127,6 +128,9 @@ src/
 - Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `settings`
 - Playback progress: dual storage (backend SQLite in Web API mode, `localStorage` in Mock mode)
 - History page: `src/views/HistoryView.vue` displays watch history grouped by date
+- Virtual scrolling: uses `vue-virtual-scroller` for large poster grids
+- i18n: uses `vue-i18n` with locale files in `src/locales/`
+- Toast notifications: use `pushAppToast()` from `@/composables/use-app-toast` (backed by vue-sonner)
 
 ### Backend Structure (`backend/`)
 
@@ -163,10 +167,12 @@ The backend exposes these HTTP endpoints:
 GET    /api/health                          # Health check
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
-PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags
-DELETE /api/library/movies/{id}             # Delete movie
+PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags, user* overrides
+DELETE /api/library/movies/{id}             # Delete movie (move to trash)
+DELETE /api/library/movies/{id}?permanent=true  # Permanently delete (must be in trash)
+POST   /api/library/movies/{id}/restore     # Restore from trash
 GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
-POST   /api/library/movies/{id}/reveal    # Open OS file manager at primary video (server machine; path rules same as stream)
+POST   /api/library/movies/{id}/reveal      # Open OS file manager at primary video (server machine; path rules same as stream)
 POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
 GET    /api/library/movies/{id}/comment     # Get user comment for movie
 PUT    /api/library/movies/{id}/comment     # Upsert user comment for movie
@@ -179,10 +185,11 @@ POST   /api/library/played-movies/{id}      # Mark movie as played
 POST   /api/library/paths                   # Add library path
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
+POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
 GET    /api/settings                        # Get settings
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
-POST   /api/proxy/ping-javbus              # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
-POST   /api/proxy/ping-google              # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
+POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
+POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
 POST   /api/scans                           # Start scan task
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
@@ -191,10 +198,12 @@ PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
 GET    /api/curated-frames                  # List curated frames
 POST   /api/curated-frames                  # Create curated frame
-POST   /api/curated-frames/export          # Export 1–20 frames as WebP (EXIF JSON) or ZIP
+POST   /api/curated-frames/export           # Export 1–20 frames as WebP (EXIF JSON) or ZIP
 GET    /api/curated-frames/{id}/image       # Get curated frame image
 PATCH  /api/curated-frames/{id}/tags        # Update frame tags
 DELETE /api/curated-frames/{id}             # Delete curated frame
+POST   /api/providers/ping                  # Ping a single provider
+POST   /api/providers/ping-all              # Ping all providers
 ```
 
 **Async Task Pattern:** Long-running operations (scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
@@ -209,12 +218,12 @@ DELETE /api/curated-frames/{id}             # Delete curated frame
 - REST API at `/api`
 - Frontend connects via HTTP when `VITE_USE_WEB_API=true`
 - Playback uses HTML5 `<video>` with HTTP Range streaming
+- Trash/restore functionality (soft delete with `trashedAt` timestamp)
 
 **Not Yet Implemented (Documented as Targets):**
 - Electron shell, preload script, main process IPC
 - mpv player integration with named pipes
 - Desktop file system bridge
-- Server-side playback history (currently localStorage-only)
 
 **Design Principle:** Frontend code should not assume Electron/mpv exists. All business logic goes through the service layer (`useLibraryService()`, `src/api/`) to allow swapping transport (HTTP now, IPC later).
 
@@ -267,6 +276,8 @@ Backend uses stable error codes (see `backend/internal/contracts/contracts.go`):
 - `SCRAPER_*` - Metadata scraping errors
 - `PLAYER_*` - Player control errors
 - `SETTINGS_*` - Configuration errors
+- `CURATED_*` - Curated frames errors
+- `PROVIDER_*` - Provider health check errors
 
 ### Database Migrations
 
@@ -301,7 +312,17 @@ User comments/notes per movie:
 Frame extraction and management:
 
 - **Web API mode:** `POST/GET/PATCH/DELETE /api/curated-frames` with `GET /api/curated-frames/{id}/image`
+- **Export:** `POST /api/curated-frames/export` supports WebP (EXIF metadata) or PNG (iTXt metadata) formats
 - **Mock mode:** Stored in IndexedDB
+
+### Trash/Restore
+
+Movies support soft-delete (trash) workflow:
+
+- **Delete:** Moves movie to trash (sets `trashedAt` timestamp); can be restored
+- **Permanent delete:** Only allowed for movies already in trash
+- **Restore:** Removes `trashedAt` timestamp, movie returns to library
+- **Trash view:** Access via `mode=trash` query parameter on library endpoint
 
 ## Frontend Patterns
 
@@ -316,6 +337,24 @@ const movies = await service.getMovies({ limit: 50 })
 ```
 
 Do not bypass the service layer for library actions.
+
+### Toast Notifications
+
+Use the global toast system:
+
+```typescript
+import { pushAppToast } from '@/composables/use-app-toast'
+
+pushAppToast('success', 'Operation completed')
+pushAppToast('error', 'Something went wrong', { duration: 5000 })
+```
+
+### Player Route Navigation
+
+The player page supports navigation context:
+- `?t=123` - Start at specific timestamp (seconds)
+- `?from=history` - Return to history page instead of detail page
+- Build player route with helper: `buildPlayerRouteFromBrowse(movieId, options)`
 
 ### shadcn-vue Components
 
@@ -335,3 +374,4 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
+- i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)
