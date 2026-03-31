@@ -167,11 +167,15 @@ The backend exposes these HTTP endpoints:
 GET    /api/health                          # Health check
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
+GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam)
+POST   /api/library/movies/{id}/playback-session  # Create explicit playback session (for example HLS stream push)
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags, user* overrides
 DELETE /api/library/movies/{id}             # Delete movie (move to trash)
 DELETE /api/library/movies/{id}?permanent=true  # Permanently delete (must be in trash)
 POST   /api/library/movies/{id}/restore     # Restore from trash
 GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
+POST   /api/library/movies/{id}/native-play # Launch external native player kernel when configured
+GET    /api/playback/sessions/{id}/hls/{file} # Serve HLS playlists and segments for pushed playback sessions
 POST   /api/library/movies/{id}/reveal      # Open OS file manager at primary video (server machine; path rules same as stream)
 POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
 GET    /api/library/movies/{id}/comment     # Get user comment for movie
@@ -299,6 +303,17 @@ Playback progress has dual storage depending on mode:
 
 - **Web API mode (`VITE_USE_WEB_API=true`):** Synced to backend SQLite via `GET/PUT/DELETE /api/playback/progress`
 - **Mock mode:** Stored in browser `localStorage` (key: `jav-library-playback-progress-v1`)
+
+### Playback Descriptor Seam
+
+Player startup should consume `GET /api/library/movies/{id}/playback` instead of assuming playback is only a raw `/stream` URL.
+
+- Current behavior: backend returns a direct-play descriptor pointing at `/api/library/movies/{id}/stream`
+- Descriptor also carries resume position, filename, mime type, and future track/session fields
+- Purpose: preserve current browser playback while creating the expansion seam for remux/transcode/native playback later
+- Browser playback may now move onto a backend-managed HLS session when stream push is enabled
+- The frontend keeps HLS playback inside the existing player page and loads `hls.js` on demand when the browser lacks native HLS support
+- Native playback can be launched through `POST /api/library/movies/{id}/native-play` when `mpv` is configured
 
 ### Movie Comments
 

@@ -6,6 +6,8 @@ import type {
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  PatchPlayerSettingsBody,
+  PlayerSettingsDTO,
   PatchBackendLogBody,
   PatchMovieBody,
   TaskDTO,
@@ -50,6 +52,16 @@ const metadataMovieProviderChainMock = ref<string[]>([])
 const metadataMovieScrapeModeMock = ref<MetadataMovieScrapeMode>("auto")
 /** Mock：HTTP 代理配置 */
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
+const playerSettingsMock = ref<PlayerSettingsDTO>({
+  hardwareDecode: true,
+  nativePlayerEnabled: true,
+  nativePlayerCommand: "mpv",
+  streamPushEnabled: true,
+  ffmpegCommand: "ffmpeg",
+  preferNativePlayer: false,
+  seekForwardStepSec: 10,
+  seekBackwardStepSec: 10,
+})
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
 
 /** 设置页概览第三卡：萃取帧条数（IndexedDB） */
@@ -399,10 +411,47 @@ export const mockLibraryService: LibraryService = {
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
   metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeMock.value),
   proxy: computed(() => proxyMock.value),
+  playerSettings: computed(() => playerSettingsMock.value),
   backendLog: computed(() => backendLogMock.value),
 
   async setProxy(config: import("@/api/types").ProxySettingsDTO) {
     proxyMock.value = { ...config }
+  },
+
+  async patchPlayerSettings(patch: PatchPlayerSettingsBody) {
+    const prev = playerSettingsMock.value
+    playerSettingsMock.value = {
+      hardwareDecode:
+        patch.hardwareDecode !== undefined ? patch.hardwareDecode : prev.hardwareDecode,
+      nativePlayerEnabled:
+        patch.nativePlayerEnabled !== undefined
+          ? patch.nativePlayerEnabled
+          : prev.nativePlayerEnabled,
+      nativePlayerCommand:
+        patch.nativePlayerCommand !== undefined
+          ? (patch.nativePlayerCommand.trim() || "mpv")
+          : prev.nativePlayerCommand,
+      streamPushEnabled:
+        patch.streamPushEnabled !== undefined
+          ? patch.streamPushEnabled
+          : prev.streamPushEnabled,
+      ffmpegCommand:
+        patch.ffmpegCommand !== undefined
+          ? (patch.ffmpegCommand.trim() || "ffmpeg")
+          : prev.ffmpegCommand,
+      preferNativePlayer:
+        patch.preferNativePlayer !== undefined
+          ? patch.preferNativePlayer
+          : prev.preferNativePlayer,
+      seekForwardStepSec:
+        patch.seekForwardStepSec !== undefined
+          ? Math.max(1, patch.seekForwardStepSec)
+          : prev.seekForwardStepSec,
+      seekBackwardStepSec:
+        patch.seekBackwardStepSec !== undefined
+          ? Math.max(1, patch.seekBackwardStepSec)
+          : prev.seekBackwardStepSec,
+    }
   },
 
   async patchBackendLog(patch: PatchBackendLogBody) {
@@ -521,7 +570,11 @@ export const mockLibraryService: LibraryService = {
     return { queued: 0, skipped: 0, invalidPaths: [] }
   },
 
-  getMoviePlaybackUrl() {
+  async getMoviePlayback() {
+    return null
+  },
+
+  async launchNativePlayback() {
     return null
   },
 

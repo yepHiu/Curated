@@ -386,10 +386,11 @@ type ProxyJavBusPingResponse struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary       *bool   `json:"organizeLibrary,omitempty"`
-	ExtendedLibraryImport *bool   `json:"extendedLibraryImport,omitempty"`
-	AutoLibraryWatch      *bool   `json:"autoLibraryWatch,omitempty"`
-	MetadataMovieProvider *string `json:"metadataMovieProvider,omitempty"`
+	OrganizeLibrary       *bool                   `json:"organizeLibrary,omitempty"`
+	ExtendedLibraryImport *bool                   `json:"extendedLibraryImport,omitempty"`
+	AutoLibraryWatch      *bool                   `json:"autoLibraryWatch,omitempty"`
+	Player                *PatchPlayerSettingsDTO `json:"player,omitempty"`
+	MetadataMovieProvider *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
@@ -401,7 +402,25 @@ type PatchSettingsRequest struct {
 }
 
 type PlayerSettingsDTO struct {
-	HardwareDecode bool `json:"hardwareDecode"`
+	HardwareDecode      bool   `json:"hardwareDecode"`
+	NativePlayerEnabled bool   `json:"nativePlayerEnabled"`
+	NativePlayerCommand string `json:"nativePlayerCommand,omitempty"`
+	StreamPushEnabled   bool   `json:"streamPushEnabled"`
+	FFmpegCommand       string `json:"ffmpegCommand,omitempty"`
+	PreferNativePlayer  bool   `json:"preferNativePlayer"`
+	SeekForwardStepSec  int    `json:"seekForwardStepSec"`
+	SeekBackwardStepSec int    `json:"seekBackwardStepSec"`
+}
+
+type PatchPlayerSettingsDTO struct {
+	HardwareDecode      *bool   `json:"hardwareDecode,omitempty"`
+	NativePlayerEnabled *bool   `json:"nativePlayerEnabled,omitempty"`
+	NativePlayerCommand *string `json:"nativePlayerCommand,omitempty"`
+	StreamPushEnabled   *bool   `json:"streamPushEnabled,omitempty"`
+	FFmpegCommand       *string `json:"ffmpegCommand,omitempty"`
+	PreferNativePlayer  *bool   `json:"preferNativePlayer,omitempty"`
+	SeekForwardStepSec  *int    `json:"seekForwardStepSec,omitempty"`
+	SeekBackwardStepSec *int    `json:"seekBackwardStepSec,omitempty"`
 }
 
 // PlaybackProgressItemDTO is one row in GET /api/playback/progress.
@@ -420,6 +439,61 @@ type PlaybackProgressListDTO struct {
 type PutPlaybackProgressBody struct {
 	PositionSec float64 `json:"positionSec"`
 	DurationSec float64 `json:"durationSec"`
+}
+
+type PlaybackMode string
+
+const (
+	PlaybackModeDirect PlaybackMode = "direct"
+	PlaybackModeHLS    PlaybackMode = "hls"
+	PlaybackModeNative PlaybackMode = "native"
+)
+
+type PlaybackAudioTrackDTO struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Default bool   `json:"default"`
+}
+
+type PlaybackSubtitleTrackDTO struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Kind    string `json:"kind,omitempty"`
+	Default bool   `json:"default"`
+}
+
+type PlaybackDescriptorDTO struct {
+	MovieID           string                     `json:"movieId"`
+	Mode              PlaybackMode               `json:"mode"`
+	SessionID         string                     `json:"sessionId,omitempty"`
+	URL               string                     `json:"url"`
+	MimeType          string                     `json:"mimeType,omitempty"`
+	FileName          string                     `json:"fileName,omitempty"`
+	DurationSec       float64                    `json:"durationSec,omitempty"`
+	ResumePositionSec float64                    `json:"resumePositionSec,omitempty"`
+	CanDirectPlay     bool                       `json:"canDirectPlay"`
+	Reason            string                     `json:"reason,omitempty"`
+	AudioTracks       []PlaybackAudioTrackDTO    `json:"audioTracks,omitempty"`
+	SubtitleTracks    []PlaybackSubtitleTrackDTO `json:"subtitleTracks,omitempty"`
+}
+
+type CreatePlaybackSessionRequest struct {
+	Mode             PlaybackMode `json:"mode,omitempty"`
+	StartPositionSec float64      `json:"startPositionSec,omitempty"`
+}
+
+type NativePlaybackLaunchRequest struct {
+	StartPositionSec float64 `json:"startPositionSec,omitempty"`
+}
+
+type NativePlaybackLaunchDTO struct {
+	OK        bool   `json:"ok"`
+	Command   string `json:"command,omitempty"`
+	Target    string `json:"target,omitempty"`
+	Mode      string `json:"mode,omitempty"`
+	Message   string `json:"message,omitempty"`
+	MovieID   string `json:"movieId,omitempty"`
+	StartedAt string `json:"startedAt,omitempty"`
 }
 
 // CuratedFrameItemDTO is list metadata (no image); use GET /api/curated-frames/{id}/image for bytes.

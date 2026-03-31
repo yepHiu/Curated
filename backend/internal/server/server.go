@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"mime"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,9 +92,25 @@ type BackendLogSettingsController interface {
 	SetBackendLogPatch(p contracts.PatchBackendLogSettings) error
 }
 
+type PlayerSettingsController interface {
+	PlayerSettings() contracts.PlayerSettingsDTO
+	SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
+}
+
+type PlaybackResolver interface {
+	ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error)
+	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
+	ResolvePlaybackSessionFile(sessionID string, name string) (string, error)
+	DeletePlaybackSession(sessionID string) error
+}
+
+type NativePlaybackLauncher interface {
+	LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error)
 }
 
 type Handler struct {
@@ -107,9 +126,12 @@ type Handler struct {
 	providerHealthChecker    ProviderHealthChecker
 	proxyCtl                 ProxyController
 	backendLogCtl            BackendLogSettingsController
+	playerSettingsCtl        PlayerSettingsController
 	movieMetadataRefresher   MovieMetadataRefresher
 	actorProfileRefresher    ActorProfileRefresher
 	libraryWatchReloader     LibraryWatchReloader
+	playbackResolver         PlaybackResolver
+	nativePlaybackLauncher   NativePlaybackLauncher
 }
 
 type Deps struct {
@@ -125,9 +147,12 @@ type Deps struct {
 	ProviderHealthChecker    ProviderHealthChecker
 	ProxyCtl                 ProxyController
 	BackendLogCtl            BackendLogSettingsController
+	PlayerSettingsCtl        PlayerSettingsController
 	MovieMetadataRefresher   MovieMetadataRefresher
 	ActorProfileRefresher    ActorProfileRefresher
 	LibraryWatchReloader     LibraryWatchReloader
+	PlaybackResolver         PlaybackResolver
+	NativePlaybackLauncher   NativePlaybackLauncher
 }
 
 func NewHandler(deps Deps) *Handler {
@@ -144,9 +169,12 @@ func NewHandler(deps Deps) *Handler {
 		providerHealthChecker:    deps.ProviderHealthChecker,
 		proxyCtl:                 deps.ProxyCtl,
 		backendLogCtl:            deps.BackendLogCtl,
+		playerSettingsCtl:        deps.PlayerSettingsCtl,
 		movieMetadataRefresher:   deps.MovieMetadataRefresher,
 		actorProfileRefresher:    deps.ActorProfileRefresher,
 		libraryWatchReloader:     deps.LibraryWatchReloader,
+		playbackResolver:         deps.PlaybackResolver,
+		nativePlaybackLauncher:   deps.NativePlaybackLauncher,
 	}
 }
 
@@ -163,7 +191,12 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/{kind}", h.handleGetMovieAsset)
+	mux.HandleFunc("GET /api/library/movies/{movieId}/playback", h.handleGetMoviePlayback)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/playback-session", h.handleCreatePlaybackSession)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/native-play", h.handleLaunchNativePlayback)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
+	mux.HandleFunc("GET /api/playback/sessions/{sessionId}/hls/{file}", h.handleGetPlaybackSessionFile)
+	mux.HandleFunc("DELETE /api/playback/sessions/{sessionId}", h.handleDeletePlaybackSession)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/reveal", h.handleRevealMovieInFileManager)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/comment", h.handleGetMovieComment)
 	mux.HandleFunc("PUT /api/library/movies/{movieId}/comment", h.handlePutMovieComment)
@@ -439,6 +472,196 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
+}
+
+func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+
+	if h.playbackResolver != nil {
+		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID)
+		if err == nil {
+			writeJSON(w, http.StatusOK, dto)
+			return
+		}
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, storage.ErrMovieVideoNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("resolve playback failed", zap.Error(err), zap.String("movieId", movieID))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to resolve playback")
+		return
+	}
+
+	detail, err := h.store.GetMovieDetail(r.Context(), movieID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("get movie playback detail failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load movie")
+		return
+	}
+
+	progress, err := h.store.GetPlaybackProgress(r.Context(), movieID)
+	if err != nil && h.logger != nil {
+		h.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
+	}
+
+	streamURL := "/api/library/movies/" + url.PathEscape(movieID) + "/stream"
+	fileName := filepath.Base(strings.TrimSpace(detail.Location))
+	mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(fileName)))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+
+	dto := contracts.PlaybackDescriptorDTO{
+		MovieID:        movieID,
+		Mode:           contracts.PlaybackModeDirect,
+		URL:            streamURL,
+		MimeType:       mimeType,
+		FileName:       fileName,
+		DurationSec:    float64(detail.RuntimeMinutes) * 60,
+		CanDirectPlay:  true,
+		AudioTracks:    []contracts.PlaybackAudioTrackDTO{},
+		SubtitleTracks: []contracts.PlaybackSubtitleTrackDTO{},
+	}
+	if progress != nil && progress.PositionSec > 0 {
+		dto.ResumePositionSec = progress.PositionSec
+		if progress.DurationSec > 0 {
+			dto.DurationSec = progress.DurationSec
+		}
+	}
+
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleCreatePlaybackSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.playbackResolver == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "playback session manager not configured")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	var body contracts.CreatePlaybackSessionRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+	if body.Mode == "" {
+		body.Mode = contracts.PlaybackModeDirect
+	}
+	dto, err := h.playbackResolver.CreatePlaybackSession(r.Context(), movieID, body.Mode, body.StartPositionSec)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, storage.ErrMovieVideoNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, dto)
+}
+
+func (h *Handler) handleLaunchNativePlayback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.nativePlaybackLauncher == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "native playback is not configured")
+		return
+	}
+	movieID := strings.TrimSpace(r.PathValue("movieId"))
+	if movieID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "movieId is required")
+		return
+	}
+	var body contracts.NativePlaybackLaunchRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+	dto, err := h.nativePlaybackLauncher.LaunchNativePlayback(r.Context(), movieID, body.StartPositionSec)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, storage.ErrMovieVideoNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "movie not found")
+			return
+		}
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleGetPlaybackSessionFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.playbackResolver == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "playback session manager not configured")
+		return
+	}
+	sessionID := strings.TrimSpace(r.PathValue("sessionId"))
+	name := strings.TrimSpace(r.PathValue("file"))
+	if sessionID == "" || name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId and file are required")
+		return
+	}
+	absPath, err := h.playbackResolver.ResolvePlaybackSessionFile(sessionID, name)
+	if err != nil {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "session file not found")
+		return
+	}
+	http.ServeFile(w, r, absPath)
+}
+
+func (h *Handler) handleDeletePlaybackSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.playbackResolver == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "playback session manager not configured")
+		return
+	}
+	sessionID := strings.TrimSpace(r.PathValue("sessionId"))
+	if sessionID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId is required")
+		return
+	}
+	if err := h.playbackResolver.DeletePlaybackSession(sessionID); err != nil {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "playback session not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.Request) {
@@ -980,12 +1203,36 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		extImp = h.extendedLibraryImportCtl.ExtendedLibraryImport()
 	}
 	dto := contracts.SettingsDTO{
-		LibraryPaths:           libraryPaths,
-		Player:                 contracts.PlayerSettingsDTO{HardwareDecode: h.cfg.Player.HardwareDecode},
+		LibraryPaths: libraryPaths,
+		Player: contracts.PlayerSettingsDTO{
+			HardwareDecode:      h.cfg.Player.HardwareDecode,
+			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
+			NativePlayerCommand: h.cfg.Player.NativePlayerCommand,
+			StreamPushEnabled:   h.cfg.Player.StreamPushEnabled,
+			FFmpegCommand:       h.cfg.Player.FFmpegCommand,
+			PreferNativePlayer:  h.cfg.Player.PreferNativePlayer,
+			SeekForwardStepSec:  h.cfg.Player.SeekForwardStepSec,
+			SeekBackwardStepSec: h.cfg.Player.SeekBackwardStepSec,
+		},
 		OrganizeLibrary:        org,
 		ExtendedLibraryImport:  extImp,
 		AutoLibraryWatch:       autoWatch,
 		MetadataMovieProviders: []string{},
+	}
+	if strings.TrimSpace(dto.Player.NativePlayerCommand) == "" {
+		dto.Player.NativePlayerCommand = "mpv"
+	}
+	if strings.TrimSpace(dto.Player.FFmpegCommand) == "" {
+		dto.Player.FFmpegCommand = "ffmpeg"
+	}
+	if dto.Player.SeekForwardStepSec <= 0 {
+		dto.Player.SeekForwardStepSec = 10
+	}
+	if dto.Player.SeekBackwardStepSec <= 0 {
+		dto.Player.SeekBackwardStepSec = 10
+	}
+	if h.playerSettingsCtl != nil {
+		dto.Player = h.playerSettingsCtl.PlayerSettings()
 	}
 	if h.metadataScrapeCtl != nil {
 		dto.MetadataMovieProvider = h.metadataScrapeCtl.MetadataMovieProvider()
@@ -1047,7 +1294,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1061,7 +1308,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1210,6 +1457,20 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.backendLogCtl.SetBackendLogPatch(*body.BackendLog); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist backend log settings", zap.Error(err))
+			}
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
+	}
+
+	if body.Player != nil {
+		if h.playerSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "player settings not available")
+			return
+		}
+		if err := h.playerSettingsCtl.SetPlayerSettingsPatch(*body.Player); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist player settings", zap.Error(err))
 			}
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 			return

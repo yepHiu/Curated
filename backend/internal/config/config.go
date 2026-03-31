@@ -71,6 +71,24 @@ type AssetConfig struct {
 
 type PlayerConfig struct {
 	HardwareDecode bool `json:"hardwareDecode"`
+	// NativePlayerEnabled allows the backend to launch an external native player process (for example mpv).
+	NativePlayerEnabled bool `json:"nativePlayerEnabled,omitempty"`
+	// NativePlayerCommand is the executable used for native playback; default "mpv".
+	NativePlayerCommand string `json:"nativePlayerCommand,omitempty"`
+	// NativePlayerArgs are prepended before Curated appends the media path/URL.
+	NativePlayerArgs []string `json:"nativePlayerArgs,omitempty"`
+	// StreamPushEnabled allows the backend to create HLS playback sessions with ffmpeg for browser fallback.
+	StreamPushEnabled bool `json:"streamPushEnabled,omitempty"`
+	// FFmpegCommand is the executable used for HLS transcoding; default "ffmpeg".
+	FFmpegCommand string `json:"ffmpegCommand,omitempty"`
+	// StreamSessionRoot stores generated HLS playlists and segments; default under cacheDir/playback-sessions.
+	StreamSessionRoot string `json:"streamSessionRoot,omitempty"`
+	// PreferNativePlayer can be used by future UI flows to default into native playback when available.
+	PreferNativePlayer bool `json:"preferNativePlayer,omitempty"`
+	// SeekForwardStepSec is the default skip-forward duration for keyboard/UI seeks.
+	SeekForwardStepSec int `json:"seekForwardStepSec,omitempty"`
+	// SeekBackwardStepSec is the default skip-back duration for keyboard/UI seeks.
+	SeekBackwardStepSec int `json:"seekBackwardStepSec,omitempty"`
 }
 
 type ProxyConfig struct {
@@ -85,11 +103,12 @@ type ProxyConfig struct {
 }
 
 func Default() Config {
+	cacheDir := defaultCacheDir()
 	return Config{
 		LogLevel:     "info",
 		HttpAddr:     ":8080",
 		DatabasePath: defaultDatabasePath(),
-		CacheDir:     defaultCacheDir(),
+		CacheDir:     cacheDir,
 		LibraryPaths: defaultLibraryPaths(),
 		Tasks: TaskConfig{
 			ScanTimeoutSeconds: 600,
@@ -106,7 +125,14 @@ func Default() Config {
 			MaxResponseBodyMB:      50,
 		},
 		Player: PlayerConfig{
-			HardwareDecode: true,
+			HardwareDecode:      true,
+			NativePlayerEnabled: true,
+			NativePlayerCommand: "mpv",
+			StreamPushEnabled:   true,
+			FFmpegCommand:       "ffmpeg",
+			StreamSessionRoot:   filepath.Join(cacheDir, "playback-sessions"),
+			SeekForwardStepSec:  10,
+			SeekBackwardStepSec: 10,
 		},
 		OrganizeLibrary:  true,
 		AutoLibraryWatch: true,
@@ -178,6 +204,21 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.Assets.MaxResponseBodyMB <= 0 {
 		cfg.Assets.MaxResponseBodyMB = 50
+	}
+	if strings.TrimSpace(cfg.Player.NativePlayerCommand) == "" {
+		cfg.Player.NativePlayerCommand = "mpv"
+	}
+	if strings.TrimSpace(cfg.Player.FFmpegCommand) == "" {
+		cfg.Player.FFmpegCommand = "ffmpeg"
+	}
+	if strings.TrimSpace(cfg.Player.StreamSessionRoot) == "" {
+		cfg.Player.StreamSessionRoot = filepath.Join(cfg.CacheDir, "playback-sessions")
+	}
+	if cfg.Player.SeekForwardStepSec <= 0 {
+		cfg.Player.SeekForwardStepSec = 10
+	}
+	if cfg.Player.SeekBackwardStepSec <= 0 {
+		cfg.Player.SeekBackwardStepSec = 10
 	}
 
 	return cfg, nil

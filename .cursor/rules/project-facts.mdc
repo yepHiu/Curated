@@ -48,3 +48,11 @@ alwaysApply: true
 
 - 已使用 **`vue-router`** 与 **`vue-virtual-scroller`**；大图海报列表勿退回非虚拟化或整页无路由切换。
 - 原型阶段仍优先：**可复用边界、类型契约、服务层**，避免一次性页面逻辑堆叠。
+## Playback Seam Note
+
+- Player startup now has a dedicated playback descriptor seam: `GET /api/library/movies/{id}/playback`.
+- The current backend response is still direct-play oriented and points to `/api/library/movies/{id}/stream`.
+- Frontend player code should consume the playback descriptor first, then treat `/stream` as an implementation detail.
+- Curated now also has two expansion paths on that seam: `POST /api/library/movies/{id}/native-play` for launching an external native player kernel, and `POST /api/library/movies/{id}/playback-session` plus `/api/playback/sessions/{id}/hls/...` for HLS stream push.
+- The current in-page HLS browser path loads `hls.js` on demand when native HLS is unavailable.
+- `GET/PATCH /api/settings` now includes playback runtime preferences such as `nativePlayerEnabled`, `nativePlayerCommand`, `streamPushEnabled`, `ffmpegCommand`, `preferNativePlayer`, `seekForwardStepSec`, and `seekBackwardStepSec`.

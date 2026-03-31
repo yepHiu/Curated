@@ -75,6 +75,24 @@ export interface LibraryPathDTO {
 
 export interface PlayerSettingsDTO {
   hardwareDecode: boolean
+  nativePlayerEnabled: boolean
+  nativePlayerCommand?: string
+  streamPushEnabled: boolean
+  ffmpegCommand?: string
+  preferNativePlayer: boolean
+  seekForwardStepSec: number
+  seekBackwardStepSec: number
+}
+
+export interface PatchPlayerSettingsBody {
+  hardwareDecode?: boolean
+  nativePlayerEnabled?: boolean
+  nativePlayerCommand?: string
+  streamPushEnabled?: boolean
+  ffmpegCommand?: string
+  preferNativePlayer?: boolean
+  seekForwardStepSec?: number
+  seekBackwardStepSec?: number
 }
 
 /** 与后端 library-config.cfg / GET settings 一致：决定新刮削使用的策略；链与单源列表可保留在切换模式时 */
@@ -144,6 +162,7 @@ export interface PatchSettingsBody {
   organizeLibrary?: boolean
   extendedLibraryImport?: boolean
   autoLibraryWatch?: boolean
+  player?: PatchPlayerSettingsBody
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string
   /** 有序的 Provider 列表。发送空数组表示清除（自动模式）。优先级高于 metadataMovieProvider */
@@ -308,6 +327,46 @@ export interface PingAllProvidersResponse {
 export interface PutPlaybackProgressBody {
   positionSec: number
   durationSec: number
+}
+
+export type PlaybackMode = "direct" | "hls" | "native"
+
+export interface PlaybackAudioTrackDTO {
+  id: string
+  label: string
+  default: boolean
+}
+
+export interface PlaybackSubtitleTrackDTO {
+  id: string
+  label: string
+  kind?: string
+  default: boolean
+}
+
+export interface PlaybackDescriptorDTO {
+  movieId: string
+  mode: PlaybackMode
+  sessionId?: string
+  url: string
+  mimeType?: string
+  fileName?: string
+  durationSec?: number
+  resumePositionSec?: number
+  canDirectPlay: boolean
+  reason?: string
+  audioTracks?: PlaybackAudioTrackDTO[]
+  subtitleTracks?: PlaybackSubtitleTrackDTO[]
+}
+
+export interface NativePlaybackLaunchDTO {
+  ok: boolean
+  command?: string
+  target?: string
+  mode?: string
+  message?: string
+  movieId?: string
+  startedAt?: string
 }
 
 /** 与后端 contracts.MaxMovieCommentRunes 一致 */

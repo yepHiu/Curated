@@ -99,9 +99,13 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | GET | `/api/health` | Health |
 | GET | `/api/library/movies` | List (filters: `q`, `tag`, `actor`, …) |
 | GET | `/api/library/movies/{id}` | Detail |
+| GET | `/api/library/movies/{id}/playback` | Playback descriptor (direct-play metadata, resume position, future transcode seam) |
+| POST | `/api/library/movies/{id}/playback-session` | Create playback session (for example HLS stream push) |
+| POST | `/api/library/movies/{id}/native-play` | Launch external native player kernel when configured |
 | PATCH | `/api/library/movies/{id}` | Favorites, user rating, `userTags`, `metadataTags` |
 | DELETE | `/api/library/movies/{id}` | Remove from library |
 | GET | `/api/library/movies/{id}/stream` | Video stream (Range) |
+| GET | `/api/playback/sessions/{id}/hls/{file}` | Serve HLS playlists and segments for pushed playback sessions |
 | GET | `/api/library/movies/{id}/asset/...` | Cover, thumb, preview stills |
 | POST | `/api/library/movies/{id}/scrape` | Re-scrape (async task) |
 | GET/PATCH | `/api/settings` | Settings; library keys persisted to `library-config.cfg` |
@@ -129,6 +133,10 @@ DTOs and error codes: `backend/internal/contracts/contracts.go`, `src/api/types.
 ## Playback & history
 
 - **Web API mode** (`VITE_USE_WEB_API=true`): progress syncs to SQLite via **`/api/playback/progress`**; played markers via **`/api/library/played-movies`**.
+- Player startup now has a dedicated playback descriptor seam via **`GET /api/library/movies/{id}/playback`**; the current implementation still returns direct-play metadata and `/stream`, but this is the planned expansion point for remux/transcode later.
+- When backend stream push is enabled, Curated can switch browser playback onto **HLS** session output under **`/api/playback/sessions/{id}/hls/...`** for browser-hostile containers.
+- The current frontend HLS path keeps playback inside the existing player page and loads `hls.js` on demand for browsers without native HLS support.
+- Curated can also launch an external native player kernel through **`POST /api/library/movies/{id}/native-play`** when `mpv` is configured.
 - **Mock mode**: progress in **`localStorage`** (`jav-library-playback-progress-v1`).
 - History UI: sidebar **History** → `history` route; player can use `?t=` and `?from=history` for return navigation.
 

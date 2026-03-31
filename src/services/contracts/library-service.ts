@@ -6,8 +6,12 @@ import type {
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  NativePlaybackLaunchDTO,
+  PlaybackDescriptorDTO,
   PatchBackendLogBody,
   PatchMovieBody,
+  PatchPlayerSettingsBody,
+  PlayerSettingsDTO,
   ProxySettingsDTO,
   TaskDTO,
 } from "@/api/types"
@@ -47,6 +51,9 @@ export interface LibraryService {
   /** HTTP 代理配置 */
   proxy: ComputedRef<ProxySettingsDTO>
   setProxy(config: ProxySettingsDTO): Promise<void>
+  /** 播放器 / HLS / 原生播放器偏好 */
+  playerSettings: ComputedRef<PlayerSettingsDTO>
+  patchPlayerSettings(patch: PatchPlayerSettingsBody): Promise<void>
   /** 后端日志目录与级别（Web：library-config.cfg；Mock：内存） */
   backendLog: ComputedRef<BackendLogSettingsDTO>
   patchBackendLog(patch: PatchBackendLogBody): Promise<void>
@@ -72,10 +79,11 @@ export interface LibraryService {
    */
   ensureMovieCached(movieId: string): Promise<void>
   /**
-   * Web：返回可赋给 video.src 的流地址；无后端或未启用 API 时返回 null。
-   * Mock：返回 null（或可选固定演示 URL）。
+   * Web：返回后端给出的播放描述（当前为 direct-play，后续可扩展 remux / transcode）。
+   * Mock：返回 null。
    */
-  getMoviePlaybackUrl(movieId: string): string | null
+  getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null>
+  launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>
   /**
    * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。
    * 顺序与选集由 `movieId` 派生种子决定，同一影片在候选集合不变时可复现，避免界面无意义跳动。

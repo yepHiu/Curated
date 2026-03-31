@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
+  ExternalLink,
   Maximize2,
   Pause,
   PictureInPicture2,
@@ -13,9 +14,13 @@ import {
   VolumeX,
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
+import { HttpClientError } from "@/api/http-client"
+import { api } from "@/api/endpoints"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import { pushAppToast } from "@/composables/use-app-toast"
+import { canPlayHlsNatively, loadHlsLibrary, type HlsInstance } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
 import {
@@ -23,6 +28,7 @@ import {
   parseResumeSecondsFromQuery,
   saveProgress,
 } from "@/lib/playback-progress-storage"
+import type { PlaybackDescriptorDTO } from "@/api/types"
 import {
   getPlayerAudioPrefs,
   savePlayerAudioPrefs,
@@ -42,9 +48,16 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const playbackSeekBackwardStep = computed(() =>
+  Math.max(1, Number(libraryService.playerSettings.value.seekBackwardStepSec ?? 10)),
+)
+const playbackSeekForwardStep = computed(() =>
+  Math.max(1, Number(libraryService.playerSettings.value.seekForwardStepSec ?? 10)),
+)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const surfaceRef = ref<HTMLElement | null>(null)
+let hlsInstance: HlsInstance | null = null
 
 /** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
 const autoplayConsumedForMovieId = ref<string | null>(null)
@@ -55,6 +68,7 @@ const PROGRESS_SAVE_INTERVAL_MS = 4000
 let lastProgressSaveAt = 0
 
 const playbackSrc = ref<string | null>(null)
+const playbackDescriptor = ref<PlaybackDescriptorDTO | null>(null)
 const playbackError = ref("")
 const isPlaying = ref(false)
 const currentTime = ref(0)
@@ -169,6 +183,7 @@ watch(isPlaying, (playing) => {
 watch(
   playbackSrc,
   async (src) => {
+    await syncVideoSource()
     if (!src) {
       clearIdleHideTimer()
       chromeVisible.value = true
@@ -182,9 +197,82 @@ watch(
   { immediate: true },
 )
 
+async function destroyHlsInstance() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+}
+
+async function syncVideoSource() {
+  await nextTick()
+  const v = videoRef.value
+  const src = playbackSrc.value?.trim() ?? ""
+  const mode = playbackDescriptor.value?.mode ?? "direct"
+  await destroyHlsInstance()
+  if (!v) return
+  if (!src) {
+    v.removeAttribute("src")
+    v.load()
+    return
+  }
+  if (mode === "hls") {
+    if (canPlayHlsNatively(v)) {
+      v.src = src
+      return
+    }
+    try {
+      const Hls = await loadHlsLibrary()
+      if (!playbackSrc.value || videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") {
+        return
+      }
+      if (!Hls.isSupported()) {
+        playbackError.value = t("player.decodeError")
+        return
+      }
+      const player = new Hls()
+      player.loadSource(src)
+      player.attachMedia(v)
+      hlsInstance = player
+      return
+    } catch {
+      playbackError.value = t("player.errGeneric")
+      return
+    }
+  }
+  v.src = src
+}
+
 function syncSrc() {
+  void releasePlaybackSession(playbackDescriptor.value?.sessionId)
   playbackError.value = ""
-  playbackSrc.value = libraryService.getMoviePlaybackUrl(props.movie.id)
+  playbackDescriptor.value = null
+  playbackSrc.value = null
+  void loadPlayback()
+}
+
+async function loadPlayback() {
+  const movieId = props.movie.id.trim()
+  if (!movieId) {
+    playbackDescriptor.value = null
+    playbackSrc.value = null
+    return
+  }
+  try {
+    const descriptor = await libraryService.getMoviePlayback(movieId)
+    if (movieId !== props.movie.id.trim()) {
+      return
+    }
+    playbackDescriptor.value = descriptor
+    playbackSrc.value = descriptor?.url?.trim() || null
+  } catch {
+    if (movieId !== props.movie.id.trim()) {
+      return
+    }
+    playbackDescriptor.value = null
+    playbackSrc.value = null
+    playbackError.value = t("player.errGeneric")
+  }
 }
 
 function flushPlaybackProgress() {
@@ -218,6 +306,7 @@ watch(
     lastProgressSaveAt = 0
     syncSrc()
     await nextTick()
+    await syncVideoSource()
     videoRef.value?.load()
   },
   { immediate: true },
@@ -244,6 +333,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   flushPlaybackProgress()
+  void releasePlaybackSession(playbackDescriptor.value?.sessionId)
+  void destroyHlsInstance()
   document.removeEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   window.removeEventListener("keydown", onPlaybackKeydown)
   document.removeEventListener("visibilitychange", onVisibilityChange)
@@ -302,15 +393,16 @@ function onLoadedMetadata() {
   duration.value = Number.isFinite(v.duration) ? v.duration : 0
   const pct = volume.value[0] ?? 100
   v.volume = pct / 100
-  v.muted = pct > 0 && playbackMuted.value
+  v.muted = playbackMuted.value
 
   const dur = duration.value
   if (resumeAppliedForMovieId.value === props.movie.id) return
   if (dur <= 0) return
 
   const fromQuery = parseResumeSecondsFromQuery(route.query.t)
+  const descriptorResume = playbackDescriptor.value?.resumePositionSec
   const stored = getProgress(props.movie.id)?.positionSec
-  const targetSec = fromQuery !== undefined ? fromQuery : stored
+  const targetSec = fromQuery !== undefined ? fromQuery : descriptorResume ?? stored
   if (targetSec === undefined) return
 
   const clamped = Math.min(Math.max(0, targetSec), Math.max(0, dur - 0.25))
@@ -481,12 +573,12 @@ function onPlaybackKeydown(e: KeyboardEvent) {
     case "ArrowLeft":
     case "KeyJ":
       e.preventDefault()
-      seekDelta(-10)
+      seekDelta(-playbackSeekBackwardStep.value)
       break
     case "ArrowRight":
     case "KeyL":
       e.preventDefault()
-      seekDelta(10)
+      seekDelta(playbackSeekForwardStep.value)
       break
     case "KeyF":
       e.preventDefault()
@@ -596,6 +688,41 @@ const noStreamHint = computed(() => {
   if (playbackSrc.value) return ""
   return import.meta.env.VITE_USE_WEB_API === "true" ? t("player.errNoSrc") : t("player.mockNoPlay")
 })
+
+function formatClientError(err: unknown, fallback: string): string {
+  if (err instanceof HttpClientError) {
+    return err.apiError?.message?.trim() || fallback
+  }
+  if (err instanceof Error) {
+    return err.message.trim() || fallback
+  }
+  return fallback
+}
+
+async function openNativePlayer() {
+  if (!playbackSrc.value) return
+  try {
+    const launched = await libraryService.launchNativePlayback(props.movie.id, currentTime.value)
+    pushAppToast(launched?.message?.trim() || "Native player launched.", {
+      variant: "success",
+      durationMs: 3200,
+    })
+  } catch (err) {
+    pushAppToast(formatClientError(err, "Could not launch the native player."), {
+      variant: "destructive",
+    })
+  }
+}
+
+async function releasePlaybackSession(sessionId?: string) {
+  const id = sessionId?.trim()
+  if (!id) return
+  try {
+    await api.deletePlaybackSession(id)
+  } catch {
+    // ignore session cleanup failures
+  }
+}
 </script>
 
 <template>
@@ -643,7 +770,6 @@ const noStreamHint = computed(() => {
           :class="videoAreaCursorClass"
           playsinline
           preload="metadata"
-          :src="playbackSrc"
           @click.stop="onVideoSurfaceClick"
           @timeupdate="onTimeUpdate"
           @loadedmetadata="onLoadedMetadata"
@@ -715,7 +841,7 @@ const noStreamHint = computed(() => {
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
-                @click="seekDelta(-10)"
+                @click="seekDelta(-playbackSeekBackwardStep)"
               >
                 <SkipBack />
               </Button>
@@ -733,7 +859,7 @@ const noStreamHint = computed(() => {
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
-                @click="seekDelta(10)"
+                @click="seekDelta(playbackSeekForwardStep)"
               >
                 <SkipForward />
               </Button>
@@ -801,6 +927,16 @@ const noStreamHint = computed(() => {
               </div>
 
               <Button
+                variant="secondary"
+                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
+                :disabled="!playbackSrc"
+                @click="openNativePlayer"
+              >
+                <ExternalLink class="size-4 shrink-0" data-icon="inline-start" aria-hidden="true" />
+                Native
+              </Button>
+
+              <Button
                 v-if="pipSupported"
                 variant="secondary"
                 class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
@@ -829,7 +965,7 @@ const noStreamHint = computed(() => {
             v-if="playbackSrc"
             class="text-center text-[10px] leading-relaxed text-white/40 sm:text-xs"
           >
-            {{ t("player.hintBar") }}
+            {{ t("player.hintBar", { backward: playbackSeekBackwardStep, forward: playbackSeekForwardStep }) }}
           </p>
         </div>
       </div>

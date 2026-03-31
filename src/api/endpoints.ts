@@ -32,10 +32,12 @@ import type {
   ListActorsParams,
   ListMoviesParams,
   MetadataRefreshQueuedDTO,
+  NativePlaybackLaunchDTO,
   MetadataScrapeByPathsBody,
   MovieCommentDTO,
   MovieDetailDTO,
   MoviesPageDTO,
+  PlaybackDescriptorDTO,
   PatchCuratedFrameTagsBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
@@ -89,6 +91,21 @@ export const api = {
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {
     return httpClient.get<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`)
+  },
+
+  getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO> {
+    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback`)
+  },
+
+  launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO> {
+    return httpClient.post<NativePlaybackLaunchDTO>(
+      `/library/movies/${encodeURIComponent(movieId)}/native-play`,
+      startPositionSec !== undefined ? { startPositionSec } : {},
+    )
+  },
+
+  deletePlaybackSession(sessionId: string): Promise<void> {
+    return httpClient.delete(`/playback/sessions/${encodeURIComponent(sessionId)}`)
   },
 
   getMovieComment(movieId: string): Promise<MovieCommentDTO> {

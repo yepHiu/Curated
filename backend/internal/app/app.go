@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"net/http"
+	"net/url"
 
 	"curated-backend/internal/assets"
 	"curated-backend/internal/config"
@@ -27,6 +28,8 @@ import (
 	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/library/movieroot"
 	"curated-backend/internal/librarywatch"
+	"curated-backend/internal/nativeplayer"
+	"curated-backend/internal/playback"
 	"curated-backend/internal/proxyenv"
 	"curated-backend/internal/scanner"
 	"curated-backend/internal/scraper"
@@ -47,6 +50,8 @@ type App struct {
 	scraper scraper.Service
 	assets  *assets.Service
 	tasks   *tasks.Manager
+	player  *nativeplayer.Launcher
+	streams *playback.Manager
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
@@ -57,6 +62,8 @@ type App struct {
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
+	// playerSettingsMu protects cfg.Player and live playback-runtime updates.
+	playerSettingsMu sync.RWMutex
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
 	metadataMovieMu            sync.RWMutex
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
@@ -117,6 +124,8 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			cfg.Assets.MaxResponseBodyMB,
 		),
 		tasks:                      tasks.NewManager(),
+		player:                     nativeplayer.New(nativeplayer.Config{Enabled: cfg.Player.NativePlayerEnabled, Command: cfg.Player.NativePlayerCommand, Args: cfg.Player.NativePlayerArgs}),
+		streams:                    playback.New(playback.Config{Enabled: cfg.Player.StreamPushEnabled, FFmpegCommand: cfg.Player.FFmpegCommand, SessionRoot: cfg.Player.StreamSessionRoot}),
 		organizeLibrary:            cfg.OrganizeLibrary,
 		extendedLibraryImport:      cfg.ExtendedLibraryImport,
 		autoLibraryWatch:           cfg.AutoLibraryWatch,
@@ -552,6 +561,142 @@ func (a *App) BackendLogSettings() contracts.BackendLogSettingsDTO {
 	}
 }
 
+// PlayerSettings returns current player/playback preferences exposed to Settings UI.
+func (a *App) PlayerSettings() contracts.PlayerSettingsDTO {
+	a.playerSettingsMu.RLock()
+	defer a.playerSettingsMu.RUnlock()
+	nativeCommand := strings.TrimSpace(a.cfg.Player.NativePlayerCommand)
+	if nativeCommand == "" {
+		nativeCommand = "mpv"
+	}
+	ffmpegCommand := strings.TrimSpace(a.cfg.Player.FFmpegCommand)
+	if ffmpegCommand == "" {
+		ffmpegCommand = "ffmpeg"
+	}
+	seekForward := a.cfg.Player.SeekForwardStepSec
+	if seekForward <= 0 {
+		seekForward = 10
+	}
+	seekBackward := a.cfg.Player.SeekBackwardStepSec
+	if seekBackward <= 0 {
+		seekBackward = 10
+	}
+	return contracts.PlayerSettingsDTO{
+		HardwareDecode:      a.cfg.Player.HardwareDecode,
+		NativePlayerEnabled: a.cfg.Player.NativePlayerEnabled,
+		NativePlayerCommand: nativeCommand,
+		StreamPushEnabled:   a.cfg.Player.StreamPushEnabled,
+		FFmpegCommand:       ffmpegCommand,
+		PreferNativePlayer:  a.cfg.Player.PreferNativePlayer,
+		SeekForwardStepSec:  seekForward,
+		SeekBackwardStepSec: seekBackward,
+	}
+}
+
+// SetPlayerSettingsPatch merges playback settings into library-config.cfg, updates in-memory config,
+// and hot-applies native-player / HLS session runtime behavior for subsequent requests.
+func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+
+	a.playerSettingsMu.RLock()
+	next := a.cfg.Player
+	a.playerSettingsMu.RUnlock()
+
+	if p.HardwareDecode != nil {
+		next.HardwareDecode = *p.HardwareDecode
+	}
+	if p.NativePlayerEnabled != nil {
+		next.NativePlayerEnabled = *p.NativePlayerEnabled
+	}
+	if p.NativePlayerCommand != nil {
+		cmd := strings.TrimSpace(*p.NativePlayerCommand)
+		if cmd == "" {
+			cmd = "mpv"
+		}
+		next.NativePlayerCommand = cmd
+	}
+	if p.StreamPushEnabled != nil {
+		next.StreamPushEnabled = *p.StreamPushEnabled
+	}
+	if p.FFmpegCommand != nil {
+		cmd := strings.TrimSpace(*p.FFmpegCommand)
+		if cmd == "" {
+			cmd = "ffmpeg"
+		}
+		next.FFmpegCommand = cmd
+	}
+	if p.PreferNativePlayer != nil {
+		next.PreferNativePlayer = *p.PreferNativePlayer
+	}
+	if p.SeekForwardStepSec != nil {
+		if *p.SeekForwardStepSec <= 0 {
+			return fmt.Errorf("seekForwardStepSec must be greater than 0")
+		}
+		next.SeekForwardStepSec = *p.SeekForwardStepSec
+	}
+	if p.SeekBackwardStepSec != nil {
+		if *p.SeekBackwardStepSec <= 0 {
+			return fmt.Errorf("seekBackwardStepSec must be greater than 0")
+		}
+		next.SeekBackwardStepSec = *p.SeekBackwardStepSec
+	}
+
+	if strings.TrimSpace(next.NativePlayerCommand) == "" {
+		next.NativePlayerCommand = "mpv"
+	}
+	if strings.TrimSpace(next.FFmpegCommand) == "" {
+		next.FFmpegCommand = "ffmpeg"
+	}
+	if next.SeekForwardStepSec <= 0 {
+		next.SeekForwardStepSec = 10
+	}
+	if next.SeekBackwardStepSec <= 0 {
+		next.SeekBackwardStepSec = 10
+	}
+
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		playerMap, _ := m["player"].(map[string]any)
+		if playerMap == nil {
+			playerMap = map[string]any{}
+		}
+		playerMap["hardwareDecode"] = next.HardwareDecode
+		playerMap["nativePlayerEnabled"] = next.NativePlayerEnabled
+		playerMap["nativePlayerCommand"] = next.NativePlayerCommand
+		playerMap["streamPushEnabled"] = next.StreamPushEnabled
+		playerMap["ffmpegCommand"] = next.FFmpegCommand
+		playerMap["preferNativePlayer"] = next.PreferNativePlayer
+		playerMap["seekForwardStepSec"] = next.SeekForwardStepSec
+		playerMap["seekBackwardStepSec"] = next.SeekBackwardStepSec
+		m["player"] = playerMap
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	a.playerSettingsMu.Lock()
+	a.cfg.Player = next
+	a.playerSettingsMu.Unlock()
+
+	if a.player != nil {
+		a.player.SetConfig(nativeplayer.Config{
+			Enabled: next.NativePlayerEnabled,
+			Command: next.NativePlayerCommand,
+			Args:    next.NativePlayerArgs,
+		})
+	}
+	if a.streams != nil {
+		a.streams.SetConfig(playback.Config{
+			Enabled:       next.StreamPushEnabled,
+			FFmpegCommand: next.FFmpegCommand,
+			SessionRoot:   next.StreamSessionRoot,
+		})
+	}
+	return nil
+}
+
 // SetBackendLogPatch merges patch into current values, persists to library-config.cfg, and updates memory.
 // Changing logDir/logLevel takes effect after backend restart.
 func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
@@ -709,10 +854,8 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 
 		p := a.Proxy()
 		settings := contracts.SettingsDTO{
-			LibraryPaths: libraryPaths,
-			Player: contracts.PlayerSettingsDTO{
-				HardwareDecode: a.cfg.Player.HardwareDecode,
-			},
+			LibraryPaths:               libraryPaths,
+			Player:                     a.PlayerSettings(),
 			OrganizeLibrary:            a.OrganizeLibrary(),
 			ExtendedLibraryImport:      a.ExtendedLibraryImport(),
 			AutoLibraryWatch:           a.AutoLibraryWatch(),
@@ -1530,6 +1673,150 @@ func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO,
 	return a.startLibraryScan(ctx, io.Discard, paths, nil)
 }
 
+func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error) {
+	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	if err != nil {
+		return contracts.PlaybackDescriptorDTO{}, err
+	}
+	progress, err := a.store.GetPlaybackProgress(ctx, movieID)
+	if err != nil && a.logger != nil {
+		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
+	}
+
+	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress)
+	if a.shouldPreferHLS(detail.Location) {
+		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location))
+		if err != nil {
+			if a.logger != nil {
+				a.logger.Warn("failed to start HLS playback session; falling back to direct", zap.Error(err), zap.String("movieId", movieID))
+			}
+			return descriptor, nil
+		}
+		descriptor.Mode = contracts.PlaybackModeHLS
+		descriptor.SessionID = session.ID
+		descriptor.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
+		descriptor.MimeType = "application/vnd.apple.mpegurl"
+		descriptor.CanDirectPlay = false
+		descriptor.Reason = "browser fallback HLS session"
+	}
+	return descriptor, nil
+}
+
+func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
+	_ = startPositionSec
+	if mode == "" || mode == contracts.PlaybackModeDirect {
+		return a.ResolvePlayback(ctx, movieID)
+	}
+	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	if err != nil {
+		return contracts.PlaybackDescriptorDTO{}, err
+	}
+	progress, err := a.store.GetPlaybackProgress(ctx, movieID)
+	if err != nil && a.logger != nil {
+		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
+	}
+	switch mode {
+	case contracts.PlaybackModeHLS:
+		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location))
+		if err != nil {
+			return contracts.PlaybackDescriptorDTO{}, err
+		}
+		dto := buildDirectPlaybackDescriptor(movieID, detail, progress)
+		dto.Mode = contracts.PlaybackModeHLS
+		dto.SessionID = session.ID
+		dto.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
+		dto.MimeType = "application/vnd.apple.mpegurl"
+		dto.CanDirectPlay = false
+		dto.Reason = "explicit HLS playback session"
+		return dto, nil
+	default:
+		return contracts.PlaybackDescriptorDTO{}, fmt.Errorf("unsupported playback mode %q", mode)
+	}
+}
+
+func (a *App) LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error) {
+	targetPath, err := a.store.ResolvePrimaryVideoPath(ctx, movieID)
+	if err != nil {
+		return contracts.NativePlaybackLaunchDTO{}, err
+	}
+	detail, err := a.store.GetMovieDetail(ctx, movieID)
+	if err != nil {
+		return contracts.NativePlaybackLaunchDTO{}, err
+	}
+	title := strings.TrimSpace(detail.Code)
+	if title == "" {
+		title = strings.TrimSpace(detail.Title)
+	}
+	if err := a.player.Launch(context.Background(), targetPath, startPositionSec, title); err != nil {
+		return contracts.NativePlaybackLaunchDTO{}, err
+	}
+	return contracts.NativePlaybackLaunchDTO{
+		OK:        true,
+		Command:   a.player.Command(),
+		Target:    targetPath,
+		Mode:      string(contracts.PlaybackModeNative),
+		Message:   "native player launched",
+		MovieID:   movieID,
+		StartedAt: nowUTC(),
+	}, nil
+}
+
+func (a *App) ResolvePlaybackSessionFile(sessionID string, name string) (string, error) {
+	return a.streams.ResolveFile(sessionID, name)
+}
+
+func (a *App) DeletePlaybackSession(sessionID string) error {
+	return a.streams.DeleteSession(sessionID)
+}
+
+func (a *App) shouldPreferHLS(location string) bool {
+	if a.streams == nil || !a.streams.Enabled() {
+		return false
+	}
+	switch strings.ToLower(filepath.Ext(strings.TrimSpace(location))) {
+	case ".mp4", ".m4v", ".webm", ".ogv":
+		return false
+	case ".mkv", ".avi", ".flv", ".ts", ".m2ts", ".wmv", ".mov":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildDirectPlaybackDescriptor(movieID string, detail contracts.MovieDetailDTO, progress *storage.PlaybackProgressRow) contracts.PlaybackDescriptorDTO {
+	fileName := filepath.Base(strings.TrimSpace(detail.Location))
+	mimeType := "application/octet-stream"
+	switch strings.ToLower(filepath.Ext(fileName)) {
+	case ".mp4", ".m4v":
+		mimeType = "video/mp4"
+	case ".webm":
+		mimeType = "video/webm"
+	case ".ogv":
+		mimeType = "video/ogg"
+	case ".m3u8":
+		mimeType = "application/vnd.apple.mpegurl"
+	}
+
+	dto := contracts.PlaybackDescriptorDTO{
+		MovieID:        movieID,
+		Mode:           contracts.PlaybackModeDirect,
+		URL:            "/api/library/movies/" + url.PathEscape(movieID) + "/stream",
+		MimeType:       mimeType,
+		FileName:       fileName,
+		DurationSec:    float64(detail.RuntimeMinutes) * 60,
+		CanDirectPlay:  true,
+		AudioTracks:    []contracts.PlaybackAudioTrackDTO{},
+		SubtitleTracks: []contracts.PlaybackSubtitleTrackDTO{},
+	}
+	if progress != nil && progress.PositionSec > 0 {
+		dto.ResumePositionSec = progress.PositionSec
+		if progress.DurationSec > 0 {
+			dto.DurationSec = progress.DurationSec
+		}
+	}
+	return dto
+}
+
 // startLibraryScan starts a library scan task. extraMeta is merged into task metadata (e.g. trigger: fsnotify).
 func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []string, extraMeta map[string]any) (contracts.TaskDTO, error) {
 	if !a.scanning.CompareAndSwap(false, true) {
@@ -1598,9 +1885,12 @@ func (a *App) HTTPHandler() http.Handler {
 		ProviderHealthChecker:    a.scraper,
 		ProxyCtl:                 a,
 		BackendLogCtl:            a,
+		PlayerSettingsCtl:        a,
 		MovieMetadataRefresher:   a,
 		ActorProfileRefresher:    a,
 		LibraryWatchReloader:     a,
+		PlaybackResolver:         a,
+		NativePlaybackLauncher:   a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
 }

@@ -4,8 +4,12 @@ import type {
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  NativePlaybackLaunchDTO,
+  PlaybackDescriptorDTO,
   PatchBackendLogBody,
   PatchMovieBody,
+  PatchPlayerSettingsBody,
+  PlayerSettingsDTO,
   ProxySettingsDTO,
   SettingsDTO,
   TaskDTO,
@@ -35,6 +39,16 @@ const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
 const metadataMovieScrapeModeState = ref<MetadataMovieScrapeMode>("auto")
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
+const playerSettingsState = ref<PlayerSettingsDTO>({
+  hardwareDecode: true,
+  nativePlayerEnabled: true,
+  nativePlayerCommand: "mpv",
+  streamPushEnabled: true,
+  ffmpegCommand: "ffmpeg",
+  preferNativePlayer: false,
+  seekForwardStepSec: 10,
+  seekBackwardStepSec: 10,
+})
 const backendLogState = ref<BackendLogSettingsDTO>({
   logDir: "",
   logLevel: "info",
@@ -49,6 +63,7 @@ let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
 let proxySaveSeq = 0
+let playerSettingsSaveSeq = 0
 let backendLogSaveSeq = 0
 let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
@@ -212,6 +227,20 @@ function applyMetadataMovieSettingsFromDTO(next: SettingsDTO) {
   metadataMovieScrapeModeState.value = resolveMetadataMovieScrapeMode(next)
 }
 
+function applyPlayerSettingsFromDTO(next: SettingsDTO) {
+  const player = next.player
+  playerSettingsState.value = {
+    hardwareDecode: player?.hardwareDecode !== false,
+    nativePlayerEnabled: player?.nativePlayerEnabled !== false,
+    nativePlayerCommand: (player?.nativePlayerCommand ?? "mpv").trim() || "mpv",
+    streamPushEnabled: player?.streamPushEnabled !== false,
+    ffmpegCommand: (player?.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg",
+    preferNativePlayer: Boolean(player?.preferNativePlayer),
+    seekForwardStepSec: Math.max(1, Number(player?.seekForwardStepSec ?? 10)),
+    seekBackwardStepSec: Math.max(1, Number(player?.seekBackwardStepSec ?? 10)),
+  }
+}
+
 async function refreshLibraryPathsFromApi() {
   try {
     const settings = await api.getSettings()
@@ -219,6 +248,7 @@ async function refreshLibraryPathsFromApi() {
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     extendedLibraryImportState.value = Boolean(settings.extendedLibraryImport)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
+    applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
     backendLogState.value = settings.backendLog ?? {
@@ -249,6 +279,7 @@ function createWebLibraryService(): LibraryService {
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
     metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeState.value),
     proxy: computed(() => proxyState.value),
+    playerSettings: computed(() => playerSettingsState.value),
     backendLog: computed(() => backendLogState.value),
 
     async setProxy(config: ProxySettingsDTO) {
@@ -261,6 +292,63 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === proxySaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async patchPlayerSettings(patch: PatchPlayerSettingsBody) {
+      const seq = ++playerSettingsSaveSeq
+      const prev = playerSettingsState.value
+      const merged: PlayerSettingsDTO = {
+        hardwareDecode:
+          patch.hardwareDecode !== undefined ? patch.hardwareDecode : prev.hardwareDecode,
+        nativePlayerEnabled:
+          patch.nativePlayerEnabled !== undefined
+            ? patch.nativePlayerEnabled
+            : prev.nativePlayerEnabled,
+        nativePlayerCommand:
+          patch.nativePlayerCommand !== undefined
+            ? patch.nativePlayerCommand
+            : prev.nativePlayerCommand,
+        streamPushEnabled:
+          patch.streamPushEnabled !== undefined
+            ? patch.streamPushEnabled
+            : prev.streamPushEnabled,
+        ffmpegCommand:
+          patch.ffmpegCommand !== undefined ? patch.ffmpegCommand : prev.ffmpegCommand,
+        preferNativePlayer:
+          patch.preferNativePlayer !== undefined
+            ? patch.preferNativePlayer
+            : prev.preferNativePlayer,
+        seekForwardStepSec:
+          patch.seekForwardStepSec !== undefined
+            ? patch.seekForwardStepSec
+            : prev.seekForwardStepSec,
+        seekBackwardStepSec:
+          patch.seekBackwardStepSec !== undefined
+            ? patch.seekBackwardStepSec
+            : prev.seekBackwardStepSec,
+      }
+      playerSettingsState.value = {
+        ...merged,
+        nativePlayerCommand: (merged.nativePlayerCommand ?? "mpv").trim() || "mpv",
+        ffmpegCommand: (merged.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg",
+        seekForwardStepSec: Math.max(1, Number(merged.seekForwardStepSec ?? 10)),
+        seekBackwardStepSec: Math.max(1, Number(merged.seekBackwardStepSec ?? 10)),
+      }
+      try {
+        const next = await api.patchSettings({ player: patch })
+        if (seq === playerSettingsSaveSeq) {
+          applyPlayerSettingsFromDTO(next)
+        }
+      } catch (err) {
+        if (seq === playerSettingsSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {
@@ -480,10 +568,24 @@ function createWebLibraryService(): LibraryService {
       return await api.startMetadataRefreshByPaths({ paths: cleaned })
     },
 
-    getMoviePlaybackUrl(movieId: string): string | null {
+    async getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null> {
       const id = movieId.trim()
-      if (!id) return null
-      return moviePlaybackAbsoluteUrl(id)
+      if (!id) {
+        return null
+      }
+      const dto = await api.getMoviePlayback(id)
+      if (!dto.url) {
+        dto.url = moviePlaybackAbsoluteUrl(id)
+      }
+      return dto
+    },
+
+    async launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null> {
+      const id = movieId.trim()
+      if (!id) {
+        return null
+      }
+      return await api.launchNativePlayback(id, startPositionSec)
     },
 
     async ensureMovieCached(movieId: string) {

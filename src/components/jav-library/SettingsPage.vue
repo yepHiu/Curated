@@ -15,7 +15,13 @@ import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
-import type { HealthDTO, ProviderHealthDTO, ProviderHealthStatus, ProxySettingsDTO } from "@/api/types"
+import type {
+  HealthDTO,
+  PatchPlayerSettingsBody,
+  ProviderHealthDTO,
+  ProviderHealthStatus,
+  ProxySettingsDTO,
+} from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import {
   SETTINGS_SCROLL_EL_KEY,
@@ -146,6 +152,7 @@ function bindSettingsScrollRoot(el: unknown) {
 
 onBeforeUnmount(() => {
   if (settingsScrollElRef) settingsScrollElRef.value = null
+  if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
 })
 
 function scrollSettingsRootToTop() {
@@ -209,7 +216,18 @@ const scanTaskTracker = useScanTaskTracker()
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
-const hardwareDecode = ref(true)
+const playbackHardwareDecodeDraft = ref(true)
+const playbackNativePlayerEnabledDraft = ref(true)
+const playbackNativePlayerCommandDraft = ref("mpv")
+const playbackStreamPushEnabledDraft = ref(true)
+const playbackFfmpegCommandDraft = ref("ffmpeg")
+const playbackPreferNativePlayerDraft = ref(false)
+const playbackSeekForwardStepDraft = ref("10")
+const playbackSeekBackwardStepDraft = ref("10")
+const playbackSaving = ref(false)
+const playbackError = ref("")
+const playbackSavedFlash = ref(false)
+let playbackSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
 
 const addPathDialogOpen = ref(false)
 const removePathDialogOpen = ref(false)
@@ -461,6 +479,97 @@ function flashBackendLogSaved() {
   }, 2200)
 }
 
+function flashPlaybackSaved() {
+  playbackSavedFlash.value = true
+  if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
+  playbackSavedFlashTimer = setTimeout(() => {
+    playbackSavedFlash.value = false
+    playbackSavedFlashTimer = null
+  }, 2200)
+}
+
+function syncPlaybackDraftFromService() {
+  const player = libraryService.playerSettings.value
+  playbackHardwareDecodeDraft.value = player.hardwareDecode !== false
+  playbackNativePlayerEnabledDraft.value = player.nativePlayerEnabled !== false
+  playbackNativePlayerCommandDraft.value = (player.nativePlayerCommand ?? "mpv").trim() || "mpv"
+  playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
+  playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
+  playbackPreferNativePlayerDraft.value = Boolean(player.preferNativePlayer)
+  playbackSeekForwardStepDraft.value = String(Math.max(1, Number(player.seekForwardStepSec ?? 10)))
+  playbackSeekBackwardStepDraft.value = String(Math.max(1, Number(player.seekBackwardStepSec ?? 10)))
+}
+
+function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
+  const forward = Number.parseInt(playbackSeekForwardStepDraft.value, 10)
+  const backward = Number.parseInt(playbackSeekBackwardStepDraft.value, 10)
+  if (!Number.isFinite(forward) || forward <= 0) {
+    playbackError.value = t("settings.playbackSeekForwardInvalid")
+    return null
+  }
+  if (!Number.isFinite(backward) || backward <= 0) {
+    playbackError.value = t("settings.playbackSeekBackwardInvalid")
+    return null
+  }
+  return {
+    hardwareDecode: playbackHardwareDecodeDraft.value,
+    nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
+    nativePlayerCommand: playbackNativePlayerCommandDraft.value.trim() || "mpv",
+    streamPushEnabled: playbackStreamPushEnabledDraft.value,
+    ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
+    preferNativePlayer: playbackPreferNativePlayerDraft.value,
+    seekForwardStepSec: forward,
+    seekBackwardStepSec: backward,
+  }
+}
+
+function playbackDraftMatchesServer(): boolean {
+  const player = libraryService.playerSettings.value
+  return (
+    playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
+    playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
+    (playbackNativePlayerCommandDraft.value.trim() || "mpv") ===
+      ((player.nativePlayerCommand ?? "mpv").trim() || "mpv") &&
+    playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
+    (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
+      ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg") &&
+    playbackPreferNativePlayerDraft.value === Boolean(player.preferNativePlayer) &&
+    Number.parseInt(playbackSeekForwardStepDraft.value, 10) ===
+      Math.max(1, Number(player.seekForwardStepSec ?? 10)) &&
+    Number.parseInt(playbackSeekBackwardStepDraft.value, 10) ===
+      Math.max(1, Number(player.seekBackwardStepSec ?? 10))
+  )
+}
+
+async function savePlaybackSettings() {
+  playbackError.value = ""
+  const patch = buildPlaybackPatchFromDraft()
+  if (!patch) {
+    return
+  }
+  try {
+    await withPreservedScroll(async () => {
+      playbackSaving.value = true
+      try {
+        await libraryService.patchPlayerSettings(patch)
+        syncPlaybackDraftFromService()
+        flashPlaybackSaved()
+      } finally {
+        playbackSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] save playback settings failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      playbackError.value = err.apiError.message
+    } else if (err instanceof Error && err.message) {
+      playbackError.value = err.message
+    } else {
+      playbackError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
 function proxyDraftMatchesServer(): boolean {
   const p = libraryService.proxy.value
   return (
@@ -524,6 +633,30 @@ watchDebounced(
       return
     }
     await saveBackendLogSettings()
+  },
+  { debounce: 550, maxWait: 5000 },
+)
+
+watchDebounced(
+  () =>
+    [
+      playbackHardwareDecodeDraft.value,
+      playbackNativePlayerEnabledDraft.value,
+      playbackNativePlayerCommandDraft.value,
+      playbackStreamPushEnabledDraft.value,
+      playbackFfmpegCommandDraft.value,
+      playbackPreferNativePlayerDraft.value,
+      playbackSeekForwardStepDraft.value,
+      playbackSeekBackwardStepDraft.value,
+    ] as const,
+  async () => {
+    if (!settingsAutoSaveReady.value) {
+      return
+    }
+    if (playbackDraftMatchesServer()) {
+      return
+    }
+    await savePlaybackSettings()
   },
   { debounce: 550, maxWait: 5000 },
 )
@@ -1107,6 +1240,7 @@ onMounted(async () => {
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
   syncProxyDraftFromService()
+  syncPlaybackDraftFromService()
   syncBackendLogDraftFromService()
   clientLogLevelUi.value = getClientLogLevelName()
   let mode = getCuratedFrameSaveMode()
@@ -3384,8 +3518,141 @@ async function runMetadataRefreshForSelected() {
                   {{ t("settings.hardwareDecodeHint") }}
                 </p>
               </div>
-              <Switch v-model="hardwareDecode" />
+              <Switch v-model="playbackHardwareDecodeDraft" />
             </div>
+
+            <div
+              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackStreamPushEnabled") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackStreamPushEnabledHint") }}
+                </p>
+              </div>
+              <Switch v-model="playbackStreamPushEnabledDraft" />
+            </div>
+
+            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackFfmpegCommand") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackFfmpegCommandHint") }}
+                </p>
+              </div>
+              <Input
+                v-model="playbackFfmpegCommandDraft"
+                :placeholder="t('settings.playbackFfmpegCommandPlaceholder')"
+              />
+            </div>
+
+            <div
+              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackNativePlayerEnabled") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackNativePlayerEnabledHint") }}
+                </p>
+              </div>
+              <Switch v-model="playbackNativePlayerEnabledDraft" />
+            </div>
+
+            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackNativePlayerCommand") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackNativePlayerCommandHint") }}
+                </p>
+              </div>
+              <Input
+                v-model="playbackNativePlayerCommandDraft"
+                :placeholder="t('settings.playbackNativePlayerCommandPlaceholder')"
+              />
+            </div>
+
+            <div
+              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackPreferNativePlayer") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackPreferNativePlayerHint") }}
+                </p>
+              </div>
+              <Switch v-model="playbackPreferNativePlayerDraft" />
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-2">
+              <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+                <div class="flex min-w-0 flex-1 flex-col gap-3">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t("settings.playbackSeekBackwardStep") }}
+                  </p>
+                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                    {{ t("settings.playbackSeekBackwardStepHint") }}
+                  </p>
+                </div>
+                <Input
+                  v-model="playbackSeekBackwardStepDraft"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+              </div>
+
+              <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+                <div class="flex min-w-0 flex-1 flex-col gap-3">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t("settings.playbackSeekForwardStep") }}
+                  </p>
+                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                    {{ t("settings.playbackSeekForwardStepHint") }}
+                  </p>
+                </div>
+                <Input
+                  v-model="playbackSeekForwardStepDraft"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <Button
+                v-if="!useWebApi"
+                type="button"
+                class="rounded-lg"
+                :disabled="playbackSaving"
+                @click="savePlaybackSettings"
+              >
+                {{ playbackSaving ? t("common.saving") : t("common.save") }}
+              </Button>
+              <p
+                v-if="playbackSaving"
+                class="text-xs text-muted-foreground motion-safe:animate-pulse"
+              >
+                {{ t("settings.playbackSyncing") }}
+              </p>
+              <p v-else-if="playbackSavedFlash" class="text-xs text-muted-foreground">
+                {{ t("settings.autoPersistSaved") }}
+              </p>
+            </div>
+
+            <p v-if="playbackError" class="text-sm text-destructive">
+              {{ playbackError }}
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -647,6 +647,173 @@ func TestHandleStreamMovie_OKAndRange(t *testing.T) {
 	}
 }
 
+func TestHandleGetMoviePlaybackDescriptor_OK(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libRoot := filepath.Join(root, "lib")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoPath := filepath.Join(libRoot, "PLAY-DESC-001.mp4")
+	if err := os.WriteFile(videoPath, []byte("fake-mp4-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, libRoot, ""); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoPath,
+		FileName: "PLAY-DESC-001.mp4",
+		Number:   "PLAY-DESC-001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertPlaybackProgress(ctx, outcome.MovieID, 123, 456); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Store:  store,
+		Tasks:  tasks.NewManager(),
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/library/movies/"+outcome.MovieID+"/playback", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var dto contracts.PlaybackDescriptorDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if dto.MovieID != outcome.MovieID {
+		t.Fatalf("movieId = %q, want %q", dto.MovieID, outcome.MovieID)
+	}
+	if dto.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode = %q, want %q", dto.Mode, contracts.PlaybackModeDirect)
+	}
+	if dto.URL != "/api/library/movies/"+outcome.MovieID+"/stream" {
+		t.Fatalf("url = %q", dto.URL)
+	}
+	if dto.FileName != "PLAY-DESC-001.mp4" {
+		t.Fatalf("fileName = %q", dto.FileName)
+	}
+	if dto.MimeType != "video/mp4" {
+		t.Fatalf("mimeType = %q, want video/mp4", dto.MimeType)
+	}
+	if dto.ResumePositionSec != 123 {
+		t.Fatalf("resumePositionSec = %v, want 123", dto.ResumePositionSec)
+	}
+	if dto.DurationSec != 456 {
+		t.Fatalf("durationSec = %v, want 456", dto.DurationSec)
+	}
+	if !dto.CanDirectPlay {
+		t.Fatal("expected canDirectPlay true")
+	}
+}
+
+func TestHandleCreatePlaybackSession_OK(t *testing.T) {
+	t.Parallel()
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		PlaybackResolver: stubPlaybackResolver{
+			createDTO: contracts.PlaybackDescriptorDTO{
+				Mode:          contracts.PlaybackModeHLS,
+				SessionID:     "sess-1",
+				URL:           "/api/playback/sessions/sess-1/hls/index.m3u8",
+				MimeType:      "application/vnd.apple.mpegurl",
+				CanDirectPlay: false,
+			},
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/demo-1/playback-session", strings.NewReader(`{"mode":"hls"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", resp.StatusCode)
+	}
+	var dto contracts.PlaybackDescriptorDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if dto.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", dto.Mode, contracts.PlaybackModeHLS)
+	}
+	if dto.SessionID != "sess-1" {
+		t.Fatalf("sessionId = %q, want sess-1", dto.SessionID)
+	}
+}
+
+func TestHandleLaunchNativePlayback_OK(t *testing.T) {
+	t.Parallel()
+	h := NewHandler(Deps{
+		Cfg:                    config.Config{},
+		Logger:                 zap.NewNop(),
+		NativePlaybackLauncher: stubNativePlaybackLauncher{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/movies/demo-1/native-play", strings.NewReader(`{"startPositionSec":12}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var dto contracts.NativePlaybackLaunchDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !dto.OK {
+		t.Fatal("expected ok=true")
+	}
+	if dto.Command != "mpv" {
+		t.Fatalf("command = %q, want mpv", dto.Command)
+	}
+}
+
 func TestHandleStreamMovie_NotFoundUnknownMovie(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -1473,7 +1640,7 @@ func (stubMetadataCtl) SetMetadataMovieProvider(string) error        { return ni
 func (stubMetadataCtl) MetadataMovieProviderChain() []string         { return nil }
 func (stubMetadataCtl) SetMetadataMovieProviderChain([]string) error { return nil }
 func (stubMetadataCtl) MetadataMovieScrapeMode() string              { return "auto" }
-func (stubMetadataCtl) SetMetadataMovieScrapeMode(string) error    { return nil }
+func (stubMetadataCtl) SetMetadataMovieScrapeMode(string) error      { return nil }
 func (stubMetadataCtl) ListMetadataMovieProviders() []string         { return nil }
 
 type stubBackendLogCtl struct {
@@ -1502,6 +1669,98 @@ func (s *stubBackendLogCtl) SetBackendLogPatch(p contracts.PatchBackendLogSettin
 		s.v.LogLevel = l
 	}
 	return nil
+}
+
+type stubPlayerSettingsCtl struct {
+	v contracts.PlayerSettingsDTO
+}
+
+func (s *stubPlayerSettingsCtl) PlayerSettings() contracts.PlayerSettingsDTO {
+	return s.v
+}
+
+func (s *stubPlayerSettingsCtl) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
+	if p.HardwareDecode != nil {
+		s.v.HardwareDecode = *p.HardwareDecode
+	}
+	if p.NativePlayerEnabled != nil {
+		s.v.NativePlayerEnabled = *p.NativePlayerEnabled
+	}
+	if p.NativePlayerCommand != nil {
+		cmd := strings.TrimSpace(*p.NativePlayerCommand)
+		if cmd == "" {
+			cmd = "mpv"
+		}
+		s.v.NativePlayerCommand = cmd
+	}
+	if p.StreamPushEnabled != nil {
+		s.v.StreamPushEnabled = *p.StreamPushEnabled
+	}
+	if p.FFmpegCommand != nil {
+		cmd := strings.TrimSpace(*p.FFmpegCommand)
+		if cmd == "" {
+			cmd = "ffmpeg"
+		}
+		s.v.FFmpegCommand = cmd
+	}
+	if p.PreferNativePlayer != nil {
+		s.v.PreferNativePlayer = *p.PreferNativePlayer
+	}
+	if p.SeekForwardStepSec != nil {
+		s.v.SeekForwardStepSec = *p.SeekForwardStepSec
+	}
+	if p.SeekBackwardStepSec != nil {
+		s.v.SeekBackwardStepSec = *p.SeekBackwardStepSec
+	}
+	return nil
+}
+
+type stubPlaybackResolver struct {
+	resolveDTO contracts.PlaybackDescriptorDTO
+	createDTO  contracts.PlaybackDescriptorDTO
+	filePath   string
+}
+
+func (s stubPlaybackResolver) ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error) {
+	_ = ctx
+	dto := s.resolveDTO
+	dto.MovieID = movieID
+	return dto, nil
+}
+
+func (s stubPlaybackResolver) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
+	_ = ctx
+	_ = startPositionSec
+	dto := s.createDTO
+	dto.MovieID = movieID
+	dto.Mode = mode
+	return dto, nil
+}
+
+func (s stubPlaybackResolver) ResolvePlaybackSessionFile(sessionID string, name string) (string, error) {
+	_ = sessionID
+	_ = name
+	return s.filePath, nil
+}
+
+func (s stubPlaybackResolver) DeletePlaybackSession(sessionID string) error {
+	_ = sessionID
+	return nil
+}
+
+type stubNativePlaybackLauncher struct{}
+
+func (stubNativePlaybackLauncher) LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error) {
+	_ = ctx
+	_ = startPositionSec
+	return contracts.NativePlaybackLaunchDTO{
+		OK:      true,
+		Command: "mpv",
+		Target:  "C:/media/demo.mkv",
+		Mode:    "native",
+		Message: "native player launched",
+		MovieID: movieID,
+	}, nil
 }
 
 func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
@@ -1559,11 +1818,11 @@ func TestHandlePatchSettings_BackendLog(t *testing.T) {
 
 	logCtl := &stubBackendLogCtl{v: contracts.BackendLogSettingsDTO{LogLevel: "info"}}
 	h := NewHandler(Deps{
-		Cfg:                config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
-		Logger:             zap.NewNop(),
-		Store:              store,
-		BackendLogCtl:      logCtl,
-		OrganizeLibraryCtl: stubOrganizeCtl{},
+		Cfg:                 config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:              zap.NewNop(),
+		Store:               store,
+		BackendLogCtl:       logCtl,
+		OrganizeLibraryCtl:  stubOrganizeCtl{},
 		AutoLibraryWatchCtl: stubAutoWatchCtl{},
 		MetadataScrapeCtl:   stubMetadataCtl{},
 	})
@@ -1598,5 +1857,93 @@ func TestHandlePatchSettings_BackendLog(t *testing.T) {
 	}
 	if dto.BackendLog.LogLevel != "warn" {
 		t.Fatalf("BackendLog.LogLevel = %q, want warn", dto.BackendLog.LogLevel)
+	}
+}
+
+func TestHandlePatchSettings_Player(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	playerCtl := &stubPlayerSettingsCtl{v: contracts.PlayerSettingsDTO{
+		HardwareDecode:      true,
+		NativePlayerEnabled: true,
+		NativePlayerCommand: "mpv",
+		StreamPushEnabled:   true,
+		FFmpegCommand:       "ffmpeg",
+		SeekForwardStepSec:  10,
+		SeekBackwardStepSec: 10,
+	}}
+	h := NewHandler(Deps{
+		Cfg: config.Config{
+			Player: config.PlayerConfig{
+				HardwareDecode:      true,
+				NativePlayerEnabled: true,
+				NativePlayerCommand: "mpv",
+				StreamPushEnabled:   true,
+				FFmpegCommand:       "ffmpeg",
+				SeekForwardStepSec:  10,
+				SeekBackwardStepSec: 10,
+			},
+		},
+		Logger:              zap.NewNop(),
+		Store:               store,
+		PlayerSettingsCtl:   playerCtl,
+		OrganizeLibraryCtl:  stubOrganizeCtl{},
+		AutoLibraryWatchCtl: stubAutoWatchCtl{},
+		MetadataScrapeCtl:   stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body := `{"player":{"hardwareDecode":false,"nativePlayerEnabled":false,"nativePlayerCommand":"vlc","streamPushEnabled":true,"ffmpegCommand":"ffmpeg-custom","preferNativePlayer":true,"seekForwardStepSec":30,"seekBackwardStepSec":7}}`
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if dto.Player.HardwareDecode {
+		t.Fatal("expected hardwareDecode false")
+	}
+	if dto.Player.NativePlayerEnabled {
+		t.Fatal("expected nativePlayerEnabled false")
+	}
+	if dto.Player.NativePlayerCommand != "vlc" {
+		t.Fatalf("nativePlayerCommand = %q, want vlc", dto.Player.NativePlayerCommand)
+	}
+	if !dto.Player.StreamPushEnabled {
+		t.Fatal("expected streamPushEnabled true")
+	}
+	if dto.Player.FFmpegCommand != "ffmpeg-custom" {
+		t.Fatalf("ffmpegCommand = %q, want ffmpeg-custom", dto.Player.FFmpegCommand)
+	}
+	if !dto.Player.PreferNativePlayer {
+		t.Fatal("expected preferNativePlayer true")
+	}
+	if dto.Player.SeekForwardStepSec != 30 {
+		t.Fatalf("seekForwardStepSec = %d, want 30", dto.Player.SeekForwardStepSec)
+	}
+	if dto.Player.SeekBackwardStepSec != 7 {
+		t.Fatalf("seekBackwardStepSec = %d, want 7", dto.Player.SeekBackwardStepSec)
 	}
 }
