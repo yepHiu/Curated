@@ -10,7 +10,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "build": "pnpm typecheck && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "release:frontend": "powershell -ExecutionPolicy Bypass -File scripts/release/build-frontend.ps1 -Version 0.0.0-local",
+    "release:backend": "powershell -ExecutionPolicy Bypass -File scripts/release/build-backend.ps1 -Version 0.0.0-local",
+    "release:portable": "powershell -ExecutionPolicy Bypass -File scripts/release/package-portable.ps1 -Version 0.0.0-local",
+    "release:installer": "powershell -ExecutionPolicy Bypass -File scripts/release/package-installer.ps1 -Version 0.0.0-local",
+    "release:publish": "powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version 0.0.0-local"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",

@@ -10,7 +10,9 @@ alwaysApply: true
 - **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
 - **后端**：`backend` 目录 `go run ./cmd/curated`，默认 **:8080**（Go 模块名 **`curated-backend`**）。
+- **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
+- **本地前端托管**：当可执行文件旁存在 **`frontend-dist/`**（或当前工作目录存在 `frontend-dist/` / `dist/`）时，后端会直接托管前端静态资源并对非 `/api` 路由做 SPA fallback。
 - **Mock 收藏/评分**：未启用 Web API 时数据在内存；收藏与用户评分会通过 **`localStorage`（`jav-library-movie-prefs`）** 在整页刷新后恢复。
 - **正式持久化**：**`VITE_USE_WEB_API=true`** 且后端运行，收藏与评分由 **`PATCH /api/library/movies/{id}`** 写入 SQLite；**播放进度**走 **`/api/playback/progress`**，**萃取帧**走 **`/api/curated-frames`**（含 **`POST /api/curated-frames/export`** 库内 WebP 导出），**已播放统计**走 **`GET/POST /api/library/played-movies...`**（与资料库同一 SQLite 文件）。
 - **库行为 JSON**：**`config/library-config.cfg`** 存 **`organizeLibrary`**、**`metadataMovieProvider`**、**`autoLibraryWatch`**、**`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`**（设置页「通用」经 **`backendLog`** 写入目录、保留天数、级别，**不覆盖** **`logFilePrefix`**；**重启后端**后文件日志路径与级别才生效）、**`proxy`** 等。其中 **`autoLibraryWatch`**（设置页「自动刮削」）控制**是否因目录监听**排队防抖扫描/刮削；与主配置 **`libraryWatchEnabled`** 同时满足才跑 fsnotify。由 **`GET/PATCH /api/settings`** 读写。
@@ -18,6 +20,7 @@ alwaysApply: true
 ## 常见操作（复述用户诉求时）
 
 - **重启前后端**：先释放 **5173 / 8080** 上旧进程（若占端口），再分别启动上述两条命令。
+- **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。
 
 ## 规则索引

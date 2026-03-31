@@ -1,20 +1,24 @@
-import { onMounted, onUnmounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 import { api } from "@/api/endpoints"
+import type { HealthDTO } from "@/api/types"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 const POLL_MS = 30_000
-/** 手动点击「重新检测」时至少保持转动提示的毫秒数，避免请求过快结束看不到动画 */
 const RECHECK_MIN_SPIN_MS = 500
 
 export type BackendHealthStatus = "mock" | "checking" | "online" | "offline"
 
-/**
- * 轮询 GET /api/health，用于侧栏等处的后端在线状态。
- * Mock 模式（未启用 VITE_USE_WEB_API）不发起请求，状态恒为 mock。
- */
 export function useBackendHealth() {
   const status = ref<BackendHealthStatus>(USE_WEB ? "checking" : "mock")
   const probing = ref(false)
+  const health = ref<HealthDTO | null>(null)
+  const versionDisplay = computed(() => {
+    const current = health.value
+    if (!current?.version) {
+      return null
+    }
+    return current.channel ? `${current.version} (${current.channel})` : current.version
+  })
 
   let timer: ReturnType<typeof setInterval> | undefined
 
@@ -27,15 +31,16 @@ export function useBackendHealth() {
       probing.value = true
     }
     try {
-      await api.health()
+      health.value = await api.health()
       status.value = "online"
     } catch {
+      health.value = null
       status.value = "offline"
     } finally {
       if (!silent) {
         const elapsed = Date.now() - spinStartedAt
         if (elapsed < RECHECK_MIN_SPIN_MS) {
-          await new Promise((r) => setTimeout(r, RECHECK_MIN_SPIN_MS - elapsed))
+          await new Promise((resolve) => setTimeout(resolve, RECHECK_MIN_SPIN_MS - elapsed))
         }
         probing.value = false
       }
@@ -66,6 +71,8 @@ export function useBackendHealth() {
     useWebApi: USE_WEB,
     status,
     probing,
+    health,
+    versionDisplay,
     checkNow,
   }
 }

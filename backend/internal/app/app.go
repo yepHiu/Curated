@@ -35,6 +35,7 @@ import (
 	"curated-backend/internal/storage"
 	"curated-backend/internal/tasks"
 	"curated-backend/internal/version"
+	"curated-backend/internal/webui"
 )
 
 type App struct {
@@ -712,13 +713,13 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			Player: contracts.PlayerSettingsDTO{
 				HardwareDecode: a.cfg.Player.HardwareDecode,
 			},
-			OrganizeLibrary:              a.OrganizeLibrary(),
-			ExtendedLibraryImport:        a.ExtendedLibraryImport(),
-			AutoLibraryWatch:             a.AutoLibraryWatch(),
-			MetadataMovieProvider:        a.MetadataMovieProvider(),
-			MetadataMovieProviders:       a.ListMetadataMovieProviders(),
-			MetadataMovieProviderChain:   a.MetadataMovieProviderChain(),
-			MetadataMovieScrapeMode:      a.MetadataMovieScrapeMode(),
+			OrganizeLibrary:            a.OrganizeLibrary(),
+			ExtendedLibraryImport:      a.ExtendedLibraryImport(),
+			AutoLibraryWatch:           a.AutoLibraryWatch(),
+			MetadataMovieProvider:      a.MetadataMovieProvider(),
+			MetadataMovieProviders:     a.ListMetadataMovieProviders(),
+			MetadataMovieProviderChain: a.MetadataMovieProviderChain(),
+			MetadataMovieScrapeMode:    a.MetadataMovieScrapeMode(),
 			Proxy: contracts.ProxySettingsDTO{
 				Enabled:  p.Enabled,
 				URL:      p.URL,
@@ -1584,7 +1585,7 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return server.NewHandler(server.Deps{
+	apiHandler := server.NewHandler(server.Deps{
 		Cfg:                      a.cfg,
 		Logger:                   a.logger,
 		Store:                    a.store,
@@ -1601,6 +1602,7 @@ func (a *App) HTTPHandler() http.Handler {
 		ActorProfileRefresher:    a,
 		LibraryWatchReloader:     a,
 	}).Routes()
+	return webui.WrapHandler(apiHandler)
 }
 
 func nowUTC() string {

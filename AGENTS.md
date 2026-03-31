@@ -16,6 +16,7 @@
 **UI 设计规范（代码级）**：`docs/frontend-ui-spec.md`。
 
 **规划类文档**：任务规划、实施计划等 Markdown 放在 **`docs/plan/`**（无则创建该目录）。
+**新增规则**：凡是输出“方案”“计划”“路线图”“实施建议”等可沉淀内容时，除了在对话中回复，还要同步保存为 **`docs/plan/*.md`** 文档；若同主题已有文档，则优先更新原文档而不是重复创建。
 
 修改架构或新增重要端点后，请同步更新 **`project-facts.mdc`**（必要时 **`workspace-quick-reference.mdc`**）、**`README.md`** 配置与 API 摘要、**`docs/library-organize.md`**（若涉及 **`library-config.cfg`**）、**`CLAUDE.md`** API 列表，以及 **`docs/architecture-and-implementation.html`**（实现说明与功能对照表）。
 

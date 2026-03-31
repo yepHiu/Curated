@@ -46,11 +46,20 @@ go run ./cmd/curated
 Useful flags:
 
 - `-config <path>` — JSON config (`Config` in `backend/internal/config/config.go`)
-- `-mode http` — HTTP only (default)
+- `-mode http` — HTTP only
 - `-mode stdio` — stdio bridge only
 - `-mode both` — HTTP + stdio
+- `-mode tray` — Windows tray mode (the default for Windows release builds)
 
 Health: `GET http://localhost:8080/api/health`
+
+On Windows `release` builds, launching `curated.exe` now defaults to tray mode:
+
+- Curated starts the local HTTP server in the background
+- a Windows tray icon is created
+- the first launch opens the browser automatically
+- a second launch reuses the existing instance and opens the browser again
+- the tray menu provides: open home, open settings, open logs, quit
 
 ### 2. Frontend
 
@@ -133,6 +142,49 @@ pnpm typecheck  # vue-tsc only
 pnpm lint       # ESLint
 pnpm test       # Vitest
 ```
+
+## Release Packaging
+
+The repository now includes a Windows-oriented release script scaffold under `scripts/release/`.
+
+Recommended entrypoint:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version 0.1.0
+```
+
+This flow currently:
+
+- builds the frontend production bundle
+- builds the Go backend with `-tags release`
+- injects `internal/version.BuildStamp`
+- assembles a `release/Curated` staging directory
+- packages a portable zip
+- generates an Inno Setup installer script and builds the installer when `ISCC.exe` is available
+- writes a release manifest to `release/manifest/release.json`
+
+Release runtime notes:
+
+- the assembled package includes `frontend-dist/` next to `curated.exe`
+- the backend serves that local frontend bundle directly when present
+- Windows release binaries default to tray mode, so launching `curated.exe` starts the background service and tray shell
+
+Individual scripts:
+
+```powershell
+scripts/release/build-frontend.ps1
+scripts/release/build-backend.ps1
+scripts/release/assemble-release.ps1
+scripts/release/package-portable.ps1
+scripts/release/package-installer.ps1
+scripts/release/publish.ps1
+```
+
+Installer notes:
+
+- The installer path uses an Inno Setup template at `scripts/release/windows/Curated.iss.tpl`.
+- If `ISCC.exe` is not installed, `package-installer.ps1` will generate `release/installer/Curated.iss` and stop with a warning instead of failing the whole plan.
+- Release binaries must continue to expose version information via `GET /api/health` (`version` + `channel`) so the UI can display a stable release identifier.
 
 ## Backend tests
 

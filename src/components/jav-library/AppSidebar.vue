@@ -21,22 +21,20 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { buildBrowseRouteTarget } from "@/lib/library-query"
+import { useBackendHealth } from "@/composables/use-backend-health"
 import { countCuratedFrames } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
+import { buildBrowseRouteTarget } from "@/lib/library-query"
+import { countUniqueTags, formatSidebarCount } from "@/lib/library-stats"
 import {
   listSortedByUpdatedDesc,
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
-import { countUniqueTags, formatSidebarCount } from "@/lib/library-stats"
-import { useBackendHealth } from "@/composables/use-backend-health"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
   defineProps<{
-    /** 桌面宽屏：仅显示图标窄条 */
     compact?: boolean
-    /** 是否显示「收起为窄条 / 展开」按钮（仅桌面栅格内使用） */
     showCollapseToggle?: boolean
   }>(),
   {
@@ -64,8 +62,13 @@ interface SidebarNavGroups {
 const { t, locale } = useI18n()
 const route = useRoute()
 const libraryService = useLibraryService()
-const { useWebApi: backendUseWebApi, status: backendStatus, probing: backendProbing, checkNow: checkBackendHealth } =
-  useBackendHealth()
+const {
+  useWebApi: backendUseWebApi,
+  status: backendStatus,
+  probing: backendProbing,
+  versionDisplay: backendVersionDisplay,
+  checkNow: checkBackendHealth,
+} = useBackendHealth()
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -98,6 +101,32 @@ const backendDotClass = computed(() => {
   }
 })
 
+const backendMetaText = computed(() => {
+  if (backendVersionDisplay.value) {
+    return backendVersionDisplay.value
+  }
+  return backendUseWebApi ? null : "mock"
+})
+
+const backendAriaLabel = computed(() => {
+  const suffix = backendMetaText.value ? `, ${backendMetaText.value}` : ""
+  if (backendStatus.value === "online") {
+    return backendMetaText.value
+      ? `${t("nav.backendLabel")}: ${backendMetaText.value}`
+      : t("nav.backendLabel")
+  }
+  return `${t("nav.backendLabel")}: ${backendStatusText.value}${suffix}`
+})
+
+const backendCompactTitle = computed(() => {
+  if (backendStatus.value === "online") {
+    return backendMetaText.value ?? t("nav.backendLabel")
+  }
+  return backendMetaText.value
+    ? `${backendStatusText.value}\n${backendMetaText.value}`
+    : backendStatusText.value
+})
+
 const curatedFrameCount = ref(0)
 
 async function refreshCuratedFrameCount() {
@@ -125,14 +154,13 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
   const total = movies.length
   const tagCount = countUniqueTags(movies)
   const actorSet = new Set<string>()
-  for (const m of movies) {
-    for (const raw of m.actors) {
-      const a = raw.trim()
-      if (a) actorSet.add(a)
+  for (const movie of movies) {
+    for (const rawActor of movie.actors) {
+      const actor = rawActor.trim()
+      if (actor) actorSet.add(actor)
     }
   }
   const actorCount = actorSet.size
-
   const historyTotal = listSortedByUpdatedDesc().length
   const framesTotal = curatedFrameCount.value
 
@@ -194,7 +222,6 @@ const getNavigationTarget = (page: AppPage) => {
     class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden rounded-3xl border border-border/70 bg-sidebar/95 text-sidebar-foreground shadow-2xl shadow-black/20 backdrop-blur transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
     :class="props.compact ? 'items-center px-2 py-3' : 'p-4'"
   >
-    <!-- 桌面完整：标题 + 可选收起 -->
     <div
       v-if="!props.compact"
       class="flex items-center justify-between gap-2 px-2 py-3"
@@ -224,7 +251,6 @@ const getNavigationTarget = (page: AppPage) => {
       </div>
     </div>
 
-    <!-- 桌面窄条：展开按钮 + 品牌图标 -->
     <div
       v-else
       class="flex w-full flex-col items-center gap-2 py-1"
@@ -254,13 +280,10 @@ const getNavigationTarget = (page: AppPage) => {
       :class="props.compact ? 'w-10' : ''"
     />
 
-    <!-- 折叠时不用 ScrollArea，避免右侧滚动条占位导致图标视觉偏移 -->
     <ScrollArea v-if="!props.compact" class="min-h-0 w-full min-w-0 flex-1">
       <div class="flex flex-col gap-6 pr-3">
         <section class="flex flex-col gap-2">
-          <span
-            class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
-          >
+          <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             {{ t("nav.browse") }}
           </span>
           <Button
@@ -285,10 +308,9 @@ const getNavigationTarget = (page: AppPage) => {
             </RouterLink>
           </Button>
         </section>
+
         <section class="flex flex-col gap-2">
-          <span
-            class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground"
-          >
+          <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             {{ t("nav.yours") }}
           </span>
           <Button
@@ -316,50 +338,34 @@ const getNavigationTarget = (page: AppPage) => {
       </div>
     </ScrollArea>
 
-    <!-- 折叠导航：不用 Button as-child，避免 Reka 合并样式后主区域高度/子节点异常；自占满列宽以便居中 -->
     <div
       v-if="props.compact"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-y-auto"
     >
       <div class="flex flex-col gap-3 py-1">
-        <nav
-          class="flex flex-col items-center gap-2"
-          :aria-label="t('nav.browse')"
-        >
+        <nav class="flex flex-col items-center gap-2" :aria-label="t('nav.browse')">
           <RouterLink
             v-for="item in sidebarNavGroups.browse"
             :key="item.page"
             :to="getNavigationTarget(item.page)"
             :title="item.label"
             class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-            :class="
-              isActive(item.page)
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : ''
-            "
+            :class="isActive(item.page) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
           >
             <component :is="item.icon" class="size-5 shrink-0" />
           </RouterLink>
         </nav>
-        <div
-          class="mx-auto h-px w-8 shrink-0 bg-sidebar-border/80"
-          aria-hidden="true"
-        />
-        <nav
-          class="flex flex-col items-center gap-2"
-          :aria-label="t('nav.yours')"
-        >
+
+        <div class="mx-auto h-px w-8 shrink-0 bg-sidebar-border/80" aria-hidden="true" />
+
+        <nav class="flex flex-col items-center gap-2" :aria-label="t('nav.yours')">
           <RouterLink
             v-for="item in sidebarNavGroups.yours"
             :key="item.page"
             :to="getNavigationTarget(item.page)"
             :title="item.label"
             class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-            :class="
-              isActive(item.page)
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : ''
-            "
+            :class="isActive(item.page) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
           >
             <component :is="item.icon" class="size-5 shrink-0" />
           </RouterLink>
@@ -372,7 +378,6 @@ const getNavigationTarget = (page: AppPage) => {
       :class="props.compact ? 'w-10' : ''"
     />
 
-    <!-- 后端在线检测（紧贴设置项上方） -->
     <section
       v-if="!props.compact"
       class="mb-2 flex min-w-0 flex-col gap-2"
@@ -380,17 +385,26 @@ const getNavigationTarget = (page: AppPage) => {
       <div
         class="flex min-w-0 items-center gap-2 rounded-2xl border border-border/50 bg-background/35 px-3 py-2"
         role="status"
-        :aria-label="`${t('nav.backendLabel')}：${backendStatusText}`"
+        :aria-label="backendAriaLabel"
         :aria-live="backendUseWebApi ? 'polite' : 'off'"
       >
-        <span
-          class="size-2 shrink-0 rounded-full"
-          :class="backendDotClass"
-          aria-hidden="true"
-        />
-        <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {{ backendStatusText }}
-        </span>
+        <span class="mt-0.5 size-2 shrink-0 rounded-full" :class="backendDotClass" aria-hidden="true" />
+        <div class="min-w-0 flex-1">
+          <div
+            v-if="backendStatus !== 'online'"
+            class="truncate text-xs text-muted-foreground"
+          >
+            {{ backendStatusText }}
+          </div>
+          <div
+            v-if="backendMetaText"
+            class="truncate text-muted-foreground/80"
+            :class="backendStatus === 'online' ? 'text-xs' : 'text-[11px]'"
+            :title="backendMetaText"
+          >
+            {{ backendMetaText }}
+          </div>
+        </div>
         <Button
           v-if="backendUseWebApi"
           type="button"
@@ -409,17 +423,18 @@ const getNavigationTarget = (page: AppPage) => {
         </Button>
       </div>
     </section>
+
     <div
       v-else
       class="mb-2 flex w-full shrink-0 items-center justify-center gap-1"
       role="status"
-      :aria-label="`${t('nav.backendLabel')}：${backendStatusText}`"
+      :aria-label="backendAriaLabel"
       :aria-live="backendUseWebApi ? 'polite' : 'off'"
     >
       <span
         class="size-2.5 shrink-0 rounded-full"
         :class="backendDotClass"
-        :title="backendStatusText"
+        :title="backendCompactTitle"
       />
       <Button
         v-if="backendUseWebApi"
@@ -453,16 +468,13 @@ const getNavigationTarget = (page: AppPage) => {
         <span>{{ t("nav.settings") }}</span>
       </RouterLink>
     </Button>
+
     <RouterLink
       v-else
       :to="getNavigationTarget('settings')"
       :title="t('nav.settings')"
       class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-      :class="
-        isActive('settings')
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : ''
-      "
+      :class="isActive('settings') ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
     >
       <Settings2 class="size-5 shrink-0" />
     </RouterLink>
