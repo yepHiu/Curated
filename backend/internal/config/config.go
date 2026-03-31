@@ -102,11 +102,17 @@ type ProxyConfig struct {
 	Password string `json:"password,omitempty"`
 }
 
+// DefaultHTTPAddr returns the compiled default HTTP listen address: :8080 for normal builds,
+// :8081 for release builds (go build -tags release).
+func DefaultHTTPAddr() string {
+	return defaultHTTPAddr()
+}
+
 func Default() Config {
 	cacheDir := defaultCacheDir()
 	return Config{
 		LogLevel:     "info",
-		HttpAddr:     ":8080",
+		HttpAddr:     defaultHTTPAddr(),
 		DatabasePath: defaultDatabasePath(),
 		CacheDir:     cacheDir,
 		LibraryPaths: defaultLibraryPaths(),
@@ -179,7 +185,7 @@ func Load(path string) (Config, error) {
 		}
 	}
 	if cfg.HttpAddr == "" {
-		cfg.HttpAddr = ":8080"
+		cfg.HttpAddr = defaultHTTPAddr()
 	}
 	if cfg.Tasks.ScanTimeoutSeconds <= 0 {
 		cfg.Tasks.ScanTimeoutSeconds = 600

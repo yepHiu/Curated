@@ -16,7 +16,10 @@ export class HttpClientError extends Error {
   }
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api"
+/** 开发走 Vite 代理 /api；生产构建未设置 VITE_API_BASE_URL 时对齐 release 后端默认 :8081 */
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "/api" : "http://127.0.0.1:8081/api")
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin)

@@ -5,6 +5,7 @@ package desktop
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"curated-backend/internal/config"
 )
@@ -26,10 +27,19 @@ func WaitForServerReady(ctx context.Context, _ string) error {
 }
 
 func ResolveBaseURL(addr string) string {
-	if addr == "" {
-		return "http://127.0.0.1:8080"
+	host := strings.TrimSpace(addr)
+	if host == "" {
+		host = config.DefaultHTTPAddr()
 	}
-	return addr
+	if strings.HasPrefix(host, ":") {
+		host = "127.0.0.1" + host
+	}
+	host = strings.ReplaceAll(host, "0.0.0.0", "127.0.0.1")
+	host = strings.ReplaceAll(host, "[::]", "127.0.0.1")
+	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+		host = "http://" + host
+	}
+	return strings.TrimRight(host, "/")
 }
 
 func ResolveDefaultLogDir(cfg config.Config) string {

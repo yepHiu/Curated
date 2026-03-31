@@ -15,7 +15,7 @@ alwaysApply: true
 
 ## 后端（已实现）
 
-- Go 服务在 **`backend/`**（模块 **`curated-backend`**），HTTP 入口：`cd backend && go run ./cmd/curated`；默认 **`httpAddr` `:8080`**（见 `backend/internal/config`）。运行模式现支持 **`http`**、**`stdio`**、**`both`**、**`tray`** 四种；其中 **Windows + release build** 默认进入 **`tray`**。
+- Go 服务在 **`backend/`**（模块 **`curated-backend`**），HTTP 入口：`cd backend && go run ./cmd/curated`；开发构建默认 **`httpAddr` `:8080`**，**`-tags release` 打包**默认 **`:8081`**（见 `backend/internal/config/default_http_addr_*.go`，JSON `httpAddr` 可覆盖）。运行模式现支持 **`http`**、**`stdio`**、**`both`**、**`tray`** 四种；其中 **Windows + release build** 默认进入 **`tray`**。
 - **SQLite** 应用库、扫描结果、任务等与 `config` 中的 `databasePath` 绑定；未配置时默认 **`runtime/curated.db`**（在 `backend` 目录下运行则为相对该目录的路径）。刮削侧另有 Metatube 引擎相关 SQLite（日志里可见 GORM）。
 - 主要逻辑：`backend/internal/app`（扫描、刮削、任务）、`server`（HTTP）、`storage`、`scanner`、`scraper`、`tasks`、`desktop`（Windows 托盘 / 单实例 / 启动失败弹窗）、`webui`（本地前端静态资源托管）。
 - **本地前端托管**：`App.HTTPHandler()` 在本地存在 `frontend-dist/` 或 `dist/` 时会直接托管前端静态资源，对非 `/api` 的 `GET/HEAD` 请求使用 SPA fallback 到 `index.html`；release 目录中的 `curated.exe + frontend-dist/` 已可直接作为浏览器入口使用。
@@ -41,7 +41,7 @@ alwaysApply: true
 - **萃取帧**：**Web API** 时 **`POST/GET/PATCH/DELETE /api/curated-frames`**、**`POST /api/curated-frames/export`**（库页多选导出 WebP，元数据在 EXIF UserComment JSON），图像 **`GET /api/curated-frames/{id}/image`**（`src/lib/curated-frame-image-url.ts`）；Mock 时仍为 **IndexedDB**（`src/lib/curated-frames/db.ts`），**无后端同等导出**。
 - 播放器续播：`PlayerPage` 读 `?t=` 或本地进度 seek，节流写入进度；`AppShell` 在 `player` 且 `query.from=history` 时返回历史。
 - **浏览器端日志**：**`loglevel`**（`src/lib/app-logger.ts`），入口 **`initClientLogger()`**；级别优先 **`localStorage`**（`curated-client-log-level`）其次 **`VITE_LOG_LEVEL`**，默认可为开发 `debug` / 生产 `warn`；设置页「通用」可改并立即生效。
-- 开发时代理：`vite.config.ts` 将 **`/api` 代理到 `http://localhost:8080`**；前端请求基址默认为 **`/api`**（见 `http-client`），一般无需再配 `VITE_API_BASE_URL`。
+- 开发时代理：`vite.config.ts` 将 **`/api` 代理到 `http://localhost:8080`**；前端 **`http-client`** 开发默认 **`/api`**，**生产构建**未设 **`VITE_API_BASE_URL`** 时默认 **`http://127.0.0.1:8081/api`**（与 release 后端默认端口一致）；可继续用环境变量覆盖。
 - `components.json` 为 **shadcn-vue**  schema，勿按 React shadcn 目录假设。
 
 ## 其它约束

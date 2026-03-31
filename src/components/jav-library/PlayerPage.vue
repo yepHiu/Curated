@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
   ExternalLink,
+  Info,
   Maximize2,
   Pause,
   PictureInPicture2,
@@ -12,6 +13,7 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
@@ -20,7 +22,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { pushAppToast } from "@/composables/use-app-toast"
-import { canPlayHlsNatively, loadHlsLibrary, type HlsInstance } from "@/lib/hls-player"
+import {
+  canPlayHlsNatively,
+  loadHlsLibrary,
+  type HlsInstance,
+  type HlsLevel,
+} from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
 import {
@@ -58,6 +65,36 @@ const playbackSeekForwardStep = computed(() =>
 const videoRef = ref<HTMLVideoElement | null>(null)
 const surfaceRef = ref<HTMLElement | null>(null)
 let hlsInstance: HlsInstance | null = null
+let detachHlsStatsListeners: (() => void) | null = null
+
+type PlayerContextMenuState = {
+  x: number
+  y: number
+}
+
+type PlaybackStatsState = {
+  audioBitrateKbps: number | null
+  videoBitrateKbps: number | null
+  width: number | null
+  height: number | null
+  fps: number | null
+}
+
+const playerContextMenu = ref<PlayerContextMenuState | null>(null)
+const detailedStatsVisible = ref(false)
+const playbackStats = ref<PlaybackStatsState>({
+  audioBitrateKbps: null,
+  videoBitrateKbps: null,
+  width: null,
+  height: null,
+  fps: null,
+})
+let frameCallbackId: number | null = null
+let fallbackFpsTimer: ReturnType<typeof setInterval> | null = null
+let fpsSampleWindowStartAt = 0
+let fpsSampleFrameCount = 0
+let fallbackLastDecodedFrames = 0
+let fallbackLastDecodedAt = 0
 
 /** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
 const autoplayConsumedForMovieId = ref<string | null>(null)
@@ -183,6 +220,11 @@ watch(isPlaying, (playing) => {
 watch(
   playbackSrc,
   async (src) => {
+    closePlayerContextMenu()
+    if (!src) {
+      detailedStatsVisible.value = false
+      resetPlaybackStats()
+    }
     await syncVideoSource()
     if (!src) {
       clearIdleHideTimer()
@@ -198,6 +240,8 @@ watch(
 )
 
 async function destroyHlsInstance() {
+  detachHlsStatsListeners?.()
+  detachHlsStatsListeners = null
   if (hlsInstance) {
     hlsInstance.destroy()
     hlsInstance = null
@@ -219,6 +263,7 @@ async function syncVideoSource() {
   if (mode === "hls") {
     if (canPlayHlsNatively(v)) {
       v.src = src
+      refreshPlaybackStatsFromVideo()
       return
     }
     try {
@@ -231,6 +276,7 @@ async function syncVideoSource() {
         return
       }
       const player = new Hls()
+      bindHlsStats(player, Hls.Events)
       player.loadSource(src)
       player.attachMedia(v)
       hlsInstance = player
@@ -241,6 +287,7 @@ async function syncVideoSource() {
     }
   }
   v.src = src
+  refreshPlaybackStatsFromVideo()
 }
 
 function syncSrc() {
@@ -347,6 +394,8 @@ onUnmounted(() => {
   }
   if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
+  stopFpsTracking()
+  closePlayerContextMenu()
 })
 
 function formatClock(seconds: number): string {
@@ -391,6 +440,8 @@ function onLoadedMetadata() {
   const v = videoRef.value
   if (!v) return
   duration.value = Number.isFinite(v.duration) ? v.duration : 0
+  refreshPlaybackStatsFromVideo()
+  startFpsTracking()
   const pct = volume.value[0] ?? 100
   v.volume = pct / 100
   v.muted = playbackMuted.value
@@ -443,6 +494,7 @@ async function onCanPlayForAutoplay() {
 
 function onPlay() {
   isPlaying.value = true
+  startFpsTracking()
 }
 
 function onPause() {
@@ -456,6 +508,7 @@ function onVideoEnded() {
 }
 
 function onVideoError() {
+  stopFpsTracking()
   const v = videoRef.value
   const code = v?.error?.code
   if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
@@ -483,8 +536,33 @@ async function togglePlayPause() {
 
 /** 左键单击画面区域（视频或上下黑边）切换播放/暂停 */
 function onVideoSurfaceClick() {
+  closePlayerContextMenu()
   if (!playbackSrc.value) return
   void togglePlayPause()
+}
+
+function closePlayerContextMenu() {
+  playerContextMenu.value = null
+}
+
+function onPlayerContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  onChromePointerActivity()
+  playerContextMenu.value = {
+    x: event.clientX,
+    y: event.clientY,
+  }
+}
+
+function toggleDetailedStats() {
+  if (!playbackSrc.value) return
+  detailedStatsVisible.value = !detailedStatsVisible.value
+  closePlayerContextMenu()
+}
+
+function closeDetailedStats() {
+  detailedStatsVisible.value = false
 }
 
 function seekDelta(deltaSec: number) {
@@ -557,6 +635,11 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 function onPlaybackKeydown(e: KeyboardEvent) {
+  if (playerContextMenu.value && e.key === "Escape") {
+    e.preventDefault()
+    closePlayerContextMenu()
+    return
+  }
   if (!playbackSrc.value) return
   if (e.ctrlKey || e.metaKey || e.altKey) return
   if (isTypingTarget(e.target)) return
@@ -723,6 +806,222 @@ async function releasePlaybackSession(sessionId?: string) {
     // ignore session cleanup failures
   }
 }
+
+function resetPlaybackStats() {
+  playbackStats.value = {
+    audioBitrateKbps: null,
+    videoBitrateKbps: null,
+    width: null,
+    height: null,
+    fps: null,
+  }
+  stopFpsTracking()
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  const num =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value)
+        : NaN
+  return Number.isFinite(num) ? num : null
+}
+
+function refreshPlaybackStatsFromVideo() {
+  const v = videoRef.value
+  if (!v) return
+  const width = Number.isFinite(v.videoWidth) && v.videoWidth > 0 ? v.videoWidth : null
+  const height = Number.isFinite(v.videoHeight) && v.videoHeight > 0 ? v.videoHeight : null
+  playbackStats.value = {
+    ...playbackStats.value,
+    width,
+    height,
+  }
+}
+
+function updatePlaybackStatsFromHlsLevel(level?: HlsLevel | null) {
+  if (!level) return
+  const width = toFiniteNumber(level.width)
+  const height = toFiniteNumber(level.height)
+  const frameRate =
+    toFiniteNumber(level.frameRate) ??
+    toFiniteNumber(level.attrs?.["FRAME-RATE"]) ??
+    toFiniteNumber(level.attrs?.FRAME_RATE)
+  const videoBitrate = toFiniteNumber(level.bitrate)
+
+  playbackStats.value = {
+    ...playbackStats.value,
+    width: width && width > 0 ? width : playbackStats.value.width,
+    height: height && height > 0 ? height : playbackStats.value.height,
+    fps: frameRate && frameRate > 0 ? frameRate : playbackStats.value.fps,
+    videoBitrateKbps:
+      videoBitrate && videoBitrate > 0
+        ? Math.round(videoBitrate / 1000)
+        : playbackStats.value.videoBitrateKbps,
+  }
+}
+
+function bindHlsStats(player: HlsInstance, events?: Record<string, string>) {
+  detachHlsStatsListeners?.()
+  detachHlsStatsListeners = null
+  const on = player.on
+  if (!on || !events) return
+
+  const updateCurrentLevelStats = () => {
+    const levels = player.levels
+    const currentLevel = player.currentLevel ?? -1
+    if (!Array.isArray(levels) || currentLevel < 0 || currentLevel >= levels.length) return
+    updatePlaybackStatsFromHlsLevel(levels[currentLevel] ?? null)
+  }
+
+  const listeners: Array<{ event: string; handler: (event: string, data?: unknown) => void }> = []
+  const register = (eventName: string | undefined, handler: (event: string, data?: unknown) => void) => {
+    if (!eventName) return
+    on.call(player, eventName, handler)
+    listeners.push({ event: eventName, handler })
+  }
+
+  register(events.MANIFEST_PARSED, () => {
+    updateCurrentLevelStats()
+  })
+  register(events.LEVEL_SWITCHED, (_event, data) => {
+    const levelIndex =
+      typeof data === "object" && data !== null && "level" in data
+        ? toFiniteNumber((data as { level?: unknown }).level)
+        : null
+    if (Array.isArray(player.levels) && levelIndex !== null && levelIndex >= 0) {
+      updatePlaybackStatsFromHlsLevel(player.levels[levelIndex] ?? null)
+      return
+    }
+    updateCurrentLevelStats()
+  })
+  register(events.FRAG_CHANGED, () => {
+    updateCurrentLevelStats()
+    refreshPlaybackStatsFromVideo()
+  })
+
+  detachHlsStatsListeners = () => {
+    if (!player.off) return
+    for (const listener of listeners) {
+      player.off(listener.event, listener.handler)
+    }
+  }
+}
+
+function stopFpsTracking() {
+  const v = videoRef.value
+  if (frameCallbackId !== null && v && typeof v.cancelVideoFrameCallback === "function") {
+    v.cancelVideoFrameCallback(frameCallbackId)
+  }
+  frameCallbackId = null
+  if (fallbackFpsTimer !== null) {
+    clearInterval(fallbackFpsTimer)
+    fallbackFpsTimer = null
+  }
+  fpsSampleWindowStartAt = 0
+  fpsSampleFrameCount = 0
+  fallbackLastDecodedFrames = 0
+  fallbackLastDecodedAt = 0
+}
+
+function startFpsTracking() {
+  stopFpsTracking()
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return
+
+  if (typeof v.requestVideoFrameCallback === "function") {
+    const onFrame = (now: number) => {
+      const currentVideo = videoRef.value
+      if (!currentVideo || currentVideo !== v || !playbackSrc.value) return
+      if (fpsSampleWindowStartAt === 0) {
+        fpsSampleWindowStartAt = now
+      }
+      fpsSampleFrameCount += 1
+      const elapsed = now - fpsSampleWindowStartAt
+      if (elapsed >= 1000) {
+        playbackStats.value = {
+          ...playbackStats.value,
+          fps: Number((fpsSampleFrameCount / (elapsed / 1000)).toFixed(2)),
+        }
+        fpsSampleWindowStartAt = now
+        fpsSampleFrameCount = 0
+      }
+      frameCallbackId = currentVideo.requestVideoFrameCallback(onFrame)
+    }
+    frameCallbackId = v.requestVideoFrameCallback(onFrame)
+    return
+  }
+
+  if (typeof v.getVideoPlaybackQuality !== "function") return
+
+  fallbackFpsTimer = window.setInterval(() => {
+    const currentVideo = videoRef.value
+    if (!currentVideo || currentVideo !== v || !playbackSrc.value) return
+    const quality = currentVideo.getVideoPlaybackQuality()
+    const now = performance.now()
+    const decodedFrames = quality.totalVideoFrames
+    if (fallbackLastDecodedAt > 0) {
+      const elapsed = now - fallbackLastDecodedAt
+      const frameDelta = decodedFrames - fallbackLastDecodedFrames
+      if (elapsed >= 500 && frameDelta >= 0) {
+        playbackStats.value = {
+          ...playbackStats.value,
+          fps: Number((frameDelta / (elapsed / 1000)).toFixed(2)),
+        }
+      }
+    }
+    fallbackLastDecodedFrames = decodedFrames
+    fallbackLastDecodedAt = now
+  }, 1000)
+}
+
+function formatBitrateLabel(kbps: number | null): string {
+  if (!kbps || kbps <= 0) return "暂不可用"
+  if (kbps >= 1000) return `${(kbps / 1000).toFixed(2)} Mbps`
+  return `${Math.round(kbps)} kbps`
+}
+
+function formatResolutionLabel(width: number | null, height: number | null): string {
+  if (!width || !height) return "暂不可用"
+  return `${width} × ${height}`
+}
+
+function formatFpsLabel(fps: number | null): string {
+  if (!fps || fps <= 0) return "暂不可用"
+  return `${fps.toFixed(fps >= 100 ? 0 : 2)} fps`
+}
+
+const playbackStatsRows = computed(() => [
+  {
+    key: "audio",
+    label: "音频码率",
+    value: formatBitrateLabel(playbackStats.value.audioBitrateKbps),
+  },
+  {
+    key: "video",
+    label: "视频码率",
+    value: formatBitrateLabel(playbackStats.value.videoBitrateKbps),
+  },
+  {
+    key: "resolution",
+    label: "视频清晰度",
+    value: formatResolutionLabel(playbackStats.value.width, playbackStats.value.height),
+  },
+  {
+    key: "fps",
+    label: "视频帧率",
+    value: formatFpsLabel(playbackStats.value.fps),
+  },
+])
+
+const detailedStatsModeLabel = computed(() => {
+  const mode = playbackDescriptor.value?.mode
+  if (mode === "hls") return "HLS"
+  if (mode === "native") return "Native"
+  if (mode === "direct") return "Direct"
+  return "暂不可用"
+})
 </script>
 
 <template>
@@ -735,6 +1034,7 @@ async function releasePlaybackSession(sessionId?: string) {
       @mousemove="onChromePointerActivity"
       @mouseenter="onChromePointerActivity"
       @mouseleave="onChromePointerLeave"
+      @contextmenu="onPlayerContextMenu"
     >
       <div
         class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5"
@@ -751,6 +1051,47 @@ async function releasePlaybackSession(sessionId?: string) {
             </p>
           </div>
         </div>
+      </div>
+
+      <div
+        v-if="detailedStatsVisible"
+        class="absolute left-4 top-20 z-[18] w-[min(22rem,calc(100%-2rem))] rounded-2xl border border-white/12 bg-black/48 p-3 text-white shadow-2xl backdrop-blur-md sm:left-5 sm:top-24 sm:p-4"
+        @click.stop
+      >
+        <div class="mb-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-medium uppercase tracking-[0.22em] text-white/55">
+              详细统计信息
+            </p>
+            <p class="mt-1 truncate text-sm font-semibold text-white/90">
+              {{ movie.code }} · {{ detailedStatsModeLabel }}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-8 shrink-0 rounded-full text-white/75 hover:bg-white/10 hover:text-white"
+            aria-label="关闭详细统计信息"
+            @click="closeDetailedStats"
+          >
+            <X class="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+        <dl class="grid gap-2.5">
+          <div
+            v-for="row in playbackStatsRows"
+            :key="row.key"
+            class="grid grid-cols-[7.25rem_minmax(0,1fr)] items-baseline gap-x-3 rounded-xl bg-white/[0.045] px-3 py-2"
+          >
+            <dt class="text-xs text-white/56">
+              {{ row.label }}
+            </dt>
+            <dd class="truncate text-right text-sm font-medium text-white/92">
+              {{ row.value }}
+            </dd>
+          </div>
+        </dl>
       </div>
 
       <div
@@ -971,6 +1312,31 @@ async function releasePlaybackSession(sessionId?: string) {
       </div>
     </div>
   </div>
+  <Teleport to="body">
+    <div
+      v-if="playerContextMenu"
+      class="fixed inset-0 z-[110]"
+      @click="closePlayerContextMenu"
+      @contextmenu.prevent
+    >
+      <div
+        class="bg-popover text-popover-foreground fixed min-w-[12rem] rounded-md border p-1 shadow-md outline-none"
+        :style="{ left: `${playerContextMenu.x}px`, top: `${playerContextMenu.y}px` }"
+        @click.stop
+      >
+        <button
+          type="button"
+          role="menuitem"
+          class="hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground relative flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors disabled:pointer-events-none disabled:opacity-50"
+          :disabled="!playbackSrc"
+          @click="toggleDetailedStats"
+        >
+          <Info class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          {{ detailedStatsVisible ? "隐藏详细统计信息" : "详细统计信息" }}
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

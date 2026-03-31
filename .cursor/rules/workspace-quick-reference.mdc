@@ -9,7 +9,7 @@ alwaysApply: true
 
 - **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
-- **后端**：`backend` 目录 `go run ./cmd/curated`，默认 **:8080**（Go 模块名 **`curated-backend`**）。
+- **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**；**`-tags release` 打包**默认 **:8081**（Go 模块名 **`curated-backend`**）。
 - **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
 - **本地前端托管**：当可执行文件旁存在 **`frontend-dist/`**（或当前工作目录存在 `frontend-dist/` / `dist/`）时，后端会直接托管前端静态资源并对非 `/api` 路由做 SPA fallback。
@@ -19,7 +19,7 @@ alwaysApply: true
 
 ## 常见操作（复述用户诉求时）
 
-- **重启前后端**：先释放 **5173 / 8080** 上旧进程（若占端口），再分别启动上述两条命令。
+- **重启前后端**：先释放 **5173** 与后端端口（开发 **8080** / release **8081**，或配置中的 `httpAddr`）上旧进程，再分别启动上述两条命令。
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。
 

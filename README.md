@@ -34,9 +34,11 @@ Local-first media library: **Vue 3** SPA plus a **Go** HTTP API (SQLite, folder 
 
 ## Quick start
 
-### 1. Backend (default `:8080`)
+### 1. Backend (default `:8080` dev, `:8081` release builds)
 
 Run from repo root or `backend/`. Without `-config`, built-in defaults apply (DB, cache, sample library paths).
+
+**Production / release binary:** `go build -tags release ./cmd/curated` uses default **`httpAddr` `:8081`** (see `backend/internal/config/default_http_addr_*.go`). Override anytime with JSON `httpAddr` or `-config`.
 
 ```bash
 cd backend
@@ -51,7 +53,7 @@ Useful flags:
 - `-mode both` — HTTP + stdio
 - `-mode tray` — Windows tray mode (the default for Windows release builds)
 
-Health: `GET http://localhost:8080/api/health`
+Health (dev): `GET http://localhost:8080/api/health` — release build default port is **8081**.
 
 On Windows `release` builds, launching `curated.exe` now defaults to tray mode:
 
@@ -75,13 +77,13 @@ Open the URL printed in the terminal (usually `http://localhost:5173`).
 - **Real backend**: set `VITE_USE_WEB_API=true` in a root `.env` (often already enabled).
 - **Mock mode**: any other value — in-memory data, no Go process.
 
-Optional: `VITE_API_BASE_URL` overrides the API base (default `/api`, aligned with the dev proxy).
+Optional: `VITE_API_BASE_URL` overrides the API base. Dev default is `/api` (Vite proxy → 8080). **`pnpm build`** uses **`http://127.0.0.1:8081/api`** when unset, matching the release backend default.
 
 ## Backend configuration (short)
 
 If you omit `-config`, defaults typically include:
 
-- **HTTP**: `:8080`
+- **HTTP**: `:8080` (`go run` / dev); **`:8081`** for `go build -tags release` (override with `httpAddr` in JSON)
 - **Database**: `backend/runtime/curated.db` (path is relative to the working directory; see `databasePath` in JSON if you need a custom file).
 - **Cache**: `backend/runtime/cache`
 - **Initial library roots**: e.g. `videos_test`, `docs/film-scanner/videos_test` — adjust `libraryPaths` in JSON as needed.

@@ -2,11 +2,24 @@ type HlsInstance = {
   loadSource(src: string): void
   attachMedia(video: HTMLVideoElement): void
   destroy(): void
+  on?(event: string, handler: (event: string, data?: unknown) => void): void
+  off?(event: string, handler: (event: string, data?: unknown) => void): void
+  currentLevel?: number
+  levels?: HlsLevel[]
+}
+
+type HlsLevel = {
+  bitrate?: number
+  width?: number
+  height?: number
+  frameRate?: number | string
+  attrs?: Record<string, unknown>
 }
 
 type HlsCtor = {
   new (): HlsInstance
   isSupported(): boolean
+  Events?: Record<string, string>
 }
 
 declare global {
@@ -64,4 +77,4 @@ export async function loadHlsLibrary(): Promise<HlsCtor> {
   return hlsLoaderPromise
 }
 
-export type { HlsInstance }
+export type { HlsInstance, HlsLevel }

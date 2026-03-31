@@ -598,7 +598,7 @@ func WaitForServerReady(ctx context.Context, baseURL string) error {
 func ResolveBaseURL(addr string) string {
 	host := strings.TrimSpace(addr)
 	if host == "" {
-		host = ":8080"
+		host = config.DefaultHTTPAddr()
 	}
 	if strings.HasPrefix(host, ":") {
 		host = "127.0.0.1" + host
