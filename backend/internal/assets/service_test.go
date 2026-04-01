@@ -18,8 +18,9 @@ func TestDownloadAll(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("asset"))
+		_, _ = w.Write([]byte("asset-image-content"))
 	}))
 	defer server.Close()
 
@@ -55,8 +56,9 @@ func TestDownloadOverwritesExistingStableFileName(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("new-bytes"))
+		_, _ = w.Write([]byte("new-bytes-image-content"))
 	}))
 	defer server.Close()
 
@@ -86,7 +88,7 @@ func TestDownloadOverwritesExistingStableFileName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(b) != "new-bytes" {
+	if string(b) != "new-bytes-image-content" {
 		t.Fatalf("cover should be re-fetched over stale file, got %q", string(b))
 	}
 }
@@ -97,8 +99,9 @@ func TestPreviewSkipsDownloadWhenFileNonempty(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		w.Header().Set("Content-Type", "image/jpeg")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("from-network"))
+		_, _ = w.Write([]byte("from-network-image-content"))
 	}))
 	defer server.Close()
 
@@ -169,5 +172,26 @@ func TestCoverUnchangedOnDownloadFailure(t *testing.T) {
 	}
 	if string(b) != "keep-me" {
 		t.Fatalf("cover should be preserved after failed download, got %q", string(b))
+	}
+}
+
+func TestDownloadActorAvatarRejectsNonImage(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("<html>blocked</html>"))
+	}))
+	defer server.Close()
+
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	service := NewService(zap.NewNop(), cacheDir, 5*time.Second, 0, 0)
+	_, status, err := service.DownloadActorAvatar(context.Background(), "Alice", server.URL+"/avatar.jpg", ImageFetchOptions{})
+	if err == nil {
+		t.Fatal("expected non-image avatar download to fail")
+	}
+	if status != http.StatusOK {
+		t.Fatalf("status=%d want %d", status, http.StatusOK)
 	}
 }

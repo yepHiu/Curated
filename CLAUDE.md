@@ -91,6 +91,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
+- **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
 - **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or default `curated` applies); **restart the backend** for new log directory/level to apply to file sinks
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
@@ -182,6 +183,7 @@ GET    /api/library/movies/{id}/comment     # Get user comment for movie
 PUT    /api/library/movies/{id}/comment     # Upsert user comment for movie
 GET    /api/library/actors                  # List actors (query: q, actorTag, sort, limit, offset)
 GET    /api/library/actors/profile          # Get actor profile (query: name)
+GET    /api/library/actors/{name}/asset/avatar # Get same-origin cached actor avatar
 PATCH  /api/library/actors/tags             # Update actor user tags (query: name)
 POST   /api/library/actors/scrape           # Scrape actor metadata (async task)
 GET    /api/library/played-movies           # List played movies with timestamps
@@ -389,4 +391,5 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
+- Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)

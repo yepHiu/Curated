@@ -7,6 +7,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/metatube-community/metatube-sdk-go/collection/sets"
@@ -40,8 +41,19 @@ func isFC2MovieProviderName(name string) bool {
 }
 
 type Service struct {
-	logger *zap.Logger
-	engine *engine.Engine
+	logger   *zap.Logger
+	engine   *engine.Engine
+	healthMu sync.RWMutex
+	health   map[string]ProviderRuntimeHealth
+}
+
+type ProviderRuntimeHealth struct {
+	LastOKAt            string
+	LastFailAt          string
+	ConsecutiveFailures int
+	AvgLatencyMs        int64
+	CooldownUntil       string
+	ErrorCategory       string
 }
 
 func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, error) {
@@ -65,6 +77,7 @@ func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, err
 	return &Service{
 		logger: logger,
 		engine: eng,
+		health: make(map[string]ProviderRuntimeHealth),
 	}, nil
 }
 
@@ -81,6 +94,38 @@ func (s *Service) ListMovieProviderNames() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func (s *Service) ProviderRuntimeHealth(name string) ProviderRuntimeHealth {
+	s.healthMu.RLock()
+	defer s.healthMu.RUnlock()
+	return s.health[strings.TrimSpace(name)]
+}
+
+func (s *Service) PreferredMovieProviderChain(strategy string) []string {
+	all := s.ListMovieProviderNames()
+	if len(all) == 0 {
+		return nil
+	}
+	index := make(map[string]string, len(all))
+	for _, name := range all {
+		index[strings.ToLower(strings.TrimSpace(name))] = name
+	}
+	var preferred []string
+	switch strings.TrimSpace(strings.ToLower(strategy)) {
+	case "auto-cn-friendly":
+		for _, candidate := range []string{"JavBus", "JavDB", "DMM", "Fanza", "MGStage", "Prestige", "FC2", "fc2hub"} {
+			if resolved, ok := index[strings.ToLower(candidate)]; ok {
+				preferred = append(preferred, resolved)
+			}
+		}
+	default:
+		return nil
+	}
+	if len(preferred) == 0 {
+		return nil
+	}
+	return preferred
 }
 
 func firstValidMovieSearchResult(results []*model.MovieSearchResult) *model.MovieSearchResult {
@@ -236,9 +281,12 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 			zap.Int("total", len(chain)),
 		)
 
+		start := time.Now()
 		results, err := s.engine.SearchMovie(number, providerName, false)
+		latency := time.Since(start).Milliseconds()
 		if err != nil {
 			lastErr = err
+			s.recordProviderFailure(providerName, latency, err)
 			s.logger.Warn("search failed in chain",
 				zap.String("number", number),
 				zap.String("provider", providerName),
@@ -250,12 +298,14 @@ func (s *Service) scrapeWithChain(ctx context.Context, movieID, number string, c
 		first := firstValidMovieSearchResult(results)
 		if first == nil {
 			lastErr = fmt.Errorf("no results from %s", providerName)
+			s.recordProviderFailure(providerName, latency, lastErr)
 			s.logger.Warn("no results from provider in chain",
 				zap.String("number", number),
 				zap.String("provider", providerName),
 			)
 			continue
 		}
+		s.recordProviderSuccess(providerName, latency)
 
 		// Found a valid result
 		s.logger.Info("search result selected from chain",
@@ -283,10 +333,14 @@ func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefe
 		if _, gerr := s.engine.GetMovieProviderByName(prefer); gerr != nil {
 			return scraper.Metadata{}, fmt.Errorf("unknown movie metadata provider %q", prefer)
 		}
+		start := time.Now()
 		results, err = s.engine.SearchMovie(number, prefer, false)
+		latency := time.Since(start).Milliseconds()
 		if err != nil {
+			s.recordProviderFailure(prefer, latency, err)
 			return scraper.Metadata{}, fmt.Errorf("search failed for %s on provider %q: %w", number, prefer, err)
 		}
+		s.recordProviderSuccess(prefer, latency)
 	} else if isFC2 {
 		results, err = s.searchMovieFC2Providers(ctx, number)
 		if err != nil {
@@ -650,18 +704,82 @@ func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status 
 	latency := time.Since(start).Milliseconds()
 
 	if searchErr != nil {
+		s.recordProviderFailure(name, latency, searchErr)
 		return "fail", latency, searchErr
 	}
 
 	if latency > providerHealthMaxLatencyMs {
-		return "fail", latency, fmt.Errorf("latency %dms exceeds %dms threshold", latency, providerHealthMaxLatencyMs)
+		err = fmt.Errorf("latency %dms exceeds %dms threshold", latency, providerHealthMaxLatencyMs)
+		s.recordProviderFailure(name, latency, err)
+		return "fail", latency, err
 	}
 
 	// If we got any valid results, consider the provider healthy
 	if len(results) > 0 {
+		s.recordProviderSuccess(name, latency)
 		return "ok", latency, nil
 	}
 
 	// No results but no error - provider is responsive but maybe the test keyword returned nothing
+	s.recordProviderSuccess(name, latency)
 	return "ok", latency, nil
+}
+
+func (s *Service) recordProviderSuccess(name string, latencyMs int64) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	s.healthMu.Lock()
+	defer s.healthMu.Unlock()
+	cur := s.health[name]
+	cur.LastOKAt = now
+	cur.ErrorCategory = ""
+	cur.CooldownUntil = ""
+	cur.ConsecutiveFailures = 0
+	if cur.AvgLatencyMs <= 0 {
+		cur.AvgLatencyMs = latencyMs
+	} else {
+		cur.AvgLatencyMs = (cur.AvgLatencyMs*3 + latencyMs) / 4
+	}
+	s.health[name] = cur
+}
+
+func (s *Service) recordProviderFailure(name string, latencyMs int64, err error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	s.healthMu.Lock()
+	defer s.healthMu.Unlock()
+	cur := s.health[name]
+	cur.LastFailAt = now
+	cur.ConsecutiveFailures++
+	cur.ErrorCategory = classifyProviderError(err)
+	if cur.AvgLatencyMs <= 0 {
+		cur.AvgLatencyMs = latencyMs
+	} else {
+		cur.AvgLatencyMs = (cur.AvgLatencyMs*3 + latencyMs) / 4
+	}
+	if cur.ConsecutiveFailures >= 3 {
+		cur.CooldownUntil = time.Now().UTC().Add(10 * time.Minute).Format(time.RFC3339)
+	}
+	s.health[name] = cur
+}
+
+func classifyProviderError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "no results"):
+		return "provider_empty_result"
+	case strings.Contains(msg, "timeout"):
+		return "connect_timeout"
+	case strings.Contains(msg, "tls"):
+		return "tls_failure"
+	case strings.Contains(msg, "forbidden"), strings.Contains(msg, "hotlink"):
+		return "hotlink_denied"
+	case strings.Contains(msg, "region"), strings.Contains(msg, "geo"), strings.Contains(msg, "restricted"):
+		return "region_restricted"
+	case strings.Contains(msg, "lookup "), strings.Contains(msg, "no such host"):
+		return "dns_failure"
+	default:
+		return "provider_invalid_content"
+	}
 }

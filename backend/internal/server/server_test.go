@@ -1641,6 +1641,8 @@ func (stubMetadataCtl) MetadataMovieProviderChain() []string         { return ni
 func (stubMetadataCtl) SetMetadataMovieProviderChain([]string) error { return nil }
 func (stubMetadataCtl) MetadataMovieScrapeMode() string              { return "auto" }
 func (stubMetadataCtl) SetMetadataMovieScrapeMode(string) error      { return nil }
+func (stubMetadataCtl) MetadataMovieStrategy() string                { return "auto-cn-friendly" }
+func (stubMetadataCtl) SetMetadataMovieStrategy(string) error        { return nil }
 func (stubMetadataCtl) ListMetadataMovieProviders() []string         { return nil }
 
 type stubBackendLogCtl struct {

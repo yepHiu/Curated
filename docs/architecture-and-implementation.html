@@ -368,7 +368,7 @@
   <p><span class="path">backend/cmd/curated/main.go</span> 流程概要：</p>
   <ol>
     <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code>）。</li>
-    <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>autoLibraryWatch</code> 等）。</li>
+    <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>metadataMovieStrategy</code>、<code>autoLibraryWatch</code> 等）。</li>
     <li>打开 SQLite：<code>storage.NewSQLiteStore(cfg.DatabasePath)</code>，执行 <code>Migrate</code>，必要时 <code>SeedLibraryPathsIfEmpty</code>。</li>
     <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。</li>
     <li><code>http</code> 模式下 <code>server.ListenAndServe</code> 挂载 <code>backendApp.HTTPHandler()</code>。</li>
@@ -393,7 +393,8 @@
     <li><code>GET .../stream</code> — 视频文件流（<code>http.ServeContent</code>，支持 Range）。</li>
     <li><code>POST .../scrape</code> — 触发单部影片元数据重刮。</li>
     <li><code>DELETE .../{movieId}</code> — 删除影片记录及相关缓存策略由存储层实现。</li>
-    <li><code>GET/PATCH /api/settings</code> — 设置 DTO（含 <code>organizeLibrary</code>、<code>autoLibraryWatch</code>、元数据源等）。</li>
+    <li><code>GET/PATCH /api/settings</code> — 设置 DTO（含 <code>organizeLibrary</code>、<code>autoLibraryWatch</code>、<code>metadataMovieStrategy</code>、元数据源等）。</li>
+    <li><code>GET /api/library/actors/{name}/asset/avatar</code> — 演员头像同源缓存资源；演员资料刮削成功后会异步下载头像到本地缓存。</li>
     <li><code>POST/PATCH/DELETE /api/library/paths</code> — 库路径 CRUD。</li>
     <li><code>POST /api/scans</code>、<code>GET /api/tasks/recent</code>、<code>GET /api/tasks/{taskId}</code> — 扫描与任务状态。</li>
   </ul>
@@ -409,7 +410,7 @@
   <p class="note"><strong>注意</strong>：<code>GET .../stream</code> 仅走 SQLite（打开磁盘上的视频文件），不走内存种子库；真实播放依赖扫描入库后的文件路径。</p>
 
   <h3>3.5 扫描、刮削与任务</h3>
-  <p>扫描由 <code>App</code> 协调：<code>scanner</code> 遍历配置的库路径，解析番号、写库；若开启整理（<code>organizeLibrary</code>），会按规则移动/组织文件。刮削通过 Metatube SDK 拉取元数据，<code>assets</code> 可把封面等缓存到 <code>cacheDir</code>。长时间操作通过 <code>tasks.Manager</code> 生成 <code>taskId</code>，前端轮询 <code>GET /api/tasks/{taskId}</code> 展示进度（如 <span class="path">ScanProgressDock.vue</span>、<span class="path">use-scan-task-tracker.ts</span>）。另：<strong>fsnotify</strong> 路径下扫描任务元数据常带 <code>trigger: fsnotify</code>，由 <code>autoLibraryWatch</code> 与主配置 <code>libraryWatchEnabled</code> 共同决定是否启用监听。</p>
+  <p>扫描由 <code>App</code> 协调：<code>scanner</code> 遍历配置的库路径，解析番号、写库；若开启整理（<code>organizeLibrary</code>），会按规则移动/组织文件。刮削通过 Metatube SDK 拉取元数据，<code>assets</code> 可把封面、预览图、演员头像等缓存到 <code>cacheDir</code>；预览图本地缺失时，后端还会基于保存的 <code>source_url</code> / <code>referer_url</code> 做同源兜底转发。长时间操作通过 <code>tasks.Manager</code> 生成 <code>taskId</code>，前端轮询 <code>GET /api/tasks/{taskId}</code> 展示进度（如 <span class="path">ScanProgressDock.vue</span>、<span class="path">use-scan-task-tracker.ts</span>），同时任务和 provider 健康结果会带 <code>errorCategory</code> 等机器可读诊断字段。另：<strong>fsnotify</strong> 路径下扫描任务元数据常带 <code>trigger: fsnotify</code>，由 <code>autoLibraryWatch</code> 与主配置 <code>libraryWatchEnabled</code> 共同决定是否启用监听。</p>
 
   <h2 id="api-contract">4. HTTP API 与契约</h2>
   <p>前后端共享的 DTO 与错误码在 Go 侧 <span class="path">backend/internal/contracts/</span> 定义；前端 TypeScript 类型在 <span class="path">src/api/types.ts</span> 等与之一致（字段命名一般为 camelCase JSON）。</p>

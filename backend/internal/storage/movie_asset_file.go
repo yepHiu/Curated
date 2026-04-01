@@ -211,6 +211,27 @@ func (s *SQLiteStore) listPreviewImageAssetRows(ctx context.Context, movieID str
 	return out, rows.Err()
 }
 
+func (s *SQLiteStore) GetMoviePreviewSourceURL(ctx context.Context, movieID string, seq int) (string, string, error) {
+	if seq < 1 {
+		return "", "", fmt.Errorf("invalid preview sequence")
+	}
+	assetID := fmt.Sprintf("%s:preview:%02d", strings.TrimSpace(movieID), seq)
+	var sourceURL string
+	var refererURL string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT source_url, referer_url FROM media_assets
+		 WHERE id = ? AND type = 'preview_image' AND TRIM(source_url) != ''`,
+		assetID,
+	).Scan(&sourceURL, &refererURL)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", ErrMovieAssetNotFound
+		}
+		return "", "", err
+	}
+	return strings.TrimSpace(sourceURL), strings.TrimSpace(refererURL), nil
+}
+
 // RewritePreviewImageURLsPreferLocal returns a copy of urls with entries replaced by same-origin preview asset paths when a valid local file exists (order matches media_assets.id).
 func (s *SQLiteStore) RewritePreviewImageURLsPreferLocal(ctx context.Context, movieID, cacheDir string, urls []string) []string {
 	if len(urls) == 0 {

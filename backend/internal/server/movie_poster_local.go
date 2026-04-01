@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -71,6 +73,7 @@ func (h *Handler) enrichMovieDetailLocalPosters(ctx context.Context, movie *cont
 	if len(movie.PreviewImages) > 0 {
 		movie.PreviewImages = h.store.RewritePreviewImageURLsPreferLocal(ctx, movie.ID, h.cfg.CacheDir, movie.PreviewImages)
 	}
+	h.enrichMovieDetailLocalActorAvatars(ctx, movie)
 }
 
 func (h *Handler) handleGetMovieAsset(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +139,9 @@ func (h *Handler) handleGetMoviePreviewAsset(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrMovieAssetNotFound), errors.Is(err, storage.ErrMovieAssetForbidden):
+			if h.proxyMoviePreviewAsset(w, r, movieID, seq) {
+				return
+			}
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "asset not found")
 		default:
 			if h.logger != nil {
@@ -159,6 +165,39 @@ func (h *Handler) handleGetMoviePreviewAsset(w http.ResponseWriter, r *http.Requ
 	name := "preview-" + strconv.Itoa(seq) + pickImageExtFromPath(f.Name())
 	w.Header().Set("Cache-Control", "private, no-cache")
 	http.ServeContent(w, r, name, st.ModTime(), f)
+}
+
+func (h *Handler) proxyMoviePreviewAsset(w http.ResponseWriter, r *http.Request, movieID string, seq int) bool {
+	sourceURL, refererURL, err := h.store.GetMoviePreviewSourceURL(r.Context(), movieID, seq)
+	if err != nil || strings.TrimSpace(sourceURL) == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+	if strings.TrimSpace(refererURL) != "" {
+		req.Header.Set("Referer", refererURL)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false
+	}
+	w.Header().Set("Cache-Control", "private, no-cache")
+	if ct := strings.TrimSpace(resp.Header.Get("Content-Type")); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, resp.Body)
+	return true
 }
 
 func pickImageExtFromPath(p string) string {

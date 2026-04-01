@@ -203,3 +203,63 @@ func TestRewritePreviewImageURLsPreferLocal(t *testing.T) {
 	}
 	_ = f.Close()
 }
+
+func TestOpenActorAvatarFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-1",
+		Path:     filepath.Join(root, "ABC-123.mp4"),
+		FileName: "ABC-123.mp4",
+		Number:   "ABC-123",
+	})
+	if err != nil {
+		t.Fatalf("persist: %v", err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "ABC-123",
+		Title:   "T",
+		Studio:  "S",
+		Summary: "x",
+		Actors:  []string{"Alice"},
+	}); err != nil {
+		t.Fatalf("metadata: %v", err)
+	}
+
+	cacheDir := filepath.Join(root, "cache")
+	avatarPath := filepath.Join(cacheDir, "actors", "Alice.jpg")
+	if err := os.MkdirAll(filepath.Dir(avatarPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(avatarPath, []byte("fake-avatar-image-content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateActorAvatarCache(ctx, "Alice", avatarPath, 200, ""); err != nil {
+		t.Fatalf("update actor avatar cache: %v", err)
+	}
+	ready, err := store.BatchActorAvatarLocalReady(ctx, []string{"Alice"}, cacheDir)
+	if err != nil {
+		t.Fatalf("batch actor avatar: %v", err)
+	}
+	if !ready["Alice"] {
+		t.Fatal("expected actor avatar to be locally ready")
+	}
+	f, err := store.OpenActorAvatarFile(ctx, "Alice", cacheDir)
+	if err != nil {
+		t.Fatalf("open actor avatar: %v", err)
+	}
+	_ = f.Close()
+}

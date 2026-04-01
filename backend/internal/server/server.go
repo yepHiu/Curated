@@ -24,6 +24,7 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/proxyenv"
+	"curated-backend/internal/scraper/metatube"
 	"curated-backend/internal/shellopen"
 	"curated-backend/internal/storage"
 	"curated-backend/internal/tasks"
@@ -71,6 +72,8 @@ type MetadataScrapeSettings interface {
 	SetMetadataMovieProviderChain(chain []string) error
 	MetadataMovieScrapeMode() string
 	SetMetadataMovieScrapeMode(mode string) error
+	MetadataMovieStrategy() string
+	SetMetadataMovieStrategy(strategy string) error
 	ListMetadataMovieProviders() []string
 }
 
@@ -187,6 +190,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
 	mux.HandleFunc("GET /api/library/actors", h.handleListActors)
 	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
+	mux.HandleFunc("GET /api/library/actors/{name}/asset/avatar", h.handleGetActorAvatarAsset)
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
@@ -293,6 +297,7 @@ func (h *Handler) handleGetActorProfile(w http.ResponseWriter, r *http.Request) 
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load actor profile")
 		return
 	}
+	h.enrichActorProfileLocalAvatar(r.Context(), &profile)
 	writeJSON(w, http.StatusOK, profile)
 }
 
@@ -354,6 +359,7 @@ func (h *Handler) handleListActors(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list actors")
 		return
 	}
+	h.enrichActorListLocalAvatars(r.Context(), result.Actors)
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -1238,6 +1244,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		dto.MetadataMovieProvider = h.metadataScrapeCtl.MetadataMovieProvider()
 		dto.MetadataMovieProviderChain = h.metadataScrapeCtl.MetadataMovieProviderChain()
 		dto.MetadataMovieScrapeMode = h.metadataScrapeCtl.MetadataMovieScrapeMode()
+		dto.MetadataMovieStrategy = h.metadataScrapeCtl.MetadataMovieStrategy()
 		if list := h.metadataScrapeCtl.ListMetadataMovieProviders(); list != nil {
 			dto.MetadataMovieProviders = list
 		}
@@ -1308,7 +1315,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1419,6 +1426,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.metadataScrapeCtl.SetMetadataMovieScrapeMode(mode); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist metadataMovieScrapeMode", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.MetadataMovieStrategy != nil {
+		if h.metadataScrapeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "metadata scrape settings not available")
+			return
+		}
+		strategy := strings.TrimSpace(strings.ToLower(*body.MetadataMovieStrategy))
+		if strategy != "auto-global" && strategy != "auto-cn-friendly" && strategy != "custom-chain" && strategy != "specified" {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid metadataMovieStrategy")
+			return
+		}
+		if err := h.metadataScrapeCtl.SetMetadataMovieStrategy(strategy); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist metadataMovieStrategy", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
 			return
@@ -1762,7 +1788,9 @@ func (h *Handler) handlePingProvider(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		dto.Message = err.Error()
+		dto.ErrorCategory = classifyProviderHealthError(err)
 	}
+	h.enrichProviderHealthRuntime(&dto)
 
 	writeJSON(w, http.StatusOK, dto)
 }
@@ -1783,10 +1811,12 @@ func (h *Handler) handlePingAllProviders(w http.ResponseWriter, r *http.Request)
 		}
 		if err != nil {
 			dto.Message = err.Error()
+			dto.ErrorCategory = classifyProviderHealthError(err)
 			failCount++
 		} else if status == "ok" {
 			okCount++
 		}
+		h.enrichProviderHealthRuntime(&dto)
 		results = append(results, dto)
 	}
 
@@ -1796,6 +1826,46 @@ func (h *Handler) handlePingAllProviders(w http.ResponseWriter, r *http.Request)
 		OK:        okCount,
 		Fail:      failCount,
 	})
+}
+
+func (h *Handler) enrichProviderHealthRuntime(dto *contracts.ProviderHealthDTO) {
+	if dto == nil {
+		return
+	}
+	checker, ok := h.providerHealthChecker.(*metatube.Service)
+	if !ok {
+		return
+	}
+	snap := checker.ProviderRuntimeHealth(dto.Name)
+	if dto.ErrorCategory == "" {
+		dto.ErrorCategory = snap.ErrorCategory
+	}
+	dto.CooldownUntil = snap.CooldownUntil
+	dto.ConsecutiveFailures = snap.ConsecutiveFailures
+	dto.AvgLatencyMs = snap.AvgLatencyMs
+}
+
+func classifyProviderHealthError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "no such host"), strings.Contains(msg, "lookup "):
+		return "dns_failure"
+	case strings.Contains(msg, "timeout"):
+		return "connect_timeout"
+	case strings.Contains(msg, "tls"):
+		return "tls_failure"
+	case strings.Contains(msg, "restricted"), strings.Contains(msg, "geo"), strings.Contains(msg, "region"):
+		return "region_restricted"
+	case strings.Contains(msg, "forbidden"), strings.Contains(msg, "referer"), strings.Contains(msg, "hotlink"):
+		return "hotlink_denied"
+	case strings.Contains(msg, "no results"):
+		return "provider_empty_result"
+	default:
+		return "provider_invalid_content"
+	}
 }
 
 func (h *Handler) handleProxyPingJavbus(w http.ResponseWriter, r *http.Request) {

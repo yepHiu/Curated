@@ -387,9 +387,43 @@ func (a *App) MetadataMovieScrapeMode() string {
 	return a.effectiveMetadataMovieScrapeModeLocked()
 }
 
+func (a *App) MetadataMovieStrategy() string {
+	a.metadataMovieMu.RLock()
+	defer a.metadataMovieMu.RUnlock()
+	strategy := strings.TrimSpace(strings.ToLower(a.cfg.MetadataMovieStrategy))
+	switch strategy {
+	case "auto-global", "auto-cn-friendly", "custom-chain", "specified":
+		return strategy
+	default:
+		mode := a.effectiveMetadataMovieScrapeModeLocked()
+		switch mode {
+		case "chain":
+			return "custom-chain"
+		case "specified":
+			return "specified"
+		default:
+			return "auto-cn-friendly"
+		}
+	}
+}
+
 func (a *App) movieScrapeOptionsForRun() scraper.MovieScrapeOptions {
 	a.metadataMovieMu.RLock()
 	defer a.metadataMovieMu.RUnlock()
+	if ms, ok := a.scraper.(*metatube.Service); ok {
+		switch strings.TrimSpace(strings.ToLower(a.cfg.MetadataMovieStrategy)) {
+		case "auto-cn-friendly":
+			return scraper.MovieScrapeOptions{ProviderChain: ms.PreferredMovieProviderChain("auto-cn-friendly")}
+		case "auto-global":
+			return scraper.MovieScrapeOptions{}
+		case "custom-chain":
+			ch := make([]string, len(a.metadataMovieProviderChain))
+			copy(ch, a.metadataMovieProviderChain)
+			return scraper.MovieScrapeOptions{ProviderChain: ch}
+		case "specified":
+			return scraper.MovieScrapeOptions{Provider: strings.TrimSpace(a.cfg.MetadataMovieProvider)}
+		}
+	}
 	mode := a.effectiveMetadataMovieScrapeModeLocked()
 	switch mode {
 	case "chain":
@@ -499,6 +533,29 @@ func (a *App) SetMetadataMovieScrapeMode(mode string) error {
 	}
 	a.metadataMovieMu.Lock()
 	a.cfg.MetadataMovieScrapeMode = normalized
+	a.metadataMovieMu.Unlock()
+	return nil
+}
+
+func (a *App) SetMetadataMovieStrategy(strategy string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	normalized := strings.TrimSpace(strings.ToLower(strategy))
+	switch normalized {
+	case "auto-global", "auto-cn-friendly", "custom-chain", "specified":
+	default:
+		return fmt.Errorf("invalid metadataMovieStrategy %q", strategy)
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["metadataMovieStrategy"] = normalized
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.metadataMovieMu.Lock()
+	a.cfg.MetadataMovieStrategy = normalized
 	a.metadataMovieMu.Unlock()
 	return nil
 }
@@ -1189,6 +1246,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 			code = contracts.ErrorCodeScraperRun
 		}
 		task = a.tasks.Fail(task.TaskID, code, err.Error())
+		task.ErrorCategory = classifyNetworkError(err)
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed scraper task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
@@ -1217,6 +1275,8 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 
 	if err := a.store.SaveMovieMetadata(ctx, metadata); err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
+		task.ErrorCategory = classifyNetworkError(err)
+		task.Provider = strings.TrimSpace(metadata.Provider)
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist scraper failure", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
@@ -1238,6 +1298,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	a.library.ApplyScrapedMetadata(metadata)
 
 	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Metadata saved for %s", result.Number))
+	task.Provider = strings.TrimSpace(metadata.Provider)
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed scraper task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
@@ -1336,6 +1397,7 @@ func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, ac
 	profile, err := a.scraper.ScrapeActor(ctx, actorName)
 	if err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
+		task.ErrorCategory = classifyNetworkError(err)
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed actor scrape task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
@@ -1349,13 +1411,18 @@ func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, ac
 
 	if err := a.store.UpdateActorProfile(ctx, profile); err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeScraperRun, err.Error())
+		task.ErrorCategory = classifyNetworkError(err)
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed actor scrape task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
 		return
 	}
+	if avatarURL := strings.TrimSpace(profile.AvatarURL); avatarURL != "" {
+		go a.downloadActorAvatar(actorName, avatarURL, profile.Homepage)
+	}
 
 	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Actor profile saved: %s", actorName))
+	task.Provider = strings.TrimSpace(profile.Provider)
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed actor scrape task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
@@ -1493,6 +1560,8 @@ func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, meta
 	downloaded, err := a.assets.DownloadAllTo(ctx, metadata, destDir)
 	if err != nil {
 		task = a.tasks.Fail(task.TaskID, contracts.ErrorCodeAssetDownload, err.Error())
+		task.ErrorCategory = classifyNetworkError(err)
+		task.Provider = strings.TrimSpace(metadata.Provider)
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed asset task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
@@ -1539,10 +1608,51 @@ func (a *App) runAssetDownload(parentCtx context.Context, output io.Writer, meta
 	}
 
 	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Downloaded %d assets for %s", len(downloaded), metadata.Number))
+	task.Provider = strings.TrimSpace(metadata.Provider)
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed asset task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
 	_ = a.emitEvent(output, contracts.EventTaskCompleted, contracts.TaskEventDTO{Task: task})
+}
+
+func (a *App) downloadActorAvatar(actorName, sourceURL, referer string) {
+	ctx, cancel := context.WithTimeout(a.appCtx, 45*time.Second)
+	defer cancel()
+	localPath, httpStatus, err := a.assets.DownloadActorAvatar(ctx, actorName, sourceURL, assets.ImageFetchOptions{Referer: referer})
+	if err != nil {
+		if saveErr := a.store.UpdateActorAvatarCache(ctx, actorName, "", httpStatus, err.Error()); saveErr != nil && a.logger != nil {
+			a.logger.Warn("failed to persist actor avatar failure", zap.Error(saveErr), zap.String("actorName", actorName))
+		}
+		return
+	}
+	if err := a.store.UpdateActorAvatarCache(ctx, actorName, localPath, httpStatus, ""); err != nil && a.logger != nil {
+		a.logger.Warn("failed to persist actor avatar cache", zap.Error(err), zap.String("actorName", actorName))
+	}
+}
+
+func classifyNetworkError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "no such host"), strings.Contains(msg, "lookup "):
+		return "dns_failure"
+	case strings.Contains(msg, "timeout"):
+		return "connect_timeout"
+	case strings.Contains(msg, "tls"):
+		return "tls_failure"
+	case strings.Contains(msg, "restricted"), strings.Contains(msg, "geo"), strings.Contains(msg, "region"):
+		return "region_restricted"
+	case strings.Contains(msg, "hotlink"), strings.Contains(msg, "referer"), strings.Contains(msg, "forbidden"):
+		return "hotlink_denied"
+	case strings.Contains(msg, "no results"):
+		return "provider_empty_result"
+	case strings.Contains(msg, "parse"):
+		return "parser_failed"
+	default:
+		return "provider_invalid_content"
+	}
 }
 
 func (a *App) respondOK(output io.Writer, id string, data any) error {

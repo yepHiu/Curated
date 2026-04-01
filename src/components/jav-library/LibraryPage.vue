@@ -113,7 +113,7 @@ function isChipActive(tag: string): boolean {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-7">
+  <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-5 lg:gap-6">
     <ActorProfileCard
       v-if="activeActorTrimmed"
       :actor-name="activeActorTrimmed"
@@ -340,11 +340,11 @@ function isChipActive(tag: string): boolean {
 
     <div
       v-else
-      class="flex flex-wrap items-center justify-between gap-3"
+      class="flex flex-wrap items-center justify-between gap-3 pb-1"
     >
       <Tabs
         :model-value="props.activeTab"
-        class="min-w-0 flex-1 gap-5"
+        class="min-w-0 flex-1 gap-4"
         @update:model-value="handleTabChange"
       >
         <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
@@ -397,7 +397,7 @@ function isChipActive(tag: string): boolean {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1">
+    <div class="min-h-0 flex-1 rounded-[1.5rem] border border-border/60 bg-background/40 p-2 sm:p-3 lg:p-4">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
         :selected-movie-id="props.selectedMovie?.id"

@@ -113,6 +113,7 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | GET/PATCH | `/api/settings` | Settings; library keys persisted to `library-config.cfg` |
 | GET | `/api/library/actors` | Actor list (filters, tags) |
 | GET | `/api/library/actors/profile` | Actor profile |
+| GET | `/api/library/actors/{name}/asset/avatar` | Same-origin cached actor avatar |
 | PATCH | `/api/library/actors/tags` | Replace actor user tags |
 | POST | `/api/library/actors/scrape` | Scrape actor metadata (task) |
 | GET/POST | `/api/library/played-movies` … | Played stats |
@@ -123,6 +124,13 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | GET | `/api/tasks/{taskId}` | Task status |
 
 DTOs and error codes: `backend/internal/contracts/contracts.go`, `src/api/types.ts`.
+
+Scrape stability additions:
+
+- actor avatars can now be cached locally and served from the backend instead of direct browser requests to remote image hosts
+- movie preview images still prefer local cache, and now have a backend fetch fallback when only `source_url` is known
+- settings now support a higher-level `metadataMovieStrategy` alongside legacy `metadataMovieScrapeMode`
+- provider health responses and task payloads include richer machine-readable failure categories for mainland-China troubleshooting
 
 ## Frontend behavior (short)
 

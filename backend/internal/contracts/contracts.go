@@ -71,6 +71,9 @@ type ListMoviesRequest struct {
 type ActorProfileDTO struct {
 	Name             string   `json:"name"`
 	AvatarURL        string   `json:"avatarUrl,omitempty"`
+	AvatarRemoteURL  string   `json:"avatarRemoteUrl,omitempty"`
+	AvatarLocalURL   string   `json:"avatarLocalUrl,omitempty"`
+	HasLocalAvatar   bool     `json:"hasLocalAvatar,omitempty"`
 	Summary          string   `json:"summary,omitempty"`
 	Homepage         string   `json:"homepage,omitempty"`
 	Provider         string   `json:"provider,omitempty"`
@@ -83,10 +86,13 @@ type ActorProfileDTO struct {
 
 // ActorListItemDTO is one row in GET /api/library/actors (library display name + stats + actor-only user tags).
 type ActorListItemDTO struct {
-	Name       string   `json:"name"`
-	AvatarURL  string   `json:"avatarUrl,omitempty"`
-	MovieCount int      `json:"movieCount"`
-	UserTags   []string `json:"userTags,omitempty"`
+	Name            string   `json:"name"`
+	AvatarURL       string   `json:"avatarUrl,omitempty"`
+	AvatarRemoteURL string   `json:"avatarRemoteUrl,omitempty"`
+	AvatarLocalURL  string   `json:"avatarLocalUrl,omitempty"`
+	HasLocalAvatar  bool     `json:"hasLocalAvatar,omitempty"`
+	MovieCount      int      `json:"movieCount"`
+	UserTags        []string `json:"userTags,omitempty"`
 }
 
 // ListActorsRequest is the query for GET /api/library/actors.
@@ -340,6 +346,8 @@ type SettingsDTO struct {
 	// MetadataMovieScrapeMode: auto | specified | chain — which strategy the backend uses for new scrapes.
 	// Saved chain/specifier lists may remain in cfg when switching mode so the UI can restore them.
 	MetadataMovieScrapeMode string `json:"metadataMovieScrapeMode"`
+	// MetadataMovieStrategy refines provider scheduling while keeping legacy mode fields compatible.
+	MetadataMovieStrategy string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
 	// BackendLog: file/console log settings persisted in library-config.cfg; restart backend to apply to Zap sinks.
@@ -395,6 +403,8 @@ type PatchSettingsRequest struct {
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
 	MetadataMovieScrapeMode *string `json:"metadataMovieScrapeMode,omitempty"`
+	// MetadataMovieStrategy: auto-global | auto-cn-friendly | custom-chain | specified.
+	MetadataMovieStrategy *string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy: nil = no change; non-nil object replaces current proxy config.
 	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
 	// BackendLog: nil = no change; non-empty partial fields merge into current and persist.
@@ -544,17 +554,19 @@ type PlayedMoviesListDTO struct {
 }
 
 type TaskDTO struct {
-	TaskID       string         `json:"taskId"`
-	Type         string         `json:"type"`
-	Status       string         `json:"status"`
-	CreatedAt    string         `json:"createdAt"`
-	StartedAt    string         `json:"startedAt,omitempty"`
-	FinishedAt   string         `json:"finishedAt,omitempty"`
-	Progress     int            `json:"progress"`
-	Message      string         `json:"message,omitempty"`
-	ErrorCode    string         `json:"errorCode,omitempty"`
-	ErrorMessage string         `json:"errorMessage,omitempty"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
+	TaskID        string         `json:"taskId"`
+	Type          string         `json:"type"`
+	Status        string         `json:"status"`
+	CreatedAt     string         `json:"createdAt"`
+	StartedAt     string         `json:"startedAt,omitempty"`
+	FinishedAt    string         `json:"finishedAt,omitempty"`
+	Progress      int            `json:"progress"`
+	Message       string         `json:"message,omitempty"`
+	ErrorCode     string         `json:"errorCode,omitempty"`
+	ErrorCategory string         `json:"errorCategory,omitempty"`
+	ErrorMessage  string         `json:"errorMessage,omitempty"`
+	Provider      string         `json:"provider,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 
 // RecentTasksDTO is returned by GET /api/tasks/recent (in-memory tasks only).
@@ -628,10 +640,14 @@ const (
 
 // ProviderHealthDTO is the result of pinging a single provider.
 type ProviderHealthDTO struct {
-	Name      string               `json:"name"`
-	Status    ProviderHealthStatus `json:"status"`
-	LatencyMs int64                `json:"latencyMs"`
-	Message   string               `json:"message,omitempty"`
+	Name                string               `json:"name"`
+	Status              ProviderHealthStatus `json:"status"`
+	LatencyMs           int64                `json:"latencyMs"`
+	Message             string               `json:"message,omitempty"`
+	ErrorCategory       string               `json:"errorCategory,omitempty"`
+	CooldownUntil       string               `json:"cooldownUntil,omitempty"`
+	ConsecutiveFailures int                  `json:"consecutiveFailures,omitempty"`
+	AvgLatencyMs        int64                `json:"avgLatencyMs,omitempty"`
 }
 
 // PingProviderRequest is the body for POST /api/providers/ping.

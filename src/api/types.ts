@@ -97,6 +97,11 @@ export interface PatchPlayerSettingsBody {
 
 /** 与后端 library-config.cfg / GET settings 一致：决定新刮削使用的策略；链与单源列表可保留在切换模式时 */
 export type MetadataMovieScrapeMode = "auto" | "specified" | "chain"
+export type MetadataMovieStrategy =
+  | "auto-global"
+  | "auto-cn-friendly"
+  | "custom-chain"
+  | "specified"
 
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
@@ -117,6 +122,7 @@ export interface SettingsDTO {
   metadataMovieProviderChain: string[]
   /** 当前生效的刮削策略（旧后端可能缺省，由前端按链/单源推断） */
   metadataMovieScrapeMode?: MetadataMovieScrapeMode
+  metadataMovieStrategy?: MetadataMovieStrategy
   /** HTTP 代理配置 */
   proxy: ProxySettingsDTO
   /** 后端进程日志（文件 + 级别）；重启后端后作用于 Zap */
@@ -169,6 +175,7 @@ export interface PatchSettingsBody {
   metadataMovieProviderChain?: string[]
   /** 仅切换生效策略，不删除已保存的链或单源字段 */
   metadataMovieScrapeMode?: MetadataMovieScrapeMode
+  metadataMovieStrategy?: MetadataMovieStrategy
   /** 代理配置；发送则替换当前配置 */
   proxy?: ProxySettingsDTO
   /** 合并写入后端日志设置 */
@@ -185,7 +192,9 @@ export interface TaskDTO {
   progress: number
   message?: string
   errorCode?: string
+  errorCategory?: string
   errorMessage?: string
+  provider?: string
   metadata?: Record<string, unknown>
 }
 
@@ -196,6 +205,9 @@ export interface RecentTasksDTO {
 export interface ActorProfileDTO {
   name: string
   avatarUrl?: string
+  avatarRemoteUrl?: string
+  avatarLocalUrl?: string
+  hasLocalAvatar?: boolean
   summary?: string
   homepage?: string
   provider?: string
@@ -211,6 +223,9 @@ export interface ActorProfileDTO {
 export interface ActorListItemDTO {
   name: string
   avatarUrl?: string
+  avatarRemoteUrl?: string
+  avatarLocalUrl?: string
+  hasLocalAvatar?: boolean
   movieCount: number
   userTags?: string[]
 }
@@ -308,6 +323,10 @@ export interface ProviderHealthDTO {
   status: ProviderHealthStatus
   latencyMs: number
   message?: string
+  errorCategory?: string
+  cooldownUntil?: string
+  consecutiveFailures?: number
+  avgLatencyMs?: number
 }
 
 /** POST /api/providers/ping request body */

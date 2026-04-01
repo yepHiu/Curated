@@ -154,12 +154,12 @@ func replaceMovieTags(ctx context.Context, tx *sql.Tx, movieID string, tags []st
 
 func replaceMediaAssets(ctx context.Context, tx *sql.Tx, metadata scraper.Metadata) error {
 	if metadata.CoverURL != "" {
-		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":cover", metadata.MovieID, "cover", metadata.CoverURL); err != nil {
+		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":cover", metadata.MovieID, "cover", metadata.CoverURL, metadata.Provider, metadata.Homepage); err != nil {
 			return err
 		}
 	}
 	if metadata.ThumbURL != "" {
-		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":thumb", metadata.MovieID, "thumb", metadata.ThumbURL); err != nil {
+		if err := upsertMediaAsset(ctx, tx, metadata.MovieID+":thumb", metadata.MovieID, "thumb", metadata.ThumbURL, metadata.Provider, metadata.Homepage); err != nil {
 			return err
 		}
 	}
@@ -167,25 +167,29 @@ func replaceMediaAssets(ctx context.Context, tx *sql.Tx, metadata scraper.Metada
 		if previewURL == "" {
 			continue
 		}
-		if err := upsertMediaAsset(ctx, tx, fmt.Sprintf("%s:preview:%02d", metadata.MovieID, index+1), metadata.MovieID, "preview_image", previewURL); err != nil {
+		if err := upsertMediaAsset(ctx, tx, fmt.Sprintf("%s:preview:%02d", metadata.MovieID, index+1), metadata.MovieID, "preview_image", previewURL, metadata.Provider, metadata.Homepage); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func upsertMediaAsset(ctx context.Context, tx *sql.Tx, id, movieID, assetType, sourceURL string) error {
+func upsertMediaAsset(ctx context.Context, tx *sql.Tx, id, movieID, assetType, sourceURL, sourceProvider, refererURL string) error {
 	_, err := tx.ExecContext(
 		ctx,
-		`INSERT INTO media_assets (id, movie_id, type, source_url, local_path, created_at, updated_at)
-		VALUES (?, ?, ?, ?, '', ?, ?)
+		`INSERT INTO media_assets (id, movie_id, type, source_url, local_path, source_provider, referer_url, created_at, updated_at)
+		VALUES (?, ?, ?, ?, '', ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source_url = excluded.source_url,
+			source_provider = excluded.source_provider,
+			referer_url = excluded.referer_url,
 			updated_at = excluded.updated_at`,
 		id,
 		movieID,
 		assetType,
 		sourceURL,
+		sourceProvider,
+		refererURL,
 		nowUTC(),
 		nowUTC(),
 	)

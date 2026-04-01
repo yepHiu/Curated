@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"curated-backend/internal/contracts"
@@ -21,6 +22,7 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 		dto              contracts.ActorProfileDTO
 		actorID          int64
 		avatar           sql.NullString
+		avatarLocalPath  sql.NullString
 		summary          sql.NullString
 		homepage         sql.NullString
 		provider         sql.NullString
@@ -30,12 +32,13 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 		profileUpdatedAt sql.NullString
 	)
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, name, avatar, summary, homepage, provider, provider_actor_id, height, birthday, profile_updated_at
+		SELECT id, name, avatar, avatar_local_path, summary, homepage, provider, provider_actor_id, height, birthday, profile_updated_at
 		FROM actors WHERE name = ?`, name,
 	).Scan(
 		&actorID,
 		&dto.Name,
 		&avatar,
+		&avatarLocalPath,
 		&summary,
 		&homepage,
 		&provider,
@@ -50,7 +53,11 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 	case err != nil:
 		return contracts.ActorProfileDTO{}, err
 	}
-	dto.AvatarURL = avatar.String
+	dto.AvatarRemoteURL = strings.TrimSpace(avatar.String)
+	dto.AvatarURL = dto.AvatarRemoteURL
+	if strings.TrimSpace(avatarLocalPath.String) != "" {
+		dto.HasLocalAvatar = true
+	}
 	dto.Summary = summary.String
 	dto.Homepage = homepage.String
 	dto.Provider = provider.String
@@ -177,11 +184,12 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 
 	listQuery := fmt.Sprintf(`
 		SELECT a.id, a.name, a.avatar, COUNT(DISTINCT ma.movie_id) AS movie_count
+			, a.avatar_local_path
 		FROM actors a
 		INNER JOIN movie_actors ma ON ma.actor_id = a.id
 		INNER JOIN movies m ON m.id = ma.movie_id
 		WHERE %s AND %s
-		GROUP BY a.id, a.name, a.avatar
+		GROUP BY a.id, a.name, a.avatar, a.avatar_local_path
 		HAVING COUNT(DISTINCT ma.movie_id) > 0
 		ORDER BY %s
 		LIMIT ? OFFSET ?`, whereClause, sqlMovieActiveClause, orderSQL)
@@ -194,15 +202,16 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 	defer rows.Close()
 
 	type row struct {
-		id         int64
-		name       string
-		avatar     string
-		movieCount int
+		id              int64
+		name            string
+		avatar          string
+		avatarLocalPath string
+		movieCount      int
 	}
 	var list []row
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.id, &r.name, &r.avatar, &r.movieCount); err != nil {
+		if err := rows.Scan(&r.id, &r.name, &r.avatar, &r.movieCount, &r.avatarLocalPath); err != nil {
 			return contracts.ListActorsResponse{}, err
 		}
 		list = append(list, r)
@@ -230,10 +239,12 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 			continue
 		}
 		out = append(out, contracts.ActorListItemDTO{
-			Name:       r.name,
-			AvatarURL:  strings.TrimSpace(r.avatar),
-			MovieCount: r.movieCount,
-			UserTags:   tagsByActor[r.id],
+			Name:            r.name,
+			AvatarURL:       strings.TrimSpace(r.avatar),
+			AvatarRemoteURL: strings.TrimSpace(r.avatar),
+			HasLocalAvatar:  strings.TrimSpace(r.avatarLocalPath) != "",
+			MovieCount:      r.movieCount,
+			UserTags:        tagsByActor[r.id],
 		})
 	}
 	return contracts.ListActorsResponse{Total: total, Actors: out}, nil
@@ -314,14 +325,15 @@ func (s *SQLiteStore) ActorListItemByName(ctx context.Context, name string) (con
 	}
 	var id int64
 	var avatar string
+	var avatarLocalPath string
 	var movieCount int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT a.id, a.avatar, COUNT(ma.movie_id)
+		SELECT a.id, a.avatar, COUNT(ma.movie_id), a.avatar_local_path
 		FROM actors a
 		LEFT JOIN movie_actors ma ON ma.actor_id = a.id
 		WHERE a.name = ?
-		GROUP BY a.id, a.name, a.avatar`, name,
-	).Scan(&id, &avatar, &movieCount)
+		GROUP BY a.id, a.name, a.avatar, a.avatar_local_path`, name,
+	).Scan(&id, &avatar, &movieCount, &avatarLocalPath)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return contracts.ActorListItemDTO{}, contracts.ErrActorNotFound
@@ -333,9 +345,136 @@ func (s *SQLiteStore) ActorListItemByName(ctx context.Context, name string) (con
 		return contracts.ActorListItemDTO{}, err
 	}
 	return contracts.ActorListItemDTO{
-		Name:       name,
-		AvatarURL:  strings.TrimSpace(avatar),
-		MovieCount: movieCount,
-		UserTags:   tagsByActor[id],
+		Name:            name,
+		AvatarURL:       strings.TrimSpace(avatar),
+		AvatarRemoteURL: strings.TrimSpace(avatar),
+		HasLocalAvatar:  strings.TrimSpace(avatarLocalPath) != "",
+		MovieCount:      movieCount,
+		UserTags:        tagsByActor[id],
 	}, nil
+}
+
+func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, localPath string, httpStatus int, lastErr string) error {
+	actorName = strings.TrimSpace(actorName)
+	if actorName == "" {
+		return contracts.ErrActorNotFound
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE actors SET
+			avatar_local_path = ?,
+			avatar_last_http_status = ?,
+			avatar_last_error = ?,
+			avatar_last_fetched_at = ?
+		WHERE name = ?`,
+		strings.TrimSpace(localPath),
+		httpStatus,
+		strings.TrimSpace(lastErr),
+		nowUTC(),
+		actorName,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return contracts.ErrActorNotFound
+	}
+	return nil
+}
+
+func (s *SQLiteStore) GetActorAvatarSource(ctx context.Context, actorName string) (string, error) {
+	actorName = strings.TrimSpace(actorName)
+	if actorName == "" {
+		return "", contracts.ErrActorNotFound
+	}
+	var avatar string
+	err := s.db.QueryRowContext(ctx, `SELECT avatar FROM actors WHERE name = ?`, actorName).Scan(&avatar)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", contracts.ErrActorNotFound
+	case err != nil:
+		return "", err
+	default:
+		return strings.TrimSpace(avatar), nil
+	}
+}
+
+func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string) (map[string]bool, error) {
+	out := make(map[string]bool, len(actorNames))
+	if len(actorNames) == 0 {
+		return out, nil
+	}
+	policy := s.loadPosterPathPolicy(ctx, cacheDir)
+	if policy.cacheAbs == "" && len(policy.rootAbs) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, 0, len(actorNames))
+	args := make([]any, 0, len(actorNames))
+	for _, name := range actorNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		placeholders = append(placeholders, "?")
+		args = append(args, name)
+	}
+	if len(placeholders) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+		`SELECT name, avatar_local_path FROM actors WHERE name IN (%s) AND TRIM(avatar_local_path) != ''`,
+		strings.Join(placeholders, ","),
+	), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, localPath string
+		if err := rows.Scan(&name, &localPath); err != nil {
+			return nil, err
+		}
+		absPath, err := absCleanPath(localPath)
+		if err != nil {
+			continue
+		}
+		if !mediaAssetPathAllowedWithPolicy(absPath, policy) {
+			continue
+		}
+		out[name] = true
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLiteStore) OpenActorAvatarFile(ctx context.Context, actorName, cacheDir string) (*os.File, error) {
+	actorName = strings.TrimSpace(actorName)
+	if actorName == "" {
+		return nil, ErrMovieAssetNotFound
+	}
+	var localPath string
+	err := s.db.QueryRowContext(ctx, `SELECT avatar_local_path FROM actors WHERE name = ? AND TRIM(avatar_local_path) != ''`, actorName).Scan(&localPath)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrMovieAssetNotFound
+		}
+		return nil, err
+	}
+	absPath, err := absCleanPath(localPath)
+	if err != nil {
+		return nil, ErrMovieAssetNotFound
+	}
+	if !s.mediaAssetPathAllowed(ctx, absPath, cacheDir) {
+		return nil, ErrMovieAssetForbidden
+	}
+	f, err := os.Open(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrMovieAssetNotFound
+		}
+		return nil, err
+	}
+	return f, nil
 }

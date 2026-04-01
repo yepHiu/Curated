@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,9 +22,14 @@ import (
 )
 
 type DownloadedAsset struct {
-	Type      string
-	SourceURL string
-	LocalPath string
+	Type       string
+	SourceURL  string
+	LocalPath  string
+	HTTPStatus int
+}
+
+type ImageFetchOptions struct {
+	Referer string
 }
 
 type Service struct {
@@ -164,6 +170,9 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return "", fmt.Errorf("unexpected asset response status %d for %s", response.StatusCode, sourceURL)
 	}
+	if !looksLikeImageContentType(response.Header.Get("Content-Type")) {
+		return "", fmt.Errorf("unexpected asset content type %q for %s", response.Header.Get("Content-Type"), sourceURL)
+	}
 
 	tmpFile, err := os.CreateTemp(destDir, ".asset-dl-*")
 	if err != nil {
@@ -204,6 +213,106 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	return localPath, nil
 }
 
+func (s *Service) DownloadActorAvatar(ctx context.Context, actorName, sourceURL string, opts ImageFetchOptions) (string, int, error) {
+	destDir := filepath.Join(s.cacheDir, "actors")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return "", 0, err
+	}
+	ext := inferExt(sourceURL)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	safeName := sanitizeFileName(actorName)
+	if safeName == "" {
+		safeName = "actor"
+	}
+	localPath := filepath.Join(destDir, safeName+ext)
+	httpStatus, err := s.downloadWithHeaders(ctx, sourceURL, localPath, opts)
+	if err != nil {
+		return "", httpStatus, err
+	}
+	return localPath, httpStatus, nil
+}
+
+func (s *Service) FetchRemoteImage(ctx context.Context, sourceURL string, opts ImageFetchOptions) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", browserheaders.UserAgentChrome120)
+	req.Header.Set("Accept", browserheaders.AcceptLikeChrome)
+	if v := strings.TrimSpace(opts.Referer); v != "" {
+		req.Header.Set("Referer", v)
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp, fmt.Errorf("unexpected asset response status %d for %s", resp.StatusCode, sourceURL)
+	}
+	if !looksLikeImageContentType(resp.Header.Get("Content-Type")) {
+		return resp, fmt.Errorf("unexpected asset content type %q for %s", resp.Header.Get("Content-Type"), sourceURL)
+	}
+	return resp, nil
+}
+
+func (s *Service) downloadWithHeaders(ctx context.Context, sourceURL, localPath string, opts ImageFetchOptions) (int, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	request.Header.Set("User-Agent", browserheaders.UserAgentChrome120)
+	request.Header.Set("Accept", browserheaders.AcceptLikeChrome)
+	if v := strings.TrimSpace(opts.Referer); v != "" {
+		request.Header.Set("Referer", v)
+	}
+	response, err := s.client.Do(request)
+	if err != nil {
+		return 0, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return response.StatusCode, fmt.Errorf("unexpected asset response status %d for %s", response.StatusCode, sourceURL)
+	}
+	if !looksLikeImageContentType(response.Header.Get("Content-Type")) {
+		return response.StatusCode, fmt.Errorf("unexpected asset content type %q for %s", response.Header.Get("Content-Type"), sourceURL)
+	}
+	tmpFile, err := os.CreateTemp(filepath.Dir(localPath), ".asset-dl-*")
+	if err != nil {
+		return response.StatusCode, err
+	}
+	tmpPath := tmpFile.Name()
+	cleanupTmp := true
+	defer func() {
+		if cleanupTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	limited := http.MaxBytesReader(nil, response.Body, s.maxResponseBody)
+	written, err := io.Copy(tmpFile, limited)
+	if err != nil {
+		_ = tmpFile.Close()
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return response.StatusCode, fmt.Errorf("asset response exceeds max size (%d bytes) for %s", s.maxResponseBody, sourceURL)
+		}
+		return response.StatusCode, err
+	}
+	if written < 64 {
+		_ = tmpFile.Close()
+		return response.StatusCode, fmt.Errorf("asset response too small (%d bytes) for %s", written, sourceURL)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return response.StatusCode, err
+	}
+	if err := replaceFileAtomically(tmpPath, localPath); err != nil {
+		return response.StatusCode, err
+	}
+	cleanupTmp = false
+	return response.StatusCode, nil
+}
+
 // replaceFileAtomically moves tmpPath to finalPath. On failure, finalPath is left unchanged
 // (so a partial download never truncates an existing good file).
 func replaceFileAtomically(tmpPath, finalPath string) error {
@@ -240,4 +349,21 @@ func inferExt(rawURL string) string {
 		}
 	}
 	return ".jpg"
+}
+
+func sanitizeFileName(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	return replacer.Replace(v)
+}
+
+func looksLikeImageContentType(v string) bool {
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(v))
+	if err != nil {
+		mediaType = strings.TrimSpace(v)
+	}
+	return strings.HasPrefix(strings.ToLower(mediaType), "image/")
 }

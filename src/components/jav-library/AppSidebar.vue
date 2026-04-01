@@ -219,12 +219,12 @@ const getNavigationTarget = (page: AppPage) => {
 
 <template>
   <aside
-    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden rounded-3xl border border-border/70 bg-sidebar/95 text-sidebar-foreground shadow-2xl shadow-black/20 backdrop-blur transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
-    :class="props.compact ? 'items-center px-2 py-3' : 'p-4'"
+    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden rounded-[1.75rem] border border-border/60 bg-sidebar/95 text-sidebar-foreground backdrop-blur transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
+    :class="props.compact ? 'items-center px-2 py-3' : 'px-3.5 py-3.5'"
   >
     <div
       v-if="!props.compact"
-      class="flex items-center justify-between gap-2 px-2 py-3"
+      class="flex min-h-14 items-center justify-between gap-2 px-2 py-2.5"
     >
       <div class="flex min-w-0 items-center">
         <div
@@ -276,12 +276,12 @@ const getNavigationTarget = (page: AppPage) => {
     </div>
 
     <Separator
-      class="my-3 shrink-0 bg-sidebar-border/80"
+      class="my-2.5 shrink-0 bg-sidebar-border/80"
       :class="props.compact ? 'w-10' : ''"
     />
 
     <ScrollArea v-if="!props.compact" class="min-h-0 w-full min-w-0 flex-1">
-      <div class="flex flex-col gap-6 pr-3">
+      <div class="flex flex-col gap-5 pr-2.5">
         <section class="flex flex-col gap-2">
           <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             {{ t("nav.browse") }}
@@ -374,7 +374,7 @@ const getNavigationTarget = (page: AppPage) => {
     </div>
 
     <Separator
-      class="my-3 shrink-0 bg-sidebar-border/80"
+      class="my-2.5 shrink-0 bg-sidebar-border/80"
       :class="props.compact ? 'w-10' : ''"
     />
 

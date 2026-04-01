@@ -90,11 +90,11 @@ onBeforeUnmount(() => {
 
 const shellGridClass = computed(() => {
   const base =
-    "grid h-full min-h-0 gap-4 grid-cols-1 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
+    "grid h-full min-h-0 gap-3 grid-cols-1 lg:gap-5 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
   if (!isLgUp.value) {
     return base
   }
-  return `${base} ${desktopSidebarCollapsed.value ? "lg:grid-cols-[4.5rem_minmax(0,1fr)]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`
+  return `${base} ${desktopSidebarCollapsed.value ? "lg:grid-cols-[4.75rem_minmax(0,1fr)]" : "lg:grid-cols-[304px_minmax(0,1fr)]"}`
 })
 
 const currentMovie = computed(() => {
@@ -605,7 +605,7 @@ function clearActorsSearch() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 lg:px-4 lg:py-4">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3 lg:px-5 lg:py-5">
       <div :class="shellGridClass">
         <div
           v-if="isLgUp"
@@ -620,11 +620,11 @@ function clearActorsSearch() {
         </div>
 
         <section
-          class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[2rem] border border-border/70 bg-background/92 shadow-xl shadow-black/8"
+          class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/95"
         >
           <!-- min-h 与中间栏 h-10 搜索框 + 上下 py-4 对齐，避免仅「返回」时顶栏变矮（如观看历史） -->
           <div
-            class="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 lg:px-5"
+            class="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3.5 sm:px-5 lg:px-6 lg:py-4"
           >
             <div class="flex flex-wrap items-center gap-2">
               <Button
@@ -650,7 +650,7 @@ function clearActorsSearch() {
               <div
                 v-if="showLibraryBrowseSearch"
                 ref="librarySearchRootRef"
-                class="relative w-full max-w-lg"
+                class="relative w-full max-w-xl"
               >
                 <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -743,7 +743,7 @@ function clearActorsSearch() {
               </div>
               <div
                 v-else-if="isCuratedFramesRoute"
-                class="relative w-full max-w-lg"
+                class="relative w-full max-w-xl"
               >
                 <Search class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -766,7 +766,7 @@ function clearActorsSearch() {
               </div>
               <div
                 v-else-if="isActorsRoute"
-                class="relative w-full max-w-lg"
+                class="relative w-full max-w-xl"
               >
                 <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -811,8 +811,10 @@ function clearActorsSearch() {
             </div>
           </div>
 
-          <div class="min-h-0 min-w-0 flex-1 overflow-hidden p-4 lg:p-5 xl:p-6">
-            <RouterView />
+          <div class="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7">
+              <RouterView />
+            </div>
           </div>
         </section>
       </div>
@@ -837,7 +839,7 @@ function clearActorsSearch() {
           @click="mobileSidebarOpen = false"
         />
         <aside
-          class="absolute top-0 bottom-0 left-0 flex w-[min(280px,88vw)] max-w-full flex-col border-r border-border/70 bg-sidebar/98 shadow-2xl shadow-black/30 backdrop-blur-md transition-transform duration-200 ease-out"
+          class="absolute top-0 bottom-0 left-0 flex w-[min(304px,88vw)] max-w-full flex-col border-r border-border/60 bg-sidebar/98 shadow-2xl shadow-black/30 backdrop-blur-md transition-transform duration-200 ease-out"
           :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
           role="dialog"
           aria-modal="true"

@@ -18,6 +18,7 @@ scripts/
 .env.*
 !.env.example
 backend/runtime/
+.gocache/
 backend/*.exe
 backend/*.exe~
 

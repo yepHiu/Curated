@@ -56,3 +56,12 @@ alwaysApply: true
 - Curated now also has two expansion paths on that seam: `POST /api/library/movies/{id}/native-play` for launching an external native player kernel, and `POST /api/library/movies/{id}/playback-session` plus `/api/playback/sessions/{id}/hls/...` for HLS stream push.
 - The current in-page HLS browser path loads `hls.js` on demand when native HLS is unavailable.
 - `GET/PATCH /api/settings` now includes playback runtime preferences such as `nativePlayerEnabled`, `nativePlayerCommand`, `streamPushEnabled`, `ffmpegCommand`, `preferNativePlayer`, `seekForwardStepSec`, and `seekBackwardStepSec`.
+
+## 2026-04 Network Stability Update
+
+- Actor scraping now supports backend-owned avatar caching and same-origin delivery via `GET /api/library/actors/{name}/asset/avatar`.
+- Actor DTOs expose local-avatar state (`avatarLocalUrl`, `avatarRemoteUrl`, `hasLocalAvatar`), and backend handlers rewrite `avatarUrl` to the same-origin path when a cached file is ready.
+- Movie preview assets still prefer local cache, and now have a backend proxy fallback when `media_assets.source_url` exists but `local_path` is missing.
+- `media_assets` now persists source-side diagnostics for downloads: `source_provider`, `referer_url`, `last_http_status`, `last_error`, `last_fetched_at`.
+- Settings / runtime now have a higher-level scrape scheduler field `metadataMovieStrategy` in addition to legacy `metadataMovieScrapeMode`.
+- Provider health responses and task records now include richer machine-readable failure information (`errorCategory`, cooldown and rolling latency state where available).
