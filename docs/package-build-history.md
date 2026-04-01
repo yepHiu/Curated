@@ -1,0 +1,26 @@
+# 整包打包历史
+
+用于记录 Curated（仓库目录仍可能显示为 `jav-shadcn`）每次整包打包的关键信息，便于后续追踪构建产物、回溯问题和核对发布内容。
+
+## 记录规则
+
+- 每次执行整包打包后追加一条记录。
+- 如果一次打包同时生成多个产物，尽量合并在同一条记录中描述。
+- `状态` 建议使用：`成功`、`失败`、`已验证`、`待验证`。
+- `产物路径` 写相对仓库路径，便于跨机器查看。
+- `备注` 记录构建环境、特殊参数、已知问题、补丁说明等。
+
+## 常用脚本
+
+- 前端构建：`pnpm build`
+- 前端发布包：`pnpm release:frontend`
+- 后端发布包：`pnpm release:backend`
+- 便携包：`pnpm release:portable`
+- 安装包：`pnpm release:installer`
+- 发布流程：`pnpm release:publish`
+
+## 历史记录
+
+| 日期 | 版本 | 提交 / 分支 | 打包类型 | 产物路径 | 状态 | 操作人 | 备注 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-04-01 | 0.0.0-local | `a52143a` / `master` | `release:publish` | `release/portable/Curated-0.0.0-local-windows-x64.zip`；`release/installer/Curated-Setup-0.0.0-local.exe` | 成功 | Codex | BuildStamp=`20260401.151209`；同时生成 `release/manifest/release.json`；为兼容当前 Windows 环境，发布脚本改为前端使用 `vite --configLoader native`、后端使用仓库内 `.gocache/` |

@@ -144,7 +144,7 @@ Scrape stability additions:
 
 - **Web API mode** (`VITE_USE_WEB_API=true`): progress syncs to SQLite via **`/api/playback/progress`**; played markers via **`/api/library/played-movies`**.
 - Player startup now has a dedicated playback descriptor seam via **`GET /api/library/movies/{id}/playback`**; the current implementation still returns direct-play metadata and `/stream`, but this is the planned expansion point for remux/transcode later.
-- When backend stream push is enabled, Curated can switch browser playback onto **HLS** session output under **`/api/playback/sessions/{id}/hls/...`** for browser-hostile containers.
+- When backend stream push is enabled, Curated now prefers browser playback through **HLS** session output under **`/api/playback/sessions/{id}/hls/...`** by default.
 - The current frontend HLS path keeps playback inside the existing player page and loads `hls.js` on demand for browsers without native HLS support.
 - Curated can also launch an external native player kernel through **`POST /api/library/movies/{id}/native-play`** when `mpv` is configured.
 - **Mock mode**: progress in **`localStorage`** (`jav-library-playback-progress-v1`).
@@ -184,7 +184,9 @@ This flow currently:
 Release runtime notes:
 
 - the assembled package includes `frontend-dist/` next to `curated.exe`
+- the assembled package also copies `backend/third_party/` to `third_party/` next to `curated.exe`
 - the backend serves that local frontend bundle directly when present
+- when `third_party/ffmpeg/bin/ffmpeg.exe` is present, bundled FFmpeg is preferred automatically for HLS stream push while the default `player.ffmpegCommand` remains `ffmpeg`
 - Windows release binaries default to tray mode, so launching `curated.exe` starts the background service and tray shell
 
 Individual scripts:

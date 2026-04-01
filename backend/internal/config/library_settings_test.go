@@ -25,6 +25,20 @@ func TestMergeLibrarySettingsFile_MissingFile_NoChangeToDefault(t *testing.T) {
 	}
 }
 
+func TestDefaultPlayerSettings_DisableHardwareDecodeAndStreamPush(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if cfg.Player.HardwareDecode {
+		t.Fatal("Default() should disable hardwareDecode")
+	}
+	if cfg.Player.StreamPushEnabled {
+		t.Fatal("Default() should disable streamPushEnabled")
+	}
+	if cfg.Player.ForceStreamPush {
+		t.Fatal("Default() should keep forceStreamPush disabled")
+	}
+}
+
 func TestMergeLibrarySettingsFile_ExtendedLibraryImportTrue(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -167,6 +181,40 @@ func TestMergeLibrarySettingsFile_BackendLog(t *testing.T) {
 	}
 	if got, want := cfg.LogLevel, "debug"; got != want {
 		t.Fatalf("LogLevel = %q, want %q", got, want)
+	}
+}
+
+func TestMergeLibrarySettingsFile_PlayerHardwareEncoder(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	raw := `{"player": {"hardwareDecode": true, "hardwareEncoder": "amf"}}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.Player.HardwareEncoder, "amf"; got != want {
+		t.Fatalf("Player.HardwareEncoder = %q, want %q", got, want)
+	}
+}
+
+func TestMergeLibrarySettingsFile_PlayerNativePlayerPreset(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	raw := `{"player": {"nativePlayerPreset": "potplayer", "nativePlayerCommand": "PotPlayerMini64.exe"}}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.Player.NativePlayerPreset, "potplayer"; got != want {
+		t.Fatalf("Player.NativePlayerPreset = %q, want %q", got, want)
 	}
 }
 

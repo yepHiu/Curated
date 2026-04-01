@@ -123,9 +123,20 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			cfg.Assets.MaxConcurrentDownloads,
 			cfg.Assets.MaxResponseBodyMB,
 		),
-		tasks:                      tasks.NewManager(),
-		player:                     nativeplayer.New(nativeplayer.Config{Enabled: cfg.Player.NativePlayerEnabled, Command: cfg.Player.NativePlayerCommand, Args: cfg.Player.NativePlayerArgs}),
-		streams:                    playback.New(playback.Config{Enabled: cfg.Player.StreamPushEnabled, FFmpegCommand: cfg.Player.FFmpegCommand, SessionRoot: cfg.Player.StreamSessionRoot}),
+		tasks: tasks.NewManager(),
+		player: nativeplayer.New(nativeplayer.Config{
+			Enabled: cfg.Player.NativePlayerEnabled,
+			Preset:  nativeplayer.NormalizePreset(cfg.Player.NativePlayerPreset, cfg.Player.NativePlayerCommand),
+			Command: cfg.Player.NativePlayerCommand,
+			Args:    cfg.Player.NativePlayerArgs,
+		}),
+		streams: playback.New(playback.Config{
+			Enabled:         cfg.Player.StreamPushEnabled,
+			HardwareDecode:  cfg.Player.HardwareDecode,
+			HardwareEncoder: cfg.Player.HardwareEncoder,
+			FFmpegCommand:   cfg.Player.FFmpegCommand,
+			SessionRoot:     cfg.Player.StreamSessionRoot,
+		}),
 		organizeLibrary:            cfg.OrganizeLibrary,
 		extendedLibraryImport:      cfg.ExtendedLibraryImport,
 		autoLibraryWatch:           cfg.AutoLibraryWatch,
@@ -145,6 +156,16 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	}
 
 	return app, nil
+}
+
+func (a *App) Close() {
+	if a == nil {
+		return
+	}
+	a.StopLibraryWatchLoop()
+	if a.streams != nil {
+		a.streams.Close()
+	}
 }
 
 // ReloadLibraryWatches re-reads library roots from the database and rebuilds directory watches.
@@ -622,9 +643,10 @@ func (a *App) BackendLogSettings() contracts.BackendLogSettingsDTO {
 func (a *App) PlayerSettings() contracts.PlayerSettingsDTO {
 	a.playerSettingsMu.RLock()
 	defer a.playerSettingsMu.RUnlock()
+	nativePreset := nativeplayer.NormalizePreset(a.cfg.Player.NativePlayerPreset, a.cfg.Player.NativePlayerCommand)
 	nativeCommand := strings.TrimSpace(a.cfg.Player.NativePlayerCommand)
 	if nativeCommand == "" {
-		nativeCommand = "mpv"
+		nativeCommand = nativeplayer.DefaultCommandForPreset(nativePreset)
 	}
 	ffmpegCommand := strings.TrimSpace(a.cfg.Player.FFmpegCommand)
 	if ffmpegCommand == "" {
@@ -640,9 +662,12 @@ func (a *App) PlayerSettings() contracts.PlayerSettingsDTO {
 	}
 	return contracts.PlayerSettingsDTO{
 		HardwareDecode:      a.cfg.Player.HardwareDecode,
+		HardwareEncoder:     config.NormalizeHardwareEncoderPreference(a.cfg.Player.HardwareEncoder),
+		NativePlayerPreset:  nativePreset,
 		NativePlayerEnabled: a.cfg.Player.NativePlayerEnabled,
 		NativePlayerCommand: nativeCommand,
 		StreamPushEnabled:   a.cfg.Player.StreamPushEnabled,
+		ForceStreamPush:     a.cfg.Player.ForceStreamPush,
 		FFmpegCommand:       ffmpegCommand,
 		PreferNativePlayer:  a.cfg.Player.PreferNativePlayer,
 		SeekForwardStepSec:  seekForward,
@@ -665,18 +690,27 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 	if p.HardwareDecode != nil {
 		next.HardwareDecode = *p.HardwareDecode
 	}
+	if p.HardwareEncoder != nil {
+		next.HardwareEncoder = config.NormalizeHardwareEncoderPreference(*p.HardwareEncoder)
+	}
+	if p.NativePlayerPreset != nil {
+		next.NativePlayerPreset = nativeplayer.NormalizePreset(*p.NativePlayerPreset, next.NativePlayerCommand)
+	}
 	if p.NativePlayerEnabled != nil {
 		next.NativePlayerEnabled = *p.NativePlayerEnabled
 	}
 	if p.NativePlayerCommand != nil {
 		cmd := strings.TrimSpace(*p.NativePlayerCommand)
 		if cmd == "" {
-			cmd = "mpv"
+			cmd = nativeplayer.DefaultCommandForPreset(next.NativePlayerPreset)
 		}
 		next.NativePlayerCommand = cmd
 	}
 	if p.StreamPushEnabled != nil {
 		next.StreamPushEnabled = *p.StreamPushEnabled
+	}
+	if p.ForceStreamPush != nil {
+		next.ForceStreamPush = *p.ForceStreamPush
 	}
 	if p.FFmpegCommand != nil {
 		cmd := strings.TrimSpace(*p.FFmpegCommand)
@@ -701,12 +735,14 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 		next.SeekBackwardStepSec = *p.SeekBackwardStepSec
 	}
 
+	next.NativePlayerPreset = nativeplayer.NormalizePreset(next.NativePlayerPreset, next.NativePlayerCommand)
 	if strings.TrimSpace(next.NativePlayerCommand) == "" {
-		next.NativePlayerCommand = "mpv"
+		next.NativePlayerCommand = nativeplayer.DefaultCommandForPreset(next.NativePlayerPreset)
 	}
 	if strings.TrimSpace(next.FFmpegCommand) == "" {
 		next.FFmpegCommand = "ffmpeg"
 	}
+	next.HardwareEncoder = config.NormalizeHardwareEncoderPreference(next.HardwareEncoder)
 	if next.SeekForwardStepSec <= 0 {
 		next.SeekForwardStepSec = 10
 	}
@@ -720,9 +756,12 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 			playerMap = map[string]any{}
 		}
 		playerMap["hardwareDecode"] = next.HardwareDecode
+		playerMap["hardwareEncoder"] = next.HardwareEncoder
+		playerMap["nativePlayerPreset"] = next.NativePlayerPreset
 		playerMap["nativePlayerEnabled"] = next.NativePlayerEnabled
 		playerMap["nativePlayerCommand"] = next.NativePlayerCommand
 		playerMap["streamPushEnabled"] = next.StreamPushEnabled
+		playerMap["forceStreamPush"] = next.ForceStreamPush
 		playerMap["ffmpegCommand"] = next.FFmpegCommand
 		playerMap["preferNativePlayer"] = next.PreferNativePlayer
 		playerMap["seekForwardStepSec"] = next.SeekForwardStepSec
@@ -740,15 +779,18 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 	if a.player != nil {
 		a.player.SetConfig(nativeplayer.Config{
 			Enabled: next.NativePlayerEnabled,
+			Preset:  next.NativePlayerPreset,
 			Command: next.NativePlayerCommand,
 			Args:    next.NativePlayerArgs,
 		})
 	}
 	if a.streams != nil {
 		a.streams.SetConfig(playback.Config{
-			Enabled:       next.StreamPushEnabled,
-			FFmpegCommand: next.FFmpegCommand,
-			SessionRoot:   next.StreamSessionRoot,
+			Enabled:         next.StreamPushEnabled,
+			HardwareDecode:  next.HardwareDecode,
+			HardwareEncoder: next.HardwareEncoder,
+			FFmpegCommand:   next.FFmpegCommand,
+			SessionRoot:     next.StreamSessionRoot,
 		})
 	}
 	return nil
@@ -1793,19 +1835,30 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
 
-	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress)
+	durationSec := a.resolvePlaybackDurationSec(ctx, strings.TrimSpace(detail.Location), detail, progress)
+	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec)
 	if a.shouldPreferHLS(detail.Location) {
-		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location))
+		startPositionSec := 0.0
+		if progress != nil && progress.PositionSec > 0 {
+			startPositionSec = progress.PositionSec
+		}
+		if durationSec > 0 && startPositionSec > durationSec {
+			startPositionSec = durationSec
+		}
+		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location), startPositionSec)
 		if err != nil {
 			if a.logger != nil {
 				a.logger.Warn("failed to start HLS playback session; falling back to direct", zap.Error(err), zap.String("movieId", movieID))
 			}
+			descriptor.Reason = "HLS session startup failed; fell back to direct playback: " + strings.TrimSpace(err.Error())
 			return descriptor, nil
 		}
 		descriptor.Mode = contracts.PlaybackModeHLS
 		descriptor.SessionID = session.ID
 		descriptor.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
 		descriptor.MimeType = "application/vnd.apple.mpegurl"
+		descriptor.StartPositionSec = session.StartPositionSec
+		descriptor.TranscodeProfile = session.ProfileName
 		descriptor.CanDirectPlay = false
 		descriptor.Reason = "browser fallback HLS session"
 	}
@@ -1813,7 +1866,6 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 }
 
 func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
-	_ = startPositionSec
 	if mode == "" || mode == contracts.PlaybackModeDirect {
 		return a.ResolvePlayback(ctx, movieID)
 	}
@@ -1825,17 +1877,27 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 	if err != nil && a.logger != nil {
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
+	durationSec := a.resolvePlaybackDurationSec(ctx, strings.TrimSpace(detail.Location), detail, progress)
 	switch mode {
 	case contracts.PlaybackModeHLS:
-		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location))
+		if startPositionSec < 0 {
+			startPositionSec = 0
+		}
+		if durationSec > 0 && startPositionSec > durationSec {
+			startPositionSec = durationSec
+		}
+		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location), startPositionSec)
 		if err != nil {
 			return contracts.PlaybackDescriptorDTO{}, err
 		}
-		dto := buildDirectPlaybackDescriptor(movieID, detail, progress)
+		dto := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec)
 		dto.Mode = contracts.PlaybackModeHLS
 		dto.SessionID = session.ID
 		dto.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
 		dto.MimeType = "application/vnd.apple.mpegurl"
+		dto.StartPositionSec = session.StartPositionSec
+		dto.ResumePositionSec = session.StartPositionSec
+		dto.TranscodeProfile = session.ProfileName
 		dto.CanDirectPlay = false
 		dto.Reason = "explicit HLS playback session"
 		return dto, nil
@@ -1883,6 +1945,9 @@ func (a *App) shouldPreferHLS(location string) bool {
 	if a.streams == nil || !a.streams.Enabled() {
 		return false
 	}
+	if a.cfg.Player.ForceStreamPush && strings.TrimSpace(location) != "" {
+		return true
+	}
 	switch strings.ToLower(filepath.Ext(strings.TrimSpace(location))) {
 	case ".mp4", ".m4v", ".webm", ".ogv":
 		return false
@@ -1893,7 +1958,48 @@ func (a *App) shouldPreferHLS(location string) bool {
 	}
 }
 
-func buildDirectPlaybackDescriptor(movieID string, detail contracts.MovieDetailDTO, progress *storage.PlaybackProgressRow) contracts.PlaybackDescriptorDTO {
+func (a *App) resolvePlaybackDurationSec(
+	ctx context.Context,
+	location string,
+	detail contracts.MovieDetailDTO,
+	progress *storage.PlaybackProgressRow,
+) float64 {
+	runtimeDurationSec := 0.0
+	if detail.RuntimeMinutes > 0 {
+		runtimeDurationSec = float64(detail.RuntimeMinutes) * 60
+	}
+	progressDurationSec := 0.0
+	if progress != nil && progress.DurationSec > 0 {
+		progressDurationSec = progress.DurationSec
+	}
+	return choosePlaybackDurationSec(0, runtimeDurationSec, progressDurationSec)
+}
+
+func choosePlaybackDurationSec(probedDurationSec float64, runtimeDurationSec float64, progressDurationSec float64) float64 {
+	if probedDurationSec > 0 {
+		return probedDurationSec
+	}
+	if runtimeDurationSec > 0 && progressDurationSec > 0 {
+		if runtimeDurationSec >= progressDurationSec {
+			return runtimeDurationSec
+		}
+		return progressDurationSec
+	}
+	if runtimeDurationSec > 0 {
+		return runtimeDurationSec
+	}
+	if progressDurationSec > 0 {
+		return progressDurationSec
+	}
+	return 0
+}
+
+func buildDirectPlaybackDescriptor(
+	movieID string,
+	detail contracts.MovieDetailDTO,
+	progress *storage.PlaybackProgressRow,
+	durationSec float64,
+) contracts.PlaybackDescriptorDTO {
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
 	mimeType := "application/octet-stream"
 	switch strings.ToLower(filepath.Ext(fileName)) {
@@ -1913,15 +2019,15 @@ func buildDirectPlaybackDescriptor(movieID string, detail contracts.MovieDetailD
 		URL:            "/api/library/movies/" + url.PathEscape(movieID) + "/stream",
 		MimeType:       mimeType,
 		FileName:       fileName,
-		DurationSec:    float64(detail.RuntimeMinutes) * 60,
+		DurationSec:    durationSec,
 		CanDirectPlay:  true,
 		AudioTracks:    []contracts.PlaybackAudioTrackDTO{},
 		SubtitleTracks: []contracts.PlaybackSubtitleTrackDTO{},
 	}
 	if progress != nil && progress.PositionSec > 0 {
 		dto.ResumePositionSec = progress.PositionSec
-		if progress.DurationSec > 0 {
-			dto.DurationSec = progress.DurationSec
+		if durationSec > 0 && dto.ResumePositionSec > durationSec {
+			dto.ResumePositionSec = durationSec
 		}
 	}
 	return dto

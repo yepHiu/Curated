@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -646,6 +647,29 @@ func (h *Handler) handleGetPlaybackSessionFile(w http.ResponseWriter, r *http.Re
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "session file not found")
 		return
 	}
+	ext := strings.ToLower(filepath.Ext(absPath))
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
+	switch ext {
+	case ".m3u8":
+		raw, err := os.ReadFile(absPath)
+		if err != nil {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "session file not found")
+			return
+		}
+		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodHead {
+			return
+		}
+		_, _ = w.Write(raw)
+		return
+	case ".ts":
+		w.Header().Set("Content-Type", "video/mp2t")
+	}
+
 	http.ServeFile(w, r, absPath)
 }
 
@@ -1215,6 +1239,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
 			NativePlayerCommand: h.cfg.Player.NativePlayerCommand,
 			StreamPushEnabled:   h.cfg.Player.StreamPushEnabled,
+			ForceStreamPush:     h.cfg.Player.ForceStreamPush,
 			FFmpegCommand:       h.cfg.Player.FFmpegCommand,
 			PreferNativePlayer:  h.cfg.Player.PreferNativePlayer,
 			SeekForwardStepSec:  h.cfg.Player.SeekForwardStepSec,

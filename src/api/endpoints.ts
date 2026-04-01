@@ -25,6 +25,7 @@ import type {
   AddLibraryPathBody,
   AddLibraryPathResultDTO,
   CreateCuratedFrameBody,
+  CreatePlaybackSessionBody,
   CuratedFramesListDTO,
   HealthDTO,
   LibraryPathDTO,
@@ -101,6 +102,13 @@ export const api = {
     return httpClient.post<NativePlaybackLaunchDTO>(
       `/library/movies/${encodeURIComponent(movieId)}/native-play`,
       startPositionSec !== undefined ? { startPositionSec } : {},
+    )
+  },
+
+  createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody): Promise<PlaybackDescriptorDTO> {
+    return httpClient.post<PlaybackDescriptorDTO>(
+      `/library/movies/${encodeURIComponent(movieId)}/playback-session`,
+      body,
     )
   },
 

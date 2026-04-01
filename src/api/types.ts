@@ -73,11 +73,23 @@ export interface LibraryPathDTO {
   firstLibraryScanPending?: boolean
 }
 
+export type HardwareEncoderPreference =
+  | "auto"
+  | "amf"
+  | "qsv"
+  | "nvenc"
+  | "software"
+
+export type NativePlayerPreset = "mpv" | "potplayer" | "custom"
+
 export interface PlayerSettingsDTO {
   hardwareDecode: boolean
+  hardwareEncoder?: HardwareEncoderPreference
+  nativePlayerPreset?: NativePlayerPreset
   nativePlayerEnabled: boolean
   nativePlayerCommand?: string
   streamPushEnabled: boolean
+  forceStreamPush?: boolean
   ffmpegCommand?: string
   preferNativePlayer: boolean
   seekForwardStepSec: number
@@ -86,9 +98,12 @@ export interface PlayerSettingsDTO {
 
 export interface PatchPlayerSettingsBody {
   hardwareDecode?: boolean
+  hardwareEncoder?: HardwareEncoderPreference
+  nativePlayerPreset?: NativePlayerPreset
   nativePlayerEnabled?: boolean
   nativePlayerCommand?: string
   streamPushEnabled?: boolean
+  forceStreamPush?: boolean
   ffmpegCommand?: string
   preferNativePlayer?: boolean
   seekForwardStepSec?: number
@@ -370,12 +385,19 @@ export interface PlaybackDescriptorDTO {
   url: string
   mimeType?: string
   fileName?: string
+  transcodeProfile?: string
   durationSec?: number
+  startPositionSec?: number
   resumePositionSec?: number
   canDirectPlay: boolean
   reason?: string
   audioTracks?: PlaybackAudioTrackDTO[]
   subtitleTracks?: PlaybackSubtitleTrackDTO[]
+}
+
+export interface CreatePlaybackSessionBody {
+  mode?: PlaybackMode
+  startPositionSec?: number
 }
 
 export interface NativePlaybackLaunchDTO {

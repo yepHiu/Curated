@@ -16,7 +16,9 @@ import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type {
+  HardwareEncoderPreference,
   HealthDTO,
+  NativePlayerPreset,
   PatchPlayerSettingsBody,
   ProviderHealthDTO,
   ProviderHealthStatus,
@@ -129,6 +131,18 @@ const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
 
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
+const PLAYBACK_HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = [
+  "auto",
+  "amf",
+  "qsv",
+  "nvenc",
+  "software",
+]
+const PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS: readonly NativePlayerPreset[] = [
+  "mpv",
+  "potplayer",
+  "custom",
+]
 
 function setThemeFromSelect(v: unknown) {
   if (v === "light" || v === "dark" || v === "system") {
@@ -217,9 +231,12 @@ const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreser
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const playbackHardwareDecodeDraft = ref(true)
+const playbackHardwareEncoderDraft = ref<HardwareEncoderPreference>("auto")
+const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("mpv")
 const playbackNativePlayerEnabledDraft = ref(true)
 const playbackNativePlayerCommandDraft = ref("mpv")
 const playbackStreamPushEnabledDraft = ref(true)
+const playbackForceStreamPushDraft = ref(false)
 const playbackFfmpegCommandDraft = ref("ffmpeg")
 const playbackPreferNativePlayerDraft = ref(false)
 const playbackSeekForwardStepDraft = ref("10")
@@ -491,13 +508,93 @@ function flashPlaybackSaved() {
 function syncPlaybackDraftFromService() {
   const player = libraryService.playerSettings.value
   playbackHardwareDecodeDraft.value = player.hardwareDecode !== false
+  playbackHardwareEncoderDraft.value = PLAYBACK_HARDWARE_ENCODER_OPTIONS.includes(
+    (player.hardwareEncoder ?? "auto") as HardwareEncoderPreference,
+  )
+    ? ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference)
+    : "auto"
+  playbackNativePlayerPresetDraft.value = normalizeNativePlayerPreset(
+    player.nativePlayerPreset,
+    player.nativePlayerCommand,
+  )
   playbackNativePlayerEnabledDraft.value = player.nativePlayerEnabled !== false
-  playbackNativePlayerCommandDraft.value = (player.nativePlayerCommand ?? "mpv").trim() || "mpv"
+  playbackNativePlayerCommandDraft.value =
+    (player.nativePlayerCommand ?? playbackNativePlayerDefaultCommand(player.nativePlayerPreset)).trim() ||
+    playbackNativePlayerDefaultCommand(player.nativePlayerPreset)
   playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
+  playbackForceStreamPushDraft.value = Boolean(player.forceStreamPush)
   playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
   playbackPreferNativePlayerDraft.value = Boolean(player.preferNativePlayer)
   playbackSeekForwardStepDraft.value = String(Math.max(1, Number(player.seekForwardStepSec ?? 10)))
   playbackSeekBackwardStepDraft.value = String(Math.max(1, Number(player.seekBackwardStepSec ?? 10)))
+}
+
+function normalizeNativePlayerPreset(
+  preset: NativePlayerPreset | undefined,
+  command?: string,
+): NativePlayerPreset {
+  switch (preset) {
+    case "mpv":
+    case "potplayer":
+    case "custom":
+      return preset
+  }
+  const cmd = (command ?? "").trim().toLowerCase()
+  if (cmd.includes("potplayer")) return "potplayer"
+  if (!cmd || cmd.includes("mpv")) return "mpv"
+  return "custom"
+}
+
+function playbackNativePlayerDefaultCommand(preset: NativePlayerPreset | undefined): string {
+  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
+}
+
+function playbackNativePlayerPresetLabel(value: NativePlayerPreset): string {
+  switch (value) {
+    case "potplayer":
+      return t("settings.playbackNativePlayerPresetPotplayer")
+    case "custom":
+      return t("settings.playbackNativePlayerPresetCustom")
+    case "mpv":
+    default:
+      return t("settings.playbackNativePlayerPresetMpv")
+  }
+}
+
+const playbackNativePlayerCommandPlaceholder = computed(() => {
+  if (playbackNativePlayerPresetDraft.value === "custom") {
+    return t("settings.playbackNativePlayerCommandPlaceholderCustom")
+  }
+  return playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value)
+})
+
+function onPlaybackNativePlayerPresetChange(value: unknown) {
+  const nextPreset = normalizeNativePlayerPreset(
+    typeof value === "string" ? (value as NativePlayerPreset) : undefined,
+  )
+  const prevPreset = playbackNativePlayerPresetDraft.value
+  const currentCommand = playbackNativePlayerCommandDraft.value.trim()
+  const previousDefault = playbackNativePlayerDefaultCommand(prevPreset)
+  playbackNativePlayerPresetDraft.value = nextPreset
+  if (!currentCommand || currentCommand === previousDefault) {
+    playbackNativePlayerCommandDraft.value = playbackNativePlayerDefaultCommand(nextPreset)
+  }
+}
+
+function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string {
+  switch (value) {
+    case "amf":
+      return t("settings.playbackHardwareEncoderAmf")
+    case "qsv":
+      return t("settings.playbackHardwareEncoderQsv")
+    case "nvenc":
+      return t("settings.playbackHardwareEncoderNvenc")
+    case "software":
+      return t("settings.playbackHardwareEncoderSoftware")
+    case "auto":
+    default:
+      return t("settings.playbackHardwareEncoderAuto")
+  }
 }
 
 function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
@@ -513,9 +610,14 @@ function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
   }
   return {
     hardwareDecode: playbackHardwareDecodeDraft.value,
+    hardwareEncoder: playbackHardwareEncoderDraft.value,
+    nativePlayerPreset: playbackNativePlayerPresetDraft.value,
     nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
-    nativePlayerCommand: playbackNativePlayerCommandDraft.value.trim() || "mpv",
+    nativePlayerCommand:
+      playbackNativePlayerCommandDraft.value.trim() ||
+      playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value),
     streamPushEnabled: playbackStreamPushEnabledDraft.value,
+    forceStreamPush: playbackForceStreamPushDraft.value,
     ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
     preferNativePlayer: playbackPreferNativePlayerDraft.value,
     seekForwardStepSec: forward,
@@ -527,10 +629,16 @@ function playbackDraftMatchesServer(): boolean {
   const player = libraryService.playerSettings.value
   return (
     playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
+    playbackHardwareEncoderDraft.value === ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference) &&
+    playbackNativePlayerPresetDraft.value ===
+      normalizeNativePlayerPreset(player.nativePlayerPreset, player.nativePlayerCommand) &&
     playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
-    (playbackNativePlayerCommandDraft.value.trim() || "mpv") ===
-      ((player.nativePlayerCommand ?? "mpv").trim() || "mpv") &&
+    (playbackNativePlayerCommandDraft.value.trim() ||
+      playbackNativePlayerDefaultCommand(player.nativePlayerPreset)) ===
+      ((player.nativePlayerCommand ?? playbackNativePlayerDefaultCommand(player.nativePlayerPreset)).trim() ||
+        playbackNativePlayerDefaultCommand(player.nativePlayerPreset)) &&
     playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
+    playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
     (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
       ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg") &&
     playbackPreferNativePlayerDraft.value === Boolean(player.preferNativePlayer) &&
@@ -641,9 +749,12 @@ watchDebounced(
   () =>
     [
       playbackHardwareDecodeDraft.value,
+      playbackHardwareEncoderDraft.value,
+      playbackNativePlayerPresetDraft.value,
       playbackNativePlayerEnabledDraft.value,
       playbackNativePlayerCommandDraft.value,
       playbackStreamPushEnabledDraft.value,
+      playbackForceStreamPushDraft.value,
       playbackFfmpegCommandDraft.value,
       playbackPreferNativePlayerDraft.value,
       playbackSeekForwardStepDraft.value,
@@ -819,6 +930,7 @@ const metadataMovieChainError = ref("")
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const viteMode = import.meta.env.MODE
 const isViteDev = import.meta.env.DEV
+const isPlaybackTestingEnv = import.meta.env.DEV || import.meta.env.MODE === "test"
 const aboutHealth = ref<HealthDTO | null>(null)
 const aboutHealthLoading = ref(false)
 const aboutHealthError = ref("")
@@ -3521,6 +3633,31 @@ async function runMetadataRefreshForSelected() {
               <Switch v-model="playbackHardwareDecodeDraft" />
             </div>
 
+            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackHardwareEncoder") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackHardwareEncoderHint") }}
+                </p>
+              </div>
+              <Select v-model="playbackHardwareEncoderDraft" :disabled="!playbackHardwareDecodeDraft">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('settings.playbackHardwareEncoderAuto')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in PLAYBACK_HARDWARE_ENCODER_OPTIONS"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ playbackHardwareEncoderLabel(option) }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div
               class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
             >
@@ -3533,6 +3670,23 @@ async function runMetadataRefreshForSelected() {
                 </p>
               </div>
               <Switch v-model="playbackStreamPushEnabledDraft" />
+            </div>
+
+            <div
+              v-if="isPlaybackTestingEnv"
+              class="rounded-lg border border-amber-500/35 bg-amber-500/8 p-4"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex min-w-0 flex-1 flex-col gap-3">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t("settings.playbackForceStreamPush") }}
+                  </p>
+                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                    {{ t("settings.playbackForceStreamPushHint") }}
+                  </p>
+                </div>
+                <Switch v-model="playbackForceStreamPushDraft" />
+              </div>
             </div>
 
             <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
@@ -3567,6 +3721,34 @@ async function runMetadataRefreshForSelected() {
             <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
                 <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.playbackNativePlayerPreset") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.playbackNativePlayerPresetHint") }}
+                </p>
+              </div>
+              <Select
+                :model-value="playbackNativePlayerPresetDraft"
+                @update:model-value="onPlaybackNativePlayerPresetChange"
+              >
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('settings.playbackNativePlayerPresetMpv')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ playbackNativePlayerPresetLabel(option) }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-medium text-foreground">
                   {{ t("settings.playbackNativePlayerCommand") }}
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -3575,7 +3757,7 @@ async function runMetadataRefreshForSelected() {
               </div>
               <Input
                 v-model="playbackNativePlayerCommandDraft"
-                :placeholder="t('settings.playbackNativePlayerCommandPlaceholder')"
+                :placeholder="playbackNativePlayerCommandPlaceholder"
               />
             </div>
 

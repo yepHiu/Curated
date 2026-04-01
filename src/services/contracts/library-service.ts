@@ -83,6 +83,11 @@ export interface LibraryService {
    * Mock：返回 null。
    */
   getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null>
+  createPlaybackSession(
+    movieId: string,
+    mode: PlaybackDescriptorDTO["mode"],
+    startPositionSec?: number,
+  ): Promise<PlaybackDescriptorDTO | null>
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>
   /**
    * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。

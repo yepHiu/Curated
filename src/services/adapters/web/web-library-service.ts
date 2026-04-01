@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
+  NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
@@ -41,6 +42,8 @@ const metadataMovieScrapeModeState = ref<MetadataMovieScrapeMode>("auto")
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
 const playerSettingsState = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
+  hardwareEncoder: "auto",
+  nativePlayerPreset: "mpv",
   nativePlayerEnabled: true,
   nativePlayerCommand: "mpv",
   streamPushEnabled: true,
@@ -231,14 +234,42 @@ function applyPlayerSettingsFromDTO(next: SettingsDTO) {
   const player = next.player
   playerSettingsState.value = {
     hardwareDecode: player?.hardwareDecode !== false,
+    hardwareEncoder: player?.hardwareEncoder ?? "auto",
+    nativePlayerPreset: normalizeNativePlayerPreset(
+      player?.nativePlayerPreset,
+      player?.nativePlayerCommand,
+    ),
     nativePlayerEnabled: player?.nativePlayerEnabled !== false,
-    nativePlayerCommand: (player?.nativePlayerCommand ?? "mpv").trim() || "mpv",
+    nativePlayerCommand:
+      (player?.nativePlayerCommand ?? defaultNativePlayerCommand(player?.nativePlayerPreset)).trim() ||
+      defaultNativePlayerCommand(player?.nativePlayerPreset),
     streamPushEnabled: player?.streamPushEnabled !== false,
+    forceStreamPush: Boolean(player?.forceStreamPush),
     ffmpegCommand: (player?.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg",
     preferNativePlayer: Boolean(player?.preferNativePlayer),
     seekForwardStepSec: Math.max(1, Number(player?.seekForwardStepSec ?? 10)),
     seekBackwardStepSec: Math.max(1, Number(player?.seekBackwardStepSec ?? 10)),
   }
+}
+
+function normalizeNativePlayerPreset(
+  preset: PlayerSettingsDTO["nativePlayerPreset"],
+  command?: string,
+): NativePlayerPreset {
+  switch (preset) {
+    case "mpv":
+    case "potplayer":
+    case "custom":
+      return preset
+  }
+  const cmd = (command ?? "").trim().toLowerCase()
+  if (cmd.includes("potplayer")) return "potplayer"
+  if (!cmd || cmd.includes("mpv")) return "mpv"
+  return "custom"
+}
+
+function defaultNativePlayerCommand(preset: PlayerSettingsDTO["nativePlayerPreset"]): string {
+  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
 }
 
 async function refreshLibraryPathsFromApi() {
@@ -308,6 +339,10 @@ function createWebLibraryService(): LibraryService {
       const merged: PlayerSettingsDTO = {
         hardwareDecode:
           patch.hardwareDecode !== undefined ? patch.hardwareDecode : prev.hardwareDecode,
+        hardwareEncoder:
+          patch.hardwareEncoder !== undefined ? patch.hardwareEncoder : prev.hardwareEncoder,
+        nativePlayerPreset:
+          patch.nativePlayerPreset !== undefined ? patch.nativePlayerPreset : prev.nativePlayerPreset,
         nativePlayerEnabled:
           patch.nativePlayerEnabled !== undefined
             ? patch.nativePlayerEnabled
@@ -320,6 +355,8 @@ function createWebLibraryService(): LibraryService {
           patch.streamPushEnabled !== undefined
             ? patch.streamPushEnabled
             : prev.streamPushEnabled,
+        forceStreamPush:
+          patch.forceStreamPush !== undefined ? patch.forceStreamPush : prev.forceStreamPush,
         ffmpegCommand:
           patch.ffmpegCommand !== undefined ? patch.ffmpegCommand : prev.ffmpegCommand,
         preferNativePlayer:
@@ -337,7 +374,13 @@ function createWebLibraryService(): LibraryService {
       }
       playerSettingsState.value = {
         ...merged,
-        nativePlayerCommand: (merged.nativePlayerCommand ?? "mpv").trim() || "mpv",
+        nativePlayerPreset: normalizeNativePlayerPreset(
+          merged.nativePlayerPreset,
+          merged.nativePlayerCommand,
+        ),
+        nativePlayerCommand:
+          (merged.nativePlayerCommand ?? defaultNativePlayerCommand(merged.nativePlayerPreset)).trim() ||
+          defaultNativePlayerCommand(merged.nativePlayerPreset),
         ffmpegCommand: (merged.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg",
         seekForwardStepSec: Math.max(1, Number(merged.seekForwardStepSec ?? 10)),
         seekBackwardStepSec: Math.max(1, Number(merged.seekBackwardStepSec ?? 10)),
@@ -574,6 +617,25 @@ function createWebLibraryService(): LibraryService {
         return null
       }
       const dto = await api.getMoviePlayback(id)
+      if (!dto.url) {
+        dto.url = moviePlaybackAbsoluteUrl(id)
+      }
+      return dto
+    },
+
+    async createPlaybackSession(
+      movieId: string,
+      mode: PlaybackDescriptorDTO["mode"],
+      startPositionSec?: number,
+    ): Promise<PlaybackDescriptorDTO | null> {
+      const id = movieId.trim()
+      if (!id) {
+        return null
+      }
+      const dto = await api.createPlaybackSession(id, {
+        mode,
+        startPositionSec,
+      })
       if (!dto.url) {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }

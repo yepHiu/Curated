@@ -133,6 +133,93 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 			cfg.LogLevel = s
 		}
 	}
+	if v, ok := m["player"]; ok {
+		playerMap, ok := v.(map[string]any)
+		if !ok {
+			return fmt.Errorf("library settings %q: player: expected object, got %T", path, v)
+		}
+		if pv, ok := playerMap["hardwareDecode"]; ok {
+			b, err := parseJSONBool(pv, "player.hardwareDecode")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.HardwareDecode = b
+		}
+		if pv, ok := playerMap["hardwareEncoder"]; ok {
+			s, err := parseJSONStringTrim(pv)
+			if err != nil {
+				return fmt.Errorf("library settings %q: player.hardwareEncoder: %w", path, err)
+			}
+			cfg.Player.HardwareEncoder = NormalizeHardwareEncoderPreference(s)
+		}
+		if pv, ok := playerMap["nativePlayerPreset"]; ok {
+			s, err := parseJSONStringTrim(pv)
+			if err != nil {
+				return fmt.Errorf("library settings %q: player.nativePlayerPreset: %w", path, err)
+			}
+			cfg.Player.NativePlayerPreset = NormalizeNativePlayerPreset(s)
+		}
+		if pv, ok := playerMap["nativePlayerEnabled"]; ok {
+			b, err := parseJSONBool(pv, "player.nativePlayerEnabled")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.NativePlayerEnabled = b
+		}
+		if pv, ok := playerMap["nativePlayerCommand"]; ok {
+			s, err := parseJSONStringTrim(pv)
+			if err != nil {
+				return fmt.Errorf("library settings %q: player.nativePlayerCommand: %w", path, err)
+			}
+			if s != "" {
+				cfg.Player.NativePlayerCommand = s
+			}
+		}
+		if pv, ok := playerMap["streamPushEnabled"]; ok {
+			b, err := parseJSONBool(pv, "player.streamPushEnabled")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.StreamPushEnabled = b
+		}
+		if pv, ok := playerMap["forceStreamPush"]; ok {
+			b, err := parseJSONBool(pv, "player.forceStreamPush")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.ForceStreamPush = b
+		}
+		if pv, ok := playerMap["ffmpegCommand"]; ok {
+			s, err := parseJSONStringTrim(pv)
+			if err != nil {
+				return fmt.Errorf("library settings %q: player.ffmpegCommand: %w", path, err)
+			}
+			if s != "" {
+				cfg.Player.FFmpegCommand = s
+			}
+		}
+		if pv, ok := playerMap["preferNativePlayer"]; ok {
+			b, err := parseJSONBool(pv, "player.preferNativePlayer")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.PreferNativePlayer = b
+		}
+		if pv, ok := playerMap["seekForwardStepSec"]; ok {
+			n, err := parseJSONIntPositive(pv, "player.seekForwardStepSec")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.SeekForwardStepSec = n
+		}
+		if pv, ok := playerMap["seekBackwardStepSec"]; ok {
+			n, err := parseJSONIntPositive(pv, "player.seekBackwardStepSec")
+			if err != nil {
+				return fmt.Errorf("library settings %q: %w", path, err)
+			}
+			cfg.Player.SeekBackwardStepSec = n
+		}
+	}
 	return nil
 }
 
@@ -157,6 +244,17 @@ func parseJSONIntNonNegative(v any, key string) (int, error) {
 	default:
 		return 0, fmt.Errorf("%s: unsupported type %T", key, v)
 	}
+}
+
+func parseJSONIntPositive(v any, key string) (int, error) {
+	n, err := parseJSONIntNonNegative(v, key)
+	if err != nil {
+		return 0, err
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("%s: invalid number %v", key, v)
+	}
+	return n, nil
 }
 
 func parseJSONStringTrim(v any) (string, error) {

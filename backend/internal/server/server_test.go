@@ -779,6 +779,52 @@ func TestHandleCreatePlaybackSession_OK(t *testing.T) {
 	}
 }
 
+func TestHandleGetPlaybackSessionFile_M3U8ServedWithoutCache(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	playlistPath := filepath.Join(root, "index.m3u8")
+	if err := os.WriteFile(playlistPath, []byte("#EXTM3U\n#EXTINF:2.0,\nsegment-00000.ts\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		PlaybackResolver: stubPlaybackResolver{
+			filePath: playlistPath,
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/playback/sessions/sess-1/hls/index.m3u8", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Range", "bytes=0-8")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Content-Type"); !strings.Contains(got, "application/vnd.apple.mpegurl") {
+		t.Fatalf("content-type = %q", got)
+	}
+	if got := resp.Header.Get("Cache-Control"); !strings.Contains(got, "no-store") {
+		t.Fatalf("cache-control = %q", got)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "segment-00000.ts") {
+		t.Fatalf("playlist body = %q", string(body))
+	}
+}
+
 func TestHandleLaunchNativePlayback_OK(t *testing.T) {
 	t.Parallel()
 	h := NewHandler(Deps{

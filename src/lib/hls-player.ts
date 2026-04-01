@@ -5,6 +5,11 @@ type HlsInstance = {
   on?(event: string, handler: (event: string, data?: unknown) => void): void
   off?(event: string, handler: (event: string, data?: unknown) => void): void
   currentLevel?: number
+  loadLevel?: number
+  nextLevel?: number
+  nextLoadLevel?: number
+  autoLevelEnabled?: boolean
+  bandwidthEstimate?: number
   levels?: HlsLevel[]
 }
 
@@ -33,8 +38,19 @@ let hlsLoaderPromise: Promise<HlsCtor> | null = null
 const HLS_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js"
 
 export function canPlayHlsNatively(video: HTMLVideoElement): boolean {
-  const result = video.canPlayType("application/vnd.apple.mpegurl")
-  return result === "probably" || result === "maybe"
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : ""
+  const vendor = typeof navigator !== "undefined" ? navigator.vendor : ""
+  const canPlay = video.canPlayType("application/vnd.apple.mpegurl")
+  const isApplePlatform = /iPad|iPhone|iPod|Macintosh/i.test(ua)
+  const isSafariEngine = /Apple/i.test(vendor) && /Safari/i.test(ua)
+  const isChromiumFamily = /Chrome|Chromium|Edg|OPR|Brave/i.test(ua)
+  const isFirefox = /Firefox/i.test(ua)
+
+  // Desktop Chrome/Edge may report HLS support loosely, but playback is not reliable there.
+  if (!isApplePlatform || !isSafariEngine || isChromiumFamily || isFirefox) {
+    return false
+  }
+  return canPlay === "probably" || canPlay === "maybe"
 }
 
 export async function loadHlsLibrary(): Promise<HlsCtor> {
@@ -75,6 +91,12 @@ export async function loadHlsLibrary(): Promise<HlsCtor> {
   })
 
   return hlsLoaderPromise
+}
+
+export function preloadHlsLibrary(): void {
+  void loadHlsLibrary().catch(() => {
+    // Prewarming is best-effort. Playback startup will retry if needed.
+  })
 }
 
 export type { HlsInstance, HlsLevel }

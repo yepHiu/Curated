@@ -73,15 +73,24 @@ type AssetConfig struct {
 
 type PlayerConfig struct {
 	HardwareDecode bool `json:"hardwareDecode"`
+	// HardwareEncoder sets the preferred hardware encoder order for HLS stream push:
+	// auto | amf | qsv | nvenc | software.
+	HardwareEncoder string `json:"hardwareEncoder,omitempty"`
+	// NativePlayerPreset controls which argument style Curated uses when launching
+	// an external player: mpv | potplayer | custom.
+	NativePlayerPreset string `json:"nativePlayerPreset,omitempty"`
 	// NativePlayerEnabled allows the backend to launch an external native player process (for example mpv).
 	NativePlayerEnabled bool `json:"nativePlayerEnabled,omitempty"`
 	// NativePlayerCommand is the executable used for native playback; default "mpv".
 	NativePlayerCommand string `json:"nativePlayerCommand,omitempty"`
 	// NativePlayerArgs are prepended before Curated appends the media path/URL.
 	NativePlayerArgs []string `json:"nativePlayerArgs,omitempty"`
-	// StreamPushEnabled allows the backend to create HLS playback sessions with ffmpeg for browser fallback.
+	// StreamPushEnabled allows the backend to create HLS playback sessions with ffmpeg and is disabled by default.
 	StreamPushEnabled bool `json:"streamPushEnabled,omitempty"`
+	// ForceStreamPush forces browser playback to prefer HLS stream push even for formats that are usually direct-play friendly.
+	ForceStreamPush bool `json:"forceStreamPush,omitempty"`
 	// FFmpegCommand is the executable used for HLS transcoding; default "ffmpeg".
+	// When left at the default command, runtime prefers a bundled third_party/ffmpeg binary if present.
 	FFmpegCommand string `json:"ffmpegCommand,omitempty"`
 	// StreamSessionRoot stores generated HLS playlists and segments; default under cacheDir/playback-sessions.
 	StreamSessionRoot string `json:"streamSessionRoot,omitempty"`
@@ -133,10 +142,13 @@ func Default() Config {
 			MaxResponseBodyMB:      50,
 		},
 		Player: PlayerConfig{
-			HardwareDecode:      true,
+			HardwareDecode:      false,
+			HardwareEncoder:     "auto",
+			NativePlayerPreset:  "mpv",
 			NativePlayerEnabled: true,
 			NativePlayerCommand: "mpv",
-			StreamPushEnabled:   true,
+			StreamPushEnabled:   false,
+			ForceStreamPush:     false,
 			FFmpegCommand:       "ffmpeg",
 			StreamSessionRoot:   filepath.Join(cacheDir, "playback-sessions"),
 			SeekForwardStepSec:  10,
@@ -216,9 +228,11 @@ func Load(path string) (Config, error) {
 	if strings.TrimSpace(cfg.Player.NativePlayerCommand) == "" {
 		cfg.Player.NativePlayerCommand = "mpv"
 	}
+	cfg.Player.NativePlayerPreset = NormalizeNativePlayerPreset(cfg.Player.NativePlayerPreset)
 	if strings.TrimSpace(cfg.Player.FFmpegCommand) == "" {
 		cfg.Player.FFmpegCommand = "ffmpeg"
 	}
+	cfg.Player.HardwareEncoder = NormalizeHardwareEncoderPreference(cfg.Player.HardwareEncoder)
 	if strings.TrimSpace(cfg.Player.StreamSessionRoot) == "" {
 		cfg.Player.StreamSessionRoot = filepath.Join(cfg.CacheDir, "playback-sessions")
 	}
@@ -272,6 +286,28 @@ func defaultDatabasePath() string {
 	}
 
 	return filepath.FromSlash("backend/runtime/curated.db")
+}
+
+func NormalizeHardwareEncoderPreference(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "auto":
+		return "auto"
+	case "amf", "qsv", "nvenc", "software":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return "auto"
+	}
+}
+
+func NormalizeNativePlayerPreset(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "mpv":
+		return "mpv"
+	case "potplayer", "custom":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return "mpv"
+	}
 }
 
 // LibraryWatchOn reports whether fsnotify-based library watching should run.

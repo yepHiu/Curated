@@ -165,6 +165,9 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 		store:      store,
 		backendApp: backendApp,
 		cleanup: func() {
+			if backendApp != nil {
+				backendApp.Close()
+			}
 			_ = store.Close()
 			_ = logger.Sync()
 		},

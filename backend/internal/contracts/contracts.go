@@ -413,9 +413,12 @@ type PatchSettingsRequest struct {
 
 type PlayerSettingsDTO struct {
 	HardwareDecode      bool   `json:"hardwareDecode"`
+	HardwareEncoder     string `json:"hardwareEncoder,omitempty"`
+	NativePlayerPreset  string `json:"nativePlayerPreset,omitempty"`
 	NativePlayerEnabled bool   `json:"nativePlayerEnabled"`
 	NativePlayerCommand string `json:"nativePlayerCommand,omitempty"`
 	StreamPushEnabled   bool   `json:"streamPushEnabled"`
+	ForceStreamPush     bool   `json:"forceStreamPush,omitempty"`
 	FFmpegCommand       string `json:"ffmpegCommand,omitempty"`
 	PreferNativePlayer  bool   `json:"preferNativePlayer"`
 	SeekForwardStepSec  int    `json:"seekForwardStepSec"`
@@ -424,9 +427,12 @@ type PlayerSettingsDTO struct {
 
 type PatchPlayerSettingsDTO struct {
 	HardwareDecode      *bool   `json:"hardwareDecode,omitempty"`
+	HardwareEncoder     *string `json:"hardwareEncoder,omitempty"`
+	NativePlayerPreset  *string `json:"nativePlayerPreset,omitempty"`
 	NativePlayerEnabled *bool   `json:"nativePlayerEnabled,omitempty"`
 	NativePlayerCommand *string `json:"nativePlayerCommand,omitempty"`
 	StreamPushEnabled   *bool   `json:"streamPushEnabled,omitempty"`
+	ForceStreamPush     *bool   `json:"forceStreamPush,omitempty"`
 	FFmpegCommand       *string `json:"ffmpegCommand,omitempty"`
 	PreferNativePlayer  *bool   `json:"preferNativePlayer,omitempty"`
 	SeekForwardStepSec  *int    `json:"seekForwardStepSec,omitempty"`
@@ -479,7 +485,9 @@ type PlaybackDescriptorDTO struct {
 	URL               string                     `json:"url"`
 	MimeType          string                     `json:"mimeType,omitempty"`
 	FileName          string                     `json:"fileName,omitempty"`
+	TranscodeProfile  string                     `json:"transcodeProfile,omitempty"`
 	DurationSec       float64                    `json:"durationSec,omitempty"`
+	StartPositionSec  float64                    `json:"startPositionSec,omitempty"`
 	ResumePositionSec float64                    `json:"resumePositionSec,omitempty"`
 	CanDirectPlay     bool                       `json:"canDirectPlay"`
 	Reason            string                     `json:"reason,omitempty"`

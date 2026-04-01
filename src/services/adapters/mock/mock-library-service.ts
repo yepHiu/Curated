@@ -3,6 +3,7 @@ import type {
   ActorListItemDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
@@ -54,15 +55,38 @@ const metadataMovieScrapeModeMock = ref<MetadataMovieScrapeMode>("auto")
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
 const playerSettingsMock = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
+  hardwareEncoder: "auto",
+  nativePlayerPreset: "mpv",
   nativePlayerEnabled: true,
   nativePlayerCommand: "mpv",
   streamPushEnabled: true,
+  forceStreamPush: false,
   ffmpegCommand: "ffmpeg",
   preferNativePlayer: false,
   seekForwardStepSec: 10,
   seekBackwardStepSec: 10,
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
+
+function normalizeNativePlayerPreset(
+  preset: PlayerSettingsDTO["nativePlayerPreset"],
+  command?: string,
+): NativePlayerPreset {
+  switch (preset) {
+    case "mpv":
+    case "potplayer":
+    case "custom":
+      return preset
+  }
+  const cmd = (command ?? "").trim().toLowerCase()
+  if (cmd.includes("potplayer")) return "potplayer"
+  if (!cmd || cmd.includes("mpv")) return "mpv"
+  return "custom"
+}
+
+function defaultNativePlayerCommand(preset: PlayerSettingsDTO["nativePlayerPreset"]): string {
+  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
+}
 
 /** 设置页概览第三卡：萃取帧条数（IndexedDB） */
 const curatedFramesCountState = ref(0)
@@ -423,6 +447,12 @@ export const mockLibraryService: LibraryService = {
     playerSettingsMock.value = {
       hardwareDecode:
         patch.hardwareDecode !== undefined ? patch.hardwareDecode : prev.hardwareDecode,
+      hardwareEncoder:
+        patch.hardwareEncoder !== undefined ? patch.hardwareEncoder : prev.hardwareEncoder,
+      nativePlayerPreset:
+        patch.nativePlayerPreset !== undefined
+          ? patch.nativePlayerPreset
+          : prev.nativePlayerPreset,
       nativePlayerEnabled:
         patch.nativePlayerEnabled !== undefined
           ? patch.nativePlayerEnabled
@@ -435,6 +465,8 @@ export const mockLibraryService: LibraryService = {
         patch.streamPushEnabled !== undefined
           ? patch.streamPushEnabled
           : prev.streamPushEnabled,
+      forceStreamPush:
+        patch.forceStreamPush !== undefined ? patch.forceStreamPush : prev.forceStreamPush,
       ffmpegCommand:
         patch.ffmpegCommand !== undefined
           ? (patch.ffmpegCommand.trim() || "ffmpeg")
@@ -451,6 +483,17 @@ export const mockLibraryService: LibraryService = {
         patch.seekBackwardStepSec !== undefined
           ? Math.max(1, patch.seekBackwardStepSec)
           : prev.seekBackwardStepSec,
+    }
+    playerSettingsMock.value = {
+      ...playerSettingsMock.value,
+      nativePlayerPreset: normalizeNativePlayerPreset(
+        playerSettingsMock.value.nativePlayerPreset,
+        playerSettingsMock.value.nativePlayerCommand,
+      ),
+      nativePlayerCommand:
+        (playerSettingsMock.value.nativePlayerCommand ??
+          defaultNativePlayerCommand(playerSettingsMock.value.nativePlayerPreset)).trim() ||
+        defaultNativePlayerCommand(playerSettingsMock.value.nativePlayerPreset),
     }
   },
 
@@ -571,6 +614,10 @@ export const mockLibraryService: LibraryService = {
   },
 
   async getMoviePlayback() {
+    return null
+  },
+
+  async createPlaybackSession() {
     return null
   },
 
