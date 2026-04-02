@@ -242,7 +242,7 @@ func (h *Handler) Routes() http.Handler {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, contracts.HealthDTO{
-		Name:         "curated",
+		Name:         version.BackendName(),
 		Version:      version.Stamp(),
 		Channel:      version.Channel,
 		Transport:    "http",

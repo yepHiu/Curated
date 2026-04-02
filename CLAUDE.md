@@ -45,18 +45,21 @@ pnpm typecheck
 ### Backend
 
 ```bash
-# Build the backend binary
+# Build the development backend binary
 cd backend
-go build -o curated.exe ./cmd/curated
+go build -o curated-dev.exe ./cmd/curated
 
 # Run backend HTTP server (default mode)
-./curated.exe
+./curated-dev.exe
 
 # Run with specific config
-./curated.exe -config path/to/config.yaml
+./curated-dev.exe -config path/to/config.yaml
 
 # Run in stdio mode (for future Electron bridge)
-./curated.exe -mode stdio
+./curated-dev.exe -mode stdio
+
+# Build the release backend binary
+go build -tags release -o curated.exe ./cmd/curated
 
 # Run tests
 go test ./...
@@ -73,7 +76,8 @@ go test -v ./internal/storage/...
 ```bash
 # Terminal 1: Start backend (from repo root or backend/)
 cd backend && go run ./cmd/curated
-# Or use pre-built binary: ./backend/curated.exe
+# Or build a Windows dev binary with: pnpm backend:build:dev
+# Then run: ./backend/runtime/curated-dev.exe
 
 # Terminal 2: Start frontend dev server
 pnpm dev
@@ -92,7 +96,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
-- **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or default `curated` applies); **restart the backend** for new log directory/level to apply to file sinks
+- **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
 Update via `PATCH /api/settings`; changes are written atomically to the config file.
@@ -388,6 +392,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 
 - The frontend Vite dev server proxies `/api` to `http://localhost:8080` (backend)
 - Backend supports three modes: `http` (default), `stdio`, `both`
+- Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)

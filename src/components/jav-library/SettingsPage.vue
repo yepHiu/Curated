@@ -308,6 +308,9 @@ const proxyJavbusResultOk = ref<boolean | null>(null)
 const proxyGoogleBusy = ref(false)
 const proxyGoogleResult = ref("")
 const proxyGoogleResultOk = ref<boolean | null>(null)
+const proxyAutoVerifyBusy = ref(false)
+let proxyDraftSyncDepth = 0
+let proxyAutoVerifySeq = 0
 
 const proxyOutboundPingBusy = computed(
   () => proxyJavbusBusy.value || proxyGoogleBusy.value,
@@ -316,20 +319,31 @@ const proxyOutboundPingBusy = computed(
 /** 代理用户名/密码折叠；有已保存认证信息时默认展开 */
 const proxyAuthExpanded = ref(false)
 
-function syncProxyDraftFromService() {
-  const p = libraryService.proxy.value
-  const parsed = parseProxyUrlDraftParts(p.url)
-  proxyEnabledDraft.value = Boolean(p.enabled)
-  proxySchemeDraft.value = parsed.scheme
-  proxyHostDraft.value = parsed.host
-  proxyPortDraft.value = parsed.port
-  proxyUsernameDraft.value = (p.username ?? parsed.username ?? "").trim()
-  proxyPasswordDraft.value = p.password ?? parsed.password ?? ""
-  const hasAuth =
-    !!(p.username?.trim() || (p.password ?? "").length > 0)
-  if (hasAuth) {
-    proxyAuthExpanded.value = true
+function runWithoutProxyDraftSideEffects<T>(fn: () => T): T {
+  proxyDraftSyncDepth += 1
+  try {
+    return fn()
+  } finally {
+    proxyDraftSyncDepth = Math.max(0, proxyDraftSyncDepth - 1)
   }
+}
+
+function syncProxyDraftFromService() {
+  runWithoutProxyDraftSideEffects(() => {
+    const p = libraryService.proxy.value
+    const parsed = parseProxyUrlDraftParts(p.url)
+    proxyEnabledDraft.value = Boolean(p.enabled)
+    proxySchemeDraft.value = parsed.scheme
+    proxyHostDraft.value = parsed.host
+    proxyPortDraft.value = parsed.port
+    proxyUsernameDraft.value = (p.username ?? parsed.username ?? "").trim()
+    proxyPasswordDraft.value = p.password ?? parsed.password ?? ""
+    const hasAuth =
+      !!(p.username?.trim() || (p.password ?? "").length > 0)
+    if (hasAuth) {
+      proxyAuthExpanded.value = true
+    }
+  })
 }
 
 function parseProxyUrlDraftParts(rawUrl?: string | null): {
@@ -431,9 +445,100 @@ watch(
     proxyPasswordDraft.value,
   ] as const,
   () => {
+    if (proxyDraftSyncDepth > 0) return
     clearProxyTestResults()
   },
 )
+
+const proxyStatusMessage = computed(() => {
+  if (proxyJavbusResult.value && proxyJavbusResultOk.value !== null) {
+    return {
+      text: proxyJavbusResult.value,
+      className: proxyJavbusResultOk.value
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-destructive",
+    }
+  }
+  if (proxyGoogleResult.value && proxyGoogleResultOk.value !== null) {
+    return {
+      text: proxyGoogleResult.value,
+      className: proxyGoogleResultOk.value
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-destructive",
+    }
+  }
+  if (useWebApi && proxyAutoVerifyBusy.value) {
+    return {
+      text: t("settings.proxyPingGoogleTesting"),
+      className: "text-xs text-muted-foreground motion-safe:animate-pulse",
+    }
+  }
+  if (useWebApi && proxySaving.value) {
+    return {
+      text: t("settings.proxySyncing"),
+      className: "text-xs text-muted-foreground motion-safe:animate-pulse",
+    }
+  }
+  if (proxyError.value) {
+    return {
+      text: proxyError.value,
+      className: "text-sm text-destructive",
+    }
+  }
+  return null
+})
+
+function applySavedProxyGoogleResult(
+  seq: number,
+  result: { ok: boolean; latencyMs?: number; httpStatus?: number; message?: string },
+) {
+  if (seq !== proxyAutoVerifySeq) return
+  if (result.ok) {
+    proxyGoogleResultOk.value = true
+    proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
+      ms: result.latencyMs,
+      status: result.httpStatus ?? "—",
+    })
+    pushAppToast(
+      t("settings.proxySaveToastVerified", {
+        ms: result.latencyMs,
+        status: result.httpStatus ?? "—",
+      }),
+      {
+        variant: "success",
+        durationMs: 4200,
+      },
+    )
+    return
+  }
+
+  const detail = result.message?.trim() || t("settings.proxyPingJavbusFailUnknown")
+  proxyGoogleResultOk.value = false
+  proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
+  pushAppToast(t("settings.proxySaveToastUnverified", { message: detail }), {
+    variant: "warning",
+    durationMs: 5200,
+  })
+}
+
+async function verifySavedProxyInBackground(seq: number) {
+  try {
+    const verifyResult = await api.pingProxyGoogle()
+    applySavedProxyGoogleResult(seq, verifyResult)
+  } catch (err) {
+    const detail =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message
+          ? err.message
+          : t("settings.proxyPingJavbusFailUnknown")
+    applySavedProxyGoogleResult(seq, { ok: false, message: detail })
+  } finally {
+    if (seq === proxyAutoVerifySeq) {
+      proxyAutoVerifyBusy.value = false
+    }
+  }
+}
 
 const BACKEND_LOG_LEVEL_OPTIONS = ["trace", "debug", "info", "warn", "error"] as const
 
@@ -586,48 +691,16 @@ async function saveProxySettings() {
       return
     }
 
-    try {
-      const verifyResult = await api.pingProxyGoogle()
-      if (verifyResult.ok) {
-        proxyGoogleResultOk.value = true
-        proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
-          ms: verifyResult.latencyMs,
-          status: verifyResult.httpStatus ?? "—",
-        })
-        pushAppToast(
-          t("settings.proxySaveToastVerified", {
-            ms: verifyResult.latencyMs,
-            status: verifyResult.httpStatus ?? "—",
-          }),
-          {
-            variant: "success",
-            durationMs: 4200,
-          },
-        )
-        return
-      }
-
-      const detail = verifyResult.message?.trim() || t("settings.proxyPingJavbusFailUnknown")
-      proxyGoogleResultOk.value = false
-      proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
-      pushAppToast(t("settings.proxySaveToastUnverified", { message: detail }), {
-        variant: "warning",
-        durationMs: 5200,
-      })
-    } catch (err) {
-      const detail =
-        err instanceof HttpClientError && err.apiError?.message
-          ? err.apiError.message
-          : err instanceof Error && err.message
-            ? err.message
-            : t("settings.proxyPingJavbusFailUnknown")
-      proxyGoogleResultOk.value = false
-      proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
-      pushAppToast(t("settings.proxySaveToastUnverified", { message: detail }), {
-        variant: "warning",
-        durationMs: 5200,
-      })
-    }
+    proxyAutoVerifySeq += 1
+    const verifySeq = proxyAutoVerifySeq
+    proxyAutoVerifyBusy.value = true
+    proxyGoogleResult.value = ""
+    proxyGoogleResultOk.value = null
+    pushAppToast(t("settings.proxySaveToastSaved"), {
+      variant: "success",
+      durationMs: 2400,
+    })
+    void verifySavedProxyInBackground(verifySeq)
   } catch (err) {
     console.error("[settings] save proxy failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -3479,35 +3552,10 @@ async function runMetadataRefreshForSelected() {
               </Button>
             </div>
             <p
-              v-if="proxyJavbusResult && proxyJavbusResultOk !== null"
-              class="text-sm"
-              :class="
-                proxyJavbusResultOk
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-destructive'
-              "
+              class="min-h-5 text-sm transition-colors"
+              :class="proxyStatusMessage?.className ?? 'text-transparent'"
             >
-              {{ proxyJavbusResult }}
-            </p>
-            <p
-              v-if="proxyGoogleResult && proxyGoogleResultOk !== null"
-              class="text-sm"
-              :class="
-                proxyGoogleResultOk
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-destructive'
-              "
-            >
-              {{ proxyGoogleResult }}
-            </p>
-            <p
-              v-if="useWebApi && proxySaving"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.proxySyncing") }}
-            </p>
-            <p v-if="proxyError" class="text-sm text-destructive">
-              {{ proxyError }}
+              {{ proxyStatusMessage?.text ?? " " }}
             </p>
           </CardContent>
         </Card>

@@ -358,6 +358,7 @@
     "proxyMockHint": "当前为 Mock / 未连后端：代理仅保存在本页内存；启用 VITE_USE_WEB_API 并连接 Curated 后端后写入服务端配置。",
     "proxySaveToastMock": "代理设置已保存到当前页面会话。",
     "proxySaveToastDisabled": "代理设置已保存，当前已切换为直连。",
+    "proxySaveToastSaved": "代理设置已保存，正在验证连通性…",
     "proxySaveToastVerified": "代理设置已保存，连通性测试通过：{ms} ms，HTTP {status}。",
     "proxySaveToastUnverified": "代理设置已保存，但代理测试未通过：{message}",
     "proxyPingJavbusHint": "使用当前表单中的代理设置请求 https://www.javbus.com/（无需先点保存），用于验证代理是否可用。",

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"curated-backend/internal/version"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -50,7 +51,7 @@ func New(level string, sink FileSink) (*zap.Logger, error) {
 	if dir := strings.TrimSpace(sink.LogDir); dir != "" {
 		prefix := strings.TrimSpace(sink.FilePrefix)
 		if prefix == "" {
-			prefix = "curated"
+			prefix = version.DefaultLogFilePrefix()
 		}
 		maxAgeDays := sink.MaxAgeDays
 		if maxAgeDays <= 0 {

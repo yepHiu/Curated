@@ -358,6 +358,7 @@
     "proxyMockHint": "Mock / Web API off: proxy is kept in page memory only. Use VITE_USE_WEB_API=true with the Curated backend to persist server-side.",
     "proxySaveToastMock": "Proxy settings were saved for the current page session.",
     "proxySaveToastDisabled": "Proxy settings saved. Direct connection is now active.",
+    "proxySaveToastSaved": "Proxy settings saved. Verifying connectivity…",
     "proxySaveToastVerified": "Proxy settings saved. Connectivity check passed: {ms} ms, HTTP {status}.",
     "proxySaveToastUnverified": "Proxy settings saved, but the proxy check failed: {message}",
     "proxyPingJavbusHint": "Uses the form above to GET https://www.javbus.com/ (no need to save first) to verify the proxy works.",

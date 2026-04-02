@@ -15,7 +15,7 @@ alwaysApply: true
 
 ## 后端（已实现）
 
-- Go 服务在 **`backend/`**（模块 **`curated-backend`**），HTTP 入口：`cd backend && go run ./cmd/curated`；开发构建默认 **`httpAddr` `:8080`**，**`-tags release` 打包**默认 **`:8081`**（见 `backend/internal/config/default_http_addr_*.go`，JSON `httpAddr` 可覆盖）。运行模式现支持 **`http`**、**`stdio`**、**`both`**、**`tray`** 四种；其中 **Windows + release build** 默认进入 **`tray`**。
+- Go 服务在 **`backend/`**（模块 **`curated-backend`**），HTTP 入口：`cd backend && go run ./cmd/curated`；开发构建默认 **`httpAddr` `:8080`**、健康名 **`curated-dev`**，并可通过 **`pnpm backend:build:dev`** 生成 **`backend/runtime/curated-dev.exe`** 以避免与安装版后端同名；**`-tags release` 打包**默认 **`:8081`**、健康名 **`curated`**（见 `backend/internal/config/default_http_addr_*.go`，JSON `httpAddr` 可覆盖）。运行模式现支持 **`http`**、**`stdio`**、**`both`**、**`tray`** 四种；其中 **Windows + release build** 默认进入 **`tray`**。
 - **SQLite** 应用库、扫描结果、任务等与 `config` 中的 `databasePath` 绑定；未配置时默认 **`runtime/curated.db`**（在 `backend` 目录下运行则为相对该目录的路径）。刮削侧另有 Metatube 引擎相关 SQLite（日志里可见 GORM）。
 - 主要逻辑：`backend/internal/app`（扫描、刮削、任务）、`server`（HTTP）、`storage`、`scanner`、`scraper`、`tasks`、`desktop`（Windows 托盘 / 单实例 / 启动失败弹窗）、`webui`（本地前端静态资源托管）。
 - **本地前端托管**：`App.HTTPHandler()` 在本地存在 `frontend-dist/` 或 `dist/` 时会直接托管前端静态资源，对非 `/api` 的 `GET/HEAD` 请求使用 SPA fallback 到 `index.html`；release 目录中的 `curated.exe + frontend-dist/` 已可直接作为浏览器入口使用。

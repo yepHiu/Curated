@@ -179,7 +179,7 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 }
 
 func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *bootstrap) error {
-	lock, primary, err := desktop.AcquireSingleInstance(`Local\Curated.Tray.Singleton`)
+	lock, primary, err := desktop.AcquireSingleInstance(version.TrayMutexName())
 	if err != nil {
 		return fmt.Errorf("single instance: %w", err)
 	}
@@ -306,7 +306,7 @@ func isExistingCuratedServer(ctx context.Context, baseURL string) bool {
 	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(health.Name), "curated")
+	return strings.EqualFold(strings.TrimSpace(health.Name), version.BackendName())
 }
 
 func exitWithInitError(message string, err error) {

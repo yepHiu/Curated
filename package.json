@@ -2,10 +2,11 @@
   "name": "jav-shadcn",
   "description": "Curated — local-first media library (Vue + Go)",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1-master",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "backend:build:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev/build-backend.ps1",
     "typecheck": "vue-tsc -b",
     "lint": "eslint .",
     "test": "vitest run",

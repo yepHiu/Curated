@@ -38,7 +38,9 @@ Local-first media library: **Vue 3** SPA plus a **Go** HTTP API (SQLite, folder 
 
 Run from repo root or `backend/`. Without `-config`, built-in defaults apply (DB, cache, sample library paths).
 
-**Production / release binary:** `go build -tags release ./cmd/curated` uses default **`httpAddr` `:8081`** (see `backend/internal/config/default_http_addr_*.go`). Override anytime with JSON `httpAddr` or `-config`.
+**Development binary:** `pnpm backend:build:dev` produces **`backend/runtime/curated-dev.exe`** on Windows so the dev backend does not collide with the installed release backend.
+
+**Production / release binary:** `go build -tags release ./cmd/curated` uses default **`httpAddr` `:8081`** (see `backend/internal/config/default_http_addr_*.go`) and still packages as **`curated.exe`**. Override anytime with JSON `httpAddr` or `-config`.
 
 ```bash
 cd backend
@@ -53,7 +55,7 @@ Useful flags:
 - `-mode both` — HTTP + stdio
 - `-mode tray` — Windows tray mode (the default for Windows release builds)
 
-Health (dev): `GET http://localhost:8080/api/health` — release build default port is **8081**.
+Health (dev): `GET http://localhost:8080/api/health` returns backend name **`curated-dev`**. Release build default port is **8081** and reports **`curated`**.
 
 On Windows `release` builds, launching `curated.exe` now defaults to tray mode:
 
@@ -83,7 +85,7 @@ Optional: `VITE_API_BASE_URL` overrides the API base. Dev default is `/api` (Vit
 
 If you omit `-config`, defaults typically include:
 
-- **HTTP**: `:8080` (`go run` / dev); **`:8081`** for `go build -tags release` (override with `httpAddr` in JSON)
+- **HTTP**: `:8080` (`go run` / dev, health name `curated-dev`); **`:8081`** for `go build -tags release` (health name `curated`, override with `httpAddr` in JSON)
 - **Database**: `backend/runtime/curated.db` (path is relative to the working directory; see `databasePath` in JSON if you need a custom file).
 - **Cache**: `backend/runtime/cache`
 - **Initial library roots**: e.g. `videos_test`, `docs/film-scanner/videos_test` — adjust `libraryPaths` in JSON as needed.

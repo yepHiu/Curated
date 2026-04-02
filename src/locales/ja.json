@@ -358,6 +358,7 @@
     "proxyMockHint": "モック / Web API 無効時はページ内メモリのみ。VITE_USE_WEB_API=true で Curated バックエンドに接続するとサーバー側に保存されます。",
     "proxySaveToastMock": "プロキシ設定を現在のページセッションに保存しました。",
     "proxySaveToastDisabled": "プロキシ設定を保存しました。現在は直接接続です。",
+    "proxySaveToastSaved": "プロキシ設定を保存しました。接続確認を実行中です…",
     "proxySaveToastVerified": "プロキシ設定を保存しました。疎通チェック成功: {ms} ms、HTTP {status}。",
     "proxySaveToastUnverified": "プロキシ設定は保存しましたが、疎通チェックに失敗しました: {message}",
     "proxyPingJavbusHint": "上記の設定で https://www.javbus.com/ に GET（保存不要）し、プロキシ疎通を確認します。",

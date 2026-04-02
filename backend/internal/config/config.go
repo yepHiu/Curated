@@ -1,6 +1,7 @@
 package config
 
 import (
+	"curated-backend/internal/version"
 	"encoding/json"
 	"errors"
 	"os"
@@ -13,7 +14,7 @@ type Config struct {
 	LogLevel string `json:"logLevel"`
 	// LogDir, if non-empty, enables daily rotated log files under this directory (e.g. "logs" or "runtime/logs").
 	LogDir string `json:"logDir,omitempty"`
-	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default "curated" when LogDir is set.
+	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default is channel-specific when LogDir is set.
 	LogFilePrefix string `json:"logFilePrefix,omitempty"`
 	// LogMaxAgeDays removes rotated files older than this many days; 0 means default 7 when file logging is enabled.
 	LogMaxAgeDays int      `json:"logMaxAgeDays,omitempty"`
@@ -192,7 +193,7 @@ func Load(path string) (Config, error) {
 	}
 	if strings.TrimSpace(cfg.LogDir) != "" {
 		if cfg.LogFilePrefix == "" {
-			cfg.LogFilePrefix = "curated"
+			cfg.LogFilePrefix = version.DefaultLogFilePrefix()
 		}
 		if cfg.LogMaxAgeDays <= 0 {
 			cfg.LogMaxAgeDays = 7

@@ -77,16 +77,35 @@ async function applyScrollRestoreSequence(
   }
 
   const el = getSettingsScrollEl(scrollElRef)
-  let observer: MutationObserver | null = null
+  const cleanupFns: Array<() => void> = []
+  const cleanupObservers = () => {
+    while (cleanupFns.length > 0) {
+      cleanupFns.pop()?.()
+    }
+  }
   if (el) {
-    observer = new MutationObserver(() => {
-      applyScroll(getSettingsScrollEl(scrollElRef), top, left)
+    const mutationObserver = new MutationObserver(() => {
+      restore()
     })
-    observer.observe(el, { childList: true, subtree: true })
-    setTimeout(() => {
-      observer?.disconnect()
-      observer = null
-    }, 600)
+    mutationObserver.observe(el, { childList: true, subtree: true })
+    cleanupFns.push(() => mutationObserver.disconnect())
+
+    const onFocusIn = () => {
+      restore()
+      requestAnimationFrame(() => restore())
+    }
+    el.addEventListener("focusin", onFocusIn, true)
+    cleanupFns.push(() => el.removeEventListener("focusin", onFocusIn, true))
+
+    if (typeof ResizeObserver !== "undefined") {
+      const resizeObserver = new ResizeObserver(() => {
+        restore()
+      })
+      resizeObserver.observe(el)
+      cleanupFns.push(() => resizeObserver.disconnect())
+    }
+
+    setTimeout(cleanupObservers, 900)
   }
 
   restore()
@@ -96,7 +115,9 @@ async function applyScrollRestoreSequence(
   setTimeout(restore, 50)
   setTimeout(restore, 150)
   setTimeout(restore, 300)
-  runScrollRestoreBurst(scrollElRef, top, left, performance.now() + 480)
+  setTimeout(restore, 500)
+  setTimeout(restore, 750)
+  runScrollRestoreBurst(scrollElRef, top, left, performance.now() + 900)
 }
 
 /**
