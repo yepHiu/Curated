@@ -22,7 +22,7 @@ type HlsLevel = {
 }
 
 type HlsCtor = {
-  new (): HlsInstance
+  new (config?: Record<string, unknown>): HlsInstance
   isSupported(): boolean
   Events?: Record<string, string>
 }
@@ -97,6 +97,180 @@ export function preloadHlsLibrary(): void {
   void loadHlsLibrary().catch(() => {
     // Prewarming is best-effort. Playback startup will retry if needed.
   })
+}
+
+function extractPlaylistEntries(
+  playlistUrl: string,
+  playlistBody: string,
+  limit: number,
+): {
+  childPlaylistUrls: string[]
+  mediaResourceUrls: string[]
+} {
+  const base = new URL(playlistUrl, window.location.href)
+  const variantPlaylistUrls: string[] = []
+  const auxiliaryPlaylistUrls: string[] = []
+  const mediaResourceUrls: string[] = []
+  let nextUriIsChildPlaylist = false
+  const add = (target: string[], candidate: string | null | undefined) => {
+    const trimmed = candidate?.trim()
+    if (!trimmed) return
+    try {
+      const absolute = new URL(trimmed, base).href
+      if (!target.includes(absolute) && target.length < limit) {
+        target.push(absolute)
+      }
+    } catch {
+      // ignore malformed lines
+    }
+  }
+
+  for (const rawLine of playlistBody.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line) continue
+    if (line.startsWith("#EXT-X-MAP:")) {
+      const uriMatch = /URI="([^"]+)"/i.exec(line)
+      add(mediaResourceUrls, uriMatch?.[1])
+      continue
+    }
+    if (line.startsWith("#EXT-X-STREAM-INF:")) {
+      nextUriIsChildPlaylist = true
+      continue
+    }
+    if (line.startsWith("#EXT-X-I-FRAME-STREAM-INF:") || line.startsWith("#EXT-X-MEDIA:")) {
+      const uriMatch = /URI="([^"]+)"/i.exec(line)
+      add(auxiliaryPlaylistUrls, uriMatch?.[1])
+      continue
+    }
+    if (line.startsWith("#")) {
+      nextUriIsChildPlaylist = false
+      continue
+    }
+    if (nextUriIsChildPlaylist) {
+      add(variantPlaylistUrls, line)
+      nextUriIsChildPlaylist = false
+      continue
+    }
+    add(mediaResourceUrls, line)
+    if (mediaResourceUrls.length >= limit) break
+  }
+
+  return {
+    childPlaylistUrls: [...variantPlaylistUrls, ...auxiliaryPlaylistUrls].slice(0, limit),
+    mediaResourceUrls: mediaResourceUrls.slice(0, limit),
+  }
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number, signal?: AbortSignal): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  const abortForwarder = () => controller.abort()
+  signal?.addEventListener("abort", abortForwarder, { once: true })
+  try {
+    return await fetch(url, {
+      credentials: "same-origin",
+      cache: "default",
+      signal: controller.signal,
+    })
+  } finally {
+    window.clearTimeout(timer)
+    signal?.removeEventListener("abort", abortForwarder)
+  }
+}
+
+async function collectPrewarmMediaUrls(
+  playlistUrl: string,
+  timeoutMs: number,
+  resourceCount: number,
+  signal?: AbortSignal,
+  visited: Set<string> = new Set(),
+  depth = 0,
+): Promise<string[]> {
+  if (visited.has(playlistUrl) || depth > 2) return []
+  visited.add(playlistUrl)
+
+  const playlistResponse = await fetchWithTimeout(playlistUrl, timeoutMs, signal)
+  if (!playlistResponse.ok) return []
+  const playlistBody = await playlistResponse.text()
+  const { childPlaylistUrls, mediaResourceUrls } = extractPlaylistEntries(
+    playlistUrl,
+    playlistBody,
+    Math.max(resourceCount, 4),
+  )
+
+  if (mediaResourceUrls.length > 0) {
+    return mediaResourceUrls.slice(0, resourceCount)
+  }
+  if (childPlaylistUrls.length === 0) {
+    return []
+  }
+
+  const resolvedMediaUrls: string[] = []
+  for (const childPlaylistUrl of childPlaylistUrls) {
+    const childMediaUrls = await collectPrewarmMediaUrls(
+      childPlaylistUrl,
+      timeoutMs,
+      resourceCount,
+      signal,
+      visited,
+      depth + 1,
+    )
+    for (const mediaUrl of childMediaUrls) {
+      if (!resolvedMediaUrls.includes(mediaUrl)) {
+        resolvedMediaUrls.push(mediaUrl)
+      }
+      if (resolvedMediaUrls.length >= resourceCount) {
+        return resolvedMediaUrls
+      }
+    }
+  }
+
+  return resolvedMediaUrls
+}
+
+export async function prewarmHlsResources(
+  playlistUrl: string,
+  options?: {
+    resourceCount?: number
+    timeoutMs?: number
+    signal?: AbortSignal
+    onProgress?: (progress: number) => void
+  },
+): Promise<void> {
+  if (typeof window === "undefined" || typeof fetch !== "function") return
+  const timeoutMs = Math.max(500, options?.timeoutMs ?? 3200)
+  const resourceCount = Math.max(1, Math.min(3, options?.resourceCount ?? 2))
+  const reportProgress = (progress: number) => {
+    options?.onProgress?.(Math.max(0, Math.min(1, progress)))
+  }
+
+  reportProgress(0.08)
+  const resourceUrls = await collectPrewarmMediaUrls(
+    playlistUrl,
+    timeoutMs,
+    resourceCount,
+    options?.signal,
+  )
+  if (resourceUrls.length === 0) {
+    reportProgress(1)
+    return
+  }
+
+  reportProgress(0.32)
+  let completedCount = 0
+  await Promise.allSettled(
+    resourceUrls.map(async (resourceUrl) => {
+      try {
+        const response = await fetchWithTimeout(resourceUrl, timeoutMs, options?.signal)
+        if (!response.ok) return
+        await response.arrayBuffer()
+      } finally {
+        completedCount += 1
+        reportProgress(0.32 + (completedCount / resourceUrls.length) * 0.68)
+      }
+    }),
+  )
+  reportProgress(1)
 }
 
 export type { HlsInstance, HlsLevel }

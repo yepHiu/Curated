@@ -103,7 +103,7 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | GET | `/api/library/movies/{id}` | Detail |
 | GET | `/api/library/movies/{id}/playback` | Playback descriptor (direct-play metadata, resume position, future transcode seam) |
 | POST | `/api/library/movies/{id}/playback-session` | Create playback session (for example HLS stream push) |
-| POST | `/api/library/movies/{id}/native-play` | Launch external native player kernel when configured |
+| POST | `/api/library/movies/{id}/native-play` | Legacy backend-side native player launch hook |
 | PATCH | `/api/library/movies/{id}` | Favorites, user rating, `userTags`, `metadataTags` |
 | DELETE | `/api/library/movies/{id}` | Remove from library |
 | GET | `/api/library/movies/{id}/stream` | Video stream (Range) |
@@ -146,7 +146,8 @@ Scrape stability additions:
 - Player startup now has a dedicated playback descriptor seam via **`GET /api/library/movies/{id}/playback`**; the current implementation still returns direct-play metadata and `/stream`, but this is the planned expansion point for remux/transcode later.
 - When backend stream push is enabled, Curated now prefers browser playback through **HLS** session output under **`/api/playback/sessions/{id}/hls/...`** by default.
 - The current frontend HLS path keeps playback inside the existing player page and loads `hls.js` on demand for browsers without native HLS support.
-- Curated can also launch an external native player kernel through **`POST /api/library/movies/{id}/native-play`** when `mpv` is configured.
+- The player page now prefers a **browser-side local-player handoff** for external playback. In the current UI, the PotPlayer preset uses a local browser protocol template (default `potplayer:{url}`) so the backend does not need to execute a player binary directly.
+- The older backend route **`POST /api/library/movies/{id}/native-play`** still exists as a legacy/native-shell hook, but it is no longer the default path for the player page's local-player button.
 - **Mock mode**: progress in **`localStorage`** (`jav-library-playback-progress-v1`).
 - History UI: sidebar **History** → `history` route; player can use `?t=` and `?from=history` for return navigation.
 

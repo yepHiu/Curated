@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import {
   ExternalLink,
   Info,
+  Loader2,
   Maximize2,
   Pause,
   PictureInPicture2,
@@ -25,6 +26,7 @@ import { pushAppToast } from "@/composables/use-app-toast"
 import {
   canPlayHlsNatively,
   loadHlsLibrary,
+  prewarmHlsResources,
   preloadHlsLibrary,
   type HlsInstance,
   type HlsLevel,
@@ -42,6 +44,12 @@ import {
   getPlayerAudioPrefs,
   savePlayerAudioPrefs,
 } from "@/lib/player-volume-storage"
+import {
+  buildNativePlayerLaunchUrl,
+  looksLikeBrowserProtocolLaunchTarget,
+  normalizeNativePlayerPresetForBrowserLaunch,
+  resolveNativePlayerBrowserTemplate,
+} from "@/lib/native-player-launch"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -114,18 +122,24 @@ let hlsDirectFallbackInFlight = false
 let playbackFallbackNoticeKey = ""
 let playbackSessionCleanupId: string | null = null
 let resumePlaybackWhenReady = false
+let hlsPrewarmSeq = 0
 
 const playbackSrc = ref<string | null>(null)
 const playbackDescriptor = ref<PlaybackDescriptorDTO | null>(null)
 const playbackError = ref("")
 const isResolvingPlayback = ref(false)
 const isSwitchingPlaybackSession = ref(false)
+const isPlaybackWaiting = ref(false)
+const isPrewarmingHls = ref(false)
+const hlsPrewarmProgress = ref(0)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
+const bufferedUntilSec = ref(0)
 const progressSliderValue = ref([0])
 const isScrubbingProgress = ref(false)
 const scrubPreviewTimeSec = ref<number | null>(null)
+const optimisticSeekTargetSec = ref<number | null>(null)
 const initialAudio = getPlayerAudioPrefs()
 const volume = ref([initialAudio.volumePercent])
 /** 与 video.muted 同步，用于 UI 与持久化（音量滑块为 0 时不使用静音标志） */
@@ -291,7 +305,14 @@ async function syncVideoSource() {
         await fallbackHlsToDirect("hls.js unsupported in this browser")
         return
       }
-      const player = new Hls()
+      const player = new Hls({
+        startFragPrefetch: true,
+        enableWorker: true,
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        backBufferLength: 90,
+      })
       bindHlsStats(player, Hls.Events)
       player.loadSource(src)
       player.attachMedia(v)
@@ -306,13 +327,48 @@ async function syncVideoSource() {
   refreshPlaybackStatsFromVideo()
 }
 
+async function prewarmHlsDescriptor(descriptor: PlaybackDescriptorDTO | null) {
+  const seq = ++hlsPrewarmSeq
+  const shouldPrewarm = descriptor?.mode === "hls" && Boolean(descriptor.url?.trim())
+  if (!shouldPrewarm) {
+    isPrewarmingHls.value = false
+    hlsPrewarmProgress.value = 0
+    return
+  }
+  isPrewarmingHls.value = true
+  hlsPrewarmProgress.value = 0.06
+  preloadHlsLibrary()
+  try {
+    await prewarmHlsResources(descriptor.url.trim(), {
+      resourceCount: 2,
+      timeoutMs: 3500,
+      onProgress: (progress) => {
+        if (seq !== hlsPrewarmSeq) return
+        hlsPrewarmProgress.value = progress
+      },
+    })
+  } catch {
+    // Best-effort only. Playback startup still proceeds normally.
+  } finally {
+    if (seq === hlsPrewarmSeq) {
+      isPrewarmingHls.value = false
+      hlsPrewarmProgress.value = 0
+    }
+  }
+}
+
 function syncSrc() {
   flushScheduledPlaybackSessionCleanup()
   void releasePlaybackSession(playbackDescriptor.value?.sessionId)
   playbackError.value = ""
   isResolvingPlayback.value = true
+  isPlaybackWaiting.value = false
+  isPrewarmingHls.value = false
+  hlsPrewarmProgress.value = 0
+  optimisticSeekTargetSec.value = null
   currentTime.value = 0
   duration.value = 0
+  bufferedUntilSec.value = 0
   progressSliderValue.value = [0]
   isScrubbingProgress.value = false
   scrubPreviewTimeSec.value = null
@@ -358,6 +414,7 @@ async function loadPlayback() {
     }
     playbackDescriptor.value = descriptor
     playbackSrc.value = descriptor?.url?.trim() || null
+    void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
     if (
@@ -400,6 +457,11 @@ async function fallbackHlsToDirect(reason?: string) {
 
   hlsDirectFallbackInFlight = true
   try {
+    ++hlsPrewarmSeq
+    isPrewarmingHls.value = false
+    hlsPrewarmProgress.value = 0
+    bufferedUntilSec.value = 0
+    markPlaybackReady()
     const absolutePositionSec = getAbsolutePlaybackTime()
     const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
     const fallbackUrl = moviePlaybackAbsoluteUrl(movieId)
@@ -547,6 +609,28 @@ const progressPercent = computed(() => {
   return Math.max(0, Math.min(100, (currentTime.value / total) * 100))
 })
 
+const playedTrackPercent = computed(() => {
+  const total = totalDurationSec.value
+  if (!total) return 0
+  const playedSec = normalizeProgressTargetSec(progressSliderValue.value[0] ?? currentTime.value)
+  return Math.max(0, Math.min(100, (playedSec / total) * 100))
+})
+
+const bufferedTrackPercent = computed(() => {
+  const total = totalDurationSec.value
+  if (!total) return 0
+  return Math.max(playedTrackPercent.value, Math.min(100, (bufferedUntilSec.value / total) * 100))
+})
+
+const bufferedAheadStyle = computed(() => {
+  const left = playedTrackPercent.value
+  const width = Math.max(0, bufferedTrackPercent.value - left)
+  return {
+    left: `${left}%`,
+    width: `${width}%`,
+  }
+})
+
 /** 实际记忆的音量档位（静音时仍保留，用于取消静音后恢复） */
 const volumePercent = computed(() => volume.value[0] ?? 0)
 /** 静音时滑块与百分比显示为 0，避免与「有声但静音」状态不一致 */
@@ -564,6 +648,11 @@ function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
   currentTime.value = getAbsolutePlaybackTime(v.currentTime)
+  syncBufferedRangeFromVideo()
+  clearOptimisticSeekIfSettled(currentTime.value)
+  if (v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+    isPlaybackWaiting.value = false
+  }
   const now = Date.now()
   if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
   lastProgressSaveAt = now
@@ -573,6 +662,7 @@ function onTimeUpdate() {
 function onLoadedMetadata() {
   const v = videoRef.value
   if (!v) return
+  markPlaybackReady()
   const videoDuration = Number.isFinite(v.duration) ? v.duration : 0
   duration.value = resolveTotalDurationSec(playbackDescriptor.value, videoDuration)
   refreshPlaybackStatsFromVideo()
@@ -580,6 +670,7 @@ function onLoadedMetadata() {
   const pct = volume.value[0] ?? 100
   v.volume = pct / 100
   v.muted = playbackMuted.value
+  syncBufferedRangeFromVideo()
   flushScheduledPlaybackSessionCleanup()
 
   if (playbackDescriptor.value?.mode === "hls") {
@@ -620,9 +711,67 @@ function normalizeProgressTargetSec(rawValue: number): number {
   return Math.min(Math.max(0, normalized), total)
 }
 
+function syncBufferedRangeFromVideo() {
+  const v = videoRef.value
+  const descriptor = playbackDescriptor.value
+  const total = totalDurationSec.value
+  if (!v || !descriptor || !playbackSrc.value || total <= 0) {
+    bufferedUntilSec.value = 0
+    return
+  }
+
+  const ranges = v.buffered
+  if (!ranges || ranges.length <= 0) {
+    bufferedUntilSec.value = 0
+    return
+  }
+
+  const absoluteCurrent = getAbsolutePlaybackTime(v.currentTime, descriptor)
+  let matchedEndSec = 0
+  let nearestAheadStartSec = Number.POSITIVE_INFINITY
+  let nearestAheadEndSec = 0
+
+  for (let index = 0; index < ranges.length; index += 1) {
+    const absoluteStart = getAbsolutePlaybackTime(ranges.start(index), descriptor)
+    const absoluteEnd = getAbsolutePlaybackTime(ranges.end(index), descriptor)
+    if (absoluteCurrent >= absoluteStart - 0.35 && absoluteCurrent <= absoluteEnd + 0.35) {
+      matchedEndSec = Math.max(matchedEndSec, absoluteEnd)
+      continue
+    }
+    if (absoluteStart > absoluteCurrent && absoluteStart < nearestAheadStartSec) {
+      nearestAheadStartSec = absoluteStart
+      nearestAheadEndSec = absoluteEnd
+    }
+  }
+
+  const nextBufferedEnd = matchedEndSec || nearestAheadEndSec || 0
+  bufferedUntilSec.value = Math.min(total, Math.max(0, nextBufferedEnd))
+}
+
 function syncProgressSliderFromPlayback() {
   if (isScrubbingProgress.value) return
   progressSliderValue.value = [normalizeProgressTargetSec(currentTime.value)]
+}
+
+function clearOptimisticSeekIfSettled(absoluteTimeSec: number = currentTime.value) {
+  const target = optimisticSeekTargetSec.value
+  if (target == null) return
+  if (Math.abs(absoluteTimeSec - target) <= 1) {
+    optimisticSeekTargetSec.value = null
+  }
+}
+
+function markPlaybackReady() {
+  isPlaybackWaiting.value = false
+  clearOptimisticSeekIfSettled()
+}
+
+function startOptimisticSeek(targetSec: number) {
+  const clamped = clampAbsolutePlaybackTarget(targetSec)
+  optimisticSeekTargetSec.value = clamped
+  currentTime.value = clamped
+  progressSliderValue.value = [clamped]
+  isPlaybackWaiting.value = true
 }
 
 function onProgressSliderInput(values?: number[]) {
@@ -635,11 +784,12 @@ function onProgressSliderInput(values?: number[]) {
 
 function onProgressSliderCommit(values?: number[]) {
   const next = normalizeProgressTargetSec(values?.[0] ?? 0)
+  const previous = currentTime.value
   progressSliderValue.value = [next]
   isScrubbingProgress.value = false
   scrubPreviewTimeSec.value = null
-  currentTime.value = next
-  void seekToAbsolutePlaybackTime(next)
+  startOptimisticSeek(next)
+  void seekToAbsolutePlaybackTime(next, { previousDisplayedTimeSec: previous })
 }
 
 watch([currentTime, totalDurationSec, isScrubbingProgress], () => {
@@ -662,6 +812,8 @@ function stripAutoplayFromRoute() {
 async function onCanPlayForAutoplay() {
   const v = videoRef.value
   if (!v || !playbackSrc.value) return
+  markPlaybackReady()
+  syncBufferedRangeFromVideo()
 
   const shouldHandleRouteAutoplay =
     props.autoplay && autoplayConsumedForMovieId.value !== props.movie.id
@@ -690,6 +842,7 @@ async function onCanPlayForAutoplay() {
 
 function onPlay() {
   isPlaying.value = true
+  markPlaybackReady()
   startFpsTracking()
 }
 
@@ -704,6 +857,7 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
   if (!descriptor || descriptor.mode !== "hls" || !sessionId) return
 
   await destroyHlsInstance()
+  markPlaybackReady()
   if (playbackDescriptor.value?.sessionId === sessionId) {
     playbackDescriptor.value = {
       ...playbackDescriptor.value,
@@ -717,11 +871,14 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
 function onVideoEnded() {
   flushPlaybackProgress()
   isPlaying.value = false
+  markPlaybackReady()
   void terminateActiveHlsPlaybackSession("HLS session closed after playback ended")
 }
 
 function onVideoError() {
   stopFpsTracking()
+  optimisticSeekTargetSec.value = null
+  isPlaybackWaiting.value = false
   const v = videoRef.value
   if (playbackDescriptor.value?.mode === "hls") {
     void fallbackHlsToDirect("video element failed while playing HLS")
@@ -796,7 +953,34 @@ function closeDetailedStats() {
 }
 
 function seekDelta(deltaSec: number) {
-  void seekToAbsolutePlaybackTime(currentTime.value + deltaSec)
+  const previous = currentTime.value
+  startOptimisticSeek(previous + deltaSec)
+  void seekToAbsolutePlaybackTime(previous + deltaSec, { previousDisplayedTimeSec: previous })
+}
+
+function onVideoWaiting() {
+  if (!playbackSrc.value) return
+  isPlaybackWaiting.value = true
+}
+
+function onVideoSeeking() {
+  if (!playbackSrc.value) return
+  isPlaybackWaiting.value = true
+}
+
+function onVideoSeeked() {
+  currentTime.value = getAbsolutePlaybackTime()
+  syncBufferedRangeFromVideo()
+  markPlaybackReady()
+}
+
+function onVideoLoadedData() {
+  syncBufferedRangeFromVideo()
+  markPlaybackReady()
+}
+
+function onVideoProgress() {
+  syncBufferedRangeFromVideo()
 }
 
 function onVolumeSlider(vols?: number[]) {
@@ -991,6 +1175,43 @@ const noStreamHint = computed(() => {
   return import.meta.env.VITE_USE_WEB_API === "true" ? t("player.errNoSrc") : t("player.mockNoPlay")
 })
 
+const nativePlayerPreset = computed(() =>
+  normalizeNativePlayerPresetForBrowserLaunch(
+    libraryService.playerSettings.value.nativePlayerPreset,
+    libraryService.playerSettings.value.nativePlayerCommand,
+  ),
+)
+
+const nativePlayerLabel = computed(() => {
+  switch (nativePlayerPreset.value) {
+    case "potplayer":
+      return "PotPlayer"
+    case "mpv":
+      return "MPV"
+    case "custom":
+    default:
+      return t("player.externalPlayer")
+  }
+})
+
+const playbackBusyLabel = computed(() => {
+  if (!playbackSrc.value && !isResolvingPlayback.value) return ""
+  if (isSwitchingPlaybackSession.value) return t("player.preparingSeek")
+  if (isResolvingPlayback.value) return t("player.preparingPlayback")
+  if (isPlaybackWaiting.value && optimisticSeekTargetSec.value != null) return t("player.bufferingSeek")
+  if (isPlaybackWaiting.value) return t("player.buffering")
+  if (isPrewarmingHls.value && playbackDescriptor.value?.mode === "hls" && !isPlaying.value) {
+    return t("player.prewarmingStream")
+  }
+  return ""
+})
+
+const showPlaybackBusyState = computed(() => Boolean(playbackBusyLabel.value))
+const showCenteredBusyOverlay = computed(() => showPlaybackBusyState.value)
+const prewarmProgressPercent = computed(() =>
+  Math.max(0, Math.min(100, Math.round(hlsPrewarmProgress.value * 100))),
+)
+
 function formatClientError(err: unknown, fallback: string): string {
   if (err instanceof HttpClientError) {
     return err.apiError?.message?.trim() || fallback
@@ -1003,17 +1224,79 @@ function formatClientError(err: unknown, fallback: string): string {
 
 async function openNativePlayer() {
   if (!playbackSrc.value) return
+  if (libraryService.playerSettings.value.nativePlayerEnabled === false) {
+    pushAppToast(t("player.nativeLaunchDisabled", { player: nativePlayerLabel.value }), {
+      variant: "warning",
+      durationMs: 4200,
+    })
+    return
+  }
+  const template = resolveNativePlayerBrowserTemplate(nativePlayerPreset.value)
+  if (!template.trim()) {
+    pushAppToast(t("player.nativeLaunchTemplateMissing", { player: nativePlayerLabel.value }), {
+      variant: "warning",
+      durationMs: 5200,
+    })
+    return
+  }
+
+  const launchTarget = buildNativePlayerLaunchUrl(template, {
+    url: moviePlaybackAbsoluteUrl(props.movie.id),
+    path: props.movie.location,
+    movieId: props.movie.id,
+    code: props.movie.code,
+    startSec: currentTime.value,
+    startMs: Math.round(currentTime.value * 1000),
+  })
+
+  if (!looksLikeBrowserProtocolLaunchTarget(launchTarget)) {
+    pushAppToast(t("player.nativeLaunchTargetInvalid", { player: nativePlayerLabel.value }), {
+      variant: "destructive",
+      durationMs: 5200,
+    })
+    return
+  }
+
+  let pageHidden = false
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      pageHidden = true
+    }
+  }
+
   try {
-    const launched = await libraryService.launchNativePlayback(props.movie.id, currentTime.value)
-    void terminateActiveHlsPlaybackSession("HLS session closed after native playback handoff")
-    pushAppToast(launched?.message?.trim() || "Native player launched.", {
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    const anchor = document.createElement("a")
+    anchor.href = launchTarget
+    anchor.rel = "noopener"
+    anchor.style.display = "none"
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    void terminateActiveHlsPlaybackSession("HLS session closed after browser native-player handoff")
+    pushAppToast(t("player.nativeLaunchRequested", { player: nativePlayerLabel.value }), {
       variant: "success",
       durationMs: 3200,
     })
+    window.setTimeout(() => {
+      if (!pageHidden && document.visibilityState === "visible") {
+        pushAppToast(t("player.nativeLaunchStillHere", { player: nativePlayerLabel.value }), {
+          variant: "warning",
+          durationMs: 5600,
+        })
+      }
+    }, 1400)
   } catch (err) {
-    pushAppToast(formatClientError(err, "Could not launch the native player."), {
-      variant: "destructive",
-    })
+    pushAppToast(
+      formatClientError(err, t("player.nativeLaunchFailed", { player: nativePlayerLabel.value })),
+      {
+        variant: "destructive",
+      },
+    )
+  } finally {
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }, 2200)
   }
 }
 
@@ -1345,13 +1628,18 @@ function clampAbsolutePlaybackTarget(targetSec: number): number {
 
 async function seekToAbsolutePlaybackTime(
   targetSec: number,
-  options: { forceSessionSwap?: boolean; resumeAfterSwap?: boolean } = {},
+  options: {
+    forceSessionSwap?: boolean
+    resumeAfterSwap?: boolean
+    previousDisplayedTimeSec?: number
+  } = {},
 ) {
   const v = videoRef.value
   const descriptor = playbackDescriptor.value
   if (!v || !descriptor || !playbackSrc.value) return
 
   const clampedTarget = clampAbsolutePlaybackTarget(targetSec)
+  isPlaybackWaiting.value = true
   if (descriptor.mode !== "hls") {
     v.currentTime = clampedTarget
     currentTime.value = clampedTarget
@@ -1400,9 +1688,17 @@ async function seekToAbsolutePlaybackTime(
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = nextDescriptor
     playbackSrc.value = nextDescriptor.url?.trim() || null
-    currentTime.value = playbackTimelineOffsetSec(nextDescriptor)
+    void prewarmHlsDescriptor(nextDescriptor)
+    currentTime.value = clampedTarget
+    progressSliderValue.value = [clampedTarget]
   } catch (err) {
     if (seq === playbackLoadSeq) {
+      optimisticSeekTargetSec.value = null
+      isPlaybackWaiting.value = false
+      if (options.previousDisplayedTimeSec != null && Number.isFinite(options.previousDisplayedTimeSec)) {
+        currentTime.value = clampAbsolutePlaybackTarget(options.previousDisplayedTimeSec)
+        progressSliderValue.value = [currentTime.value]
+      }
       pushAppToast(formatClientError(err, t("player.errGeneric")), {
         variant: "destructive",
       })
@@ -1634,7 +1930,9 @@ const detailedStatsModeLabel = computed(() => {
 })
 
 const videoPreloadMode = computed(() =>
-  playbackDescriptor.value?.mode === "direct" ? "auto" : "metadata",
+  playbackDescriptor.value?.mode === "hls" || playbackDescriptor.value?.mode === "direct"
+    ? "auto"
+    : "metadata",
 )
 </script>
 
@@ -1742,10 +2040,15 @@ const videoPreloadMode = computed(() =>
           :preload="videoPreloadMode"
           @click.stop="onVideoSurfaceClick"
           @timeupdate="onTimeUpdate"
+          @progress="onVideoProgress"
           @loadedmetadata="onLoadedMetadata"
+          @loadeddata="onVideoLoadedData"
           @canplay="onCanPlayForAutoplay"
           @play="onPlay"
           @pause="onPause"
+          @waiting="onVideoWaiting"
+          @seeking="onVideoSeeking"
+          @seeked="onVideoSeeked"
           @ended="onVideoEnded"
           @error="onVideoError"
           @enterpictureinpicture="onVideoEnterPictureInPicture"
@@ -1771,6 +2074,31 @@ const videoPreloadMode = computed(() =>
         >
           {{ playbackError }}
         </div>
+
+        <Transition
+          enter-active-class="transition duration-200 ease-out"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition duration-200 ease-in"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <div
+            v-if="showCenteredBusyOverlay"
+            class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6"
+          >
+            <div class="flex min-w-[12rem] max-w-sm flex-col items-center gap-3 rounded-[1.5rem] border border-white/12 bg-black/48 px-6 py-5 text-center text-white shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-md">
+              <Loader2 class="size-8 animate-spin text-white/85" aria-hidden="true" />
+              <span class="text-sm font-medium tracking-[0.01em] text-white/88">{{ playbackBusyLabel }}</span>
+              <span
+                v-if="isPrewarmingHls && playbackDescriptor?.mode === 'hls' && !isPlaying"
+                class="text-xs font-medium tabular-nums text-white/55"
+              >
+                {{ prewarmProgressPercent }}%
+              </span>
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <div
@@ -1783,16 +2111,29 @@ const videoPreloadMode = computed(() =>
             <span>{{ totalDurationSec > 0 ? formatClock(totalDurationSec) : "\u2014" }}</span>
           </div>
 
-          <Slider
-            :model-value="progressSliderValue"
-            :max="Math.max(totalDurationSec, 0.25)"
-            :step="0.1"
-            :disabled="!playbackSrc || totalDurationSec <= 0"
-            :aria-label="t('player.progressAria')"
-            class="w-full"
-            @update:model-value="onProgressSliderInput"
-            @value-commit="onProgressSliderCommit"
-          />
+          <div class="relative">
+            <Slider
+              :model-value="progressSliderValue"
+              :max="Math.max(totalDurationSec, 0.25)"
+              :step="0.1"
+              :disabled="!playbackSrc || totalDurationSec <= 0"
+              :aria-label="t('player.progressAria')"
+              class="relative z-10 w-full"
+              @update:model-value="onProgressSliderInput"
+              @value-commit="onProgressSliderCommit"
+            />
+
+            <div
+              v-if="bufferedTrackPercent > playedTrackPercent"
+              class="pointer-events-none absolute inset-x-0 top-1/2 z-[11] h-1.5 -translate-y-1/2 overflow-hidden rounded-full"
+              aria-hidden="true"
+            >
+              <div
+                class="absolute inset-y-0 rounded-full bg-white/26"
+                :style="bufferedAheadStyle"
+              />
+            </div>
+          </div>
 
           <p
             v-if="curatedCaptureError"
@@ -1903,7 +2244,7 @@ const videoPreloadMode = computed(() =>
                 @click="openNativePlayer"
               >
                 <ExternalLink class="size-4 shrink-0" data-icon="inline-start" aria-hidden="true" />
-                Native
+                {{ nativePlayerLabel }}
               </Button>
 
               <Button
@@ -2001,6 +2342,7 @@ const videoPreloadMode = computed(() =>
   .curated-shutter-ring {
     animation: curated-shutter-minimal 0.2s ease-out forwards;
   }
+
   @keyframes curated-shutter-minimal {
     from {
       opacity: 0.85;

@@ -175,7 +175,7 @@ DELETE /api/library/movies/{id}             # Delete movie (move to trash)
 DELETE /api/library/movies/{id}?permanent=true  # Permanently delete (must be in trash)
 POST   /api/library/movies/{id}/restore     # Restore from trash
 GET    /api/library/movies/{id}/stream      # Video stream (HTML5 video/Range requests)
-POST   /api/library/movies/{id}/native-play # Launch external native player kernel when configured
+POST   /api/library/movies/{id}/native-play # Legacy backend-side native player launch hook
 GET    /api/playback/sessions/{id}/hls/{file} # Serve HLS playlists and segments for pushed playback sessions
 POST   /api/library/movies/{id}/reveal      # Open OS file manager at primary video (server machine; path rules same as stream)
 POST   /api/library/movies/{id}/scrape      # Re-scrape metadata (async task)
@@ -315,7 +315,8 @@ Player startup should consume `GET /api/library/movies/{id}/playback` instead of
 - Purpose: preserve current browser playback while creating the expansion seam for remux/transcode/native playback later
 - Browser playback may now move onto a backend-managed HLS session when stream push is enabled
 - The frontend keeps HLS playback inside the existing player page and loads `hls.js` on demand when the browser lacks native HLS support
-- Native playback can be launched through `POST /api/library/movies/{id}/native-play` when `mpv` is configured
+- The current player page prefers browser-side local-player handoff for external playback. With the PotPlayer preset, the frontend uses a browser protocol template (default `potplayer:{url}`) instead of depending on backend process launch.
+- `POST /api/library/movies/{id}/native-play` still exists as a legacy/native-shell hook, but it is no longer the default path for the player page button
 
 ### Movie Comments
 

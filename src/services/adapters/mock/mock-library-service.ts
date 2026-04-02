@@ -56,9 +56,9 @@ const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false }
 const playerSettingsMock = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
-  nativePlayerPreset: "mpv",
+  nativePlayerPreset: "potplayer",
   nativePlayerEnabled: true,
-  nativePlayerCommand: "mpv",
+  nativePlayerCommand: "PotPlayerMini64.exe",
   streamPushEnabled: true,
   forceStreamPush: false,
   ffmpegCommand: "ffmpeg",

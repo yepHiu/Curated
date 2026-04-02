@@ -438,6 +438,7 @@
   <h3>5.4 播放与续播</h3>
   <p>前端根据影片 ID 构造指向 <code>/api/library/movies/{id}/stream</code> 的 URL（开发环境仍走 Vite 代理）。播放器组件发起媒体请求，由 Go <code>ServeContent</code> 按文件实际路径读出并支持 HTTP Range。</p>
   <p><strong>续播（前端）</strong>：<span class="path">PlayerPage.vue</span> 在 <code>loadedmetadata</code> 后按路由 <code>?t=</code> 或 <code>localStorage</code> 写入的位置 seek；播放中节流回写进度。详情/资料库进播放器可由 <code>buildPlayerRouteFromBrowse</code> 附带 <code>t</code>；历史页进播放器带 <code>from=history</code>，顶栏返回历史（<span class="path">AppShell.vue</span>）。</p>
+  <p><strong>本机播放器拉起（前端）</strong>：播放器页不再默认依赖后端 <code>native-play</code> 去执行外部程序，而是由浏览器侧按协议模板拉起本机播放器。当前实现默认以 PotPlayer 为主，协议模板建议值为 <code>potplayer:{url}</code>，并保存在浏览器 <code>localStorage</code>（键名 <code>curated-native-player-browser-template-v1</code>）中，便于按机器区分是否安装了对应播放器。</p>
 
   <h2 id="features">6. 功能模块与代码落点</h2>
   <table>
@@ -451,7 +452,7 @@
       <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
       <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
       <tr><td>监听触发的自动扫描</td><td>设置 UI（自动刮削）</td><td><code>AutoLibraryWatchController</code> + <code>librarywatch.Watcher</code>；<code>autoLibraryWatch</code> 写入 <code>library-config.cfg</code></td></tr>
-      <tr><td>观看历史 / 续播</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code></td><td>—（未落库）</td></tr>
+      <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
     </tbody>
   </table>
 

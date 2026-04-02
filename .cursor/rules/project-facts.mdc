@@ -53,9 +53,10 @@ alwaysApply: true
 - Player startup now has a dedicated playback descriptor seam: `GET /api/library/movies/{id}/playback`.
 - The current backend response is still direct-play oriented and points to `/api/library/movies/{id}/stream`.
 - Frontend player code should consume the playback descriptor first, then treat `/stream` as an implementation detail.
-- Curated now also has two expansion paths on that seam: `POST /api/library/movies/{id}/native-play` for launching an external native player kernel, and `POST /api/library/movies/{id}/playback-session` plus `/api/playback/sessions/{id}/hls/...` for HLS stream push.
+- Curated now also has two expansion paths on that seam: a **browser-side native-player handoff** path used by the current frontend (default PotPlayer protocol template `potplayer:{url}`), plus the backend session path `POST /api/library/movies/{id}/playback-session` and `/api/playback/sessions/{id}/hls/...` for HLS stream push. The older `POST /api/library/movies/{id}/native-play` backend-launch route still exists as a legacy/native-shell hook, but the player page no longer depends on it for the default local-player action.
 - The current in-page HLS browser path loads `hls.js` on demand when native HLS is unavailable.
 - `GET/PATCH /api/settings` now includes playback runtime preferences such as `nativePlayerEnabled`, `nativePlayerCommand`, `streamPushEnabled`, `ffmpegCommand`, `preferNativePlayer`, `seekForwardStepSec`, and `seekBackwardStepSec`.
+- Browser protocol handoff templates are **per-machine frontend state** stored in `localStorage` under `curated-native-player-browser-template-v1`; settings UI treats this as a browser launch template rather than a backend executable path.
 
 ## 2026-04 Network Stability Update
 

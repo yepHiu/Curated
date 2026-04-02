@@ -25,6 +25,7 @@ import type {
   ProxySettingsDTO,
 } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
+import { pushAppToast } from "@/composables/use-app-toast"
 import {
   SETTINGS_SCROLL_EL_KEY,
   SETTINGS_SCROLL_ROOT_ID,
@@ -120,6 +121,14 @@ import {
   type SettingsSectionSlug,
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
+import {
+  defaultNativePlayerBackendCommand,
+  defaultNativePlayerBrowserTemplate,
+  getStoredNativePlayerBrowserTemplate,
+  normalizeNativePlayerPresetForBrowserLaunch,
+  persistNativePlayerBrowserTemplate,
+  resolveNativePlayerBrowserTemplate,
+} from "@/lib/native-player-launch"
 import { cn } from "@/lib/utils"
 
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
@@ -143,6 +152,9 @@ const PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS: readonly NativePlayerPreset[] = [
   "potplayer",
   "custom",
 ]
+type ProxyScheme = "http" | "socks5"
+const PROXY_SCHEME_OPTIONS: readonly ProxyScheme[] = ["http", "socks5"]
+const DEFAULT_PROXY_HOST = "127.0.0.1"
 
 function setThemeFromSelect(v: unknown) {
   if (v === "light" || v === "dark" || v === "system") {
@@ -232,9 +244,9 @@ const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreser
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
 const playbackHardwareDecodeDraft = ref(true)
 const playbackHardwareEncoderDraft = ref<HardwareEncoderPreference>("auto")
-const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("mpv")
+const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("potplayer")
 const playbackNativePlayerEnabledDraft = ref(true)
-const playbackNativePlayerCommandDraft = ref("mpv")
+const playbackNativePlayerProtocolTemplateDraft = ref(defaultNativePlayerBrowserTemplate("potplayer"))
 const playbackStreamPushEnabledDraft = ref(true)
 const playbackForceStreamPushDraft = ref(false)
 const playbackFfmpegCommandDraft = ref("ffmpeg")
@@ -283,7 +295,9 @@ const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
 const proxyEnabledDraft = ref(false)
-const proxyUrlDraft = ref("")
+const proxySchemeDraft = ref<ProxyScheme>("http")
+const proxyHostDraft = ref(DEFAULT_PROXY_HOST)
+const proxyPortDraft = ref("")
 const proxyUsernameDraft = ref("")
 const proxyPasswordDraft = ref("")
 const proxySaving = ref(false)
@@ -304,16 +318,122 @@ const proxyAuthExpanded = ref(false)
 
 function syncProxyDraftFromService() {
   const p = libraryService.proxy.value
+  const parsed = parseProxyUrlDraftParts(p.url)
   proxyEnabledDraft.value = Boolean(p.enabled)
-  proxyUrlDraft.value = (p.url ?? "").trim()
-  proxyUsernameDraft.value = (p.username ?? "").trim()
-  proxyPasswordDraft.value = p.password ?? ""
+  proxySchemeDraft.value = parsed.scheme
+  proxyHostDraft.value = parsed.host
+  proxyPortDraft.value = parsed.port
+  proxyUsernameDraft.value = (p.username ?? parsed.username ?? "").trim()
+  proxyPasswordDraft.value = p.password ?? parsed.password ?? ""
   const hasAuth =
     !!(p.username?.trim() || (p.password ?? "").length > 0)
   if (hasAuth) {
     proxyAuthExpanded.value = true
   }
 }
+
+function parseProxyUrlDraftParts(rawUrl?: string | null): {
+  scheme: ProxyScheme
+  host: string
+  port: string
+  username?: string
+  password?: string
+} {
+  const fallback = {
+    scheme: "http" as ProxyScheme,
+    host: DEFAULT_PROXY_HOST,
+    port: "",
+  }
+  const trimmed = rawUrl?.trim()
+  if (!trimmed) return fallback
+
+  try {
+    const parsed = new URL(trimmed)
+    const protocol = parsed.protocol.replace(/:$/, "").toLowerCase()
+    const scheme: ProxyScheme = protocol.startsWith("socks5") ? "socks5" : "http"
+    return {
+      scheme,
+      host: parsed.hostname || DEFAULT_PROXY_HOST,
+      port: parsed.port || "",
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+    }
+  } catch {
+    const match = /^([a-z0-9+.-]+):\/\/([^:/?#]+)(?::(\d+))?/i.exec(trimmed)
+    if (!match) return fallback
+    return {
+      scheme: match[1].toLowerCase().startsWith("socks5") ? "socks5" : "http",
+      host: match[2]?.trim() || DEFAULT_PROXY_HOST,
+      port: match[3]?.trim() || "",
+    }
+  }
+}
+
+function proxySchemeLabel(value: ProxyScheme): string {
+  return value === "socks5" ? t("settings.proxySchemeSocks5") : t("settings.proxySchemeHttp")
+}
+
+function normalizeProxyHostDraft(): string {
+  return proxyHostDraft.value.trim() || DEFAULT_PROXY_HOST
+}
+
+function buildProxySettingsFromDraft(): ProxySettingsDTO | null {
+  proxyError.value = ""
+
+  if (!proxyEnabledDraft.value) {
+    return { enabled: false }
+  }
+
+  const host = normalizeProxyHostDraft()
+  if (!host) {
+    proxyError.value = t("settings.proxyHostRequired")
+    return null
+  }
+
+  const portRaw = proxyPortDraft.value.trim()
+  if (!portRaw) {
+    proxyError.value = t("settings.proxyPortRequired")
+    return null
+  }
+  if (!/^\d+$/.test(portRaw)) {
+    proxyError.value = t("settings.proxyPortInvalid")
+    return null
+  }
+
+  const port = Number.parseInt(portRaw, 10)
+  if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+    proxyError.value = t("settings.proxyPortInvalid")
+    return null
+  }
+
+  return {
+    enabled: true,
+    url: `${proxySchemeDraft.value}://${host}:${port}`,
+    username: proxyUsernameDraft.value.trim() || undefined,
+    password: proxyPasswordDraft.value || undefined,
+  }
+}
+
+function clearProxyTestResults() {
+  proxyJavbusResult.value = ""
+  proxyJavbusResultOk.value = null
+  proxyGoogleResult.value = ""
+  proxyGoogleResultOk.value = null
+}
+
+watch(
+  () => [
+    proxyEnabledDraft.value,
+    proxySchemeDraft.value,
+    proxyHostDraft.value,
+    proxyPortDraft.value,
+    proxyUsernameDraft.value,
+    proxyPasswordDraft.value,
+  ] as const,
+  () => {
+    clearProxyTestResults()
+  },
+)
 
 const BACKEND_LOG_LEVEL_OPTIONS = ["trace", "debug", "info", "warn", "error"] as const
 
@@ -438,28 +558,76 @@ async function saveBackendLogSettings() {
 }
 
 async function saveProxySettings() {
-  proxyError.value = ""
-  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
-    proxyError.value = t("settings.proxyUrlRequired")
-    return
-  }
-  const body: ProxySettingsDTO = {
-    enabled: proxyEnabledDraft.value,
-    url: proxyUrlDraft.value.trim() || undefined,
-    username: proxyUsernameDraft.value.trim() || undefined,
-    password: proxyPasswordDraft.value || undefined,
-  }
+  const body = buildProxySettingsFromDraft()
+  if (!body) return
   try {
     await withPreservedScroll(async () => {
       proxySaving.value = true
       try {
         await libraryService.setProxy(body)
         syncProxyDraftFromService()
-        flashProxySaved()
       } finally {
         proxySaving.value = false
       }
     })
+    if (!useWebApi) {
+      pushAppToast(t("settings.proxySaveToastMock"), {
+        variant: "success",
+        durationMs: 3200,
+      })
+      return
+    }
+
+    if (!body.enabled) {
+      pushAppToast(t("settings.proxySaveToastDisabled"), {
+        variant: "success",
+        durationMs: 3200,
+      })
+      return
+    }
+
+    try {
+      const verifyResult = await api.pingProxyGoogle()
+      if (verifyResult.ok) {
+        proxyGoogleResultOk.value = true
+        proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
+          ms: verifyResult.latencyMs,
+          status: verifyResult.httpStatus ?? "—",
+        })
+        pushAppToast(
+          t("settings.proxySaveToastVerified", {
+            ms: verifyResult.latencyMs,
+            status: verifyResult.httpStatus ?? "—",
+          }),
+          {
+            variant: "success",
+            durationMs: 4200,
+          },
+        )
+        return
+      }
+
+      const detail = verifyResult.message?.trim() || t("settings.proxyPingJavbusFailUnknown")
+      proxyGoogleResultOk.value = false
+      proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
+      pushAppToast(t("settings.proxySaveToastUnverified", { message: detail }), {
+        variant: "warning",
+        durationMs: 5200,
+      })
+    } catch (err) {
+      const detail =
+        err instanceof HttpClientError && err.apiError?.message
+          ? err.apiError.message
+          : err instanceof Error && err.message
+            ? err.message
+            : t("settings.proxyPingJavbusFailUnknown")
+      proxyGoogleResultOk.value = false
+      proxyGoogleResult.value = t("settings.proxyPingJavbusFail", { message: detail })
+      pushAppToast(t("settings.proxySaveToastUnverified", { message: detail }), {
+        variant: "warning",
+        durationMs: 5200,
+      })
+    }
   } catch (err) {
     console.error("[settings] save proxy failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -469,23 +637,16 @@ async function saveProxySettings() {
     } else {
       proxyError.value = t("settings.errSaveTitle")
     }
+    pushAppToast(proxyError.value, {
+      variant: "destructive",
+      durationMs: 4200,
+    })
   }
 }
 
 const settingsAutoSaveReady = ref(false)
-const proxySavedFlash = ref(false)
 const backendLogSavedFlash = ref(false)
-let proxySavedFlashTimer: ReturnType<typeof setTimeout> | null = null
 let backendLogSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
-
-function flashProxySaved() {
-  proxySavedFlash.value = true
-  if (proxySavedFlashTimer) clearTimeout(proxySavedFlashTimer)
-  proxySavedFlashTimer = setTimeout(() => {
-    proxySavedFlash.value = false
-    proxySavedFlashTimer = null
-  }, 2200)
-}
 
 function flashBackendLogSaved() {
   backendLogSavedFlash.value = true
@@ -513,14 +674,15 @@ function syncPlaybackDraftFromService() {
   )
     ? ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference)
     : "auto"
-  playbackNativePlayerPresetDraft.value = normalizeNativePlayerPreset(
+  playbackNativePlayerPresetDraft.value = normalizeNativePlayerPresetForBrowserLaunch(
     player.nativePlayerPreset,
     player.nativePlayerCommand,
   )
   playbackNativePlayerEnabledDraft.value = player.nativePlayerEnabled !== false
-  playbackNativePlayerCommandDraft.value =
-    (player.nativePlayerCommand ?? playbackNativePlayerDefaultCommand(player.nativePlayerPreset)).trim() ||
-    playbackNativePlayerDefaultCommand(player.nativePlayerPreset)
+  playbackNativePlayerProtocolTemplateDraft.value = resolveNativePlayerBrowserTemplate(
+    playbackNativePlayerPresetDraft.value,
+    getStoredNativePlayerBrowserTemplate(),
+  )
   playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
   playbackForceStreamPushDraft.value = Boolean(player.forceStreamPush)
   playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
@@ -529,24 +691,8 @@ function syncPlaybackDraftFromService() {
   playbackSeekBackwardStepDraft.value = String(Math.max(1, Number(player.seekBackwardStepSec ?? 10)))
 }
 
-function normalizeNativePlayerPreset(
-  preset: NativePlayerPreset | undefined,
-  command?: string,
-): NativePlayerPreset {
-  switch (preset) {
-    case "mpv":
-    case "potplayer":
-    case "custom":
-      return preset
-  }
-  const cmd = (command ?? "").trim().toLowerCase()
-  if (cmd.includes("potplayer")) return "potplayer"
-  if (!cmd || cmd.includes("mpv")) return "mpv"
-  return "custom"
-}
-
 function playbackNativePlayerDefaultCommand(preset: NativePlayerPreset | undefined): string {
-  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
+  return defaultNativePlayerBackendCommand(preset)
 }
 
 function playbackNativePlayerPresetLabel(value: NativePlayerPreset): string {
@@ -561,23 +707,26 @@ function playbackNativePlayerPresetLabel(value: NativePlayerPreset): string {
   }
 }
 
-const playbackNativePlayerCommandPlaceholder = computed(() => {
+const playbackNativePlayerProtocolTemplatePlaceholder = computed(() => {
   if (playbackNativePlayerPresetDraft.value === "custom") {
     return t("settings.playbackNativePlayerCommandPlaceholderCustom")
   }
-  return playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value)
+  return (
+    defaultNativePlayerBrowserTemplate(playbackNativePlayerPresetDraft.value) ||
+    t("settings.playbackNativePlayerCommandPlaceholder")
+  )
 })
 
 function onPlaybackNativePlayerPresetChange(value: unknown) {
-  const nextPreset = normalizeNativePlayerPreset(
+  const nextPreset = normalizeNativePlayerPresetForBrowserLaunch(
     typeof value === "string" ? (value as NativePlayerPreset) : undefined,
   )
   const prevPreset = playbackNativePlayerPresetDraft.value
-  const currentCommand = playbackNativePlayerCommandDraft.value.trim()
-  const previousDefault = playbackNativePlayerDefaultCommand(prevPreset)
+  const currentTemplate = playbackNativePlayerProtocolTemplateDraft.value.trim()
+  const previousDefault = defaultNativePlayerBrowserTemplate(prevPreset)
   playbackNativePlayerPresetDraft.value = nextPreset
-  if (!currentCommand || currentCommand === previousDefault) {
-    playbackNativePlayerCommandDraft.value = playbackNativePlayerDefaultCommand(nextPreset)
+  if (!currentTemplate || currentTemplate === previousDefault) {
+    playbackNativePlayerProtocolTemplateDraft.value = defaultNativePlayerBrowserTemplate(nextPreset)
   }
 }
 
@@ -608,14 +757,24 @@ function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
     playbackError.value = t("settings.playbackSeekBackwardInvalid")
     return null
   }
+  const player = libraryService.playerSettings.value
+  const currentPreset = normalizeNativePlayerPresetForBrowserLaunch(
+    player.nativePlayerPreset,
+    player.nativePlayerCommand,
+  )
+  const currentCommand = (player.nativePlayerCommand ?? "").trim()
+  const currentDefault = playbackNativePlayerDefaultCommand(currentPreset)
+  const nextDefault = playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value)
+  const nextBackendCommand =
+    !currentCommand || currentCommand === currentDefault || currentPreset !== playbackNativePlayerPresetDraft.value
+      ? nextDefault
+      : currentCommand
   return {
     hardwareDecode: playbackHardwareDecodeDraft.value,
     hardwareEncoder: playbackHardwareEncoderDraft.value,
     nativePlayerPreset: playbackNativePlayerPresetDraft.value,
     nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
-    nativePlayerCommand:
-      playbackNativePlayerCommandDraft.value.trim() ||
-      playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value),
+    nativePlayerCommand: nextBackendCommand,
     streamPushEnabled: playbackStreamPushEnabledDraft.value,
     forceStreamPush: playbackForceStreamPushDraft.value,
     ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
@@ -631,12 +790,8 @@ function playbackDraftMatchesServer(): boolean {
     playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
     playbackHardwareEncoderDraft.value === ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference) &&
     playbackNativePlayerPresetDraft.value ===
-      normalizeNativePlayerPreset(player.nativePlayerPreset, player.nativePlayerCommand) &&
+      normalizeNativePlayerPresetForBrowserLaunch(player.nativePlayerPreset, player.nativePlayerCommand) &&
     playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
-    (playbackNativePlayerCommandDraft.value.trim() ||
-      playbackNativePlayerDefaultCommand(player.nativePlayerPreset)) ===
-      ((player.nativePlayerCommand ?? playbackNativePlayerDefaultCommand(player.nativePlayerPreset)).trim() ||
-        playbackNativePlayerDefaultCommand(player.nativePlayerPreset)) &&
     playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
     playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
     (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
@@ -649,18 +804,39 @@ function playbackDraftMatchesServer(): boolean {
   )
 }
 
+function playbackBrowserTemplateMatchesPersisted(): boolean {
+  return playbackNativePlayerProtocolTemplateDraft.value.trim() ===
+    resolveNativePlayerBrowserTemplate(
+      playbackNativePlayerPresetDraft.value,
+      getStoredNativePlayerBrowserTemplate(),
+    )
+}
+
 async function savePlaybackSettings() {
   playbackError.value = ""
-  const patch = buildPlaybackPatchFromDraft()
-  if (!patch) {
-    return
+  const shouldPatchServer = !playbackDraftMatchesServer()
+  const shouldPersistBrowserTemplate = !playbackBrowserTemplateMatchesPersisted()
+  let patch: PatchPlayerSettingsBody | null = null
+  if (shouldPatchServer) {
+    patch = buildPlaybackPatchFromDraft()
+    if (!patch) {
+      return
+    }
   }
   try {
     await withPreservedScroll(async () => {
       playbackSaving.value = true
       try {
-        await libraryService.patchPlayerSettings(patch)
-        syncPlaybackDraftFromService()
+        if (shouldPatchServer && patch) {
+          await libraryService.patchPlayerSettings(patch)
+          syncPlaybackDraftFromService()
+        }
+        if (shouldPersistBrowserTemplate) {
+          playbackNativePlayerProtocolTemplateDraft.value = persistNativePlayerBrowserTemplate(
+            playbackNativePlayerPresetDraft.value,
+            playbackNativePlayerProtocolTemplateDraft.value,
+          )
+        }
         flashPlaybackSaved()
       } finally {
         playbackSaving.value = false
@@ -676,16 +852,6 @@ async function savePlaybackSettings() {
       playbackError.value = t("settings.errSaveTitle")
     }
   }
-}
-
-function proxyDraftMatchesServer(): boolean {
-  const p = libraryService.proxy.value
-  return (
-    proxyEnabledDraft.value === Boolean(p.enabled) &&
-    proxyUrlDraft.value.trim() === (p.url ?? "").trim() &&
-    proxyUsernameDraft.value.trim() === (p.username ?? "").trim() &&
-    (proxyPasswordDraft.value || "") === (p.password ?? "")
-  )
 }
 
 function backendLogDraftMatchesServer(): boolean {
@@ -705,26 +871,6 @@ function backendLogDraftMatchesServer(): boolean {
   }
   return Number.isFinite(cur) && cur === s
 }
-
-watchDebounced(
-  () =>
-    [
-      proxyEnabledDraft.value,
-      proxyUrlDraft.value,
-      proxyUsernameDraft.value,
-      proxyPasswordDraft.value,
-    ] as const,
-  async () => {
-    if (!settingsAutoSaveReady.value || !useWebApi) {
-      return
-    }
-    if (proxyDraftMatchesServer()) {
-      return
-    }
-    await saveProxySettings()
-  },
-  { debounce: 550, maxWait: 5000 },
-)
 
 watchDebounced(
   () =>
@@ -752,7 +898,7 @@ watchDebounced(
       playbackHardwareEncoderDraft.value,
       playbackNativePlayerPresetDraft.value,
       playbackNativePlayerEnabledDraft.value,
-      playbackNativePlayerCommandDraft.value,
+      playbackNativePlayerProtocolTemplateDraft.value,
       playbackStreamPushEnabledDraft.value,
       playbackForceStreamPushDraft.value,
       playbackFfmpegCommandDraft.value,
@@ -764,7 +910,7 @@ watchDebounced(
     if (!settingsAutoSaveReady.value) {
       return
     }
-    if (playbackDraftMatchesServer()) {
+    if (playbackDraftMatchesServer() && playbackBrowserTemplateMatchesPersisted()) {
       return
     }
     await savePlaybackSettings()
@@ -773,13 +919,10 @@ watchDebounced(
 )
 
 async function testProxyJavbus() {
-  proxyError.value = ""
+  const draft = buildProxySettingsFromDraft()
+  if (!draft) return
   proxyJavbusResult.value = ""
   proxyJavbusResultOk.value = null
-  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
-    proxyError.value = t("settings.proxyUrlRequired")
-    return
-  }
   if (!useWebApi) {
     return
   }
@@ -787,12 +930,7 @@ async function testProxyJavbus() {
     proxyJavbusBusy.value = true
       try {
         const body = {
-          proxy: {
-            enabled: proxyEnabledDraft.value,
-            url: proxyUrlDraft.value.trim() || undefined,
-            username: proxyUsernameDraft.value.trim() || undefined,
-            password: proxyPasswordDraft.value || undefined,
-          } satisfies ProxySettingsDTO,
+          proxy: draft,
         }
         const res = await api.pingProxyJavbus(body)
         if (res.ok) {
@@ -826,13 +964,10 @@ async function testProxyJavbus() {
 }
 
 async function testProxyGoogle() {
-  proxyError.value = ""
+  const draft = buildProxySettingsFromDraft()
+  if (!draft) return
   proxyGoogleResult.value = ""
   proxyGoogleResultOk.value = null
-  if (proxyEnabledDraft.value && !proxyUrlDraft.value.trim()) {
-    proxyError.value = t("settings.proxyUrlRequired")
-    return
-  }
   if (!useWebApi) {
     return
   }
@@ -840,12 +975,7 @@ async function testProxyGoogle() {
     proxyGoogleBusy.value = true
       try {
         const body = {
-          proxy: {
-            enabled: proxyEnabledDraft.value,
-            url: proxyUrlDraft.value.trim() || undefined,
-            username: proxyUsernameDraft.value.trim() || undefined,
-            password: proxyPasswordDraft.value || undefined,
-          } satisfies ProxySettingsDTO,
+          proxy: draft,
         }
         const res = await api.pingProxyGoogle(body)
         if (res.ok) {
@@ -3206,16 +3336,44 @@ async function runMetadataRefreshForSelected() {
               v-if="proxyEnabledDraft"
               class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
             >
-              <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.proxyUrl") }}</p>
-                <Input
-                  v-model="proxyUrlDraft"
-                  type="url"
-                  autocomplete="off"
-                  class="rounded-xl border-border/50"
-                  :placeholder="t('settings.proxyUrlPlaceholder')"
-                  :disabled="proxySaving"
-                />
+              <div class="grid gap-3 md:grid-cols-[11rem_minmax(0,1fr)_10rem]">
+                <div class="flex flex-col gap-3">
+                  <p class="text-sm font-medium">{{ t("settings.proxyScheme") }}</p>
+                  <Select v-model="proxySchemeDraft" :disabled="proxySaving">
+                    <SelectTrigger>
+                      <SelectValue :placeholder="t('settings.proxySchemeHttp')" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="option in PROXY_SCHEME_OPTIONS"
+                        :key="option"
+                        :value="option"
+                      >
+                        {{ proxySchemeLabel(option) }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex flex-col gap-3">
+                  <p class="text-sm font-medium">{{ t("settings.proxyHost") }}</p>
+                  <Input
+                    v-model="proxyHostDraft"
+                    autocomplete="off"
+                    class="rounded-xl border-border/50"
+                    :placeholder="t('settings.proxyHostPlaceholder')"
+                    :disabled="proxySaving"
+                  />
+                </div>
+                <div class="flex flex-col gap-3">
+                  <p class="text-sm font-medium">{{ t("settings.proxyPort") }}</p>
+                  <Input
+                    v-model="proxyPortDraft"
+                    inputmode="numeric"
+                    class="rounded-xl border-border/50"
+                    :placeholder="t('settings.proxyPortPlaceholder')"
+                    :disabled="proxySaving"
+                  />
+                </div>
               </div>
               <div class="flex flex-col gap-3">
                 <button
@@ -3272,7 +3430,6 @@ async function runMetadataRefreshForSelected() {
             </p>
             <div class="flex flex-wrap items-center gap-3">
               <Button
-                v-if="!useWebApi"
                 type="button"
                 class="rounded-lg"
                 :disabled="proxySaving || proxyOutboundPingBusy"
@@ -3348,12 +3505,6 @@ async function runMetadataRefreshForSelected() {
               class="text-xs text-muted-foreground motion-safe:animate-pulse"
             >
               {{ t("settings.proxySyncing") }}
-            </p>
-            <p
-              v-else-if="useWebApi && proxySavedFlash"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.autoPersistSaved") }}
             </p>
             <p v-if="proxyError" class="text-sm text-destructive">
               {{ proxyError }}
@@ -3756,8 +3907,8 @@ async function runMetadataRefreshForSelected() {
                 </p>
               </div>
               <Input
-                v-model="playbackNativePlayerCommandDraft"
-                :placeholder="playbackNativePlayerCommandPlaceholder"
+                v-model="playbackNativePlayerProtocolTemplateDraft"
+                :placeholder="playbackNativePlayerProtocolTemplatePlaceholder"
               />
             </div>
 

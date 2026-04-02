@@ -43,9 +43,9 @@ const proxyState = ref<ProxySettingsDTO>({ enabled: false })
 const playerSettingsState = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
-  nativePlayerPreset: "mpv",
+  nativePlayerPreset: "potplayer",
   nativePlayerEnabled: true,
-  nativePlayerCommand: "mpv",
+  nativePlayerCommand: "PotPlayerMini64.exe",
   streamPushEnabled: true,
   ffmpegCommand: "ffmpeg",
   preferNativePlayer: false,
