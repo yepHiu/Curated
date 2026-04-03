@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/Curated-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Curated</title>
+    <script>
+      ;(function () {
+        try {
+          var k = "curated-ui-theme"
+          var t = localStorage.getItem(k)
+          var pref =
+            t === "light" || t === "dark" || t === "system" ? t : null
+          if (pref === null) {
+            pref = "dark"
+            try {
+              localStorage.setItem(k, "dark")
+            } catch (e) {}
+          }
+          var dark =
+            pref === "dark" ||
+            (pref === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches)
+          if (dark) document.documentElement.classList.add("dark")
+          else document.documentElement.classList.remove("dark")
+        } catch (e) {
+          document.documentElement.classList.add("dark")
+        }
+      })()
+    </script>
+    <script type="module" crossorigin src="/assets/index-DMxkCGvN.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-Dw2cE7zH.js">
+    <link rel="modulepreload" crossorigin href="/assets/lucide-icons-DhxJaq-W.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-Diamu_JX.js">
+    <link rel="modulepreload" crossorigin href="/assets/vue-i18n-HYOd_GRb.js">
+    <link rel="modulepreload" crossorigin href="/assets/vue-router-CsUSwag_.js">
+    <link rel="modulepreload" crossorigin href="/assets/virtual-scroller-CeT-YVkS.js">
+    <link rel="modulepreload" crossorigin href="/assets/endpoints-DgPMh0T7.js">
+    <link rel="stylesheet" crossorigin href="/assets/vendor-Ds1aFT64.css">
+    <link rel="stylesheet" crossorigin href="/assets/virtual-scroller-nCwVVNUn.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CAwMTHJQ.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

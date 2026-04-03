@@ -141,6 +141,7 @@
     "curatedFramesCount": "萃取帧"
   },
   "library": {
+    "backToTop": "回到顶部",
     "tagBrowseTitle": "标签浏览",
     "tagBrowseDesc": "点击标签按同名筛选（与顶栏搜索、详情页标签一致）。元数据标签来自刮削/NFO，用户标签仅保存在本地库。",
     "clearFilter": "清除筛选",

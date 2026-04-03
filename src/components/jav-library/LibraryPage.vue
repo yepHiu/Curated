@@ -38,6 +38,7 @@ const props = defineProps<{
   activeStudioFilter?: string
   /** 演员资料卡「用户标签」联想候选（影片 userTags 等，与演员库卡同源） */
   actorUserTagSuggestions?: readonly string[]
+  scrollPreserveKey?: string
 }>()
 
 const emit = defineEmits<{
@@ -403,6 +404,7 @@ function isChipActive(tag: string): boolean {
         :selected-movie-id="props.selectedMovie?.id"
         :batch-mode="batchModeOn"
         :batch-selected-ids="props.batchSelectedIds ?? []"
+        :scroll-preserve-key="props.scrollPreserveKey"
         :empty-title="props.mode === 'trash' ? t('library.trashEmptyTitle') : undefined"
         :empty-description="props.mode === 'trash' ? t('library.trashEmptyDesc') : undefined"
         @select="emit('select', $event)"

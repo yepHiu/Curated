@@ -141,6 +141,7 @@
     "curatedFramesCount": "Curated frames"
   },
   "library": {
+    "backToTop": "Back to top",
     "tagBrowseTitle": "Browse by tag",
     "tagBrowseDesc": "Click a tag to filter by exact name (same as top search and detail tags). Metadata tags come from scrape/NFO; user tags are local only.",
     "clearFilter": "Clear filter",

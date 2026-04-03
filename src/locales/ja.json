@@ -141,6 +141,7 @@
     "curatedFramesCount": "萃取フレーム"
   },
   "library": {
+    "backToTop": "トップへ戻る",
     "tagBrowseTitle": "タグで閲覧",
     "tagBrowseDesc": "タグをクリックして完全一致で絞り込み（上部検索・詳細タグと同じ）。メタデータタグはスクレイプ/NFO 由来、ユーザータグはローカルのみ。",
     "clearFilter": "フィルタ解除",

@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue"
 import { useResizeObserver } from "@vueuse/core"
+import { ChevronUp } from "lucide-vue-next"
+import { useI18n } from "vue-i18n"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
 import type { Movie } from "@/domain/movie/types"
+import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
+import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
 
 interface MovieChunk {
   id: string
@@ -21,6 +25,7 @@ const props = withDefaults(
     batchSelectedIds?: readonly string[]
     emptyTitle?: string
     emptyDescription?: string
+    scrollPreserveKey?: string
   }>(),
   {
     batchMode: false,
@@ -30,6 +35,8 @@ const props = withDefaults(
       "Try another query or switch to a different library tab.",
   },
 )
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   select: [movieId: string]
@@ -61,7 +68,27 @@ const BUFFER_CHUNKS = 5
 const BUFFER_PX = 600
 
 const rootEl = ref<HTMLElement | null>(null)
+const scrollEl = ref<HTMLElement | null>(null)
 const containerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200)
+
+function setScrollerRef(value: unknown) {
+  if (value instanceof HTMLElement) {
+    scrollEl.value = value
+    return
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "$el" in value &&
+    (value as { $el?: unknown }).$el instanceof HTMLElement
+  ) {
+    scrollEl.value = (value as { $el: HTMLElement }).$el
+    return
+  }
+
+  scrollEl.value = null
+}
 
 useResizeObserver(rootEl, (entries) => {
   const w = entries[0]?.contentRect.width
@@ -165,11 +192,19 @@ const getChunk = (value: unknown): MovieChunk =>
         items: [],
         sizeKey: "",
       }
+
+const preserveKey = computed(() => props.scrollPreserveKey?.trim() ?? "")
+const { scrollTop, scrollToTop } = useLibraryScrollPreserve({
+  scrollElRef: scrollEl,
+  preserveKey,
+})
+const showScrollToTop = computed(() => scrollTop.value >= 560)
 </script>
 
 <template>
-  <div v-if="props.movies.length" ref="rootEl" class="h-full min-h-0">
+  <div v-if="props.movies.length" ref="rootEl" class="relative h-full min-h-0">
     <DynamicScroller
+      :ref="setScrollerRef"
       :items="movieChunks"
       key-field="id"
       :min-item-size="estimatedChunkHeight"
@@ -222,6 +257,20 @@ const getChunk = (value: unknown): MovieChunk =>
         </DynamicScrollerItem>
       </template>
     </DynamicScroller>
+
+    <Button
+      v-show="showScrollToTop"
+      type="button"
+      variant="outline"
+      size="sm"
+      class="absolute right-3 bottom-3 z-20 h-10 rounded-full border-border/70 bg-background/85 px-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-sm transition-all duration-200 hover:border-primary/45 hover:bg-background focus-visible:ring-ring/70 motion-reduce:transition-none sm:right-4 sm:bottom-4"
+      :aria-label="t('library.backToTop')"
+      @click="scrollToTop"
+    >
+      <ChevronUp class="size-4" />
+      <span class="hidden sm:inline">{{ t("library.backToTop") }}</span>
+      <span class="sr-only sm:hidden">{{ t("library.backToTop") }}</span>
+    </Button>
   </div>
 
   <Card v-else class="rounded-3xl border-border/70 bg-card/80">

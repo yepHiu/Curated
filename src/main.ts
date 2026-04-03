@@ -11,11 +11,30 @@ import "./style.css"
 
 initClientLogger()
 
-async function boot() {
-  if (import.meta.env.VITE_USE_WEB_API === "true") {
-    await Promise.all([hydratePlaybackProgress(), hydratePlayedMovies()])
+function hydrateWebStateAfterMount() {
+  if (import.meta.env.VITE_USE_WEB_API !== "true") {
+    return
   }
+
+  const run = () => {
+    void Promise.allSettled([hydratePlaybackProgress(), hydratePlayedMovies()])
+  }
+
+  const idleCallback = (window as Window & {
+    requestIdleCallback?: (callback: () => void) => number
+  }).requestIdleCallback
+
+  if (typeof idleCallback === "function") {
+    idleCallback(run)
+    return
+  }
+
+  setTimeout(run, 0)
+}
+
+function boot() {
   createApp(App).use(i18n).use(router).mount("#app")
+  hydrateWebStateAfterMount()
 }
 
 void boot()

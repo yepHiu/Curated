@@ -72,7 +72,8 @@ let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
 
 /** 并发「全量资料库列表」拉取合并为单次 in-flight，避免 ensure / reload / 多入口重复请求 */
-let fullLibraryListsPromise: Promise<{ active: Movie[]; trashed: Movie[] }> | null = null
+let activeMoviesPromise: Promise<Movie[]> | null = null
+let trashedMoviesPromise: Promise<Movie[]> | null = null
 const pendingMovieDetailLoads = new Map<string, Promise<Movie | undefined>>()
 
 /** 单次请求条数；多页拉取直至 total 或达到上限，避免首屏只看见前 200 条 */
@@ -90,14 +91,14 @@ function mapLibraryPathsFromSettings(
   }))
 }
 
-async function fetchAllMoviesFromApi(): Promise<Movie[]> {
-  const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0 })
+async function fetchPagedMovies(mode?: "trash"): Promise<Movie[]> {
+  const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0, mode })
   const all: Movie[] = first.items.map(mapMovieListItem)
   let offset = all.length
   const { total } = first
 
   while (offset < total && all.length < MAX_MOVIES_PREFETCH) {
-    const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset })
+    const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset, mode })
     const batch = page.items.map(mapMovieListItem)
     if (batch.length === 0) {
       break
@@ -109,35 +110,24 @@ async function fetchAllMoviesFromApi(): Promise<Movie[]> {
   return all
 }
 
-async function fetchAllTrashedMoviesFromApi(): Promise<Movie[]> {
-  const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0, mode: "trash" })
-  const all: Movie[] = first.items.map(mapMovieListItem)
-  let offset = all.length
-  const { total } = first
-
-  while (offset < total && all.length < MAX_MOVIES_PREFETCH) {
-    const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset, mode: "trash" })
-    const batch = page.items.map(mapMovieListItem)
-    if (batch.length === 0) {
-      break
-    }
-    all.push(...batch)
-    offset += batch.length
+function loadActiveMovies(): Promise<Movie[]> {
+  if (activeMoviesPromise) {
+    return activeMoviesPromise
   }
-
-  return all
+  activeMoviesPromise = fetchPagedMovies().finally(() => {
+    activeMoviesPromise = null
+  })
+  return activeMoviesPromise
 }
 
-async function loadFullLibraryLists(): Promise<{ active: Movie[]; trashed: Movie[] }> {
-  if (fullLibraryListsPromise) {
-    return fullLibraryListsPromise
+function loadTrashedMovies(): Promise<Movie[]> {
+  if (trashedMoviesPromise) {
+    return trashedMoviesPromise
   }
-  fullLibraryListsPromise = Promise.all([fetchAllMoviesFromApi(), fetchAllTrashedMoviesFromApi()])
-    .then(([active, trashed]) => ({ active, trashed }))
-    .finally(() => {
-      fullLibraryListsPromise = null
-    })
-  return fullLibraryListsPromise
+  trashedMoviesPromise = fetchPagedMovies("trash").finally(() => {
+    trashedMoviesPromise = null
+  })
+  return trashedMoviesPromise
 }
 
 async function refreshCuratedFramesCountFromApi() {
@@ -153,30 +143,38 @@ watch(curatedFramesRevision, () => {
   void refreshCuratedFramesCountFromApi()
 })
 
-async function reloadMoviesFromApiImmediate() {
+function isTrashHashRoute(): boolean {
+  if (typeof window === "undefined") {
+    return false
+  }
+  const hash = window.location.hash || ""
+  return hash === "#/trash" || hash.startsWith("#/trash?")
+}
+
+async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }) {
   if (reloadMoviesDebounce) {
     clearTimeout(reloadMoviesDebounce)
     reloadMoviesDebounce = null
   }
   try {
-    const { active, trashed } = await loadFullLibraryLists()
-    moviesState.value = active
-    trashedMoviesState.value = trashed
+    moviesState.value = await loadActiveMovies()
+    if (options?.includeTrash) {
+      trashedMoviesState.value = await loadTrashedMovies()
+    }
     loaded = true
-    void refreshCuratedFramesCountFromApi()
   } catch (err) {
     console.error("[web-library-service] failed to reload movies", err)
   }
 }
 
-async function ensureLoaded() {
+async function ensureLoaded(options?: { includeTrash?: boolean }) {
   if (loaded) return
   try {
-    const { active, trashed } = await loadFullLibraryLists()
-    moviesState.value = active
-    trashedMoviesState.value = trashed
+    moviesState.value = await loadActiveMovies()
+    if (options?.includeTrash) {
+      trashedMoviesState.value = await loadTrashedMovies()
+    }
     loaded = true
-    void refreshCuratedFramesCountFromApi()
   } catch (err) {
     console.error("[web-library-service] failed to load movies", err)
   }
@@ -292,7 +290,7 @@ async function refreshLibraryPathsFromApi() {
 }
 
 function createWebLibraryService(): LibraryService {
-  void ensureLoaded()
+  void ensureLoaded({ includeTrash: isTrashHashRoute() })
 
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
@@ -403,7 +401,7 @@ function createWebLibraryService(): LibraryService {
     },
 
     async refreshSettings() {
-      await refreshLibraryPathsFromApi()
+      await Promise.all([refreshLibraryPathsFromApi(), refreshCuratedFramesCountFromApi()])
     },
 
     async reloadMoviesFromApi() {
@@ -413,8 +411,16 @@ function createWebLibraryService(): LibraryService {
       }
       reloadMoviesDebounce = setTimeout(() => {
         reloadMoviesDebounce = null
-        void reloadMoviesFromApiImmediate()
+        void reloadMoviesFromApiImmediate({ includeTrash: isTrashHashRoute() })
       }, 450)
+    },
+
+    async ensureTrashLoaded() {
+      try {
+        trashedMoviesState.value = await loadTrashedMovies()
+      } catch (err) {
+        console.error("[web-library-service] failed to load trashed movies", err)
+      }
     },
 
     async setOrganizeLibrary(value: boolean) {
@@ -591,7 +597,7 @@ function createWebLibraryService(): LibraryService {
     async removeLibraryPath(id: string) {
       await api.deleteLibraryPath(id)
       await refreshLibraryPathsFromApi()
-      await reloadMoviesFromApiImmediate()
+      await reloadMoviesFromApiImmediate({ includeTrash: isTrashHashRoute() })
     },
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {
@@ -725,7 +731,7 @@ function createWebLibraryService(): LibraryService {
       await api.deleteMovie(id)
       moviesState.value = moviesState.value.filter((m) => m.id !== id)
       try {
-        trashedMoviesState.value = await fetchAllTrashedMoviesFromApi()
+        trashedMoviesState.value = await loadTrashedMovies()
       } catch {
         // 忽略回收站刷新失败，主列表已一致
       }
@@ -734,7 +740,7 @@ function createWebLibraryService(): LibraryService {
     async restoreMovie(movieId: string) {
       const id = movieId.trim()
       await api.restoreMovie(id)
-      await reloadMoviesFromApiImmediate()
+      await reloadMoviesFromApiImmediate({ includeTrash: true })
     },
 
     async deleteMoviePermanently(movieId: string) {

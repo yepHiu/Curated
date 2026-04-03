@@ -1,0 +1,1 @@
+function e(e){return e.toLowerCase().replace(/[\s\-_]/g,``)}function t(t){let n=t.code?.trim()?e(t.code):``,r=`${t.title} ${t.code} ${t.studio} ${t.actors.join(` `)} ${t.tags.join(` `)} ${t.userTags.join(` `)}`;return(n?`${r} ${n}`:r).trim().toLowerCase()}export{e as n,t};

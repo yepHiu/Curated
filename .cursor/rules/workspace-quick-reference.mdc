@@ -22,6 +22,7 @@ alwaysApply: true
 - **重启前后端**：先释放 **5173** 与后端端口（开发 **8080** / release **8081**，或配置中的 `httpAddr`）上旧进程，再分别启动上述两条命令。
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。
+- **记录打包版本**：每次执行 `pnpm release:frontend`、`pnpm release:backend`、`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish`，或任何实际产出安装包 / 便携包 / 发布清单的打包动作后，都要在 `docs/package-build-history.md` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
 
 ## 规则索引
 

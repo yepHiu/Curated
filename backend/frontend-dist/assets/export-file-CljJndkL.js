@@ -1,0 +1,1 @@
+function e(e,t){let n=URL.createObjectURL(e),r=document.createElement(`a`);r.href=n,r.download=t,r.rel=`noopener`,document.body.appendChild(r),r.click(),r.remove(),window.setTimeout(()=>URL.revokeObjectURL(n),3e4)}async function t(e,t,n){let r=await(await e.getFileHandle(n,{create:!0})).createWritable();await r.write(t),await r.close()}export{t as n,e as t};

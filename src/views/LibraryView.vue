@@ -27,6 +27,7 @@ import {
   resolveLibraryMode,
 } from "@/lib/library-query"
 import { bumpMovieImageVersion } from "@/lib/image-version"
+import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
 import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
@@ -517,6 +518,17 @@ async function runBatchPermanentDelete() {
 }
 
 const libraryMode = computed<LibraryMode>(() => resolveLibraryMode(route))
+const libraryScrollKey = computed(() => buildLibraryBrowseScrollKey(route))
+
+watch(
+  libraryMode,
+  (mode) => {
+    if (USE_WEB_API && mode === "trash") {
+      void libraryService.ensureTrashLoaded()
+    }
+  },
+  { immediate: true },
+)
 
 const libraryMovies = computed(() =>
   libraryMode.value === "trash" ? libraryService.trashedMovies.value : libraryService.movies.value,
@@ -771,6 +783,7 @@ const activeStudioForPage = computed(() =>
         :active-actor-filter="activeActorForPage"
         :active-studio-filter="activeStudioForPage"
         :actor-user-tag-suggestions="actorUserTagSuggestionPool"
+        :scroll-preserve-key="libraryScrollKey"
         @update:active-tab="updateActiveTab"
         @select="selectMovie"
         @open-details="openDetails"
