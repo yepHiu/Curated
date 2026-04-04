@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"curated-backend/internal/config"
 )
 
 type TrayOptions struct {
+	Logger      *zap.Logger
 	Config      config.Config
 	OpenURL     string
 	SettingsURL string
