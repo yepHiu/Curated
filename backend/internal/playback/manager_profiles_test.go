@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,8 +15,15 @@ func TestBuildTranscodeProfilesIncludesHardwareCandidatesWhenEnabled(t *testing.
 		"",
 		0,
 	)
-	if len(profiles) < 2 {
-		t.Fatalf("expected hardware profiles plus software fallback, got %d", len(profiles))
+	switch runtime.GOOS {
+	case "windows", "darwin":
+		if len(profiles) < 2 {
+			t.Fatalf("expected hardware profiles plus software fallback, got %d", len(profiles))
+		}
+	default:
+		if len(profiles) < 1 {
+			t.Fatalf("expected at least software fallback, got %d", len(profiles))
+		}
 	}
 	if profiles[len(profiles)-1].Name != "libx264" {
 		t.Fatalf("last profile = %q, want libx264 fallback", profiles[len(profiles)-1].Name)
@@ -40,8 +48,20 @@ func TestBuildTranscodeProfilesSoftwareOnlyWhenHardwareDisabled(t *testing.T) {
 }
 
 func TestBuildTranscodeProfilesPrefersConfiguredHardwareEncoder(t *testing.T) {
+	var cfg Config
+	var wantFirst string
+	switch runtime.GOOS {
+	case "windows":
+		cfg = Config{HardwareDecode: true, HardwareEncoder: "amf"}
+		wantFirst = "h264_amf"
+	case "darwin":
+		cfg = Config{HardwareDecode: true, HardwareEncoder: "videotoolbox"}
+		wantFirst = "h264_videotoolbox"
+	default:
+		t.Skip("configured hardware encoder ordering is only asserted on windows and darwin")
+	}
 	profiles := buildTranscodeProfiles(
-		Config{HardwareDecode: true, HardwareEncoder: "amf"},
+		cfg,
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
@@ -51,8 +71,8 @@ func TestBuildTranscodeProfilesPrefersConfiguredHardwareEncoder(t *testing.T) {
 	if len(profiles) < 2 {
 		t.Fatalf("expected hardware profiles plus software fallback, got %d", len(profiles))
 	}
-	if profiles[0].Name != "h264_amf" {
-		t.Fatalf("first profile = %q, want h264_amf", profiles[0].Name)
+	if profiles[0].Name != wantFirst {
+		t.Fatalf("first profile = %q, want %q", profiles[0].Name, wantFirst)
 	}
 }
 

@@ -54,6 +54,7 @@ const PLAYBACK_HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = 
   "amf",
   "qsv",
   "nvenc",
+  "videotoolbox",
   "software",
 ]
 const PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS: readonly NativePlayerPreset[] = [
@@ -148,6 +149,8 @@ function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string 
       return t("settings.playbackHardwareEncoderQsv")
     case "nvenc":
       return t("settings.playbackHardwareEncoderNvenc")
+    case "videotoolbox":
+      return t("settings.playbackHardwareEncoderVideotoolbox")
     case "software":
       return t("settings.playbackHardwareEncoderSoftware")
     case "auto":

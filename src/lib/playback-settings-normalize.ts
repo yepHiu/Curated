@@ -5,6 +5,7 @@ const HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = [
   "amf",
   "qsv",
   "nvenc",
+  "videotoolbox",
   "software",
 ]
 

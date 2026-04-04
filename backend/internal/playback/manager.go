@@ -465,6 +465,17 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 					),
 				},
 			)
+		case "darwin":
+			profiles = append(profiles, transcodeProfile{
+				Name: "h264_videotoolbox",
+				Args: append(
+					append(
+						append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
+						append(accurateSeekArgs, "-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1")...,
+					),
+					hlsArgs...,
+				),
+			})
 		}
 	}
 
@@ -613,6 +624,8 @@ func normalizeHardwareEncoderProfileName(value string) string {
 		return "h264_qsv"
 	case "nvenc", "h264_nvenc":
 		return "h264_nvenc"
+	case "videotoolbox", "vt", "h264_videotoolbox":
+		return "h264_videotoolbox"
 	case "software", "libx264":
 		return "libx264"
 	default:

@@ -408,6 +408,7 @@
     "playbackHardwareEncoderAmf": "AMF（AMD）",
     "playbackHardwareEncoderQsv": "QSV（Intel Quick Sync）",
     "playbackHardwareEncoderNvenc": "NVENC（NVIDIA）",
+    "playbackHardwareEncoderVideotoolbox": "VideoToolbox（Apple）",
     "playbackHardwareEncoderSoftware": "软件编码（libx264）",
     "playbackStreamPushEnabled": "启用 HLS 推流",
     "playbackStreamPushEnabledHint": "当浏览器不适合直接播放源文件时，允许后端通过 ffmpeg 创建 HLS 会话供页面播放。",

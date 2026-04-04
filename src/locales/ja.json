@@ -408,6 +408,7 @@
     "playbackHardwareEncoderAmf": "AMF（AMD）",
     "playbackHardwareEncoderQsv": "QSV（Intel Quick Sync）",
     "playbackHardwareEncoderNvenc": "NVENC（NVIDIA）",
+    "playbackHardwareEncoderVideotoolbox": "VideoToolbox（Apple）",
     "playbackHardwareEncoderSoftware": "ソフトウェア（libx264）",
     "playbackStreamPushEnabled": "HLS ストリーム配信を有効化",
     "playbackStreamPushEnabledHint": "ブラウザで元ファイルを直接再生しにくい場合に、バックエンドが ffmpeg で HLS セッションを作成できるようにします。",

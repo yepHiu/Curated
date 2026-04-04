@@ -78,6 +78,7 @@ export type HardwareEncoderPreference =
   | "amf"
   | "qsv"
   | "nvenc"
+  | "videotoolbox"
   | "software"
 
 export type NativePlayerPreset = "mpv" | "potplayer" | "custom"

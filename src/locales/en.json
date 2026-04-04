@@ -408,6 +408,7 @@
     "playbackHardwareEncoderAmf": "AMF (AMD)",
     "playbackHardwareEncoderQsv": "QSV (Intel Quick Sync)",
     "playbackHardwareEncoderNvenc": "NVENC (NVIDIA)",
+    "playbackHardwareEncoderVideotoolbox": "VideoToolbox (Apple)",
     "playbackHardwareEncoderSoftware": "Software (libx264)",
     "playbackStreamPushEnabled": "Enable HLS stream push",
     "playbackStreamPushEnabledHint": "Allows the backend to create an HLS session with ffmpeg when the browser should not play the source file directly.",

@@ -75,7 +75,7 @@ type AssetConfig struct {
 type PlayerConfig struct {
 	HardwareDecode bool `json:"hardwareDecode"`
 	// HardwareEncoder sets the preferred hardware encoder order for HLS stream push:
-	// auto | amf | qsv | nvenc | software.
+	// auto | amf | qsv | nvenc | videotoolbox | software.
 	HardwareEncoder string `json:"hardwareEncoder,omitempty"`
 	// NativePlayerPreset controls which argument style Curated uses when launching
 	// an external player: mpv | potplayer | custom.
@@ -293,7 +293,7 @@ func NormalizeHardwareEncoderPreference(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "auto":
 		return "auto"
-	case "amf", "qsv", "nvenc", "software":
+	case "amf", "qsv", "nvenc", "software", "videotoolbox":
 		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return "auto"

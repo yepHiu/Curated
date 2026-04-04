@@ -1791,6 +1791,8 @@ function formatTranscodeProfileLabel(profile: string | null | undefined): string
       return "Intel QSV"
     case "h264_nvenc":
       return "NVIDIA NVENC"
+    case "h264_videotoolbox":
+      return "VideoToolbox"
     case "libx264":
       return "libx264"
     default:

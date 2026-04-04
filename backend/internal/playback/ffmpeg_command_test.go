@@ -29,8 +29,16 @@ func TestResolveFFmpegCommandPrefersBundledBinaryForDefaultCommand(t *testing.T)
 	}
 
 	got := resolveFFmpegCommand("ffmpeg")
-	if got != bundled {
-		t.Fatalf("resolveFFmpegCommand(default) = %q, want bundled %q", got, bundled)
+	gfi, err := os.Stat(got)
+	if err != nil {
+		t.Fatalf("stat resolved path %q: %v", got, err)
+	}
+	bfi, err := os.Stat(bundled)
+	if err != nil {
+		t.Fatalf("stat bundled path %q: %v", bundled, err)
+	}
+	if !os.SameFile(gfi, bfi) {
+		t.Fatalf("resolveFFmpegCommand(default) = %q, want same file as bundled %q", got, bundled)
 	}
 }
 
