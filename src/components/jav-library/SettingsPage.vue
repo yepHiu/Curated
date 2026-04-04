@@ -897,24 +897,24 @@ async function performSavePlaybackSettings() {
     }
   }
   try {
-    await withPreservedScroll(async () => {
-      playbackSaving.value = true
-      try {
-        if (shouldPatchServer && patch) {
-          await libraryService.patchPlayerSettings(patch)
-          syncPlaybackDraftFromService()
-        }
-        if (shouldPersistBrowserTemplate) {
-          playbackNativePlayerProtocolTemplateDraft.value = persistNativePlayerBrowserTemplate(
-            playbackNativePlayerPresetDraft.value,
-            playbackNativePlayerProtocolTemplateDraft.value,
-          )
-        }
-        flashPlaybackSaved()
-      } finally {
-        playbackSaving.value = false
+    // 播放项自动保存极高频；不再包 withPreservedScroll，避免 finally 里连续滚动回写与 Vue patch 冲突导致白屏。
+    playbackSaving.value = true
+    try {
+      if (shouldPatchServer && patch) {
+        await libraryService.patchPlayerSettings(patch)
+        await nextTick()
+        syncPlaybackDraftFromService()
       }
-    })
+      if (shouldPersistBrowserTemplate) {
+        playbackNativePlayerProtocolTemplateDraft.value = persistNativePlayerBrowserTemplate(
+          playbackNativePlayerPresetDraft.value,
+          playbackNativePlayerProtocolTemplateDraft.value,
+        )
+      }
+      flashPlaybackSaved()
+    } finally {
+      playbackSaving.value = false
+    }
   } catch (err) {
     console.error("[settings] save playback settings failed", err)
     if (err instanceof HttpClientError && err.apiError?.message) {

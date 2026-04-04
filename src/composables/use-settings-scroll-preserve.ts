@@ -46,21 +46,11 @@ function applyScroll(el: HTMLElement | null, top: number, left: number) {
   }
 }
 
-function runScrollRestoreBurst(
-  scrollElRef: Ref<HTMLElement | null>,
-  top: number,
-  left: number,
-  stopAt: number,
-) {
-  const tick = () => {
-    applyScroll(getSettingsScrollEl(scrollElRef), top, left)
-    if (performance.now() < stopAt) {
-      requestAnimationFrame(tick)
-    }
-  }
-  requestAnimationFrame(tick)
-}
-
+/**
+ * 在异步保存后把设置页滚动条拉回捕获位置。
+ * 刻意保持轻量：曾用 MutationObserver + 多段 setTimeout + 长时间 rAF burst，
+ * 与 Switch 触发的 Vue 更新叠在一起会导致整页白屏。
+ */
 async function applyScrollRestoreSequence(
   scrollElRef: Ref<HTMLElement | null>,
   top: number,
@@ -84,37 +74,8 @@ async function applyScrollRestoreSequence(
     }
   }
 
-  const el = getSettingsScrollEl(scrollElRef)
-  const cleanupFns: Array<() => void> = []
-  const cleanupObservers = () => {
-    while (cleanupFns.length > 0) {
-      cleanupFns.pop()?.()
-    }
-  }
-  if (el) {
-    // 不在此处挂 MutationObserver / ResizeObserver（subtree 会覆盖整页设置表单）：
-    // 播放/HLS 相关 Switch 自动保存时会连续触发布局与 patch，与同步 restore 叠在一起
-    // 曾导致整页白屏。滚动回位改由下方 rAF / 定时器 / burst 与 focusin 承担。
-    const onFocusIn = () => {
-      restore()
-      requestAnimationFrame(() => restore())
-    }
-    el.addEventListener("focusin", onFocusIn, true)
-    cleanupFns.push(() => el.removeEventListener("focusin", onFocusIn, true))
-
-    setTimeout(cleanupObservers, 900)
-  }
-
   restore()
-  queueMicrotask(restore)
-  setTimeout(restore, 0)
   requestAnimationFrame(() => restore())
-  setTimeout(restore, 50)
-  setTimeout(restore, 150)
-  setTimeout(restore, 300)
-  setTimeout(restore, 500)
-  setTimeout(restore, 750)
-  runScrollRestoreBurst(scrollElRef, top, left, performance.now() + 900)
 }
 
 /**
