@@ -19,6 +19,7 @@ scripts/
 !.env.example
 backend/runtime/
 .gocache/
+.tmp-go-modcache/
 backend/*.exe
 backend/*.exe~
 
