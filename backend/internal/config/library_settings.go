@@ -8,11 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"go.uber.org/zap/zapcore"
 )
 
 const librarySettingsFileName = "library-config.cfg"
+
+var librarySettingsWriteMu sync.Mutex
 
 // DefaultLibrarySettingsPath returns library-config.cfg: release builds use
 // <curatedDataRoot>/config/library-config.cfg; dev builds use repo-relative paths (same rules as defaultDatabasePath).
@@ -312,6 +316,9 @@ func WriteLibrarySettingsMerge(path string, mutator func(map[string]any) error) 
 	if mutator == nil {
 		return errors.New("nil mutator")
 	}
+	librarySettingsWriteMu.Lock()
+	defer librarySettingsWriteMu.Unlock()
+
 	path = filepath.Clean(path)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -345,7 +352,29 @@ func WriteLibrarySettingsMerge(path string, mutator func(map[string]any) error) 
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	return replaceLibrarySettingsFileAtomically(tmpName, path)
+}
+
+func replaceLibrarySettingsFileAtomically(tmpPath string, finalPath string) error {
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		if err := os.Rename(tmpPath, finalPath); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+
+		if err := os.Remove(finalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			lastErr = err
+		} else if err := os.Rename(tmpPath, finalPath); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+
+		time.Sleep(time.Duration(attempt+1) * 25 * time.Millisecond)
+	}
+	return lastErr
 }
 
 func readLibrarySettingsMap(path string) (map[string]any, error) {

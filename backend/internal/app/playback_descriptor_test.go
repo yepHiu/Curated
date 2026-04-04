@@ -48,4 +48,29 @@ func TestBuildDirectPlaybackDescriptorKeepsResolvedDurationAndClampsResume(t *te
 	if dto.ResumePositionSec != 7200 {
 		t.Fatalf("resumePositionSec = %v, want 7200", dto.ResumePositionSec)
 	}
+	if dto.CanDirectPlay {
+		t.Fatal("expected mkv direct playback to be marked as browser-unsafe")
+	}
+}
+
+func TestBuildDirectPlaybackDescriptorMarksMP4AsDirectPlayable(t *testing.T) {
+	t.Parallel()
+
+	dto := buildDirectPlaybackDescriptor(
+		"movie-2",
+		contracts.MovieDetailDTO{
+			MovieListItemDTO: contracts.MovieListItemDTO{
+				Location: `D:\media\movie-2.mp4`,
+			},
+		},
+		nil,
+		3600,
+	)
+
+	if !dto.CanDirectPlay {
+		t.Fatal("expected mp4 direct playback to remain browser-playable")
+	}
+	if dto.MimeType != "video/mp4" {
+		t.Fatalf("mimeType = %q, want video/mp4", dto.MimeType)
+	}
 }

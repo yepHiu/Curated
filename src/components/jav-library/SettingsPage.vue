@@ -16,10 +16,7 @@ import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type {
-  HardwareEncoderPreference,
   HealthDTO,
-  NativePlayerPreset,
-  PatchPlayerSettingsBody,
   ProviderHealthDTO,
   ProviderHealthStatus,
   ProxySettingsDTO,
@@ -54,11 +51,9 @@ import {
   ListChecks,
   Loader2,
   Pencil,
-  PlayCircle,
   Plus,
   RefreshCw,
   ScanSearch,
-  ScrollText,
   Sparkles,
   Trash2,
   Wrench,
@@ -106,30 +101,17 @@ import {
   supportsFileSystemAccess,
 } from "@/lib/curated-frames/db"
 import {
-  CLIENT_LOG_LEVEL_OPTIONS,
-  getClientLogLevelName,
-  setClientLogLevel,
-  type ClientLogLevelName,
-} from "@/lib/app-logger"
-import {
   getCuratedFrameSaveMode,
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
+import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
+import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
   SETTINGS_NAV_ITEMS,
   type SettingsSectionSlug,
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
-import {
-  defaultNativePlayerBackendCommand,
-  defaultNativePlayerBrowserTemplate,
-  getStoredNativePlayerBrowserTemplate,
-  normalizeNativePlayerPresetForBrowserLaunch,
-  persistNativePlayerBrowserTemplate,
-  resolveNativePlayerBrowserTemplate,
-} from "@/lib/native-player-launch"
-import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { cn } from "@/lib/utils"
 
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
@@ -141,18 +123,6 @@ const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
 
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
-const PLAYBACK_HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = [
-  "auto",
-  "amf",
-  "qsv",
-  "nvenc",
-  "software",
-]
-const PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS: readonly NativePlayerPreset[] = [
-  "mpv",
-  "potplayer",
-  "custom",
-]
 type ProxyScheme = "http" | "socks5"
 const PROXY_SCHEME_OPTIONS: readonly ProxyScheme[] = ["http", "socks5"]
 const DEFAULT_PROXY_HOST = "127.0.0.1"
@@ -167,6 +137,11 @@ const router = useRouter()
 const settingsScrollElRef = inject<Ref<HTMLElement | null>>(SETTINGS_SCROLL_EL_KEY, ref(null))
 const settingsNavItems = SETTINGS_NAV_ITEMS
 const activeSlug = ref<SettingsSectionSlug>("overview")
+const renderedSettingsSlugs = ref<SettingsSectionSlug[]>(["overview"])
+
+function shouldRenderSettingsSection(slug: SettingsSectionSlug): boolean {
+  return renderedSettingsSlugs.value.includes(slug)
+}
 
 function bindSettingsScrollRoot(el: unknown) {
   if (!settingsScrollElRef) return
@@ -179,7 +154,6 @@ function bindSettingsScrollRoot(el: unknown) {
 
 onBeforeUnmount(() => {
   if (settingsScrollElRef) settingsScrollElRef.value = null
-  if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
 })
 
 function scrollSettingsRootToTop() {
@@ -205,6 +179,12 @@ function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
 }
 
 watch(activeSlug, (slug) => {
+  if (!renderedSettingsSlugs.value.includes(slug)) {
+    renderedSettingsSlugs.value = [...renderedSettingsSlugs.value, slug]
+  }
+  if (slug === "about") {
+    void ensureAboutHealthLoaded()
+  }
   void nextTick(() => scrollSettingsRootToTop())
   if (route.query.section !== slug) {
     router.replace({ query: { ...route.query, section: slug } }).catch(() => {})
@@ -243,23 +223,6 @@ const scanTaskTracker = useScanTaskTracker()
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
-const playbackHardwareDecodeDraft = ref(true)
-const playbackHardwareEncoderDraft = ref<HardwareEncoderPreference>("auto")
-const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("potplayer")
-const playbackNativePlayerEnabledDraft = ref(true)
-const playbackNativePlayerProtocolTemplateDraft = ref(defaultNativePlayerBrowserTemplate("potplayer"))
-const playbackStreamPushEnabledDraft = ref(true)
-const playbackForceStreamPushDraft = ref(false)
-const playbackFfmpegCommandDraft = ref("ffmpeg")
-const playbackPreferNativePlayerDraft = ref(false)
-const playbackSeekForwardStepDraft = ref("10")
-const playbackSeekBackwardStepDraft = ref("10")
-const playbackSaving = ref(false)
-const playbackError = ref("")
-const playbackSavedFlash = ref(false)
-let playbackSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
-let playbackSavePromise: Promise<void> | null = null
-let playbackSaveQueued = false
 
 const addPathDialogOpen = ref(false)
 const removePathDialogOpen = ref(false)
@@ -543,128 +506,7 @@ async function verifySavedProxyInBackground(seq: number) {
   }
 }
 
-const BACKEND_LOG_LEVEL_OPTIONS = ["trace", "debug", "info", "warn", "error"] as const
-
 /** 日志保留天数：0=模块默认约 7 天；另含 1/5/10/30 预设；其它已保存值会多出一项「当前 n 天」 */
-const BACKEND_LOG_MAX_AGE_PRESET_VALUES = ["0", "1", "5", "10", "30"] as const
-
-const backendLogDirDraft = ref("")
-const backendLogMaxAgeDaysChoice = ref("0")
-const backendLogLevelDraft = ref("info")
-const backendLogSaving = ref(false)
-const backendLogError = ref("")
-const backendLogDirPickHint = ref("")
-const pickBackendLogDirBusy = ref(false)
-
-const clientLogLevelUi = ref<ClientLogLevelName>(getClientLogLevelName())
-
-function syncBackendLogMaxAgeDaysChoiceFromDto(d: number | undefined) {
-  if (d === undefined || d <= 0) {
-    backendLogMaxAgeDaysChoice.value = "0"
-    return
-  }
-  backendLogMaxAgeDaysChoice.value = String(d)
-}
-
-const backendLogMaxAgeSelectItems = computed(() => {
-  void locale.value
-  const base: { value: string; label: string }[] = [
-    { value: "0", label: t("settings.backendLogMaxAgeOptDefault") },
-    { value: "1", label: t("settings.backendLogMaxAgeOpt1") },
-    { value: "5", label: t("settings.backendLogMaxAgeOpt5") },
-    { value: "10", label: t("settings.backendLogMaxAgeOpt10") },
-    { value: "30", label: t("settings.backendLogMaxAgeOpt30") },
-  ]
-  const cur = backendLogMaxAgeDaysChoice.value
-  if ((BACKEND_LOG_MAX_AGE_PRESET_VALUES as readonly string[]).includes(cur)) {
-    return base
-  }
-  const n = Number.parseInt(cur, 10)
-  if (Number.isFinite(n) && n > 0) {
-    return [
-      ...base,
-      { value: cur, label: t("settings.backendLogMaxAgeOptCustom", { n }) },
-    ]
-  }
-  return base
-})
-
-function syncBackendLogDraftFromService() {
-  const b = libraryService.backendLog.value
-  backendLogDirDraft.value = (b.logDir ?? "").trim()
-  syncBackendLogMaxAgeDaysChoiceFromDto(b.logMaxAgeDays)
-  const lvl = (b.logLevel ?? "info").trim() || "info"
-  backendLogLevelDraft.value = (BACKEND_LOG_LEVEL_OPTIONS as readonly string[]).includes(lvl)
-    ? lvl
-    : "info"
-}
-
-function onClientLogLevelSelect(v: unknown) {
-  if (typeof v === "string" && (CLIENT_LOG_LEVEL_OPTIONS as readonly string[]).includes(v)) {
-    setClientLogLevel(v as ClientLogLevelName)
-    clientLogLevelUi.value = v as ClientLogLevelName
-  }
-}
-
-async function pickBackendLogDirectory() {
-  backendLogDirPickHint.value = ""
-  backendLogError.value = ""
-  pickBackendLogDirBusy.value = true
-  try {
-    const outcome = await pickLibraryDirectory()
-    if (outcome.status === "ok") {
-      backendLogDirDraft.value = outcome.path
-      return
-    }
-    if (outcome.status === "hint") {
-      backendLogDirPickHint.value = outcome.message
-      await nextTick()
-      document.getElementById("backend-log-dir")?.focus()
-      return
-    }
-    if (outcome.status === "unsupported") {
-      backendLogDirPickHint.value = t("settings.errPickUnsupported")
-    }
-  } finally {
-    pickBackendLogDirBusy.value = false
-  }
-}
-
-async function saveBackendLogSettings() {
-  backendLogError.value = ""
-  backendLogDirPickHint.value = ""
-  const maxAge = Number.parseInt(backendLogMaxAgeDaysChoice.value, 10)
-  if (!Number.isFinite(maxAge) || maxAge < 0) {
-    backendLogError.value = t("settings.backendLogMaxAgeInvalid")
-    return
-  }
-  try {
-    await withPreservedScroll(async () => {
-      backendLogSaving.value = true
-      try {
-        await libraryService.patchBackendLog({
-          logDir: backendLogDirDraft.value.trim(),
-          logMaxAgeDays: maxAge,
-          logLevel: backendLogLevelDraft.value.trim() || "info",
-        })
-        syncBackendLogDraftFromService()
-        flashBackendLogSaved()
-      } finally {
-        backendLogSaving.value = false
-      }
-    })
-  } catch (err) {
-    console.error("[settings] save backend log failed", err)
-    if (err instanceof HttpClientError && err.apiError?.message) {
-      backendLogError.value = err.apiError.message
-    } else if (err instanceof Error && err.message) {
-      backendLogError.value = err.message
-    } else {
-      backendLogError.value = t("settings.errSaveTitle")
-    }
-  }
-}
-
 async function saveProxySettings() {
   const body = buildProxySettingsFromDraft()
   if (!body) return
@@ -721,170 +563,7 @@ async function saveProxySettings() {
 }
 
 const settingsAutoSaveReady = ref(false)
-const backendLogSavedFlash = ref(false)
-let backendLogSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
-
-function flashBackendLogSaved() {
-  backendLogSavedFlash.value = true
-  if (backendLogSavedFlashTimer) clearTimeout(backendLogSavedFlashTimer)
-  backendLogSavedFlashTimer = setTimeout(() => {
-    backendLogSavedFlash.value = false
-    backendLogSavedFlashTimer = null
-  }, 2200)
-}
-
-function flashPlaybackSaved() {
-  playbackSavedFlash.value = true
-  if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
-  playbackSavedFlashTimer = setTimeout(() => {
-    playbackSavedFlash.value = false
-    playbackSavedFlashTimer = null
-  }, 2200)
-}
-
-function syncPlaybackDraftFromService() {
-  const player = libraryService.playerSettings.value
-  playbackHardwareDecodeDraft.value = player.hardwareDecode !== false
-  playbackHardwareEncoderDraft.value = normalizeHardwareEncoderPreference(player.hardwareEncoder)
-  playbackNativePlayerPresetDraft.value = normalizeNativePlayerPresetForBrowserLaunch(
-    player.nativePlayerPreset,
-    player.nativePlayerCommand,
-  )
-  playbackNativePlayerEnabledDraft.value = player.nativePlayerEnabled !== false
-  playbackNativePlayerProtocolTemplateDraft.value = resolveNativePlayerBrowserTemplate(
-    playbackNativePlayerPresetDraft.value,
-    getStoredNativePlayerBrowserTemplate(),
-  )
-  playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
-  playbackForceStreamPushDraft.value = Boolean(player.forceStreamPush)
-  playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
-  playbackPreferNativePlayerDraft.value = Boolean(player.preferNativePlayer)
-  playbackSeekForwardStepDraft.value = String(Math.max(1, Number(player.seekForwardStepSec ?? 10)))
-  playbackSeekBackwardStepDraft.value = String(Math.max(1, Number(player.seekBackwardStepSec ?? 10)))
-}
-
-function playbackNativePlayerDefaultCommand(preset: NativePlayerPreset | undefined): string {
-  return defaultNativePlayerBackendCommand(preset)
-}
-
-function playbackNativePlayerPresetLabel(value: NativePlayerPreset): string {
-  switch (value) {
-    case "potplayer":
-      return t("settings.playbackNativePlayerPresetPotplayer")
-    case "custom":
-      return t("settings.playbackNativePlayerPresetCustom")
-    case "mpv":
-    default:
-      return t("settings.playbackNativePlayerPresetMpv")
-  }
-}
-
-const playbackNativePlayerProtocolTemplatePlaceholder = computed(() => {
-  if (playbackNativePlayerPresetDraft.value === "custom") {
-    return t("settings.playbackNativePlayerCommandPlaceholderCustom")
-  }
-  return (
-    defaultNativePlayerBrowserTemplate(playbackNativePlayerPresetDraft.value) ||
-    t("settings.playbackNativePlayerCommandPlaceholder")
-  )
-})
-
-function onPlaybackNativePlayerPresetChange(value: unknown) {
-  const nextPreset = normalizeNativePlayerPresetForBrowserLaunch(
-    typeof value === "string" ? (value as NativePlayerPreset) : undefined,
-  )
-  const prevPreset = playbackNativePlayerPresetDraft.value
-  const currentTemplate = playbackNativePlayerProtocolTemplateDraft.value.trim()
-  const previousDefault = defaultNativePlayerBrowserTemplate(prevPreset)
-  playbackNativePlayerPresetDraft.value = nextPreset
-  if (!currentTemplate || currentTemplate === previousDefault) {
-    playbackNativePlayerProtocolTemplateDraft.value = defaultNativePlayerBrowserTemplate(nextPreset)
-  }
-}
-
-function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string {
-  switch (value) {
-    case "amf":
-      return t("settings.playbackHardwareEncoderAmf")
-    case "qsv":
-      return t("settings.playbackHardwareEncoderQsv")
-    case "nvenc":
-      return t("settings.playbackHardwareEncoderNvenc")
-    case "software":
-      return t("settings.playbackHardwareEncoderSoftware")
-    case "auto":
-    default:
-      return t("settings.playbackHardwareEncoderAuto")
-  }
-}
-
-function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
-  const forward = Number.parseInt(playbackSeekForwardStepDraft.value, 10)
-  const backward = Number.parseInt(playbackSeekBackwardStepDraft.value, 10)
-  if (!Number.isFinite(forward) || forward <= 0) {
-    playbackError.value = t("settings.playbackSeekForwardInvalid")
-    return null
-  }
-  if (!Number.isFinite(backward) || backward <= 0) {
-    playbackError.value = t("settings.playbackSeekBackwardInvalid")
-    return null
-  }
-  const player = libraryService.playerSettings.value
-  const currentPreset = normalizeNativePlayerPresetForBrowserLaunch(
-    player.nativePlayerPreset,
-    player.nativePlayerCommand,
-  )
-  const currentCommand = (player.nativePlayerCommand ?? "").trim()
-  const currentDefault = playbackNativePlayerDefaultCommand(currentPreset)
-  const nextDefault = playbackNativePlayerDefaultCommand(playbackNativePlayerPresetDraft.value)
-  const nextBackendCommand =
-    !currentCommand || currentCommand === currentDefault || currentPreset !== playbackNativePlayerPresetDraft.value
-      ? nextDefault
-      : currentCommand
-  return {
-    hardwareDecode: playbackHardwareDecodeDraft.value,
-    hardwareEncoder: normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value),
-    nativePlayerPreset: playbackNativePlayerPresetDraft.value,
-    nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
-    nativePlayerCommand: nextBackendCommand,
-    streamPushEnabled: playbackStreamPushEnabledDraft.value,
-    forceStreamPush: playbackForceStreamPushDraft.value,
-    ffmpegCommand: playbackFfmpegCommandDraft.value.trim() || "ffmpeg",
-    preferNativePlayer: playbackPreferNativePlayerDraft.value,
-    seekForwardStepSec: forward,
-    seekBackwardStepSec: backward,
-  }
-}
-
-function playbackDraftMatchesServer(): boolean {
-  const player = libraryService.playerSettings.value
-  return (
-    playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
-    normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value) ===
-      normalizeHardwareEncoderPreference(player.hardwareEncoder) &&
-    playbackNativePlayerPresetDraft.value ===
-      normalizeNativePlayerPresetForBrowserLaunch(player.nativePlayerPreset, player.nativePlayerCommand) &&
-    playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
-    playbackStreamPushEnabledDraft.value === (player.streamPushEnabled !== false) &&
-    playbackForceStreamPushDraft.value === Boolean(player.forceStreamPush) &&
-    (playbackFfmpegCommandDraft.value.trim() || "ffmpeg") ===
-      ((player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg") &&
-    playbackPreferNativePlayerDraft.value === Boolean(player.preferNativePlayer) &&
-    Number.parseInt(playbackSeekForwardStepDraft.value, 10) ===
-      Math.max(1, Number(player.seekForwardStepSec ?? 10)) &&
-    Number.parseInt(playbackSeekBackwardStepDraft.value, 10) ===
-      Math.max(1, Number(player.seekBackwardStepSec ?? 10))
-  )
-}
-
-function playbackBrowserTemplateMatchesPersisted(): boolean {
-  return playbackNativePlayerProtocolTemplateDraft.value.trim() ===
-    resolveNativePlayerBrowserTemplate(
-      playbackNativePlayerPresetDraft.value,
-      getStoredNativePlayerBrowserTemplate(),
-    )
-}
-
+/*
 async function performSavePlaybackSettings() {
   playbackError.value = ""
   const shouldPatchServer = !playbackDraftMatchesServer()
@@ -1014,6 +693,7 @@ watchDebounced(
   },
   { debounce: 550, maxWait: 5000 },
 )
+*/
 
 async function testProxyJavbus() {
   const draft = buildProxySettingsFromDraft()
@@ -1157,10 +837,10 @@ const metadataMovieChainError = ref("")
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const viteMode = import.meta.env.MODE
 const isViteDev = import.meta.env.DEV
-const isPlaybackTestingEnv = import.meta.env.DEV || import.meta.env.MODE === "test"
 const aboutHealth = ref<HealthDTO | null>(null)
 const aboutHealthLoading = ref(false)
 const aboutHealthError = ref("")
+const aboutHealthLoaded = ref(false)
 
 async function loadAboutHealth() {
   if (!useWebApi) return
@@ -1180,6 +860,14 @@ async function loadAboutHealth() {
   } finally {
     aboutHealthLoading.value = false
   }
+}
+
+async function ensureAboutHealthLoaded() {
+  if (!useWebApi || aboutHealthLoaded.value || aboutHealthLoading.value) {
+    return
+  }
+  aboutHealthLoaded.value = true
+  await loadAboutHealth()
 }
 
 /** 与后端 `version.Display()` 一致；旧接口无 `channel` 时不要出现 `0.1.0-` 尾缀 */
@@ -1579,9 +1267,6 @@ onMounted(async () => {
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
   syncProxyDraftFromService()
-  syncPlaybackDraftFromService()
-  syncBackendLogDraftFromService()
-  clientLogLevelUi.value = getClientLogLevelName()
   let mode = getCuratedFrameSaveMode()
   if (mode === "directory" && !supportsFileSystemAccess()) {
     mode = "app"
@@ -1589,9 +1274,6 @@ onMounted(async () => {
   }
   curatedSaveMode.value = mode
   void refreshCuratedExportDirLabel()
-  if (useWebApi) {
-    void loadAboutHealth()
-  }
   await nextTick()
   settingsAutoSaveReady.value = true
 })
@@ -2024,7 +1706,11 @@ async function runMetadataRefreshForSelected() {
       :ref="bindSettingsScrollRoot"
       class="min-h-0 min-w-0 flex flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable]"
     >
-    <TabsContent value="overview" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('overview')"
+      value="overview"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-overview"
       class="space-y-6"
@@ -2068,7 +1754,11 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="general" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('general')"
+      value="general"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-general"
       class="space-y-8"
@@ -2146,198 +1836,16 @@ async function runMetadataRefreshForSelected() {
     </Card>
     </div>
     </div>
-    <div id="settings-section-logging" class="flex flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-2 pb-0">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <ScrollText class="size-4" />
-              </span>
-              {{ t("settings.backendLogTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.backendLogDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-0">
-            <p
-              v-if="!useWebApi"
-              class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
-            >
-              {{ t("settings.backendLogMockHint") }}
-            </p>
-            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-              <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.backendLogDir") }}</p>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Input
-                    id="backend-log-dir"
-                    v-model="backendLogDirDraft"
-                    type="text"
-                    autocomplete="off"
-                    class="min-w-0 rounded-xl border-border/50 sm:flex-1"
-                    :placeholder="t('settings.backendLogDirPlaceholder')"
-                    :disabled="backendLogSaving || pickBackendLogDirBusy"
-                    @input="backendLogDirPickHint = ''"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    class="rounded-2xl sm:shrink-0"
-                    :disabled="backendLogSaving || pickBackendLogDirBusy"
-                    @click="pickBackendLogDirectory"
-                  >
-                    <FolderOpen data-icon="inline-start" aria-hidden="true" />
-                    {{
-                      pickBackendLogDirBusy ? t("settings.picking") : t("settings.pickFolder")
-                    }}
-                  </Button>
-                </div>
-                <p
-                  v-if="backendLogDirPickHint"
-                  class="whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
-                >
-                  {{ backendLogDirPickHint }}
-                </p>
-              </div>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div class="flex min-w-0 flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.backendLogMaxAge") }}</p>
-                  <Select
-                    v-model="backendLogMaxAgeDaysChoice"
-                    :disabled="backendLogSaving"
-                  >
-                    <SelectTrigger
-                      class="h-9 w-full min-w-0 rounded-xl border-border/50"
-                      :aria-label="t('settings.backendLogMaxAge')"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent class="rounded-xl border-border/50">
-                      <SelectItem
-                        v-for="item in backendLogMaxAgeSelectItems"
-                        :key="`blog-maxage-${item.value}`"
-                        class="rounded-lg"
-                        :value="item.value"
-                      >
-                        {{ item.label }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="flex min-w-0 flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.backendLogLevel") }}</p>
-                  <Select
-                    v-model="backendLogLevelDraft"
-                    :disabled="backendLogSaving"
-                  >
-                    <SelectTrigger
-                      class="h-9 w-full min-w-0 rounded-xl border-border/50"
-                      :aria-label="t('settings.backendLogLevel')"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent class="rounded-xl border-border/50">
-                      <SelectItem
-                        v-for="lvl in BACKEND_LOG_LEVEL_OPTIONS"
-                        :key="`blog-${lvl}`"
-                        class="rounded-lg"
-                        :value="lvl"
-                      >
-                        {{ lvl }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            <Button
-              v-if="!useWebApi"
-              type="button"
-              class="w-fit rounded-lg"
-              :disabled="backendLogSaving"
-              @click="saveBackendLogSettings"
-            >
-              {{ backendLogSaving ? t("common.saving") : t("settings.backendLogSave") }}
-            </Button>
-            <p
-              v-else-if="useWebApi && backendLogSaving"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.proxySyncing") }}
-            </p>
-            <p
-              v-else-if="useWebApi && backendLogSavedFlash"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.autoPersistSaved") }}
-            </p>
-            <p v-if="backendLogError" class="text-sm text-destructive">
-              {{ backendLogError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Activity class="size-4" />
-              </span>
-              {{ t("settings.clientLogTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.clientLogDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <p class="text-sm font-medium text-foreground">{{ t("settings.clientLogLevel") }}</p>
-              <Select
-                :model-value="clientLogLevelUi"
-                @update:model-value="onClientLogLevelSelect"
-              >
-                <SelectTrigger
-                  class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
-                  :aria-label="t('settings.clientLogLevel')"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent class="rounded-xl border-border/50">
-                  <SelectItem
-                    v-for="lvl in CLIENT_LOG_LEVEL_OPTIONS"
-                    :key="`clog-${lvl}`"
-                    class="rounded-lg"
-                    :value="lvl"
-                  >
-                    {{ lvl }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <SettingsLoggingSection :auto-save-ready="settingsAutoSaveReady" />
     </div>
     </section>
     </TabsContent>
 
-    <TabsContent value="library" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('library')"
+      value="library"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-library"
       class="space-y-6"
@@ -2817,7 +2325,11 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="metadata" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('metadata')"
+      value="metadata"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-metadata"
       class="space-y-6"
@@ -3379,7 +2891,11 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="network" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('network')"
+      value="network"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-network"
       class="space-y-6"
@@ -3588,7 +3104,11 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="curated" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('curated')"
+      value="curated"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-curated"
       class="space-y-6"
@@ -3817,255 +3337,26 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="playback" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('playback')"
+      value="playback"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-playback"
       class="space-y-6"
       :aria-label="t('settings.navPlayback')"
     >
     <h2 class="sr-only">{{ t("settings.navPlayback") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <PlayCircle class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.playbackCardTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.playbackCardDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">{{ t("settings.hardwareDecode") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.hardwareDecodeHint") }}
-                </p>
-              </div>
-              <Switch v-model="playbackHardwareDecodeDraft" />
-            </div>
-
-            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackHardwareEncoder") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackHardwareEncoderHint") }}
-                </p>
-              </div>
-              <Select v-model="playbackHardwareEncoderDraft" :disabled="!playbackHardwareDecodeDraft">
-                <SelectTrigger>
-                  <SelectValue :placeholder="t('settings.playbackHardwareEncoderAuto')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in PLAYBACK_HARDWARE_ENCODER_OPTIONS"
-                    :key="option"
-                    :value="option"
-                  >
-                    {{ playbackHardwareEncoderLabel(option) }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackStreamPushEnabled") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackStreamPushEnabledHint") }}
-                </p>
-              </div>
-              <Switch v-model="playbackStreamPushEnabledDraft" />
-            </div>
-
-            <div
-              v-if="isPlaybackTestingEnv"
-              class="rounded-lg border border-amber-500/35 bg-amber-500/8 p-4"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div class="flex min-w-0 flex-1 flex-col gap-3">
-                  <p class="text-sm font-medium text-foreground">
-                    {{ t("settings.playbackForceStreamPush") }}
-                  </p>
-                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                    {{ t("settings.playbackForceStreamPushHint") }}
-                  </p>
-                </div>
-                <Switch v-model="playbackForceStreamPushDraft" />
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackFfmpegCommand") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackFfmpegCommandHint") }}
-                </p>
-              </div>
-              <Input
-                v-model="playbackFfmpegCommandDraft"
-                :placeholder="t('settings.playbackFfmpegCommandPlaceholder')"
-              />
-            </div>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackNativePlayerEnabled") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackNativePlayerEnabledHint") }}
-                </p>
-              </div>
-              <Switch v-model="playbackNativePlayerEnabledDraft" />
-            </div>
-
-            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackNativePlayerPreset") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackNativePlayerPresetHint") }}
-                </p>
-              </div>
-              <Select
-                :model-value="playbackNativePlayerPresetDraft"
-                @update:model-value="onPlaybackNativePlayerPresetChange"
-              >
-                <SelectTrigger>
-                  <SelectValue :placeholder="t('settings.playbackNativePlayerPresetMpv')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS"
-                    :key="option"
-                    :value="option"
-                  >
-                    {{ playbackNativePlayerPresetLabel(option) }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackNativePlayerCommand") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackNativePlayerCommandHint") }}
-                </p>
-              </div>
-              <Input
-                v-model="playbackNativePlayerProtocolTemplateDraft"
-                :placeholder="playbackNativePlayerProtocolTemplatePlaceholder"
-              />
-            </div>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.playbackPreferNativePlayer") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.playbackPreferNativePlayerHint") }}
-                </p>
-              </div>
-              <Switch v-model="playbackPreferNativePlayerDraft" />
-            </div>
-
-            <div class="grid gap-3 md:grid-cols-2">
-              <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-                <div class="flex min-w-0 flex-1 flex-col gap-3">
-                  <p class="text-sm font-medium text-foreground">
-                    {{ t("settings.playbackSeekBackwardStep") }}
-                  </p>
-                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                    {{ t("settings.playbackSeekBackwardStepHint") }}
-                  </p>
-                </div>
-                <Input
-                  v-model="playbackSeekBackwardStepDraft"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                />
-              </div>
-
-              <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-                <div class="flex min-w-0 flex-1 flex-col gap-3">
-                  <p class="text-sm font-medium text-foreground">
-                    {{ t("settings.playbackSeekForwardStep") }}
-                  </p>
-                  <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                    {{ t("settings.playbackSeekForwardStepHint") }}
-                  </p>
-                </div>
-                <Input
-                  v-model="playbackSeekForwardStepDraft"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                />
-              </div>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-              <Button
-                v-if="!useWebApi"
-                type="button"
-                class="rounded-lg"
-                :disabled="playbackSaving"
-                @click="savePlaybackSettings"
-              >
-                {{ playbackSaving ? t("common.saving") : t("common.save") }}
-              </Button>
-              <p
-                v-if="playbackSaving"
-                class="text-xs text-muted-foreground motion-safe:animate-pulse"
-              >
-                {{ t("settings.playbackSyncing") }}
-              </p>
-              <p v-else-if="playbackSavedFlash" class="text-xs text-muted-foreground">
-                {{ t("settings.autoPersistSaved") }}
-              </p>
-            </div>
-
-            <p v-if="playbackError" class="text-sm text-destructive">
-              {{ playbackError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
+      <SettingsPlaybackSection :auto-save-ready="settingsAutoSaveReady" />
     </section>
     </TabsContent>
 
-    <TabsContent value="maintenance" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('maintenance')"
+      value="maintenance"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-maintenance"
       class="space-y-6"
@@ -4161,7 +3452,11 @@ async function runMetadataRefreshForSelected() {
     </section>
     </TabsContent>
 
-    <TabsContent value="about" class="mt-0 min-w-0 flex-1 outline-none">
+    <TabsContent
+      v-if="shouldRenderSettingsSection('about')"
+      value="about"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
     <section
       id="settings-section-about"
       class="space-y-6"

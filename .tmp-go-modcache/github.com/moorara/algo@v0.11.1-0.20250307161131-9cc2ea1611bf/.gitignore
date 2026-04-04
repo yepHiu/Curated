@@ -1,0 +1,6 @@
+# Test files
+*.out
+*.test
+
+# Misc files
+*.html

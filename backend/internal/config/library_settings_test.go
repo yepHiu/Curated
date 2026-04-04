@@ -2,8 +2,10 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -247,5 +249,71 @@ func TestWriteLibrarySettingsMerge_CreatesFile(t *testing.T) {
 	}
 	if cfg.OrganizeLibrary {
 		t.Fatal("expected false")
+	}
+}
+
+func TestWriteLibrarySettingsMerge_ReplacesExistingFile(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"organizeLibrary":true,"futureKey":"keep-me"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["organizeLibrary"] = false
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OrganizeLibrary {
+		t.Fatal("expected organizeLibrary=false after merge")
+	}
+
+	m, err := readLibrarySettingsMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(m["futureKey"]); got != "keep-me" {
+		t.Fatalf("futureKey = %q, want keep-me", got)
+	}
+}
+
+func TestWriteLibrarySettingsMerge_SerializesConcurrentWriters(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+				m[fmt.Sprintf("key_%d", i)] = i
+				return nil
+			})
+			if err != nil {
+				t.Errorf("writer %d: %v", i, err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	m, err := readLibrarySettingsMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 8; i++ {
+		key := fmt.Sprintf("key_%d", i)
+		if got := fmt.Sprint(m[key]); got != fmt.Sprint(i) {
+			t.Fatalf("%s = %q, want %d", key, got, i)
+		}
 	}
 }

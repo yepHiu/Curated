@@ -2001,17 +2001,7 @@ func buildDirectPlaybackDescriptor(
 	durationSec float64,
 ) contracts.PlaybackDescriptorDTO {
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
-	mimeType := "application/octet-stream"
-	switch strings.ToLower(filepath.Ext(fileName)) {
-	case ".mp4", ".m4v":
-		mimeType = "video/mp4"
-	case ".webm":
-		mimeType = "video/webm"
-	case ".ogv":
-		mimeType = "video/ogg"
-	case ".m3u8":
-		mimeType = "application/vnd.apple.mpegurl"
-	}
+	mimeType, canDirectPlay := resolveDirectPlaybackMimeType(fileName)
 
 	dto := contracts.PlaybackDescriptorDTO{
 		MovieID:        movieID,
@@ -2020,7 +2010,7 @@ func buildDirectPlaybackDescriptor(
 		MimeType:       mimeType,
 		FileName:       fileName,
 		DurationSec:    durationSec,
-		CanDirectPlay:  true,
+		CanDirectPlay:  canDirectPlay,
 		AudioTracks:    []contracts.PlaybackAudioTrackDTO{},
 		SubtitleTracks: []contracts.PlaybackSubtitleTrackDTO{},
 	}
@@ -2031,6 +2021,21 @@ func buildDirectPlaybackDescriptor(
 		}
 	}
 	return dto
+}
+
+func resolveDirectPlaybackMimeType(fileName string) (mimeType string, canDirectPlay bool) {
+	switch strings.ToLower(filepath.Ext(strings.TrimSpace(fileName))) {
+	case ".mp4", ".m4v":
+		return "video/mp4", true
+	case ".webm":
+		return "video/webm", true
+	case ".ogv":
+		return "video/ogg", true
+	case ".m3u8":
+		return "application/vnd.apple.mpegurl", true
+	default:
+		return "application/octet-stream", false
+	}
 }
 
 // startLibraryScan starts a library scan task. extraMeta is merged into task metadata (e.g. trigger: fsnotify).

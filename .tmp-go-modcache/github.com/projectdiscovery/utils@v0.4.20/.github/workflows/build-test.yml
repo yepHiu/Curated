@@ -1,0 +1,31 @@
+name: 🔨 Build Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Test Builds
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21.x
+
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Test
+        run: go test ./...
+
+      - name: Race Condition Tests
+        if: ${{ matrix.os != 'windows-latest' }} # false positives in windows
+        run: go test -race ./...
+
+      - name: Fuzz File Read  # fuzz tests need to be run separately  
+        run:  go test -fuzztime=10s -fuzz=FuzzSafeOpen -run "FuzzSafeOpen" ./file/...

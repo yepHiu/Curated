@@ -290,6 +290,9 @@ async function syncVideoSource() {
     v.load()
     return
   }
+  if (mode === "direct" && playbackDescriptor.value?.canDirectPlay === false) {
+    playbackError.value = t("player.decodeError")
+  }
   if (mode === "hls") {
     if (canPlayHlsNatively(v)) {
       v.src = src
@@ -354,6 +357,57 @@ async function prewarmHlsDescriptor(descriptor: PlaybackDescriptorDTO | null) {
       isPrewarmingHls.value = false
       hlsPrewarmProgress.value = 0
     }
+  }
+}
+
+function canBrowserDirectPlayFromFileName(fileName?: string | null): boolean {
+  const normalized = (fileName ?? "").trim().toLowerCase()
+  return [".mp4", ".m4v", ".webm", ".ogv", ".m3u8"].some((ext) => normalized.endsWith(ext))
+}
+
+async function tryStartPlaybackIfRequested(): Promise<boolean> {
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return false
+
+  const shouldHandleRouteAutoplay =
+    props.autoplay && autoplayConsumedForMovieId.value !== props.movie.id
+  const shouldResumePlayback = resumePlaybackWhenReady
+  if (!shouldHandleRouteAutoplay && !shouldResumePlayback) {
+    return false
+  }
+
+  if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    isPlaybackWaiting.value = true
+    return false
+  }
+
+  if (shouldHandleRouteAutoplay) {
+    autoplayConsumedForMovieId.value = props.movie.id
+  }
+  resumePlaybackWhenReady = false
+  playbackError.value = ""
+
+  try {
+    await v.play()
+    if (shouldHandleRouteAutoplay) {
+      stripAutoplayFromRoute()
+    }
+    return true
+  } catch {
+    if (shouldResumePlayback) {
+      resumePlaybackWhenReady = true
+    }
+    if (shouldHandleRouteAutoplay) {
+      autoplayConsumedForMovieId.value = null
+    }
+    if (v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      isPlaybackWaiting.value = true
+      return false
+    }
+    playbackError.value = shouldHandleRouteAutoplay
+      ? t("player.autoplayBlocked")
+      : t("player.playStartError")
+    return false
   }
 }
 
@@ -479,7 +533,7 @@ async function fallbackHlsToDirect(reason?: string) {
       mimeType: "video/mp4",
       startPositionSec: undefined,
       resumePositionSec: absolutePositionSec,
-      canDirectPlay: true,
+      canDirectPlay: canBrowserDirectPlayFromFileName(current.fileName),
       reason: reason?.trim() || "hls fallback to direct playback",
     }
     playbackSrc.value = fallbackUrl
@@ -682,6 +736,7 @@ function onLoadedMetadata() {
     ) {
       stripTFromRoute()
     }
+    void tryStartPlaybackIfRequested()
     return
   }
 
@@ -700,6 +755,7 @@ function onLoadedMetadata() {
   currentTime.value = clamped
   resumeAppliedForMovieId.value = props.movie.id
   stripTFromRoute()
+  void tryStartPlaybackIfRequested()
 }
 
 function normalizeProgressTargetSec(rawValue: number): number {
@@ -810,34 +866,9 @@ function stripAutoplayFromRoute() {
 
 /** 从详情/资料库点「播放」进入本页时，在可播后自动 play；成功后去掉 ?autoplay=1 */
 async function onCanPlayForAutoplay() {
-  const v = videoRef.value
-  if (!v || !playbackSrc.value) return
   markPlaybackReady()
   syncBufferedRangeFromVideo()
-
-  const shouldHandleRouteAutoplay =
-    props.autoplay && autoplayConsumedForMovieId.value !== props.movie.id
-  const shouldResumePlayback = resumePlaybackWhenReady
-  if (!shouldHandleRouteAutoplay && !shouldResumePlayback) return
-
-  if (shouldHandleRouteAutoplay) {
-    autoplayConsumedForMovieId.value = props.movie.id
-  }
-  resumePlaybackWhenReady = false
-  try {
-    await v.play()
-    if (shouldHandleRouteAutoplay) {
-      stripAutoplayFromRoute()
-    }
-  } catch {
-    if (shouldHandleRouteAutoplay) {
-      autoplayConsumedForMovieId.value = null
-    }
-    if (shouldResumePlayback) {
-      resumePlaybackWhenReady = true
-    }
-    playbackError.value = t("player.autoplayBlocked")
-  }
+  void tryStartPlaybackIfRequested()
 }
 
 function onPlay() {
@@ -900,6 +931,10 @@ async function togglePlayPause() {
   if (!v || !playbackSrc.value || !descriptor) return
   try {
     if (v.paused) {
+      if (descriptor.mode === "direct" && descriptor.canDirectPlay === false) {
+        playbackError.value = t("player.decodeError")
+        return
+      }
       if (
         descriptor.mode === "hls" &&
         (!descriptor.sessionId || currentTime.value >= Math.max(0, totalDurationSec.value - 0.15))
@@ -912,7 +947,12 @@ async function togglePlayPause() {
         })
         return
       }
-      await v.play()
+      autoplayConsumedForMovieId.value = props.movie.id
+      resumePlaybackWhenReady = true
+      const started = await tryStartPlaybackIfRequested()
+      if (!started && resumePlaybackWhenReady) {
+        isPlaybackWaiting.value = true
+      }
     } else {
       v.pause()
     }
@@ -977,6 +1017,7 @@ function onVideoSeeked() {
 function onVideoLoadedData() {
   syncBufferedRangeFromVideo()
   markPlaybackReady()
+  void tryStartPlaybackIfRequested()
 }
 
 function onVideoProgress() {
