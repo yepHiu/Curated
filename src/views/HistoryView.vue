@@ -191,9 +191,6 @@ watch(
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <h1 class="text-2xl font-semibold tracking-tight">{{ t("history.title") }}</h1>
-              <p class="text-sm text-muted-foreground">
-                {{ t("history.subtitle") }}
-              </p>
             </div>
             <div
               v-if="!isEmpty"
