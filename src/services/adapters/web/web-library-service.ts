@@ -25,6 +25,7 @@ import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import type { LibraryService } from "@/services/contracts/library-service"
+import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
 const moviesState: Ref<Movie[]> = ref([])
@@ -232,7 +233,7 @@ function applyPlayerSettingsFromDTO(next: SettingsDTO) {
   const player = next.player
   playerSettingsState.value = {
     hardwareDecode: player?.hardwareDecode !== false,
-    hardwareEncoder: player?.hardwareEncoder ?? "auto",
+    hardwareEncoder: normalizeHardwareEncoderPreference(player?.hardwareEncoder),
     nativePlayerPreset: normalizeNativePlayerPreset(
       player?.nativePlayerPreset,
       player?.nativePlayerCommand,
@@ -372,6 +373,7 @@ function createWebLibraryService(): LibraryService {
       }
       playerSettingsState.value = {
         ...merged,
+        hardwareEncoder: normalizeHardwareEncoderPreference(merged.hardwareEncoder),
         nativePlayerPreset: normalizeNativePlayerPreset(
           merged.nativePlayerPreset,
           merged.nativePlayerCommand,

@@ -129,6 +129,7 @@ import {
   persistNativePlayerBrowserTemplate,
   resolveNativePlayerBrowserTemplate,
 } from "@/lib/native-player-launch"
+import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { cn } from "@/lib/utils"
 
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
@@ -257,6 +258,8 @@ const playbackSaving = ref(false)
 const playbackError = ref("")
 const playbackSavedFlash = ref(false)
 let playbackSavedFlashTimer: ReturnType<typeof setTimeout> | null = null
+let playbackSavePromise: Promise<void> | null = null
+let playbackSaveQueued = false
 
 const addPathDialogOpen = ref(false)
 const removePathDialogOpen = ref(false)
@@ -742,11 +745,7 @@ function flashPlaybackSaved() {
 function syncPlaybackDraftFromService() {
   const player = libraryService.playerSettings.value
   playbackHardwareDecodeDraft.value = player.hardwareDecode !== false
-  playbackHardwareEncoderDraft.value = PLAYBACK_HARDWARE_ENCODER_OPTIONS.includes(
-    (player.hardwareEncoder ?? "auto") as HardwareEncoderPreference,
-  )
-    ? ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference)
-    : "auto"
+  playbackHardwareEncoderDraft.value = normalizeHardwareEncoderPreference(player.hardwareEncoder)
   playbackNativePlayerPresetDraft.value = normalizeNativePlayerPresetForBrowserLaunch(
     player.nativePlayerPreset,
     player.nativePlayerCommand,
@@ -844,7 +843,7 @@ function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
       : currentCommand
   return {
     hardwareDecode: playbackHardwareDecodeDraft.value,
-    hardwareEncoder: playbackHardwareEncoderDraft.value,
+    hardwareEncoder: normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value),
     nativePlayerPreset: playbackNativePlayerPresetDraft.value,
     nativePlayerEnabled: playbackNativePlayerEnabledDraft.value,
     nativePlayerCommand: nextBackendCommand,
@@ -861,7 +860,8 @@ function playbackDraftMatchesServer(): boolean {
   const player = libraryService.playerSettings.value
   return (
     playbackHardwareDecodeDraft.value === (player.hardwareDecode !== false) &&
-    playbackHardwareEncoderDraft.value === ((player.hardwareEncoder ?? "auto") as HardwareEncoderPreference) &&
+    normalizeHardwareEncoderPreference(playbackHardwareEncoderDraft.value) ===
+      normalizeHardwareEncoderPreference(player.hardwareEncoder) &&
     playbackNativePlayerPresetDraft.value ===
       normalizeNativePlayerPresetForBrowserLaunch(player.nativePlayerPreset, player.nativePlayerCommand) &&
     playbackNativePlayerEnabledDraft.value === (player.nativePlayerEnabled !== false) &&
@@ -885,7 +885,7 @@ function playbackBrowserTemplateMatchesPersisted(): boolean {
     )
 }
 
-async function savePlaybackSettings() {
+async function performSavePlaybackSettings() {
   playbackError.value = ""
   const shouldPatchServer = !playbackDraftMatchesServer()
   const shouldPersistBrowserTemplate = !playbackBrowserTemplateMatchesPersisted()
@@ -924,6 +924,26 @@ async function savePlaybackSettings() {
     } else {
       playbackError.value = t("settings.errSaveTitle")
     }
+  }
+}
+
+async function savePlaybackSettings() {
+  if (playbackSavePromise) {
+    playbackSaveQueued = true
+    return playbackSavePromise
+  }
+
+  playbackSavePromise = (async () => {
+    do {
+      playbackSaveQueued = false
+      await performSavePlaybackSettings()
+    } while (playbackSaveQueued)
+  })()
+
+  try {
+    await playbackSavePromise
+  } finally {
+    playbackSavePromise = null
   }
 }
 
@@ -980,13 +1000,17 @@ watchDebounced(
       playbackSeekBackwardStepDraft.value,
     ] as const,
   async () => {
-    if (!settingsAutoSaveReady.value) {
-      return
+    try {
+      if (!settingsAutoSaveReady.value) {
+        return
+      }
+      if (playbackDraftMatchesServer() && playbackBrowserTemplateMatchesPersisted()) {
+        return
+      }
+      await savePlaybackSettings()
+    } catch (err) {
+      console.error("[settings] playback autosave failed", err)
     }
-    if (playbackDraftMatchesServer() && playbackBrowserTemplateMatchesPersisted()) {
-      return
-    }
-    await savePlaybackSettings()
   },
   { debounce: 550, maxWait: 5000 },
 )

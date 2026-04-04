@@ -38,8 +38,12 @@ function captureScroll(scrollElRef: Ref<HTMLElement | null>): { top: number; lef
 
 function applyScroll(el: HTMLElement | null, top: number, left: number) {
   if (!el) return
-  el.scrollTop = top
-  el.scrollLeft = left
+  try {
+    el.scrollTop = top
+    el.scrollLeft = left
+  } catch (err) {
+    console.error("[settings-scroll-preserve] applyScroll failed", err)
+  }
 }
 
 function runScrollRestoreBurst(
@@ -71,9 +75,13 @@ async function applyScrollRestoreSequence(
   })
 
   const restore = () => {
-    const t = getSettingsScrollEl(scrollElRef)
-    applyScroll(t, top, left)
-    if (t) noteSettingsScrollPosition(t)
+    try {
+      const t = getSettingsScrollEl(scrollElRef)
+      applyScroll(t, top, left)
+      if (t) noteSettingsScrollPosition(t)
+    } catch (err) {
+      console.error("[settings-scroll-preserve] restore failed", err)
+    }
   }
 
   const el = getSettingsScrollEl(scrollElRef)
@@ -84,11 +92,26 @@ async function applyScrollRestoreSequence(
     }
   }
   if (el) {
+    let mutationRestoreRaf = 0
+    const scheduleRestoreFromObserver = () => {
+      if (mutationRestoreRaf !== 0) return
+      mutationRestoreRaf = requestAnimationFrame(() => {
+        mutationRestoreRaf = 0
+        restore()
+      })
+    }
+
     const mutationObserver = new MutationObserver(() => {
-      restore()
+      scheduleRestoreFromObserver()
     })
     mutationObserver.observe(el, { childList: true, subtree: true })
-    cleanupFns.push(() => mutationObserver.disconnect())
+    cleanupFns.push(() => {
+      if (mutationRestoreRaf !== 0) {
+        cancelAnimationFrame(mutationRestoreRaf)
+        mutationRestoreRaf = 0
+      }
+      mutationObserver.disconnect()
+    })
 
     const onFocusIn = () => {
       restore()
@@ -98,11 +121,22 @@ async function applyScrollRestoreSequence(
     cleanupFns.push(() => el.removeEventListener("focusin", onFocusIn, true))
 
     if (typeof ResizeObserver !== "undefined") {
+      let resizeRestoreRaf = 0
       const resizeObserver = new ResizeObserver(() => {
-        restore()
+        if (resizeRestoreRaf !== 0) return
+        resizeRestoreRaf = requestAnimationFrame(() => {
+          resizeRestoreRaf = 0
+          restore()
+        })
       })
       resizeObserver.observe(el)
-      cleanupFns.push(() => resizeObserver.disconnect())
+      cleanupFns.push(() => {
+        if (resizeRestoreRaf !== 0) {
+          cancelAnimationFrame(resizeRestoreRaf)
+          resizeRestoreRaf = 0
+        }
+        resizeObserver.disconnect()
+      })
     }
 
     setTimeout(cleanupObservers, 900)
