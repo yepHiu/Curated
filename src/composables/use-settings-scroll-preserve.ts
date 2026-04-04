@@ -92,52 +92,15 @@ async function applyScrollRestoreSequence(
     }
   }
   if (el) {
-    let mutationRestoreRaf = 0
-    const scheduleRestoreFromObserver = () => {
-      if (mutationRestoreRaf !== 0) return
-      mutationRestoreRaf = requestAnimationFrame(() => {
-        mutationRestoreRaf = 0
-        restore()
-      })
-    }
-
-    const mutationObserver = new MutationObserver(() => {
-      scheduleRestoreFromObserver()
-    })
-    mutationObserver.observe(el, { childList: true, subtree: true })
-    cleanupFns.push(() => {
-      if (mutationRestoreRaf !== 0) {
-        cancelAnimationFrame(mutationRestoreRaf)
-        mutationRestoreRaf = 0
-      }
-      mutationObserver.disconnect()
-    })
-
+    // 不在此处挂 MutationObserver / ResizeObserver（subtree 会覆盖整页设置表单）：
+    // 播放/HLS 相关 Switch 自动保存时会连续触发布局与 patch，与同步 restore 叠在一起
+    // 曾导致整页白屏。滚动回位改由下方 rAF / 定时器 / burst 与 focusin 承担。
     const onFocusIn = () => {
       restore()
       requestAnimationFrame(() => restore())
     }
     el.addEventListener("focusin", onFocusIn, true)
     cleanupFns.push(() => el.removeEventListener("focusin", onFocusIn, true))
-
-    if (typeof ResizeObserver !== "undefined") {
-      let resizeRestoreRaf = 0
-      const resizeObserver = new ResizeObserver(() => {
-        if (resizeRestoreRaf !== 0) return
-        resizeRestoreRaf = requestAnimationFrame(() => {
-          resizeRestoreRaf = 0
-          restore()
-        })
-      })
-      resizeObserver.observe(el)
-      cleanupFns.push(() => {
-        if (resizeRestoreRaf !== 0) {
-          cancelAnimationFrame(resizeRestoreRaf)
-          resizeRestoreRaf = 0
-        }
-        resizeObserver.disconnect()
-      })
-    }
 
     setTimeout(cleanupObservers, 900)
   }
