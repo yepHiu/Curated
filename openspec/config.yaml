@@ -1,0 +1,17 @@
+schema: spec-driven
+
+# Shown to AI when creating OpenSpec artifacts. Keep short; full rules live in-repo.
+context: |
+  Product: Curated (repo folder may be jav-shadcn). Stack: Vue 3 + TypeScript + Vite + shadcn-vue at repo root;
+  Go HTTP API + SQLite under backend/. See AGENTS.md and .cursor/rules/ (workspace-quick-reference,
+  project-facts, git-commit-workflow). Spec-driven changes: openspec/changes/<name>/.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours

@@ -32,6 +32,8 @@ Onboard **Curated** (`jav-shadcn`) to the **OpenSpec** spec-driven workflow and 
 
    Use `openspec update . --force` only if the user explicitly wants to overwrite local instruction copies.
 
+   **Note:** `openspec update` may sync Cursor commands from the OpenSpec schema and **remove** custom slash-command files not in the schema. If you maintain extra commands (e.g. this file), re-add them or pin workflow; keep them under version control.
+
 3. **First-time OpenSpec in this clone (only if `openspec/` is incomplete)**
 
    ```bash
