@@ -383,6 +383,7 @@ export interface PlaybackDescriptorDTO {
   movieId: string
   mode: PlaybackMode
   sessionId?: string
+  sessionKind?: string
   url: string
   mimeType?: string
   fileName?: string
@@ -392,6 +393,11 @@ export interface PlaybackDescriptorDTO {
   resumePositionSec?: number
   canDirectPlay: boolean
   reason?: string
+  reasonCode?: string
+  reasonMessage?: string
+  sourceContainer?: string
+  sourceVideoCodec?: string
+  sourceAudioCodec?: string
   audioTracks?: PlaybackAudioTrackDTO[]
   subtitleTracks?: PlaybackSubtitleTrackDTO[]
 }

@@ -482,6 +482,7 @@ type PlaybackDescriptorDTO struct {
 	MovieID           string                     `json:"movieId"`
 	Mode              PlaybackMode               `json:"mode"`
 	SessionID         string                     `json:"sessionId,omitempty"`
+	SessionKind       string                     `json:"sessionKind,omitempty"`
 	URL               string                     `json:"url"`
 	MimeType          string                     `json:"mimeType,omitempty"`
 	FileName          string                     `json:"fileName,omitempty"`
@@ -491,6 +492,11 @@ type PlaybackDescriptorDTO struct {
 	ResumePositionSec float64                    `json:"resumePositionSec,omitempty"`
 	CanDirectPlay     bool                       `json:"canDirectPlay"`
 	Reason            string                     `json:"reason,omitempty"`
+	ReasonCode        string                     `json:"reasonCode,omitempty"`
+	ReasonMessage     string                     `json:"reasonMessage,omitempty"`
+	SourceContainer   string                     `json:"sourceContainer,omitempty"`
+	SourceVideoCodec  string                     `json:"sourceVideoCodec,omitempty"`
+	SourceAudioCodec  string                     `json:"sourceAudioCodec,omitempty"`
 	AudioTracks       []PlaybackAudioTrackDTO    `json:"audioTracks,omitempty"`
 	SubtitleTracks    []PlaybackSubtitleTrackDTO `json:"subtitleTracks,omitempty"`
 }

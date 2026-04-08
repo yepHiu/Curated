@@ -1844,9 +1844,17 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
 
-	durationSec := a.resolvePlaybackDurationSec(ctx, strings.TrimSpace(detail.Location), detail, progress)
-	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec)
-	if a.shouldPreferHLS(detail.Location) {
+	location := strings.TrimSpace(detail.Location)
+	mediaInfo := a.resolvePlaybackMediaInfo(ctx, location)
+	durationSec := a.resolvePlaybackDurationSec(ctx, location, detail, progress, mediaInfo)
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location:          location,
+		MediaInfo:         mediaInfo,
+		StreamPushEnabled: a.streams != nil && a.streams.Enabled(),
+		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
+	})
+	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec, decision)
+	if decision.Mode == contracts.PlaybackModeHLS {
 		startPositionSec := 0.0
 		if progress != nil && progress.PositionSec > 0 {
 			startPositionSec = progress.PositionSec
@@ -1854,12 +1862,19 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 		if durationSec > 0 && startPositionSec > durationSec {
 			startPositionSec = durationSec
 		}
-		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location), startPositionSec)
+		session, err := a.streams.StartHLSSession(ctx, movieID, location, playback.StartHLSSessionOptions{
+			StartPositionSec: startPositionSec,
+			PreferRemux:      decision.PreferRemux,
+			SourceVideoCodec: decision.SourceVideoCodec,
+			SourceAudioCodec: decision.SourceAudioCodec,
+		})
 		if err != nil {
 			if a.logger != nil {
 				a.logger.Warn("failed to start HLS playback session; falling back to direct", zap.Error(err), zap.String("movieId", movieID))
 			}
-			descriptor.Reason = "HLS session startup failed; fell back to direct playback: " + strings.TrimSpace(err.Error())
+			descriptor.ReasonCode = "hls_session_start_failed"
+			descriptor.ReasonMessage = "HLS session startup failed; fell back to direct playback."
+			descriptor.Reason = descriptor.ReasonMessage + " " + strings.TrimSpace(err.Error())
 			return descriptor, nil
 		}
 		descriptor.Mode = contracts.PlaybackModeHLS
@@ -1868,8 +1883,11 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 		descriptor.MimeType = "application/vnd.apple.mpegurl"
 		descriptor.StartPositionSec = session.StartPositionSec
 		descriptor.TranscodeProfile = session.ProfileName
+		descriptor.SessionKind = session.Kind
 		descriptor.CanDirectPlay = false
-		descriptor.Reason = "browser fallback HLS session"
+		descriptor.ReasonCode = decision.ReasonCode
+		descriptor.ReasonMessage = decision.ReasonMessage
+		descriptor.Reason = decision.ReasonMessage
 	}
 	return descriptor, nil
 }
@@ -1886,7 +1904,15 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 	if err != nil && a.logger != nil {
 		a.logger.Warn("get playback progress failed", zap.Error(err), zap.String("movieId", movieID))
 	}
-	durationSec := a.resolvePlaybackDurationSec(ctx, strings.TrimSpace(detail.Location), detail, progress)
+	location := strings.TrimSpace(detail.Location)
+	mediaInfo := a.resolvePlaybackMediaInfo(ctx, location)
+	durationSec := a.resolvePlaybackDurationSec(ctx, location, detail, progress, mediaInfo)
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location:          location,
+		MediaInfo:         mediaInfo,
+		StreamPushEnabled: a.streams != nil && a.streams.Enabled(),
+		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
+	})
 	switch mode {
 	case contracts.PlaybackModeHLS:
 		if startPositionSec < 0 {
@@ -1895,11 +1921,16 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 		if durationSec > 0 && startPositionSec > durationSec {
 			startPositionSec = durationSec
 		}
-		session, err := a.streams.StartHLSSession(ctx, movieID, strings.TrimSpace(detail.Location), startPositionSec)
+		session, err := a.streams.StartHLSSession(ctx, movieID, location, playback.StartHLSSessionOptions{
+			StartPositionSec: startPositionSec,
+			PreferRemux:      decision.PreferRemux,
+			SourceVideoCodec: decision.SourceVideoCodec,
+			SourceAudioCodec: decision.SourceAudioCodec,
+		})
 		if err != nil {
 			return contracts.PlaybackDescriptorDTO{}, err
 		}
-		dto := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec)
+		dto := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec, decision)
 		dto.Mode = contracts.PlaybackModeHLS
 		dto.SessionID = session.ID
 		dto.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
@@ -1907,8 +1938,11 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 		dto.StartPositionSec = session.StartPositionSec
 		dto.ResumePositionSec = session.StartPositionSec
 		dto.TranscodeProfile = session.ProfileName
+		dto.SessionKind = session.Kind
 		dto.CanDirectPlay = false
-		dto.Reason = "explicit HLS playback session"
+		dto.ReasonCode = decision.ReasonCode
+		dto.ReasonMessage = "Explicit HLS playback session created from the current playback plan."
+		dto.Reason = dto.ReasonMessage
 		return dto, nil
 	default:
 		return contracts.PlaybackDescriptorDTO{}, fmt.Errorf("unsupported playback mode %q", mode)
@@ -1951,20 +1985,12 @@ func (a *App) DeletePlaybackSession(sessionID string) error {
 }
 
 func (a *App) shouldPreferHLS(location string) bool {
-	if a.streams == nil || !a.streams.Enabled() {
-		return false
-	}
-	if a.cfg.Player.ForceStreamPush && strings.TrimSpace(location) != "" {
-		return true
-	}
-	switch strings.ToLower(filepath.Ext(strings.TrimSpace(location))) {
-	case ".mp4", ".m4v", ".webm", ".ogv":
-		return false
-	case ".mkv", ".avi", ".flv", ".ts", ".m2ts", ".wmv", ".mov":
-		return true
-	default:
-		return false
-	}
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location:          location,
+		StreamPushEnabled: a.streams != nil && a.streams.Enabled(),
+		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
+	})
+	return decision.Mode == contracts.PlaybackModeHLS
 }
 
 func (a *App) resolvePlaybackDurationSec(
@@ -1972,6 +1998,7 @@ func (a *App) resolvePlaybackDurationSec(
 	location string,
 	detail contracts.MovieDetailDTO,
 	progress *storage.PlaybackProgressRow,
+	mediaInfo playback.MediaInfo,
 ) float64 {
 	runtimeDurationSec := 0.0
 	if detail.RuntimeMinutes > 0 {
@@ -1981,7 +2008,16 @@ func (a *App) resolvePlaybackDurationSec(
 	if progress != nil && progress.DurationSec > 0 {
 		progressDurationSec = progress.DurationSec
 	}
-	return choosePlaybackDurationSec(0, runtimeDurationSec, progressDurationSec)
+	probedDurationSec := mediaInfo.DurationSec
+	if probedDurationSec <= 0 && strings.TrimSpace(location) != "" {
+		duration, err := playback.ProbeMediaDuration(ctx, location, a.cfg.Player.FFmpegCommand)
+		if err == nil {
+			probedDurationSec = duration
+		} else if a.logger != nil {
+			a.logger.Debug("playback duration probe failed", zap.Error(err), zap.String("location", location))
+		}
+	}
+	return choosePlaybackDurationSec(probedDurationSec, runtimeDurationSec, progressDurationSec)
 }
 
 func choosePlaybackDurationSec(probedDurationSec float64, runtimeDurationSec float64, progressDurationSec float64) float64 {
@@ -2008,20 +2044,31 @@ func buildDirectPlaybackDescriptor(
 	detail contracts.MovieDetailDTO,
 	progress *storage.PlaybackProgressRow,
 	durationSec float64,
+	decision playbackDecision,
 ) contracts.PlaybackDescriptorDTO {
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
 	mimeType, canDirectPlay := resolveDirectPlaybackMimeType(fileName)
+	if decision.CanDirectPlay {
+		canDirectPlay = true
+	}
 
 	dto := contracts.PlaybackDescriptorDTO{
-		MovieID:        movieID,
-		Mode:           contracts.PlaybackModeDirect,
-		URL:            "/api/library/movies/" + url.PathEscape(movieID) + "/stream",
-		MimeType:       mimeType,
-		FileName:       fileName,
-		DurationSec:    durationSec,
-		CanDirectPlay:  canDirectPlay,
-		AudioTracks:    []contracts.PlaybackAudioTrackDTO{},
-		SubtitleTracks: []contracts.PlaybackSubtitleTrackDTO{},
+		MovieID:          movieID,
+		Mode:             contracts.PlaybackModeDirect,
+		URL:              "/api/library/movies/" + url.PathEscape(movieID) + "/stream",
+		MimeType:         mimeType,
+		FileName:         fileName,
+		DurationSec:      durationSec,
+		CanDirectPlay:    canDirectPlay,
+		SessionKind:      decision.SessionKind,
+		ReasonCode:       decision.ReasonCode,
+		ReasonMessage:    decision.ReasonMessage,
+		Reason:           decision.ReasonMessage,
+		SourceContainer:  decision.SourceContainer,
+		SourceVideoCodec: decision.SourceVideoCodec,
+		SourceAudioCodec: decision.SourceAudioCodec,
+		AudioTracks:      []contracts.PlaybackAudioTrackDTO{},
+		SubtitleTracks:   []contracts.PlaybackSubtitleTrackDTO{},
 	}
 	if progress != nil && progress.PositionSec > 0 {
 		dto.ResumePositionSec = progress.PositionSec
@@ -2030,6 +2077,22 @@ func buildDirectPlaybackDescriptor(
 		}
 	}
 	return dto
+}
+
+func (a *App) resolvePlaybackMediaInfo(ctx context.Context, location string) playback.MediaInfo {
+	location = strings.TrimSpace(location)
+	if location == "" {
+		return playback.MediaInfo{}
+	}
+
+	mediaInfo, err := playback.ProbeMediaInfo(ctx, location, a.cfg.Player.FFmpegCommand)
+	if err != nil {
+		if a.logger != nil {
+			a.logger.Debug("playback media probe failed", zap.Error(err), zap.String("location", location))
+		}
+		return playback.MediaInfo{}
+	}
+	return mediaInfo
 }
 
 func resolveDirectPlaybackMimeType(fileName string) (mimeType string, canDirectPlay bool) {

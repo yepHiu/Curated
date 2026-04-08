@@ -1783,8 +1783,32 @@ function formatReasonLabel(reason: string | null | undefined): string {
   return text
 }
 
+function formatSessionKindLabel(sessionKind: string | null | undefined): string {
+  switch ((sessionKind ?? "").trim().toLowerCase()) {
+    case "direct-file":
+      return "Direct File"
+    case "remux-hls":
+      return "Remux HLS"
+    case "transcode-hls":
+      return "Transcode HLS"
+    default:
+      return "N/A"
+  }
+}
+
+function formatSourceFormatLabel(descriptor: PlaybackDescriptorDTO | null | undefined): string {
+  const container = descriptor?.sourceContainer?.trim()
+  const videoCodec = descriptor?.sourceVideoCodec?.trim()
+  const audioCodec = descriptor?.sourceAudioCodec?.trim()
+  const parts = [container, videoCodec, audioCodec].filter((value) => Boolean(value))
+  if (parts.length === 0) return "N/A"
+  return parts.join(" / ")
+}
+
 function formatTranscodeProfileLabel(profile: string | null | undefined): string {
   switch ((profile ?? "").trim().toLowerCase()) {
+    case "remux_copy":
+      return "FFmpeg Stream Copy"
     case "h264_amf":
       return "AMD AMF"
     case "h264_qsv":
@@ -1857,6 +1881,11 @@ const playbackStatsRows = computed(() => {
       value: detailedStatsModeLabel.value,
     },
     {
+      key: "session-kind",
+      label: "Session",
+      value: formatSessionKindLabel(descriptor?.sessionKind),
+    },
+    {
       key: "file",
       label: "File",
       value: fileBasename.value || "N/A",
@@ -1872,9 +1901,19 @@ const playbackStatsRows = computed(() => {
       value: formatTranscodeProfileLabel(descriptor?.transcodeProfile),
     },
     {
+      key: "reason-code",
+      label: "Reason Code",
+      value: formatReasonLabel(descriptor?.reasonCode),
+    },
+    {
       key: "reason",
       label: "Reason",
-      value: formatReasonLabel(descriptor?.reason),
+      value: formatReasonLabel(descriptor?.reasonMessage ?? descriptor?.reason),
+    },
+    {
+      key: "source-format",
+      label: "Source Format",
+      value: formatSourceFormatLabel(descriptor),
     },
     {
       key: "current",
@@ -1965,8 +2004,13 @@ const playbackStatsColumns = computed(() => {
 })
 
 const detailedStatsModeLabel = computed(() => {
-  const mode = playbackDescriptor.value?.mode
-  if (mode === "hls") return "HLS"
+  const descriptor = playbackDescriptor.value
+  const mode = descriptor?.mode
+  if (mode === "hls") {
+    if (descriptor?.sessionKind === "remux-hls") return "HLS (Remux)"
+    if (descriptor?.sessionKind === "transcode-hls") return "HLS (Transcode)"
+    return "HLS"
+  }
   if (mode === "native") return "Native"
   if (mode === "direct") return "Direct"
   return "N/A"

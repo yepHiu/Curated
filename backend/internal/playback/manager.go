@@ -42,6 +42,7 @@ type Session struct {
 	Directory        string
 	StartPositionSec float64
 	ProfileName      string
+	Kind             string
 	StartedAt        time.Time
 }
 
@@ -53,8 +54,24 @@ type sessionState struct {
 }
 
 type transcodeProfile struct {
-	Name string
-	Args []string
+	Name        string
+	SessionKind string
+	Args        []string
+}
+
+type StartHLSSessionOptions struct {
+	StartPositionSec float64
+	PreferRemux      bool
+	SourceVideoCodec string
+	SourceAudioCodec string
+}
+
+type buildProfileOptions struct {
+	PreferredProfile string
+	StartPositionSec float64
+	PreferRemux      bool
+	SourceVideoCodec string
+	SourceAudioCodec string
 }
 
 type Manager struct {
@@ -90,7 +107,7 @@ func (m *Manager) SetConfig(cfg Config) {
 	m.mu.Unlock()
 }
 
-func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePath string, startPositionSec float64) (Session, error) {
+func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePath string, options StartHLSSessionOptions) (Session, error) {
 	if m == nil {
 		return Session{}, ErrStreamPushDisabled
 	}
@@ -140,10 +157,16 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	m.mu.RLock()
 	preferredProfile = m.lastSuccessfulProfile
 	m.mu.RUnlock()
-	if startPositionSec < 0 {
-		startPositionSec = 0
+	if options.StartPositionSec < 0 {
+		options.StartPositionSec = 0
 	}
-	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", preferredProfile, startPositionSec)
+	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", buildProfileOptions{
+		PreferredProfile: preferredProfile,
+		StartPositionSec: options.StartPositionSec,
+		PreferRemux:      options.PreferRemux,
+		SourceVideoCodec: options.SourceVideoCodec,
+		SourceAudioCodec: options.SourceAudioCodec,
+	})
 
 	var lastErr error
 	for index, profile := range profiles {
@@ -154,7 +177,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 			}
 		}
 
-		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile, startPositionSec)
+		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile, options.StartPositionSec)
 		if err == nil {
 			staleStates := m.replaceSession(sessionID, state, profile.Name)
 			for _, stale := range staleStates {
@@ -373,6 +396,7 @@ func startTranscodeSession(
 			Directory:        dir,
 			StartPositionSec: startPositionSec,
 			ProfileName:      profile.Name,
+			Kind:             profile.SessionKind,
 			StartedAt:        time.Now().UTC(),
 		},
 		cancel: cancel,
@@ -404,15 +428,15 @@ func startTranscodeSession(
 	return state, nil
 }
 
-func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, preferredProfile string, startPositionSec float64) []transcodeProfile {
+func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, options buildProfileOptions) []transcodeProfile {
 	inputPrefix := []string{"-y"}
 	if cfg.HardwareDecode {
 		inputPrefix = append(inputPrefix, "-hwaccel", "auto")
 	}
-	inputSeekArgs, accurateSeekArgs := buildSeekArgs(startPositionSec)
+	inputSeekArgs, accurateSeekArgs := buildSeekArgs(options.StartPositionSec)
 	configuredPreference := normalizeHardwareEncoderProfileName(cfg.HardwareEncoder)
 
-	hlsArgs := []string{
+	transcodeHLSArgs := []string{
 		"-pix_fmt", "yuv420p",
 		"-c:a", "aac",
 		"-ac", "2",
@@ -428,63 +452,94 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		"-hls_segment_filename", segmentPattern,
 		playlistPath,
 	}
+	remuxHLSArgs := []string{
+		"-c:v", "copy",
+		"-c:a", "copy",
+		"-f", "hls",
+		"-hls_init_time", hlsInitialSegmentSeconds,
+		"-hls_time", hlsTargetSegmentSeconds,
+		"-hls_list_size", "0",
+		"-hls_allow_cache", "0",
+		"-hls_flags", "independent_segments",
+		"-hls_playlist_type", "event",
+		"-start_number", "0",
+		"-hls_segment_filename", segmentPattern,
+		playlistPath,
+	}
 
 	profiles := make([]transcodeProfile, 0, 4)
+	if options.PreferRemux && canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
+		profiles = append(profiles, transcodeProfile{
+			Name:        "remux_copy",
+			SessionKind: "remux-hls",
+			Args: append(
+				append(
+					append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
+					accurateSeekArgs...,
+				),
+				remuxHLSArgs...,
+			),
+		})
+	}
 	if cfg.HardwareDecode {
 		switch runtime.GOOS {
 		case "windows":
 			profiles = append(profiles,
 				transcodeProfile{
-					Name: "h264_nvenc",
+					Name:        "h264_nvenc",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 				transcodeProfile{
-					Name: "h264_qsv",
+					Name:        "h264_qsv",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 				transcodeProfile{
-					Name: "h264_amf",
+					Name:        "h264_amf",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_amf", "-quality", "quality")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 			)
 		case "darwin":
 			profiles = append(profiles, transcodeProfile{
-				Name: "h264_videotoolbox",
+				Name:        "h264_videotoolbox",
+				SessionKind: "transcode-hls",
 				Args: append(
 					append(
 						append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 						append(accurateSeekArgs, "-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1")...,
 					),
-					hlsArgs...,
+					transcodeHLSArgs...,
 				),
 			})
 		}
 	}
 
 	if configuredPreference != "" {
-		preferredProfile = configuredPreference
+		options.PreferredProfile = configuredPreference
 	}
-	if preferredProfile != "" {
+	if options.PreferredProfile != "" {
 		for idx, profile := range profiles {
-			if profile.Name != preferredProfile {
+			if profile.Name != options.PreferredProfile {
 				continue
 			}
 			if idx > 0 {
@@ -495,13 +550,14 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	}
 
 	profiles = append(profiles, transcodeProfile{
-		Name: "libx264",
+		Name:        "libx264",
+		SessionKind: "transcode-hls",
 		Args: append(
 			append(
 				append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 				append(accurateSeekArgs, "-c:v", "libx264", "-preset", "veryfast", "-crf", "17")...,
 			),
-			hlsArgs...,
+			transcodeHLSArgs...,
 		),
 	})
 	if configuredPreference == "libx264" {
@@ -631,4 +687,10 @@ func normalizeHardwareEncoderProfileName(value string) string {
 	default:
 		return ""
 	}
+}
+
+func canStreamCopyCodecsForHLS(videoCodec string, audioCodec string) bool {
+	videoCodec = strings.ToLower(strings.TrimSpace(videoCodec))
+	audioCodec = strings.ToLower(strings.TrimSpace(audioCodec))
+	return videoCodec == "h264" && (audioCodec == "aac" || audioCodec == "mp3" || audioCodec == "ac3" || audioCodec == "eac3")
 }
