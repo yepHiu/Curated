@@ -21,6 +21,13 @@ export interface HealthDTO {
   databasePath: string
 }
 
+export interface DevPerformanceSummaryDTO {
+  supported: boolean
+  sampledAt?: string
+  systemCpuPercent?: number
+  backendCpuPercent?: number
+}
+
 export interface MovieListItemDTO {
   id: string
   title: string
