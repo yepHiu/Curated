@@ -96,6 +96,9 @@ function syncPlaybackDraftFromService() {
   )
   playbackStreamPushEnabledDraft.value = player.streamPushEnabled !== false
   playbackForceStreamPushDraft.value = Boolean(player.forceStreamPush)
+  if (!playbackStreamPushEnabledDraft.value) {
+    playbackForceStreamPushDraft.value = false
+  }
   playbackFfmpegCommandDraft.value = (player.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg"
   playbackPreferNativePlayerDraft.value = Boolean(player.preferNativePlayer)
   playbackSeekForwardStepDraft.value = String(Math.max(1, Number(player.seekForwardStepSec ?? 10)))
@@ -339,6 +342,13 @@ watch(
   { immediate: true },
 )
 
+/** 关闭「启用 HLS 推流」时，无法同时保留「强制走 HLS 推流」。 */
+watch(playbackStreamPushEnabledDraft, (enabled) => {
+  if (!enabled && playbackForceStreamPushDraft.value) {
+    playbackForceStreamPushDraft.value = false
+  }
+})
+
 onBeforeUnmount(() => {
   if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)
 })
@@ -429,7 +439,10 @@ onBeforeUnmount(() => {
                   {{ t("settings.playbackForceStreamPushHint") }}
                 </p>
               </div>
-              <Switch v-model="playbackForceStreamPushDraft" />
+              <Switch
+                v-model="playbackForceStreamPushDraft"
+                :disabled="!playbackStreamPushEnabledDraft"
+              />
             </div>
           </div>
 

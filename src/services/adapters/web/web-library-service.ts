@@ -232,6 +232,9 @@ function applyMetadataMovieSettingsFromDTO(next: SettingsDTO) {
 
 function applyPlayerSettingsFromDTO(next: SettingsDTO) {
   const player = next.player
+  const streamPushEnabled = player?.streamPushEnabled !== false
+  const forceStreamPush =
+    streamPushEnabled && Boolean(player?.forceStreamPush)
   playerSettingsState.value = {
     hardwareDecode: player?.hardwareDecode !== false,
     hardwareEncoder: normalizeHardwareEncoderPreference(player?.hardwareEncoder),
@@ -243,8 +246,8 @@ function applyPlayerSettingsFromDTO(next: SettingsDTO) {
     nativePlayerCommand:
       (player?.nativePlayerCommand ?? defaultNativePlayerCommand(player?.nativePlayerPreset)).trim() ||
       defaultNativePlayerCommand(player?.nativePlayerPreset),
-    streamPushEnabled: player?.streamPushEnabled !== false,
-    forceStreamPush: Boolean(player?.forceStreamPush),
+    streamPushEnabled,
+    forceStreamPush,
     ffmpegCommand: (player?.ffmpegCommand ?? "ffmpeg").trim() || "ffmpeg",
     preferNativePlayer: Boolean(player?.preferNativePlayer),
     seekForwardStepSec: Math.max(1, Number(player?.seekForwardStepSec ?? 10)),
@@ -371,6 +374,9 @@ function createWebLibraryService(): LibraryService {
           patch.seekBackwardStepSec !== undefined
             ? patch.seekBackwardStepSec
             : prev.seekBackwardStepSec,
+      }
+      if (!merged.streamPushEnabled) {
+        merged.forceStreamPush = false
       }
       playerSettingsState.value = {
         ...merged,

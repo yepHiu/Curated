@@ -484,6 +484,12 @@ export const mockLibraryService: LibraryService = {
           ? Math.max(1, patch.seekBackwardStepSec)
           : prev.seekBackwardStepSec,
     }
+    if (!playerSettingsMock.value.streamPushEnabled) {
+      playerSettingsMock.value = {
+        ...playerSettingsMock.value,
+        forceStreamPush: false,
+      }
+    }
     playerSettingsMock.value = {
       ...playerSettingsMock.value,
       nativePlayerPreset: normalizeNativePlayerPreset(

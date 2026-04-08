@@ -660,6 +660,10 @@ func (a *App) PlayerSettings() contracts.PlayerSettingsDTO {
 	if seekBackward <= 0 {
 		seekBackward = 10
 	}
+	forceStreamPush := a.cfg.Player.ForceStreamPush
+	if !a.cfg.Player.StreamPushEnabled {
+		forceStreamPush = false
+	}
 	return contracts.PlayerSettingsDTO{
 		HardwareDecode:      a.cfg.Player.HardwareDecode,
 		HardwareEncoder:     config.NormalizeHardwareEncoderPreference(a.cfg.Player.HardwareEncoder),
@@ -667,7 +671,7 @@ func (a *App) PlayerSettings() contracts.PlayerSettingsDTO {
 		NativePlayerEnabled: a.cfg.Player.NativePlayerEnabled,
 		NativePlayerCommand: nativeCommand,
 		StreamPushEnabled:   a.cfg.Player.StreamPushEnabled,
-		ForceStreamPush:     a.cfg.Player.ForceStreamPush,
+		ForceStreamPush:     forceStreamPush,
 		FFmpegCommand:       ffmpegCommand,
 		PreferNativePlayer:  a.cfg.Player.PreferNativePlayer,
 		SeekForwardStepSec:  seekForward,
@@ -748,6 +752,10 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 	}
 	if next.SeekBackwardStepSec <= 0 {
 		next.SeekBackwardStepSec = 10
+	}
+	// HLS push disabled: "force HLS" is meaningless; keep cfg and runtime consistent.
+	if !next.StreamPushEnabled {
+		next.ForceStreamPush = false
 	}
 
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
