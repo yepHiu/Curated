@@ -58,6 +58,13 @@ type HealthDTO struct {
 	DatabasePath string `json:"databasePath"`
 }
 
+type DevPerformanceSummaryDTO struct {
+	Supported         bool    `json:"supported"`
+	SampledAt         string  `json:"sampledAt,omitempty"`
+	SystemCPUPercent  float64 `json:"systemCpuPercent,omitempty"`
+	BackendCPUPercent float64 `json:"backendCpuPercent,omitempty"`
+}
+
 type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`
@@ -482,6 +489,7 @@ type PlaybackDescriptorDTO struct {
 	MovieID           string                     `json:"movieId"`
 	Mode              PlaybackMode               `json:"mode"`
 	SessionID         string                     `json:"sessionId,omitempty"`
+	SessionKind       string                     `json:"sessionKind,omitempty"`
 	URL               string                     `json:"url"`
 	MimeType          string                     `json:"mimeType,omitempty"`
 	FileName          string                     `json:"fileName,omitempty"`
@@ -491,6 +499,11 @@ type PlaybackDescriptorDTO struct {
 	ResumePositionSec float64                    `json:"resumePositionSec,omitempty"`
 	CanDirectPlay     bool                       `json:"canDirectPlay"`
 	Reason            string                     `json:"reason,omitempty"`
+	ReasonCode        string                     `json:"reasonCode,omitempty"`
+	ReasonMessage     string                     `json:"reasonMessage,omitempty"`
+	SourceContainer   string                     `json:"sourceContainer,omitempty"`
+	SourceVideoCodec  string                     `json:"sourceVideoCodec,omitempty"`
+	SourceAudioCodec  string                     `json:"sourceAudioCodec,omitempty"`
 	AudioTracks       []PlaybackAudioTrackDTO    `json:"audioTracks,omitempty"`
 	SubtitleTracks    []PlaybackSubtitleTrackDTO `json:"subtitleTracks,omitempty"`
 }
@@ -498,6 +511,24 @@ type PlaybackDescriptorDTO struct {
 type CreatePlaybackSessionRequest struct {
 	Mode             PlaybackMode `json:"mode,omitempty"`
 	StartPositionSec float64      `json:"startPositionSec,omitempty"`
+}
+
+type PlaybackSessionStatusDTO struct {
+	SessionID        string  `json:"sessionId"`
+	MovieID          string  `json:"movieId"`
+	SessionKind      string  `json:"sessionKind,omitempty"`
+	TranscodeProfile string  `json:"transcodeProfile,omitempty"`
+	StartPositionSec float64 `json:"startPositionSec,omitempty"`
+	StartedAt        string  `json:"startedAt,omitempty"`
+	LastAccessedAt   string  `json:"lastAccessedAt,omitempty"`
+	ExpiresAt        string  `json:"expiresAt,omitempty"`
+	FinishedAt       string  `json:"finishedAt,omitempty"`
+	State            string  `json:"state,omitempty"`
+	LastError        string  `json:"lastError,omitempty"`
+}
+
+type PlaybackSessionListDTO struct {
+	Items []PlaybackSessionStatusDTO `json:"items"`
 }
 
 type NativePlaybackLaunchRequest struct {

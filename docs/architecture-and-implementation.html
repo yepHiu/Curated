@@ -387,6 +387,7 @@
   <p><span class="path">backend/internal/server/server.go</span> 中 <code>Routes()</code> 注册 REST 风格接口（前缀均为 <code>/api</code>），主要包括：</p>
   <ul>
     <li><code>GET /api/health</code> — 健康检查（含 <code>databasePath</code> 等）。</li>
+    <li><code>GET /api/dev/performance</code> — 开发环境性能摘要（整机 CPU / 后端进程 CPU），供底部性能监测条轮询。</li>
     <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>limit</code>、<code>offset</code>）。</li>
     <li><code>GET /api/library/movies/{movieId}</code> — 详情。</li>
     <li><code>PATCH /api/library/movies/{movieId}</code> — 更新收藏与用户评分（JSON 字段见下文）。</li>
@@ -452,7 +453,7 @@
       <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
       <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
       <tr><td>监听触发的自动扫描</td><td>设置 UI（自动刮削）</td><td><code>AutoLibraryWatchController</code> + <code>librarywatch.Watcher</code>；<code>autoLibraryWatch</code> 写入 <code>library-config.cfg</code></td></tr>
-      <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
+      <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；支持 <code>/api/playback/sessions/recent</code> 与 <code>/api/playback/sessions/{id}</code> 观测会话状态；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
     </tbody>
   </table>
 
@@ -461,6 +462,7 @@
     <li>后端：<code>cd backend && go run ./cmd/curated</code>，默认 <code>:8080</code>；数据库路径见配置与 <code>GET /api/health</code>。</li>
     <li>前端：<code>pnpm dev</code>；<span class="path">vite.config.ts</span> 将 <code>/api</code> 代理到 <code>http://localhost:8080</code>。</li>
     <li>联调：根目录 <code>.env</code> 中 <code>VITE_USE_WEB_API=true</code>（或等价环境变量）。</li>
+    <li>开发态诊断：<span class="path">src/layouts/AppShell.vue</span> 会挂载一个固定在底部表面的 <code>DevPerformanceBar</code>，不影响页面布局；它聚合前端 FPS / long task / memory / 路由切换 / 解码体验指标、HTTP 请求窗口统计，以及 <code>GET /api/dev/performance</code> 的 CPU 摘要。</li>
   </ul>
 
   <footer>

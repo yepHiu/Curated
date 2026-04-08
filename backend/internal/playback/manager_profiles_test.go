@@ -12,8 +12,7 @@ func TestBuildTranscodeProfilesIncludesHardwareCandidatesWhenEnabled(t *testing.
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		0,
+		buildProfileOptions{},
 	)
 	switch runtime.GOOS {
 	case "windows", "darwin":
@@ -36,8 +35,7 @@ func TestBuildTranscodeProfilesSoftwareOnlyWhenHardwareDisabled(t *testing.T) {
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		0,
+		buildProfileOptions{},
 	)
 	if len(profiles) != 1 {
 		t.Fatalf("expected only software fallback, got %d profiles", len(profiles))
@@ -65,8 +63,7 @@ func TestBuildTranscodeProfilesPrefersConfiguredHardwareEncoder(t *testing.T) {
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		0,
+		buildProfileOptions{},
 	)
 	if len(profiles) < 2 {
 		t.Fatalf("expected hardware profiles plus software fallback, got %d", len(profiles))
@@ -82,8 +79,7 @@ func TestBuildTranscodeProfilesCanForceSoftwarePreference(t *testing.T) {
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		0,
+		buildProfileOptions{},
 	)
 	if len(profiles) != 1 {
 		t.Fatalf("expected only software fallback, got %d profiles", len(profiles))
@@ -99,8 +95,7 @@ func TestBuildTranscodeProfilesKeepsSessionOutputsRelativeToCmdDir(t *testing.T)
 		`D:\movie.mkv`,
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		0,
+		buildProfileOptions{},
 	)
 	if len(profiles) != 1 {
 		t.Fatalf("expected only software fallback, got %d profiles", len(profiles))
@@ -132,8 +127,7 @@ func TestBuildTranscodeProfilesUsesHybridSeekWindowWhenRequested(t *testing.T) {
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
-		"",
-		3723.5,
+		buildProfileOptions{StartPositionSec: 3723.5},
 	)
 	if len(profiles) != 1 {
 		t.Fatalf("expected only software fallback, got %d profiles", len(profiles))
@@ -166,9 +160,54 @@ func TestBuildTranscodeProfilesUsesHybridSeekWindowWhenRequested(t *testing.T) {
 	}
 }
 
+func TestBuildTranscodeProfilesPrefersRemuxBeforeFullTranscodeWhenEligible(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{
+			PreferRemux:      true,
+			SourceVideoCodec: "h264",
+			SourceAudioCodec: "aac",
+		},
+	)
+	if len(profiles) < 2 {
+		t.Fatalf("expected remux profile plus software fallback, got %d profiles", len(profiles))
+	}
+	if profiles[0].Name != "remux_copy" {
+		t.Fatalf("first profile = %q, want remux_copy", profiles[0].Name)
+	}
+	args := strings.Join(profiles[0].Args, " ")
+	if !strings.Contains(args, "-c:v copy") || !strings.Contains(args, "-c:a copy") {
+		t.Fatalf("expected remux profile to copy both codecs, got %q", args)
+	}
+}
+
+func TestBuildTranscodeProfilesSkipsRemuxWhenSourceAudioIsNotHlsFriendly(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{
+			PreferRemux:      true,
+			SourceVideoCodec: "h264",
+			SourceAudioCodec: "dts",
+		},
+	)
+	if len(profiles) == 0 {
+		t.Fatal("expected at least one transcode fallback profile")
+	}
+	if profiles[0].Name == "remux_copy" {
+		t.Fatalf("unexpected remux profile for dts audio: %+v", profiles[0])
+	}
+}
+
 func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
 	t.Parallel()
 	manager := New(Config{})
+	t.Cleanup(manager.Close)
 	manager.sessions["sess-a"] = &sessionState{session: Session{ID: "sess-a", MovieID: "movie-a"}}
 	manager.sessions["sess-b"] = &sessionState{session: Session{ID: "sess-b", MovieID: "movie-a"}}
 	manager.sessions["sess-c"] = &sessionState{session: Session{ID: "sess-c", MovieID: "movie-b"}}
@@ -191,6 +230,7 @@ func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
 func TestManagerCloseClearsAllSessions(t *testing.T) {
 	t.Parallel()
 	manager := New(Config{})
+	t.Cleanup(manager.Close)
 	manager.sessions["sess-a"] = &sessionState{session: Session{ID: "sess-a", MovieID: "movie-a"}}
 	manager.sessions["sess-b"] = &sessionState{session: Session{ID: "sess-b", MovieID: "movie-b"}}
 

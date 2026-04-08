@@ -17,7 +17,8 @@ export const SETTINGS_SCROLL_ROOT_ID = "settings-scroll-root"
  * Call from `SettingsView` (scroll listener).
  * 滚动恢复逻辑已移除；保留空实现以免改 `SettingsView` 调用点。
  */
-export function noteSettingsScrollPosition(_el: HTMLElement) {
+export function noteSettingsScrollPosition(el: HTMLElement) {
+  void el
   // no-op
 }
 

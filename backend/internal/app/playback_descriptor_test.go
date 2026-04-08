@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/playback"
 	"curated-backend/internal/storage"
 )
 
@@ -40,6 +41,7 @@ func TestBuildDirectPlaybackDescriptorKeepsResolvedDurationAndClampsResume(t *te
 			DurationSec: 4,
 		},
 		7200,
+		playbackDecision{},
 	)
 
 	if dto.DurationSec != 7200 {
@@ -65,6 +67,7 @@ func TestBuildDirectPlaybackDescriptorMarksMP4AsDirectPlayable(t *testing.T) {
 		},
 		nil,
 		3600,
+		playbackDecision{},
 	)
 
 	if !dto.CanDirectPlay {
@@ -72,5 +75,86 @@ func TestBuildDirectPlaybackDescriptorMarksMP4AsDirectPlayable(t *testing.T) {
 	}
 	if dto.MimeType != "video/mp4" {
 		t.Fatalf("mimeType = %q, want video/mp4", dto.MimeType)
+	}
+}
+
+func TestBuildPlaybackDecisionPrefersDirectForBrowserSafeSource(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-1.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:  "mp4",
+			VideoCodec: "h264",
+			AudioCodec: "aac",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeDirect)
+	}
+	if decision.SessionKind != playbackSessionKindDirectFile {
+		t.Fatalf("sessionKind = %q, want %q", decision.SessionKind, playbackSessionKindDirectFile)
+	}
+	if decision.PreferRemux {
+		t.Fatal("direct playback must not request remux")
+	}
+	if decision.ReasonCode != "browser_direct_play_supported" {
+		t.Fatalf("reasonCode = %q, want browser_direct_play_supported", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionPrefersRemuxHLSForBrowserUnsafeContainer(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-2.mkv",
+		MediaInfo: playback.MediaInfo{
+			Container:  "matroska",
+			VideoCodec: "h264",
+			AudioCodec: "aac",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeHLS)
+	}
+	if decision.SessionKind != playbackSessionKindRemuxHLS {
+		t.Fatalf("sessionKind = %q, want %q", decision.SessionKind, playbackSessionKindRemuxHLS)
+	}
+	if !decision.PreferRemux {
+		t.Fatal("expected remux-first HLS plan for h264/aac source")
+	}
+	if decision.ReasonCode != "browser_container_unsupported" {
+		t.Fatalf("reasonCode = %q, want browser_container_unsupported", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionFallsBackToTranscodeHLSWhenAudioNeedsConversion(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-3.mkv",
+		MediaInfo: playback.MediaInfo{
+			Container:  "matroska",
+			VideoCodec: "h264",
+			AudioCodec: "dts",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeHLS)
+	}
+	if decision.SessionKind != playbackSessionKindTranscodeHLS {
+		t.Fatalf("sessionKind = %q, want %q", decision.SessionKind, playbackSessionKindTranscodeHLS)
+	}
+	if decision.PreferRemux {
+		t.Fatal("expected transcode fallback when audio codec is not HLS-friendly")
+	}
+	if decision.ReasonCode != "browser_container_unsupported" {
+		t.Fatalf("reasonCode = %q, want browser_container_unsupported", decision.ReasonCode)
 	}
 }

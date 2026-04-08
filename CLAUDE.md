@@ -170,10 +170,13 @@ The backend exposes these HTTP endpoints:
 
 ```
 GET    /api/health                          # Health check
+GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
 GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam)
 POST   /api/library/movies/{id}/playback-session  # Create explicit playback session (for example HLS stream push)
+GET    /api/playback/sessions/recent        # List active + recently archived playback sessions for diagnostics
+GET    /api/playback/sessions/{id}          # Get playback session status snapshot
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags, user* overrides
 DELETE /api/library/movies/{id}             # Delete movie (move to trash)
 DELETE /api/library/movies/{id}?permanent=true  # Permanently delete (must be in trash)
@@ -316,9 +319,12 @@ Player startup should consume `GET /api/library/movies/{id}/playback` instead of
 
 - Current behavior: backend returns a direct-play descriptor pointing at `/api/library/movies/{id}/stream`
 - Descriptor also carries resume position, filename, mime type, and future track/session fields
+- Descriptor now also carries structured playback diagnostics: `sessionKind`, `reasonCode`, `reasonMessage`, `sourceContainer`, `sourceVideoCodec`, `sourceAudioCodec`
 - Purpose: preserve current browser playback while creating the expansion seam for remux/transcode/native playback later
 - Browser playback may now move onto a backend-managed HLS session when stream push is enabled
+- HLS startup is remux-first when the source is already HLS-friendly, with fallback to hardware/software transcode profiles
 - The frontend keeps HLS playback inside the existing player page and loads `hls.js` on demand when the browser lacks native HLS support
+- The backend now keeps a bounded in-memory archive for recent playback sessions so `GET /api/playback/sessions/recent` and `GET /api/playback/sessions/{id}` can diagnose recently stopped or expired HLS sessions
 - The current player page prefers browser-side local-player handoff for external playback. With the PotPlayer preset, the frontend uses a browser protocol template (default `potplayer:{url}`) instead of depending on backend process launch.
 - `POST /api/library/movies/{id}/native-play` still exists as a legacy/native-shell hook, but it is no longer the default path for the player page button
 
@@ -394,6 +400,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
+- In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status

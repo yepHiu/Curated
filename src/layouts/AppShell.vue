@@ -5,6 +5,7 @@ import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vue
 import { LayoutDashboard, Menu, Moon, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
+import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
@@ -821,6 +822,7 @@ function clearActorsSearch() {
     </div>
 
     <ScanProgressDock />
+    <DevPerformanceBar v-if="isDev" />
     <Toaster :theme="resolvedMode" />
 
     <Teleport to="body">

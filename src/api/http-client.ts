@@ -1,4 +1,5 @@
 import type { ApiError } from "./types"
+import { devRequestMonitor } from "@/lib/dev-performance/request-monitor"
 
 export class HttpClientError extends Error {
   readonly status: number
@@ -20,6 +21,7 @@ export class HttpClientError extends Error {
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.DEV ? "/api" : "http://127.0.0.1:8081/api")
+const DEV_REQUEST_MONITOR_ENABLED = import.meta.env.DEV
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin)
@@ -33,6 +35,46 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   }
 
   return url.toString()
+}
+
+function buildMonitorPath(path: string, params?: Record<string, string | number | undefined>): string {
+  const url = new URL(buildUrl(path, params), window.location.origin)
+  return `${url.pathname}${url.search}`
+}
+
+async function monitoredFetch(
+  method: string,
+  path: string,
+  init: RequestInit,
+  params?: Record<string, string | number | undefined>,
+): Promise<Response> {
+  const requestId = DEV_REQUEST_MONITOR_ENABLED
+    ? devRequestMonitor.startRequest({
+      method,
+      path: buildMonitorPath(path, params),
+    })
+    : null
+
+  try {
+    const response = await fetch(buildUrl(path, params), {
+      method,
+      ...init,
+    })
+    if (requestId) {
+      devRequestMonitor.finishRequest(requestId, {
+        status: response.status,
+      })
+    }
+    return response
+  } catch (error) {
+    if (requestId) {
+      devRequestMonitor.finishRequest(requestId, {
+        status: null,
+        failed: true,
+      })
+    }
+    throw error
+  }
 }
 
 async function parseJsonBody<T>(response: Response): Promise<T> {
@@ -71,16 +113,14 @@ async function handleErrorResponse(response: Response): Promise<never> {
 
 export const httpClient = {
   async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
-    const response = await fetch(buildUrl(path, params), {
-      method: "GET",
+    const response = await monitoredFetch("GET", path, {
       headers: { "Accept": "application/json" },
-    })
+    }, params)
     return handleResponse<T>(response)
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(buildUrl(path), {
-      method: "POST",
+    const response = await monitoredFetch("POST", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -91,8 +131,7 @@ export const httpClient = {
   },
 
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(buildUrl(path), {
-      method: "PATCH",
+    const response = await monitoredFetch("PATCH", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -103,8 +142,7 @@ export const httpClient = {
   },
 
   async put<T = void>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(buildUrl(path), {
-      method: "PUT",
+    const response = await monitoredFetch("PUT", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -115,8 +153,7 @@ export const httpClient = {
   },
 
   async delete(path: string): Promise<void> {
-    const response = await fetch(buildUrl(path), {
-      method: "DELETE",
+    const response = await monitoredFetch("DELETE", path, {
       headers: { "Accept": "application/json" },
     })
     if (!response.ok) {
@@ -134,8 +171,7 @@ export const httpClient = {
     path: string,
     body?: unknown,
   ): Promise<{ blob: Blob; contentDisposition: string | null }> {
-    const response = await fetch(buildUrl(path), {
-      method: "POST",
+    const response = await monitoredFetch("POST", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "image/webp,application/zip,application/json;q=0.1,*/*;q=0.05",

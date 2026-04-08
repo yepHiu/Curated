@@ -27,6 +27,7 @@ import type {
   CreateCuratedFrameBody,
   CreatePlaybackSessionBody,
   CuratedFramesListDTO,
+  DevPerformanceSummaryDTO,
   HealthDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
@@ -58,6 +59,10 @@ import type {
 export const api = {
   health(): Promise<HealthDTO> {
     return httpClient.get<HealthDTO>("/health")
+  },
+
+  getDevPerformanceSummary(): Promise<DevPerformanceSummaryDTO> {
+    return httpClient.get<DevPerformanceSummaryDTO>("/dev/performance")
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

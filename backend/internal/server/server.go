@@ -106,9 +106,15 @@ type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
 }
 
+type DevPerformanceProvider interface {
+	GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO
+}
+
 type PlaybackResolver interface {
 	ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error)
 	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
+	GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error)
+	ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error)
 	ResolvePlaybackSessionFile(sessionID string, name string) (string, error)
 	DeletePlaybackSession(sessionID string) error
 }
@@ -134,6 +140,7 @@ type Handler struct {
 	movieMetadataRefresher   MovieMetadataRefresher
 	actorProfileRefresher    ActorProfileRefresher
 	libraryWatchReloader     LibraryWatchReloader
+	devPerformanceProvider   DevPerformanceProvider
 	playbackResolver         PlaybackResolver
 	nativePlaybackLauncher   NativePlaybackLauncher
 }
@@ -155,6 +162,7 @@ type Deps struct {
 	MovieMetadataRefresher   MovieMetadataRefresher
 	ActorProfileRefresher    ActorProfileRefresher
 	LibraryWatchReloader     LibraryWatchReloader
+	DevPerformanceProvider   DevPerformanceProvider
 	PlaybackResolver         PlaybackResolver
 	NativePlaybackLauncher   NativePlaybackLauncher
 }
@@ -177,6 +185,7 @@ func NewHandler(deps Deps) *Handler {
 		movieMetadataRefresher:   deps.MovieMetadataRefresher,
 		actorProfileRefresher:    deps.ActorProfileRefresher,
 		libraryWatchReloader:     deps.LibraryWatchReloader,
+		devPerformanceProvider:   deps.DevPerformanceProvider,
 		playbackResolver:         deps.PlaybackResolver,
 		nativePlaybackLauncher:   deps.NativePlaybackLauncher,
 	}
@@ -186,6 +195,7 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
+	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
 	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
@@ -200,6 +210,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/movies/{movieId}/playback-session", h.handleCreatePlaybackSession)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/native-play", h.handleLaunchNativePlayback)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/stream", h.handleStreamMovie)
+	mux.HandleFunc("GET /api/playback/sessions/recent", h.handleGetRecentPlaybackSessions)
+	mux.HandleFunc("GET /api/playback/sessions/{sessionId}", h.handleGetPlaybackSession)
 	mux.HandleFunc("GET /api/playback/sessions/{sessionId}/hls/{file}", h.handleGetPlaybackSessionFile)
 	mux.HandleFunc("DELETE /api/playback/sessions/{sessionId}", h.handleDeletePlaybackSession)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/reveal", h.handleRevealMovieInFileManager)
@@ -248,6 +260,18 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		Transport:    "http",
 		DatabasePath: h.cfg.DatabasePath,
 	})
+}
+
+func (h *Handler) handleDevPerformance(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.devPerformanceProvider == nil {
+		writeJSON(w, http.StatusOK, contracts.DevPerformanceSummaryDTO{Supported: false})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.devPerformanceProvider.GetDevPerformanceSummary(r.Context()))
 }
 
 func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
@@ -671,6 +695,54 @@ func (h *Handler) handleGetPlaybackSessionFile(w http.ResponseWriter, r *http.Re
 	}
 
 	http.ServeFile(w, r, absPath)
+}
+
+func (h *Handler) handleGetRecentPlaybackSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.playbackResolver == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "playback session manager not configured")
+		return
+	}
+	limit := 20
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	dto, err := h.playbackResolver.ListRecentPlaybackSessions(r.Context(), limit)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("list playback sessions failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to list playback sessions")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleGetPlaybackSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.playbackResolver == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "playback session manager not configured")
+		return
+	}
+	sessionID := strings.TrimSpace(r.PathValue("sessionId"))
+	if sessionID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId is required")
+		return
+	}
+	dto, err := h.playbackResolver.GetPlaybackSession(r.Context(), sessionID)
+	if err != nil {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "playback session not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) handleDeletePlaybackSession(w http.ResponseWriter, r *http.Request) {

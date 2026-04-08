@@ -143,6 +143,76 @@ func TestHandleRevealMovie_NotFound(t *testing.T) {
 	}
 }
 
+func TestHandleGetDevPerformance_DefaultSummary(t *testing.T) {
+	t.Parallel()
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/dev/performance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := body["supported"]; !ok {
+		t.Fatal("expected supported field in dev performance summary")
+	}
+}
+
+func TestHandleGetDevPerformance_UsesProviderSummary(t *testing.T) {
+	t.Parallel()
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		DevPerformanceProvider: stubDevPerformanceProvider{
+			dto: contracts.DevPerformanceSummaryDTO{
+				Supported:         true,
+				SampledAt:         "2026-04-09T00:00:00Z",
+				SystemCPUPercent:  18.5,
+				BackendCPUPercent: 7.25,
+			},
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/dev/performance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var body contracts.DevPerformanceSummaryDTO
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Supported {
+		t.Fatal("expected supported summary")
+	}
+	if body.SystemCPUPercent != 18.5 {
+		t.Fatalf("system cpu = %v, want 18.5", body.SystemCPUPercent)
+	}
+	if body.BackendCPUPercent != 7.25 {
+		t.Fatalf("backend cpu = %v, want 7.25", body.BackendCPUPercent)
+	}
+}
+
 func TestHandleDeleteMovie_SoftTrashThenPermanent204(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -1764,9 +1834,20 @@ func (s *stubPlayerSettingsCtl) SetPlayerSettingsPatch(p contracts.PatchPlayerSe
 }
 
 type stubPlaybackResolver struct {
-	resolveDTO contracts.PlaybackDescriptorDTO
-	createDTO  contracts.PlaybackDescriptorDTO
-	filePath   string
+	resolveDTO  contracts.PlaybackDescriptorDTO
+	createDTO   contracts.PlaybackDescriptorDTO
+	filePath    string
+	sessionByID contracts.PlaybackSessionStatusDTO
+	sessions    []contracts.PlaybackSessionStatusDTO
+}
+
+type stubDevPerformanceProvider struct {
+	dto contracts.DevPerformanceSummaryDTO
+}
+
+func (s stubDevPerformanceProvider) GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO {
+	_ = ctx
+	return s.dto
 }
 
 func (s stubPlaybackResolver) ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error) {

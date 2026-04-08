@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -28,11 +29,13 @@ const (
 )
 
 type Config struct {
-	Enabled         bool
-	HardwareDecode  bool
-	HardwareEncoder string
-	FFmpegCommand   string
-	SessionRoot     string
+	Enabled                bool
+	HardwareDecode         bool
+	HardwareEncoder        string
+	FFmpegCommand          string
+	SessionRoot            string
+	SessionIdleTimeout     time.Duration
+	SessionJanitorInterval time.Duration
 }
 
 type Session struct {
@@ -42,19 +45,39 @@ type Session struct {
 	Directory        string
 	StartPositionSec float64
 	ProfileName      string
+	Kind             string
 	StartedAt        time.Time
 }
 
 type sessionState struct {
-	session Session
-	cancel  context.CancelFunc
-	cmd     *exec.Cmd
-	waitCh  chan error
+	session        Session
+	cancel         context.CancelFunc
+	cmd            *exec.Cmd
+	waitCh         chan error
+	lastAccessedAt time.Time
+	finishedAt     time.Time
+	lastError      string
 }
 
 type transcodeProfile struct {
-	Name string
-	Args []string
+	Name        string
+	SessionKind string
+	Args        []string
+}
+
+type StartHLSSessionOptions struct {
+	StartPositionSec float64
+	PreferRemux      bool
+	SourceVideoCodec string
+	SourceAudioCodec string
+}
+
+type buildProfileOptions struct {
+	PreferredProfile string
+	StartPositionSec float64
+	PreferRemux      bool
+	SourceVideoCodec string
+	SourceAudioCodec string
 }
 
 type Manager struct {
@@ -63,13 +86,34 @@ type Manager struct {
 	sessionStartMu        sync.Mutex
 	mu                    sync.RWMutex
 	sessions              map[string]*sessionState
+	// recentSnapshots keeps a bounded in-memory history after sessions leave the
+	// active registry, so status/recent APIs can still explain what just happened.
+	recentSnapshots       []SessionSnapshot
+	janitorCancel         context.CancelFunc
+	janitorDone           chan struct{}
 }
 
+type SessionSnapshot struct {
+	Session        Session
+	LastAccessedAt time.Time
+	ExpiresAt      time.Time
+	FinishedAt     time.Time
+	// State is a coarse lifecycle label exposed to diagnostics endpoints.
+	State          string
+	LastError      string
+}
+
+const recentSessionHistoryLimit = 32
+
 func New(cfg Config) *Manager {
-	return &Manager{
-		cfg:      cfg,
-		sessions: make(map[string]*sessionState),
+	manager := &Manager{
+		cfg:             cfg,
+		sessions:        make(map[string]*sessionState),
+		recentSnapshots: make([]SessionSnapshot, 0, recentSessionHistoryLimit),
+		janitorDone:     make(chan struct{}),
 	}
+	manager.startJanitorLoop()
+	return manager
 }
 
 func (m *Manager) Enabled() bool {
@@ -90,7 +134,7 @@ func (m *Manager) SetConfig(cfg Config) {
 	m.mu.Unlock()
 }
 
-func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePath string, startPositionSec float64) (Session, error) {
+func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePath string, options StartHLSSessionOptions) (Session, error) {
 	if m == nil {
 		return Session{}, ErrStreamPushDisabled
 	}
@@ -140,10 +184,16 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	m.mu.RLock()
 	preferredProfile = m.lastSuccessfulProfile
 	m.mu.RUnlock()
-	if startPositionSec < 0 {
-		startPositionSec = 0
+	if options.StartPositionSec < 0 {
+		options.StartPositionSec = 0
 	}
-	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", preferredProfile, startPositionSec)
+	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", buildProfileOptions{
+		PreferredProfile: preferredProfile,
+		StartPositionSec: options.StartPositionSec,
+		PreferRemux:      options.PreferRemux,
+		SourceVideoCodec: options.SourceVideoCodec,
+		SourceAudioCodec: options.SourceAudioCodec,
+	})
 
 	var lastErr error
 	for index, profile := range profiles {
@@ -154,7 +204,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 			}
 		}
 
-		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile, startPositionSec)
+		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile, options.StartPositionSec)
 		if err == nil {
 			staleStates := m.replaceSession(sessionID, state, profile.Name)
 			for _, stale := range staleStates {
@@ -182,6 +232,7 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	if !ok {
 		return "", ErrSessionNotFound
 	}
+	touchSession(state)
 	cleanName := filepath.Clean(strings.TrimSpace(name))
 	if cleanName == "." || cleanName == "" || strings.Contains(cleanName, "..") {
 		return "", ErrSessionNotFound
@@ -208,6 +259,7 @@ func (m *Manager) DeleteSession(sessionID string) error {
 	state, ok := m.sessions[sessionID]
 	if ok {
 		delete(m.sessions, sessionID)
+		m.archiveSessionStateLocked(state, "stopped", time.Now().UTC())
 	}
 	m.mu.Unlock()
 	if !ok {
@@ -217,9 +269,70 @@ func (m *Manager) DeleteSession(sessionID string) error {
 	return nil
 }
 
+func (m *Manager) GetSessionSnapshot(sessionID string) (SessionSnapshot, error) {
+	if m == nil {
+		return SessionSnapshot{}, ErrSessionNotFound
+	}
+	m.mu.RLock()
+	state, ok := m.sessions[sessionID]
+	cfg := m.cfg
+	recentSnapshots := append([]SessionSnapshot(nil), m.recentSnapshots...)
+	m.mu.RUnlock()
+	if !ok {
+		for _, snapshot := range recentSnapshots {
+			if snapshot.Session.ID == sessionID {
+				return snapshot, nil
+			}
+		}
+		return SessionSnapshot{}, ErrSessionNotFound
+	}
+	return buildSessionSnapshot(state, sessionIdleTimeout(cfg)), nil
+}
+
+func (m *Manager) ListSessionSnapshots(limit int) []SessionSnapshot {
+	if m == nil {
+		return nil
+	}
+	m.mu.RLock()
+	cfg := m.cfg
+	states := make([]*sessionState, 0, len(m.sessions))
+	for _, state := range m.sessions {
+		states = append(states, state)
+	}
+	recentSnapshots := append([]SessionSnapshot(nil), m.recentSnapshots...)
+	m.mu.RUnlock()
+
+	snapshots := make([]SessionSnapshot, 0, len(states)+len(recentSnapshots))
+	timeout := sessionIdleTimeout(cfg)
+	for _, state := range states {
+		snapshots = append(snapshots, buildSessionSnapshot(state, timeout))
+	}
+	snapshots = append(snapshots, recentSnapshots...)
+	slices.SortFunc(snapshots, func(a, b SessionSnapshot) int {
+		switch {
+		case a.Session.StartedAt.After(b.Session.StartedAt):
+			return -1
+		case a.Session.StartedAt.Before(b.Session.StartedAt):
+			return 1
+		default:
+			return 0
+		}
+	})
+	// Active snapshots win over archived ones with the same session ID.
+	snapshots = compactSessionSnapshotsByID(snapshots)
+	if limit > 0 && len(snapshots) > limit {
+		return snapshots[:limit]
+	}
+	return snapshots
+}
+
 func (m *Manager) Close() {
 	if m == nil {
 		return
+	}
+	if m.janitorCancel != nil {
+		m.janitorCancel()
+		<-m.janitorDone
 	}
 	m.sessionStartMu.Lock()
 	staleStates := m.takeAllSessionsLocked()
@@ -373,15 +486,19 @@ func startTranscodeSession(
 			Directory:        dir,
 			StartPositionSec: startPositionSec,
 			ProfileName:      profile.Name,
+			Kind:             profile.SessionKind,
 			StartedAt:        time.Now().UTC(),
 		},
-		cancel: cancel,
-		cmd:    cmd,
-		waitCh: make(chan error, 1),
+		cancel:         cancel,
+		cmd:            cmd,
+		waitCh:         make(chan error, 1),
+		lastAccessedAt: time.Now().UTC(),
 	}
 
 	go func() {
-		state.waitCh <- cmd.Wait()
+		err := cmd.Wait()
+		markSessionFinished(state, err)
+		state.waitCh <- err
 	}()
 
 	if err := waitForFileOrProcessExit(ctx, playlistPath, state.waitCh, 12*time.Second); err != nil {
@@ -404,15 +521,15 @@ func startTranscodeSession(
 	return state, nil
 }
 
-func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, preferredProfile string, startPositionSec float64) []transcodeProfile {
+func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, options buildProfileOptions) []transcodeProfile {
 	inputPrefix := []string{"-y"}
 	if cfg.HardwareDecode {
 		inputPrefix = append(inputPrefix, "-hwaccel", "auto")
 	}
-	inputSeekArgs, accurateSeekArgs := buildSeekArgs(startPositionSec)
+	inputSeekArgs, accurateSeekArgs := buildSeekArgs(options.StartPositionSec)
 	configuredPreference := normalizeHardwareEncoderProfileName(cfg.HardwareEncoder)
 
-	hlsArgs := []string{
+	transcodeHLSArgs := []string{
 		"-pix_fmt", "yuv420p",
 		"-c:a", "aac",
 		"-ac", "2",
@@ -428,63 +545,94 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		"-hls_segment_filename", segmentPattern,
 		playlistPath,
 	}
+	remuxHLSArgs := []string{
+		"-c:v", "copy",
+		"-c:a", "copy",
+		"-f", "hls",
+		"-hls_init_time", hlsInitialSegmentSeconds,
+		"-hls_time", hlsTargetSegmentSeconds,
+		"-hls_list_size", "0",
+		"-hls_allow_cache", "0",
+		"-hls_flags", "independent_segments",
+		"-hls_playlist_type", "event",
+		"-start_number", "0",
+		"-hls_segment_filename", segmentPattern,
+		playlistPath,
+	}
 
 	profiles := make([]transcodeProfile, 0, 4)
+	if options.PreferRemux && canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
+		profiles = append(profiles, transcodeProfile{
+			Name:        "remux_copy",
+			SessionKind: "remux-hls",
+			Args: append(
+				append(
+					append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
+					accurateSeekArgs...,
+				),
+				remuxHLSArgs...,
+			),
+		})
+	}
 	if cfg.HardwareDecode {
 		switch runtime.GOOS {
 		case "windows":
 			profiles = append(profiles,
 				transcodeProfile{
-					Name: "h264_nvenc",
+					Name:        "h264_nvenc",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 				transcodeProfile{
-					Name: "h264_qsv",
+					Name:        "h264_qsv",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 				transcodeProfile{
-					Name: "h264_amf",
+					Name:        "h264_amf",
+					SessionKind: "transcode-hls",
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 							append(accurateSeekArgs, "-c:v", "h264_amf", "-quality", "quality")...,
 						),
-						hlsArgs...,
+						transcodeHLSArgs...,
 					),
 				},
 			)
 		case "darwin":
 			profiles = append(profiles, transcodeProfile{
-				Name: "h264_videotoolbox",
+				Name:        "h264_videotoolbox",
+				SessionKind: "transcode-hls",
 				Args: append(
 					append(
 						append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 						append(accurateSeekArgs, "-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1")...,
 					),
-					hlsArgs...,
+					transcodeHLSArgs...,
 				),
 			})
 		}
 	}
 
 	if configuredPreference != "" {
-		preferredProfile = configuredPreference
+		options.PreferredProfile = configuredPreference
 	}
-	if preferredProfile != "" {
+	if options.PreferredProfile != "" {
 		for idx, profile := range profiles {
-			if profile.Name != preferredProfile {
+			if profile.Name != options.PreferredProfile {
 				continue
 			}
 			if idx > 0 {
@@ -495,13 +643,14 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	}
 
 	profiles = append(profiles, transcodeProfile{
-		Name: "libx264",
+		Name:        "libx264",
+		SessionKind: "transcode-hls",
 		Args: append(
 			append(
 				append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
 				append(accurateSeekArgs, "-c:v", "libx264", "-preset", "veryfast", "-crf", "17")...,
 			),
-			hlsArgs...,
+			transcodeHLSArgs...,
 		),
 	})
 	if configuredPreference == "libx264" {
@@ -539,6 +688,33 @@ func buildSeekArgs(startPositionSec float64) ([]string, []string) {
 	return inputSeekArgs, []string{"-ss", formatSeekOffset(accurateSeekSec)}
 }
 
+func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	timeout := sessionIdleTimeout(m.cfg)
+	if timeout <= 0 {
+		return nil
+	}
+
+	staleStates := make([]*sessionState, 0)
+	for existingID, state := range m.sessions {
+		if state.lastAccessedAt.IsZero() {
+			state.lastAccessedAt = state.session.StartedAt
+		}
+		if now.Sub(state.lastAccessedAt) < timeout {
+			continue
+		}
+		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(state, "expired", now)
+		staleStates = append(staleStates, state)
+	}
+	return staleStates
+}
+
 func (m *Manager) replaceSession(sessionID string, state *sessionState, profileName string) []*sessionState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -552,6 +728,7 @@ func (m *Manager) replaceSession(sessionID string, state *sessionState, profileN
 			continue
 		}
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	m.sessions[sessionID] = state
@@ -569,6 +746,7 @@ func (m *Manager) takeSessionsForMovie(movieID string) []*sessionState {
 			continue
 		}
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	return staleStates
@@ -581,6 +759,7 @@ func (m *Manager) takeAllSessionsLocked() []*sessionState {
 	staleStates := make([]*sessionState, 0, len(m.sessions))
 	for existingID, existingState := range m.sessions {
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "closed", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	return staleStates
@@ -614,6 +793,139 @@ func stopSessionState(state *sessionState) {
 	_ = os.RemoveAll(state.session.Directory)
 }
 
+func touchSession(state *sessionState) {
+	if state == nil {
+		return
+	}
+	state.lastAccessedAt = time.Now().UTC()
+}
+
+func markSessionFinished(state *sessionState, err error) {
+	if state == nil {
+		return
+	}
+	state.finishedAt = time.Now().UTC()
+	if err != nil {
+		state.lastError = err.Error()
+	}
+}
+
+func buildSessionSnapshot(state *sessionState, timeout time.Duration) SessionSnapshot {
+	lastAccessedAt := state.lastAccessedAt
+	if lastAccessedAt.IsZero() {
+		lastAccessedAt = state.session.StartedAt
+	}
+	snapshot := SessionSnapshot{
+		Session:        state.session,
+		LastAccessedAt: lastAccessedAt,
+		FinishedAt:     state.finishedAt,
+		State:          "running",
+		LastError:      strings.TrimSpace(state.lastError),
+	}
+	if timeout > 0 {
+		snapshot.ExpiresAt = lastAccessedAt.Add(timeout)
+	}
+	if !state.finishedAt.IsZero() {
+		snapshot.State = "finished"
+	}
+	if snapshot.LastError != "" {
+		snapshot.State = "failed"
+	}
+	return snapshot
+}
+
+func (m *Manager) archiveSessionStateLocked(state *sessionState, terminalState string, finishedAt time.Time) {
+	if m == nil || state == nil {
+		return
+	}
+	snapshot := buildSessionSnapshot(state, sessionIdleTimeout(m.cfg))
+	snapshot = finalizeArchivedSnapshot(snapshot, terminalState, finishedAt)
+	m.recentSnapshots = append(m.recentSnapshots, snapshot)
+	slices.SortFunc(m.recentSnapshots, func(a, b SessionSnapshot) int {
+		switch {
+		case a.Session.StartedAt.After(b.Session.StartedAt):
+			return -1
+		case a.Session.StartedAt.Before(b.Session.StartedAt):
+			return 1
+		default:
+			return 0
+		}
+	})
+	m.recentSnapshots = compactSessionSnapshotsByID(m.recentSnapshots)
+	if len(m.recentSnapshots) > recentSessionHistoryLimit {
+		m.recentSnapshots = m.recentSnapshots[:recentSessionHistoryLimit]
+	}
+}
+
+func finalizeArchivedSnapshot(snapshot SessionSnapshot, terminalState string, finishedAt time.Time) SessionSnapshot {
+	if snapshot.FinishedAt.IsZero() {
+		snapshot.FinishedAt = finishedAt
+	}
+	if snapshot.State == "failed" || snapshot.State == "finished" {
+		return snapshot
+	}
+	if strings.TrimSpace(terminalState) != "" {
+		snapshot.State = terminalState
+	}
+	return snapshot
+}
+
+func compactSessionSnapshotsByID(snapshots []SessionSnapshot) []SessionSnapshot {
+	if len(snapshots) == 0 {
+		return snapshots
+	}
+	compacted := make([]SessionSnapshot, 0, len(snapshots))
+	seen := make(map[string]struct{}, len(snapshots))
+	for _, snapshot := range snapshots {
+		sessionID := strings.TrimSpace(snapshot.Session.ID)
+		if sessionID == "" {
+			continue
+		}
+		if _, ok := seen[sessionID]; ok {
+			continue
+		}
+		seen[sessionID] = struct{}{}
+		compacted = append(compacted, snapshot)
+	}
+	return compacted
+}
+
+func sessionIdleTimeout(cfg Config) time.Duration {
+	if cfg.SessionIdleTimeout > 0 {
+		return cfg.SessionIdleTimeout
+	}
+	return 3 * time.Minute
+}
+
+func sessionJanitorInterval(cfg Config) time.Duration {
+	if cfg.SessionJanitorInterval > 0 {
+		return cfg.SessionJanitorInterval
+	}
+	return 30 * time.Second
+}
+
+func (m *Manager) startJanitorLoop() {
+	ctx, cancel := context.WithCancel(context.Background())
+	m.janitorCancel = cancel
+	go func() {
+		defer close(m.janitorDone)
+		// The janitor only reaps idle sessions; it does not participate in
+		// session startup so playback requests stay on the hot path.
+		ticker := time.NewTicker(sessionJanitorInterval(m.cfg))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for _, stale := range m.cleanupExpiredSessions(time.Now().UTC()) {
+					stopSessionState(stale)
+				}
+			}
+		}
+	}()
+}
+
 func normalizeHardwareEncoderProfileName(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "auto":
@@ -631,4 +943,10 @@ func normalizeHardwareEncoderProfileName(value string) string {
 	default:
 		return ""
 	}
+}
+
+func canStreamCopyCodecsForHLS(videoCodec string, audioCodec string) bool {
+	videoCodec = strings.ToLower(strings.TrimSpace(videoCodec))
+	audioCodec = strings.ToLower(strings.TrimSpace(audioCodec))
+	return videoCodec == "h264" && (audioCodec == "aac" || audioCodec == "mp3" || audioCodec == "ac3" || audioCodec == "eac3")
 }
