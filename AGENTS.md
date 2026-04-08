@@ -11,6 +11,7 @@
 | 高 | `architecture-boundaries.mdc` | 已实现 vs 目标桌面架构 |
 | 中 | `project-standards.mdc` | 规则索引入口 |
 | 高 | `git-commit-workflow.mdc` | 最小修改单元提交；仅用户明确要求时再 `git push` |
+| 高 | `docs/agent-build-and-test.md` | **构建 / 编译 / 测试**：统一命令与工作目录（pnpm、Go），避免多 Agent 各套执行方式 |
 | 按需 | `ui-component-spec.mdc`、`vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc` | 前端 UI 与实现 |
 | 按需 | `backend-go-standards.mdc`、`backend-api-contracts.mdc` 等 | 后端与合约 |
 
