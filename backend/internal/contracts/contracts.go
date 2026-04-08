@@ -58,6 +58,13 @@ type HealthDTO struct {
 	DatabasePath string `json:"databasePath"`
 }
 
+type DevPerformanceSummaryDTO struct {
+	Supported         bool    `json:"supported"`
+	SampledAt         string  `json:"sampledAt,omitempty"`
+	SystemCPUPercent  float64 `json:"systemCpuPercent,omitempty"`
+	BackendCPUPercent float64 `json:"backendCpuPercent,omitempty"`
+}
+
 type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`

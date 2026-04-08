@@ -24,6 +24,7 @@ import (
 	"curated-backend/internal/assets"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/devmetrics"
 	"curated-backend/internal/library"
 	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/library/movieroot"
@@ -52,6 +53,7 @@ type App struct {
 	tasks   *tasks.Manager
 	player  *nativeplayer.Launcher
 	streams *playback.Manager
+	devCPUSampler devmetrics.CPUSampler
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
@@ -137,6 +139,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			FFmpegCommand:   cfg.Player.FFmpegCommand,
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
+		devCPUSampler:               devmetrics.NewCPUSampler(),
 		organizeLibrary:            cfg.OrganizeLibrary,
 		extendedLibraryImport:      cfg.ExtendedLibraryImport,
 		autoLibraryWatch:           cfg.AutoLibraryWatch,
@@ -2224,10 +2227,24 @@ func (a *App) HTTPHandler() http.Handler {
 		MovieMetadataRefresher:   a,
 		ActorProfileRefresher:    a,
 		LibraryWatchReloader:     a,
+		DevPerformanceProvider:   a,
 		PlaybackResolver:         a,
 		NativePlaybackLauncher:   a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
+}
+
+func (a *App) GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO {
+	if a == nil || a.devCPUSampler == nil {
+		return contracts.DevPerformanceSummaryDTO{Supported: false}
+	}
+	snapshot := a.devCPUSampler.Snapshot(ctx)
+	return contracts.DevPerformanceSummaryDTO{
+		Supported:         snapshot.Supported,
+		SampledAt:         snapshot.SampledAt,
+		SystemCPUPercent:  snapshot.SystemCPUPercent,
+		BackendCPUPercent: snapshot.BackendCPUPercent,
+	}
 }
 
 func nowUTC() string {
