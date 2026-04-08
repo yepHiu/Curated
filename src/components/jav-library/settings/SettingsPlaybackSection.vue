@@ -342,7 +342,11 @@ watch(
   { immediate: true },
 )
 
-/** 关闭「启用 HLS 推流」时，无法同时保留「强制走 HLS 推流」。 */
+/**
+ * 推流开关与「强制 HLS」的关系（单向）：
+ * - 关闭推流时：顺带关闭强制（无法在无推流时强制 HLS）。
+ * - 开启推流时：绝不自动开启强制（禁止在此处或其它路径把 force 置为 true）。
+ */
 watch(playbackStreamPushEnabledDraft, (enabled) => {
   if (!enabled && playbackForceStreamPushDraft.value) {
     playbackForceStreamPushDraft.value = false

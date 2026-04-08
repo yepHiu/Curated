@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest"
 import { mockLibraryService } from "@/services/adapters/mock/mock-library-service"
 
+describe("mockLibraryService.patchPlayerSettings", () => {
+  it("does not enable forceStreamPush when only enabling stream push", async () => {
+    await mockLibraryService.patchPlayerSettings({
+      streamPushEnabled: false,
+      forceStreamPush: false,
+    })
+    expect(mockLibraryService.playerSettings.value.streamPushEnabled).toBe(false)
+    expect(mockLibraryService.playerSettings.value.forceStreamPush).toBe(false)
+
+    await mockLibraryService.patchPlayerSettings({ streamPushEnabled: true })
+    expect(mockLibraryService.playerSettings.value.streamPushEnabled).toBe(true)
+    expect(mockLibraryService.playerSettings.value.forceStreamPush).toBe(false)
+  })
+})
+
 describe("mockLibraryService", () => {
   it("ensureMovieCached resolves (mock is fully in-memory)", async () => {
     await expect(mockLibraryService.ensureMovieCached("any-id")).resolves.toBeUndefined()

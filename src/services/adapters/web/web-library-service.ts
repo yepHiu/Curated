@@ -375,6 +375,7 @@ function createWebLibraryService(): LibraryService {
             ? patch.seekBackwardStepSec
             : prev.seekBackwardStepSec,
       }
+      // Never set forceStreamPush true from streamPushEnabled; only clear force when push is off.
       if (!merged.streamPushEnabled) {
         merged.forceStreamPush = false
       }

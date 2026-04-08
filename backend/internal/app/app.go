@@ -753,7 +753,8 @@ func (a *App) SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error {
 	if next.SeekBackwardStepSec <= 0 {
 		next.SeekBackwardStepSec = 10
 	}
-	// HLS push disabled: "force HLS" is meaningless; keep cfg and runtime consistent.
+	// Invariant: enabling StreamPushEnabled must never imply enabling ForceStreamPush (no auto-couple).
+	// Only the converse is applied: when push is off, force-HLS is cleared.
 	if !next.StreamPushEnabled {
 		next.ForceStreamPush = false
 	}
