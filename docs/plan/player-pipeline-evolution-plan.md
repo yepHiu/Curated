@@ -521,7 +521,25 @@ sequenceDiagram
     UI->>Mgr: 页面切换/结束时 DELETE session
 ```
 
-### 9.4 图例
+### 9.4 HLS 会话治理
+
+```mermaid
+flowchart TD
+    A[StartHLSSession 成功] --> B[注册 active session]
+    B --> C[读取 m3u8 / ts]
+    C --> D[更新 lastAccessedAt]
+    D --> E[重新计算 expiresAt]
+    B --> F[定时 janitor tick]
+    F --> G{是否超出 idle timeout}
+    G -->|否| C
+    G -->|是| H[归档 session snapshot]
+    H --> I[停止 ffmpeg 并清理临时目录]
+    I --> J[recent/status API 仍可查询]
+    B --> K[DELETE /api/playback/sessions/{id}]
+    K --> H
+```
+
+### 9.5 图例
 
 - `direct-file`：浏览器直接读取 `/stream`，不创建 HLS 会话。
 - `remux-hls`：进入 HLS，但优先 `-c:v copy -c:a copy`，只做容器/分段重封装。
@@ -546,6 +564,11 @@ sequenceDiagram
 - HLS manager 已支持 remux-first profile：
   - 满足 HLS 友好编码时优先 `remux_copy`
   - 失败后继续回退到硬件/软件转码 profile
+- HLS session manager 已补齐基础治理能力：
+  - idle timeout + janitor 周期清理
+  - `GET /api/playback/sessions/recent`
+  - `GET /api/playback/sessions/{id}`
+  - 最近会话快照归档，显式删除或 janitor 清理后仍可观测最近状态
 - 播放页详细统计面板已展示：
   - Session 类型
   - Reason Code
@@ -554,7 +577,6 @@ sequenceDiagram
 
 ### 尚未落地
 
-- HLS 会话 TTL / janitor / recent sessions 观测接口
 - FFmpeg stderr 归档与 profile 命中统计
 - native handoff 会话闭环
 - `hls.js` 从 CDN 切换为本地打包依赖

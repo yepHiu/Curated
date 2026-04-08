@@ -57,6 +57,7 @@ alwaysApply: true
 - Playback descriptors now carry structured decision diagnostics in addition to `mode`: `sessionKind`, `reasonCode`, `reasonMessage`, `sourceContainer`, `sourceVideoCodec`, `sourceAudioCodec`.
 - Playback planning is no longer extension-only. Backend resolution now probes media metadata first, then chooses between `direct-file`, `remux-hls`, and `transcode-hls`.
 - HLS session startup is now remux-first when the source is already HLS-friendly (`h264` video + compatible audio), with automatic fallback to hardware/software transcode profiles if stream-copy startup fails.
+- HLS session governance now includes an idle-session janitor plus diagnostics routes: `GET /api/playback/sessions/recent` and `GET /api/playback/sessions/{id}`. The manager keeps active sessions and a bounded in-memory archive of recently closed or expired sessions so those endpoints remain useful after cleanup.
 - The current in-page HLS browser path loads `hls.js` on demand when native HLS is unavailable.
 - `GET/PATCH /api/settings` now includes playback runtime preferences such as `nativePlayerEnabled`, `nativePlayerCommand`, `streamPushEnabled`, `ffmpegCommand`, `preferNativePlayer`, `seekForwardStepSec`, and `seekBackwardStepSec`.
 - Browser protocol handoff templates are **per-machine frontend state** stored in `localStorage` under `curated-native-player-browser-template-v1`; settings UI treats this as a browser launch template rather than a backend executable path.

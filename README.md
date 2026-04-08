@@ -105,6 +105,8 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | GET | `/api/library/movies/{id}` | Detail |
 | GET | `/api/library/movies/{id}/playback` | Playback descriptor (direct-play metadata, resume position, future transcode seam) |
 | POST | `/api/library/movies/{id}/playback-session` | Create playback session (for example HLS stream push) |
+| GET | `/api/playback/sessions/recent` | List active and recently archived playback sessions for diagnostics |
+| GET | `/api/playback/sessions/{id}` | Get playback session status snapshot |
 | POST | `/api/library/movies/{id}/native-play` | Legacy backend-side native player launch hook |
 | PATCH | `/api/library/movies/{id}` | Favorites, user rating, `userTags`, `metadataTags` |
 | DELETE | `/api/library/movies/{id}` | Remove from library |
@@ -146,8 +148,11 @@ Scrape stability additions:
 
 - **Web API mode** (`VITE_USE_WEB_API=true`): progress syncs to SQLite via **`/api/playback/progress`**; played markers via **`/api/library/played-movies`**.
 - Player startup now has a dedicated playback descriptor seam via **`GET /api/library/movies/{id}/playback`**; the current implementation still returns direct-play metadata and `/stream`, but this is the planned expansion point for remux/transcode later.
+- Playback descriptors now carry structured decision diagnostics such as **`sessionKind`**, **`reasonCode`**, **`reasonMessage`**, **`sourceContainer`**, **`sourceVideoCodec`**, and **`sourceAudioCodec`** so the player page can explain why direct play, remux HLS, or transcode HLS was chosen.
 - When backend stream push is enabled, Curated now prefers browser playback through **HLS** session output under **`/api/playback/sessions/{id}/hls/...`** by default.
+- HLS startup is now **remux-first** when the source is already browser-friendly enough for stream copy, with automatic fallback to hardware/software transcode profiles when remux startup fails.
 - The current frontend HLS path keeps playback inside the existing player page and loads `hls.js` on demand for browsers without native HLS support.
+- HLS session governance now includes an idle-session janitor plus status endpoints under **`/api/playback/sessions/recent`** and **`/api/playback/sessions/{id}`**. Those endpoints expose active sessions and a bounded in-memory archive of recently closed/expired sessions with `state`, `transcodeProfile`, `lastAccessedAt`, `expiresAt`, `finishedAt`, and `lastError`.
 - The player page now prefers a **browser-side local-player handoff** for external playback. In the current UI, the PotPlayer preset uses a local browser protocol template (default `potplayer:{url}`) so the backend does not need to execute a player binary directly.
 - The older backend route **`POST /api/library/movies/{id}/native-play`** still exists as a legacy/native-shell hook, but it is no longer the default path for the player page's local-player button.
 - **Mock mode**: progress in **`localStorage`** (`jav-library-playback-progress-v1`).
