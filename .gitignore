@@ -20,6 +20,12 @@ scripts/
 backend/runtime/
 .gocache/
 .tmp-go-modcache/
+# Go coverage / profiles if accidentally written in repo (prefer /tmp or OS temp)
+coverage.out
+coverage.html
+*.test.exe
+# Claude Code local permissions (machine-specific)
+.claude/settings.local.json
 backend/*.exe
 backend/*.exe~
 
