@@ -170,6 +170,7 @@ The backend exposes these HTTP endpoints:
 
 ```
 GET    /api/health                          # Health check
+GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
 GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam)
@@ -399,6 +400,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
+- In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status

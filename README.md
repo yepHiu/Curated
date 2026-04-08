@@ -101,6 +101,7 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/health` | Health |
+| GET | `/api/dev/performance` | Dev-only CPU summary for the bottom performance monitor bar |
 | GET | `/api/library/movies` | List (filters: `q`, `tag`, `actor`, …) |
 | GET | `/api/library/movies/{id}` | Detail |
 | GET | `/api/library/movies/{id}/playback` | Playback descriptor (direct-play metadata, resume position, future transcode seam) |
@@ -143,6 +144,7 @@ Scrape stability additions:
 - **Actor filter** (`actor=` on library): **Actor profile card** with Metatube refresh and **actor user tags** (same API as actor library cards).
 - **Actors** page: actor cards with tag editing; **History** for playback history grouping.
 - **Settings**: overview, paths, scraping, proxy, library behavior, curated frames, playback, maintenance.
+- **Development diagnostics**: in `import.meta.env.DEV`, `AppShell` now mounts a fixed bottom performance monitor bar that does not affect page layout. It aggregates frontend FPS / long tasks / memory / route timing / decode-experience metrics plus request-window stats and backend CPU summary.
 
 ## Playback & history
 
