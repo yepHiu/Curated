@@ -506,6 +506,24 @@ type CreatePlaybackSessionRequest struct {
 	StartPositionSec float64      `json:"startPositionSec,omitempty"`
 }
 
+type PlaybackSessionStatusDTO struct {
+	SessionID        string  `json:"sessionId"`
+	MovieID          string  `json:"movieId"`
+	SessionKind      string  `json:"sessionKind,omitempty"`
+	TranscodeProfile string  `json:"transcodeProfile,omitempty"`
+	StartPositionSec float64 `json:"startPositionSec,omitempty"`
+	StartedAt        string  `json:"startedAt,omitempty"`
+	LastAccessedAt   string  `json:"lastAccessedAt,omitempty"`
+	ExpiresAt        string  `json:"expiresAt,omitempty"`
+	FinishedAt       string  `json:"finishedAt,omitempty"`
+	State            string  `json:"state,omitempty"`
+	LastError        string  `json:"lastError,omitempty"`
+}
+
+type PlaybackSessionListDTO struct {
+	Items []PlaybackSessionStatusDTO `json:"items"`
+}
+
 type NativePlaybackLaunchRequest struct {
 	StartPositionSec float64 `json:"startPositionSec,omitempty"`
 }

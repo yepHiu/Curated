@@ -1984,6 +1984,25 @@ func (a *App) DeletePlaybackSession(sessionID string) error {
 	return a.streams.DeleteSession(sessionID)
 }
 
+func (a *App) GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error) {
+	_ = ctx
+	snapshot, err := a.streams.GetSessionSnapshot(sessionID)
+	if err != nil {
+		return contracts.PlaybackSessionStatusDTO{}, err
+	}
+	return playbackSessionStatusDTO(snapshot), nil
+}
+
+func (a *App) ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error) {
+	_ = ctx
+	snapshots := a.streams.ListSessionSnapshots(limit)
+	items := make([]contracts.PlaybackSessionStatusDTO, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		items = append(items, playbackSessionStatusDTO(snapshot))
+	}
+	return contracts.PlaybackSessionListDTO{Items: items}, nil
+}
+
 func (a *App) shouldPreferHLS(location string) bool {
 	decision := buildPlaybackDecision(playbackDecisionInput{
 		Location:          location,
@@ -2077,6 +2096,29 @@ func buildDirectPlaybackDescriptor(
 		}
 	}
 	return dto
+}
+
+func playbackSessionStatusDTO(snapshot playback.SessionSnapshot) contracts.PlaybackSessionStatusDTO {
+	return contracts.PlaybackSessionStatusDTO{
+		SessionID:        snapshot.Session.ID,
+		MovieID:          snapshot.Session.MovieID,
+		SessionKind:      snapshot.Session.Kind,
+		TranscodeProfile: snapshot.Session.ProfileName,
+		StartPositionSec: snapshot.Session.StartPositionSec,
+		StartedAt:        formatOptionalPlaybackTime(snapshot.Session.StartedAt),
+		LastAccessedAt:   formatOptionalPlaybackTime(snapshot.LastAccessedAt),
+		ExpiresAt:        formatOptionalPlaybackTime(snapshot.ExpiresAt),
+		FinishedAt:       formatOptionalPlaybackTime(snapshot.FinishedAt),
+		State:            snapshot.State,
+		LastError:        strings.TrimSpace(snapshot.LastError),
+	}
+}
+
+func formatOptionalPlaybackTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 func (a *App) resolvePlaybackMediaInfo(ctx context.Context, location string) playback.MediaInfo {

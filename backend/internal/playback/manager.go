@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -28,11 +29,13 @@ const (
 )
 
 type Config struct {
-	Enabled         bool
-	HardwareDecode  bool
-	HardwareEncoder string
-	FFmpegCommand   string
-	SessionRoot     string
+	Enabled                bool
+	HardwareDecode         bool
+	HardwareEncoder        string
+	FFmpegCommand          string
+	SessionRoot            string
+	SessionIdleTimeout     time.Duration
+	SessionJanitorInterval time.Duration
 }
 
 type Session struct {
@@ -47,10 +50,13 @@ type Session struct {
 }
 
 type sessionState struct {
-	session Session
-	cancel  context.CancelFunc
-	cmd     *exec.Cmd
-	waitCh  chan error
+	session        Session
+	cancel         context.CancelFunc
+	cmd            *exec.Cmd
+	waitCh         chan error
+	lastAccessedAt time.Time
+	finishedAt     time.Time
+	lastError      string
 }
 
 type transcodeProfile struct {
@@ -80,13 +86,34 @@ type Manager struct {
 	sessionStartMu        sync.Mutex
 	mu                    sync.RWMutex
 	sessions              map[string]*sessionState
+	// recentSnapshots keeps a bounded in-memory history after sessions leave the
+	// active registry, so status/recent APIs can still explain what just happened.
+	recentSnapshots       []SessionSnapshot
+	janitorCancel         context.CancelFunc
+	janitorDone           chan struct{}
 }
 
+type SessionSnapshot struct {
+	Session        Session
+	LastAccessedAt time.Time
+	ExpiresAt      time.Time
+	FinishedAt     time.Time
+	// State is a coarse lifecycle label exposed to diagnostics endpoints.
+	State          string
+	LastError      string
+}
+
+const recentSessionHistoryLimit = 32
+
 func New(cfg Config) *Manager {
-	return &Manager{
-		cfg:      cfg,
-		sessions: make(map[string]*sessionState),
+	manager := &Manager{
+		cfg:             cfg,
+		sessions:        make(map[string]*sessionState),
+		recentSnapshots: make([]SessionSnapshot, 0, recentSessionHistoryLimit),
+		janitorDone:     make(chan struct{}),
 	}
+	manager.startJanitorLoop()
+	return manager
 }
 
 func (m *Manager) Enabled() bool {
@@ -205,6 +232,7 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	if !ok {
 		return "", ErrSessionNotFound
 	}
+	touchSession(state)
 	cleanName := filepath.Clean(strings.TrimSpace(name))
 	if cleanName == "." || cleanName == "" || strings.Contains(cleanName, "..") {
 		return "", ErrSessionNotFound
@@ -231,6 +259,7 @@ func (m *Manager) DeleteSession(sessionID string) error {
 	state, ok := m.sessions[sessionID]
 	if ok {
 		delete(m.sessions, sessionID)
+		m.archiveSessionStateLocked(state, "stopped", time.Now().UTC())
 	}
 	m.mu.Unlock()
 	if !ok {
@@ -240,9 +269,70 @@ func (m *Manager) DeleteSession(sessionID string) error {
 	return nil
 }
 
+func (m *Manager) GetSessionSnapshot(sessionID string) (SessionSnapshot, error) {
+	if m == nil {
+		return SessionSnapshot{}, ErrSessionNotFound
+	}
+	m.mu.RLock()
+	state, ok := m.sessions[sessionID]
+	cfg := m.cfg
+	recentSnapshots := append([]SessionSnapshot(nil), m.recentSnapshots...)
+	m.mu.RUnlock()
+	if !ok {
+		for _, snapshot := range recentSnapshots {
+			if snapshot.Session.ID == sessionID {
+				return snapshot, nil
+			}
+		}
+		return SessionSnapshot{}, ErrSessionNotFound
+	}
+	return buildSessionSnapshot(state, sessionIdleTimeout(cfg)), nil
+}
+
+func (m *Manager) ListSessionSnapshots(limit int) []SessionSnapshot {
+	if m == nil {
+		return nil
+	}
+	m.mu.RLock()
+	cfg := m.cfg
+	states := make([]*sessionState, 0, len(m.sessions))
+	for _, state := range m.sessions {
+		states = append(states, state)
+	}
+	recentSnapshots := append([]SessionSnapshot(nil), m.recentSnapshots...)
+	m.mu.RUnlock()
+
+	snapshots := make([]SessionSnapshot, 0, len(states)+len(recentSnapshots))
+	timeout := sessionIdleTimeout(cfg)
+	for _, state := range states {
+		snapshots = append(snapshots, buildSessionSnapshot(state, timeout))
+	}
+	snapshots = append(snapshots, recentSnapshots...)
+	slices.SortFunc(snapshots, func(a, b SessionSnapshot) int {
+		switch {
+		case a.Session.StartedAt.After(b.Session.StartedAt):
+			return -1
+		case a.Session.StartedAt.Before(b.Session.StartedAt):
+			return 1
+		default:
+			return 0
+		}
+	})
+	// Active snapshots win over archived ones with the same session ID.
+	snapshots = compactSessionSnapshotsByID(snapshots)
+	if limit > 0 && len(snapshots) > limit {
+		return snapshots[:limit]
+	}
+	return snapshots
+}
+
 func (m *Manager) Close() {
 	if m == nil {
 		return
+	}
+	if m.janitorCancel != nil {
+		m.janitorCancel()
+		<-m.janitorDone
 	}
 	m.sessionStartMu.Lock()
 	staleStates := m.takeAllSessionsLocked()
@@ -399,13 +489,16 @@ func startTranscodeSession(
 			Kind:             profile.SessionKind,
 			StartedAt:        time.Now().UTC(),
 		},
-		cancel: cancel,
-		cmd:    cmd,
-		waitCh: make(chan error, 1),
+		cancel:         cancel,
+		cmd:            cmd,
+		waitCh:         make(chan error, 1),
+		lastAccessedAt: time.Now().UTC(),
 	}
 
 	go func() {
-		state.waitCh <- cmd.Wait()
+		err := cmd.Wait()
+		markSessionFinished(state, err)
+		state.waitCh <- err
 	}()
 
 	if err := waitForFileOrProcessExit(ctx, playlistPath, state.waitCh, 12*time.Second); err != nil {
@@ -595,6 +688,33 @@ func buildSeekArgs(startPositionSec float64) ([]string, []string) {
 	return inputSeekArgs, []string{"-ss", formatSeekOffset(accurateSeekSec)}
 }
 
+func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	timeout := sessionIdleTimeout(m.cfg)
+	if timeout <= 0 {
+		return nil
+	}
+
+	staleStates := make([]*sessionState, 0)
+	for existingID, state := range m.sessions {
+		if state.lastAccessedAt.IsZero() {
+			state.lastAccessedAt = state.session.StartedAt
+		}
+		if now.Sub(state.lastAccessedAt) < timeout {
+			continue
+		}
+		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(state, "expired", now)
+		staleStates = append(staleStates, state)
+	}
+	return staleStates
+}
+
 func (m *Manager) replaceSession(sessionID string, state *sessionState, profileName string) []*sessionState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -608,6 +728,7 @@ func (m *Manager) replaceSession(sessionID string, state *sessionState, profileN
 			continue
 		}
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	m.sessions[sessionID] = state
@@ -625,6 +746,7 @@ func (m *Manager) takeSessionsForMovie(movieID string) []*sessionState {
 			continue
 		}
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	return staleStates
@@ -637,6 +759,7 @@ func (m *Manager) takeAllSessionsLocked() []*sessionState {
 	staleStates := make([]*sessionState, 0, len(m.sessions))
 	for existingID, existingState := range m.sessions {
 		delete(m.sessions, existingID)
+		m.archiveSessionStateLocked(existingState, "closed", time.Now().UTC())
 		staleStates = append(staleStates, existingState)
 	}
 	return staleStates
@@ -668,6 +791,139 @@ func stopSessionState(state *sessionState) {
 		}
 	}
 	_ = os.RemoveAll(state.session.Directory)
+}
+
+func touchSession(state *sessionState) {
+	if state == nil {
+		return
+	}
+	state.lastAccessedAt = time.Now().UTC()
+}
+
+func markSessionFinished(state *sessionState, err error) {
+	if state == nil {
+		return
+	}
+	state.finishedAt = time.Now().UTC()
+	if err != nil {
+		state.lastError = err.Error()
+	}
+}
+
+func buildSessionSnapshot(state *sessionState, timeout time.Duration) SessionSnapshot {
+	lastAccessedAt := state.lastAccessedAt
+	if lastAccessedAt.IsZero() {
+		lastAccessedAt = state.session.StartedAt
+	}
+	snapshot := SessionSnapshot{
+		Session:        state.session,
+		LastAccessedAt: lastAccessedAt,
+		FinishedAt:     state.finishedAt,
+		State:          "running",
+		LastError:      strings.TrimSpace(state.lastError),
+	}
+	if timeout > 0 {
+		snapshot.ExpiresAt = lastAccessedAt.Add(timeout)
+	}
+	if !state.finishedAt.IsZero() {
+		snapshot.State = "finished"
+	}
+	if snapshot.LastError != "" {
+		snapshot.State = "failed"
+	}
+	return snapshot
+}
+
+func (m *Manager) archiveSessionStateLocked(state *sessionState, terminalState string, finishedAt time.Time) {
+	if m == nil || state == nil {
+		return
+	}
+	snapshot := buildSessionSnapshot(state, sessionIdleTimeout(m.cfg))
+	snapshot = finalizeArchivedSnapshot(snapshot, terminalState, finishedAt)
+	m.recentSnapshots = append(m.recentSnapshots, snapshot)
+	slices.SortFunc(m.recentSnapshots, func(a, b SessionSnapshot) int {
+		switch {
+		case a.Session.StartedAt.After(b.Session.StartedAt):
+			return -1
+		case a.Session.StartedAt.Before(b.Session.StartedAt):
+			return 1
+		default:
+			return 0
+		}
+	})
+	m.recentSnapshots = compactSessionSnapshotsByID(m.recentSnapshots)
+	if len(m.recentSnapshots) > recentSessionHistoryLimit {
+		m.recentSnapshots = m.recentSnapshots[:recentSessionHistoryLimit]
+	}
+}
+
+func finalizeArchivedSnapshot(snapshot SessionSnapshot, terminalState string, finishedAt time.Time) SessionSnapshot {
+	if snapshot.FinishedAt.IsZero() {
+		snapshot.FinishedAt = finishedAt
+	}
+	if snapshot.State == "failed" || snapshot.State == "finished" {
+		return snapshot
+	}
+	if strings.TrimSpace(terminalState) != "" {
+		snapshot.State = terminalState
+	}
+	return snapshot
+}
+
+func compactSessionSnapshotsByID(snapshots []SessionSnapshot) []SessionSnapshot {
+	if len(snapshots) == 0 {
+		return snapshots
+	}
+	compacted := make([]SessionSnapshot, 0, len(snapshots))
+	seen := make(map[string]struct{}, len(snapshots))
+	for _, snapshot := range snapshots {
+		sessionID := strings.TrimSpace(snapshot.Session.ID)
+		if sessionID == "" {
+			continue
+		}
+		if _, ok := seen[sessionID]; ok {
+			continue
+		}
+		seen[sessionID] = struct{}{}
+		compacted = append(compacted, snapshot)
+	}
+	return compacted
+}
+
+func sessionIdleTimeout(cfg Config) time.Duration {
+	if cfg.SessionIdleTimeout > 0 {
+		return cfg.SessionIdleTimeout
+	}
+	return 3 * time.Minute
+}
+
+func sessionJanitorInterval(cfg Config) time.Duration {
+	if cfg.SessionJanitorInterval > 0 {
+		return cfg.SessionJanitorInterval
+	}
+	return 30 * time.Second
+}
+
+func (m *Manager) startJanitorLoop() {
+	ctx, cancel := context.WithCancel(context.Background())
+	m.janitorCancel = cancel
+	go func() {
+		defer close(m.janitorDone)
+		// The janitor only reaps idle sessions; it does not participate in
+		// session startup so playback requests stay on the hot path.
+		ticker := time.NewTicker(sessionJanitorInterval(m.cfg))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for _, stale := range m.cleanupExpiredSessions(time.Now().UTC()) {
+					stopSessionState(stale)
+				}
+			}
+		}
+	}()
 }
 
 func normalizeHardwareEncoderProfileName(value string) string {

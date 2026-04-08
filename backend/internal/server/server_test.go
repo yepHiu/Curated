@@ -1764,9 +1764,11 @@ func (s *stubPlayerSettingsCtl) SetPlayerSettingsPatch(p contracts.PatchPlayerSe
 }
 
 type stubPlaybackResolver struct {
-	resolveDTO contracts.PlaybackDescriptorDTO
-	createDTO  contracts.PlaybackDescriptorDTO
-	filePath   string
+	resolveDTO  contracts.PlaybackDescriptorDTO
+	createDTO   contracts.PlaybackDescriptorDTO
+	filePath    string
+	sessionByID contracts.PlaybackSessionStatusDTO
+	sessions    []contracts.PlaybackSessionStatusDTO
 }
 
 func (s stubPlaybackResolver) ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error) {

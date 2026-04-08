@@ -207,6 +207,7 @@ func TestBuildTranscodeProfilesSkipsRemuxWhenSourceAudioIsNotHlsFriendly(t *test
 func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
 	t.Parallel()
 	manager := New(Config{})
+	t.Cleanup(manager.Close)
 	manager.sessions["sess-a"] = &sessionState{session: Session{ID: "sess-a", MovieID: "movie-a"}}
 	manager.sessions["sess-b"] = &sessionState{session: Session{ID: "sess-b", MovieID: "movie-a"}}
 	manager.sessions["sess-c"] = &sessionState{session: Session{ID: "sess-c", MovieID: "movie-b"}}
@@ -229,6 +230,7 @@ func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
 func TestManagerCloseClearsAllSessions(t *testing.T) {
 	t.Parallel()
 	manager := New(Config{})
+	t.Cleanup(manager.Close)
 	manager.sessions["sess-a"] = &sessionState{session: Session{ID: "sess-a", MovieID: "movie-a"}}
 	manager.sessions["sess-b"] = &sessionState{session: Session{ID: "sess-b", MovieID: "movie-b"}}
 
