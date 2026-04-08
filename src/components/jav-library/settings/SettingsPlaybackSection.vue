@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { PlayCircle } from "lucide-vue-next"
@@ -324,9 +324,20 @@ watchDebounced(
   { debounce: 550, maxWait: 5000 },
 )
 
-onMounted(() => {
-  syncPlaybackDraftFromService()
-})
+/**
+ * 父页在 onMounted 末尾才把 autoSaveReady 置为 true（此前已 await refreshSettings）。
+ * 若在此处用 onMounted 同步草稿，会早于 GET /api/settings，playerSettings 仍是占位值，
+ * 例如 forceStreamPush 会与 library-config.cfg 不一致。
+ */
+watch(
+  () => props.autoSaveReady,
+  (ready) => {
+    if (ready) {
+      syncPlaybackDraftFromService()
+    }
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   if (playbackSavedFlashTimer) clearTimeout(playbackSavedFlashTimer)

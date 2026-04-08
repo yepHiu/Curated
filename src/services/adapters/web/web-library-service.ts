@@ -48,6 +48,7 @@ const playerSettingsState = ref<PlayerSettingsDTO>({
   nativePlayerEnabled: true,
   nativePlayerCommand: "PotPlayerMini64.exe",
   streamPushEnabled: true,
+  forceStreamPush: false,
   ffmpegCommand: "ffmpeg",
   preferNativePlayer: false,
   seekForwardStepSec: 10,
