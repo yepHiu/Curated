@@ -38,6 +38,11 @@ import {
   parseResumeSecondsFromQuery,
   saveProgress,
 } from "@/lib/playback-progress-storage"
+import {
+  descriptorMatchesRequestedPlaybackTarget,
+  resolveHlsLocalSeekTargetSec,
+  resolvePreferredPlaybackTargetSec,
+} from "@/lib/playback-targets"
 import type { PlaybackDescriptorDTO } from "@/api/types"
 import { cn } from "@/lib/utils"
 import {
@@ -448,7 +453,7 @@ async function loadPlayback() {
     if (
       descriptor?.mode === "hls" &&
       requestedStartSec !== undefined &&
-      Math.abs((descriptor.startPositionSec ?? 0) - Math.max(0, requestedStartSec)) > 1
+      !descriptorMatchesRequestedPlaybackTarget(requestedStartSec, descriptor)
     ) {
       const reseekedDescriptor = await libraryService.createPlaybackSession(
         movieId,
@@ -471,13 +476,6 @@ async function loadPlayback() {
     void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
-    if (
-      requestedStartSec !== undefined &&
-      descriptor?.mode === "hls" &&
-      Math.abs((descriptor.startPositionSec ?? 0) - Math.max(0, requestedStartSec)) <= 1
-    ) {
-      stripTFromRoute()
-    }
     const fallbackReason = descriptor?.reason?.trim() || ""
     const fallbackKey = `${movieId}:${descriptor?.mode ?? ""}:${fallbackReason}`
     if (
@@ -727,13 +725,32 @@ function onLoadedMetadata() {
   syncBufferedRangeFromVideo()
   flushScheduledPlaybackSessionCleanup()
 
+  const fromQuery = parseResumeSecondsFromQuery(route.query.t)
+  const targetSec = resolvePreferredPlaybackTargetSec(
+    fromQuery,
+    playbackDescriptor.value,
+    getProgress(props.movie.id)?.positionSec,
+  )
+
   if (playbackDescriptor.value?.mode === "hls") {
-    currentTime.value = getAbsolutePlaybackTime(0)
-    resumeAppliedForMovieId.value = props.movie.id
-    if (
-      route.query.t !== undefined &&
-      Math.abs((playbackDescriptor.value?.startPositionSec ?? 0) - (parseResumeSecondsFromQuery(route.query.t) ?? 0)) <= 1
-    ) {
+    if (resumeAppliedForMovieId.value !== props.movie.id && targetSec !== undefined) {
+      const localSeekTarget = resolveHlsLocalSeekTargetSec(
+        targetSec,
+        playbackDescriptor.value?.startPositionSec,
+      )
+      if (
+        localSeekTarget !== undefined &&
+        Math.abs((Number.isFinite(v.currentTime) ? v.currentTime : 0) - localSeekTarget) > 0.25
+      ) {
+        v.currentTime = localSeekTarget
+      }
+      currentTime.value = getAbsolutePlaybackTime(localSeekTarget ?? v.currentTime)
+      resumeAppliedForMovieId.value = props.movie.id
+    } else {
+      currentTime.value = getAbsolutePlaybackTime(v.currentTime)
+      resumeAppliedForMovieId.value = props.movie.id
+    }
+    if (fromQuery !== undefined) {
       stripTFromRoute()
     }
     void tryStartPlaybackIfRequested()
@@ -744,10 +761,6 @@ function onLoadedMetadata() {
   if (resumeAppliedForMovieId.value === props.movie.id) return
   if (dur <= 0) return
 
-  const fromQuery = parseResumeSecondsFromQuery(route.query.t)
-  const descriptorResume = playbackDescriptor.value?.resumePositionSec
-  const stored = getProgress(props.movie.id)?.positionSec
-  const targetSec = fromQuery !== undefined ? fromQuery : descriptorResume ?? stored
   if (targetSec === undefined) return
 
   const clamped = Math.min(Math.max(0, targetSec), Math.max(0, dur - 0.25))
@@ -1159,7 +1172,9 @@ async function runCuratedCapture() {
     curatedShutterTimer = null
   }, 600)
 
-  const result = await saveCuratedCaptureFromVideo(v, props.movie)
+  const result = await saveCuratedCaptureFromVideo(v, props.movie, {
+    positionSecOverride: getAbsolutePlaybackTime(v.currentTime),
+  })
   if (!result.ok) {
     curatedCaptureError.value = result.reason
     curatedShutterActive.value = false

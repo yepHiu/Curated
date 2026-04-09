@@ -82,11 +82,11 @@ export async function hydratePlaybackProgress(): Promise<void> {
 }
 
 /**
- * Parse `t` from route query: positive integer seconds.
+ * Parse `t` from route query: positive seconds, including fractional seek positions.
  */
 export function parseResumeSecondsFromQuery(t: unknown): number | undefined {
   if (typeof t !== "string" || !t.trim()) return undefined
-  const n = Number.parseInt(t, 10)
+  const n = Number(t)
   if (!Number.isFinite(n) || n < 0) return undefined
   return n
 }

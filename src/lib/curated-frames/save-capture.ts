@@ -26,19 +26,38 @@ export type SaveCuratedCaptureResult =
   | { ok: true }
   | { ok: false; reason: string }
 
+export type SaveCuratedCaptureOptions = {
+  positionSecOverride?: number
+}
+
+export function resolveCuratedCapturePositionSec(
+  videoCurrentTime: number,
+  positionSecOverride?: number,
+): number {
+  const explicit = Number(positionSecOverride)
+  if (Number.isFinite(explicit) && explicit >= 0) {
+    return explicit
+  }
+  return Number.isFinite(videoCurrentTime) && videoCurrentTime >= 0 ? videoCurrentTime : 0
+}
+
 /**
  * 从 video 截帧：Web API 时 POST 后端 SQLite；否则写入 IndexedDB。按设置可额外下载或写入用户目录。
  */
 export async function saveCuratedCaptureFromVideo(
   video: HTMLVideoElement,
   movie: Movie,
+  options: SaveCuratedCaptureOptions = {},
 ): Promise<SaveCuratedCaptureResult> {
   const cap = await captureVideoFrameToPng(video)
   if (!cap.ok) {
     return { ok: false, reason: cap.reason }
   }
 
-  const positionSec = video.currentTime
+  const positionSec = resolveCuratedCapturePositionSec(
+    video.currentTime,
+    options.positionSecOverride,
+  )
   const capturedAt = new Date().toISOString()
   const id = crypto.randomUUID()
 

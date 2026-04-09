@@ -3,6 +3,11 @@ import type { LibraryMode } from "@/domain/library/types"
 import { buildMovieRouteQuery } from "@/lib/library-query"
 import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
+function formatResumeSecondsForRoute(resumeSec: number): string {
+  const normalized = Math.max(0, resumeSec)
+  return String(Number(normalized.toFixed(3)))
+}
+
 /** Open player from browse/detail with library query context and optional resume `t`. */
 export function buildPlayerRouteFromBrowse(
   movieId: string,
@@ -44,7 +49,7 @@ export function buildPlayerRouteFromCuratedFrame(movieId: string, resumeSec: num
   const query: LocationQuery = {
     autoplay: "1",
     from: "curated-frames",
-    t: String(Math.max(0, Math.floor(resumeSec))),
+    t: formatResumeSecondsForRoute(resumeSec),
   }
   return {
     name: "player" as const,
