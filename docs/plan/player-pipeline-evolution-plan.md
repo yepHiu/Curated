@@ -379,6 +379,226 @@ Curated 当前缺这一层，导致很多“浏览器不喜欢容器，但并不
 - 外部播放器路径更稳定
 - 后续做进度回写有落点
 
+### Phase 4 实施草案：原生播放器闭环优化
+
+#### 4.4.1 要解决的核心问题
+
+当前浏览器协议模板拉起本机播放器已经可用，但它仍然是单向链路：
+
+- Curated 只负责发起 handoff
+- 外部播放器是否成功打开，当前缺少稳定的结果记录
+- 用户从外部播放器回到 Curated 后，系统无法恢复“刚才那次外部播放”
+- 外部播放结束后，进度只能依赖用户手动重新定位，无法形成回写闭环
+
+因此这一阶段的目标不是“把外部播放器做成桌面内核”，而是先把 native handoff 升级成一条**可记录、可恢复、可回填**的链路。
+
+#### 4.4.2 本阶段范围
+
+本阶段纳入：
+
+- 浏览器侧 native handoff 会话记录
+- handoff 结果状态标准化
+- 从 Curated 恢复最近一次外部播放会话
+- 手动把外部播放位置回填到现有播放进度存储
+- 协议模板中的 URL / seek 参数兼容性整理
+
+本阶段不纳入：
+
+- 完整的 `mpv` JSON IPC 控制
+- 外部播放器实时状态轮询
+- 自动读取播放器当前时间
+- 自动在播放结束时标记已看完
+- 把浏览器协议 handoff 全量回退成后端 `native-play` 唯一入口
+
+#### 4.4.3 建议架构
+
+保持当前双路径并存：
+
+- 默认路径仍是浏览器侧协议模板 handoff
+- 后端 `POST /api/library/movies/{id}/native-play` 保留为 legacy / shell hook
+
+在此基础上补一层 **native handoff session**：
+
+1. 前端决定发起本机播放器 handoff
+2. 前端在本地创建一条 handoff session 记录
+3. 前端按协议模板拉起外部播放器
+4. 前端把 launch result 回写到 handoff session
+5. 用户返回 Curated 时，播放器页或详情页可读取最近一次 handoff session
+6. 用户可用“一键从外部播放位置继续”或“手动回填到当前进度”
+
+这层 session 与 HLS session 不同：
+
+- HLS session 是后端运行态对象
+- native handoff session 是前端主导的本地恢复对象
+
+#### 4.4.4 数据模型建议
+
+建议新增浏览器本地存储键，例如：
+
+- `curated-native-handoff-sessions-v1`
+
+建议记录字段：
+
+- `sessionId`
+- `movieId`
+- `createdAt`
+- `startedAt`
+- `updatedAt`
+- `launchPath`
+  - `protocol-url`
+  - `file-path`
+  - `stream-url`
+- `target`
+  - 最终 handoff 的 URL 或文件路径
+- `playerPreset`
+  - `potplayer`
+  - `mpv`
+  - `custom`
+- `template`
+  - 发起时使用的协议模板快照
+- `startPositionSec`
+  - 发起时传给外部播放器的起播点
+- `resumePositionSec`
+  - 用户回到 Curated 时手动填写或确认的播放位置
+- `launchReason`
+  - `explicit_native_button`
+  - `prefer_native_player`
+  - 未来可扩展
+- `launchResult`
+  - `pending`
+  - `opened`
+  - `failed`
+  - `cancelled`
+  - `returned`
+- `lastError`
+  - 供 UI 展示失败原因
+
+约束建议：
+
+- 每部影片只保留最近一条 active / recent native handoff session
+- 全局 recent 列表保留固定上限，例如 20 到 50 条
+- 旧格式由前端静默迁移，不做复杂兼容分支
+
+#### 4.4.5 前端交互建议
+
+播放器页 / 详情页中，本机播放器动作建议拆成两个层次：
+
+- 主动作：`在本机播放器中打开`
+- 返回站内后的恢复动作：
+  - `继续上次外部播放位置`
+  - `回填外部播放进度`
+
+交互建议：
+
+1. 用户点击“在本机播放器中打开”
+2. 前端创建 handoff session，状态为 `pending`
+3. 前端执行协议模板替换并发起跳转
+4. 如果浏览器侧没有抛出明显错误，则记为 `opened`
+5. 当用户回到 Curated，若存在该影片最近一次 `opened` handoff session：
+   - 展示一张轻量提示卡
+   - 默认给出“从起播点继续”和“手动输入当前位置回填”两个动作
+6. 用户确认回填后，复用现有 `saveProgress()` / playback progress 存储链路
+
+这里故意不做“自动推断播放到了哪里”。
+原因很简单：当前没有可靠 IPC，强行自动化只会制造脏进度。
+
+#### 4.4.6 后端角色边界
+
+这一阶段后端只做配角，不重新接管主链路。
+
+建议保持：
+
+- `native-play` 作为 legacy 能力继续存在
+- 设置页中的播放器运行时配置继续保留
+
+可选补充但不强依赖：
+
+- 如后续希望让前端也能统一展示“native launch reason / result”，可以增加一个轻量 DTO 约定，但本阶段不要求新增后端持久化表
+- 如某些平台需要后端参与构造 file path / session URL，也应只提供辅助接口，不把浏览器 handoff 全量迁回后端
+
+#### 4.4.7 代码落点建议
+
+前端建议新增或调整：
+
+- `src/lib/native-player-launch.ts`
+  - 继续负责模板替换与 handoff 发起
+  - 但不再只返回布尔结果，应返回结构化 launch result
+- `src/lib/native-handoff-session-storage.ts`
+  - 新增，专门管理本地 handoff session 的创建、更新、裁剪、查询
+- `src/components/jav-library/PlayerPage.vue`
+  - 增加 handoff session 恢复提示与手动回填入口
+- `src/components/jav-library/MovieDetailView.vue` 或等效详情动作组件
+  - 在非播放器场景下也能恢复最近一次外部播放会话
+- `src/api/types.ts`
+  - 如前端已有统一 launch result DTO，可在此补齐类型；若纯前端存储可不新增 API DTO
+
+测试建议覆盖：
+
+- `native-player-launch` 模板替换
+- session storage 的 upsert / trim / migrate
+- Player 页恢复提示显示逻辑
+- 手动回填后对现有 playback progress 存储的写入
+
+#### 4.4.8 建议拆分为 4 个交付批次
+
+批次 A：native handoff session 存储层
+
+- 新增本地存储模块
+- 定义数据结构、迁移、裁剪、按影片读取 recent session
+- 为后续 UI 提供稳定查询接口
+
+批次 B：结构化 launch result
+
+- `native-player-launch` 返回结构化结果，而不是只做 fire-and-forget
+- 统一 `launchReason` / `launchResult` / `lastError`
+- 把模板与 seek 参数最终展开值写入 session
+
+批次 C：恢复与手动回填 UI
+
+- Player 页识别最近一次外部播放会话
+- 提供“从上次起播点继续”和“手动回填进度”
+- 回填成功后同步刷新当前页进度态
+
+批次 D：`mpv` 最小 IPC 预研
+
+- 仅验证是否能低成本拿到当前位置或退出事件
+- 不承诺在本阶段正式接入
+- 输出是否值得进入下一阶段的结论
+
+#### 4.4.9 验收标准
+
+满足以下条件即可认为 Phase 4 第一版完成：
+
+- 用户从播放器页触发本机播放器 handoff 后，会产生一条可查询的 recent handoff session
+- 同一影片重复 handoff 不会无限堆积脏记录
+- 用户返回 Curated 后，能看到最近一次外部播放会话的恢复入口
+- 用户可以手动输入或确认当前位置，并成功回写到现有播放进度链路
+- 失败 handoff 有可见原因，不再是纯静默失败
+- 不破坏现有浏览器内 direct / HLS 播放路径
+
+#### 4.4.10 风险与边界
+
+主要风险：
+
+- 浏览器协议拉起本身天然不可完全观测，`opened` 只能表示“已发起且未立即失败”，不能证明播放器一定成功播放
+- 不同播放器对 URL 编码、seek 参数、命令模板的兼容性差异很大
+- 如果把“自动进度同步”也塞进本阶段，复杂度会明显失控
+
+因此本阶段的取舍应该保持清晰：
+
+- 先解决“记不住、回不来、无法回填”
+- 暂不承诺“自动同步、远程控制、实时状态”
+
+#### 4.4.11 推荐落地顺序
+
+推荐先后顺序：
+
+1. `native-handoff-session-storage.ts`
+2. `native-player-launch.ts` 结构化结果改造
+3. Player 页恢复提示与手动回填
+4. 详情页入口复用
+5. `mpv` 最小 IPC 预研结论文档
+
 ## Phase 5：高级流媒体能力
 
 这部分放最后，不建议当前就做。
