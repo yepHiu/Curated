@@ -1,4 +1,7 @@
 import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
+import { resolveDesignLabAccess } from "@/lib/design-lab-access"
+
+const designLabAccess = resolveDesignLabAccess(import.meta.env.DEV)
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -71,6 +74,12 @@ const router = createRouter({
           path: "settings",
           name: "settings",
           component: () => import("@/views/SettingsView.vue"),
+        },
+        {
+          path: "design-lab",
+          name: "design-lab",
+          beforeEnter: () => (designLabAccess.enabled ? true : designLabAccess.fallbackTarget!),
+          component: () => import("@/views/DesignLabView.vue"),
         },
         {
           path: ":pathMatch(.*)*",

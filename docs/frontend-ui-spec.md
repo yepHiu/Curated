@@ -19,6 +19,9 @@ Cursor / Agent 速查规则：[`.cursor/rules/ui-component-spec.mdc`](../.cursor
 
 ### 2.1 事实源
 
+- **2026-04 令牌扩展**：在不改变 Curated 主视觉基调的前提下，`src/style.css` 额外定义了 `--surface` / `--surface-elevated` / `--surface-muted`、`--success`、`--warning`、`--danger`、`--info`、`--border-strong` 等语义变量，用于 Design Lab 和后续组件规范收敛。
+- **Design Lab（开发态）**：`/design-lab` 是仅开发环境开放的内部 UI Playground；入口位于 `Settings > About`，用于展示设计令牌、组件状态、交互原型、动效和可访问性示例，避免把实验性界面直接堆进设置页主体。
+
 - **语义色与圆角**：`:root` 与 `.dark` 中定义 `--background`、`--foreground`、`--card`、`--primary`、`--border`、`--muted` 等；Tailwind v4 在 `@theme inline` 中映射为 `--color-*`，供 `bg-background`、`text-foreground` 等使用。
 - **默认外观**：当前 **`:root` 即为深色主界面**（`html` 上未必有 `class="dark"`）。`body` 使用 `bg-background text-foreground`，并带有轻微背景渐变。
 - **深色变体**：`@custom-variant dark (&:is(.dark *))` 表示 **`dark:` 前缀类仅在 `.dark` 祖先内生效**。主界面不要依赖「全局 `dark:`」来撑表单对比度。
@@ -48,6 +51,7 @@ Cursor / Agent 速查规则：[`.cursor/rules/ui-component-spec.mdc`](../.cursor
 |------|------|
 | `src/components/ui` | shadcn-vue 基元与通用块（Button、Card、Dialog、Input、Tabs…） |
 | `src/components/jav-library` | Curated 业务组件（影片卡、详情、播放器、设置聚合等） |
+| `src/components/design-lab` | 开发态内部设计系统工作台（Design Lab）与 Playground 专用展示组件 |
 | `src/layouts/AppShell.vue` | 侧栏、顶栏、主内容区布局与壳层导航行为 |
 | `src/views/*.vue` | 路由页面：组装上述组件，保持精简 |
 
