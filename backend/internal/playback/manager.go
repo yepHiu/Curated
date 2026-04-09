@@ -60,9 +60,10 @@ type sessionState struct {
 }
 
 type transcodeProfile struct {
-	Name        string
-	SessionKind string
-	Args        []string
+	Name              string
+	SessionKind       string
+	Args              []string
+	TimelineOriginSec float64
 }
 
 type StartHLSSessionOptions struct {
@@ -204,7 +205,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 			}
 		}
 
-		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile, options.StartPositionSec)
+		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile)
 		if err == nil {
 			staleStates := m.replaceSession(sessionID, state, profile.Name)
 			for _, stale := range staleStates {
@@ -465,7 +466,6 @@ func startTranscodeSession(
 	dir string,
 	playlistPath string,
 	profile transcodeProfile,
-	startPositionSec float64,
 ) (*sessionState, error) {
 	runCtx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(runCtx, cmdName, profile.Args...)
@@ -484,7 +484,7 @@ func startTranscodeSession(
 			MovieID:          movieID,
 			PlaylistPath:     playlistPath,
 			Directory:        dir,
-			StartPositionSec: startPositionSec,
+			StartPositionSec: profile.TimelineOriginSec,
 			ProfileName:      profile.Name,
 			Kind:             profile.SessionKind,
 			StartedAt:        time.Now().UTC(),
@@ -526,7 +526,8 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	if cfg.HardwareDecode {
 		inputPrefix = append(inputPrefix, "-hwaccel", "auto")
 	}
-	inputSeekArgs, accurateSeekArgs := buildSeekArgs(options.StartPositionSec)
+	seekPlan := buildSeekPlan(options.StartPositionSec)
+	inputSeekArgs, accurateSeekArgs := seekPlan.InputArgs, seekPlan.AccurateArgs
 	configuredPreference := normalizeHardwareEncoderProfileName(cfg.HardwareEncoder)
 
 	transcodeHLSArgs := []string{
@@ -563,8 +564,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	profiles := make([]transcodeProfile, 0, 4)
 	if options.PreferRemux && canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
 		profiles = append(profiles, transcodeProfile{
-			Name:        "remux_copy",
-			SessionKind: "remux-hls",
+			Name:              "remux_copy",
+			SessionKind:       "remux-hls",
+			TimelineOriginSec: seekPlan.InputSeekSec,
 			Args: append(
 				append(
 					append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -579,8 +581,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		case "windows":
 			profiles = append(profiles,
 				transcodeProfile{
-					Name:        "h264_nvenc",
-					SessionKind: "transcode-hls",
+					Name:              "h264_nvenc",
+					SessionKind:       "transcode-hls",
+					TimelineOriginSec: seekPlan.RequestedStartSec,
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -590,8 +593,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 					),
 				},
 				transcodeProfile{
-					Name:        "h264_qsv",
-					SessionKind: "transcode-hls",
+					Name:              "h264_qsv",
+					SessionKind:       "transcode-hls",
+					TimelineOriginSec: seekPlan.RequestedStartSec,
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -601,8 +605,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 					),
 				},
 				transcodeProfile{
-					Name:        "h264_amf",
-					SessionKind: "transcode-hls",
+					Name:              "h264_amf",
+					SessionKind:       "transcode-hls",
+					TimelineOriginSec: seekPlan.RequestedStartSec,
 					Args: append(
 						append(
 							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -614,8 +619,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 			)
 		case "darwin":
 			profiles = append(profiles, transcodeProfile{
-				Name:        "h264_videotoolbox",
-				SessionKind: "transcode-hls",
+				Name:              "h264_videotoolbox",
+				SessionKind:       "transcode-hls",
+				TimelineOriginSec: seekPlan.RequestedStartSec,
 				Args: append(
 					append(
 						append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -643,8 +649,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	}
 
 	profiles = append(profiles, transcodeProfile{
-		Name:        "libx264",
-		SessionKind: "transcode-hls",
+		Name:              "libx264",
+		SessionKind:       "transcode-hls",
+		TimelineOriginSec: seekPlan.RequestedStartSec,
 		Args: append(
 			append(
 				append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
@@ -666,26 +673,41 @@ func formatSeekOffset(startPositionSec float64) string {
 	return fmt.Sprintf("%.3f", startPositionSec)
 }
 
-func buildSeekArgs(startPositionSec float64) ([]string, []string) {
+type seekPlan struct {
+	RequestedStartSec float64
+	InputSeekSec      float64
+	AccurateSeekSec   float64
+	InputArgs         []string
+	AccurateArgs      []string
+}
+
+func buildSeekPlan(startPositionSec float64) seekPlan {
+	plan := seekPlan{}
 	if startPositionSec <= 0 {
-		return nil, nil
+		return plan
 	}
 
 	const preciseSeekWindowSec = 2.0
-	inputSeekSec := startPositionSec - preciseSeekWindowSec
-	if inputSeekSec < 0 {
-		inputSeekSec = 0
+	plan.RequestedStartSec = startPositionSec
+	plan.InputSeekSec = startPositionSec - preciseSeekWindowSec
+	if plan.InputSeekSec < 0 {
+		plan.InputSeekSec = 0
 	}
-	accurateSeekSec := startPositionSec - inputSeekSec
-	if accurateSeekSec < 0 {
-		accurateSeekSec = 0
+	plan.AccurateSeekSec = startPositionSec - plan.InputSeekSec
+	if plan.AccurateSeekSec < 0 {
+		plan.AccurateSeekSec = 0
 	}
 
-	inputSeekArgs := []string{"-ss", formatSeekOffset(inputSeekSec)}
-	if accurateSeekSec <= 0.001 {
-		return inputSeekArgs, nil
+	plan.InputArgs = []string{"-ss", formatSeekOffset(plan.InputSeekSec)}
+	if plan.AccurateSeekSec > 0.001 {
+		plan.AccurateArgs = []string{"-ss", formatSeekOffset(plan.AccurateSeekSec)}
 	}
-	return inputSeekArgs, []string{"-ss", formatSeekOffset(accurateSeekSec)}
+	return plan
+}
+
+func buildSeekArgs(startPositionSec float64) ([]string, []string) {
+	plan := buildSeekPlan(startPositionSec)
+	return plan.InputArgs, plan.AccurateArgs
 }
 
 func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {

@@ -1939,7 +1939,7 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 		dto.URL = "/api/playback/sessions/" + session.ID + "/hls/index.m3u8"
 		dto.MimeType = "application/vnd.apple.mpegurl"
 		dto.StartPositionSec = session.StartPositionSec
-		dto.ResumePositionSec = session.StartPositionSec
+		dto.ResumePositionSec = startPositionSec
 		dto.TranscodeProfile = session.ProfileName
 		dto.SessionKind = session.Kind
 		dto.CanDirectPlay = false

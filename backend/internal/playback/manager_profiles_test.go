@@ -184,6 +184,49 @@ func TestBuildTranscodeProfilesPrefersRemuxBeforeFullTranscodeWhenEligible(t *te
 	}
 }
 
+func TestBuildTranscodeProfilesUsesActualTimelineOriginForRemuxSessions(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{
+			StartPositionSec: 3723.5,
+			PreferRemux:      true,
+			SourceVideoCodec: "h264",
+			SourceAudioCodec: "aac",
+		},
+	)
+	if len(profiles) < 1 {
+		t.Fatal("expected at least one profile")
+	}
+	if profiles[0].Name != "remux_copy" {
+		t.Fatalf("first profile = %q, want remux_copy", profiles[0].Name)
+	}
+	if profiles[0].TimelineOriginSec != 3721.5 {
+		t.Fatalf("timeline origin = %v, want 3721.5", profiles[0].TimelineOriginSec)
+	}
+}
+
+func TestBuildTranscodeProfilesKeepsRequestedTimelineOriginForTranscodeSessions(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{StartPositionSec: 3723.5},
+	)
+	if len(profiles) != 1 {
+		t.Fatalf("expected only software fallback, got %d profiles", len(profiles))
+	}
+	if profiles[0].Name != "libx264" {
+		t.Fatalf("profile name = %q, want libx264", profiles[0].Name)
+	}
+	if profiles[0].TimelineOriginSec != 3723.5 {
+		t.Fatalf("timeline origin = %v, want 3723.5", profiles[0].TimelineOriginSec)
+	}
+}
+
 func TestBuildTranscodeProfilesSkipsRemuxWhenSourceAudioIsNotHlsFriendly(t *testing.T) {
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},
