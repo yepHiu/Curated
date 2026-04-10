@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -98,6 +99,10 @@ type CuratedFrameMeta struct {
 }
 
 func (s *SQLiteStore) InsertCuratedFrame(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte) error {
+	return s.InsertCuratedFrameWithThumbnail(ctx, meta, imageBlob, nil)
+}
+
+func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte, thumbBlob []byte) error {
 	actorsJSON, err := json.Marshal(meta.Actors)
 	if err != nil {
 		return err
@@ -107,9 +112,9 @@ func (s *SQLiteStore) InsertCuratedFrame(ctx context.Context, meta CuratedFrameM
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO curated_frames (id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, meta.ID, meta.MovieID, meta.Title, meta.Code, string(actorsJSON), meta.PositionSec, meta.CapturedAt, string(tagsJSON), imageBlob)
+		INSERT INTO curated_frames (id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob, thumb_blob)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, meta.ID, meta.MovieID, meta.Title, meta.Code, string(actorsJSON), meta.PositionSec, meta.CapturedAt, string(tagsJSON), imageBlob, thumbBlob)
 	return err
 }
 
@@ -121,6 +126,112 @@ func scanCuratedMeta(actorsJSON, tagsJSON string, dest *CuratedFrameMeta) error 
 		dest.Tags = nil
 	}
 	return nil
+}
+
+type CuratedFrameQuery struct {
+	Query   string
+	Actor   string
+	MovieID string
+	Tag     string
+	Limit   int
+	Offset  int
+}
+
+type CuratedFramePage struct {
+	Items  []CuratedFrameMeta
+	Total  int
+	Limit  int
+	Offset int
+}
+
+type CuratedFrameFacet struct {
+	Name  string
+	Count int
+}
+
+func normalizedCuratedFrameLimit(limit int) int {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 200 {
+		return 200
+	}
+	return limit
+}
+
+func curatedJSONContainsArg(value string) string {
+	b, err := json.Marshal(strings.TrimSpace(value))
+	if err != nil {
+		return "%"
+	}
+	return "%" + string(b) + "%"
+}
+
+func buildCuratedFrameWhere(q CuratedFrameQuery) (string, []any) {
+	clauses := make([]string, 0, 4)
+	args := make([]any, 0, 4)
+	if s := strings.TrimSpace(q.Query); s != "" {
+		like := "%" + strings.ToLower(s) + "%"
+		clauses = append(clauses, `LOWER(title || ' ' || code || ' ' || movie_id || ' ' || actors_json || ' ' || tags_json || ' ' || captured_at || ' ' || CAST(position_sec AS TEXT)) LIKE ?`)
+		args = append(args, like)
+	}
+	if s := strings.TrimSpace(q.Actor); s != "" {
+		clauses = append(clauses, `actors_json LIKE ?`)
+		args = append(args, curatedJSONContainsArg(s))
+	}
+	if s := strings.TrimSpace(q.MovieID); s != "" {
+		clauses = append(clauses, `movie_id = ?`)
+		args = append(args, s)
+	}
+	if s := strings.TrimSpace(q.Tag); s != "" {
+		clauses = append(clauses, `tags_json LIKE ?`)
+		args = append(args, curatedJSONContainsArg(s))
+	}
+	if len(clauses) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuery) (CuratedFramePage, error) {
+	limit := normalizedCuratedFrameLimit(q.Limit)
+	offset := q.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	where, args := buildCuratedFrameWhere(q)
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM curated_frames`+where, args...).Scan(&total); err != nil {
+		return CuratedFramePage{}, err
+	}
+
+	pageArgs := append(append([]any{}, args...), limit, offset)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
+		FROM curated_frames`+where+`
+		ORDER BY captured_at DESC
+		LIMIT ? OFFSET ?
+	`, pageArgs...)
+	if err != nil {
+		return CuratedFramePage{}, err
+	}
+	defer rows.Close()
+
+	out := make([]CuratedFrameMeta, 0, limit)
+	for rows.Next() {
+		var m CuratedFrameMeta
+		var actorsJSON, tagsJSON string
+		if err := rows.Scan(&m.ID, &m.MovieID, &m.Title, &m.Code, &actorsJSON, &m.PositionSec, &m.CapturedAt, &tagsJSON); err != nil {
+			return CuratedFramePage{}, err
+		}
+		_ = scanCuratedMeta(actorsJSON, tagsJSON, &m)
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return CuratedFramePage{}, err
+	}
+	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]CuratedFrameMeta, error) {
@@ -147,6 +258,61 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	return out, rows.Err()
 }
 
+func listCuratedFrameJSONFacet(ctx context.Context, db *sql.DB, column string) ([]CuratedFrameFacet, error) {
+	rows, err := db.QueryContext(ctx, `SELECT `+column+` FROM curated_frames`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := map[string]int{}
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var values []string
+		if err := json.Unmarshal([]byte(raw), &values); err != nil {
+			continue
+		}
+		seen := map[string]struct{}{}
+		for _, value := range values {
+			name := strings.TrimSpace(value)
+			if name == "" {
+				continue
+			}
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			counts[name]++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]CuratedFrameFacet, 0, len(counts))
+	for name, count := range counts {
+		out = append(out, CuratedFrameFacet{Name: name, Count: count})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
+}
+
+func (s *SQLiteStore) ListCuratedFrameActors(ctx context.Context) ([]CuratedFrameFacet, error) {
+	return listCuratedFrameJSONFacet(ctx, s.db, "actors_json")
+}
+
+func (s *SQLiteStore) ListCuratedFrameTags(ctx context.Context) ([]CuratedFrameFacet, error) {
+	return listCuratedFrameJSONFacet(ctx, s.db, "tags_json")
+}
+
 func (s *SQLiteStore) GetCuratedFrameImage(ctx context.Context, id string) ([]byte, error) {
 	var blob []byte
 	err := s.db.QueryRowContext(ctx, `SELECT image_blob FROM curated_frames WHERE id = ?`, id).Scan(&blob)
@@ -157,6 +323,54 @@ func (s *SQLiteStore) GetCuratedFrameImage(ctx context.Context, id string) ([]by
 		return nil, err
 	}
 	return blob, nil
+}
+
+func (s *SQLiteStore) GetCuratedFrameThumbnail(ctx context.Context, id string) ([]byte, error) {
+	var thumb, image []byte
+	err := s.db.QueryRowContext(ctx, `SELECT thumb_blob, image_blob FROM curated_frames WHERE id = ?`, id).Scan(&thumb, &image)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(thumb) > 0 {
+		return thumb, nil
+	}
+	return image, nil
+}
+
+func (s *SQLiteStore) FindNearbyCuratedFrame(ctx context.Context, movieID string, positionSec, thresholdSec float64) (*CuratedFrameMeta, error) {
+	if strings.TrimSpace(movieID) == "" || thresholdSec <= 0 {
+		return nil, nil
+	}
+
+	var meta CuratedFrameMeta
+	var actorsJSON, tagsJSON string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
+		FROM curated_frames
+		WHERE movie_id = ? AND ABS(position_sec - ?) <= ?
+		ORDER BY ABS(position_sec - ?) ASC, captured_at DESC
+		LIMIT 1
+	`, movieID, positionSec, thresholdSec, positionSec).Scan(
+		&meta.ID,
+		&meta.MovieID,
+		&meta.Title,
+		&meta.Code,
+		&actorsJSON,
+		&meta.PositionSec,
+		&meta.CapturedAt,
+		&tagsJSON,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	_ = scanCuratedMeta(actorsJSON, tagsJSON, &meta)
+	return &meta, nil
 }
 
 // ErrCuratedFrameNotFound is returned when a curated frame id does not exist.

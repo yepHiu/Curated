@@ -558,7 +558,10 @@ type CuratedFrameItemDTO struct {
 }
 
 type CuratedFramesListDTO struct {
-	Items []CuratedFrameItemDTO `json:"items"`
+	Items  []CuratedFrameItemDTO `json:"items"`
+	Total  int                   `json:"total"`
+	Limit  int                   `json:"limit"`
+	Offset int                   `json:"offset"`
 }
 
 // CreateCuratedFrameBody is the JSON body for POST /api/curated-frames (image as standard base64, no data: prefix).
@@ -572,6 +575,19 @@ type CreateCuratedFrameBody struct {
 	CapturedAt  string   `json:"capturedAt"`
 	Tags        []string `json:"tags"`
 	ImageBase64 string   `json:"imageBase64"`
+}
+
+type CuratedFrameStatsDTO struct {
+	Total int `json:"total"`
+}
+
+type CuratedFrameFacetItemDTO struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type CuratedFrameFacetListDTO struct {
+	Items []CuratedFrameFacetItemDTO `json:"items"`
 }
 
 // PatchCuratedFrameTagsBody is the JSON body for PATCH /api/curated-frames/{id}/tags.

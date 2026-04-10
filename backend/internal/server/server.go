@@ -237,7 +237,11 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/playback/progress/{movieId}", h.handleDeletePlaybackProgress)
 
 	mux.HandleFunc("GET /api/curated-frames", h.handleListCuratedFrames)
+	mux.HandleFunc("GET /api/curated-frames/stats", h.handleGetCuratedFrameStats)
+	mux.HandleFunc("GET /api/curated-frames/tags", h.handleListCuratedFrameTags)
+	mux.HandleFunc("GET /api/curated-frames/actors", h.handleListCuratedFrameActors)
 	mux.HandleFunc("POST /api/curated-frames", h.handlePostCuratedFrame)
+	mux.HandleFunc("GET /api/curated-frames/{id}/thumbnail", h.handleGetCuratedFrameThumbnail)
 	mux.HandleFunc("GET /api/curated-frames/{id}/image", h.handleGetCuratedFrameImage)
 	mux.HandleFunc("PATCH /api/curated-frames/{id}/tags", h.handlePatchCuratedFrameTags)
 	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)
@@ -1836,12 +1840,17 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 }
 
 func writeAppError(w http.ResponseWriter, status int, code string, message string) {
+	writeAppErrorWithDetails(w, status, code, message, nil)
+}
+
+func writeAppErrorWithDetails(w http.ResponseWriter, status int, code string, message string, details map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(contracts.AppError{
 		Code:      code,
 		Message:   message,
 		Retryable: status >= 500,
+		Details:   details,
 	})
 }
 

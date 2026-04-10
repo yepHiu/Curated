@@ -13,13 +13,18 @@ import (
 
 // FrameMetaJSON is embedded in EXIF UserComment as UTF-8 JSON.
 type FrameMetaJSON struct {
-	Title       string   `json:"title"`
-	Code        string   `json:"code"`
-	Actors      []string `json:"actors"`
-	PositionSec float64  `json:"positionSec"`
-	CapturedAt  string   `json:"capturedAt"`
-	FrameID     string   `json:"frameId"`
-	MovieID     string   `json:"movieId"`
+	Title         string   `json:"title"`
+	Code          string   `json:"code"`
+	Actors        []string `json:"actors"`
+	PositionSec   float64  `json:"positionSec"`
+	CapturedAt    string   `json:"capturedAt"`
+	FrameID       string   `json:"frameId"`
+	MovieID       string   `json:"movieId"`
+	Tags          []string `json:"tags"`
+	SchemaVersion int      `json:"schemaVersion"`
+	ExportedAt    string   `json:"exportedAt"`
+	AppName       string   `json:"appName"`
+	AppVersion    string   `json:"appVersion"`
 }
 
 // EncodePNGToWebP decodes PNG bytes, re-encodes as lossy WebP, and embeds EXIF UserComment JSON.

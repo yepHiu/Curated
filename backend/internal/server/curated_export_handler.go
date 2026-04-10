@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"go.uber.org/zap"
@@ -17,6 +18,7 @@ import (
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/curatedexport"
 	"curated-backend/internal/storage"
+	"curated-backend/internal/version"
 )
 
 const maxCuratedExportFrames = 20
@@ -107,6 +109,8 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 		data []byte
 	}
 	files := make([]outFile, 0, len(rows))
+	exportedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	appVersion := version.Display()
 
 	for _, row := range rows {
 		if len(row.ImageBlob) == 0 {
@@ -123,13 +127,18 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 			return
 		}
 		meta := curatedexport.FrameMetaJSON{
-			Title:       row.Title,
-			Code:        row.Code,
-			Actors:      row.Actors,
-			PositionSec: row.PositionSec,
-			CapturedAt:  row.CapturedAt,
-			FrameID:     row.ID,
-			MovieID:     row.MovieID,
+			Title:         row.Title,
+			Code:          row.Code,
+			Actors:        row.Actors,
+			PositionSec:   row.PositionSec,
+			CapturedAt:    row.CapturedAt,
+			FrameID:       row.ID,
+			MovieID:       row.MovieID,
+			Tags:          row.Tags,
+			SchemaVersion: 1,
+			ExportedAt:    exportedAt,
+			AppName:       "Curated",
+			AppVersion:    appVersion,
 		}
 		var outBytes []byte
 		var fname string
