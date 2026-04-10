@@ -398,7 +398,7 @@ function isChipActive(tag: string): boolean {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 rounded-[1.5rem] border border-border/60 bg-background/40 p-2 sm:p-3 lg:p-4">
+    <div class="min-h-0 flex-1">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
         :selected-movie-id="props.selectedMovie?.id"
