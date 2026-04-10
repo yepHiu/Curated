@@ -1095,9 +1095,6 @@ defineExpose({
 
             <div class="flex flex-col gap-3">
               <p class="text-sm font-medium">{{ t("curated.tagsSectionTitle") }}</p>
-              <p class="text-xs text-muted-foreground">
-                {{ t("curated.tagsSectionHint") }}
-              </p>
               <div class="flex flex-wrap items-center gap-2">
                 <Badge
                   v-for="tag in dialogTags"
