@@ -33,7 +33,7 @@
 | Lint | `pnpm lint` | `npm run lint` |
 | 测试 | `pnpm test` | `npm run test` |
 | 构建 | `pnpm build` | `npm run build` |
-| 单文件 Vitest | `pnpm vitest run <file>` | `npx vitest run <file>` |
+| 单文件 Vitest | `pnpm test -- <file>` | `npm run test -- <file>` |
 
 若用 **`npm`** 管理依赖并需提交锁文件，应维护 **`package-lock.json`**；**不要**在同一 PR 里混改 `pnpm-lock.yaml` 与 `package-lock.json` 且无说明，以免团队混乱。
 
@@ -105,7 +105,7 @@ pnpm dev
 **单测文件**（示例）：
 
 ```bash
-pnpm vitest run path/to/file.test.ts
+pnpm test -- path/to/file.test.ts
 ```
 
 ---

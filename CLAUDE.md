@@ -36,7 +36,7 @@ pnpm lint
 pnpm test
 
 # Run single test file
-pnpm vitest run src/path/to/file.test.ts
+pnpm test -- src/path/to/file.test.ts
 
 # Type check only
 pnpm typecheck
@@ -209,10 +209,14 @@ GET    /api/tasks/{taskId}                  # Get task status
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
-GET    /api/curated-frames                  # List curated frames
-POST   /api/curated-frames                  # Create curated frame
-POST   /api/curated-frames/export           # Export 1–20 frames as WebP (EXIF JSON) or ZIP
+GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset; returns total/limit/offset)
+GET    /api/curated-frames/stats            # Curated frames total count
+GET    /api/curated-frames/tags             # Curated frame tag facets
+GET    /api/curated-frames/actors           # Curated frame actor facets
+POST   /api/curated-frames                  # Create curated frame (legacy JSON imageBase64 or multipart metadata + image); near-duplicates are allowed and reviewed in the library UI
+POST   /api/curated-frames/export           # Export 1–20 frames as WebP/PNG with embedded tags/schemaVersion/exportedAt/appName/appVersion or ZIP
 GET    /api/curated-frames/{id}/image       # Get curated frame image
+GET    /api/curated-frames/{id}/thumbnail   # Get curated frame thumbnail
 PATCH  /api/curated-frames/{id}/tags        # Update frame tags
 DELETE /api/curated-frames/{id}             # Delete curated frame
 POST   /api/providers/ping                  # Ping a single provider
@@ -339,8 +343,8 @@ User comments/notes per movie:
 
 Frame extraction and management:
 
-- **Web API mode:** `POST/GET/PATCH/DELETE /api/curated-frames` with `GET /api/curated-frames/{id}/image`
-- **Export:** `POST /api/curated-frames/export` supports WebP (EXIF metadata) or PNG (iTXt metadata) formats
+- **Web API mode:** paginated `GET /api/curated-frames`, `GET /api/curated-frames/stats`, `GET /api/curated-frames/tags`, `GET /api/curated-frames/actors`, `POST/GET/PATCH/DELETE /api/curated-frames`, with `GET /api/curated-frames/{id}/image` and `GET /api/curated-frames/{id}/thumbnail`
+- **Export:** `POST /api/curated-frames/export` supports WebP (EXIF metadata) or PNG (iTXt metadata) formats and now embeds `tags`, `schemaVersion`, `exportedAt`, `appName`, and `appVersion`
 - **Mock mode:** Stored in IndexedDB
 
 ### Trash/Restore

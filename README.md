@@ -123,7 +123,15 @@ See `backend/internal/server/server.go` for the full route table. Highlights:
 | POST | `/api/library/actors/scrape` | Scrape actor metadata (task) |
 | GET/POST | `/api/library/played-movies` … | Played stats |
 | GET/PUT/DELETE | `/api/playback/progress` … | Playback progress (SQLite) |
-| POST/GET/… | `/api/curated-frames` … | Curated frames + export |
+| GET | `/api/curated-frames` | Curated frames page query (`q` / `actor` / `movieId` / `tag` / `limit` / `offset`) |
+| GET | `/api/curated-frames/stats` | Curated frames count |
+| GET | `/api/curated-frames/tags` | Curated frame tag facets |
+| GET | `/api/curated-frames/actors` | Curated frame actor facets |
+| POST | `/api/curated-frames` | Create curated frame (legacy JSON `imageBase64` or multipart `metadata` + `image`); near-duplicate captures are allowed and should be reviewed in the curated frames library UI |
+| GET | `/api/curated-frames/{id}/image` | Full curated frame image |
+| GET | `/api/curated-frames/{id}/thumbnail` | Curated frame thumbnail |
+| PATCH/DELETE | `/api/curated-frames/{id}/…` | Update tags / delete frame |
+| POST | `/api/curated-frames/export` | Export 1–20 curated frames as WebP/PNG with embedded metadata (`tags`, `schemaVersion`, `exportedAt`, `appName`, `appVersion`) or ZIP |
 | POST | `/api/scans` | Start library scan |
 | GET | `/api/tasks/recent` | Recent finished tasks |
 | GET | `/api/tasks/{taskId}` | Task status |
@@ -168,7 +176,7 @@ pnpm build      # typecheck + production build
 pnpm preview    # Preview build
 pnpm typecheck  # vue-tsc only
 pnpm lint       # ESLint
-pnpm test       # Vitest
+pnpm test       # Vitest (Windows-safe: native config loader + threads pool)
 ```
 
 ## Release Packaging

@@ -396,6 +396,11 @@
     <li><code>DELETE .../{movieId}</code> — 删除影片记录及相关缓存策略由存储层实现。</li>
     <li><code>GET/PATCH /api/settings</code> — 设置 DTO（含 <code>organizeLibrary</code>、<code>autoLibraryWatch</code>、<code>metadataMovieStrategy</code>、元数据源等）。</li>
     <li><code>GET /api/library/actors/{name}/asset/avatar</code> — 演员头像同源缓存资源；演员资料刮削成功后会异步下载头像到本地缓存。</li>
+    <li><code>GET /api/curated-frames</code> — 萃取帧分页查询；支持 <code>q</code>、<code>actor</code>、<code>movieId</code>、<code>tag</code>、<code>limit</code>、<code>offset</code>，响应带 <code>total</code>/<code>limit</code>/<code>offset</code>。</li>
+    <li><code>GET /api/curated-frames/stats</code>、<code>GET /api/curated-frames/tags</code>、<code>GET /api/curated-frames/actors</code> — 提供萃取帧总数与标签/演员 facet 聚合，前端不再依赖全量列表自行计数。</li>
+    <li><code>POST /api/curated-frames</code> — 兼容旧 JSON <code>imageBase64</code> 与新 <code>multipart/form-data</code>（<code>metadata</code> + <code>image</code>）上传；入库时生成缩略图 BLOB，不再因同片 3 秒阈值内的近重复帧阻断保存，重复治理改到萃取帧库页面内提示用户复核并删除多余项。</li>
+    <li><code>GET /api/curated-frames/{id}/image</code>、<code>GET /api/curated-frames/{id}/thumbnail</code> — 分别提供原图与缩略图；历史行缺少缩略图时可回退原图。</li>
+    <li><code>POST /api/curated-frames/export</code> — WebP EXIF 与 PNG iTXt 导出元数据统一补齐 <code>tags</code>、<code>schemaVersion</code>、<code>exportedAt</code>、<code>appName</code>、<code>appVersion</code>。</li>
     <li><code>POST/PATCH/DELETE /api/library/paths</code> — 库路径 CRUD。</li>
     <li><code>POST /api/scans</code>、<code>GET /api/tasks/recent</code>、<code>GET /api/tasks/{taskId}</code> — 扫描与任务状态。</li>
   </ul>

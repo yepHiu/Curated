@@ -24,4 +24,12 @@ Bad: return a raw scraper payload or a CLI-formatted text blob directly to rende
 
 ## Curated frames export (HTTP)
 
-- **`POST /api/curated-frames/export`**：Body `{ ids: string[], actorName?: string }`（`ids` 去重后 1～20）。可选 **`actorName`** 须属于每帧的 `actors`，用于文件名中的演员段；省略时用首演员或 `unknown`。响应：单张 **`image/webp`**（含 EXIF UserComment JSON）；多张 **`application/zip`**。错误码含 **`CURATED_EXPORT_ACTOR_MISMATCH`**（演员与帧不匹配）。
+- **`POST /api/curated-frames/export`**：Body `{ ids: string[], actorName?: string, format?: "webp" | "png" }`（`ids` 去重后 1～20）。可选 **`actorName`** 须属于每帧的 `actors`，用于文件名中的演员段；省略时用首演员或 `unknown`。单张返回 `image/webp` 或 `image/png`，多张返回 `application/zip`。嵌入元数据至少包含 `title`、`code`、`actors`、`positionSec`、`capturedAt`、`frameId`、`movieId`、`tags`、`schemaVersion`、`exportedAt`、`appName`、`appVersion`。错误码含 **`CURATED_EXPORT_ACTOR_MISMATCH`**（演员与帧不匹配）。
+
+## Curated frames library (HTTP)
+
+- **`GET /api/curated-frames`**：查询参数支持 `q`、`actor`、`movieId`、`tag`、`limit`、`offset`；响应为 `{ items, total, limit, offset }`，不要再假设前端必须拉取全量列表后自行计数。
+- **`GET /api/curated-frames/stats`**：返回聚合统计 `{ total }`，供侧栏/设置页等轻量计数场景使用。
+- **`GET /api/curated-frames/tags`**、**`GET /api/curated-frames/actors`**：返回 facet 结构 `{ items: [{ name, count }] }`，用于建议词与过滤面板，避免前端从当前页数据反推全库聚合。
+- **`POST /api/curated-frames`**：兼容两种创建契约：旧版 JSON `{ ...metadata, imageBase64 }` 与新版 `multipart/form-data`（`metadata` JSON + `image` 文件）。新增上传路径时必须保持旧 JSON 路径兼容，直到前端全部切换完成。接口不因同片近重复帧阻断保存；同一 `movieId` 且 `positionSec` 在 3 秒阈值内的治理应在萃取帧库页面以提示、标记和建议删除的形式处理。
+- **`GET /api/curated-frames/{id}/thumbnail`**：返回缩略图资源；后端可为历史数据回退原图，但对前端的稳定契约仍是“可直接展示的缩略图 URL”。
