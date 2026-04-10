@@ -119,7 +119,6 @@
     "captureNoCtx": "キャンバスコンテキストを作成できません",
     "captureCors": "キャプチャ不可（CORS なしのクロスオリジン）",
     "captureBlobFail": "画像のエクスポートに失敗",
-    "detailDialogDesc": "フレームの詳細とタグ。閉じるとタグを保存。タグはキュレートライブラリ専用で、作品のユーザータグとは無関係。タグをクリックすると上部検索で同名フレームに絞り込みます。",
     "fieldCode": "品番",
     "fieldActors": "出演者",
     "fieldPosition": "再生位置",

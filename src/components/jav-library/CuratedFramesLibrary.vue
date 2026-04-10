@@ -1069,9 +1069,6 @@ defineExpose({
               <DialogTitle class="line-clamp-3 text-lg font-semibold leading-snug sm:text-xl">
                 {{ selected?.title }}
               </DialogTitle>
-              <DialogDescription class="text-xs sm:text-sm">
-                {{ t("curated.detailDialogDesc") }}
-              </DialogDescription>
             </DialogHeader>
 
             <dl class="space-y-3 text-sm">

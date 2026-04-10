@@ -119,7 +119,6 @@
     "captureNoCtx": "无法创建画布上下文",
     "captureCors": "无法截取画面（可能为跨域资源且无 CORS）",
     "captureBlobFail": "导出图像失败",
-    "detailDialogDesc": "萃取帧详情与标签；关闭对话框将保存标签。标签仅属于萃取帧库，与影片「我的标签」无关；点击标签会在本页用顶栏搜索筛选同名萃取帧。",
     "fieldCode": "番号",
     "fieldActors": "演员",
     "fieldPosition": "片内时间",

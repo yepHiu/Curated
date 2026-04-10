@@ -119,7 +119,6 @@
     "captureNoCtx": "Cannot create canvas context",
     "captureCors": "Cannot capture (cross-origin without CORS)",
     "captureBlobFail": "Failed to export image",
-    "detailDialogDesc": "Frame details and tags; closing saves tags. Tags belong to the curated library only, not movie user tags. Click a tag to filter curated frames via the top search.",
     "fieldCode": "Code",
     "fieldActors": "Actors",
     "fieldPosition": "Time in video",
