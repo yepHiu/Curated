@@ -1223,7 +1223,7 @@ defineExpose({
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
                   :disabled="exportBusy"
