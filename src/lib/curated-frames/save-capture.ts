@@ -9,19 +9,6 @@ import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => {
-      const s = r.result as string
-      const i = s.indexOf(",")
-      resolve(i >= 0 ? s.slice(i + 1) : s)
-    }
-    r.onerror = () => reject(r.error ?? new Error("read failed"))
-    r.readAsDataURL(blob)
-  })
-}
-
 export type SaveCuratedCaptureResult =
   | { ok: true }
   | { ok: false; reason: string }
@@ -75,8 +62,7 @@ export async function saveCuratedCaptureFromVideo(
 
   try {
     if (USE_WEB) {
-      const imageBase64 = await blobToBase64(cap.blob)
-      await api.createCuratedFrame({
+      await api.createCuratedFrameUpload({
         id: row.id,
         movieId: row.movieId,
         title: row.title,
@@ -85,13 +71,13 @@ export async function saveCuratedCaptureFromVideo(
         positionSec: row.positionSec,
         capturedAt: row.capturedAt,
         tags: row.tags,
-        imageBase64,
-      })
+      }, cap.blob)
       bumpCuratedFramesRevision()
     } else {
       await putCuratedFrame(row)
     }
-  } catch {
+  } catch (error) {
+    void error
     return {
       ok: false,
       reason: USE_WEB

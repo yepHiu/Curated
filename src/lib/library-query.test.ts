@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   buildBrowseRouteTarget,
+  buildClearLibraryActorFilterQuery,
   buildMovieRouteQuery,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
@@ -157,6 +158,24 @@ describe("library query helpers", () => {
       selected: "id-1",
       tab: "new",
     })
+  })
+
+  it("clears equivalent q when clearing actor filter", () => {
+    expect(
+      buildClearLibraryActorFilterQuery(
+        { actor: "Mina", q: " mina ", selected: "movie-1", tab: "new" },
+        "Mina",
+      ),
+    ).toEqual({ tab: "new" })
+  })
+
+  it("keeps unrelated q when clearing actor filter", () => {
+    expect(
+      buildClearLibraryActorFilterQuery(
+        { actor: "Mina", q: "studio keyword", selected: "movie-1", tab: "new" },
+        "Mina",
+      ),
+    ).toEqual({ q: "studio keyword", tab: "new" })
   })
 
   it("reads exact studio filter and merges studio patch", () => {

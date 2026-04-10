@@ -16,6 +16,7 @@ import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import {
   buildMovieRouteQuery,
+  buildClearLibraryActorFilterQuery,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
@@ -741,13 +742,9 @@ const clearExactTagFilter = async () => {
 }
 
 const clearExactActorFilter = async () => {
-  const patch: Partial<Record<"q" | "actor", string | undefined>> = { actor: undefined }
-  if (actorResolvedFromSearch.value && searchQuery.value.trim() !== "") {
-    patch.q = undefined
-  }
   await router.replace({
     name: libraryMode.value,
-    query: mergeLibraryQuery(route.query, patch),
+    query: buildClearLibraryActorFilterQuery(route.query, actorProfileDisplayName.value),
   })
 }
 

@@ -449,8 +449,20 @@ export interface CuratedFrameItemDTO {
   tags: string[]
 }
 
+export interface ListCuratedFramesParams {
+  q?: string
+  actor?: string
+  movieId?: string
+  tag?: string
+  limit?: number
+  offset?: number
+}
+
 export interface CuratedFramesListDTO {
   items: CuratedFrameItemDTO[]
+  total: number
+  limit: number
+  offset: number
 }
 
 /** POST /curated-frames */
@@ -463,12 +475,25 @@ export interface CreateCuratedFrameBody {
   positionSec: number
   capturedAt: string
   tags?: string[]
-  imageBase64: string
+  imageBase64?: string
 }
 
 /** PATCH /curated-frames/{id}/tags */
 export interface PatchCuratedFrameTagsBody {
   tags: string[]
+}
+
+export interface CuratedFrameStatsDTO {
+  total: number
+}
+
+export interface CuratedFrameFacetItemDTO {
+  name: string
+  count: number
+}
+
+export interface CuratedFrameFacetListDTO {
+  items: CuratedFrameFacetItemDTO[]
 }
 
 /** POST /curated-frames/export → WebP/PNG 单文件或 ZIP */

@@ -9,7 +9,7 @@
     "backend:build:dev": "powershell -ExecutionPolicy Bypass -File scripts/dev/build-backend.ps1",
     "typecheck": "vue-tsc -b",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --configLoader native --pool threads",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
     "release:frontend": "powershell -ExecutionPolicy Bypass -File scripts/release/build-frontend.ps1 -Version 0.0.0-local",

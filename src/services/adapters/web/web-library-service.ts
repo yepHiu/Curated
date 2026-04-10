@@ -134,8 +134,8 @@ function loadTrashedMovies(): Promise<Movie[]> {
 
 async function refreshCuratedFramesCountFromApi() {
   try {
-    const { items } = await api.listCuratedFrames()
-    curatedFramesCountState.value = items.length
+    const { total } = await api.getCuratedFrameStats()
+    curatedFramesCountState.value = total
   } catch {
     curatedFramesCountState.value = 0
   }

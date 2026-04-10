@@ -131,6 +131,7 @@
     "tagSuggestAria": "タグ候補",
     "playFromTime": "この位置から再生",
     "deleteThisFrame": "このフレームを削除",
+    "deleteSelectedFrames": "選択分を削除",
     "deleteWorking": "削除中…",
     "deleteCardAria": "このキュレートフレームを削除",
     "exportWebp": "WebP でエクスポート",
@@ -150,7 +151,18 @@
     "batchSelectGroupCapped": "このグループは {max} 枚を超えています。先頭 {max} 枚のみ選択しました（エクスポート上限）。",
     "multiSelectHint": "一括管理：カードを選択し、下部バーから WebP または PNG をエクスポート（Web API が必要）。",
     "multiSelectEnter": "一括管理",
-    "multiSelectExit": "一括を終了"
+    "multiSelectExit": "一括を終了",
+    "deleteSelectedLabel": "{n} 枚のフレーム",
+    "deletePartialFailed": "{total} 枚中 {done} 枚を削除しましたが、残りの削除に失敗しました。後でもう一度試してください。",
+    "duplicateFrameExists": "この再生位置の近くに既存のキュレートフレームがあります。あとでライブラリで確認できます。",
+    "duplicateReviewTitle": "重複の可能性があるフレームグループが {count} 件あります",
+    "duplicateReviewBody": "同じ作品で {threshold} 秒以内のフレームをここでマークしています。内容を確認して不要なものを削除してください。",
+    "duplicateReviewBadge": "重複候補",
+    "duplicateReviewDialogHint": "このフレームは同じ作品の他の萃取フレームと {threshold} 秒以内で近接しています。確認して不要なものを削除してください。",
+    "tagSaveDirty": "タグの変更はまだ保存されていません。",
+    "tagSaveSaved": "タグを保存しました。",
+    "tagSaveFailed": "タグの保存に失敗しました。下書きは保持されています。",
+    "tagSaveRetry": "再保存"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",

@@ -131,6 +131,7 @@
     "tagSuggestAria": "标签建议",
     "playFromTime": "从该时间点播放",
     "deleteThisFrame": "删除此萃取帧",
+    "deleteSelectedFrames": "删除所选",
     "deleteWorking": "删除中…",
     "deleteCardAria": "删除此萃取帧",
     "exportWebp": "导出 WebP",
@@ -150,7 +151,18 @@
     "batchSelectGroupCapped": "该组超过 {max} 张，已自动只选前 {max} 张（导出单次上限）。",
     "multiSelectHint": "批量管理：可勾选卡片后在底部栏导出 WebP 或 PNG（需 Web API）。",
     "multiSelectEnter": "批量管理",
-    "multiSelectExit": "退出批量"
+    "multiSelectExit": "退出批量",
+    "deleteSelectedLabel": "已选 {n} 张萃取帧",
+    "deletePartialFailed": "已删除 {done} / {total} 张，剩余项删除失败，请稍后重试。",
+    "duplicateFrameExists": "该时间点附近已有萃取帧，可稍后在萃取帧库中复核。",
+    "duplicateReviewTitle": "发现 {count} 组可能重复的萃取帧",
+    "duplicateReviewBody": "同一影片内 {threshold} 秒以内的萃取帧已标记出来；建议确认画面后删除多余项。",
+    "duplicateReviewBadge": "可能重复",
+    "duplicateReviewDialogHint": "这张帧与同片 {threshold} 秒内的其他萃取帧接近，建议确认后删除多余项。",
+    "tagSaveDirty": "标签变更尚未保存。",
+    "tagSaveSaved": "标签已保存。",
+    "tagSaveFailed": "标签保存失败，草稿已保留。",
+    "tagSaveRetry": "重试保存"
   },
   "stats": {
     "moviesInLibrary": "入库影片",

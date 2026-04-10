@@ -25,6 +25,8 @@ import type {
   AddLibraryPathBody,
   AddLibraryPathResultDTO,
   CreateCuratedFrameBody,
+  CuratedFrameFacetListDTO,
+  CuratedFrameStatsDTO,
   CreatePlaybackSessionBody,
   CuratedFramesListDTO,
   DevPerformanceSummaryDTO,
@@ -32,6 +34,7 @@ import type {
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListActorsParams,
+  ListCuratedFramesParams,
   ListMoviesParams,
   MetadataRefreshQueuedDTO,
   NativePlaybackLaunchDTO,
@@ -201,12 +204,33 @@ export const api = {
     return httpClient.delete(`/playback/progress/${encodeURIComponent(movieId)}`)
   },
 
-  listCuratedFrames(): Promise<CuratedFramesListDTO> {
-    return httpClient.get<CuratedFramesListDTO>("/curated-frames")
+  listCuratedFrames(params?: ListCuratedFramesParams): Promise<CuratedFramesListDTO> {
+    return httpClient.get<CuratedFramesListDTO>("/curated-frames", params as Record<string, string | number | undefined>)
+  },
+
+  getCuratedFrameStats(): Promise<CuratedFrameStatsDTO> {
+    return httpClient.get<CuratedFrameStatsDTO>("/curated-frames/stats")
+  },
+
+  listCuratedFrameTags(): Promise<CuratedFrameFacetListDTO> {
+    return httpClient.get<CuratedFrameFacetListDTO>("/curated-frames/tags")
+  },
+
+  listCuratedFrameActors(): Promise<CuratedFrameFacetListDTO> {
+    return httpClient.get<CuratedFrameFacetListDTO>("/curated-frames/actors")
   },
 
   createCuratedFrame(body: CreateCuratedFrameBody): Promise<void> {
     return httpClient.post<void>("/curated-frames", body)
+  },
+
+  createCuratedFrameUpload(body: CreateCuratedFrameBody, image: Blob): Promise<void> {
+    const form = new FormData()
+    const { imageBase64: _imageBase64, ...metadata } = body
+    void _imageBase64
+    form.set("metadata", JSON.stringify(metadata))
+    form.set("image", image, "frame.png")
+    return httpClient.postForm<void>("/curated-frames", form)
   },
 
   patchCuratedFrameTags(id: string, body: PatchCuratedFrameTagsBody): Promise<void> {

@@ -192,6 +192,21 @@ export const buildMovieRouteQuery = (
     selected: selectedMovieId,
   })
 
+export const buildClearLibraryActorFilterQuery = (
+  currentQuery: LocationQuery,
+  activeActorName: string,
+) => {
+  const actorName = activeActorName.trim().toLowerCase()
+  const searchQuery = getLibrarySearchQuery(currentQuery).trim()
+  const shouldClearSearch = actorName !== "" && searchQuery.toLowerCase() === actorName
+
+  return mergeLibraryQuery(currentQuery, {
+    actor: undefined,
+    q: shouldClearSearch ? undefined : searchQuery || undefined,
+    selected: undefined,
+  })
+}
+
 /** 萃取帧库专用搜索（与影片库 `q` 隔离） */
 export const getCuratedFrameSearchQuery = (query: LocationQuery) =>
   typeof query.cfq === "string" ? query.cfq : ""

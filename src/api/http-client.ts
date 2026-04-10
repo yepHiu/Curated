@@ -130,6 +130,14 @@ export const httpClient = {
     return handleResponse<T>(response)
   },
 
+  async postForm<T>(path: string, body: FormData): Promise<T> {
+    const response = await monitoredFetch("POST", path, {
+      headers: { "Accept": "application/json" },
+      body,
+    })
+    return handleResponse<T>(response)
+  },
+
   async patch<T>(path: string, body?: unknown): Promise<T> {
     const response = await monitoredFetch("PATCH", path, {
       headers: {

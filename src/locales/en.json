@@ -131,6 +131,7 @@
     "tagSuggestAria": "Tag suggestions",
     "playFromTime": "Play from this time",
     "deleteThisFrame": "Delete this frame",
+    "deleteSelectedFrames": "Delete selected",
     "deleteWorking": "Deleting…",
     "deleteCardAria": "Delete this curated frame",
     "exportWebp": "Export WebP",
@@ -150,7 +151,18 @@
     "batchSelectGroupCapped": "This group has more than {max} frames; only the first {max} are selected (export limit).",
     "multiSelectHint": "Batch management: select cards, then export WebP or PNG from the bottom bar (Web API required).",
     "multiSelectEnter": "Batch manage",
-    "multiSelectExit": "Exit batch"
+    "multiSelectExit": "Exit batch",
+    "deleteSelectedLabel": "{n} selected frames",
+    "deletePartialFailed": "Deleted {done} / {total} frames, but the remaining delete failed. Try again later.",
+    "duplicateFrameExists": "A curated frame already exists near this playback moment; review it later in the curated frames library.",
+    "duplicateReviewTitle": "Found {count} possible duplicate frame groups",
+    "duplicateReviewBody": "Frames from the same movie within {threshold} seconds are marked here. Review them and delete the extras you do not want.",
+    "duplicateReviewBadge": "Possible duplicate",
+    "duplicateReviewDialogHint": "This frame is close to other captures from the same movie within {threshold} seconds. Review them before deleting the extras.",
+    "tagSaveDirty": "Tag changes are not saved yet.",
+    "tagSaveSaved": "Tags saved.",
+    "tagSaveFailed": "Saving tags failed. Draft kept in place.",
+    "tagSaveRetry": "Retry save"
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

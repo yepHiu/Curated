@@ -41,6 +41,18 @@ import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-ke
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { curatedFrameImageUrl, curatedFrameThumbnailUrl } from "@/lib/curated-frame-image-url"
 import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
+import { deleteCuratedFramesBatch } from "@/lib/curated-frames/batch-delete"
+import {
+  buildCuratedFrameNearDuplicateIndex,
+  findCuratedFrameNearDuplicateGroups,
+  type CuratedFrameNearDuplicateGroup,
+} from "@/lib/curated-frames/near-duplicates"
+import {
+  commitCuratedFrameTags,
+  shouldCommitCuratedFrameTagDraft,
+  shouldShowCuratedFrameTagRetry,
+  type CuratedFrameTagSaveStatus,
+} from "@/lib/curated-frames/p2-state"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
 
@@ -62,6 +74,7 @@ const namedActorForExport = ref<string | null>(null)
 const selectedFrameIds = ref<string[]>([])
 const exportToolbarError = ref("")
 const exportBusy = ref(false)
+const batchDeleteBusy = ref(false)
 const dialogOpenedFromActor = ref<string | null>(null)
 const dialogExportError = ref("")
 
@@ -399,11 +412,21 @@ watch(
 )
 
 onUnmounted(() => {
+  if (dialogTagSaveTimer) {
+    clearTimeout(dialogTagSaveTimer)
+    dialogTagSaveTimer = null
+  }
   revokeAllUrls()
 })
 
 const isEmpty = computed(() => !rowsLoading.value && listWithUrls.value.length === 0)
 const hasMoreRows = computed(() => rawRows.value.length < totalRows.value)
+const curatedFrameNearDuplicateThresholdSec = 3
+const nearDuplicateGroups = computed(() =>
+  findCuratedFrameNearDuplicateGroups(rawRows.value, curatedFrameNearDuplicateThresholdSec),
+)
+const nearDuplicateFrameIds = computed(() => buildCuratedFrameNearDuplicateIndex(nearDuplicateGroups.value))
+const nearDuplicateSummaryGroups = computed(() => nearDuplicateGroups.value.slice(0, 3))
 
 /** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
 const batchShowSelectVisible = computed(() => mainTab.value !== "actors")
@@ -490,6 +513,13 @@ const dialogOpen = ref(false)
 const selected = ref<CuratedFrameRecord | null>(null)
 const selectedImageUrl = ref("")
 const dialogTags = ref<string[]>([])
+const dialogTagSaveStatus = ref<CuratedFrameTagSaveStatus>("idle")
+const dialogTagSaveError = ref("")
+const lastSavedDialogTags = ref<string[]>([])
+const dialogTagSaveDebounceMs = 250
+
+let dialogTagSaveTimer: ReturnType<typeof setTimeout> | null = null
+let dialogTagSaveInFlight = false
 
 /** 与详情页「我的标签」一致：内联添加 */
 const newUserTagDraft = ref("")
@@ -544,6 +574,32 @@ function resetTagInputState() {
   userTagInputOpen.value = false
 }
 
+function sameDialogTags(a: string[], b: string[]) {
+  if (a.length !== b.length) {
+    return false
+  }
+  return a.every((tag, index) => tag === b[index])
+}
+
+function resetDialogTagSaveState(savedTags: string[] = []) {
+  if (dialogTagSaveTimer) {
+    clearTimeout(dialogTagSaveTimer)
+    dialogTagSaveTimer = null
+  }
+  dialogTagSaveInFlight = false
+  lastSavedDialogTags.value = [...savedTags]
+  dialogTagSaveStatus.value = "idle"
+  dialogTagSaveError.value = ""
+}
+
+function resetDialogState() {
+  selected.value = null
+  selectedImageUrl.value = ""
+  resetTagInputState()
+  resetDialogTagSaveState()
+  dialogOpen.value = false
+}
+
 function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   const { imageBlob, ...meta } = item.row
   void imageBlob
@@ -553,18 +609,108 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   selectedImageUrl.value = imageBlob ? item.url : curatedFrameImageUrl(item.row.id)
   dialogTags.value = [...item.row.tags]
   resetTagInputState()
+  resetDialogTagSaveState(item.row.tags)
   dialogOpen.value = true
+}
+
+watch(
+  dialogTags,
+  (nextTags) => {
+    if (!selected.value) {
+      return
+    }
+    dialogTagSaveError.value = ""
+    if (!shouldCommitCuratedFrameTagDraft({
+      tags: nextTags,
+      lastSavedTags: lastSavedDialogTags.value,
+      saveInFlight: dialogTagSaveInFlight,
+    })) {
+      dialogTagSaveStatus.value = sameDialogTags(nextTags, lastSavedDialogTags.value)
+        ? "idle"
+        : dialogTagSaveStatus.value
+      return
+    }
+    dialogTagSaveStatus.value = "dirty"
+    if (dialogTagSaveTimer) {
+      clearTimeout(dialogTagSaveTimer)
+    }
+    dialogTagSaveTimer = setTimeout(() => {
+      dialogTagSaveTimer = null
+      void persistDialogTags()
+    }, dialogTagSaveDebounceMs)
+  },
+  { deep: true },
+)
+
+async function persistDialogTags(options: { toastOnError?: boolean } = {}) {
+  const frame = selected.value
+  if (!frame) {
+    return true
+  }
+  if (dialogTagSaveTimer) {
+    clearTimeout(dialogTagSaveTimer)
+    dialogTagSaveTimer = null
+  }
+  if (dialogTagSaveInFlight) {
+    return false
+  }
+  if (!shouldCommitCuratedFrameTagDraft({
+    tags: dialogTags.value,
+    lastSavedTags: lastSavedDialogTags.value,
+    saveInFlight: dialogTagSaveInFlight,
+  })) {
+    dialogTagSaveStatus.value = sameDialogTags(dialogTags.value, lastSavedDialogTags.value)
+      ? "idle"
+      : dialogTagSaveStatus.value
+    return true
+  }
+  dialogTagSaveInFlight = true
+  dialogTagSaveStatus.value = "saving"
+  dialogTagSaveError.value = ""
+  const result = await commitCuratedFrameTags({
+    frameId: frame.id,
+    tags: dialogTags.value,
+    lastSavedTags: lastSavedDialogTags.value,
+    update: updateCuratedFrameTags,
+  })
+  if (!result.ok) {
+    dialogTagSaveStatus.value = "error"
+    dialogTagSaveError.value = t("curated.tagSaveFailed")
+    if (options.toastOnError) {
+      pushAppToast(dialogTagSaveError.value, { variant: "destructive" })
+    }
+    dialogTagSaveInFlight = false
+    return false
+  }
+  dialogTagSaveInFlight = false
+  lastSavedDialogTags.value = [...result.lastSavedTags]
+  dialogTagSaveStatus.value = result.status
+  if (selected.value?.id === frame.id) {
+    selected.value = { ...selected.value, tags: [...result.lastSavedTags] }
+  }
+  if (selected.value?.id === frame.id && !sameDialogTags(dialogTags.value, lastSavedDialogTags.value)) {
+    dialogTagSaveStatus.value = "dirty"
+    dialogTagSaveTimer = setTimeout(() => {
+      dialogTagSaveTimer = null
+      void persistDialogTags()
+    }, dialogTagSaveDebounceMs)
+  }
+  return true
+}
+
+async function saveDialogTagsNow() {
+  await persistDialogTags({ toastOnError: true })
 }
 
 async function handleDialogOpenChange(v: boolean) {
   if (!v) {
-    const id = selected.value?.id
-    if (id) {
-      await updateCuratedFrameTags(id, dialogTags.value)
+    const ok = await persistDialogTags({ toastOnError: true })
+    if (!ok) {
+      dialogOpen.value = true
+      return
     }
-    selected.value = null
-    selectedImageUrl.value = ""
-    resetTagInputState()
+    resetDialogState()
+    return
   }
   dialogOpen.value = v
 }
@@ -647,11 +793,10 @@ async function browseCuratedFramesByTag(tag: string) {
   if (!t || !selected.value) {
     return
   }
-  await updateCuratedFrameTags(selected.value.id, dialogTags.value)
-  dialogOpen.value = false
-  selected.value = null
-  selectedImageUrl.value = ""
-  resetTagInputState()
+  if (!(await persistDialogTags({ toastOnError: true }))) {
+    return
+  }
+  resetDialogState()
   await router.push({
     name: "curated-frames",
     query: mergeCuratedFramesQuery(route.query, { cfq: t }),
@@ -660,52 +805,104 @@ async function browseCuratedFramesByTag(tag: string) {
 
 async function playFromFrame() {
   if (!selected.value) return
-  await updateCuratedFrameTags(selected.value.id, dialogTags.value)
+  if (!(await persistDialogTags({ toastOnError: true }))) {
+    return
+  }
   const { movieId, positionSec } = selected.value
-  selected.value = null
-  selectedImageUrl.value = ""
-  resetTagInputState()
-  dialogOpen.value = false
+  resetDialogState()
   await router.push(buildPlayerRouteFromCuratedFrame(movieId, positionSec))
 }
 
 /** 删除萃取帧（确认弹窗） */
 const deleteConfirmOpen = ref(false)
-const deleteTargetId = ref<string | null>(null)
+const deleteTargetIds = ref<string[]>([])
 const deleteTargetLabel = ref("")
 const deleteFrameBusy = ref(false)
 const deleteFrameError = ref("")
 
+function resetDeleteConfirmState() {
+  deleteConfirmOpen.value = false
+  deleteTargetIds.value = []
+  deleteTargetLabel.value = ""
+}
+
+function frameLabelForDelete(id: string) {
+  const row = rawRows.value.find((item) => item.id === id)
+  if (!row) {
+    return t("curated.deleteLabel")
+  }
+  return row.code.trim() || row.title.trim().slice(0, 48) || t("curated.deleteLabel")
+}
+
 function openDeleteConfirmFromDialog() {
   if (!selected.value) return
   deleteFrameError.value = ""
-  deleteTargetId.value = selected.value.id
-  deleteTargetLabel.value =
-    selected.value.code.trim() || selected.value.title.trim().slice(0, 48) || t("curated.deleteLabel")
+  deleteTargetIds.value = [selected.value.id]
+  deleteTargetLabel.value = frameLabelForDelete(selected.value.id)
   deleteConfirmOpen.value = true
 }
 
+function openDeleteConfirmForSelectedFrames() {
+  const ids = [...new Set(selectedFrameIds.value)]
+  if (ids.length === 0) {
+    return
+  }
+  deleteFrameError.value = ""
+  deleteTargetIds.value = ids
+  deleteTargetLabel.value =
+    ids.length === 1
+      ? frameLabelForDelete(ids[0]!)
+      : t("curated.deleteSelectedLabel", { n: ids.length })
+  deleteConfirmOpen.value = true
+}
+
+function applyDeletedFrameIds(deletedIds: readonly string[]) {
+  if (deletedIds.length === 0) {
+    return
+  }
+
+  const deletedSet = new Set(deletedIds)
+  selectedFrameIds.value = selectedFrameIds.value.filter((id) => !deletedSet.has(id))
+  if (selectedFrameIds.value.length === 0) {
+    exportSelectionBucket.value = "none"
+    namedActorForExport.value = null
+  } else if (mainTab.value === "actors") {
+    reconcileActorsTabExportBucket()
+  }
+
+  if (selected.value?.id && deletedSet.has(selected.value.id)) {
+    selected.value = null
+    selectedImageUrl.value = ""
+    resetTagInputState()
+    dialogOpen.value = false
+  }
+}
+
 async function executeDeleteCuratedFrame() {
-  const id = deleteTargetId.value
-  if (!id) return
+  const ids = [...deleteTargetIds.value]
+  if (ids.length === 0) return
   deleteFrameError.value = ""
   deleteFrameBusy.value = true
+  batchDeleteBusy.value = ids.length > 1
   try {
-    await deleteCuratedFrame(id)
-    deleteConfirmOpen.value = false
-    deleteTargetId.value = null
-    deleteTargetLabel.value = ""
-    if (selected.value?.id === id) {
-      selected.value = null
-      selectedImageUrl.value = ""
-      resetTagInputState()
-      dialogOpen.value = false
+    const result = await deleteCuratedFramesBatch(ids, deleteCuratedFrame)
+    applyDeletedFrameIds(result.deletedIds)
+
+    if (result.ok) {
+      resetDeleteConfirmState()
+      return
     }
+
+    console.error("[curated-frames] delete failed", result.error)
+    deleteFrameError.value = result.deletedIds.length > 0
+      ? t("curated.deletePartialFailed", { done: result.deletedIds.length, total: ids.length })
+      : t("curated.deleteFailed")
   } catch (err) {
     console.error("[curated-frames] delete failed", err)
     deleteFrameError.value = t("curated.deleteFailed")
   } finally {
     deleteFrameBusy.value = false
+    batchDeleteBusy.value = false
   }
 }
 
@@ -734,16 +931,34 @@ function formatCapturedAt(iso: string) {
   }
 }
 
+function isNearDuplicateFrame(frameId: string) {
+  return nearDuplicateFrameIds.value.has(frameId)
+}
+
+function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithUrl["row"]>) {
+  const lead = group.items[0]
+  if (!lead) {
+    return ""
+  }
+  const label = lead.code.trim() || lead.title.trim() || lead.movieId.trim()
+  const positions = group.items.map((item) => formatClock(item.positionSec)).join(" / ")
+  return `${label} · ${positions}`
+}
+
 defineExpose({
   batchMode,
   isEmpty,
   selectedFrameIds,
   exportBusy,
+  batchDeleteBusy,
   batchShowSelectVisible,
   exportToolbarError,
   exitBatchMode,
   clearExportSelection,
   selectAllVisibleUpTo20,
+  deleteSelectedFrames: () => {
+    openDeleteConfirmForSelectedFrames()
+  },
   exportSelectedWebp: () => exportSelectedAsFormat("webp"),
   exportSelectedPng: () => exportSelectedAsFormat("png"),
 })
@@ -758,6 +973,27 @@ defineExpose({
       <p class="text-sm text-muted-foreground">
         {{ t("curated.subtitle", { key: t("curated.keyHint") }) }}
       </p>
+    </div>
+
+    <div
+      v-if="nearDuplicateGroups.length > 0"
+      class="rounded-3xl border border-amber-300/70 bg-amber-50/80 p-4 text-sm text-amber-950 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+    >
+      <p class="font-medium">
+        {{ t("curated.duplicateReviewTitle", { count: nearDuplicateGroups.length }) }}
+      </p>
+      <p class="mt-1 text-amber-900/80 dark:text-amber-100/80">
+        {{ t("curated.duplicateReviewBody", { threshold: curatedFrameNearDuplicateThresholdSec }) }}
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <span
+          v-for="group in nearDuplicateSummaryGroups"
+          :key="`${group.movieId}-${group.items.map((item) => item.id).join('-')}`"
+          class="rounded-full border border-amber-400/60 bg-background/70 px-2.5 py-1 text-xs text-foreground"
+        >
+          {{ formatNearDuplicateGroup(group) }}
+        </span>
+      </div>
     </div>
 
     <div
@@ -834,7 +1070,8 @@ defineExpose({
           <div
             v-for="item in listWithUrls"
             :key="item.row.id"
-            class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+            class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+            :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
           >
             <label
               v-if="batchMode"
@@ -850,6 +1087,12 @@ defineExpose({
                 @change="toggleFrameSelection(item.row.id)"
               />
             </label>
+            <span
+              v-if="isNearDuplicateFrame(item.row.id)"
+              class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
+            >
+              {{ t("curated.duplicateReviewBadge") }}
+            </span>
             <button
               type="button"
               class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -905,7 +1148,8 @@ defineExpose({
               <div
                 v-for="item in items"
                 :key="`${actor}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
               >
                 <label
                   v-if="batchMode"
@@ -921,6 +1165,12 @@ defineExpose({
                     @change="toggleFrameSelection(item.row.id, actor)"
                   />
                 </label>
+                <span
+                  v-if="isNearDuplicateFrame(item.row.id)"
+                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
+                >
+                  {{ t("curated.duplicateReviewBadge") }}
+                </span>
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -989,7 +1239,8 @@ defineExpose({
               <div
                 v-for="item in g.items"
                 :key="`${g.movieKey}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
+                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
               >
                 <label
                   v-if="batchMode"
@@ -1005,6 +1256,12 @@ defineExpose({
                     @change="toggleFrameSelection(item.row.id)"
                   />
                 </label>
+                <span
+                  v-if="isNearDuplicateFrame(item.row.id)"
+                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
+                >
+                  {{ t("curated.duplicateReviewBadge") }}
+                </span>
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1089,6 +1346,13 @@ defineExpose({
                 <dd>{{ selected ? formatCapturedAt(selected.capturedAt) : "—" }}</dd>
               </div>
             </dl>
+
+            <p
+              v-if="selected && isNearDuplicateFrame(selected.id)"
+              class="rounded-2xl border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+            >
+              {{ t("curated.duplicateReviewDialogHint", { threshold: curatedFrameNearDuplicateThresholdSec }) }}
+            </p>
 
             <div class="flex flex-col gap-3">
               <p class="text-sm font-medium">{{ t("curated.tagsSectionTitle") }}</p>
@@ -1193,6 +1457,38 @@ defineExpose({
                 </div>
               </div>
               <p v-if="userTagFormError" class="text-sm text-destructive">{{ userTagFormError }}</p>
+              <div class="flex items-center justify-between gap-3">
+                <p
+                  v-if="dialogTagSaveStatus === 'saving'"
+                  class="text-xs text-muted-foreground"
+                >
+                  {{ t("common.saving") }}
+                </p>
+                <p
+                  v-else-if="dialogTagSaveStatus === 'saved'"
+                  class="text-xs text-emerald-600"
+                >
+                  {{ t("curated.tagSaveSaved") }}
+                </p>
+                <p
+                  v-else-if="dialogTagSaveStatus === 'error'"
+                  class="text-xs text-destructive"
+                  role="alert"
+                >
+                  {{ dialogTagSaveError }}
+                </p>
+                <span v-else class="text-xs text-muted-foreground"></span>
+                <Button
+                  v-if="shouldShowCuratedFrameTagRetry(dialogTagSaveStatus)"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="h-8 rounded-xl px-3"
+                  @click="saveDialogTagsNow"
+                >
+                  {{ t("curated.tagSaveRetry") }}
+                </Button>
+              </div>
             </div>
 
             <p v-if="dialogExportError" class="text-sm text-destructive" role="alert">{{ dialogExportError }}</p>
@@ -1209,7 +1505,7 @@ defineExpose({
                   variant="secondary"
                   size="sm"
                   class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                  :disabled="exportBusy"
+                  :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
                   @click="exportSingleFromDialog('webp')"
                 >
                   <Download class="size-4 shrink-0" aria-hidden="true" />
@@ -1220,7 +1516,7 @@ defineExpose({
                   variant="secondary"
                   size="sm"
                   class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                  :disabled="exportBusy"
+                  :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
                   @click="exportSingleFromDialog('png')"
                 >
                   <Download class="size-4 shrink-0" aria-hidden="true" />
@@ -1232,6 +1528,7 @@ defineExpose({
                   type="button"
                   size="sm"
                   class="h-10 w-full justify-center gap-1.5 rounded-xl"
+                  :disabled="dialogTagSaveStatus === 'saving'"
                   @click="playFromFrame"
                 >
                   <PlayCircle class="size-4 shrink-0" aria-hidden="true" />

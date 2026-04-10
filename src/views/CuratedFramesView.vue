@@ -11,11 +11,13 @@ type CuratedFramesLibraryExpose = {
   isEmpty: ComputedRef<boolean>
   selectedFrameIds: Ref<string[]>
   exportBusy: Ref<boolean>
+  batchDeleteBusy: Ref<boolean>
   batchShowSelectVisible: ComputedRef<boolean>
   exportToolbarError: Ref<string>
   exitBatchMode: () => void
   clearExportSelection: () => void
   selectAllVisibleUpTo20: () => void
+  deleteSelectedFrames: () => void
   exportSelectedWebp: () => void | Promise<void>
   exportSelectedPng: () => void | Promise<void>
 }
@@ -31,6 +33,7 @@ const showCuratedBatchBar = computed(() => {
 const batchSelectedCount = computed(() => unref(curatedLibRef.value?.selectedFrameIds)?.length ?? 0)
 
 const batchExportBusy = computed(() => unref(curatedLibRef.value?.exportBusy) ?? false)
+const batchDeleteBusy = computed(() => unref(curatedLibRef.value?.batchDeleteBusy) ?? false)
 
 const batchShowSelectVisible = computed(() => unref(curatedLibRef.value?.batchShowSelectVisible) ?? false)
 
@@ -55,6 +58,10 @@ function onCuratedBatchExportWebp() {
 function onCuratedBatchExportPng() {
   void curatedLibRef.value?.exportSelectedPng()
 }
+
+function onCuratedBatchDeleteSelected() {
+  curatedLibRef.value?.deleteSelectedFrames()
+}
 </script>
 
 <template>
@@ -67,12 +74,14 @@ function onCuratedBatchExportPng() {
       v-if="showCuratedBatchBar"
       :selected-count="batchSelectedCount"
       :export-busy="batchExportBusy"
+      :delete-busy="batchDeleteBusy"
       :show-select-visible="batchShowSelectVisible"
       :use-web-api="useWebApi"
       :export-error="batchExportError"
       @exit="onCuratedBatchExit"
       @clear-selection="onCuratedBatchClear"
       @select-all-visible="onCuratedBatchSelectAllVisible"
+      @delete-selected="onCuratedBatchDeleteSelected"
       @export-webp="onCuratedBatchExportWebp"
       @export-png="onCuratedBatchExportPng"
     />
