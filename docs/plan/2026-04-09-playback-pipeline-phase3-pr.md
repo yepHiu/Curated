@@ -36,7 +36,7 @@
   - `CLAUDE.md`
   - `.cursor/rules/project-facts.mdc`
   - `docs/architecture-and-implementation.html`
-  - `docs/plan/player-pipeline-evolution-plan.md`
+  - `docs/plan/2026-04-01-player-pipeline-evolution-plan.md`
 
 ## API 变化
 

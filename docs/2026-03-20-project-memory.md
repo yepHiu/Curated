@@ -3,7 +3,7 @@
 ## 1. 产品定位
 
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
-- `docs/jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
+- `docs/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
 - 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** + Vite 代理 **`/api` → `:8080`** 联通真实 HTTP API（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
 
@@ -28,7 +28,7 @@
 - 产品组件：`src/components/jav-library`
 - UI 原子组件：`src/components/ui`
 - 主题样式：`src/style.css`
-- **UI 设计规范（代码级）**：[`docs/frontend-ui-spec.md`](frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../.cursor/rules/ui-component-spec.mdc)
+- **UI 设计规范（代码级）**：[`docs/2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
 - 播放进度（仅浏览器，非服务端）：`src/lib/playback-progress-storage.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
 - 已播计数（localStorage）：`src/lib/played-movies-storage.ts`
@@ -155,6 +155,6 @@
 
 - 本文记录“稳定事实、产品判断、阶段边界”，不记录短期实现细节。
 - 当路由结构、页面骨架、数据来源方式或桌面集成状态发生变化时，应优先更新本文。
-- 若 `docs/jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
-- 打整机安装包或执行正式发布时，版本号必须跟随 `docs/package-build-history.md` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
+- 若 `docs/2026-03-20-jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
+- 打整机安装包或执行正式发布时，版本号必须跟随 `docs/2026-04-02-package-build-history.md` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
 - 调整全局 `Input` 默认样式或主题变量时，同步检查 **§9 表单与文本输入** 与 **`vue-frontend-standards.mdc`** 是否仍一致。

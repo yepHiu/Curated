@@ -7,7 +7,7 @@
 需要明确的是：
 
 - 当前仓库仍然是 `Vue 3 + TypeScript + Vite` 的前端脚手架。
-- `docs/jav-libary.md` 描述的是目标产品蓝图，不代表这些后端能力已经存在。
+- `docs/2026-03-20-jav-libary.md` 描述的是目标产品蓝图，不代表这些后端能力已经存在。
 - 本文讨论的是未来后端的设计与实施计划，不应被当作当前实现事实。
 
 ## 2. 后端目标
@@ -213,7 +213,7 @@ type Scraper interface {
 
 ## 6. 数据模型规划
 
-`docs/jav-libary.md` 中已经定义了 `movies`、`actors`、`movie_actors`、`tags`、`movie_tags`。这些结构可作为 MVP 起点，但不足以支撑完整后台任务和资源管理。
+`docs/2026-03-20-jav-libary.md` 中已经定义了 `movies`、`actors`、`movie_actors`、`tags`、`movie_tags`。这些结构可作为 MVP 起点，但不足以支撑完整后台任务和资源管理。
 
 建议在首版数据库设计中补充以下模型：
 
@@ -463,8 +463,8 @@ backend/
 
 为避免后续后端实现偏离边界，建议与本文配套使用以下文档：
 
-- `docs/backend-contract-constraints.md`：约束命令、事件、DTO、错误码和对外协议边界
-- `docs/backend-go-standards.md`：约束 `Go` 目录结构、分层方式、错误处理、日志和测试习惯
-- `docs/backend-task-constraints.md`：约束扫描、搜刮、资源缓存等后台任务的统一模型
+- `docs/2026-03-21-backend-contract-constraints.md`：约束命令、事件、DTO、错误码和对外协议边界
+- `docs/2026-03-21-backend-go-standards.md`：约束 `Go` 目录结构、分层方式、错误处理、日志和测试习惯
+- `docs/2026-03-21-backend-task-constraints.md`：约束扫描、搜刮、资源缓存等后台任务的统一模型
 
-后续若项目真正进入实现阶段，应优先更新本文和 `docs/project-memory.md`，确保“当前事实”和“未来目标”保持清晰分离。
+后续若项目真正进入实现阶段，应优先更新本文和 `docs/2026-03-20-project-memory.md`，确保“当前事实”和“未来目标”保持清晰分离。

@@ -583,7 +583,7 @@ updated_at        DATETIME
 ### 6.5 待决策
 
 - 是否需要单独的 `assets` 表记录 poster、thumb、preview 的派生资源。
-- 是否需要 **`play_history`（或服务端等价模型）** 支撑断点续播与最近播放的**跨设备/可备份**同步。**`当前状态`（前端）**：续播与观看历史已由 **`localStorage`** 实现（见 `docs/project-memory.md`），**不写入**当前 SQLite 库。
+- 是否需要 **`play_history`（或服务端等价模型）** 支撑断点续播与最近播放的**跨设备/可备份**同步。**`当前状态`（前端）**：续播与观看历史已由 **`localStorage`** 实现（见 `docs/2026-03-20-project-memory.md`），**不写入**当前 SQLite 库。
 - 是否要为电影文件和逻辑影片分离建模，以支持多文件版本。
 
 ---

@@ -1,6 +1,6 @@
 ---
 description: Backend implementation standards for Go services and backend docs
-globs: "{backend/**/*.go,backend/**/*.sql,docs/backend*.md,docs/jav-libary.md}"
+globs: "{backend/**/*.go,backend/**/*.sql,docs/*backend*.md,docs/*jav-libary.md}"
 alwaysApply: false
 ---
 

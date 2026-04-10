@@ -22,13 +22,13 @@ alwaysApply: true
 - **重启前后端**：先释放 **5173** 与后端端口（开发 **8080** / release **8081**，或配置中的 `httpAddr`）上旧进程，再分别启动上述两条命令。
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。
-- **记录打包版本**：每次执行 `pnpm release:frontend`、`pnpm release:backend`、`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish`，或任何实际产出安装包 / 便携包 / 发布清单的打包动作后，都要在 `docs/package-build-history.md` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
-- **整机安装包版本规则**：每次制作整机安装包或执行整机发布前，必须先查看 `docs/package-build-history.md` 的最新有效发布记录，再沿着该版本历史确定本次 `-Version`；安装包文件名、发布清单与台账记录必须使用同一版本号，不得跳过台账单独编写版本，也不得发布后补写不一致的版本记录。
+- **记录打包版本**：每次执行 `pnpm release:frontend`、`pnpm release:backend`、`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish`，或任何实际产出安装包 / 便携包 / 发布清单的打包动作后，都要在 `docs/2026-04-02-package-build-history.md` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
+- **整机安装包版本规则**：每次制作整机安装包或执行整机发布前，必须先查看 `docs/2026-04-02-package-build-history.md` 的最新有效发布记录，再沿着该版本历史确定本次 `-Version`；安装包文件名、发布清单与台账记录必须使用同一版本号，不得跳过台账单独编写版本，也不得发布后补写不一致的版本记录。
 
 ## 规则索引
 
 - 实现细节与目录：**`project-facts.mdc`**。
 - 前后端分层与桌面未来边界：**`architecture-boundaries.mdc`**。
-- UI 分层与设计令牌：**`ui-component-spec.mdc`**；人读 **`docs/frontend-ui-spec.md`**。
+- UI 分层与设计令牌：**`ui-component-spec.mdc`**；人读 **`docs/2026-03-24-frontend-ui-spec.md`**。
 - Vue 写法：**`vue-frontend-standards.mdc`**、**`jav-library-frontend-patterns.mdc`**。
 - Go/合约/文档：**`backend-go-standards.mdc`**、**`backend-api-contracts.mdc`**、**`docs-sync.mdc`**。

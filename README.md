@@ -225,11 +225,11 @@ go test ./...
 
 ## Documentation
 
-- [`docs/jav-libary.md`](docs/jav-libary.md) — product design and target architecture
-- [`docs/project-memory.md`](docs/project-memory.md) — implementation facts (if present)
+- [`docs/2026-03-20-jav-libary.md`](docs/2026-03-20-jav-libary.md) — product design and target architecture
+- [`docs/2026-03-20-project-memory.md`](docs/2026-03-20-project-memory.md) — implementation facts (if present)
 - [`docs/architecture-and-implementation.html`](docs/architecture-and-implementation.html) — architecture overview (open in a browser)
-- [`docs/library-organize.md`](docs/library-organize.md) — library organization notes
-- [`docs/frontend-ui-spec.md`](docs/frontend-ui-spec.md) — UI tokens and patterns
+- [`docs/2026-03-21-library-organize.md`](docs/2026-03-21-library-organize.md) — library organization notes
+- [`docs/2026-03-24-frontend-ui-spec.md`](docs/2026-03-24-frontend-ui-spec.md) — UI tokens and patterns
 
 ## Notes
 

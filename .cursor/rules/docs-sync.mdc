@@ -6,6 +6,7 @@ alwaysApply: false
 
 # Documentation Sync
 
+- **命名**：`docs/` 与 `docs/plan/` 下的 Markdown 采用 **`YYYY-MM-DD-主题.md`**；日期一般取该文件**首次进入 Git 历史**的日期（`git log --diff-filter=A --follow --format=%cs -- <path>`），或与文档主题对应的约定日期。
 - **Plan 文档路径**：新的规划 / 实施计划类 Markdown 写入 **`docs/plan/`**；目录缺失时先创建 **`docs/plan`** 再添加文件。
 - Separate implemented facts from future plans and unresolved decisions.
 - When describing architecture, explicitly state whether it is current code, target design, or a phased recommendation.

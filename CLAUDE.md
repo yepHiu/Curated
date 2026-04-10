@@ -244,11 +244,11 @@ POST   /api/providers/ping-all              # Ping all providers
 
 Reference these docs in `docs/` for detailed specifications:
 
-- `jav-library.md` - Complete product design document (domain models, UI design, task system)
-- `backend-go-standards.md` - Go coding standards and directory structure
-- `backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
-- `frontend-ui-spec.md` - Frontend UI design tokens and component specifications
-- `project-memory.md` - Current implementation facts and architectural decisions
+- `2026-03-20-jav-libary.md` - Complete product design document (domain models, UI design, task system)
+- `2026-03-21-backend-go-standards.md` - Go coding standards and directory structure
+- `2026-03-21-backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
+- `2026-03-24-frontend-ui-spec.md` - Frontend UI design tokens and component specifications
+- `2026-03-20-project-memory.md` - Current implementation facts and architectural decisions
 - `film-scanner/CLAUDE.md` - Reference implementation for metadata scraping
 
 Additional guidance in `.cursor/rules/`:

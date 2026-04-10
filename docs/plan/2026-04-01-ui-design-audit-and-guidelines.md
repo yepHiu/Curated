@@ -376,7 +376,7 @@
 
 建议后续把本文件中的稳定结论吸收进：
 
-- `docs/frontend-ui-spec.md`
+- `docs/2026-03-24-frontend-ui-spec.md`
 
 其中可沉淀为：
 
