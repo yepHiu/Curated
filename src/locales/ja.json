@@ -160,7 +160,6 @@
     "duplicateReviewBadge": "重複候補",
     "duplicateReviewDialogHint": "このフレームは同じ作品の他の萃取フレームと {threshold} 秒以内で近接しています。確認して不要なものを削除してください。",
     "tagSaveDirty": "タグの変更はまだ保存されていません。",
-    "tagSaveSaved": "タグを保存しました。",
     "tagSaveFailed": "タグの保存に失敗しました。下書きは保持されています。",
     "tagSaveRetry": "再保存"
   },

@@ -1465,12 +1465,6 @@ defineExpose({
                   {{ t("common.saving") }}
                 </p>
                 <p
-                  v-else-if="dialogTagSaveStatus === 'saved'"
-                  class="text-xs text-emerald-600"
-                >
-                  {{ t("curated.tagSaveSaved") }}
-                </p>
-                <p
                   v-else-if="dialogTagSaveStatus === 'error'"
                   class="text-xs text-destructive"
                   role="alert"

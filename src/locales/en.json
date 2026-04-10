@@ -160,7 +160,6 @@
     "duplicateReviewBadge": "Possible duplicate",
     "duplicateReviewDialogHint": "This frame is close to other captures from the same movie within {threshold} seconds. Review them before deleting the extras.",
     "tagSaveDirty": "Tag changes are not saved yet.",
-    "tagSaveSaved": "Tags saved.",
     "tagSaveFailed": "Saving tags failed. Draft kept in place.",
     "tagSaveRetry": "Retry save"
   },

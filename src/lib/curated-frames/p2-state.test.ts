@@ -18,6 +18,18 @@ describe("curated frame P2 state helpers", () => {
     expect(result).toEqual({ ok: true, status: "idle", lastSavedTags: ["a"] })
   })
 
+  it("returns idle after successful tag update", async () => {
+    const update = vi.fn().mockResolvedValue(undefined)
+    const result = await commitCuratedFrameTags({
+      frameId: "frame-1",
+      tags: ["a", "b"],
+      lastSavedTags: ["a"],
+      update,
+    })
+    expect(update).toHaveBeenCalledWith("frame-1", ["a", "b"])
+    expect(result).toEqual({ ok: true, status: "idle", lastSavedTags: ["a", "b"] })
+  })
+
   it("keeps last saved tags when tag update fails", async () => {
     const update = vi.fn().mockRejectedValue(new Error("boom"))
     const result = await commitCuratedFrameTags({
@@ -58,7 +70,7 @@ describe("curated frame P2 state helpers", () => {
   it("keeps manual tag actions limited to failed autosave retries", () => {
     expect(shouldShowCuratedFrameTagRetry("dirty")).toBe(false)
     expect(shouldShowCuratedFrameTagRetry("saving")).toBe(false)
-    expect(shouldShowCuratedFrameTagRetry("saved")).toBe(false)
+    expect(shouldShowCuratedFrameTagRetry("idle")).toBe(false)
     expect(shouldShowCuratedFrameTagRetry("error")).toBe(true)
   })
 })

@@ -160,7 +160,6 @@
     "duplicateReviewBadge": "可能重复",
     "duplicateReviewDialogHint": "这张帧与同片 {threshold} 秒内的其他萃取帧接近，建议确认后删除多余项。",
     "tagSaveDirty": "标签变更尚未保存。",
-    "tagSaveSaved": "标签已保存。",
     "tagSaveFailed": "标签保存失败，草稿已保留。",
     "tagSaveRetry": "重试保存"
   },

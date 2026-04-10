@@ -1,4 +1,4 @@
-export type CuratedFrameTagSaveStatus = "idle" | "dirty" | "saving" | "saved" | "error"
+export type CuratedFrameTagSaveStatus = "idle" | "dirty" | "saving" | "error"
 
 export type CommitCuratedFrameTagsParams = {
   frameId: string
@@ -8,7 +8,7 @@ export type CommitCuratedFrameTagsParams = {
 }
 
 export type CommitCuratedFrameTagsResult =
-  | { ok: true; status: "idle" | "saved"; lastSavedTags: string[] }
+  | { ok: true; status: "idle"; lastSavedTags: string[] }
   | { ok: false; status: "error"; lastSavedTags: string[]; error: unknown }
 
 export type ShouldCommitCuratedFrameTagDraftParams = {
@@ -45,7 +45,7 @@ export async function commitCuratedFrameTags(
 
   try {
     await params.update(params.frameId, nextTags)
-    return { ok: true, status: "saved", lastSavedTags: nextTags }
+    return { ok: true, status: "idle", lastSavedTags: nextTags }
   } catch (error) {
     return { ok: false, status: "error", lastSavedTags, error }
   }
