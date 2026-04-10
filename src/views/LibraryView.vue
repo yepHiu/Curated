@@ -538,8 +538,18 @@ const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
 const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
 const studioExactQuery = computed(() => getLibraryStudioExactQuery(route.query).trim())
-/** 小写 -> 库内规范演员名（用于 q 与演员名匹配） */
+/**
+ * 小写 -> 库内规范演员名（用于 q 与演员名匹配）。
+ * 仅在「无 actor= 且顶栏 q 非空」时需要解析；有 `actor=` 或 q 为空时跳过全库扫描，避免大库下卡主线程。
+ */
 const actorCanonicalByLower = computed(() => {
+  if (actorExactQuery.value) {
+    return new Map<string, string>()
+  }
+  const q = searchQuery.value.trim()
+  if (!q) {
+    return new Map<string, string>()
+  }
   const m = new Map<string, string>()
   for (const movie of libraryMovies.value) {
     for (const raw of movie.actors) {
@@ -663,9 +673,9 @@ const replaceQuery = async (
 
 watch(
   [selectedMovie, () => route.query.selected],
-  ([movie, currentSelected]) => {
+  ([movie]) => {
     const nextSelected = movie?.id
-    const normalizedSelected = typeof currentSelected === "string" ? currentSelected : undefined
+    const normalizedSelected = getSelectedMovieQuery(route.query)
 
     if (nextSelected === normalizedSelected) {
       return
@@ -675,7 +685,7 @@ watch(
       selected: nextSelected,
     })
   },
-  { immediate: true },
+  { immediate: true, flush: "post" },
 )
 
 const updateActiveTab = async (value: LibraryTab) => {

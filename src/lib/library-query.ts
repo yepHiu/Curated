@@ -99,8 +99,17 @@ export const getLibraryTabQuery = (query: LocationQuery): LibraryTab => {
   return libraryTabs.includes(value as LibraryTab) ? (value as LibraryTab) : "all"
 }
 
-export const getSelectedMovieQuery = (query: LocationQuery) =>
-  typeof query.selected === "string" ? query.selected : undefined
+export const getSelectedMovieQuery = (query: LocationQuery) => {
+  const raw = query.selected
+  if (typeof raw === "string") {
+    return raw
+  }
+  if (Array.isArray(raw)) {
+    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
+    return first
+  }
+  return undefined
+}
 
 export const getBrowseContextQuery = (query: LocationQuery) => ({
   from: getBrowseSourceMode(query),

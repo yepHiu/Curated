@@ -67,6 +67,10 @@ describe("library query helpers", () => {
     expect(getLibraryTabQuery(query)).toBe("top-rated")
   })
 
+  it("reads selected movie id from first string when query repeats key", () => {
+    expect(getSelectedMovieQuery({ selected: ["a", "b"] })).toBe("a")
+  })
+
   it("merges browse query patches and clears empty values", () => {
     const merged = mergeLibraryQuery(
       {
