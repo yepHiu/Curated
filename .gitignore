@@ -52,3 +52,8 @@ videos_test/
 
 # logfile
 log/
+
+# config file
+config/
+
+

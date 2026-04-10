@@ -134,6 +134,7 @@ function setThemeFromSelect(v: unknown) {
 }
 const route = useRoute()
 const router = useRouter()
+
 const settingsScrollElRef = inject<Ref<HTMLElement | null>>(SETTINGS_SCROLL_EL_KEY, ref(null))
 const settingsNavItems = SETTINGS_NAV_ITEMS
 const activeSlug = ref<SettingsSectionSlug>("overview")
@@ -3527,21 +3528,6 @@ async function runMetadataRefreshForSelected() {
                 </dt>
                 <dd class="mt-1.5">
                   {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
-                </dd>
-              </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.designLabEntryTitle") }}
-                </dt>
-                <dd class="mt-1.5 space-y-3">
-                  <p>{{ t("settings.designLabEntryDesc") }}</p>
-                  <Button
-                    variant="secondary"
-                    class="h-10 rounded-xl px-4 font-medium"
-                    @click="router.push({ name: 'design-lab' })"
-                  >
-                    {{ t("settings.openDesignLab") }}
-                  </Button>
                 </dd>
               </div>
             </dl>
