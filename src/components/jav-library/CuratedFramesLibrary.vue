@@ -32,17 +32,14 @@ import { getCuratedFrameSearchQuery, mergeCuratedFramesQuery } from "@/lib/libra
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
 import {
   deleteCuratedFrame,
-  listCuratedFramesByCapturedAtDesc,
+  listCuratedFrameTagSuggestions,
+  listCuratedFramesPage,
   updateCuratedFrameTags,
 } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
-import {
-  buildCuratedFrameTagSuggestionPool,
-  filterCuratedFramesByQuery,
-} from "@/lib/curated-frames/search"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
-import { curatedFrameImageUrl } from "@/lib/curated-frame-image-url"
+import { curatedFrameImageUrl, curatedFrameThumbnailUrl } from "@/lib/curated-frame-image-url"
 import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
@@ -52,6 +49,7 @@ const route = useRoute()
 const router = useRouter()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
+const curatedPageLimit = 60
 
 /** 与资料库「批量管理」一致：勾选卡片并配合底部工具栏导出 */
 const batchMode = ref(false)
@@ -330,6 +328,9 @@ interface RowWithUrl {
 
 const rawRows = ref<CuratedFrameDbRow[]>([])
 const listWithUrls = ref<RowWithUrl[]>([])
+const totalRows = ref(0)
+const rowsLoading = ref(false)
+const rowsLoadingMore = ref(false)
 
 function revokeAllUrls() {
   for (const x of listWithUrls.value) {
@@ -340,12 +341,45 @@ function revokeAllUrls() {
   listWithUrls.value = []
 }
 
+function currentCuratedQuery() {
+  return getCuratedFrameSearchQuery(route.query).trim()
+}
+
 async function reloadFromDb() {
-  rawRows.value = await listCuratedFramesByCapturedAtDesc()
+  rowsLoading.value = true
+  try {
+    const page = await listCuratedFramesPage({
+      q: currentCuratedQuery(),
+      limit: curatedPageLimit,
+      offset: 0,
+    })
+    rawRows.value = page.items
+    totalRows.value = page.total
+  } finally {
+    rowsLoading.value = false
+  }
+}
+
+async function loadMoreRows() {
+  if (rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
+    return
+  }
+  rowsLoadingMore.value = true
+  try {
+    const page = await listCuratedFramesPage({
+      q: currentCuratedQuery(),
+      limit: curatedPageLimit,
+      offset: rawRows.value.length,
+    })
+    rawRows.value = [...rawRows.value, ...page.items]
+    totalRows.value = page.total
+  } finally {
+    rowsLoadingMore.value = false
+  }
 }
 
 watch(
-  () => curatedFramesRevision.value,
+  [() => curatedFramesRevision.value, () => getCuratedFrameSearchQuery(route.query)],
   () => {
     void reloadFromDb()
   },
@@ -353,14 +387,12 @@ watch(
 )
 
 watch(
-  [rawRows, () => getCuratedFrameSearchQuery(route.query)],
+  rawRows,
   () => {
     revokeAllUrls()
-    const q = getCuratedFrameSearchQuery(route.query)
-    const filtered = filterCuratedFramesByQuery(rawRows.value, q)
-    listWithUrls.value = filtered.map((row) => ({
+    listWithUrls.value = rawRows.value.map((row) => ({
       row,
-      url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameImageUrl(row.id),
+      url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id),
     }))
   },
   { immediate: true, deep: true },
@@ -370,7 +402,8 @@ onUnmounted(() => {
   revokeAllUrls()
 })
 
-const isEmpty = computed(() => listWithUrls.value.length === 0)
+const isEmpty = computed(() => !rowsLoading.value && listWithUrls.value.length === 0)
+const hasMoreRows = computed(() => rawRows.value.length < totalRows.value)
 
 /** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
 const batchShowSelectVisible = computed(() => mainTab.value !== "actors")
@@ -470,7 +503,23 @@ const tagSuggestDomId = useId()
 const { focused: userTagSuggestRowFocused } = useFocusWithin(userTagSuggestRootRef)
 
 /** 仅萃取帧库内已出现过的标签，与影片库标签无关 */
-const userTagSuggestionCandidates = computed(() => buildCuratedFrameTagSuggestionPool(rawRows.value))
+const userTagSuggestionCandidates = ref<string[]>([])
+
+async function reloadTagSuggestions() {
+  try {
+    userTagSuggestionCandidates.value = await listCuratedFrameTagSuggestions()
+  } catch {
+    userTagSuggestionCandidates.value = []
+  }
+}
+
+watch(
+  () => curatedFramesRevision.value,
+  () => {
+    void reloadTagSuggestions()
+  },
+  { immediate: true },
+)
 
 const filteredUserTagSuggestions = computed(() =>
   filterUserTagSuggestions(
@@ -501,7 +550,7 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   dialogOpenedFromActor.value = fromActorSection
   dialogExportError.value = ""
   selected.value = meta
-  selectedImageUrl.value = item.url
+  selectedImageUrl.value = imageBlob ? item.url : curatedFrameImageUrl(item.row.id)
   dialogTags.value = [...item.row.tags]
   resetTagInputState()
   dialogOpen.value = true
@@ -627,14 +676,6 @@ const deleteTargetLabel = ref("")
 const deleteFrameBusy = ref(false)
 const deleteFrameError = ref("")
 
-function openDeleteConfirmForCard(item: RowWithUrl) {
-  deleteFrameError.value = ""
-  deleteTargetId.value = item.row.id
-  deleteTargetLabel.value =
-    item.row.code.trim() || item.row.title.trim().slice(0, 48) || t("curated.deleteLabel")
-  deleteConfirmOpen.value = true
-}
-
 function openDeleteConfirmFromDialog() {
   if (!selected.value) return
   deleteFrameError.value = ""
@@ -733,11 +774,16 @@ defineExpose({
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
     >
       <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
-          <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
-          <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
-          <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
-        </TabsList>
+        <div class="flex flex-wrap items-center gap-3">
+          <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
+            <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
+            <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
+            <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
+          </TabsList>
+          <p class="text-xs text-muted-foreground">
+            {{ t("curated.pageSummary", { shown: rawRows.length, total: totalRows }) }}
+          </p>
+        </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
           <template v-if="!batchMode">
             <Button
@@ -824,17 +870,6 @@ defineExpose({
                 </p>
               </div>
             </button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              class="absolute top-2 right-2 z-10 size-9 rounded-xl border border-border/60 bg-background/90 text-destructive opacity-100 shadow-md backdrop-blur-sm transition-opacity hover:bg-destructive/10 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-              :title="t('curated.deleteCard')"
-              :aria-label="t('curated.deleteCardAria')"
-              @click.stop="openDeleteConfirmForCard(item)"
-            >
-              <Trash2 class="size-4" />
-            </Button>
           </div>
         </div>
       </TabsContent>
@@ -906,17 +941,6 @@ defineExpose({
                     </p>
                   </div>
                 </button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  class="absolute top-2 right-2 z-10 size-9 rounded-xl border border-border/60 bg-background/90 text-destructive opacity-100 shadow-md backdrop-blur-sm transition-opacity hover:bg-destructive/10 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                  :title="t('curated.deleteCard')"
-                  :aria-label="t('curated.deleteCardAria')"
-                  @click.stop="openDeleteConfirmForCard(item)"
-                >
-                  <Trash2 class="size-4" />
-                </Button>
               </div>
             </div>
           </section>
@@ -1001,22 +1025,22 @@ defineExpose({
                     </p>
                   </div>
                 </button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  class="absolute top-2 right-2 z-10 size-9 rounded-xl border border-border/60 bg-background/90 text-destructive opacity-100 shadow-md backdrop-blur-sm transition-opacity hover:bg-destructive/10 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                  :title="t('curated.deleteCard')"
-                  :aria-label="t('curated.deleteCardAria')"
-                  @click.stop="openDeleteConfirmForCard(item)"
-                >
-                  <Trash2 class="size-4" />
-                </Button>
               </div>
             </div>
           </section>
         </div>
       </TabsContent>
+      <div v-if="hasMoreRows" class="flex justify-center py-5">
+        <Button
+          type="button"
+          variant="outline"
+          class="rounded-2xl"
+          :disabled="rowsLoadingMore"
+          @click="loadMoreRows"
+        >
+          {{ rowsLoadingMore ? t("common.loading") : t("curated.loadMore") }}
+        </Button>
+      </div>
       </div>
     </Tabs>
 
@@ -1106,7 +1130,7 @@ defineExpose({
                   <Button
                     type="button"
                     variant="secondary"
-                    class="shrink-0 rounded-2xl"
+                    class="h-[29px] min-h-[29px] shrink-0 rounded-2xl px-3 py-0 text-xs has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3.5"
                     @click="onUserTagAddButtonClick"
                   >
                     <Plus data-icon="inline-start" />
