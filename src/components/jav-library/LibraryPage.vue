@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -151,11 +150,8 @@ function isChipActive(tag: string): boolean {
     >
       <CardHeader class="gap-3">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="min-w-0 flex-1 space-y-1">
+          <div class="min-w-0 flex-1">
             <CardTitle>{{ t("library.tagBrowseTitle") }}</CardTitle>
-            <CardDescription class="text-pretty">
-              {{ t("library.tagBrowseDesc") }}
-            </CardDescription>
           </div>
           <Button
             v-if="activeTagTrimmed"

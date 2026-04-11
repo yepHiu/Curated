@@ -159,6 +159,14 @@
     "duplicateReviewBody": "同一影片内 {threshold} 秒以内的萃取帧已标记出来；建议确认画面后删除多余项。",
     "duplicateReviewBadge": "可能重复",
     "duplicateReviewDialogHint": "这张帧与同片 {threshold} 秒内的其他萃取帧接近，建议确认后删除多余项。",
+    "tagFilterTitle": "标签筛选",
+    "tagFilterAll": "全部",
+    "tagFilterEmpty": "还没有萃取帧标签，给帧打标签后可在这里筛选。",
+    "tagFilterNoMatches": "没有命中该标签的萃取帧。",
+    "tagFilterShowMore": "更多标签（还有 {count} 个）",
+    "tagFilterShowLess": "收起标签",
+    "ariaFilterFrameTag": "按萃取帧标签筛选：{tag}，{count} 张",
+    "ariaClearFrameTagFilter": "清除萃取帧标签筛选",
     "tagSaveDirty": "标签变更尚未保存。",
     "tagSaveFailed": "标签保存失败，草稿已保留。",
     "tagSaveRetry": "重试保存"
@@ -173,7 +181,6 @@
   "library": {
     "backToTop": "回到顶部",
     "tagBrowseTitle": "标签浏览",
-    "tagBrowseDesc": "点击标签按同名筛选（与顶栏搜索、详情页标签一致）。元数据标签来自刮削/NFO，用户标签仅保存在本地库。",
     "clearFilter": "清除筛选",
     "filterActive": "当前筛选：",
     "metaTags": "元数据标签（刮削 / NFO）",
