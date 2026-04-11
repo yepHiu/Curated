@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
 import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
+import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 
 interface MovieChunk {
   id: string
@@ -211,8 +212,6 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
       :buffer="BUFFER_PX"
       :pool-size="BUFFER_CHUNKS * 2 + 5"
       class="h-full min-h-0 overflow-y-auto pr-2"
-      list-class="flex flex-col gap-5"
-      item-class="pb-5"
     >
       <template #default="{ item, index, active }">
         <DynamicScrollerItem
@@ -222,15 +221,11 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
           :size-dependencies="[getChunk(item).sizeKey]"
           :min-size="estimatedChunkHeight"
         >
-          <!-- 勿在 grid 容器上加 min-w-0（虚拟列表绝对定位链下会误缩成单列）。max 用 minmax(0,1fr) 降列溢出；overflow-x-hidden 兜底 -->
+          <!-- 块间距必须留在被 DynamicScrollerItem 测量的 grid 内容里；外层 item-class padding 不参与高度测量，会让第 4/5 行跨块粘连。 -->
           <div
             class="grid w-full overflow-x-hidden"
             :ref="(el) => onChunkGridRef(el)"
-            :style="{
-              gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${GRID_COL_MIN}), minmax(0, 1fr)))`,
-              columnGap: GRID_GAP,
-              rowGap: GRID_GAP,
-            }"
+            :style="buildMovieGridChunkStyle({ minTrackWidth: GRID_COL_MIN, gap: GRID_GAP })"
           >
             <div
               v-for="movie in getChunk(item).items"
