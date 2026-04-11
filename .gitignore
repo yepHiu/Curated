@@ -76,4 +76,7 @@ log/
 # config file
 config/
 
+# Local Codex temp / brainstorm session (not tracked)
+.codex-temp/
+**/codex-20260411225501/
 
