@@ -37,6 +37,15 @@ describe("library query helpers", () => {
     ).toBe("trash")
   })
 
+  it("resolveLibraryMode prefers path when name and path disagree (e.g. stale name during navigation)", () => {
+    expect(
+      resolveLibraryMode({
+        name: "library",
+        path: "/trash",
+      }),
+    ).toBe("trash")
+  })
+
   it("isLibraryBrowseRoute is true for trash path even when name is missing", () => {
     expect(
       isLibraryBrowseRoute({

@@ -16,21 +16,19 @@ export const isLibraryRouteName = (
 
 /**
  * 资料库五态（library / favorites / recent / tags / trash）路由解析。
- * 在 route.name 尚未就绪或与 path 短暂不一致时，用 path 末段兜底，避免回收站误用主库列表（例如刷出 Mock 种子）。
+ * 优先用 path 末段：在 route.name 尚未就绪或与 path 短暂不一致时，避免仍把 `name === "library"` 当成主库，
+ * 从而回收站误用主库列表 + URL `tab` 子筛选导致网格为空（侧栏回收站计数仍来自 trashed 列表）。
  */
 export function resolveLibraryMode(
   route: Pick<RouteLocationNormalizedLoaded, "name" | "path">,
 ): LibraryMode {
-  if (isLibraryRouteName(route.name)) {
-    return route.name
-  }
   const parts = route.path.replace(/\/+$/, "").split("/").filter(Boolean)
-  if (parts.length === 0) {
-    return "library"
-  }
-  const seg = parts[parts.length - 1]!
+  const seg = parts.length > 0 ? parts[parts.length - 1]! : ""
   if (isLibraryMode(seg)) {
     return seg
+  }
+  if (isLibraryRouteName(route.name)) {
+    return route.name
   }
   return "library"
 }
