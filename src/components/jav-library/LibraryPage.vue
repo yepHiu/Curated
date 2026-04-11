@@ -146,7 +146,7 @@ function isChipActive(tag: string): boolean {
     </div>
     <Card
       v-if="props.mode === 'tags'"
-      class="rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
+      class="gap-3 py-5 rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
     >
       <CardHeader class="gap-3">
         <div class="flex flex-wrap items-start justify-between gap-3">
