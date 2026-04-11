@@ -5,6 +5,7 @@ import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vue
 import { LayoutDashboard, Menu, Moon, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
+import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
@@ -38,6 +39,7 @@ import {
 } from "@/lib/library-query"
 import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
 import { useTheme } from "@/composables/use-theme"
+import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
 
 useLibraryWatchToasts()
@@ -854,12 +856,10 @@ function clearActorsSearch() {
       </div>
     </Teleport>
 
-    <span
+    <DevEnvironmentBadge
       v-if="isDev"
-      class="pointer-events-none fixed bottom-3 right-3 z-[90] select-none rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-widest text-amber-800 shadow-sm dark:border-amber-400/35 dark:bg-amber-400/10 dark:text-amber-300"
-      aria-hidden="true"
-    >
-      dev
-    </span>
+      :show-perf-restore="devPerformanceBarHidden"
+      @show-performance-monitor="setDevPerformanceBarHidden(false)"
+    />
   </div>
 </template>

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import { ChevronDown, ChevronUp, ClipboardCopy, Cpu, Pause, Play, RotateCcw } from "lucide-vue-next"
+import { ChevronDown, ChevronUp, ClipboardCopy, Cpu, Pause, Play, RotateCcw, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { useDevPerformanceMonitor } from "@/composables/use-dev-performance-monitor"
+import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 
 const monitor = useDevPerformanceMonitor()
+const hidden = devPerformanceBarHidden
 
 function formatNumber(value: number | null | undefined, digits = 1, suffix = ""): string {
   if (value == null) {
@@ -61,7 +63,7 @@ const recentRequests = computed(() => monitor.requestSnapshot.value.recentReques
     <div class="pointer-events-none fixed inset-x-0 bottom-0 z-[95] px-2 pb-2 sm:px-3">
       <div class="pointer-events-auto mx-auto flex w-full max-w-[1200px] flex-col gap-2">
         <section
-          v-if="monitor.expanded.value"
+          v-if="!hidden && monitor.expanded.value"
           class="overflow-hidden rounded-[1.4rem] border border-slate-900/10 bg-background/94 shadow-[0_-14px_40px_rgba(15,23,42,0.16)] backdrop-blur-md dark:border-white/10"
         >
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
@@ -103,6 +105,17 @@ const recentRequests = computed(() => monitor.requestSnapshot.value.recentReques
               >
                 <ClipboardCopy class="size-4" />
                 Copy Summary
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                class="rounded-full"
+                aria-label="Hide performance monitor"
+                @click.stop="setDevPerformanceBarHidden(true)"
+              >
+                <X class="size-4" />
+                Hide
               </Button>
               <Button
                 type="button"
@@ -210,37 +223,49 @@ const recentRequests = computed(() => monitor.requestSnapshot.value.recentReques
           </div>
         </section>
 
-        <button
-          type="button"
-          class="flex h-10 w-full items-center justify-between gap-3 rounded-full border border-slate-900/10 bg-background/92 px-4 text-left shadow-[0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-md transition-colors hover:border-primary/40 dark:border-white/10"
-          :aria-expanded="monitor.expanded.value"
-          @click="monitor.toggleExpanded"
-        >
-          <div class="flex min-w-0 items-center gap-3 text-sm">
-            <span class="inline-flex items-center gap-2 font-semibold text-foreground">
-              <Cpu class="size-4 text-primary" />
-              Perf
-            </span>
-            <span class="truncate text-muted-foreground">{{ routeLabel }}</span>
-            <span class="hidden text-muted-foreground sm:inline">
-              {{ requestSummaryLabel }}
-            </span>
-            <span class="hidden text-muted-foreground md:inline">
-              {{ backendStatusLabel }}
-            </span>
-            <span class="hidden text-muted-foreground xl:inline">
-              {{ decodeLabel }}
-            </span>
-          </div>
+        <div v-if="!hidden" class="flex items-center gap-2">
+          <button
+            type="button"
+            class="flex h-10 min-w-0 flex-1 items-center justify-between gap-3 rounded-full border border-slate-900/10 bg-background/92 px-4 text-left shadow-[0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-md transition-colors hover:border-primary/40 dark:border-white/10"
+            :aria-expanded="monitor.expanded.value"
+            @click="monitor.toggleExpanded"
+          >
+            <div class="flex min-w-0 items-center gap-3 text-sm">
+              <span class="inline-flex items-center gap-2 font-semibold text-foreground">
+                <Cpu class="size-4 text-primary" />
+                Perf
+              </span>
+              <span class="truncate text-muted-foreground">{{ routeLabel }}</span>
+              <span class="hidden text-muted-foreground sm:inline">
+                {{ requestSummaryLabel }}
+              </span>
+              <span class="hidden text-muted-foreground md:inline">
+                {{ backendStatusLabel }}
+              </span>
+              <span class="hidden text-muted-foreground xl:inline">
+                {{ decodeLabel }}
+              </span>
+            </div>
 
-          <div class="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>CPU {{ systemCpuLabel }}</span>
-            <span>FPS {{ formatNumber(monitor.frontendSnapshot.value.fps, 1) }}</span>
-            <span>{{ monitor.paused.value ? "paused" : "live" }}</span>
-            <ChevronUp v-if="monitor.expanded.value" class="size-4" />
-            <ChevronUp v-else class="size-4 rotate-180" />
-          </div>
-        </button>
+            <div class="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>CPU {{ systemCpuLabel }}</span>
+              <span>FPS {{ formatNumber(monitor.frontendSnapshot.value.fps, 1) }}</span>
+              <span>{{ monitor.paused.value ? "paused" : "live" }}</span>
+              <ChevronUp v-if="monitor.expanded.value" class="size-4" />
+              <ChevronUp v-else class="size-4 rotate-180" />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            class="flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-900/10 bg-background/92 text-muted-foreground shadow-[0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground dark:border-white/10"
+            aria-label="Hide performance monitor"
+            title="Hide performance monitor"
+            @click="setDevPerformanceBarHidden(true)"
+          >
+            <X class="size-4" />
+          </button>
+        </div>
       </div>
     </div>
   </Teleport>
