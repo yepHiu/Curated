@@ -94,8 +94,6 @@
   },
   "curated": {
     "title": "Curated Frame",
-    "subtitle": "In the player, click Curated or press {key} to capture the current frame; sorted by capture time. Use the top search (this library only). Delete from the card or detail.",
-    "keyHint": "C",
     "pageSummary": "Showing {shown} of {total}",
     "loadMore": "Load more",
     "empty": "No curated frames yet. Capture some from the player.",

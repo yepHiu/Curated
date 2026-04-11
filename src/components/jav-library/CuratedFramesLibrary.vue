@@ -1049,12 +1049,7 @@ defineExpose({
   <div
     class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-3 sm:px-6"
   >
-    <div class="flex flex-col gap-2 pt-2">
-      <h1 class="text-2xl font-semibold tracking-tight">{{ t("curated.title") }}</h1>
-      <p class="text-sm text-muted-foreground">
-        {{ t("curated.subtitle", { key: t("curated.keyHint") }) }}
-      </p>
-    </div>
+    <h1 class="pt-2 text-2xl font-semibold tracking-tight">{{ t("curated.title") }}</h1>
 
     <div
       v-if="nearDuplicateGroups.length > 0"

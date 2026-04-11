@@ -94,8 +94,6 @@
   },
   "curated": {
     "title": "Curated Frame · キュレートフレーム",
-    "subtitle": "プレイヤーで「Curated」を押すか {key} で現在フレームを保存。撮影時刻順。上部検索（このライブラリのみ）。カードまたは詳細から削除。",
-    "keyHint": "C",
     "pageSummary": "{shown} / {total} 件を表示中",
     "loadMore": "さらに読み込む",
     "empty": "キュレートフレームはまだありません。プレイヤーから保存してください。",
