@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
-import { LayoutDashboard, Menu, Moon, Search, Sun, X } from "lucide-vue-next"
+import { LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
 
 const shellGridClass = computed(() => {
   const base =
-    "grid h-full min-h-0 gap-3 grid-cols-1 lg:gap-5 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
+    "grid h-full min-h-0 grid-cols-1 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
   if (!isLgUp.value) {
     return base
   }
@@ -460,18 +460,27 @@ watchDebounced(
     const currentTag = getLibraryTagExactQuery(route.query).trim()
     const currentActor = getLibraryActorExactQuery(route.query).trim()
     const currentStudio = getLibraryStudioExactQuery(route.query).trim()
+    const syncedToTextSearch =
+      normalized === currentQ && (currentQ !== "" || (!currentTag && !currentActor && !currentStudio))
+    const syncedToTagFilter =
+      currentTag !== "" && normalized === currentTag && currentQ === "" && !currentActor && !currentStudio
+    const syncedToActorFilter =
+      currentActor !== "" &&
+      normalized === currentActor &&
+      currentQ === "" &&
+      !currentTag &&
+      !currentStudio
+    const syncedToStudioFilter =
+      currentStudio !== "" &&
+      normalized === currentStudio &&
+      currentQ === "" &&
+      !currentTag &&
+      !currentActor
     if (
-      (normalized === currentQ && !currentTag && !currentActor && !currentStudio) ||
-      (currentActor !== "" &&
-        normalized === currentActor &&
-        currentQ === "" &&
-        !currentTag &&
-        !currentStudio) ||
-      (currentStudio !== "" &&
-        normalized === currentStudio &&
-        currentQ === "" &&
-        !currentTag &&
-        !currentActor)
+      syncedToTextSearch ||
+      syncedToTagFilter ||
+      syncedToActorFilter ||
+      syncedToStudioFilter
     ) {
       return
     }
@@ -608,22 +617,23 @@ function clearActorsSearch() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3 lg:px-5 lg:py-5">
-      <div :class="shellGridClass">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        data-shell-layout="split"
+        :class="shellGridClass"
+      >
         <div
           v-if="isLgUp"
-          class="min-h-0 min-w-0 overflow-hidden"
+          class="min-h-0 min-w-0 overflow-hidden border-r border-sidebar-border/80 bg-sidebar/95"
         >
           <AppSidebar
             class="min-h-0"
             :compact="desktopSidebarCollapsed"
-            show-collapse-toggle
-            @toggle-compact="desktopSidebarCollapsed = !desktopSidebarCollapsed"
           />
         </div>
 
         <section
-          class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-border/60 bg-background/95"
+          class="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background/95"
         >
           <!-- min-h 与中间栏 h-10 搜索框 + 上下 py-4 对齐，避免仅「返回」时顶栏变矮（如观看历史） -->
           <div
@@ -631,11 +641,25 @@ function clearActorsSearch() {
           >
             <div class="flex flex-wrap items-center gap-2">
               <Button
+                v-if="isLgUp"
+                type="button"
+                variant="ghost"
+                size="icon"
+                class="hidden shrink-0 rounded-2xl text-muted-foreground hover:text-foreground lg:inline-flex"
+                data-sidebar-toggle="desktop"
+                :title="desktopSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')"
+                :aria-label="desktopSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')"
+                @click="desktopSidebarCollapsed = !desktopSidebarCollapsed"
+              >
+                <PanelLeftOpen v-if="desktopSidebarCollapsed" class="size-5" />
+                <PanelLeftClose v-else class="size-5" />
+              </Button>
+              <Button
                 v-if="!isLgUp"
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 size="icon"
-                class="shrink-0 rounded-2xl lg:hidden"
+                class="shrink-0 rounded-2xl text-muted-foreground hover:text-foreground lg:hidden"
                 :aria-label="t('shell.openMenu')"
                 @click="mobileSidebarOpen = true"
               >
