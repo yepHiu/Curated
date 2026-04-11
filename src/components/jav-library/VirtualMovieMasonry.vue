@@ -222,12 +222,12 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
           :size-dependencies="[getChunk(item).sizeKey]"
           :min-size="estimatedChunkHeight"
         >
-          <!-- 列宽 min 用 clamp 响应式；1fr 吃满行；卡片区 max-width 限制单卡上限并居中 -->
+          <!-- 列宽 min 用 clamp；max 用 minmax(0,1fr) 避免 1fr≈minmax(auto,1fr) 被内容最小宽度撑开导致列溢出、与邻列贴死 -->
           <div
-            class="grid w-full"
+            class="grid w-full min-w-0"
             :ref="(el) => onChunkGridRef(el)"
             :style="{
-              gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${GRID_COL_MIN}), 1fr))`,
+              gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${GRID_COL_MIN}), minmax(0, 1fr)))`,
               columnGap: GRID_GAP,
               rowGap: GRID_GAP,
             }"
@@ -237,7 +237,7 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
               :key="movie.id"
               class="flex min-w-0 justify-center"
             >
-              <div class="w-full" :style="{ maxWidth: CARD_MAX_WIDTH }">
+              <div class="w-full min-w-0" :style="{ maxWidth: CARD_MAX_WIDTH }">
               <MovieCard
                 :movie="movie"
                 :selected="movie.id === props.selectedMovieId"
