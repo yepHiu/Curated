@@ -356,7 +356,7 @@
   <h3>2.5 观看进度与历史（仅浏览器，非 API）</h3>
   <ul>
     <li><span class="path">src/lib/playback-progress-storage.ts</span>：每条影片的播放位置、时长、更新时间，键名 <code>jav-library-playback-progress-v1</code>。</li>
-    <li><span class="path">src/lib/player-route.ts</span>：构造进播放器时的 query（如 <code>?t=</code> 续播、<code>from=history</code> 返回栈）。</li>
+    <li><span class="path">src/lib/player-route.ts</span> 与 <span class="path">src/lib/navigation-intent.ts</span>：统一构造详情/播放器路由与返回语义；<code>browse=</code> 保存资料库上下文，<code>back=</code> 标记播放器返回目标，<code>?t=</code> 表示续播时间。</li>
     <li><span class="path">src/lib/playback-history-groups.ts</span>：历史页按本地日历日分组标题（今天 / 昨天 / …）。</li>
     <li><span class="path">src/components/jav-library/PlaybackHistoryCard.vue</span>：历史列表卡片（文案 + 海报 + 底栏进度条）。</li>
     <li><strong>不与 SQLite 同步</strong>；服务端 <code>play_history</code> 仍为产品文档中的待决策项。</li>
@@ -443,7 +443,7 @@
   </div>
   <h3>5.4 播放与续播</h3>
   <p>前端根据影片 ID 构造指向 <code>/api/library/movies/{id}/stream</code> 的 URL（开发环境仍走 Vite 代理）。播放器组件发起媒体请求，由 Go <code>ServeContent</code> 按文件实际路径读出并支持 HTTP Range。</p>
-  <p><strong>续播（前端）</strong>：<span class="path">PlayerPage.vue</span> 在 <code>loadedmetadata</code> 后按路由 <code>?t=</code> 或 <code>localStorage</code> 写入的位置 seek；播放中节流回写进度。详情/资料库进播放器可由 <code>buildPlayerRouteFromBrowse</code> 附带 <code>t</code>；历史页进播放器带 <code>from=history</code>，顶栏返回历史（<span class="path">AppShell.vue</span>）。</p>
+  <p><strong>续播（前端）</strong>：<span class="path">PlayerPage.vue</span> 在 <code>loadedmetadata</code> 后按路由 <code>?t=</code> 或 <code>localStorage</code> 写入的位置 seek；播放中节流回写进度。详情/资料库进播放器时，会同时携带 <code>browse=</code> 资料库上下文与显式 <code>back=detail</code> / <code>back=browse</code>；历史页与萃取帧页则分别使用 <code>back=history</code>、<code>back=curated-frames</code>。顶栏返回由 <span class="path">AppShell.vue</span> 通过 <span class="path">src/lib/navigation-intent.ts</span> 统一解析，而不是在壳层内分散拼装。</p>
   <p><strong>本机播放器拉起（前端）</strong>：播放器页不再默认依赖后端 <code>native-play</code> 去执行外部程序，而是由浏览器侧按协议模板拉起本机播放器。当前实现默认以 PotPlayer 为主，协议模板建议值为 <code>potplayer:{url}</code>，并保存在浏览器 <code>localStorage</code>（键名 <code>curated-native-player-browser-template-v1</code>）中，便于按机器区分是否安装了对应播放器。</p>
 
   <h2 id="features">6. 功能模块与代码落点</h2>
