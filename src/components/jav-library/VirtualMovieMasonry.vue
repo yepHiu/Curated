@@ -222,9 +222,9 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
           :size-dependencies="[getChunk(item).sizeKey]"
           :min-size="estimatedChunkHeight"
         >
-          <!-- 列宽 min 用 clamp；max 用 minmax(0,1fr) 避免 1fr≈minmax(auto,1fr) 被内容最小宽度撑开导致列溢出、与邻列贴死 -->
+          <!-- 勿在 grid 容器上加 min-w-0（虚拟列表绝对定位链下会误缩成单列）。max 用 minmax(0,1fr) 降列溢出；overflow-x-hidden 兜底 -->
           <div
-            class="grid w-full min-w-0"
+            class="grid w-full overflow-x-hidden"
             :ref="(el) => onChunkGridRef(el)"
             :style="{
               gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${GRID_COL_MIN}), minmax(0, 1fr)))`,
