@@ -9,9 +9,11 @@ import {
   getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
+  getCuratedFrameTagQuery,
   getSelectedMovieQuery,
   mergeLibraryQuery,
   isLibraryBrowseRoute,
+  mergeCuratedFramesQuery,
   resolveLibraryMode,
 } from "@/lib/library-query"
 
@@ -140,6 +142,7 @@ describe("library query helpers", () => {
   it("reads exact tag filter and merges tag patch", () => {
     expect(getLibraryTagExactQuery({ tag: "4K" })).toBe("4K")
     expect(getLibraryTagExactQuery({})).toBe("")
+    expect(getLibraryTagExactQuery({ tag: ["first", "ignored"] })).toBe("first")
 
     const merged = mergeLibraryQuery({ q: "foo", tag: "old" }, { tag: "new", q: undefined })
     expect(merged.tag).toBe("new")
@@ -216,5 +219,19 @@ describe("library query helpers", () => {
       selected: "id-1",
       tab: "new",
     })
+  })
+
+  it("reads and merges curated frame tag filter separately from curated search", () => {
+    expect(getCuratedFrameTagQuery({ cft: "pose", cfq: "abc" })).toBe("pose")
+    expect(getCuratedFrameTagQuery({})).toBe("")
+
+    const merged = mergeCuratedFramesQuery(
+      { cfq: "abc", cft: "old" },
+      { cft: "new" },
+    )
+    expect(merged).toEqual({ cfq: "abc", cft: "new" })
+
+    const cleared = mergeCuratedFramesQuery(merged, { cft: "" })
+    expect(cleared).toEqual({ cfq: "abc" })
   })
 })

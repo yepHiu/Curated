@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import { useRoute } from "vue-router"
 import { CheckSquare, ChevronDown, ListChecks, X } from "lucide-vue-next"
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
@@ -20,6 +21,7 @@ import {
   aggregateMetadataTagCounts,
   aggregateUserTagCounts,
 } from "@/lib/library-stats"
+import { getLibraryTagExactQuery } from "@/lib/library-query"
 
 const props = defineProps<{
   mode: LibraryMode
@@ -30,8 +32,6 @@ const props = defineProps<{
   batchMode?: boolean
   /** 多选 id 列表（来自父级 Set 快照，用于卡片勾选态） */
   batchSelectedIds?: readonly string[]
-  /** 当前 URL 精确标签筛选（用于高亮） */
-  activeTagFilter?: string
   /** 当前 URL 精确演员筛选（`actor=`） */
   activeActorFilter?: string
   /** 当前 URL 精确厂商筛选（`studio=`） */
@@ -60,6 +60,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const route = useRoute()
 /** 折叠时各区块默认展示的标签个数（其余用「展开」） */
 const TAG_PREVIEW_COUNT = 14
 
@@ -92,7 +93,13 @@ const userTagsHiddenCount = computed(() =>
   Math.max(0, userTagRanked.value.length - TAG_PREVIEW_COUNT),
 )
 
-const activeTagTrimmed = computed(() => props.activeTagFilter?.trim() ?? "")
+/** 与列表筛选同源：直接读 route.query，避免首击 replace 后父级 prop 与 URL 短暂不同步导致芯片不高亮 */
+const activeTagTrimmed = computed(() => {
+  if (props.mode === "trash") {
+    return ""
+  }
+  return getLibraryTagExactQuery(route.query).trim()
+})
 const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 

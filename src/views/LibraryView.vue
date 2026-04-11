@@ -765,8 +765,7 @@ const clearExactStudioFilter = async () => {
   })
 }
 
-/** 回收站不展示 URL 带入的演员 / 标签 / 厂商筛选条（与无搜索一致） */
-const activeTagForPage = computed(() => (libraryMode.value === "trash" ? "" : tagExactQuery.value))
+/** 回收站不展示 URL 带入的演员 / 厂商筛选条（与无搜索一致）；标签高亮由 LibraryPage 读 route */
 const activeActorForPage = computed(() =>
   libraryMode.value === "trash" ? "" : actorProfileDisplayName.value,
 )
@@ -786,7 +785,6 @@ const activeStudioForPage = computed(() =>
         :active-tab="effectiveTab"
         :batch-mode="batchMode"
         :batch-selected-ids="batchSelectedIdsList"
-        :active-tag-filter="activeTagForPage"
         :active-actor-filter="activeActorForPage"
         :active-studio-filter="activeStudioForPage"
         :actor-user-tag-suggestions="actorUserTagSuggestionPool"

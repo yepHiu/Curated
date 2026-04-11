@@ -63,8 +63,17 @@ export const getLibrarySearchQuery = (query: LocationQuery): string => {
 }
 
 /** 精确标签筛选（元数据或用户标签字段完全匹配）；与 `q` 可同时生效（交集） */
-export const getLibraryTagExactQuery = (query: LocationQuery) =>
-  typeof query.tag === "string" ? query.tag : ""
+export const getLibraryTagExactQuery = (query: LocationQuery): string => {
+  const raw = query.tag
+  if (typeof raw === "string") {
+    return raw
+  }
+  if (Array.isArray(raw)) {
+    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
+    return first ?? ""
+  }
+  return ""
+}
 
 /** 精确演员筛选（`actors` 数组元素完全匹配）；与 `q`、`tag` 可同时生效（交集） */
 export const getLibraryActorExactQuery = (query: LocationQuery): string => {
@@ -218,18 +227,28 @@ export const buildClearLibraryActorFilterQuery = (
 export const getCuratedFrameSearchQuery = (query: LocationQuery) =>
   typeof query.cfq === "string" ? query.cfq : ""
 
+/** 萃取帧库专用标签筛选（与 `cfq` 独立） */
+export const getCuratedFrameTagQuery = (query: LocationQuery) =>
+  typeof query.cft === "string" ? query.cft : ""
+
 export const mergeCuratedFramesQuery = (
   sourceQuery: LocationQuery,
-  patch: Partial<{ cfq: string | undefined }>,
+  patch: Partial<{ cfq: string | undefined; cft: string | undefined }>,
 ) => {
   const nextQuery: LocationQuery = { ...sourceQuery }
-  if (hasOwnKey(patch, "cfq")) {
-    const t = patch.cfq?.trim()
+  const applyValue = (key: "cfq" | "cft", value: string | undefined) => {
+    const t = value?.trim()
     if (t) {
-      nextQuery.cfq = t
+      nextQuery[key] = t
     } else {
-      delete nextQuery.cfq
+      delete nextQuery[key]
     }
+  }
+  if (hasOwnKey(patch, "cfq")) {
+    applyValue("cfq", patch.cfq)
+  }
+  if (hasOwnKey(patch, "cft")) {
+    applyValue("cft", patch.cft)
   }
   return nextQuery
 }
