@@ -29,3 +29,4 @@
 | 日期 | 版本 | 提交 / 分支 | 打包类型 | 产物路径 | 状态 | 操作人 | 备注 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-04-01 | 0.0.0-local | `a52143a` / `master` | `release:publish` | `release/portable/Curated-0.0.0-local-windows-x64.zip`；`release/installer/Curated-Setup-0.0.0-local.exe` | 成功 | Codex | BuildStamp=`20260401.151209`；同时生成 `release/manifest/release.json`；为兼容当前 Windows 环境，发布脚本改为前端使用 `vite --configLoader native`、后端使用仓库内 `.gocache/` |
+| 2026-04-02 | 0.0.1-master | `c517ddb` / `master` | `release:publish` | `release/portable/Curated-0.0.1-master-windows-x64.zip`；`release/installer/Curated-Setup-0.0.1-master.exe` | 成功 | Codex（补记） | BuildStamp=`20260402.160705`；`release/manifest/release.json` 生成时间为 `2026-04-02T16:07:26Z`；SHA256 已写入 manifest；本条根据现存 manifest、产物时间戳与 git 历史补记。 |

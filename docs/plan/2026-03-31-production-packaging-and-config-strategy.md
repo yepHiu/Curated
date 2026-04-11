@@ -12,6 +12,159 @@
 
 本文描述的是 **推荐方案、约束和实施计划**，不是当前仓库已经全部完成的事实实现。
 
+## 1.1 当前生产安装包链路梳理（2026-04-11）
+
+本节按当前仓库脚本与代码事实梳理生产环境安装包链路；与后续规划不一致时，以本节为当前实现快照。
+
+### 入口命令
+
+当前 `package.json` 暴露了如下 release 脚本：
+
+- `pnpm release:frontend`
+- `pnpm release:backend`
+- `pnpm release:portable`
+- `pnpm release:installer`
+- `pnpm release:publish`
+
+这些 npm 脚本当前都把 `-Version` 固定为 `0.0.0-local`。正式整机安装包不应直接沿用该默认值；应先读取 `docs/2026-04-02-package-build-history.md` 的最近有效发布记录，再显式执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <version>
+```
+
+如果需要固定构建戳，可额外传入：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <version> -BuildStamp <yyyyMMdd.HHmmss>
+```
+
+同一次发布中，`-Version`、安装包文件名、绿色包文件名、`release/manifest/release.json` 与 `docs/2026-04-02-package-build-history.md` 台账记录必须保持一致。
+
+### 主链路
+
+当前完整发布入口是 `scripts/release/publish.ps1`，执行顺序如下：
+
+```text
+publish.ps1
+  -> build-frontend.ps1
+  -> build-backend.ps1
+  -> assemble-release.ps1
+  -> package-portable.ps1
+  -> package-installer.ps1
+  -> write release/manifest/release.json
+```
+
+1. `build-frontend.ps1`
+   - 工作目录切到仓库根目录。
+   - 设置 `VITE_APP_VERSION=$Version`。
+   - 执行 `pnpm typecheck`。
+   - 执行 `pnpm exec vite build --configLoader native`。
+   - 将根目录 `dist/` 复制到 `release/frontend/`（或传入的 `-OutputDir`）。
+   - 注意：当前 `src/` 内未检索到 `VITE_APP_VERSION` 消费点，前端产物虽注入该环境变量，但 UI 版本展示主要仍来自后端 `GET /api/health` 的 `version/channel`。
+
+2. `build-backend.ps1`
+   - 工作目录切到 `backend/`。
+   - 默认输出 `release/backend/curated.exe`。
+   - 创建并使用仓库内 `.gocache/` 作为 `GOCACHE`。这是发布脚本的当前实现，与日常测试“不要把 Go 缓存指到仓库内”的默认约定不同。
+   - 执行：
+
+```powershell
+go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/version.BuildStamp=<BuildStamp>" -o <binaryPath> ./cmd/curated
+```
+
+3. `assemble-release.ps1`
+   - 默认输入 `release/backend/curated.exe` 与 `release/frontend/`。
+   - 默认输出 `release/Curated/`。
+   - 目录内容包括：
+     - `curated.exe`
+     - `curated.ico`
+     - `frontend-dist/`
+     - `third_party/`（如果 `backend/third_party/` 存在）
+     - `runtime/config/`
+     - `runtime/data/`
+     - `runtime/cache/`
+     - `runtime/logs/`
+     - `runtime/config/library-config.example.cfg`
+     - `README-release.txt`
+     - `docs/production-packaging-and-config-strategy.md`
+   - 2026-04-11 修正：脚本现在复制当前实际存在的 `docs/plan/2026-03-31-production-packaging-and-config-strategy.md`，并在发布目录中仍输出为 `docs/production-packaging-and-config-strategy.md`。
+
+4. `package-portable.ps1`
+   - 默认输入 `release/Curated/`。
+   - 默认输出 `release/portable/Curated-<version>-windows-x64.zip`。
+   - 使用 `Compress-Archive` 打包 `release/Curated/*`。
+
+5. `package-installer.ps1`
+   - 默认输入 `release/Curated/`。
+   - 读取模板 `scripts/release/windows/Curated.iss.tpl`。
+   - 生成 `release/installer/Curated.iss`，替换 `__APP_VERSION__`、`__APP_DIR__`、`__OUTPUT_DIR__`、`__SETUP_BASENAME__`。
+   - 查找 `ISCC.exe`；若存在则调用 Inno Setup 生成 `release/installer/Curated-Setup-<version>.exe`。
+   - 若找不到 `ISCC.exe`，脚本只生成 `.iss` 并 warning 后返回，不会生成安装器 exe。
+
+6. `release/manifest/release.json`
+   - `publish.ps1` 在最后创建或更新 manifest。
+   - 当前字段包括：
+     - `productName`
+     - `version`
+     - `buildStamp`
+     - `channel`
+     - `generatedAtUtc`
+     - `artifacts[]`
+   - `artifacts[]` 只在对应文件存在时追加：
+     - portable zip：记录文件名、绝对路径、SHA256
+     - installer exe：记录文件名、绝对路径、SHA256
+
+### 运行态链路
+
+当前 release 二进制的运行态关键点：
+
+- `-tags release` 使后端默认 HTTP 地址从 `:8080` 切到 `:8081`。
+- `-tags release` 使 `version.Channel` 为 `release`，健康名为 `curated`。
+- Windows + release build 默认启动模式为 `tray`：启动本地 HTTP 服务、托盘图标、单实例互斥，并打开浏览器。
+- 后端 `webui.FindDistDir()` 会优先从可执行文件旁查找 `frontend-dist/` 或 `dist/`，因此安装目录中的 `curated.exe + frontend-dist/` 可以直接服务前端页面。
+- 前端生产构建未设置 `VITE_API_BASE_URL` 时，`src/api/http-client.ts` 默认请求 `http://127.0.0.1:8081/api`，与 release 后端默认端口一致。
+- release build 的默认数据根目录为 `%LOCALAPPDATA%\Curated`，可通过 `CURATED_DATA_DIR` 覆盖；默认派生：
+  - `config/library-config.cfg`
+  - `data/curated.db`
+  - `cache/`
+  - 日志目录在托盘菜单中按配置解析，未显式配置时基于数据根目录的 `logs/`。
+
+### 当前已观察到的台账风险
+
+- `release/manifest/release.json` 当前记录的是 `0.0.1-master`，但 `docs/2026-04-02-package-build-history.md` 当前最后一条是 `0.0.0-local`。这表示已有产物与版本台账存在不同步风险。
+- 后续任何实际产出安装包、绿色包或发布清单的动作完成后，都需要立即追加 `docs/2026-04-02-package-build-history.md`，不要发布后再补写不一致版本。
+
+### 正式打包操作清单
+
+执行整机安装包或完整发布前：
+
+1. 读取 `docs/2026-04-02-package-build-history.md`，确认最近一条有效发布记录。
+2. 确认本次 `-Version`，不要直接使用 `package.json` 中 `release:*` 脚本默认的 `0.0.0-local`。
+3. 确认当前 commit / branch，并记录将用于台账的 short SHA。
+4. 确认 Inno Setup 是否可用：`ISCC.exe` 需存在于 PATH，或位于 `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` / `C:\Program Files\Inno Setup 6\ISCC.exe`。
+5. 确认 `config/library-config.cfg` 中示例配置可作为 `runtime/config/library-config.example.cfg` 随包分发；不要把本机私密代理、私有路径或临时调试配置带入示例配置。
+6. 如需随包提供 FFmpeg，确认 `backend/third_party/ffmpeg/` 内存在实际运行时文件；当前仓库只有 README 时，包内也只会带 README。
+
+推荐执行命令：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <version>
+```
+
+执行完成后：
+
+1. 检查 `release/portable/Curated-<version>-windows-x64.zip` 是否存在。
+2. 检查 `release/installer/Curated-Setup-<version>.exe` 是否存在；如果只生成 `release/installer/Curated.iss`，说明本机未找到 Inno Setup 编译器。
+3. 检查 `release/manifest/release.json` 中的 `version`、`artifacts[].fileName`、`sha256` 是否与实际产物一致。
+4. 解压或检查 `release/Curated/`，确认至少包含：
+   - `curated.exe`
+   - `curated.ico`
+   - `frontend-dist/index.html`
+   - `runtime/config/library-config.example.cfg`
+   - `README-release.txt`
+5. 追加 `docs/2026-04-02-package-build-history.md`，记录日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
+6. 如发布态需要手动验收，运行 `release/Curated/curated.exe`，确认托盘模式启动、浏览器打开、`GET http://127.0.0.1:8081/api/health` 返回 `name=curated`、`channel=release`，并确认前端页面可加载。
+
 ## 2. 当前仓库现状
 
 ### 2.1 已有能力
