@@ -4,7 +4,7 @@ import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { api } from "@/api/endpoints"
-import type { PostCuratedFramesExportBody } from "@/api/types"
+import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
   Camera,
   CheckSquare,
@@ -28,10 +28,15 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
-import { getCuratedFrameSearchQuery, mergeCuratedFramesQuery } from "@/lib/library-query"
+import {
+  getCuratedFrameSearchQuery,
+  getCuratedFrameTagQuery,
+  mergeCuratedFramesQuery,
+} from "@/lib/library-query"
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
 import {
   deleteCuratedFrame,
+  listCuratedFrameTagFacets,
   listCuratedFrameTagSuggestions,
   listCuratedFramesPage,
   updateCuratedFrameTags,
@@ -53,6 +58,7 @@ import {
   shouldShowCuratedFrameTagRetry,
   type CuratedFrameTagSaveStatus,
 } from "@/lib/curated-frames/p2-state"
+import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
 
@@ -62,6 +68,7 @@ const router = useRouter()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const curatedPageLimit = 60
+const curatedTagFilterPreviewLimit = 16
 
 /** 与资料库「批量管理」一致：勾选卡片并配合底部工具栏导出 */
 const batchMode = ref(false)
@@ -344,6 +351,8 @@ const listWithUrls = ref<RowWithUrl[]>([])
 const totalRows = ref(0)
 const rowsLoading = ref(false)
 const rowsLoadingMore = ref(false)
+const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
+const tagFiltersExpanded = ref(false)
 
 function revokeAllUrls() {
   for (const x of listWithUrls.value) {
@@ -358,11 +367,16 @@ function currentCuratedQuery() {
   return getCuratedFrameSearchQuery(route.query).trim()
 }
 
+function currentCuratedTagFilter() {
+  return getCuratedFrameTagQuery(route.query).trim()
+}
+
 async function reloadFromDb() {
   rowsLoading.value = true
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
+      tag: currentCuratedTagFilter(),
       limit: curatedPageLimit,
       offset: 0,
     })
@@ -381,6 +395,7 @@ async function loadMoreRows() {
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
+      tag: currentCuratedTagFilter(),
       limit: curatedPageLimit,
       offset: rawRows.value.length,
     })
@@ -392,7 +407,11 @@ async function loadMoreRows() {
 }
 
 watch(
-  [() => curatedFramesRevision.value, () => getCuratedFrameSearchQuery(route.query)],
+  [
+    () => curatedFramesRevision.value,
+    () => getCuratedFrameSearchQuery(route.query),
+    () => getCuratedFrameTagQuery(route.query),
+  ],
   () => {
     void reloadFromDb()
   },
@@ -420,7 +439,40 @@ onUnmounted(() => {
 })
 
 const isEmpty = computed(() => !rowsLoading.value && listWithUrls.value.length === 0)
+const activeTagFilter = computed(() => getCuratedFrameTagQuery(route.query).trim())
+const hasActiveFrameFilters = computed(
+  () => currentCuratedQuery() !== "" || activeTagFilter.value !== "",
+)
+const isLibraryEmpty = computed(
+  () =>
+    !rowsLoading.value &&
+    listWithUrls.value.length === 0 &&
+    totalRows.value === 0 &&
+    !hasActiveFrameFilters.value &&
+    curatedTagFacets.value.length === 0,
+)
+const isFilteredEmpty = computed(
+  () => !rowsLoading.value && listWithUrls.value.length === 0 && !isLibraryEmpty.value,
+)
 const hasMoreRows = computed(() => rawRows.value.length < totalRows.value)
+const visibleCuratedTagFacets = computed(() => {
+  const facets = visibleCuratedFrameTagFacets(
+    curatedTagFacets.value,
+    curatedTagFilterPreviewLimit,
+    tagFiltersExpanded.value,
+  )
+  const active = activeTagFilter.value
+  if (!active || tagFiltersExpanded.value || facets.some((item) => item.name === active)) {
+    return facets
+  }
+  const activeFacet = curatedTagFacets.value.find((item) => item.name === active)
+  return activeFacet
+    ? [activeFacet, ...facets.slice(0, Math.max(curatedTagFilterPreviewLimit - 1, 0))]
+    : facets
+})
+const hiddenCuratedTagFacetCount = computed(() =>
+  Math.max(curatedTagFacets.value.length - curatedTagFilterPreviewLimit, 0),
+)
 const curatedFrameNearDuplicateThresholdSec = 3
 const nearDuplicateGroups = computed(() =>
   findCuratedFrameNearDuplicateGroups(rawRows.value, curatedFrameNearDuplicateThresholdSec),
@@ -544,12 +596,21 @@ async function reloadTagSuggestions() {
 }
 
 watch(
-  () => curatedFramesRevision.value,
+  [() => curatedFramesRevision.value, () => locale.value],
   () => {
     void reloadTagSuggestions()
+    void reloadTagFacets()
   },
   { immediate: true },
 )
+
+async function reloadTagFacets() {
+  try {
+    curatedTagFacets.value = await listCuratedFrameTagFacets(locale.value)
+  } catch {
+    curatedTagFacets.value = []
+  }
+}
 
 const filteredUserTagSuggestions = computed(() =>
   filterUserTagSuggestions(
@@ -787,7 +848,27 @@ function pickUserTagSuggestion(tag: string) {
   void nextTick(() => newUserTagInputRef.value?.focus())
 }
 
-/** 在本页用顶栏同源 cfq 筛选萃取帧，不进入影片库 tag */
+function isCuratedTagFilterActive(tag: string) {
+  return activeTagFilter.value === tag.trim()
+}
+
+function setCuratedFrameTagFilter(tag: string | undefined) {
+  const normalized = tag?.trim()
+  void router.replace({
+    name: "curated-frames",
+    query: mergeCuratedFramesQuery(route.query, { cft: normalized || undefined }),
+  })
+}
+
+function toggleCuratedFrameTagFilter(tag: string) {
+  const normalized = tag.trim()
+  if (!normalized) {
+    return
+  }
+  setCuratedFrameTagFilter(isCuratedTagFilterActive(normalized) ? undefined : normalized)
+}
+
+/** 在本页用独立 cft 参数筛选萃取帧，不进入影片库 tag */
 async function browseCuratedFramesByTag(tag: string) {
   const t = tag.trim()
   if (!t || !selected.value) {
@@ -799,7 +880,7 @@ async function browseCuratedFramesByTag(tag: string) {
   resetDialogState()
   await router.push({
     name: "curated-frames",
-    query: mergeCuratedFramesQuery(route.query, { cfq: t }),
+    query: mergeCuratedFramesQuery(route.query, { cft: t }),
   })
 }
 
@@ -997,7 +1078,7 @@ defineExpose({
     </div>
 
     <div
-      v-if="isEmpty"
+      v-if="isLibraryEmpty"
       class="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-16 text-center"
     >
       <Camera class="size-12 text-muted-foreground" />
@@ -1060,9 +1141,110 @@ defineExpose({
         </div>
       </div>
 
+      <section
+        class="shrink-0 rounded-3xl border border-border/70 bg-card/85 px-4 py-3 shadow-lg shadow-black/5"
+        :aria-label="t('curated.tagFilterTitle')"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 space-y-2">
+            <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {{ t("curated.tagFilterTitle") }}
+            </p>
+            <div v-if="curatedTagFacets.length > 0" class="flex flex-wrap gap-2">
+              <Badge
+                as-child
+                :variant="!activeTagFilter ? 'default' : 'secondary'"
+                :class="[
+                  'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
+                  !activeTagFilter
+                    ? 'border-primary/40'
+                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
+                ]"
+              >
+                <button
+                  type="button"
+                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
+                  :aria-pressed="!activeTagFilter"
+                  :aria-label="t('curated.ariaClearFrameTagFilter')"
+                  @click="setCuratedFrameTagFilter(undefined)"
+                >
+                  {{ t("curated.tagFilterAll") }}
+                </button>
+              </Badge>
+              <Badge
+                v-for="tag in visibleCuratedTagFacets"
+                :key="tag.name"
+                as-child
+                :variant="isCuratedTagFilterActive(tag.name) ? 'default' : 'secondary'"
+                :class="[
+                  'max-w-[14rem] rounded-full border px-3 py-1 text-sm font-normal transition-colors',
+                  isCuratedTagFilterActive(tag.name)
+                    ? 'border-primary/40'
+                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
+                ]"
+              >
+                <button
+                  type="button"
+                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
+                  :aria-pressed="isCuratedTagFilterActive(tag.name)"
+                  :aria-label="t('curated.ariaFilterFrameTag', { tag: tag.name, count: tag.count })"
+                  @click="toggleCuratedFrameTagFilter(tag.name)"
+                >
+                  <span class="truncate">{{ tag.name }}</span>
+                  <span
+                    class="tabular-nums text-xs opacity-80"
+                    :class="
+                      isCuratedTagFilterActive(tag.name)
+                        ? 'text-primary-foreground/90'
+                        : 'text-muted-foreground'
+                    "
+                  >
+                    · {{ tag.count }}
+                  </span>
+                </button>
+              </Badge>
+            </div>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t("curated.tagFilterEmpty") }}
+            </p>
+          </div>
+          <Button
+            v-if="hiddenCuratedTagFacetCount > 0"
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="h-8 shrink-0 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
+            @click="tagFiltersExpanded = !tagFiltersExpanded"
+          >
+            {{
+              tagFiltersExpanded
+                ? t("curated.tagFilterShowLess")
+                : t("curated.tagFilterShowMore", { count: hiddenCuratedTagFacetCount })
+            }}
+          </Button>
+        </div>
+      </section>
+
       <div
         class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
       >
+      <div
+        v-if="isFilteredEmpty"
+        class="mb-4 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-12 text-center"
+      >
+        <Camera class="size-10 text-muted-foreground" />
+        <p class="text-sm text-muted-foreground">{{ t("curated.tagFilterNoMatches") }}</p>
+        <Button
+          v-if="activeTagFilter"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="rounded-2xl"
+          @click="setCuratedFrameTagFilter(undefined)"
+        >
+          {{ t("curated.tagFilterAll") }}
+        </Button>
+      </div>
       <TabsContent value="timeline" class="mt-0 outline-none">
         <div
           class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
