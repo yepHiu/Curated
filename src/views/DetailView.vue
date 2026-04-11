@@ -9,12 +9,11 @@ import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import {
-  buildMovieRouteQuery,
   getBrowseSourceMode,
   getDetailBrowseTargetMode,
   mergeLibraryQuery,
 } from "@/lib/library-query"
-import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
+import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
@@ -128,24 +127,25 @@ const userTagSuggestionPool = computed(() =>
 )
 
 const selectMovie = async (nextMovieId: string) => {
-  await router.replace({
-    name: "detail",
-    params: { id: nextMovieId },
-    query: buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
-  })
+  await router.replace(
+    buildDetailRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
+  )
 }
 
 const openDetails = async (nextMovieId: string) => {
-  await router.push({
-    name: "detail",
-    params: { id: nextMovieId },
-    query: buildMovieRouteQuery(route.query, getBrowseSourceMode(route.query), nextMovieId),
-  })
+  await router.push(
+    buildDetailRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
+  )
 }
 
 const openPlayer = async (nextMovieId: string) => {
   await router.push(
-    buildPlayerRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
+    buildPlayerRouteFromBrowseIntent(
+      nextMovieId,
+      route.query,
+      getBrowseSourceMode(route.query),
+      "detail",
+    ),
   )
 }
 

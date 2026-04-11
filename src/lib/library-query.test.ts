@@ -66,13 +66,14 @@ describe("library query helpers", () => {
 
   it("normalizes browse query values", () => {
     const query = {
-      from: "favorites",
+      browse: "favorites",
       q: "MKB",
       selected: "mkb-100",
       tab: "top-rated",
     }
 
     expect(getBrowseSourceMode({ from: "trash" })).toBe("trash")
+    expect(getBrowseSourceMode({ browse: "recent" })).toBe("recent")
     expect(getBrowseSourceMode(query)).toBe("favorites")
     expect(getLibrarySearchQuery(query)).toBe("MKB")
     expect(getSelectedMovieQuery(query)).toBe("mkb-100")
@@ -113,6 +114,10 @@ describe("library query helpers", () => {
       q: "Mina",
       selected: "sld-101",
       tab: "new",
+      autoplay: "1",
+      t: "12",
+      back: "detail",
+      browse: "favorites",
     })
 
     const movieQuery = buildMovieRouteQuery(
@@ -120,6 +125,9 @@ describe("library query helpers", () => {
         q: "Mina",
         selected: "sld-101",
         tab: "new",
+        autoplay: "1",
+        t: "12",
+        back: "detail",
       },
       "recent",
       "nva-102",
@@ -135,7 +143,7 @@ describe("library query helpers", () => {
     })
 
     expect(movieQuery).toEqual({
-      from: "recent",
+      browse: "recent",
       q: "Mina",
       selected: "nva-102",
       tab: "new",
@@ -176,7 +184,7 @@ describe("library query helpers", () => {
       query: { q: "x", actor: "Lead A", tab: "new" },
     })
     expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
-      from: "library",
+      browse: "library",
       q: "x",
       actor: "Lead A",
       selected: "id-1",
@@ -221,7 +229,7 @@ describe("library query helpers", () => {
       query: { q: "x", studio: "ACME", tab: "new" },
     })
     expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
-      from: "library",
+      browse: "library",
       q: "x",
       studio: "ACME",
       selected: "id-1",

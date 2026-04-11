@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -438,16 +437,13 @@ onUnmounted(() => {
 <template>
   <Card
     v-if="useWeb"
-    class="rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
+    class="gap-3 py-4 sm:py-5 rounded-3xl border-border/70 bg-card/85 shadow-lg shadow-black/5"
     :class="showUserTagSuggestions ? 'relative z-30' : ''"
   >
-    <CardHeader class="gap-3">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0 flex-1 space-y-1">
+    <CardHeader class="gap-2">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
           <CardTitle>{{ t("library.actorCardTitle") }}</CardTitle>
-          <CardDescription class="text-pretty">
-            {{ t("library.actorCardDesc") }}
-          </CardDescription>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
           <Button
@@ -473,7 +469,7 @@ onUnmounted(() => {
         </div>
       </div>
     </CardHeader>
-    <CardContent class="flex flex-col gap-4 overflow-visible sm:flex-row sm:items-start">
+    <CardContent class="flex flex-col gap-3 overflow-visible sm:flex-row sm:items-start">
       <div
         v-if="initialLoading"
         class="text-sm text-muted-foreground"
@@ -502,22 +498,19 @@ onUnmounted(() => {
             {{ profile.name.slice(0, 1) }}
           </AvatarFallback>
         </Avatar>
-        <div class="min-w-0 flex-1 space-y-3">
+        <div class="min-w-0 flex-1 space-y-2">
           <div>
             <p class="text-lg font-semibold tracking-tight">
               {{ profile.name }}
             </p>
             <p
               v-if="profile.summary"
-              class="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty whitespace-pre-wrap"
+              class="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty whitespace-pre-wrap"
             >
               {{ profile.summary }}
             </p>
           </div>
-          <section class="space-y-2">
-            <p class="text-xs font-medium text-muted-foreground">
-              {{ t("library.actorProfileUserTags") }}
-            </p>
+          <section class="space-y-1.5">
             <div class="flex flex-wrap items-center gap-2">
               <Badge
                 v-for="tag in userTags"
@@ -603,7 +596,7 @@ onUnmounted(() => {
           </section>
           <dl
             v-if="profile.birthday || (profile.height && profile.height > 0) || profile.homepage"
-            class="grid gap-2 text-sm sm:grid-cols-2"
+            class="grid gap-1.5 text-sm sm:grid-cols-2"
           >
             <div v-if="profile.birthday">
               <dt class="text-muted-foreground">

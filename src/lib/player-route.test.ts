@@ -13,7 +13,7 @@ describe("buildPlayerRouteFromCuratedFrame", () => {
       params: { id: "movie-1" },
       query: {
         autoplay: "1",
-        from: "curated-frames",
+        back: "curated-frames",
         t: "123.456",
       },
     })

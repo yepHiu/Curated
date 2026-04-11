@@ -1,59 +1,32 @@
 import type { LocationQuery } from "vue-router"
 import type { LibraryMode } from "@/domain/library/types"
-import { buildMovieRouteQuery } from "@/lib/library-query"
-import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
-
-function formatResumeSecondsForRoute(resumeSec: number): string {
-  const normalized = Math.max(0, resumeSec)
-  return String(Number(normalized.toFixed(3)))
-}
+import {
+  buildPlayerRouteFromBrowseIntent,
+  buildPlayerRouteFromCuratedFrameIntent,
+  buildPlayerRouteFromHistoryIntent,
+} from "@/lib/navigation-intent"
 
 /** Open player from browse/detail with library query context and optional resume `t`. */
 export function buildPlayerRouteFromBrowse(
   movieId: string,
   currentQuery: LocationQuery,
   sourceMode: LibraryMode,
+  options?: { back?: "browse" | "detail" },
 ) {
-  const t = getResumeSecondsForOpenPlayer(movieId)
-  const base = buildMovieRouteQuery(currentQuery, sourceMode, movieId)
-  const query: LocationQuery = {
-    ...base,
-    autoplay: "1",
-  }
-  if (t !== undefined) {
-    query.t = String(t)
-  }
-  return {
-    name: "player" as const,
-    params: { id: movieId },
-    query,
-  }
+  return buildPlayerRouteFromBrowseIntent(
+    movieId,
+    currentQuery,
+    sourceMode,
+    options?.back ?? "detail",
+  )
 }
 
-/** Open player from History page (minimal query, back stack uses `from`). */
+/** Open player from History page with an explicit history return target. */
 export function buildPlayerRouteFromHistory(movieId: string, resumeSec: number) {
-  const query: LocationQuery = {
-    autoplay: "1",
-    from: "history",
-    t: String(Math.max(0, Math.floor(resumeSec))),
-  }
-  return {
-    name: "player" as const,
-    params: { id: movieId },
-    query,
-  }
+  return buildPlayerRouteFromHistoryIntent(movieId, resumeSec)
 }
 
-/** 从萃取帧库跳转播放：保留时间点，返回栈可识别来源 */
+/** Open player from curated-frame capture time with an explicit curated return target. */
 export function buildPlayerRouteFromCuratedFrame(movieId: string, resumeSec: number) {
-  const query: LocationQuery = {
-    autoplay: "1",
-    from: "curated-frames",
-    t: formatResumeSecondsForRoute(resumeSec),
-  }
-  return {
-    name: "player" as const,
-    params: { id: movieId },
-    query,
-  }
+  return buildPlayerRouteFromCuratedFrameIntent(movieId, resumeSec)
 }

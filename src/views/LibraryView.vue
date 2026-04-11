@@ -15,7 +15,6 @@ import { isTerminalTaskStatus, waitForTrackedTaskTerminal } from "@/composables/
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import {
-  buildMovieRouteQuery,
   buildClearLibraryActorFilterQuery,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
@@ -29,7 +28,7 @@ import {
 } from "@/lib/library-query"
 import { bumpMovieImageVersion } from "@/lib/image-version"
 import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
-import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
+import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
@@ -702,11 +701,7 @@ const selectMovie = async (movieId: string) => {
 }
 
 const openDetails = async (movieId: string) => {
-  await router.push({
-    name: "detail",
-    params: { id: movieId },
-    query: buildMovieRouteQuery(route.query, libraryMode.value, movieId),
-  })
+  await router.push(buildDetailRouteFromBrowse(movieId, route.query, libraryMode.value))
 }
 
 const openPlayer = async (movieId?: string) => {
@@ -716,7 +711,9 @@ const openPlayer = async (movieId?: string) => {
     return
   }
 
-  await router.push(buildPlayerRouteFromBrowse(nextMovieId, route.query, libraryMode.value))
+  await router.push(
+    buildPlayerRouteFromBrowseIntent(nextMovieId, route.query, libraryMode.value, "browse"),
+  )
 }
 
 const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {

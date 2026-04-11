@@ -3,9 +3,18 @@ import type { LocationQuery, RouteLocationNormalizedLoaded, RouteRecordName } fr
 
 const libraryModes = ["library", "favorites", "recent", "tags", "trash"] as const
 const libraryTabs = ["all", "new", "top-rated"] as const
+const libraryNavigationTransientKeys = ["from", "browse", "back", "autoplay", "t"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
   Object.prototype.hasOwnProperty.call(value, key)
+
+function omitLibraryNavigationTransientKeys(sourceQuery: LocationQuery) {
+  const nextQuery: LocationQuery = { ...sourceQuery }
+  for (const key of libraryNavigationTransientKeys) {
+    delete nextQuery[key]
+  }
+  return nextQuery
+}
 
 export const isLibraryMode = (value: unknown): value is LibraryMode =>
   typeof value === "string" && libraryModes.includes(value as LibraryMode)
@@ -47,8 +56,12 @@ export function isLibraryBrowseRoute(
   return isLibraryMode(parts[parts.length - 1]!)
 }
 
-export const getBrowseSourceMode = (query: LocationQuery): LibraryMode =>
-  isLibraryMode(query.from) ? query.from : "library"
+export const getBrowseSourceMode = (query: LocationQuery): LibraryMode => {
+  if (isLibraryMode(query.browse)) {
+    return query.browse
+  }
+  return isLibraryMode(query.from) ? query.from : "library"
+}
 
 export type DetailBrowseTargetKind = "tag" | "actor" | "studio"
 
@@ -131,7 +144,7 @@ export const getSelectedMovieQuery = (query: LocationQuery) => {
 }
 
 export const getBrowseContextQuery = (query: LocationQuery) => ({
-  from: getBrowseSourceMode(query),
+  browse: getBrowseSourceMode(query),
   q: getLibrarySearchQuery(query) || undefined,
   tag: getLibraryTagExactQuery(query).trim() || undefined,
   actor: getLibraryActorExactQuery(query).trim() || undefined,
@@ -146,9 +159,7 @@ export const mergeLibraryQuery = (
     Record<"q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio", string | undefined>
   >,
 ) => {
-  const nextQuery: LocationQuery = {
-    ...sourceQuery,
-  }
+  const nextQuery: LocationQuery = omitLibraryNavigationTransientKeys(sourceQuery)
 
   const applyValue = (
     key: "q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio",
@@ -210,14 +221,16 @@ export const buildMovieRouteQuery = (
   sourceMode: LibraryMode,
   selectedMovieId: string,
 ) =>
-  mergeLibraryQuery(currentQuery, {
-    from: sourceMode,
-    q: getLibrarySearchQuery(currentQuery) || undefined,
-    tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
-    actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
-    studio: getLibraryStudioExactQuery(currentQuery).trim() || undefined,
-    tab: getLibraryTabQuery(currentQuery),
-    selected: selectedMovieId,
+  ({
+    browse: sourceMode,
+    ...mergeLibraryQuery(currentQuery, {
+      q: getLibrarySearchQuery(currentQuery) || undefined,
+      tag: getLibraryTagExactQuery(currentQuery).trim() || undefined,
+      actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
+      studio: getLibraryStudioExactQuery(currentQuery).trim() || undefined,
+      tab: getLibraryTabQuery(currentQuery),
+      selected: selectedMovieId,
+    }),
   })
 
 export const buildClearLibraryActorFilterQuery = (

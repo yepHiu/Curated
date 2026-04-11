@@ -195,8 +195,6 @@
     "ariaFilterTag": "按标签筛选：{tag}，{count} 部影片",
     "ariaFilterUserTag": "按用户标签筛选：{tag}，{count} 部影片",
     "actorCardTitle": "演员资料",
-    "actorCardDesc": "来自 Metatube 刮削；头像与简介会写入本地库。",
-    "actorProfileUserTags": "用户标签（演员）",
     "clearActorFilter": "清除演员筛选",
     "actorProfileLoading": "正在加载演员资料…",
     "actorProfileNotFound": "库中无此演员记录。",

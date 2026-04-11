@@ -18,14 +18,13 @@ import {
   buildLibrarySearchSuggestions,
   librarySearchSuggestionsHasAny,
 } from "@/lib/library-search-suggestions"
+import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import {
   ACTORS_SEARCH_QUERY_KEY,
   getActorsSearchQuery,
   mergeActorsQuery,
 } from "@/lib/actors-route-query"
 import {
-  buildMovieRouteQuery,
-  getBrowseSourceMode,
   getCuratedFrameSearchQuery,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
@@ -117,8 +116,6 @@ const showLibraryBrowseSearch = computed(
 const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRoute.value)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
-const isDetailRoute = computed(() => route.name === "detail")
-const isPlayerRoute = computed(() => route.name === "player")
 const useFlushWorkspaceFrame = computed(() =>
   ["library", "favorites", "tags", "trash", "history", "curated-frames"].includes(
     String(route.name ?? ""),
@@ -132,45 +129,11 @@ const routerViewFrameClass = computed(() =>
     : "flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7",
 )
 
-const headerBackTarget = computed(() => {
-  if (isPlayerRoute.value && currentMovieId.value) {
-    if (route.query.from === "history") {
-      return { name: "history" }
-    }
-    if (route.query.from === "curated-frames") {
-      return { name: "curated-frames" }
-    }
-    return {
-      name: "detail",
-      params: { id: currentMovieId.value },
-      query: buildMovieRouteQuery(
-        route.query,
-        getBrowseSourceMode(route.query),
-        currentMovieId.value,
-      ),
-    }
-  }
-
-  if (isDetailRoute.value) {
-    return {
-      name: getBrowseSourceMode(route.query),
-      query: mergeLibraryQuery(route.query, {
-        selected: currentMovieId.value,
-      }),
-    }
-  }
-
-  return { name: "library" }
-})
-
+const headerBackIntent = computed(() => resolveNavigationBackLink(route, currentMovieId.value))
+const headerBackTarget = computed(() => headerBackIntent.value.to)
 const headerBackLabel = computed(() => {
   void locale.value
-  if (isPlayerRoute.value && currentMovieId.value) {
-    if (route.query.from === "history") return t("shell.backHistory")
-    if (route.query.from === "curated-frames") return t("shell.backCurated")
-    return t("shell.backDetail")
-  }
-  return t("shell.backLibrary")
+  return t(headerBackIntent.value.labelKey)
 })
 
 /** 输入即时更新；同步到 URL 防抖，避免每键一次 router.replace 导致整库重算/重绘 */

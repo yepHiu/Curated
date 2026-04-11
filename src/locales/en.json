@@ -187,8 +187,6 @@
     "ariaFilterTag": "Filter by tag {tag}, {count} movies",
     "ariaFilterUserTag": "Filter by user tag {tag}, {count} movies",
     "actorCardTitle": "Actor",
-    "actorCardDesc": "Profile from Metatube scrape; avatar and summary are saved locally.",
-    "actorProfileUserTags": "User tags (actor)",
     "clearActorFilter": "Clear actor filter",
     "actorProfileLoading": "Loading actor profile…",
     "actorProfileNotFound": "No actor record in the library.",
