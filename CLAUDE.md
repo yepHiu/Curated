@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Current Architecture Phase:** Web phase (Vue SPA + Go HTTP API). Future target is Electron desktop app with mpv player integration.
 
+**Public docs rule:** Root `README.md` is the English primary README, `README.zh-CN.md` and `README.ja-JP.md` are full translations, and root `API.md` is the single public API reference. Do not rebuild the full API table inside the README.
+
 ## Tech Stack
 
 - **Frontend:** Vue 3 + TypeScript + Vite + Tailwind CSS v4 + shadcn-vue + vue-i18n
@@ -247,6 +249,8 @@ POST   /api/providers/ping-all              # Ping all providers
 ## Key Documentation
 
 Reference these docs in `docs/` for detailed specifications:
+
+- `API.md` - Public HTTP API reference; update this when public API behavior changes
 
 - `2026-03-20-jav-libary.md` - Complete product design document (domain models, UI design, task system)
 - `2026-03-21-backend-go-standards.md` - Go coding standards and directory structure

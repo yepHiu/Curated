@@ -26,7 +26,28 @@
 - `pnpm release:installer`
 - `pnpm release:publish`
 
-这些 npm 脚本当前都把 `-Version` 固定为 `0.0.0-local`。正式整机安装包不应直接沿用该默认值；应先读取 `docs/2026-04-02-package-build-history.md` 的最近有效发布记录，再显式执行：
+### 1.1.1 当前生效的生产包版本规则（2026-04-12）
+
+- 生产包版本的唯一自动化来源是 `release/version.json`，当前基线为 `1.1.0`。
+- `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动把 `patch` 加 1。
+- `pnpm release:publish` 只在入口处分配一次新版本，再把同一个版本号传给便携包、安装包与 `release/manifest/release.json`，避免一轮整机发布消耗多个 patch。
+- `major` / `minor` 只允许人工调整，命令为 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`；调整时必须把 `patch` 重置为 `0`。
+- `package.json` 的 `version` 不再作为生产包版本来源。
+- 同一次发布中，安装包文件名、便携包文件名、`release/manifest/release.json` 与 `docs/2026-04-02-package-build-history.md` 必须保持一致。
+
+当前推荐入口命令：
+
+```powershell
+pnpm release:publish
+```
+
+如需固定构建戳，可显式执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -BuildStamp <yyyyMMdd.HHmmss>
+```
+
+以下段落保留为 2026-04-12 之前的链路说明；当前生效规则以上一节 `1.1.1 当前生效的生产包版本规则` 为准。旧流程里，正式整机安装包需要显式传入 `-Version`：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <version>
@@ -75,10 +96,11 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 3. `assemble-release.ps1`
    - 默认输入 `release/backend/curated.exe` 与 `release/frontend/`。
    - 默认输出 `release/Curated/`。
+   - 品牌图标约定：安装包、桌面快捷方式、托盘运行时统一使用 `backend/internal/assets/curated.ico`；该 `.ico` 当前来自 `icon/Curated-icon-nobg.png` 的多尺寸派生版本。README 顶部带字标志使用 `icon/curated-title-nobg.png`，不参与 Windows 可执行图标链路。
    - 目录内容包括：
-     - `curated.exe`
-     - `curated.ico`
-     - `frontend-dist/`
+      - `curated.exe`
+      - `curated.ico`
+      - `frontend-dist/`
      - `third_party/`（如果 `backend/third_party/` 存在）
      - `runtime/config/`
      - `runtime/data/`
@@ -104,15 +126,16 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 6. `release/manifest/release.json`
    - `publish.ps1` 在最后创建或更新 manifest。
    - 当前字段包括：
-     - `productName`
-     - `version`
+      - `productName`
+      - `version`
      - `buildStamp`
      - `channel`
      - `generatedAtUtc`
      - `artifacts[]`
    - `artifacts[]` 只在对应文件存在时追加：
-     - portable zip：记录文件名、绝对路径、SHA256
-     - installer exe：记录文件名、绝对路径、SHA256
+      - portable zip：记录文件名、绝对路径、SHA256
+      - installer exe：记录文件名、绝对路径、SHA256
+   - 若更新品牌图标，先更新 `icon/Curated-icon-nobg.png`，再同步生成/替换 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`，避免 Web 图标、托盘图标、安装包快捷方式图标不一致。
 
 ### 运行态链路
 
