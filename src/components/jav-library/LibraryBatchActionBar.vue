@@ -70,7 +70,7 @@ function submitTagDialog() {
   <div
     role="toolbar"
     :aria-label="t('library.batchToolbarAria')"
-    class="w-full shrink-0 overflow-hidden border-t border-border/70 bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md sm:px-4 rounded-b-[calc(1.75rem-1rem)] sm:rounded-b-[calc(1.75rem-1.25rem)] lg:rounded-b-[calc(1.75rem-1.5rem)] xl:rounded-b-none"
+    class="w-full shrink-0 overflow-hidden border-t border-border/70 bg-card/95 px-3 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md sm:px-4"
     style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))"
   >
     <div class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">

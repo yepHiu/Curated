@@ -50,6 +50,18 @@ export function isLibraryBrowseRoute(
 export const getBrowseSourceMode = (query: LocationQuery): LibraryMode =>
   isLibraryMode(query.from) ? query.from : "library"
 
+export type DetailBrowseTargetKind = "tag" | "actor" | "studio"
+
+export const getDetailBrowseTargetMode = (
+  sourceMode: LibraryMode,
+  kind: DetailBrowseTargetKind,
+): LibraryMode => {
+  if (sourceMode === "tags" && (kind === "actor" || kind === "studio")) {
+    return "library"
+  }
+  return sourceMode
+}
+
 export const getLibrarySearchQuery = (query: LocationQuery): string => {
   const raw = query.q
   if (typeof raw === "string") {

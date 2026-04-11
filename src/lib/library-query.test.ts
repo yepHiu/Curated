@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildBrowseRouteTarget,
   buildClearLibraryActorFilterQuery,
+  getDetailBrowseTargetMode,
   buildMovieRouteQuery,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
@@ -76,6 +77,13 @@ describe("library query helpers", () => {
     expect(getLibrarySearchQuery(query)).toBe("MKB")
     expect(getSelectedMovieQuery(query)).toBe("mkb-100")
     expect(getLibraryTabQuery(query)).toBe("top-rated")
+  })
+
+  it("keeps tag detail browsing in tags mode but sends actor and studio filters to the library", () => {
+    expect(getDetailBrowseTargetMode("tags", "tag")).toBe("tags")
+    expect(getDetailBrowseTargetMode("tags", "actor")).toBe("library")
+    expect(getDetailBrowseTargetMode("tags", "studio")).toBe("library")
+    expect(getDetailBrowseTargetMode("favorites", "actor")).toBe("favorites")
   })
 
   it("reads selected movie id from first string when query repeats key", () => {

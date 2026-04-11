@@ -8,7 +8,12 @@ import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
-import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
+import {
+  buildMovieRouteQuery,
+  getBrowseSourceMode,
+  getDetailBrowseTargetMode,
+  mergeLibraryQuery,
+} from "@/lib/library-query"
 import { buildPlayerRouteFromBrowse } from "@/lib/player-route"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
@@ -227,9 +232,11 @@ const browseByTag = async (payload: { tag: string }) => {
   if (!tag) {
     return
   }
+  const sourceMode = getBrowseSourceMode(route.query)
   await router.push({
-    name: getBrowseSourceMode(route.query),
+    name: getDetailBrowseTargetMode(sourceMode, "tag"),
     query: mergeLibraryQuery(route.query, {
+      from: undefined,
       tag,
       q: undefined,
       actor: undefined,
@@ -245,9 +252,11 @@ const browseByActor = async (payload: { actor: string }) => {
   if (!actor) {
     return
   }
+  const sourceMode = getBrowseSourceMode(route.query)
   await router.push({
-    name: getBrowseSourceMode(route.query),
+    name: getDetailBrowseTargetMode(sourceMode, "actor"),
     query: mergeLibraryQuery(route.query, {
+      from: undefined,
       actor,
       q: undefined,
       tag: undefined,
@@ -263,9 +272,11 @@ const browseByStudio = async (payload: { studio: string }) => {
   if (!studio) {
     return
   }
+  const sourceMode = getBrowseSourceMode(route.query)
   await router.push({
-    name: getBrowseSourceMode(route.query),
+    name: getDetailBrowseTargetMode(sourceMode, "studio"),
     query: mergeLibraryQuery(route.query, {
+      from: undefined,
       studio,
       q: undefined,
       tag: undefined,

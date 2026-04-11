@@ -29,7 +29,7 @@ const { t } = useI18n()
   <div
     role="toolbar"
     :aria-label="t('curated.batchToolbarAria')"
-    class="relative z-30 w-full shrink-0 overflow-hidden border-t border-border bg-card px-3 py-3 shadow-[0_-12px_32px_rgba(0,0,0,0.14)] sm:px-4 rounded-b-[calc(2rem-1rem)] lg:rounded-b-[calc(2rem-1.25rem)] xl:rounded-b-[calc(2rem-1.5rem)] dark:shadow-[0_-12px_36px_rgba(0,0,0,0.45)]"
+    class="relative z-30 w-full shrink-0 overflow-hidden border-t border-border bg-card px-3 py-3 shadow-[0_-12px_32px_rgba(0,0,0,0.14)] sm:px-4 dark:shadow-[0_-12px_36px_rgba(0,0,0,0.45)]"
     style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))"
   >
     <div class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">

@@ -112,6 +112,12 @@ import {
   type SettingsSectionSlug,
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
+import {
+  statusDotClass,
+  statusPanelClass,
+  statusTextClass,
+  type StatusTone,
+} from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
 
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
@@ -421,17 +427,13 @@ const proxyStatusMessage = computed(() => {
   if (proxyJavbusResult.value && proxyJavbusResultOk.value !== null) {
     return {
       text: proxyJavbusResult.value,
-      className: proxyJavbusResultOk.value
-        ? "text-emerald-600 dark:text-emerald-400"
-        : "text-destructive",
+      className: proxyJavbusResultOk.value ? statusTextClass("success") : statusTextClass("danger"),
     }
   }
   if (proxyGoogleResult.value && proxyGoogleResultOk.value !== null) {
     return {
       text: proxyGoogleResult.value,
-      className: proxyGoogleResultOk.value
-        ? "text-emerald-600 dark:text-emerald-400"
-        : "text-destructive",
+      className: proxyGoogleResultOk.value ? statusTextClass("success") : statusTextClass("danger"),
     }
   }
   if (useWebApi && proxyAutoVerifyBusy.value) {
@@ -449,7 +451,7 @@ const proxyStatusMessage = computed(() => {
   if (proxyError.value) {
     return {
       text: proxyError.value,
-      className: "text-sm text-destructive",
+      className: cn("text-sm", statusTextClass("danger")),
     }
   }
   return null
@@ -894,10 +896,14 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
   return undefined
 }
 
-function providerHealthStatusClass(status: ProviderHealthStatus): string {
-  if (status === "ok") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-  if (status === "degraded") return "border-amber-500/40 bg-amber-500/10 text-amber-100"
-  return "border-destructive/40 bg-destructive/10 text-destructive"
+function providerHealthTone(status: ProviderHealthStatus): StatusTone {
+  if (status === "ok") return "success"
+  if (status === "degraded") return "warning"
+  return "danger"
+}
+
+function providerHealthStatusVariant(status: ProviderHealthStatus): StatusTone {
+  return providerHealthTone(status)
 }
 
 function providerHealthStatusLabel(status: ProviderHealthStatus): string {
@@ -1011,9 +1017,7 @@ function providerChainRowPinging(name: string): boolean {
 }
 
 function providerHealthDotClass(status: ProviderHealthStatus): string {
-  if (status === "ok") return "bg-emerald-500 shadow-sm ring-1 ring-emerald-500/40"
-  if (status === "degraded") return "bg-amber-500 shadow-sm ring-1 ring-amber-500/40"
-  return "bg-destructive shadow-sm ring-1 ring-destructive/40"
+  return statusDotClass(providerHealthTone(status))
 }
 
 const triggerScrapeCardBusy = ref(false)
@@ -2627,13 +2631,12 @@ async function runMetadataRefreshForSelected() {
                 class="flex flex-wrap items-center gap-3"
               >
                 <Badge
-                  variant="outline"
-                  class="text-xs font-normal"
-                  :class="
-                    providerHealthStatusClass(
+                  :variant="
+                    providerHealthStatusVariant(
                       healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
                     )
                   "
+                  class="text-xs font-normal"
                 >
                   {{
                     providerHealthStatusLabel(
@@ -2661,7 +2664,7 @@ async function runMetadataRefreshForSelected() {
             >
               <p
                 v-if="!canPickSpecifiedMetadata"
-                class="rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/95"
+                :class="cn(statusPanelClass('warning'), 'rounded-xl px-3 py-2 text-sm')"
               >
                 {{ t("settings.metadataMovieProviderChainNoList") }}
               </p>
@@ -3239,7 +3242,7 @@ async function runMetadataRefreshForSelected() {
                   </span>
                   <span
                     v-if="!supportsFileSystemAccess()"
-                    class="mt-1 block text-xs text-amber-700 dark:text-amber-400"
+                    :class="cn('mt-1 block text-xs', statusTextClass('warning'))"
                   >
                     {{ t("settings.curatedDirUnsupported") }}
                   </span>
@@ -3312,10 +3315,10 @@ async function runMetadataRefreshForSelected() {
             </p>
 
             <div
-              class="rounded-2xl border border-sky-500/20 border-l-[3px] border-l-sky-500/55 bg-sky-500/[0.07] px-4 py-3 dark:border-sky-400/15 dark:border-l-sky-400/50 dark:bg-sky-950/40"
+              :class="statusPanelClass('info')"
               role="note"
             >
-              <p class="text-sm font-medium text-sky-950 dark:text-sky-100">
+              <p :class="cn('text-sm font-medium', statusTextClass('info'))">
                 {{ t("settings.curatedCorsTitle") }}
               </p>
               <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">

@@ -3,8 +3,6 @@ import type { Component } from "vue"
 import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
-  ChevronLeft,
-  ChevronRight,
   Clapperboard,
   History,
   LibraryBig,
@@ -30,22 +28,17 @@ import {
   listSortedByUpdatedDesc,
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
+import { statusDotClass } from "@/lib/ui/status-tone"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
   defineProps<{
     compact?: boolean
-    showCollapseToggle?: boolean
   }>(),
   {
     compact: false,
-    showCollapseToggle: false,
   },
 )
-
-const emit = defineEmits<{
-  toggleCompact: []
-}>()
 
 interface NavigationItem {
   label: string
@@ -91,11 +84,11 @@ const backendDotClass = computed(() => {
     case "checking":
       return "bg-muted-foreground/55 animate-pulse"
     case "online":
-      return "bg-emerald-500 shadow-[0_0_10px_rgb(52_211_153_/_0.35)]"
+      return statusDotClass("success")
     case "offline":
-      return "bg-destructive"
+      return statusDotClass("danger")
     case "mock":
-      return "bg-amber-500/90"
+      return statusDotClass("warning")
     default:
       return "bg-muted-foreground/40"
   }
@@ -219,12 +212,12 @@ const getNavigationTarget = (page: AppPage) => {
 
 <template>
   <aside
-    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden rounded-[1.75rem] border border-border/60 bg-sidebar/95 text-sidebar-foreground backdrop-blur transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
-    :class="props.compact ? 'items-center px-2 py-3' : 'px-3.5 py-3.5'"
+    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden bg-sidebar text-sidebar-foreground transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
+    :class="props.compact ? 'items-center px-2 pb-3 pt-0' : 'px-3.5 pb-3.5 pt-0'"
   >
     <div
       v-if="!props.compact"
-      class="flex min-h-14 items-center justify-between gap-2 px-2 py-2.5"
+      class="flex min-h-[4.5rem] shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/80 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4"
     >
       <div class="flex min-w-0 items-center">
         <div
@@ -235,38 +228,12 @@ const getNavigationTarget = (page: AppPage) => {
           <span class="truncate">Curated</span>
         </div>
       </div>
-      <div class="flex shrink-0 items-center gap-1">
-        <Button
-          v-if="props.showCollapseToggle"
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="rounded-xl"
-          :title="t('nav.collapseSidebar')"
-          :aria-label="t('nav.collapseSidebar')"
-          @click="emit('toggleCompact')"
-        >
-          <ChevronLeft class="size-5" />
-        </Button>
-      </div>
     </div>
 
     <div
       v-else
-      class="flex w-full flex-col items-center gap-2 py-1"
+      class="flex min-h-[4.5rem] w-full shrink-0 flex-col items-center justify-center border-b border-sidebar-border/80 py-3.5 lg:py-4"
     >
-      <Button
-        v-if="props.showCollapseToggle"
-        type="button"
-        variant="ghost"
-        size="icon-lg"
-        class="shrink-0 rounded-xl"
-        :title="t('nav.expandSidebar')"
-        :aria-label="t('nav.expandSidebar')"
-        @click="emit('toggleCompact')"
-      >
-        <ChevronRight class="size-5" />
-      </Button>
       <div
         class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-primary"
         title="Curated"
@@ -275,13 +242,8 @@ const getNavigationTarget = (page: AppPage) => {
       </div>
     </div>
 
-    <Separator
-      class="my-2.5 shrink-0 bg-sidebar-border/80"
-      :class="props.compact ? 'w-10' : ''"
-    />
-
     <ScrollArea v-if="!props.compact" class="min-h-0 w-full min-w-0 flex-1">
-      <div class="flex flex-col gap-5 pr-2.5">
+      <div class="flex flex-col gap-5 pt-3.5 pr-2.5">
         <section class="flex flex-col gap-2">
           <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             {{ t("nav.browse") }}
@@ -342,7 +304,7 @@ const getNavigationTarget = (page: AppPage) => {
       v-if="props.compact"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-y-auto"
     >
-      <div class="flex flex-col gap-3 py-1">
+      <div class="flex flex-col gap-3 pt-3.5 pb-1">
         <nav class="flex flex-col items-center gap-2" :aria-label="t('nav.browse')">
           <RouterLink
             v-for="item in sidebarNavGroups.browse"
@@ -426,7 +388,7 @@ const getNavigationTarget = (page: AppPage) => {
 
     <div
       v-else
-      class="mb-2 flex w-full shrink-0 items-center justify-center gap-1"
+      class="mb-2 flex w-full shrink-0 items-center justify-center"
       role="status"
       :aria-label="backendAriaLabel"
       :aria-live="backendUseWebApi ? 'polite' : 'off'"
@@ -436,22 +398,6 @@ const getNavigationTarget = (page: AppPage) => {
         :class="backendDotClass"
         :title="backendCompactTitle"
       />
-      <Button
-        v-if="backendUseWebApi"
-        type="button"
-        variant="ghost"
-        size="icon"
-        class="size-7 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-        :title="t('nav.backendRecheck')"
-        :aria-label="t('nav.backendRecheck')"
-        :disabled="backendProbing"
-        @click="checkBackendHealth"
-      >
-        <RefreshCw
-          class="size-3.5"
-          :class="{ 'motion-safe:animate-spin': backendProbing }"
-        />
-      </Button>
     </div>
 
     <Button

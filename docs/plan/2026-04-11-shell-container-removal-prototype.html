@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Curated Shell Layout Prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #0b0f19;
+        --foreground: #f8f7fb;
+        --muted: #151b2b;
+        --muted-foreground: #9aa4b8;
+        --border: rgb(255 255 255 / 10%);
+        --border-strong: rgb(255 255 255 / 16%);
+        --sidebar: #101423;
+        --sidebar-accent: #1f2639;
+        --sidebar-foreground: #f8f7fb;
+        --primary: #fe628e;
+        --primary-soft: rgb(254 98 142 / 14%);
+        --card: rgb(255 255 255 / 4%);
+        --panel: rgb(255 255 255 / 6%);
+        --shadow: 0 28px 70px rgb(0 0 0 / 30%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgb(254 98 142 / 14%), transparent 28rem),
+          radial-gradient(circle at 78% 16%, rgb(99 102 241 / 12%), transparent 26rem),
+          var(--background);
+        color: var(--foreground);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .page {
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        gap: 28px;
+        padding: 28px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 20px;
+        align-items: end;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: clamp(34px, 5vw, 72px);
+        line-height: 0.96;
+        letter-spacing: -0.06em;
+      }
+
+      .intro-note {
+        color: var(--muted-foreground);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .options {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      .option {
+        overflow: hidden;
+        border: 1px solid var(--border-strong);
+        border-radius: 28px;
+        background: rgb(255 255 255 / 3%);
+        box-shadow: var(--shadow);
+      }
+
+      .option-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--border);
+        padding: 18px 20px;
+      }
+
+      .option-title {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .badge {
+        display: inline-flex;
+        min-width: 32px;
+        height: 32px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .option h2 {
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .option-desc {
+        color: var(--muted-foreground);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .recommended {
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .browser {
+        height: min(720px, calc(100vh - 210px));
+        min-height: 520px;
+        background: #070a12;
+      }
+
+      .shell-a,
+      .shell-b,
+      .shell-c {
+        display: grid;
+        height: 100%;
+        min-height: 0;
+      }
+
+      .shell-a {
+        grid-template-columns: 304px minmax(0, 1fr);
+      }
+
+      .shell-b {
+        grid-template-columns: 304px minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .shell-c {
+        grid-template-columns: 304px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        background: var(--sidebar);
+        color: var(--sidebar-foreground);
+      }
+
+      .shell-a .sidebar,
+      .shell-c .sidebar {
+        border-right: 1px solid var(--border);
+      }
+
+      .shell-b .sidebar {
+        border: 1px solid var(--border);
+        border-radius: 28px;
+      }
+
+      .brand {
+        display: flex;
+        min-height: 72px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 18px;
+      }
+
+      .brand-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--primary);
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+
+      .spark {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+        background: var(--primary-soft);
+      }
+
+      .collapse {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        border-radius: 13px;
+        color: var(--muted-foreground);
+      }
+
+      .nav {
+        display: flex;
+        min-height: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: 28px;
+        overflow: hidden;
+        padding: 18px;
+      }
+
+      .nav-label {
+        margin-bottom: 9px;
+        padding-left: 8px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.19em;
+        text-transform: uppercase;
+      }
+
+      .nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        height: 42px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-radius: 14px;
+        padding: 0 12px;
+        color: var(--sidebar-foreground);
+        font-size: 14px;
+      }
+
+      .nav-item.active {
+        background: var(--sidebar-accent);
+      }
+
+      .nav-left {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .dot-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 6px;
+        background: rgb(255 255 255 / 24%);
+      }
+
+      .count {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgb(255 255 255 / 5%);
+        padding: 2px 7px;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .status {
+        margin: auto 18px 18px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgb(0 0 0 / 12%);
+        padding: 12px;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+
+      .main {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        background: transparent;
+      }
+
+      .shell-b .main {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: rgb(11 15 25 / 78%);
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 72px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
+      }
+
+      .search {
+        display: flex;
+        width: min(520px, 46vw);
+        height: 40px;
+        align-items: center;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgb(255 255 255 / 4%);
+        color: var(--muted-foreground);
+        padding: 0 14px;
+        font-size: 13px;
+      }
+
+      .toggle {
+        display: flex;
+        width: 82px;
+        height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        border-left: 1px solid var(--border);
+        padding-left: 16px;
+        color: var(--muted-foreground);
+      }
+
+      .workspace {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 22px 28px 28px;
+      }
+
+      .shell-c .workspace {
+        padding: 0;
+      }
+
+      .content-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: end;
+        margin-bottom: 22px;
+      }
+
+      .kicker {
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .content-title {
+        margin-top: 6px;
+        font-size: clamp(28px, 3vw, 44px);
+        line-height: 1;
+        letter-spacing: -0.055em;
+      }
+
+      .content-subtitle {
+        margin-top: 8px;
+        max-width: 720px;
+        color: var(--muted-foreground);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgb(255 255 255 / 4%);
+        padding: 8px 11px;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .chip.active {
+        border-color: rgb(254 98 142 / 35%);
+        background: var(--primary-soft);
+        color: var(--foreground);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .poster {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--card);
+      }
+
+      .poster-art {
+        aspect-ratio: 3 / 4;
+        background:
+          linear-gradient(145deg, rgb(254 98 142 / 42%), transparent 45%),
+          linear-gradient(30deg, rgb(255 255 255 / 20%), transparent),
+          #202638;
+      }
+
+      .poster-meta {
+        padding: 12px;
+      }
+
+      .line {
+        height: 10px;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 14%);
+      }
+
+      .line.short {
+        width: 62%;
+        margin-top: 8px;
+        background: rgb(255 255 255 / 8%);
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        border-top: 1px solid var(--border);
+        padding: 16px 20px 20px;
+      }
+
+      .note {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgb(255 255 255 / 3%);
+        padding: 14px;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .note span {
+        color: var(--muted-foreground);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .implementation-hint {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.62fr);
+        gap: 18px;
+        align-items: stretch;
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: rgb(255 255 255 / 3%);
+        padding: 20px;
+      }
+
+      code,
+      pre {
+        font-family:
+          "SFMono-Regular",
+          Consolas,
+          "Liberation Mono",
+          monospace;
+      }
+
+      pre {
+        overflow: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: rgb(0 0 0 / 24%);
+        padding: 16px;
+        color: #d9e2f1;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .hint-copy {
+        color: var(--muted-foreground);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .hint-copy strong {
+        color: var(--foreground);
+      }
+
+      @media (max-width: 980px) {
+        .page {
+          padding: 18px;
+        }
+
+        .intro,
+        .implementation-hint {
+          grid-template-columns: 1fr;
+        }
+
+        .browser {
+          height: auto;
+          min-height: 620px;
+        }
+
+        .shell-a,
+        .shell-b,
+        .shell-c {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .topbar {
+          min-height: 68px;
+        }
+
+        .search {
+          width: 100%;
+        }
+
+        .content-header,
+        .notes {
+          grid-template-columns: 1fr;
+        }
+
+        .filter-row {
+          justify-content: flex-start;
+        }
+
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">Curated shell direction</p>
+          <h1>去掉“大容器包裹感”，把侧边栏和内容区放回同一层应用骨架。</h1>
+        </div>
+        <p class="intro-note">
+          我对你的理解是：现在侧栏和内容区各自像浮动卡片，内容区外面还有一个圆角边框容器。
+          目标是更接近 shadcn 的 App Shell：左侧是固定导航面，右侧是工作区；两者共享全高，不再被一个共同的大卡片包住。
+        </p>
+      </section>
+
+      <section class="options">
+        <article class="option">
+          <div class="option-header">
+            <div class="option-title">
+              <span class="badge">A</span>
+              <div>
+                <h2>推荐方向：Split Shell，一体化侧栏 + 内容区</h2>
+                <p class="option-desc">去掉外层圆角/边框容器，也去掉侧栏和内容区之间的大 gap；侧栏用右边线分隔，内容区直接占满。</p>
+              </div>
+            </div>
+            <span class="recommended">Recommended</span>
+          </div>
+          <div class="browser">
+            <div class="shell-a">
+              <aside class="sidebar">
+                <div class="brand">
+                  <div class="brand-name"><span class="spark">✦</span> Curated</div>
+                  <div class="collapse">‹</div>
+                </div>
+                <nav class="nav">
+                  <div>
+                    <div class="nav-label">Browse</div>
+                    <div class="nav-list">
+                      <div class="nav-item active"><span class="nav-left"><span class="dot-icon"></span>资料库</span><span class="count">1.2k</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>演员</span><span class="count">384</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>标签</span><span class="count">96</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>回收站</span></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="nav-label">Yours</div>
+                    <div class="nav-list">
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>萃取帧库</span><span class="count">42</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>观看历史</span></div>
+                    </div>
+                  </div>
+                </nav>
+                <div class="status">后端在线 · curated-dev</div>
+              </aside>
+              <section class="main">
+                <header class="topbar">
+                  <div class="search">搜索番号、演员、标签...</div>
+                  <div class="toggle">☀︎ ● ☾</div>
+                </header>
+                <div class="workspace">
+                  <div class="content-header">
+                    <div>
+                      <div class="kicker">Library</div>
+                      <h3 class="content-title">资料库</h3>
+                      <p class="content-subtitle">页面内容不再被一个大圆角 section 包住；顶栏、筛选区、海报网格都是右侧工作区的一部分。</p>
+                    </div>
+                    <div class="filter-row">
+                      <span class="chip active">全部</span>
+                      <span class="chip">收藏</span>
+                      <span class="chip">最近添加</span>
+                    </div>
+                  </div>
+                  <div class="grid">
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+          <div class="notes">
+            <div class="note"><strong>去掉什么</strong><span>去掉右侧内容区外层 `rounded + border` 大容器，也去掉根布局的厚重 padding/gap。</span></div>
+            <div class="note"><strong>保留什么</strong><span>保留 AppShell 内部滚动、顶栏搜索、主题切换、桌面侧栏折叠和移动端抽屉。</span></div>
+            <div class="note"><strong>视觉结果</strong><span>更像 shadcn 的 Sidebar demo：导航是结构，不是卡片；内容区是工作台，不是装在盒子里。</span></div>
+          </div>
+        </article>
+
+        <article class="option">
+          <div class="option-header">
+            <div class="option-title">
+              <span class="badge">B</span>
+              <div>
+                <h2>保守方向：去掉共同外框，但侧栏和内容仍各自卡片化</h2>
+                <p class="option-desc">保留一点 gap、圆角和边框，视觉更接近当前版本，只是把“共同大容器”的感觉弱化。</p>
+              </div>
+            </div>
+          </div>
+          <div class="browser">
+            <div class="shell-b">
+              <aside class="sidebar">
+                <div class="brand"><div class="brand-name"><span class="spark">✦</span> Curated</div><div class="collapse">‹</div></div>
+                <nav class="nav">
+                  <div>
+                    <div class="nav-label">Browse</div>
+                    <div class="nav-list">
+                      <div class="nav-item active"><span class="nav-left"><span class="dot-icon"></span>资料库</span><span class="count">1.2k</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>演员</span><span class="count">384</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>标签</span><span class="count">96</span></div>
+                    </div>
+                  </div>
+                </nav>
+                <div class="status">后端在线 · curated-dev</div>
+              </aside>
+              <section class="main">
+                <header class="topbar"><div class="search">搜索番号、演员、标签...</div><div class="toggle">☀︎ ● ☾</div></header>
+                <div class="workspace">
+                  <div class="content-header">
+                    <div>
+                      <div class="kicker">Library</div>
+                      <h3 class="content-title">资料库</h3>
+                      <p class="content-subtitle">这个版本还保留了右侧内容面的圆角边框，因此“容器感”仍然会存在，只是没有最外层大盒子。</p>
+                    </div>
+                  </div>
+                  <div class="grid">
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="option">
+          <div class="option-header">
+            <div class="option-title">
+              <span class="badge">C</span>
+              <div>
+                <h2>极简方向：全平铺，无内边距内容从边界开始</h2>
+                <p class="option-desc">侧栏和内容区完全铺满，连工作区留白也压到最少。很干净，但容易让资料库页面显得拥挤。</p>
+              </div>
+            </div>
+          </div>
+          <div class="browser">
+            <div class="shell-c">
+              <aside class="sidebar">
+                <div class="brand"><div class="brand-name"><span class="spark">✦</span> Curated</div><div class="collapse">‹</div></div>
+                <nav class="nav">
+                  <div>
+                    <div class="nav-label">Browse</div>
+                    <div class="nav-list">
+                      <div class="nav-item active"><span class="nav-left"><span class="dot-icon"></span>资料库</span><span class="count">1.2k</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>演员</span><span class="count">384</span></div>
+                      <div class="nav-item"><span class="nav-left"><span class="dot-icon"></span>标签</span><span class="count">96</span></div>
+                    </div>
+                  </div>
+                </nav>
+                <div class="status">后端在线 · curated-dev</div>
+              </aside>
+              <section class="main">
+                <header class="topbar"><div class="search">搜索番号、演员、标签...</div><div class="toggle">☀︎ ● ☾</div></header>
+                <div class="workspace">
+                  <div style="padding: 22px 24px 0;">
+                    <div class="content-header">
+                      <div>
+                        <div class="kicker">Library</div>
+                        <h3 class="content-title">资料库</h3>
+                        <p class="content-subtitle">这个版本最“平”，但内容贴边以后需要每个页面自己处理留白，后续维护成本更高。</p>
+                      </div>
+                    </div>
+                    <div class="grid">
+                      <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                      <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                      <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                      <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                      <div class="poster"><div class="poster-art"></div><div class="poster-meta"><div class="line"></div><div class="line short"></div></div></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="implementation-hint">
+        <div>
+          <p class="eyebrow">What this means in AppShell.vue</p>
+          <h2>如果方向选 A，我后面会把壳层改成“grid 直接承载 sidebar + main”。</h2>
+          <p class="hint-copy">
+            <strong>关键不是换主题，而是换层级：</strong>
+            `AppShell` 的右侧 `section` 不再使用大圆角边框作为页面外壳；`AppSidebar` 也从独立卡片变成左侧导航面。
+            页面内部卡片、海报、设置项可以继续保留自己的卡片样式。
+          </p>
+        </div>
+        <pre><code>&lt;div class="grid h-full grid-cols-[304px_minmax(0,1fr)]"&gt;
+  &lt;AppSidebar class="border-r bg-sidebar" /&gt;
+  &lt;main class="flex min-h-0 flex-col"&gt;
+    &lt;header class="border-b"&gt;搜索 / 返回 / 主题&lt;/header&gt;
+    &lt;div class="min-h-0 flex-1 overflow-hidden"&gt;
+      &lt;RouterView /&gt;
+    &lt;/div&gt;
+  &lt;/main&gt;
+&lt;/div&gt;</code></pre>
+      </section>
+    </main>
+  </body>
+</html>

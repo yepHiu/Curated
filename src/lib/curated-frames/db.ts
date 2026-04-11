@@ -1,7 +1,9 @@
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
+import type { CuratedFrameFacetItemDTO } from "@/api/types"
 import { bumpCuratedFramesRevision } from "@/lib/curated-frames/revision"
 import { filterCuratedFramesByQuery } from "@/lib/curated-frames/search"
+import { buildCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
@@ -252,6 +254,15 @@ export async function listCuratedFrameTagSuggestions(): Promise<string[]> {
     }
   }
   return [...set].sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true }))
+}
+
+export async function listCuratedFrameTagFacets(locale = "zh-CN"): Promise<CuratedFrameFacetItemDTO[]> {
+  if (USE_WEB) {
+    const { items } = await api.listCuratedFrameTags()
+    return [...items].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, locale, { numeric: true }))
+  }
+  const page = await listCuratedFramesPage()
+  return buildCuratedFrameTagFacets(page.items, locale)
 }
 
 export async function getStoredDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {

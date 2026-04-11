@@ -119,8 +119,18 @@ const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRout
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const isDetailRoute = computed(() => route.name === "detail")
 const isPlayerRoute = computed(() => route.name === "player")
+const useFlushWorkspaceFrame = computed(() =>
+  ["library", "favorites", "tags", "trash", "history", "curated-frames"].includes(
+    String(route.name ?? ""),
+  ),
+)
 
 const showHeaderBack = computed(() => !isPrimaryBrowseRoute.value)
+const routerViewFrameClass = computed(() =>
+  useFlushWorkspaceFrame.value
+    ? "flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+    : "flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7",
+)
 
 const headerBackTarget = computed(() => {
   if (isPlayerRoute.value && currentMovieId.value) {
@@ -839,7 +849,10 @@ function clearActorsSearch() {
           </div>
 
           <div class="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7">
+            <div
+              data-router-view-frame
+              :class="routerViewFrameClass"
+            >
               <RouterView />
             </div>
           </div>
