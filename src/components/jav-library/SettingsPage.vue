@@ -268,6 +268,8 @@ const extendedLibraryImportSaving = ref(false)
 const extendedLibraryImportError = ref("")
 const autoLibraryWatchSaving = ref(false)
 const autoLibraryWatchError = ref("")
+const autoActorProfileScrapeSaving = ref(false)
+const autoActorProfileScrapeError = ref("")
 const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
@@ -795,6 +797,7 @@ async function testProxyGoogle() {
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
 const extendedLibraryImport = computed(() => libraryService.extendedLibraryImport.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
+const autoActorProfileScrape = computed(() => libraryService.autoActorProfileScrape.value)
 
 const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
 const metadataMovieProviders = computed(() => [...libraryService.metadataMovieProviders.value])
@@ -1507,6 +1510,27 @@ async function onAutoLibraryWatchChange(next: boolean) {
       autoLibraryWatchError.value = err.apiError.message
     } else {
       autoLibraryWatchError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
+async function onAutoActorProfileScrapeChange(next: boolean) {
+  autoActorProfileScrapeError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      autoActorProfileScrapeSaving.value = true
+      try {
+        await libraryService.setAutoActorProfileScrape(next)
+      } finally {
+        autoActorProfileScrapeSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] auto actor profile scrape toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      autoActorProfileScrapeError.value = err.apiError.message
+    } else {
+      autoActorProfileScrapeError.value = t("settings.errSaveTitle")
     }
   }
 }
@@ -2461,6 +2485,34 @@ async function runMetadataRefreshForSelected() {
             </div>
             <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
               {{ autoLibraryWatchError }}
+            </p>
+
+            <div
+              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/[0.08] p-4"
+              :aria-busy="autoActorProfileScrapeSaving"
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-3">
+                <p class="text-sm font-semibold text-foreground">{{
+                  t("settings.autoActorProfileScrape")
+                }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.autoActorProfileScrapeHint") }}
+                </p>
+                <p
+                  v-if="autoActorProfileScrapeSaving"
+                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
+                >
+                  {{ t("settings.autoActorProfileScrapeSyncing") }}
+                </p>
+              </div>
+              <Switch
+                class="motion-safe:transition-colors motion-safe:duration-200"
+                :model-value="autoActorProfileScrape"
+                @update:model-value="onAutoActorProfileScrapeChange"
+              />
+            </div>
+            <p v-if="autoActorProfileScrapeError" class="text-sm text-destructive">
+              {{ autoActorProfileScrapeError }}
             </p>
 
             <fieldset

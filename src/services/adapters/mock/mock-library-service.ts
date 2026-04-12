@@ -45,6 +45,7 @@ import type { LibraryService } from "@/services/contracts/library-service"
 const organizeLibraryMock = ref(false)
 const extendedLibraryImportMock = ref(false)
 const autoLibraryWatchMock = ref(true)
+const autoActorProfileScrapeMock = ref(false)
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
@@ -430,6 +431,7 @@ export const mockLibraryService: LibraryService = {
   organizeLibrary: computed(() => organizeLibraryMock.value),
   extendedLibraryImport: computed(() => extendedLibraryImportMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
+  autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
@@ -537,6 +539,10 @@ export const mockLibraryService: LibraryService = {
 
   async setAutoLibraryWatch(value: boolean) {
     autoLibraryWatchMock.value = value
+  },
+
+  async setAutoActorProfileScrape(value: boolean) {
+    autoActorProfileScrapeMock.value = value
   },
 
   async setMetadataMovieProvider(name: string) {

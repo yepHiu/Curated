@@ -139,6 +139,7 @@ export interface SettingsDTO {
   extendedLibraryImport: boolean
   /** 为 true 时库根目录监听新文件并防抖触发扫描（及后续刮削）；与主配置 libraryWatchEnabled 共同生效 */
   autoLibraryWatch: boolean
+  autoActorProfileScrape: boolean
   /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
   metadataMovieProvider: string
   /** 当前引擎可用的影片源名（排序），供指定模式选择 */
@@ -193,6 +194,7 @@ export interface PatchSettingsBody {
   organizeLibrary?: boolean
   extendedLibraryImport?: boolean
   autoLibraryWatch?: boolean
+  autoActorProfileScrape?: boolean
   player?: PatchPlayerSettingsBody
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string

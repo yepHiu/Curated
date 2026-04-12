@@ -36,6 +36,7 @@ const organizeLibraryState = ref(true)
 /** 与后端默认一致：关，避免误触新库「首次扫描」扩展逻辑 */
 const extendedLibraryImportState = ref(false)
 const autoLibraryWatchState = ref(true)
+const autoActorProfileScrapeState = ref(false)
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
@@ -64,6 +65,7 @@ const curatedFramesCountState = ref(0)
 let organizeLibrarySaveSeq = 0
 let extendedLibraryImportSaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
+let autoActorProfileScrapeSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
@@ -282,6 +284,7 @@ async function refreshLibraryPathsFromApi() {
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     extendedLibraryImportState.value = Boolean(settings.extendedLibraryImport)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
+    autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
     applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
@@ -308,6 +311,7 @@ function createWebLibraryService(): LibraryService {
     organizeLibrary: computed(() => organizeLibraryState.value),
     extendedLibraryImport: computed(() => extendedLibraryImportState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
+    autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
@@ -487,6 +491,26 @@ function createWebLibraryService(): LibraryService {
             await refreshLibraryPathsFromApi()
           } catch {
             // 拉取失败时保留当前 UI 值，由上层错误提示处理
+          }
+        }
+        throw err
+      }
+    },
+
+    async setAutoActorProfileScrape(value: boolean) {
+      const seq = ++autoActorProfileScrapeSaveSeq
+      autoActorProfileScrapeState.value = value
+      try {
+        const next = await api.patchSettings({ autoActorProfileScrape: value })
+        if (seq === autoActorProfileScrapeSaveSeq) {
+          autoActorProfileScrapeState.value = Boolean(next.autoActorProfileScrape)
+        }
+      } catch (err) {
+        if (seq === autoActorProfileScrapeSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
           }
         }
         throw err

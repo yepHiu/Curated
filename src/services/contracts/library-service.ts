@@ -38,6 +38,8 @@ export interface LibraryService {
   /** 库目录监听触发的自动扫描/刮削；mock 为本地状态 */
   autoLibraryWatch: ComputedRef<boolean>
   setAutoLibraryWatch(value: boolean): Promise<void>
+  autoActorProfileScrape: ComputedRef<boolean>
+  setAutoActorProfileScrape(value: boolean): Promise<void>
   /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
   metadataMovieProvider: ComputedRef<string>
   metadataMovieProviders: ComputedRef<readonly string[]>
