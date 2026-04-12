@@ -28,6 +28,26 @@ $status = "failed"
 $artifactPaths = @()
 $notes = "versionSource=$($versionInfo.Source); BuildStamp=$BuildStamp"
 
+function Get-ReleaseResultProperty {
+  param(
+    [Parameter(Mandatory = $false)]
+    [object]$Result,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PropertyName
+  )
+
+  $resultItems = @(@($Result) | Where-Object { $null -ne $_ })
+  for ($index = $resultItems.Count - 1; $index -ge 0; $index -= 1) {
+    $candidate = $resultItems[$index]
+    if ($candidate.PSObject.Properties.Match($PropertyName).Count -gt 0) {
+      return $candidate.$PropertyName
+    }
+  }
+
+  return $null
+}
+
 try {
   Write-Host "==> Publishing Curated release"
   Write-Host "Version   : $Version"
@@ -75,20 +95,24 @@ try {
   $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding utf8
 
   $artifactPaths = @()
-  if ($portableResult -and $portableResult.ArtifactPaths) {
-    $artifactPaths += [string[]]$portableResult.ArtifactPaths
+  $portableArtifactPaths = Get-ReleaseResultProperty -Result $portableResult -PropertyName "ArtifactPaths"
+  if ($portableArtifactPaths) {
+    $artifactPaths += [string[]]$portableArtifactPaths
   }
-  if ($installerResult -and $installerResult.ArtifactPaths) {
-    $artifactPaths += [string[]]$installerResult.ArtifactPaths
+  $installerArtifactPaths = Get-ReleaseResultProperty -Result $installerResult -PropertyName "ArtifactPaths"
+  if ($installerArtifactPaths) {
+    $artifactPaths += [string[]]$installerArtifactPaths
   }
   $artifactPaths += $manifestPath
 
   $resultStatuses = @()
-  if ($portableResult) {
-    $resultStatuses += [string]$portableResult.Status
+  $portableStatus = Get-ReleaseResultProperty -Result $portableResult -PropertyName "Status"
+  if ($portableStatus) {
+    $resultStatuses += [string]$portableStatus
   }
-  if ($installerResult) {
-    $resultStatuses += [string]$installerResult.Status
+  $installerStatus = Get-ReleaseResultProperty -Result $installerResult -PropertyName "Status"
+  if ($installerStatus) {
+    $resultStatuses += [string]$installerStatus
   }
 
   if ($resultStatuses -contains "failed") {
@@ -99,11 +123,13 @@ try {
     $status = "success"
   }
 
-  if ($portableResult -and -not [string]::IsNullOrWhiteSpace($portableResult.Notes)) {
-    $notes = "$notes; portable=$($portableResult.Notes)"
+  $portableNotes = Get-ReleaseResultProperty -Result $portableResult -PropertyName "Notes"
+  if (-not [string]::IsNullOrWhiteSpace($portableNotes)) {
+    $notes = "$notes; portable=$portableNotes"
   }
-  if ($installerResult -and -not [string]::IsNullOrWhiteSpace($installerResult.Notes)) {
-    $notes = "$notes; installer=$($installerResult.Notes)"
+  $installerNotes = Get-ReleaseResultProperty -Result $installerResult -PropertyName "Notes"
+  if (-not [string]::IsNullOrWhiteSpace($installerNotes)) {
+    $notes = "$notes; installer=$installerNotes"
   }
 
   Write-Host "Release publish flow complete."
@@ -114,14 +140,32 @@ catch {
 }
 finally {
   if (-not [string]::IsNullOrWhiteSpace($Version)) {
-    Add-PackageBuildHistoryEntry `
-      -RepoRoot $repoRoot `
-      -HistoryPath $HistoryPath `
-      -Version $Version `
-      -BuildType "release:publish" `
-      -ArtifactPaths $artifactPaths `
-      -Status $status `
-      -Operator (Get-ReleaseOperator) `
-      -Notes $notes
+    $historyArtifactPaths = @($artifactPaths | Where-Object {
+      -not [string]::IsNullOrWhiteSpace([string]$_)
+    })
+
+    if ($historyArtifactPaths.Count -eq 0) {
+      if (Test-Path $portableZip) {
+        $historyArtifactPaths += $portableZip
+      }
+      if (Test-Path $installerExe) {
+        $historyArtifactPaths += $installerExe
+      }
+      if (Test-Path $manifestPath) {
+        $historyArtifactPaths += $manifestPath
+      }
+    }
+
+    if ($historyArtifactPaths.Count -gt 0) {
+      Add-PackageBuildHistoryEntry `
+        -RepoRoot $repoRoot `
+        -HistoryPath $HistoryPath `
+        -Version $Version `
+        -BuildType "release:publish" `
+        -ArtifactPaths $historyArtifactPaths `
+        -Status $status `
+        -Operator (Get-ReleaseOperator) `
+        -Notes $notes
+    }
   }
 }

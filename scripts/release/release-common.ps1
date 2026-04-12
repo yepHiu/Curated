@@ -38,7 +38,29 @@ function Convert-ToRepoRelativePath {
   )
 
   $resolvedPath = [System.IO.Path]::GetFullPath($PathValue)
-  $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $resolvedPath)
+  $getRelativePathMethod = [System.IO.Path].GetMethod(
+    "GetRelativePath",
+    [type[]]@([string], [string])
+  )
+
+  if ($null -ne $getRelativePathMethod) {
+    $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $resolvedPath)
+  } else {
+    $repoRootPath = [System.IO.Path]::GetFullPath($RepoRoot)
+    if (
+      -not $repoRootPath.EndsWith([System.IO.Path]::DirectorySeparatorChar) -and
+      -not $repoRootPath.EndsWith([System.IO.Path]::AltDirectorySeparatorChar)
+    ) {
+      $repoRootPath += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $repoRootUri = [System.Uri]::new($repoRootPath)
+    $resolvedPathUri = [System.Uri]::new($resolvedPath)
+    $relative = [System.Uri]::UnescapeDataString(
+      $repoRootUri.MakeRelativeUri($resolvedPathUri).ToString()
+    ).Replace("/", [System.IO.Path]::DirectorySeparatorChar)
+  }
+
   return $relative.Replace("\", "/")
 }
 

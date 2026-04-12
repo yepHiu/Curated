@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest"
-import {
-  buildPackagingPreview,
-  PackagingPreviewInput,
-} from "./curated-packaging-preview"
+import { buildPackagingPreview } from "./curated-packaging-preview"
+import type { PackagingPreviewInput } from "./curated-packaging-preview"
 
 describe("buildPackagingPreview", () => {
   it("predicts installer patch bump without base change", () => {
