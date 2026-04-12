@@ -919,11 +919,12 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 	switch command.Type {
 	case contracts.CommandSystemHealth:
 		return a.respondOK(output, command.ID, contracts.HealthDTO{
-			Name:         version.BackendName(),
-			Version:      version.Stamp(),
-			Channel:      version.Channel,
-			Transport:    "stdio-jsonl",
-			DatabasePath: a.cfg.DatabasePath,
+			Name:             version.BackendName(),
+			Version:          version.Stamp(),
+			Channel:          version.Channel,
+			InstallerVersion: version.PackageVersion(),
+			Transport:        "stdio-jsonl",
+			DatabasePath:     a.cfg.DatabasePath,
 		})
 
 	case contracts.CommandLibraryList:

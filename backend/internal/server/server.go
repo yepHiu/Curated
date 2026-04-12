@@ -258,11 +258,12 @@ func (h *Handler) Routes() http.Handler {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, contracts.HealthDTO{
-		Name:         version.BackendName(),
-		Version:      version.Stamp(),
-		Channel:      version.Channel,
-		Transport:    "http",
-		DatabasePath: h.cfg.DatabasePath,
+		Name:             version.BackendName(),
+		Version:          version.Stamp(),
+		Channel:          version.Channel,
+		InstallerVersion: version.PackageVersion(),
+		Transport:        "http",
+		DatabasePath:     h.cfg.DatabasePath,
 	})
 }
 

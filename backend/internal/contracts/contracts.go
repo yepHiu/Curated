@@ -51,11 +51,12 @@ type AppError struct {
 }
 
 type HealthDTO struct {
-	Name         string `json:"name"`
-	Version      string `json:"version"` // Build stamp YYYYMMDD.HHMMSS (UTC) or git.* / unknown; see Channel
-	Channel      string `json:"channel"` // "dev" or "release" (-tags release)
-	Transport    string `json:"transport"`
-	DatabasePath string `json:"databasePath"`
+	Name             string `json:"name"`
+	Version          string `json:"version"` // Build stamp YYYYMMDD.HHMMSS (UTC) or git.* / unknown; see Channel
+	Channel          string `json:"channel"` // "dev" or "release" (-tags release)
+	InstallerVersion string `json:"installerVersion,omitempty"`
+	Transport        string `json:"transport"`
+	DatabasePath     string `json:"databasePath"`
 }
 
 type DevPerformanceSummaryDTO struct {

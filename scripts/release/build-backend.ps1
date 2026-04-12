@@ -33,7 +33,7 @@ if (Test-Path $resolvedOutputDir) {
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
 New-Item -ItemType Directory -Path $goCacheDir -Force | Out-Null
 
-$ldflags = "-H=windowsgui -X curated-backend/internal/version.BuildStamp=$BuildStamp"
+$ldflags = "-H=windowsgui -X curated-backend/internal/version.BuildStamp=$BuildStamp -X curated-backend/internal/version.InstallerVersion=$Version"
 
 Push-Location $backendRoot
 try {

@@ -25,6 +25,10 @@ import (
 // BuildStamp is an optional link-time override, compact form YYYYMMDD.HHMMSS (UTC recommended).
 var BuildStamp = ""
 
+// InstallerVersion is an optional link-time override for the packaged release version
+// (for example, the version allocated from release/version.json during publish).
+var InstallerVersion = ""
+
 var (
 	resolvedFallback string
 	resolveOnce      sync.Once
@@ -73,4 +77,9 @@ func stampFromBuildInfo() string {
 // Display returns stamp and channel in one string, e.g. "20260328.143052-dev" or "...-release".
 func Display() string {
 	return Stamp() + "-" + Channel
+}
+
+// PackageVersion returns the packaged release version when embedded into the binary.
+func PackageVersion() string {
+	return strings.TrimSpace(InstallerVersion)
 }
