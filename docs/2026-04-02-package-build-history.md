@@ -36,3 +36,5 @@
 | 2026-04-12 | 1.1.2 | 6d16780c / master | release:portable | release/portable/Curated-1.1.2-windows-x64.zip | 鎴愬姛 | wujiahui | versionSource=auto-patch |
 | 2026-04-12 | 1.1.2 | 6d16780c / master | release:portable | release/portable/Curated-1.1.2-windows-x64.zip | 鎴愬姛 | wujiahui | versionSource=explicit |
 | 2026-04-12 | 1.1.2 | 6d16780c / master | release:installer | release/installer/Curated-Setup-1.1.2.exe | 鎴愬姛 | wujiahui | versionSource=explicit |
+| 2026-04-12 | 1.1.3 | d58e8d85 / master | release:publish | release/portable/Curated-1.1.3-windows-x64.zip; release/installer/Curated-Setup-1.1.3.exe; release/manifest/release.json | 鎴愬姛 | wujiahui | versionSource=auto-patch; BuildStamp=20260412.085211; portable=versionSource=explicit; installer=versionSource=explicit |
+| 2026-04-12 | 1.1.4 | d58e8d85 / master | release:publish | release/portable/Curated-1.1.4-windows-x64.zip; release/installer/Curated-Setup-1.1.4.exe; release/manifest/release.json | 鎴愬姛 | wujiahui | versionSource=auto-patch; BuildStamp=20260412.100459; portable=versionSource=explicit; installer=versionSource=explicit |
