@@ -1,0 +1,4 @@
+interface:
+  display_name: "Curated Backend Runtime"
+  short_description: "Build and run Curated backend modes."
+  default_prompt: "Use $curated-backend-runtime to build or run the Curated backend in development or release mode."
