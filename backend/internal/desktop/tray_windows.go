@@ -612,13 +612,12 @@ func ResolveBaseURL(addr string) string {
 }
 
 func ResolveDefaultLogDir(cfg config.Config) string {
-	if strings.TrimSpace(cfg.LogDir) != "" {
-		if abs, err := filepath.Abs(cfg.LogDir); err == nil {
+	dir := config.ResolveLogDir(cfg.LogDir)
+	if strings.TrimSpace(dir) != "" {
+		if abs, err := filepath.Abs(dir); err == nil {
 			return abs
 		}
-		return cfg.LogDir
+		return dir
 	}
-	settingsPath := config.DefaultLibrarySettingsPath()
-	root := filepath.Dir(filepath.Dir(settingsPath))
-	return filepath.Join(root, "logs")
+	return "."
 }

@@ -46,8 +46,8 @@ func ResolveBaseURL(addr string) string {
 }
 
 func ResolveDefaultLogDir(cfg config.Config) string {
-	if cfg.LogDir != "" {
-		return cfg.LogDir
+	if dir := config.ResolveLogDir(cfg.LogDir); dir != "" {
+		return dir
 	}
 	return "."
 }

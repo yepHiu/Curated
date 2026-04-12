@@ -3,11 +3,12 @@ package nativeplayer
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+
+	"curated-backend/internal/executil"
 )
 
 type Config struct {
@@ -77,7 +78,7 @@ func (l *Launcher) Launch(ctx context.Context, mediaTarget string, startPosition
 	args = append(args, buildPresetArgs(preset, startPositionSec, title)...)
 	args = append(args, mediaTarget)
 
-	cmd := exec.CommandContext(ctx, cmdName, args...)
+	cmd := executil.CommandContext(ctx, cmdName, args...)
 	if runtime.GOOS == "windows" && filepath.IsAbs(mediaTarget) {
 		cmd.Dir = filepath.Dir(mediaTarget)
 	}

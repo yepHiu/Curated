@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"curated-backend/internal/executil"
 )
 
 // MediaInfo is the lightweight probe result used by playback planning.
@@ -73,7 +74,7 @@ func ProbeMediaInfo(ctx context.Context, sourcePath string, ffmpegCommand string
 func probeMediaInfoViaFFprobe(ctx context.Context, sourcePath string, ffmpegCommand string) (MediaInfo, error) {
 	var lastErr error
 	for _, candidate := range ffprobeCommandCandidates(ffmpegCommand) {
-		cmd := exec.CommandContext(
+		cmd := executil.CommandContext(
 			ctx,
 			candidate,
 			"-v", "error",

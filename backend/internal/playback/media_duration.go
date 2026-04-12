@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+
+	"curated-backend/internal/executil"
 )
 
 type mediaDurationCacheKey struct {
@@ -66,7 +67,7 @@ func ProbeMediaDuration(ctx context.Context, sourcePath string, ffmpegCommand st
 func probeDurationViaFFprobe(ctx context.Context, sourcePath string, ffmpegCommand string) (float64, error) {
 	var lastErr error
 	for _, candidate := range ffprobeCommandCandidates(ffmpegCommand) {
-		cmd := exec.CommandContext(
+		cmd := executil.CommandContext(
 			ctx,
 			candidate,
 			"-v", "error",
@@ -93,7 +94,7 @@ func probeDurationViaFFprobe(ctx context.Context, sourcePath string, ffmpegComma
 }
 
 func probeDurationViaFFmpeg(ctx context.Context, sourcePath string, ffmpegCommand string) (float64, error) {
-	cmd := exec.CommandContext(ctx, resolveFFmpegCommand(ffmpegCommand), "-i", sourcePath)
+	cmd := executil.CommandContext(ctx, resolveFFmpegCommand(ffmpegCommand), "-i", sourcePath)
 	cmd.Stdout = io.Discard
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

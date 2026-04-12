@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"curated-backend/internal/executil"
 )
 
 var (
@@ -89,9 +91,9 @@ type Manager struct {
 	sessions              map[string]*sessionState
 	// recentSnapshots keeps a bounded in-memory history after sessions leave the
 	// active registry, so status/recent APIs can still explain what just happened.
-	recentSnapshots       []SessionSnapshot
-	janitorCancel         context.CancelFunc
-	janitorDone           chan struct{}
+	recentSnapshots []SessionSnapshot
+	janitorCancel   context.CancelFunc
+	janitorDone     chan struct{}
 }
 
 type SessionSnapshot struct {
@@ -100,8 +102,8 @@ type SessionSnapshot struct {
 	ExpiresAt      time.Time
 	FinishedAt     time.Time
 	// State is a coarse lifecycle label exposed to diagnostics endpoints.
-	State          string
-	LastError      string
+	State     string
+	LastError string
 }
 
 const recentSessionHistoryLimit = 32
@@ -468,7 +470,7 @@ func startTranscodeSession(
 	profile transcodeProfile,
 ) (*sessionState, error) {
 	runCtx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(runCtx, cmdName, profile.Args...)
+	cmd := executil.CommandContext(runCtx, cmdName, profile.Args...)
 	cmd.Dir = dir
 	cmd.Stdout = io.Discard
 	var stderr bytes.Buffer
