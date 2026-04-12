@@ -9,15 +9,16 @@ alwaysApply: true
 
 - **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
-- **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**、健康名 **`curated-dev`**；Windows 开发构建推荐 `pnpm backend:build:dev` 产出 **`backend/runtime/curated-dev.exe`**；**`-tags release` 打包**默认 **:8081**、健康名 **`curated`**（Go 模块名 **`curated-backend`**）。
+- **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**、健康名 **`curated-dev`**；Windows 开发构建必须产出 **`backend/runtime/curated-dev.exe`**，不要生成或保留与生产包同名的 `curated.exe`，以免和正式安装版后端冲突；**`-tags release` 打包**默认 **:8081**、健康名 **`curated`**（Go 模块名 **`curated-backend`**）。
 - **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
+- **Repo-local skill**：后端开发态 / 生产态编译与运行请求优先使用 **`.cursor/skills/curated-backend-runtime/`**，统一处理 `go run`、`pnpm backend:build:dev`、`pnpm release:backend`、`pnpm release:publish` 与 `curated-dev.exe` / `curated.exe` 命名边界。
 - **品牌图标**：`icon/curated-title-nobg.png` 用于 `README.md` 顶部带字标志；`icon/Curated-icon-nobg.png` 用于 Web favicon、后台托盘与安装包图标。替换品牌图时，同步更新 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png`、`backend/internal/assets/curated.ico`。
 - **公开文档结构**：`README.md` 是英文主版，`README.zh-CN.md` / `README.ja-JP.md` 是完整翻译版；`API.md` 是唯一公开 API 参考文档。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
 - **本地前端托管**：当可执行文件旁存在 **`frontend-dist/`**（或当前工作目录存在 `frontend-dist/` / `dist/`）时，后端会直接托管前端静态资源并对非 `/api` 路由做 SPA fallback。
 - **Mock 收藏/评分**：未启用 Web API 时数据在内存；收藏与用户评分会通过 **`localStorage`（`jav-library-movie-prefs`）** 在整页刷新后恢复。
 - **正式持久化**：**`VITE_USE_WEB_API=true`** 且后端运行，收藏与评分由 **`PATCH /api/library/movies/{id}`** 写入 SQLite；**播放进度**走 **`/api/playback/progress`**，**萃取帧**走 **`/api/curated-frames`**（含 **`POST /api/curated-frames/export`** 库内 WebP 导出），**已播放统计**走 **`GET/POST /api/library/played-movies...`**（与资料库同一 SQLite 文件）。
-- **库行为 JSON**：**`config/library-config.cfg`** 存 **`organizeLibrary`**、**`metadataMovieProvider`**、**`autoLibraryWatch`**、**`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`**（设置页「通用」经 **`backendLog`** 写入目录、保留天数、级别，**不覆盖** **`logFilePrefix`**；**空 `logDir` 不再表示仅控制台**，而是使用默认目录：**release** 写入 **`LOCALAPPDATA\\Curated\\logs`**，**dev** 写入 **`backend/runtime/logs`**；**重启后端**后文件日志路径与级别才生效）、**`proxy`** 等。其中 **`autoLibraryWatch`**（设置页「自动刮削」）控制**是否因目录监听**排队防抖扫描/刮削；与主配置 **`libraryWatchEnabled`** 同时满足才跑 fsnotify。由 **`GET/PATCH /api/settings`** 读写。
+- **库行为 JSON**：**`config/library-config.cfg`** 存 **`organizeLibrary`**、**`metadataMovieProvider`**、**`autoLibraryWatch`**、**`autoActorProfileScrape`**、**`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`**（设置页「通用」经 **`backendLog`** 写入目录、保留天数、级别，**不覆盖** **`logFilePrefix`**；**空 `logDir` 不再表示仅控制台**，而是使用默认目录：**release** 写入 **`LOCALAPPDATA\\Curated\\logs`**，**dev** 写入 **`backend/runtime/logs`**；**重启后端**后文件日志路径与级别才生效）、**`proxy`** 等。其中 **`autoLibraryWatch`**（设置页「自动刮削」）控制**是否因目录监听**排队防抖扫描/刮削；**`autoActorProfileScrape`** 控制**影片元数据刮削完成后**是否继续为缺头像和简介的演员自动排队 `scrape.actor`；由 **`GET/PATCH /api/settings`** 读写。
 
 ## 常见操作（复述用户诉求时）
 

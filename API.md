@@ -330,6 +330,7 @@ Important notes:
 
 - updates are written back to `config/library-config.cfg` for library-level keys
 - playback runtime preferences are also surfaced through this settings contract
+- `autoActorProfileScrape` is an opt-in library-level setting; when enabled, successful movie metadata scrapes may enqueue missing actor-profile scrape tasks for actors that still lack both avatar and summary
 - some backend logging changes require restart before file sinks fully reflect new values
 
 ## Curated Frames

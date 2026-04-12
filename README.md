@@ -125,6 +125,7 @@ Common library-level settings include:
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `autoLibraryWatch`
+- `autoActorProfileScrape`
 - `proxy`
 - backend log directory and retention settings
   Empty `logDir` means "use the default log directory" rather than disabling file logging:

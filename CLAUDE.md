@@ -73,6 +73,11 @@ go test ./internal/storage/...
 go test -v ./internal/storage/...
 ```
 
+Windows binary naming rule:
+- Development backend builds must use `curated-dev.exe`.
+- Release/package backend builds use `curated.exe`.
+- Do not generate a dev Windows backend binary named `curated.exe`, because it can conflict with the installed production backend on the same machine.
+
 ### Full Stack Development
 
 ```bash
@@ -96,6 +101,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
+- **`autoActorProfileScrape`** - Whether successful movie metadata scrapes enqueue missing actor profile scrapes for actors with neither avatar nor summary (default: `false`)
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
 - **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); empty **`logDir`** means "use the default log directory" instead of disabling file logging: dev builds default to **`backend/runtime/logs`**, while release builds default to **`LOCALAPPDATA\\Curated\\logs`**. **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
@@ -227,7 +233,7 @@ POST   /api/providers/ping-all              # Ping all providers
 
 **Async Task Pattern:** Long-running operations (scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
 
-**Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged.
+**Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged. When **`autoActorProfileScrape`** is true, successful movie metadata scrapes also enqueue `scrape.actor` tasks for actors that still lack both avatar and summary.
 
 ## Architecture Boundaries
 
@@ -407,10 +413,11 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - The frontend Vite dev server proxies `/api` to `http://localhost:8080` (backend)
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
+- Windows dev backend binary naming is an explicit constraint: keep dev builds as `curated-dev.exe` and reserve `curated.exe` for release/package builds only
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
-- Library organization (`organizeLibrary`) and directory-watch-driven auto scan (`autoLibraryWatch`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
+- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), and scan/import-time missing actor profile scraping (`autoActorProfileScrape`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)
