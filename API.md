@@ -76,6 +76,9 @@ Important notes:
 
 - development mode reports the `curated-dev` backend identity
 - release mode reports `curated`
+- `version` is the backend build identifier / build stamp shown in Settings -> About
+- `installerVersion` is an optional installer/package version, embedded into release backend binaries at packaging time
+- `installerVersion` may be omitted in development or non-packaged builds
 - release builds should continue exposing stable version and channel information
 
 ### `GET /api/dev/performance`

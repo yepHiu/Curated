@@ -171,7 +171,7 @@ backend/
 The backend exposes these HTTP endpoints:
 
 ```
-GET    /api/health                          # Health check
+GET    /api/health                          # Health check (name, version/build stamp, optional installerVersion, channel, databasePath)
 GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
