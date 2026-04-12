@@ -491,6 +491,7 @@
     "aboutCardTitle": "关于 Curated",
     "aboutCardDesc": "产品与运行方式说明。",
     "aboutVersionLabel": "版本号",
+    "aboutInstallerVersionLabel": "安装包版本号",
     "aboutVersionLoading": "正在获取后端版本…",
     "aboutVersionFetchFailed": "无法获取后端版本",
     "aboutVersionMock": "Mock 模式（未启用 Web API），无后端版本信息",

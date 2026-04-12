@@ -17,6 +17,8 @@ export interface HealthDTO {
   version: string
   /** 构建通道：`dev` / `release`；旧后端可能缺省 */
   channel?: string
+  /** 正式打包版本号；开发态通常缺省 */
+  installerVersion?: string
   transport: string
   databasePath: string
 }

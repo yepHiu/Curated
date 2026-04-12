@@ -483,6 +483,7 @@
     "aboutCardTitle": "Curated について",
     "aboutCardDesc": "製品と動作モードの説明。",
     "aboutVersionLabel": "バージョン",
+    "aboutInstallerVersionLabel": "インストーラー版",
     "aboutVersionLoading": "バックエンドのバージョンを取得中…",
     "aboutVersionFetchFailed": "バックエンドのバージョンを取得できませんでした",
     "aboutVersionMock": "Mock モード（Web API 無効）— バックエンドのバージョンはありません",

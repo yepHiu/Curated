@@ -101,6 +101,10 @@ import {
   supportsFileSystemAccess,
 } from "@/lib/curated-frames/db"
 import {
+  formatAboutBackendVersion,
+  formatAboutInstallerVersion,
+} from "@/lib/about-version"
+import {
   getCuratedFrameSaveMode,
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
@@ -871,13 +875,6 @@ async function ensureAboutHealthLoaded() {
   }
   aboutHealthLoaded.value = true
   await loadAboutHealth()
-}
-
-/** 与后端 `version.Display()` 一致；旧接口无 `channel` 时不要出现 `0.1.0-` 尾缀 */
-function formatAboutBackendVersion(h: HealthDTO): string {
-  const ch = typeof h.channel === "string" ? h.channel.trim() : ""
-  if (ch) return `${h.version}-${ch}`
-  return h.version
 }
 
 const providerHealthByName = ref<Record<string, ProviderHealthDTO>>({})
@@ -3513,6 +3510,17 @@ async function runMetadataRefreshForSelected() {
                   <span v-else>—</span>
                 </dd>
               </div>
+              <div
+                v-if="aboutHealth && formatAboutInstallerVersion(aboutHealth)"
+                class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3"
+              >
+                <dt class="font-medium text-foreground">
+                  {{ t("settings.aboutInstallerVersionLabel") }}
+                </dt>
+                <dd class="mt-1.5 font-mono text-foreground/90">
+                  {{ formatAboutInstallerVersion(aboutHealth) }}
+                </dd>
+              </div>
               <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
                 <dt class="font-medium text-foreground">
                   {{ t("settings.aboutDataModeLabel") }}
@@ -3553,6 +3561,17 @@ async function runMetadataRefreshForSelected() {
                 <span v-else-if="aboutHealthError" class="font-sans text-destructive">{{ aboutHealthError }}</span>
                 <span v-else-if="aboutHealth">{{ formatAboutBackendVersion(aboutHealth) }}</span>
                 <span v-else>—</span>
+              </p>
+            </div>
+            <div
+              v-if="aboutHealth && formatAboutInstallerVersion(aboutHealth)"
+              class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3"
+            >
+              <p class="font-medium text-foreground">
+                {{ t("settings.aboutInstallerVersionLabel") }}
+              </p>
+              <p class="mt-1.5 font-mono text-sm text-foreground/90">
+                {{ formatAboutInstallerVersion(aboutHealth) }}
               </p>
             </div>
           </template>

@@ -483,6 +483,7 @@
     "aboutCardTitle": "About Curated",
     "aboutCardDesc": "Product and runtime notes.",
     "aboutVersionLabel": "Version",
+    "aboutInstallerVersionLabel": "Installer version",
     "aboutVersionLoading": "Loading backend version…",
     "aboutVersionFetchFailed": "Could not load backend version",
     "aboutVersionMock": "Mock mode (Web API off) — no backend version",
