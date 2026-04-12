@@ -109,7 +109,7 @@ const playbackStats = ref<PlaybackStatsState>({
   fps: null,
 })
 let frameCallbackId: number | null = null
-let fallbackFpsTimer: ReturnType<typeof setInterval> | null = null
+let fallbackFpsTimer: number | null = null
 let fpsSampleWindowStartAt = 0
 let fpsSampleFrameCount = 0
 let fallbackLastDecodedFrames = 0
@@ -186,13 +186,13 @@ function onDocumentPictureInPictureChange() {
 const curatedShutterActive = ref(false)
 const curatedPlusOne = ref(false)
 const curatedCaptureError = ref("")
-let curatedPlusOneTimer: ReturnType<typeof setTimeout> | null = null
-let curatedShutterTimer: ReturnType<typeof setTimeout> | null = null
+let curatedPlusOneTimer: number | null = null
+let curatedShutterTimer: number | null = null
 
 /** 播放中鼠标静止一段时间后隐藏控件与指针；移动鼠标恢复 */
 const IDLE_HIDE_MS = 5000
 const chromeVisible = ref(true)
-let idleHideTimer: ReturnType<typeof setTimeout> | null = null
+let idleHideTimer: number | null = null
 
 function clearIdleHideTimer() {
   if (idleHideTimer !== null) {

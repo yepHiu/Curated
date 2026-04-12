@@ -25,10 +25,14 @@ const props = withDefaults(
     showFavorite?: boolean
     batchMode?: boolean
     batchChecked?: boolean
+    posterLoading?: "lazy" | "eager"
+    posterFetchPriority?: "high" | "low" | "auto"
   }>(),
   {
     batchMode: false,
     batchChecked: false,
+    posterLoading: "eager",
+    posterFetchPriority: "auto",
   },
 )
 
@@ -171,7 +175,8 @@ const handleFavoriteChange = (nextValue: boolean) => {
             :alt="movie.code"
             :version="imageVersion"
             class="absolute inset-0 z-[1]"
-            loading="eager"
+            :loading="props.posterLoading"
+            :fetch-priority="props.posterFetchPriority"
             @load="posterImageLoaded = true"
             @error="posterImageLoaded = false"
           />

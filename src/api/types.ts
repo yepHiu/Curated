@@ -159,7 +159,7 @@ export interface ProxySettingsDTO {
   password?: string
 }
 
-/** 后端日志目录与级别（library-config.cfg）；空 logDir 表示仅控制台 */
+/** 后端日志目录与级别（library-config.cfg）；空 logDir 表示使用当前构建的默认日志目录 */
 export interface BackendLogSettingsDTO {
   logDir: string
   logFilePrefix?: string

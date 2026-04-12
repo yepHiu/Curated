@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import MovieCard from "@/components/jav-library/MovieCard.vue"
 import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
+import {
+  estimateVirtualMovieChunkHeight,
+  getVirtualMovieFocusChunkIndex,
+  resolveVirtualMoviePosterLoadPolicy,
+} from "@/lib/library-virtual-scroll"
 import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 
 interface MovieChunk {
@@ -60,17 +65,15 @@ const MIN_TRACK_PX = 188
 /** 与 rowGap/columnGap 的 clamp 中间值接近 */
 const GAP_PX_ESTIMATE = 20
 /** 卡片略放大后虚拟行高略增 */
-const ESTIMATED_CARD_HEIGHT = 300
-const ESTIMATED_GAP = 22
-
 /** 虚拟滚动缓冲区：上下各多渲染的块数，防止快速滚动白屏（与文档「上下各缓冲 5」对齐） */
-const BUFFER_CHUNKS = 5
+const BUFFER_CHUNKS = 8
 /** 虚拟滚动缓冲区像素：额外像素缓冲，与块数缓冲叠加使用 */
-const BUFFER_PX = 600
+const BUFFER_PX = 1400
 
 const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
 const containerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200)
+const containerHeight = ref(typeof window !== "undefined" ? window.innerHeight : 900)
 
 function setScrollerRef(value: unknown) {
   if (value instanceof HTMLElement) {
@@ -92,9 +95,13 @@ function setScrollerRef(value: unknown) {
 }
 
 useResizeObserver(rootEl, (entries) => {
-  const w = entries[0]?.contentRect.width
-  if (w != null && w > 0) {
-    containerWidth.value = w
+  const rect = entries[0]?.contentRect
+  if (!rect) return
+  if (rect.width > 0) {
+    containerWidth.value = rect.width
+  }
+  if (rect.height > 0) {
+    containerHeight.value = rect.height
   }
 })
 
@@ -137,7 +144,14 @@ const effectiveColumnCount = computed(() =>
 
 const chunkCapacity = computed(() => Math.max(1, effectiveColumnCount.value * ROWS_PER_CHUNK))
 
-const estimatedChunkHeight = ROWS_PER_CHUNK * (ESTIMATED_CARD_HEIGHT + ESTIMATED_GAP)
+const estimatedChunkHeight = computed(() =>
+  estimateVirtualMovieChunkHeight({
+    containerWidth: containerWidth.value,
+    columnCount: effectiveColumnCount.value,
+    rowsPerChunk: ROWS_PER_CHUNK,
+    gapPx: GAP_PX_ESTIMATE,
+  }),
+)
 
 /** 网格列最小宽度：窄屏不过小、随视口变宽、大屏有上限 */
 const GRID_COL_MIN = "clamp(11.25rem, 9vw + 8.75rem, 15rem)"
@@ -200,6 +214,17 @@ const { scrollTop, scrollToTop } = useLibraryScrollPreserve({
   preserveKey,
 })
 const showScrollToTop = computed(() => scrollTop.value >= 560)
+const focusChunkIndex = computed(() =>
+  getVirtualMovieFocusChunkIndex({
+    scrollTop: scrollTop.value,
+    viewportHeight: containerHeight.value,
+    chunkHeight: estimatedChunkHeight.value,
+  }),
+)
+
+function posterLoadPolicyForChunk(index: number) {
+  return resolveVirtualMoviePosterLoadPolicy(index, focusChunkIndex.value)
+}
 </script>
 
 <template>
@@ -210,7 +235,7 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
       key-field="id"
       :min-item-size="estimatedChunkHeight"
       :buffer="BUFFER_PX"
-      :pool-size="BUFFER_CHUNKS * 2 + 5"
+      :pool-size="BUFFER_CHUNKS * 2 + 7"
       class="h-full min-h-0 overflow-y-auto pr-2"
     >
       <template #default="{ item, index, active }">
@@ -238,6 +263,8 @@ const showScrollToTop = computed(() => scrollTop.value >= 560)
                 :selected="movie.id === props.selectedMovieId"
                 :batch-mode="props.batchMode"
                 :batch-checked="batchSelectedSet.has(movie.id)"
+                :poster-loading="posterLoadPolicyForChunk(index).loading"
+                :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
                 :show-favorite="false"
                 @select="emit('select', $event)"
                 @open-details="emit('openDetails', $event)"
