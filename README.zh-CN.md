@@ -128,6 +128,9 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 - `proxy`
 - 后端日志目录与保留设置
 
+  空 `logDir` 表示“使用默认日志目录”，而不是关闭文件日志：
+  正式包写入 `LOCALAPPDATA\\Curated\\logs`，开发态写入 `backend/runtime/logs`。
+
 发布构建默认使用端口 `:8081`，除非被配置覆盖。
 
 ## API

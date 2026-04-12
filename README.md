@@ -127,6 +127,8 @@ Common library-level settings include:
 - `autoLibraryWatch`
 - `proxy`
 - backend log directory and retention settings
+  Empty `logDir` means "use the default log directory" rather than disabling file logging:
+  release builds use `LOCALAPPDATA\\Curated\\logs`, while dev builds use `backend/runtime/logs`.
 
 Release builds default to port `:8081` unless overridden by config.
 

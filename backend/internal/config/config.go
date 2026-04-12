@@ -12,7 +12,8 @@ import (
 
 type Config struct {
 	LogLevel string `json:"logLevel"`
-	// LogDir, if non-empty, enables daily rotated log files under this directory (e.g. "logs" or "runtime/logs").
+	// LogDir stores the effective backend log directory. Empty config values are normalized
+	// to the build-specific default (dev: project runtime/logs; release: app-data logs).
 	LogDir string `json:"logDir,omitempty"`
 	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default is channel-specific when LogDir is set.
 	LogFilePrefix string `json:"logFilePrefix,omitempty"`
@@ -124,6 +125,7 @@ func Default() Config {
 	cacheDir := defaultCacheDir()
 	return Config{
 		LogLevel:     "info",
+		LogDir:       defaultLogDir(),
 		HttpAddr:     defaultHTTPAddr(),
 		DatabasePath: defaultDatabasePath(),
 		CacheDir:     cacheDir,
@@ -191,6 +193,7 @@ func Load(path string) (Config, error) {
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = "info"
 	}
+	cfg.LogDir = ResolveLogDir(cfg.LogDir)
 	if strings.TrimSpace(cfg.LogDir) != "" {
 		if cfg.LogFilePrefix == "" {
 			cfg.LogFilePrefix = version.DefaultLogFilePrefix()

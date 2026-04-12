@@ -43,16 +43,16 @@ import (
 )
 
 type App struct {
-	cfg     config.Config
-	logger  *zap.Logger
-	store   *storage.SQLiteStore
-	library *library.Service
-	scanner *scanner.Service
-	scraper scraper.Service
-	assets  *assets.Service
-	tasks   *tasks.Manager
-	player  *nativeplayer.Launcher
-	streams *playback.Manager
+	cfg           config.Config
+	logger        *zap.Logger
+	store         *storage.SQLiteStore
+	library       *library.Service
+	scanner       *scanner.Service
+	scraper       scraper.Service
+	assets        *assets.Service
+	tasks         *tasks.Manager
+	player        *nativeplayer.Launcher
+	streams       *playback.Manager
 	devCPUSampler devmetrics.CPUSampler
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
@@ -139,7 +139,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			FFmpegCommand:   cfg.Player.FFmpegCommand,
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
-		devCPUSampler:               devmetrics.NewCPUSampler(),
+		devCPUSampler:              devmetrics.NewCPUSampler(),
 		organizeLibrary:            cfg.OrganizeLibrary,
 		extendedLibraryImport:      cfg.ExtendedLibraryImport,
 		autoLibraryWatch:           cfg.AutoLibraryWatch,
@@ -635,7 +635,7 @@ func (a *App) SetProxy(p config.ProxyConfig) error {
 // BackendLogSettings returns current backend log fields (merged config + library-config.cfg).
 func (a *App) BackendLogSettings() contracts.BackendLogSettingsDTO {
 	return contracts.BackendLogSettingsDTO{
-		LogDir:        a.cfg.LogDir,
+		LogDir:        config.ResolveLogDir(a.cfg.LogDir),
 		LogFilePrefix: a.cfg.LogFilePrefix,
 		LogMaxAgeDays: a.cfg.LogMaxAgeDays,
 		LogLevel:      a.cfg.LogLevel,
@@ -863,7 +863,7 @@ func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
 	}); err != nil {
 		return err
 	}
-	a.cfg.LogDir = nextDir
+	a.cfg.LogDir = config.ResolveLogDir(nextDir)
 	a.cfg.LogFilePrefix = nextPrefix
 	a.cfg.LogMaxAgeDays = nextMaxAge
 	a.cfg.LogLevel = nextLevel

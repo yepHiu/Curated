@@ -108,7 +108,7 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		if err != nil {
 			return fmt.Errorf("library settings %q: logDir: %w", path, err)
 		}
-		cfg.LogDir = s
+		cfg.LogDir = ResolveLogDir(s)
 	}
 	if v, ok := m["logFilePrefix"]; ok {
 		s, err := parseJSONStringTrim(v)
