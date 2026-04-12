@@ -1749,6 +1749,16 @@ type stubAutoWatchCtl struct{}
 func (stubAutoWatchCtl) AutoLibraryWatch() bool         { return true }
 func (stubAutoWatchCtl) SetAutoLibraryWatch(bool) error { return nil }
 
+type stubAutoActorScrapeCtl struct {
+	v bool
+}
+
+func (s *stubAutoActorScrapeCtl) AutoActorProfileScrape() bool { return s.v }
+func (s *stubAutoActorScrapeCtl) SetAutoActorProfileScrape(v bool) error {
+	s.v = v
+	return nil
+}
+
 type stubMetadataCtl struct{}
 
 func (stubMetadataCtl) MetadataMovieProvider() string                { return "" }
@@ -1930,6 +1940,95 @@ func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	}
 	if !dto.ExtendedLibraryImport {
 		t.Fatal("expected extendedLibraryImport true from controller")
+	}
+}
+
+func TestHandleGetSettings_AutoActorProfileScrapeFromController(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:                       config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:                    zap.NewNop(),
+		Store:                     store,
+		OrganizeLibraryCtl:        stubOrganizeCtl{},
+		AutoLibraryWatchCtl:       stubAutoWatchCtl{},
+		AutoActorProfileScrapeCtl: &stubAutoActorScrapeCtl{v: true},
+		MetadataScrapeCtl:         stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !dto.AutoActorProfileScrape {
+		t.Fatal("expected autoActorProfileScrape true from controller")
+	}
+}
+
+func TestHandlePatchSettings_AutoActorProfileScrape(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctl := &stubAutoActorScrapeCtl{v: false}
+	h := NewHandler(Deps{
+		Cfg:                       config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:                    zap.NewNop(),
+		Store:                     store,
+		OrganizeLibraryCtl:        stubOrganizeCtl{},
+		AutoLibraryWatchCtl:       stubAutoWatchCtl{},
+		AutoActorProfileScrapeCtl: ctl,
+		MetadataScrapeCtl:         stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"autoActorProfileScrape":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !ctl.v || !dto.AutoActorProfileScrape {
+		t.Fatalf("autoActorProfileScrape not enabled: ctl=%v dto=%v", ctl.v, dto.AutoActorProfileScrape)
 	}
 }
 

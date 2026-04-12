@@ -73,6 +73,22 @@ func TestMergeLibrarySettingsFile_AutoLibraryWatchFalse(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_AutoActorProfileScrapeTrue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"autoActorProfileScrape": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoActorProfileScrape {
+		t.Fatal("expected autoActorProfileScrape true from file")
+	}
+}
+
 func TestMergeLibrarySettingsFile_ExplicitFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -29,6 +29,8 @@ type Config struct {
 	OrganizeLibrary bool `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true (default), fsnotify on library roots may queue debounced scans (and follow-on scrape). Persisted in library-config.cfg.
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
+	// AutoActorProfileScrape: when true, successful movie metadata scrapes may enqueue missing actor profile scrapes. Persisted in library-config.cfg and default-off to avoid surprise outbound requests.
+	AutoActorProfileScrape bool `json:"autoActorProfileScrape,omitempty"`
 	// ExtendedLibraryImport: first scan on a newly added library root may run curated/external layout detection (library-config.cfg). Default false for zero impact on existing libraries.
 	ExtendedLibraryImport bool `json:"extendedLibraryImport,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.

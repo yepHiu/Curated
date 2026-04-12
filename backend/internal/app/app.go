@@ -64,6 +64,12 @@ type App struct {
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
+	// autoActorProfileScrape gates scan/import-time actor profile scrape enqueue; persisted to library-config.cfg.
+	autoActorProfileScrape   bool
+	autoActorProfileScrapeMu sync.RWMutex
+	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
+	autoActorProfileScrapePending   map[string]struct{}
+	autoActorProfileScrapePendingMu sync.Mutex
 	// playerSettingsMu protects cfg.Player and live playback-runtime updates.
 	playerSettingsMu sync.RWMutex
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
@@ -139,15 +145,17 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			FFmpegCommand:   cfg.Player.FFmpegCommand,
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
-		devCPUSampler:              devmetrics.NewCPUSampler(),
-		organizeLibrary:            cfg.OrganizeLibrary,
-		extendedLibraryImport:      cfg.ExtendedLibraryImport,
-		autoLibraryWatch:           cfg.AutoLibraryWatch,
-		metadataMovieProviderChain: cfg.MetadataMovieProviderChain,
-		librarySettingsPath:        strings.TrimSpace(librarySettingsPath),
-		appCtx:                     ctx,
-		scrapeSem:                  make(chan struct{}, scrapeConc),
-		watchScanPending:           make(map[string]struct{}),
+		devCPUSampler:                 devmetrics.NewCPUSampler(),
+		organizeLibrary:               cfg.OrganizeLibrary,
+		extendedLibraryImport:         cfg.ExtendedLibraryImport,
+		autoLibraryWatch:              cfg.AutoLibraryWatch,
+		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
+		autoActorProfileScrapePending: make(map[string]struct{}),
+		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
+		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
+		appCtx:                        ctx,
+		scrapeSem:                     make(chan struct{}, scrapeConc),
+		watchScanPending:              make(map[string]struct{}),
 	}
 
 	// 与设置页「保存代理设置」相同：持久化写回 + proxyenv.Sync。进程重启后仅依赖启动时第一次 Sync
@@ -298,6 +306,13 @@ func (a *App) AutoLibraryWatch() bool {
 	return a.autoLibraryWatch
 }
 
+// AutoActorProfileScrape reports whether movie metadata scrapes may auto-enqueue missing actor profiles.
+func (a *App) AutoActorProfileScrape() bool {
+	a.autoActorProfileScrapeMu.RLock()
+	defer a.autoActorProfileScrapeMu.RUnlock()
+	return a.autoActorProfileScrape
+}
+
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
 func (a *App) SetAutoLibraryWatch(v bool) error {
 	path := a.librarySettingsPath
@@ -318,6 +333,25 @@ func (a *App) SetAutoLibraryWatch(v bool) error {
 		return a.EnsureLibraryWatchRunning()
 	}
 	a.StopLibraryWatchLoop()
+	return nil
+}
+
+// SetAutoActorProfileScrape persists autoActorProfileScrape to library-config.cfg and updates in-memory state.
+func (a *App) SetAutoActorProfileScrape(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["autoActorProfileScrape"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.autoActorProfileScrapeMu.Lock()
+	a.autoActorProfileScrape = v
+	a.cfg.AutoActorProfileScrape = v
+	a.autoActorProfileScrapeMu.Unlock()
 	return nil
 }
 
@@ -971,6 +1005,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			OrganizeLibrary:            a.OrganizeLibrary(),
 			ExtendedLibraryImport:      a.ExtendedLibraryImport(),
 			AutoLibraryWatch:           a.AutoLibraryWatch(),
+			AutoActorProfileScrape:     a.AutoActorProfileScrape(),
 			MetadataMovieProvider:      a.MetadataMovieProvider(),
 			MetadataMovieProviders:     a.ListMetadataMovieProviders(),
 			MetadataMovieProviderChain: a.MetadataMovieProviderChain(),
@@ -1351,6 +1386,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	}
 
 	a.library.ApplyScrapedMetadata(metadata)
+	a.enqueueAutoActorProfileScrapes(ctx, metadata.Actors)
 
 	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Metadata saved for %s", result.Number))
 	task.Provider = strings.TrimSpace(metadata.Provider)
@@ -1488,6 +1524,102 @@ func (a *App) runActorScrapeBody(ctx context.Context, task contracts.TaskDTO, ac
 	)
 }
 
+func normalizeActorScrapePendingKey(actorName string) string {
+	return strings.ToLower(strings.TrimSpace(actorName))
+}
+
+func (a *App) claimAutoActorProfileScrape(actorName string) bool {
+	key := normalizeActorScrapePendingKey(actorName)
+	if key == "" {
+		return false
+	}
+	a.autoActorProfileScrapePendingMu.Lock()
+	defer a.autoActorProfileScrapePendingMu.Unlock()
+	if a.autoActorProfileScrapePending == nil {
+		a.autoActorProfileScrapePending = make(map[string]struct{})
+	}
+	if _, exists := a.autoActorProfileScrapePending[key]; exists {
+		return false
+	}
+	a.autoActorProfileScrapePending[key] = struct{}{}
+	return true
+}
+
+func (a *App) releaseAutoActorProfileScrape(actorName string) {
+	key := normalizeActorScrapePendingKey(actorName)
+	if key == "" {
+		return
+	}
+	a.autoActorProfileScrapePendingMu.Lock()
+	delete(a.autoActorProfileScrapePending, key)
+	a.autoActorProfileScrapePendingMu.Unlock()
+}
+
+func (a *App) createActorProfileScrapeTask(ctx context.Context, actorName string, metadata map[string]any) (contracts.TaskDTO, error) {
+	task := a.tasks.Create("scrape.actor", metadata)
+	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scraping actor profile: %s", actorName))
+	if err := a.store.SaveTask(ctx, task); err != nil {
+		return contracts.TaskDTO{}, err
+	}
+	return task, nil
+}
+
+func (a *App) enqueueActorProfileScrapeTask(task contracts.TaskDTO, actorName string, onDone func()) {
+	go func(t contracts.TaskDTO, name string) {
+		if onDone != nil {
+			defer onDone()
+		}
+		a.scrapeSem <- struct{}{}
+		defer func() { <-a.scrapeSem }()
+		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
+		defer cancel()
+		a.runActorScrapeBody(scrapeCtx, t, name)
+	}(task, actorName)
+}
+
+func (a *App) enqueueAutoActorProfileScrapes(ctx context.Context, actorNames []string) {
+	if !a.AutoActorProfileScrape() {
+		return
+	}
+	seen := make(map[string]struct{}, len(actorNames))
+	for _, rawName := range actorNames {
+		name := strings.TrimSpace(rawName)
+		key := normalizeActorScrapePendingKey(name)
+		if key == "" {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+
+		needsScrape, err := a.store.ActorProfileNeedsScrape(ctx, name)
+		if err != nil {
+			a.logger.Warn("failed to check actor scrape eligibility", zap.Error(err), zap.String("actorName", name))
+			continue
+		}
+		if !needsScrape {
+			continue
+		}
+		if !a.claimAutoActorProfileScrape(name) {
+			continue
+		}
+
+		task, err := a.createActorProfileScrapeTask(ctx, name, map[string]any{
+			"actorName": name,
+			"trigger":   "auto.movie-metadata",
+		})
+		if err != nil {
+			a.releaseAutoActorProfileScrape(name)
+			a.logger.Warn("failed to enqueue auto actor profile scrape", zap.Error(err), zap.String("actorName", name))
+			continue
+		}
+		a.enqueueActorProfileScrapeTask(task, name, func() {
+			a.releaseAutoActorProfileScrape(name)
+		})
+	}
+}
+
 // StartActorProfileScrape enqueues Metatube actor lookup for an existing library actor row (exact name).
 func (a *App) StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error) {
 	actorName = strings.TrimSpace(actorName)
@@ -1502,20 +1634,11 @@ func (a *App) StartActorProfileScrape(ctx context.Context, actorName string) (co
 		return contracts.TaskDTO{}, contracts.ErrActorNotFound
 	}
 
-	task := a.tasks.Create("scrape.actor", map[string]any{"actorName": actorName})
-	task = a.tasks.Start(task.TaskID, fmt.Sprintf("Scraping actor profile: %s", actorName))
-	if err := a.store.SaveTask(ctx, task); err != nil {
+	task, err := a.createActorProfileScrapeTask(ctx, actorName, map[string]any{"actorName": actorName})
+	if err != nil {
 		return contracts.TaskDTO{}, err
 	}
-
-	go func(t contracts.TaskDTO, name string) {
-		a.scrapeSem <- struct{}{}
-		defer func() { <-a.scrapeSem }()
-		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
-		defer cancel()
-		a.runActorScrapeBody(scrapeCtx, t, name)
-	}(task, actorName)
-
+	a.enqueueActorProfileScrapeTask(task, actorName, nil)
 	return task, nil
 }
 
@@ -2212,25 +2335,26 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 
 func (a *App) HTTPHandler() http.Handler {
 	apiHandler := server.NewHandler(server.Deps{
-		Cfg:                      a.cfg,
-		Logger:                   a.logger,
-		Store:                    a.store,
-		Tasks:                    a.tasks,
-		ScanStarter:              a,
-		OrganizeLibraryCtl:       a,
-		ExtendedLibraryImportCtl: a,
-		AutoLibraryWatchCtl:      a,
-		MetadataScrapeCtl:        a,
-		ProviderHealthChecker:    a.scraper,
-		ProxyCtl:                 a,
-		BackendLogCtl:            a,
-		PlayerSettingsCtl:        a,
-		MovieMetadataRefresher:   a,
-		ActorProfileRefresher:    a,
-		LibraryWatchReloader:     a,
-		DevPerformanceProvider:   a,
-		PlaybackResolver:         a,
-		NativePlaybackLauncher:   a,
+		Cfg:                       a.cfg,
+		Logger:                    a.logger,
+		Store:                     a.store,
+		Tasks:                     a.tasks,
+		ScanStarter:               a,
+		OrganizeLibraryCtl:        a,
+		ExtendedLibraryImportCtl:  a,
+		AutoLibraryWatchCtl:       a,
+		AutoActorProfileScrapeCtl: a,
+		MetadataScrapeCtl:         a,
+		ProviderHealthChecker:     a.scraper,
+		ProxyCtl:                  a,
+		BackendLogCtl:             a,
+		PlayerSettingsCtl:         a,
+		MovieMetadataRefresher:    a,
+		ActorProfileRefresher:     a,
+		LibraryWatchReloader:      a,
+		DevPerformanceProvider:    a,
+		PlaybackResolver:          a,
+		NativePlaybackLauncher:    a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
 }

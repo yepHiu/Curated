@@ -91,6 +91,26 @@ func (s *SQLiteStore) ActorNameExists(ctx context.Context, name string) (bool, e
 	}
 }
 
+// ActorProfileNeedsScrape reports whether the exact actors row exists and still lacks both
+// a remote avatar URL and a summary. This matches the current frontend lazy auto-scrape rule.
+func (s *SQLiteStore) ActorProfileNeedsScrape(ctx context.Context, name string) (bool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false, nil
+	}
+	var avatar string
+	var summary string
+	err := s.db.QueryRowContext(ctx, `SELECT avatar, summary FROM actors WHERE name = ?`, name).Scan(&avatar, &summary)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return false, nil
+	case err != nil:
+		return false, err
+	default:
+		return strings.TrimSpace(avatar) == "" && strings.TrimSpace(summary) == "", nil
+	}
+}
+
 // UpdateActorProfile persists scraped fields for the library actor row keyed by DisplayName.
 func (s *SQLiteStore) UpdateActorProfile(ctx context.Context, p scraper.ActorProfile) error {
 	name := strings.TrimSpace(p.DisplayName)

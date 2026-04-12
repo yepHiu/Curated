@@ -346,7 +346,9 @@ type SettingsDTO struct {
 	// ExtendedLibraryImport: when true, first scan under a newly added library root may classify curated/external layouts (library-config.cfg).
 	ExtendedLibraryImport bool `json:"extendedLibraryImport"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
-	AutoLibraryWatch       bool     `json:"autoLibraryWatch"`
+	AutoLibraryWatch bool `json:"autoLibraryWatch"`
+	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
+	AutoActorProfileScrape bool     `json:"autoActorProfileScrape"`
 	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
 	MetadataMovieProviders []string `json:"metadataMovieProviders"`
 	// MetadataMovieProviderChain: ordered provider priority list (may be non-empty while UI mode is auto/specified).
@@ -402,11 +404,12 @@ type ProxyJavBusPingResponse struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary       *bool                   `json:"organizeLibrary,omitempty"`
-	ExtendedLibraryImport *bool                   `json:"extendedLibraryImport,omitempty"`
-	AutoLibraryWatch      *bool                   `json:"autoLibraryWatch,omitempty"`
-	Player                *PatchPlayerSettingsDTO `json:"player,omitempty"`
-	MetadataMovieProvider *string                 `json:"metadataMovieProvider,omitempty"`
+	OrganizeLibrary        *bool                   `json:"organizeLibrary,omitempty"`
+	ExtendedLibraryImport  *bool                   `json:"extendedLibraryImport,omitempty"`
+	AutoLibraryWatch       *bool                   `json:"autoLibraryWatch,omitempty"`
+	AutoActorProfileScrape *bool                   `json:"autoActorProfileScrape,omitempty"`
+	Player                 *PatchPlayerSettingsDTO `json:"player,omitempty"`
+	MetadataMovieProvider  *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.

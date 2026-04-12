@@ -65,6 +65,12 @@ type AutoLibraryWatchController interface {
 	SetAutoLibraryWatch(v bool) error
 }
 
+// AutoActorProfileScrapeController exposes whether movie metadata scrapes may auto-enqueue missing actor profiles.
+type AutoActorProfileScrapeController interface {
+	AutoActorProfileScrape() bool
+	SetAutoActorProfileScrape(v bool) error
+}
+
 // MetadataScrapeSettings exposes Metatube movie provider preference (empty = auto) and the list of valid provider names.
 type MetadataScrapeSettings interface {
 	MetadataMovieProvider() string
@@ -124,70 +130,73 @@ type NativePlaybackLauncher interface {
 }
 
 type Handler struct {
-	cfg                      config.Config
-	logger                   *zap.Logger
-	store                    *storage.SQLiteStore
-	tasks                    *tasks.Manager
-	scanStarter              ScanStarter
-	organizeLibraryCtl       OrganizeLibraryController
-	extendedLibraryImportCtl ExtendedLibraryImportController
-	autoLibraryWatchCtl      AutoLibraryWatchController
-	metadataScrapeCtl        MetadataScrapeSettings
-	providerHealthChecker    ProviderHealthChecker
-	proxyCtl                 ProxyController
-	backendLogCtl            BackendLogSettingsController
-	playerSettingsCtl        PlayerSettingsController
-	movieMetadataRefresher   MovieMetadataRefresher
-	actorProfileRefresher    ActorProfileRefresher
-	libraryWatchReloader     LibraryWatchReloader
-	devPerformanceProvider   DevPerformanceProvider
-	playbackResolver         PlaybackResolver
-	nativePlaybackLauncher   NativePlaybackLauncher
+	cfg                       config.Config
+	logger                    *zap.Logger
+	store                     *storage.SQLiteStore
+	tasks                     *tasks.Manager
+	scanStarter               ScanStarter
+	organizeLibraryCtl        OrganizeLibraryController
+	extendedLibraryImportCtl  ExtendedLibraryImportController
+	autoLibraryWatchCtl       AutoLibraryWatchController
+	autoActorProfileScrapeCtl AutoActorProfileScrapeController
+	metadataScrapeCtl         MetadataScrapeSettings
+	providerHealthChecker     ProviderHealthChecker
+	proxyCtl                  ProxyController
+	backendLogCtl             BackendLogSettingsController
+	playerSettingsCtl         PlayerSettingsController
+	movieMetadataRefresher    MovieMetadataRefresher
+	actorProfileRefresher     ActorProfileRefresher
+	libraryWatchReloader      LibraryWatchReloader
+	devPerformanceProvider    DevPerformanceProvider
+	playbackResolver          PlaybackResolver
+	nativePlaybackLauncher    NativePlaybackLauncher
 }
 
 type Deps struct {
-	Cfg                      config.Config
-	Logger                   *zap.Logger
-	Store                    *storage.SQLiteStore
-	Tasks                    *tasks.Manager
-	ScanStarter              ScanStarter
-	OrganizeLibraryCtl       OrganizeLibraryController
-	ExtendedLibraryImportCtl ExtendedLibraryImportController
-	AutoLibraryWatchCtl      AutoLibraryWatchController
-	MetadataScrapeCtl        MetadataScrapeSettings
-	ProviderHealthChecker    ProviderHealthChecker
-	ProxyCtl                 ProxyController
-	BackendLogCtl            BackendLogSettingsController
-	PlayerSettingsCtl        PlayerSettingsController
-	MovieMetadataRefresher   MovieMetadataRefresher
-	ActorProfileRefresher    ActorProfileRefresher
-	LibraryWatchReloader     LibraryWatchReloader
-	DevPerformanceProvider   DevPerformanceProvider
-	PlaybackResolver         PlaybackResolver
-	NativePlaybackLauncher   NativePlaybackLauncher
+	Cfg                       config.Config
+	Logger                    *zap.Logger
+	Store                     *storage.SQLiteStore
+	Tasks                     *tasks.Manager
+	ScanStarter               ScanStarter
+	OrganizeLibraryCtl        OrganizeLibraryController
+	ExtendedLibraryImportCtl  ExtendedLibraryImportController
+	AutoLibraryWatchCtl       AutoLibraryWatchController
+	AutoActorProfileScrapeCtl AutoActorProfileScrapeController
+	MetadataScrapeCtl         MetadataScrapeSettings
+	ProviderHealthChecker     ProviderHealthChecker
+	ProxyCtl                  ProxyController
+	BackendLogCtl             BackendLogSettingsController
+	PlayerSettingsCtl         PlayerSettingsController
+	MovieMetadataRefresher    MovieMetadataRefresher
+	ActorProfileRefresher     ActorProfileRefresher
+	LibraryWatchReloader      LibraryWatchReloader
+	DevPerformanceProvider    DevPerformanceProvider
+	PlaybackResolver          PlaybackResolver
+	NativePlaybackLauncher    NativePlaybackLauncher
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
-		cfg:                      deps.Cfg,
-		logger:                   deps.Logger,
-		store:                    deps.Store,
-		tasks:                    deps.Tasks,
-		scanStarter:              deps.ScanStarter,
-		organizeLibraryCtl:       deps.OrganizeLibraryCtl,
-		extendedLibraryImportCtl: deps.ExtendedLibraryImportCtl,
-		autoLibraryWatchCtl:      deps.AutoLibraryWatchCtl,
-		metadataScrapeCtl:        deps.MetadataScrapeCtl,
-		providerHealthChecker:    deps.ProviderHealthChecker,
-		proxyCtl:                 deps.ProxyCtl,
-		backendLogCtl:            deps.BackendLogCtl,
-		playerSettingsCtl:        deps.PlayerSettingsCtl,
-		movieMetadataRefresher:   deps.MovieMetadataRefresher,
-		actorProfileRefresher:    deps.ActorProfileRefresher,
-		libraryWatchReloader:     deps.LibraryWatchReloader,
-		devPerformanceProvider:   deps.DevPerformanceProvider,
-		playbackResolver:         deps.PlaybackResolver,
-		nativePlaybackLauncher:   deps.NativePlaybackLauncher,
+		cfg:                       deps.Cfg,
+		logger:                    deps.Logger,
+		store:                     deps.Store,
+		tasks:                     deps.Tasks,
+		scanStarter:               deps.ScanStarter,
+		organizeLibraryCtl:        deps.OrganizeLibraryCtl,
+		extendedLibraryImportCtl:  deps.ExtendedLibraryImportCtl,
+		autoLibraryWatchCtl:       deps.AutoLibraryWatchCtl,
+		autoActorProfileScrapeCtl: deps.AutoActorProfileScrapeCtl,
+		metadataScrapeCtl:         deps.MetadataScrapeCtl,
+		providerHealthChecker:     deps.ProviderHealthChecker,
+		proxyCtl:                  deps.ProxyCtl,
+		backendLogCtl:             deps.BackendLogCtl,
+		playerSettingsCtl:         deps.PlayerSettingsCtl,
+		movieMetadataRefresher:    deps.MovieMetadataRefresher,
+		actorProfileRefresher:     deps.ActorProfileRefresher,
+		libraryWatchReloader:      deps.LibraryWatchReloader,
+		devPerformanceProvider:    deps.DevPerformanceProvider,
+		playbackResolver:          deps.PlaybackResolver,
+		nativePlaybackLauncher:    deps.NativePlaybackLauncher,
 	}
 }
 
@@ -1305,6 +1314,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.autoLibraryWatchCtl != nil {
 		autoWatch = h.autoLibraryWatchCtl.AutoLibraryWatch()
 	}
+	autoActorProfileScrape := h.cfg.AutoActorProfileScrape
+	if h.autoActorProfileScrapeCtl != nil {
+		autoActorProfileScrape = h.autoActorProfileScrapeCtl.AutoActorProfileScrape()
+	}
 	extImp := h.cfg.ExtendedLibraryImport
 	if h.extendedLibraryImportCtl != nil {
 		extImp = h.extendedLibraryImportCtl.ExtendedLibraryImport()
@@ -1325,6 +1338,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		OrganizeLibrary:        org,
 		ExtendedLibraryImport:  extImp,
 		AutoLibraryWatch:       autoWatch,
+		AutoActorProfileScrape: autoActorProfileScrape,
 		MetadataMovieProviders: []string{},
 	}
 	if strings.TrimSpace(dto.Player.NativePlayerCommand) == "" {
@@ -1403,7 +1417,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1417,7 +1431,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1458,6 +1472,20 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.autoLibraryWatchCtl.SetAutoLibraryWatch(*body.AutoLibraryWatch); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist autoLibraryWatch", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.AutoActorProfileScrape != nil {
+		if h.autoActorProfileScrapeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "auto actor profile scrape settings not available")
+			return
+		}
+		if err := h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(*body.AutoActorProfileScrape); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist autoActorProfileScrape", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
 			return
