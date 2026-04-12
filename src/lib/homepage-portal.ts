@@ -96,6 +96,28 @@ function seededHeroOrder(movies: readonly Movie[], daySeed: string): Movie[] {
     .map((entry) => entry.movie)
 }
 
+function isFC2MovieCode(code: string | undefined): boolean {
+  const normalized = (code ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "")
+  return normalized.startsWith("FC2")
+}
+
+function fillHeroMovies(movies: readonly Movie[], limit: number): Movie[] {
+  if (limit <= 0 || movies.length === 0) return []
+  if (movies.length >= limit) return movies.slice(0, limit)
+
+  const filled: Movie[] = []
+  while (filled.length < limit) {
+    for (const movie of movies) {
+      filled.push(movie)
+      if (filled.length >= limit) return filled
+    }
+  }
+  return filled
+}
+
 function buildPreferenceWeights(
   movies: readonly Movie[],
   playbackByMovieId: ReadonlyMap<string, PlaybackProgressEntry>,
@@ -160,10 +182,11 @@ export function buildHomepagePortalModel({
 }: BuildHomepagePortalInput): HomepagePortalModel {
   const activeMovies = movies.filter((movie) => !movie.trashedAt?.trim())
   const playbackByMovieId = buildPlaybackMap(playbackEntries)
+  const heroPool = activeMovies.filter((movie) => !isFC2MovieCode(movie.code))
 
-  const heroMovies = seededHeroOrder(activeMovies, stableDateSeed(daySeed)).slice(
-    0,
-    Math.min(heroLimit, activeMovies.length),
+  const heroMovies = fillHeroMovies(
+    seededHeroOrder(heroPool, stableDateSeed(daySeed)),
+    heroLimit,
   )
 
   const recentMovies = [...activeMovies].sort(compareByAddedAtDesc).slice(0, recentLimit)

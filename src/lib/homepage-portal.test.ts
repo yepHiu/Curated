@@ -63,6 +63,31 @@ describe("buildHomepagePortalModel", () => {
     )
   })
 
+  it("never shows FC2 titles in hero and repeats non-FC2 titles to fill 8 slots", () => {
+    const movies = [
+      makeMovie("a", { code: "ABC-001", rating: 4.9 }),
+      makeMovie("b", { code: "MIDE-002", rating: 4.7 }),
+      makeMovie("c", { code: "IPX-003", rating: 4.5 }),
+      makeMovie("d", { code: "SSIS-004", rating: 4.3 }),
+      makeMovie("e", { code: "FC2-123456", rating: 5 }),
+      makeMovie("f", { code: "fc2-234567", rating: 5 }),
+      makeMovie("g", { code: "FC2PPV-345678", rating: 5 }),
+      makeMovie("h", { code: "FC2 PPV 456789", rating: 5 }),
+    ]
+
+    const model = buildHomepagePortalModel({
+      movies,
+      daySeed: "2026-04-13",
+      heroLimit: 8,
+    })
+
+    expect(model.heroMovies).toHaveLength(8)
+    expect(model.heroMovies.every((movie) => !movie.code.toUpperCase().includes("FC2"))).toBe(
+      true,
+    )
+    expect(new Set(model.heroMovies.map((movie) => movie.id))).toEqual(new Set(["a", "b", "c", "d"]))
+  })
+
   it("sorts recent imports by addedAt descending", () => {
     const movies = [
       makeMovie("old", { addedAt: "2026-04-01T00:00:00.000Z" }),
