@@ -64,6 +64,15 @@ describe("library query helpers", () => {
     ).toBe(false)
   })
 
+  it("does not treat the root home path as a library browse route", () => {
+    expect(
+      isLibraryBrowseRoute({
+        name: "home",
+        path: "/",
+      }),
+    ).toBe(false)
+  })
+
   it("normalizes browse query values", () => {
     const query = {
       browse: "favorites",

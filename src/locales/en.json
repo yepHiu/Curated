@@ -2,6 +2,7 @@
   "nav": {
     "browse": "Browse",
     "yours": "Yours",
+    "home": "Home",
     "library": "All Movies",
     "tags": "Tags",
     "history": "History",
@@ -61,6 +62,7 @@
     "backHistory": "Back to history",
     "backCurated": "Back to curated frames",
     "backDetail": "Back to details",
+    "backHome": "Back to home",
     "backLibrary": "Back to library",
     "themeToggleAria": "Switch between light and dark appearance",
     "themeToggleHint": "On for dark, off for light; synced with Settings → Appearance."
@@ -91,6 +93,29 @@
     "batchToolbarAria": "Watch history batch actions",
     "batchSelectAria": "Select watch history for {title}",
     "batchDeselectAria": "Deselect watch history for {title}"
+  },
+  "home": {
+    "heroEyebrow": "Daily Spotlight",
+    "heroFallbackSummary": "A cinematic rotation assembled from your library for tonight.",
+    "emptyTitle": "Your portal is waiting for its first films",
+    "emptyBody": "Import titles into Curated and this homepage will start building daily hero picks, recent arrivals, resume rows, and taste-based recommendations.",
+    "heroProgressLabel": "Today's 8 picks",
+    "heroDetailsAction": "Open details",
+    "heroPlayAction": "Play now",
+    "sectionRecentTitle": "Recently Imported",
+    "sectionRecentBody": "Fresh titles that just landed in your library.",
+    "sectionRecommendTitle": "Today's Recommendations",
+    "sectionRecommendBody": "Suggestions ranked from your favorites, ratings, playback signals, and recurring tastes.",
+    "sectionContinueTitle": "Continue Watching",
+    "sectionContinueBody": "Jump back into unfinished sessions without digging through history.",
+    "sectionTasteTitle": "Taste Radar",
+    "sectionTasteBody": "A quick read on the actors, tags, and studios shaping today's feed.",
+    "tasteActorsTitle": "Actors",
+    "tasteTagsTitle": "Tags",
+    "tasteStudiosTitle": "Studios",
+    "tasteEmpty": "Not enough signals yet",
+    "continueRemaining": "{minutes} min left",
+    "continueUpdatedLabel": "Ready to resume"
   },
   "curated": {
     "title": "Curated Frame",

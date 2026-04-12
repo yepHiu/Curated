@@ -1,5 +1,6 @@
 {
   "nav": {
+    "home": "ホーム",
     "browse": "ブラウズ",
     "yours": "あなたの",
     "library": "すべての作品",
@@ -61,6 +62,7 @@
     "backHistory": "履歴に戻る",
     "backCurated": "キュレートに戻る",
     "backDetail": "詳細に戻る",
+    "backHome": "ホームに戻る",
     "backLibrary": "ライブラリに戻る",
     "themeToggleAria": "ライト／ダーク外観の切り替え",
     "themeToggleHint": "オンでダーク、オフでライト。設定の「外観」と同期します。"
@@ -91,6 +93,29 @@
     "batchToolbarAria": "視聴履歴の一括操作",
     "batchSelectAria": "「{title}」の視聴履歴を選択",
     "batchDeselectAria": "「{title}」の視聴履歴の選択を解除"
+  },
+  "home": {
+    "heroEyebrow": "今日のスポットライト",
+    "heroFallbackSummary": "今夜の視聴候補を、あなたのライブラリからシネマティックに並べます。",
+    "emptyTitle": "ホームポータルは最初の作品を待っています",
+    "emptyBody": "Curated に作品を取り込むと、毎日の Hero、最近追加、続きから、好みベースの推薦がここに並びます。",
+    "heroProgressLabel": "今日の 8 本",
+    "heroDetailsAction": "詳細を見る",
+    "heroPlayAction": "今すぐ再生",
+    "sectionRecentTitle": "最近追加",
+    "sectionRecentBody": "ライブラリに入ったばかりの作品をすぐ見つけられます。",
+    "sectionRecommendTitle": "今日のおすすめ",
+    "sectionRecommendBody": "お気に入り、評価、再生履歴、好みの傾向から並べた提案です。",
+    "sectionContinueTitle": "続きを見る",
+    "sectionContinueBody": "履歴を掘り返さずに、途中の作品へすぐ戻れます。",
+    "sectionTasteTitle": "好みレーダー",
+    "sectionTasteBody": "俳優、タグ、スタジオの傾向から、今日のフィードの理由をざっくり示します。",
+    "tasteActorsTitle": "俳優",
+    "tasteTagsTitle": "タグ",
+    "tasteStudiosTitle": "スタジオ",
+    "tasteEmpty": "まだ十分なシグナルがありません",
+    "continueRemaining": "残り {minutes} 分",
+    "continueUpdatedLabel": "すぐに再開できます"
   },
   "curated": {
     "title": "Curated Frame · キュレートフレーム",

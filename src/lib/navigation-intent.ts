@@ -3,7 +3,7 @@ import type { LocationQuery, RouteLocationNormalizedLoaded, RouteLocationRaw } f
 import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
 import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
-const navigationBackTargets = ["browse", "detail", "history", "curated-frames"] as const
+const navigationBackTargets = ["home", "browse", "detail", "history", "curated-frames"] as const
 
 export type NavigationBackTarget = (typeof navigationBackTargets)[number]
 
@@ -124,6 +124,12 @@ export function resolveNavigationBackLink(
         labelKey: "shell.backHistory",
       }
     }
+    if (backTarget === "home") {
+      return {
+        to: { name: "home" },
+        labelKey: "shell.backHome",
+      }
+    }
     if (backTarget === "curated-frames") {
       return {
         to: { name: "curated-frames" },
@@ -147,6 +153,12 @@ export function resolveNavigationBackLink(
   }
 
   if (route.name === "detail" && currentMovieId) {
+    if (getNavigationBackTarget(route.query) === "home") {
+      return {
+        to: { name: "home" },
+        labelKey: "shell.backHome",
+      }
+    }
     return {
       to: buildBrowseBackLink(route.query, currentMovieId),
       labelKey: "shell.backLibrary",

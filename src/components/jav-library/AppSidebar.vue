@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n"
 import {
   Clapperboard,
   History,
+  House,
   LibraryBig,
   RefreshCw,
   Settings2,
@@ -159,6 +160,7 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
 
   return {
     browse: [
+      { label: t("nav.home"), page: "home", icon: House },
       { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
       {
         label: t("nav.actors"),
@@ -194,6 +196,9 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
 const isActive = (page: AppPage) => route.name === page
 
 const getNavigationTarget = (page: AppPage) => {
+  if (page === "home") {
+    return { name: "home" }
+  }
   if (page === "settings") {
     return { name: page }
   }

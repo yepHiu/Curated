@@ -1,4 +1,5 @@
 export type AppPage =
+  | "home"
   | "library"
   | "favorites"
   | "recent"

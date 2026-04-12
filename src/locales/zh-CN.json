@@ -1,5 +1,6 @@
 {
   "nav": {
+    "home": "首页",
     "browse": "浏览",
     "yours": "我的",
     "library": "全部影片",
@@ -61,6 +62,7 @@
     "backHistory": "返回历史",
     "backCurated": "返回萃取帧",
     "backDetail": "返回详情",
+    "backHome": "返回首页",
     "backLibrary": "返回资料库",
     "themeToggleAria": "切换浅色或深色外观",
     "themeToggleHint": "开启为深色，关闭为浅色；与设置中「外观」同步。"
@@ -91,6 +93,29 @@
     "batchToolbarAria": "观看历史批量操作",
     "batchSelectAria": "选择「{title}」的观看记录",
     "batchDeselectAria": "取消选择「{title}」的观看记录"
+  },
+  "home": {
+    "heroEyebrow": "今日放映",
+    "heroFallbackSummary": "从你的影片库里挑出的今夜轮播，会在这里开始。",
+    "emptyTitle": "首页门户还在等待第一批影片",
+    "emptyBody": "先把影片导入 Curated，首页就会自动生成每日 Hero、最近导入、继续观看和偏好推荐。",
+    "heroProgressLabel": "今日 8 部精选",
+    "heroDetailsAction": "查看详情",
+    "heroPlayAction": "立即播放",
+    "sectionRecentTitle": "最近导入",
+    "sectionRecentBody": "刚进入影片库的新内容，可以先从这里开始看。",
+    "sectionRecommendTitle": "今日推荐",
+    "sectionRecommendBody": "根据你的收藏、评分、播放行为和偏好信号排出的今日片单。",
+    "sectionContinueTitle": "继续观看",
+    "sectionContinueBody": "把没看完的片子拉回来，不用再去历史里翻。",
+    "sectionTasteTitle": "偏好雷达",
+    "sectionTasteBody": "用演员、标签和片商三条线索，快速解释今天为什么会推这些内容。",
+    "tasteActorsTitle": "演员",
+    "tasteTagsTitle": "标签",
+    "tasteStudiosTitle": "片商",
+    "tasteEmpty": "暂时还没有足够的偏好信号",
+    "continueRemaining": "剩余 {minutes} 分钟",
+    "continueUpdatedLabel": "可直接续播"
   },
   "curated": {
     "title": "萃取帧",

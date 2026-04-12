@@ -109,15 +109,18 @@ const currentMovie = computed(() => {
 
 const currentMovieId = computed(() => currentMovie.value?.id)
 const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
+const isHomeRoute = computed(() => route.name === "home")
 /** 回收站不显示资料库顶栏搜索 */
 const showLibraryBrowseSearch = computed(
   () => isLibraryRoute.value && resolveLibraryMode(route) !== "trash",
 )
 const isActorsRoute = computed(() => route.name === "actors")
-const isPrimaryBrowseRoute = computed(() => isLibraryRoute.value || isActorsRoute.value)
+const isPrimaryBrowseRoute = computed(
+  () => isHomeRoute.value || isLibraryRoute.value || isActorsRoute.value,
+)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const useFlushWorkspaceFrame = computed(() =>
-  ["library", "favorites", "tags", "trash", "history", "curated-frames"].includes(
+  ["home", "library", "favorites", "tags", "trash", "history", "curated-frames"].includes(
     String(route.name ?? ""),
   ),
 )

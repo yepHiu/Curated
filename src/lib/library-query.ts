@@ -51,7 +51,7 @@ export function isLibraryBrowseRoute(
   }
   const parts = route.path.replace(/\/+$/, "").split("/").filter(Boolean)
   if (parts.length === 0) {
-    return true
+    return false
   }
   return isLibraryMode(parts[parts.length - 1]!)
 }

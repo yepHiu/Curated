@@ -13,6 +13,7 @@ const props = defineProps<{
   entry: PlaybackProgressEntry
   batchMode?: boolean
   selected?: boolean
+  showRemoveAction?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -85,7 +86,7 @@ const actorsLine = computed(() => {
           </label>
 
           <Button
-            v-if="!props.batchMode"
+            v-if="!props.batchMode && props.showRemoveAction !== false"
             type="button"
             variant="ghost"
             size="icon"

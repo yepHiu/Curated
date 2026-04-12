@@ -84,6 +84,7 @@ describe("navigation intent helpers", () => {
   })
 
   it("parses explicit and legacy back-target query semantics", () => {
+    expect(getNavigationBackTarget({ back: "home" })).toBe("home")
     expect(getNavigationBackTarget({ back: "browse" })).toBe("browse")
     expect(getNavigationBackTarget({ from: "history" })).toBe("history")
     expect(getNavigationBackTarget({ from: "curated-frames" })).toBe("curated-frames")
@@ -151,6 +152,19 @@ describe("navigation intent helpers", () => {
       resolveNavigationBackLink(
         {
           name: "player",
+          query: { back: "home" },
+        },
+        "movie-1",
+      ),
+    ).toEqual({
+      labelKey: "shell.backHome",
+      to: { name: "home" },
+    })
+
+    expect(
+      resolveNavigationBackLink(
+        {
+          name: "player",
           query: { back: "history" },
         },
         "movie-1",
@@ -181,6 +195,21 @@ describe("navigation intent helpers", () => {
           selected: "movie-1",
         },
       },
+    })
+
+    expect(
+      resolveNavigationBackLink(
+        {
+          name: "detail",
+          query: {
+            back: "home",
+          },
+        },
+        "movie-1",
+      ),
+    ).toEqual({
+      labelKey: "shell.backHome",
+      to: { name: "home" },
     })
   })
 })
