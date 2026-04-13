@@ -17,6 +17,16 @@ describe("mockLibraryService.patchPlayerSettings", () => {
 })
 
 describe("mockLibraryService", () => {
+  it("tracks launch-at-login in local mock state while remaining unsupported", async () => {
+    expect(mockLibraryService.launchAtLogin.value).toBe(false)
+    expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)
+
+    await mockLibraryService.setLaunchAtLogin(true)
+
+    expect(mockLibraryService.launchAtLogin.value).toBe(true)
+    expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)
+  })
+
   it("ensureMovieCached resolves (mock is fully in-memory)", async () => {
     await expect(mockLibraryService.ensureMovieCached("any-id")).resolves.toBeUndefined()
   })

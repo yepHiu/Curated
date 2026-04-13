@@ -46,6 +46,8 @@ const organizeLibraryMock = ref(false)
 const extendedLibraryImportMock = ref(false)
 const autoLibraryWatchMock = ref(true)
 const autoActorProfileScrapeMock = ref(false)
+const launchAtLoginMock = ref(false)
+const launchAtLoginSupportedMock = ref(false)
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
@@ -432,6 +434,8 @@ export const mockLibraryService: LibraryService = {
   extendedLibraryImport: computed(() => extendedLibraryImportMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
+  launchAtLogin: computed(() => launchAtLoginMock.value),
+  launchAtLoginSupported: computed(() => launchAtLoginSupportedMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
@@ -543,6 +547,10 @@ export const mockLibraryService: LibraryService = {
 
   async setAutoActorProfileScrape(value: boolean) {
     autoActorProfileScrapeMock.value = value
+  },
+
+  async setLaunchAtLogin(value: boolean) {
+    launchAtLoginMock.value = value
   },
 
   async setMetadataMovieProvider(name: string) {

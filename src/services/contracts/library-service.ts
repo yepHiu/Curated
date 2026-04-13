@@ -40,6 +40,9 @@ export interface LibraryService {
   setAutoLibraryWatch(value: boolean): Promise<void>
   autoActorProfileScrape: ComputedRef<boolean>
   setAutoActorProfileScrape(value: boolean): Promise<void>
+  launchAtLogin: ComputedRef<boolean>
+  launchAtLoginSupported: ComputedRef<boolean>
+  setLaunchAtLogin(value: boolean): Promise<void>
   /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
   metadataMovieProvider: ComputedRef<string>
   metadataMovieProviders: ComputedRef<readonly string[]>

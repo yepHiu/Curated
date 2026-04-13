@@ -37,6 +37,8 @@ const organizeLibraryState = ref(true)
 const extendedLibraryImportState = ref(false)
 const autoLibraryWatchState = ref(true)
 const autoActorProfileScrapeState = ref(false)
+const launchAtLoginState = ref(false)
+const launchAtLoginSupportedState = ref(false)
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
@@ -66,6 +68,7 @@ let organizeLibrarySaveSeq = 0
 let extendedLibraryImportSaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
 let autoActorProfileScrapeSaveSeq = 0
+let launchAtLoginSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
@@ -285,6 +288,8 @@ async function refreshLibraryPathsFromApi() {
     extendedLibraryImportState.value = Boolean(settings.extendedLibraryImport)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
+    launchAtLoginState.value = Boolean(settings.launchAtLogin)
+    launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
     applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
@@ -312,6 +317,8 @@ function createWebLibraryService(): LibraryService {
     extendedLibraryImport: computed(() => extendedLibraryImportState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
+    launchAtLogin: computed(() => launchAtLoginState.value),
+    launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
@@ -507,6 +514,27 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === autoActorProfileScrapeSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async setLaunchAtLogin(value: boolean) {
+      const seq = ++launchAtLoginSaveSeq
+      launchAtLoginState.value = value
+      try {
+        const next = await api.patchSettings({ launchAtLogin: value })
+        if (seq === launchAtLoginSaveSeq) {
+          launchAtLoginState.value = Boolean(next.launchAtLogin)
+          launchAtLoginSupportedState.value = Boolean(next.launchAtLoginSupported)
+        }
+      } catch (err) {
+        if (seq === launchAtLoginSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {

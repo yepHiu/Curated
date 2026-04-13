@@ -52,6 +52,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Power,
   RefreshCw,
   ScanSearch,
   Sparkles,
@@ -270,6 +271,8 @@ const autoLibraryWatchSaving = ref(false)
 const autoLibraryWatchError = ref("")
 const autoActorProfileScrapeSaving = ref(false)
 const autoActorProfileScrapeError = ref("")
+const launchAtLoginSaving = ref(false)
+const launchAtLoginError = ref("")
 const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
@@ -798,6 +801,8 @@ const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
 const extendedLibraryImport = computed(() => libraryService.extendedLibraryImport.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
 const autoActorProfileScrape = computed(() => libraryService.autoActorProfileScrape.value)
+const launchAtLogin = computed(() => libraryService.launchAtLogin.value)
+const launchAtLoginSupported = computed(() => libraryService.launchAtLoginSupported.value)
 
 const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
 const metadataMovieProviders = computed(() => [...libraryService.metadataMovieProviders.value])
@@ -847,6 +852,14 @@ const metadataMovieChainError = ref("")
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const viteMode = import.meta.env.MODE
 const isViteDev = import.meta.env.DEV
+const launchAtLoginDisabled = computed(
+  () => !useWebApi || (!launchAtLoginSupported.value && !launchAtLogin.value),
+)
+const launchAtLoginUnavailableHint = computed(() => {
+  if (!useWebApi) return t("settings.launchAtLoginMockHint")
+  if (!launchAtLoginSupported.value) return t("settings.launchAtLoginUnsupportedHint")
+  return ""
+})
 const aboutHealth = ref<HealthDTO | null>(null)
 const aboutHealthLoading = ref(false)
 const aboutHealthError = ref("")
@@ -1535,6 +1548,27 @@ async function onAutoActorProfileScrapeChange(next: boolean) {
   }
 }
 
+async function onLaunchAtLoginChange(next: boolean) {
+  launchAtLoginError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      launchAtLoginSaving.value = true
+      try {
+        await libraryService.setLaunchAtLogin(next)
+      } finally {
+        launchAtLoginSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] launch-at-login toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      launchAtLoginError.value = err.apiError.message
+    } else {
+      launchAtLoginError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
 async function onMetadataMovieModeAuto() {
   if (metadataMovieModeUi.value === "auto") return
   metadataMovieError.value = ""
@@ -1858,6 +1892,63 @@ async function runMetadataRefreshForSelected() {
             </SelectContent>
           </Select>
         </div>
+      </CardContent>
+    </Card>
+    </div>
+    <div class="break-inside-avoid">
+    <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
+      <CardHeader class="space-y-3 pb-2">
+        <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Power class="size-4" />
+          </span>
+          {{ t("settings.launchAtLoginTitle") }}
+        </CardTitle>
+        <CardDescription
+          class="text-xs leading-relaxed text-pretty text-muted-foreground"
+        >
+          {{ t("settings.launchAtLoginDesc") }}
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-3 pt-2">
+        <div
+          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          :aria-busy="launchAtLoginSaving"
+        >
+          <div class="min-w-0 space-y-1">
+            <p class="text-sm font-medium text-foreground">
+              {{ t("settings.launchAtLoginSwitch") }}
+            </p>
+            <p class="text-xs leading-relaxed text-muted-foreground">
+              {{ t("settings.launchAtLoginHint") }}
+            </p>
+            <p
+              v-if="launchAtLoginSaving"
+              class="text-xs text-muted-foreground motion-safe:animate-pulse"
+            >
+              {{ t("settings.launchAtLoginSyncing") }}
+            </p>
+            <p
+              v-else-if="launchAtLoginUnavailableHint"
+              class="text-xs leading-relaxed text-muted-foreground"
+            >
+              {{ launchAtLoginUnavailableHint }}
+            </p>
+          </div>
+          <Switch
+            class="motion-safe:transition-colors motion-safe:duration-200"
+            :model-value="launchAtLogin"
+            :disabled="launchAtLoginDisabled"
+            :aria-label="t('settings.launchAtLoginSwitch')"
+            @update:model-value="onLaunchAtLoginChange"
+          />
+        </div>
+        <p v-if="launchAtLoginError" class="text-sm text-destructive">
+          {{ launchAtLoginError }}
+        </p>
       </CardContent>
     </Card>
     </div>
