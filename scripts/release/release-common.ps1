@@ -89,7 +89,7 @@ function Resolve-ReleaseVersion {
 
     [string]$Version,
 
-    [string]$VersionFile = "release/version.json"
+    [string]$VersionFile = "scripts/release/version.json"
   )
 
   if (-not [string]::IsNullOrWhiteSpace($Version)) {
@@ -123,7 +123,7 @@ function Set-ReleaseVersionBase {
     [Parameter(Mandatory = $true)]
     [int]$Minor,
 
-    [string]$VersionFile = "release/version.json"
+    [string]$VersionFile = "scripts/release/version.json"
   )
 
   $versionFilePath = Resolve-ReleasePath -RepoRoot $RepoRoot -PathValue $VersionFile

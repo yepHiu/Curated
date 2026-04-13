@@ -6,7 +6,7 @@ param(
   [Parameter(Mandatory = $true)]
   [int]$Minor,
 
-  [string]$VersionFile = "release/version.json"
+  [string]$VersionFile = "scripts/release/version.json"
 )
 
 $ErrorActionPreference = "Stop"

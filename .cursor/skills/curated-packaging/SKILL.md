@@ -22,7 +22,7 @@ Use this skill only inside this repository. Do not treat it as a global skill or
 
 - Map natural-language packaging requests to one of: `publish`, `installer`, `portable`, `preview`, `set-base`.
 - Respect the repository release rules:
-  - `release/version.json` is the only automatic production version source.
+  - `scripts/release/version.json` is the only automatic production version source.
   - `publish` allocates one version once and reuses it for all generated artifacts.
   - `major` and `minor` changes are manual base changes; `patch` is the auto-bump part.
 - Always preview before execution.

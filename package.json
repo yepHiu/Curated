@@ -17,7 +17,7 @@
     "release:portable": "powershell -ExecutionPolicy Bypass -File scripts/release/package-portable.ps1",
     "release:installer": "powershell -ExecutionPolicy Bypass -File scripts/release/package-installer.ps1",
     "release:publish": "powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1",
-    "release:version:show": "node scripts/release/versioning.mjs show --file release/version.json",
+    "release:version:show": "node scripts/release/versioning.mjs show --file scripts/release/version.json",
     "release:version:set-base": "powershell -ExecutionPolicy Bypass -File scripts/release/set-version-base.ps1"
   },
   "dependencies": {

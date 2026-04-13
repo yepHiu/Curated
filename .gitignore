@@ -12,14 +12,12 @@ node_modules
 dist
 dist-ssr
 release/
-!release/
-release/*
-!release/version.json
 scripts/
 !scripts/
 scripts/*
 !scripts/release/
 scripts/release/*
+!scripts/release/version.json
 !scripts/release/assemble-release.ps1
 !scripts/release/build-backend.ps1
 !scripts/release/build-frontend.ps1
@@ -41,6 +39,7 @@ scripts/release/windows/*
 backend/runtime/
 .gocache/
 .tmp-go-modcache/
+.tmp/
 # Go coverage / profiles if accidentally written in repo (prefer /tmp or OS temp)
 coverage.out
 coverage.html

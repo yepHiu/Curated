@@ -163,7 +163,7 @@ pnpm release:publish
 
 关键说明：
 
-- 生产包版本号统一由 `release/version.json` 管理。
+- 生产包版本号统一由 `scripts/release/version.json` 管理。
 - 当前版本基线为 `1.1.0`。
 - 发布流程会生成 Windows 发布目录、便携包、安装器脚本和发布清单。
 - Windows 发布构建默认以托盘模式运行，并在 `frontend-dist/` 与可执行文件同目录时直接托管前端。

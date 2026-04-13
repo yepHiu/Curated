@@ -7,7 +7,7 @@
 - 本文件是 Curated 的打包版本台账；后续只要发生实际打包产物输出，就继续在文末追加，不覆盖历史记录。
 - 每次执行整包打包后追加一条记录。
 - 如果一次打包同时生成多个产物，尽量合并在同一条记录中描述。
-- `版本` 填写本次打包实际使用的生产包版本号；该版本号默认来自 `release/version.json` 自动分配的 `major.minor.patch`，而不是 `package.json` 的 `version`。
+- `版本` 填写本次打包实际使用的生产包版本号；该版本号默认来自 `scripts/release/version.json` 自动分配的 `major.minor.patch`，而不是 `package.json` 的 `version`。
 - 当前生产包版本基线为 `1.1.0`。`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1；`major` / `minor` 仅允许通过 `scripts/release/set-version-base.ps1` 人工调整，并在调整时把 `patch` 重置为 `0`。
 - 同一次整机发布中的安装包文件名、便携包文件名、`release/manifest/release.json`、命令参数 `-Version` 与本台账的 `版本` 列必须保持一致。
 - `提交 / 分支` 建议记录打包时的 commit short SHA 与当前分支，便于后续回溯。
@@ -40,3 +40,4 @@
 | 2026-04-12 | 1.1.4 | d58e8d85 / master | release:publish | release/portable/Curated-1.1.4-windows-x64.zip; release/installer/Curated-Setup-1.1.4.exe; release/manifest/release.json | 鎴愬姛 | wujiahui | versionSource=auto-patch; BuildStamp=20260412.100459; portable=versionSource=explicit; installer=versionSource=explicit |
 | 2026-04-13 | 1.2.1 | 8b1ef9b0 / master | release:publish | release/portable/Curated-1.2.1-windows-x64.zip; release/installer/Curated-Setup-1.2.1.exe; release/manifest/release.json | 鎴愬姛 | wujiahui | versionSource=auto-patch; BuildStamp=20260412.173621; portable=versionSource=explicit; installer=versionSource=explicit |
 | 2026-04-13 | 1.2.1 | 8b1ef9b0 / master | release:installer | release/installer/Curated-Setup-1.2.1.exe | 鎴愬姛 | wujiahui | versionSource=explicit |
+| 2026-04-13 | 1.2.2 | cacfa022 / master | release:publish | release/portable/Curated-1.2.2-windows-x64.zip; release/installer/Curated-Setup-1.2.2.exe; release/manifest/release.json | 鎴愬姛 | wujiahui | versionSource=auto-patch; BuildStamp=20260412.180713; portable=versionSource=explicit; installer=versionSource=explicit |

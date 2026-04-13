@@ -15,7 +15,7 @@ The user-visible requirement is that the production package can show the install
 
 - About currently shows only backend health `version` plus `channel`.
 - Backend health `version` is the build stamp (`YYYYMMDD.HHMMSS`) or fallback build metadata.
-- Release packaging already has a single authoritative package version source: `release/version.json`.
+- Release packaging already has a single authoritative package version source: `scripts/release/version.json`.
 - Backend release builds currently do not embed that package version into the binary.
 
 ## Decision

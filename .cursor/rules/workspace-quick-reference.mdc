@@ -27,7 +27,7 @@ alwaysApply: true
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。对外接口说明统一更新 `API.md`，不要把完整 API 表重新写回 README。
 - **改 README 内容**：若变更用户可见能力、命令入口或公开说明，默认同步检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 三份文档是否需要一起更新。
 - **记录打包版本**：每次执行 `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 并实际尝试产出便携包 / 安装包 / 发布清单后，脚本都必须自动向 `docs/2026-04-02-package-build-history.md` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
-- **整机安装包版本规则**：生产包版本的唯一自动化来源是 `release/version.json`。当前基线为 `1.1.0`；`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1。`major` / `minor` 仅允许人工通过 `scripts/release/set-version-base.ps1` 调整，调整时必须把 `patch` 归零。安装包文件名、便携包文件名、`release/manifest/release.json` 与台账记录必须使用同一版本号。
+- **整机安装包版本规则**：生产包版本的唯一自动化来源是 `scripts/release/version.json`。当前基线为 `1.1.0`；`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1。`major` / `minor` 仅允许人工通过 `scripts/release/set-version-base.ps1` 调整，调整时必须把 `patch` 归零。安装包文件名、便携包文件名、`release/manifest/release.json` 与台账记录必须使用同一版本号。
 - **版本辅助命令**：查看当前生产包版本基线用 `pnpm release:version:show`；手动切换到新的 `major.minor.0` 用 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`。
 
 ## 规则索引

@@ -8,7 +8,7 @@ param(
 
   [string]$TemplatePath = "scripts/release/windows/Curated.iss.tpl",
 
-  [string]$VersionFile = "release/version.json",
+  [string]$VersionFile = "scripts/release/version.json",
 
   [string]$HistoryPath = "docs/2026-04-02-package-build-history.md",
 

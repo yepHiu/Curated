@@ -26,7 +26,7 @@ import (
 var BuildStamp = ""
 
 // InstallerVersion is an optional link-time override for the packaged release version
-// (for example, the version allocated from release/version.json during publish).
+// (for example, the version allocated from scripts/release/version.json during publish).
 var InstallerVersion = ""
 
 var (

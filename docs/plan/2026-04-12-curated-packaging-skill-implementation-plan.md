@@ -89,7 +89,7 @@ Use this skill only inside the Curated repository.
 
 ## Version Rules
 
-- Read `release/version.json` as the only automatic product-version source.
+- Read `scripts/release/version.json` as the only automatic product-version source.
 - Respect the current `major.minor.patch` rules already implemented in `scripts/release/`.
 - Do not invent a parallel versioning system.
 - `publish` must allocate one version once and reuse it for all artifacts.
@@ -628,7 +628,7 @@ Check:
 - the skill is repo-local only
 - the skill supports natural-language packaging requests
 - the skill previews before execution
-- the skill respects `release/version.json`
+- the skill respects `scripts/release/version.json`
 - the skill does not allocate two versions for `publish`
 
 If any of those are missing, update the skill or scripts before moving on.

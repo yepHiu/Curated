@@ -163,7 +163,7 @@ pnpm release:publish
 
 Key notes:
 
-- Production package versioning is owned by `release/version.json`.
+- Production package versioning is owned by `scripts/release/version.json`.
 - The current base line is `1.1.0`.
 - Release packaging assembles a Windows-oriented staging directory, portable zip, installer script, and release manifest.
 - Windows release binaries default to tray mode and can host the built frontend locally when `frontend-dist/` is present beside the executable.

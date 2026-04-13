@@ -28,7 +28,7 @@
 
 ### 1.1.1 当前生效的生产包版本规则（2026-04-12）
 
-- 生产包版本的唯一自动化来源是 `release/version.json`，当前基线为 `1.1.0`。
+- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.1.0`。
 - `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动把 `patch` 加 1。
 - `pnpm release:publish` 只在入口处分配一次新版本，再把同一个版本号传给便携包、安装包与 `release/manifest/release.json`，避免一轮整机发布消耗多个 patch。
 - `major` / `minor` 只允许人工调整，命令为 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`；调整时必须把 `patch` 重置为 `0`。
