@@ -8,6 +8,7 @@ alwaysApply: true
 ## 一键心智模型
 
 - **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
+- **编码约束**：写入 `.cursor/rules/*.mdc`、`docs/plan/*.md`、项目记忆类 Markdown 与打包历史等中文文档时，必须显式使用 **UTF-8** 编码，禁止依赖系统默认编码。
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
 - **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**、健康名 **`curated-dev`**；Windows 开发构建必须产出 **`backend/runtime/curated-dev.exe`**，不要生成或保留与生产包同名的 `curated.exe`，以免和正式安装版后端冲突；**`-tags release` 打包**默认 **:8081**、健康名 **`curated`**（Go 模块名 **`curated-backend`**）。
 - **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
