@@ -348,7 +348,11 @@ type SettingsDTO struct {
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
-	AutoActorProfileScrape bool     `json:"autoActorProfileScrape"`
+	AutoActorProfileScrape bool `json:"autoActorProfileScrape"`
+	// LaunchAtLogin: when true, Curated registers a current-user login autostart entry and starts silently in tray mode.
+	LaunchAtLogin bool `json:"launchAtLogin"`
+	// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
+	LaunchAtLoginSupported bool     `json:"launchAtLoginSupported"`
 	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
 	MetadataMovieProviders []string `json:"metadataMovieProviders"`
 	// MetadataMovieProviderChain: ordered provider priority list (may be non-empty while UI mode is auto/specified).
@@ -408,6 +412,7 @@ type PatchSettingsRequest struct {
 	ExtendedLibraryImport  *bool                   `json:"extendedLibraryImport,omitempty"`
 	AutoLibraryWatch       *bool                   `json:"autoLibraryWatch,omitempty"`
 	AutoActorProfileScrape *bool                   `json:"autoActorProfileScrape,omitempty"`
+	LaunchAtLogin          *bool                   `json:"launchAtLogin,omitempty"`
 	Player                 *PatchPlayerSettingsDTO `json:"player,omitempty"`
 	MetadataMovieProvider  *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).

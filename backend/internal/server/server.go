@@ -107,6 +107,12 @@ type PlayerSettingsController interface {
 	SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error
 }
 
+type LaunchAtLoginController interface {
+	LaunchAtLogin() bool
+	LaunchAtLoginSupported() bool
+	SetLaunchAtLogin(v bool) error
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
@@ -139,6 +145,7 @@ type Handler struct {
 	extendedLibraryImportCtl  ExtendedLibraryImportController
 	autoLibraryWatchCtl       AutoLibraryWatchController
 	autoActorProfileScrapeCtl AutoActorProfileScrapeController
+	launchAtLoginCtl          LaunchAtLoginController
 	metadataScrapeCtl         MetadataScrapeSettings
 	providerHealthChecker     ProviderHealthChecker
 	proxyCtl                  ProxyController
@@ -162,6 +169,7 @@ type Deps struct {
 	ExtendedLibraryImportCtl  ExtendedLibraryImportController
 	AutoLibraryWatchCtl       AutoLibraryWatchController
 	AutoActorProfileScrapeCtl AutoActorProfileScrapeController
+	LaunchAtLoginCtl          LaunchAtLoginController
 	MetadataScrapeCtl         MetadataScrapeSettings
 	ProviderHealthChecker     ProviderHealthChecker
 	ProxyCtl                  ProxyController
@@ -186,6 +194,7 @@ func NewHandler(deps Deps) *Handler {
 		extendedLibraryImportCtl:  deps.ExtendedLibraryImportCtl,
 		autoLibraryWatchCtl:       deps.AutoLibraryWatchCtl,
 		autoActorProfileScrapeCtl: deps.AutoActorProfileScrapeCtl,
+		launchAtLoginCtl:          deps.LaunchAtLoginCtl,
 		metadataScrapeCtl:         deps.MetadataScrapeCtl,
 		providerHealthChecker:     deps.ProviderHealthChecker,
 		proxyCtl:                  deps.ProxyCtl,
@@ -1318,6 +1327,12 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.autoActorProfileScrapeCtl != nil {
 		autoActorProfileScrape = h.autoActorProfileScrapeCtl.AutoActorProfileScrape()
 	}
+	launchAtLogin := h.cfg.LaunchAtLogin
+	launchAtLoginSupported := false
+	if h.launchAtLoginCtl != nil {
+		launchAtLogin = h.launchAtLoginCtl.LaunchAtLogin()
+		launchAtLoginSupported = h.launchAtLoginCtl.LaunchAtLoginSupported()
+	}
 	extImp := h.cfg.ExtendedLibraryImport
 	if h.extendedLibraryImportCtl != nil {
 		extImp = h.extendedLibraryImportCtl.ExtendedLibraryImport()
@@ -1339,6 +1354,8 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		ExtendedLibraryImport:  extImp,
 		AutoLibraryWatch:       autoWatch,
 		AutoActorProfileScrape: autoActorProfileScrape,
+		LaunchAtLogin:          launchAtLogin,
+		LaunchAtLoginSupported: launchAtLoginSupported,
 		MetadataMovieProviders: []string{},
 	}
 	if strings.TrimSpace(dto.Player.NativePlayerCommand) == "" {
@@ -1417,7 +1434,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1431,7 +1448,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1486,6 +1503,24 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		if err := h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(*body.AutoActorProfileScrape); err != nil {
 			if h.logger != nil {
 				h.logger.Warn("failed to persist autoActorProfileScrape", zap.Error(err))
+			}
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+			return
+		}
+	}
+
+	if body.LaunchAtLogin != nil {
+		if h.launchAtLoginCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "launch at login settings not available")
+			return
+		}
+		if *body.LaunchAtLogin && !h.launchAtLoginCtl.LaunchAtLoginSupported() {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "launch at login is not supported in this runtime")
+			return
+		}
+		if err := h.launchAtLoginCtl.SetLaunchAtLogin(*body.LaunchAtLogin); err != nil {
+			if h.logger != nil {
+				h.logger.Warn("failed to persist launchAtLogin", zap.Error(err))
 			}
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
 			return

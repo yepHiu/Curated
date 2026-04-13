@@ -31,6 +31,8 @@ type Config struct {
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, successful movie metadata scrapes may enqueue missing actor profile scrapes. Persisted in library-config.cfg and default-off to avoid surprise outbound requests.
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape,omitempty"`
+	// LaunchAtLogin persists the Windows login autostart preference in library-config.cfg. Default false.
+	LaunchAtLogin bool `json:"launchAtLogin,omitempty"`
 	// ExtendedLibraryImport: first scan on a newly added library root may run curated/external layout detection (library-config.cfg). Default false for zero impact on existing libraries.
 	ExtendedLibraryImport bool `json:"extendedLibraryImport,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
@@ -161,6 +163,7 @@ func Default() Config {
 		},
 		OrganizeLibrary:  true,
 		AutoLibraryWatch: true,
+		LaunchAtLogin:    false,
 	}
 }
 

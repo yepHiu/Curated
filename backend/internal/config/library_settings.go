@@ -64,6 +64,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.AutoActorProfileScrape = b
 	}
+	if v, ok := m["launchAtLogin"]; ok {
+		b, err := parseJSONBool(v, "launchAtLogin")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.LaunchAtLogin = b
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

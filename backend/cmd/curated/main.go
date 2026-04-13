@@ -29,6 +29,18 @@ import (
 	"curated-backend/internal/version"
 )
 
+type trayModeOptions struct {
+	silentInitialBrowser bool
+}
+
+var (
+	acquireSingleInstanceFn = desktop.AcquireSingleInstance
+	runHTTPFn               = runHTTP
+	waitForServerOrExitFn   = waitForServerOrExit
+	runTrayFn               = desktop.RunTray
+	openURLFn               = shellopen.OpenURL
+)
+
 type bootstrap struct {
 	cfg        config.Config
 	logger     *zap.Logger
@@ -45,6 +57,7 @@ func main() {
 
 	configPath := flag.String("config", "", "Path to backend config file")
 	mode := flag.String("mode", defaultMode, "Run mode: http, stdio, both, or tray")
+	autostart := flag.Bool("autostart", false, "Internal flag for silent login autostart")
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -75,7 +88,7 @@ func main() {
 			boot.logger.Fatal("backend exited with error", logging.Error(err))
 		}
 	case "tray":
-		if err := runTrayMode(ctx, cancel, boot); err != nil && !errors.Is(err, context.Canceled) {
+		if err := runTrayMode(ctx, cancel, boot, trayModeOptions{silentInitialBrowser: *autostart}); err != nil && !errors.Is(err, context.Canceled) {
 			desktop.ShowErrorDialog("Curated startup failed", err.Error())
 			boot.logger.Fatal("tray mode error", logging.Error(err))
 		}
@@ -178,8 +191,8 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 	return server.ListenAndServe(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger)
 }
 
-func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *bootstrap) error {
-	lock, primary, err := desktop.AcquireSingleInstance(version.TrayMutexName())
+func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *bootstrap, opts trayModeOptions) error {
+	lock, primary, err := acquireSingleInstanceFn(version.TrayMutexName())
 	if err != nil {
 		return fmt.Errorf("single instance: %w", err)
 	}
@@ -189,7 +202,7 @@ func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *boo
 
 	baseURL := desktop.ResolveBaseURL(boot.cfg.HttpAddr)
 	if !primary {
-		return shellopen.OpenURL(context.Background(), baseURL)
+		return openURLFn(context.Background(), baseURL)
 	}
 
 	serverCtx, serverCancel := context.WithCancel(parentCtx)
@@ -197,17 +210,17 @@ func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *boo
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		serverErrCh <- runHTTP(serverCtx, boot)
+		serverErrCh <- runHTTPFn(serverCtx, boot)
 	}()
 
 	readyCtx, readyCancel := context.WithTimeout(parentCtx, 15*time.Second)
 	defer readyCancel()
-	if err := waitForServerOrExit(readyCtx, serverErrCh, baseURL); err != nil {
+	if err := waitForServerOrExitFn(readyCtx, serverErrCh, baseURL); err != nil {
 		serverCancel()
 		return err
 	}
 
-	if err := desktop.RunTray(parentCtx, desktop.TrayOptions{
+	if err := runTrayFn(parentCtx, desktop.TrayOptions{
 		Logger:      boot.logger,
 		Config:      boot.cfg,
 		OpenURL:     baseURL,
@@ -222,8 +235,10 @@ func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *boo
 		return err
 	}
 
-	if err := shellopen.OpenURL(context.Background(), baseURL); err != nil && boot.logger != nil {
-		boot.logger.Warn("tray: initial browser launch failed", zap.Error(err))
+	if !opts.silentInitialBrowser {
+		if err := openURLFn(context.Background(), baseURL); err != nil && boot.logger != nil {
+			boot.logger.Warn("tray: initial browser launch failed", zap.Error(err))
+		}
 	}
 
 	select {
@@ -255,7 +270,7 @@ func waitForServerOrExit(ctx context.Context, serverErrCh <-chan error, baseURL 
 		}
 		if isAddrInUseError(err) {
 			if ok := isExistingCuratedServer(ctx, baseURL); ok {
-				if openErr := shellopen.OpenURL(context.Background(), baseURL); openErr != nil {
+				if openErr := openURLFn(context.Background(), baseURL); openErr != nil {
 					return openErr
 				}
 				return nil

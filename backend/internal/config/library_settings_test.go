@@ -25,6 +25,17 @@ func TestMergeLibrarySettingsFile_MissingFile_NoChangeToDefault(t *testing.T) {
 	if !cfg.AutoLibraryWatch {
 		t.Fatal("expected AutoLibraryWatch still true (default)")
 	}
+	if cfg.LaunchAtLogin {
+		t.Fatal("expected LaunchAtLogin still false (default)")
+	}
+}
+
+func TestDefault_LaunchAtLoginFalse(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if cfg.LaunchAtLogin {
+		t.Fatal("Default() should keep launchAtLogin false")
+	}
 }
 
 func TestDefaultPlayerSettings_DisableHardwareDecodeAndStreamPush(t *testing.T) {
@@ -86,6 +97,22 @@ func TestMergeLibrarySettingsFile_AutoActorProfileScrapeTrue(t *testing.T) {
 	}
 	if !cfg.AutoActorProfileScrape {
 		t.Fatal("expected autoActorProfileScrape true from file")
+	}
+}
+
+func TestMergeLibrarySettingsFile_LaunchAtLoginTrue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"launchAtLogin": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.LaunchAtLogin {
+		t.Fatal("expected launchAtLogin true from file")
 	}
 }
 

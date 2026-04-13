@@ -24,6 +24,7 @@ import (
 	"curated-backend/internal/assets"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/desktop"
 	"curated-backend/internal/devmetrics"
 	"curated-backend/internal/library"
 	"curated-backend/internal/library/moviecode"
@@ -40,6 +41,11 @@ import (
 	"curated-backend/internal/tasks"
 	"curated-backend/internal/version"
 	"curated-backend/internal/webui"
+)
+
+var (
+	launchAtLoginSupportedFn = desktop.LaunchAtLoginSupported
+	syncLaunchAtLoginFn      = desktop.SyncLaunchAtLogin
 )
 
 type App struct {
@@ -67,6 +73,9 @@ type App struct {
 	// autoActorProfileScrape gates scan/import-time actor profile scrape enqueue; persisted to library-config.cfg.
 	autoActorProfileScrape   bool
 	autoActorProfileScrapeMu sync.RWMutex
+	// launchAtLogin persists whether Curated should register Windows login autostart via the current-user Run key.
+	launchAtLogin   bool
+	launchAtLoginMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapePendingMu sync.Mutex
@@ -150,6 +159,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		extendedLibraryImport:         cfg.ExtendedLibraryImport,
 		autoLibraryWatch:              cfg.AutoLibraryWatch,
 		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
+		launchAtLogin:                 cfg.LaunchAtLogin,
 		autoActorProfileScrapePending: make(map[string]struct{}),
 		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
 		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
@@ -313,6 +323,18 @@ func (a *App) AutoActorProfileScrape() bool {
 	return a.autoActorProfileScrape
 }
 
+// LaunchAtLogin reports whether the persisted login autostart preference is enabled.
+func (a *App) LaunchAtLogin() bool {
+	a.launchAtLoginMu.RLock()
+	defer a.launchAtLoginMu.RUnlock()
+	return a.launchAtLogin
+}
+
+// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
+func (a *App) LaunchAtLoginSupported() bool {
+	return launchAtLoginSupportedFn()
+}
+
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
 func (a *App) SetAutoLibraryWatch(v bool) error {
 	path := a.librarySettingsPath
@@ -352,6 +374,42 @@ func (a *App) SetAutoActorProfileScrape(v bool) error {
 	a.autoActorProfileScrape = v
 	a.cfg.AutoActorProfileScrape = v
 	a.autoActorProfileScrapeMu.Unlock()
+	return nil
+}
+
+// SetLaunchAtLogin persists launchAtLogin to library-config.cfg, synchronizes the OS autostart entry,
+// and only updates in-memory state after both steps succeed.
+func (a *App) SetLaunchAtLogin(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if v && !a.LaunchAtLoginSupported() {
+		return fmt.Errorf("launch at login is not supported in this runtime")
+	}
+
+	prev := a.LaunchAtLogin()
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["launchAtLogin"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := syncLaunchAtLoginFn(v); err != nil {
+		revertErr := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+			m["launchAtLogin"] = prev
+			return nil
+		})
+		if revertErr != nil {
+			return fmt.Errorf("sync launch at login: %w (revert settings: %v)", err, revertErr)
+		}
+		return fmt.Errorf("sync launch at login: %w", err)
+	}
+
+	a.launchAtLoginMu.Lock()
+	a.launchAtLogin = v
+	a.cfg.LaunchAtLogin = v
+	a.launchAtLoginMu.Unlock()
 	return nil
 }
 
@@ -2344,6 +2402,7 @@ func (a *App) HTTPHandler() http.Handler {
 		ExtendedLibraryImportCtl:  a,
 		AutoLibraryWatchCtl:       a,
 		AutoActorProfileScrapeCtl: a,
+		LaunchAtLoginCtl:          a,
 		MetadataScrapeCtl:         a,
 		ProviderHealthChecker:     a.scraper,
 		ProxyCtl:                  a,
