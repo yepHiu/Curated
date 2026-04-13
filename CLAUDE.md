@@ -102,6 +102,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`organizeLibrary`** - Whether to organize library files into structured folders
 - **`autoLibraryWatch`** - Whether to auto-scan when files change via fsnotify (default: `true`)
 - **`autoActorProfileScrape`** - Whether successful movie metadata scrapes enqueue missing actor profile scrapes for actors with neither avatar nor summary (default: `false`)
+- **`launchAtLogin`** - Whether Windows login autostart is enabled for the current user (default: `false`); supported runtimes sync `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` to launch `curated(.exe) -mode tray -autostart`, which starts silently in tray mode without opening the browser on that login launch
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
 - **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); empty **`logDir`** means "use the default log directory" instead of disabling file logging: dev builds default to **`backend/runtime/logs`**, while release builds default to **`LOCALAPPDATA\\Curated\\logs`**. **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
@@ -207,7 +208,7 @@ POST   /api/library/paths                   # Add library path
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
-GET    /api/settings                        # Get settings
+GET    /api/settings                        # Get settings (includes launchAtLogin / launchAtLoginSupported)
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
@@ -417,7 +418,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
-- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), and scan/import-time missing actor profile scraping (`autoActorProfileScrape`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
+- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), and Windows login autostart (`launchAtLogin`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)

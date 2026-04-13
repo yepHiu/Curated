@@ -28,7 +28,7 @@
 - 产品组件：`src/components/jav-library`
 - UI 原子组件：`src/components/ui`
 - 主题样式：`src/style.css`
-- 品牌资源：`icon/curated-title-nobg.png` 为 README 顶部带字标志；`icon/Curated-icon-nobg.png` 为应用无字图标源图，已同步到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`
+- 品牌资源：`icon/curated-title-nobg.png` 为 README 顶部带字标志；`icon/curated-icon-rg-dark-pink.png` 为应用无字图标源图，已同步到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`
 - 公开文档：`README.md` 为英文主版，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；根目录 `API.md` 为唯一公开 API 参考文档
 - **UI 设计规范（代码级）**：[`docs/2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
@@ -160,6 +160,6 @@
 - 若 `docs/2026-03-20-jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
 - 打整机安装包或执行正式发布时，版本号必须跟随 `docs/2026-04-02-package-build-history.md` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
 - 调整全局 `Input` 默认样式或主题变量时，同步检查 **§9 表单与文本输入** 与 **`vue-frontend-standards.mdc`** 是否仍一致。
-- 调整品牌资源时，优先以 `icon/` 为设计源：README 使用 `icon/curated-title-nobg.png`，应用图标统一由 `icon/Curated-icon-nobg.png` 派生；至少同步检查 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。
+- 调整品牌资源时，优先以 `icon/` 为设计源：README 使用 `icon/curated-title-nobg.png`，应用图标统一由 `icon/curated-icon-rg-dark-pink.png` 派生；至少同步检查 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。
 - 调整公开接口时，根目录 `API.md` 是唯一对外 API 参考文档；README 三语版只保留 API 概要和链接，不再维护完整接口表。
 - 调整用户可见说明、命令入口或公开功能描述时，默认同步检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 三份文档，避免多语言 README 长期漂移。

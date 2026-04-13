@@ -96,7 +96,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 3. `assemble-release.ps1`
    - 默认输入 `release/backend/curated.exe` 与 `release/frontend/`。
    - 默认输出 `release/Curated/`。
-   - 品牌图标约定：安装包、桌面快捷方式、托盘运行时统一使用 `backend/internal/assets/curated.ico`；该 `.ico` 当前来自 `icon/Curated-icon-nobg.png` 的多尺寸派生版本。README 顶部带字标志使用 `icon/curated-title-nobg.png`，不参与 Windows 可执行图标链路。
+   - 品牌图标约定：安装包、桌面快捷方式、托盘运行时统一使用 `backend/internal/assets/curated.ico`；该 `.ico` 当前来自 `icon/curated-icon-rg-dark-pink.png` 的多尺寸派生版本。README 顶部带字标志使用 `icon/curated-title-nobg.png`，不参与 Windows 可执行图标链路。
    - 目录内容包括：
       - `curated.exe`
       - `curated.ico`
@@ -135,7 +135,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
    - `artifacts[]` 只在对应文件存在时追加：
       - portable zip：记录文件名、绝对路径、SHA256
       - installer exe：记录文件名、绝对路径、SHA256
-   - 若更新品牌图标，先更新 `icon/Curated-icon-nobg.png`，再同步生成/替换 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`，避免 Web 图标、托盘图标、安装包快捷方式图标不一致。
+   - 若更新品牌图标，先更新 `icon/curated-icon-rg-dark-pink.png`，再同步生成/替换 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`，避免 Web 图标、托盘图标、安装包快捷方式图标不一致。
 
 ### 运行态链路
 

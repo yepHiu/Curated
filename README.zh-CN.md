@@ -125,6 +125,7 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `autoLibraryWatch`
+- `launchAtLogin`
 - `proxy`
 - 后端日志目录与保留设置
 
@@ -167,6 +168,7 @@ pnpm release:publish
 - 当前版本基线为 `1.1.0`。
 - 发布流程会生成 Windows 发布目录、便携包、安装器脚本和发布清单。
 - Windows 发布构建默认以托盘模式运行，并在 `frontend-dist/` 与可执行文件同目录时直接托管前端。
+- 设置页可以为当前用户持久化 Windows 开机自启动；这类登录触发的启动会静默进入托盘，不会自动打开浏览器页面。
 
 更多发布资料：
 

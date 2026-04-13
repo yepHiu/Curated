@@ -126,6 +126,7 @@ Common library-level settings include:
 - `metadataMovieStrategy`
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
+- `launchAtLogin`
 - `proxy`
 - backend log directory and retention settings
   Empty `logDir` means "use the default log directory" rather than disabling file logging:
@@ -167,6 +168,7 @@ Key notes:
 - The current base line is `1.1.0`.
 - Release packaging assembles a Windows-oriented staging directory, portable zip, installer script, and release manifest.
 - Windows release binaries default to tray mode and can host the built frontend locally when `frontend-dist/` is present beside the executable.
+- Settings can persist Windows login autostart for the current user; autostart launches Curated silently in tray mode without opening the browser on that login-triggered run.
 
 Additional release references:
 
