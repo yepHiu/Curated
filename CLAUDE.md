@@ -180,6 +180,8 @@ The backend exposes these HTTP endpoints:
 ```
 GET    /api/health                          # Health check (name, version/build stamp, optional installerVersion, channel, databasePath)
 GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
+GET    /api/homepage/recommendations        # Persisted UTC-day homepage hero + recommendation snapshot
+POST   /api/homepage/recommendations/refresh # Force-regenerate the current UTC-day homepage recommendation snapshot
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
 GET    /api/library/movies/{id}             # Get movie detail
 GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam)
@@ -235,6 +237,8 @@ POST   /api/providers/ping-all              # Ping all providers
 **Async Task Pattern:** Long-running operations (scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
 
 **Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged. When **`autoActorProfileScrape`** is true, successful movie metadata scrapes also enqueue `scrape.actor` tasks for actors that still lack both avatar and summary.
+
+**Homepage daily recommendations:** `GET /api/homepage/recommendations` returns the UTC-day snapshot used by the homepage hero and today's recommendations. In Web API mode the backend persists this snapshot in SQLite, the frontend re-fetches automatically when the UTC day key changes so all browsers/devices see the same daily selection, and generation now combines a hard yesterday-exclusion rule, a recent-history exposure penalty, and actor/studio diversity penalties to spread titles more evenly across days. `POST /api/homepage/recommendations/refresh` force-regenerates that same-day snapshot for development verification, and the Settings -> About page exposes a dev-only refresh button when `import.meta.env.DEV` and `VITE_USE_WEB_API=true`.
 
 ## Architecture Boundaries
 

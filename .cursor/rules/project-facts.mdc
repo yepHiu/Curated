@@ -75,3 +75,12 @@ alwaysApply: true
 - `media_assets` now persists source-side diagnostics for downloads: `source_provider`, `referer_url`, `last_http_status`, `last_error`, `last_fetched_at`.
 - Settings / runtime now have a higher-level scrape scheduler field `metadataMovieStrategy` in addition to legacy `metadataMovieScrapeMode`.
 - Provider health responses and task records now include richer machine-readable failure information (`errorCategory`, cooldown and rolling latency state where available).
+
+## 2026-04 Homepage Daily Recommendations
+
+- New backend endpoints: `GET /api/homepage/recommendations` and `POST /api/homepage/recommendations/refresh`.
+- Backend persistence: SQLite table `homepage_daily_recommendations` stores one snapshot per UTC day with `heroMovieIds`, `recommendationMovieIds`, `generatedAt`, and `generationVersion`.
+- Generation behavior: the backend reuses the persisted snapshot for the same UTC day, hard-avoids yesterday's combined hero/recommendation set when inventory allows, applies a recent-history exposure penalty from prior persisted daily snapshots so repeatedly surfaced titles gradually lose rank, and adds actor/studio diversity penalties while assembling the same-day slate. Yesterday is only backfilled after fresh titles are exhausted.
+- Frontend wiring: `HomeView.vue` still builds the homepage portal locally for recent items, continue watching, and taste radar, but `heroMovies` and homepage recommendations are overridden by the backend snapshot when available.
+- Frontend rollover: `src/composables/use-homepage-daily-recommendations.ts` watches the current UTC day key and re-fetches automatically after a day change; if a later refresh fails, the previous snapshot is kept in memory.
+- Dev verification: `SettingsPage.vue` renders `SettingsHomepageDevTools.vue` only in dev mode with Web API enabled, exposing a manual refresh button in Settings -> About that calls `POST /api/homepage/recommendations/refresh`.

@@ -463,6 +463,11 @@
     </tbody>
   </table>
 
+  <h3>6.1 Homepage daily recommendations</h3>
+  <p><code>HomeView</code> 现已通过 <code>use-homepage-daily-recommendations.ts</code> 调用 <code>GET /api/homepage/recommendations</code>。后端会以 UTC 日期为键生成并持久化首页快照，包含 hero 与“今日推荐”的影片 ID 列表；同一天内所有浏览器与设备都会读取同一份 SQLite 快照。</p>
+  <p>前端仍然本地组装 recent、continue watching、taste radar，但会在有快照时覆盖 hero 与推荐位。页面还会监听当前 UTC day key，跨天后自动重拉；若新的请求失败，则保留当前已加载快照，避免首页内容抖动或退回随机本地推荐。</p>
+  <p>同一天的候选挑选除了保留既有评分、收藏、新鲜度和历史曝光惩罚外，还会在 hero 与推荐整套 slate 的装配过程中加入演员与厂牌多样性惩罚，尽量避免单日推荐被同一演员或同一家厂牌主导。开发态下，设置页 About 卡片会显示一个仅在 <code>import.meta.env.DEV</code> 且 <code>VITE_USE_WEB_API=true</code> 时可见的手动刷新按钮，对应调用 <code>POST /api/homepage/recommendations/refresh</code> 以便验证当日快照是否被重算并覆盖。</p>
+
   <h2 id="dev">7. 本地开发与联调</h2>
   <ul>
     <li>后端：<code>cd backend && go run ./cmd/curated</code>，默认 <code>:8080</code>；数据库路径、构建版本与可选安装包版本号可通过 <code>GET /api/health</code> 查看。</li>

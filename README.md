@@ -28,6 +28,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - Local-first architecture with a Vue SPA frontend and a Go HTTP API backend.
 - Real API mode and mock mode for fast UI iteration.
 - SQLite-backed persistence for library data, playback progress, comments, ratings, and curated frames.
+- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, with recent-history exposure penalties plus actor and studio diversity balancing to reduce repeated titles across days.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
 
@@ -81,6 +82,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 - Virtualized poster-grid browsing for large libraries.
 - Favorites, ratings, tags, and library organization controls.
 - Real backend mode and mock adapter mode behind the same frontend service layer.
+- Homepage hero and "today's recommendations" can be sourced from a backend-generated daily snapshot that rolls over automatically on the UTC day boundary and tries to avoid same-day actor/studio clustering.
 
 ### Playback
 

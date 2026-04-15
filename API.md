@@ -92,6 +92,37 @@ Important notes:
 - intended for development diagnostics
 - not a core product-facing endpoint
 
+## Homepage
+
+### `GET /api/homepage/recommendations`
+
+Purpose:
+
+- return the persisted homepage daily recommendation snapshot used by the homepage hero and today's recommendation rail
+
+Important notes:
+
+- the backend uses the current UTC date as the snapshot key
+- the first request for a UTC day generates and persists the snapshot in SQLite; later requests reuse the same result
+- the snapshot contains `heroMovieIds` and `recommendationMovieIds`, plus `dateUtc`, `generatedAt`, and `generationVersion`
+- when enough inventory is available, the backend avoids reusing yesterday's hero and recommendation titles
+- generation also applies a recency-weighted exposure penalty based on persisted snapshots from previous UTC days, so titles that have been shown repeatedly in recent days gradually lose rank
+- the slate builder also applies actor and studio diversity penalties while picking the hero and recommendation set, so the same actors or studios are less likely to dominate one day's slate
+- if inventory is too small, the backend backfills from yesterday only after exhausting fresh titles
+
+### `POST /api/homepage/recommendations/refresh`
+
+Purpose:
+
+- force-regenerate and overwrite the persisted homepage daily recommendation snapshot for the current UTC day
+
+Important notes:
+
+- intended primarily for development and verification workflows
+- returns the same DTO shape as `GET /api/homepage/recommendations`
+- uses the same UTC day key and persistence table, but bypasses reuse of the existing snapshot for that day
+- the frontend exposes this through a development-only button in Settings -> About when running in dev mode with `VITE_USE_WEB_API=true`
+
 ## Movies
 
 ### `GET /api/library/movies`
