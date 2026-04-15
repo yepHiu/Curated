@@ -3,6 +3,7 @@ import type {
   ActorListItemDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  HomepageDailyRecommendationsDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -18,6 +19,8 @@ import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { countCuratedFrames } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
+import { getCurrentUtcDayKey } from "@/lib/current-utc-day-key"
+import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
@@ -518,6 +521,21 @@ export const mockLibraryService: LibraryService = {
       logMaxAgeDays:
         patch.logMaxAgeDays !== undefined ? patch.logMaxAgeDays : prev.logMaxAgeDays,
       logLevel: patch.logLevel !== undefined ? patch.logLevel : prev.logLevel,
+    }
+  },
+
+  async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+    const dateUtc = getCurrentUtcDayKey()
+    const model = buildHomepagePortalModel({
+      movies: moviesState.value,
+      daySeed: dateUtc,
+    })
+    return {
+      dateUtc,
+      generatedAt: `${dateUtc}T00:00:00Z`,
+      generationVersion: "mock-v1",
+      heroMovieIds: model.heroMovies.map((movie) => movie.id),
+      recommendationMovieIds: model.recommendations.map((entry) => entry.movie.id),
     }
   },
 

@@ -106,10 +106,14 @@ import {
   formatAboutInstallerVersion,
 } from "@/lib/about-version"
 import {
+  getCuratedCaptureKeyCode,
   getCuratedFrameSaveMode,
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
+import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
+import SettingsCuratedShortcutSection from "@/components/jav-library/settings/SettingsCuratedShortcutSection.vue"
+import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
@@ -240,6 +244,9 @@ const addPathDialogOpen = ref(false)
 const removePathDialogOpen = ref(false)
 const removePathPending = ref<{ id: string; title: string; path: string } | null>(null)
 const removePathBusy = ref(false)
+const curatedCaptureShortcutLabel = computed(() =>
+  formatCuratedCaptureKeyLabel(getCuratedCaptureKeyCode()),
+)
 const newPath = ref("")
 const newPathTitle = ref("")
 const addBusy = ref(false)
@@ -3285,7 +3292,7 @@ async function runMetadataRefreshForSelected() {
                 <kbd
                   class="pointer-events-none inline-flex h-7 min-w-7 select-none items-center justify-center rounded-lg border border-border bg-muted px-2 font-mono text-xs font-semibold text-foreground shadow-sm"
                 >
-                  C
+                  {{ curatedCaptureShortcutLabel }}
                 </kbd>
                 <span class="font-normal text-muted-foreground">{{
                   t("settings.curatedCardOr")
@@ -3389,6 +3396,8 @@ async function runMetadataRefreshForSelected() {
                 </span>
               </label>
             </fieldset>
+
+            <SettingsCuratedShortcutSection />
 
             <div
               v-if="curatedSaveMode === 'directory' && supportsFileSystemAccess()"
@@ -3718,6 +3727,10 @@ async function runMetadataRefreshForSelected() {
               </p>
             </div>
           </template>
+          <SettingsHomepageDevTools
+            v-if="isViteDev && useWebApi"
+            @refreshed="void loadAboutHealth()"
+          />
         </CardContent>
       </Card>
     </div>

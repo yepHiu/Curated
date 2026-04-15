@@ -516,3 +516,11 @@ export interface PostCuratedFramesExportBody {
 export interface PlayedMoviesListDTO {
   movieIds: string[]
 }
+
+export interface HomepageDailyRecommendationsDTO {
+  dateUtc: string
+  generatedAt: string
+  generationVersion?: string
+  heroMovieIds: string[]
+  recommendationMovieIds: string[]
+}

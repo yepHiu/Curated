@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils"
 import { computed, ref } from "vue"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import HomeView from "./HomeView.vue"
 import type { Movie } from "@/domain/movie/types"
 
@@ -40,9 +40,20 @@ const mockMovies = vi.hoisted(() => [
   makeMovie("m7", { rating: 4.2 }),
   makeMovie("m8", { rating: 4.1 }),
   makeMovie("m9", { rating: 4.0 }),
+  makeMovie("m10", { rating: 3.9 }),
+  makeMovie("m11", { rating: 3.8 }),
 ])
 
 const routerPushMock = vi.hoisted(() => vi.fn())
+const homepageSnapshotState = vi.hoisted(() => ({
+  value: null as null | {
+    dateUtc: string
+    generatedAt: string
+    generationVersion?: string
+    heroMovieIds: string[]
+    recommendationMovieIds: string[]
+  },
+}))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -83,6 +94,15 @@ vi.mock("@/lib/playback-progress-storage", () => ({
   playbackProgressRevision: ref(0),
 }))
 
+vi.mock("@/composables/use-homepage-daily-recommendations", () => ({
+  useHomepageDailyRecommendations: () => ({
+    snapshot: homepageSnapshotState,
+    loading: ref(false),
+    error: ref<unknown>(null),
+    refresh: vi.fn(),
+  }),
+}))
+
 vi.mock("@/components/jav-library/MovieCard.vue", () => ({
   default: {
     name: "MovieCard",
@@ -107,6 +127,11 @@ vi.mock("@/components/jav-library/PlaybackHistoryCard.vue", () => ({
 }))
 
 describe("HomeView", () => {
+  beforeEach(() => {
+    routerPushMock.mockReset()
+    homepageSnapshotState.value = null
+  })
+
   it("renders the homepage hero and section rows", () => {
     const wrapper = mount(HomeView)
     const heroFrame = wrapper.get("[data-home-hero-frame]")
@@ -130,6 +155,35 @@ describe("HomeView", () => {
     expect(wrapper.text()).toContain("home.sectionRecommendTitle")
     expect(wrapper.text()).toContain("home.sectionContinueTitle")
     expect(wrapper.findAll(".playback-history-card-stub")).toHaveLength(2)
+  })
+
+  it("prefers backend daily snapshot ids for hero and recommendations", () => {
+    homepageSnapshotState.value = {
+      dateUtc: "2026-04-15",
+      generatedAt: "2026-04-15T00:00:01Z",
+      generationVersion: "v1",
+      heroMovieIds: ["m9", "m8", "m7", "m6", "m5", "m4", "m3", "m2"],
+      recommendationMovieIds: ["m11", "m10", "m1"],
+    }
+
+    const wrapper = mount(HomeView)
+    const portal = wrapper.getComponent({ name: "HomepagePortal" })
+    const model = portal.props("model") as {
+      heroMovies: Movie[]
+      recommendations: { movie: Movie }[]
+    }
+
+    expect(model.heroMovies.map((movie) => movie.id)).toEqual([
+      "m9",
+      "m8",
+      "m7",
+      "m6",
+      "m5",
+      "m4",
+      "m3",
+      "m2",
+    ])
+    expect(model.recommendations.map((entry) => entry.movie.id)).toEqual(["m11", "m10", "m1"])
   })
 
   it("opens library filters from taste radar chips", async () => {

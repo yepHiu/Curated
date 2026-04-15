@@ -31,6 +31,7 @@ import type {
   CuratedFramesListDTO,
   DevPerformanceSummaryDTO,
   HealthDTO,
+  HomepageDailyRecommendationsDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListActorsParams,
@@ -70,6 +71,14 @@ export const api = {
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {
     return httpClient.get<PlayedMoviesListDTO>("/library/played-movies")
+  },
+
+  getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+    return httpClient.get<HomepageDailyRecommendationsDTO>("/homepage/recommendations")
+  },
+
+  refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+    return httpClient.post<HomepageDailyRecommendationsDTO>("/homepage/recommendations/refresh")
   },
 
   recordPlayedMovie(movieId: string): Promise<void> {

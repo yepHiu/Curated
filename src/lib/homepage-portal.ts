@@ -39,11 +39,17 @@ export interface BuildHomepagePortalInput {
   movies: readonly Movie[]
   playbackEntries?: readonly PlaybackProgressEntry[]
   daySeed?: string
+  dailyRecommendations?: HomepageDailyRecommendationsSelection
   heroLimit?: number
   recentLimit?: number
   recommendationLimit?: number
   continueLimit?: number
   tasteLimitPerKind?: number
+}
+
+export interface HomepageDailyRecommendationsSelection {
+  heroMovieIds: readonly string[]
+  recommendationMovieIds: readonly string[]
 }
 
 function stableDateSeed(daySeed?: string): string {
@@ -170,10 +176,99 @@ function topEntries(
     .map(([label, weight]) => ({ kind, label, weight }))
 }
 
+function pickMoviesBySnapshotIds(
+  ids: readonly string[],
+  movieById: ReadonlyMap<string, Movie>,
+  limit: number,
+  excludedIds: Set<string>,
+): Movie[] {
+  const ordered: Movie[] = []
+  for (const rawId of ids) {
+    if (ordered.length >= limit) break
+    const id = rawId.trim()
+    if (!id || excludedIds.has(id)) continue
+    const movie = movieById.get(id)
+    if (!movie) continue
+    ordered.push(movie)
+    excludedIds.add(id)
+  }
+  return ordered
+}
+
+function withHomepageDailyRecommendations(
+  model: HomepagePortalModel,
+  activeMovies: readonly Movie[],
+  selection: HomepageDailyRecommendationsSelection | undefined,
+): HomepagePortalModel {
+  if (!selection) {
+    return model
+  }
+
+  const movieById = new Map(activeMovies.map((movie) => [movie.id, movie] as const))
+  const selectedHeroIds = new Set<string>()
+  const heroMovies = pickMoviesBySnapshotIds(
+    selection.heroMovieIds,
+    movieById,
+    model.heroMovies.length,
+    selectedHeroIds,
+  )
+
+  if (heroMovies.length === 0 && selection.heroMovieIds.length > 0) {
+    heroMovies.push(...model.heroMovies)
+    for (const movie of model.heroMovies) {
+      selectedHeroIds.add(movie.id)
+    }
+  } else {
+    for (const movie of model.heroMovies) {
+      if (heroMovies.length >= model.heroMovies.length) break
+      if (selectedHeroIds.has(movie.id)) continue
+      heroMovies.push(movie)
+      selectedHeroIds.add(movie.id)
+    }
+  }
+
+  const selectedRecommendationIds = new Set(selectedHeroIds)
+  const recommendationMovies = pickMoviesBySnapshotIds(
+    selection.recommendationMovieIds,
+    movieById,
+    model.recommendations.length,
+    selectedRecommendationIds,
+  )
+
+  const fallbackRecommendations = new Map(
+    model.recommendations.map((entry) => [entry.movie.id, entry] as const),
+  )
+  const recommendations: HomepageRecommendationEntry[] = recommendationMovies.map((movie) => (
+    fallbackRecommendations.get(movie.id) ?? {
+      movie,
+      reasons: [],
+      score: movie.rating * 10,
+    }
+  ))
+
+  if (recommendations.length === 0 && selection.recommendationMovieIds.length > 0) {
+    recommendations.push(...model.recommendations)
+  } else {
+    for (const entry of model.recommendations) {
+      if (recommendations.length >= model.recommendations.length) break
+      if (selectedRecommendationIds.has(entry.movie.id)) continue
+      recommendations.push(entry)
+      selectedRecommendationIds.add(entry.movie.id)
+    }
+  }
+
+  return {
+    ...model,
+    heroMovies,
+    recommendations,
+  }
+}
+
 export function buildHomepagePortalModel({
   movies,
   playbackEntries = [],
   daySeed,
+  dailyRecommendations,
   heroLimit = 8,
   recentLimit = 6,
   recommendationLimit = 6,
@@ -276,11 +371,11 @@ export function buildHomepagePortalModel({
     ...topEntries("studio", preference.studios, tasteLimitPerKind),
   ]
 
-  return {
+  return withHomepageDailyRecommendations({
     heroMovies,
     recentMovies,
     recommendations,
     continueWatching,
     tasteRadar,
-  }
+  }, activeMovies, dailyRecommendations)
 }

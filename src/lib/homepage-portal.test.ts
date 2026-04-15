@@ -169,4 +169,26 @@ describe("buildHomepagePortalModel", () => {
     expect(model.recommendations[0]?.movie.id).toBe("matched")
     expect(model.recommendations[0]?.reasons.some((reason) => reason.kind === "actor")).toBe(true)
   })
+
+  it("prefers backend daily snapshot ids for hero and recommendation order", () => {
+    const movies = Array.from({ length: 10 }, (_, index) =>
+      makeMovie(`m${index + 1}`, {
+        rating: 5 - index * 0.1,
+      }),
+    )
+
+    const model = buildHomepagePortalModel({
+      movies,
+      daySeed: "2026-04-15",
+      heroLimit: 4,
+      recommendationLimit: 3,
+      dailyRecommendations: {
+        heroMovieIds: ["m4", "m2", "m8", "m1"],
+        recommendationMovieIds: ["m9", "m6", "m5"],
+      },
+    })
+
+    expect(model.heroMovies.map((movie) => movie.id)).toEqual(["m4", "m2", "m8", "m1"])
+    expect(model.recommendations.map((entry) => entry.movie.id)).toEqual(["m9", "m6", "m5"])
+  })
 })

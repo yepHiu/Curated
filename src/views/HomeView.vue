@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
 import { useRouter } from "vue-router"
 import HomepagePortal from "@/components/jav-library/HomepagePortal.vue"
 import type { HomepageTasteEntry } from "@/lib/homepage-portal"
@@ -12,6 +13,7 @@ import { useLibraryService } from "@/services/library-service"
 
 const libraryService = useLibraryService()
 const router = useRouter()
+const homepageDailyRecommendations = useHomepageDailyRecommendations()
 
 const portalModel = computed(() => {
   void playbackProgressRevision.value
@@ -19,6 +21,7 @@ const portalModel = computed(() => {
   return buildHomepagePortalModel({
     movies: libraryService.movies.value,
     playbackEntries: listSortedByUpdatedDesc(),
+    dailyRecommendations: homepageDailyRecommendations.snapshot.value ?? undefined,
     heroLimit: 8,
   })
 })

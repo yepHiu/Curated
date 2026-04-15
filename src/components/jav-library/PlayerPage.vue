@@ -33,6 +33,7 @@ import {
 } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
+import { getCuratedCaptureKeyCode } from "@/lib/curated-frames/settings-storage"
 import {
   getProgress,
   parseResumeSecondsFromQuery,
@@ -55,6 +56,10 @@ import {
   normalizeNativePlayerPresetForBrowserLaunch,
   resolveNativePlayerBrowserTemplate,
 } from "@/lib/native-player-launch"
+import {
+  formatCuratedCaptureKeyLabel,
+  shouldIgnoreGlobalPlaybackHotkeysForTarget,
+} from "@/lib/player-shortcuts"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -1083,13 +1088,6 @@ function adjustVolume(delta: number) {
   onVolumeSlider([next])
 }
 
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false
-  const tag = el.tagName
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true
-  return el.isContentEditable
-}
-
 function onPlaybackKeydown(e: KeyboardEvent) {
   if (playerContextMenu.value && e.key === "Escape") {
     e.preventDefault()
@@ -1098,7 +1096,7 @@ function onPlaybackKeydown(e: KeyboardEvent) {
   }
   if (!playbackSrc.value) return
   if (e.ctrlKey || e.metaKey || e.altKey) return
-  if (isTypingTarget(e.target)) return
+  if (shouldIgnoreGlobalPlaybackHotkeysForTarget(e.target)) return
 
   /** 快捷键也视为活动，避免仅键盘操作时界面被永久隐藏 */
   onChromePointerActivity()
@@ -1147,11 +1145,11 @@ function onPlaybackKeydown(e: KeyboardEvent) {
         void document.exitFullscreen()
       }
       break
-    case "KeyC":
-      e.preventDefault()
-      void runCuratedCapture()
-      break
     default:
+      if (e.code === getCuratedCaptureKeyCode()) {
+        e.preventDefault()
+        void runCuratedCapture()
+      }
       break
   }
 }
@@ -1859,6 +1857,9 @@ const volumeStatusLabel = computed(() => {
   if (playbackMuted.value) return "Muted"
   return `${Math.round(volumePercent.value)}%`
 })
+const curatedCaptureShortcutLabel = computed(() =>
+  formatCuratedCaptureKeyLabel(getCuratedCaptureKeyCode()),
+)
 
 const currentPlaybackBitrateLabel = computed(() =>
   formatBitrateLabel(
@@ -2378,7 +2379,7 @@ const videoPreloadMode = computed(() =>
             v-if="playbackSrc"
             class="text-center text-[10px] leading-relaxed text-white/40 sm:text-xs"
           >
-            {{ t("player.hintBar", { backward: playbackSeekBackwardStep, forward: playbackSeekForwardStep }) }}
+            {{ t("player.hintBar", { backward: playbackSeekBackwardStep, forward: playbackSeekForwardStep, capture: curatedCaptureShortcutLabel }) }}
           </p>
         </div>
       </div>

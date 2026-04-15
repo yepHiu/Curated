@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
+  HomepageDailyRecommendationsDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -641,6 +642,10 @@ function createWebLibraryService(): LibraryService {
         }
         throw err
       }
+    },
+
+    async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+      return await api.getHomepageDailyRecommendations()
     },
 
     async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
