@@ -617,6 +617,14 @@ type PlayedMoviesListDTO struct {
 	MovieIDs []string `json:"movieIds"`
 }
 
+type HomepageDailyRecommendationsDTO struct {
+	DateUTC                string   `json:"dateUtc"`
+	GeneratedAt            string   `json:"generatedAt"`
+	GenerationVersion      string   `json:"generationVersion,omitempty"`
+	HeroMovieIDs           []string `json:"heroMovieIds"`
+	RecommendationMovieIDs []string `json:"recommendationMovieIds"`
+}
+
 type TaskDTO struct {
 	TaskID        string         `json:"taskId"`
 	Type          string         `json:"type"`

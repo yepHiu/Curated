@@ -2414,6 +2414,7 @@ func (a *App) HTTPHandler() http.Handler {
 		DevPerformanceProvider:    a,
 		PlaybackResolver:          a,
 		NativePlaybackLauncher:    a,
+		HomepageRecommendations:   a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
 }

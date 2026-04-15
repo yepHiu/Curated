@@ -135,6 +135,11 @@ type NativePlaybackLauncher interface {
 	LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error)
 }
 
+type HomepageRecommendationsProvider interface {
+	GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
+	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
+}
+
 type Handler struct {
 	cfg                       config.Config
 	logger                    *zap.Logger
@@ -157,6 +162,7 @@ type Handler struct {
 	devPerformanceProvider    DevPerformanceProvider
 	playbackResolver          PlaybackResolver
 	nativePlaybackLauncher    NativePlaybackLauncher
+	homepageRecommendations   HomepageRecommendationsProvider
 }
 
 type Deps struct {
@@ -181,6 +187,7 @@ type Deps struct {
 	DevPerformanceProvider    DevPerformanceProvider
 	PlaybackResolver          PlaybackResolver
 	NativePlaybackLauncher    NativePlaybackLauncher
+	HomepageRecommendations   HomepageRecommendationsProvider
 }
 
 func NewHandler(deps Deps) *Handler {
@@ -206,6 +213,7 @@ func NewHandler(deps Deps) *Handler {
 		devPerformanceProvider:    deps.DevPerformanceProvider,
 		playbackResolver:          deps.PlaybackResolver,
 		nativePlaybackLauncher:    deps.NativePlaybackLauncher,
+		homepageRecommendations:   deps.HomepageRecommendations,
 	}
 }
 
@@ -214,6 +222,8 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
+	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
+	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
 	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
