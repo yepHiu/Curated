@@ -779,3 +779,287 @@ Windows 安装器建议满足：
 一句话概括：
 
 **程序负责分发，数据目录负责持久化，版本信息贯穿构建、产物和运行时显示。**
+
+## 16. 预览包可行性补充（2026-04-16）
+
+### 16.1 当前状态结论
+
+当前仓库对“预览包”是**部分具备基础，但还没有完整支持**。
+
+已经具备的基础：
+- `-tags release` 构建默认把可写数据放到 **`%LOCALAPPDATA%\Curated`**，即：
+  - `config/library-config.cfg`
+  - `data/curated.db`
+  - `cache/`
+  - `logs/`
+- 这意味着：**只要还是 release 语义的构建，天然就能复用正式版已经存在的数据库、配置和缓存目录**。
+
+当前缺失的部分：
+- 发布脚本当前只有 **`release`** 通道，没有 **`preview`** 通道。
+- 安装器模板当前固定写死：
+  - `AppId={{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}`
+  - `AppName=Curated`
+  - `DefaultDirName={autopf}\Curated`
+  - `AppMutex=Local\Curated.Tray.Singleton`
+- 这表示当前如果直接“再打一份预览安装包”，它不会是一个真正独立的 preview 安装身份，而更像同一个正式版产品的另一份安装产物。
+
+### 16.2 是否能支持
+
+**能支持。**
+
+但要先明确一个边界：你说的“预览包”其实包含两个不同层面的诉求：
+
+1. **安装身份**
+   - 是覆盖正式版安装，还是作为 `Curated Preview` 并存安装。
+2. **数据身份**
+   - 是继续共用 **`%LOCALAPPDATA%\Curated`**，还是使用独立的 preview 数据目录。
+
+### 16.3 三种可选方案
+
+#### 方案 A：预览包覆盖正式版安装，共用正式版数据
+
+特点：
+- 改动最小。
+- 安装器仍沿用同一个 `AppId`、安装目录和快捷方式。
+- 数据继续使用 **`%LOCALAPPDATA%\Curated`**。
+
+优点：
+- 实现成本最低。
+- 升级/回滚路径简单。
+
+缺点：
+- **不能与正式版并存安装。**
+- 用户体验上更像“候选正式版”，不是真正独立的 preview。
+
+#### 方案 B：预览包独立安装，共用正式版数据
+
+特点：
+- 安装器使用独立身份，例如：
+  - `AppId=Curated Preview`
+  - `AppName=Curated Preview`
+  - `DefaultDirName={autopf}\Curated Preview`
+- 但运行时**仍然指向**正式版同一份数据根：
+  - **`%LOCALAPPDATA%\Curated`**
+
+优点：
+- **可以和正式版并存安装。**
+- 预览包可以直接读取现有数据库、配置、缓存，满足“无缝接上正式版数据”的目标。
+- 最符合“预览包是整机包，但又不重新建一套库”的诉求。
+
+缺点：
+- 必须认真处理**并发访问同一份 SQLite / 配置**的问题。
+- 预览包和正式版不能被允许同时运行并同时写同一份数据。
+
+补充约束：
+- 如果 preview 与 release 共用同一份数据目录，建议它们也共用同一把全局互斥锁，或者显式做“跨通道单实例”控制。
+- 否则两个安装实例同时打开同一个 `curated.db`，风险不可接受。
+
+#### 方案 C：预览包独立安装，独立数据目录
+
+特点：
+- 安装身份独立。
+- 数据目录也独立，例如 **`%LOCALAPPDATA%\CuratedPreview`**。
+
+优点：
+- 最安全，互不影响。
+- 不存在共用 SQLite 的运行时竞争。
+
+缺点：
+- **不满足“无缝复用正式版数据库/配置”的核心诉求。**
+
+### 16.4 推荐方案
+
+**推荐方案 B：独立安装身份，共用正式版数据目录。**
+
+这是最符合“预览包是一个可安装的整机包，同时又能直接接上正式版已有数据库和配置”的方案。
+
+但必须附带两个硬约束：
+- **硬约束 1：preview 与 release 不能同时运行。**
+- **硬约束 2：preview 默认不自动接管正式版的自启动、系统集成和默认打开行为。**
+
+### 16.5 为支持方案 B 需要补的实现点
+
+1. **新增打包通道/风味（flavor）**
+   - 当前只有 `release`。
+   - 需要新增一个例如 `preview` 的打包风味，但它的数据目录策略要继续复用 release 的用户数据根。
+
+2. **脚本参数化**
+   - `build-backend.ps1`
+   - `assemble-release.ps1`
+   - `package-installer.ps1`
+   - `publish.ps1`
+   - 这些脚本都需要支持 `-Channel` 或 `-Flavor`，不能再把 `release` 写死。
+
+3. **安装器模板参数化**
+   - `AppId`
+   - `AppName`
+   - `DefaultDirName`
+   - `DefaultGroupName`
+   - 输出文件名
+   - 让 preview 包拥有独立安装身份。
+
+4. **运行时版本/渠道显示**
+   - 当前 `version.Channel` 只有 `dev` / `release`。
+   - 需要新增可显示的 preview 标识，至少让健康检查和 UI 能看出这是 preview 包。
+
+5. **开发态功能开关**
+   - 不能直接把 preview 做成 dev build。
+   - 正确做法应是：**仍然是 production packaging / release-style runtime**，但通过显式的 feature flags 打开部分开发态能力。
+
+6. **共享数据下的互斥策略**
+   - 如果 preview 共用正式版数据目录，建议复用正式版 mutex，或单独增加一个“共享数据根互斥”。
+   - 目标是防止 preview 和 release 双开。
+
+7. **自启动与系统集成策略**
+   - preview 不建议默认写正式版相同的开机自启项。
+   - 是否允许 preview 修改正式版的系统自启配置，需要单独定规则。
+
+### 16.6 一句话结论
+
+**支持，但不能只靠“再打一份 release 安装包”解决。**
+
+如果要满足：
+- 可安装到本机
+- 保留 preview 独立身份
+- 无缝复用正式版数据库与配置
+
+则需要把当前发布体系从“单一 release 通道”扩展为“release / preview 两种 packaging flavor + 共享数据策略 + 跨安装实例互斥策略”。
+
+## 17. 打包历史补充：记录相对上一包的 Git 变更内容（2026-04-16）
+
+### 17.1 目标
+
+在 `docs/2026-04-02-package-build-history.md` 的表格中新增一列：
+
+- `变更内容`
+
+用于记录**本次打包相对于上一条打包记录**之间的 Git 提交历史，直接来源于 `git log --oneline`，不做智能归类、不做自然语言总结。
+
+### 17.2 适用范围
+
+本规则适用于所有会自动写入打包历史的打包类型：
+
+- `release:publish`
+- `release:installer`
+- `release:portable`
+
+也就是说，不区分打包类型；只要脚本调用 `Add-PackageBuildHistoryEntry` 追加台账，就要同时写入 `变更内容`。
+
+### 17.3 对比基线定义
+
+`变更内容` 的生成范围定义为：
+
+- **上界**：当前写入打包历史时的 Git `HEAD`
+- **下界**：打包历史文件中**上一条记录**的 `提交 / 分支` 列里记录的 commit short SHA
+
+等价于执行：
+
+```powershell
+git log --oneline <previous-commit>..<current-commit>
+```
+
+注意点：
+
+- 这里的“上一条记录”指打包历史文件里时间上紧邻当前追加位置的上一行有效记录。
+- **不是**“上一条同类型打包记录”。
+- 这样可以保证在“所有打包类型都写历史”的规则下，对比基线始终唯一且稳定。
+
+### 17.4 写入内容格式
+
+`变更内容` 列直接写 `git log --oneline` 的结果，保留原始提交标题，使用 Markdown 单元格安全编码后写入：
+
+- 多条提交之间使用 `<br>` 换行
+- 不做 `feat/fix/revert/docs` 分类
+- 不额外改写成“新增 / 修改 / 回退”中文摘要
+
+示例：
+
+```text
+abc1234 feat(player): add external player settings<br>
+def5678 fix(release): keep installer close-app behavior<br>
+9876abc docs: update release packaging notes
+```
+
+### 17.5 特殊情况规则
+
+#### A. 同一提交重复打包
+
+如果上一条记录和当前记录指向同一个 commit，则写：
+
+```text
+无代码差异（同一提交重复打包）
+```
+
+#### B. 历史中没有上一条记录
+
+如果当前要写入的是第一条打包记录，没有可对比的上一条记录，则写：
+
+```text
+首条打包记录，无上一包可比对
+```
+
+#### C. 无法解析上一条记录中的 commit
+
+如果上一条记录里的 `提交 / 分支` 列格式异常，或 short SHA 无法在当前仓库解析到真实 commit，则写：
+
+```text
+无法解析上一条打包记录对应 commit
+```
+
+#### D. 范围内没有新提交
+
+如果 `git log --oneline <prev>..<current>` 返回空，等价处理为：
+
+```text
+无代码差异（同一提交重复打包）
+```
+
+### 17.6 文档表头调整
+
+`docs/2026-04-02-package-build-history.md` 的历史表格表头需要从：
+
+```text
+| 日期 | 版本 | 提交 / 分支 | 打包类型 | 产物路径 | 状态 | 操作人 | 备注 |
+```
+
+调整为：
+
+```text
+| 日期 | 版本 | 提交 / 分支 | 打包类型 | 产物路径 | 状态 | 操作人 | 变更内容 | 备注 |
+```
+
+同时需要把已有历史记录补一个占位值，避免 Markdown 表格列数不一致。历史旧记录的 `变更内容` 可统一补为：
+
+```text
+历史记录补齐前未采集
+```
+
+### 17.7 脚本实现边界
+
+实现应集中在 `scripts/release/release-common.ps1` 中，围绕 `Add-PackageBuildHistoryEntry` 补齐，避免把同一套逻辑分散到：
+
+- `publish.ps1`
+- `package-installer.ps1`
+- `package-portable.ps1`
+
+推荐新增两个辅助函数：
+
+- `Get-LastPackageHistoryCommit`
+  - 从历史文件中解析上一条记录的 short SHA
+- `Get-PackageHistoryChangeSummary`
+  - 基于 `git log --oneline <prev>..<head>` 生成要写入 `变更内容` 的文本
+
+然后由 `Add-PackageBuildHistoryEntry` 在最终拼接 Markdown 行时统一写入。
+
+### 17.8 不做的事情
+
+本次规则明确**不做**以下能力：
+
+- 不按 `feat/fix/revert` 自动归类
+- 不生成中文“新增了什么 / 修改了什么 / 回退了什么”的总结句
+- 不按“上一条同类型打包记录”作为比较基线
+- 不跨版本号或 manifest 再做二次推断
+
+目标只保留一个：
+
+**在打包台账中稳定记录“上一包到当前包之间的原始 Git 提交标题列表”。**
