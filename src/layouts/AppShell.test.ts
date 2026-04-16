@@ -164,6 +164,14 @@ describe("AppShell library search route sync", () => {
     expect(wrapper.find('[data-show-collapse-toggle="true"]').exists()).toBe(false)
   })
 
+  it("uses the tightened desktop sidebar grid transition", () => {
+    const wrapper = shallowMount(AppShell)
+    const split = wrapper.get('[data-shell-layout="split"]')
+
+    expect(split.classes().join(" ")).toContain("lg:duration-200")
+    expect(split.classes().join(" ")).not.toContain("lg:duration-300")
+  })
+
   it("does not wrap batch-toolbar routes in the global workspace padding", () => {
     routerMocks.route.name = "library"
     const wrapper = shallowMount(AppShell)

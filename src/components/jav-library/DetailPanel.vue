@@ -37,6 +37,7 @@ import MediaStill from "@/components/jav-library/MediaStill.vue"
 import MovieDeleteConfirmDialog from "@/components/jav-library/MovieDeleteConfirmDialog.vue"
 import MovieEditDialog from "@/components/jav-library/MovieEditDialog.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
+import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { getMovieImageVersion } from "@/lib/image-version"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
@@ -558,12 +559,13 @@ function pickUserTagSuggestion(tag: string) {
           />
         </div>
 
-        <p
+        <ExpandableText
           v-if="summaryDisplay"
-          class="text-pretty text-sm leading-6 text-muted-foreground"
-        >
-          {{ summaryDisplay }}
-        </p>
+          :text="summaryDisplay"
+          :collapsed-lines="5"
+          :expand-label="t('detailPanel.expandSummary')"
+          :collapse-label="t('detailPanel.collapseSummary')"
+        />
 
         <div class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("detailPanel.metadataTags") }}</p>

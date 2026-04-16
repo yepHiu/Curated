@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
 
 const shellGridClass = computed(() => {
   const base =
-    "grid h-full min-h-0 grid-cols-1 lg:transition-[grid-template-columns] lg:duration-300 lg:ease-in-out motion-reduce:lg:transition-none"
+    "grid h-full min-h-0 grid-cols-1 lg:transition-[grid-template-columns] lg:duration-200 lg:ease-out motion-reduce:lg:transition-none"
   if (!isLgUp.value) {
     return base
   }

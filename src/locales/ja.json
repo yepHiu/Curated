@@ -690,6 +690,8 @@
     "fieldTitle": "タイトル",
     "fieldStudio": "レーベル",
     "fieldSummary": "あらすじ",
+    "expandSummary": "あらすじを展開",
+    "collapseSummary": "あらすじを折りたたむ",
     "fieldReleaseDate": "発売日",
     "fieldRuntimeMinutes": "再生時間（分）",
     "saveMovieEdit": "保存",

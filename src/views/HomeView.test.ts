@@ -45,6 +45,7 @@ const mockMovies = vi.hoisted(() => [
 ])
 
 const routerPushMock = vi.hoisted(() => vi.fn())
+const armHomeDetailReturnRestoreMock = vi.hoisted(() => vi.fn())
 const homepageSnapshotState = vi.hoisted(() => ({
   value: null as null | {
     dateUtc: string
@@ -66,6 +67,11 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: routerPushMock,
   }),
+}))
+
+vi.mock("@/composables/use-home-scroll-preserve", () => ({
+  armHomeDetailReturnRestore: armHomeDetailReturnRestoreMock,
+  useHomeScrollPreserve: () => ({ persist: vi.fn() }),
 }))
 
 vi.mock("@/services/library-service", () => ({
@@ -129,6 +135,7 @@ vi.mock("@/components/jav-library/PlaybackHistoryCard.vue", () => ({
 describe("HomeView", () => {
   beforeEach(() => {
     routerPushMock.mockReset()
+    armHomeDetailReturnRestoreMock.mockReset()
     homepageSnapshotState.value = null
   })
 
@@ -211,6 +218,20 @@ describe("HomeView", () => {
       query: {
         studio: "Studio A",
       },
+    })
+  })
+
+  it("arms homepage restore before opening detail", async () => {
+    const wrapper = mount(HomeView)
+
+    wrapper.getComponent({ name: "HomepagePortal" }).vm.$emit("openDetails", "m1")
+    await wrapper.vm.$nextTick()
+
+    expect(armHomeDetailReturnRestoreMock).toHaveBeenCalledTimes(1)
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "detail",
+      params: { id: "m1" },
+      query: { back: "home" },
     })
   })
 })

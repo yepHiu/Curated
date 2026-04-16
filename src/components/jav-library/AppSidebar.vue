@@ -53,6 +53,12 @@ interface SidebarNavGroups {
   yours: NavigationItem[]
 }
 
+interface SidebarNavSection {
+  key: "browse" | "yours"
+  title: string
+  items: NavigationItem[]
+}
+
 const { t, locale } = useI18n()
 const route = useRoute()
 const libraryService = useLibraryService()
@@ -193,6 +199,19 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
   }
 })
 
+const sidebarSections = computed((): SidebarNavSection[] => [
+  {
+    key: "browse",
+    title: t("nav.browse"),
+    items: sidebarNavGroups.value.browse,
+  },
+  {
+    key: "yours",
+    title: t("nav.yours"),
+    items: sidebarNavGroups.value.yours,
+  },
+])
+
 const isActive = (page: AppPage) => route.name === page
 
 const getNavigationTarget = (page: AppPage) => {
@@ -217,128 +236,90 @@ const getNavigationTarget = (page: AppPage) => {
 
 <template>
   <aside
-    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden bg-sidebar text-sidebar-foreground transition-[padding] duration-300 ease-in-out motion-reduce:transition-none"
-    :class="props.compact ? 'items-center px-2 pb-3 pt-0' : 'px-3.5 pb-3.5 pt-0'"
+    class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden bg-sidebar text-sidebar-foreground motion-reduce:transition-none"
+    :class="props.compact ? 'px-2 pb-3 pt-0' : 'px-3.5 pb-3.5 pt-0'"
   >
     <div
-      v-if="!props.compact"
-      class="flex min-h-[4.5rem] shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/80 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4"
-    >
-      <div class="flex min-w-0 items-center">
-        <div
-          class="font-curated inline-flex w-fit max-w-full items-center gap-2 px-1 py-1 text-lg font-semibold tracking-wide text-primary sm:text-xl"
-          title="Curated"
-        >
-          <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
-          <span class="truncate">Curated</span>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-else
-      class="flex min-h-[4.5rem] w-full shrink-0 flex-col items-center justify-center border-b border-sidebar-border/80 py-3.5 lg:py-4"
+      class="flex min-h-[4.5rem] shrink-0 items-center border-b border-sidebar-border/80"
+      :class="props.compact ? 'justify-center py-3.5 lg:py-4' : 'justify-between gap-2 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4'"
     >
       <div
-        class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-primary"
+        class="font-curated inline-flex w-fit max-w-full items-center gap-2 px-1 py-1 font-semibold tracking-wide text-primary"
+        :class="props.compact ? 'justify-center text-base' : 'text-lg sm:text-xl'"
         title="Curated"
       >
-        <Sparkles class="size-5 text-primary" />
+        <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
+        <span
+          class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
+          :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
+          :aria-hidden="props.compact"
+        >
+          Curated
+        </span>
       </div>
     </div>
 
-    <ScrollArea v-if="!props.compact" class="min-h-0 w-full min-w-0 flex-1">
-      <div class="flex flex-col gap-5 pt-3.5 pr-2.5">
-        <section class="flex flex-col gap-2">
-          <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-            {{ t("nav.browse") }}
-          </span>
-          <Button
-            v-for="item in sidebarNavGroups.browse"
-            :key="item.page"
-            as-child
-            :variant="isActive(item.page) ? 'secondary' : 'ghost'"
-            class="w-full justify-between rounded-2xl px-3"
+    <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
+      <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5 pr-2.5'">
+        <section
+          v-for="section in sidebarSections"
+          :key="section.key"
+          class="flex flex-col gap-2"
+          :aria-label="section.title"
+        >
+          <span
+            class="overflow-hidden text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
+            :class="props.compact ? 'max-h-0 px-0 opacity-0' : 'max-h-8 px-2 opacity-100'"
+            :aria-hidden="props.compact"
           >
-            <RouterLink :to="getNavigationTarget(item.page)">
-              <span class="flex min-w-0 items-center gap-2 truncate">
-                <component :is="item.icon" data-icon="inline-start" />
-                <span class="truncate">{{ item.label }}</span>
-              </span>
-              <Badge
-                v-if="item.hint"
-                variant="secondary"
-                class="rounded-full border border-border/60 bg-background/60"
-              >
-                {{ item.hint }}
-              </Badge>
-            </RouterLink>
-          </Button>
-        </section>
+            {{ section.title }}
+          </span>
 
-        <section class="flex flex-col gap-2">
-          <span class="px-2 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-            {{ t("nav.yours") }}
-          </span>
-          <Button
-            v-for="item in sidebarNavGroups.yours"
+          <RouterLink
+            v-for="item in section.items"
             :key="item.page"
-            as-child
-            :variant="isActive(item.page) ? 'secondary' : 'ghost'"
-            class="w-full justify-between rounded-2xl px-3"
+            :to="getNavigationTarget(item.page)"
+            data-sidebar-nav-link
+            :title="props.compact ? item.label : undefined"
+            class="group flex min-h-10 w-full min-w-0 items-center rounded-2xl text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+            :class="[
+              isActive(item.page)
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'hover:bg-sidebar-accent/60',
+              props.compact ? 'justify-center px-2' : 'justify-between px-3',
+            ]"
           >
-            <RouterLink :to="getNavigationTarget(item.page)">
-              <span class="flex min-w-0 items-center gap-2 truncate">
-                <component :is="item.icon" data-icon="inline-start" />
-                <span class="truncate">{{ item.label }}</span>
+            <span
+              class="flex min-w-0 items-center overflow-hidden"
+              :class="props.compact ? 'justify-center' : 'gap-2 truncate'"
+            >
+              <component :is="item.icon" class="size-5 shrink-0" data-icon="inline-start" />
+              <span
+                class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
+                :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
+                :aria-hidden="props.compact"
+              >
+                {{ item.label }}
               </span>
+            </span>
+
+            <span
+              v-if="item.hint"
+              class="shrink-0 transition-[opacity,width] duration-150 motion-reduce:transition-none"
+              :class="props.compact ? 'w-0 overflow-hidden opacity-0' : 'w-auto opacity-100'"
+              :aria-hidden="props.compact"
+            >
               <Badge
-                v-if="item.hint"
                 variant="secondary"
                 class="rounded-full border border-border/60 bg-background/60"
               >
                 {{ item.hint }}
               </Badge>
-            </RouterLink>
-          </Button>
+            </span>
+          </RouterLink>
         </section>
       </div>
     </ScrollArea>
-
-    <div
-      v-if="props.compact"
-      class="flex min-h-0 w-full min-w-0 flex-1 flex-col self-stretch overflow-y-auto"
-    >
-      <div class="flex flex-col gap-3 pt-3.5 pb-1">
-        <nav class="flex flex-col items-center gap-2" :aria-label="t('nav.browse')">
-          <RouterLink
-            v-for="item in sidebarNavGroups.browse"
-            :key="item.page"
-            :to="getNavigationTarget(item.page)"
-            :title="item.label"
-            class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-            :class="isActive(item.page) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
-          >
-            <component :is="item.icon" class="size-5 shrink-0" />
-          </RouterLink>
-        </nav>
-
-        <div class="mx-auto h-px w-8 shrink-0 bg-sidebar-border/80" aria-hidden="true" />
-
-        <nav class="flex flex-col items-center gap-2" :aria-label="t('nav.yours')">
-          <RouterLink
-            v-for="item in sidebarNavGroups.yours"
-            :key="item.page"
-            :to="getNavigationTarget(item.page)"
-            :title="item.label"
-            class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-            :class="isActive(item.page) ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
-          >
-            <component :is="item.icon" class="size-5 shrink-0" />
-          </RouterLink>
-        </nav>
-      </div>
-    </div>
 
     <Separator
       class="my-2.5 shrink-0 bg-sidebar-border/80"
@@ -406,28 +387,31 @@ const getNavigationTarget = (page: AppPage) => {
     </div>
 
     <Button
-      v-if="!props.compact"
       as-child
       :variant="isActive('settings') ? 'secondary' : 'ghost'"
-      class="w-full justify-start rounded-2xl px-3"
+      class="w-full rounded-2xl"
     >
       <RouterLink
-        :to="getNavigationTarget('settings')"
-        class="flex w-full items-center gap-2"
+      data-sidebar-nav-link
+      :to="getNavigationTarget('settings')"
+        :title="props.compact ? t('nav.settings') : undefined"
+        class="flex min-h-10 w-full min-w-0 items-center rounded-2xl text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+        :class="[
+          isActive('settings')
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'hover:bg-sidebar-accent/60',
+          props.compact ? 'justify-center px-2' : 'justify-start px-3',
+        ]"
       >
-        <Settings2 data-icon="inline-start" />
-        <span>{{ t("nav.settings") }}</span>
+        <Settings2 class="size-5 shrink-0" data-icon="inline-start" />
+        <span
+          class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
+          :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] pl-2 opacity-100'"
+          :aria-hidden="props.compact"
+        >
+          {{ t("nav.settings") }}
+        </span>
       </RouterLink>
     </Button>
-
-    <RouterLink
-      v-else
-      :to="getNavigationTarget('settings')"
-      :title="t('nav.settings')"
-      class="flex size-10 shrink-0 items-center justify-center rounded-2xl text-sidebar-foreground transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
-      :class="isActive('settings') ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''"
-    >
-      <Settings2 class="size-5 shrink-0" />
-    </RouterLink>
   </aside>
 </template>

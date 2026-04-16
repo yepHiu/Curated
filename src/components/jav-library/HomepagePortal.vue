@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import type { HomepagePortalModel, HomepageTasteEntry } from "@/lib/homepage-portal"
 import HomeContinueRow from "@/components/jav-library/HomeContinueRow.vue"
 import HomeHeroCarousel from "@/components/jav-library/HomeHeroCarousel.vue"
 import HomeSectionRow from "@/components/jav-library/HomeSectionRow.vue"
+import { useHomeScrollPreserve } from "@/composables/use-home-scroll-preserve"
 
 const props = defineProps<{
   model: HomepagePortalModel
@@ -17,6 +18,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const homeScrollRegionRef = ref<HTMLElement | null>(null)
+const { persist } = useHomeScrollPreserve({ scrollElRef: homeScrollRegionRef })
 
 const recommendationMovies = computed(() =>
   props.model.recommendations.map((entry) => entry.movie),
@@ -37,12 +40,18 @@ const tasteGroups = computed(() => {
     { kind: "studio" as const, title: t("home.tasteStudiosTitle"), values: rows.get("studio") ?? [] },
   ]
 })
+
+function onHomeScroll() {
+  persist()
+}
 </script>
 
 <template>
   <div
+    ref="homeScrollRegionRef"
     data-home-scroll-region
     class="h-full min-h-0 overflow-y-auto bg-background text-foreground"
+    @scroll.passive="onHomeScroll"
   >
     <HomeHeroCarousel
       :movies="model.heroMovies"

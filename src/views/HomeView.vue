@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
+import { armHomeDetailReturnRestore } from "@/composables/use-home-scroll-preserve"
 import { useRouter } from "vue-router"
 import HomepagePortal from "@/components/jav-library/HomepagePortal.vue"
 import type { HomepageTasteEntry } from "@/lib/homepage-portal"
@@ -27,6 +28,7 @@ const portalModel = computed(() => {
 })
 
 function openDetails(movieId: string) {
+  armHomeDetailReturnRestore()
   void router.push({
     name: "detail",
     params: { id: movieId },

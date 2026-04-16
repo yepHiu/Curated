@@ -690,6 +690,8 @@
     "fieldTitle": "Title",
     "fieldStudio": "Studio",
     "fieldSummary": "Summary",
+    "expandSummary": "Expand summary",
+    "collapseSummary": "Collapse summary",
     "fieldReleaseDate": "Release date",
     "fieldRuntimeMinutes": "Runtime (minutes)",
     "saveMovieEdit": "Save",

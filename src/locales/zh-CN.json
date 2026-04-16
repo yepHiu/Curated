@@ -698,6 +698,8 @@
     "fieldTitle": "标题",
     "fieldStudio": "片商",
     "fieldSummary": "简介",
+    "expandSummary": "展开简介",
+    "collapseSummary": "收起简介",
     "fieldReleaseDate": "发行日",
     "fieldRuntimeMinutes": "时长（分钟）",
     "saveMovieEdit": "保存",
