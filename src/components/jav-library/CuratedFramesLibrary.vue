@@ -17,6 +17,7 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
   DialogClose,
@@ -326,16 +327,18 @@ async function exportSingleFromDialog(format: "webp" | "png") {
   if (!selected.value) {
     return
   }
-  let actorName: string | undefined
-  const from = dialogOpenedFromActor.value
-  if (
-    from &&
-    from !== noActorLabel.value &&
-    selected.value.actors.some((a) => a.trim() === from)
-  ) {
-    actorName = from
-  }
+  const actorName = resolveSingleFrameActorNameForExport(selected.value, dialogOpenedFromActor.value)
   await runExport([selected.value.id], actorName, format, "dialog")
+}
+
+async function exportSingleFromContextMenu(format: "webp" | "png") {
+  const menu = frameContextMenu.value
+  if (!menu) {
+    return
+  }
+  closeFrameContextMenu()
+  const actorName = resolveSingleFrameActorNameForExport(menu.frame, menu.fromActorSection)
+  await runExport([menu.frame.id], actorName, format, "dialog")
 }
 
 const maxFrameTags = 64
@@ -564,6 +567,14 @@ const movieGroups = computed((): MovieGroupSection[] => {
 const dialogOpen = ref(false)
 const selected = ref<CuratedFrameRecord | null>(null)
 const selectedImageUrl = ref("")
+type CuratedFrameContextMenuState = {
+  x: number
+  y: number
+  frame: CuratedFrameRecord
+  fromActorSection: string | null
+}
+
+const frameContextMenu = ref<CuratedFrameContextMenuState | null>(null)
 const dialogTags = ref<string[]>([])
 const dialogTagSaveStatus = ref<CuratedFrameTagSaveStatus>("idle")
 const dialogTagSaveError = ref("")
@@ -661,9 +672,41 @@ function resetDialogState() {
   dialogOpen.value = false
 }
 
+function closeFrameContextMenu() {
+  frameContextMenu.value = null
+}
+
+function onFrameContextMenu(
+  event: MouseEvent,
+  item: RowWithUrl,
+  fromActorSection: string | null = null,
+) {
+  frameContextMenu.value = {
+    x: event.clientX,
+    y: event.clientY,
+    frame: item.row,
+    fromActorSection,
+  }
+}
+
+function resolveSingleFrameActorNameForExport(
+  frame: CuratedFrameRecord,
+  fromActorSection: string | null,
+): string | undefined {
+  if (
+    fromActorSection &&
+    fromActorSection !== noActorLabel.value &&
+    frame.actors.some((actor) => actor.trim() === fromActorSection)
+  ) {
+    return fromActorSection
+  }
+  return undefined
+}
+
 function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   const { imageBlob, ...meta } = item.row
   void imageBlob
+  closeFrameContextMenu()
   dialogOpenedFromActor.value = fromActorSection
   dialogExportError.value = ""
   selected.value = meta
@@ -917,9 +960,22 @@ function frameLabelForDelete(id: string) {
 
 function openDeleteConfirmFromDialog() {
   if (!selected.value) return
+  closeFrameContextMenu()
   deleteFrameError.value = ""
   deleteTargetIds.value = [selected.value.id]
   deleteTargetLabel.value = frameLabelForDelete(selected.value.id)
+  deleteConfirmOpen.value = true
+}
+
+function openDeleteConfirmFromContextMenu() {
+  const menu = frameContextMenu.value
+  if (!menu) {
+    return
+  }
+  closeFrameContextMenu()
+  deleteFrameError.value = ""
+  deleteTargetIds.value = [menu.frame.id]
+  deleteTargetLabel.value = frameLabelForDelete(menu.frame.id)
   deleteConfirmOpen.value = true
 }
 
@@ -1273,6 +1329,7 @@ defineExpose({
             <button
               type="button"
               class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              @contextmenu.prevent="onFrameContextMenu($event, item)"
               @click="openDialog(item)"
             >
               <div class="relative aspect-video w-full bg-black/80">
@@ -1351,6 +1408,7 @@ defineExpose({
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @contextmenu.prevent="onFrameContextMenu($event, item, actor)"
                   @click="openDialog(item, actor)"
                 >
                   <div class="relative aspect-video w-full bg-black/80">
@@ -1442,6 +1500,7 @@ defineExpose({
                 <button
                   type="button"
                   class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @contextmenu.prevent="onFrameContextMenu($event, item)"
                   @click="openDialog(item)"
                 >
                   <div class="relative aspect-video w-full bg-black/80">
@@ -1721,6 +1780,18 @@ defineExpose({
         </div>
       </DialogContent>
     </Dialog>
+
+    <CuratedFrameContextMenu
+      v-if="frameContextMenu"
+      :frame="frameContextMenu.frame"
+      :x="frameContextMenu.x"
+      :y="frameContextMenu.y"
+      :use-web-api="useWebApi"
+      @close="closeFrameContextMenu"
+      @export-webp="exportSingleFromContextMenu('webp')"
+      @export-png="exportSingleFromContextMenu('png')"
+      @delete="openDeleteConfirmFromContextMenu"
+    />
 
     <Dialog v-model:open="deleteConfirmOpen">
       <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
