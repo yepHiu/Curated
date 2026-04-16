@@ -26,6 +26,8 @@ scripts/release/*
 !scripts/release/publish.ps1
 !scripts/release/release-common.ps1
 !scripts/release/set-version-base.ps1
+!scripts/release/package-history.d.mts
+!scripts/release/package-history.mjs
 !scripts/release/versioning.d.mts
 !scripts/release/versioning.mjs
 !scripts/release/windows/
