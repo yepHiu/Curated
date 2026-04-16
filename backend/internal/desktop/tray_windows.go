@@ -91,6 +91,15 @@ var (
 	kernel32                   = windows.NewLazySystemDLL("kernel32.dll")
 	procGetModuleHandleW       = kernel32.NewProc("GetModuleHandleW")
 	activeNativeTray           *nativeTrayRuntime
+	destroyWindowFn            = func(handle windows.Handle) {
+		_, _, _ = procDestroyWindow.Call(uintptr(handle))
+	}
+	postQuitMessageFn = func(code int32) {
+		procPostQuitMessage.Call(uintptr(code))
+	}
+	shellNotifyIconFn = func(message uintptr, data *notifyIconData) {
+		_, _, _ = procShellNotifyIconW.Call(message, uintptr(unsafe.Pointer(data)))
+	}
 )
 
 type TrayOptions struct {
@@ -115,6 +124,7 @@ type nativeTrayRuntime struct {
 	taskbarCreatedID uint32
 	notifyData       notifyIconData
 	ready            chan error
+	cancelOnce       sync.Once
 	closeOnce        sync.Once
 	cleanupOnce      sync.Once
 }
@@ -406,12 +416,16 @@ func (t *nativeTrayRuntime) handleWindowMessage(hWnd windows.Handle, message uin
 		}
 		return 0
 	case wmClose:
+		t.requestAppCancel()
 		t.removeNotifyIcon()
-		_, _, _ = procDestroyWindow.Call(uintptr(t.window))
+		destroyWindowFn(t.window)
 		return 0
 	case wmDestroy, wmEndSession:
+		if message == wmEndSession {
+			t.requestAppCancel()
+		}
 		t.removeNotifyIcon()
-		procPostQuitMessage.Call(0)
+		postQuitMessageFn(0)
 		return 0
 	default:
 		result, _, _ := procDefWindowProcW.Call(uintptr(hWnd), uintptr(message), wParam, lParam)
@@ -463,7 +477,7 @@ func (t *nativeTrayRuntime) handleCommand(commandID uint32) {
 	case trayCommandLogs:
 		go t.openDirectory(t.opts.LogDir, "tray: open logs failed")
 	case trayCommandQuit:
-		go t.opts.Cancel()
+		t.requestAppCancel()
 		t.requestClose()
 	}
 }
@@ -488,6 +502,14 @@ func (t *nativeTrayRuntime) requestClose() {
 	})
 }
 
+func (t *nativeTrayRuntime) requestAppCancel() {
+	t.cancelOnce.Do(func() {
+		if t.opts.Cancel != nil {
+			t.opts.Cancel()
+		}
+	})
+}
+
 func (t *nativeTrayRuntime) addNotifyIcon() error {
 	t.notifyData.Size = uint32(unsafe.Sizeof(t.notifyData))
 	res, _, err := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&t.notifyData)))
@@ -499,7 +521,7 @@ func (t *nativeTrayRuntime) addNotifyIcon() error {
 
 func (t *nativeTrayRuntime) removeNotifyIcon() {
 	t.notifyData.Size = uint32(unsafe.Sizeof(t.notifyData))
-	_, _, _ = procShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&t.notifyData)))
+	shellNotifyIconFn(nimDelete, &t.notifyData)
 }
 
 func (t *nativeTrayRuntime) setNotifyVersion(versionValue uint32) error {
