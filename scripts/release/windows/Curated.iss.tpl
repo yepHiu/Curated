@@ -23,7 +23,6 @@ SetupIconFile={#MyAppSourceDir}\curated.ico
 UninstallDisplayIcon={app}\curated.ico
 CloseApplications=yes
 RestartApplications=no
-AppMutex=Local\Curated.Tray.Singleton
 CloseApplicationsFilter=curated.exe
 
 [Languages]
