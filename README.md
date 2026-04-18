@@ -168,13 +168,17 @@ Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
 - The current base line is `1.1.0`.
-- Release packaging assembles a Windows-oriented staging directory, portable zip, installer script, and release manifest.
+- `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
+- Release packaging assembles a Windows-oriented staging directory, portable zip, installer executable, and release manifest.
+- The package build ledger now lives in `docs/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
 - Windows release binaries default to tray mode and can host the built frontend locally when `frontend-dist/` is present beside the executable.
+- The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source.
 - Settings can persist Windows login autostart for the current user; autostart launches Curated silently in tray mode without opening the browser on that login-triggered run.
 
 Additional release references:
 
 - [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
+- [docs/package-build-history.csv](docs/package-build-history.csv)
 - [docs/2026-04-02-package-build-history.md](docs/2026-04-02-package-build-history.md)
 
 ## Documentation

@@ -168,13 +168,17 @@ pnpm release:publish
 
 - 生产包版本号统一由 `scripts/release/version.json` 管理。
 - 当前版本基线为 `1.1.0`。
-- 发布流程会生成 Windows 发布目录、便携包、安装器脚本和发布清单。
+- `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
+- 发布流程会生成 Windows 发布目录、便携包、安装器可执行文件和发布清单。
+- 打包历史台账已经迁移到 `docs/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
 - Windows 发布构建默认以托盘模式运行，并在 `frontend-dist/` 与可执行文件同目录时直接托管前端。
+- 安装包仍然继续使用 Inno Setup，只是由 Python 负责渲染 `.iss` 模板并调用 `ISCC.exe`。
 - 设置页可以为当前用户持久化 Windows 开机自启动；这类登录触发的启动会静默进入托盘，不会自动打开浏览器页面。
 
 更多发布资料：
 
 - [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
+- [docs/package-build-history.csv](docs/package-build-history.csv)
 - [docs/2026-04-02-package-build-history.md](docs/2026-04-02-package-build-history.md)
 
 ## 文档

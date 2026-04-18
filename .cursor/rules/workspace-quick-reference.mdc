@@ -12,7 +12,7 @@ alwaysApply: true
 - **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
 - **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**、健康名 **`curated-dev`**；Windows 开发构建必须产出 **`backend/runtime/curated-dev.exe`**，不要生成或保留与生产包同名的 `curated.exe`，以免和正式安装版后端冲突；**`-tags release` 打包**默认 **:8081**、健康名 **`curated`**（Go 模块名 **`curated-backend`**）。
 - **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
-- **Repo-local skill**：后端开发态 / 生产态编译与运行请求优先使用 **`.cursor/skills/curated-backend-runtime/`**，统一处理 `go run`、`pnpm backend:build:dev`、`pnpm release:backend`、`pnpm release:publish` 与 `curated-dev.exe` / `curated.exe` 命名边界。
+- **Repo-local skill**：后端开发态 / 生产态编译与运行请求优先使用 **`.cursor/skills/curated-backend-runtime/`**，统一处理 `go run`、`pnpm backend:build:dev`、`pnpm release:backend`、`pnpm release:publish` 与 `curated-dev.exe` / `curated.exe` 命名边界；`pnpm release:*` 当前统一经 `python scripts/release/release_cli.py` 编排。
 - **品牌图标**：`icon/curated-title-nobg.png` 用于 `README.md` 顶部带字标志；`icon/curated-icon-rg-dark-pink.png` 用于 Web favicon、后台托盘与安装包图标。替换品牌图时，同步更新 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png`、`backend/internal/assets/curated.ico`。
 - **公开文档结构**：`README.md` 是英文主版，`README.zh-CN.md` / `README.ja-JP.md` 是完整翻译版；`API.md` 是唯一公开 API 参考文档。
 - **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
@@ -27,8 +27,8 @@ alwaysApply: true
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。模拟系统登录静默启动时追加 `-autostart`，这会保留托盘与本地 HTTP 服务，但跳过首次浏览器打开。
 - **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。对外接口说明统一更新 `API.md`，不要把完整 API 表重新写回 README。
 - **改 README 内容**：若变更用户可见能力、命令入口或公开说明，默认同步检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 三份文档是否需要一起更新。
-- **记录打包版本**：每次执行 `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 并实际尝试产出便携包 / 安装包 / 发布清单后，脚本都必须自动向 `docs/2026-04-02-package-build-history.md` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
-- **整机安装包版本规则**：生产包版本的唯一自动化来源是 `scripts/release/version.json`。当前基线为 `1.1.0`；`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1。`major` / `minor` 仅允许人工通过 `scripts/release/set-version-base.ps1` 调整，调整时必须把 `patch` 归零。安装包文件名、便携包文件名、`release/manifest/release.json` 与台账记录必须使用同一版本号。
+- **记录打包版本**：每次执行 `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 并实际尝试产出便携包 / 安装包 / 发布清单后，脚本都必须自动向 `docs/package-build-history.csv` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注；CSV 采用 UTF-8 with BOM，便于 Excel / WPS 打开。
+- **整机安装包版本规则**：生产包版本的唯一自动化来源是 `scripts/release/version.json`。当前基线为 `1.1.0`；`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1。`major` / `minor` 仅允许人工通过 `pnpm release:version:set-base -- --Major <major> --Minor <minor>` 调整，调整时必须把 `patch` 归零。安装包文件名、便携包文件名、`release/manifest/release.json` 与台账记录必须使用同一版本号。
 - **版本辅助命令**：查看当前生产包版本基线用 `pnpm release:version:show`；手动切换到新的 `major.minor.0` 用 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`。
 
 ## 规则索引

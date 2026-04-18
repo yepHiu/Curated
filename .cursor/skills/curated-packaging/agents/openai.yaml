@@ -1,5 +1,5 @@
 name: curated-packaging
 model: gpt-4o-mini
-version: "0.1.0"
+version: "0.3.0"
 description: |
-  Use this repo-local packaging skill for natural-language Curated release requests. Always preview the detected mode and predicted version before running any packaging command.
+  Use this repo-local packaging skill for natural-language Curated release requests. Preview with the Python helper first, including the active CSV package-history ledger state, then execute through scripts/release/release_cli.py.

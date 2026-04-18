@@ -168,13 +168,17 @@ pnpm release:publish
 
 - 本番パッケージのバージョンは `scripts/release/version.json` で一元管理されます。
 - 現在のベースラインは `1.1.0` です。
-- リリースフローでは、Windows 用ステージングディレクトリ、ポータブル zip、インストーラースクリプト、リリースマニフェストを生成します。
+- `pnpm release:*` は現在 `python scripts/release/release_cli.py` に統一されています。
+- リリースフローでは、Windows 用ステージングディレクトリ、ポータブル zip、インストーラー実行ファイル、リリースマニフェストを生成します。
+- パッケージ履歴台帳は `docs/package-build-history.csv` に移行済みで、Excel / WPS 互換のため UTF-8 with BOM で保存されます。
 - Windows リリースビルドはデフォルトでトレイモードになり、`frontend-dist/` が実行ファイルの横にあればフロントエンドをローカル配信できます。
+- インストーラー自体は引き続き Inno Setup を使いますが、`.iss` テンプレートの描画と `ISCC.exe` 呼び出しは Python 側で行います。
 - 設定画面から現在のユーザー向け Windows ログイン時起動を永続化できます。この自動起動はサイレントでトレイに入り、ブラウザは自動で開きません。
 
 関連するリリース資料:
 
 - [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
+- [docs/package-build-history.csv](docs/package-build-history.csv)
 - [docs/2026-04-02-package-build-history.md](docs/2026-04-02-package-build-history.md)
 
 ## ドキュメント
