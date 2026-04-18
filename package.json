@@ -12,13 +12,14 @@
     "test": "vitest run --configLoader native --pool threads",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
-    "release:frontend": "powershell -ExecutionPolicy Bypass -File scripts/release/build-frontend.ps1 -Version 0.0.0-local",
-    "release:backend": "powershell -ExecutionPolicy Bypass -File scripts/release/build-backend.ps1 -Version 0.0.0-local",
-    "release:portable": "powershell -ExecutionPolicy Bypass -File scripts/release/package-portable.ps1",
-    "release:installer": "powershell -ExecutionPolicy Bypass -File scripts/release/package-installer.ps1",
-    "release:publish": "powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1",
-    "release:version:show": "node scripts/release/versioning.mjs show --file scripts/release/version.json",
-    "release:version:set-base": "powershell -ExecutionPolicy Bypass -File scripts/release/set-version-base.ps1"
+    "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
+    "release:backend": "python scripts/release/release_cli.py build-backend --version 0.0.0-local",
+    "release:portable": "python scripts/release/release_cli.py package-portable",
+    "release:installer": "python scripts/release/release_cli.py package-installer",
+    "release:publish": "python scripts/release/release_cli.py publish",
+    "release:version:show": "python scripts/release/release_cli.py show-version",
+    "release:version:set-base": "python scripts/release/release_cli.py set-version-base",
+    "release:history:migrate": "python scripts/release/release_cli.py migrate-history"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
