@@ -58,8 +58,15 @@ import {
 } from "@/lib/native-player-launch"
 import {
   formatCuratedCaptureKeyLabel,
+  shouldBlurPlaybackSliderAfterCommit,
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
+import {
+  clearOptimisticSeekTargetIfSettled,
+  hasAuthoritativeClockMoved,
+  shouldEnterSeekWaitingState,
+  shouldReconcileDisplayedPlaybackTime,
+} from "@/lib/player-playback-clock"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -84,6 +91,7 @@ const playbackSeekForwardStep = computed(() =>
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const surfaceRef = ref<HTMLElement | null>(null)
+const progressSliderRootRef = ref<HTMLElement | null>(null)
 let hlsInstance: HlsInstance | null = null
 let detachHlsStatsListeners: (() => void) | null = null
 
@@ -193,6 +201,10 @@ const curatedPlusOne = ref(false)
 const curatedCaptureError = ref("")
 let curatedPlusOneTimer: number | null = null
 let curatedShutterTimer: number | null = null
+const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
+let playbackClockSyncIntervalId: number | null = null
+let lastAuthoritativePlaybackTimeSec: number | null = null
+let progressSliderFocusRestoreTimer: number | null = null
 
 /** 播放中鼠标静止一段时间后隐藏控件与指针；移动鼠标恢复 */
 const IDLE_HIDE_MS = 5000
@@ -256,6 +268,83 @@ watch(isPlaying, (playing) => {
     scheduleChromeIdleHide()
   }
 })
+
+function stopPlaybackClockSyncLoop() {
+  if (playbackClockSyncIntervalId !== null) {
+    clearInterval(playbackClockSyncIntervalId)
+    playbackClockSyncIntervalId = null
+  }
+}
+
+function resetPlaybackClockSyncSample() {
+  lastAuthoritativePlaybackTimeSec = null
+}
+
+function shouldRunPlaybackClockSyncLoop(): boolean {
+  return Boolean(
+    playbackSrc.value && (isPlaying.value || optimisticSeekTargetSec.value != null || isPlaybackWaiting.value),
+  )
+}
+
+function readAuthoritativePlaybackClockSample():
+  | { absoluteTimeSec: number; advanced: boolean }
+  | null {
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return null
+  const absoluteTimeSec = clampAbsolutePlaybackTarget(getAbsolutePlaybackTime(v.currentTime))
+  const previous = lastAuthoritativePlaybackTimeSec
+  const advanced = hasAuthoritativeClockMoved(previous, absoluteTimeSec)
+  lastAuthoritativePlaybackTimeSec = absoluteTimeSec
+  return {
+    absoluteTimeSec,
+    advanced,
+  }
+}
+
+function reconcileDisplayedPlaybackClock() {
+  const v = videoRef.value
+  const sample = readAuthoritativePlaybackClockSample()
+  if (!v || !sample) return
+
+  const canClearStaleOptimisticSeek = sample.advanced || !isPlaybackWaiting.value
+  clearOptimisticSeekState(sample.absoluteTimeSec, {
+    allowStaleDriftClear: canClearStaleOptimisticSeek,
+  })
+
+  if (
+    shouldReconcileDisplayedPlaybackTime({
+      displayedTimeSec: currentTime.value,
+      authoritativeTimeSec: sample.absoluteTimeSec,
+      optimisticSeekTargetSec: optimisticSeekTargetSec.value,
+      isScrubbingProgress: isScrubbingProgress.value,
+      isPlaybackWaiting: isPlaybackWaiting.value,
+      authoritativeClockAdvanced: sample.advanced,
+    })
+  ) {
+    currentTime.value = sample.absoluteTimeSec
+  }
+
+  if (sample.advanced && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+    isPlaybackWaiting.value = false
+  }
+}
+
+function syncPlaybackClockLoopState() {
+  stopPlaybackClockSyncLoop()
+  if (!shouldRunPlaybackClockSyncLoop()) {
+    if (!playbackSrc.value) {
+      resetPlaybackClockSyncSample()
+    }
+    return
+  }
+  playbackClockSyncIntervalId = window.setInterval(() => {
+    reconcileDisplayedPlaybackClock()
+  }, PLAYBACK_CLOCK_SYNC_INTERVAL_MS)
+}
+
+watch([isPlaying, playbackSrc, optimisticSeekTargetSec, isPlaybackWaiting], () => {
+  syncPlaybackClockLoopState()
+}, { immediate: true })
 
 watch(
   playbackSrc,
@@ -422,6 +511,8 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
 }
 
 function syncSrc() {
+  stopPlaybackClockSyncLoop()
+  resetPlaybackClockSyncSample()
   flushScheduledPlaybackSessionCleanup()
   void releasePlaybackSession(playbackDescriptor.value?.sessionId)
   playbackError.value = ""
@@ -616,6 +707,8 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onPlaybackKeydown)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
+  stopPlaybackClockSyncLoop()
+  resetPlaybackClockSyncSample()
   clearIdleHideTimer()
   if (document.pictureInPictureElement) {
     void document.exitPictureInPicture().catch(() => {
@@ -624,6 +717,7 @@ onUnmounted(() => {
   }
   if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
+  if (progressSliderFocusRestoreTimer) clearTimeout(progressSliderFocusRestoreTimer)
   stopFpsTracking()
   closePlayerContextMenu()
 })
@@ -827,12 +921,23 @@ function syncProgressSliderFromPlayback() {
   progressSliderValue.value = [normalizeProgressTargetSec(currentTime.value)]
 }
 
-function clearOptimisticSeekIfSettled(absoluteTimeSec: number = currentTime.value) {
+function clearOptimisticSeekState(
+  absoluteTimeSec: number = currentTime.value,
+  options: { allowStaleDriftClear?: boolean } = {},
+) {
   const target = optimisticSeekTargetSec.value
   if (target == null) return
-  if (Math.abs(absoluteTimeSec - target) <= 1) {
-    optimisticSeekTargetSec.value = null
+  if (!options.allowStaleDriftClear) {
+    if (Math.abs(absoluteTimeSec - target) <= 1) {
+      optimisticSeekTargetSec.value = null
+    }
+    return
   }
+  optimisticSeekTargetSec.value = clearOptimisticSeekTargetIfSettled(target, absoluteTimeSec)
+}
+
+function clearOptimisticSeekIfSettled(absoluteTimeSec: number = currentTime.value) {
+  clearOptimisticSeekState(absoluteTimeSec)
 }
 
 function markPlaybackReady() {
@@ -840,12 +945,15 @@ function markPlaybackReady() {
   clearOptimisticSeekIfSettled()
 }
 
-function startOptimisticSeek(targetSec: number) {
+function startOptimisticSeek(
+  targetSec: number,
+  options: { enterWaitingState?: boolean } = {},
+) {
   const clamped = clampAbsolutePlaybackTarget(targetSec)
   optimisticSeekTargetSec.value = clamped
   currentTime.value = clamped
   progressSliderValue.value = [clamped]
-  isPlaybackWaiting.value = true
+  isPlaybackWaiting.value = options.enterWaitingState === true
 }
 
 function onProgressSliderInput(values?: number[]) {
@@ -859,11 +967,31 @@ function onProgressSliderInput(values?: number[]) {
 function onProgressSliderCommit(values?: number[]) {
   const next = normalizeProgressTargetSec(values?.[0] ?? 0)
   const previous = currentTime.value
+  const descriptor = playbackDescriptor.value
   progressSliderValue.value = [next]
   isScrubbingProgress.value = false
   scrubPreviewTimeSec.value = null
-  startOptimisticSeek(next)
+  startOptimisticSeek(next, {
+    enterWaitingState: shouldEnterSeekWaitingState(descriptor?.mode),
+  })
   void seekToAbsolutePlaybackTime(next, { previousDisplayedTimeSec: previous })
+  restoreGlobalPlaybackHotkeysAfterProgressCommit()
+}
+
+function restoreGlobalPlaybackHotkeysAfterProgressCommit() {
+  blurFocusedProgressSliderElement()
+  if (progressSliderFocusRestoreTimer) clearTimeout(progressSliderFocusRestoreTimer)
+  progressSliderFocusRestoreTimer = window.setTimeout(() => {
+    progressSliderFocusRestoreTimer = null
+    blurFocusedProgressSliderElement()
+  }, 0)
+}
+
+function blurFocusedProgressSliderElement() {
+  const activeElement = document.activeElement
+  if (!shouldBlurPlaybackSliderAfterCommit(activeElement, progressSliderRootRef.value)) return
+  if (!(activeElement instanceof HTMLElement)) return
+  activeElement.blur()
 }
 
 watch([currentTime, totalDurationSec, isScrubbingProgress], () => {
@@ -1012,7 +1140,10 @@ function closeDetailedStats() {
 
 function seekDelta(deltaSec: number) {
   const previous = currentTime.value
-  startOptimisticSeek(previous + deltaSec)
+  const descriptor = playbackDescriptor.value
+  startOptimisticSeek(previous + deltaSec, {
+    enterWaitingState: shouldEnterSeekWaitingState(descriptor?.mode),
+  })
   void seekToAbsolutePlaybackTime(previous + deltaSec, { previousDisplayedTimeSec: previous })
 }
 
@@ -1252,7 +1383,13 @@ const playbackBusyLabel = computed(() => {
   if (!playbackSrc.value && !isResolvingPlayback.value) return ""
   if (isSwitchingPlaybackSession.value) return t("player.preparingSeek")
   if (isResolvingPlayback.value) return t("player.preparingPlayback")
-  if (isPlaybackWaiting.value && optimisticSeekTargetSec.value != null) return t("player.bufferingSeek")
+  if (
+    isPlaybackWaiting.value &&
+    optimisticSeekTargetSec.value != null &&
+    shouldEnterSeekWaitingState(playbackDescriptor.value?.mode)
+  ) {
+    return t("player.bufferingSeek")
+  }
   if (isPlaybackWaiting.value) return t("player.buffering")
   if (isPrewarmingHls.value && playbackDescriptor.value?.mode === "hls" && !isPlaying.value) {
     return t("player.prewarmingStream")
@@ -1693,7 +1830,7 @@ async function seekToAbsolutePlaybackTime(
   if (!v || !descriptor || !playbackSrc.value) return
 
   const clampedTarget = clampAbsolutePlaybackTarget(targetSec)
-  isPlaybackWaiting.value = true
+  isPlaybackWaiting.value = shouldEnterSeekWaitingState(descriptor.mode)
   if (descriptor.mode !== "hls") {
     v.currentTime = clampedTarget
     currentTime.value = clampedTarget
@@ -2214,7 +2351,7 @@ const videoPreloadMode = computed(() =>
             <span>{{ totalDurationSec > 0 ? formatClock(totalDurationSec) : "\u2014" }}</span>
           </div>
 
-          <div class="relative">
+          <div ref="progressSliderRootRef" class="relative">
             <Slider
               :model-value="progressSliderValue"
               :max="Math.max(totalDurationSec, 0.25)"

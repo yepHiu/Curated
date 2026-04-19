@@ -53,3 +53,12 @@ export function shouldIgnoreGlobalPlaybackHotkeysForTarget(
   if (target.closest('[data-slot="slider"]')) return true
   return false
 }
+
+export function shouldBlurPlaybackSliderAfterCommit(
+  activeElement: Element | null,
+  sliderRoot: HTMLElement | null,
+): boolean {
+  if (!(activeElement instanceof HTMLElement)) return false
+  if (!sliderRoot) return false
+  return activeElement === sliderRoot || sliderRoot.contains(activeElement)
+}

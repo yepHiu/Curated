@@ -5,6 +5,7 @@ import {
   isCuratedCaptureKeyReserved,
   isSupportedCuratedCaptureKeyCode,
   normalizeCuratedCaptureKeyCode,
+  shouldBlurPlaybackSliderAfterCommit,
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
 
@@ -56,5 +57,18 @@ describe("player shortcut utilities", () => {
 
     const plain = document.createElement("div")
     expect(shouldIgnoreGlobalPlaybackHotkeysForTarget(plain)).toBe(false)
+  })
+
+  it("restores global playback hotkeys after committing the progress slider", () => {
+    const slider = document.createElement("div")
+    slider.setAttribute("data-slot", "slider")
+    const sliderThumb = document.createElement("button")
+    slider.appendChild(sliderThumb)
+
+    const unrelated = document.createElement("button")
+
+    expect(shouldBlurPlaybackSliderAfterCommit(sliderThumb, slider)).toBe(true)
+    expect(shouldBlurPlaybackSliderAfterCommit(unrelated, slider)).toBe(false)
+    expect(shouldBlurPlaybackSliderAfterCommit(null, slider)).toBe(false)
   })
 })
