@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Curated Update Badge Prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f18;
+        --panel: rgba(255, 255, 255, 0.05);
+        --panel-strong: rgba(255, 255, 255, 0.08);
+        --line: rgba(255, 255, 255, 0.1);
+        --text: #f6f7fb;
+        --muted: #9ba6ba;
+        --brand: #fe628e;
+        --brand-soft: rgba(254, 98, 142, 0.14);
+        --brand-strong: rgba(254, 98, 142, 0.24);
+        --success: #8fd5ba;
+        --shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(254, 98, 142, 0.16), transparent 24rem),
+          radial-gradient(circle at 85% 10%, rgba(116, 125, 255, 0.12), transparent 24rem),
+          linear-gradient(180deg, #0a0d15, #0d111c 42%, #090c13);
+        color: var(--text);
+        font-family:
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+
+      .page {
+        width: min(1440px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      .header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: #ffc6d6;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(32px, 5vw, 64px);
+        line-height: 0.95;
+        letter-spacing: -0.06em;
+      }
+
+      .summary {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .summary strong {
+        color: var(--text);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.03);
+        box-shadow: var(--shadow);
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .card-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .index {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .card-desc {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .browser {
+        height: 720px;
+        background: #070a12;
+      }
+
+      .shell-expanded {
+        display: grid;
+        grid-template-columns: 288px minmax(0, 1fr);
+        height: 100%;
+      }
+
+      .shell-compact {
+        display: grid;
+        grid-template-columns: 86px minmax(0, 1fr);
+        height: 100%;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-right: 1px solid var(--line);
+        background: rgba(16, 20, 35, 0.96);
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 78px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .spark {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 15px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 16px;
+        box-shadow: inset 0 0 0 1px rgba(254, 98, 142, 0.18);
+      }
+
+      .brand-name {
+        color: var(--brand);
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        white-space: nowrap;
+      }
+
+      .brand-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgba(254, 98, 142, 0.96), rgba(255, 149, 183, 0.94));
+        color: #241017;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        box-shadow: 0 8px 18px rgba(254, 98, 142, 0.25);
+      }
+
+      .brand-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .status-dot {
+        display: inline-flex;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--success);
+        box-shadow: 0 0 0 8px rgba(143, 213, 186, 0.12);
+      }
+
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        padding: 18px;
+      }
+
+      .label {
+        padding-left: 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 42px;
+        padding: 0 12px;
+        border-radius: 15px;
+        color: var(--text);
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .nav-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .dot-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .hint {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 22px;
+        padding: 0 7px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .sidebar-note {
+        margin: auto 18px 18px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .sidebar-note strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .sidebar-note span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 78px;
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        width: min(480px, 44vw);
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.04);
+        font-size: 13px;
+      }
+
+      .right-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 18px;
+        flex: 1;
+        min-height: 0;
+        padding: 22px;
+      }
+
+      .hero {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background:
+          radial-gradient(circle at 8% 16%, rgba(254, 98, 142, 0.18), transparent 16rem),
+          linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+          #101626;
+        padding: 24px;
+      }
+
+      .kicker {
+        color: #ffc9d8;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .hero h3 {
+        margin-top: 8px;
+        font-size: clamp(28px, 3vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .hero p {
+        margin-top: 10px;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .poster {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel);
+      }
+
+      .poster-art {
+        aspect-ratio: 0.75;
+        background:
+          linear-gradient(145deg, rgba(254, 98, 142, 0.32), transparent 44%),
+          linear-gradient(30deg, rgba(255, 255, 255, 0.12), transparent),
+          #212a40;
+      }
+
+      .poster-meta {
+        padding: 12px;
+      }
+
+      .line-1,
+      .line-2 {
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .line-1 {
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .line-2 {
+        width: 58%;
+        margin-top: 8px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .about-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-height: 0;
+        border: 1px solid var(--brand-strong);
+        border-radius: 28px;
+        background:
+          linear-gradient(180deg, rgba(254, 98, 142, 0.08), rgba(255, 255, 255, 0.03)),
+          #101523;
+        padding: 18px;
+      }
+
+      .about-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .about-chip {
+        display: inline-flex;
+        align-items: center;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(254, 98, 142, 0.14);
+        color: #ffd5e1;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .detail {
+        display: grid;
+        gap: 10px;
+      }
+
+      .detail-row {
+        padding: 12px 13px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .detail-row strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+
+      .detail-row span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .cta {
+        display: flex;
+        gap: 10px;
+        margin-top: auto;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #ff8fb2, #fe628e);
+        color: #210f15;
+        box-shadow: 0 12px 24px rgba(254, 98, 142, 0.22);
+      }
+
+      .btn-secondary {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+      }
+
+      .compact-brand {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 78px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .compact-anchor {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 18px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 18px;
+        font-weight: 800;
+        box-shadow: inset 0 0 0 1px rgba(254, 98, 142, 0.18);
+      }
+
+      .compact-dot {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #101423;
+        border-radius: 999px;
+        background: #fe628e;
+        box-shadow: 0 0 0 8px rgba(254, 98, 142, 0.12);
+      }
+
+      .compact-nav {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 0;
+      }
+
+      .compact-item {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        color: rgba(255, 255, 255, 0.88);
+        background: transparent;
+      }
+
+      .compact-item.active {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .compact-item::before {
+        content: "";
+        width: 18px;
+        height: 18px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .tooltip-demo {
+        position: absolute;
+        top: 20px;
+        left: 72px;
+        width: 214px;
+        padding: 12px 13px;
+        border: 1px solid var(--brand-strong);
+        border-radius: 16px;
+        background: rgba(16, 20, 35, 0.98);
+        box-shadow: var(--shadow);
+      }
+
+      .tooltip-demo strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+
+      .tooltip-demo span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .behavior {
+        margin-top: 18px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .behavior ul {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      @media (max-width: 1100px) {
+        .page {
+          width: min(100vw - 20px, 1000px);
+          padding: 20px 0 30px;
+        }
+
+        .header,
+        .layout,
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .browser {
+          height: auto;
+          min-height: 720px;
+        }
+
+        .hero-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .tooltip-demo {
+          position: static;
+          width: 100%;
+          margin: 8px auto 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Curated Update Prompt</p>
+          <h1>侧边栏品牌区更新提示原型</h1>
+        </div>
+        <p class="summary">
+          这一版只验证一件事：<strong>当有新版本时，是否在左上角品牌区给轻量提示</strong>。
+          右侧 About 卡片只是用来表现点击后的承接，不代表首页会真的同时展开这个面板。
+        </p>
+      </header>
+
+      <section class="layout">
+        <article class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <span class="index">A</span>
+              <div>
+                <h2>展开侧边栏</h2>
+                <p class="card-desc">推荐样式：Logo 右边直接挂一个小 badge，持续提醒但不打断。</p>
+              </div>
+            </div>
+          </div>
+          <div class="browser">
+            <div class="shell-expanded">
+              <aside class="sidebar">
+                <div class="brand-row">
+                  <div class="brand-left">
+                    <span class="spark">✦</span>
+                    <div class="brand-group">
+                      <span class="brand-name">Curated</span>
+                      <span class="brand-badge">New</span>
+                    </div>
+                  </div>
+                  <span class="status-dot" aria-hidden="true"></span>
+                </div>
+
+                <div class="nav">
+                  <div>
+                    <div class="label">Browse</div>
+                    <div class="nav-list">
+                      <div class="nav-item active">
+                        <span class="nav-left"><span class="dot-icon"></span>主页</span>
+                      </div>
+                      <div class="nav-item">
+                        <span class="nav-left"><span class="dot-icon"></span>资料库</span>
+                        <span class="hint">824</span>
+                      </div>
+                      <div class="nav-item">
+                        <span class="nav-left"><span class="dot-icon"></span>演员</span>
+                        <span class="hint">142</span>
+                      </div>
+                      <div class="nav-item">
+                        <span class="nav-left"><span class="dot-icon"></span>标签</span>
+                        <span class="hint">68</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="label">Yours</div>
+                    <div class="nav-list">
+                      <div class="nav-item">
+                        <span class="nav-left"><span class="dot-icon"></span>萃取帧库</span>
+                        <span class="hint">248</span>
+                      </div>
+                      <div class="nav-item">
+                        <span class="nav-left"><span class="dot-icon"></span>观看历史</span>
+                        <span class="hint">37</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sidebar-note">
+                  <strong>交互建议</strong>
+                  <span>点击 Logo 区域或 New 标签后，跳转到 Settings → About，查看完整版本详情与下载入口。</span>
+                </div>
+              </aside>
+
+              <section class="main">
+                <div class="topbar">
+                  <div class="search">搜索片名、演员、标签…</div>
+                  <div class="right-actions">
+                    <span class="pill">同步成功</span>
+                    <span class="pill">深色主题</span>
+                  </div>
+                </div>
+
+                <div class="workspace">
+                  <section class="hero">
+                    <div>
+                      <div class="kicker">Home</div>
+                      <h3>今天先从这里开始看</h3>
+                      <p>
+                        Logo 邻近的更新提醒只负责告诉用户“有新版本了”，不在首页里直接展开大面积更新说明，避免打断主浏览任务。
+                      </p>
+                    </div>
+
+                    <div class="hero-grid">
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                    </div>
+                  </section>
+
+                  <aside class="about-preview">
+                    <div class="about-title">
+                      <h3>Settings → About</h3>
+                      <span class="about-chip">有可用更新</span>
+                    </div>
+
+                    <div class="detail">
+                      <div class="detail-row">
+                        <strong>当前安装版本</strong>
+                        <span>1.2.7</span>
+                      </div>
+                      <div class="detail-row">
+                        <strong>远端最新版本</strong>
+                        <span>1.2.8 · 发布于 2026-04-20</span>
+                      </div>
+                      <div class="detail-row">
+                        <strong>Release 页面</strong>
+                        <span>github.com/yepHiu/Curated/releases/tag/v1.2.8</span>
+                      </div>
+                    </div>
+
+                    <div class="cta">
+                      <span class="btn btn-primary">前往下载更新</span>
+                      <span class="btn btn-secondary">重新检查</span>
+                    </div>
+                  </aside>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <span class="index">B</span>
+              <div>
+                <h2>收起侧边栏</h2>
+                <p class="card-desc">推荐退化：不要塞文字，改成角标或小圆点，hover 再补充完整信息。</p>
+              </div>
+            </div>
+          </div>
+          <div class="browser">
+            <div class="shell-compact">
+              <aside class="sidebar" style="position: relative">
+                <div class="compact-brand">
+                  <div class="compact-anchor">
+                    ✦
+                    <span class="compact-dot"></span>
+                  </div>
+                </div>
+
+                <div class="compact-nav">
+                  <div class="compact-item active" title="主页"></div>
+                  <div class="compact-item" title="资料库"></div>
+                  <div class="compact-item" title="演员"></div>
+                  <div class="compact-item" title="标签"></div>
+                  <div class="compact-item" title="历史"></div>
+                </div>
+
+                <div class="tooltip-demo">
+                  <strong>发现新版本</strong>
+                  <span>当前 1.2.7，最新 1.2.8。点击品牌图标后进入 About 查看详情并下载更新。</span>
+                </div>
+              </aside>
+
+              <section class="main">
+                <div class="topbar">
+                  <div class="search">紧凑模式下仍保持主浏览界面完整，不让提示文字挤压内容。</div>
+                  <div class="right-actions">
+                    <span class="pill">Compact</span>
+                  </div>
+                </div>
+
+                <div class="workspace">
+                  <section class="hero">
+                    <div>
+                      <div class="kicker">Compact Sidebar</div>
+                      <h3>收起态只保留一个角标</h3>
+                      <p>
+                        这里的重点是“被看见”，不是“把所有更新信息都塞进侧边栏”。所以紧凑模式建议只保留视觉标记，再交给 tooltip 和 About 页面承接。
+                      </p>
+                    </div>
+
+                    <div class="hero-grid">
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                      <article class="poster">
+                        <div class="poster-art"></div>
+                        <div class="poster-meta"><div class="line-1"></div><div class="line-2"></div></div>
+                      </article>
+                    </div>
+                  </section>
+
+                  <aside class="about-preview">
+                    <div class="about-title">
+                      <h3>承接页仍然是 About</h3>
+                      <span class="about-chip">点击后进入</span>
+                    </div>
+
+                    <div class="detail">
+                      <div class="detail-row">
+                        <strong>品牌区提示职责</strong>
+                        <span>只负责提醒，不负责展示所有 release 字段。</span>
+                      </div>
+                      <div class="detail-row">
+                        <strong>紧凑态建议</strong>
+                        <span>角标 + tooltip，比直接塞 `v1.2.8` 更稳，不会破坏收起态节奏。</span>
+                      </div>
+                      <div class="detail-row">
+                        <strong>视觉目标</strong>
+                        <span>让用户注意到“有更新”，但仍把播放、浏览、推荐当成主任务。</span>
+                      </div>
+                    </div>
+
+                    <div class="cta">
+                      <span class="btn btn-primary">查看更新详情</span>
+                      <span class="btn btn-secondary">稍后处理</span>
+                    </div>
+                  </aside>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="behavior">
+        <h2>这份原型表达的方案</h2>
+        <ul>
+          <li>展开态：`Curated` 文字右边挂一个小 `New` badge，存在感足够，但不抢主导航层级。</li>
+          <li>收起态：品牌图标右上角只保留角标，小而稳定，hover 时通过 tooltip 展示版本信息。</li>
+          <li>品牌区提示是“提醒入口”，真正的版本详情、发布时间和下载按钮仍然放在 `Settings → About`。</li>
+          <li>如果你觉得 `New` 太轻，后续可以再试一版 `更新` 或 `v1.2.8`，但我当前推荐先从最短文案开始。</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

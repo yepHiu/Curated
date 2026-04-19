@@ -26,3 +26,11 @@ b2b2f092 chore(release): bump package version to 1.2.4 and record publish
 f4e71dc2 feat(frontend): homepage daily picks, portal, and player shortcuts
 b71b1775 feat(backend): persist homepage daily recommendations",versionSource=auto-patch; BuildStamp=20260416.164557; portable=versionSource=explicit; installer=versionSource=explicit
 2026-04-17,1.2.6,4319daf7,master,release:publish,release/portable/Curated-1.2.6-windows-x64.zip; release/installer/Curated-Setup-1.2.6.exe; release/manifest/release.json,成功,wujiahui,无代码差异（同一提交重复打包）,versionSource=auto-patch; BuildStamp=20260416.165419; portable=versionSource=explicit; installer=versionSource=explicit
+2026-04-19,1.2.7,185c6a33,master,release:publish,release/portable/Curated-1.2.7-windows-x64.zip; release/installer/Curated-Setup-1.2.7.exe; release/manifest/release.json,成功,wujiahui,"185c6a33 docs: homepage recommendation freshness plans and facts
+951661d5 feat(backend): ladder exclusions for homepage daily picks
+064d3047 docs(plan): player seek time sync bugfix notes
+6684d120 fix(frontend): sync player seek UI with playback clock
+d11eda1a docs: Python release CLI, CSV history, and packaging skill
+f6873df8 feat(scripts): replace PowerShell release pipeline with Python CLI
+1e3e7acd chore(release): bump package version to 1.2.6 and record publish
+796d8c1f fix(backend): dedupe Windows tray cancel and inject syscall seams",versionSource=auto-patch; BuildStamp=20260419.111519; portable=versionSource=explicit; installer=versionSource=explicit

@@ -4,7 +4,7 @@ description: Use when the user asks in natural language to preview or run Curate
 license: MIT
 metadata:
   repo: Curated
-  version: "0.3.0"
+  version: "0.4.0"
   previewScript: .cursor/skills/curated-packaging/scripts/preview-package.py
   executeScript: .cursor/skills/curated-packaging/scripts/execute-package.py
   packagingCommands:
@@ -59,3 +59,18 @@ Use this skill only inside this repository. Do not treat it as a global skill or
   - `python scripts/release/release_cli.py set-version-base`
   - `python scripts/release/release_cli.py migrate-history`
 - When the user asks about package/version history, use `docs/package-build-history.csv` as the source of truth and prefer showing the latest row plus its `change_summary`.
+
+## Post-Package Release Notes
+
+- Every successful production packaging run must also produce a release-note file under `docs/release-notes/`.
+- Never place packaging release notes under `docs/plan/`.
+- Use the file naming convention `YYYY-MM-DD-release-<version>-notes.md`, for example `2026-04-19-release-1.2.7-notes.md`.
+- If `docs/release-notes/README.md` exists, follow its documented convention; otherwise keep the same structure above.
+- The release note should include at minimum:
+  - release version
+  - short summary of changes
+  - artifact names
+  - checksums when available
+  - a GitHub Release body draft when useful
+- After packaging completes, send the release-note content or a directly copyable GitHub Release draft back to the user in the response.
+- If packaging partially succeeds but artifact metadata is incomplete, still create the note and clearly mark the missing fields for follow-up.

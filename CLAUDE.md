@@ -180,6 +180,8 @@ The backend exposes these HTTP endpoints:
 ```
 GET    /api/health                          # Health check (name, version/build stamp, optional installerVersion, channel, databasePath)
 GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
+GET    /api/app-update/status               # Cached packaged-app update status vs latest GitHub Release
+POST   /api/app-update/check                # Force a fresh packaged-app update check
 GET    /api/homepage/recommendations        # Persisted UTC-day homepage hero + recommendation snapshot
 POST   /api/homepage/recommendations/refresh # Force-regenerate the current UTC-day homepage recommendation snapshot
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
@@ -239,6 +241,8 @@ POST   /api/providers/ping-all              # Ping all providers
 **Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged. When **`autoActorProfileScrape`** is true, successful movie metadata scrapes also enqueue `scrape.actor` tasks for actors that still lack both avatar and summary.
 
 **Homepage daily recommendations:** `GET /api/homepage/recommendations` returns the UTC-day snapshot used by the homepage hero and today's recommendations. In Web API mode the backend persists this snapshot in SQLite, the frontend re-fetches automatically when the UTC day key changes so all browsers/devices see the same daily selection, and generation now combines a hard yesterday-exclusion rule, a recent-history exposure penalty, and actor/studio diversity penalties to spread titles more evenly across days. `POST /api/homepage/recommendations/refresh` force-regenerates that same-day snapshot for development verification, and the Settings -> About page exposes a dev-only refresh button when `import.meta.env.DEV` and `VITE_USE_WEB_API=true`.
+
+**App update checks:** `GET /api/app-update/status` returns the packaged-app update state used by Settings -> About and the sidebar brand badge, while `POST /api/app-update/check` forces a refresh. The backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`, caches the result in SQLite, reuses the process proxy settings for outbound requests, and uses `0.0.0` as the dev-runtime fallback when no packaged installer version was injected.
 
 ## Architecture Boundaries
 
@@ -420,6 +424,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Windows dev backend binary naming is an explicit constraint: keep dev builds as `curated-dev.exe` and reserve `curated.exe` for release/package builds only
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
+- Settings -> About now includes packaged-app update status, a manual update-check action, and a release-page link; when an update is available, the sidebar brand area shows a lightweight badge/dot that routes users into `Settings -> About`
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
 - Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), and Windows login autostart (`launchAtLogin`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)

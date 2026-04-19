@@ -78,7 +78,7 @@ Important notes:
 - release mode reports `curated`
 - `version` is the backend build identifier / build stamp shown in Settings -> About
 - `installerVersion` is an optional installer/package version, embedded into release backend binaries at packaging time
-- `installerVersion` may be omitted in development or non-packaged builds
+- development runtimes expose `installerVersion: "0.0.0"` as a stable fallback when no packaged version was injected
 - release builds should continue exposing stable version and channel information
 
 ### `GET /api/dev/performance`
@@ -91,6 +91,33 @@ Important notes:
 
 - intended for development diagnostics
 - not a core product-facing endpoint
+
+## App Updates
+
+### `GET /api/app-update/status`
+
+Purpose:
+
+- return the current app-update comparison result used by Settings -> About and the sidebar brand badge
+
+Important notes:
+
+- the backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`
+- development runtimes use `0.0.0` as the local installed version so the full update-check path remains testable before packaging
+- successful checks are cached in SQLite so routine reads do not hit GitHub on every app start
+- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `releaseNotesSnippet`, and optional `errorMessage`
+
+### `POST /api/app-update/check`
+
+Purpose:
+
+- force a fresh app-update check against the latest GitHub Release
+
+Important notes:
+
+- bypasses the cached status used by `GET /api/app-update/status`
+- returns the same DTO shape as the status endpoint
+- used by the manual "Check for updates" action in Settings -> About
 
 ## Homepage
 

@@ -29,6 +29,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - Real API mode and mock mode for fast UI iteration.
 - SQLite-backed persistence for library data, playback progress, comments, ratings, and curated frames.
 - UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, with recent-history exposure penalties plus actor and studio diversity balancing to reduce repeated titles across days.
+- Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
 
@@ -104,6 +105,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 - Windows-oriented release workflow.
 - Tray-mode release runtime with local frontend hosting beside the backend executable.
+- Settings -> About can compare the current packaged installer version with the latest GitHub Release and open the official release page for manual upgrade.
 
 ## Configuration
 
