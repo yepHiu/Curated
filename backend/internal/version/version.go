@@ -29,6 +29,8 @@ var BuildStamp = ""
 // (for example, the version allocated from scripts/release/version.json during publish).
 var InstallerVersion = ""
 
+const devFallbackPackageVersion = "0.0.0"
+
 var (
 	resolvedFallback string
 	resolveOnce      sync.Once
@@ -81,5 +83,11 @@ func Display() string {
 
 // PackageVersion returns the packaged release version when embedded into the binary.
 func PackageVersion() string {
-	return strings.TrimSpace(InstallerVersion)
+	if version := strings.TrimSpace(InstallerVersion); version != "" {
+		return version
+	}
+	if Channel != "release" {
+		return devFallbackPackageVersion
+	}
+	return ""
 }

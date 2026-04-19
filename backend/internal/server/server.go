@@ -140,6 +140,11 @@ type HomepageRecommendationsProvider interface {
 	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
 }
 
+type AppUpdateProvider interface {
+	GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
+	CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
+}
+
 type Handler struct {
 	cfg                       config.Config
 	logger                    *zap.Logger
@@ -163,6 +168,7 @@ type Handler struct {
 	playbackResolver          PlaybackResolver
 	nativePlaybackLauncher    NativePlaybackLauncher
 	homepageRecommendations   HomepageRecommendationsProvider
+	appUpdateProvider         AppUpdateProvider
 }
 
 type Deps struct {
@@ -188,6 +194,7 @@ type Deps struct {
 	PlaybackResolver          PlaybackResolver
 	NativePlaybackLauncher    NativePlaybackLauncher
 	HomepageRecommendations   HomepageRecommendationsProvider
+	AppUpdateProvider         AppUpdateProvider
 }
 
 func NewHandler(deps Deps) *Handler {
@@ -214,6 +221,7 @@ func NewHandler(deps Deps) *Handler {
 		playbackResolver:          deps.PlaybackResolver,
 		nativePlaybackLauncher:    deps.NativePlaybackLauncher,
 		homepageRecommendations:   deps.HomepageRecommendations,
+		appUpdateProvider:         deps.AppUpdateProvider,
 	}
 }
 
@@ -222,6 +230,8 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
+	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
+	mux.HandleFunc("POST /api/app-update/check", h.handleCheckAppUpdate)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

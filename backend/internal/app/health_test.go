@@ -59,3 +59,46 @@ func TestHandleCommand_SystemHealthIncludesInstallerVersion(t *testing.T) {
 		t.Fatalf("health.InstallerVersion = %q, want %q", got, want)
 	}
 }
+
+func TestHandleCommand_SystemHealthUsesDevFallbackInstallerVersion(t *testing.T) {
+	t.Parallel()
+
+	prev := version.InstallerVersion
+	version.InstallerVersion = ""
+	t.Cleanup(func() {
+		version.InstallerVersion = prev
+	})
+
+	a := &App{
+		cfg:    config.Config{DatabasePath: "runtime/curated.db"},
+		logger: zap.NewNop(),
+	}
+
+	var out bytes.Buffer
+	err := a.handleCommand(context.Background(), &out, contracts.Command{
+		ID:   "health-2",
+		Type: contracts.CommandSystemHealth,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var resp contracts.Response
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	raw, err := json.Marshal(resp.Data)
+	if err != nil {
+		t.Fatalf("marshal response data: %v", err)
+	}
+
+	var health contracts.HealthDTO
+	if err := json.Unmarshal(raw, &health); err != nil {
+		t.Fatalf("unmarshal health dto: %v", err)
+	}
+
+	if got, want := health.InstallerVersion, "0.0.0"; got != want {
+		t.Fatalf("health.InstallerVersion = %q, want %q", got, want)
+	}
+}

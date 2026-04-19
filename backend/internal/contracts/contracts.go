@@ -66,6 +66,21 @@ type DevPerformanceSummaryDTO struct {
 	BackendCPUPercent float64 `json:"backendCpuPercent,omitempty"`
 }
 
+type AppUpdateStatusDTO struct {
+	Supported           bool   `json:"supported"`
+	Status              string `json:"status"`
+	InstalledVersion    string `json:"installedVersion,omitempty"`
+	LatestVersion       string `json:"latestVersion,omitempty"`
+	HasUpdate           bool   `json:"hasUpdate,omitempty"`
+	CheckedAt           string `json:"checkedAt,omitempty"`
+	PublishedAt         string `json:"publishedAt,omitempty"`
+	ReleaseName         string `json:"releaseName,omitempty"`
+	ReleaseURL          string `json:"releaseUrl,omitempty"`
+	ReleaseNotesSnippet string `json:"releaseNotesSnippet,omitempty"`
+	Source              string `json:"source,omitempty"`
+	ErrorMessage        string `json:"errorMessage,omitempty"`
+}
+
 type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`

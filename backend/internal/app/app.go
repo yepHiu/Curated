@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"curated-backend/internal/appupdate"
 	"curated-backend/internal/assets"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
@@ -60,6 +61,7 @@ type App struct {
 	player        *nativeplayer.Launcher
 	streams       *playback.Manager
 	devCPUSampler devmetrics.CPUSampler
+	appUpdate     *appupdate.Service
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
@@ -155,6 +157,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
 		devCPUSampler:                 devmetrics.NewCPUSampler(),
+		appUpdate:                     appupdate.NewService(store, logger),
 		organizeLibrary:               cfg.OrganizeLibrary,
 		extendedLibraryImport:         cfg.ExtendedLibraryImport,
 		autoLibraryWatch:              cfg.AutoLibraryWatch,
@@ -2415,8 +2418,35 @@ func (a *App) HTTPHandler() http.Handler {
 		PlaybackResolver:          a,
 		NativePlaybackLauncher:    a,
 		HomepageRecommendations:   a,
+		AppUpdateProvider:         a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
+}
+
+func (a *App) GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
+	if a == nil || a.appUpdate == nil {
+		return contracts.AppUpdateStatusDTO{
+			Supported:    false,
+			Status:       "unsupported",
+			ReleaseURL:   appupdate.DefaultReleasePageURL,
+			Source:       "github-releases",
+			ErrorMessage: "app update service unavailable",
+		}, nil
+	}
+	return a.appUpdate.GetStatus(ctx)
+}
+
+func (a *App) CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
+	if a == nil || a.appUpdate == nil {
+		return contracts.AppUpdateStatusDTO{
+			Supported:    false,
+			Status:       "unsupported",
+			ReleaseURL:   appupdate.DefaultReleasePageURL,
+			Source:       "github-releases",
+			ErrorMessage: "app update service unavailable",
+		}, nil
+	}
+	return a.appUpdate.CheckNow(ctx)
 }
 
 func (a *App) GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO {
