@@ -103,7 +103,6 @@ import {
 } from "@/lib/curated-frames/db"
 import {
   formatAboutBackendVersion,
-  formatAboutInstallerVersion,
 } from "@/lib/about-version"
 import {
   getCuratedCaptureKeyCode,
@@ -113,6 +112,7 @@ import {
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
 import SettingsCuratedShortcutSection from "@/components/jav-library/settings/SettingsCuratedShortcutSection.vue"
+import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
 import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
 import { useLibraryService } from "@/services/library-service"
@@ -871,6 +871,32 @@ const aboutHealth = ref<HealthDTO | null>(null)
 const aboutHealthLoading = ref(false)
 const aboutHealthError = ref("")
 const aboutHealthLoaded = ref(false)
+
+const aboutBackendVersionDisplay = computed(() => {
+  if (!useWebApi) {
+    return t("settings.aboutVersionMock")
+  }
+  if (aboutHealthLoading.value) {
+    return t("settings.aboutVersionLoading")
+  }
+  if (aboutHealthError.value) {
+    return aboutHealthError.value
+  }
+  if (aboutHealth.value) {
+    return formatAboutBackendVersion(aboutHealth.value)
+  }
+  return "—"
+})
+
+const aboutBackendVersionStatus = computed<"default" | "loading" | "error">(() => {
+  if (aboutHealthError.value) {
+    return "error"
+  }
+  if (aboutHealthLoading.value) {
+    return "loading"
+  }
+  return "default"
+})
 
 async function loadAboutHealth() {
   if (!useWebApi) return
@@ -3645,7 +3671,7 @@ async function runMetadataRefreshForSelected() {
           <!-- 开发：版本号、数据模式、前端构建模式 -->
           <template v-if="isViteDev">
             <dl class="space-y-4">
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
+              <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
                 <dt class="font-medium text-foreground">
                   {{ t("settings.aboutVersionLabel") }}
                 </dt>
@@ -3662,17 +3688,11 @@ async function runMetadataRefreshForSelected() {
                   <span v-else>—</span>
                 </dd>
               </div>
-              <div
-                v-if="aboutHealth && formatAboutInstallerVersion(aboutHealth)"
-                class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3"
-              >
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutInstallerVersionLabel") }}
-                </dt>
-                <dd class="mt-1.5 font-mono text-foreground/90">
-                  {{ formatAboutInstallerVersion(aboutHealth) }}
-                </dd>
-              </div>
+              <SettingsAppUpdateSection
+                v-if="useWebApi"
+                :backend-version-display="aboutBackendVersionDisplay"
+                :backend-version-status="aboutBackendVersionStatus"
+              />
               <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
                 <dt class="font-medium text-foreground">
                   {{ t("settings.aboutDataModeLabel") }}
@@ -3700,7 +3720,7 @@ async function runMetadataRefreshForSelected() {
           </template>
           <!-- 生产：仅版本号 -->
           <template v-else>
-            <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
+            <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
               <p class="font-medium text-foreground">
                 {{ t("settings.aboutVersionLabel") }}
               </p>
@@ -3715,17 +3735,11 @@ async function runMetadataRefreshForSelected() {
                 <span v-else>—</span>
               </p>
             </div>
-            <div
-              v-if="aboutHealth && formatAboutInstallerVersion(aboutHealth)"
-              class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3"
-            >
-              <p class="font-medium text-foreground">
-                {{ t("settings.aboutInstallerVersionLabel") }}
-              </p>
-              <p class="mt-1.5 font-mono text-sm text-foreground/90">
-                {{ formatAboutInstallerVersion(aboutHealth) }}
-              </p>
-            </div>
+            <SettingsAppUpdateSection
+              v-if="useWebApi"
+              :backend-version-display="aboutBackendVersionDisplay"
+              :backend-version-status="aboutBackendVersionStatus"
+            />
           </template>
           <SettingsHomepageDevTools
             v-if="isViteDev && useWebApi"

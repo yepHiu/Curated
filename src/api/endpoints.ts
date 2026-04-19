@@ -24,6 +24,7 @@ import type {
   ActorsListDTO,
   AddLibraryPathBody,
   AddLibraryPathResultDTO,
+  AppUpdateStatusDTO,
   CreateCuratedFrameBody,
   CuratedFrameFacetListDTO,
   CuratedFrameStatsDTO,
@@ -67,6 +68,14 @@ export const api = {
 
   getDevPerformanceSummary(): Promise<DevPerformanceSummaryDTO> {
     return httpClient.get<DevPerformanceSummaryDTO>("/dev/performance")
+  },
+
+  getAppUpdateStatus(): Promise<AppUpdateStatusDTO> {
+    return httpClient.get<AppUpdateStatusDTO>("/app-update/status")
+  },
+
+  checkAppUpdateNow(): Promise<AppUpdateStatusDTO> {
+    return httpClient.post<AppUpdateStatusDTO>("/app-update/check")
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

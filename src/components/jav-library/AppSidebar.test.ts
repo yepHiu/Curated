@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest"
 
 import AppSidebar from "./AppSidebar.vue"
 
+const updateAvailable = ref(false)
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     locale: ref("zh-CN"),
@@ -37,6 +39,33 @@ vi.mock("@/composables/use-backend-health", () => ({
   }),
 }))
 
+vi.mock("@/composables/use-app-update", () => ({
+  useAppUpdate: () => ({
+    useWebApi: true,
+    status: computed(() => (updateAvailable.value ? "update-available" : "up-to-date")),
+    summary: computed(() =>
+      updateAvailable.value
+        ? {
+            supported: true,
+            status: "update-available",
+            installedVersion: "1.2.7",
+            latestVersion: "1.2.8",
+            hasUpdate: true,
+          }
+        : {
+            supported: true,
+            status: "up-to-date",
+            installedVersion: "1.2.8",
+            latestVersion: "1.2.8",
+            hasUpdate: false,
+          },
+    ),
+    hasUpdateBadge: computed(() => updateAvailable.value),
+    checkNow: vi.fn(),
+    ensureLoaded: vi.fn(),
+  }),
+}))
+
 vi.mock("@/lib/curated-frames/db", () => ({
   countCuratedFrames: vi.fn(async () => 0),
 }))
@@ -67,7 +96,28 @@ vi.mock("@/components/ui/separator", () => ({
 }))
 
 describe("AppSidebar", () => {
+  it("shows the brand update badge in expanded mode when a new version is available", async () => {
+    updateAvailable.value = true
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    expect(wrapper.find("[data-update-badge]").exists()).toBe(true)
+    expect(wrapper.find("[data-update-badge]").text()).toContain("New")
+  })
+
+  it("shows the compact brand update dot when a new version is available", async () => {
+    updateAvailable.value = true
+
+    const wrapper = mount(AppSidebar, { props: { compact: true } })
+    await flushPromises()
+
+    expect(wrapper.find("[data-update-dot]").exists()).toBe(true)
+  })
+
   it("keeps the same core nav link count when toggling compact mode", async () => {
+    updateAvailable.value = false
+
     const wrapper = mount(AppSidebar, { props: { compact: false } })
     await flushPromises()
 

@@ -30,6 +30,21 @@ export interface DevPerformanceSummaryDTO {
   backendCpuPercent?: number
 }
 
+export interface AppUpdateStatusDTO {
+  supported: boolean
+  status: "unsupported" | "up-to-date" | "update-available" | "error"
+  installedVersion?: string
+  latestVersion?: string
+  hasUpdate?: boolean
+  checkedAt?: string
+  publishedAt?: string
+  releaseName?: string
+  releaseUrl?: string
+  releaseNotesSnippet?: string
+  source?: string
+  errorMessage?: string
+}
+
 export interface MovieListItemDTO {
   id: string
   title: string

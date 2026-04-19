@@ -7,7 +7,7 @@ export function formatAboutBackendVersion(h: HealthDTO): string {
   return h.version
 }
 
-/** Packaged installer/release version is optional and only exists for official package builds. */
+/** Health now reports a stable installer version string in both release and dev runtimes. */
 export function formatAboutInstallerVersion(h: HealthDTO): string {
   return typeof h.installerVersion === "string" ? h.installerVersion.trim() : ""
 }

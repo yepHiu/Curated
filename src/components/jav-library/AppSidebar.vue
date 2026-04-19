@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import { useAppUpdate } from "@/composables/use-app-update"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { countCuratedFrames } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
@@ -69,6 +70,7 @@ const {
   versionDisplay: backendVersionDisplay,
   checkNow: checkBackendHealth,
 } = useBackendHealth()
+const { hasUpdateBadge, summary: appUpdateSummary } = useAppUpdate()
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -214,6 +216,21 @@ const sidebarSections = computed((): SidebarNavSection[] => [
 
 const isActive = (page: AppPage) => route.name === page
 
+const brandNavigationTarget = computed(() => ({
+  name: "settings",
+  query: { ...route.query, section: "about" },
+}))
+
+const brandUpdateTitle = computed(() => {
+  if (!hasUpdateBadge.value) {
+    return "Curated"
+  }
+  const latest = appUpdateSummary.value?.latestVersion?.trim()
+  return latest
+    ? `Curated\nNew version ${latest}`
+    : "Curated\nNew version available"
+})
+
 const getNavigationTarget = (page: AppPage) => {
   if (page === "home") {
     return { name: "home" }
@@ -243,12 +260,22 @@ const getNavigationTarget = (page: AppPage) => {
       class="flex min-h-[4.5rem] shrink-0 items-center border-b border-sidebar-border/80"
       :class="props.compact ? 'justify-center py-3.5 lg:py-4' : 'justify-between gap-2 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4'"
     >
-      <div
+      <RouterLink
+        :to="brandNavigationTarget"
+        data-sidebar-brand-link
         class="font-curated inline-flex w-fit max-w-full items-center gap-2 px-1 py-1 font-semibold tracking-wide text-primary"
         :class="props.compact ? 'justify-center text-base' : 'text-lg sm:text-xl'"
-        title="Curated"
+        :title="brandUpdateTitle"
       >
-        <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
+        <span class="relative inline-flex items-center">
+          <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
+          <span
+            v-if="props.compact && hasUpdateBadge"
+            data-update-dot
+            class="absolute -right-1 -top-1 size-2.5 rounded-full border border-sidebar bg-primary shadow-[0_0_0_3px_rgba(254,98,142,0.16)]"
+            aria-hidden="true"
+          />
+        </span>
         <span
           class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
           :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
@@ -256,7 +283,15 @@ const getNavigationTarget = (page: AppPage) => {
         >
           Curated
         </span>
-      </div>
+        <Badge
+          v-if="!props.compact && hasUpdateBadge"
+          data-update-badge
+          variant="secondary"
+          class="rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary"
+        >
+          New
+        </Badge>
+      </RouterLink>
     </div>
 
     <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
