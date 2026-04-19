@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,15 +133,7 @@ func (f *homepageRecommendationFixture) mustResaveMovieMetadataWithProfile(
 }
 
 func testMovieCode(i int) string {
-	if i < 10 {
-		return "M0" + string(rune('0'+i))
-	}
-	if i < 100 {
-		tens := rune('0' + (i / 10))
-		ones := rune('0' + (i % 10))
-		return "M" + string(tens) + string(ones)
-	}
-	return "M100"
+	return fmt.Sprintf("M%02d", i)
 }
 
 func TestGenerateHomepageDailyRecommendationsAvoidsYesterdayWhenInventoryAllows(t *testing.T) {
@@ -305,5 +298,125 @@ func TestGenerateHomepageDailyRecommendationsBalancesActorsAndStudiosAcrossSlate
 	}
 	if clusterCount != 4 {
 		t.Fatalf("clusterCount = %d, want 4, all=%#v", clusterCount, all)
+	}
+}
+
+func TestGenerateHomepageDailyRecommendationsAvoidsLast7DaysWhenInventoryAllows(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 112)
+	for i := 1; i <= 98; i++ {
+		fixture.mustResaveMovieMetadata(t, testMovieCode(i), 5.0)
+	}
+	for i := 99; i <= 112; i++ {
+		fixture.mustResaveMovieMetadata(t, testMovieCode(i), 1.0)
+	}
+
+	for offset := 1; offset <= 7; offset++ {
+		dateUTC := fmt.Sprintf("2026-04-%02d", 15-offset)
+		start := (offset-1)*14 + 1
+		heroIDs := make([]string, 0, 8)
+		recommendationIDs := make([]string, 0, 6)
+		for i := 0; i < 8; i++ {
+			heroIDs = append(heroIDs, strings.ToLower(testMovieCode(start+i)))
+		}
+		for i := 8; i < 14; i++ {
+			recommendationIDs = append(recommendationIDs, strings.ToLower(testMovieCode(start+i)))
+		}
+		fixture.mustSaveSnapshot(t, dateUTC, heroIDs, recommendationIDs)
+	}
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	recentIDs := make(map[string]struct{}, 98)
+	for i := 1; i <= 98; i++ {
+		recentIDs[strings.ToLower(testMovieCode(i))] = struct{}{}
+	}
+
+	all := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if len(all) != 14 {
+		t.Fatalf("len(all) = %d, want 14", len(all))
+	}
+	for _, id := range all {
+		if _, ok := recentIDs[id]; ok {
+			t.Fatalf("last-7-day movie %q reappeared in %#v", id, all)
+		}
+	}
+}
+
+func TestGenerateHomepageDailyRecommendationsFallsBackToShorterRecentWindow(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 35)
+
+	groupA := []string{"m01", "m02", "m03", "m04", "m05", "m06", "m07"}
+	groupB := []string{"m08", "m09", "m10", "m11", "m12", "m13", "m14"}
+	groupC := []string{"m15", "m16", "m17", "m18", "m19", "m20", "m21"}
+	groupD := []string{"m22", "m23", "m24", "m25", "m26", "m27", "m28"}
+	groupE := []string{"m29", "m30", "m31", "m32", "m33", "m34", "m35"}
+
+	for _, id := range groupC {
+		fixture.mustResaveMovieMetadata(t, strings.ToUpper(id), 5.0)
+	}
+	for _, id := range append(append([]string{}, groupD...), groupE...) {
+		fixture.mustResaveMovieMetadata(t, strings.ToUpper(id), 3.5)
+	}
+
+	fixture.mustSaveSnapshot(t, "2026-04-14",
+		append(append([]string{}, groupA...), groupB[:1]...),
+		append([]string{}, groupB[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-13",
+		append(append([]string{}, groupB...), groupC[:1]...),
+		append([]string{}, groupC[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-12",
+		append(append([]string{}, groupC...), groupA[:1]...),
+		append([]string{}, groupA[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-11",
+		append(append([]string{}, groupD...), groupA[:1]...),
+		append([]string{}, groupA[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-10",
+		append(append([]string{}, groupD...), groupB[:1]...),
+		append([]string{}, groupB[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-09",
+		append(append([]string{}, groupE...), groupC[:1]...),
+		append([]string{}, groupC[1:]...),
+	)
+	fixture.mustSaveSnapshot(t, "2026-04-08",
+		append(append([]string{}, groupE...), groupA[:1]...),
+		append([]string{}, groupA[1:]...),
+	)
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	all := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if len(all) != 14 {
+		t.Fatalf("len(all) = %d, want 14", len(all))
+	}
+
+	disallowed := make(map[string]struct{}, 21)
+	for _, id := range append(append([]string{}, groupA...), groupB...) {
+		disallowed[id] = struct{}{}
+	}
+	for _, id := range groupC {
+		disallowed[id] = struct{}{}
+	}
+
+	for _, id := range all {
+		if _, ok := disallowed[id]; ok {
+			t.Fatalf("movie from the last 3 days %q reappeared in %#v", id, all)
+		}
 	}
 }

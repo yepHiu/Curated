@@ -13,7 +13,7 @@ import (
 	"curated-backend/internal/storage"
 )
 
-const homepageDailyRecommendationGenerationVersion = "v3"
+const homepageDailyRecommendationGenerationVersion = "v4"
 
 const (
 	homepageDailyExposureLookbackDays   = 14
@@ -22,6 +22,8 @@ const (
 	homepageDailyActorDiversityPenalty  = 2.25
 	homepageDailyStudioDiversityPenalty = 1.75
 )
+
+var homepageDailyRecentExclusionWindows = []int{7, 5, 3, 1, 0}
 
 type homepageDailyCandidate struct {
 	movie     contracts.MovieListItemDTO
@@ -32,6 +34,11 @@ type homepageDailyCandidate struct {
 type homepageDailySelectionState struct {
 	actorCounts  map[string]int
 	studioCounts map[string]int
+}
+
+type homepageDailyExclusionPolicy struct {
+	windowDays int
+	movieIDs   map[string]struct{}
 }
 
 func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
@@ -106,24 +113,13 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 
-	yesterdayUTC := previousUTCDate(dateUTC)
-	yesterdaySnapshot, yesterdayExists, err := a.store.GetHomepageDailyRecommendationSnapshot(ctx, yesterdayUTC)
+	recentSnapshots, err := a.listHomepageRecentSnapshots(ctx, dateUTC, homepageDailyExposureLookbackDays)
 	if err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
-
-	yesterdayIDs := make(map[string]struct{})
-	if yesterdayExists {
-		for _, id := range yesterdaySnapshot.HeroMovieIDs {
-			if trimmed := strings.TrimSpace(id); trimmed != "" {
-				yesterdayIDs[trimmed] = struct{}{}
-			}
-		}
-		for _, id := range yesterdaySnapshot.RecommendationMovieIDs {
-			if trimmed := strings.TrimSpace(id); trimmed != "" {
-				yesterdayIDs[trimmed] = struct{}{}
-			}
-		}
+	exclusionLadder, err := buildHomepageDailyExclusionLadder(dateUTC, recentSnapshots, homepageDailyRecentExclusionWindows)
+	if err != nil {
+		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 
 	allCandidates := rankHomepageDailyCandidates(page.Items, dateUTC, exposurePenaltyByMovieID)
@@ -133,8 +129,22 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		studioCounts: make(map[string]int),
 	}
 
-	heroIDs := selectHomepageDailyIDs(allCandidates, selected, yesterdayIDs, selectionState, 8, true)
-	recommendationIDs := selectHomepageDailyIDs(allCandidates, selected, yesterdayIDs, selectionState, 6, false)
+	heroIDs, heroExclusionWindowUsed := selectHomepageDailyIDs(
+		allCandidates,
+		selected,
+		selectionState,
+		8,
+		true,
+		exclusionLadder,
+	)
+	recommendationIDs, recommendationExclusionWindowUsed := selectHomepageDailyIDs(
+		allCandidates,
+		selected,
+		selectionState,
+		6,
+		false,
+		exclusionLadder,
+	)
 
 	dto := contracts.HomepageDailyRecommendationsDTO{
 		DateUTC:                dateUTC,
@@ -149,10 +159,9 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 			zap.String("dateUTC", dateUTC),
 			zap.Int("candidateCount", len(allCandidates)),
 			zap.Int("historyPenaltyMovieCount", len(exposurePenaltyByMovieID)),
-			zap.Int("yesterdayExclusionCount", len(yesterdayIDs)),
-			zap.Bool("yesterdaySnapshotExists", yesterdayExists),
-			zap.Bool("heroBackfilledFromYesterday", hasOverlap(heroIDs, yesterdayIDs)),
-			zap.Bool("recommendationsBackfilledFromYesterday", hasOverlap(recommendationIDs, yesterdayIDs)),
+			zap.Int("recentSnapshotCount", len(recentSnapshots)),
+			zap.Int("heroExclusionWindowDays", heroExclusionWindowUsed),
+			zap.Int("recommendationExclusionWindowDays", recommendationExclusionWindowUsed),
 			zap.Strings("heroMovieIDs", heroIDs),
 			zap.Strings("recommendationMovieIDs", recommendationIDs),
 		)
@@ -206,6 +215,79 @@ func (a *App) buildHomepageExposurePenaltyMap(ctx context.Context, dateUTC strin
 	return penaltyByMovieID, nil
 }
 
+func (a *App) listHomepageRecentSnapshots(
+	ctx context.Context,
+	dateUTC string,
+	lookbackDays int,
+) ([]storage.HomepageDailyRecommendationSnapshot, error) {
+	currentDate, err := time.Parse("2006-01-02", dateUTC)
+	if err != nil {
+		return nil, err
+	}
+	if lookbackDays <= 0 {
+		return []storage.HomepageDailyRecommendationSnapshot{}, nil
+	}
+
+	startDateUTC := currentDate.AddDate(0, 0, -lookbackDays).Format("2006-01-02")
+	endDateUTC := currentDate.AddDate(0, 0, -1).Format("2006-01-02")
+	if startDateUTC > endDateUTC {
+		return []storage.HomepageDailyRecommendationSnapshot{}, nil
+	}
+
+	return a.store.ListHomepageDailyRecommendationSnapshotsInRange(ctx, startDateUTC, endDateUTC)
+}
+
+func buildHomepageDailyExclusionLadder(
+	dateUTC string,
+	snapshots []storage.HomepageDailyRecommendationSnapshot,
+	windows []int,
+) ([]homepageDailyExclusionPolicy, error) {
+	currentDate, err := time.Parse("2006-01-02", dateUTC)
+	if err != nil {
+		return nil, err
+	}
+
+	policies := make([]homepageDailyExclusionPolicy, 0, len(windows))
+	for _, windowDays := range windows {
+		policies = append(policies, homepageDailyExclusionPolicy{
+			windowDays: windowDays,
+			movieIDs:   buildHomepageRecentExclusionSet(currentDate, snapshots, windowDays),
+		})
+	}
+	return policies, nil
+}
+
+func buildHomepageRecentExclusionSet(
+	currentDate time.Time,
+	snapshots []storage.HomepageDailyRecommendationSnapshot,
+	windowDays int,
+) map[string]struct{} {
+	excluded := make(map[string]struct{})
+	if windowDays <= 0 {
+		return excluded
+	}
+
+	for _, snapshot := range snapshots {
+		snapshotDate, err := time.Parse("2006-01-02", snapshot.DateUTC)
+		if err != nil {
+			continue
+		}
+		daysAgo := int(currentDate.Sub(snapshotDate).Hours() / 24)
+		if daysAgo <= 0 || daysAgo > windowDays {
+			continue
+		}
+		for _, movieID := range append(snapshot.HeroMovieIDs, snapshot.RecommendationMovieIDs...) {
+			normalizedMovieID := strings.TrimSpace(movieID)
+			if normalizedMovieID == "" {
+				continue
+			}
+			excluded[normalizedMovieID] = struct{}{}
+		}
+	}
+
+	return excluded
+}
+
 func rankHomepageDailyCandidates(items []contracts.MovieListItemDTO, dateUTC string, extraPenalty map[string]float64) []homepageDailyCandidate {
 	candidates := make([]homepageDailyCandidate, 0, len(items))
 	for _, movie := range items {
@@ -254,18 +336,19 @@ func rankHomepageDailyCandidates(items []contracts.MovieListItemDTO, dateUTC str
 func selectHomepageDailyIDs(
 	candidates []homepageDailyCandidate,
 	selected map[string]struct{},
-	yesterdayIDs map[string]struct{},
 	selectionState homepageDailySelectionState,
 	limit int,
 	heroOnly bool,
-) []string {
+	exclusionLadder []homepageDailyExclusionPolicy,
+) ([]string, int) {
 	if limit <= 0 {
-		return nil
+		return nil, 0
 	}
 
 	out := make([]string, 0, limit)
+	exclusionWindowUsed := 0
 
-	appendFromPool := func(allowYesterday bool) {
+	appendFromPool := func(excludedMovieIDs map[string]struct{}) {
 		for len(out) < limit {
 			bestIndex := -1
 			bestScore := 0.0
@@ -281,10 +364,8 @@ func selectHomepageDailyIDs(
 				if heroOnly && isFC2MovieCode(candidate.movie.Code) {
 					continue
 				}
-				if !allowYesterday {
-					if _, wasYesterday := yesterdayIDs[movieID]; wasYesterday {
-						continue
-					}
+				if _, excluded := excludedMovieIDs[movieID]; excluded {
+					continue
 				}
 
 				score := candidate.score - homepageDiversityPenalty(candidate.movie, selectionState)
@@ -306,12 +387,18 @@ func selectHomepageDailyIDs(
 		}
 	}
 
-	appendFromPool(false)
-	if len(out) < limit {
-		appendFromPool(true)
+	for _, policy := range exclusionLadder {
+		if len(out) >= limit {
+			break
+		}
+		beforeCount := len(out)
+		appendFromPool(policy.movieIDs)
+		if len(out) > beforeCount {
+			exclusionWindowUsed = policy.windowDays
+		}
 	}
 
-	return out
+	return out, exclusionWindowUsed
 }
 
 func homepageDiversityPenalty(
@@ -361,14 +448,6 @@ func accumulateHomepageDiversity(selectionState homepageDailySelectionState, mov
 	}
 }
 
-func previousUTCDate(dateUTC string) string {
-	parsed, err := time.Parse("2006-01-02", dateUTC)
-	if err != nil {
-		return ""
-	}
-	return parsed.AddDate(0, 0, -1).Format("2006-01-02")
-}
-
 func homepageFreshnessBoost(addedAt string, dateUTC string) float64 {
 	addedDate, err := time.Parse("2006-01-02", addedAt)
 	if err != nil {
@@ -409,15 +488,6 @@ func homepageExposurePenalty(daysAgo int) float64 {
 
 	recencyWeight := float64(homepageDailyExposureLookbackDays-daysAgo+1) / float64(homepageDailyExposureLookbackDays)
 	return homepageDailyExposurePenaltyFloor + recencyWeight*homepageDailyExposurePenaltyScale
-}
-
-func hasOverlap(ids []string, excluded map[string]struct{}) bool {
-	for _, id := range ids {
-		if _, ok := excluded[id]; ok {
-			return true
-		}
-	}
-	return false
 }
 
 func isFC2MovieCode(code string) bool {
