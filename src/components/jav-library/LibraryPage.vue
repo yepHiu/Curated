@@ -121,12 +121,6 @@ function isChipActive(tag: string): boolean {
 
 <template>
   <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-5 lg:gap-6">
-    <ActorProfileCard
-      v-if="activeActorTrimmed"
-      :actor-name="activeActorTrimmed"
-      :user-tag-suggestions="props.actorUserTagSuggestions ?? []"
-      @clear-filter="emit('clearExactActorFilter')"
-    />
     <div
       v-if="activeStudioTrimmed"
       class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/85 px-4 py-3 shadow-sm shadow-black/5"
@@ -416,7 +410,15 @@ function isChipActive(tag: string): boolean {
         @toggle-favorite="emit('toggleFavorite', $event)"
         @context-menu="emit('contextMenu', $event)"
         @toggle-batch-select="emit('toggleBatchSelect', $event)"
-      />
+      >
+        <template v-if="props.mode !== 'tags' && activeActorTrimmed" #header>
+          <ActorProfileCard
+            :actor-name="activeActorTrimmed"
+            :user-tag-suggestions="props.actorUserTagSuggestions ?? []"
+            @clear-filter="emit('clearExactActorFilter')"
+          />
+        </template>
+      </VirtualMovieMasonry>
     </div>
   </div>
 </template>

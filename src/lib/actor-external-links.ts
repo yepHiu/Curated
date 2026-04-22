@@ -1,4 +1,4 @@
-export const MAX_ACTOR_EXTERNAL_LINKS = 16
+export const MAX_ACTOR_EXTERNAL_LINKS = 1
 
 export function normalizeActorExternalLinkDraft(raw: string): string {
   return raw.trim()

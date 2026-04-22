@@ -231,6 +231,7 @@
     "actorExternalLinksPlaceholder": "https://example.com/profile",
     "actorExternalLinksInvalid": "请输入有效的 http:// 或 https:// 链接",
     "actorExternalLinksSaveError": "保存演员外链失败",
+    "actorExternalLinksUnsupported": "当前后端不支持保存演员外链，请重启并更新 Curated 后端。",
     "actorExternalLinksMaxCount": "最多可添加 {n} 个外链",
     "actorScraping": "正在刮削演员头像与简介…",
     "actorScrapeFailed": "刮削失败：{msg}",

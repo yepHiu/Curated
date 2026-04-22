@@ -223,6 +223,7 @@
     "actorExternalLinksPlaceholder": "https://example.com/profile",
     "actorExternalLinksInvalid": "有効な http:// または https:// リンクを入力してください",
     "actorExternalLinksSaveError": "出演者の外部リンクを保存できませんでした",
+    "actorExternalLinksUnsupported": "現在のバックエンドは出演者の外部リンク保存に対応していません。Curated バックエンドを再起動して最新版に更新してください。",
     "actorExternalLinksMaxCount": "外部リンクは最大 {n} 件まで追加できます",
     "actorScraping": "アバターと概要を取得中…",
     "actorScrapeFailed": "スクレイプ失敗：{msg}",

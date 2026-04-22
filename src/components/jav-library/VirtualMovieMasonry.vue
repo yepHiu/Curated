@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue"
+import { computed, nextTick, ref, useSlots } from "vue"
 import { useResizeObserver } from "@vueuse/core"
 import { ChevronUp } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
@@ -43,6 +43,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+const slots = useSlots()
 
 const emit = defineEmits<{
   select: [movieId: string]
@@ -52,6 +53,8 @@ const emit = defineEmits<{
   contextMenu: [payload: { event: MouseEvent; movie: Movie }]
   toggleBatchSelect: [movieId: string]
 }>()
+
+const hasHeaderSlot = computed(() => Boolean(slots.header))
 
 const batchSelectedSet = computed(() => new Set(props.batchSelectedIds ?? []))
 
@@ -228,8 +231,9 @@ function posterLoadPolicyForChunk(index: number) {
 </script>
 
 <template>
-  <div v-if="props.movies.length" ref="rootEl" class="relative h-full min-h-0">
+  <div v-if="props.movies.length || hasHeaderSlot" ref="rootEl" class="relative h-full min-h-0">
     <DynamicScroller
+      v-if="props.movies.length"
       :ref="setScrollerRef"
       :items="movieChunks"
       key-field="id"
@@ -238,6 +242,12 @@ function posterLoadPolicyForChunk(index: number) {
       :pool-size="BUFFER_CHUNKS * 2 + 7"
       class="h-full min-h-0 overflow-y-auto pr-2"
     >
+      <template #before>
+        <div v-if="hasHeaderSlot" class="pb-5 lg:pb-6">
+          <slot name="header" />
+        </div>
+      </template>
+
       <template #default="{ item, index, active }">
         <DynamicScrollerItem
           :item="item"
@@ -279,6 +289,25 @@ function posterLoadPolicyForChunk(index: number) {
         </DynamicScrollerItem>
       </template>
     </DynamicScroller>
+
+    <div
+      v-else
+      :ref="setScrollerRef"
+      class="h-full min-h-0 overflow-y-auto pr-2"
+    >
+      <div v-if="hasHeaderSlot" class="pb-5 lg:pb-6">
+        <slot name="header" />
+      </div>
+
+      <Card class="rounded-3xl border-border/70 bg-card/80">
+        <CardHeader>
+          <CardTitle>{{ props.emptyTitle }}</CardTitle>
+          <CardDescription>
+            {{ props.emptyDescription }}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
 
     <Button
       v-show="showScrollToTop"

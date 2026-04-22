@@ -223,6 +223,7 @@
     "actorExternalLinksPlaceholder": "https://example.com/profile",
     "actorExternalLinksInvalid": "Enter a valid http:// or https:// link",
     "actorExternalLinksSaveError": "Failed to save actor external links",
+    "actorExternalLinksUnsupported": "Your current backend does not support saving actor external links. Restart Curated with the latest backend.",
     "actorExternalLinksMaxCount": "You can add up to {n} external links",
     "actorScraping": "Scraping actor avatar and summary…",
     "actorScrapeFailed": "Scrape failed: {msg}",
