@@ -34,3 +34,6 @@ d11eda1a docs: Python release CLI, CSV history, and packaging skill
 f6873df8 feat(scripts): replace PowerShell release pipeline with Python CLI
 1e3e7acd chore(release): bump package version to 1.2.6 and record publish
 796d8c1f fix(backend): dedupe Windows tray cancel and inject syscall seams",versionSource=auto-patch; BuildStamp=20260419.111519; portable=versionSource=explicit; installer=versionSource=explicit
+2026-04-20,1.2.8,e82542f0,master,release:publish,release/portable/Curated-1.2.8-windows-x64.zip; release/installer/Curated-Setup-1.2.8.exe; release/manifest/release.json,成功,wujiahui,"e82542f0 docs: app update PRD, API, release notes, and packaging version 1.2.7
+488fef75 feat(frontend): app update check settings and sidebar badge
+932f0c2e feat(backend): app update manifest fetch and status persistence",versionSource=auto-patch; BuildStamp=20260419.165433; portable=versionSource=explicit; installer=versionSource=explicit
