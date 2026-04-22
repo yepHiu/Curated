@@ -262,6 +262,11 @@ export interface ActorProfileDTO {
   profileUpdatedAt?: string
   /** 演员维度用户标签，与 ActorListItemDTO.userTags 同源 */
   userTags?: string[]
+  externalLinks?: string[]
+}
+
+export interface PatchActorExternalLinksBody {
+  externalLinks: string[]
 }
 
 /** GET /library/actors 单行；userTags 为演员维度用户标签，与影片 tag 无关 */

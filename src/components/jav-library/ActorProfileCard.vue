@@ -18,6 +18,11 @@ import {
 } from "@/components/ui/card"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
+import {
+  MAX_ACTOR_EXTERNAL_LINKS,
+  isValidActorExternalLink,
+  normalizeActorExternalLinkDraft,
+} from "@/lib/actor-external-links"
 import { mergeActorsQuery } from "@/lib/actors-route-query"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { useLibraryService } from "@/services/library-service"
@@ -56,6 +61,10 @@ const userTagSuggestListRef = ref<HTMLElement | null>(null)
 const tagSuggestDomId = useId()
 const { focused: userTagSuggestRowFocused } = useFocusWithin(userTagSuggestRootRef)
 const tagPatching = ref(false)
+const externalLinksSaving = ref(false)
+const externalLinkInputOpen = ref(false)
+const newExternalLinkDraft = ref("")
+const externalLinkFormError = ref("")
 
 const profile = ref<ActorProfileDTO | null>(null)
 const initialLoading = ref(false)
@@ -65,6 +74,7 @@ const scraping = ref(false)
 const scrapeError = ref<string | null>(null)
 
 const userTags = computed(() => profile.value?.userTags ?? [])
+const externalLinks = computed(() => profile.value?.externalLinks ?? [])
 
 const filteredUserTagSuggestions = computed(() =>
   filterUserTagSuggestions(
@@ -324,6 +334,9 @@ watch(
     newUserTagDraft.value = ""
     userTagFormError.value = ""
     userTagInputOpen.value = false
+    newExternalLinkDraft.value = ""
+    externalLinkFormError.value = ""
+    externalLinkInputOpen.value = false
     void load()
   },
 )
@@ -369,6 +382,23 @@ async function patchActorTags(next: string[]) {
   }
 }
 
+async function patchActorExternalLinks(next: string[]) {
+  const name = props.actorName.trim()
+  if (!name) {
+    return
+  }
+  externalLinksSaving.value = true
+  externalLinkFormError.value = ""
+  try {
+    profile.value = await api.patchActorExternalLinks(name, next)
+  } catch (e) {
+    externalLinkFormError.value =
+      e instanceof Error ? e.message : t("library.actorExternalLinksSaveError")
+  } finally {
+    externalLinksSaving.value = false
+  }
+}
+
 async function addUserTagWithValue(raw: string) {
   userTagFormError.value = ""
   const tagText = raw.trim()
@@ -395,6 +425,30 @@ async function addUserTag() {
   await addUserTagWithValue(newUserTagDraft.value)
 }
 
+async function addExternalLink() {
+  externalLinkFormError.value = ""
+  const next = normalizeActorExternalLinkDraft(newExternalLinkDraft.value)
+  if (!next) {
+    return
+  }
+  if (!isValidActorExternalLink(next)) {
+    externalLinkFormError.value = t("library.actorExternalLinksInvalid")
+    return
+  }
+  if (externalLinks.value.includes(next)) {
+    newExternalLinkDraft.value = ""
+    return
+  }
+  if (externalLinks.value.length >= MAX_ACTOR_EXTERNAL_LINKS) {
+    externalLinkFormError.value = t("library.actorExternalLinksMaxCount", {
+      n: MAX_ACTOR_EXTERNAL_LINKS,
+    })
+    return
+  }
+  await patchActorExternalLinks([...externalLinks.value, next])
+  newExternalLinkDraft.value = ""
+}
+
 const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
   showSuggestions: showUserTagSuggestions,
   suggestions: filteredUserTagSuggestions,
@@ -416,6 +470,10 @@ onClickOutside(
 
 async function removeUserTag(tag: string) {
   await patchActorTags(userTags.value.filter((x) => x !== tag))
+}
+
+async function removeExternalLink(link: string) {
+  await patchActorExternalLinks(externalLinks.value.filter((x) => x !== link))
 }
 
 function pickUserTagSuggestion(s: string) {
@@ -629,6 +687,84 @@ onUnmounted(() => {
               </dd>
             </div>
           </dl>
+          <section class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm text-muted-foreground">
+                {{ t("library.actorExternalLinks") }}
+              </p>
+              <Button
+                data-actor-external-link-add
+                type="button"
+                variant="secondary"
+                class="rounded-2xl"
+                :disabled="externalLinksSaving"
+                @click="externalLinkInputOpen ? addExternalLink() : (externalLinkInputOpen = true)"
+              >
+                <Plus data-icon="inline-start" />
+                {{ t("common.add") }}
+              </Button>
+            </div>
+            <div
+              v-if="externalLinkInputOpen"
+              class="flex items-center gap-2 rounded-2xl border border-border/80 bg-background/80 px-3 py-1.5 shadow-sm"
+            >
+              <input
+                data-actor-external-link-input
+                v-model="newExternalLinkDraft"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                :disabled="externalLinksSaving"
+                :placeholder="t('library.actorExternalLinksPlaceholder')"
+                class="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0"
+                @keydown.enter.prevent="addExternalLink"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                :disabled="externalLinksSaving"
+                @click="externalLinkInputOpen = false"
+              >
+                <X class="size-4" />
+              </Button>
+            </div>
+            <ul
+              v-if="externalLinks.length > 0"
+              class="space-y-2"
+            >
+              <li
+                v-for="link in externalLinks"
+                :key="link"
+                data-actor-external-link-row
+                class="flex items-center gap-2 rounded-2xl border border-border/60 bg-background/60 px-3 py-2"
+              >
+                <a
+                  class="min-w-0 flex-1 truncate text-primary underline-offset-4 hover:underline"
+                  :href="link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ link }}
+                </a>
+                <button
+                  :data-actor-external-link-remove="link"
+                  type="button"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
+                  :disabled="externalLinksSaving"
+                  @click="removeExternalLink(link)"
+                >
+                  <X class="size-4" />
+                </button>
+              </li>
+            </ul>
+            <p
+              v-if="externalLinkFormError"
+              class="text-sm text-destructive"
+            >
+              {{ externalLinkFormError }}
+            </p>
+          </section>
           <p
             v-if="scraping"
             class="text-sm text-muted-foreground"

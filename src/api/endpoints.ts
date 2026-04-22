@@ -45,6 +45,7 @@ import type {
   MovieDetailDTO,
   MoviesPageDTO,
   PlaybackDescriptorDTO,
+  PatchActorExternalLinksBody,
   PatchCuratedFrameTagsBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
@@ -109,6 +110,12 @@ export const api = {
   patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
     const q = new URLSearchParams({ name })
     return httpClient.patch<ActorListItemDTO>(`/library/actors/tags?${q.toString()}`, { userTags })
+  },
+
+  patchActorExternalLinks(name: string, externalLinks: string[]): Promise<ActorProfileDTO> {
+    const q = new URLSearchParams({ name })
+    const body: PatchActorExternalLinksBody = { externalLinks }
+    return httpClient.patch<ActorProfileDTO>(`/library/actors/external-links?${q.toString()}`, body)
   },
 
   scrapeActorProfile(name: string): Promise<TaskDTO> {
