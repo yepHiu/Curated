@@ -350,6 +350,18 @@ Important notes:
 
 - actor identity is typically passed through the actor name query field
 
+### `PATCH /api/library/actors/external-links`
+
+Purpose:
+
+- replace the full user-managed external link list for a specific actor
+
+Important notes:
+
+- actor identity is passed through the actor name query field
+- request body shape is `{ "externalLinks": string[] }`
+- links are separate from the scraped `homepage` field and are returned by `GET /api/library/actors/profile`
+
 ### `POST /api/library/actors/scrape`
 
 Purpose:

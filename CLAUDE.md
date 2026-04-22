@@ -205,6 +205,7 @@ GET    /api/library/actors                  # List actors (query: q, actorTag, s
 GET    /api/library/actors/profile          # Get actor profile (query: name)
 GET    /api/library/actors/{name}/asset/avatar # Get same-origin cached actor avatar
 PATCH  /api/library/actors/tags             # Update actor user tags (query: name)
+PATCH  /api/library/actors/external-links   # Update actor user external links (query: name)
 POST   /api/library/actors/scrape           # Scrape actor metadata (async task)
 GET    /api/library/played-movies           # List played movies with timestamps
 POST   /api/library/played-movies/{id}      # Mark movie as played
