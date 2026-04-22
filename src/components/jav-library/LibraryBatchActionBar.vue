@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { useFocusWithin } from "@vueuse/core"
+import { computed, nextTick, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { Heart, HeartOff, RefreshCw, RotateCcw, Tag, Trash2, X } from "lucide-vue-next"
 import type { LibraryMode } from "@/domain/library/types"
@@ -14,15 +15,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
+import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 
-const props = defineProps<{
-  mode: LibraryMode
-  selectedCount: number
-  useWebApi: boolean
-  scrapeProgress: { current: number; total: number } | null
-  scrapeBusy: boolean
-  operationBusy: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    mode: LibraryMode
+    selectedCount: number
+    useWebApi: boolean
+    scrapeProgress: { current: number; total: number } | null
+    scrapeBusy: boolean
+    operationBusy: boolean
+    userTagSuggestions?: readonly string[]
+  }>(),
+  {
+    userTagSuggestions: () => [],
+  },
+)
 
 const emit = defineEmits<{
   exit: []
@@ -48,6 +57,43 @@ const restoreConfirmOpen = ref(false)
 const tagDialogOpen = ref(false)
 const tagDraft = ref("")
 const tagError = ref("")
+const tagInputRef = ref<{ focus?: () => void; $el?: { focus?: () => void } } | null>(null)
+const tagSuggestRootRef = ref<HTMLElement | null>(null)
+const tagSuggestListRef = ref<HTMLElement | null>(null)
+const tagSuggestDomId = useId()
+const { focused: tagSuggestFocused } = useFocusWithin(tagSuggestRootRef)
+
+const filteredTagSuggestions = computed(() =>
+  filterUserTagSuggestions(props.userTagSuggestions, tagDraft.value, [], { limit: 10 }),
+)
+
+const showTagSuggestions = computed(
+  () =>
+    tagDialogOpen.value &&
+    tagSuggestFocused.value &&
+    tagDraft.value.trim() !== "" &&
+    filteredTagSuggestions.value.length > 0,
+)
+
+function focusTagInput() {
+  const target = tagInputRef.value
+  if (typeof target?.focus === "function") {
+    target.focus()
+    return
+  }
+  if (typeof target?.$el?.focus === "function") {
+    target.$el.focus()
+  }
+}
+
+watch(tagDialogOpen, (open) => {
+  if (!open) {
+    tagDraft.value = ""
+    tagError.value = ""
+    return
+  }
+  void nextTick(() => focusTagInput())
+})
 
 function openTagDialog() {
   tagError.value = ""
@@ -55,8 +101,8 @@ function openTagDialog() {
   tagDialogOpen.value = true
 }
 
-function submitTagDialog() {
-  const tag = tagDraft.value.trim()
+function submitTagDialog(raw?: unknown) {
+  const tag = typeof raw === "string" ? raw.trim() : tagDraft.value.trim()
   if (!tag) {
     tagError.value = t("library.batchTagRequired")
     return
@@ -64,6 +110,18 @@ function submitTagDialog() {
   tagDialogOpen.value = false
   emit("addUserTag", tag)
 }
+
+function pickTagSuggestion(tag: string) {
+  submitTagDialog(tag)
+}
+
+const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
+  showSuggestions: showTagSuggestions,
+  suggestions: filteredTagSuggestions,
+  listRootRef: tagSuggestListRef,
+  commitTag: (tag) => submitTagDialog(tag),
+  commitDraft: () => submitTagDialog(),
+})
 </script>
 
 <template>
@@ -337,13 +395,47 @@ function submitTagDialog() {
           >
             {{ tagError }}
           </p>
-          <Input
-            v-model="tagDraft"
-            class="rounded-xl"
-            :placeholder="t('library.batchTagPlaceholder')"
-            autocomplete="off"
-            @keydown.enter.prevent="submitTagDialog"
-          />
+          <div ref="tagSuggestRootRef" class="relative">
+            <Input
+              :id="`${tagSuggestDomId}-input`"
+              ref="tagInputRef"
+              v-model="tagDraft"
+              class="rounded-xl"
+              :placeholder="t('library.batchTagPlaceholder')"
+              autocomplete="off"
+              role="combobox"
+              :aria-expanded="showTagSuggestions"
+              :aria-activedescendant="
+                highlightIndex >= 0 ? `${tagSuggestDomId}-opt-${highlightIndex}` : undefined
+              "
+              aria-autocomplete="list"
+              :aria-controls="showTagSuggestions ? `${tagSuggestDomId}-list` : undefined"
+              @keydown="onTagSuggestKeydown"
+            />
+            <ul
+              v-if="showTagSuggestions"
+              :id="`${tagSuggestDomId}-list`"
+              ref="tagSuggestListRef"
+              class="absolute top-full left-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-2xl border border-border/80 bg-popover/98 py-1 text-popover-foreground shadow-lg backdrop-blur-sm"
+              role="listbox"
+              :aria-label="t('detailPanel.tagSuggestAria')"
+            >
+              <li v-for="(tag, index) in filteredTagSuggestions" :key="tag">
+                <button
+                  :id="`${tagSuggestDomId}-opt-${index}`"
+                  type="button"
+                  role="option"
+                  :data-tag-suggest-idx="index"
+                  class="w-full truncate px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  :class="highlightIndex === index ? 'bg-muted' : ''"
+                  :aria-selected="highlightIndex === index"
+                  @mousedown.prevent="pickTagSuggestion(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
         <DialogFooter class="gap-3">
           <DialogClose as-child>
@@ -351,7 +443,7 @@ function submitTagDialog() {
               {{ t("common.cancel") }}
             </Button>
           </DialogClose>
-          <Button type="button" class="rounded-2xl" @click="submitTagDialog">
+          <Button type="button" class="rounded-2xl" @click="submitTagDialog()">
             {{ t("library.batchTagSubmit") }}
           </Button>
         </DialogFooter>

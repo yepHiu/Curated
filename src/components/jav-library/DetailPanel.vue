@@ -296,9 +296,7 @@ function removeMetadataTag(tag: string) {
 }
 
 function pickUserTagSuggestion(tag: string) {
-  newUserTagDraft.value = tag
-  userTagFormError.value = ""
-  void nextTick(() => newUserTagInputRef.value?.focus())
+  addUserTagWithValue(tag)
 }
 </script>
 

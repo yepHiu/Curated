@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEventListener } from "@vueuse/core"
 import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -13,7 +14,11 @@ import {
   getDetailBrowseTargetMode,
   mergeLibraryQuery,
 } from "@/lib/library-query"
-import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
+import {
+  buildDetailRouteFromBrowse,
+  buildPlayerRouteFromBrowseIntent,
+  resolveNavigationBackLink,
+} from "@/lib/navigation-intent"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
@@ -390,6 +395,51 @@ const handleRevealInFileManager = async (id: string) => {
     console.error("[DetailView] reveal in file manager failed", err)
   }
 }
+
+function shouldIgnoreDetailEscapeKeydown(event: KeyboardEvent): boolean {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey
+  ) {
+    return true
+  }
+
+  const target = event.target
+  if (target instanceof HTMLElement) {
+    const tag = target.tagName
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      return true
+    }
+    if (target.isContentEditable || target.contentEditable === "true") {
+      return true
+    }
+  }
+
+  return document.querySelector('[role="dialog"]') !== null
+}
+
+async function navigateBackFromDetail() {
+  const id = movieId.value ?? detailMovie.value?.id
+  if (!id) {
+    return
+  }
+  await router.push(resolveNavigationBackLink(route, id).to)
+}
+
+useEventListener("keydown", (event: KeyboardEvent) => {
+  if (event.key !== "Escape") {
+    return
+  }
+  if (shouldIgnoreDetailEscapeKeydown(event)) {
+    return
+  }
+  event.preventDefault()
+  void navigateBackFromDetail()
+})
 </script>
 
 <template>

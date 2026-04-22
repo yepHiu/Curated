@@ -811,6 +811,7 @@ const activeStudioForPage = computed(() =>
       :scrape-progress="batchScrapeProgress"
       :scrape-busy="batchScrapeBusy"
       :operation-busy="batchOperationBusy"
+      :user-tag-suggestions="actorUserTagSuggestionPool"
       @exit="exitBatchMode"
       @clear-selection="clearBatchSelection"
       @select-all-visible="selectAllVisibleInBatch"
