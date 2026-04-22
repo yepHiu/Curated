@@ -1,157 +1,152 @@
 # Library Actor Profile Card Scroll Design
 
 Date: 2026-04-23
-Status: Approved for spec review
+Status: Implemented
 
 ## Goal
 
-Adjust the actor profile card placement in the library page so that, when an actor filter is active, the actor profile card scrolls together with the main content area.
+Make the actor profile card truly participate in the same scroll as the movie cards on the normal library content area.
 
 Confirmed scope:
 
-- Only change the normal library page layout.
-- Do not change `tags` mode.
-- Do not change `trash` mode.
-- Place the actor profile card below the sort/tab row that currently shows the "入库时间 / 发售日期 / 评分" style switching controls.
-- The actor profile card should remain above the movie grid.
+- Keep the actor profile card below the sort/tab row.
+- The actor profile card must scroll together with the movie grid, not stay outside the list scroll area.
+- Do not change `tags` mode behavior.
+- Do not introduce a new page-level scroll container.
 
-## Current Context
+## Root Cause
 
-Today, `ActorProfileCard` is rendered near the top of `LibraryPage.vue`, before the main mode-specific content blocks. That makes it visually feel separate from the main content flow.
+The first layout-only adjustment was insufficient.
 
-In the normal library mode, the page structure is effectively:
+`LibraryPage.vue` places the actor profile card above `VirtualMovieMasonry`, but the real scroll owner is not `LibraryPage`. The actual scroll container lives inside `VirtualMovieMasonry.vue`, where `DynamicScroller` uses `overflow-y-auto`.
 
-1. actor profile card
-2. optional studio filter bar
-3. sort/tab row
-4. movie masonry
-
-This means the actor card appears higher than the sort controls, which is not the intended reading order when the actor card is contextual content for the current filtered result set.
+That means any actor card rendered outside `VirtualMovieMasonry` will never be part of the same scroll stream as the movie cards, even if it appears visually close to them.
 
 ## Options
 
-### Option A: Move the actor profile card into the normal library content flow
+### Option A: Add a header slot to `VirtualMovieMasonry`
 
-Render `ActorProfileCard` only inside the normal library mode section, directly below the sort/tab row and above `VirtualMovieMasonry`.
+Render pre-grid content inside the masonry scroll container, before the virtualized movie chunks.
 
 Pros:
 
-- Matches the desired scroll behavior naturally.
-- Keeps the actor card visually attached to the movie results it explains.
-- Smallest structural change.
-- Lowest risk to `VirtualMovieMasonry` sizing and scroll-preserve behavior.
+- Keeps one real scroll owner.
+- Minimal behavioral change.
+- Preserves `useLibraryScrollPreserve`.
+- Keeps virtualization logic intact.
 
 Cons:
 
-- Requires one small conditional layout split in `LibraryPage.vue`.
+- Requires a small component API change.
 
 Recommendation: use this option.
 
-### Option B: Keep the card where it is but change scroll container boundaries
+### Option B: Move scroll ownership from `VirtualMovieMasonry` to `LibraryPage`
 
-Rebuild the layout so the current top area and the content area share one larger scrolling container.
-
-Pros:
-
-- Preserves current DOM order.
-
-Cons:
-
-- Higher layout risk.
-- More likely to affect masonry height calculations and scroll preserve behavior.
-- Harder to reason about than simply moving the card.
-
-### Option C: Make the card sticky under the sort row
-
-Keep the card visible while the list scrolls.
+Make the parent page own scrolling and make masonry a pure content renderer.
 
 Pros:
 
-- Actor info stays available.
+- Centralizes layout ownership.
 
 Cons:
 
-- Does not match the requested behavior.
-- Consumes vertical space.
-- More intrusive on smaller screens.
+- Higher risk to virtual scrolling.
+- More likely to break scroll preservation and sizing assumptions.
+- Larger change surface than needed.
+
+Not recommended.
+
+### Option C: Fake shared scrolling with sticky or overlay behavior
+
+Keep the actor card outside the list but simulate the visual result.
+
+Pros:
+
+- Small DOM change.
+
+Cons:
+
+- Does not satisfy the requirement.
+- Introduces UI inconsistency.
 
 Not recommended.
 
 ## Recommended Design
 
-### 1. Placement
+### 1. Scroll ownership stays in `VirtualMovieMasonry`
 
-In `LibraryPage.vue`:
+Do not move scroll ownership out of the masonry component.
 
-- Remove the top-level `ActorProfileCard` placement from the shared page header flow.
-- Re-render it only in the normal library branch.
-- Insert it after the normal-library sort/tab row and before the movie masonry area.
+`VirtualMovieMasonry` remains responsible for:
 
-Resulting normal library flow:
+- the scrollable container
+- virtualized chunk rendering
+- scroll preservation
+- back-to-top behavior
 
-1. optional studio filter bar
-2. sort/tab row
-3. actor profile card
-4. movie masonry
+### 2. Add a `header` slot to `VirtualMovieMasonry`
 
-This makes the actor card part of the same content stream as the filtered movie results.
+Expose a named `header` slot that renders inside the masonry scroll container and before the virtualized movie content.
 
-### 2. Mode behavior
+Implementation details:
 
-Normal library mode:
+- When movies exist, render the slot through `DynamicScroller`'s `before` slot.
+- When the list is empty but the header exists, render a fallback scroll container that still contains:
+  - the header slot first
+  - the empty-state card second
 
-- show actor card below the sort/tab row when `activeActorTrimmed` is non-empty
+This preserves the shared scrolling behavior even for empty filtered results.
+
+### 3. Pass `ActorProfileCard` through the new slot from `LibraryPage`
+
+`LibraryPage.vue` should stop rendering `ActorProfileCard` as a sibling above the masonry.
+
+Instead, it should pass the actor card into:
+
+- `<VirtualMovieMasonry>`
+- via `#header`
+
+This keeps the existing visual order:
+
+1. sort/tab row
+2. actor profile card
+3. movie cards
+
+But now all three belong to the same content scroll.
+
+### 4. Mode behavior
+
+Normal library content flow:
+
+- render the actor profile card through the masonry header slot when an actor filter is active
 
 Tags mode:
 
-- no placement change
-- keep current tags browsing card behavior unchanged
+- do not provide header content
 
 Trash mode:
 
-- no placement change
-- actor card remains absent from this layout treatment
+- keep existing layout behavior unchanged
 
-### 3. Scrolling behavior
+## Verification Strategy
 
-No new scroll container should be introduced.
+Automated verification:
 
-The actor card should simply become a normal block in the same vertical flow above `VirtualMovieMasonry`. This gives the desired "scroll with the content" behavior without changing the scroll ownership model.
+- `LibraryPage.test.ts` should assert the actor profile card is passed into the masonry header slot.
+- `VirtualMovieMasonry.test.ts` should assert the header slot renders before movie items inside the scroller.
+- `VirtualMovieMasonry.test.ts` should also cover the empty-list fallback case.
 
-That is the key design choice to avoid side effects in:
+Runtime verification:
 
-- masonry sizing
-- preserved list scroll position
-- existing page height assumptions
+- actor card stays below the sort/tab row
+- actor card scrolls away together with movie cards
+- tags mode remains unchanged
+- empty-state layout still shows actor card above the empty card when relevant
 
-### 4. Risk control
-
-Files touched should stay narrow:
+## Files Affected
 
 - `src/components/jav-library/LibraryPage.vue`
-- possibly one focused component test if coverage is added
-- no change to `ActorProfileCard.vue` behavior
-- no change to `LibraryView.vue` filtering logic
-
-This is intentionally a composition-only change, not a data or behavior change.
-
-### 5. Verification
-
-Manual verification target:
-
-- in normal library mode with `actor=` active, the sort/tab row appears first
-- the actor profile card appears directly below it
-- scrolling the page scrolls the actor profile card away together with the movie list
-- `tags` mode and `trash` mode stay visually unchanged
-
-Automated verification target:
-
-- a focused `LibraryPage` layout test can assert that `ActorProfileCard` is rendered in the normal library content section and not before the shared top structure
-
-## Out of Scope
-
-- redesigning the actor profile card itself
-- sticky actor profile behavior
-- changing sort/tab semantics
-- changing actor card behavior in `tags` or `trash` mode
-- refactoring scroll-preserve logic
+- `src/components/jav-library/VirtualMovieMasonry.vue`
+- `src/components/jav-library/LibraryPage.test.ts`
+- `src/components/jav-library/VirtualMovieMasonry.test.ts`
