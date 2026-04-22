@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"curated-backend/internal/contracts"
@@ -95,5 +97,100 @@ func TestListActorsAndReplaceActorUserTags(t *testing.T) {
 	}
 	if res4.Total != 1 || res4.Actors[0].Name != "Alpha Star" {
 		t.Fatalf("q filter by actor user tag = %+v", res4)
+	}
+}
+
+func TestGetActorProfile_ExternalLinks(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "actor-links.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-1",
+		Path:     filepath.Join(root, "MOV-1.mp4"),
+		FileName: "MOV-1.mp4",
+		Number:   "MOV-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:        outcome.MovieID,
+		Number:         "MOV-1",
+		Title:          "One",
+		Summary:        "s",
+		Studio:         "Studio",
+		Actors:         []string{"Alpha Star"},
+		RuntimeMinutes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.ReplaceActorExternalLinksByName(ctx, "Alpha Star", []string{
+		" https://example.com/a ",
+		"https://example.com/b",
+		"https://example.com/a",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	profile, err := store.GetActorProfile(ctx, "Alpha Star")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"https://example.com/a", "https://example.com/b"}
+	if !reflect.DeepEqual(profile.ExternalLinks, want) {
+		t.Fatalf("external links = %#v, want %#v", profile.ExternalLinks, want)
+	}
+}
+
+func TestReplaceActorExternalLinksByName_RejectsInvalidURL(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "actor-links-invalid.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-2",
+		Path:     filepath.Join(root, "MOV-2.mp4"),
+		FileName: "MOV-2.mp4",
+		Number:   "MOV-2",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:        outcome.MovieID,
+		Number:         "MOV-2",
+		Title:          "Two",
+		Summary:        "s",
+		Studio:         "Studio",
+		Actors:         []string{"Beta Star"},
+		RuntimeMinutes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	err = store.ReplaceActorExternalLinksByName(ctx, "Beta Star", []string{"javascript:alert(1)"})
+	if !errors.Is(err, ErrInvalidActorExternalLinks) {
+		t.Fatalf("err = %v, want ErrInvalidActorExternalLinks", err)
 	}
 }

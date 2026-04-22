@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -1576,6 +1577,125 @@ func TestHandlePatchActorUserTags_NotFound(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestHandlePatchActorExternalLinks_Success(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "handler-actor-links.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-actor-links",
+		Path:     filepath.Join(root, "MOV-3.mp4"),
+		FileName: "MOV-3.mp4",
+		Number:   "MOV-3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:        outcome.MovieID,
+		Number:         "MOV-3",
+		Title:          "Three",
+		Summary:        "s",
+		Studio:         "Studio",
+		Actors:         []string{"Gamma Star"},
+		RuntimeMinutes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/actors/external-links?name=Gamma%20Star", strings.NewReader(`{"externalLinks":["https://example.com/a","https://example.com/b"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var body contracts.ActorProfileDTO
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://example.com/a", "https://example.com/b"}
+	if !reflect.DeepEqual(body.ExternalLinks, want) {
+		t.Fatalf("external links = %#v, want %#v", body.ExternalLinks, want)
+	}
+}
+
+func TestHandlePatchActorExternalLinks_InvalidURL(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "handler-actor-links-invalid.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-actor-links-invalid",
+		Path:     filepath.Join(root, "MOV-4.mp4"),
+		FileName: "MOV-4.mp4",
+		Number:   "MOV-4",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:        outcome.MovieID,
+		Number:         "MOV-4",
+		Title:          "Four",
+		Summary:        "s",
+		Studio:         "Studio",
+		Actors:         []string{"Delta Star"},
+		RuntimeMinutes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/library/actors/external-links?name=Delta%20Star", strings.NewReader(`{"externalLinks":["ftp://example.com"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
 }
 

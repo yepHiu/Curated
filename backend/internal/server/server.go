@@ -242,6 +242,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/actors/{name}/asset/avatar", h.handleGetActorAvatarAsset)
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
+	mux.HandleFunc("PATCH /api/library/actors/external-links", h.handlePatchActorExternalLinks)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/{kind}", h.handleGetMovieAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/playback", h.handleGetMoviePlayback)
@@ -479,6 +480,57 @@ func (h *Handler) handlePatchActorUserTags(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) handlePatchActorExternalLinks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if r.Body != nil {
+		_ = r.Body.Close()
+	}
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "failed to read body")
+		return
+	}
+	var in contracts.PatchActorExternalLinksBody
+	if err := json.Unmarshal(body, &in); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		return
+	}
+	err = h.store.ReplaceActorExternalLinksByName(r.Context(), name, in.ExternalLinks)
+	if err != nil {
+		if errors.Is(err, contracts.ErrActorNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "actor not found")
+			return
+		}
+		if errors.Is(err, storage.ErrInvalidActorExternalLinks) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("patch actor external links failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to update actor external links")
+		return
+	}
+	profile, err := h.store.GetActorProfile(r.Context(), name)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("load actor after external links patch failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load actor profile")
+		return
+	}
+	h.enrichActorProfileLocalAvatar(r.Context(), &profile)
+	writeJSON(w, http.StatusOK, profile)
 }
 
 func (h *Handler) handleGetMovie(w http.ResponseWriter, r *http.Request) {

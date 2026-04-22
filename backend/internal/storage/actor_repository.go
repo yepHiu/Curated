@@ -70,6 +70,11 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 		return contracts.ActorProfileDTO{}, err
 	}
 	dto.UserTags = tagsByID[actorID]
+	linksByID, err := s.loadActorExternalLinksForIDs(ctx, []int64{actorID})
+	if err != nil {
+		return contracts.ActorProfileDTO{}, err
+	}
+	dto.ExternalLinks = linksByID[actorID]
 	return dto, nil
 }
 

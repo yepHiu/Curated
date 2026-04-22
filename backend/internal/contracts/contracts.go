@@ -105,6 +105,7 @@ type ActorProfileDTO struct {
 	Birthday         string   `json:"birthday,omitempty"`
 	ProfileUpdatedAt string   `json:"profileUpdatedAt,omitempty"`
 	UserTags         []string `json:"userTags,omitempty"`
+	ExternalLinks    []string `json:"externalLinks,omitempty"`
 }
 
 // ActorListItemDTO is one row in GET /api/library/actors (library display name + stats + actor-only user tags).
@@ -136,6 +137,11 @@ type ListActorsResponse struct {
 // PatchActorUserTagsBody is the JSON body for PATCH /api/library/actors/tags?name=.
 type PatchActorUserTagsBody struct {
 	UserTags []string `json:"userTags"`
+}
+
+// PatchActorExternalLinksBody is the JSON body for PATCH /api/library/actors/external-links?name=.
+type PatchActorExternalLinksBody struct {
+	ExternalLinks []string `json:"externalLinks"`
 }
 
 // MaxMovieCommentRunes is the maximum length (Unicode scalars) for PUT /library/movies/{id}/comment body.
