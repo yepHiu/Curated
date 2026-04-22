@@ -1,0 +1,4 @@
+interface:
+  display_name: "PRD CSV"
+  short_description: "Manage Curated PRD requirements in CSV."
+  default_prompt: "Use $prd-csv to add, refine, and track requirement rows in docs/prd/requirements.csv for this repository."
