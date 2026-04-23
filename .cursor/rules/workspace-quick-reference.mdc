@@ -1,40 +1,62 @@
 ---
-description: 日常开发速记（启动、环境、代理）— 供 AI 与用户对齐操作
+description: 日常开发速记（启动、联调、根目录政策）
 alwaysApply: true
 ---
 
 # Workspace Quick Reference（项目记忆）
 
-## 一键心智模型
+## 一眼记住
 
-- **产品名**：**Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。
-- **编码约束**：写入 `.cursor/rules/*.mdc`、`docs/plan/*.md`、项目记忆类 Markdown 与打包历史等中文文档时，必须显式使用 **UTF-8** 编码，禁止依赖系统默认编码。
-- **前端**：仓库根目录 `pnpm dev`（Vite，常见端口 **5173**）。
-- **后端**：`backend` 目录 `go run ./cmd/curated`，开发默认 **:8080**、健康名 **`curated-dev`**；Windows 开发构建必须产出 **`backend/runtime/curated-dev.exe`**，不要生成或保留与生产包同名的 `curated.exe`，以免和正式安装版后端冲突；**`-tags release` 打包**默认 **:8081**、健康名 **`curated`**（Go 模块名 **`curated-backend`**）。
-- **Windows 发布态**：`-tags release` 构建的 `curated.exe` 在 Windows 上默认以 **`-mode tray`** 运行：启动本地 HTTP 服务、显示托盘图标，并自动打开浏览器；显式传 `-mode http` 可回退为纯服务模式。
-- **Repo-local skill**：后端开发态 / 生产态编译与运行请求优先使用 **`.cursor/skills/curated-backend-runtime/`**，统一处理 `go run`、`pnpm backend:build:dev`、`pnpm release:backend`、`pnpm release:publish` 与 `curated-dev.exe` / `curated.exe` 命名边界；`pnpm release:*` 当前统一经 `python scripts/release/release_cli.py` 编排。
-- **品牌图标**：`icon/curated-title-nobg.png` 用于 `README.md` 顶部带字标志；`icon/curated-icon-rg-dark-pink.png` 用于 Web favicon、后台托盘与安装包图标。替换品牌图时，同步更新 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png`、`backend/internal/assets/curated.ico`。
-- **公开文档结构**：`README.md` 是英文主版，`README.zh-CN.md` / `README.ja-JP.md` 是完整翻译版；`API.md` 是唯一公开 API 参考文档。
-- **联调**：`vite.config.ts` 把 **`/api` → `http://localhost:8080`**；`.env` 中 **`VITE_USE_WEB_API=true`** 时用真实 API，否则 Mock。
-- **本地前端托管**：当可执行文件旁存在 **`frontend-dist/`**（或当前工作目录存在 `frontend-dist/` / `dist/`）时，后端会直接托管前端静态资源并对非 `/api` 路由做 SPA fallback。
-- **Mock 收藏/评分**：未启用 Web API 时数据在内存；收藏与用户评分会通过 **`localStorage`（`jav-library-movie-prefs`）** 在整页刷新后恢复。
-- **正式持久化**：**`VITE_USE_WEB_API=true`** 且后端运行，收藏与评分由 **`PATCH /api/library/movies/{id}`** 写入 SQLite；**播放进度**走 **`/api/playback/progress`**，**萃取帧**走 **`/api/curated-frames`**（含 **`POST /api/curated-frames/export`** 库内 WebP 导出），**已播放统计**走 **`GET/POST /api/library/played-movies...`**（与资料库同一 SQLite 文件）。
-- **库行为 JSON**：**`config/library-config.cfg`** 存 **`organizeLibrary`**、**`metadataMovieProvider`**、**`autoLibraryWatch`**、**`autoActorProfileScrape`**、**`launchAtLogin`**、**`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`**（设置页「通用」经 **`backendLog`** 写入目录、保留天数、级别，**不覆盖** **`logFilePrefix`**；**空 `logDir` 不再表示仅控制台**，而是使用默认目录：**release** 写入 **`LOCALAPPDATA\\Curated\\logs`**，**dev** 写入 **`backend/runtime/logs`**；**重启后端**后文件日志路径与级别才生效）、**`proxy`** 等。其中 **`autoLibraryWatch`**（设置页「自动刮削」）控制**是否因目录监听**排队防抖扫描/刮削；**`autoActorProfileScrape`** 控制**影片元数据刮削完成后**是否继续为缺头像和简介的演员自动排队 `scrape.actor`；**`launchAtLogin`** 控制 Windows 当前用户登录后的**静默托盘自启动**，启动时仅拉起托盘与本地服务，**不自动弹出浏览器**，并通过 **`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`** 同步系统项；由 **`GET/PATCH /api/settings`** 读写。
+- **产品正式名称**：`Curated`。仓库目录 / npm `name` 仍可能是 `jav-shadcn`。
+- **前端启动**：仓库根目录运行 `pnpm dev`，默认 `http://localhost:5173`。
+- **后端启动**：`cd backend && go run ./cmd/curated`，开发默认端口 `:8080`，健康名 `curated-dev`。
+- **开发态 Windows 后端二进制**：`pnpm backend:build:dev`，产物必须是 `backend/runtime/curated-dev.exe`，不要生成开发态 `curated.exe`。
+- **release 构建默认端口**：`-tags release` 时默认 `:8081`，健康名 `curated`。
+- **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
+- **Vite 代理**：`vite.config.ts` 将 `/api` 代理到 `http://localhost:8080`。
+- **本地静态托管**：存在 `frontend-dist/` 或 `dist/` 时，后端会直接托管前端静态文件并对非 `/api` 路由做 SPA fallback。
 
-## 常见操作（复述用户诉求时）
+## 根目录政策（阶段 1）
 
-- **重启前后端**：先释放 **5173** 与后端端口（开发 **8080** / release **8081**，或配置中的 `httpAddr`）上旧进程，再分别启动上述两条命令。
-- **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；第二次启动不会再拉起第二个实例，而是复用已有实例并打开浏览器。模拟系统登录静默启动时追加 `-autostart`，这会保留托盘与本地 HTTP 服务，但跳过首次浏览器打开。
-- **改 API 行为**：改 `backend/internal/server` + `app`；前端路径在 `src/api/endpoints.ts`（相对 `/api`）。对外接口说明统一更新 `API.md`，不要把完整 API 表重新写回 README。
-- **改 README 内容**：若变更用户可见能力、命令入口或公开说明，默认同步检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 三份文档是否需要一起更新。
-- **记录打包版本**：每次执行 `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 并实际尝试产出便携包 / 安装包 / 发布清单后，脚本都必须自动向 `docs/package-build-history.csv` 追加一条记录，写清日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注；CSV 采用 UTF-8 with BOM，便于 Excel / WPS 打开。
-- **整机安装包版本规则**：生产包版本的唯一自动化来源是 `scripts/release/version.json`。当前基线为 `1.1.0`；`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动把 `patch` 加 1。`major` / `minor` 仅允许人工通过 `pnpm release:version:set-base -- --Major <major> --Minor <minor>` 调整，调整时必须把 `patch` 归零。安装包文件名、便携包文件名、`release/manifest/release.json` 与台账记录必须使用同一版本号。
-- **版本辅助命令**：查看当前生产包版本基线用 `pnpm release:version:show`；手动切换到新的 `major.minor.0` 用 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`。
+- **主要 tracked 根目录**：`src/`、`backend/`、`docs/`、`scripts/`、`public/`、`icon/`、`.cursor/`
+- **固定保留在根目录的本地目录**：
+  - `videos_test/`：测试素材目录，保留原位，不纳入目录重排
+  - `config/`：资料库级运行配置目录，暂时继续保留在 repo root，不并入 `backend/internal/config`
+- **允许的开发态运行产物**：`backend/runtime/`，用于开发二进制、数据库、日志等
+- **新的本地临时目录优先放到**：`.workspace/`
+- **不要**继续随意增加新的根目录临时目录
+- **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
+- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录
+
+## 配置与持久化
+
+- **资料库级 JSON 配置文件**：`config/library-config.cfg`
+- 该文件保存：
+  - `organizeLibrary`
+  - `metadataMovieProvider`
+  - `metadataMovieStrategy`
+  - `autoLibraryWatch`
+  - `autoActorProfileScrape`
+  - `launchAtLogin`
+  - `proxy`
+  - `logDir` / `logFilePrefix` / `logMaxAgeDays` / `logLevel`
+- `PATCH /api/settings` 会部分更新这些资料库级设置。
+- 空 `logDir` 表示使用默认日志目录，而不是关闭文件日志：
+  - release 默认 `LOCALAPPDATA\\Curated\\logs`
+  - dev 默认 `backend/runtime/logs`
+
+## 常见操作
+
+- **重启前后端**：先释放 `5173` 与后端端口（开发 `8080` / release `8081` 或配置里的 `httpAddr`），再分别启动。
+- **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；二次启动会复用现有实例并重新打开浏览器。
+- **修改 API 行为**：优先改 `backend/internal/server` 与 `backend/internal/app`，前端路径集中在 `src/api/endpoints.ts`。
+- **修改 README / 对外说明**：如果用户可见行为、命令入口、目录政策或公开说明变了，检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 是否需要同步。
+- **打包历史**：`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 会向 `docs/package-build-history.csv` 追加记录。
 
 ## 规则索引
 
-- 实现细节与目录：**`project-facts.mdc`**。
-- 前后端分层与桌面未来边界：**`architecture-boundaries.mdc`**。
-- UI 分层与设计令牌：**`ui-component-spec.mdc`**；人读 **`docs/2026-03-24-frontend-ui-spec.md`**。
-- Vue 写法：**`vue-frontend-standards.mdc`**、**`jav-library-frontend-patterns.mdc`**。
-- Go/合约/文档：**`backend-go-standards.mdc`**、**`backend-api-contracts.mdc`**、**`docs-sync.mdc`**。
+- 实现细节与目录事实：`project-facts.mdc`
+- 前后端分层与桌面目标边界：`architecture-boundaries.mdc`
+- UI 分层与设计令牌：`ui-component-spec.mdc`
+- Vue 前端约束：`vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc`
+- Go / 合约 / 文档同步：`backend-go-standards.mdc`、`backend-api-contracts.mdc`、`docs-sync.mdc`

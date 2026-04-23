@@ -138,7 +138,7 @@ cd backend && go test ./...
 1. **不要设置** `GOCACHE`、`GOMODCACHE`、`GOTMPDIR` 指向本仓库路径。直接执行 `cd backend && go test ./...` 即可，让 Go 使用默认位置（Windows 常见为 `%LocalAppData%\go-build` 与用户 `go` 目录下的 `pkg/mod`）。
 2. 若曾误设，可删掉仓库内误生成的目录后，在新终端执行 **`go env -u GOCACHE`**、**`go env -u GOMODCACHE`**（若此前用 `go env -w` 写过），或改为本机**仓库外**路径。
 3. **覆盖率 / 测试输出**：不要默认把 `-coverprofile=coverage.out`、`-memprofile` 等写到仓库根或未忽略路径；需要时写到系统临时目录、或 `backend/` 下明确路径并确保在 **`.gitignore`** 中。
-4. 仓库内 **`.gocache/`**、**`.tmp-go-modcache/`** 已在 **`.gitignore`** 中作为兜底；仍应避免主动把缓存指到此处，除非项目自带脚本（如发布打包）明确要求。
+4. 仓库内 **`.gocache/`**、**`.tmp-go/`**、**`.tmp-go-modcache/`** 已在 **`.gitignore`** 中作为兜底；仍应避免主动把缓存指到此处。当前 release Python 脚本也已改为使用系统临时目录承载 Go 构建缓存，不再以仓库内缓存目录作为例外。
 
 ---
 

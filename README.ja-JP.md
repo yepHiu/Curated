@@ -195,3 +195,11 @@ pnpm release:publish
 - 現在のリポジトリは **Web-first** 実装フェーズです。
 - Electron と mpv は今後の方向性であり、現時点でこのリポジトリに同梱される機能ではありません。
 - `docs/film-scanner/` は主に参照資料とフィクスチャを保持しており、本番モジュール構成そのものではありません。
+
+## Root Directory Policy
+
+- `videos_test/` はローカルのテスト用フィクスチャディレクトリとしてリポジトリ直下に固定で残します。
+- `config/` はライブラリ実行設定のためにリポジトリ直下に残し、`backend/internal/config` へ統合しません。
+- `backend/runtime/` は開発時の実行生成物を置く許可済みディレクトリです。
+- 新しいローカル専用の一時状態は `.workspace/` を優先します。
+- Go ビルドキャッシュはリポジトリ内に作成しません。release スクリプトはバックエンド build cache にシステムの一時ディレクトリを使うようになりました。

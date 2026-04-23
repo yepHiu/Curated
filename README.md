@@ -158,6 +158,14 @@ See [API.md](API.md) for the full endpoint reference.
 └── package.json            # pnpm scripts and dependencies
 ```
 
+Root directory policy notes:
+
+- `videos_test/` stays at the repository root as a fixed local test-fixture directory.
+- `config/` stays at the repository root for library-level runtime config; do not merge it into `backend/internal/config`.
+- `backend/runtime/` is the allowed dev-runtime output area.
+- New local-only scratch state should prefer `.workspace/`.
+- Go build caches should not be created inside the repository; release tooling now uses system temporary directories for backend build cache paths.
+
 ## Release And Packaging
 
 Recommended release entrypoint:

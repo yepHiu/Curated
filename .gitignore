@@ -38,6 +38,7 @@ scripts/prd/*
 !.env.example
 backend/runtime/
 .gocache/
+.tmp-go/
 .tmp-go-modcache/
 .tmp/
 # Go coverage / profiles if accidentally written in repo (prefer /tmp or OS temp)
@@ -78,6 +79,10 @@ log/
 
 # config file (repo root only; do not ignore backend/internal/config)
 /config/
+
+# Preferred repo-local scratch namespace for future local-only workspace state
+/.workspace/
+/.local/
 
 # Local Codex temp / brainstorm session (not tracked)
 .codex-temp/

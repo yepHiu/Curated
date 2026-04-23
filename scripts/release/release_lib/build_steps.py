@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -77,8 +78,6 @@ def build_backend(
 ) -> Path:
     repo_root = get_repo_root()
     backend_root = repo_root / "backend"
-    go_cache_dir = repo_root / ".gocache"
-    go_tmp_dir = repo_root / ".tmp-go"
     resolved_output_dir = resolve_release_path(output_dir, repo_root)
     binary_path = resolved_output_dir / binary_name
 
@@ -90,12 +89,13 @@ def build_backend(
     if resolved_output_dir.exists():
         shutil.rmtree(resolved_output_dir)
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
-    go_cache_dir.mkdir(parents=True, exist_ok=True)
-    go_tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    go_cache_dir = tempfile.mkdtemp(prefix="curated-go-build-cache-")
+    go_tmp_dir = tempfile.mkdtemp(prefix="curated-go-build-tmp-")
 
     env = os.environ.copy()
-    env["GOCACHE"] = str(go_cache_dir)
-    env["GOTMPDIR"] = str(go_tmp_dir)
+    env["GOCACHE"] = go_cache_dir
+    env["GOTMPDIR"] = go_tmp_dir
     env["GOTELEMETRY"] = "off"
     ldflags = (
         "-H=windowsgui "
