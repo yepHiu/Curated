@@ -1,7 +1,8 @@
 # Actor Profile External Links Design
 
 Date: 2026-04-23
-Status: Approved
+Updated: 2026-04-25
+Status: Revised for actor edit dialog
 
 ## Goal
 
@@ -13,6 +14,9 @@ Scope confirmed:
 - Add a separate user-managed external links list for each actor.
 - Each item is URL-only. No title scraping, no custom label.
 - Management UI lives only in `ActorProfileCard.vue`.
+- The current phase adopts the conservative editing scope: only user-managed actor tags and user-managed external links are editable.
+- The actor card should expose a single "Edit actor info" entry and move external-link editing into a dialog instead of keeping inline add controls on the card surface.
+- The actor card should render the external-links display block only when at least one saved external link exists.
 - Support only `VITE_USE_WEB_API=true` for now. Mock mode is out of scope.
 
 ## Existing Context
@@ -159,17 +163,26 @@ PATCH semantics:
 
 UI location:
 
-- Add a new "External Links" block in `ActorProfileCard.vue`.
+- Keep all actor-profile editing entry points inside `ActorProfileCard.vue`.
+- Add a single "Edit actor info" button in the actor card header.
+- Clicking that button opens a `Dialog` for editing actor-managed metadata in this phase:
+  - `userTags`
+  - `externalLinks`
 - Keep scraped `homepage` as its own row above or beside the new user-managed block.
 
 Interaction model:
 
-- Existing saved links render as clickable rows or chips with:
+- On the card body, external links are display-only.
+- Existing saved links render as clickable rows with:
   - URL text
   - open-in-new-tab behavior
-  - remove action
-- Add an inline input plus "Add" action for one URL at a time.
-- Save immediately when adding or removing, same as actor tags.
+- No standalone external-link add or edit button remains in the card body.
+- The dialog becomes the single place to edit external links.
+- User tags can remain editable in this phase, but they should be managed from the same dialog so the actor card no longer mixes inline editing with modal editing for adjacent actor-owned fields.
+- Dialog submission should persist:
+  - actor tags via the existing actor-tag update path
+  - external links via the existing external-links PATCH path
+- If only one of the two payloads actually changed, only send that request.
 
 Important scope decisions:
 
@@ -177,6 +190,7 @@ Important scope decisions:
 - No title fetching.
 - No link preview.
 - No drag-sort in this phase.
+- No editing of scraped profile fields such as `summary`, `birthday`, `height`, `homepage`, or `avatar` in this conservative phase.
 
 Implementation note:
 
@@ -187,8 +201,10 @@ Implementation note:
 Frontend:
 
 - Show inline validation error when URL is invalid.
-- Disable add/remove actions while request is in flight.
+- Disable dialog save / remove actions while request is in flight.
 - On save success, update local `profile` state from the returned DTO.
+- Closing the dialog without saving should discard draft-only changes.
+- When no external links are saved, the actor card body should not render the external-links label or empty placeholder text.
 
 Backend:
 
@@ -209,9 +225,11 @@ Backend tests:
 Frontend tests:
 
 - actor profile card renders external links when present
-- add valid URL triggers PATCH and updates UI
-- invalid URL shows inline error
-- remove link triggers PATCH and removes UI item
+- actor profile card hides the external-links section entirely when no external link exists
+- clicking "Edit actor info" opens the dialog
+- editing a valid external link in the dialog triggers PATCH and updates UI
+- invalid URL shows dialog-scoped validation error
+- closing the dialog discards unsaved draft changes
 
 ## Out of Scope
 
@@ -226,3 +244,4 @@ Frontend tests:
 
 - The actor profile card external links block uses a row list, not compact chips.
 - Reason: URLs are long and readability is more important than density in this area.
+- As of 2026-04-25, editing is modal-based: the card body displays saved external links only, while editing is centralized in a single actor-info dialog.

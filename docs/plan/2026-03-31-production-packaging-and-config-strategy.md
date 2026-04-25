@@ -420,7 +420,6 @@ C:\Program Files\Curated\curated.exe
 
 - `organizeLibrary`
 - `autoLibraryWatch`
-- `extendedLibraryImport`
 - `metadataMovieProvider`
 - `metadataMovieProviderChain`
 - `metadataMovieScrapeMode`
