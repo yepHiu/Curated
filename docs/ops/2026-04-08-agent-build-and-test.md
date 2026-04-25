@@ -169,7 +169,7 @@ cd backend && go test ./...
 
 ## 9. 生产包版本号
 
-- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.1.0`。
+- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.3.1`。
 - `pnpm release:*` 当前统一调用 `python scripts/release/release_cli.py`。
 - `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动执行 `patch + 1`。
 - `major` / `minor` 只允许人工通过 `pnpm release:version:set-base -- --Major <major> --Minor <minor>` 调整，并在调整时把 `patch` 重置为 `0`。

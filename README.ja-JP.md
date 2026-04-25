@@ -167,7 +167,7 @@ pnpm release:publish
 主なポイント:
 
 - 本番パッケージのバージョンは `scripts/release/version.json` で一元管理されます。
-- 現在のベースラインは `1.1.0` です。
+- 現在のベースラインは `1.3.1` です。
 - `pnpm release:*` は現在 `python scripts/release/release_cli.py` に統一されています。
 - リリースフローでは、Windows 用ステージングディレクトリ、ポータブル zip、インストーラー実行ファイル、リリースマニフェストを生成します。
 - パッケージ履歴台帳は `docs/ops/package-build-history.csv` に移行済みで、Excel / WPS 互換のため UTF-8 with BOM で保存されます。

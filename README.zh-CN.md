@@ -175,7 +175,7 @@ pnpm release:publish
 关键说明：
 
 - 生产包版本号统一由 `scripts/release/version.json` 管理。
-- 当前版本基线为 `1.1.0`。
+- 当前版本基线为 `1.3.1`。
 - `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
 - 发布流程会生成 Windows 发布目录、便携包、安装器可执行文件和发布清单。
 - 打包历史台账已经迁移到 `docs/ops/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。

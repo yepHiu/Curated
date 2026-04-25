@@ -178,7 +178,7 @@ pnpm release:publish
 Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.1.0`.
+- The current base line is `1.3.1`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
 - Release packaging assembles a Windows-oriented staging directory, portable zip, installer executable, and release manifest.
 - The package build ledger now lives in `docs/ops/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
