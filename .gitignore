@@ -91,3 +91,6 @@ log/
 # OpenSpec local workflow (not tracked)
 openspec/
 
+# Superpowers skills (local / optional; not part of app source)
+.superpowers/
+
