@@ -37,3 +37,21 @@ f6873df8 feat(scripts): replace PowerShell release pipeline with Python CLI
 2026-04-20,1.2.8,e82542f0,master,release:publish,release/portable/Curated-1.2.8-windows-x64.zip; release/installer/Curated-Setup-1.2.8.exe; release/manifest/release.json,成功,wujiahui,"e82542f0 docs: app update PRD, API, release notes, and packaging version 1.2.7
 488fef75 feat(frontend): app update check settings and sidebar badge
 932f0c2e feat(backend): app update manifest fetch and status persistence",versionSource=auto-patch; BuildStamp=20260419.165433; portable=versionSource=explicit; installer=versionSource=explicit
+2026-04-26,1.3.1,26273e1f,master,release:publish,release/portable/Curated-1.3.1-windows-x64.zip; release/installer/Curated-Setup-1.3.1.exe; release/manifest/release.json,成功,wujiahui,"26273e1f docs: sync API, README, CLAUDE, and project-facts with new behavior
+d9ec3d04 feat(frontend): export format, homepage skeleton, immersive player, settings and library UX
+c0207e31 feat(backend): curated frame JPG export, library path reveal, playback and scan wiring
+0460be57 docs: add plans for export, player chrome, homepage skeleton, and backend review
+e14f3bda chore: ignore local .superpowers directory
+06ab3c21 docs: reorganize docs into reference, product, ops, and review
+a00beb97 docs(rules): enforce diff-based atomic commits
+6d98ce10 repo: remove film-scanner snapshot and repo-local Go cache paths
+f6f53115 docs(plan): repository structure improvement (EN + zh-CN)
+81734b87 docs(plan): actor profile card scroll design and implementation
+9332ed62 fix(frontend): actor profile card scroll and 29px add buttons
+60cb4f17 docs: actor external links API and profile card scroll plan
+a6be9f3b feat(frontend): actor profile external links UI
+dcc4c2ca feat(backend): actor external links storage and API
+e94f169b chore(release): bump to 1.2.8 and extend package ledger
+19d3a065 feat(frontend): batch tag suggestions and actor detail external links
+52faca31 docs: PRD CSV samples, actor link plans, and prd-csv skill
+7018b0d1 feat(scripts): PRD requirements CSV linter",versionSource=explicit; BuildStamp=20260425.193341; portable=versionSource=explicit; installer=versionSource=explicit
