@@ -479,8 +479,10 @@ onBeforeUnmount(() => {
             <Switch v-model="playbackNativePlayerEnabledDraft" />
           </div>
 
-          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-            <div class="flex min-w-0 flex-1 flex-col gap-3">
+          <div
+            class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+          >
+            <div class="min-w-0 flex-1 flex flex-col gap-3">
               <p class="text-sm font-medium text-foreground">
                 {{ t("settings.playbackNativePlayerPreset") }}
               </p>
@@ -488,23 +490,25 @@ onBeforeUnmount(() => {
                 {{ t("settings.playbackNativePlayerPresetHint") }}
               </p>
             </div>
-            <Select
-              :model-value="playbackNativePlayerPresetDraft"
-              @update:model-value="onPlaybackNativePlayerPresetChange"
-            >
-              <SelectTrigger>
-                <SelectValue :placeholder="t('settings.playbackNativePlayerPresetMpv')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS"
-                  :key="option"
-                  :value="option"
-                >
-                  {{ playbackNativePlayerPresetLabel(option) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
+              <Select
+                :model-value="playbackNativePlayerPresetDraft"
+                @update:model-value="onPlaybackNativePlayerPresetChange"
+              >
+                <SelectTrigger class="w-full min-w-0 sm:w-fit">
+                  <SelectValue :placeholder="t('settings.playbackNativePlayerPresetMpv')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ playbackNativePlayerPresetLabel(option) }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">

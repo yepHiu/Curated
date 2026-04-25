@@ -62,10 +62,12 @@ import {
 import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
+import { useLibraryService } from "@/services/library-service"
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const libraryService = useLibraryService()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const curatedPageLimit = 60
@@ -284,16 +286,22 @@ function actorNameForExportRequest(): string | undefined {
   return namedActorForExport.value
 }
 
+type CuratedExportFormat = NonNullable<PostCuratedFramesExportBody["format"]>
+
+function preferredCuratedExportFormat(): CuratedExportFormat {
+  return libraryService.curatedFrameExportFormat.value ?? "jpg"
+}
+
 async function runExport(
   ids: string[],
   actorName: string | undefined,
-  format: "webp" | "png",
-  errorTarget: "toolbar" | "dialog",
+  format: CuratedExportFormat,
+  errorTarget: "toolbar" | "dialog" | "toast",
 ) {
   exportBusy.value = true
   if (errorTarget === "toolbar") {
     exportToolbarError.value = ""
-  } else {
+  } else if (errorTarget === "dialog") {
     dialogExportError.value = ""
   }
   const body: PostCuratedFramesExportBody = { ids, format }
@@ -308,37 +316,44 @@ async function runExport(
     const msg = t("curated.exportFailed")
     if (errorTarget === "toolbar") {
       exportToolbarError.value = msg
-    } else {
+    } else if (errorTarget === "dialog") {
       dialogExportError.value = msg
+    } else {
+      pushAppToast(msg, { variant: "destructive" })
     }
   } finally {
     exportBusy.value = false
   }
 }
 
-async function exportSelectedAsFormat(format: "webp" | "png") {
+async function exportSelected() {
   if (selectedFrameIds.value.length === 0) {
     return
   }
-  await runExport(selectedFrameIds.value, actorNameForExportRequest(), format, "toolbar")
+  await runExport(
+    selectedFrameIds.value,
+    actorNameForExportRequest(),
+    preferredCuratedExportFormat(),
+    "toolbar",
+  )
 }
 
-async function exportSingleFromDialog(format: "webp" | "png") {
+async function exportSingleFromDialog() {
   if (!selected.value) {
     return
   }
   const actorName = resolveSingleFrameActorNameForExport(selected.value, dialogOpenedFromActor.value)
-  await runExport([selected.value.id], actorName, format, "dialog")
+  await runExport([selected.value.id], actorName, preferredCuratedExportFormat(), "dialog")
 }
 
-async function exportSingleFromContextMenu(format: "webp" | "png") {
+async function exportSingleFromContextMenu() {
   const menu = frameContextMenu.value
   if (!menu) {
     return
   }
   closeFrameContextMenu()
   const actorName = resolveSingleFrameActorNameForExport(menu.frame, menu.fromActorSection)
-  await runExport([menu.frame.id], actorName, format, "dialog")
+  await runExport([menu.frame.id], actorName, preferredCuratedExportFormat(), "toast")
 }
 
 const maxFrameTags = 64
@@ -1096,8 +1111,7 @@ defineExpose({
   deleteSelectedFrames: () => {
     openDeleteConfirmForSelectedFrames()
   },
-  exportSelectedWebp: () => exportSelectedAsFormat("webp"),
-  exportSelectedPng: () => exportSelectedAsFormat("png"),
+  exportSelected,
 })
 </script>
 
@@ -1728,7 +1742,7 @@ defineExpose({
             >
               <div
                 v-if="useWebApi"
-                class="grid grid-cols-2 gap-2"
+                class="grid grid-cols-1 gap-2"
               >
                 <Button
                   type="button"
@@ -1736,21 +1750,10 @@ defineExpose({
                   size="sm"
                   class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
                   :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
-                  @click="exportSingleFromDialog('webp')"
+                  @click="exportSingleFromDialog"
                 >
                   <Download class="size-4 shrink-0" aria-hidden="true" />
-                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                  :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
-                  @click="exportSingleFromDialog('png')"
-                >
-                  <Download class="size-4 shrink-0" aria-hidden="true" />
-                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportPng") }}</span>
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}</span>
                 </Button>
               </div>
               <div class="flex flex-col gap-2">
@@ -1788,8 +1791,7 @@ defineExpose({
       :y="frameContextMenu.y"
       :use-web-api="useWebApi"
       @close="closeFrameContextMenu"
-      @export-webp="exportSingleFromContextMenu('webp')"
-      @export-png="exportSingleFromContextMenu('png')"
+      @export="exportSingleFromContextMenu"
       @delete="openDeleteConfirmFromContextMenu"
     />
 

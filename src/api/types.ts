@@ -142,6 +142,7 @@ export type MetadataMovieStrategy =
   | "auto-cn-friendly"
   | "custom-chain"
   | "specified"
+export type CuratedFrameExportFormat = "jpg" | "webp" | "png"
 
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
@@ -151,12 +152,12 @@ export interface SettingsDTO {
   /**
    * 开启后，在新加入的库根「第一次成功扫描」时，会尝试识别 Curated 清单或外部整理目录布局（仅标注，不改动已有库路径的默认行为）。
    */
-  extendedLibraryImport: boolean
   /** 为 true 时库根目录监听新文件并防抖触发扫描（及后续刮削）；与主配置 libraryWatchEnabled 共同生效 */
   autoLibraryWatch: boolean
   autoActorProfileScrape: boolean
   launchAtLogin: boolean
   launchAtLoginSupported: boolean
+  curatedFrameExportFormat: CuratedFrameExportFormat
   /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
   metadataMovieProvider: string
   /** 当前引擎可用的影片源名（排序），供指定模式选择 */
@@ -209,10 +210,10 @@ export interface ProxyJavBusPingResponse {
 
 export interface PatchSettingsBody {
   organizeLibrary?: boolean
-  extendedLibraryImport?: boolean
   autoLibraryWatch?: boolean
   autoActorProfileScrape?: boolean
   launchAtLogin?: boolean
+  curatedFrameExportFormat?: CuratedFrameExportFormat
   player?: PatchPlayerSettingsBody
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string
@@ -529,7 +530,7 @@ export interface PostCuratedFramesExportBody {
   /** 按演员分组导出时传入；须属于每帧的 actors */
   actorName?: string
   /** 默认 webp；png 为带 iTXt 元数据的 PNG */
-  format?: "webp" | "png"
+  format?: CuratedFrameExportFormat
 }
 
 /** GET /library/played-movies */

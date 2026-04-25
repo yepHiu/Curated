@@ -54,17 +54,14 @@ describe("SettingsCuratedShortcutSection", () => {
   it("cancels capture mode when escape is pressed", async () => {
     const wrapper = mount(SettingsCuratedShortcutSection)
 
-    await wrapper.get("[data-curated-shortcut-record]").trigger("click")
-    expect(wrapper.get("[data-curated-shortcut-status]").text()).toContain(
-      "settings.curatedShortcutListening",
-    )
+    const record = wrapper.get("[data-curated-shortcut-record]")
+    await record.trigger("click")
+    expect((record.element as HTMLButtonElement).disabled).toBe(true)
 
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape", key: "Escape" }))
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get("[data-curated-shortcut-status]").text()).toContain(
-      "settings.curatedShortcutIdle",
-    )
+    expect((record.element as HTMLButtonElement).disabled).toBe(false)
     expect(wrapper.get("[data-curated-shortcut-current]").text()).toContain("C")
   })
 

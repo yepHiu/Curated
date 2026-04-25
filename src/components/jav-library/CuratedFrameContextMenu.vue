@@ -15,8 +15,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  exportWebp: []
-  exportPng: []
+  export: []
   delete: []
 }>()
 
@@ -45,15 +44,9 @@ function close() {
   emit("close")
 }
 
-function onExportWebp() {
+function onExport() {
   if (!props.useWebApi) return
-  emit("exportWebp")
-  close()
-}
-
-function onExportPng() {
-  if (!props.useWebApi) return
-  emit("exportPng")
+  emit("export")
   close()
 }
 
@@ -104,23 +97,11 @@ watch(
         :class="itemClass"
         :disabled="!useWebApi"
         :title="exportHint"
-        data-curated-frame-context-action="export-webp"
-        @click="onExportWebp"
+        data-curated-frame-context-action="export"
+        @click="onExport"
       >
         <Download class="size-4 shrink-0" aria-hidden="true" />
-        {{ t("curated.exportWebp") }}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        :class="itemClass"
-        :disabled="!useWebApi"
-        :title="exportHint"
-        data-curated-frame-context-action="export-png"
-        @click="onExportPng"
-      >
-        <Download class="size-4 shrink-0" aria-hidden="true" />
-        {{ t("curated.exportPng") }}
+        {{ t("curated.export") }}
       </button>
       <button
         type="button"

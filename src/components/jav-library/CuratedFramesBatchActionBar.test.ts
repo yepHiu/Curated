@@ -1,4 +1,4 @@
-import { shallowMount } from "@vue/test-utils"
+import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import CuratedFramesBatchActionBar from "./CuratedFramesBatchActionBar.vue"
 
@@ -8,13 +8,9 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-vi.mock("@/components/ui/button", () => ({
-  Button: { name: "Button", template: "<button><slot /></button>" },
-}))
-
-describe("CuratedFramesBatchActionBar layout", () => {
-  it("aligns flush with the content bottom instead of preserving rounded shell corners", () => {
-    const wrapper = shallowMount(CuratedFramesBatchActionBar, {
+describe("CuratedFramesBatchActionBar", () => {
+  it("renders a single export button", () => {
+    const wrapper = mount(CuratedFramesBatchActionBar, {
       props: {
         selectedCount: 2,
         exportBusy: false,
@@ -25,7 +21,11 @@ describe("CuratedFramesBatchActionBar layout", () => {
       },
     })
 
-    const toolbar = wrapper.get('[role="toolbar"]')
-    expect(toolbar.classes().join(" ")).not.toContain("rounded-b-[calc")
+    const buttons = wrapper.findAll("button")
+    const exportButtons = buttons.filter((button) => button.text().includes("curated.export"))
+
+    expect(exportButtons).toHaveLength(1)
+    expect(wrapper.text()).not.toContain("curated.exportWebp")
+    expect(wrapper.text()).not.toContain("curated.exportPng")
   })
 })

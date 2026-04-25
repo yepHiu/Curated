@@ -7,6 +7,7 @@ import {
   Info,
   Loader2,
   Maximize2,
+  Minimize2,
   Pause,
   PictureInPicture2,
   Play,
@@ -57,7 +58,6 @@ import {
   resolveNativePlayerBrowserTemplate,
 } from "@/lib/native-player-launch"
 import {
-  formatCuratedCaptureKeyLabel,
   shouldBlurPlaybackSliderAfterCommit,
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
@@ -67,6 +67,7 @@ import {
   shouldEnterSeekWaitingState,
   shouldReconcileDisplayedPlaybackTime,
 } from "@/lib/player-playback-clock"
+import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -166,6 +167,7 @@ const playbackMuted = ref(initialAudio.muted)
 /** 浏览器原生画中画（Document Picture-in-Picture 除外） */
 const pipSupported = ref(false)
 const isPipActive = ref(false)
+const isSurfaceFullscreen = ref(false)
 
 function refreshPipSupport() {
   try {
@@ -196,6 +198,15 @@ function onDocumentPictureInPictureChange() {
   syncPipActiveFromDocument()
 }
 
+function syncSurfaceFullscreenFromDocument() {
+  const el = surfaceRef.value
+  isSurfaceFullscreen.value = Boolean(el && document.fullscreenElement === el)
+}
+
+function onDocumentFullscreenChange() {
+  syncSurfaceFullscreenFromDocument()
+}
+
 const curatedShutterActive = ref(false)
 const curatedPlusOne = ref(false)
 const curatedCaptureError = ref("")
@@ -206,39 +217,17 @@ let playbackClockSyncIntervalId: number | null = null
 let lastAuthoritativePlaybackTimeSec: number | null = null
 let progressSliderFocusRestoreTimer: number | null = null
 
-/** 播放中鼠标静止一段时间后隐藏控件与指针；移动鼠标恢复 */
+/** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
 const IDLE_HIDE_MS = 5000
-const chromeVisible = ref(true)
-let idleHideTimer: number | null = null
-
-function clearIdleHideTimer() {
-  if (idleHideTimer !== null) {
-    clearTimeout(idleHideTimer)
-    idleHideTimer = null
-  }
-}
-
-function scheduleChromeIdleHide() {
-  clearIdleHideTimer()
-  if (!playbackSrc.value || !isPlaying.value) {
-    chromeVisible.value = true
-    return
-  }
-  idleHideTimer = window.setTimeout(() => {
-    idleHideTimer = null
-    chromeVisible.value = false
-  }, IDLE_HIDE_MS)
-}
-
-function onChromePointerActivity() {
-  chromeVisible.value = true
-  scheduleChromeIdleHide()
-}
-
-function onChromePointerLeave() {
-  clearIdleHideTimer()
-  chromeVisible.value = true
-}
+const immersiveChrome = usePlayerImmersiveChrome({
+  hasPlayback: computed(() => Boolean(playbackSrc.value)),
+  isPlaying,
+  hideDelayMs: IDLE_HIDE_MS,
+})
+const chromeVisible = immersiveChrome.chromeVisible
+const immersiveFeedback = immersiveChrome.feedback
+const scheduleChromeIdleHide = immersiveChrome.scheduleChromeIdleHide
+const clearIdleHideTimer = immersiveChrome.clearIdleHideTimer
 
 const CHROME_LAYER_TRANSITION =
   "transition-opacity duration-300 ease-out motion-reduce:transition-none"
@@ -263,7 +252,6 @@ const videoAreaCursorClass = computed(() => {
 watch(isPlaying, (playing) => {
   if (!playing) {
     clearIdleHideTimer()
-    chromeVisible.value = true
   } else if (playbackSrc.value) {
     scheduleChromeIdleHide()
   }
@@ -693,7 +681,9 @@ onMounted(() => {
     preloadHlsLibrary()
   }
   document.addEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
+  document.addEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.addEventListener("keydown", onPlaybackKeydown)
+  window.addEventListener("mousemove", immersiveChrome.onPageMouseMove, { passive: true })
   document.addEventListener("visibilitychange", onVisibilityChange)
   window.addEventListener("beforeunload", onWindowBeforeUnload)
 })
@@ -704,12 +694,15 @@ onUnmounted(() => {
   void releasePlaybackSession(playbackDescriptor.value?.sessionId)
   void destroyHlsInstance()
   document.removeEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
+  document.removeEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.removeEventListener("keydown", onPlaybackKeydown)
+  window.removeEventListener("mousemove", immersiveChrome.onPageMouseMove)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
   stopPlaybackClockSyncLoop()
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()
+  immersiveChrome.dispose()
   if (document.pictureInPictureElement) {
     void document.exitPictureInPicture().catch(() => {
       // ignore
@@ -957,7 +950,6 @@ function startOptimisticSeek(
 }
 
 function onProgressSliderInput(values?: number[]) {
-  onChromePointerActivity()
   const next = normalizeProgressTargetSec(values?.[0] ?? 0)
   isScrubbingProgress.value = true
   scrubPreviewTimeSec.value = next
@@ -1121,7 +1113,6 @@ function closePlayerContextMenu() {
 function onPlayerContextMenu(event: MouseEvent) {
   event.preventDefault()
   event.stopPropagation()
-  onChromePointerActivity()
   playerContextMenu.value = {
     x: event.clientX,
     y: event.clientY,
@@ -1139,6 +1130,9 @@ function closeDetailedStats() {
 }
 
 function seekDelta(deltaSec: number) {
+  if (!chromeVisible.value) {
+    immersiveChrome.showSeekFeedback(deltaSec)
+  }
   const previous = currentTime.value
   const descriptor = playbackDescriptor.value
   startOptimisticSeek(previous + deltaSec, {
@@ -1229,9 +1223,6 @@ function onPlaybackKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return
   if (shouldIgnoreGlobalPlaybackHotkeysForTarget(e.target)) return
 
-  /** 快捷键也视为活动，避免仅键盘操作时界面被永久隐藏 */
-  onChromePointerActivity()
-
   switch (e.code) {
     case "Space":
     case "KeyK":
@@ -1315,6 +1306,9 @@ async function runCuratedCapture() {
     curatedPlusOne.value = false
     curatedPlusOneTimer = null
   }, 800)
+  if (!chromeVisible.value) {
+    immersiveChrome.showCuratedFeedback(`${t("player.curatedLabel")} +1`)
+  }
 }
 
 async function toggleFullscreen() {
@@ -1328,11 +1322,12 @@ async function toggleFullscreen() {
     }
   } catch {
     // ignore
+  } finally {
+    syncSurfaceFullscreenFromDocument()
   }
 }
 
 async function togglePictureInPicture() {
-  onChromePointerActivity()
   const v = videoRef.value
   if (!v || !playbackSrc.value || !pipSupported.value) return
   try {
@@ -1994,10 +1989,6 @@ const volumeStatusLabel = computed(() => {
   if (playbackMuted.value) return "Muted"
   return `${Math.round(volumePercent.value)}%`
 })
-const curatedCaptureShortcutLabel = computed(() =>
-  formatCuratedCaptureKeyLabel(getCuratedCaptureKeyCode()),
-)
-
 const currentPlaybackBitrateLabel = computed(() =>
   formatBitrateLabel(
     playbackDescriptor.value?.mode === "hls"
@@ -2177,15 +2168,11 @@ const videoPreloadMode = computed(() =>
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col p-1 sm:p-2">
+  <div class="flex h-full min-h-0 flex-col">
     <div
       ref="surfaceRef"
-      class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-border/50 bg-gradient-to-br from-black via-zinc-950 to-black"
+      class="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-black via-zinc-950 to-black"
       :class="surfaceCursorClass"
-      @mousedown="onChromePointerActivity"
-      @mousemove="onChromePointerActivity"
-      @mouseenter="onChromePointerActivity"
-      @mouseleave="onChromePointerLeave"
       @contextmenu="onPlayerContextMenu"
     >
       <div
@@ -2204,6 +2191,45 @@ const videoPreloadMode = computed(() =>
           </div>
         </div>
       </div>
+
+      <Transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="opacity-0 translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-1"
+      >
+        <div
+          v-if="immersiveFeedback && !chromeVisible"
+          class="pointer-events-none absolute right-4 top-4 z-[19] sm:right-5 sm:top-5"
+        >
+          <div
+            :class="
+              cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium shadow-[0_10px_24px_rgba(0,0,0,0.18)] ring-1 backdrop-blur-md',
+                immersiveFeedback.kind === 'curated'
+                  ? 'bg-primary/12 text-primary ring-primary/20'
+                  : 'bg-black/40 text-white/88 ring-white/10',
+              )
+            "
+          >
+            <SkipBack
+              v-if="immersiveFeedback.kind === 'seek' && immersiveFeedback.direction === 'backward'"
+              class="size-4"
+              aria-hidden="true"
+            />
+            <SkipForward
+              v-else-if="immersiveFeedback.kind === 'seek'"
+              class="size-4"
+              aria-hidden="true"
+            />
+            <span
+              :class="immersiveFeedback.kind === 'seek' ? 'tabular-nums' : ''"
+            >{{ immersiveFeedback.label }}</span>
+          </div>
+        </div>
+      </Transition>
 
       <div
         v-if="detailedStatsVisible"
@@ -2262,12 +2288,12 @@ const videoPreloadMode = computed(() =>
       </div>
 
       <div
-        class="relative flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6 lg:p-8"
+        class="relative flex min-h-0 flex-1 items-center justify-center"
         :class="videoAreaCursorClass"
         @click="onVideoSurfaceClick"
       >
         <div
-          class="pointer-events-none absolute inset-4 z-[5] rounded-2xl sm:inset-6 lg:inset-8"
+          class="pointer-events-none absolute inset-0 z-[5]"
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
@@ -2489,35 +2515,35 @@ const videoPreloadMode = computed(() =>
 
               <Button
                 v-if="pipSupported"
+                type="button"
                 variant="secondary"
-                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
+                size="icon"
+                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
                 :aria-pressed="isPipActive"
                 :aria-label="isPipActive ? t('player.ariaPipExit') : t('player.ariaPipEnter')"
                 @click="togglePictureInPicture"
               >
-                <PictureInPicture2 class="size-4 shrink-0" data-icon="inline-start" aria-hidden="true" />
-                {{ isPipActive ? t("player.pipExit") : t("player.pip") }}
+                <PictureInPicture2 class="size-4 shrink-0" aria-hidden="true" />
               </Button>
 
               <Button
+                type="button"
                 variant="secondary"
-                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
+                size="icon"
+                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
+                :aria-pressed="isSurfaceFullscreen"
+                :aria-label="
+                  isSurfaceFullscreen ? t('player.ariaFullscreenExit') : t('player.ariaFullscreenEnter')
+                "
                 @click="toggleFullscreen"
               >
-                <Maximize2 data-icon="inline-start" />
-                {{ t("player.fullscreen") }}
+                <Minimize2 v-if="isSurfaceFullscreen" class="size-4 shrink-0" aria-hidden="true" />
+                <Maximize2 v-else class="size-4 shrink-0" aria-hidden="true" />
               </Button>
             </div>
           </div>
-
-          <p
-            v-if="playbackSrc"
-            class="text-center text-[10px] leading-relaxed text-white/40 sm:text-xs"
-          >
-            {{ t("player.hintBar", { backward: playbackSeekBackwardStep, forward: playbackSeekForwardStep, capture: curatedCaptureShortcutLabel }) }}
-          </p>
         </div>
       </div>
     </div>

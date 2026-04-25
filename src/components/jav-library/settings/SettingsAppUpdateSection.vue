@@ -129,7 +129,7 @@ async function handleCheckNow() {
             <Badge
               v-if="hasUpdateBadge"
               variant="secondary"
-              class="rounded-full border border-amber-500/30 bg-amber-500/15 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100"
+              class="rounded-full border border-amber-600/35 bg-amber-500/20 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100"
             >
               New
             </Badge>

@@ -18,8 +18,7 @@ const emit = defineEmits<{
   clearSelection: []
   selectAllVisible: []
   deleteSelected: []
-  exportWebp: []
-  exportPng: []
+  export: []
 }>()
 
 const { t } = useI18n()
@@ -73,22 +72,10 @@ const { t } = useI18n()
           class="gap-1.5 rounded-xl"
           :disabled="selectedCount === 0 || exportBusy || deleteBusy || !props.useWebApi"
           :title="!props.useWebApi ? t('curated.exportRequiresApi') : undefined"
-          @click="emit('exportWebp')"
+          @click="emit('export')"
         >
           <Download class="size-4" />
-          {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWebp") }}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          class="gap-1.5 rounded-xl"
-          :disabled="selectedCount === 0 || exportBusy || deleteBusy || !props.useWebApi"
-          :title="!props.useWebApi ? t('curated.exportRequiresApi') : undefined"
-          @click="emit('exportPng')"
-        >
-          <Download class="size-4" />
-          {{ exportBusy ? t("curated.exportWorking") : t("curated.exportPng") }}
+          {{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}
         </Button>
         <Button
           type="button"

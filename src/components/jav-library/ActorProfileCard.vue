@@ -16,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
 import {
@@ -61,7 +69,7 @@ const tagSuggestDomId = useId()
 const { focused: userTagSuggestRowFocused } = useFocusWithin(userTagSuggestRootRef)
 const tagPatching = ref(false)
 const externalLinksSaving = ref(false)
-const externalLinkInputOpen = ref(false)
+const actorEditDialogOpen = ref(false)
 const newExternalLinkDraft = ref("")
 const externalLinkFormError = ref("")
 const externalLinkInputRef = ref<HTMLInputElement | null>(null)
@@ -337,7 +345,7 @@ watch(
     userTagInputOpen.value = false
     newExternalLinkDraft.value = ""
     externalLinkFormError.value = ""
-    externalLinkInputOpen.value = false
+    actorEditDialogOpen.value = false
     void load()
   },
 )
@@ -438,44 +446,44 @@ async function addUserTag() {
   await addUserTagWithValue(newUserTagDraft.value)
 }
 
-async function addExternalLink() {
+async function saveActorExternalLinks() {
   externalLinkFormError.value = ""
   const next = normalizeActorExternalLinkDraft(newExternalLinkDraft.value)
-  if (!next) {
+  if (!next && !primaryExternalLink.value) {
+    actorEditDialogOpen.value = false
     return
   }
-  if (!isValidActorExternalLink(next)) {
+  if (next && !isValidActorExternalLink(next)) {
     externalLinkFormError.value = t("library.actorExternalLinksInvalid")
     return
   }
-  if (primaryExternalLink.value === next) {
-    externalLinkInputOpen.value = false
-    newExternalLinkDraft.value = ""
+  const nextLinks = next ? [next] : []
+  const unchanged =
+    nextLinks.length === externalLinks.value.length &&
+    nextLinks.every((link, idx) => link === externalLinks.value[idx])
+
+  if (unchanged) {
+    actorEditDialogOpen.value = false
     return
   }
-  const ok = await patchActorExternalLinks([next])
+  const ok = await patchActorExternalLinks(nextLinks)
   if (ok) {
-    externalLinkInputOpen.value = false
-    newExternalLinkDraft.value = ""
+    actorEditDialogOpen.value = false
   }
 }
 
-function cancelExternalLinkInput() {
-  externalLinkInputOpen.value = false
+function cancelActorEditDialog() {
+  actorEditDialogOpen.value = false
   newExternalLinkDraft.value = ""
   externalLinkFormError.value = ""
 }
 
-async function onExternalLinkAddButtonClick() {
+async function openActorEditDialog() {
   externalLinkFormError.value = ""
-  if (!externalLinkInputOpen.value) {
-    newExternalLinkDraft.value = primaryExternalLink.value
-    externalLinkInputOpen.value = true
-    await nextTick()
-    externalLinkInputRef.value?.focus()
-    return
-  }
-  void addExternalLink()
+  newExternalLinkDraft.value = primaryExternalLink.value
+  actorEditDialogOpen.value = true
+  await nextTick()
+  externalLinkInputRef.value?.focus()
 }
 
 const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
@@ -529,6 +537,17 @@ onUnmounted(() => {
           <CardTitle>{{ t("library.actorCardTitle") }}</CardTitle>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            v-if="profile && !initialLoading && !notFound && !loadError"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="rounded-xl"
+            data-actor-edit-open
+            @click="openActorEditDialog"
+          >
+            {{ t("library.editActorInfo") }}
+          </Button>
           <Button
             v-if="profile && !initialLoading && !notFound && !loadError"
             type="button"
@@ -712,25 +731,11 @@ onUnmounted(() => {
               </dd>
             </div>
           </dl>
-          <section class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm text-muted-foreground">
-                {{ t("library.actorExternalLinks") }}
-              </p>
-              <Button
-                data-actor-external-link-add
-                type="button"
-                variant="secondary"
-                class="h-[29px] min-h-[29px] max-h-[29px] rounded-2xl py-0 leading-none"
-                :disabled="externalLinksSaving"
-                @click="onExternalLinkAddButtonClick"
-              >
-                <Plus data-icon="inline-start" />
-                {{ t("common.add") }}
-              </Button>
-            </div>
+          <section v-if="primaryExternalLink" class="space-y-1">
+            <p class="text-sm text-muted-foreground">
+              {{ t("library.actorExternalLinks") }}
+            </p>
             <p
-              v-if="primaryExternalLink"
               class="truncate text-sm"
             >
               <a
@@ -741,56 +746,6 @@ onUnmounted(() => {
               >
                 {{ primaryExternalLink }}
               </a>
-            </p>
-            <div
-              v-if="externalLinkInputOpen"
-              class="flex max-w-full flex-wrap items-center gap-2"
-            >
-              <div class="relative max-w-full min-w-[min(100%,12rem)] flex-1">
-                <div
-                  class="flex h-9 w-full items-center gap-0.5 rounded-2xl border border-border/80 bg-background/80 pl-3 pr-0.5 shadow-sm"
-                >
-                  <input
-                    ref="externalLinkInputRef"
-                    data-actor-external-link-input
-                    v-model="newExternalLinkDraft"
-                    type="url"
-                    inputmode="url"
-                    autocomplete="off"
-                    :disabled="externalLinksSaving"
-                    :placeholder="t('library.actorExternalLinksPlaceholder')"
-                    class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0 disabled:opacity-50"
-                    @keydown.enter.prevent="addExternalLink"
-                  />
-                  <Button
-                    data-actor-external-link-cancel
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    :disabled="externalLinksSaving"
-                    @click="cancelExternalLinkInput"
-                  >
-                    <X class="size-4" />
-                  </Button>
-                </div>
-              </div>
-              <Button
-                data-actor-external-link-save
-                type="button"
-                variant="secondary"
-                class="h-[29px] min-h-[29px] max-h-[29px] rounded-2xl py-0 leading-none"
-                :disabled="externalLinksSaving"
-                @click="addExternalLink"
-              >
-                {{ t("common.save") }}
-              </Button>
-            </div>
-            <p
-              v-if="externalLinkFormError"
-              class="text-sm text-destructive"
-            >
-              {{ externalLinkFormError }}
             </p>
           </section>
           <p
@@ -809,6 +764,71 @@ onUnmounted(() => {
       </template>
     </CardContent>
   </Card>
+
+  <Dialog v-model:open="actorEditDialogOpen">
+    <DialogContent
+      v-if="actorEditDialogOpen"
+      data-actor-edit-dialog
+      class="max-h-[min(90vh,32rem)] overflow-y-auto rounded-3xl border-border/70 sm:max-w-lg"
+    >
+      <DialogHeader>
+        <DialogTitle>{{ t("library.editActorInfoTitle") }}</DialogTitle>
+        <DialogDescription class="text-pretty">
+          {{ t("library.editActorInfoDesc") }}
+        </DialogDescription>
+      </DialogHeader>
+      <div class="flex flex-col gap-4 py-2">
+        <div class="grid gap-2">
+          <label class="text-sm font-medium" for="actor-edit-external-link">
+            {{ t("library.actorExternalLinks") }}
+          </label>
+          <input
+            id="actor-edit-external-link"
+            ref="externalLinkInputRef"
+            data-actor-edit-external-link-input
+            v-model="newExternalLinkDraft"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            :disabled="externalLinksSaving"
+            :placeholder="t('library.actorExternalLinksPlaceholder')"
+            class="text-foreground placeholder:text-muted-foreground flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            @keydown.enter.prevent="saveActorExternalLinks"
+          />
+          <p class="text-xs text-muted-foreground">
+            {{ t("library.editActorInfoExternalLinkHint") }}
+          </p>
+        </div>
+        <p
+          v-if="externalLinkFormError"
+          class="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {{ externalLinkFormError }}
+        </p>
+      </div>
+      <DialogFooter class="gap-3">
+        <Button
+          data-actor-edit-cancel
+          type="button"
+          variant="outline"
+          class="rounded-2xl"
+          :disabled="externalLinksSaving"
+          @click="cancelActorEditDialog"
+        >
+          {{ t("common.cancel") }}
+        </Button>
+        <Button
+          data-actor-edit-save
+          type="button"
+          class="rounded-2xl"
+          :disabled="externalLinksSaving"
+          @click="saveActorExternalLinks"
+        >
+          {{ externalLinksSaving ? t("common.saving") : t("common.save") }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 
   <Teleport to="body">
     <ul

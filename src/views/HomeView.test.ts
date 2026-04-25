@@ -30,7 +30,7 @@ function makeMovie(id: string, overrides: Partial<Movie> = {}): Movie {
   }
 }
 
-const mockMovies = vi.hoisted(() => [
+const defaultMockMovies = vi.hoisted(() => [
   makeMovie("m1", { isFavorite: true, rating: 4.9, userRating: 5, userTags: ["User Tag A"] }),
   makeMovie("m2", { rating: 4.8, actors: ["Actor B"], tags: ["tag-b"], studio: "Studio B" }),
   makeMovie("m3", { rating: 4.6 }),
@@ -43,6 +43,7 @@ const mockMovies = vi.hoisted(() => [
   makeMovie("m10", { rating: 3.9 }),
   makeMovie("m11", { rating: 3.8 }),
 ])
+const moviesState = vi.hoisted(() => ({ value: defaultMockMovies as Movie[] }))
 
 const routerPushMock = vi.hoisted(() => vi.fn())
 const armHomeDetailReturnRestoreMock = vi.hoisted(() => vi.fn())
@@ -55,6 +56,7 @@ const homepageSnapshotState = vi.hoisted(() => ({
     recommendationMovieIds: string[]
   },
 }))
+const moviesLoadedState = vi.hoisted(() => ({ value: true }))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -76,8 +78,9 @@ vi.mock("@/composables/use-home-scroll-preserve", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
-    movies: computed(() => mockMovies),
+    movies: computed(() => moviesState.value),
     trashedMovies: computed(() => []),
+    moviesLoaded: computed(() => moviesLoadedState.value),
   }),
 }))
 
@@ -137,6 +140,18 @@ describe("HomeView", () => {
     routerPushMock.mockReset()
     armHomeDetailReturnRestoreMock.mockReset()
     homepageSnapshotState.value = null
+    moviesLoadedState.value = true
+    moviesState.value = defaultMockMovies
+  })
+
+  it("renders homepage skeleton until movies are loaded", () => {
+    moviesLoadedState.value = false
+
+    const wrapper = mount(HomeView)
+
+    expect(wrapper.find("[data-homepage-portal-skeleton]").exists()).toBe(true)
+    expect(wrapper.findComponent({ name: "HomepagePortal" }).exists()).toBe(false)
+    expect(wrapper.find("[data-home-hero]").exists()).toBe(false)
   })
 
   it("renders the homepage hero and section rows", () => {
@@ -162,6 +177,18 @@ describe("HomeView", () => {
     expect(wrapper.text()).toContain("home.sectionRecommendTitle")
     expect(wrapper.text()).toContain("home.sectionContinueTitle")
     expect(wrapper.findAll(".playback-history-card-stub")).toHaveLength(2)
+  })
+
+  it("renders dedicated empty state after movies finish loading with no results", () => {
+    moviesState.value = []
+
+    const wrapper = mount(HomeView)
+
+    expect(wrapper.find("[data-homepage-empty-state]").exists()).toBe(true)
+    expect(wrapper.findComponent({ name: "HomepagePortal" }).exists()).toBe(false)
+    expect(wrapper.find("[data-homepage-portal-skeleton]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("home.emptyTitle")
+    expect(wrapper.text()).toContain("home.emptyBody")
   })
 
   it("prefers backend daily snapshot ids for hero and recommendations", () => {

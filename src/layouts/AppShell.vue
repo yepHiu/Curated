@@ -120,7 +120,7 @@ const isPrimaryBrowseRoute = computed(
 )
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const useFlushWorkspaceFrame = computed(() =>
-  ["home", "library", "favorites", "tags", "trash", "history", "curated-frames"].includes(
+  ["home", "library", "favorites", "tags", "trash", "history", "curated-frames", "player"].includes(
     String(route.name ?? ""),
   ),
 )

@@ -34,20 +34,16 @@ describe("CuratedFrameContextMenu", () => {
 
     await nextTick()
 
-    const exportWebp = document.body.querySelector('[data-curated-frame-context-action="export-webp"]') as HTMLButtonElement | null
-    const exportPng = document.body.querySelector('[data-curated-frame-context-action="export-png"]') as HTMLButtonElement | null
+    const exportButton = document.body.querySelector('[data-curated-frame-context-action="export"]') as HTMLButtonElement | null
     const deleteButton = document.body.querySelector('[data-curated-frame-context-action="delete"]') as HTMLButtonElement | null
 
-    expect(exportWebp).not.toBeNull()
-    expect(exportPng).not.toBeNull()
+    expect(exportButton).not.toBeNull()
     expect(deleteButton).not.toBeNull()
 
-    exportWebp?.click()
-    exportPng?.click()
+    exportButton?.click()
     deleteButton?.click()
 
-    expect(wrapper.emitted("exportWebp")).toHaveLength(1)
-    expect(wrapper.emitted("exportPng")).toHaveLength(1)
+    expect(wrapper.emitted("export")).toHaveLength(1)
     expect(wrapper.emitted("delete")).toHaveLength(1)
 
     wrapper.unmount()
@@ -66,12 +62,10 @@ describe("CuratedFrameContextMenu", () => {
 
     await nextTick()
 
-    const exportWebp = document.body.querySelector('[data-curated-frame-context-action="export-webp"]') as HTMLButtonElement | null
-    const exportPng = document.body.querySelector('[data-curated-frame-context-action="export-png"]') as HTMLButtonElement | null
+    const exportButton = document.body.querySelector('[data-curated-frame-context-action="export"]') as HTMLButtonElement | null
     const deleteButton = document.body.querySelector('[data-curated-frame-context-action="delete"]') as HTMLButtonElement | null
 
-    expect(exportWebp?.disabled).toBe(true)
-    expect(exportPng?.disabled).toBe(true)
+    expect(exportButton?.disabled).toBe(true)
     expect(deleteButton?.disabled).toBe(false)
 
     wrapper.unmount()

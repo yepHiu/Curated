@@ -3,6 +3,7 @@ import type {
   ActorListItemDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -21,6 +22,8 @@ import type { Movie } from "@/domain/movie/types"
 
 export interface LibraryService {
   movies: ComputedRef<readonly Movie[]>
+  /** 电影主列表首轮加载是否已完成；true 代表拿到过一次明确结果，不代表一定有数据。 */
+  moviesLoaded: ComputedRef<boolean>
   /** 回收站列表（Web：mode=trash；Mock：带 trashedAt 的条目） */
   trashedMovies: ComputedRef<readonly Movie[]>
   libraryStats: ComputedRef<readonly LibraryStat[]>
@@ -33,9 +36,6 @@ export interface LibraryService {
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */
   organizeLibrary: ComputedRef<boolean>
   setOrganizeLibrary(value: boolean): Promise<void>
-  /** 新库根首次扫描时的扩展导入识别（Curated / 外部整理）；默认关，与 organizeLibrary 独立 */
-  extendedLibraryImport: ComputedRef<boolean>
-  setExtendedLibraryImport(value: boolean): Promise<void>
   /** 库目录监听触发的自动扫描/刮削；mock 为本地状态 */
   autoLibraryWatch: ComputedRef<boolean>
   setAutoLibraryWatch(value: boolean): Promise<void>
@@ -44,6 +44,8 @@ export interface LibraryService {
   launchAtLogin: ComputedRef<boolean>
   launchAtLoginSupported: ComputedRef<boolean>
   setLaunchAtLogin(value: boolean): Promise<void>
+  curatedFrameExportFormat: ComputedRef<CuratedFrameExportFormat>
+  setCuratedFrameExportFormat(format: CuratedFrameExportFormat): Promise<void>
   /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
   metadataMovieProvider: ComputedRef<string>
   metadataMovieProviders: ComputedRef<readonly string[]>
@@ -70,6 +72,7 @@ export interface LibraryService {
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>
   removeLibraryPath(id: string): Promise<void>
+  revealLibraryPathInFileManager(id: string): Promise<void>
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */

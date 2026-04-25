@@ -16,6 +16,7 @@ import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type {
+  CuratedFrameExportFormat,
   HealthDTO,
   ProviderHealthDTO,
   ProviderHealthStatus,
@@ -37,12 +38,10 @@ import {
   ChevronDown,
   CheckSquare,
   Database,
-  FolderInput,
   FolderOpen,
   FolderPlus,
   Globe,
   GripVertical,
-  HelpCircle,
   ImageDown,
   Info,
   Languages,
@@ -50,13 +49,11 @@ import {
   Layers,
   ListChecks,
   Loader2,
-  Pencil,
   Plus,
   Power,
   RefreshCw,
   ScanSearch,
   Sparkles,
-  Trash2,
   Wrench,
   X,
 } from "lucide-vue-next"
@@ -114,6 +111,7 @@ import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLo
 import SettingsCuratedShortcutSection from "@/components/jav-library/settings/SettingsCuratedShortcutSection.vue"
 import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
 import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
+import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
@@ -133,8 +131,9 @@ import { cn } from "@/lib/utils"
 const SETTINGS_CONTROL_H32_CLASS =
   "[&_[data-slot=button]]:!h-8 [&_[data-slot=button]]:!min-h-8 [&_[data-slot=button]]:!max-h-8 [&_[data-slot=button][data-size=icon]]:!size-8 [&_[data-slot=button][data-size=icon-sm]]:!size-8 [&_[data-slot=button][data-size=icon-lg]]:!size-8 [&_[data-slot=select-trigger]]:!h-8 [&_[data-slot=select-trigger]]:!min-h-8 [&_[data-slot=select-trigger]]:!max-h-8 [&_[data-slot=select-trigger]]:!py-0 [&_[data-slot=tabs-trigger]]:!h-8 [&_[data-slot=tabs-trigger]]:!min-h-8 [&_[data-slot=tabs-trigger]]:!max-h-8 [&_[data-slot=tabs-trigger]]:!py-0"
 /** 资料库路径行：铅笔 / 扫描 / 移除 三枚图标按钮，统一 36×36 圆角矩形（覆盖上方全局 icon size-8） */
+/** 资料库路径行：除「更多 ⋮」外，其它图标按钮 36×36（更多菜单为 ghost 竖三点，不强制放大，见 `data-overflow-menu-trigger`） */
 const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
-  "[&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!size-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!min-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!min-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!max-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!max-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]]:!rounded-lg"
+  "[&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!size-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!min-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!min-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!max-h-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!max-w-9 [&_.library-path-toolbar_[data-slot=button][data-size=icon]:not([data-overflow-menu-trigger])]:!rounded-lg"
 
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
@@ -251,6 +250,7 @@ const newPath = ref("")
 const newPathTitle = ref("")
 const addBusy = ref(false)
 const scanPathBusy = ref<string | null>(null)
+const revealPathBusy = ref<string | null>(null)
 const fullScanBusy = ref(false)
 const pathAddError = ref("")
 const directoryHint = ref("")
@@ -272,14 +272,14 @@ const libraryPathsBatchMode = ref(false)
 /** 后台保存中：仅作轻提示，不禁用开关以免打断动画、体感卡顿 */
 const organizeLibrarySaving = ref(false)
 const organizeLibraryError = ref("")
-const extendedLibraryImportSaving = ref(false)
-const extendedLibraryImportError = ref("")
 const autoLibraryWatchSaving = ref(false)
 const autoLibraryWatchError = ref("")
 const autoActorProfileScrapeSaving = ref(false)
 const autoActorProfileScrapeError = ref("")
 const launchAtLoginSaving = ref(false)
 const launchAtLoginError = ref("")
+const curatedExportFormatSaving = ref(false)
+const curatedExportFormatError = ref("")
 const metadataMovieSaving = ref(false)
 const metadataMovieError = ref("")
 
@@ -805,11 +805,18 @@ async function testProxyGoogle() {
 }
 
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
-const extendedLibraryImport = computed(() => libraryService.extendedLibraryImport.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
 const autoActorProfileScrape = computed(() => libraryService.autoActorProfileScrape.value)
 const launchAtLogin = computed(() => libraryService.launchAtLogin.value)
 const launchAtLoginSupported = computed(() => libraryService.launchAtLoginSupported.value)
+const curatedFrameExportFormat = computed(() => libraryService.curatedFrameExportFormat.value)
+const curatedExportFormatOptions = computed(
+  (): { value: CuratedFrameExportFormat; label: string }[] => [
+    { value: "jpg", label: "JPG" },
+    { value: "webp", label: "WebP" },
+    { value: "png", label: "PNG" },
+  ],
+)
 
 const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
 const metadataMovieProviders = computed(() => [...libraryService.metadataMovieProviders.value])
@@ -1497,6 +1504,29 @@ async function rescanPath(path: string) {
   }
 }
 
+async function revealLibraryPath(path: { id: string; title: string }) {
+  scanFeedbackError.value = ""
+  revealPathBusy.value = path.id
+  try {
+    await libraryService.revealLibraryPathInFileManager(path.id)
+    pushAppToast(t("detail.revealSuccess"), {
+      variant: "success",
+      durationMs: 2400,
+    })
+  } catch (err) {
+    console.error("[settings] reveal library path failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      scanFeedbackError.value = err.apiError.message
+    } else if (err instanceof Error && err.message === "MOCK_REVEAL_NOT_SUPPORTED") {
+      scanFeedbackError.value = t("detail.revealMockMode")
+    } else {
+      scanFeedbackError.value = t("detail.revealFailGeneric")
+    }
+  } finally {
+    revealPathBusy.value = null
+  }
+}
+
 async function onOrganizeLibraryChange(next: boolean) {
   organizeLibraryError.value = ""
   try {
@@ -1514,27 +1544,6 @@ async function onOrganizeLibraryChange(next: boolean) {
       organizeLibraryError.value = err.apiError.message
     } else {
       organizeLibraryError.value = t("settings.errSaveTitle")
-    }
-  }
-}
-
-async function onExtendedLibraryImportChange(next: boolean) {
-  extendedLibraryImportError.value = ""
-  try {
-    await withPreservedScroll(async () => {
-      extendedLibraryImportSaving.value = true
-      try {
-        await libraryService.setExtendedLibraryImport(next)
-      } finally {
-        extendedLibraryImportSaving.value = false
-      }
-    })
-  } catch (err) {
-    console.error("[settings] extended library import toggle failed", err)
-    if (err instanceof HttpClientError && err.apiError?.message) {
-      extendedLibraryImportError.value = err.apiError.message
-    } else {
-      extendedLibraryImportError.value = t("settings.errSaveTitle")
     }
   }
 }
@@ -1600,6 +1609,33 @@ async function onLaunchAtLoginChange(next: boolean) {
       launchAtLoginError.value = t("settings.errSaveTitle")
     }
   }
+}
+
+async function onCuratedExportFormatChange(next: CuratedFrameExportFormat) {
+  if (next === curatedFrameExportFormat.value) return
+  curatedExportFormatError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      curatedExportFormatSaving.value = true
+      try {
+        await libraryService.setCuratedFrameExportFormat(next)
+      } finally {
+        curatedExportFormatSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] curated export format change failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      curatedExportFormatError.value = err.apiError.message
+    } else {
+      curatedExportFormatError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
+function onCuratedExportFormatSelect(next: unknown) {
+  if (next !== "jpg" && next !== "webp" && next !== "png") return
+  void onCuratedExportFormatChange(next)
 }
 
 async function onMetadataMovieModeAuto() {
@@ -2225,38 +2261,15 @@ async function runMetadataRefreshForSelected() {
                       </div>
                     </div>
                     <div class="library-path-toolbar flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        :aria-label="t('settings.editTitle')"
-                        @click="startEditLibraryTitle(path)"
-                      >
-                        <Pencil class="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        :disabled="scanPathBusy === path.path"
-                        :aria-label="t('settings.rescan')"
-                        @click="rescanPath(path.path)"
-                      >
-                        <RefreshCw
-                          class="size-4"
-                          :class="scanPathBusy === path.path ? 'animate-spin' : ''"
-                          aria-hidden="true"
-                        />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        :aria-label="t('settings.removePathAria', { title: path.title })"
-                        @click="openRemovePathConfirm(path)"
-                      >
-                        <Trash2 class="size-4" aria-hidden="true" />
-                      </Button>
+                      <SettingsLibraryPathActions
+                        :path="path"
+                        :reveal-busy="revealPathBusy === path.id"
+                        :scan-busy="scanPathBusy === path.path"
+                        @reveal="revealLibraryPath"
+                        @edit="startEditLibraryTitle"
+                        @rescan="rescanPath($event.path)"
+                        @remove="openRemovePathConfirm"
+                      />
                     </div>
                   </div>
                 </template>
@@ -2380,7 +2393,7 @@ async function runMetadataRefreshForSelected() {
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-2">
             <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
               :aria-busy="organizeLibrarySaving"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -2408,69 +2421,6 @@ async function runMetadataRefreshForSelected() {
         </Card>
       </div>
 
-      <div id="settings-section-libraryBehavior" class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <FolderInput class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.extendedImportTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.extendedImportDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
-              :aria-busy="extendedLibraryImportSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.extendedImportSwitch") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.extendedImportHint") }}
-                </p>
-                <p
-                  v-if="extendedLibraryImportSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.extendedImportSyncing") }}
-                </p>
-              </div>
-              <TooltipProvider :delay-duration="500">
-                <TooltipRoot>
-                  <TooltipTrigger as-child>
-                    <Switch
-                      class="motion-safe:transition-colors motion-safe:duration-200"
-                      :model-value="extendedLibraryImport"
-                      :aria-label="t('settings.extendedImportSwitch')"
-                      @update:model-value="onExtendedLibraryImportChange"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPortal>
-                    <TooltipContent
-                      side="left"
-                      :side-offset="8"
-                      class="z-50 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-                    >
-                      {{ t("settings.extendedImportSwitchTooltip") }}
-                    </TooltipContent>
-                  </TooltipPortal>
-                </TooltipRoot>
-              </TooltipProvider>
-            </div>
-            <p v-if="extendedLibraryImportError" class="text-sm text-destructive">
-              {{ extendedLibraryImportError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
       </div>
     </section>
     </TabsContent>
@@ -2501,36 +2451,6 @@ async function runMetadataRefreshForSelected() {
                 </span>
                 <span class="min-w-0">{{ t("settings.metadataMovieProviderTitle") }}</span>
               </span>
-              <TooltipProvider :delay-duration="280">
-                <TooltipRoot>
-                  <TooltipTrigger as-child>
-                    <button
-                      type="button"
-                      class="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/25 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      <HelpCircle class="size-[1.05rem]" aria-hidden="true" />
-                      <span class="sr-only">{{
-                        t("settings.metadataMovieProviderHelpAria")
-                      }}</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipPortal>
-                    <TooltipContent
-                      side="bottom"
-                      align="start"
-                      :side-offset="8"
-                      class="z-50 max-w-[min(22rem,calc(100vw-2rem))] space-y-2 rounded-xl border border-border/50 bg-popover px-3 py-2.5 text-left text-popover-foreground shadow-lg"
-                    >
-                      <p class="text-xs leading-relaxed text-pretty">
-                        {{ t("settings.metadataMovieProviderHelpP1") }}
-                      </p>
-                      <p class="text-xs leading-relaxed text-pretty text-muted-foreground">
-                        {{ t("settings.metadataMovieProviderHelpP2") }}
-                      </p>
-                    </TooltipContent>
-                  </TooltipPortal>
-                </TooltipRoot>
-              </TooltipProvider>
             </CardTitle>
             <CardDescription
               class="text-xs leading-relaxed text-pretty text-muted-foreground"
@@ -2584,7 +2504,7 @@ async function runMetadataRefreshForSelected() {
             </p>
 
             <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
               :aria-busy="autoLibraryWatchSaving"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -3106,7 +3026,7 @@ async function runMetadataRefreshForSelected() {
               {{ t("settings.proxyMockHint") }}
             </p>
             <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[0.04] p-4 shadow-sm shadow-black/5 dark:border-primary/30 dark:bg-primary/10"
+              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
               :aria-busy="proxySaving"
             >
               <div class="min-w-0 flex-1 space-y-1">
@@ -3425,6 +3345,54 @@ async function runMetadataRefreshForSelected() {
 
             <SettingsCuratedShortcutSection />
 
+            <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-3">
+              <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
+              <div
+                class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              >
+                <div class="min-w-0 flex-1 space-y-1">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t("settings.curatedExportFormatTitle") }}
+                  </p>
+                  <p class="text-xs leading-relaxed text-muted-foreground">
+                    {{ t("settings.curatedExportFormatHint") }}
+                  </p>
+                </div>
+                <div
+                  class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-shrink-0"
+                >
+                  <span
+                    v-if="curatedExportFormatSaving"
+                    class="shrink-0 text-xs text-muted-foreground"
+                  >
+                    {{ t("common.saving") }}
+                  </span>
+                  <Select
+                    :model-value="curatedFrameExportFormat"
+                    :disabled="curatedExportFormatSaving"
+                    @update:model-value="onCuratedExportFormatSelect"
+                  >
+                    <SelectTrigger
+                      class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-32 sm:min-w-0 sm:shrink-0"
+                      :aria-label="t('settings.curatedExportFormatLabel')"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent class="rounded-xl border-border/50">
+                      <SelectItem
+                        v-for="option in curatedExportFormatOptions"
+                        :key="`curated-export-format-${option.value}`"
+                        class="rounded-lg"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </fieldset>
+
             <div
               v-if="curatedSaveMode === 'directory' && supportsFileSystemAccess()"
               class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4"
@@ -3487,6 +3455,9 @@ async function runMetadataRefreshForSelected() {
 
             <p v-if="curatedExportError" class="text-sm text-destructive" role="alert">
               {{ curatedExportError }}
+            </p>
+            <p v-if="curatedExportFormatError" class="text-sm text-destructive" role="alert">
+              {{ curatedExportFormatError }}
             </p>
 
             <div

@@ -166,11 +166,15 @@ defineExpose({
         type="button"
         variant="ghost"
         size="icon"
-        class="size-9 justify-self-end rounded-lg text-zinc-400 hover:bg-white/10 hover:text-white focus-visible:border-transparent focus-visible:ring-[0.5px] focus-visible:ring-white/22 focus-visible:ring-offset-0 dark:hover:bg-white/10 sm:size-10"
+        class="group size-9 justify-self-end rounded-lg text-zinc-400 outline-none ring-offset-0 hover:bg-transparent hover:text-white focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 focus-visible:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.22)] dark:hover:bg-transparent sm:size-10"
         aria-label="关闭"
         @click="emit('close')"
       >
-        <X class="size-4" />
+        <span
+          class="inline-flex size-7 items-center justify-center rounded-md transition-colors group-hover:bg-white/10 sm:size-8"
+        >
+          <X class="size-4" />
+        </span>
       </Button>
     </div>
 
@@ -179,9 +183,9 @@ defineExpose({
     >
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="icon"
-        class="h-auto min-h-[2.5rem] w-10 shrink-0 self-center rounded-xl border-zinc-600 bg-zinc-900/90 text-white shadow-sm focus-visible:ring-offset-0 disabled:opacity-25 sm:w-11"
+        class="size-10 shrink-0 self-center rounded-xl border-0 bg-transparent text-zinc-200 shadow-none hover:bg-white/10 hover:text-white focus-visible:ring-offset-0 dark:hover:bg-white/10 disabled:opacity-25 sm:size-11"
         :disabled="!canPrev"
         aria-label="上一张"
         @click="scrollMainPrev"
@@ -254,9 +258,9 @@ defineExpose({
 
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="icon"
-        class="h-auto min-h-[2.5rem] w-10 shrink-0 self-center rounded-xl border-zinc-600 bg-zinc-900/90 text-white shadow-sm focus-visible:ring-offset-0 disabled:opacity-25 sm:w-11"
+        class="size-10 shrink-0 self-center rounded-xl border-0 bg-transparent text-zinc-200 shadow-none hover:bg-white/10 hover:text-white focus-visible:ring-offset-0 dark:hover:bg-white/10 disabled:opacity-25 sm:size-11"
         :disabled="!canNext"
         aria-label="下一张"
         @click="scrollMainNext"

@@ -18,8 +18,7 @@ type CuratedFramesLibraryExpose = {
   clearExportSelection: () => void
   selectAllVisibleUpTo20: () => void
   deleteSelectedFrames: () => void
-  exportSelectedWebp: () => void | Promise<void>
-  exportSelectedPng: () => void | Promise<void>
+  exportSelected: () => void | Promise<void>
 }
 
 const curatedLibRef = ref<CuratedFramesLibraryExpose | null>(null)
@@ -51,12 +50,8 @@ function onCuratedBatchSelectAllVisible() {
   curatedLibRef.value?.selectAllVisibleUpTo20()
 }
 
-function onCuratedBatchExportWebp() {
-  void curatedLibRef.value?.exportSelectedWebp()
-}
-
-function onCuratedBatchExportPng() {
-  void curatedLibRef.value?.exportSelectedPng()
+function onCuratedBatchExport() {
+  void curatedLibRef.value?.exportSelected()
 }
 
 function onCuratedBatchDeleteSelected() {
@@ -82,8 +77,7 @@ function onCuratedBatchDeleteSelected() {
       @clear-selection="onCuratedBatchClear"
       @select-all-visible="onCuratedBatchSelectAllVisible"
       @delete-selected="onCuratedBatchDeleteSelected"
-      @export-webp="onCuratedBatchExportWebp"
-      @export-png="onCuratedBatchExportPng"
+      @export="onCuratedBatchExport"
     />
   </div>
 </template>

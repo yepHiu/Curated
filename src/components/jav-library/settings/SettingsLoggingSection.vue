@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { Activity, FolderOpen, ScrollText } from "lucide-vue-next"
@@ -225,9 +225,18 @@ watchDebounced(
 )
 
 onMounted(() => {
-  syncBackendLogDraftFromService()
   clientLogLevelUi.value = getClientLogLevelName()
 })
+
+watch(
+  () => props.autoSaveReady,
+  (ready) => {
+    if (ready) {
+      syncBackendLogDraftFromService()
+    }
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   if (backendLogSavedFlashTimer) clearTimeout(backendLogSavedFlashTimer)

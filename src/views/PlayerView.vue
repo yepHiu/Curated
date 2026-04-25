@@ -59,7 +59,7 @@ watch(
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto pr-2">
+  <div class="h-full overflow-hidden">
     <div
       v-if="hydrating"
       class="rounded-3xl border border-border/70 bg-card/80 p-8 text-sm text-muted-foreground"

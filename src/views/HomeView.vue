@@ -3,7 +3,9 @@ import { computed } from "vue"
 import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
 import { armHomeDetailReturnRestore } from "@/composables/use-home-scroll-preserve"
 import { useRouter } from "vue-router"
+import HomepageEmptyState from "@/components/jav-library/HomepageEmptyState.vue"
 import HomepagePortal from "@/components/jav-library/HomepagePortal.vue"
+import HomepagePortalSkeleton from "@/components/jav-library/HomepagePortalSkeleton.vue"
 import type { HomepageTasteEntry } from "@/lib/homepage-portal"
 import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import {
@@ -15,6 +17,10 @@ import { useLibraryService } from "@/services/library-service"
 const libraryService = useLibraryService()
 const router = useRouter()
 const homepageDailyRecommendations = useHomepageDailyRecommendations()
+const showHomepageSkeleton = computed(() => !libraryService.moviesLoaded.value)
+const showHomepageEmptyState = computed(
+  () => libraryService.moviesLoaded.value && libraryService.movies.value.length === 0,
+)
 
 const portalModel = computed(() => {
   void playbackProgressRevision.value
@@ -67,7 +73,10 @@ function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string 
 </script>
 
 <template>
+  <HomepagePortalSkeleton v-if="showHomepageSkeleton" />
+  <HomepageEmptyState v-else-if="showHomepageEmptyState" />
   <HomepagePortal
+    v-else
     :model="portalModel"
     @open-details="openDetails"
     @open-player="openPlayer"

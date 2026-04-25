@@ -203,6 +203,10 @@ export const api = {
     return httpClient.post<void>(`/library/movies/${encodeURIComponent(movieId)}/reveal`)
   },
 
+  revealLibraryPathInFileManager(id: string): Promise<void> {
+    return httpClient.post<void>(`/library/paths/${encodeURIComponent(id)}/reveal`)
+  },
+
   startMetadataRefreshByPaths(body: MetadataScrapeByPathsBody): Promise<MetadataRefreshQueuedDTO> {
     return httpClient.post<MetadataRefreshQueuedDTO>("/library/metadata-scrape", body)
   },

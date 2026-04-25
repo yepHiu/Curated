@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
+  CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
   NativePlayerPreset,
   ListActorsParams,
@@ -30,16 +31,17 @@ import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-norm
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
 const moviesState: Ref<Movie[]> = ref([])
+const moviesLoadedState = ref(false)
 const trashedMoviesState: Ref<Movie[]> = ref([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
 /** 与后端默认一致：关，避免误触新库「首次扫描」扩展逻辑 */
-const extendedLibraryImportState = ref(false)
 const autoLibraryWatchState = ref(true)
 const autoActorProfileScrapeState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
+const curatedFrameExportFormatState = ref<CuratedFrameExportFormat>("jpg")
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
@@ -66,17 +68,16 @@ const backendLogState = ref<BackendLogSettingsDTO>({
 const curatedFramesCountState = ref(0)
 /** 忽略过期的 PATCH 响应，避免快速连点时状态被旧请求写乱 */
 let organizeLibrarySaveSeq = 0
-let extendedLibraryImportSaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
 let autoActorProfileScrapeSaveSeq = 0
 let launchAtLoginSaveSeq = 0
+let curatedFrameExportFormatSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
 let proxySaveSeq = 0
 let playerSettingsSaveSeq = 0
 let backendLogSaveSeq = 0
-let loaded = false
 let reloadMoviesDebounce: ReturnType<typeof setTimeout> | null = null
 
 /** 并发「全量资料库列表」拉取合并为单次 in-flight，避免 ensure / reload / 多入口重复请求 */
@@ -169,20 +170,20 @@ async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }
     if (options?.includeTrash) {
       trashedMoviesState.value = await loadTrashedMovies()
     }
-    loaded = true
+    moviesLoadedState.value = true
   } catch (err) {
     console.error("[web-library-service] failed to reload movies", err)
   }
 }
 
 async function ensureLoaded(options?: { includeTrash?: boolean }) {
-  if (loaded) return
+  if (moviesLoadedState.value) return
   try {
     moviesState.value = await loadActiveMovies()
     if (options?.includeTrash) {
       trashedMoviesState.value = await loadTrashedMovies()
     }
-    loaded = true
+    moviesLoadedState.value = true
   } catch (err) {
     console.error("[web-library-service] failed to load movies", err)
   }
@@ -286,11 +287,11 @@ async function refreshLibraryPathsFromApi() {
     const settings = await api.getSettings()
     libraryPathsState.value = mapLibraryPathsFromSettings(settings.libraryPaths)
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
-    extendedLibraryImportState.value = Boolean(settings.extendedLibraryImport)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
+    curatedFrameExportFormatState.value = settings.curatedFrameExportFormat ?? "jpg"
     applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
@@ -308,6 +309,7 @@ function createWebLibraryService(): LibraryService {
 
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
+    moviesLoaded: computed(() => moviesLoadedState.value),
     trashedMovies: computed(() => trashedMoviesState.value),
     libraryStats: computed(() => {
       const loc = i18n.global.locale.value as string
@@ -315,11 +317,11 @@ function createWebLibraryService(): LibraryService {
     }),
     libraryPaths: computed(() => libraryPathsState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
-    extendedLibraryImport: computed(() => extendedLibraryImportState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
     launchAtLogin: computed(() => launchAtLoginState.value),
     launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
+    curatedFrameExportFormat: computed(() => curatedFrameExportFormatState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
@@ -465,26 +467,6 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
-    async setExtendedLibraryImport(value: boolean) {
-      const seq = ++extendedLibraryImportSaveSeq
-      extendedLibraryImportState.value = value
-      try {
-        const next = await api.patchSettings({ extendedLibraryImport: value })
-        if (seq === extendedLibraryImportSaveSeq) {
-          extendedLibraryImportState.value = Boolean(next.extendedLibraryImport)
-        }
-      } catch (err) {
-        if (seq === extendedLibraryImportSaveSeq) {
-          try {
-            await refreshLibraryPathsFromApi()
-          } catch {
-            // ignore
-          }
-        }
-        throw err
-      }
-    },
-
     async setAutoLibraryWatch(value: boolean) {
       const seq = ++autoLibraryWatchSaveSeq
       autoLibraryWatchState.value = value
@@ -536,6 +518,26 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === launchAtLoginSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async setCuratedFrameExportFormat(format: CuratedFrameExportFormat) {
+      const seq = ++curatedFrameExportFormatSaveSeq
+      curatedFrameExportFormatState.value = format
+      try {
+        const next = await api.patchSettings({ curatedFrameExportFormat: format })
+        if (seq === curatedFrameExportFormatSaveSeq) {
+          curatedFrameExportFormatState.value = next.curatedFrameExportFormat ?? "jpg"
+        }
+      } catch (err) {
+        if (seq === curatedFrameExportFormatSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {
@@ -665,6 +667,10 @@ function createWebLibraryService(): LibraryService {
       await api.deleteLibraryPath(id)
       await refreshLibraryPathsFromApi()
       await reloadMoviesFromApiImmediate({ includeTrash: isTrashHashRoute() })
+    },
+
+    async revealLibraryPathInFileManager(id: string): Promise<void> {
+      await api.revealLibraryPathInFileManager(id)
     },
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {

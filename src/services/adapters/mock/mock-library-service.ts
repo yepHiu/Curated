@@ -3,6 +3,7 @@ import type {
   ActorListItemDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
   NativePlayerPreset,
   ListActorsParams,
@@ -46,11 +47,11 @@ import {
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const organizeLibraryMock = ref(false)
-const extendedLibraryImportMock = ref(false)
 const autoLibraryWatchMock = ref(true)
 const autoActorProfileScrapeMock = ref(false)
 const launchAtLoginMock = ref(false)
 const launchAtLoginSupportedMock = ref(false)
+const curatedFrameExportFormatMock = ref<CuratedFrameExportFormat>("jpg")
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
@@ -419,6 +420,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
+  moviesLoaded: computed(() => true),
   trashedMovies: computed(() =>
     moviesState.value
       .filter((m) => Boolean(m.trashedAt?.trim()))
@@ -434,11 +436,11 @@ export const mockLibraryService: LibraryService = {
   ),
   libraryPaths: computed(() => libraryPathsState.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
-  extendedLibraryImport: computed(() => extendedLibraryImportMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
   launchAtLogin: computed(() => launchAtLoginMock.value),
   launchAtLoginSupported: computed(() => launchAtLoginSupportedMock.value),
+  curatedFrameExportFormat: computed(() => curatedFrameExportFormatMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
@@ -555,10 +557,6 @@ export const mockLibraryService: LibraryService = {
     organizeLibraryMock.value = value
   },
 
-  async setExtendedLibraryImport(value: boolean) {
-    extendedLibraryImportMock.value = value
-  },
-
   async setAutoLibraryWatch(value: boolean) {
     autoLibraryWatchMock.value = value
   },
@@ -569,6 +567,10 @@ export const mockLibraryService: LibraryService = {
 
   async setLaunchAtLogin(value: boolean) {
     launchAtLoginMock.value = value
+  },
+
+  async setCuratedFrameExportFormat(format: CuratedFrameExportFormat) {
+    curatedFrameExportFormatMock.value = format
   },
 
   async setMetadataMovieProvider(name: string) {
@@ -636,6 +638,10 @@ export const mockLibraryService: LibraryService = {
       if (!mockPathHasLibraryRoot(loc, removedRoot)) return true
       return remainingRoots.some((r) => mockPathHasLibraryRoot(loc, r))
     })
+  },
+
+  async revealLibraryPathInFileManager() {
+    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
   },
 
   async scanLibraryPaths() {

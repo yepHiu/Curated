@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const getActorProfile = vi.fn()
 const patchActorExternalLinks = vi.fn()
+const patchActorUserTags = vi.fn()
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -55,7 +56,7 @@ vi.mock("@/api/http-client", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
-    patchActorUserTags: vi.fn(),
+    patchActorUserTags,
   }),
 }))
 
@@ -102,6 +103,23 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: { template: "<div><slot /></div>" },
 }))
 
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: {
+    props: ["open"],
+    emits: ["update:open"],
+    template: "<div><slot /></div>",
+  },
+  DialogClose: {
+    emits: ["click"],
+    template: "<button @click=\"$emit('click', $event)\"><slot /></button>",
+  },
+  DialogContent: { template: "<div><slot /></div>" },
+  DialogDescription: { template: "<div><slot /></div>" },
+  DialogFooter: { template: "<div><slot /></div>" },
+  DialogHeader: { template: "<div><slot /></div>" },
+  DialogTitle: { template: "<div><slot /></div>" },
+}))
+
 async function mountComponent() {
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "true")
@@ -123,9 +141,10 @@ describe("ActorProfileCard", () => {
   beforeEach(() => {
     getActorProfile.mockReset()
     patchActorExternalLinks.mockReset()
+    patchActorUserTags.mockReset()
   })
 
-  it("renders one saved external link and replaces it with a new valid url", async () => {
+  it("opens the actor edit dialog and replaces the saved external link", async () => {
     getActorProfile.mockResolvedValue({
       name: "Alpha Star",
       externalLinks: ["https://example.com/a"],
@@ -145,19 +164,21 @@ describe("ActorProfileCard", () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain("https://example.com/a")
+    expect(wrapper.find("[data-actor-external-link-add]").exists()).toBe(false)
 
-    await wrapper.get("[data-actor-external-link-add]").trigger("click")
-    await wrapper.get("[data-actor-external-link-input]").setValue("https://example.com/b")
-    await wrapper.get("[data-actor-external-link-save]").trigger("click")
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    expect(wrapper.find("[data-actor-edit-dialog]").exists()).toBe(true)
+
+    await wrapper.get("[data-actor-edit-external-link-input]").setValue("https://example.com/b")
+    await wrapper.get("[data-actor-edit-save]").trigger("click")
     await flushPromises()
 
     expect(patchActorExternalLinks).toHaveBeenCalledWith("Alpha Star", ["https://example.com/b"])
     expect(wrapper.text()).not.toContain("https://example.com/a")
     expect(wrapper.text()).toContain("https://example.com/b")
-    expect(wrapper.find("[data-actor-external-link-remove]").exists()).toBe(false)
   })
 
-  it("shows an inline error for invalid external links", async () => {
+  it("shows a dialog validation error for invalid external links", async () => {
     getActorProfile.mockResolvedValue({
       name: "Alpha Star",
       externalLinks: [],
@@ -169,18 +190,18 @@ describe("ActorProfileCard", () => {
     const wrapper = await mountComponent()
     await flushPromises()
 
-    await wrapper.get("[data-actor-external-link-add]").trigger("click")
-    await wrapper.get("[data-actor-external-link-input]").setValue("ftp://example.com")
-    await wrapper.get("[data-actor-external-link-save]").trigger("click")
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    await wrapper.get("[data-actor-edit-external-link-input]").setValue("ftp://example.com")
+    await wrapper.get("[data-actor-edit-save]").trigger("click")
 
     expect(wrapper.text()).toContain("library.actorExternalLinksInvalid")
     expect(patchActorExternalLinks).not.toHaveBeenCalled()
   })
 
-  it("closes the external link editor from the inline cancel control", async () => {
+  it("discards external-link draft changes when the dialog is cancelled", async () => {
     getActorProfile.mockResolvedValue({
       name: "Alpha Star",
-      externalLinks: [],
+      externalLinks: ["https://example.com/a"],
       userTags: [],
       summary: "Bio",
       avatarUrl: "https://example.com/avatar.jpg",
@@ -189,11 +210,17 @@ describe("ActorProfileCard", () => {
     const wrapper = await mountComponent()
     await flushPromises()
 
-    await wrapper.get("[data-actor-external-link-add]").trigger("click")
-    expect(wrapper.find("[data-actor-external-link-input]").exists()).toBe(true)
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    await wrapper.get("[data-actor-edit-external-link-input]").setValue("https://example.com/draft")
+    await wrapper.get("[data-actor-edit-cancel]").trigger("click")
 
-    await wrapper.get("[data-actor-external-link-cancel]").trigger("click")
-    expect(wrapper.find("[data-actor-external-link-input]").exists()).toBe(false)
+    expect(wrapper.find("[data-actor-edit-dialog]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("https://example.com/a")
+    expect(wrapper.text()).not.toContain("https://example.com/draft")
+
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    const reopenedInput = wrapper.get("[data-actor-edit-external-link-input]")
+    expect((reopenedInput.element as HTMLInputElement).value).toBe("https://example.com/a")
   })
 
   it("shows a friendly message instead of raw HTTP 404 when saving fails with not found", async () => {
@@ -211,9 +238,9 @@ describe("ActorProfileCard", () => {
     const wrapper = await mountComponent()
     await flushPromises()
 
-    await wrapper.get("[data-actor-external-link-add]").trigger("click")
-    await wrapper.get("[data-actor-external-link-input]").setValue("https://example.com/b")
-    await wrapper.get("[data-actor-external-link-save]").trigger("click")
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    await wrapper.get("[data-actor-edit-external-link-input]").setValue("https://example.com/b")
+    await wrapper.get("[data-actor-edit-save]").trigger("click")
     await flushPromises()
 
     expect(wrapper.text()).toContain("library.actorExternalLinksUnsupported")
@@ -241,15 +268,31 @@ describe("ActorProfileCard", () => {
     const wrapper = await mountComponent()
     await flushPromises()
 
-    await wrapper.get("[data-actor-external-link-add]").trigger("click")
-    await wrapper.get("[data-actor-external-link-input]").setValue("https://example.com/b")
-    await wrapper.get("[data-actor-external-link-save]").trigger("click")
+    await wrapper.get("[data-actor-edit-open]").trigger("click")
+    await wrapper.get("[data-actor-edit-external-link-input]").setValue("https://example.com/b")
+    await wrapper.get("[data-actor-edit-save]").trigger("click")
     await flushPromises()
 
     expect(wrapper.text()).toContain("library.actorProfileNotFound")
   })
 
-  it("renders the external links heading only once when a link exists", async () => {
+  it("hides the external links section when no saved external link exists", async () => {
+    getActorProfile.mockResolvedValue({
+      name: "Alpha Star",
+      externalLinks: [],
+      userTags: [],
+      summary: "Bio",
+      avatarUrl: "https://example.com/avatar.jpg",
+    })
+
+    const wrapper = await mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("library.actorExternalLinks")
+    expect(wrapper.find("[data-actor-edit-open]").exists()).toBe(true)
+  })
+
+  it("renders the external links heading only once on the card when a link exists", async () => {
     getActorProfile.mockResolvedValue({
       name: "Alpha Star",
       externalLinks: ["https://example.com/a"],

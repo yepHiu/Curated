@@ -5,6 +5,22 @@ import { describe, expect, it, vi } from "vitest"
 import AppSidebar from "./AppSidebar.vue"
 
 const updateAvailable = ref(false)
+const movies = ref([
+  {
+    id: "movie-1",
+    actors: ["Actor A", "Actor B"],
+    tags: ["Tag A"],
+    userTags: [],
+  },
+])
+const trashedMovies = ref([
+  {
+    id: "trash-1",
+    actors: [],
+    tags: [],
+    userTags: [],
+  },
+])
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -24,8 +40,8 @@ vi.mock("vue-router", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
-    movies: computed(() => []),
-    trashedMovies: computed(() => []),
+    movies: computed(() => movies.value),
+    trashedMovies: computed(() => trashedMovies.value),
   }),
 }))
 
@@ -96,6 +112,19 @@ vi.mock("@/components/ui/separator", () => ({
 }))
 
 describe("AppSidebar", () => {
+  it("does not show numeric sidebar counts when movie data exists", async () => {
+    updateAvailable.value = false
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const libraryLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.library"))
+
+    expect(libraryLink?.text()).toBe("nav.library")
+  })
+
   it("shows the brand update badge in expanded mode when a new version is available", async () => {
     updateAvailable.value = true
 

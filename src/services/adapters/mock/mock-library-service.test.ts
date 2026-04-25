@@ -17,6 +17,10 @@ describe("mockLibraryService.patchPlayerSettings", () => {
 })
 
 describe("mockLibraryService", () => {
+  it("reports movies as already loaded in mock mode", () => {
+    expect(mockLibraryService.moviesLoaded.value).toBe(true)
+  })
+
   it("tracks launch-at-login in local mock state while remaining unsupported", async () => {
     expect(mockLibraryService.launchAtLogin.value).toBe(false)
     expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)
@@ -27,8 +31,24 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)
   })
 
+  it("defaults curated-frame export format to jpg and allows switching formats", async () => {
+    expect(mockLibraryService.curatedFrameExportFormat.value).toBe("jpg")
+
+    await mockLibraryService.setCuratedFrameExportFormat("png")
+    expect(mockLibraryService.curatedFrameExportFormat.value).toBe("png")
+
+    await mockLibraryService.setCuratedFrameExportFormat("jpg")
+    expect(mockLibraryService.curatedFrameExportFormat.value).toBe("jpg")
+  })
+
   it("ensureMovieCached resolves (mock is fully in-memory)", async () => {
     await expect(mockLibraryService.ensureMovieCached("any-id")).resolves.toBeUndefined()
+  })
+
+  it("rejects opening a library path in file manager in mock mode", async () => {
+    await expect(
+      mockLibraryService.revealLibraryPathInFileManager("library-a"),
+    ).rejects.toThrow("MOCK_REVEAL_NOT_SUPPORTED")
   })
 
   it("returns undefined for an unknown movie id", () => {

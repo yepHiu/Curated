@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import { computed, onMounted, ref, watch } from "vue"
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   Clapperboard,
@@ -22,16 +22,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useAppUpdate } from "@/composables/use-app-update"
 import { useBackendHealth } from "@/composables/use-backend-health"
-import { countCuratedFrames } from "@/lib/curated-frames/db"
-import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
-import { countUniqueTags, formatSidebarCount } from "@/lib/library-stats"
-import {
-  listSortedByUpdatedDesc,
-  playbackProgressRevision,
-} from "@/lib/playback-progress-storage"
 import { statusDotClass } from "@/lib/ui/status-tone"
-import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
   defineProps<{
@@ -46,7 +38,6 @@ interface NavigationItem {
   label: string
   page: AppPage
   icon: Component
-  hint?: string
 }
 
 interface SidebarNavGroups {
@@ -62,7 +53,6 @@ interface SidebarNavSection {
 
 const { t, locale } = useI18n()
 const route = useRoute()
-const libraryService = useLibraryService()
 const {
   useWebApi: backendUseWebApi,
   status: backendStatus,
@@ -129,74 +119,20 @@ const backendCompactTitle = computed(() => {
     : backendStatusText.value
 })
 
-const curatedFrameCount = ref(0)
-
-async function refreshCuratedFrameCount() {
-  try {
-    curatedFrameCount.value = await countCuratedFrames()
-  } catch {
-    curatedFrameCount.value = 0
-  }
-}
-
-watch(curatedFramesRevision, () => {
-  void refreshCuratedFrameCount()
-})
-
-onMounted(() => {
-  void refreshCuratedFrameCount()
-})
-
 const sidebarNavGroups = computed((): SidebarNavGroups => {
   void locale.value
-  void playbackProgressRevision.value
-  void curatedFramesRevision.value
-  const movies = libraryService.movies.value
-  const trashTotal = libraryService.trashedMovies.value.length
-  const total = movies.length
-  const tagCount = countUniqueTags(movies)
-  const actorSet = new Set<string>()
-  for (const movie of movies) {
-    for (const rawActor of movie.actors) {
-      const actor = rawActor.trim()
-      if (actor) actorSet.add(actor)
-    }
-  }
-  const actorCount = actorSet.size
-  const historyTotal = listSortedByUpdatedDesc().length
-  const framesTotal = curatedFrameCount.value
 
   return {
     browse: [
       { label: t("nav.home"), page: "home", icon: House },
-      { label: t("nav.library"), page: "library", icon: LibraryBig, hint: formatSidebarCount(total) },
-      {
-        label: t("nav.actors"),
-        page: "actors",
-        icon: Users,
-        hint: actorCount > 0 ? formatSidebarCount(actorCount) : undefined,
-      },
-      { label: t("nav.tags"), page: "tags", icon: Tags, hint: formatSidebarCount(tagCount) },
-      {
-        label: t("nav.trash"),
-        page: "trash",
-        icon: Trash2,
-        hint: trashTotal > 0 ? formatSidebarCount(trashTotal) : undefined,
-      },
+      { label: t("nav.library"), page: "library", icon: LibraryBig },
+      { label: t("nav.actors"), page: "actors", icon: Users },
+      { label: t("nav.tags"), page: "tags", icon: Tags },
+      { label: t("nav.trash"), page: "trash", icon: Trash2 },
     ],
     yours: [
-      {
-        label: t("nav.curatedFrames"),
-        page: "curated-frames",
-        icon: Clapperboard,
-        hint: framesTotal > 0 ? formatSidebarCount(framesTotal) : undefined,
-      },
-      {
-        label: t("nav.history"),
-        page: "history",
-        icon: History,
-        hint: historyTotal > 0 ? formatSidebarCount(historyTotal) : undefined,
-      },
+      { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
+      { label: t("nav.history"), page: "history", icon: History },
     ],
   }
 })
@@ -216,8 +152,10 @@ const sidebarSections = computed((): SidebarNavSection[] => [
 
 const isActive = (page: AppPage) => route.name === page
 
-const brandNavigationTarget = computed(() => ({
-  name: "settings",
+const brandHomeTarget = computed(() => ({ name: "home" as const }))
+
+const brandAboutUpdateTarget = computed(() => ({
+  name: "settings" as const,
   query: { ...route.query, section: "about" },
 }))
 
@@ -260,38 +198,55 @@ const getNavigationTarget = (page: AppPage) => {
       class="flex min-h-[4.5rem] shrink-0 items-center border-b border-sidebar-border/80"
       :class="props.compact ? 'justify-center py-3.5 lg:py-4' : 'justify-between gap-2 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4'"
     >
-      <RouterLink
-        :to="brandNavigationTarget"
-        data-sidebar-brand-link
-        class="font-curated inline-flex w-fit max-w-full items-center gap-2 px-1 py-1 font-semibold tracking-wide text-primary"
-        :class="props.compact ? 'justify-center text-base' : 'text-lg sm:text-xl'"
-        :title="brandUpdateTitle"
+      <div
+        class="flex min-w-0 items-center"
+        :class="props.compact ? 'w-full justify-center' : 'w-full min-w-0 justify-start gap-2'"
       >
-        <span class="relative inline-flex items-center">
-          <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
+        <RouterLink
+          :to="brandHomeTarget"
+          data-sidebar-brand-link
+          class="font-curated inline-flex items-center gap-2 px-1 py-1 font-semibold tracking-wide text-primary"
+          :class="
+            props.compact
+              ? 'w-full max-w-full justify-center text-base'
+              : 'min-w-0 w-fit min-w-0 max-w-full flex-1 text-lg sm:text-xl'
+          "
+          :title="t('nav.home')"
+        >
+          <span class="relative inline-flex items-center">
+            <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
+            <span
+              v-if="props.compact && hasUpdateBadge"
+              data-update-dot
+              class="absolute -right-1 -top-1 size-2.5 rounded-full border border-sidebar bg-primary shadow-[0_0_0_3px_rgba(254,98,142,0.16)]"
+              aria-hidden="true"
+            />
+          </span>
           <span
-            v-if="props.compact && hasUpdateBadge"
-            data-update-dot
-            class="absolute -right-1 -top-1 size-2.5 rounded-full border border-sidebar bg-primary shadow-[0_0_0_3px_rgba(254,98,142,0.16)]"
-            aria-hidden="true"
-          />
-        </span>
-        <span
-          class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
-          :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
-          :aria-hidden="props.compact"
-        >
-          Curated
-        </span>
-        <Badge
+            class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
+            :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
+            :aria-hidden="props.compact"
+          >
+            Curated
+          </span>
+        </RouterLink>
+        <RouterLink
           v-if="!props.compact && hasUpdateBadge"
-          data-update-badge
-          variant="secondary"
-          class="rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary"
+          :to="brandAboutUpdateTarget"
+          data-update-badge-link
+          :title="brandUpdateTitle"
+          :aria-label="brandUpdateTitle"
+          class="inline-flex shrink-0"
         >
-          New
-        </Badge>
-      </RouterLink>
+          <Badge
+            data-update-badge
+            variant="secondary"
+            class="pointer-events-none rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary"
+          >
+            New
+          </Badge>
+        </RouterLink>
+      </div>
     </div>
 
     <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
@@ -316,12 +271,14 @@ const getNavigationTarget = (page: AppPage) => {
             :to="getNavigationTarget(item.page)"
             data-sidebar-nav-link
             :title="props.compact ? item.label : undefined"
-            class="group flex min-h-10 w-full min-w-0 items-center rounded-2xl text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+            class="group flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
             :class="[
               isActive(item.page)
                 ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                 : 'hover:bg-sidebar-accent/60',
-              props.compact ? 'justify-center px-2' : 'justify-between px-3',
+              props.compact
+                ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
+                : 'min-h-10 w-full justify-between rounded-2xl px-3',
             ]"
           >
             <span
@@ -336,20 +293,6 @@ const getNavigationTarget = (page: AppPage) => {
               >
                 {{ item.label }}
               </span>
-            </span>
-
-            <span
-              v-if="item.hint"
-              class="shrink-0 transition-[opacity,width] duration-150 motion-reduce:transition-none"
-              :class="props.compact ? 'w-0 overflow-hidden opacity-0' : 'w-auto opacity-100'"
-              :aria-hidden="props.compact"
-            >
-              <Badge
-                variant="secondary"
-                class="rounded-full border border-border/60 bg-background/60"
-              >
-                {{ item.hint }}
-              </Badge>
             </span>
           </RouterLink>
         </section>
@@ -424,18 +367,20 @@ const getNavigationTarget = (page: AppPage) => {
     <Button
       as-child
       :variant="isActive('settings') ? 'secondary' : 'ghost'"
-      class="w-full rounded-2xl"
+      :class="props.compact ? 'flex w-full justify-center' : 'w-full rounded-2xl'"
     >
       <RouterLink
-      data-sidebar-nav-link
-      :to="getNavigationTarget('settings')"
+        data-sidebar-nav-link
+        :to="getNavigationTarget('settings')"
         :title="props.compact ? t('nav.settings') : undefined"
-        class="flex min-h-10 w-full min-w-0 items-center rounded-2xl text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+        class="flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
         :class="[
           isActive('settings')
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'hover:bg-sidebar-accent/60',
-          props.compact ? 'justify-center px-2' : 'justify-start px-3',
+          props.compact
+            ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
+            : 'min-h-10 w-full justify-start rounded-2xl px-3',
         ]"
       >
         <Settings2 class="size-5 shrink-0" data-icon="inline-start" />
