@@ -94,3 +94,6 @@ openspec/
 # Superpowers skills (local / optional; not part of app source)
 .superpowers/
 
+# Repo-local caches (e.g. Go build cache when GOCACHE points here)
+.cache/
+
