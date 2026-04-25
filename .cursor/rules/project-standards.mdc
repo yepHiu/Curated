@@ -8,6 +8,6 @@ alwaysApply: true
 - **Product name: Curated** (repo directory / npm package id may remain `jav-shadcn`). This repo is a **`Vue 3 + TypeScript + Vite` + `shadcn-vue`** app at the repo root, with a **`Go` HTTP backend** under **`backend/`** (not a frontend-only scaffold).
 - Separate **current code facts** from **future desktop (Electron / IPC / mpv)** plans; see `architecture-boundaries.mdc`.
 - Primary rule handoff: **`workspace-quick-reference.mdc`** (daily ops) → **`project-facts.mdc`** (structure/API) → **`git-commit-workflow.mdc`** (最小单元提交；仅用户要求时再 push) → **`ui-component-spec.mdc`** (UI layering, tokens, surfaces) → **`vue-frontend-standards.mdc`** (incl. **Form controls** / `Input`) / **`jav-library-frontend-patterns.mdc`** (library UX) → **`backend-*`** rules when touching Go.
-- **Planning docs**: 后续任务规划、实施计划、路线图等 Markdown **plan** 文档统一放在 **`docs/plan/`**；若目录不存在则创建后再写入（勿把 plan 散落在 `docs/` 根目录，除非与既有固定文档路径冲突时再在规则中说明例外）。
+- **Planning docs**: 后续任务规划、实施计划、路线图等 Markdown **plan** 文档统一放在 **`docs/plan/`**；若目录不存在则创建后再写入（勿把 plan 散落在 `docs/` 根目录；**`docs/README.md`** 说明 `reference/`、`product/`、`ops/`、`review/` 等用途，长文与规范各归其位）。
 - **Plan persistence**: 当代理输出“方案 / 计划 / 路线图 / 实施建议”等可复用内容时，除对话回复外，还应同步落盘到 **`docs/plan/*.md`**；同主题优先更新已有文档，避免重复创建近似 plan。
 - **Encoding rule**: 写入项目规则、项目记忆及相关 Markdown 台账/计划文档时，一律显式使用 **UTF-8** 编码；不要依赖 PowerShell / 编辑器 / 系统默认代码页，避免中文内容写入后出现乱码。

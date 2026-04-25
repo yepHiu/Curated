@@ -51,7 +51,7 @@ alwaysApply: true
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；二次启动会复用现有实例并重新打开浏览器。
 - **修改 API 行为**：优先改 `backend/internal/server` 与 `backend/internal/app`，前端路径集中在 `src/api/endpoints.ts`。
 - **修改 README / 对外说明**：如果用户可见行为、命令入口、目录政策或公开说明变了，检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 是否需要同步。
-- **打包历史**：`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 会向 `docs/package-build-history.csv` 追加记录。
+- **打包历史**：`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 会向 `docs/ops/package-build-history.csv` 追加记录。
 
 ## 规则索引
 

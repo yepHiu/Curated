@@ -79,7 +79,7 @@ Expected: PASS
 ### Task 3: Migrate the existing history document
 
 **Files:**
-- Modify: `docs/2026-04-02-package-build-history.md`
+- Modify: `docs/ops/2026-04-02-package-build-history.md`
 
 - [ ] **Step 1: Update the table header**
 

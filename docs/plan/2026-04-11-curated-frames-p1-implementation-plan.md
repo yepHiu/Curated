@@ -21,7 +21,7 @@
 - [ ] 前端萃取帧页 Web API 模式使用后端查询与缩略图；Mock 模式保留 IndexedDB 本地过滤。
 - [ ] 前端侧边栏与设置页统计改用 stats 接口，避免全量列表计数。
 - [ ] 设置页文案改为“应用库 + 附加输出”的语义，降低保存位置误解。
-- [ ] 同步新增接口到 `.cursor/rules/project-facts.mdc`、`.cursor/rules/backend-api-contracts.mdc`、`README.md`、`CLAUDE.md`、`docs/architecture-and-implementation.html`。
+- [ ] 同步新增接口到 `.cursor/rules/project-facts.mdc`、`.cursor/rules/backend-api-contracts.mdc`、`README.md`、`CLAUDE.md`、`docs/reference/architecture-and-implementation.html`。
 
 ## Verification
 

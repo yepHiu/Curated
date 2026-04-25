@@ -151,7 +151,7 @@ Curated は、ライブラリ、再生、俳優、設定、キュレートフレ
 │   ├── cmd/curated/        # バックエンドエントリポイント
 │   └── internal/           # app、config、storage、server、scanner、scraper、tasks、desktop
 ├── config/                 # ライブラリ実行設定
-├── docs/                   # 製品ノート、計画文書、UI 仕様、アーキテクチャ文書
+├── docs/                   # 概要は docs/README.md（reference / product / ops / plan 等）
 ├── icon/                   # ブランドデザインのソースアセット
 └── package.json            # pnpm スクリプトと依存関係
 ```
@@ -170,7 +170,7 @@ pnpm release:publish
 - 現在のベースラインは `1.1.0` です。
 - `pnpm release:*` は現在 `python scripts/release/release_cli.py` に統一されています。
 - リリースフローでは、Windows 用ステージングディレクトリ、ポータブル zip、インストーラー実行ファイル、リリースマニフェストを生成します。
-- パッケージ履歴台帳は `docs/package-build-history.csv` に移行済みで、Excel / WPS 互換のため UTF-8 with BOM で保存されます。
+- パッケージ履歴台帳は `docs/ops/package-build-history.csv` に移行済みで、Excel / WPS 互換のため UTF-8 with BOM で保存されます。
 - Windows リリースビルドはデフォルトでトレイモードになり、`frontend-dist/` が実行ファイルの横にあればフロントエンドをローカル配信できます。
 - インストーラー自体は引き続き Inno Setup を使いますが、`.iss` テンプレートの描画と `ISCC.exe` 呼び出しは Python 側で行います。
 - 設定画面から現在のユーザー向け Windows ログイン時起動を永続化できます。この自動起動はサイレントでトレイに入り、ブラウザは自動で開きません。
@@ -178,17 +178,17 @@ pnpm release:publish
 関連するリリース資料:
 
 - [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
-- [docs/package-build-history.csv](docs/package-build-history.csv)
-- [docs/2026-04-02-package-build-history.md](docs/2026-04-02-package-build-history.md)
+- [docs/ops/package-build-history.csv](docs/ops/package-build-history.csv)
+- [docs/ops/2026-04-02-package-build-history.md](docs/ops/2026-04-02-package-build-history.md)
 
 ## ドキュメント
 
 - [API.md](API.md): 公開 HTTP API リファレンス
-- [docs/2026-03-20-jav-libary.md](docs/2026-03-20-jav-libary.md): 製品設計と目標アーキテクチャ
-- [docs/2026-03-20-project-memory.md](docs/2026-03-20-project-memory.md): 実装事実と安定したプロジェクトメモリ
-- [docs/architecture-and-implementation.html](docs/architecture-and-implementation.html): アーキテクチャ概要
-- [docs/2026-03-21-library-organize.md](docs/2026-03-21-library-organize.md): ライブラリ整理メモ
-- [docs/2026-03-24-frontend-ui-spec.md](docs/2026-03-24-frontend-ui-spec.md): フロントエンド UI 仕様
+- [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md): 製品設計と目標アーキテクチャ
+- [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md): 実装事実と安定したプロジェクトメモリ
+- [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html): アーキテクチャ概要
+- [docs/reference/2026-03-21-library-organize.md](docs/reference/2026-03-21-library-organize.md): ライブラリ整理メモ
+- [docs/reference/2026-03-24-frontend-ui-spec.md](docs/reference/2026-03-24-frontend-ui-spec.md): フロントエンド UI 仕様
 
 ## 補足
 

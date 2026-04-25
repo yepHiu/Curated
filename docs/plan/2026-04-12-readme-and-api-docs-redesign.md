@@ -150,7 +150,7 @@ The implementation must update the following memory / instruction surfaces:
 - `.cursor/rules/workspace-quick-reference.mdc`
   - state that API changes require `API.md` updates
   - state that README changes with user-facing impact must be reflected in all language variants
-- `docs/2026-03-20-project-memory.md`
+- `docs/reference/2026-03-20-project-memory.md`
   - record the public documentation structure:
     - `README.md`
     - `README.zh-CN.md`

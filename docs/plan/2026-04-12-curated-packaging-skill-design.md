@@ -89,7 +89,7 @@ skill 在触发后需要先把请求映射为内部模式：
 - `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时都会自动执行 `patch + 1`
 - `major` / `minor` 只允许人工调整，并在调整时把 `patch` 重置为 `0`
 - `pnpm release:publish` 只允许在入口处分配一次新版本，再把同一个版本传给便携包、安装包和 manifest
-- 打包台账写入 `docs/2026-04-02-package-build-history.md`
+- 打包台账写入 `docs/ops/2026-04-02-package-build-history.md`
 
 skill 不得绕开这些规则自行计算并写入版本文件；它只能预览、调用现有命令并验证结果。
 

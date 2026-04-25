@@ -54,7 +54,7 @@ def main() -> None:
     portable_parser.add_argument("--input-dir", default="release/Curated")
     portable_parser.add_argument("--output-dir", default="release/portable")
     portable_parser.add_argument("--version-file", default="scripts/release/version.json")
-    portable_parser.add_argument("--history-path", default="docs/package-build-history.csv")
+    portable_parser.add_argument("--history-path", default="docs/ops/package-build-history.csv")
     portable_parser.add_argument("--skip-history", action="store_true")
 
     installer_parser = subparsers.add_parser("package-installer")
@@ -63,7 +63,7 @@ def main() -> None:
     installer_parser.add_argument("--output-dir", default="release/installer")
     installer_parser.add_argument("--template-path", default="scripts/release/windows/Curated.iss.tpl")
     installer_parser.add_argument("--version-file", default="scripts/release/version.json")
-    installer_parser.add_argument("--history-path", default="docs/package-build-history.csv")
+    installer_parser.add_argument("--history-path", default="docs/ops/package-build-history.csv")
     installer_parser.add_argument("--skip-history", action="store_true")
 
     publish_parser = subparsers.add_parser("publish")
@@ -71,12 +71,12 @@ def main() -> None:
     publish_parser.add_argument("--build-stamp", default=utc_build_stamp())
     publish_parser.add_argument("--output-dir", default="release")
     publish_parser.add_argument("--version-file", default="scripts/release/version.json")
-    publish_parser.add_argument("--history-path", default="docs/package-build-history.csv")
+    publish_parser.add_argument("--history-path", default="docs/ops/package-build-history.csv")
 
     # One-off migration from the legacy Markdown ledger to CSV.
     migrate_parser = subparsers.add_parser("migrate-history")
-    migrate_parser.add_argument("--markdown-path", default="docs/2026-04-02-package-build-history.md")
-    migrate_parser.add_argument("--csv-path", default="docs/package-build-history.csv")
+    migrate_parser.add_argument("--markdown-path", default="docs/ops/2026-04-02-package-build-history.md")
+    migrate_parser.add_argument("--csv-path", default="docs/ops/package-build-history.csv")
 
     args = parser.parse_args()
 

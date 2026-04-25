@@ -24,7 +24,7 @@
 - `scripts/release/tests/__init__.py`
 - `scripts/release/tests/test_versioning.py`
 - `scripts/release/tests/test_history.py`
-- `docs/package-build-history.csv`
+- `docs/ops/package-build-history.csv`
 
 **Modify**
 - `package.json`
@@ -33,8 +33,8 @@
 - `README.ja-JP.md`
 - `.cursor/rules/workspace-quick-reference.mdc`
 - `.cursor/rules/project-facts.mdc`
-- `docs/2026-04-08-agent-build-and-test.md`
-- `docs/2026-04-02-package-build-history.md`
+- `docs/ops/2026-04-08-agent-build-and-test.md`
+- `docs/ops/2026-04-02-package-build-history.md`
 
 **Keep But Stop Using As Primary Entrypoints**
 - `scripts/release/*.ps1`
@@ -105,8 +105,8 @@
 
 **Files:**
 - Modify: `package.json`
-- Create: `docs/package-build-history.csv`
-- Modify: `docs/2026-04-02-package-build-history.md`
+- Create: `docs/ops/package-build-history.csv`
+- Modify: `docs/ops/2026-04-02-package-build-history.md`
 
 - [ ] Run the Python migration command to convert the existing Markdown ledger into CSV
 - [ ] Verify the CSV contains all current history rows and headers:
@@ -131,10 +131,10 @@
 - Modify: `README.ja-JP.md`
 - Modify: `.cursor/rules/workspace-quick-reference.mdc`
 - Modify: `.cursor/rules/project-facts.mdc`
-- Modify: `docs/2026-04-08-agent-build-and-test.md`
+- Modify: `docs/ops/2026-04-08-agent-build-and-test.md`
 
 - [ ] Replace references to PowerShell / Node release entrypoints with Python release entrypoints
-- [ ] Replace references to `docs/2026-04-02-package-build-history.md` as the active ledger with `docs/package-build-history.csv`
+- [ ] Replace references to `docs/ops/2026-04-02-package-build-history.md` as the active ledger with `docs/ops/package-build-history.csv`
 - [ ] Keep references to `scripts/release/version.json` unchanged as the single version source
 - [ ] Document that the installer still uses Inno Setup under Python orchestration
 
@@ -151,6 +151,6 @@
 - [ ] Verify:
   - the expected artifacts exist under `release/portable`, `release/installer`, and `release/manifest`
   - `scripts/release/version.json` advanced correctly
-  - `docs/package-build-history.csv` appended new rows with valid `change_summary`
+  - `docs/ops/package-build-history.csv` appended new rows with valid `change_summary`
   - the Markdown ledger file was not appended anymore
 - [ ] Run `git diff --stat` and inspect for accidental unrelated changes before closeout

@@ -78,7 +78,7 @@
 - Modify: `README.md`
 - Modify: `CLAUDE.md`
 - Modify: `.cursor/rules/project-facts.mdc`
-- Modify: `docs/architecture-and-implementation.html`
+- Modify: `docs/reference/architecture-and-implementation.html`
 - Modify: `docs/plan/2026-04-09-dev-performance-monitor-bar-plan.md`
 
 - [ ] Sync docs for the new development diagnostics endpoint and overlay behavior

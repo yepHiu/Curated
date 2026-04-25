@@ -153,7 +153,7 @@ See [API.md](API.md) for the full endpoint reference.
 │   ├── cmd/curated/        # Backend entrypoint
 │   └── internal/           # App, config, storage, server, scanner, scraper, tasks, desktop
 ├── config/                 # Library-level runtime config
-├── docs/                   # Product notes, plans, UI spec, architecture docs
+├── docs/                   # See docs/README.md: reference, product, ops, plan, prd, release-notes
 ├── icon/                   # Brand design source assets
 └── package.json            # pnpm scripts and dependencies
 ```
@@ -180,7 +180,7 @@ Key notes:
 - The current base line is `1.1.0`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
 - Release packaging assembles a Windows-oriented staging directory, portable zip, installer executable, and release manifest.
-- The package build ledger now lives in `docs/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
+- The package build ledger now lives in `docs/ops/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
 - Windows release binaries default to tray mode and can host the built frontend locally when `frontend-dist/` is present beside the executable.
 - The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source.
 - Settings can persist Windows login autostart for the current user; autostart launches Curated silently in tray mode without opening the browser on that login-triggered run.
@@ -188,17 +188,17 @@ Key notes:
 Additional release references:
 
 - [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
-- [docs/package-build-history.csv](docs/package-build-history.csv)
-- [docs/2026-04-02-package-build-history.md](docs/2026-04-02-package-build-history.md)
+- [docs/ops/package-build-history.csv](docs/ops/package-build-history.csv)
+- [docs/ops/2026-04-02-package-build-history.md](docs/ops/2026-04-02-package-build-history.md)
 
 ## Documentation
 
 - [API.md](API.md): public HTTP API reference
-- [docs/2026-03-20-jav-libary.md](docs/2026-03-20-jav-libary.md): product design and target architecture
-- [docs/2026-03-20-project-memory.md](docs/2026-03-20-project-memory.md): implementation facts and stable project memory
-- [docs/architecture-and-implementation.html](docs/architecture-and-implementation.html): architecture overview
-- [docs/2026-03-21-library-organize.md](docs/2026-03-21-library-organize.md): library organization notes
-- [docs/2026-03-24-frontend-ui-spec.md](docs/2026-03-24-frontend-ui-spec.md): UI tokens and frontend patterns
+- [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md): product design and target architecture
+- [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md): implementation facts and stable project memory
+- [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html): architecture overview
+- [docs/reference/2026-03-21-library-organize.md](docs/reference/2026-03-21-library-organize.md): library organization notes
+- [docs/reference/2026-03-24-frontend-ui-spec.md](docs/reference/2026-03-24-frontend-ui-spec.md): UI tokens and frontend patterns
 
 ## Notes
 

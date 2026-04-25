@@ -3,7 +3,7 @@
 ## 1. 产品定位
 
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
-- `docs/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
+- `docs/product/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
 - 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** + Vite 代理 **`/api` → `:8080`** 联通真实 HTTP API（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
 
@@ -30,7 +30,7 @@
 - 主题样式：`src/style.css`
 - 品牌资源：`icon/curated-title-nobg.png` 为 README 顶部带字标志；`icon/curated-icon-rg-dark-pink.png` 为应用无字图标源图，已同步到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`
 - 公开文档：`README.md` 为英文主版，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；根目录 `API.md` 为唯一公开 API 参考文档
-- **UI 设计规范（代码级）**：[`docs/2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../.cursor/rules/ui-component-spec.mdc)
+- **UI 设计规范（代码级）**：[`2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
 - 播放进度（仅浏览器，非服务端）：`src/lib/playback-progress-storage.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
 - 已播计数（localStorage）：`src/lib/played-movies-storage.ts`
@@ -59,7 +59,7 @@
 - `favorites`
 - `recent`
 - `tags`
-- `actors`（演员库：[`ActorsView.vue`](../src/views/ActorsView.vue)；API **`GET/PATCH /api/library/actors…`**；路由 query **`actorsQ`** / **`actorTag`**）
+- `actors`（演员库：[`ActorsView.vue`](../../src/views/ActorsView.vue)；API **`GET/PATCH /api/library/actors…`**；路由 query **`actorsQ`** / **`actorTag`**）
 - `history`（观看历史：按本地日期分组，数据见下）
 - `detail/:id`
 - `player/:id?`
@@ -68,9 +68,9 @@
 ### 观看进度与历史（前端事实）
 
 - **续播进度**（当前时间、时长、`updatedAt`）保存在 **`localStorage`** 键 **`jav-library-playback-progress-v1`**；**不与后端同步**。清除站点数据、换浏览器或隐私模式会丢失。
-- **路由**：`history` → [`src/views/HistoryView.vue`](src/views/HistoryView.vue)；按本地日历日分组（今天/昨天/日期）；卡片 [`PlaybackHistoryCard.vue`](src/components/jav-library/PlaybackHistoryCard.vue)（左文案、右海报 **`coverUrl` 优先**、`object-cover` 裁切、底栏进度条）。
+- **路由**：`history` → [`src/views/HistoryView.vue`](../../src/views/HistoryView.vue)；按本地日历日分组（今天/昨天/日期）；卡片 [`PlaybackHistoryCard.vue`](../../src/components/jav-library/PlaybackHistoryCard.vue)（左文案、右海报 **`coverUrl` 优先**、`object-cover` 裁切、底栏进度条）。
 - **续播**：`PlayerPage` 在 `loadedmetadata` 后根据 **`?t=`**（优先）或本地存储 seek；`timeupdate` 节流写入；pause/ended/隐藏页签/unmount 补写。
-- 从资料库/详情进入播放器：[`buildPlayerRouteFromBrowse`](src/lib/player-route.ts) 可在有效进度下附带 **`?t=`**；从历史进入附带 **`?from=history`**，`AppShell` 顶栏返回历史而非详情。
+- 从资料库/详情进入播放器：[`buildPlayerRouteFromBrowse`](../../src/lib/player-route.ts) 可在有效进度下附带 **`?t=`**；从历史进入附带 **`?from=history`**，`AppShell` 顶栏返回历史而非详情。
 
 ### 当前体验重点
 
@@ -157,8 +157,8 @@
 
 - 本文记录“稳定事实、产品判断、阶段边界”，不记录短期实现细节。
 - 当路由结构、页面骨架、数据来源方式或桌面集成状态发生变化时，应优先更新本文。
-- 若 `docs/2026-03-20-jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
-- 打整机安装包或执行正式发布时，版本号必须跟随 `docs/package-build-history.csv` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
+- 若 `docs/product/2026-03-20-jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
+- 打整机安装包或执行正式发布时，版本号必须跟随 `docs/ops/package-build-history.csv` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
 - 调整全局 `Input` 默认样式或主题变量时，同步检查 **§9 表单与文本输入** 与 **`vue-frontend-standards.mdc`** 是否仍一致。
 - 调整品牌资源时，优先以 `icon/` 为设计源：README 使用 `icon/curated-title-nobg.png`，应用图标统一由 `icon/curated-icon-rg-dark-pink.png` 派生；至少同步检查 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。
 - 调整公开接口时，根目录 `API.md` 是唯一对外 API 参考文档；README 三语版只保留 API 概要和链接，不再维护完整接口表。

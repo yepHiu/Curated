@@ -4,7 +4,7 @@ globs: src/**/*.{ts,vue}
 alwaysApply: false
 ---
 
-总览与设计令牌、业务面清单见 **`ui-component-spec.mdc`**；人读长文见 **`docs/2026-03-24-frontend-ui-spec.md`**。
+总览与设计令牌、业务面清单见 **`ui-component-spec.mdc`**；人读长文见 **`docs/reference/2026-03-24-frontend-ui-spec.md`**。
 
 # Vue Frontend Standards
 

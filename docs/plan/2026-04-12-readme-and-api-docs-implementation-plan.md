@@ -175,7 +175,7 @@ Expected:
 **Files:**
 - Modify: `.cursor/rules/project-facts.mdc`
 - Modify: `.cursor/rules/workspace-quick-reference.mdc`
-- Modify: `docs/2026-03-20-project-memory.md`
+- Modify: `docs/reference/2026-03-20-project-memory.md`
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Record the new public documentation structure**
@@ -197,7 +197,7 @@ Required rule:
 Run:
 
 ```powershell
-[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; rg -n "API.md|README.zh-CN.md|README.ja-JP.md|single public API reference|完整翻译|full translation" .cursor/rules docs/2026-03-20-project-memory.md CLAUDE.md -S
+[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; rg -n "API.md|README.zh-CN.md|README.ja-JP.md|single public API reference|完整翻译|full translation" .cursor/rules docs/reference/2026-03-20-project-memory.md CLAUDE.md -S
 ```
 
 Expected:
@@ -237,6 +237,6 @@ Expected:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add README.md README.zh-CN.md README.ja-JP.md API.md .cursor/rules/project-facts.mdc .cursor/rules/workspace-quick-reference.mdc docs/2026-03-20-project-memory.md CLAUDE.md docs/plan/2026-04-12-readme-and-api-docs-redesign.md docs/plan/2026-04-12-readme-and-api-docs-implementation-plan.md
+git add README.md README.zh-CN.md README.ja-JP.md API.md .cursor/rules/project-facts.mdc .cursor/rules/workspace-quick-reference.mdc docs/reference/2026-03-20-project-memory.md CLAUDE.md docs/plan/2026-04-12-readme-and-api-docs-redesign.md docs/plan/2026-04-12-readme-and-api-docs-implementation-plan.md
 git commit -m "docs: redesign README and split API reference"
 ```

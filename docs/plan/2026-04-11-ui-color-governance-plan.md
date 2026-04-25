@@ -12,7 +12,7 @@
 已存在的基础：
 
 - `src/style.css` 已定义全局语义色：`primary`、`success`、`warning`、`danger`、`info`、`background`、`card`、`muted`、`border` 等
-- `docs/2026-03-24-frontend-ui-spec.md` 已要求业务组件优先使用语义化 token
+- `docs/reference/2026-03-24-frontend-ui-spec.md` 已要求业务组件优先使用语义化 token
 
 当前问题：
 

@@ -6,7 +6,7 @@ alwaysApply: false
 
 # UI Component Spec（Curated）
 
-人读详解与维护约定：**[`docs/2026-03-24-frontend-ui-spec.md`](docs/2026-03-24-frontend-ui-spec.md)**（仓库根相对路径）。表单控件细节：**[`vue-frontend-standards.mdc`](vue-frontend-standards.mdc)**。业务页面体验：**[`jav-library-frontend-patterns.mdc`](jav-library-frontend-patterns.mdc)**。
+人读详解与维护约定：**[`docs/reference/2026-03-24-frontend-ui-spec.md`](docs/reference/2026-03-24-frontend-ui-spec.md)**（仓库根相对路径）。表单控件细节：**[`vue-frontend-standards.mdc`](vue-frontend-standards.mdc)**。业务页面体验：**[`jav-library-frontend-patterns.mdc`](jav-library-frontend-patterns.mdc)**。
 
 ## 分层（MUST）
 
@@ -45,4 +45,4 @@ alwaysApply: false
 
 ## 变更同步
 
-修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/2026-03-24-frontend-ui-spec.md`** 与本文件相关条目。
+修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/reference/2026-03-24-frontend-ui-spec.md`** 与本文件相关条目。

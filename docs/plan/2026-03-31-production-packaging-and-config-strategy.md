@@ -33,7 +33,7 @@
 - `pnpm release:publish` 只在入口处分配一次新版本，再把同一个版本号传给便携包、安装包与 `release/manifest/release.json`，避免一轮整机发布消耗多个 patch。
 - `major` / `minor` 只允许人工调整，命令为 `pnpm release:version:set-base -- --Major <major> --Minor <minor>`；调整时必须把 `patch` 重置为 `0`。
 - `package.json` 的 `version` 不再作为生产包版本来源。
-- 同一次发布中，安装包文件名、便携包文件名、`release/manifest/release.json` 与 `docs/2026-04-02-package-build-history.md` 必须保持一致。
+- 同一次发布中，安装包文件名、便携包文件名、`release/manifest/release.json` 与 `docs/ops/2026-04-02-package-build-history.md` 必须保持一致。
 
 当前推荐入口命令：
 
@@ -59,7 +59,7 @@ powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <v
 powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <version> -BuildStamp <yyyyMMdd.HHmmss>
 ```
 
-同一次发布中，`-Version`、安装包文件名、绿色包文件名、`release/manifest/release.json` 与 `docs/2026-04-02-package-build-history.md` 台账记录必须保持一致。
+同一次发布中，`-Version`、安装包文件名、绿色包文件名、`release/manifest/release.json` 与 `docs/ops/2026-04-02-package-build-history.md` 台账记录必须保持一致。
 
 ### 主链路
 
@@ -154,14 +154,14 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 
 ### 当前已观察到的台账风险
 
-- `release/manifest/release.json` 当前记录的是 `0.0.1-master`，但 `docs/2026-04-02-package-build-history.md` 当前最后一条是 `0.0.0-local`。这表示已有产物与版本台账存在不同步风险。
-- 后续任何实际产出安装包、绿色包或发布清单的动作完成后，都需要立即追加 `docs/2026-04-02-package-build-history.md`，不要发布后再补写不一致版本。
+- `release/manifest/release.json` 当前记录的是 `0.0.1-master`，但 `docs/ops/2026-04-02-package-build-history.md` 当前最后一条是 `0.0.0-local`。这表示已有产物与版本台账存在不同步风险。
+- 后续任何实际产出安装包、绿色包或发布清单的动作完成后，都需要立即追加 `docs/ops/2026-04-02-package-build-history.md`，不要发布后再补写不一致版本。
 
 ### 正式打包操作清单
 
 执行整机安装包或完整发布前：
 
-1. 读取 `docs/2026-04-02-package-build-history.md`，确认最近一条有效发布记录。
+1. 读取 `docs/ops/2026-04-02-package-build-history.md`，确认最近一条有效发布记录。
 2. 确认本次 `-Version`，不要直接使用 `package.json` 中 `release:*` 脚本默认的 `0.0.0-local`。
 3. 确认当前 commit / branch，并记录将用于台账的 short SHA。
 4. 确认 Inno Setup 是否可用：`ISCC.exe` 需存在于 PATH，或位于 `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` / `C:\Program Files\Inno Setup 6\ISCC.exe`。
@@ -185,7 +185,7 @@ powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <v
    - `frontend-dist/index.html`
    - `runtime/config/library-config.example.cfg`
    - `README-release.txt`
-5. 追加 `docs/2026-04-02-package-build-history.md`，记录日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
+5. 追加 `docs/ops/2026-04-02-package-build-history.md`，记录日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
 6. 如发布态需要手动验收，运行 `release/Curated/curated.exe`，确认托盘模式启动、浏览器打开、`GET http://127.0.0.1:8081/api/health` 返回 `name=curated`、`channel=release`，并确认前端页面可加载。
 
 ## 2. 当前仓库现状
@@ -929,7 +929,7 @@ Windows 安装器建议满足：
 
 ### 17.1 目标
 
-在 `docs/2026-04-02-package-build-history.md` 的表格中新增一列：
+在 `docs/ops/2026-04-02-package-build-history.md` 的表格中新增一列：
 
 - `变更内容`
 
@@ -1016,7 +1016,7 @@ def5678 fix(release): keep installer close-app behavior<br>
 
 ### 17.6 文档表头调整
 
-`docs/2026-04-02-package-build-history.md` 的历史表格表头需要从：
+`docs/ops/2026-04-02-package-build-history.md` 的历史表格表头需要从：
 
 ```text
 | 日期 | 版本 | 提交 / 分支 | 打包类型 | 产物路径 | 状态 | 操作人 | 备注 |

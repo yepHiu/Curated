@@ -16,7 +16,7 @@
 - Create: `docs/plan/2026-04-13-desktop-icon-sync-plan.md`
 - Modify: `.cursor/rules/workspace-quick-reference.mdc`
 - Modify: `.cursor/rules/project-facts.mdc`
-- Modify: `docs/2026-03-20-project-memory.md`
+- Modify: `docs/reference/2026-03-20-project-memory.md`
 - Modify: `docs/plan/2026-03-31-production-packaging-and-config-strategy.md`
 
 - [ ] **Step 1: Update the repo memory files to point to the new source image**

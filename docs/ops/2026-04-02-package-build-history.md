@@ -4,6 +4,6 @@
 
 迁移说明：
 
-- `docs/package-build-history.csv` 是当前唯一写入源。
+- `docs/ops/package-build-history.csv` 是当前唯一写入源。
 - CSV 使用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
 - 旧 Markdown 表格记录已经迁移完成，本文件仅保留说明入口，不再继续追加发布记录。

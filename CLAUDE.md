@@ -268,12 +268,12 @@ Reference these docs in `docs/` for detailed specifications:
 
 - `API.md` - Public HTTP API reference; update this when public API behavior changes
 
-- `2026-03-20-jav-libary.md` - Complete product design document (domain models, UI design, task system)
-- `2026-03-21-backend-go-standards.md` - Go coding standards and directory structure
-- `2026-03-21-backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
-- `2026-03-24-frontend-ui-spec.md` - Frontend UI design tokens and component specifications
-- `2026-03-20-project-memory.md` - Current implementation facts and architectural decisions
-- `film-scanner/CLAUDE.md` - Reference implementation for metadata scraping
+- `docs/product/2026-03-20-jav-libary.md` - Complete product design document (domain models, UI design, task system)
+- `docs/reference/2026-03-21-backend-go-standards.md` - Go coding standards and directory structure
+- `docs/reference/2026-03-21-backend-contract-constraints.md` - API contract design (commands, events, DTOs, error codes)
+- `docs/reference/2026-03-24-frontend-ui-spec.md` - Frontend UI design tokens and component specifications
+- `docs/reference/2026-03-20-project-memory.md` - Current implementation facts and architectural decisions
+- `docs/film-scanner/CLAUDE.md` - Reference implementation for metadata scraping (if present)
 
 Additional guidance in `.cursor/rules/`:
 - `architecture-boundaries.mdc` - Current vs target architecture

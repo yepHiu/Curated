@@ -66,7 +66,7 @@
 **Files:**
 - Modify: `.cursor/rules/workspace-quick-reference.mdc`
 - Modify: `.cursor/rules/project-facts.mdc`
-- Modify: `docs/2026-03-21-library-organize.md`
+- Modify: `docs/reference/2026-03-21-library-organize.md`
 - Modify: `README.md`
 - Modify: `README.zh-CN.md`
 - Modify: `README.ja-JP.md`

@@ -25,11 +25,11 @@ Use this skill only inside this repository. Do not treat it as a global skill or
 - Map natural-language packaging requests to one of: `publish`, `installer`, `portable`, `preview`, `set-base`.
 - Respect the repository release rules:
   - `scripts/release/version.json` is the only automatic production version source.
-  - `docs/package-build-history.csv` is the active package/version history ledger.
+  - `docs/ops/package-build-history.csv` is the active package/version history ledger.
   - `publish` allocates one version once and reuses it for all generated artifacts.
   - `major` and `minor` changes are manual base changes; `patch` is the auto-bump part.
 - Treat package history management as part of the packaging workflow:
-  - packaging commands append new rows to `docs/package-build-history.csv`
+  - packaging commands append new rows to `docs/ops/package-build-history.csv`
   - `change_summary` comes from the git range between the previous ledger row and the current commit
   - the legacy Markdown history doc is only an entry point, not the active write target
 - Always preview before execution.
@@ -58,7 +58,7 @@ Use this skill only inside this repository. Do not treat it as a global skill or
   - `python scripts/release/release_cli.py package-portable`
   - `python scripts/release/release_cli.py set-version-base`
   - `python scripts/release/release_cli.py migrate-history`
-- When the user asks about package/version history, use `docs/package-build-history.csv` as the source of truth and prefer showing the latest row plus its `change_summary`.
+- When the user asks about package/version history, use `docs/ops/package-build-history.csv` as the source of truth and prefer showing the latest row plus its `change_summary`.
 
 ## Post-Package Release Notes
 

@@ -107,7 +107,7 @@ Do not rewrite player immersive HUD colors or dev performance/watermark colors i
 ### Task 4: Documentation and Verification
 
 **Files:**
-- Modify: `docs/2026-03-24-frontend-ui-spec.md`
+- Modify: `docs/reference/2026-03-24-frontend-ui-spec.md`
 - Modify: `docs/plan/2026-04-11-ui-color-governance-plan.md`
 
 - [ ] **Step 1: Update the UI spec**

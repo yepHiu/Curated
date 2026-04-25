@@ -21,8 +21,8 @@ from .versioning import allocate_next_patch_in_file, format_version, read_versio
 
 
 DEFAULT_VERSION_FILE = "scripts/release/version.json"
-DEFAULT_HISTORY_CSV = "docs/package-build-history.csv"
-LEGACY_HISTORY_MD = "docs/2026-04-02-package-build-history.md"
+DEFAULT_HISTORY_CSV = "docs/ops/package-build-history.csv"
+LEGACY_HISTORY_MD = "docs/ops/2026-04-02-package-build-history.md"
 
 
 def utc_build_stamp() -> str:
