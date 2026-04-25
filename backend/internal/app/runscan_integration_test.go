@@ -77,7 +77,7 @@ func startScanTask(a *App, store *storage.SQLiteStore, ctx context.Context, path
 	return task.TaskID
 }
 
-func TestIntegration_RunScan_ImportLayoutCuratedAndClearsPending(t *testing.T) {
+func TestIntegration_RunScan_LegacyExtendedLibraryImportIgnoredAndClearsPending(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	libRoot := filepath.Join(root, "media")
@@ -119,7 +119,13 @@ func TestIntegration_RunScan_ImportLayoutCuratedAndClearsPending(t *testing.T) {
 	cfg.DatabasePath = dbPath
 	cfg.CacheDir = filepath.Join(root, "cache")
 	cfg.OrganizeLibrary = false
-	cfg.ExtendedLibraryImport = true
+	settingsPath := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(settingsPath, []byte(`{"extendedLibraryImport": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.MergeLibrarySettingsFile(&cfg, settingsPath); err != nil {
+		t.Fatal(err)
+	}
 
 	a := newTestApp(t, store, cfg)
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
@@ -134,8 +140,8 @@ func TestIntegration_RunScan_ImportLayoutCuratedAndClearsPending(t *testing.T) {
 	if len(imported) != 1 {
 		t.Fatalf("want 1 imported, got imported=%d updated=%d skipped=%d", len(imported), 0, len(skipped))
 	}
-	if imported[0].ImportLayout != "curated" {
-		t.Fatalf("ImportLayout = %q want curated", imported[0].ImportLayout)
+	if imported[0].ImportLayout != "" {
+		t.Fatalf("ImportLayout should stay empty after legacy setting is ignored, got %q", imported[0].ImportLayout)
 	}
 
 	paths, err := store.ListLibraryPaths(ctx)
@@ -149,7 +155,7 @@ func TestIntegration_RunScan_ImportLayoutCuratedAndClearsPending(t *testing.T) {
 	}
 }
 
-func TestIntegration_RunScan_ImportLayoutExternal(t *testing.T) {
+func TestIntegration_RunScan_LegacyExtendedLibraryImportIgnoredForExternalLayout(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	libRoot := filepath.Join(root, "lib")
@@ -178,7 +184,13 @@ func TestIntegration_RunScan_ImportLayoutExternal(t *testing.T) {
 	cfg.DatabasePath = dbPath
 	cfg.CacheDir = filepath.Join(root, "cache")
 	cfg.OrganizeLibrary = false
-	cfg.ExtendedLibraryImport = true
+	settingsPath := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(settingsPath, []byte(`{"extendedLibraryImport": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.MergeLibrarySettingsFile(&cfg, settingsPath); err != nil {
+		t.Fatal(err)
+	}
 
 	a := newTestApp(t, store, cfg)
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
@@ -189,12 +201,12 @@ func TestIntegration_RunScan_ImportLayoutExternal(t *testing.T) {
 	if len(imported) != 1 || len(skipped) != 0 {
 		t.Fatalf("imported=%d skipped=%d", len(imported), len(skipped))
 	}
-	if imported[0].ImportLayout != "external" {
-		t.Fatalf("ImportLayout = %q want external", imported[0].ImportLayout)
+	if imported[0].ImportLayout != "" {
+		t.Fatalf("ImportLayout should stay empty after legacy setting is ignored, got %q", imported[0].ImportLayout)
 	}
 }
 
-func TestIntegration_RunScan_ExtendedOff_NoImportLayout(t *testing.T) {
+func TestIntegration_RunScan_NoImportLayoutWithoutLegacySetting(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	libRoot := filepath.Join(root, "lib")
@@ -228,7 +240,6 @@ func TestIntegration_RunScan_ExtendedOff_NoImportLayout(t *testing.T) {
 	cfg.DatabasePath = dbPath
 	cfg.CacheDir = filepath.Join(root, "cache")
 	cfg.OrganizeLibrary = false
-	cfg.ExtendedLibraryImport = false
 
 	a := newTestApp(t, store, cfg)
 	taskID := startScanTask(a, store, ctx, []string{libRoot})
@@ -240,7 +251,7 @@ func TestIntegration_RunScan_ExtendedOff_NoImportLayout(t *testing.T) {
 		t.Fatalf("want 1 imported, got %d", len(imported))
 	}
 	if imported[0].ImportLayout != "" {
-		t.Fatalf("ImportLayout should be empty when extended import off, got %q", imported[0].ImportLayout)
+		t.Fatalf("ImportLayout should be empty, got %q", imported[0].ImportLayout)
 	}
 }
 
@@ -277,7 +288,6 @@ func TestIntegration_RunScan_DuplicateMovieRootSecondSkipped(t *testing.T) {
 	cfg.DatabasePath = dbPath
 	cfg.CacheDir = filepath.Join(root, "cache")
 	cfg.OrganizeLibrary = false
-	cfg.ExtendedLibraryImport = true
 
 	a := newTestApp(t, store, cfg)
 	taskID := startScanTask(a, store, ctx, []string{libRoot})

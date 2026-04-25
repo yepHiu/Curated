@@ -33,8 +33,8 @@ type Config struct {
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape,omitempty"`
 	// LaunchAtLogin persists the Windows login autostart preference in library-config.cfg. Default false.
 	LaunchAtLogin bool `json:"launchAtLogin,omitempty"`
-	// ExtendedLibraryImport: first scan on a newly added library root may run curated/external layout detection (library-config.cfg). Default false for zero impact on existing libraries.
-	ExtendedLibraryImport bool `json:"extendedLibraryImport,omitempty"`
+	// CuratedFrameExportFormat controls curated frame export output format. Persisted in library-config.cfg.
+	CuratedFrameExportFormat string `json:"curatedFrameExportFormat,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.
@@ -161,9 +161,10 @@ func Default() Config {
 			SeekForwardStepSec:  10,
 			SeekBackwardStepSec: 10,
 		},
-		OrganizeLibrary:  true,
-		AutoLibraryWatch: true,
-		LaunchAtLogin:    false,
+		OrganizeLibrary:          true,
+		AutoLibraryWatch:         true,
+		LaunchAtLogin:            false,
+		CuratedFrameExportFormat: "jpg",
 	}
 }
 
@@ -210,6 +211,7 @@ func Load(path string) (Config, error) {
 	if cfg.HttpAddr == "" {
 		cfg.HttpAddr = defaultHTTPAddr()
 	}
+	cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat)
 	if cfg.Tasks.ScanTimeoutSeconds <= 0 {
 		cfg.Tasks.ScanTimeoutSeconds = 600
 	}
@@ -316,6 +318,19 @@ func NormalizeNativePlayerPreset(value string) string {
 		return strings.ToLower(strings.TrimSpace(value))
 	default:
 		return "mpv"
+	}
+}
+
+func NormalizeCuratedFrameExportFormat(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "webp":
+		return "webp"
+	case "png":
+		return "png"
+	case "jpg":
+		return "jpg"
+	default:
+		return "jpg"
 	}
 }
 

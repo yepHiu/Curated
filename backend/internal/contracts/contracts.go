@@ -191,7 +191,7 @@ type ScanFileResultDTO struct {
 	MovieID      string `json:"movieId,omitempty"`
 	Status       string `json:"status"`
 	Reason       string `json:"reason,omitempty"`
-	ImportLayout string `json:"importLayout,omitempty"` // loose | curated | external (extended first-scan only)
+	ImportLayout string `json:"importLayout,omitempty"` // deprecated layout hint field; no longer populated by scans
 }
 
 type ScanSummaryDTO struct {
@@ -364,8 +364,6 @@ type SettingsDTO struct {
 	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
 	Player          PlayerSettingsDTO `json:"player"`
 	OrganizeLibrary bool              `json:"organizeLibrary"`
-	// ExtendedLibraryImport: when true, first scan under a newly added library root may classify curated/external layouts (library-config.cfg).
-	ExtendedLibraryImport bool `json:"extendedLibraryImport"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
@@ -373,9 +371,10 @@ type SettingsDTO struct {
 	// LaunchAtLogin: when true, Curated registers a current-user login autostart entry and starts silently in tray mode.
 	LaunchAtLogin bool `json:"launchAtLogin"`
 	// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
-	LaunchAtLoginSupported bool     `json:"launchAtLoginSupported"`
-	MetadataMovieProvider  string   `json:"metadataMovieProvider"`
-	MetadataMovieProviders []string `json:"metadataMovieProviders"`
+	LaunchAtLoginSupported   bool     `json:"launchAtLoginSupported"`
+	CuratedFrameExportFormat string   `json:"curatedFrameExportFormat"`
+	MetadataMovieProvider    string   `json:"metadataMovieProvider"`
+	MetadataMovieProviders   []string `json:"metadataMovieProviders"`
 	// MetadataMovieProviderChain: ordered provider priority list (may be non-empty while UI mode is auto/specified).
 	MetadataMovieProviderChain []string `json:"metadataMovieProviderChain"`
 	// MetadataMovieScrapeMode: auto | specified | chain — which strategy the backend uses for new scrapes.
@@ -429,13 +428,13 @@ type ProxyJavBusPingResponse struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary        *bool                   `json:"organizeLibrary,omitempty"`
-	ExtendedLibraryImport  *bool                   `json:"extendedLibraryImport,omitempty"`
-	AutoLibraryWatch       *bool                   `json:"autoLibraryWatch,omitempty"`
-	AutoActorProfileScrape *bool                   `json:"autoActorProfileScrape,omitempty"`
-	LaunchAtLogin          *bool                   `json:"launchAtLogin,omitempty"`
-	Player                 *PatchPlayerSettingsDTO `json:"player,omitempty"`
-	MetadataMovieProvider  *string                 `json:"metadataMovieProvider,omitempty"`
+	OrganizeLibrary          *bool                   `json:"organizeLibrary,omitempty"`
+	AutoLibraryWatch         *bool                   `json:"autoLibraryWatch,omitempty"`
+	AutoActorProfileScrape   *bool                   `json:"autoActorProfileScrape,omitempty"`
+	LaunchAtLogin            *bool                   `json:"launchAtLogin,omitempty"`
+	CuratedFrameExportFormat *string                 `json:"curatedFrameExportFormat,omitempty"`
+	Player                   *PatchPlayerSettingsDTO `json:"player,omitempty"`
+	MetadataMovieProvider    *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
@@ -629,7 +628,7 @@ type PatchCuratedFrameTagsBody struct {
 type PostCuratedFramesExportBody struct {
 	IDs       []string `json:"ids"`
 	ActorName string   `json:"actorName,omitempty"`
-	// Format is "webp" (default) or "png".
+	// Format is "jpg" (default), "webp", or "png". The export handler may also accept "jpeg" as a compatibility alias.
 	Format string `json:"format,omitempty"`
 }
 

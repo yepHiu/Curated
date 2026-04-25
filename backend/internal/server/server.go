@@ -32,6 +32,11 @@ import (
 	"curated-backend/internal/version"
 )
 
+var (
+	openDirectoryFn       = shellopen.OpenDirectory
+	revealInFileManagerFn = shellopen.RevealInFileManager
+)
+
 type ScanStarter interface {
 	StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error)
 }
@@ -51,12 +56,6 @@ type ActorProfileRefresher interface {
 type OrganizeLibraryController interface {
 	OrganizeLibrary() bool
 	SetOrganizeLibrary(v bool) error
-}
-
-// ExtendedLibraryImportController toggles first-scan layout detection for newly added library roots (library-config.cfg).
-type ExtendedLibraryImportController interface {
-	ExtendedLibraryImport() bool
-	SetExtendedLibraryImport(v bool) error
 }
 
 // AutoLibraryWatchController exposes whether fsnotify-driven library scans are allowed (library-config.cfg).
@@ -113,6 +112,11 @@ type LaunchAtLoginController interface {
 	SetLaunchAtLogin(v bool) error
 }
 
+type CuratedFrameExportFormatController interface {
+	CuratedFrameExportFormat() string
+	SetCuratedFrameExportFormat(v string) error
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
@@ -146,82 +150,82 @@ type AppUpdateProvider interface {
 }
 
 type Handler struct {
-	cfg                       config.Config
-	logger                    *zap.Logger
-	store                     *storage.SQLiteStore
-	tasks                     *tasks.Manager
-	scanStarter               ScanStarter
-	organizeLibraryCtl        OrganizeLibraryController
-	extendedLibraryImportCtl  ExtendedLibraryImportController
-	autoLibraryWatchCtl       AutoLibraryWatchController
-	autoActorProfileScrapeCtl AutoActorProfileScrapeController
-	launchAtLoginCtl          LaunchAtLoginController
-	metadataScrapeCtl         MetadataScrapeSettings
-	providerHealthChecker     ProviderHealthChecker
-	proxyCtl                  ProxyController
-	backendLogCtl             BackendLogSettingsController
-	playerSettingsCtl         PlayerSettingsController
-	movieMetadataRefresher    MovieMetadataRefresher
-	actorProfileRefresher     ActorProfileRefresher
-	libraryWatchReloader      LibraryWatchReloader
-	devPerformanceProvider    DevPerformanceProvider
-	playbackResolver          PlaybackResolver
-	nativePlaybackLauncher    NativePlaybackLauncher
-	homepageRecommendations   HomepageRecommendationsProvider
-	appUpdateProvider         AppUpdateProvider
+	cfg                         config.Config
+	logger                      *zap.Logger
+	store                       *storage.SQLiteStore
+	tasks                       *tasks.Manager
+	scanStarter                 ScanStarter
+	organizeLibraryCtl          OrganizeLibraryController
+	autoLibraryWatchCtl         AutoLibraryWatchController
+	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
+	launchAtLoginCtl            LaunchAtLoginController
+	curatedFrameExportFormatCtl CuratedFrameExportFormatController
+	metadataScrapeCtl           MetadataScrapeSettings
+	providerHealthChecker       ProviderHealthChecker
+	proxyCtl                    ProxyController
+	backendLogCtl               BackendLogSettingsController
+	playerSettingsCtl           PlayerSettingsController
+	movieMetadataRefresher      MovieMetadataRefresher
+	actorProfileRefresher       ActorProfileRefresher
+	libraryWatchReloader        LibraryWatchReloader
+	devPerformanceProvider      DevPerformanceProvider
+	playbackResolver            PlaybackResolver
+	nativePlaybackLauncher      NativePlaybackLauncher
+	homepageRecommendations     HomepageRecommendationsProvider
+	appUpdateProvider           AppUpdateProvider
 }
 
 type Deps struct {
-	Cfg                       config.Config
-	Logger                    *zap.Logger
-	Store                     *storage.SQLiteStore
-	Tasks                     *tasks.Manager
-	ScanStarter               ScanStarter
-	OrganizeLibraryCtl        OrganizeLibraryController
-	ExtendedLibraryImportCtl  ExtendedLibraryImportController
-	AutoLibraryWatchCtl       AutoLibraryWatchController
-	AutoActorProfileScrapeCtl AutoActorProfileScrapeController
-	LaunchAtLoginCtl          LaunchAtLoginController
-	MetadataScrapeCtl         MetadataScrapeSettings
-	ProviderHealthChecker     ProviderHealthChecker
-	ProxyCtl                  ProxyController
-	BackendLogCtl             BackendLogSettingsController
-	PlayerSettingsCtl         PlayerSettingsController
-	MovieMetadataRefresher    MovieMetadataRefresher
-	ActorProfileRefresher     ActorProfileRefresher
-	LibraryWatchReloader      LibraryWatchReloader
-	DevPerformanceProvider    DevPerformanceProvider
-	PlaybackResolver          PlaybackResolver
-	NativePlaybackLauncher    NativePlaybackLauncher
-	HomepageRecommendations   HomepageRecommendationsProvider
-	AppUpdateProvider         AppUpdateProvider
+	Cfg                         config.Config
+	Logger                      *zap.Logger
+	Store                       *storage.SQLiteStore
+	Tasks                       *tasks.Manager
+	ScanStarter                 ScanStarter
+	OrganizeLibraryCtl          OrganizeLibraryController
+	AutoLibraryWatchCtl         AutoLibraryWatchController
+	AutoActorProfileScrapeCtl   AutoActorProfileScrapeController
+	LaunchAtLoginCtl            LaunchAtLoginController
+	CuratedFrameExportFormatCtl CuratedFrameExportFormatController
+	MetadataScrapeCtl           MetadataScrapeSettings
+	ProviderHealthChecker       ProviderHealthChecker
+	ProxyCtl                    ProxyController
+	BackendLogCtl               BackendLogSettingsController
+	PlayerSettingsCtl           PlayerSettingsController
+	MovieMetadataRefresher      MovieMetadataRefresher
+	ActorProfileRefresher       ActorProfileRefresher
+	LibraryWatchReloader        LibraryWatchReloader
+	DevPerformanceProvider      DevPerformanceProvider
+	PlaybackResolver            PlaybackResolver
+	NativePlaybackLauncher      NativePlaybackLauncher
+	HomepageRecommendations     HomepageRecommendationsProvider
+	AppUpdateProvider           AppUpdateProvider
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
-		cfg:                       deps.Cfg,
-		logger:                    deps.Logger,
-		store:                     deps.Store,
-		tasks:                     deps.Tasks,
-		scanStarter:               deps.ScanStarter,
-		organizeLibraryCtl:        deps.OrganizeLibraryCtl,
-		extendedLibraryImportCtl:  deps.ExtendedLibraryImportCtl,
-		autoLibraryWatchCtl:       deps.AutoLibraryWatchCtl,
-		autoActorProfileScrapeCtl: deps.AutoActorProfileScrapeCtl,
-		launchAtLoginCtl:          deps.LaunchAtLoginCtl,
-		metadataScrapeCtl:         deps.MetadataScrapeCtl,
-		providerHealthChecker:     deps.ProviderHealthChecker,
-		proxyCtl:                  deps.ProxyCtl,
-		backendLogCtl:             deps.BackendLogCtl,
-		playerSettingsCtl:         deps.PlayerSettingsCtl,
-		movieMetadataRefresher:    deps.MovieMetadataRefresher,
-		actorProfileRefresher:     deps.ActorProfileRefresher,
-		libraryWatchReloader:      deps.LibraryWatchReloader,
-		devPerformanceProvider:    deps.DevPerformanceProvider,
-		playbackResolver:          deps.PlaybackResolver,
-		nativePlaybackLauncher:    deps.NativePlaybackLauncher,
-		homepageRecommendations:   deps.HomepageRecommendations,
-		appUpdateProvider:         deps.AppUpdateProvider,
+		cfg:                         deps.Cfg,
+		logger:                      deps.Logger,
+		store:                       deps.Store,
+		tasks:                       deps.Tasks,
+		scanStarter:                 deps.ScanStarter,
+		organizeLibraryCtl:          deps.OrganizeLibraryCtl,
+		autoLibraryWatchCtl:         deps.AutoLibraryWatchCtl,
+		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
+		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
+		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
+		metadataScrapeCtl:           deps.MetadataScrapeCtl,
+		providerHealthChecker:       deps.ProviderHealthChecker,
+		proxyCtl:                    deps.ProxyCtl,
+		backendLogCtl:               deps.BackendLogCtl,
+		playerSettingsCtl:           deps.PlayerSettingsCtl,
+		movieMetadataRefresher:      deps.MovieMetadataRefresher,
+		actorProfileRefresher:       deps.ActorProfileRefresher,
+		libraryWatchReloader:        deps.LibraryWatchReloader,
+		devPerformanceProvider:      deps.DevPerformanceProvider,
+		playbackResolver:            deps.PlaybackResolver,
+		nativePlaybackLauncher:      deps.NativePlaybackLauncher,
+		homepageRecommendations:     deps.HomepageRecommendations,
+		appUpdateProvider:           deps.AppUpdateProvider,
 	}
 }
 
@@ -265,6 +269,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
 	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
+	mux.HandleFunc("POST /api/library/paths/{id}/reveal", h.handleRevealLibraryPathInFileManager)
 	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
@@ -896,9 +901,69 @@ func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.
 	// is often cancelled immediately and would kill the explorer child from exec.CommandContext.
 	revealCtx, revealCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer revealCancel()
-	if err := shellopen.RevealInFileManager(revealCtx, absPath); err != nil {
+	if err := revealInFileManagerFn(revealCtx, absPath); err != nil {
 		if h.logger != nil {
 			h.logger.Warn("reveal in file manager failed", zap.Error(err), zap.String("path", absPath))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager: "+err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleRevealLibraryPathInFileManager(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "id is required")
+		return
+	}
+
+	dto, err := h.store.GetLibraryPath(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("get library path for reveal failed", zap.Error(err), zap.String("id", id))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load library path")
+		return
+	}
+
+	absDir := filepath.Clean(strings.TrimSpace(dto.Path))
+	if absDir == "" || !filepath.IsAbs(absDir) {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "library path is invalid")
+		return
+	}
+
+	info, err := os.Stat(absDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path directory not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("stat library path for reveal failed", zap.Error(err), zap.String("path", absDir))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to access library path")
+		return
+	}
+	if !info.IsDir() {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path directory not found")
+		return
+	}
+
+	revealCtx, revealCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer revealCancel()
+	if err := openDirectoryFn(revealCtx, absDir); err != nil {
+		if h.logger != nil {
+			h.logger.Warn("open library path in file manager failed", zap.Error(err), zap.String("path", absDir))
 		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager: "+err.Error())
 		return
@@ -1405,9 +1470,9 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		launchAtLogin = h.launchAtLoginCtl.LaunchAtLogin()
 		launchAtLoginSupported = h.launchAtLoginCtl.LaunchAtLoginSupported()
 	}
-	extImp := h.cfg.ExtendedLibraryImport
-	if h.extendedLibraryImportCtl != nil {
-		extImp = h.extendedLibraryImportCtl.ExtendedLibraryImport()
+	curatedFrameExportFormat := config.NormalizeCuratedFrameExportFormat(h.cfg.CuratedFrameExportFormat)
+	if h.curatedFrameExportFormatCtl != nil {
+		curatedFrameExportFormat = config.NormalizeCuratedFrameExportFormat(h.curatedFrameExportFormatCtl.CuratedFrameExportFormat())
 	}
 	dto := contracts.SettingsDTO{
 		LibraryPaths: libraryPaths,
@@ -1422,13 +1487,13 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 			SeekForwardStepSec:  h.cfg.Player.SeekForwardStepSec,
 			SeekBackwardStepSec: h.cfg.Player.SeekBackwardStepSec,
 		},
-		OrganizeLibrary:        org,
-		ExtendedLibraryImport:  extImp,
-		AutoLibraryWatch:       autoWatch,
-		AutoActorProfileScrape: autoActorProfileScrape,
-		LaunchAtLogin:          launchAtLogin,
-		LaunchAtLoginSupported: launchAtLoginSupported,
-		MetadataMovieProviders: []string{},
+		OrganizeLibrary:          org,
+		AutoLibraryWatch:         autoWatch,
+		AutoActorProfileScrape:   autoActorProfileScrape,
+		LaunchAtLogin:            launchAtLogin,
+		LaunchAtLoginSupported:   launchAtLoginSupported,
+		CuratedFrameExportFormat: curatedFrameExportFormat,
+		MetadataMovieProviders:   []string{},
 	}
 	if strings.TrimSpace(dto.Player.NativePlayerCommand) == "" {
 		dto.Player.NativePlayerCommand = "mpv"
@@ -1489,6 +1554,74 @@ func movieProviderNameAllowed(want string, allowed []string) bool {
 	return false
 }
 
+type settingsPatchFailure struct {
+	status  int
+	code    string
+	message func(error) string
+}
+
+func fixedSettingsPatchMessage(msg string) func(error) string {
+	return func(error) string { return msg }
+}
+
+func (f settingsPatchFailure) userMessage(err error) string {
+	if f.message != nil {
+		return f.message(err)
+	}
+	if err != nil {
+		return err.Error()
+	}
+	return "failed to update settings"
+}
+
+type settingsPatchOperation struct {
+	name     string
+	apply    func() error
+	rollback func() error
+	failure  settingsPatchFailure
+}
+
+func rollbackSettingsPatchOperations(ops []settingsPatchOperation, applied int) error {
+	for i := applied - 1; i >= 0; i-- {
+		if ops[i].rollback == nil {
+			continue
+		}
+		if err := ops[i].rollback(); err != nil {
+			return fmt.Errorf("%s rollback failed: %w", ops[i].name, err)
+		}
+	}
+	return nil
+}
+
+func boolPtr(v bool) *bool       { return &v }
+func stringPtr(v string) *string { return &v }
+func intPtr(v int) *int          { return &v }
+
+func backendLogPatchFromDTO(dto contracts.BackendLogSettingsDTO) contracts.PatchBackendLogSettings {
+	return contracts.PatchBackendLogSettings{
+		LogDir:        stringPtr(dto.LogDir),
+		LogFilePrefix: stringPtr(dto.LogFilePrefix),
+		LogMaxAgeDays: intPtr(dto.LogMaxAgeDays),
+		LogLevel:      stringPtr(dto.LogLevel),
+	}
+}
+
+func playerSettingsPatchFromDTO(dto contracts.PlayerSettingsDTO) contracts.PatchPlayerSettingsDTO {
+	return contracts.PatchPlayerSettingsDTO{
+		HardwareDecode:      boolPtr(dto.HardwareDecode),
+		HardwareEncoder:     stringPtr(dto.HardwareEncoder),
+		NativePlayerPreset:  stringPtr(dto.NativePlayerPreset),
+		NativePlayerEnabled: boolPtr(dto.NativePlayerEnabled),
+		NativePlayerCommand: stringPtr(dto.NativePlayerCommand),
+		StreamPushEnabled:   boolPtr(dto.StreamPushEnabled),
+		ForceStreamPush:     boolPtr(dto.ForceStreamPush),
+		FFmpegCommand:       stringPtr(dto.FFmpegCommand),
+		PreferNativePlayer:  boolPtr(dto.PreferNativePlayer),
+		SeekForwardStepSec:  intPtr(dto.SeekForwardStepSec),
+		SeekBackwardStepSec: intPtr(dto.SeekBackwardStepSec),
+	}
+}
+
 func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
@@ -1506,7 +1639,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.extendedLibraryImportCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1520,37 +1653,30 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.MetadataMovieProvider == nil && body.ExtendedLibraryImport == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
+
+	ops := make([]settingsPatchOperation, 0, 12)
 
 	if body.OrganizeLibrary != nil {
 		if h.organizeLibraryCtl == nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "organize library settings not available")
 			return
 		}
-		if err := h.organizeLibraryCtl.SetOrganizeLibrary(*body.OrganizeLibrary); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist organizeLibrary", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
-	}
-
-	if body.ExtendedLibraryImport != nil {
-		if h.extendedLibraryImportCtl == nil {
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "extended library import settings not available")
-			return
-		}
-		if err := h.extendedLibraryImportCtl.SetExtendedLibraryImport(*body.ExtendedLibraryImport); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist extendedLibraryImport", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.organizeLibraryCtl.OrganizeLibrary()
+		target := *body.OrganizeLibrary
+		ops = append(ops, settingsPatchOperation{
+			name:     "organizeLibrary",
+			apply:    func() error { return h.organizeLibraryCtl.SetOrganizeLibrary(target) },
+			rollback: func() error { return h.organizeLibraryCtl.SetOrganizeLibrary(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.AutoLibraryWatch != nil {
@@ -1558,13 +1684,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "auto library watch settings not available")
 			return
 		}
-		if err := h.autoLibraryWatchCtl.SetAutoLibraryWatch(*body.AutoLibraryWatch); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist autoLibraryWatch", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.autoLibraryWatchCtl.AutoLibraryWatch()
+		target := *body.AutoLibraryWatch
+		ops = append(ops, settingsPatchOperation{
+			name:     "autoLibraryWatch",
+			apply:    func() error { return h.autoLibraryWatchCtl.SetAutoLibraryWatch(target) },
+			rollback: func() error { return h.autoLibraryWatchCtl.SetAutoLibraryWatch(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.AutoActorProfileScrape != nil {
@@ -1572,13 +1703,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "auto actor profile scrape settings not available")
 			return
 		}
-		if err := h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(*body.AutoActorProfileScrape); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist autoActorProfileScrape", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.autoActorProfileScrapeCtl.AutoActorProfileScrape()
+		target := *body.AutoActorProfileScrape
+		ops = append(ops, settingsPatchOperation{
+			name:     "autoActorProfileScrape",
+			apply:    func() error { return h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(target) },
+			rollback: func() error { return h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.LaunchAtLogin != nil {
@@ -1590,13 +1726,41 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "launch at login is not supported in this runtime")
 			return
 		}
-		if err := h.launchAtLoginCtl.SetLaunchAtLogin(*body.LaunchAtLogin); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist launchAtLogin", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
+		prev := h.launchAtLoginCtl.LaunchAtLogin()
+		target := *body.LaunchAtLogin
+		ops = append(ops, settingsPatchOperation{
+			name:     "launchAtLogin",
+			apply:    func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(target) },
+			rollback: func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.CuratedFrameExportFormat != nil {
+		if h.curatedFrameExportFormatCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "curated frame export format settings not available")
 			return
 		}
+		target := strings.ToLower(strings.TrimSpace(*body.CuratedFrameExportFormat))
+		if target != "jpg" && target != "webp" && target != "png" {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `curatedFrameExportFormat must be one of "jpg", "webp", or "png"`)
+			return
+		}
+		prev := h.curatedFrameExportFormatCtl.CuratedFrameExportFormat()
+		ops = append(ops, settingsPatchOperation{
+			name:     "curatedFrameExportFormat",
+			apply:    func() error { return h.curatedFrameExportFormatCtl.SetCuratedFrameExportFormat(target) },
+			rollback: func() error { return h.curatedFrameExportFormatCtl.SetCuratedFrameExportFormat(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
 	}
 
 	if body.MetadataMovieProvider != nil {
@@ -1612,13 +1776,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if err := h.metadataScrapeCtl.SetMetadataMovieProvider(name); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist metadataMovieProvider", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.metadataScrapeCtl.MetadataMovieProvider()
+		target := name
+		ops = append(ops, settingsPatchOperation{
+			name:     "metadataMovieProvider",
+			apply:    func() error { return h.metadataScrapeCtl.SetMetadataMovieProvider(target) },
+			rollback: func() error { return h.metadataScrapeCtl.SetMetadataMovieProvider(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.MetadataMovieProviderChain != nil {
@@ -1641,13 +1810,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if err := h.metadataScrapeCtl.SetMetadataMovieProviderChain(chain); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist metadataMovieProviderChain", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := append([]string(nil), h.metadataScrapeCtl.MetadataMovieProviderChain()...)
+		target := append([]string(nil), chain...)
+		ops = append(ops, settingsPatchOperation{
+			name:     "metadataMovieProviderChain",
+			apply:    func() error { return h.metadataScrapeCtl.SetMetadataMovieProviderChain(target) },
+			rollback: func() error { return h.metadataScrapeCtl.SetMetadataMovieProviderChain(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.MetadataMovieScrapeMode != nil {
@@ -1660,13 +1834,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid metadataMovieScrapeMode")
 			return
 		}
-		if err := h.metadataScrapeCtl.SetMetadataMovieScrapeMode(mode); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist metadataMovieScrapeMode", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.metadataScrapeCtl.MetadataMovieScrapeMode()
+		target := mode
+		ops = append(ops, settingsPatchOperation{
+			name:     "metadataMovieScrapeMode",
+			apply:    func() error { return h.metadataScrapeCtl.SetMetadataMovieScrapeMode(target) },
+			rollback: func() error { return h.metadataScrapeCtl.SetMetadataMovieScrapeMode(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.MetadataMovieStrategy != nil {
@@ -1679,13 +1858,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid metadataMovieStrategy")
 			return
 		}
-		if err := h.metadataScrapeCtl.SetMetadataMovieStrategy(strategy); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist metadataMovieStrategy", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save library settings")
-			return
-		}
+		prev := h.metadataScrapeCtl.MetadataMovieStrategy()
+		target := strategy
+		ops = append(ops, settingsPatchOperation{
+			name:     "metadataMovieStrategy",
+			apply:    func() error { return h.metadataScrapeCtl.SetMetadataMovieStrategy(target) },
+			rollback: func() error { return h.metadataScrapeCtl.SetMetadataMovieStrategy(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
 	}
 
 	if body.Proxy != nil {
@@ -1703,13 +1887,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "proxy URL is required when enabled")
 			return
 		}
-		if err := h.proxyCtl.SetProxy(cfg); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist proxy settings", zap.Error(err))
-			}
-			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to save proxy settings")
-			return
-		}
+		prev := h.proxyCtl.Proxy()
+		target := cfg
+		ops = append(ops, settingsPatchOperation{
+			name:     "proxy",
+			apply:    func() error { return h.proxyCtl.SetProxy(target) },
+			rollback: func() error { return h.proxyCtl.SetProxy(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save proxy settings"),
+			},
+		})
 	}
 
 	if body.BackendLog != nil && patchBackendLogHasChanges(body.BackendLog) {
@@ -1717,13 +1906,18 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "backend log settings not available")
 			return
 		}
-		if err := h.backendLogCtl.SetBackendLogPatch(*body.BackendLog); err != nil {
-			if h.logger != nil {
-				h.logger.Warn("failed to persist backend log settings", zap.Error(err))
-			}
-			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
-			return
-		}
+		prev := h.backendLogCtl.BackendLogSettings()
+		target := *body.BackendLog
+		ops = append(ops, settingsPatchOperation{
+			name:     "backendLog",
+			apply:    func() error { return h.backendLogCtl.SetBackendLogPatch(target) },
+			rollback: func() error { return h.backendLogCtl.SetBackendLogPatch(backendLogPatchFromDTO(prev)) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
 	}
 
 	if body.Player != nil {
@@ -1731,11 +1925,33 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "player settings not available")
 			return
 		}
-		if err := h.playerSettingsCtl.SetPlayerSettingsPatch(*body.Player); err != nil {
+		prev := h.playerSettingsCtl.PlayerSettings()
+		target := *body.Player
+		ops = append(ops, settingsPatchOperation{
+			name:     "player",
+			apply:    func() error { return h.playerSettingsCtl.SetPlayerSettingsPatch(target) },
+			rollback: func() error { return h.playerSettingsCtl.SetPlayerSettingsPatch(playerSettingsPatchFromDTO(prev)) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	for i, op := range ops {
+		if err := op.apply(); err != nil {
 			if h.logger != nil {
-				h.logger.Warn("failed to persist player settings", zap.Error(err))
+				h.logger.Warn("settings patch apply failed", zap.String("field", op.name), zap.Error(err))
 			}
-			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			if rollbackErr := rollbackSettingsPatchOperations(ops, i); rollbackErr != nil {
+				if h.logger != nil {
+					h.logger.Error("settings patch rollback failed", zap.Error(rollbackErr), zap.String("field", op.name))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to roll back settings after patch error")
+				return
+			}
+			writeAppError(w, op.failure.status, op.failure.code, op.failure.userMessage(err))
 			return
 		}
 	}

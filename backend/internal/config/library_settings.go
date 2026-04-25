@@ -71,6 +71,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.LaunchAtLogin = b
 	}
+	if v, ok := m["curatedFrameExportFormat"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(s)
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {
@@ -104,13 +111,6 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		case "auto-global", "auto-cn-friendly", "custom-chain", "specified":
 			cfg.MetadataMovieStrategy = strings.ToLower(strings.TrimSpace(s))
 		}
-	}
-	if v, ok := m["extendedLibraryImport"]; ok {
-		b, err := parseJSONBool(v, "extendedLibraryImport")
-		if err != nil {
-			return fmt.Errorf("library settings %q: %w", path, err)
-		}
-		cfg.ExtendedLibraryImport = b
 	}
 	if v, ok := m["proxy"]; ok {
 		if err := parseProxyConfig(v, &cfg.Proxy); err != nil {

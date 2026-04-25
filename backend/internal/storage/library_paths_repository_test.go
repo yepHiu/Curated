@@ -320,3 +320,85 @@ func TestDeleteLibraryPathAndPruneOrphanMovies_DeleteOtherRootUnchanged(t *testi
 		t.Fatalf("movie under alpha intact: %v total=%d", err, page.Total)
 	}
 }
+
+func TestDeleteLibraryPathAndPruneOrphanMovies_RollsBackPathDeletionWhenMoviePruneFails(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	alpha := filepath.Join(root, "alpha")
+	if err := os.MkdirAll(alpha, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoAlpha := filepath.Join(alpha, "ROLLBACK-1.mp4")
+	if err := os.WriteFile(videoAlpha, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewSQLiteStore(filepath.Join(root, "rollback.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	alphaDTO, err := store.AddLibraryPath(ctx, alpha, "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t1",
+		Path:     videoAlpha,
+		FileName: "ROLLBACK-1.mp4",
+		Number:   "ROLLBACK-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID: outcome.MovieID,
+		Number:  "ROLLBACK-1",
+		Title:   "T",
+		Summary: "S",
+		Studio:  "St",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.db.ExecContext(ctx, `
+		CREATE TRIGGER fail_movie_delete
+		BEFORE DELETE ON movies
+		BEGIN
+			SELECT RAISE(ABORT, 'forced movie delete failure');
+		END;
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.DeleteLibraryPathAndPruneOrphanMovies(ctx, alphaDTO.ID); err == nil {
+		t.Fatal("expected delete library path prune to fail")
+	}
+
+	n, err := store.GetLibraryPathCount(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("library path delete should roll back on prune failure, got count=%d", n)
+	}
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 {
+		t.Fatalf("movie rows should remain intact after rollback, got total=%d", page.Total)
+	}
+
+	if _, err := os.Stat(videoAlpha); err != nil {
+		t.Fatalf("rollback path delete must not touch files on disk: %v", err)
+	}
+}

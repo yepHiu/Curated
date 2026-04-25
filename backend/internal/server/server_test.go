@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1857,10 +1858,17 @@ type stubOrganizeCtl struct{}
 func (stubOrganizeCtl) OrganizeLibrary() bool         { return true }
 func (stubOrganizeCtl) SetOrganizeLibrary(bool) error { return nil }
 
-type stubExtendedImportCtl struct{ v bool }
+type statefulOrganizeCtl struct {
+	v   bool
+	err error
+}
 
-func (s stubExtendedImportCtl) ExtendedLibraryImport() bool { return s.v }
-func (stubExtendedImportCtl) SetExtendedLibraryImport(bool) error {
+func (s *statefulOrganizeCtl) OrganizeLibrary() bool { return s.v }
+func (s *statefulOrganizeCtl) SetOrganizeLibrary(v bool) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.v = v
 	return nil
 }
 
@@ -1906,7 +1914,8 @@ func (stubMetadataCtl) SetMetadataMovieStrategy(string) error        { return ni
 func (stubMetadataCtl) ListMetadataMovieProviders() []string         { return nil }
 
 type stubBackendLogCtl struct {
-	v contracts.BackendLogSettingsDTO
+	v   contracts.BackendLogSettingsDTO
+	err error
 }
 
 func (s *stubBackendLogCtl) BackendLogSettings() contracts.BackendLogSettingsDTO {
@@ -1914,6 +1923,9 @@ func (s *stubBackendLogCtl) BackendLogSettings() contracts.BackendLogSettingsDTO
 }
 
 func (s *stubBackendLogCtl) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
+	if s.err != nil {
+		return s.err
+	}
 	if p.LogDir != nil {
 		s.v.LogDir = strings.TrimSpace(*p.LogDir)
 	}
@@ -2036,7 +2048,7 @@ func (stubNativePlaybackLauncher) LaunchNativePlayback(ctx context.Context, movi
 	}, nil
 }
 
-func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
+func TestHandleGetSettings_OmitsLegacyExtendedLibraryImportField(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
@@ -2049,13 +2061,12 @@ func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	}
 
 	h := NewHandler(Deps{
-		Cfg:                      config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
-		Logger:                   zap.NewNop(),
-		Store:                    store,
-		OrganizeLibraryCtl:       stubOrganizeCtl{},
-		ExtendedLibraryImportCtl: stubExtendedImportCtl{v: true},
-		AutoLibraryWatchCtl:      stubAutoWatchCtl{},
-		MetadataScrapeCtl:        stubMetadataCtl{},
+		Cfg:                 config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:              zap.NewNop(),
+		Store:               store,
+		OrganizeLibraryCtl:  stubOrganizeCtl{},
+		AutoLibraryWatchCtl: stubAutoWatchCtl{},
+		MetadataScrapeCtl:   stubMetadataCtl{},
 	})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
@@ -2068,12 +2079,99 @@ func TestHandleGetSettings_ExtendedLibraryImportFromController(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var dto contracts.SettingsDTO
-	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		t.Fatal(err)
 	}
-	if !dto.ExtendedLibraryImport {
-		t.Fatal("expected extendedLibraryImport true from controller")
+	if _, ok := raw["extendedLibraryImport"]; ok {
+		t.Fatal("legacy extendedLibraryImport field should be omitted from settings payload")
+	}
+}
+
+func TestHandleRevealLibraryPathInFileManager(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libraryRoot := filepath.Join(root, "library")
+	if err := os.MkdirAll(libraryRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dto, err := store.AddLibraryPath(ctx, libraryRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opened string
+	prevOpenDirectory := openDirectoryFn
+	openDirectoryFn = func(ctx context.Context, absDir string) error {
+		_ = ctx
+		opened = absDir
+		return nil
+	}
+	t.Cleanup(func() { openDirectoryFn = prevOpenDirectory })
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/paths/"+dto.ID+"/reveal", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", resp.StatusCode)
+	}
+	if opened != libraryRoot {
+		t.Fatalf("opened = %q, want %q", opened, libraryRoot)
+	}
+}
+
+func TestHandleRevealLibraryPathInFileManager_MissingDirectory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libraryRoot := filepath.Join(root, "missing-library")
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dto, err := store.AddLibraryPath(ctx, libraryRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/library/paths/"+dto.ID+"/reveal", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
 }
 
@@ -2444,5 +2542,68 @@ func TestHandlePatchSettings_Player(t *testing.T) {
 	}
 	if dto.Player.SeekBackwardStepSec != 7 {
 		t.Fatalf("seekBackwardStepSec = %d, want 7", dto.Player.SeekBackwardStepSec)
+	}
+}
+
+func TestHandlePatchSettings_RollsBackEarlierChangesWhenLaterPatchFails(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	organizeCtl := &statefulOrganizeCtl{v: false}
+	logCtl := &stubBackendLogCtl{
+		v:   contracts.BackendLogSettingsDTO{LogLevel: "info"},
+		err: errors.New("boom"),
+	}
+	h := NewHandler(Deps{
+		Cfg:                config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:             zap.NewNop(),
+		Store:              store,
+		OrganizeLibraryCtl: organizeCtl,
+		BackendLogCtl:      logCtl,
+		MetadataScrapeCtl:  stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"organizeLibrary":true,"backendLog":{"logLevel":"warn"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	if organizeCtl.v {
+		t.Fatal("organizeLibrary should roll back when a later setting fails")
+	}
+
+	getResp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer getResp.Body.Close()
+	if getResp.StatusCode != http.StatusOK {
+		t.Fatalf("get status = %d", getResp.StatusCode)
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(getResp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if dto.OrganizeLibrary {
+		t.Fatal("GET /api/settings should still report organizeLibrary=false after rollback")
 	}
 }

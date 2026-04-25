@@ -45,6 +45,29 @@ func (s *SQLiteStore) ListLibraryPaths(ctx context.Context) ([]contracts.Library
 	return out, rows.Err()
 }
 
+// GetLibraryPath returns a single configured library path row by id.
+func (s *SQLiteStore) GetLibraryPath(ctx context.Context, id string) (contracts.LibraryPathDTO, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return contracts.LibraryPathDTO{}, fmt.Errorf("id is required")
+	}
+
+	var row contracts.LibraryPathDTO
+	var pendingInt int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, path, title, first_library_scan_pending FROM library_paths WHERE id = ?`,
+		id,
+	).Scan(&row.ID, &row.Path, &row.Title, &pendingInt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return contracts.LibraryPathDTO{}, ErrLibraryPathNotFound
+		}
+		return contracts.LibraryPathDTO{}, err
+	}
+	row.FirstLibraryScanPending = pendingInt != 0
+	return row, nil
+}
+
 // ListLibraryPathStrings returns path strings only (for scanning), same order as ListLibraryPaths.
 func (s *SQLiteStore) ListLibraryPathStrings(ctx context.Context) ([]string, error) {
 	dtos, err := s.ListLibraryPaths(ctx)
@@ -58,6 +81,30 @@ func (s *SQLiteStore) ListLibraryPathStrings(ctx context.Context) ([]string, err
 		}
 	}
 	return paths, nil
+}
+
+type libraryPathStringsQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func listLibraryPathStringsWithQuery(ctx context.Context, q libraryPathStringsQueryer) ([]string, error) {
+	rows, err := q.QueryContext(ctx, `SELECT path FROM library_paths ORDER BY path ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	paths := make([]string, 0)
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(path) != "" {
+			paths = append(paths, path)
+		}
+	}
+	return paths, rows.Err()
 }
 
 // AddLibraryPath inserts a new library path. Path must be non-empty after trim; title defaults to base name of path.
@@ -163,16 +210,23 @@ func (s *SQLiteStore) DeleteLibraryPath(ctx context.Context, id string) error {
 	return nil
 }
 
-// DeleteLibraryPathAndPruneOrphanMovies removes the library path row, then removes each movie row whose
+// DeleteLibraryPathAndPruneOrphanMovies removes the library path row, then unbinds movie rows whose
 // media path lies under the removed root but not under any remaining configured library root
-// (so nested/overlapping roots still cover the same files). Only the database is updated; files on disk are not deleted.
+// (so nested/overlapping roots still cover the same files). Only the database is updated; the
+// configured library directory and any media files on disk are never deleted here.
 func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context, id string) (pruned int, err error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return 0, fmt.Errorf("id is required")
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var pathStr string
-	err = s.db.QueryRowContext(ctx, `SELECT path FROM library_paths WHERE id = ?`, id).Scan(&pathStr)
+	err = tx.QueryRowContext(ctx, `SELECT path FROM library_paths WHERE id = ?`, id).Scan(&pathStr)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrLibraryPathNotFound
 	}
@@ -184,7 +238,7 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 		return 0, fmt.Errorf("invalid stored library path")
 	}
 
-	res, err := s.db.ExecContext(ctx, `DELETE FROM library_paths WHERE id = ?`, id)
+	res, err := tx.ExecContext(ctx, `DELETE FROM library_paths WHERE id = ?`, id)
 	if err != nil {
 		return 0, err
 	}
@@ -196,12 +250,12 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 		return 0, ErrLibraryPathNotFound
 	}
 
-	remaining, err := s.ListLibraryPathStrings(ctx)
+	remaining, err := listLibraryPathStringsWithQuery(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
 
-	rows, err := s.db.QueryContext(ctx,
+	rows, err := tx.QueryContext(ctx,
 		`SELECT id, location FROM movies WHERE TRIM(COALESCE(location, '')) != ''`)
 	if err != nil {
 		return 0, err
@@ -245,13 +299,16 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 	}
 
 	for _, movieID := range toDelete {
-		if err := s.DeleteMovieRecordsOnly(ctx, movieID); err != nil {
+		if _, err := deleteMovieDatabaseTx(ctx, tx, movieID); err != nil {
 			if errors.Is(err, ErrMovieNotFound) {
 				continue
 			}
 			return pruned, err
 		}
 		pruned++
+	}
+	if err := tx.Commit(); err != nil {
+		return pruned, err
 	}
 	return pruned, nil
 }

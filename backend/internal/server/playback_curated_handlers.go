@@ -45,6 +45,13 @@ func mapCuratedFrameFacets(rows []storage.CuratedFrameFacet) []contracts.Curated
 	return items
 }
 
+func curatedImageContentType(blob []byte) string {
+	if len(blob) == 0 {
+		return "application/octet-stream"
+	}
+	return http.DetectContentType(blob)
+}
+
 func (h *Handler) handleListPlaybackProgress(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -219,7 +226,7 @@ func (h *Handler) handleGetCuratedFrameImage(w http.ResponseWriter, r *http.Requ
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "curated frame not found")
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", curatedImageContentType(blob))
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(blob)
@@ -245,7 +252,7 @@ func (h *Handler) handleGetCuratedFrameThumbnail(w http.ResponseWriter, r *http.
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "curated frame not found")
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", curatedImageContentType(blob))
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(blob)

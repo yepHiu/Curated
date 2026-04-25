@@ -29,7 +29,6 @@ import (
 	"curated-backend/internal/devmetrics"
 	"curated-backend/internal/library"
 	"curated-backend/internal/library/moviecode"
-	"curated-backend/internal/library/movieroot"
 	"curated-backend/internal/librarywatch"
 	"curated-backend/internal/nativeplayer"
 	"curated-backend/internal/playback"
@@ -66,9 +65,6 @@ type App struct {
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
 	organizeMu      sync.RWMutex
-	// extendedLibraryImport: first-scan layout detection on newly added library roots (library-config.cfg).
-	extendedLibraryImport bool
-	extendedImportMu      sync.RWMutex
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
@@ -78,6 +74,9 @@ type App struct {
 	// launchAtLogin persists whether Curated should register Windows login autostart via the current-user Run key.
 	launchAtLogin   bool
 	launchAtLoginMu sync.RWMutex
+	// curatedFrameExportFormat controls curated-frame export output format via Settings.
+	curatedFrameExportFormat   string
+	curatedFrameExportFormatMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapePendingMu sync.Mutex
@@ -159,10 +158,10 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		devCPUSampler:                 devmetrics.NewCPUSampler(),
 		appUpdate:                     appupdate.NewService(store, logger),
 		organizeLibrary:               cfg.OrganizeLibrary,
-		extendedLibraryImport:         cfg.ExtendedLibraryImport,
 		autoLibraryWatch:              cfg.AutoLibraryWatch,
 		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
 		launchAtLogin:                 cfg.LaunchAtLogin,
+		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		autoActorProfileScrapePending: make(map[string]struct{}),
 		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
 		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
@@ -286,32 +285,6 @@ func (a *App) SetOrganizeLibrary(v bool) error {
 	return nil
 }
 
-// ExtendedLibraryImport reports whether first-scan import layout detection is enabled (library-config.cfg).
-func (a *App) ExtendedLibraryImport() bool {
-	a.extendedImportMu.RLock()
-	defer a.extendedImportMu.RUnlock()
-	return a.extendedLibraryImport
-}
-
-// SetExtendedLibraryImport persists extendedLibraryImport to library-config.cfg and updates in-memory state.
-func (a *App) SetExtendedLibraryImport(v bool) error {
-	path := a.librarySettingsPath
-	if path == "" {
-		return fmt.Errorf("library settings path not configured")
-	}
-	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
-		m["extendedLibraryImport"] = v
-		return nil
-	}); err != nil {
-		return err
-	}
-	a.extendedImportMu.Lock()
-	a.extendedLibraryImport = v
-	a.cfg.ExtendedLibraryImport = v
-	a.extendedImportMu.Unlock()
-	return nil
-}
-
 // AutoLibraryWatch reports whether directory watching may queue scans for new files under library roots.
 func (a *App) AutoLibraryWatch() bool {
 	a.autoLibraryWatchMu.RLock()
@@ -336,6 +309,12 @@ func (a *App) LaunchAtLogin() bool {
 // LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
 func (a *App) LaunchAtLoginSupported() bool {
 	return launchAtLoginSupportedFn()
+}
+
+func (a *App) CuratedFrameExportFormat() string {
+	a.curatedFrameExportFormatMu.RLock()
+	defer a.curatedFrameExportFormatMu.RUnlock()
+	return config.NormalizeCuratedFrameExportFormat(a.curatedFrameExportFormat)
 }
 
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
@@ -413,6 +392,28 @@ func (a *App) SetLaunchAtLogin(v bool) error {
 	a.launchAtLogin = v
 	a.cfg.LaunchAtLogin = v
 	a.launchAtLoginMu.Unlock()
+	return nil
+}
+
+func (a *App) SetCuratedFrameExportFormat(v string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeCuratedFrameExportFormat(v)
+	if strings.TrimSpace(strings.ToLower(v)) != next {
+		return fmt.Errorf(`curatedFrameExportFormat must be one of "jpg", "webp", or "png"`)
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["curatedFrameExportFormat"] = next
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.curatedFrameExportFormatMu.Lock()
+	a.curatedFrameExportFormat = next
+	a.cfg.CuratedFrameExportFormat = next
+	a.curatedFrameExportFormatMu.Unlock()
 	return nil
 }
 
@@ -1064,9 +1065,9 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			LibraryPaths:               libraryPaths,
 			Player:                     a.PlayerSettings(),
 			OrganizeLibrary:            a.OrganizeLibrary(),
-			ExtendedLibraryImport:      a.ExtendedLibraryImport(),
 			AutoLibraryWatch:           a.AutoLibraryWatch(),
 			AutoActorProfileScrape:     a.AutoActorProfileScrape(),
+			CuratedFrameExportFormat:   a.CuratedFrameExportFormat(),
 			MetadataMovieProvider:      a.MetadataMovieProvider(),
 			MetadataMovieProviders:     a.ListMetadataMovieProviders(),
 			MetadataMovieProviderChain: a.MetadataMovieProviderChain(),
@@ -1152,14 +1153,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	)
 	var lastProgressEmit time.Time
 
-	libraryPathRows, listErr := a.store.ListLibraryPaths(ctx)
-	if listErr != nil {
-		task := a.tasks.Fail(taskID, contracts.ErrorCodeInternal, listErr.Error())
-		_ = a.store.SaveTask(ctx, task)
-		_ = a.emitEvent(output, contracts.EventTaskFailed, contracts.TaskEventDTO{Task: task})
-		return
-	}
-	extendedSnapshot := a.ExtendedLibraryImport()
 	seenMovieRoots := make(map[string]struct{})
 
 	summary, err := a.scanner.Scan(ctx, taskID, paths, scanner.Hooks{
@@ -1232,13 +1225,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				}
 				result.Path = newPath
 				result.FileName = filepath.Base(newPath)
-			}
-
-			lp := movieroot.ResolveConfiguredLibraryPath(result.Path, libraryPathRows)
-			pending := lp != nil && lp.FirstLibraryScanPending
-			kind, _ := movieroot.ClassifyVideoRoot(result.Path, result.Number, extendedSnapshot, pending)
-			if extendedSnapshot && pending {
-				result.ImportLayout = string(kind)
 			}
 
 			rootKey := strings.ToLower(filepath.Clean(filepath.Dir(result.Path))) + "\x00" + moviecode.NormalizeForStorageID(result.Number)
@@ -2396,29 +2382,29 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 
 func (a *App) HTTPHandler() http.Handler {
 	apiHandler := server.NewHandler(server.Deps{
-		Cfg:                       a.cfg,
-		Logger:                    a.logger,
-		Store:                     a.store,
-		Tasks:                     a.tasks,
-		ScanStarter:               a,
-		OrganizeLibraryCtl:        a,
-		ExtendedLibraryImportCtl:  a,
-		AutoLibraryWatchCtl:       a,
-		AutoActorProfileScrapeCtl: a,
-		LaunchAtLoginCtl:          a,
-		MetadataScrapeCtl:         a,
-		ProviderHealthChecker:     a.scraper,
-		ProxyCtl:                  a,
-		BackendLogCtl:             a,
-		PlayerSettingsCtl:         a,
-		MovieMetadataRefresher:    a,
-		ActorProfileRefresher:     a,
-		LibraryWatchReloader:      a,
-		DevPerformanceProvider:    a,
-		PlaybackResolver:          a,
-		NativePlaybackLauncher:    a,
-		HomepageRecommendations:   a,
-		AppUpdateProvider:         a,
+		Cfg:                         a.cfg,
+		Logger:                      a.logger,
+		Store:                       a.store,
+		Tasks:                       a.tasks,
+		ScanStarter:                 a,
+		OrganizeLibraryCtl:          a,
+		AutoLibraryWatchCtl:         a,
+		AutoActorProfileScrapeCtl:   a,
+		LaunchAtLoginCtl:            a,
+		CuratedFrameExportFormatCtl: a,
+		MetadataScrapeCtl:           a,
+		ProviderHealthChecker:       a.scraper,
+		ProxyCtl:                    a,
+		BackendLogCtl:               a,
+		PlayerSettingsCtl:           a,
+		MovieMetadataRefresher:      a,
+		ActorProfileRefresher:       a,
+		LibraryWatchReloader:        a,
+		DevPerformanceProvider:      a,
+		PlaybackResolver:            a,
+		NativePlaybackLauncher:      a,
+		HomepageRecommendations:     a,
+		AppUpdateProvider:           a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
 }

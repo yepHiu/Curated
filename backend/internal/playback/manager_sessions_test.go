@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -194,5 +195,44 @@ func TestCleanupExpiredSessionsArchivesExpiredSnapshot(t *testing.T) {
 	}
 	if snapshot.ExpiresAt.IsZero() {
 		t.Fatal("expected expired snapshot to retain expiration time")
+	}
+}
+
+func TestSessionStateSnapshotTracksStateTransitions(t *testing.T) {
+	t.Parallel()
+
+	startedAt := time.Date(2026, 4, 25, 8, 0, 0, 0, time.UTC)
+	accessedAt := startedAt.Add(45 * time.Second)
+	finishedAt := startedAt.Add(2 * time.Minute)
+	state := &sessionState{
+		session: Session{
+			ID:        "sess-state",
+			MovieID:   "movie-state",
+			StartedAt: startedAt,
+		},
+	}
+
+	state.touchAt(accessedAt)
+	running := state.snapshot(2 * time.Minute)
+	if running.LastAccessedAt != accessedAt {
+		t.Fatalf("running LastAccessedAt = %v, want %v", running.LastAccessedAt, accessedAt)
+	}
+	if running.ExpiresAt != accessedAt.Add(2*time.Minute) {
+		t.Fatalf("running ExpiresAt = %v, want %v", running.ExpiresAt, accessedAt.Add(2*time.Minute))
+	}
+	if running.State != "running" {
+		t.Fatalf("running State = %q, want running", running.State)
+	}
+
+	state.markFinishedAt(finishedAt, errors.New("transcoder exited"))
+	failed := state.snapshot(2 * time.Minute)
+	if failed.FinishedAt != finishedAt {
+		t.Fatalf("failed FinishedAt = %v, want %v", failed.FinishedAt, finishedAt)
+	}
+	if failed.State != "failed" {
+		t.Fatalf("failed State = %q, want failed", failed.State)
+	}
+	if failed.LastError != "transcoder exited" {
+		t.Fatalf("failed LastError = %q, want transcoder exited", failed.LastError)
 	}
 }

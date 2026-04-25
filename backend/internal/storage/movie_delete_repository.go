@@ -13,19 +13,11 @@ import (
 // ErrMovieNotFound is returned when deleting a non-existent movie id.
 var ErrMovieNotFound = errors.New("movie not found")
 
-// deleteMovieDatabase removes the movie row and related join rows in one transaction.
-// It returns paths that DeleteMovie may remove on disk afterward (nil if movie was missing).
-func (s *SQLiteStore) deleteMovieDatabase(ctx context.Context, movieID string) (diskCleanupPaths []string, err error) {
+func deleteMovieDatabaseTx(ctx context.Context, tx *sql.Tx, movieID string) (diskCleanupPaths []string, err error) {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
 		return nil, ErrMovieNotFound
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	var location string
 	err = tx.QueryRowContext(ctx, `SELECT location FROM movies WHERE id = ?`, movieID).Scan(&location)
@@ -83,11 +75,26 @@ func (s *SQLiteStore) deleteMovieDatabase(ctx context.Context, movieID string) (
 		return nil, ErrMovieNotFound
 	}
 
+	return collectMovieFilePaths(location, assetPaths), nil
+}
+
+// deleteMovieDatabase removes the movie row and related join rows in one transaction.
+// It returns paths that DeleteMovie may remove on disk afterward (nil if movie was missing).
+func (s *SQLiteStore) deleteMovieDatabase(ctx context.Context, movieID string) (diskCleanupPaths []string, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	paths, err := deleteMovieDatabaseTx(ctx, tx, movieID)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-
-	return collectMovieFilePaths(location, assetPaths), nil
+	return paths, nil
 }
 
 // DeleteMovieRecordsOnly removes a movie and related rows from the database only; it does not delete

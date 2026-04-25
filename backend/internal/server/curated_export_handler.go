@@ -83,10 +83,13 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 
 	format := strings.ToLower(strings.TrimSpace(req.Format))
 	if format == "" {
-		format = "webp"
+		format = "jpg"
 	}
-	if format != "webp" && format != "png" {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `format must be "webp" or "png"`)
+	if format == "jpeg" {
+		format = "jpg"
+	}
+	if format != "jpg" && format != "webp" && format != "png" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `format must be "jpg", "webp", or "png"`)
 		return
 	}
 
@@ -143,6 +146,15 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 		var outBytes []byte
 		var fname string
 		switch format {
+		case "jpg":
+			jpegBytes, err := curatedexport.EncodeImageToJPEGWithCuratedMeta(row.ImageBlob, meta, 90)
+			if err != nil {
+				h.logger.Error("curated frame jpeg encode", zap.String("id", row.ID), zap.Error(err))
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid or unsupported frame image")
+				return
+			}
+			outBytes = jpegBytes
+			fname = curatedexport.ExportJPGFilename(actorForName, row.Code, row.PositionSec, row.ID, usedNames)
 		case "png":
 			pngBytes, err := curatedexport.EncodePNGWithCuratedMetaITxt(row.ImageBlob, meta)
 			if err != nil {
@@ -166,11 +178,14 @@ func (h *Handler) handlePostCuratedFramesExport(w http.ResponseWriter, r *http.R
 	}
 
 	if len(files) == 1 {
-		ct := "image/webp"
-		fallback := "curated-export.webp"
+		ct := "image/jpeg"
+		fallback := "curated-export.jpg"
 		if format == "png" {
 			ct = "image/png"
 			fallback = "curated-export.png"
+		} else if format == "webp" {
+			ct = "image/webp"
+			fallback = "curated-export.webp"
 		}
 		w.Header().Set("Content-Type", ct)
 		w.Header().Set("Content-Disposition", contentDispositionAttachment(files[0].name, fallback))

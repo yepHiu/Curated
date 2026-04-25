@@ -52,6 +52,7 @@ type Session struct {
 }
 
 type sessionState struct {
+	mu             sync.RWMutex
 	session        Session
 	cancel         context.CancelFunc
 	cmd            *exec.Cmd
@@ -726,10 +727,7 @@ func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {
 
 	staleStates := make([]*sessionState, 0)
 	for existingID, state := range m.sessions {
-		if state.lastAccessedAt.IsZero() {
-			state.lastAccessedAt = state.session.StartedAt
-		}
-		if now.Sub(state.lastAccessedAt) < timeout {
+		if now.Sub(state.lastAccessedOrStartedAt()) < timeout {
 			continue
 		}
 		delete(m.sessions, existingID)
@@ -817,45 +815,91 @@ func stopSessionState(state *sessionState) {
 	_ = os.RemoveAll(state.session.Directory)
 }
 
-func touchSession(state *sessionState) {
-	if state == nil {
+func (s *sessionState) touchAt(now time.Time) {
+	if s == nil {
 		return
 	}
-	state.lastAccessedAt = time.Now().UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	s.mu.Lock()
+	s.lastAccessedAt = now
+	s.mu.Unlock()
 }
 
-func markSessionFinished(state *sessionState, err error) {
-	if state == nil {
+func (s *sessionState) markFinishedAt(now time.Time, err error) {
+	if s == nil {
 		return
 	}
-	state.finishedAt = time.Now().UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	s.mu.Lock()
+	s.finishedAt = now
 	if err != nil {
-		state.lastError = err.Error()
+		s.lastError = err.Error()
 	}
+	s.mu.Unlock()
 }
 
-func buildSessionSnapshot(state *sessionState, timeout time.Duration) SessionSnapshot {
-	lastAccessedAt := state.lastAccessedAt
+func (s *sessionState) lastAccessedOrStartedAt() time.Time {
+	if s == nil {
+		return time.Time{}
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.lastAccessedAt.IsZero() {
+		return s.lastAccessedAt
+	}
+	return s.session.StartedAt
+}
+
+func (s *sessionState) snapshot(timeout time.Duration) SessionSnapshot {
+	if s == nil {
+		return SessionSnapshot{}
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	lastAccessedAt := s.lastAccessedAt
 	if lastAccessedAt.IsZero() {
-		lastAccessedAt = state.session.StartedAt
+		lastAccessedAt = s.session.StartedAt
 	}
 	snapshot := SessionSnapshot{
-		Session:        state.session,
+		Session:        s.session,
 		LastAccessedAt: lastAccessedAt,
-		FinishedAt:     state.finishedAt,
+		FinishedAt:     s.finishedAt,
 		State:          "running",
-		LastError:      strings.TrimSpace(state.lastError),
+		LastError:      strings.TrimSpace(s.lastError),
 	}
 	if timeout > 0 {
 		snapshot.ExpiresAt = lastAccessedAt.Add(timeout)
 	}
-	if !state.finishedAt.IsZero() {
+	if !s.finishedAt.IsZero() {
 		snapshot.State = "finished"
 	}
 	if snapshot.LastError != "" {
 		snapshot.State = "failed"
 	}
 	return snapshot
+}
+
+func touchSession(state *sessionState) {
+	if state == nil {
+		return
+	}
+	state.touchAt(time.Now().UTC())
+}
+
+func markSessionFinished(state *sessionState, err error) {
+	if state == nil {
+		return
+	}
+	state.markFinishedAt(time.Now().UTC(), err)
+}
+
+func buildSessionSnapshot(state *sessionState, timeout time.Duration) SessionSnapshot {
+	return state.snapshot(timeout)
 }
 
 func (m *Manager) archiveSessionStateLocked(state *sessionState, terminalState string, finishedAt time.Time) {

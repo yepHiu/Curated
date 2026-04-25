@@ -64,3 +64,8 @@ func ExportWebPFilename(actorForName, code string, positionSec float64, frameID 
 func ExportPNGFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}) string {
 	return exportCuratedFilename(actorForName, code, positionSec, frameID, used, ".png")
 }
+
+// ExportJPGFilename builds curated-{actor}-{code}-{sec}s.jpg with optional id suffix for ZIP uniqueness.
+func ExportJPGFilename(actorForName, code string, positionSec float64, frameID string, used map[string]struct{}) string {
+	return exportCuratedFilename(actorForName, code, positionSec, frameID, used, ".jpg")
+}

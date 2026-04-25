@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"mime/multipart"
@@ -72,6 +73,21 @@ func makeTestPNG(t *testing.T, width, height int) []byte {
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func makeTestJPEG(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: uint8((x * 3) % 255), G: uint8((y * 5) % 255), B: 120, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
@@ -258,5 +274,49 @@ func TestHandlePostCuratedFrameMultipartAndThumbnail(t *testing.T) {
 	}
 	if len(data) == 0 {
 		t.Fatal("expected thumbnail bytes")
+	}
+}
+
+func TestHandleCuratedFrameImageAndThumbnailDetectJPEGContentType(t *testing.T) {
+	t.Parallel()
+	store, srv := newCuratedFramesP1Server(t)
+	ctx := context.Background()
+	movieID := addMovieForCuratedFramesP1Test(t, store, "CFP1-JPEG")
+	jpegBlob := makeTestJPEG(t, 120, 80)
+	if err := store.InsertCuratedFrame(ctx, storage.CuratedFrameMeta{
+		ID:          "frame-jpeg",
+		MovieID:     movieID,
+		Title:       "JPEG Frame",
+		Code:        "CFP1-JPEG",
+		Actors:      []string{"Mina"},
+		PositionSec: 18,
+		CapturedAt:  "2026-04-11T11:00:00Z",
+		Tags:        []string{"jpeg"},
+	}, jpegBlob); err != nil {
+		t.Fatal(err)
+	}
+
+	imageResp, err := http.Get(srv.URL + "/api/curated-frames/frame-jpeg/image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer imageResp.Body.Close()
+	if imageResp.StatusCode != http.StatusOK {
+		t.Fatalf("image status = %d, want 200", imageResp.StatusCode)
+	}
+	if got := imageResp.Header.Get("Content-Type"); got != "image/jpeg" {
+		t.Fatalf("image content-type = %q, want image/jpeg", got)
+	}
+
+	thumbResp, err := http.Get(srv.URL + "/api/curated-frames/frame-jpeg/thumbnail")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer thumbResp.Body.Close()
+	if thumbResp.StatusCode != http.StatusOK {
+		t.Fatalf("thumbnail status = %d, want 200", thumbResp.StatusCode)
+	}
+	if got := thumbResp.Header.Get("Content-Type"); got != "image/jpeg" {
+		t.Fatalf("thumbnail content-type = %q, want image/jpeg", got)
 	}
 }

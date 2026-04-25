@@ -52,19 +52,22 @@ func TestDefaultPlayerSettings_DisableHardwareDecodeAndStreamPush(t *testing.T) 
 	}
 }
 
-func TestMergeLibrarySettingsFile_ExtendedLibraryImportTrue(t *testing.T) {
+func TestMergeLibrarySettingsFile_LegacyExtendedLibraryImportIgnored(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	path := filepath.Join(root, "library-config.cfg")
-	if err := os.WriteFile(path, []byte(`{"extendedLibraryImport": true}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"extendedLibraryImport": true, "organizeLibrary": false}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg := Default()
 	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.ExtendedLibraryImport {
-		t.Fatal("expected extendedLibraryImport true from file")
+	if cfg.OrganizeLibrary {
+		t.Fatal("expected organizeLibrary false from file")
+	}
+	if cfg.AutoLibraryWatch != Default().AutoLibraryWatch {
+		t.Fatal("legacy extendedLibraryImport should be ignored")
 	}
 }
 
