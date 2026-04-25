@@ -240,6 +240,42 @@ Purpose:
 
 - upsert the saved user comment for one movie
 
+## Library Paths
+
+### `POST /api/library/paths`
+
+Purpose:
+
+- add a configured library root
+
+### `PATCH /api/library/paths/{id}`
+
+Purpose:
+
+- update the display title for one configured library root
+
+### `DELETE /api/library/paths/{id}`
+
+Purpose:
+
+- remove one configured library root from the database configuration
+
+Important notes:
+
+- this unbinds or prunes database records that are no longer covered by any configured root
+- it does not delete the actual on-disk library directory
+
+### `POST /api/library/paths/{id}/reveal`
+
+Purpose:
+
+- open the configured library root directory in the server machine's file manager
+
+Important notes:
+
+- the backend validates that the stored path still exists on disk and is a directory
+- this opens the folder only; it does not modify library configuration or disk files
+
 ## Playback
 
 ### `GET /api/library/movies/{id}/playback`
@@ -400,6 +436,7 @@ Important notes:
 
 - updates are written back to `config/library-config.cfg` for library-level keys
 - playback runtime preferences are also surfaced through this settings contract
+- `curatedFrameExportFormat` is a persisted library-level setting; accepted values are `jpg`, `webp`, and `png`, with `jpg` as the default
 - `autoActorProfileScrape` is an opt-in library-level setting; when enabled, successful movie metadata scrapes may enqueue missing actor-profile scrape tasks for actors that still lack both avatar and summary
 - some backend logging changes require restart before file sinks fully reflect new values
 
@@ -521,3 +558,14 @@ Primary type sources:
 - frontend API types: `src/api/types.ts`
 
 For exact field-level payload structure, consult those source files together with the server route handlers in `backend/internal/server/server.go`.
+### `POST /api/curated-frames/export`
+
+Purpose:
+
+- export 1-20 curated frames in a single image format or a ZIP archive when multiple files are returned
+
+Important notes:
+
+- accepts `jpg`, `webp`, and `png`
+- JPG exports use `.jpg` filenames and `image/jpeg`
+- frontend single-export and batch-export actions now use the persisted `curatedFrameExportFormat` setting

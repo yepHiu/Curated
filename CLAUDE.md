@@ -210,6 +210,7 @@ POST   /api/library/actors/scrape           # Scrape actor metadata (async task)
 GET    /api/library/played-movies           # List played movies with timestamps
 POST   /api/library/played-movies/{id}      # Mark movie as played
 POST   /api/library/paths                   # Add library path
+POST   /api/library/paths/{id}/reveal       # Open configured library root in OS file manager
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
@@ -228,7 +229,7 @@ GET    /api/curated-frames/stats            # Curated frames total count
 GET    /api/curated-frames/tags             # Curated frame tag facets
 GET    /api/curated-frames/actors           # Curated frame actor facets
 POST   /api/curated-frames                  # Create curated frame (legacy JSON imageBase64 or multipart metadata + image); near-duplicates are allowed and reviewed in the library UI
-POST   /api/curated-frames/export           # Export 1–20 frames as WebP/PNG with embedded tags/schemaVersion/exportedAt/appName/appVersion or ZIP
+POST   /api/curated-frames/export           # Export 1–20 frames as JPG/WebP/PNG with embedded tags/schemaVersion/exportedAt/appName/appVersion or ZIP
 GET    /api/curated-frames/{id}/image       # Get curated frame image
 GET    /api/curated-frames/{id}/thumbnail   # Get curated frame thumbnail
 PATCH  /api/curated-frames/{id}/tags        # Update frame tags
@@ -364,7 +365,7 @@ User comments/notes per movie:
 Frame extraction and management:
 
 - **Web API mode:** paginated `GET /api/curated-frames`, `GET /api/curated-frames/stats`, `GET /api/curated-frames/tags`, `GET /api/curated-frames/actors`, `POST/GET/PATCH/DELETE /api/curated-frames`, with `GET /api/curated-frames/{id}/image` and `GET /api/curated-frames/{id}/thumbnail`
-- **Export:** `POST /api/curated-frames/export` supports WebP (EXIF metadata) or PNG (iTXt metadata) formats and now embeds `tags`, `schemaVersion`, `exportedAt`, `appName`, and `appVersion`
+- **Export:** `POST /api/curated-frames/export` supports JPG (EXIF `UserComment`), WebP (EXIF metadata), or PNG (iTXt metadata) formats and embeds `tags`, `schemaVersion`, `exportedAt`, `appName`, and `appVersion`
 - **Mock mode:** Stored in IndexedDB
 
 ### Trash/Restore
@@ -425,10 +426,10 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Windows dev backend binary naming is an explicit constraint: keep dev builds as `curated-dev.exe` and reserve `curated.exe` for release/package builds only
 - Current state: Frontend uses web adapter when `VITE_USE_WEB_API=true` (default in `.env`), mock adapter otherwise
-- Settings -> About now includes packaged-app update status, a manual update-check action, and a release-page link; when an update is available, the sidebar brand area shows a lightweight badge/dot that routes users into `Settings -> About`
+- Settings -> About now includes packaged-app update status, a manual update-check action, and a release-page link; when an update is available, the sidebar shows a lightweight `New` badge (expanded) or dot (compact) that links to `Settings -> About`, while the `Curated` brand text/icon links to the home page
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
-- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), and Windows login autostart (`launchAtLogin`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
+- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), Windows login autostart (`launchAtLogin`), and curated-frame export format (`curatedFrameExportFormat`, default `jpg`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)

@@ -131,6 +131,7 @@ Common library-level settings include:
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `launchAtLogin`
+- `curatedFrameExportFormat` (default `jpg`; accepted values: `jpg`, `webp`, `png`)
 - `proxy`
 - backend log directory and retention settings
   Empty `logDir` means "use the default log directory" rather than disabling file logging:
