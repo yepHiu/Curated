@@ -107,11 +107,11 @@ func TestBuildTranscodeProfilesKeepsSessionOutputsRelativeToCmdDir(t *testing.T)
 	if !strings.Contains(args, "segment-%05d.ts") || !strings.Contains(args, "index.m3u8") {
 		t.Fatalf("expected relative HLS output names in args, got %q", args)
 	}
-	if !strings.Contains(args, "-hls_init_time 2") || !strings.Contains(args, "-hls_time 4") {
-		t.Fatalf("expected balanced HLS segment timings in args, got %q", args)
+	if !strings.Contains(args, "-hls_init_time 2") || !strings.Contains(args, "-hls_time 2") {
+		t.Fatalf("expected short HLS segment timings in args, got %q", args)
 	}
-	if !strings.Contains(args, "-force_key_frames expr:gte(t,n_forced*4)") {
-		t.Fatalf("expected 4-second keyframe cadence in args, got %q", args)
+	if !strings.Contains(args, "-force_key_frames expr:gte(t,n_forced*2)") {
+		t.Fatalf("expected 2-second keyframe cadence in args, got %q", args)
 	}
 	if !strings.Contains(args, "-pix_fmt yuv420p") {
 		t.Fatalf("expected browser-safe pixel format in args, got %q", args)
@@ -191,7 +191,7 @@ func TestBuildTranscodeProfilesUsesActualTimelineOriginForRemuxSessions(t *testi
 		"segment-%05d.ts",
 		"index.m3u8",
 		buildProfileOptions{
-			StartPositionSec: 3723.5,
+			StartPositionSec: 0,
 			PreferRemux:      true,
 			SourceVideoCodec: "h264",
 			SourceAudioCodec: "aac",
@@ -203,8 +203,29 @@ func TestBuildTranscodeProfilesUsesActualTimelineOriginForRemuxSessions(t *testi
 	if profiles[0].Name != "remux_copy" {
 		t.Fatalf("first profile = %q, want remux_copy", profiles[0].Name)
 	}
-	if profiles[0].TimelineOriginSec != 3721.5 {
-		t.Fatalf("timeline origin = %v, want 3721.5", profiles[0].TimelineOriginSec)
+	if profiles[0].TimelineOriginSec != 0 {
+		t.Fatalf("timeline origin = %v, want 0", profiles[0].TimelineOriginSec)
+	}
+}
+
+func TestBuildTranscodeProfilesSkipsRemuxWhenStartingMidStream(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{
+			StartPositionSec: 3723.5,
+			PreferRemux:      true,
+			SourceVideoCodec: "h264",
+			SourceAudioCodec: "aac",
+		},
+	)
+	if len(profiles) == 0 {
+		t.Fatal("expected at least one transcode fallback profile")
+	}
+	if profiles[0].Name == "remux_copy" {
+		t.Fatalf("unexpected remux profile for mid-stream start: %+v", profiles[0])
 	}
 }
 

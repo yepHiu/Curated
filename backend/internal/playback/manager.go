@@ -26,8 +26,9 @@ var (
 )
 
 const (
-	hlsInitialSegmentSeconds = "2"
-	hlsTargetSegmentSeconds  = "4"
+	hlsInitialSegmentSeconds      = "2"
+	hlsTargetSegmentSeconds       = "2"
+	hlsStartupSegmentAheadTimeout = 2500 * time.Millisecond
 )
 
 type Config struct {
@@ -433,11 +434,8 @@ func waitForNonEmptyFileOrProcessExit(ctx context.Context, path string, waitCh <
 func waitForPlaylistSegmentReference(ctx context.Context, playlistPath string, segmentName string, waitCh <-chan error, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		if raw, err := os.ReadFile(playlistPath); err == nil {
-			playlist := string(raw)
-			if strings.Contains(playlist, "#EXTINF:") && strings.Contains(playlist, segmentName) {
-				return nil
-			}
+		if playlistReferencesSegment(playlistPath, segmentName) {
+			return nil
 		}
 		select {
 		case err := <-waitCh:
@@ -459,6 +457,43 @@ func waitForPlaylistSegmentReference(ctx context.Context, playlistPath string, s
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func waitForPlaylistSegmentReferenceOptional(ctx context.Context, playlistPath string, segmentName string, waitCh <-chan error, timeout time.Duration) (bool, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		if playlistReferencesSegment(playlistPath, segmentName) {
+			return true, nil
+		}
+		select {
+		case err := <-waitCh:
+			if err == nil {
+				return false, nil
+			}
+			return false, err
+		default:
+		}
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			default:
+			}
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func playlistReferencesSegment(playlistPath string, segmentName string) bool {
+	raw, err := os.ReadFile(playlistPath)
+	if err != nil {
+		return false
+	}
+	playlist := string(raw)
+	return strings.Contains(playlist, "#EXTINF:") && strings.Contains(playlist, segmentName)
 }
 
 func startTranscodeSession(
@@ -520,6 +555,12 @@ func startTranscodeSession(
 		stderrText := strings.TrimSpace(stderr.String())
 		return nil, fmt.Errorf("%s playlist readiness failed: %w: %s", profile.Name, err, stderrText)
 	}
+	secondSegmentPath := filepath.Join(dir, "segment-00001.ts")
+	if _, err := waitForPlaylistSegmentReferenceOptional(ctx, playlistPath, filepath.Base(secondSegmentPath), state.waitCh, hlsStartupSegmentAheadTimeout); err != nil {
+		cancel()
+		stderrText := strings.TrimSpace(stderr.String())
+		return nil, fmt.Errorf("%s startup buffer failed: %w: %s", profile.Name, err, stderrText)
+	}
 
 	return state, nil
 }
@@ -537,7 +578,7 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		"-pix_fmt", "yuv420p",
 		"-c:a", "aac",
 		"-ac", "2",
-		"-force_key_frames", "expr:gte(t,n_forced*4)",
+		"-force_key_frames", "expr:gte(t,n_forced*2)",
 		"-f", "hls",
 		"-hls_init_time", hlsInitialSegmentSeconds,
 		"-hls_time", hlsTargetSegmentSeconds,
@@ -565,7 +606,7 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	}
 
 	profiles := make([]transcodeProfile, 0, 4)
-	if options.PreferRemux && canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
+	if shouldPreferRemuxProfile(options) {
 		profiles = append(profiles, transcodeProfile{
 			Name:              "remux_copy",
 			SessionKind:       "remux-hls",
@@ -711,6 +752,16 @@ func buildSeekPlan(startPositionSec float64) seekPlan {
 func buildSeekArgs(startPositionSec float64) ([]string, []string) {
 	plan := buildSeekPlan(startPositionSec)
 	return plan.InputArgs, plan.AccurateArgs
+}
+
+func shouldPreferRemuxProfile(options buildProfileOptions) bool {
+	if !options.PreferRemux {
+		return false
+	}
+	if !canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
+		return false
+	}
+	return options.StartPositionSec <= 0.001
 }
 
 func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {
