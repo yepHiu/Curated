@@ -1,1 +1,0 @@
-import{i as e,r as t}from"./navigation-intent-CZcVu6Si.js";function n(t,n){return e(t,n)}function r(e,n){return t(e,n)}export{n,r as t};
