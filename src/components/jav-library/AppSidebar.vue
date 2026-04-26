@@ -251,51 +251,54 @@ const getNavigationTarget = (page: AppPage) => {
 
     <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
       <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5 pr-2.5'">
-        <section
-          v-for="section in sidebarSections"
-          :key="section.key"
-          class="flex flex-col gap-2"
-          :aria-label="section.title"
-        >
-          <span
-            class="overflow-hidden text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
-            :class="props.compact ? 'max-h-0 px-0 opacity-0' : 'max-h-8 px-2 opacity-100'"
-            :aria-hidden="props.compact"
-          >
-            {{ section.title }}
-          </span>
-
-          <RouterLink
-            v-for="item in section.items"
-            :key="item.page"
-            :to="getNavigationTarget(item.page)"
-            data-sidebar-nav-link
-            :title="props.compact ? item.label : undefined"
-            class="group flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
-            :class="[
-              isActive(item.page)
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'hover:bg-sidebar-accent/60',
-              props.compact
-                ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
-                : 'min-h-10 w-full justify-between rounded-2xl px-3',
-            ]"
-          >
+        <template v-for="(section, sectionIndex) in sidebarSections" :key="section.key">
+          <section class="flex flex-col gap-2" :aria-label="section.title">
             <span
-              class="flex min-w-0 items-center overflow-hidden"
-              :class="props.compact ? 'justify-center' : 'gap-2 truncate'"
+              class="overflow-hidden text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
+              :class="props.compact ? 'max-h-0 px-0 opacity-0' : 'max-h-8 px-2 opacity-100'"
+              :aria-hidden="props.compact"
             >
-              <component :is="item.icon" class="size-5 shrink-0" data-icon="inline-start" />
-              <span
-                class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
-                :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
-                :aria-hidden="props.compact"
-              >
-                {{ item.label }}
-              </span>
+              {{ section.title }}
             </span>
-          </RouterLink>
-        </section>
+
+            <RouterLink
+              v-for="item in section.items"
+              :key="item.page"
+              :to="getNavigationTarget(item.page)"
+              data-sidebar-nav-link
+              :title="props.compact ? item.label : undefined"
+              class="group flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+              :class="[
+                isActive(item.page)
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'hover:bg-sidebar-accent/60',
+                props.compact
+                  ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
+                  : 'min-h-10 w-full justify-between rounded-2xl px-3',
+              ]"
+            >
+              <span
+                class="flex min-w-0 items-center overflow-hidden"
+                :class="props.compact ? 'justify-center' : 'gap-2 truncate'"
+              >
+                <component :is="item.icon" class="size-5 shrink-0" data-icon="inline-start" />
+                <span
+                  class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
+                  :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
+                  :aria-hidden="props.compact"
+                >
+                  {{ item.label }}
+                </span>
+              </span>
+            </RouterLink>
+          </section>
+
+          <Separator
+            v-if="sectionIndex === 0"
+            class="shrink-0 bg-sidebar-border/80"
+            :class="props.compact ? 'mx-auto w-10' : ''"
+          />
+        </template>
       </div>
     </ScrollArea>
 
@@ -364,34 +367,33 @@ const getNavigationTarget = (page: AppPage) => {
       />
     </div>
 
-    <Button
-      as-child
-      :variant="isActive('settings') ? 'secondary' : 'ghost'"
-      :class="props.compact ? 'flex w-full justify-center' : 'w-full rounded-2xl'"
+    <RouterLink
+      data-sidebar-nav-link
+      :to="getNavigationTarget('settings')"
+      :title="props.compact ? t('nav.settings') : undefined"
+      class="group flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
+      :class="[
+        isActive('settings')
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+          : 'hover:bg-sidebar-accent/60',
+        props.compact
+          ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
+          : 'min-h-10 w-full justify-between rounded-2xl px-3',
+      ]"
     >
-      <RouterLink
-        data-sidebar-nav-link
-        :to="getNavigationTarget('settings')"
-        :title="props.compact ? t('nav.settings') : undefined"
-        class="flex min-w-0 items-center text-sidebar-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
-        :class="[
-          isActive('settings')
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'hover:bg-sidebar-accent/60',
-          props.compact
-            ? 'mx-auto size-10 shrink-0 justify-center rounded-lg p-0'
-            : 'min-h-10 w-full justify-start rounded-2xl px-3',
-        ]"
+      <span
+        class="flex min-w-0 items-center overflow-hidden"
+        :class="props.compact ? 'justify-center' : 'gap-2 truncate'"
       >
         <Settings2 class="size-5 shrink-0" data-icon="inline-start" />
         <span
           class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
-          :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] pl-2 opacity-100'"
+          :class="props.compact ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'"
           :aria-hidden="props.compact"
         >
           {{ t("nav.settings") }}
         </span>
-      </RouterLink>
-    </Button>
+      </span>
+    </RouterLink>
   </aside>
 </template>
