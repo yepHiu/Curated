@@ -20,15 +20,18 @@ import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
+import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
+  buildHlsPlaybackConfig,
   canPlayHlsNatively,
   loadHlsLibrary,
   prewarmHlsResources,
   preloadHlsLibrary,
+  startHlsLoadingAtSessionOrigin,
   type HlsInstance,
   type HlsLevel,
 } from "@/lib/hls-player"
@@ -45,6 +48,11 @@ import {
   resolveHlsLocalSeekTargetSec,
   resolvePreferredPlaybackTargetSec,
 } from "@/lib/playback-targets"
+import {
+  resetVideoElementPlaybackPipeline,
+  shouldDeferPlaybackStartUntilCurrentData,
+  shouldResetVideoElementBeforeModeAttach,
+} from "@/lib/player-media-source"
 import type { PlaybackDescriptorDTO } from "@/api/types"
 import { cn } from "@/lib/utils"
 import {
@@ -111,6 +119,8 @@ type PlaybackStatsState = {
   fps: number | null
 }
 
+type SessionPlaybackMode = "direct" | "hls"
+
 const playerContextMenu = ref<PlayerContextMenuState | null>(null)
 const detailedStatsVisible = ref(false)
 const playbackStats = ref<PlaybackStatsState>({
@@ -142,6 +152,7 @@ let playbackFallbackNoticeKey = ""
 let playbackSessionCleanupId: string | null = null
 let resumePlaybackWhenReady = false
 let hlsPrewarmSeq = 0
+let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
 
 const playbackSrc = ref<string | null>(null)
 const playbackDescriptor = ref<PlaybackDescriptorDTO | null>(null)
@@ -159,6 +170,7 @@ const progressSliderValue = ref([0])
 const isScrubbingProgress = ref(false)
 const scrubPreviewTimeSec = ref<number | null>(null)
 const optimisticSeekTargetSec = ref<number | null>(null)
+const playbackRate = ref(1)
 const initialAudio = getPlayerAudioPrefs()
 const volume = ref([initialAudio.volumePercent])
 /** 与 video.muted 同步，用于 UI 与持久化（音量滑块为 0 时不使用静音标志） */
@@ -356,6 +368,21 @@ watch(
   { immediate: true },
 )
 
+watch(
+  [videoRef, playbackRate, playbackSrc],
+  () => {
+    applyPlaybackRateToVideo()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.movie.id,
+  () => {
+    playbackRate.value = 1
+  },
+)
+
 async function destroyHlsInstance() {
   detachHlsStatsListeners?.()
   detachHlsStatsListeners = null
@@ -370,20 +397,28 @@ async function syncVideoSource() {
   const v = videoRef.value
   const src = playbackSrc.value?.trim() ?? ""
   const mode = playbackDescriptor.value?.mode ?? "direct"
+  const previousMode = lastAppliedPlaybackMode
   await destroyHlsInstance()
   if (!v) return
   if (!src) {
     v.removeAttribute("src")
     v.load()
+    lastAppliedPlaybackMode = undefined
     return
   }
   if (mode === "direct" && playbackDescriptor.value?.canDirectPlay === false) {
     playbackError.value = t("player.decodeError")
   }
   if (mode === "hls") {
+    if (shouldResetVideoElementBeforeModeAttach(previousMode, "hls")) {
+      resetVideoElementPlaybackPipeline(v)
+    }
     if (canPlayHlsNatively(v)) {
       v.src = src
+      applyPlaybackRateToVideo()
+      lastAppliedPlaybackMode = "hls"
       refreshPlaybackStatsFromVideo()
+      void tryStartPlaybackIfRequested()
       return
     }
     try {
@@ -395,18 +430,18 @@ async function syncVideoSource() {
         await fallbackHlsToDirect("hls.js unsupported in this browser")
         return
       }
-      const player = new Hls({
-        startFragPrefetch: true,
-        enableWorker: true,
-        lowLatencyMode: false,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        backBufferLength: 90,
+      const player = new Hls(buildHlsPlaybackConfig())
+      bindHlsStats(player, Hls.Events, {
+        onManifestParsed: () => {
+          if (videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") return
+          startHlsLoadingAtSessionOrigin(player)
+          void tryStartPlaybackIfRequested()
+        },
       })
-      bindHlsStats(player, Hls.Events)
       player.loadSource(src)
       player.attachMedia(v)
       hlsInstance = player
+      lastAppliedPlaybackMode = "hls"
       return
     } catch {
       await fallbackHlsToDirect("failed to initialize hls.js")
@@ -414,6 +449,8 @@ async function syncVideoSource() {
     }
   }
   v.src = src
+  applyPlaybackRateToVideo()
+  lastAppliedPlaybackMode = "direct"
   refreshPlaybackStatsFromVideo()
 }
 
@@ -463,7 +500,15 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
     return false
   }
 
-  if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+  const playbackMode: SessionPlaybackMode = playbackDescriptor.value?.mode === "hls" ? "hls" : "direct"
+  if (
+    shouldDeferPlaybackStartUntilCurrentData({
+      readyState: v.readyState,
+      haveCurrentData: HTMLMediaElement.HAVE_CURRENT_DATA,
+      playbackMode,
+      resumeRequested: shouldResumePlayback,
+    })
+  ) {
     isPlaybackWaiting.value = true
     return false
   }
@@ -806,6 +851,7 @@ function onTimeUpdate() {
 function onLoadedMetadata() {
   const v = videoRef.value
   if (!v) return
+  applyPlaybackRateToVideo()
   markPlaybackReady()
   const videoDuration = Number.isFinite(v.duration) ? v.duration : 0
   duration.value = resolveTotalDurationSec(playbackDescriptor.value, videoDuration)
@@ -1167,6 +1213,14 @@ function onVideoProgress() {
   syncBufferedRangeFromVideo()
 }
 
+function applyPlaybackRateToVideo() {
+  const v = videoRef.value
+  if (!v) return
+  const nextRate = Number.isFinite(playbackRate.value) && playbackRate.value > 0 ? playbackRate.value : 1
+  v.defaultPlaybackRate = nextRate
+  v.playbackRate = nextRate
+}
+
 function onVolumeSlider(vols?: number[]) {
   if (!vols?.length) return
   const pct = Math.max(0, Math.min(100, Math.round(vols[0] ?? 100)))
@@ -1211,6 +1265,77 @@ function adjustVolume(delta: number) {
   const cur = volume.value[0] ?? 100
   const next = Math.max(0, Math.min(100, Math.round(cur + delta)))
   onVolumeSlider([next])
+}
+
+async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
+  const currentDescriptor = playbackDescriptor.value
+  const movieId = props.movie.id.trim()
+  if (!currentDescriptor || !playbackSrc.value || !movieId || isSwitchingPlaybackSession.value) return
+
+  const currentMode: SessionPlaybackMode = currentDescriptor.mode === "hls" ? "hls" : "direct"
+  if (nextMode === currentMode) return
+
+  const targetSec = clampAbsolutePlaybackTarget(getAbsolutePlaybackTime())
+  const previousSessionId = currentDescriptor.sessionId
+  const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
+  const seq = ++playbackLoadSeq
+  isResolvingPlayback.value = true
+  isSwitchingPlaybackSession.value = true
+  isPlaybackWaiting.value = shouldEnterSeekWaitingState(nextMode)
+  playbackError.value = ""
+
+  try {
+    const nextDescriptor = await libraryService.createPlaybackSession(
+      movieId,
+      nextMode,
+      targetSec,
+    )
+    if (!nextDescriptor) return
+
+    if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
+      if (nextDescriptor.sessionId) {
+        await releasePlaybackSession(nextDescriptor.sessionId)
+      }
+      return
+    }
+
+    const normalizedDescriptor: PlaybackDescriptorDTO = nextMode === "direct"
+      ? {
+          ...nextDescriptor,
+          mode: "direct",
+          startPositionSec: undefined,
+          resumePositionSec: targetSec,
+        }
+      : {
+          ...nextDescriptor,
+          mode: "hls",
+          resumePositionSec: targetSec,
+        }
+
+    if (shouldResumePlayback) {
+      resumePlaybackWhenReady = true
+    }
+
+    resumeAppliedForMovieId.value = null
+    schedulePlaybackSessionCleanup(previousSessionId)
+    playbackDescriptor.value = normalizedDescriptor
+    playbackSrc.value = normalizedDescriptor.url?.trim() || null
+    void prewarmHlsDescriptor(normalizedDescriptor)
+    currentTime.value = targetSec
+    progressSliderValue.value = [targetSec]
+  } catch (err) {
+    if (seq === playbackLoadSeq) {
+      isPlaybackWaiting.value = false
+      pushAppToast(formatClientError(err, t("player.errGeneric")), {
+        variant: "destructive",
+      })
+    }
+  } finally {
+    if (seq === playbackLoadSeq) {
+      isResolvingPlayback.value = false
+      isSwitchingPlaybackSession.value = false
+    }
+  }
 }
 
 function onPlaybackKeydown(e: KeyboardEvent) {
@@ -1372,6 +1497,18 @@ const nativePlayerLabel = computed(() => {
     default:
       return t("player.externalPlayer")
   }
+})
+
+const currentPlaybackMode = computed<SessionPlaybackMode>(() =>
+  playbackDescriptor.value?.mode === "hls" ? "hls" : "direct",
+)
+
+const canSwitchToDirectPlayback = computed(() => {
+  const descriptor = playbackDescriptor.value
+  if (!descriptor) return false
+  if (descriptor.mode === "direct") return true
+  if (descriptor.canDirectPlay) return true
+  return canBrowserDirectPlayFromFileName(descriptor.fileName)
 })
 
 const playbackBusyLabel = computed(() => {
@@ -1611,7 +1748,11 @@ function updatePlaybackStatsFromHlsFragment(data?: unknown) {
   }
 }
 
-function bindHlsStats(player: HlsInstance, events?: Record<string, string>) {
+function bindHlsStats(
+  player: HlsInstance,
+  events?: Record<string, string>,
+  options: { onManifestParsed?: () => void } = {},
+) {
   detachHlsStatsListeners?.()
   detachHlsStatsListeners = null
   const on = player.on
@@ -1667,6 +1808,7 @@ function bindHlsStats(player: HlsInstance, events?: Record<string, string>) {
 
   register(events.MANIFEST_PARSED, () => {
     updateCurrentLevelStats()
+    options.onManifestParsed?.()
   })
   register(events.LEVEL_SWITCHED, (_event, data) => {
     updateCurrentLevelStats(data)
@@ -2502,6 +2644,16 @@ const videoPreloadMode = computed(() =>
                 />
                 <span class="w-10 shrink-0 text-right text-sm leading-none tabular-nums">{{ volumePercentLabel }}%</span>
               </div>
+
+              <PlayerPlaybackSettingsMenu
+                :disabled="!playbackSrc"
+                :playback-rate="playbackRate"
+                :playback-mode="currentPlaybackMode"
+                :can-switch-to-direct="canSwitchToDirectPlayback"
+                :switching-mode="isSwitchingPlaybackSession"
+                @update:playback-rate="playbackRate = $event"
+                @update:playback-mode="switchPlaybackMode"
+              />
 
               <Button
                 variant="secondary"

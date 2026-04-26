@@ -1,6 +1,7 @@
 type HlsInstance = {
   loadSource(src: string): void
   attachMedia(video: HTMLVideoElement): void
+  startLoad?(startPosition?: number, skipSeekToStartPosition?: boolean): void
   destroy(): void
   on?(event: string, handler: (event: string, data?: unknown) => void): void
   off?(event: string, handler: (event: string, data?: unknown) => void): void
@@ -36,6 +37,25 @@ declare global {
 let hlsLoaderPromise: Promise<HlsCtor> | null = null
 
 const HLS_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.min.js"
+
+export function buildHlsPlaybackConfig(): Record<string, unknown> {
+  return {
+    // Backend HLS sessions are event-style playlists while ffmpeg is still
+    // writing segments. Start at the session origin instead of hls.js' live edge.
+    autoStartLoad: false,
+    startPosition: 0,
+    startFragPrefetch: true,
+    enableWorker: true,
+    lowLatencyMode: false,
+    maxBufferLength: 30,
+    maxMaxBufferLength: 60,
+    backBufferLength: 90,
+  }
+}
+
+export function startHlsLoadingAtSessionOrigin(player: Pick<HlsInstance, "startLoad">): void {
+  player.startLoad?.(0)
+}
 
 export function canPlayHlsNatively(video: HTMLVideoElement): boolean {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : ""
