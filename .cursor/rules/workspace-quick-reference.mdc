@@ -27,6 +27,7 @@ alwaysApply: true
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
 - **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；打包会将真实 FFmpeg 放入 `third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
+- **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## 配置与持久化
 

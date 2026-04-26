@@ -26,6 +26,7 @@ Use this skill only inside this repository. Do not treat it as a global skill or
 - Respect the repository release rules:
   - `scripts/release/version.json` is the only automatic production version source.
   - `docs/ops/package-build-history.csv` is the active package/version history ledger.
+  - Do not delete existing production package artifacts unless the user explicitly asks for deletion. This applies to both `release/installer/*.exe` and `release/portable/*.zip`, including cleanup before repackaging or rebuilding the same version.
   - `publish` allocates one version once and reuses it for all generated artifacts.
   - `major` and `minor` changes are manual base changes; `patch` is the auto-bump part.
 - Treat package history management as part of the packaging workflow:
