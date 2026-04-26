@@ -18,14 +18,14 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     v-slot="{ modelValue }"
     data-slot="slider"
     :class="cn(
-      'relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
+      'relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=horizontal]:h-6 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
       props.class,
     )"
     v-bind="forwarded"
   >
     <SliderTrack
       data-slot="slider-track"
-      class="bg-muted relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+      class="bg-muted absolute inset-x-0 top-1/2 grow -translate-y-1/2 overflow-hidden rounded-full data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:relative data-[orientation=vertical]:inset-x-auto data-[orientation=vertical]:top-auto data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5 data-[orientation=vertical]:translate-y-0"
     >
       <SliderRange
         data-slot="slider-range"
