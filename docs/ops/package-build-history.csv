@@ -64,3 +64,5 @@ e133bba2 build(frontend): sync packaged assets
 af4885f9 docs: align packaged app version baseline to 1.3.1
 1a09dab9 chore(release): bump to 1.3.1, extend package ledger, add release notes
 8a11090c chore: ignore repo-local .cache directory",versionSource=auto-patch; BuildStamp=20260426.163342; portable=versionSource=explicit; installer=versionSource=explicit
+2026-04-27,1.3.2,c09ed800,master,release:publish,release/portable/Curated-1.3.2-windows-x64.zip; release/installer/Curated-Setup-1.3.2.exe; release/manifest/release.json,成功,wujiahui,"c09ed800 fix(release): bundle ffmpeg runtime in packages
+5f9ee393 chore(release): prepare 1.3.2 package",versionSource=explicit; BuildStamp=20260426.172610; portable=versionSource=explicit; installer=versionSource=explicit
