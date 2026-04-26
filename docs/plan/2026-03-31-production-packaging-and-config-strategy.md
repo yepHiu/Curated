@@ -101,7 +101,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
       - `curated.exe`
       - `curated.ico`
       - `frontend-dist/`
-     - `third_party/`（如果 `backend/third_party/` 存在）
+     - `third_party/`（包含 `backend/third_party/` 内容，并在发布打包时补齐 FFmpeg 运行时）
      - `runtime/config/`
      - `runtime/data/`
      - `runtime/cache/`
@@ -166,7 +166,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 3. 确认当前 commit / branch，并记录将用于台账的 short SHA。
 4. 确认 Inno Setup 是否可用：`ISCC.exe` 需存在于 PATH，或位于 `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` / `C:\Program Files\Inno Setup 6\ISCC.exe`。
 5. 确认 `config/library-config.cfg` 中示例配置可作为 `runtime/config/library-config.example.cfg` 随包分发；不要把本机私密代理、私有路径或临时调试配置带入示例配置。
-6. 如需随包提供 FFmpeg，确认 `backend/third_party/ffmpeg/` 内存在实际运行时文件；当前仓库只有 README 时，包内也只会带 README。
+6. 确认 FFmpeg 可随包分发：优先使用 `backend/third_party/ffmpeg/bin/` 中的真实运行时；如果仓库内只有 README，发布脚本会尝试从 Scoop 或 PATH 发现真实 `ffmpeg.exe` / `ffprobe.exe` 并复制到 `third_party/ffmpeg/bin/`，且不会复制 `scoop/shims` 下的 shim；如果没有找到可用运行时，打包应失败而不是产出缺少 FFmpeg 的安装包。
 
 推荐执行命令：
 

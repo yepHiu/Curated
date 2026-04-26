@@ -6,6 +6,8 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -23,6 +25,13 @@ from .versioning import allocate_next_patch_in_file, format_version, read_versio
 DEFAULT_VERSION_FILE = "scripts/release/version.json"
 DEFAULT_HISTORY_CSV = "docs/ops/package-build-history.csv"
 LEGACY_HISTORY_MD = "docs/ops/2026-04-02-package-build-history.md"
+
+
+@dataclass(frozen=True)
+class FFmpegRuntime:
+    ffmpeg: Path
+    ffprobe: Path | None
+    source: str
 
 
 def utc_build_stamp() -> str:
@@ -125,7 +134,6 @@ def assemble_release(
     resolved_output_dir = resolve_release_path(output_dir, repo_root)
     runtime_dir = resolved_output_dir / "runtime"
     docs_dir = resolved_output_dir / "docs"
-    third_party_dir = repo_root / "backend" / "third_party"
 
     if not resolved_binary_path.exists():
         raise FileNotFoundError(f"Release binary not found: {resolved_binary_path}")
@@ -154,8 +162,7 @@ def assemble_release(
             dirs_exist_ok=True,
         )
 
-    if third_party_dir.exists():
-        shutil.copytree(third_party_dir, resolved_output_dir / "third_party", dirs_exist_ok=True)
+    ffmpeg_bundle_source = _bundle_ffmpeg_runtime(repo_root, resolved_output_dir)
 
     shutil.copy2(
         repo_root / "config" / "library-config.cfg",
@@ -180,7 +187,7 @@ def assemble_release(
         "Current status:\n"
         "  - curated.exe is the release backend binary.\n"
         "  - frontend-dist contains the production frontend output.\n"
-        "  - third_party can contain bundled runtime tools such as ffmpeg.\n"
+        f"  - third_party contains bundled FFmpeg runtime tools. Source: {ffmpeg_bundle_source}.\n"
         "  - runtime\\config\\library-config.example.cfg is a sample library settings file.\n\n"
         "Target production behavior:\n"
         "  - release builds should use the per-user data directory by default.\n"
@@ -190,6 +197,153 @@ def assemble_release(
 
     print("Release directory assembled.")
     return resolved_output_dir
+
+
+def _bundle_ffmpeg_runtime(repo_root: Path, release_dir: Path) -> str:
+    third_party_source_dir = repo_root / "backend" / "third_party"
+    third_party_output_dir = release_dir / "third_party"
+    ffmpeg_output_dir = third_party_output_dir / "ffmpeg"
+    ffmpeg_bin_output_dir = ffmpeg_output_dir / "bin"
+
+    if third_party_source_dir.exists():
+        shutil.copytree(third_party_source_dir, third_party_output_dir, dirs_exist_ok=True)
+
+    bundled_ffmpeg_path = ffmpeg_bin_output_dir / _ffmpeg_binary_name()
+    if bundled_ffmpeg_path.is_file():
+        return "backend/third_party"
+
+    runtime = _discover_ffmpeg_runtime(repo_root)
+    if runtime is None:
+        raise FileNotFoundError(
+            "FFmpeg runtime not found. Install FFmpeg locally or place it under "
+            "backend/third_party/ffmpeg/bin before running release packaging."
+        )
+
+    ffmpeg_bin_output_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(runtime.ffmpeg, ffmpeg_bin_output_dir / _ffmpeg_binary_name())
+    if runtime.ffprobe is not None and runtime.ffprobe.is_file():
+        shutil.copy2(runtime.ffprobe, ffmpeg_bin_output_dir / _ffprobe_binary_name())
+
+    _copy_ffmpeg_license_material(runtime, ffmpeg_output_dir)
+    _write_ffmpeg_bundle_notice(runtime, ffmpeg_output_dir)
+    return runtime.source
+
+
+def _discover_ffmpeg_runtime(
+    repo_root: Path,
+    run_capture: Callable[[list[str]], str | None] | None = None,
+) -> FFmpegRuntime | None:
+    del repo_root
+
+    capture = run_capture or _run_capture
+    scoop_runtime = _discover_scoop_ffmpeg_runtime(capture)
+    if scoop_runtime is not None:
+        return scoop_runtime
+
+    ffmpeg_path = _normalize_executable_path(shutil.which(_ffmpeg_binary_name()) or shutil.which("ffmpeg"))
+    if ffmpeg_path is None or _is_scoop_shim_path(ffmpeg_path):
+        return None
+
+    ffprobe_path = _normalize_executable_path(shutil.which(_ffprobe_binary_name()) or shutil.which("ffprobe"))
+    if ffprobe_path is not None and _is_scoop_shim_path(ffprobe_path):
+        ffprobe_path = None
+
+    return FFmpegRuntime(ffmpeg=ffmpeg_path, ffprobe=ffprobe_path, source="PATH")
+
+
+def _discover_scoop_ffmpeg_runtime(run_capture: Callable[[list[str]], str | None]) -> FFmpegRuntime | None:
+    ffmpeg_path = _path_from_command_output(run_capture(["scoop", "which", "ffmpeg"]))
+    if ffmpeg_path is None or _is_scoop_shim_path(ffmpeg_path):
+        return None
+
+    ffprobe_path = _path_from_command_output(run_capture(["scoop", "which", "ffprobe"]))
+    if ffprobe_path is not None and _is_scoop_shim_path(ffprobe_path):
+        ffprobe_path = None
+
+    return FFmpegRuntime(ffmpeg=ffmpeg_path, ffprobe=ffprobe_path, source="scoop")
+
+
+def _run_capture(command: list[str]) -> str | None:
+    resolved_command = list(command)
+    executable = shutil.which(resolved_command[0])
+    if not executable and os.name == "nt":
+        executable = shutil.which(f"{resolved_command[0]}.cmd") or shutil.which(f"{resolved_command[0]}.exe")
+    if executable:
+        resolved_command[0] = executable
+
+    try:
+        completed = subprocess.run(
+            resolved_command,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def _path_from_command_output(output: str | None) -> Path | None:
+    if not output:
+        return None
+    for line in output.splitlines():
+        candidate = _normalize_executable_path(line)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def _normalize_executable_path(value: str | None) -> Path | None:
+    if not value:
+        return None
+    cleaned = value.strip().strip('"').strip("'")
+    if not cleaned:
+        return None
+    path = Path(cleaned).expanduser()
+    if not path.is_file():
+        return None
+    return path
+
+
+def _is_scoop_shim_path(path: Path) -> bool:
+    parts = {part.lower() for part in path.parts}
+    return "scoop" in parts and "shims" in parts
+
+
+def _ffmpeg_binary_name() -> str:
+    return "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+
+
+def _ffprobe_binary_name() -> str:
+    return "ffprobe.exe" if os.name == "nt" else "ffprobe"
+
+
+def _copy_ffmpeg_license_material(runtime: FFmpegRuntime, ffmpeg_output_dir: Path) -> None:
+    runtime_root = runtime.ffmpeg.parent.parent
+    for directory_name in ("LICENSES", "licenses"):
+        source_dir = runtime_root / directory_name
+        if source_dir.is_dir():
+            shutil.copytree(source_dir, ffmpeg_output_dir / directory_name, dirs_exist_ok=True)
+    for source_file in runtime_root.glob("*"):
+        if not source_file.is_file():
+            continue
+        upper_name = source_file.name.upper()
+        if upper_name.startswith(("LICENSE", "COPYING", "NOTICE")) or upper_name.endswith("LICENSE.TXT"):
+            shutil.copy2(source_file, ffmpeg_output_dir / source_file.name)
+
+
+def _write_ffmpeg_bundle_notice(runtime: FFmpegRuntime, ffmpeg_output_dir: Path) -> None:
+    notice = (
+        "Curated bundled FFmpeg runtime\n\n"
+        f"Source       : {runtime.source}\n"
+        f"ffmpeg.exe   : {runtime.ffmpeg}\n"
+        f"ffprobe.exe  : {runtime.ffprobe or 'not bundled'}\n\n"
+        "This package includes FFmpeg for Curated HLS playback sessions.\n"
+        "Keep the upstream FFmpeg license and notices with any redistributed build.\n"
+    )
+    (ffmpeg_output_dir / "README-Curated-Bundle.txt").write_text(notice, encoding="utf-8")
 
 
 def package_portable(

@@ -169,8 +169,9 @@ cd backend && go test ./...
 
 ## 9. 生产包版本号
 
-- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.3.1`。
+- 生产包版本的唯一自动化来源是 `scripts/release/version.json`，当前基线为 `1.3.2`。
 - `pnpm release:*` 当前统一调用 `python scripts/release/release_cli.py`。
 - `pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 在未显式传入 `-Version` 时，都会自动执行 `patch + 1`。
 - `major` / `minor` 只允许人工通过 `pnpm release:version:set-base -- --Major <major> --Minor <minor>` 调整，并在调整时把 `patch` 重置为 `0`。
 - `pnpm release:publish` 是整机发布推荐入口，它只分配一次版本号，再复用到便携包、安装包、manifest 与 `docs/ops/package-build-history.csv` 打包台账。
+- 发布打包会把 FFmpeg 运行时放入 `third_party/ffmpeg/bin/`：优先使用 `backend/third_party/ffmpeg/bin/`，否则从 Scoop 或 PATH 发现真实二进制；`scoop/shims` 下的 shim 不会被复制，找不到真实运行时时打包失败。
