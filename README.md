@@ -28,7 +28,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - Local-first architecture with a Vue SPA frontend and a Go HTTP API backend.
 - Real API mode and mock mode for fast UI iteration.
 - SQLite-backed persistence for library data, playback progress, comments, ratings, and curated frames.
-- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, with recent-history exposure penalties plus actor and studio diversity balancing to reduce repeated titles across days.
+- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
 - Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
@@ -114,7 +114,7 @@ Runtime configuration is split between frontend environment variables and backen
 ### Frontend
 
 - `VITE_USE_WEB_API=true`: use the real backend
-- `VITE_API_BASE_URL`: override the API base URL
+- `VITE_API_BASE_URL`: override the API base URL; when unset, the frontend uses same-origin `/api`
 - `VITE_LOG_LEVEL`: optional browser log level default
 
 ### Backend
@@ -137,7 +137,7 @@ Common library-level settings include:
   Empty `logDir` means "use the default log directory" rather than disabling file logging:
   release builds use `LOCALAPPDATA\\Curated\\logs`, while dev builds use `backend/runtime/logs`.
 
-Release builds default to port `:8081` unless overridden by config.
+Release builds default to port `:8081` unless overridden by config. The bundled frontend also uses same-origin `/api` by default, so LAN clients opening `http://<host-ip>:8081` call the backend on that same host and port.
 
 ## API
 

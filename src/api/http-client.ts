@@ -17,10 +17,12 @@ export class HttpClientError extends Error {
   }
 }
 
-/** 开发走 Vite 代理 /api；生产构建未设置 VITE_API_BASE_URL 时对齐 release 后端默认 :8081 */
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? "/api" : "http://127.0.0.1:8081/api")
+/** Default to same-origin /api; Vite dev proxy and release hosting both serve this path. */
+export function resolveApiBaseUrl(env: Pick<ImportMetaEnv, "VITE_API_BASE_URL">): string {
+  return env.VITE_API_BASE_URL ?? "/api"
+}
+
+const BASE_URL = resolveApiBaseUrl(import.meta.env)
 const DEV_REQUEST_MONITOR_ENABLED = import.meta.env.DEV
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {

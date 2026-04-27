@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"hash/fnv"
+	"math"
+	"math/rand"
 	"sort"
 	"strings"
 	"time"
@@ -13,22 +15,25 @@ import (
 	"curated-backend/internal/storage"
 )
 
-const homepageDailyRecommendationGenerationVersion = "v4"
+const homepageDailyRecommendationGenerationVersion = "v6"
 
 const (
-	homepageDailyExposureLookbackDays   = 14
+	homepageDailyExposureLookbackDays   = 28
 	homepageDailyExposurePenaltyFloor   = 0.75
 	homepageDailyExposurePenaltyScale   = 3.0
-	homepageDailyActorDiversityPenalty  = 2.25
-	homepageDailyStudioDiversityPenalty = 1.75
+	homepageDailyActorDiversityPenalty  = 12.0
+	homepageDailyStudioDiversityPenalty = 8.0
+	homepageDailyCoolingDays            = 14
+	homepageDailyHardCoolingDays        = 3
 )
 
-var homepageDailyRecentExclusionWindows = []int{7, 5, 3, 1, 0}
+var homepageDailyRecentExclusionWindows = []int{14, 10, 7, 5, 3, 1, 0}
 
 type homepageDailyCandidate struct {
 	movie     contracts.MovieListItemDTO
 	score     float64
 	hashScore uint64
+	state     storage.HomepageRecommendationState
 }
 
 type homepageDailySelectionState struct {
@@ -48,7 +53,7 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 
 	if snapshot, ok, err := a.store.GetHomepageDailyRecommendationSnapshot(ctx, dateUTC); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
-	} else if ok {
+	} else if ok && snapshot.GenerationVersion == homepageDailyRecommendationGenerationVersion {
 		return contracts.HomepageDailyRecommendationsDTO{
 			DateUTC:                snapshot.DateUTC,
 			GeneratedAt:            snapshot.GeneratedAt,
@@ -72,6 +77,9 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 	}); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
+	if err := a.persistHomepageRecommendationStates(ctx, dto); err != nil {
+		return contracts.HomepageDailyRecommendationsDTO{}, err
+	}
 
 	return dto, nil
 }
@@ -93,6 +101,9 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 		GeneratedAt:            dto.GeneratedAt,
 		GenerationVersion:      dto.GenerationVersion,
 	}); err != nil {
+		return contracts.HomepageDailyRecommendationsDTO{}, err
+	}
+	if err := a.persistHomepageRecommendationStates(ctx, dto); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 
@@ -122,12 +133,18 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 
-	allCandidates := rankHomepageDailyCandidates(page.Items, dateUTC, exposurePenaltyByMovieID)
+	recommendationStates, err := a.listHomepageRecommendationStateMap(ctx)
+	if err != nil {
+		return contracts.HomepageDailyRecommendationsDTO{}, err
+	}
+
+	allCandidates := rankHomepageDailyCandidates(page.Items, dateUTC, exposurePenaltyByMovieID, recommendationStates)
 	selected := make(map[string]struct{})
 	selectionState := homepageDailySelectionState{
 		actorCounts:  make(map[string]int),
 		studioCounts: make(map[string]int),
 	}
+	random := rand.New(rand.NewSource(int64(homepageDailyHash(dateUTC + "|" + homepageDailyRecommendationGenerationVersion))))
 
 	heroIDs, heroExclusionWindowUsed := selectHomepageDailyIDs(
 		allCandidates,
@@ -136,6 +153,8 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		8,
 		true,
 		exclusionLadder,
+		dateUTC,
+		random,
 	)
 	recommendationIDs, recommendationExclusionWindowUsed := selectHomepageDailyIDs(
 		allCandidates,
@@ -144,6 +163,8 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		6,
 		false,
 		exclusionLadder,
+		dateUTC,
+		random,
 	)
 
 	dto := contracts.HomepageDailyRecommendationsDTO{
@@ -158,6 +179,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		a.logger.Info("homepage daily recommendations generated",
 			zap.String("dateUTC", dateUTC),
 			zap.Int("candidateCount", len(allCandidates)),
+			zap.Int("recommendationStateCount", len(recommendationStates)),
 			zap.Int("historyPenaltyMovieCount", len(exposurePenaltyByMovieID)),
 			zap.Int("recentSnapshotCount", len(recentSnapshots)),
 			zap.Int("heroExclusionWindowDays", heroExclusionWindowUsed),
@@ -168,6 +190,67 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 	}
 
 	return dto, nil
+}
+
+func (a *App) listHomepageRecommendationStateMap(ctx context.Context) (map[string]storage.HomepageRecommendationState, error) {
+	states, err := a.store.ListHomepageRecommendationStates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]storage.HomepageRecommendationState, len(states))
+	for _, state := range states {
+		movieID := strings.TrimSpace(state.MovieID)
+		if movieID == "" {
+			continue
+		}
+		out[movieID] = state
+	}
+	return out, nil
+}
+
+func (a *App) persistHomepageRecommendationStates(ctx context.Context, dto contracts.HomepageDailyRecommendationsDTO) error {
+	currentStates, err := a.listHomepageRecommendationStateMap(ctx)
+	if err != nil {
+		return err
+	}
+
+	generatedAt := strings.TrimSpace(dto.GeneratedAt)
+	if generatedAt == "" {
+		generatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	generatedTime, err := time.Parse(time.RFC3339, generatedAt)
+	if err != nil {
+		generatedTime = time.Now().UTC()
+		generatedAt = generatedTime.Format(time.RFC3339)
+	}
+	recommendedTime := generatedTime
+	if parsedDateUTC, err := time.Parse("2006-01-02", dto.DateUTC); err == nil {
+		recommendedTime = parsedDateUTC
+	}
+	recommendedAt := recommendedTime.Format(time.RFC3339)
+	skipUntil := recommendedTime.AddDate(0, 0, homepageDailyHardCoolingDays).Format(time.RFC3339)
+
+	selected := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	updates := make([]storage.HomepageRecommendationState, 0, len(selected))
+	seen := make(map[string]struct{}, len(selected))
+	for _, movieID := range selected {
+		normalizedMovieID := strings.TrimSpace(movieID)
+		if normalizedMovieID == "" {
+			continue
+		}
+		if _, ok := seen[normalizedMovieID]; ok {
+			continue
+		}
+		seen[normalizedMovieID] = struct{}{}
+		state := currentStates[normalizedMovieID]
+		state.MovieID = normalizedMovieID
+		state.LastRecommendedAt = recommendedAt
+		state.RecommendCount++
+		state.SkipUntil = skipUntil
+		state.UpdatedAt = generatedAt
+		updates = append(updates, state)
+	}
+	return a.store.UpsertHomepageRecommendationStates(ctx, updates)
 }
 
 func (a *App) buildHomepageExposurePenaltyMap(ctx context.Context, dateUTC string) (map[string]float64, error) {
@@ -288,7 +371,12 @@ func buildHomepageRecentExclusionSet(
 	return excluded
 }
 
-func rankHomepageDailyCandidates(items []contracts.MovieListItemDTO, dateUTC string, extraPenalty map[string]float64) []homepageDailyCandidate {
+func rankHomepageDailyCandidates(
+	items []contracts.MovieListItemDTO,
+	dateUTC string,
+	extraPenalty map[string]float64,
+	states map[string]storage.HomepageRecommendationState,
+) []homepageDailyCandidate {
 	candidates := make([]homepageDailyCandidate, 0, len(items))
 	for _, movie := range items {
 		if strings.TrimSpace(movie.ID) == "" {
@@ -317,6 +405,7 @@ func rankHomepageDailyCandidates(items []contracts.MovieListItemDTO, dateUTC str
 			movie:     movie,
 			score:     score,
 			hashScore: hashScore,
+			state:     states[movie.ID],
 		})
 	}
 
@@ -340,6 +429,8 @@ func selectHomepageDailyIDs(
 	limit int,
 	heroOnly bool,
 	exclusionLadder []homepageDailyExclusionPolicy,
+	dateUTC string,
+	random *rand.Rand,
 ) ([]string, int) {
 	if limit <= 0 {
 		return nil, 0
@@ -350,9 +441,11 @@ func selectHomepageDailyIDs(
 
 	appendFromPool := func(excludedMovieIDs map[string]struct{}) {
 		for len(out) < limit {
-			bestIndex := -1
-			bestScore := 0.0
-			var bestHash uint64
+			weightedCandidates := make([]struct {
+				index  int
+				weight float64
+			}, 0, len(candidates))
+			totalWeight := 0.0
 			for index, candidate := range candidates {
 				movieID := strings.TrimSpace(candidate.movie.ID)
 				if movieID == "" {
@@ -369,16 +462,29 @@ func selectHomepageDailyIDs(
 				}
 
 				score := candidate.score - homepageDiversityPenalty(candidate.movie, selectionState)
-				if bestIndex == -1 || score > bestScore || (score == bestScore && candidate.hashScore < bestHash) {
-					bestIndex = index
-					bestScore = score
-					bestHash = candidate.hashScore
+				weight := homepageRecommendationWeight(score, candidate.state, dateUTC)
+				if weight <= 0 {
+					continue
 				}
+				weightedCandidates = append(weightedCandidates, struct {
+					index  int
+					weight float64
+				}{index: index, weight: weight})
+				totalWeight += weight
 			}
-			if bestIndex < 0 {
+			if len(weightedCandidates) == 0 || totalWeight <= 0 {
 				return
 			}
 
+			threshold := random.Float64() * totalWeight
+			bestIndex := weightedCandidates[len(weightedCandidates)-1].index
+			for _, weightedCandidate := range weightedCandidates {
+				threshold -= weightedCandidate.weight
+				if threshold <= 0 {
+					bestIndex = weightedCandidate.index
+					break
+				}
+			}
 			chosen := candidates[bestIndex].movie
 			movieID := strings.TrimSpace(chosen.ID)
 			selected[movieID] = struct{}{}
@@ -399,6 +505,47 @@ func selectHomepageDailyIDs(
 	}
 
 	return out, exclusionWindowUsed
+}
+
+func homepageRecommendationWeight(score float64, state storage.HomepageRecommendationState, dateUTC string) float64 {
+	currentDate, err := time.Parse("2006-01-02", dateUTC)
+	if err != nil {
+		return 0
+	}
+	currentTime := currentDate
+
+	if skipUntil := strings.TrimSpace(state.SkipUntil); skipUntil != "" {
+		if parsedSkipUntil, err := time.Parse(time.RFC3339, skipUntil); err == nil && currentTime.Before(parsedSkipUntil) {
+			return 0
+		}
+	}
+
+	daysSinceLastRecommendation := 90
+	if lastRecommendedAt := strings.TrimSpace(state.LastRecommendedAt); lastRecommendedAt != "" {
+		if parsedLastRecommendedAt, err := time.Parse(time.RFC3339, lastRecommendedAt); err == nil {
+			daysSinceLastRecommendation = int(currentTime.Sub(parsedLastRecommendedAt).Hours() / 24)
+		}
+	}
+	if daysSinceLastRecommendation >= 0 && daysSinceLastRecommendation < homepageDailyHardCoolingDays {
+		return 0
+	}
+	if daysSinceLastRecommendation < 0 {
+		daysSinceLastRecommendation = 0
+	}
+
+	positiveScore := math.Max(score, 0.1)
+	recencyDays := math.Min(float64(daysSinceLastRecommendation), 90)
+	recencyWeight := math.Pow(recencyDays+1, 1.5)
+	countPenalty := math.Log2(float64(state.RecommendCount) + 2)
+	if countPenalty < 1 {
+		countPenalty = 1
+	}
+
+	weight := positiveScore * recencyWeight / countPenalty
+	if daysSinceLastRecommendation < homepageDailyCoolingDays {
+		weight *= float64(daysSinceLastRecommendation) / float64(homepageDailyCoolingDays)
+	}
+	return weight
 }
 
 func homepageDiversityPenalty(

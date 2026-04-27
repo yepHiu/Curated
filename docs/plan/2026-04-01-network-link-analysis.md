@@ -24,7 +24,7 @@
 
 - 第一层：前端浏览器 -> Curated 本地后端
   - 开发环境下，Vite 把 `/api` 代理到 `http://localhost:8080`
-  - 生产构建默认把 API 指向 `http://127.0.0.1:8081/api`
+  - 生产构建默认把 API 指向同源 `/api`，由当前访问的 Curated 主机与端口提供服务
   - 对应代码：
     - `src/api/http-client.ts`
     - `vite.config.ts`

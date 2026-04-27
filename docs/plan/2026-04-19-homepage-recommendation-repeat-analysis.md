@@ -1,6 +1,6 @@
 # Homepage Recommendation Repeat Analysis
 
-## Current Behavior
+## Original Problem
 
 The homepage recommendation backend currently persists one snapshot per UTC day and reuses that same snapshot for the rest of the UTC day.
 
@@ -13,9 +13,9 @@ Observed recommendation generation behavior:
   - older snapshots are not hard-excluded, they only contribute an exposure penalty;
   - if inventory is insufficient, yesterday titles are backfilled as the final fallback.
 
-## Why Repeats Still Happen After 2-3 Days
+## Why Repeats Still Happened After 2-3 Days
 
-The current implementation applies a soft score penalty for prior exposure over a 14-day lookback window, but that penalty is not strong enough to guarantee weekly freshness.
+The previous implementation applied a soft score penalty for prior exposure over a 14-day lookback window, but that penalty was not strong enough to guarantee weekly freshness.
 
 Concretely:
 
@@ -46,19 +46,21 @@ It is a policy gap:
 
 - **Hard exclusion window:** only 1 day
 - **Soft penalty window:** 14 days
-- **Desired user expectation:** roughly 7-day freshness when inventory allows
+- **Desired user expectation:** avoid obvious weekly/biweekly cycles when inventory allows
 
 Those are mismatched.
 
 ## Recommended Direction
 
-Keep daily snapshots, but change cross-day freshness from "softly discourage" to "hard avoid for a rolling 7-day window, with graceful fallback".
+Keep daily snapshots, but change cross-day freshness from "softly discourage" to "hard avoid for a rolling window, with graceful fallback".
 
 Recommended selection strategy:
 
-1. Build a combined set of movie IDs shown in the last 7 days.
-2. First pass: hard-exclude all titles from that 7-day set.
+1. Build a combined set of movie IDs shown in the recent hard-exclusion window.
+2. First pass: hard-exclude all titles from the 14-day set.
 3. If not enough titles remain, degrade gradually:
+   - retry with 10-day exclusion
+   - retry with 7-day exclusion
    - retry with 5-day exclusion
    - then 3-day exclusion
    - then 1-day exclusion
@@ -67,7 +69,7 @@ Recommended selection strategy:
 
 This matches the stated product goal:
 
-- if the library is large enough, users should not see repeats within the week;
+- if the library is large enough, users should not see repeats within the last two weeks;
 - if the library is too small, the system still returns a complete slate instead of failing.
 
 ## Alternative: Refresh Only On Monday And Thursday
@@ -90,31 +92,46 @@ So if the goal is "do not see the same movies again within a week", a Monday/Thu
 
 ## Implemented Policy
 
-The backend policy is now:
+2026-04-19 policy:
 
 - daily homepage snapshots remain the default cadence;
 - same-day hero/recommendation dedupe remains unchanged;
 - cross-day hard exclusion now uses a fallback ladder:
+  - `14` days
+  - `10` days
   - `7` days
   - `5` days
   - `3` days
   - `1` day
   - `0` days
-- if the library has enough inventory, the generator will avoid the entire last-7-day combined slate;
+- if the library has enough inventory, the generator will avoid the entire last-14-day combined slate;
 - if not, it gradually relaxes the exclusion window until the slate can be filled;
-- the older exposure-penalty logic still remains, so even after fallback the ranking still discourages recently surfaced titles.
+- the exposure-penalty lookback is now 28 days, so even after fallback the ranking still discourages recently surfaced titles;
+- persisted same-day snapshots are reused only when their `generationVersion` matches the current algorithm version, so algorithm updates can replace stale daily output.
+
+2026-04-28 update:
+
+- daily snapshots are now treated as same-day display caches, not the only recommendation memory;
+- `homepage_recommendation_states` stores per-movie `last_recommended_at`, `recommend_count`, `skip_until`, and `updated_at`;
+- generation performs weighted sampling without replacement from movie metadata plus recommendation state;
+- hard-cooling movies are skipped while enough inventory exists;
+- movies recently recommended recover weight over a 14-day cooling window;
+- long-unseen movies gain weight and repeatedly recommended movies receive a logarithmic count penalty;
+- selected movies update their recommendation state after the new daily snapshot is persisted.
 
 This gives the desired product behavior:
 
 - strong freshness when inventory is sufficient;
-- graceful degradation instead of empty or undersized rows when inventory is limited.
+- graceful degradation instead of empty or undersized rows when inventory is limited;
+- persistent recommendation memory that survives beyond daily snapshot history.
 
 ## Suggested Product Choice
 
 Preferred default:
 
 - daily snapshot generation
-- 7-day hard exclusion with fallback ladder
+- per-movie recommendation state with weighted sampling
+- same-day daily snapshot cache for stable display
 
 Optional future setting:
 

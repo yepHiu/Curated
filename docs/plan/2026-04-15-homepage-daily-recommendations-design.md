@@ -5,7 +5,7 @@ Date: 2026-04-15
 
 ## Goal
 
-Move homepage `Hero` and `今日推荐` from frontend-only deterministic assembly to backend-persisted UTC daily recommendation snapshots so every device and browser sees the same results. Keep the results rotating daily, enforce no overlap with the previous UTC day when inventory allows, and bias selection toward broader library coverage instead of repeatedly surfacing the same top titles.
+Move homepage `Hero` and `今日推荐` from frontend-only deterministic assembly to backend-persisted UTC daily recommendation snapshots so every device and browser sees the same results. Keep the results rotating daily, enforce no overlap with recent UTC daily slates when inventory allows, and bias selection toward broader library coverage instead of repeatedly surfacing the same top titles.
 
 ## Confirmed Product Decisions
 
@@ -13,10 +13,10 @@ Move homepage `Hero` and `今日推荐` from frontend-only deterministic assembl
 - Scope includes both homepage `Hero` and homepage `今日推荐`.
 - Recommendation day boundary remains UTC.
 - Cross-day behavior must update automatically even if the app stays open.
-- Previous-day recommendation state must be backend-persisted so all devices and browsers stay consistent.
-- “Yesterday” means the previous UTC calendar day, not the last generated snapshot day.
+- Recent recommendation state must be backend-persisted so all devices and browsers stay consistent.
+- Freshness windows are based on UTC calendar days, not client-local dates.
 - When the library cannot satisfy full no-repeat coverage, quantity wins:
-  fill as many slots as possible from non-yesterday titles first, then allow controlled reuse.
+  fill as many slots as possible from non-recent titles first, then allow controlled reuse.
 
 ## Architecture
 
@@ -37,10 +37,11 @@ Each snapshot should persist at least:
 
 Behavior:
 
-- If today’s snapshot exists, return it unchanged.
+- If today’s snapshot exists with the current `generationVersion`, return it unchanged.
+- If today’s snapshot exists with a stale `generationVersion`, regenerate it with the current algorithm and upsert the snapshot.
 - If today’s snapshot does not exist, generate it from current library state and persist it.
-- If yesterday’s snapshot exists, treat its `Hero + 今日推荐` union as the previous-day exclusion set.
-- If yesterday’s snapshot does not exist, generate today normally without previous-day exclusion.
+- Load prior snapshots within the exposure lookback window and build recent-exposure sets from each prior `Hero + 今日推荐` union.
+- Persist long-lived per-movie recommendation memory separately in `homepage_recommendation_states` with `last_recommended_at`, `recommend_count`, `skip_until`, and `updated_at`.
 
 ## Recommendation Algorithm
 
@@ -55,11 +56,11 @@ Behavior:
 
 - Exclude trashed titles from both sections.
 - Continue excluding `FC2` titles from `Hero`.
-- Use yesterday’s `Hero + 今日推荐` union as the default exclusion set for today.
+- Use recent prior `Hero + 今日推荐` unions as hard-exclusion sets, starting with the last 14 days and relaxing only when needed.
 
 ### Selection strategy
 
-Use a layered scoring model instead of pure randomness:
+Use weighted sampling without replacement instead of pure randomness or a deterministic top-N sort:
 
 `base_score = quality + preference + freshness - exposure_penalty - recent_repeat_penalty - diversity_penalty`
 
@@ -77,6 +78,11 @@ Suggested dimensions:
   - titles shown many times in a rolling window lose weight
 - `recent_repeat_penalty`
   - very recent homepage appearances lose more weight than older appearances
+- `recommendation_state`
+  - hard-cooling movies are skipped while enough inventory exists
+  - movies inside the 14-day cooling window recover gradually
+  - long-unseen movies gain weight
+  - movies with high `recommend_count` receive a logarithmic count penalty
 - `diversity_penalty`
   - soft penalty when the same actor, tag, or studio already dominates today’s slate
 
@@ -90,16 +96,18 @@ so small libraries still produce a full slate.
 
 1. Resolve `today_utc`.
 2. Return today’s snapshot if already stored.
-3. Load yesterday’s snapshot if it exists.
+3. Load prior snapshots within the exposure lookback window.
 4. Build the active candidate pool.
-5. Build the previous-day exclusion set from yesterday’s `Hero + 今日推荐`.
-6. Select `Hero 8` from eligible candidates.
-7. Select `今日推荐 6` from the remaining eligible candidates.
-8. If fewer than 14 non-yesterday titles are available:
-   - fill from non-yesterday titles first
-   - backfill from yesterday titles only when necessary
+5. Build recent hard-exclusion sets from prior `Hero + 今日推荐` unions.
+6. Load `homepage_recommendation_states` and attach per-movie state to each candidate.
+7. Try exclusion windows in order: `14 -> 10 -> 7 -> 5 -> 3 -> 1 -> 0`.
+8. Select `Hero 8` and `今日推荐 6` with weighted sampling from the first window that can fill the slate.
+9. If fewer than 14 non-recent titles are available:
+   - fill from the freshest available window first
+   - relax the exclusion window only when necessary
    - prefer least-recently-exposed titles during backfill
-9. Persist the finished snapshot.
+10. Persist the finished snapshot.
+11. Update recommendation state for each selected movie.
 
 ## API Shape
 
@@ -150,8 +158,8 @@ Recommended behavior:
 
 - Same UTC day returns the same snapshot after first generation.
 - A new UTC day produces a new snapshot.
-- When inventory allows, today’s `14` titles do not overlap with yesterday’s `14`.
-- When inventory is insufficient, non-yesterday titles are exhausted before yesterday titles are reused.
+- When inventory allows, today’s `14` titles do not overlap with the last 14 days of prior homepage slates.
+- When inventory is insufficient, non-recent titles are exhausted before recently surfaced titles are reused.
 - Diversity and exposure penalties reduce repetition over repeated day generations.
 - Concurrent same-day requests do not create conflicting snapshots.
 
@@ -172,9 +180,8 @@ Recommended behavior:
 ### Migration
 
 - Introduce a new daily homepage snapshot table without backfilling historical data.
-- On the first post-release day:
-  - if yesterday's snapshot does not exist, generate today's snapshot without previous-day exclusion
-  - from the second generated UTC day onward, previous-day exclusion starts applying normally
+- On the first post-release day, generate today's snapshot from whatever prior snapshot history exists.
+- Existing same-day snapshots with stale `generationVersion` are regenerated so algorithm changes are visible without waiting for the next UTC day.
 
 ### Concurrency Safety
 
@@ -190,8 +197,9 @@ Recommended behavior:
   - `date_utc`
   - whether an existing snapshot was reused or a new one was generated
   - active candidate pool size
-  - previous-day exclusion size
-  - whether fallback reuse from yesterday was required
+  - active hard-exclusion window
+  - recent exclusion set size
+  - whether fallback reuse from a shorter window was required
   - selected `hero_movie_ids`
   - selected `recommendation_movie_ids`
 - Persist or log `generation_version` with the snapshot so future algorithm changes remain traceable.

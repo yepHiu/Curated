@@ -37,6 +37,7 @@ scripts/prd/*
 .env.*
 !.env.example
 backend/runtime/
+backend/frontend-dist/
 .gocache/
 .tmp-go/
 .tmp-go-modcache/

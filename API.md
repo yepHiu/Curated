@@ -130,12 +130,13 @@ Purpose:
 Important notes:
 
 - the backend uses the current UTC date as the snapshot key
-- the first request for a UTC day generates and persists the snapshot in SQLite; later requests reuse the same result
+- the first request for a UTC day generates and persists the snapshot in SQLite; later requests reuse the same result only when `generationVersion` matches the current algorithm
 - the snapshot contains `heroMovieIds` and `recommendationMovieIds`, plus `dateUtc`, `generatedAt`, and `generationVersion`
-- when enough inventory is available, the backend avoids reusing yesterday's hero and recommendation titles
-- generation also applies a recency-weighted exposure penalty based on persisted snapshots from previous UTC days, so titles that have been shown repeatedly in recent days gradually lose rank
+- recommendation memory is persisted separately per movie in `homepage_recommendation_states`, tracking `last_recommended_at`, `recommend_count`, and `skip_until`
+- when enough inventory is available, the backend avoids reusing the combined hero/recommendation slate from the last 14 UTC days, then falls back through `14 -> 10 -> 7 -> 5 -> 3 -> 1 -> 0` day exclusion windows only as needed
+- generation uses weighted sampling without replacement: hard-cooling movies are skipped, recently recommended movies recover weight over a 14-day cooling window, long-unseen movies gain weight, and repeatedly recommended movies receive a logarithmic count penalty
 - the slate builder also applies actor and studio diversity penalties while picking the hero and recommendation set, so the same actors or studios are less likely to dominate one day's slate
-- if inventory is too small, the backend backfills from yesterday only after exhausting fresh titles
+- after a new daily slate is persisted, the selected movies' recommendation states are updated so later days have persistent memory beyond the daily snapshot itself
 
 ### `POST /api/homepage/recommendations/refresh`
 

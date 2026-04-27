@@ -163,6 +163,119 @@ func TestGenerateHomepageDailyRecommendationsAvoidsYesterdayWhenInventoryAllows(
 	}
 }
 
+func TestGetOrCreateHomepageDailyRecommendationsRegeneratesStaleGenerationVersion(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 20)
+	fixture.mustSaveSnapshot(t, "2026-04-15",
+		[]string{"m01"},
+		[]string{"m02"},
+	)
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	if dto.GenerationVersion != homepageDailyRecommendationGenerationVersion {
+		t.Fatalf("GenerationVersion = %q, want %q", dto.GenerationVersion, homepageDailyRecommendationGenerationVersion)
+	}
+	if len(dto.HeroMovieIDs) != 8 || len(dto.RecommendationMovieIDs) != 6 {
+		t.Fatalf("stale snapshot was reused: hero=%#v recommendations=%#v", dto.HeroMovieIDs, dto.RecommendationMovieIDs)
+	}
+}
+
+func TestGenerateHomepageDailyRecommendationsPersistsSelectedMovieState(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 20)
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	selected := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if len(selected) != 14 {
+		t.Fatalf("len(selected) = %d, want 14", len(selected))
+	}
+
+	states, err := fixture.store.ListHomepageRecommendationStates(ctx)
+	if err != nil {
+		t.Fatalf("ListHomepageRecommendationStates() error = %v", err)
+	}
+	stateByMovieID := make(map[string]storage.HomepageRecommendationState, len(states))
+	for _, state := range states {
+		stateByMovieID[state.MovieID] = state
+	}
+
+	for _, movieID := range selected {
+		state, ok := stateByMovieID[movieID]
+		if !ok {
+			t.Fatalf("missing recommendation state for selected movie %q; states=%#v", movieID, states)
+		}
+		if state.RecommendCount != 1 {
+			t.Fatalf("RecommendCount[%s] = %d, want 1", movieID, state.RecommendCount)
+		}
+		if state.LastRecommendedAt != "2026-04-15T00:00:00Z" {
+			t.Fatalf("LastRecommendedAt[%s] = %q, want date-based timestamp", movieID, state.LastRecommendedAt)
+		}
+		if state.SkipUntil != "2026-04-18T00:00:00Z" {
+			t.Fatalf("SkipUntil[%s] = %q, want hard cooldown from dateUTC", movieID, state.SkipUntil)
+		}
+		if state.UpdatedAt == "" {
+			t.Fatalf("state[%s] missing UpdatedAt: %#v", movieID, state)
+		}
+	}
+}
+
+func TestGenerateHomepageDailyRecommendationsSkipsPersistedHardCooldownWhenInventoryAllows(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 28)
+
+	coolingStates := make([]storage.HomepageRecommendationState, 0, 14)
+	for i := 1; i <= 14; i++ {
+		movieID := strings.ToLower(testMovieCode(i))
+		fixture.mustResaveMovieMetadata(t, movieID, 5.0)
+		coolingStates = append(coolingStates, storage.HomepageRecommendationState{
+			MovieID:           movieID,
+			LastRecommendedAt: "2026-04-14T00:00:00Z",
+			RecommendCount:    1,
+			SkipUntil:         "2026-04-18T00:00:00Z",
+			UpdatedAt:         "2026-04-14T00:00:00Z",
+		})
+	}
+	for i := 15; i <= 28; i++ {
+		fixture.mustResaveMovieMetadata(t, testMovieCode(i), 4.0)
+	}
+	if err := fixture.store.UpsertHomepageRecommendationStates(ctx, coolingStates); err != nil {
+		t.Fatalf("UpsertHomepageRecommendationStates() error = %v", err)
+	}
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	coolingMovieIDs := make(map[string]struct{}, 14)
+	for i := 1; i <= 14; i++ {
+		coolingMovieIDs[strings.ToLower(testMovieCode(i))] = struct{}{}
+	}
+	all := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if len(all) != 14 {
+		t.Fatalf("len(all) = %d, want 14", len(all))
+	}
+	for _, movieID := range all {
+		if _, ok := coolingMovieIDs[movieID]; ok {
+			t.Fatalf("hard-cooling movie %q appeared in %#v", movieID, all)
+		}
+	}
+}
+
 func TestGenerateHomepageDailyRecommendationsBackfillsYesterdayOnlyAfterExhaustingFreshTitles(t *testing.T) {
 	t.Parallel()
 
@@ -344,6 +457,45 @@ func TestGenerateHomepageDailyRecommendationsAvoidsLast7DaysWhenInventoryAllows(
 	for _, id := range all {
 		if _, ok := recentIDs[id]; ok {
 			t.Fatalf("last-7-day movie %q reappeared in %#v", id, all)
+		}
+	}
+}
+
+func TestGenerateHomepageDailyRecommendationsAvoidsTwoWeekMondayRepeatWhenInventoryAllows(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 42)
+
+	for i := 1; i <= 14; i++ {
+		fixture.mustResaveMovieMetadata(t, testMovieCode(i), 5.0)
+	}
+	for i := 15; i <= 42; i++ {
+		fixture.mustResaveMovieMetadata(t, testMovieCode(i), 4.8)
+	}
+
+	fixture.mustSaveSnapshot(t, "2026-04-13",
+		[]string{"m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08"},
+		[]string{"m09", "m10", "m11", "m12", "m13", "m14"},
+	)
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-27")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	twoWeekOldIDs := make(map[string]struct{}, 14)
+	for i := 1; i <= 14; i++ {
+		twoWeekOldIDs[strings.ToLower(testMovieCode(i))] = struct{}{}
+	}
+
+	all := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if len(all) != 14 {
+		t.Fatalf("len(all) = %d, want 14", len(all))
+	}
+	for _, id := range all {
+		if _, ok := twoWeekOldIDs[id]; ok {
+			t.Fatalf("two-week-old Monday movie %q reappeared in %#v", id, all)
 		}
 	}
 }

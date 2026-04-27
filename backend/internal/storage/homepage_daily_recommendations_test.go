@@ -126,3 +126,64 @@ func TestListHomepageDailyRecommendationSnapshotsInRangeReturnsDescendingRows(t 
 		t.Fatalf("dates = %#v", []string{got[0].DateUTC, got[1].DateUTC})
 	}
 }
+
+func TestHomepageRecommendationStateLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "homepage-states.db"))
+	if err != nil {
+		t.Fatalf("NewSQLiteStore() error = %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate() error = %v", err)
+	}
+
+	initial := []HomepageRecommendationState{
+		{
+			MovieID:           "m01",
+			LastRecommendedAt: "2026-04-15T00:00:00Z",
+			RecommendCount:    1,
+			SkipUntil:         "2026-04-18T00:00:00Z",
+			UpdatedAt:         "2026-04-15T00:00:00Z",
+		},
+		{
+			MovieID:           "m02",
+			LastRecommendedAt: "2026-04-10T00:00:00Z",
+			RecommendCount:    3,
+			SkipUntil:         "2026-04-13T00:00:00Z",
+			UpdatedAt:         "2026-04-10T00:00:00Z",
+		},
+	}
+	if err := store.UpsertHomepageRecommendationStates(ctx, initial); err != nil {
+		t.Fatalf("UpsertHomepageRecommendationStates(initial) error = %v", err)
+	}
+
+	if err := store.UpsertHomepageRecommendationStates(ctx, []HomepageRecommendationState{
+		{
+			MovieID:           "m01",
+			LastRecommendedAt: "2026-04-16T00:00:00Z",
+			RecommendCount:    2,
+			SkipUntil:         "2026-04-19T00:00:00Z",
+			UpdatedAt:         "2026-04-16T00:00:00Z",
+		},
+	}); err != nil {
+		t.Fatalf("UpsertHomepageRecommendationStates(update) error = %v", err)
+	}
+
+	got, err := store.ListHomepageRecommendationStates(ctx)
+	if err != nil {
+		t.Fatalf("ListHomepageRecommendationStates() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+	if got[0].MovieID != "m01" || got[0].RecommendCount != 2 || got[0].SkipUntil != "2026-04-19T00:00:00Z" {
+		t.Fatalf("updated state = %#v", got[0])
+	}
+	if got[1].MovieID != "m02" || got[1].RecommendCount != 3 {
+		t.Fatalf("second state = %#v", got[1])
+	}
+}

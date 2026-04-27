@@ -145,7 +145,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 - `-tags release` 使 `version.Channel` 为 `release`，健康名为 `curated`。
 - Windows + release build 默认启动模式为 `tray`：启动本地 HTTP 服务、托盘图标、单实例互斥，并打开浏览器。
 - 后端 `webui.FindDistDir()` 会优先从可执行文件旁查找 `frontend-dist/` 或 `dist/`，因此安装目录中的 `curated.exe + frontend-dist/` 可以直接服务前端页面。
-- 前端生产构建未设置 `VITE_API_BASE_URL` 时，`src/api/http-client.ts` 默认请求 `http://127.0.0.1:8081/api`，与 release 后端默认端口一致。
+- 前端生产构建未设置 `VITE_API_BASE_URL` 时，`src/api/http-client.ts` 默认请求同源 `/api`，由 release 后端的 8081 静态托管入口接住；局域网客户端访问 `http://<host-ip>:8081` 时也会请求同一主机的后端。
 - release build 的默认数据根目录为 `%LOCALAPPDATA%\Curated`，可通过 `CURATED_DATA_DIR` 覆盖；默认派生：
   - `config/library-config.cfg`
   - `data/curated.db`
@@ -186,7 +186,7 @@ powershell -ExecutionPolicy Bypass -File scripts/release/publish.ps1 -Version <v
    - `runtime/config/library-config.example.cfg`
    - `README-release.txt`
 5. 追加 `docs/ops/2026-04-02-package-build-history.md`，记录日期、版本、提交 / 分支、打包类型、产物路径、状态、操作人与备注。
-6. 如发布态需要手动验收，运行 `release/Curated/curated.exe`，确认托盘模式启动、浏览器打开、`GET http://127.0.0.1:8081/api/health` 返回 `name=curated`、`channel=release`，并确认前端页面可加载。
+6. 如发布态需要手动验收，运行 `release/Curated/curated.exe`，确认托盘模式启动、浏览器打开、`GET http://127.0.0.1:8081/api/health` 返回 `name=curated`、`channel=release`，并确认前端页面可加载；局域网验收时改用 `GET http://<host-ip>:8081/api/health`。
 
 ## 2. 当前仓库现状
 

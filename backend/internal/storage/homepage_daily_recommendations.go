@@ -14,6 +14,14 @@ type HomepageDailyRecommendationSnapshot struct {
 	GenerationVersion      string
 }
 
+type HomepageRecommendationState struct {
+	MovieID           string
+	LastRecommendedAt string
+	RecommendCount    int
+	SkipUntil         string
+	UpdatedAt         string
+}
+
 func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context, dateUTC string) (HomepageDailyRecommendationSnapshot, bool, error) {
 	var heroJSON string
 	var recommendationJSON string
@@ -122,4 +130,81 @@ func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 	}
 
 	return snapshots, nil
+}
+
+func (s *SQLiteStore) ListHomepageRecommendationStates(ctx context.Context) ([]HomepageRecommendationState, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT movie_id, last_recommended_at, recommend_count, skip_until, updated_at
+		FROM homepage_recommendation_states
+		ORDER BY movie_id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	states := make([]HomepageRecommendationState, 0)
+	for rows.Next() {
+		var state HomepageRecommendationState
+		if err := rows.Scan(
+			&state.MovieID,
+			&state.LastRecommendedAt,
+			&state.RecommendCount,
+			&state.SkipUntil,
+			&state.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		states = append(states, state)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return states, nil
+}
+
+func (s *SQLiteStore) UpsertHomepageRecommendationStates(ctx context.Context, states []HomepageRecommendationState) error {
+	if len(states) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO homepage_recommendation_states (
+			movie_id,
+			last_recommended_at,
+			recommend_count,
+			skip_until,
+			updated_at
+		) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(movie_id) DO UPDATE SET
+			last_recommended_at = excluded.last_recommended_at,
+			recommend_count = excluded.recommend_count,
+			skip_until = excluded.skip_until,
+			updated_at = excluded.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, state := range states {
+		if _, err := stmt.ExecContext(
+			ctx,
+			state.MovieID,
+			state.LastRecommendedAt,
+			state.RecommendCount,
+			state.SkipUntil,
+			state.UpdatedAt,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
