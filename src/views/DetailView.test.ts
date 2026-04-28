@@ -71,16 +71,13 @@ vi.mock("@/components/jav-library/NotFoundState.vue", () => ({
   },
 }))
 
-vi.mock("@/services/adapters/web/web-library-service", () => ({
-  loadMovieDetail: vi.fn(),
-}))
-
 vi.mock("@/services/library-service", () => {
   const movie = makeMovie()
   return {
     useLibraryService: () => ({
       movies: computed(() => [movie]),
       getMovieById: (id: string) => (id === movie.id ? movie : undefined),
+      loadMovieDetail: vi.fn(async (id: string) => (id === movie.id ? movie : undefined)),
       getRelatedMovies: () => [],
       toggleFavorite: vi.fn(),
       patchMovie: vi.fn(),

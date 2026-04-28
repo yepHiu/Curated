@@ -8,7 +8,9 @@ alwaysApply: false
 
 # Curated Frontend Patterns
 
-- Data and mutations go through **`useLibraryService()`** / **`src/api`** (Web or Mock per `VITE_USE_WEB_API`); do not bypass the service layer for library actions from views.
+- Data and mutations go through **`useLibraryService()`** and service contracts; concrete adapters call **`src/api`** (Web or Mock per `VITE_USE_WEB_API`). Views/components must not import Web/Mock adapters directly or bypass the service layer for library actions.
+- State management currently defaults to **Composables + service layer**. Pinia or a similar store can be trialed later from a small, self-contained service/new feature when it reduces real complexity; avoid a large upfront migration or parallel app-wide store.
+- Frontend code must not assume Electron, mpv, PotPlayer, or any native-player executable exists. Native-player handoff must stay optional, disabled by default when not configured, and expressed through service settings / browser protocol templates rather than hard-coded runtime assumptions.
 - Keep the app as a routed SPA under `AppShell`; do not move page switching back into `App.vue`.
 - Use `vue-router` params and query state for page context such as selected movie, active library tab, and search keywords.
 - Preserve internal scrolling containers; avoid changes that make the whole shell scroll when only the content area should scroll.

@@ -24,21 +24,24 @@ export function normalizeNativePlayerPresetForBrowserLaunch(
   }
   const cmd = (command ?? "").trim().toLowerCase()
   if (cmd.includes("potplayer")) return "potplayer"
-  if (!cmd || cmd.includes("mpv")) return "mpv"
+  if (cmd.includes("mpv")) return "mpv"
   return "custom"
 }
 
 export function defaultNativePlayerBackendCommand(
   preset: NativePlayerPreset | undefined,
 ): string {
-  return normalizeNativePlayerPresetForBrowserLaunch(preset) === "potplayer"
-    ? "PotPlayerMini64.exe"
-    : "mpv"
+  if (!preset) return ""
+  const normalized = normalizeNativePlayerPresetForBrowserLaunch(preset)
+  if (normalized === "potplayer") return "PotPlayerMini64.exe"
+  if (normalized === "mpv") return "mpv"
+  return ""
 }
 
 export function defaultNativePlayerBrowserTemplate(
   preset: NativePlayerPreset | undefined,
 ): string {
+  if (!preset) return ""
   switch (normalizeNativePlayerPresetForBrowserLaunch(preset)) {
     case "potplayer":
       return "potplayer:{url}"

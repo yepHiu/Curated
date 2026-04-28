@@ -85,6 +85,8 @@ export interface LibraryService {
    */
   refreshMetadataForLibraryPaths(paths: string[]): Promise<MetadataRefreshQueuedDTO>
   getMovieById(movieId?: string): Movie | undefined
+  /** Load one movie through the active adapter and merge it into that adapter's cache when possible. */
+  loadMovieDetail(movieId: string): Promise<Movie | undefined>
   /**
    * Web：列表未包含该 id 时拉取单条并写入缓存（避免仅加载首页导致播放/详情找不到）。
    * Mock：空操作。

@@ -50,9 +50,9 @@ const proxyState = ref<ProxySettingsDTO>({ enabled: false })
 const playerSettingsState = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
-  nativePlayerPreset: "potplayer",
-  nativePlayerEnabled: true,
-  nativePlayerCommand: "PotPlayerMini64.exe",
+  nativePlayerPreset: "custom",
+  nativePlayerEnabled: false,
+  nativePlayerCommand: "",
   streamPushEnabled: true,
   forceStreamPush: false,
   ffmpegCommand: "ffmpeg",
@@ -249,7 +249,7 @@ function applyPlayerSettingsFromDTO(next: SettingsDTO) {
       player?.nativePlayerPreset,
       player?.nativePlayerCommand,
     ),
-    nativePlayerEnabled: player?.nativePlayerEnabled !== false,
+    nativePlayerEnabled: Boolean(player?.nativePlayerEnabled),
     nativePlayerCommand:
       (player?.nativePlayerCommand ?? defaultNativePlayerCommand(player?.nativePlayerPreset)).trim() ||
       defaultNativePlayerCommand(player?.nativePlayerPreset),
@@ -274,12 +274,15 @@ function normalizeNativePlayerPreset(
   }
   const cmd = (command ?? "").trim().toLowerCase()
   if (cmd.includes("potplayer")) return "potplayer"
-  if (!cmd || cmd.includes("mpv")) return "mpv"
+  if (cmd.includes("mpv")) return "mpv"
   return "custom"
 }
 
 function defaultNativePlayerCommand(preset: PlayerSettingsDTO["nativePlayerPreset"]): string {
-  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
+  const normalized = normalizeNativePlayerPreset(preset)
+  if (normalized === "potplayer") return "PotPlayerMini64.exe"
+  if (normalized === "mpv") return "mpv"
+  return ""
 }
 
 async function refreshLibraryPathsFromApi() {
@@ -753,6 +756,10 @@ function createWebLibraryService(): LibraryService {
         moviesState.value.find((m) => m.id === id) ??
         trashedMoviesState.value.find((m) => m.id === id)
       )
+    },
+
+    async loadMovieDetail(movieId: string) {
+      return await loadMovieDetail(movieId)
     },
 
     getRelatedMovies(movieId, limit = 6) {

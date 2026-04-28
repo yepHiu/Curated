@@ -37,7 +37,6 @@ import {
   compareByRatingDesc,
   compareByReleaseDateDesc,
 } from "@/lib/movie-sort"
-import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -120,7 +119,7 @@ watch(scanTaskTracker.activeTask, async (task) => {
 
   if (task.status === "completed") {
     bumpMovieImageVersion(mid)
-    await loadMovieDetail(mid)
+    await libraryService.loadMovieDetail(mid)
   } else if (task.status === "failed" || task.status === "partial_failed") {
     pushAppToast(task.errorMessage?.trim() || t("detail.scrapeFailed"), { variant: "destructive" })
   }
@@ -344,7 +343,7 @@ async function runBatchRefreshMetadata() {
         )
         if (final.status === "completed") {
           bumpMovieImageVersion(id)
-          await loadMovieDetail(id)
+          await libraryService.loadMovieDetail(id)
           ok++
         } else {
           fail++

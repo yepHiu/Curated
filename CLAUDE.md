@@ -139,6 +139,7 @@ src/
 - Domain components are in `src/components/jav-library/`
 - Mock data and types are in `src/lib/jav-library.ts`
 - Service layer with adapter pattern for backend communication
+- State management defaults to composables plus the service layer; Pinia may be introduced later through a small, bounded service/new feature, not a broad upfront migration
 - Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `settings`
 - Playback progress: dual storage (backend SQLite in Web API mode, `localStorage` in Mock mode)
 - History page: `src/views/HistoryView.vue` displays watch history grouped by date
@@ -261,7 +262,7 @@ POST   /api/providers/ping-all              # Ping all providers
 - mpv player integration with named pipes
 - Desktop file system bridge
 
-**Design Principle:** Frontend code should not assume Electron/mpv exists. All business logic goes through the service layer (`useLibraryService()`, `src/api/`) to allow swapping transport (HTTP now, IPC later).
+**Design Principle:** Frontend code should not assume Electron, mpv, PotPlayer, or any native-player executable exists. All business logic goes through composables plus the service layer (`useLibraryService()`, service contracts, and adapter-owned `src/api`) to allow swapping transport (HTTP now, IPC later). Shared state defaults to composables and services; Pinia can be evaluated later from a small, bounded service/new feature when it reduces complexity, rather than as a broad upfront migration.
 
 ## Key Documentation
 
@@ -389,7 +390,11 @@ const service = useLibraryService()
 const movies = await service.getMovies({ limit: 50 })
 ```
 
-Do not bypass the service layer for library actions.
+Do not bypass the service layer for library actions. Views/components should not import concrete Web/Mock adapters directly; add a service-contract method when UI needs a new business capability.
+
+### State Management
+
+Use Vue composables and service-layer refs/computed values as the default shared-state model. Pinia or another store may be introduced incrementally for a small, bounded service or new feature when it removes real complexity; avoid starting with an app-wide migration or duplicate global store.
 
 ### Toast Notifications
 

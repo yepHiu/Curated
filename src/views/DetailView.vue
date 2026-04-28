@@ -20,7 +20,6 @@ import {
   resolveNavigationBackLink,
 } from "@/lib/navigation-intent"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
-import { loadMovieDetail } from "@/services/adapters/web/web-library-service"
 import { useLibraryService } from "@/services/library-service"
 import { bumpMovieImageVersion } from "@/lib/image-version"
 import type { Movie } from "@/domain/movie/types"
@@ -78,23 +77,15 @@ watch(
     if (!id) {
       return
     }
-    if (USE_WEB_API) {
-      detailLoading.value = true
-      try {
-        const loaded = await loadMovieDetail(id)
-        if (loaded) {
-          detailMovie.value = loaded
-        } else {
-          detailMovie.value = libraryService.getMovieById(id)
-          if (!detailMovie.value) {
-            detailLoadError.value = t("detail.loadError")
-          }
-        }
-      } finally {
-        detailLoading.value = false
+    detailLoading.value = true
+    try {
+      const loaded = await libraryService.loadMovieDetail(id)
+      detailMovie.value = loaded ?? libraryService.getMovieById(id)
+      if (!detailMovie.value) {
+        detailLoadError.value = t("detail.loadError")
       }
-    } else {
-      detailMovie.value = libraryService.getMovieById(id)
+    } finally {
+      detailLoading.value = false
     }
   },
   { immediate: true },
@@ -113,7 +104,7 @@ watch(scanTaskTracker.activeTask, async (task) => {
     metadataRefreshError.value = ""
     // 递增图片版本号，强制刷新海报/缩略图缓存
     bumpMovieImageVersion(id)
-    const loaded = await loadMovieDetail(id)
+    const loaded = await libraryService.loadMovieDetail(id)
     if (loaded) {
       detailMovie.value = loaded
     }
@@ -320,16 +311,8 @@ const handleRestoreMovie = async (id: string) => {
   restoreBusy.value = true
   try {
     await libraryService.restoreMovie(id)
-    if (USE_WEB_API) {
-      const loaded = await loadMovieDetail(id)
-      if (loaded) {
-        detailMovie.value = loaded
-      } else {
-        detailMovie.value = libraryService.getMovieById(id)
-      }
-    } else {
-      detailMovie.value = libraryService.getMovieById(id)
-    }
+    const loaded = await libraryService.loadMovieDetail(id)
+    detailMovie.value = loaded ?? libraryService.getMovieById(id)
   } catch (err) {
     restoreError.value = formatClientError(err, t("detail.restoreFailGeneric"))
     console.error("[DetailView] restore movie failed", err)

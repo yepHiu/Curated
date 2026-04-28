@@ -9,6 +9,7 @@ alwaysApply: false
 # Vue Frontend Standards
 
 - Use `Vue 3` SFCs with `<script setup lang="ts">`; prefer Composition API over Options API.
+- Default shared state should live in composables plus the frontend service layer. A state library such as Pinia may be introduced later for a small, well-bounded service or new feature, but do not start with a broad store migration or large cross-app rewrite.
 - Keep TypeScript strict. Do not introduce `any`, silent casts, or ignored type errors unless clearly justified.
 - Prefer imports from `@/components`, `@/lib`, and `@/composables` instead of long relative paths.
 - Reuse `shadcn-vue` primitives from `src/components/ui` before creating new base components.

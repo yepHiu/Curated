@@ -1,25 +1,29 @@
 ---
-description: 当前实现 vs 目标桌面架构边界
+description: Current implementation vs target desktop architecture boundaries
 alwaysApply: true
 ---
 
 # Architecture Boundaries
 
-## 文档与真相
+## Documentation Truth
 
-- **`docs/product/2026-03-20-jav-libary.md`**（**Curated** 产品设计）描述的是**目标产品架构**；以**当前代码**为事实来源，文档与代码冲突时先改文档或标明「规划中」。
-- 在文档中区分：**已实现**、**目标态**、**待定**。
+- `docs/product/2026-03-20-jav-libary.md` describes both current product behavior and target architecture. Current code is the source of truth when documents conflict with implementation.
+- In documents, clearly label current, target, and pending items.
 
-## 当前仓库已具备（不要再说「还没有」）
+## Implemented Current State
 
-- **Go HTTP 后端**、**SQLite 应用库**、**扫描 / 刮削 / 任务**、**REST 式 `/api`** 等已在 `backend/` 落地。
-- 前端可通过 **`VITE_USE_WEB_API`** 走真实 HTTP，与上述后端对接。
+- Go HTTP backend, SQLite application database, scanning, scraping, task system, and REST API under `backend/` are implemented.
+- The frontend can use real HTTP through `VITE_USE_WEB_API=true`.
 
-## 仍未当作已实现
+## Not Implemented As Current Frontend Assumptions
 
-- **Electron**、**preload/Main 与渲染进程 IPC**、**mpv 播放器进程**、**桌面级文件/权限桥** 等：规划在文档中，**不要**在 Vue 里写死为已存在；业务代码仍经 **`library-service` 契约** 与 **`src/api`**，便于日后换传输层。
+- Electron, preload/main process IPC, mpv process control, and desktop file/permission bridges are planning or future desktop concerns unless current code proves otherwise.
+- Vue renderer code must not assume Electron, mpv, PotPlayer, or any native-player executable exists.
 
-## 编写业务代码时
+## Frontend Business Code
 
-- 渲染层依赖**前端服务层 + 类型**，不直接假设「本地文件路径、IPC 名、DB 连接串」等桌面细节。
-- 需要新能力时：先 **DTO / 错误码 / 事件名**（可与 `backend/internal/contracts` 对齐），再接线 HTTP 或日后的 stdio/IPC。
+- Rendering code depends on composables, frontend service contracts, and shared types.
+- State management currently defaults to composables plus the service layer. Pinia or a similar store may be introduced incrementally for a small, bounded service or new feature when it clearly improves maintainability; avoid a big-bang migration or broad parallel global store.
+- Views/components must not import concrete Web/Mock adapters directly for library behavior. Use `useLibraryService()` and add service-contract methods when a new capability is needed.
+- Native-player handoff must stay optional and disabled by default when not configured. Express it through service settings and browser protocol templates, not hard-coded runtime assumptions.
+- When adding a new capability, define DTOs/error codes/event names first, then wire the current HTTP adapter or a future stdio/IPC adapter behind the same service contract.

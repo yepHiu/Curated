@@ -63,9 +63,9 @@ const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false }
 const playerSettingsMock = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
-  nativePlayerPreset: "potplayer",
-  nativePlayerEnabled: true,
-  nativePlayerCommand: "PotPlayerMini64.exe",
+  nativePlayerPreset: "custom",
+  nativePlayerEnabled: false,
+  nativePlayerCommand: "",
   streamPushEnabled: true,
   forceStreamPush: false,
   ffmpegCommand: "ffmpeg",
@@ -87,12 +87,15 @@ function normalizeNativePlayerPreset(
   }
   const cmd = (command ?? "").trim().toLowerCase()
   if (cmd.includes("potplayer")) return "potplayer"
-  if (!cmd || cmd.includes("mpv")) return "mpv"
+  if (cmd.includes("mpv")) return "mpv"
   return "custom"
 }
 
 function defaultNativePlayerCommand(preset: PlayerSettingsDTO["nativePlayerPreset"]): string {
-  return normalizeNativePlayerPreset(preset) === "potplayer" ? "PotPlayerMini64.exe" : "mpv"
+  const normalized = normalizeNativePlayerPreset(preset)
+  if (normalized === "potplayer") return "PotPlayerMini64.exe"
+  if (normalized === "mpv") return "mpv"
+  return ""
 }
 
 /** 设置页概览第三卡：萃取帧条数（IndexedDB） */
@@ -470,7 +473,7 @@ export const mockLibraryService: LibraryService = {
           : prev.nativePlayerEnabled,
       nativePlayerCommand:
         patch.nativePlayerCommand !== undefined
-          ? (patch.nativePlayerCommand.trim() || "mpv")
+          ? patch.nativePlayerCommand.trim()
           : prev.nativePlayerCommand,
       streamPushEnabled:
         patch.streamPushEnabled !== undefined
@@ -678,6 +681,9 @@ export const mockLibraryService: LibraryService = {
   },
 
   getMovieById(movieId) {
+    return moviesState.value.find((movie) => movie.id === movieId)
+  },
+  async loadMovieDetail(movieId: string) {
     return moviesState.value.find((movie) => movie.id === movieId)
   },
   getRelatedMovies(movieId, limit = 6) {

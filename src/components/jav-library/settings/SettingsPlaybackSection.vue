@@ -58,16 +58,16 @@ const PLAYBACK_HARDWARE_ENCODER_OPTIONS: readonly HardwareEncoderPreference[] = 
   "software",
 ]
 const PLAYBACK_NATIVE_PLAYER_PRESET_OPTIONS: readonly NativePlayerPreset[] = [
-  "mpv",
-  "potplayer",
   "custom",
+  "potplayer",
+  "mpv",
 ]
 
 const playbackHardwareDecodeDraft = ref(true)
 const playbackHardwareEncoderDraft = ref<HardwareEncoderPreference>("auto")
-const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("potplayer")
-const playbackNativePlayerEnabledDraft = ref(true)
-const playbackNativePlayerProtocolTemplateDraft = ref(defaultNativePlayerBrowserTemplate("potplayer"))
+const playbackNativePlayerPresetDraft = ref<NativePlayerPreset>("custom")
+const playbackNativePlayerEnabledDraft = ref(false)
+const playbackNativePlayerProtocolTemplateDraft = ref(defaultNativePlayerBrowserTemplate("custom"))
 const playbackStreamPushEnabledDraft = ref(true)
 const playbackForceStreamPushDraft = ref(false)
 const playbackFfmpegCommandDraft = ref("ffmpeg")
@@ -89,7 +89,7 @@ function syncPlaybackDraftFromService() {
     player.nativePlayerPreset,
     player.nativePlayerCommand,
   )
-  playbackNativePlayerEnabledDraft.value = player.nativePlayerEnabled !== false
+  playbackNativePlayerEnabledDraft.value = Boolean(player.nativePlayerEnabled)
   playbackNativePlayerProtocolTemplateDraft.value = resolveNativePlayerBrowserTemplate(
     playbackNativePlayerPresetDraft.value,
     getStoredNativePlayerBrowserTemplate(),
