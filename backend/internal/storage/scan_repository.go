@@ -91,7 +91,10 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 
 	queryErr := tx.QueryRowContext(
 		ctx,
-		`SELECT id, code, location FROM movies WHERE code = ? OR location = ? LIMIT 1`,
+		`SELECT id, code, location FROM movies
+			 WHERE (code = ? OR location = ?)
+			   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')
+			 LIMIT 1`,
 		result.Number,
 		result.Path,
 	).Scan(&movieID, &code, &location)

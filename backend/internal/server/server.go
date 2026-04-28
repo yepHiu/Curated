@@ -447,7 +447,7 @@ func (h *Handler) handlePatchActorUserTags(w http.ResponseWriter, r *http.Reques
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 256<<10))
 	if r.Body != nil {
 		_ = r.Body.Close()
 	}
@@ -497,7 +497,7 @@ func (h *Handler) handlePatchActorExternalLinks(w http.ResponseWriter, r *http.R
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "name is required")
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 256<<10))
 	if r.Body != nil {
 		_ = r.Body.Close()
 	}
@@ -1223,7 +1223,7 @@ func (h *Handler) handlePatchMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if r.Body != nil {
 		_ = r.Body.Close()
 	}

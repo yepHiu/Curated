@@ -33,6 +33,7 @@ func (m *Manager) Create(taskType string, metadata map[string]any) contracts.Tas
 
 	m.mu.Lock()
 	m.tasks[task.TaskID] = task
+	_ = m.enforceCap()
 	m.mu.Unlock()
 
 	return task
@@ -133,6 +134,77 @@ func (m *Manager) ListRecentFinished(limit int) []contracts.TaskDTO {
 		out = out[:limit]
 	}
 	return out
+}
+
+const (
+	defaultTaskMaxAge  = 24 * time.Hour
+	maxInMemoryTasks   = 5000
+)
+
+// PurgeOldTasks removes terminal tasks whose FinishedAt is older than maxAge.
+// Returns the number of tasks removed.
+func (m *Manager) PurgeOldTasks(maxAge time.Duration) int {
+	if maxAge <= 0 {
+		maxAge = defaultTaskMaxAge
+	}
+	cutoff := time.Now().UTC().Add(-maxAge).Format(time.RFC3339)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	removed := 0
+	for id, t := range m.tasks {
+		switch t.Status {
+		case contracts.TaskCompleted, contracts.TaskFailed,
+			contracts.TaskPartialFailed, contracts.TaskCancelled:
+			if t.FinishedAt != "" && t.FinishedAt < cutoff {
+				delete(m.tasks, id)
+				removed++
+			}
+		}
+	}
+	return removed
+}
+
+// enforceCap prunes the oldest terminal tasks when the map exceeds maxInMemoryTasks.
+func (m *Manager) enforceCap() int {
+	// Called from Create while already holding m.mu.Lock().
+	if len(m.tasks) <= maxInMemoryTasks {
+		return 0
+	}
+
+	type entry struct {
+		id         string
+		finishedAt string
+	}
+	var terminal []entry
+	for id, t := range m.tasks {
+		switch t.Status {
+		case contracts.TaskCompleted, contracts.TaskFailed,
+			contracts.TaskPartialFailed, contracts.TaskCancelled:
+			if t.FinishedAt != "" {
+				terminal = append(terminal, entry{id, t.FinishedAt})
+			}
+		}
+	}
+	if len(terminal) == 0 {
+		return 0
+	}
+
+	slices.SortFunc(terminal, func(a, b entry) int {
+		if a.finishedAt < b.finishedAt { return -1 }
+		if a.finishedAt > b.finishedAt { return 1 }
+		return 0
+	})
+
+	toRemove := len(m.tasks) - maxInMemoryTasks/2
+	if toRemove > len(terminal) {
+		toRemove = len(terminal)
+	}
+	for i := 0; i < toRemove; i++ {
+		delete(m.tasks, terminal[i].id)
+	}
+	return toRemove
 }
 
 func (m *Manager) update(taskID string, mutate func(contracts.TaskDTO) contracts.TaskDTO) contracts.TaskDTO {

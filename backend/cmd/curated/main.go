@@ -164,6 +164,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	}
 
 	backendApp.StartAutoScanLoop(ctx)
+	backendApp.StartTaskJanitor(ctx)
 	if cfg.LibraryWatchOn() {
 		if err := backendApp.EnsureLibraryWatchRunning(); err != nil {
 			_ = store.Close()

@@ -2004,6 +2004,26 @@ func (a *App) StartAutoScanLoop(ctx context.Context) {
 	}()
 }
 
+// StartTaskJanitor runs periodic task cleanup until ctx is cancelled.
+// It purges terminal tasks older than 24 hours and enforces the in-memory cap.
+func (a *App) StartTaskJanitor(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n := a.tasks.PurgeOldTasks(0) // 0 uses default 24h maxAge
+				if n > 0 && a.logger != nil {
+					a.logger.Debug("purged old tasks", zap.Int("count", n))
+				}
+			}
+		}
+	}()
+}
+
 func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error) {
 	return a.startLibraryScan(ctx, io.Discard, paths, nil)
 }

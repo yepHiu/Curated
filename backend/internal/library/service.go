@@ -15,13 +15,15 @@ import (
 var errMovieNotFound = errors.New("movie not found")
 
 type Service struct {
-	mu     sync.RWMutex
-	movies []contracts.MovieDetailDTO
+	mu          sync.RWMutex
+	movies      []contracts.MovieDetailDTO
+	searchTexts map[string]string // movieID → pre-computed searchable text
 }
 
 func NewService() *Service {
 	return &Service{
-		movies: nil,
+		movies:      nil,
+		searchTexts: make(map[string]string),
 	}
 }
 
@@ -40,8 +42,11 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 		}
 
 		eff := contracts.EffectiveMovieDetailDTO(movie)
-		if query != "" && !matchesQuery(eff, query) {
-			continue
+		if query != "" {
+			searchText := s.searchTexts[movie.ID]
+			if !matchesQuery(eff, searchText, query) {
+				continue
+			}
 		}
 
 		if actorExact != "" && !slices.Contains(movie.Actors, actorExact) {
@@ -240,24 +245,45 @@ func coalesceSummary(summary string) string {
 	return summary
 }
 
-func matchesQuery(movie contracts.MovieDetailDTO, query string) bool {
+func matchesQuery(movie contracts.MovieDetailDTO, searchText, query string) bool {
+	// Static fields that never change at runtime.
 	fields := []string{
 		movie.Title,
 		movie.Code,
 		movie.Studio,
 		movie.Summary,
-		strings.Join(movie.Actors, " "),
-		strings.Join(movie.Tags, " "),
-		strings.Join(movie.UserTags, " "),
 	}
-
 	for _, field := range fields {
 		if strings.Contains(strings.ToLower(field), query) {
 			return true
 		}
 	}
-
+	// Pre-computed text for slice-based fields (Actors, Tags, UserTags).
+	if searchText != "" && strings.Contains(strings.ToLower(searchText), query) {
+		return true
+	}
 	return false
+}
+
+func buildSearchText(m contracts.MovieListItemDTO) string {
+	parts := make([]string, 0, len(m.Actors)+len(m.Tags)+len(m.UserTags))
+	parts = append(parts, m.Actors...)
+	parts = append(parts, m.Tags...)
+	parts = append(parts, m.UserTags...)
+	return strings.Join(parts, " ")
+}
+
+// RebuildSearchTexts recomputes the cached search text for every movie in the service.
+// Call this after bulk-loading movies (e.g. from storage on startup) before any ListMovies call.
+func (s *Service) RebuildSearchTexts() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.searchTexts == nil {
+		s.searchTexts = make(map[string]string, len(s.movies))
+	}
+	for i := range s.movies {
+		s.searchTexts[s.movies[i].ID] = buildSearchText(s.movies[i].MovieListItemDTO)
+	}
 }
 
 func syncEffectiveRating(m *contracts.MovieDetailDTO) {

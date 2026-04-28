@@ -256,7 +256,7 @@ func (s *SQLiteStore) DeleteLibraryPathAndPruneOrphanMovies(ctx context.Context,
 	}
 
 	rows, err := tx.QueryContext(ctx,
-		`SELECT id, location FROM movies WHERE TRIM(COALESCE(location, '')) != ''`)
+		`SELECT id, location FROM movies WHERE TRIM(COALESCE(location, '')) != '' AND (trashed_at IS NULL OR TRIM(trashed_at) = '')`)
 	if err != nil {
 		return 0, err
 	}
