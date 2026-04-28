@@ -93,6 +93,7 @@ type App struct {
 
 	// scrapeSem limits concurrent scrape.movie pipelines (network + DB).
 	scrapeSem chan struct{}
+	scrapeWg  sync.WaitGroup
 
 	watchScanMu      sync.Mutex
 	watchScanPending map[string]struct{}
@@ -188,6 +189,19 @@ func (a *App) Close() {
 	a.StopLibraryWatchLoop()
 	if a.streams != nil {
 		a.streams.Close()
+	}
+	// Drain in-flight scrape goroutines so they don't access the closed store.
+	done := make(chan struct{})
+	go func() {
+		a.scrapeWg.Wait()
+		close(done)
+	}()
+	const scrapeDrainTimeout = 10 * time.Second
+	select {
+	case <-done:
+	case <-time.After(scrapeDrainTimeout):
+		a.logger.Warn("timed out waiting for scrape goroutines to finish",
+			zap.Duration("timeout", scrapeDrainTimeout))
 	}
 }
 
@@ -1344,7 +1358,9 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 
 // enqueueScrape runs runScrape in a goroutine bounded by scrapeSem (config scraper.maxConcurrent).
 func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result contracts.ScanFileResultDTO, parentScanTaskID string) {
+	a.scrapeWg.Add(1)
 	go func(r contracts.ScanFileResultDTO, parent string) {
+		defer a.scrapeWg.Done()
 		a.scrapeSem <- struct{}{}
 		defer func() { <-a.scrapeSem }()
 		a.runScrape(parentCtx, output, r, parent)
@@ -1612,7 +1628,9 @@ func (a *App) createActorProfileScrapeTask(ctx context.Context, actorName string
 }
 
 func (a *App) enqueueActorProfileScrapeTask(task contracts.TaskDTO, actorName string, onDone func()) {
+	a.scrapeWg.Add(1)
 	go func(t contracts.TaskDTO, name string) {
+		defer a.scrapeWg.Done()
 		if onDone != nil {
 			defer onDone()
 		}
