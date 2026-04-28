@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -362,7 +363,7 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 		thumbBlob = bytes.Clone(raw)
 	}
 	if err := h.store.InsertCuratedFrameWithThumbnail(ctx, meta, raw, thumbBlob); err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "unique") {
+		if errors.Is(err, storage.ErrCuratedFrameDuplicateID) {
 			writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "curated frame id already exists")
 			return
 		}

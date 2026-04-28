@@ -115,7 +115,19 @@ func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta 
 		INSERT INTO curated_frames (id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob, thumb_blob)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, meta.ID, meta.MovieID, meta.Title, meta.Code, string(actorsJSON), meta.PositionSec, meta.CapturedAt, string(tagsJSON), imageBlob, thumbBlob)
+	if isSQLiteConstraint(err) {
+		return fmt.Errorf("%w: %w", ErrCuratedFrameDuplicateID, err)
+	}
 	return err
+}
+
+// isSQLiteConstraint returns true if err is a SQLite constraint violation (code 19).
+func isSQLiteConstraint(err error) bool {
+	if err == nil {
+		return false
+	}
+	var e interface{ Code() int }
+	return errors.As(err, &e) && e.Code() == 19
 }
 
 func scanCuratedMeta(actorsJSON, tagsJSON string, dest *CuratedFrameMeta) error {
@@ -375,6 +387,9 @@ func (s *SQLiteStore) FindNearbyCuratedFrame(ctx context.Context, movieID string
 
 // ErrCuratedFrameNotFound is returned when a curated frame id does not exist.
 var ErrCuratedFrameNotFound = errors.New("curated frame not found")
+
+// ErrCuratedFrameDuplicateID is returned when a curated frame id already exists.
+var ErrCuratedFrameDuplicateID = errors.New("curated frame id already exists")
 
 // CuratedFrameExportRow is metadata plus PNG/JPEG image bytes for WebP export.
 type CuratedFrameExportRow struct {
