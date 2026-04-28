@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -370,25 +369,11 @@ func WriteLibrarySettingsMerge(path string, mutator func(map[string]any) error) 
 }
 
 func replaceLibrarySettingsFileAtomically(tmpPath string, finalPath string) error {
-	var lastErr error
-	for attempt := 0; attempt < 5; attempt++ {
-		if err := os.Rename(tmpPath, finalPath); err == nil {
-			return nil
-		} else {
-			lastErr = err
-		}
-
-		if err := os.Remove(finalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			lastErr = err
-		} else if err := os.Rename(tmpPath, finalPath); err == nil {
-			return nil
-		} else {
-			lastErr = err
-		}
-
-		time.Sleep(time.Duration(attempt+1) * 25 * time.Millisecond)
-	}
-	return lastErr
+	// Temp file is created in the same directory as finalPath, so cross-volume
+	// os.Rename is not possible. On Windows, Rename fails if target exists,
+	// so remove the target first.
+	_ = os.Remove(finalPath)
+	return os.Rename(tmpPath, finalPath)
 }
 
 func readLibrarySettingsMap(path string) (map[string]any, error) {
