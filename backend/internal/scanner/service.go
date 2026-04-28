@@ -53,7 +53,7 @@ func (s *Service) Scan(ctx context.Context, taskID string, paths []string, hooks
 		return contracts.ScanSummaryDTO{}, errNoPathsConfigured
 	}
 
-	discoveredFiles, err := s.findVideoFiles(paths)
+	discoveredFiles, err := s.findVideoFiles(ctx, paths)
 	if err != nil {
 		return contracts.ScanSummaryDTO{}, err
 	}
@@ -116,9 +116,10 @@ func (s *Service) Scan(ctx context.Context, taskID string, paths []string, hooks
 
 // findVideoFiles 对每个根路径做 filepath.Walk，收集扩展名在白名单内的普通文件路径，
 // 按 Clean 后的路径去重，最终按字典序排序后返回。
-func (s *Service) findVideoFiles(paths []string) ([]string, error) {
+func (s *Service) findVideoFiles(ctx context.Context, paths []string) ([]string, error) {
 	files := make([]string, 0)
 	seen := make(map[string]struct{})
+	var walkCount int
 
 	for _, rootPath := range paths {
 		if strings.TrimSpace(rootPath) == "" {
@@ -128,6 +129,14 @@ func (s *Service) findVideoFiles(paths []string) ([]string, error) {
 		walkErr := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+			walkCount++
+			if walkCount%100 == 0 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
 			}
 			if info.IsDir() {
 				return nil
