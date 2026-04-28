@@ -1,0 +1,4 @@
+interface:
+  display_name: "Curated Dev Start"
+  short_description: "Start Curated frontend and backend dev services."
+  default_prompt: "Start the Curated development environment."
