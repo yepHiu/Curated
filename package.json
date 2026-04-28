@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc -b",
     "lint": "eslint .",
     "test": "vitest run --configLoader native --pool threads",
+    "test:display": "playwright test tests/display-scaling/display-scaling.spec.ts",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
     "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
@@ -40,6 +41,7 @@
     "vue-virtual-scroller": "2.0.0-beta.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^24.12.0",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",
