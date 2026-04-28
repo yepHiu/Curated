@@ -38,6 +38,13 @@ alwaysApply: false
 - **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。
 - **壳层**：保留 **`AppShell`** 内滚动：内容区滚动，避免整页壳跟着滚。
 
+## 显示缩放（MUST）
+
+- 修改 **壳层布局、网格、卡片、播放器 HUD、设置页、对话框、全局字体或 spacing** 时，必须按 **[`docs/reference/frontend-display-scaling-checklist.md`](docs/reference/frontend-display-scaling-checklist.md)** 做多端显示缩放检查。
+- 普通布局以 CSS pixel 为基准；不要为每一种 DPR 或物理分辨率写独立业务布局分支。
+- 显示适配不应绕过服务层或把业务能力判断塞进页面组件；浏览器前端不默认假设 Electron / mpv 存在。
+- 不因显示适配一次性引入 Pinia/Vuex 等全局状态管理重构；如后续需要 Pinia，应从小服务或小模块逐步试点。
+
 ## 交互与可访问性（SHOULD）
 
 - 可点击海报/卡片主区域用 **`button type="button"`** 或明确 `role` + 键盘可操作；保留 **`focus-visible`** 样式（勿 `outline-none` 且无替代）。

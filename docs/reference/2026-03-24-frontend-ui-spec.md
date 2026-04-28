@@ -44,12 +44,20 @@
 - 装饰性层应使用 `aria-hidden="true"`，图片与封面应提供有意义的 `alt`。
 - 在展示型页面中，如需避免误操作，可在 showcase adapter 层抑制交互，而不是修改业务组件本体。
 
-## 7. 维护要求
+## 7. 显示缩放与多端检查
+
+- 涉及 macOS Retina、外接屏、浏览器缩放、系统显示缩放、窄 viewport 的 UI 检查，统一使用 [`frontend-display-scaling-checklist.md`](frontend-display-scaling-checklist.md)。
+- 修改壳层布局、海报网格、播放器 HUD、设置页、对话框、全局 typography 或 spacing 后，应按显示缩放检查清单做回归。
+- 普通布局以 CSS 像素为基准，不为每一种物理分辨率或 DPR 单独写布局分支。
+- 显示适配不应把业务逻辑放入页面组件；业务能力判断仍通过服务层与 Composables。
+- 当前阶段不因为显示适配引入全局状态管理重构。Pinia 如需引入，应后续从小模块逐步试点。
+
+## 8. 维护要求
 
 - 修改全局主题令牌、基础组件默认样式或关键业务组件视觉结构后，应同步更新本文件。
 - 若架构事实发生变化，还应同步检查 `AGENTS.md`、`.cursor/rules/*.mdc` 与 `docs/plan/*` 中的相关说明。
 
-## 8. 颜色治理约束
+## 9. 颜色治理约束
 
 - 常规业务页面优先使用语义化 token：`background`、`foreground`、`card`、`surface`、`muted`、`accent`、`border`、`primary`。
 - 状态表达统一收敛到四类语义色：`success`、`warning`、`danger`、`info`。状态点、状态徽标、状态文字、状态提示面板应优先复用统一承载方式，而不是每个页面手写一套颜色。
