@@ -28,6 +28,10 @@ import (
 // Keep in sync with github.com/metatube-community/metatube-sdk-go/engine/register.go for your version.
 var fc2MovieProviderNames = []string{"FC2", "fc2hub"}
 
+// providerHealthProbeKeyword is the search term used to verify a provider responds successfully.
+// SSIS is one of the most widely available JAV labels across nearly all adult metadata providers.
+const providerHealthProbeKeyword = "SSIS"
+
 // providerHealthMaxLatencyMs: health probe round-trip above this is reported as fail (not merely slow).
 const providerHealthMaxLatencyMs int64 = 5000
 
@@ -678,9 +682,9 @@ func (s *Service) CheckProviderHealth(ctx context.Context, name string) (status 
 		return "fail", time.Since(start).Milliseconds(), fmt.Errorf("provider not found: %w", err)
 	}
 
-	// Use a lightweight search to check provider health
-	// Search for a known popular ID that should exist on most providers
-	testKeyword := "SSIS"
+	// Use a lightweight search to check provider health.
+	// Search for a known popular ID that should exist on most providers.
+	testKeyword := providerHealthProbeKeyword
 
 	const maxAttempts = 3
 	var results []*model.MovieSearchResult
