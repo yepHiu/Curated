@@ -34,6 +34,11 @@ type homepageDailyCandidate struct {
 	score     float64
 	hashScore uint64
 	state     storage.HomepageRecommendationState
+
+	// Pre-computed normalized fields to avoid per-iteration allocations.
+	uniqueActors     []string
+	normalizedStudio string
+	recencyFactor    float64 // pre-computed from homepageRecommendationWeight static parts
 }
 
 type homepageDailySelectionState struct {
@@ -153,7 +158,6 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		8,
 		true,
 		exclusionLadder,
-		dateUTC,
 		random,
 	)
 	recommendationIDs, recommendationExclusionWindowUsed := selectHomepageDailyIDs(
@@ -163,7 +167,6 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		6,
 		false,
 		exclusionLadder,
-		dateUTC,
 		random,
 	)
 
@@ -402,10 +405,13 @@ func rankHomepageDailyCandidates(
 
 		hashScore := homepageDailyHash(dateUTC + "|" + movie.ID)
 		candidates = append(candidates, homepageDailyCandidate{
-			movie:     movie,
-			score:     score,
-			hashScore: hashScore,
-			state:     states[movie.ID],
+			movie:            movie,
+			score:            score,
+			hashScore:        hashScore,
+			state:            states[movie.ID],
+			uniqueActors:     normalizeUniqueActors(movie.Actors),
+			normalizedStudio: strings.TrimSpace(movie.Studio),
+			recencyFactor:    homepageRecencyFactor(states[movie.ID], dateUTC),
 		})
 	}
 
@@ -429,7 +435,6 @@ func selectHomepageDailyIDs(
 	limit int,
 	heroOnly bool,
 	exclusionLadder []homepageDailyExclusionPolicy,
-	dateUTC string,
 	random *rand.Rand,
 ) ([]string, int) {
 	if limit <= 0 {
@@ -440,56 +445,122 @@ func selectHomepageDailyIDs(
 	exclusionWindowUsed := 0
 
 	appendFromPool := func(excludedMovieIDs map[string]struct{}) {
-		for len(out) < limit {
-			weightedCandidates := make([]struct {
-				index  int
-				weight float64
-			}, 0, len(candidates))
-			totalWeight := 0.0
-			for index, candidate := range candidates {
-				movieID := strings.TrimSpace(candidate.movie.ID)
-				if movieID == "" {
-					continue
-				}
-				if _, ok := selected[movieID]; ok {
-					continue
-				}
-				if heroOnly && isFC2MovieCode(candidate.movie.Code) {
-					continue
-				}
-				if _, excluded := excludedMovieIDs[movieID]; excluded {
-					continue
-				}
+		if len(out) >= limit {
+			return
+		}
 
-				score := candidate.score - homepageDiversityPenalty(candidate.movie, selectionState)
-				weight := homepageRecommendationWeight(score, candidate.state, dateUTC)
-				if weight <= 0 {
-					continue
-				}
-				weightedCandidates = append(weightedCandidates, struct {
-					index  int
-					weight float64
-				}{index: index, weight: weight})
-				totalWeight += weight
+		// Build initial active set: candidates not yet selected and not excluded.
+		active := make([]int, 0, len(candidates))
+		activeSet := make(map[int]struct{}, len(candidates))
+		weights := make([]float64, len(candidates))
+
+		// Inverted indexes: actor/studio → candidate indices sharing that attribute.
+		actorToCandidates := make(map[string][]int)
+		studioToCandidates := make(map[string][]int)
+
+		totalWeight := 0.0
+
+		for idx, candidate := range candidates {
+			movieID := strings.TrimSpace(candidate.movie.ID)
+			if movieID == "" {
+				continue
 			}
-			if len(weightedCandidates) == 0 || totalWeight <= 0 {
+			if _, ok := selected[movieID]; ok {
+				continue
+			}
+			if heroOnly && isFC2MovieCode(candidate.movie.Code) {
+				continue
+			}
+			if _, excluded := excludedMovieIDs[movieID]; excluded {
+				continue
+			}
+
+			score := candidate.score - diversityPenaltyFast(candidate, selectionState)
+			w := homepageCandidateWeight(score, candidate.recencyFactor)
+			if w <= 0 {
+				continue
+			}
+
+			active = append(active, idx)
+			activeSet[idx] = struct{}{}
+			weights[idx] = w
+			totalWeight += w
+
+			for _, actor := range candidate.uniqueActors {
+				actorToCandidates[actor] = append(actorToCandidates[actor], idx)
+			}
+			if candidate.normalizedStudio != "" {
+				studioToCandidates[candidate.normalizedStudio] = append(studioToCandidates[candidate.normalizedStudio], idx)
+			}
+		}
+
+		if len(active) == 0 || totalWeight <= 0 {
+			return
+		}
+
+		for len(out) < limit {
+			if len(active) == 0 || totalWeight <= 0 {
 				return
 			}
 
+			// Weighted random selection.
 			threshold := random.Float64() * totalWeight
-			bestIndex := weightedCandidates[len(weightedCandidates)-1].index
-			for _, weightedCandidate := range weightedCandidates {
-				threshold -= weightedCandidate.weight
+			bestIdx := active[len(active)-1]
+			for _, idx := range active {
+				threshold -= weights[idx]
 				if threshold <= 0 {
-					bestIndex = weightedCandidate.index
+					bestIdx = idx
 					break
 				}
 			}
-			chosen := candidates[bestIndex].movie
-			movieID := strings.TrimSpace(chosen.ID)
+
+			chosen := candidates[bestIdx]
+			movieID := strings.TrimSpace(chosen.movie.ID)
 			selected[movieID] = struct{}{}
-			accumulateHomepageDiversity(selectionState, chosen)
+			accumulateHomepageDiversityFast(selectionState, chosen)
 			out = append(out, movieID)
+
+			// Remove chosen from active set.
+			delete(activeSet, bestIdx)
+			totalWeight -= weights[bestIdx]
+
+			// Rebuild active slice without the chosen index.
+			newActive := make([]int, 0, len(active)-1)
+			for _, idx := range active {
+				if idx != bestIdx {
+					newActive = append(newActive, idx)
+				}
+			}
+			active = newActive
+
+			// Incrementally update weights for remaining candidates that share
+			// actors or studio with the chosen one.
+			affected := make(map[int]struct{})
+			for _, actor := range chosen.uniqueActors {
+				for _, idx := range actorToCandidates[actor] {
+					if _, ok := activeSet[idx]; ok {
+						affected[idx] = struct{}{}
+					}
+				}
+			}
+			if chosen.normalizedStudio != "" {
+				for _, idx := range studioToCandidates[chosen.normalizedStudio] {
+					if _, ok := activeSet[idx]; ok {
+						affected[idx] = struct{}{}
+					}
+				}
+			}
+
+			for idx := range affected {
+				if _, ok := activeSet[idx]; !ok {
+					continue
+				}
+				oldWeight := weights[idx]
+				score := candidates[idx].score - diversityPenaltyFast(candidates[idx], selectionState)
+				newWeight := homepageCandidateWeight(score, candidates[idx].recencyFactor)
+				weights[idx] = newWeight
+				totalWeight = totalWeight - oldWeight + newWeight
+			}
 		}
 	}
 
@@ -505,6 +576,31 @@ func selectHomepageDailyIDs(
 	}
 
 	return out, exclusionWindowUsed
+}
+
+// diversityPenaltyFast uses pre-computed normalized actors/studio from the candidate.
+func diversityPenaltyFast(
+	candidate homepageDailyCandidate,
+	selectionState homepageDailySelectionState,
+) float64 {
+	penalty := 0.0
+	for _, actor := range candidate.uniqueActors {
+		penalty += float64(selectionState.actorCounts[actor]) * homepageDailyActorDiversityPenalty
+	}
+	if candidate.normalizedStudio != "" {
+		penalty += float64(selectionState.studioCounts[candidate.normalizedStudio]) * homepageDailyStudioDiversityPenalty
+	}
+	return penalty
+}
+
+// accumulateHomepageDiversityFast uses pre-computed normalized actors/studio.
+func accumulateHomepageDiversityFast(selectionState homepageDailySelectionState, candidate homepageDailyCandidate) {
+	for _, actor := range candidate.uniqueActors {
+		selectionState.actorCounts[actor]++
+	}
+	if candidate.normalizedStudio != "" {
+		selectionState.studioCounts[candidate.normalizedStudio]++
+	}
 }
 
 func homepageRecommendationWeight(score float64, state storage.HomepageRecommendationState, dateUTC string) float64 {
@@ -593,6 +689,75 @@ func accumulateHomepageDiversity(selectionState homepageDailySelectionState, mov
 	if normalizedStudio != "" {
 		selectionState.studioCounts[normalizedStudio]++
 	}
+}
+
+func normalizeUniqueActors(actors []string) []string {
+	if len(actors) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(actors))
+	out := make([]string, 0, len(actors))
+	for _, a := range actors {
+		na := strings.TrimSpace(a)
+		if na == "" {
+			continue
+		}
+		if _, ok := seen[na]; ok {
+			continue
+		}
+		seen[na] = struct{}{}
+		out = append(out, na)
+	}
+	return out
+}
+
+// homepageRecencyFactor pre-computes the static parts of homepageRecommendationWeight
+// that do not depend on the diversity-adjusted score.
+func homepageRecencyFactor(state storage.HomepageRecommendationState, dateUTC string) float64 {
+	currentDate, err := time.Parse("2006-01-02", dateUTC)
+	if err != nil {
+		return 0
+	}
+
+	if skipUntil := strings.TrimSpace(state.SkipUntil); skipUntil != "" {
+		if parsedSkipUntil, err := time.Parse(time.RFC3339, skipUntil); err == nil && currentDate.Before(parsedSkipUntil) {
+			return 0
+		}
+	}
+
+	daysSinceLastRecommendation := 90
+	if lastRecommendedAt := strings.TrimSpace(state.LastRecommendedAt); lastRecommendedAt != "" {
+		if parsedLastRecommendedAt, err := time.Parse(time.RFC3339, lastRecommendedAt); err == nil {
+			daysSinceLastRecommendation = int(currentDate.Sub(parsedLastRecommendedAt).Hours() / 24)
+		}
+	}
+	if daysSinceLastRecommendation >= 0 && daysSinceLastRecommendation < homepageDailyHardCoolingDays {
+		return 0
+	}
+	if daysSinceLastRecommendation < 0 {
+		daysSinceLastRecommendation = 0
+	}
+
+	recencyDays := math.Min(float64(daysSinceLastRecommendation), 90)
+	recencyWeight := math.Pow(recencyDays+1, 1.5)
+	countPenalty := math.Log2(float64(state.RecommendCount) + 2)
+	if countPenalty < 1 {
+		countPenalty = 1
+	}
+	factor := recencyWeight / countPenalty
+	if daysSinceLastRecommendation < homepageDailyCoolingDays {
+		factor *= float64(daysSinceLastRecommendation) / float64(homepageDailyCoolingDays)
+	}
+	return factor
+}
+
+// homepageCandidateWeight computes the final weight from a score and pre-computed recencyFactor.
+func homepageCandidateWeight(score float64, recencyFactor float64) float64 {
+	if recencyFactor <= 0 {
+		return 0
+	}
+	positiveScore := math.Max(score, 0.1)
+	return positiveScore * recencyFactor
 }
 
 func homepageFreshnessBoost(addedAt string, dateUTC string) float64 {
