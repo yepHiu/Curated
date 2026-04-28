@@ -2656,13 +2656,15 @@ const videoPreloadMode = computed(() =>
               />
 
               <Button
+                type="button"
                 variant="secondary"
-                class="h-9 shrink-0 rounded-2xl bg-white/10 px-4 text-white hover:bg-white/20"
+                size="icon"
+                class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
+                :aria-label="nativePlayerLabel"
                 @click="openNativePlayer"
               >
-                <ExternalLink class="size-4 shrink-0" data-icon="inline-start" aria-hidden="true" />
-                {{ nativePlayerLabel }}
+                <ExternalLink class="size-4 shrink-0" aria-hidden="true" />
               </Button>
 
               <Button
