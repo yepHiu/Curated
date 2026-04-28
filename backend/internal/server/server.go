@@ -905,7 +905,7 @@ func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.
 		if h.logger != nil {
 			h.logger.Warn("reveal in file manager failed", zap.Error(err), zap.String("path", absPath))
 		}
-		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager: "+err.Error())
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -965,7 +965,7 @@ func (h *Handler) handleRevealLibraryPathInFileManager(w http.ResponseWriter, r 
 		if h.logger != nil {
 			h.logger.Warn("open library path in file manager failed", zap.Error(err), zap.String("path", absDir))
 		}
-		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager: "+err.Error())
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to open file manager")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
