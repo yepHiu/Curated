@@ -48,6 +48,7 @@
 
 - 涉及 macOS Retina、外接屏、浏览器缩放、系统显示缩放、窄 viewport 的 UI 检查，统一使用 [`frontend-display-scaling-checklist.md`](frontend-display-scaling-checklist.md)。
 - 修改壳层布局、海报网格、播放器 HUD、设置页、对话框、全局 typography 或 spacing 后，应按显示缩放检查清单做回归。
+- `pnpm test:display` 和其他 display scaling 冒烟测试耗时较长，代理不得在没有用户明确同意的情况下主动运行。
 - 普通布局以 CSS 像素为基准，不为每一种物理分辨率或 DPR 单独写布局分支。
 - 显示适配不应把业务逻辑放入页面组件；业务能力判断仍通过服务层与 Composables。
 - 当前阶段不因为显示适配引入全局状态管理重构。Pinia 如需引入，应后续从小模块逐步试点。
