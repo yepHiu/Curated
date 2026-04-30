@@ -682,10 +682,15 @@ export const mockLibraryService: LibraryService = {
   },
 
   getMovieById(movieId) {
-    return moviesState.value.find((movie) => movie.id === movieId)
+    const id = movieId?.trim()
+    if (!id) return undefined
+    return moviesState.value.find((movie) => movie.id === id)
   },
   async loadMovieDetail(movieId: string) {
-    return moviesState.value.find((movie) => movie.id === movieId)
+    const id = movieId.trim()
+    if (!id) return undefined
+    await Promise.resolve()
+    return moviesState.value.find((movie) => movie.id === id)
   },
   getRelatedMovies(movieId, limit = 6) {
     const id = movieId.trim()

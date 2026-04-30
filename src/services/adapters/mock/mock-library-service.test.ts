@@ -55,6 +55,49 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.getMovieById("missing-movie")).toBeUndefined()
   })
 
+  it("finds trashed movies by trimmed id like the web adapter", async () => {
+    const movieId = mockLibraryService.movies.value[0]?.id
+    expect(movieId).toBeTruthy()
+
+    if (!movieId) {
+      return
+    }
+
+    await mockLibraryService.deleteMovie(movieId)
+
+    try {
+      expect(mockLibraryService.movies.value.some((movie) => movie.id === movieId)).toBe(false)
+      expect(mockLibraryService.trashedMovies.value.some((movie) => movie.id === movieId)).toBe(
+        true,
+      )
+      expect(mockLibraryService.getMovieById(` ${movieId} `)?.id).toBe(movieId)
+      await expect(mockLibraryService.loadMovieDetail(` ${movieId} `)).resolves.toMatchObject({
+        id: movieId,
+      })
+    } finally {
+      await mockLibraryService.restoreMovie(movieId)
+    }
+  })
+
+  it("resolves loadMovieDetail asynchronously", async () => {
+    const movieId = mockLibraryService.movies.value[0]?.id
+    expect(movieId).toBeTruthy()
+
+    if (!movieId) {
+      return
+    }
+
+    let settled = false
+    const detailPromise = mockLibraryService.loadMovieDetail(movieId).then((movie) => {
+      settled = true
+      return movie
+    })
+
+    expect(settled).toBe(false)
+    await expect(detailPromise).resolves.toMatchObject({ id: movieId })
+    expect(settled).toBe(true)
+  })
+
   it("toggles favorite state in the shared movie source", async () => {
     const libraryService = mockLibraryService
     const movieId = libraryService.movies.value[0]?.id
