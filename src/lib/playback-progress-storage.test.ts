@@ -22,6 +22,7 @@ async function importStorage(opts?: {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   localStorage.clear()
   vi.resetModules()
   vi.clearAllMocks()
@@ -33,6 +34,16 @@ describe("playback progress storage", () => {
     return importStorage().then(({ parseResumeSecondsFromQuery }) => {
       expect(parseResumeSecondsFromQuery("123.456")).toBe(123.456)
     })
+  })
+
+  it("ignores malformed route query resume values", async () => {
+    const { parseResumeSecondsFromQuery } = await importStorage()
+
+    expect(parseResumeSecondsFromQuery("")).toBeUndefined()
+    expect(parseResumeSecondsFromQuery("abc")).toBeUndefined()
+    expect(parseResumeSecondsFromQuery("-1")).toBeUndefined()
+    expect(parseResumeSecondsFromQuery(["10"])).toBeUndefined()
+    expect(parseResumeSecondsFromQuery(undefined)).toBeUndefined()
   })
 
   it("ignores malformed localStorage rows when hydrating mock cache", async () => {
@@ -117,6 +128,42 @@ describe("playback progress storage", () => {
     expect(getProgress("newest")).toBeUndefined()
     expect(listSortedByUpdatedDesc().map((row) => row.movieId)).toEqual(["old"])
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")).not.toHaveProperty("newest")
+  })
+
+  it("keeps local progress in memory when localStorage persistence fails", async () => {
+    const { getProgress, listSortedByUpdatedDesc, playbackProgressRevision, saveProgress } =
+      await importStorage()
+    const initialRevision = playbackProgressRevision.value
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError")
+    })
+
+    expect(() => saveProgress("movie-1", 10, 100)).not.toThrow()
+
+    expect(playbackProgressRevision.value).toBe(initialRevision + 1)
+    expect(getProgress("movie-1")).toMatchObject({
+      movieId: "movie-1",
+      positionSec: 10,
+      durationSec: 100,
+    })
+    expect(listSortedByUpdatedDesc().map((row) => row.movieId)).toEqual(["movie-1"])
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  it("removes local progress from memory when localStorage persistence fails", async () => {
+    const { getProgress, playbackProgressRevision, removeProgress, saveProgress } =
+      await importStorage()
+    saveProgress("movie-1", 10, 100)
+    const revisionAfterSave = playbackProgressRevision.value
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError")
+    })
+
+    expect(() => removeProgress("movie-1")).not.toThrow()
+
+    expect(playbackProgressRevision.value).toBe(revisionAfterSave + 1)
+    expect(getProgress("movie-1")).toBeUndefined()
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")).toHaveProperty("movie-1")
   })
 
   it("hydrates web progress and keeps cache on later API failure", async () => {

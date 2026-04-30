@@ -28,10 +28,11 @@
 | 1.3 修复关键操作的错误吞没 | 已完成 | `LibraryView` 收藏/编辑失败改为 destructive toast；资料库加载失败通过 `LibraryService.loadError` 展示 banner；`SettingsPage` 移除库根失败改为 destructive toast；Web adapter 在列表/详情加载失败时写入可消费的 `loadError` | `src/views/LibraryView.vue`, `src/views/LibraryView.test.ts`, `src/components/jav-library/SettingsPage.vue`, `src/services/contracts/library-service.ts`, `src/services/adapters/web/web-library-service.ts`, `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/mock/mock-library-service.ts` |
 | 1.4 补全 i18n locale key 缺口 | 已完成 | 补齐策展帧 tag filter 的英文/日文 key；补齐 `settings.curatedExportFormatSaving` 的中文/日文 key；新增 locale parity 测试防回归 | `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json`, `src/i18n/locales.test.ts` |
 | 3.1 web-library-service 测试 | 部分完成 | 新增 Web adapter 测试骨架，覆盖初始列表加载失败写入 `loadError`、详情加载失败/API message、初始分页加载、多并发详情请求合并与缓存写入、`patchMovie` 合并响应与缺失缓存预加载、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新、删除/恢复/永久删除后的 active/trash 缓存同步、`ensureMovieCached` 空 id / active cache / trash cache 短路，以及 settings 写入失败恢复和 stale save 防覆盖 | `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/web/web-library-service.ts` |
-| 3.2 playback-progress-storage 测试 | 部分完成 | 已覆盖 route query 解析、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除；localStorage quota/private mode 仍可后续单独补 | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
-| 3.3 PlayerView 基础测试 | 部分完成 | 新增 `PlayerView` 入口测试，覆盖缓存命中渲染 `PlayerPage`、autoplay 路由参数及严格边界、非字符串路由 id 播放目标解析、未找到状态、Web API hydrate loading 与播放记录写入/抑制；`playback-targets` 已覆盖 resume query 优先级、descriptor fallback、无效值和 HLS local seek 边界；播放器内部加载态后续继续补 | `src/views/PlayerView.test.ts`, `src/lib/playback-targets.test.ts` |
-| 3.4 Composable 测试补全 | 部分完成 | 新增 `use-scan-task-tracker` 卸载清理测试；新增 `use-backend-health` mock/Web 成功失败、轮询、卸载清理、手动 recheck spinner 测试；新增 `use-app-update` disabled、按需加载、手动失败、自动检查去重测试 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/composables/use-backend-health.test.ts`, `src/composables/use-app-update.test.ts` |
+| 3.2 playback-progress-storage 测试 | 已完成 | 已覆盖 route query 解析与无效值、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除，以及 localStorage quota/private mode 下保存/删除失败仍更新内存与 revision | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
+| 3.3 PlayerView / PlayerPage 基础测试 | 已完成 | `PlayerView` 入口测试覆盖缓存命中渲染 `PlayerPage`、autoplay 路由参数及严格边界、非字符串路由 id 播放目标解析、未找到状态、Web API hydrate loading 与播放记录写入/抑制；`playback-targets` 覆盖 resume query 优先级、descriptor fallback、无效值和 HLS local seek 边界；`PlayerPage.loading.test.ts` 覆盖 descriptor 加载中、无片源、加载失败、Web API no-stream hint | `src/views/PlayerView.test.ts`, `src/lib/playback-targets.test.ts`, `src/components/jav-library/PlayerPage.loading.test.ts` |
+| 3.4 Composable 测试补全 | 已完成 | 新增 `use-scan-task-tracker` 卸载清理测试；新增 `use-backend-health` mock/Web 成功失败、轮询、卸载清理、手动 recheck spinner 测试；新增 `use-app-update` disabled、按需加载、手动失败、自动检查去重测试 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/composables/use-backend-health.test.ts`, `src/composables/use-app-update.test.ts` |
 | 3.5 现有测试扩展 | 已完成 | `DetailView` 覆盖详情加载、未找到、收藏/评分转发、删除后返回、元数据刷新任务跟踪、Escape 返回；`HistoryView` 覆盖空态、单条删除、批量删除和 batch toolbar；`DetailPanel` 覆盖用户评分、清除评分、删除/永久删除、恢复、用户标签建议 | `src/views/DetailView.test.ts`, `src/views/HistoryView.test.ts`, `src/components/jav-library/DetailPanel.test.ts` |
+| 3.6 curated-frames 边界测试 | 部分完成 | 新增 `capture` 单元测试覆盖 video not-ready、canvas 2D context 缺失、跨域绘制失败、toBlob 失败、成功返回 PNG Blob 和文件名清洗；新增 `db` 单元测试覆盖本地写入缺 imageBlob 的前置校验，以及 Web API 分支的分页列表、tag 更新、删除、统计、tag suggestion/facet 排序 | `src/lib/curated-frames/capture.test.ts`, `src/lib/curated-frames/db.test.ts` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
@@ -64,17 +65,22 @@
 - `pnpm test -- src/lib/playback-targets.test.ts`：1 file / 8 tests passed
 - `pnpm test -- src/components/jav-library/DetailPanel.test.ts src/views/DetailView.test.ts src/views/HistoryView.test.ts`：3 files / 15 tests passed
 - `pnpm test -- src/api/http-client.test.ts src/composables/use-scan-task-tracker.test.ts src/lib/playback-progress-storage.test.ts src/i18n/locales.test.ts src/lib/native-player-launch.test.ts`：5 files / 15 tests passed
+- `pnpm test -- src/lib/playback-progress-storage.test.ts`：1 file / 9 tests passed
+- `pnpm test -- src/lib/curated-frames/capture.test.ts`：1 file / 6 tests passed
+- `pnpm test -- src/lib/curated-frames/db.test.ts`：1 file / 6 tests passed
+- `pnpm test -- src/components/jav-library/PlayerPage.loading.test.ts`：1 file / 4 tests passed
+- `pnpm test -- src/lib/playback-progress-storage.test.ts src/lib/curated-frames/capture.test.ts src/lib/curated-frames/db.test.ts src/components/jav-library/PlayerPage.loading.test.ts`：4 files / 25 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
-- `pnpm test`：81 files / 301 tests passed
+- `pnpm test`：84 files / 320 tests passed
 - `pnpm build`：passed（包含 `pnpm typecheck && vite build`）
 - `git diff --check`：exit 0（仅 Windows CRLF 提示）
 
 ### 下一批优先继续
 
-1. **3.3 PlayerView / PlayerPage 基础测试**：继续覆盖 PlayerPage 关键加载态。
+1. **3.1 web-library-service 测试**：继续补 `patchMovie` 失败回滚、并发竞态等更细粒度路径。
 2. **4.6 Mock / Web 适配器行为差异**：继续补错误类型一致性。
-3. **3.2 / 3.4 测试边界补齐**：继续补 localStorage quota/private mode、curated-frames DB/capture 等剩余边界。
+3. **3.6 curated-frames 边界测试**：如接受新增测试依赖，可继续用 fake IndexedDB 覆盖本地 IndexedDB 读写/查询/删除全链路；当前已覆盖 Web API 分支和本地写入前置校验。
 
 ---
 
@@ -309,7 +315,7 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 
 ### 3.2 playback-progress-storage 测试
 
-**状态（2026-05-01）:** 部分完成。核心导出函数和 Web/localStorage 主路径已覆盖；localStorage quota/private mode 可后续继续补充。
+**状态（2026-05-01）:** 已完成。核心导出函数和 Web/localStorage 主路径已覆盖；已补充 route query 无效值、localStorage quota/private mode 下保存/删除失败仍保持内存状态和 revision 更新的回归测试。
 
 **目标:** 覆盖所有导出函数
 
@@ -331,7 +337,7 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 
 ### 3.3 PlayerView 测试
 
-**状态（2026-05-01）:** 部分完成。已新增 `src/views/PlayerView.test.ts`，覆盖缓存命中、未找到、Web API hydrate loading、autoplay 路由开关及严格边界、非字符串路由 id 播放目标解析，以及播放记录写入/抑制；`src/lib/playback-targets.test.ts` 已覆盖 resume query 优先级、descriptor resume/start fallback、stored progress fallback、无效值忽略、HLS seek offset 和 session origin clamp。后续继续补 PlayerPage 关键加载态。
+**状态（2026-05-01）:** 已完成。已新增 `src/views/PlayerView.test.ts`，覆盖缓存命中、未找到、Web API hydrate loading、autoplay 路由开关及严格边界、非字符串路由 id 播放目标解析，以及播放记录写入/抑制；`src/lib/playback-targets.test.ts` 已覆盖 resume query 优先级、descriptor resume/start fallback、stored progress fallback、无效值忽略、HLS seek offset 和 session origin clamp；`src/components/jav-library/PlayerPage.loading.test.ts` 已覆盖 descriptor 加载中、无片源、加载失败和 Web API no-stream hint。
 
 **目标:** 最基本的播放器加载路径
 
@@ -349,7 +355,7 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 
 ### 3.4 Composable 测试补全
 
-**状态（2026-05-01）:** 部分完成。已补 `use-scan-task-tracker.test.ts` 的卸载清理回归；`use-backend-health`、`use-app-update` 尚未补。
+**状态（2026-05-01）:** 已完成。已补 `use-scan-task-tracker.test.ts` 的卸载清理回归；`use-backend-health`、`use-app-update` 均已补主路径和失败路径测试。
 
 **新建文件及测试点:**
 
@@ -375,6 +381,28 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 | `DetailView.test.ts` | 1 test | 6 tests（加载、404、favorite、rating、delete、metadata refresh） |
 | `HistoryView.test.ts` | 1 test | 4 tests（渲染、空态、删除确认、批量操作流程） |
 | `DetailPanel.test.ts` | 1 test | 4 tests（tag 编辑、rating 交互、favorite 切换、delete 按钮） |
+
+---
+
+### 3.6 curated-frames 边界测试
+
+**状态（2026-05-01）:** 部分完成。已新增 `src/lib/curated-frames/capture.test.ts` 覆盖截帧失败/成功边界与文件名清洗；已新增 `src/lib/curated-frames/db.test.ts` 覆盖 Web API 分支和本地写入前置校验。本地 IndexedDB 全链路仍建议在引入 fake IndexedDB 测试依赖后补齐。
+
+**目标:** 覆盖策展帧底层库函数的关键失败路径，降低后续拆分 `CuratedFramesLibrary` 时的回归风险。
+
+**文件:**
+- `src/lib/curated-frames/capture.test.ts`
+- `src/lib/curated-frames/db.test.ts`
+
+**已覆盖测试点:**
+| 模块 | 场景 |
+|------|------|
+| `captureVideoFrameToPng` | video 未就绪、canvas context 缺失、跨域绘制失败、toBlob 失败、成功返回 PNG Blob |
+| `formatFrameFilename` | 非法文件名字符替换、秒数向下取整、ISO 时间清洗 |
+| `db` Web API 分支 | 分页列表映射、tag 更新、删除、统计、tag suggestion/facet |
+| `putCuratedFrame` local guard | 本地模式缺少 `imageBlob` 时在打开 IndexedDB 前失败 |
+
+**后续可补:** 使用 fake IndexedDB 覆盖本地 `put/list/update/findNearby/delete/count/directoryHandle` 全链路。
 
 ---
 
