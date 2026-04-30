@@ -33,6 +33,7 @@
 | 3.4 Composable 测试补全 | 已完成 | 新增 `use-scan-task-tracker` 卸载清理测试；新增 `use-backend-health` mock/Web 成功失败、轮询、卸载清理、手动 recheck spinner 测试；新增 `use-app-update` disabled、按需加载、手动失败、自动检查去重测试 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/composables/use-backend-health.test.ts`, `src/composables/use-app-update.test.ts` |
 | 3.5 现有测试扩展 | 已完成 | `DetailView` 覆盖详情加载、未找到、收藏/评分转发、删除后返回、元数据刷新任务跟踪、Escape 返回；`HistoryView` 覆盖空态、单条删除、批量删除和 batch toolbar；`DetailPanel` 覆盖用户评分、清除评分、删除/永久删除、恢复、用户标签建议 | `src/views/DetailView.test.ts`, `src/views/HistoryView.test.ts`, `src/components/jav-library/DetailPanel.test.ts` |
 | 3.6 curated-frames 边界测试 | 部分完成 | 新增 `capture` 单元测试覆盖 video not-ready、canvas 2D context 缺失、跨域绘制失败、toBlob 失败、成功返回 PNG Blob 和文件名清洗；新增 `db` 单元测试覆盖本地写入缺 imageBlob 的前置校验，以及 Web API 分支的分页列表、tag 更新、删除、统计、tag suggestion/facet 排序 | `src/lib/curated-frames/capture.test.ts`, `src/lib/curated-frames/db.test.ts` |
+| 4.1 API 响应校验 guards | 已完成 | 新增轻量 `InvalidApiResponseError` 与 DTO guards，先对 `GET /health`、`GET /library/movies`、`GET /library/movies/:id`、`PATCH /library/movies/:id` 接入运行时响应校验；新增 endpoint validation 测试覆盖合法响应保留与坏响应拒绝 | `src/api/guards.ts`, `src/api/endpoints.ts`, `src/api/endpoints.validation.test.ts` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
@@ -70,6 +71,8 @@
 - `pnpm test -- src/lib/curated-frames/db.test.ts`：1 file / 6 tests passed
 - `pnpm test -- src/components/jav-library/PlayerPage.loading.test.ts`：1 file / 4 tests passed
 - `pnpm test -- src/lib/playback-progress-storage.test.ts src/lib/curated-frames/capture.test.ts src/lib/curated-frames/db.test.ts src/components/jav-library/PlayerPage.loading.test.ts`：4 files / 25 tests passed
+- `pnpm test -- src/api/endpoints.validation.test.ts`：1 file / 4 tests passed
+- `pnpm test -- src/api/endpoints.validation.test.ts src/api/http-client.test.ts src/services/adapters/web/web-library-service.test.ts`：3 files / 26 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
 - `pnpm test`：84 files / 320 tests passed
@@ -409,6 +412,8 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 ## Phase 4: 架构改进
 
 ### 4.1 API 响应校验（Zod / 轻量替代）
+
+**状态（2026-05-01）:** 已完成。新增 `src/api/guards.ts`，以零依赖 guard 校验 `HealthDTO`、`MoviesPageDTO`、`MovieDetailDTO`；`src/api/endpoints.ts` 已对健康检查、影片列表、影片详情、影片 PATCH 响应接入 `assertApiResponse`；回归测试见 `src/api/endpoints.validation.test.ts`。
 
 **目标:** 消除 `JSON.parse(text) as T` 的类型不安全
 

@@ -1,4 +1,10 @@
 import { httpClient } from "./http-client"
+import {
+  assertApiResponse,
+  isHealthDTO,
+  isMovieDetailDTO,
+  isMoviesPageDTO,
+} from "./guards"
 
 function filenameFromContentDisposition(h: string | null): string {
   if (!h) {
@@ -64,7 +70,9 @@ import type {
 
 export const api = {
   health(): Promise<HealthDTO> {
-    return httpClient.get<HealthDTO>("/health")
+    return httpClient
+      .get<unknown>("/health")
+      .then((value) => assertApiResponse("GET /health", value, isHealthDTO))
   },
 
   getDevPerformanceSummary(): Promise<DevPerformanceSummaryDTO> {
@@ -96,7 +104,9 @@ export const api = {
   },
 
   listMovies(params?: ListMoviesParams): Promise<MoviesPageDTO> {
-    return httpClient.get<MoviesPageDTO>("/library/movies", params as Record<string, string | number | undefined>)
+    return httpClient
+      .get<unknown>("/library/movies", params as Record<string, string | number | undefined>)
+      .then((value) => assertApiResponse("GET /library/movies", value, isMoviesPageDTO))
   },
 
   getActorProfile(name: string): Promise<ActorProfileDTO> {
@@ -124,7 +134,9 @@ export const api = {
   },
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {
-    return httpClient.get<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`)
+    return httpClient
+      .get<unknown>(`/library/movies/${encodeURIComponent(movieId)}`)
+      .then((value) => assertApiResponse("GET /library/movies/:id", value, isMovieDetailDTO))
   },
 
   getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO> {
@@ -158,7 +170,9 @@ export const api = {
   },
 
   patchMovie(movieId: string, body: PatchMovieBody): Promise<MovieDetailDTO> {
-    return httpClient.patch<MovieDetailDTO>(`/library/movies/${encodeURIComponent(movieId)}`, body)
+    return httpClient
+      .patch<unknown>(`/library/movies/${encodeURIComponent(movieId)}`, body)
+      .then((value) => assertApiResponse("PATCH /library/movies/:id", value, isMovieDetailDTO))
   },
 
   deleteMovie(movieId: string, opts?: { permanent?: boolean }): Promise<void> {
