@@ -18,7 +18,6 @@ import type {
   CuratedFrameExportFormat,
   HealthDTO,
   ProviderHealthDTO,
-  ProviderHealthStatus,
   ProxySettingsDTO,
 } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
@@ -32,15 +31,11 @@ import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
-  Activity,
   CheckSquare,
   Database,
   FolderOpen,
   FolderPlus,
-  GripVertical,
   ListChecks,
-  Loader2,
-  Plus,
   RefreshCw,
   Sparkles,
   X,
@@ -64,13 +59,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getStoredDirectoryHandle,
@@ -93,6 +81,7 @@ import SettingsLibraryPathActions from "@/components/jav-library/settings/Settin
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
+import SettingsMetadataProviderChainSection from "@/components/jav-library/settings/SettingsMetadataProviderChainSection.vue"
 import SettingsMetadataProviderSelectSection from "@/components/jav-library/settings/SettingsMetadataProviderSelectSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
@@ -105,10 +94,7 @@ import {
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
 import {
-  statusDotClass,
-  statusPanelClass,
   statusTextClass,
-  type StatusTone,
 } from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
 
@@ -930,18 +916,6 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
   return undefined
 }
 
-function providerHealthTone(status: ProviderHealthStatus): StatusTone {
-  if (status === "ok") return "success"
-  if (status === "degraded") return "warning"
-  return "danger"
-}
-
-function providerHealthStatusLabel(status: ProviderHealthStatus): string {
-  if (status === "ok") return t("settings.providerHealthStatusOk")
-  if (status === "degraded") return t("settings.providerHealthStatusDegraded")
-  return t("settings.providerHealthStatusFail")
-}
-
 async function pingAllMetadataProviders() {
   if (!useWebApi) return
   providerHealthPingError.value = ""
@@ -1040,14 +1014,6 @@ function onChainDrop(toIndex: number) {
 
 function onChainDragEnd() {
   chainDragFromIndex.value = null
-}
-
-function providerChainRowPinging(name: string): boolean {
-  return providerPingAllBusy.value || providerPingOneName.value === name
-}
-
-function providerHealthDotClass(status: ProviderHealthStatus): string {
-  return statusDotClass(providerHealthTone(status))
 }
 
 const triggerScrapeCardBusy = ref(false)
@@ -2296,180 +2262,29 @@ async function runMetadataRefreshForSelected() {
               @ping-provider="pingOneMetadataProvider"
             />
 
-            <!-- Provider Chain Management（与 canPickSpecifiedMetadata 解耦：无站点列表时仍显示已保存的链） -->
-            <div
+            <SettingsMetadataProviderChainSection
               v-if="metadataMovieModeUi === 'chain'"
-              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
-            >
-              <p
-                v-if="!canPickSpecifiedMetadata"
-                :class="cn(statusPanelClass('warning'), 'rounded-xl px-3 py-2 text-sm')"
-              >
-                {{ t("settings.metadataMovieProviderChainNoList") }}
-              </p>
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{ t("settings.metadataMovieProviderChainDragHint") }}
-                  </p>
-                </div>
-                <span class="shrink-0 text-xs text-muted-foreground">
-                  {{ providerChainDraft.length }} {{ t("settings.providersSelected") }}
-                </span>
-              </div>
-
-              <!-- Provider Chain List -->
-              <div class="flex flex-col gap-3">
-                <div
-                  v-for="(provider, index) in providerChainDraft"
-                  :key="provider + '-' + index"
-                  class="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-background/50 px-2 py-2 transition-[opacity,box-shadow] sm:px-3"
-                  :class="{
-                    'opacity-55': chainDragFromIndex === index,
-                    'ring-2 ring-primary/25 ring-offset-2 ring-offset-background':
-                      chainDragFromIndex === index,
-                  }"
-                  draggable="true"
-                  @dragstart="onChainDragStart($event, index)"
-                  @dragover="onChainDragOver"
-                  @drop.prevent="onChainDrop(index)"
-                  @dragend="onChainDragEnd"
-                >
-                  <span
-                    class="inline-flex cursor-grab touch-none items-center rounded-md p-1 text-muted-foreground active:cursor-grabbing"
-                    :aria-label="t('settings.metadataMovieProviderChainDragHandleAria')"
-                  >
-                    <GripVertical class="size-4 shrink-0" aria-hidden="true" />
-                  </span>
-                  <div
-                    class="flex shrink-0 items-center gap-3"
-                    :title="
-                      useWebApi && healthForProvider(provider)
-                        ? providerHealthStatusLabel(healthForProvider(provider)!.status) +
-                          ' · ' +
-                          healthForProvider(provider)!.latencyMs +
-                          'ms'
-                        : undefined
-                    "
-                  >
-                    <Loader2
-                      v-if="useWebApi && providerChainRowPinging(provider)"
-                      class="size-3.5 shrink-0 animate-spin text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-else-if="useWebApi && healthForProvider(provider)"
-                      class="size-2.5 shrink-0 rounded-full"
-                      :class="providerHealthDotClass(healthForProvider(provider)!.status)"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-else
-                      class="size-2.5 shrink-0 rounded-full bg-muted-foreground/25"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-if="useWebApi && healthForProvider(provider) && !providerChainRowPinging(provider)"
-                      class="w-[3.25rem] shrink-0 tabular-nums text-[0.65rem] text-muted-foreground"
-                    >
-                      {{ healthForProvider(provider)!.latencyMs }}ms
-                    </span>
-                  </div>
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ provider }}</span>
-                  <Button
-                    v-if="useWebApi"
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-lg"
-                    :disabled="providerPingAllBusy || providerPingOneName === provider"
-                    :aria-label="t('settings.providerHealthPingOneAria', { name: provider })"
-                    @click="pingOneMetadataProvider(provider)"
-                  >
-                    <Activity
-                      class="size-4"
-                      :class="{ 'motion-safe:animate-pulse': providerPingOneName === provider }"
-                    />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                    :aria-label="
-                      t('settings.metadataMovieProviderRemoveFromChainAria', { name: provider })
-                    "
-                    @click="removeProviderFromChain(index)"
-                  >
-                    <X class="size-4" />
-                  </Button>
-                </div>
-
-                <!-- Empty State -->
-                <div
-                  v-if="providerChainDraft.length === 0"
-                  class="rounded-xl border border-dashed border-border/60 bg-background/30 px-3 py-6 text-center text-sm text-muted-foreground"
-                >
-                  {{ t("settings.metadataMovieProviderChainEmpty") }}
-                </div>
-              </div>
-
-              <!-- Add Provider -->
-              <div v-if="availableProvidersForChain.length > 0" class="flex items-center gap-3 pt-2">
-                <Select v-model="selectedProviderToAdd">
-                  <SelectTrigger class="h-9 flex-1 rounded-xl text-sm">
-                    <SelectValue :placeholder="t('settings.selectProviderToAdd')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="p in availableProvidersForChain"
-                      :key="p"
-                      :value="p"
-                    >
-                      {{ p }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="h-9 rounded-xl px-3"
-                  :disabled="!selectedProviderToAdd"
-                  @click="addProviderToChain"
-                >
-                  <Plus class="mr-1 size-4" />
-                  {{ t("common.add") }}
-                </Button>
-              </div>
-
-              <!-- Manual save：与自动保存相同；无变更时为 no-op -->
-              <div class="flex flex-col gap-3 pt-2">
-                <p class="text-xs text-muted-foreground">
-                  {{ t("settings.metadataMovieProviderChainAutoSave") }}
-                </p>
-                <Button
-                  type="button"
-                  variant="default"
-                  class="w-fit rounded-xl font-medium"
-                  :disabled="metadataMovieChainSaving"
-                  @click="saveProviderChain"
-                >
-                  {{ metadataMovieChainSaving ? t("common.saving") : t("common.save") }}
-                </Button>
-              </div>
-
-              <p
-                v-if="metadataMovieChainSaving"
-                class="text-xs text-muted-foreground motion-safe:animate-pulse"
-              >
-                {{ t("settings.metadataMovieProviderSyncing") }}
-              </p>
-              <p v-if="metadataMovieChainError" class="text-sm text-destructive">
-                {{ metadataMovieChainError }}
-              </p>
-            </div>
+              :use-web-api="useWebApi"
+              :can-pick-specified-metadata="canPickSpecifiedMetadata"
+              :provider-chain-draft="providerChainDraft"
+              :available-providers-for-chain="availableProvidersForChain"
+              :selected-provider-to-add="selectedProviderToAdd"
+              :chain-drag-from-index="chainDragFromIndex"
+              :metadata-movie-chain-saving="metadataMovieChainSaving"
+              :metadata-movie-chain-error="metadataMovieChainError"
+              :provider-ping-all-busy="providerPingAllBusy"
+              :provider-ping-one-name="providerPingOneName"
+              :provider-health-by-name="providerHealthByName"
+              @drag-start="onChainDragStart"
+              @drag-over="onChainDragOver"
+              @drop-provider="onChainDrop"
+              @drag-end="onChainDragEnd"
+              @ping-provider="pingOneMetadataProvider"
+              @remove-provider="removeProviderFromChain"
+              @update:selected-provider-to-add="selectedProviderToAdd = $event"
+              @add-provider="addProviderToChain"
+              @save-provider-chain="saveProviderChain"
+            />
 
             <p
               v-if="!canPickSpecifiedMetadata && metadataMovieModeUi !== 'chain'"
