@@ -269,7 +269,7 @@ const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
     <Dialog v-model:open="refreshConfirmOpen">
       <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{{ t("library.batchRefreshConfirmTitle") }}</DialogTitle>
+          <DialogTitle v-once>{{ t("library.batchRefreshConfirmTitle") }}</DialogTitle>
           <DialogDescription class="text-pretty">
             {{ t("library.batchRefreshConfirmDesc", { n: selectedCount }) }}
           </DialogDescription>
@@ -297,7 +297,7 @@ const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
     <Dialog v-model:open="trashConfirmOpen">
       <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{{ t("library.batchTrashConfirmTitle") }}</DialogTitle>
+          <DialogTitle v-once>{{ t("library.batchTrashConfirmTitle") }}</DialogTitle>
           <DialogDescription class="text-pretty">
             {{ t("library.batchTrashConfirmDesc", { n: selectedCount }) }}
           </DialogDescription>
@@ -326,7 +326,7 @@ const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
     <Dialog v-model:open="permanentConfirmOpen">
       <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{{ t("library.batchPermanentConfirmTitle") }}</DialogTitle>
+          <DialogTitle v-once>{{ t("library.batchPermanentConfirmTitle") }}</DialogTitle>
           <DialogDescription class="text-pretty">
             {{ t("library.batchPermanentConfirmDesc", { n: selectedCount }) }}
           </DialogDescription>
@@ -355,7 +355,7 @@ const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
     <Dialog v-model:open="restoreConfirmOpen">
       <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{{ t("library.batchRestoreConfirmTitle") }}</DialogTitle>
+          <DialogTitle v-once>{{ t("library.batchRestoreConfirmTitle") }}</DialogTitle>
           <DialogDescription class="text-pretty">
             {{ t("library.batchRestoreConfirmDesc", { n: selectedCount }) }}
           </DialogDescription>

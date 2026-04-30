@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
 import { armHomeDetailReturnRestore } from "@/composables/use-home-scroll-preserve"
 import { useRouter } from "vue-router"
@@ -22,8 +22,29 @@ const showHomepageEmptyState = computed(
   () => libraryService.moviesLoaded.value && libraryService.movies.value.length === 0,
 )
 
+const PORTAL_PLAYBACK_PROGRESS_DEBOUNCE_MS = 5_000
+const portalPlaybackProgressRevision = ref(playbackProgressRevision.value)
+let portalPlaybackProgressTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(playbackProgressRevision, (revision) => {
+  if (portalPlaybackProgressTimer) {
+    clearTimeout(portalPlaybackProgressTimer)
+  }
+  portalPlaybackProgressTimer = setTimeout(() => {
+    portalPlaybackProgressTimer = null
+    portalPlaybackProgressRevision.value = revision
+  }, PORTAL_PLAYBACK_PROGRESS_DEBOUNCE_MS)
+})
+
+onBeforeUnmount(() => {
+  if (portalPlaybackProgressTimer) {
+    clearTimeout(portalPlaybackProgressTimer)
+    portalPlaybackProgressTimer = null
+  }
+})
+
 const portalModel = computed(() => {
-  void playbackProgressRevision.value
+  void portalPlaybackProgressRevision.value
 
   return buildHomepagePortalModel({
     movies: libraryService.movies.value,

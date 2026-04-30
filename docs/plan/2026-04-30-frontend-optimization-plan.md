@@ -41,6 +41,7 @@
 | 4.6 Mock / Web 适配器行为差异 | 已完成 | Mock adapter 的 `getMovieById` / `loadMovieDetail` 已对齐 Web adapter 的 trimmed id 查找，并覆盖回收站影片查找；`loadMovieDetail` 显式跨 microtask 返回以保持异步语义；Mock 主动抛出的不支持、校验失败、not found 错误统一改为 `HttpClientError`，带 status / code / retryable | `src/services/adapters/mock/mock-library-service.ts`, `src/services/adapters/mock/mock-library-service.test.ts` |
 | 4.7 Native player URL 安全加固 | 已完成 | `looksLikeBrowserProtocolLaunchTarget` 显式拒绝 `javascript:` / `data:` / `vbscript:`，保留 `potplayer:` 等外部播放器协议 | `src/lib/native-player-launch.ts`, `src/lib/native-player-launch.test.ts` |
 | 5.1 硬编码中文迁移到 locale 文件 | 已完成 | Review 清单内用户可见硬编码文本已迁移：`PlayerView` loading / not found 到 `player.*`；目录选择提示到 `pickDir.*`；扫描进度 dock 到 `scan.*`，扫描任务 fallback 到 `scanTask.fetchFailed`；评分组件 aria 到 `rating.*`；展开文本默认按钮到 `movie.*`；预览图查看器到 `preview.*`；PlayerPage stats 到 `player.hideStats` / `player.showStats`。相关路径由 `PlayerView.test.ts`、`pick-directory.test.ts`、`ScanProgressDock.test.ts`、`use-scan-task-tracker.test.ts`、`MovieRatingStars.test.ts`、`ExpandableText.test.ts`、`PreviewImageViewerInner.test.ts`、`PlayerPage.i18n.test.ts` 与 locale parity 测试覆盖 | `src/views/PlayerView.vue`, `src/views/PlayerView.test.ts`, `src/lib/pick-directory.ts`, `src/lib/pick-directory.test.ts`, `src/components/jav-library/ScanProgressDock.vue`, `src/components/jav-library/ScanProgressDock.test.ts`, `src/components/jav-library/MovieRatingStars.vue`, `src/components/jav-library/MovieRatingStars.test.ts`, `src/components/jav-library/ExpandableText.vue`, `src/components/jav-library/ExpandableText.test.ts`, `src/components/jav-library/PreviewImageViewerInner.vue`, `src/components/jav-library/PreviewImageViewerInner.test.ts`, `src/components/jav-library/PlayerPage.vue`, `src/components/jav-library/PlayerPage.i18n.test.ts`, `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json` |
+| 5.2 性能微优化 | 已完成 | `HomeView` 对播放进度 revision 引发的 portal model 重建加 5s 防抖，避免播放期间高频重算；`ScanProgressDock` 静态统计标签、`DetailPage` 空预览占位块、`LibraryBatchActionBar` 批量确认弹窗静态标题加 `v-once`；新增 render hints raw-source 回归 | `src/views/HomeView.vue`, `src/views/HomeView.test.ts`, `src/components/jav-library/ScanProgressDock.vue`, `src/components/jav-library/DetailPage.vue`, `src/components/jav-library/LibraryBatchActionBar.vue`, `src/components/jav-library/render-hints.test.ts` |
 | Lint 本地工作区排除 | 已完成（计划外支撑项） | `eslint .` 排除 `.workspace/**` 与 `.local/**`，避免扫描本地 Go/cache 临时目录导致 EPERM，符合仓库本地临时目录政策 | `eslint.config.js` |
 
 ### 验证记录
@@ -76,6 +77,7 @@
 - `pnpm test -- src/api/endpoints.validation.test.ts src/api/http-client.test.ts src/services/adapters/web/web-library-service.test.ts`：3 files / 26 tests passed
 - `pnpm test -- src/services/library-service-boundary.test.ts src/components/jav-library/ActorProfileCard.test.ts src/components/jav-library/PlayerPage.loading.test.ts src/components/jav-library/settings/SettingsHomepageDevTools.test.ts src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts`：6 files / 43 tests passed
 - `pnpm test -- src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts src/components/jav-library/ActorProfileCard.test.ts`：3 files / 38 tests passed
+- `pnpm test -- src/components/jav-library/render-hints.test.ts src/views/HomeView.test.ts src/components/jav-library/ScanProgressDock.test.ts src/components/jav-library/DetailPage.test.ts src/components/jav-library/LibraryBatchActionBar.test.ts src/components/jav-library/LibraryBatchActionBar.integration.test.ts`：6 files / 17 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
 - `pnpm test`：84 files / 320 tests passed
@@ -84,9 +86,8 @@
 
 ### 下一批优先继续
 
-1. **5.2 性能微优化**：PortalModel 播放进度更新防抖，以及关键静态片段 `v-once`。
-2. **Phase 2 组件拆分**：按 SettingsPage、PlayerPage、CuratedFramesLibrary 顺序拆分并保持回归测试。
-3. **3.6 curated-frames 边界测试**：如接受新增测试依赖，可继续用 fake IndexedDB 覆盖本地 IndexedDB 读写/查询/删除全链路；当前已覆盖 Web API 分支和本地写入前置校验。
+1. **Phase 2 组件拆分**：按 SettingsPage、PlayerPage、CuratedFramesLibrary 顺序拆分并保持回归测试。
+2. **3.6 curated-frames 边界测试**：如接受新增测试依赖，可继续用 fake IndexedDB 覆盖本地 IndexedDB 读写/查询/删除全链路；当前已覆盖 Web API 分支和本地写入前置校验。
 
 ---
 
@@ -652,6 +653,8 @@ function looksLikeBrowserProtocolLaunchTarget(url: string): boolean {
 ---
 
 ### 5.2 性能微优化
+
+**状态（2026-05-01）:** 已完成。`HomeView` 已将 `playbackProgressRevision` 对 `portalModel` 的触发改为 5s 防抖；静态 render hints 已落到 `ScanProgressDock` 统计标签、`DetailPage` 空预览占位块、`LibraryBatchActionBar` 批量确认弹窗静态标题，并由 `src/components/jav-library/render-hints.test.ts` 回归约束。
 
 **5.2.1 PortalModel 播放期间防抖**
 

@@ -79,20 +79,20 @@ const detailLine = computed(() => {
               {{ detailLine }}
             </p>
             <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>{{ t("scan.processed") }}</span>
+              <span v-once>{{ t("scan.processed") }}</span>
               <span class="text-right font-mono text-foreground">
                 {{ metaNum(activeTask.metadata, "scanProcessed") }} /
                 {{ metaNum(activeTask.metadata, "scanTotal") }}
               </span>
-              <span>{{ t("scan.newItems") }}</span>
+              <span v-once>{{ t("scan.newItems") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanImported")
               }}</span>
-              <span>{{ t("scan.updated") }}</span>
+              <span v-once>{{ t("scan.updated") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanUpdated")
               }}</span>
-              <span>{{ t("scan.skipped") }}</span>
+              <span v-once>{{ t("scan.skipped") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanSkipped")
               }}</span>

@@ -224,6 +224,7 @@ function openPosterInViewer() {
 
       <CardContent v-else class="grid w-full gap-4 sm:grid-cols-3">
         <div
+          v-once
           v-for="index in 3"
           :key="index"
           class="aspect-[16/9] rounded-[1.25rem] border border-dashed border-border/70 bg-muted/20"
