@@ -77,6 +77,7 @@ import SettingsAboutSection from "@/components/jav-library/settings/SettingsAbou
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
+import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
@@ -1928,57 +1929,13 @@ async function runMetadataRefreshForSelected() {
               </div>
             </div>
 
-            <Dialog v-model:open="removePathDialogOpen">
-                <DialogContent
-                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                >
-                  <DialogHeader>
-                    <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
-                    <DialogDescription>
-                      <div class="space-y-2">
-                        <p class="text-pretty">
-                          {{
-                            t("settings.removePathConfirmDesc", {
-                              title: removePathPending?.title ?? "—",
-                            })
-                          }}
-                        </p>
-                        <p
-                          v-if="removePathPending?.path"
-                          class="break-all font-mono text-xs text-muted-foreground"
-                        >
-                          {{ removePathPending.path }}
-                        </p>
-                      </div>
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter class="gap-3">
-                    <DialogClose as-child>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="removePathBusy"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      class="rounded-2xl"
-                      :disabled="removePathBusy || !removePathPending"
-                      @click="confirmRemoveLibraryPath"
-                    >
-                      {{
-                        removePathBusy
-                          ? t("settings.removePathConfirmWorking")
-                          : t("settings.removePathConfirmAction")
-                      }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+            <SettingsLibraryPathRemoveDialog
+              v-model:open="removePathDialogOpen"
+              :pending="removePathPending"
+              :busy="removePathBusy"
+              :content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+              @confirm="confirmRemoveLibraryPath"
+            />
 
             <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
               {{ metadataRefreshSuccess }}
