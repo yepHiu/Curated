@@ -27,6 +27,7 @@
 | 1.2 HTTP Client 添加超时机制 | 已完成 | 所有 `httpClient` 请求统一使用 30s `AbortController` 超时；超时转换为 `HttpClientError(0, COMMON_TIMEOUT)`；`DELETE` 改为复用共享 `handleResponse<void>()` | `src/api/http-client.ts`, `src/api/http-client.test.ts` |
 | 1.3 修复关键操作的错误吞没 | 已完成 | `LibraryView` 收藏/编辑失败改为 destructive toast；资料库加载失败通过 `LibraryService.loadError` 展示 banner；`SettingsPage` 移除库根失败改为 destructive toast；Web adapter 在列表/详情加载失败时写入可消费的 `loadError` | `src/views/LibraryView.vue`, `src/views/LibraryView.test.ts`, `src/components/jav-library/SettingsPage.vue`, `src/services/contracts/library-service.ts`, `src/services/adapters/web/web-library-service.ts`, `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/mock/mock-library-service.ts` |
 | 1.4 补全 i18n locale key 缺口 | 已完成 | 补齐策展帧 tag filter 的英文/日文 key；补齐 `settings.curatedExportFormatSaving` 的中文/日文 key；新增 locale parity 测试防回归 | `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json`, `src/i18n/locales.test.ts` |
+| 3.1 web-library-service 测试 | 部分完成 | 新增 Web adapter 测试骨架，覆盖初始列表加载失败写入 `loadError`、详情加载失败写入 `loadError`、初始分页加载、多并发详情请求合并与缓存写入 | `src/services/adapters/web/web-library-service.test.ts` |
 | 3.2 playback-progress-storage 测试 | 部分完成 | 已覆盖 route query 解析、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除；localStorage quota/private mode 仍可后续单独补 | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
 | 3.4 Composable 测试补全 | 部分完成 | 新增 `use-scan-task-tracker` 卸载清理测试；`use-backend-health` 与 `use-app-update` 测试尚未开始 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
@@ -38,6 +39,7 @@
 
 - `pnpm test -- src/App.test.ts src/i18n/locales.test.ts`：2 files / 4 tests passed
 - `pnpm test -- src/views/LibraryView.test.ts src/services/adapters/web/web-library-service.test.ts src/i18n/locales.test.ts`：3 files / 7 tests passed
+- `pnpm test -- src/services/adapters/web/web-library-service.test.ts`：1 file / 4 tests passed
 - `pnpm test -- src/api/http-client.test.ts src/composables/use-scan-task-tracker.test.ts src/lib/playback-progress-storage.test.ts src/i18n/locales.test.ts src/lib/native-player-launch.test.ts`：5 files / 15 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
@@ -47,7 +49,7 @@
 
 ### 下一批优先继续
 
-1. **3.1 web-library-service 测试**：继续扩展 `ensureLoaded`、`reloadMoviesFromApi`、`loadMovieDetail` 的成功路径、分页和缓存复用。
+1. **3.1 web-library-service 测试**：继续扩展 `toggleFavorite`、`patchMovie`、`reloadMoviesFromApi` debounce/coalesce、`loadMovieDetail` 404/HTTP 错误路径。
 2. **3.3 PlayerView 基础测试**：加载、未找到、loading、resume 参数。
 3. **4.5 shallowRef 优化**：`web-library-service.ts`、`HistoryView.vue`、`ActorsPage.vue`。
 
@@ -261,6 +263,8 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 ## Phase 3: 测试补全
 
 ### 3.1 web-library-service 测试
+
+**状态（2026-05-01）:** 部分完成。已新增 `src/services/adapters/web/web-library-service.test.ts`，覆盖初始列表失败、详情失败、分页加载、并发详情请求合并与缓存写入；后续继续补 `toggleFavorite` / `patchMovie` 乐观更新与回滚、`reloadMoviesFromApi` debounce/coalesce、404/HTTP 错误路径。
 
 **目标:** 覆盖生产适配器的核心路径
 
