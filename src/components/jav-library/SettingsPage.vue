@@ -34,7 +34,6 @@ import {
   Database,
   Sparkles,
 } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -42,7 +41,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getStoredDirectoryHandle,
@@ -62,7 +60,7 @@ import SettingsAboutSection from "@/components/jav-library/settings/SettingsAbou
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
-import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
+import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
 import SettingsLibraryPathToolbar from "@/components/jav-library/settings/SettingsLibraryPathToolbar.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
@@ -1192,10 +1190,6 @@ async function clearCuratedExportDirectory() {
 
 const hasMetadataPathSelection = computed(() => selectedMetadataRefreshPaths.value.length > 0)
 
-function isMetadataPathChecked(path: string) {
-  return selectedMetadataRefreshPaths.value.includes(path)
-}
-
 function toggleMetadataPathSelection(path: string) {
   const cur = selectedMetadataRefreshPaths.value
   if (cur.includes(path)) {
@@ -1883,89 +1877,24 @@ async function runMetadataRefreshForSelected() {
               {{ metadataRefreshError }}
             </p>
 
-            <div class="flex flex-col gap-3">
-              <div
-                v-for="path in libraryPathsList"
-                :key="path.id"
-                class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-              >
-                <template v-if="editingLibraryPathId === path.id">
-                  <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-3">
-                      <p class="text-xs font-medium text-muted-foreground">{{ t("settings.pathReadonly") }}</p>
-                      <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
-                        t("settings.pathTitleLabel")
-                      }}</label>
-                      <Input
-                        :id="`edit-title-${path.id}`"
-                        v-model="editLibraryTitleDraft"
-                        class="rounded-xl"
-                        :placeholder="t('settings.displayName')"
-                        autocomplete="off"
-                        @keydown.enter.prevent="saveLibraryPathTitle(path.id)"
-                      />
-                      <p class="text-xs text-muted-foreground">
-                        {{ t("settings.editTitleHint") }}
-                      </p>
-                      <p v-if="editTitleError" class="text-sm text-destructive">
-                        {{ editTitleError }}
-                      </p>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="saveLibraryPathTitle(path.id)"
-                      >
-                        {{ editTitleBusy ? t("common.saving") : t("settings.saveTitle") }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="cancelEditLibraryTitle"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex min-w-0 flex-1 items-start gap-3">
-                      <input
-                        v-if="libraryPathsBatchMode"
-                        type="checkbox"
-                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
-                        :checked="isMetadataPathChecked(path.path)"
-                        :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
-                        @change="toggleMetadataPathSelection(path.path)"
-                      />
-                      <div class="flex min-w-0 flex-1 flex-col gap-3">
-                        <p class="font-medium">{{ path.title }}</p>
-                        <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
-                      </div>
-                    </div>
-                    <div class="library-path-toolbar flex flex-wrap items-center gap-2">
-                      <SettingsLibraryPathActions
-                        :path="path"
-                        :reveal-busy="revealPathBusy === path.id"
-                        :scan-busy="scanPathBusy === path.path"
-                        @reveal="revealLibraryPath"
-                        @edit="startEditLibraryTitle"
-                        @rescan="rescanPath($event.path)"
-                        @remove="openRemovePathConfirm"
-                      />
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
+            <SettingsLibraryPathList
+              v-model:edit-library-title-draft="editLibraryTitleDraft"
+              :paths="libraryPathsList"
+              :batch-mode="libraryPathsBatchMode"
+              :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
+              :editing-library-path-id="editingLibraryPathId"
+              :edit-title-busy="editTitleBusy"
+              :edit-title-error="editTitleError"
+              :reveal-path-busy="revealPathBusy"
+              :scan-path-busy="scanPathBusy"
+              @save-title="saveLibraryPathTitle"
+              @cancel-edit="cancelEditLibraryTitle"
+              @toggle-metadata-path-selection="toggleMetadataPathSelection"
+              @reveal="revealLibraryPath"
+              @edit="startEditLibraryTitle"
+              @rescan="rescanPath($event.path)"
+              @remove="openRemovePathConfirm"
+            />
 
             <div class="flex flex-wrap justify-start gap-2 pt-1">
               <SettingsLibraryPathAddDialog
