@@ -671,8 +671,32 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
+    async health() {
+      return await api.health()
+    },
+
+    async pingProxyJavbus(body) {
+      return await api.pingProxyJavbus(body)
+    },
+
+    async pingProxyGoogle(body) {
+      return await api.pingProxyGoogle(body)
+    },
+
+    async pingProvider(name: string) {
+      return await api.pingProvider(name)
+    },
+
+    async pingAllProviders() {
+      return await api.pingAllProviders()
+    },
+
     async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
       return await api.getHomepageDailyRecommendations()
+    },
+
+    async refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+      return await api.refreshHomepageDailyRecommendations()
     },
 
     async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
@@ -700,6 +724,10 @@ function createWebLibraryService(): LibraryService {
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {
       return await api.startScan(paths?.length ? { paths } : undefined)
+    },
+
+    async getTaskStatus(taskId: string): Promise<TaskDTO> {
+      return await api.getTaskStatus(taskId)
     },
 
     async refreshMovieMetadata(movieId: string): Promise<TaskDTO | null> {
@@ -752,6 +780,14 @@ function createWebLibraryService(): LibraryService {
         return null
       }
       return await api.launchNativePlayback(id, startPositionSec)
+    },
+
+    async deletePlaybackSession(sessionId: string) {
+      const id = sessionId.trim()
+      if (!id) {
+        return
+      }
+      await api.deletePlaybackSession(id)
     },
 
     async ensureMovieCached(movieId: string) {
@@ -855,8 +891,32 @@ function createWebLibraryService(): LibraryService {
       return await api.listActors(params)
     },
 
+    async getActorProfile(name: string) {
+      return await api.getActorProfile(name)
+    },
+
+    async scrapeActorProfile(name: string) {
+      return await api.scrapeActorProfile(name)
+    },
+
     async patchActorUserTags(name: string, userTags: string[]) {
       return await api.patchActorUserTags(name.trim(), userTags)
+    },
+
+    async patchActorExternalLinks(name: string, externalLinks: string[]) {
+      return await api.patchActorExternalLinks(name.trim(), externalLinks)
+    },
+
+    async getMovieComment(movieId: string) {
+      return await api.getMovieComment(movieId.trim())
+    },
+
+    async putMovieComment(movieId: string, body) {
+      return await api.putMovieComment(movieId.trim(), body)
+    },
+
+    async exportCuratedFrames(body) {
+      return await api.postCuratedFramesExport(body)
     },
   }
 

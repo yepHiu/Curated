@@ -15,6 +15,7 @@ const routerMocks = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   getMoviePlayback: vi.fn(),
   createPlaybackSession: vi.fn(),
+  deletePlaybackSession: vi.fn(),
 }))
 
 const serviceState = vi.hoisted(() => ({
@@ -27,10 +28,6 @@ const serviceState = vi.hoisted(() => ({
       nativePlayerEnabled: false,
     },
   },
-}))
-
-const apiMocks = vi.hoisted(() => ({
-  deletePlaybackSession: vi.fn(),
 }))
 
 vi.mock("vue-router", () => ({
@@ -58,11 +55,8 @@ vi.mock("@/services/library-service", () => ({
     playerSettings: serviceState.playerSettings,
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
+    deletePlaybackSession: serviceMocks.deletePlaybackSession,
   }),
-}))
-
-vi.mock("@/api/endpoints", () => ({
-  api: apiMocks,
 }))
 
 vi.mock("@/lib/hls-player", () => ({
@@ -153,7 +147,7 @@ beforeEach(() => {
   routerMocks.replace.mockReset()
   serviceMocks.getMoviePlayback.mockReset()
   serviceMocks.createPlaybackSession.mockReset()
-  apiMocks.deletePlaybackSession.mockReset()
+  serviceMocks.deletePlaybackSession.mockReset()
   serviceState.playerSettings.value = {
     seekBackwardStepSec: 10,
     seekForwardStepSec: 10,

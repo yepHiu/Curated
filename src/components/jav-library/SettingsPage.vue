@@ -13,7 +13,6 @@ import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
-import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type {
   CuratedFrameExportFormat,
@@ -508,7 +507,7 @@ function applySavedProxyGoogleResult(
 
 async function verifySavedProxyInBackground(seq: number) {
   try {
-    const verifyResult = await api.pingProxyGoogle()
+    const verifyResult = await libraryService.pingProxyGoogle()
     applySavedProxyGoogleResult(seq, verifyResult)
   } catch (err) {
     const detail =
@@ -728,7 +727,7 @@ async function testProxyJavbus() {
         const body = {
           proxy: draft,
         }
-        const res = await api.pingProxyJavbus(body)
+        const res = await libraryService.pingProxyJavbus(body)
         if (res.ok) {
           proxyJavbusResultOk.value = true
           proxyJavbusResult.value = t("settings.proxyPingJavbusOk", {
@@ -773,7 +772,7 @@ async function testProxyGoogle() {
         const body = {
           proxy: draft,
         }
-        const res = await api.pingProxyGoogle(body)
+        const res = await libraryService.pingProxyGoogle(body)
         if (res.ok) {
           proxyGoogleResultOk.value = true
           proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
@@ -910,7 +909,7 @@ async function loadAboutHealth() {
   aboutHealthLoading.value = true
   aboutHealthError.value = ""
   try {
-    aboutHealth.value = await api.health()
+    aboutHealth.value = await libraryService.health()
   } catch (err) {
     aboutHealth.value = null
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -973,7 +972,7 @@ async function pingAllMetadataProviders() {
     await withPreservedScroll(async () => {
       providerPingAllBusy.value = true
       try {
-        const res = await api.pingAllProviders()
+        const res = await libraryService.pingAllProviders()
         const next: Record<string, ProviderHealthDTO> = { ...providerHealthByName.value }
         for (const p of res.providers) {
           next[p.name] = p
@@ -1007,7 +1006,7 @@ async function pingOneMetadataProvider(name: string) {
     await withPreservedScroll(async () => {
       providerPingOneName.value = name
       try {
-        const dto = await api.pingProvider(name.trim())
+        const dto = await libraryService.pingProvider(name.trim())
         providerHealthByName.value = { ...providerHealthByName.value, [dto.name]: dto }
       } finally {
         providerPingOneName.value = null

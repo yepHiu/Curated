@@ -34,6 +34,7 @@
 | 3.5 现有测试扩展 | 已完成 | `DetailView` 覆盖详情加载、未找到、收藏/评分转发、删除后返回、元数据刷新任务跟踪、Escape 返回；`HistoryView` 覆盖空态、单条删除、批量删除和 batch toolbar；`DetailPanel` 覆盖用户评分、清除评分、删除/永久删除、恢复、用户标签建议 | `src/views/DetailView.test.ts`, `src/views/HistoryView.test.ts`, `src/components/jav-library/DetailPanel.test.ts` |
 | 3.6 curated-frames 边界测试 | 部分完成 | 新增 `capture` 单元测试覆盖 video not-ready、canvas 2D context 缺失、跨域绘制失败、toBlob 失败、成功返回 PNG Blob 和文件名清洗；新增 `db` 单元测试覆盖本地写入缺 imageBlob 的前置校验，以及 Web API 分支的分页列表、tag 更新、删除、统计、tag suggestion/facet 排序 | `src/lib/curated-frames/capture.test.ts`, `src/lib/curated-frames/db.test.ts` |
 | 4.1 API 响应校验 guards | 已完成 | 新增轻量 `InvalidApiResponseError` 与 DTO guards，先对 `GET /health`、`GET /library/movies`、`GET /library/movies/:id`、`PATCH /library/movies/:id` 接入运行时响应校验；新增 endpoint validation 测试覆盖合法响应保留与坏响应拒绝 | `src/api/guards.ts`, `src/api/endpoints.ts`, `src/api/endpoints.validation.test.ts` |
+| 4.2 Service 层收口 | 已完成 | `LibraryService` 合约补齐健康检查、代理/Provider ping、任务轮询、演员资料、影片评论、播放会话释放、首页推荐刷新与策展帧导出等方法；Web/Mock adapter 完整实现；6 个组件改为经 service 调用；新增边界测试防止这些组件重新直连 `@/api/endpoints` | `src/services/contracts/library-service.ts`, `src/services/adapters/web/web-library-service.ts`, `src/services/adapters/mock/mock-library-service.ts`, `src/services/library-service-boundary.test.ts`, `src/components/jav-library/ActorProfileCard.vue`, `src/components/jav-library/MovieCommentSection.vue`, `src/components/jav-library/PlayerPage.vue`, `src/components/jav-library/CuratedFramesLibrary.vue`, `src/components/jav-library/SettingsPage.vue`, `src/components/jav-library/settings/SettingsHomepageDevTools.vue` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
@@ -73,6 +74,7 @@
 - `pnpm test -- src/lib/playback-progress-storage.test.ts src/lib/curated-frames/capture.test.ts src/lib/curated-frames/db.test.ts src/components/jav-library/PlayerPage.loading.test.ts`：4 files / 25 tests passed
 - `pnpm test -- src/api/endpoints.validation.test.ts`：1 file / 4 tests passed
 - `pnpm test -- src/api/endpoints.validation.test.ts src/api/http-client.test.ts src/services/adapters/web/web-library-service.test.ts`：3 files / 26 tests passed
+- `pnpm test -- src/services/library-service-boundary.test.ts src/components/jav-library/ActorProfileCard.test.ts src/components/jav-library/PlayerPage.loading.test.ts src/components/jav-library/settings/SettingsHomepageDevTools.test.ts src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts`：6 files / 43 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
 - `pnpm test`：84 files / 320 tests passed
@@ -455,6 +457,8 @@ const MoviesPageDTOSchema = z.object({
 ---
 
 ### 4.2 Service 层收口
+
+**状态（2026-05-01）:** 已完成。`src/services/contracts/library-service.ts` 已补齐组件所需的 API 门面；Web adapter 继续作为唯一 endpoint 调用方，Mock adapter 提供等价的本地/模拟实现；`ActorProfileCard.vue`、`MovieCommentSection.vue`、`PlayerPage.vue`、`CuratedFramesLibrary.vue`、`SettingsPage.vue`、`SettingsHomepageDevTools.vue` 均已改为通过 `useLibraryService()` 调用；新增 `src/services/library-service-boundary.test.ts` 防止上述组件回退到直接 import `@/api/endpoints`。
 
 **目标:** 所有组件通过 service 层调用，不直接 import `api`
 

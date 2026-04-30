@@ -1,20 +1,29 @@
 import type { ComputedRef } from "vue"
 import type {
   ActorListItemDTO,
+  ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
   CuratedFrameExportFormat,
+  HealthDTO,
   HomepageDailyRecommendationsDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   NativePlaybackLaunchDTO,
+  MovieCommentDTO,
   PlaybackDescriptorDTO,
   PatchBackendLogBody,
+  PostCuratedFramesExportBody,
   PatchMovieBody,
   PatchPlayerSettingsBody,
+  PingAllProvidersResponse,
   PlayerSettingsDTO,
+  ProviderHealthDTO,
   ProxySettingsDTO,
+  ProxyJavBusPingRequestBody,
+  ProxyJavBusPingResponse,
+  PutMovieCommentBody,
   TaskDTO,
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
@@ -69,7 +78,13 @@ export interface LibraryService {
   /** 后端日志目录与级别（Web：library-config.cfg；Mock：内存） */
   backendLog: ComputedRef<BackendLogSettingsDTO>
   patchBackendLog(patch: PatchBackendLogBody): Promise<void>
+  health(): Promise<HealthDTO>
+  pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
+  pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
+  pingProvider(name: string): Promise<ProviderHealthDTO>
+  pingAllProviders(): Promise<PingAllProvidersResponse>
   getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO>
+  refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO>
   /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>
@@ -77,6 +92,7 @@ export interface LibraryService {
   revealLibraryPathInFileManager(id: string): Promise<void>
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
+  getTaskStatus(taskId: string): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
   /** Web：请求后端在系统文件管理器中显示该片主视频；Mock 会拒绝。 */
@@ -123,12 +139,25 @@ export interface LibraryService {
   restoreMovie(movieId: string): Promise<void>
   /** 永久删除（须已在回收站；Web：DELETE ?permanent=true） */
   deleteMoviePermanently(movieId: string): Promise<void>
+  deletePlaybackSession(sessionId: string): Promise<void>
   /**
    * Web：把详情合并进列表缓存（已存在则覆盖同 id）。Mock：空操作。
    */
   mergeMovieIntoCache(movie: Movie): void
   /** Web：GET /library/actors；Mock：由内存影片聚合 */
   listActors(params?: ListActorsParams): Promise<ActorsListDTO>
+  /** Web：GET /library/actors/profile；Mock：由内存演员聚合基础资料 */
+  getActorProfile(name: string): Promise<ActorProfileDTO>
+  /** Web：POST /library/actors/scrape；Mock：返回已完成任务 */
+  scrapeActorProfile(name: string): Promise<TaskDTO>
   /** Web：PATCH /library/actors/tags；Mock：内存 Map */
   patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO>
+  /** Web：PATCH /library/actors/external-links；Mock：内存 Map */
+  patchActorExternalLinks(name: string, externalLinks: string[]): Promise<ActorProfileDTO>
+  /** Web：GET /library/movies/{id}/comment；Mock：localStorage */
+  getMovieComment(movieId: string): Promise<MovieCommentDTO>
+  /** Web：PUT /library/movies/{id}/comment；Mock：localStorage */
+  putMovieComment(movieId: string, body: PutMovieCommentBody): Promise<MovieCommentDTO>
+  /** Web：POST /curated-frames/export；Mock：不支持后端打包导出 */
+  exportCuratedFrames(body: PostCuratedFramesExportBody): Promise<{ blob: Blob; filename: string }>
 }

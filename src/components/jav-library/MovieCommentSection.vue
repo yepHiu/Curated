@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import { MAX_MOVIE_COMMENT_RUNES, type MovieCommentDTO } from "@/api/types"
 import { Button } from "@/components/ui/button"
@@ -12,9 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
-
-const useWeb = import.meta.env.VITE_USE_WEB_API === "true"
+import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
   defineProps<{
@@ -26,6 +23,7 @@ const props = withDefaults(
 )
 
 const { t, locale } = useI18n()
+const libraryService = useLibraryService()
 
 const draft = ref("")
 const updatedAt = ref("")
@@ -70,12 +68,7 @@ async function load() {
   loadError.value = ""
   saveError.value = ""
   try {
-    let dto: MovieCommentDTO
-    if (useWeb) {
-      dto = await api.getMovieComment(id)
-    } else {
-      dto = getLocalMovieComment(id)
-    }
+    const dto: MovieCommentDTO = await libraryService.getMovieComment(id)
     draft.value = dto.body
     updatedAt.value = dto.updatedAt
   } catch (err) {
@@ -101,12 +94,9 @@ async function save() {
   saving.value = true
   saveError.value = ""
   try {
-    let dto: MovieCommentDTO
-    if (useWeb) {
-      dto = await api.putMovieComment(id, { body: bodyTrimmed })
-    } else {
-      dto = putLocalMovieComment(id, bodyTrimmed)
-    }
+    const dto: MovieCommentDTO = await libraryService.putMovieComment(id, {
+      body: bodyTrimmed,
+    })
     draft.value = dto.body
     updatedAt.value = dto.updatedAt
   } catch (err) {

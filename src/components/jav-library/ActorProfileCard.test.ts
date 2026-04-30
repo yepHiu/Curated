@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const getActorProfile = vi.fn()
 const patchActorExternalLinks = vi.fn()
 const patchActorUserTags = vi.fn()
+const scrapeActorProfile = vi.fn()
+const getTaskStatus = vi.fn()
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -29,15 +31,6 @@ vi.mock("lucide-vue-next", () => ({
   X: { name: "X", template: "<span />" },
 }))
 
-vi.mock("@/api/endpoints", () => ({
-  api: {
-    getActorProfile,
-    patchActorExternalLinks,
-    scrapeActorProfile: vi.fn(),
-    getTaskStatus: vi.fn(),
-  },
-}))
-
 vi.mock("@/api/http-client", () => ({
   HttpClientError: class HttpClientError extends Error {
     status: number
@@ -56,7 +49,11 @@ vi.mock("@/api/http-client", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
+    getActorProfile,
+    patchActorExternalLinks,
     patchActorUserTags,
+    scrapeActorProfile,
+    getTaskStatus,
   }),
 }))
 
@@ -142,6 +139,8 @@ describe("ActorProfileCard", () => {
     getActorProfile.mockReset()
     patchActorExternalLinks.mockReset()
     patchActorUserTags.mockReset()
+    scrapeActorProfile.mockReset()
+    getTaskStatus.mockReset()
   })
 
   it("opens the actor edit dialog and replaces the saved external link", async () => {

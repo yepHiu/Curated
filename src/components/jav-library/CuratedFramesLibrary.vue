@@ -3,7 +3,6 @@ import { useFocusWithin, onClickOutside } from "@vueuse/core"
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { api } from "@/api/endpoints"
 import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
   Camera,
@@ -309,7 +308,7 @@ async function runExport(
     body.actorName = actorName
   }
   try {
-    const { blob, filename } = await api.postCuratedFramesExport(body)
+    const { blob, filename } = await libraryService.exportCuratedFrames(body)
     triggerDownloadBlob(blob, filename)
   } catch (err) {
     console.error("[curated-frames] export failed", err)

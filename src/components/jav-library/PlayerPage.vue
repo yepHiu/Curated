@@ -18,7 +18,6 @@ import {
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
-import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import { Badge } from "@/components/ui/badge"
@@ -1627,7 +1626,7 @@ async function releasePlaybackSession(sessionId?: string) {
   const id = sessionId?.trim()
   if (!id) return
   try {
-    await api.deletePlaybackSession(id)
+    await libraryService.deletePlaybackSession(id)
   } catch {
     // ignore session cleanup failures
   }
