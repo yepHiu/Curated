@@ -35,7 +35,7 @@
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
 | 4.7 Native player URL 安全加固 | 已完成 | `looksLikeBrowserProtocolLaunchTarget` 显式拒绝 `javascript:` / `data:` / `vbscript:`，保留 `potplayer:` 等外部播放器协议 | `src/lib/native-player-launch.ts`, `src/lib/native-player-launch.test.ts` |
-| 5.1 硬编码中文迁移到 locale 文件 | 部分完成 | `PlayerView` 的 loading / not found 可见文本已迁移到 `player.*`；目录选择提示已迁移到 `pickDir.*`；扫描进度 dock 的状态标题、统计标签、关闭按钮已迁移到 `scan.*`，扫描任务状态 fallback 已迁移到 `scanTask.fetchFailed`；评分组件 aria 文案已迁移到 `rating.*`；相关路径由 `PlayerView.test.ts`、`pick-directory.test.ts`、`ScanProgressDock.test.ts`、`use-scan-task-tracker.test.ts`、`MovieRatingStars.test.ts` 与 locale parity 测试覆盖 | `src/views/PlayerView.vue`, `src/views/PlayerView.test.ts`, `src/lib/pick-directory.ts`, `src/lib/pick-directory.test.ts`, `src/components/jav-library/ScanProgressDock.vue`, `src/components/jav-library/ScanProgressDock.test.ts`, `src/components/jav-library/MovieRatingStars.vue`, `src/components/jav-library/MovieRatingStars.test.ts`, `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json` |
+| 5.1 硬编码中文迁移到 locale 文件 | 部分完成 | `PlayerView` 的 loading / not found 可见文本已迁移到 `player.*`；目录选择提示已迁移到 `pickDir.*`；扫描进度 dock 的状态标题、统计标签、关闭按钮已迁移到 `scan.*`，扫描任务状态 fallback 已迁移到 `scanTask.fetchFailed`；评分组件 aria 文案已迁移到 `rating.*`；展开文本默认按钮已迁移到 `movie.*`；相关路径由 `PlayerView.test.ts`、`pick-directory.test.ts`、`ScanProgressDock.test.ts`、`use-scan-task-tracker.test.ts`、`MovieRatingStars.test.ts`、`ExpandableText.test.ts` 与 locale parity 测试覆盖 | `src/views/PlayerView.vue`, `src/views/PlayerView.test.ts`, `src/lib/pick-directory.ts`, `src/lib/pick-directory.test.ts`, `src/components/jav-library/ScanProgressDock.vue`, `src/components/jav-library/ScanProgressDock.test.ts`, `src/components/jav-library/MovieRatingStars.vue`, `src/components/jav-library/MovieRatingStars.test.ts`, `src/components/jav-library/ExpandableText.vue`, `src/components/jav-library/ExpandableText.test.ts`, `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json` |
 | Lint 本地工作区排除 | 已完成（计划外支撑项） | `eslint .` 排除 `.workspace/**` 与 `.local/**`，避免扫描本地 Go/cache 临时目录导致 EPERM，符合仓库本地临时目录政策 | `eslint.config.js` |
 
 ### 验证记录
@@ -51,10 +51,11 @@
 - `pnpm test -- src/lib/pick-directory.test.ts src/i18n/locales.test.ts`：2 files / 4 tests passed
 - `pnpm test -- src/components/jav-library/ScanProgressDock.test.ts src/composables/use-scan-task-tracker.test.ts src/i18n/locales.test.ts`：3 files / 10 tests passed
 - `pnpm test -- src/components/jav-library/MovieRatingStars.test.ts src/i18n/locales.test.ts`：2 files / 4 tests passed
+- `pnpm test -- src/components/jav-library/ExpandableText.test.ts src/i18n/locales.test.ts`：2 files / 6 tests passed
 - `pnpm test -- src/api/http-client.test.ts src/composables/use-scan-task-tracker.test.ts src/lib/playback-progress-storage.test.ts src/i18n/locales.test.ts src/lib/native-player-launch.test.ts`：5 files / 15 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
-- `pnpm test`：79 files / 267 tests passed
+- `pnpm test`：79 files / 268 tests passed
 - `pnpm build`：passed（包含 `pnpm typecheck && vite build`）
 - `git diff --check`：exit 0（仅 Windows CRLF 提示）
 
@@ -62,7 +63,7 @@
 
 1. **3.1 web-library-service 测试**：继续扩展删除/恢复/回收站、`ensureMovieCached` 空 id/已缓存短路、settings 同步失败恢复路径。
 2. **3.3 PlayerView / PlayerPage 基础测试**：继续覆盖 resume 参数、播放目标解析和 PlayerPage 关键加载态。
-3. **5.1 硬编码文本迁移**：继续处理 preview / 展开文本 / PlayerPage stats 等可见文本。
+3. **5.1 硬编码文本迁移**：继续处理 preview / PlayerPage stats 等可见文本。
 
 ---
 
@@ -547,7 +548,7 @@ function looksLikeBrowserProtocolLaunchTarget(url: string): boolean {
 
 ### 5.1 硬编码中文迁移到 locale 文件
 
-**状态（2026-05-01）:** 部分完成。`PlayerView.vue` 的 `player.loadingTarget`、`player.notFoundTitle`、`player.notFoundDesc` 已迁移并补齐三语文案；`pick-directory.ts` 的目录选择提示已迁移到 `pickDir.unsupported` / `pickDir.selected`；`ScanProgressDock.vue` 的扫描状态标题、统计标签、关闭按钮已迁移到 `scan.*`；`use-scan-task-tracker.ts` 的扫描状态 fallback 已迁移到 `scanTask.fetchFailed`；`MovieRatingStars.vue` 的评分 aria 文案已迁移到 `rating.*`。其余 preview、展开文本、PlayerPage stats 等文本仍需继续。
+**状态（2026-05-01）:** 部分完成。`PlayerView.vue` 的 `player.loadingTarget`、`player.notFoundTitle`、`player.notFoundDesc` 已迁移并补齐三语文案；`pick-directory.ts` 的目录选择提示已迁移到 `pickDir.unsupported` / `pickDir.selected`；`ScanProgressDock.vue` 的扫描状态标题、统计标签、关闭按钮已迁移到 `scan.*`；`use-scan-task-tracker.ts` 的扫描状态 fallback 已迁移到 `scanTask.fetchFailed`；`MovieRatingStars.vue` 的评分 aria 文案已迁移到 `rating.*`；`ExpandableText.vue` 的默认展开/收起按钮已迁移到 `movie.*`。其余 preview、PlayerPage stats 等文本仍需继续。
 
 **目标:** 所有用户可见文本通过 `$t()` 获取
 

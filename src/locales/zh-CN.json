@@ -335,6 +335,10 @@
     "ariaLabel": "我的评分，半星步进",
     "score": "打 {s} 分"
   },
+  "movie": {
+    "expandSummary": "展开简介",
+    "collapseSummary": "收起简介"
+  },
   "settings": {
     "language": "界面语言",
     "appearance": "外观",

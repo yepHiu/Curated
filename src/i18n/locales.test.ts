@@ -31,6 +31,8 @@ const requiredLocaleKeys = [
   "scanTask.fetchFailed",
   "rating.ariaLabel",
   "rating.score",
+  "movie.expandSummary",
+  "movie.collapseSummary",
 ]
 
 function readLocaleKey(messages: Record<string, unknown>, key: string): unknown {

@@ -335,6 +335,10 @@
     "ariaLabel": "自分の評価、半星ステップ",
     "score": "{s}点を付ける"
   },
+  "movie": {
+    "expandSummary": "概要を展開",
+    "collapseSummary": "概要を折りたたむ"
+  },
   "settings": {
     "language": "表示言語",
     "appearance": "外観",

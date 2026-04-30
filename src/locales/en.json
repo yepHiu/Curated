@@ -335,6 +335,10 @@
     "ariaLabel": "My rating, half-star steps",
     "score": "Rate {s}"
   },
+  "movie": {
+    "expandSummary": "Expand summary",
+    "collapseSummary": "Collapse summary"
+  },
   "settings": {
     "language": "Interface language",
     "appearance": "Appearance",
