@@ -331,6 +331,10 @@
   "scanTask": {
     "fetchFailed": "Failed to fetch scan task status"
   },
+  "rating": {
+    "ariaLabel": "My rating, half-star steps",
+    "score": "Rate {s}"
+  },
   "settings": {
     "language": "Interface language",
     "appearance": "Appearance",

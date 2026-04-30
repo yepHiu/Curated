@@ -331,6 +331,10 @@
   "scanTask": {
     "fetchFailed": "スキャンタスクの状態を取得できません"
   },
+  "rating": {
+    "ariaLabel": "自分の評価、半星ステップ",
+    "score": "{s}点を付ける"
+  },
   "settings": {
     "language": "表示言語",
     "appearance": "外観",

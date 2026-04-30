@@ -331,6 +331,10 @@
   "scanTask": {
     "fetchFailed": "无法获取扫描任务状态"
   },
+  "rating": {
+    "ariaLabel": "我的评分，半星步进",
+    "score": "打 {s} 分"
+  },
   "settings": {
     "language": "界面语言",
     "appearance": "外观",

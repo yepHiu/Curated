@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n"
 import { Star } from "lucide-vue-next"
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ const emit = defineEmits<{
 }>()
 
 const stars = [1, 2, 3, 4, 5] as const
+const { t } = useI18n()
 
 function starFilled(s: number) {
   return props.modelValue >= s
@@ -30,7 +32,7 @@ function pick(s: number, side: "left" | "right") {
   <div
     class="inline-flex h-6 items-center gap-px"
     role="group"
-    aria-label="我的评分，半星步进"
+    :aria-label="t('rating.ariaLabel')"
   >
     <span
       v-for="s in stars"
@@ -41,14 +43,14 @@ function pick(s: number, side: "left" | "right") {
       <button
         type="button"
         class="absolute inset-y-0 left-0 z-[2] w-1/2 cursor-pointer rounded-l-sm border-0 bg-transparent p-0 outline-none ring-offset-background hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
-        :aria-label="`打 ${s - 0.5} 分`"
+        :aria-label="t('rating.score', { s: s - 0.5 })"
         @click="pick(s, 'left')"
       />
       <!-- 右半：s -->
       <button
         type="button"
         class="absolute inset-y-0 right-0 z-[2] w-1/2 cursor-pointer rounded-r-sm border-0 bg-transparent p-0 outline-none ring-offset-background hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
-        :aria-label="`打 ${s} 分`"
+        :aria-label="t('rating.score', { s })"
         @click="pick(s, 'right')"
       />
 
