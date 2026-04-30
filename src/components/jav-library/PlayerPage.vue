@@ -87,6 +87,14 @@ import {
   formatTranscodeProfileLabel,
   isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
+import {
+  clampAbsolutePlaybackTarget as clampPlaybackTarget,
+  formatPlaybackClock as formatClock,
+  getAbsolutePlaybackTimeSec,
+  getPlaybackTimelineOffsetSec,
+  normalizeProgressTargetSec as normalizePlaybackProgressTargetSec,
+  resolvePlaybackTotalDurationSec,
+} from "@/lib/player-playback-timeline"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
 
@@ -772,28 +780,11 @@ onUnmounted(() => {
   closePlayerContextMenu()
 })
 
-function formatClock(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "00:00"
-  const s = Math.floor(seconds % 60)
-  const m = Math.floor(seconds / 60) % 60
-  const h = Math.floor(seconds / 3600)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`
-  return `${pad(m)}:${pad(s)}`
-}
-
-function getDescriptorDurationSec(descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value): number {
-  const raw = descriptor?.durationSec
-  return raw != null && Number.isFinite(raw) && raw > 0 ? raw : 0
-}
-
 function resolveTotalDurationSec(
   descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value,
   mediaDurationSec: number = duration.value,
 ): number {
-  const finiteMediaDuration =
-    Number.isFinite(mediaDurationSec) && mediaDurationSec > 0 ? mediaDurationSec : 0
-  return Math.max(finiteMediaDuration, getDescriptorDurationSec(descriptor))
+  return resolvePlaybackTotalDurationSec(descriptor, mediaDurationSec)
 }
 
 const totalDurationSec = computed(() => resolveTotalDurationSec())
@@ -922,12 +913,7 @@ function onLoadedMetadata() {
 }
 
 function normalizeProgressTargetSec(rawValue: number): number {
-  const normalized = Number.isFinite(rawValue) ? rawValue : 0
-  const total = totalDurationSec.value
-  if (total <= 0) {
-    return Math.max(0, normalized)
-  }
-  return Math.min(Math.max(0, normalized), total)
+  return normalizePlaybackProgressTargetSec(rawValue, totalDurationSec.value)
 }
 
 function syncBufferedRangeFromVideo() {
@@ -1923,19 +1909,14 @@ function startFpsTracking() {
 }
 
 function playbackTimelineOffsetSec(descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value): number {
-  if (!descriptor || descriptor.mode !== "hls") {
-    return 0
-  }
-  const offset = Number(descriptor.startPositionSec ?? 0)
-  return Number.isFinite(offset) && offset > 0 ? offset : 0
+  return getPlaybackTimelineOffsetSec(descriptor)
 }
 
 function getAbsolutePlaybackTime(
   localTimeSec: number = Number(videoRef.value?.currentTime ?? 0),
   descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value,
 ): number {
-  const local = Number.isFinite(localTimeSec) && localTimeSec > 0 ? localTimeSec : 0
-  return local + playbackTimelineOffsetSec(descriptor)
+  return getAbsolutePlaybackTimeSec(localTimeSec, descriptor)
 }
 
 function schedulePlaybackSessionCleanup(sessionId?: string) {
@@ -1952,12 +1933,7 @@ function flushScheduledPlaybackSessionCleanup() {
 }
 
 function clampAbsolutePlaybackTarget(targetSec: number): number {
-  const total = totalDurationSec.value
-  const normalized = Number.isFinite(targetSec) ? targetSec : 0
-  if (total <= 0) {
-    return Math.max(0, normalized)
-  }
-  return Math.min(Math.max(0, normalized), Math.max(0, total - 0.25))
+  return clampPlaybackTarget(targetSec, totalDurationSec.value)
 }
 
 async function seekToAbsolutePlaybackTime(
