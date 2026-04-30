@@ -36,7 +36,6 @@ import {
   FolderOpen,
   FolderPlus,
   ListChecks,
-  RefreshCw,
   Sparkles,
   X,
 } from "lucide-vue-next"
@@ -83,6 +82,7 @@ import SettingsMetadataAutomationSection from "@/components/jav-library/settings
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
 import SettingsMetadataProviderChainSection from "@/components/jav-library/settings/SettingsMetadataProviderChainSection.vue"
 import SettingsMetadataProviderSelectSection from "@/components/jav-library/settings/SettingsMetadataProviderSelectSection.vue"
+import SettingsMetadataTriggerScrapeSection from "@/components/jav-library/settings/SettingsMetadataTriggerScrapeSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
@@ -2302,47 +2302,12 @@ async function runMetadataRefreshForSelected() {
               {{ metadataMovieError }}
             </p>
 
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div class="min-w-0 flex flex-col gap-3">
-                <p class="text-sm font-semibold">{{ t("settings.triggerScrape") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.triggerScrapeHint") }}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                class="h-11 shrink-0 rounded-2xl px-5 font-medium"
-                :disabled="triggerScrapeCardBusy"
-                @click="runTriggerScrapeAllLibraryRoots"
-              >
-                <RefreshCw
-                  data-icon="inline-start"
-                  class="size-4"
-                  :class="{ 'motion-safe:animate-spin': triggerScrapeCardBusy }"
-                />
-                {{
-                  triggerScrapeCardBusy
-                    ? t("settings.triggerScrapeRunning")
-                    : t("settings.triggerScrapeRunButton")
-                }}
-              </Button>
-            </div>
-            <p
-              v-if="triggerScrapeCardSuccess"
-              class="text-sm text-primary"
-            >
-              {{ triggerScrapeCardSuccess }}
-            </p>
-            <p
-              v-if="triggerScrapeCardError"
-              class="text-sm text-destructive"
-              role="alert"
-            >
-              {{ triggerScrapeCardError }}
-            </p>
+            <SettingsMetadataTriggerScrapeSection
+              :busy="triggerScrapeCardBusy"
+              :success="triggerScrapeCardSuccess"
+              :error="triggerScrapeCardError"
+              @run="runTriggerScrapeAllLibraryRoots"
+            />
           </CardContent>
         </Card>
       </div>
