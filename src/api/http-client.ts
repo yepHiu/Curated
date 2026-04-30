@@ -24,6 +24,7 @@ export function resolveApiBaseUrl(env: Pick<ImportMetaEnv, "VITE_API_BASE_URL">)
 
 const BASE_URL = resolveApiBaseUrl(import.meta.env)
 const DEV_REQUEST_MONITOR_ENABLED = import.meta.env.DEV
+const DEFAULT_TIMEOUT_MS = 30_000
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin)
@@ -50,6 +51,8 @@ async function monitoredFetch(
   init: RequestInit,
   params?: Record<string, string | number | undefined>,
 ): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
   const requestId = DEV_REQUEST_MONITOR_ENABLED
     ? devRequestMonitor.startRequest({
       method,
@@ -61,6 +64,7 @@ async function monitoredFetch(
     const response = await fetch(buildUrl(path, params), {
       method,
       ...init,
+      signal: controller.signal,
     })
     if (requestId) {
       devRequestMonitor.finishRequest(requestId, {
@@ -75,7 +79,16 @@ async function monitoredFetch(
         failed: true,
       })
     }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new HttpClientError(0, {
+        code: "COMMON_TIMEOUT",
+        message: "Request timed out",
+        retryable: true,
+      })
+    }
     throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -166,15 +179,7 @@ export const httpClient = {
     const response = await monitoredFetch("DELETE", path, {
       headers: { "Accept": "application/json" },
     })
-    if (!response.ok) {
-      let apiError: ApiError | undefined
-      try {
-        apiError = await response.json()
-      } catch {
-        // response body was not JSON
-      }
-      throw new HttpClientError(response.status, apiError)
-    }
+    await handleResponse<void>(response)
   },
 
   async postBlob(
