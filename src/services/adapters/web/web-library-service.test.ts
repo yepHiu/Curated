@@ -2,7 +2,7 @@ import { flushPromises } from "@vue/test-utils"
 import { ref } from "vue"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { HttpClientError } from "@/api/http-client"
-import type { MovieDetailDTO, MovieListItemDTO } from "@/api/types"
+import type { MovieDetailDTO, MovieListItemDTO, SettingsDTO } from "@/api/types"
 
 const apiMocks = vi.hoisted(() => ({
   listMovies: vi.fn(),
@@ -10,6 +10,8 @@ const apiMocks = vi.hoisted(() => ({
   patchMovie: vi.fn(),
   deleteMovie: vi.fn(),
   restoreMovie: vi.fn(),
+  getSettings: vi.fn(),
+  patchSettings: vi.fn(),
 }))
 
 function movieListDto(id: string, overrides: Partial<MovieListItemDTO> = {}): MovieListItemDTO {
@@ -41,6 +43,41 @@ function movieDetailDto(id: string, overrides: Partial<MovieDetailDTO> = {}): Mo
   }
 }
 
+function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
+  return {
+    libraryPaths: [],
+    player: {
+      hardwareDecode: true,
+      hardwareEncoder: "auto",
+      nativePlayerPreset: "custom",
+      nativePlayerEnabled: false,
+      nativePlayerCommand: "",
+      streamPushEnabled: true,
+      forceStreamPush: false,
+      ffmpegCommand: "ffmpeg",
+      preferNativePlayer: false,
+      seekForwardStepSec: 10,
+      seekBackwardStepSec: 10,
+    },
+    organizeLibrary: true,
+    autoLibraryWatch: true,
+    autoActorProfileScrape: false,
+    launchAtLogin: false,
+    launchAtLoginSupported: false,
+    curatedFrameExportFormat: "jpg",
+    metadataMovieProvider: "",
+    metadataMovieProviders: [],
+    metadataMovieProviderChain: [],
+    metadataMovieScrapeMode: "auto",
+    proxy: { enabled: false },
+    backendLog: {
+      logDir: "",
+      logLevel: "info",
+    },
+    ...overrides,
+  }
+}
+
 vi.mock("@/api/endpoints", () => ({
   api: apiMocks,
 }))
@@ -62,6 +99,8 @@ beforeEach(() => {
   apiMocks.patchMovie.mockReset()
   apiMocks.deleteMovie.mockReset()
   apiMocks.restoreMovie.mockReset()
+  apiMocks.getSettings.mockReset()
+  apiMocks.patchSettings.mockReset()
   vi.useRealTimers()
 })
 
@@ -105,6 +144,93 @@ describe("webLibraryService loadError", () => {
 })
 
 describe("webLibraryService mutations", () => {
+  it("recovers organize library state from settings when saving fails", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.patchSettings.mockRejectedValueOnce(new Error("save failed"))
+    apiMocks.getSettings.mockResolvedValueOnce(
+      settingsDto({
+        organizeLibrary: true,
+        libraryPaths: [
+          {
+            id: "library-1",
+            path: "D:/media",
+            title: "Media",
+            firstLibraryScanPending: true,
+          },
+        ],
+      }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await expect(webLibraryService.setOrganizeLibrary(false)).rejects.toThrow("save failed")
+
+    expect(apiMocks.patchSettings).toHaveBeenCalledWith({ organizeLibrary: false })
+    expect(apiMocks.getSettings).toHaveBeenCalledTimes(1)
+    expect(webLibraryService.organizeLibrary.value).toBe(true)
+    expect(webLibraryService.libraryPaths.value).toEqual([
+      {
+        id: "library-1",
+        path: "D:/media",
+        title: "Media",
+        firstLibraryScanPending: true,
+      },
+    ])
+  })
+
+  it("does not let a stale failed settings save override a newer successful save", async () => {
+    let rejectFirstPatch: (reason?: unknown) => void
+    const firstPatch = new Promise<SettingsDTO>((_, reject) => {
+      rejectFirstPatch = reject
+    })
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.patchSettings
+      .mockReturnValueOnce(firstPatch)
+      .mockResolvedValueOnce(settingsDto({ organizeLibrary: true }))
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+
+    const firstSave = webLibraryService.setOrganizeLibrary(false)
+    await Promise.resolve()
+    expect(webLibraryService.organizeLibrary.value).toBe(false)
+
+    await webLibraryService.setOrganizeLibrary(true)
+    rejectFirstPatch!(new Error("old save failed"))
+    await expect(firstSave).rejects.toThrow("old save failed")
+
+    expect(apiMocks.getSettings).not.toHaveBeenCalled()
+    expect(webLibraryService.organizeLibrary.value).toBe(true)
+  })
+
+  it("recovers proxy settings from settings when saving fails", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.patchSettings.mockRejectedValueOnce(new Error("proxy failed"))
+    apiMocks.getSettings.mockResolvedValueOnce(
+      settingsDto({
+        proxy: { enabled: false },
+      }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await expect(
+      webLibraryService.setProxy({
+        enabled: true,
+        url: "http://127.0.0.1:7890",
+      }),
+    ).rejects.toThrow("proxy failed")
+
+    expect(apiMocks.patchSettings).toHaveBeenCalledWith({
+      proxy: {
+        enabled: true,
+        url: "http://127.0.0.1:7890",
+      },
+    })
+    expect(apiMocks.getSettings).toHaveBeenCalledTimes(1)
+    expect(webLibraryService.proxy.value).toEqual({ enabled: false })
+  })
+
   it("short-circuits blank movie ids without waiting for library loading", async () => {
     let resolveList: (value: {
       items: MovieListItemDTO[]
