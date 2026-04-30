@@ -1,6 +1,7 @@
 import { flushPromises } from "@vue/test-utils"
 import { ref } from "vue"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { HttpClientError } from "@/api/http-client"
 import type { MovieDetailDTO, MovieListItemDTO } from "@/api/types"
 
 const apiMocks = vi.hoisted(() => ({
@@ -79,9 +80,79 @@ describe("webLibraryService loadError", () => {
 
     expect(webLibraryService.loadError.value).toBe("detail failed")
   })
+
+  it("uses the API error message when movie detail loading fails with an HTTP error", async () => {
+    apiMocks.listMovies.mockResolvedValue({ items: [], total: 0 })
+    apiMocks.getMovie.mockRejectedValueOnce(
+      new HttpClientError(404, {
+        code: "MOVIE_NOT_FOUND",
+        message: "Movie is gone",
+        retryable: false,
+      }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await expect(webLibraryService.loadMovieDetail("movie-1")).resolves.toBeUndefined()
+
+    expect(webLibraryService.loadError.value).toBe("Movie is gone")
+  })
 })
 
 describe("webLibraryService mutations", () => {
+  it("patches a cached movie and merges the returned detail into cache", async () => {
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-1", { title: "Original title" })],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+    apiMocks.patchMovie.mockResolvedValueOnce(
+      movieDetailDto("movie-1", { title: "Updated title", summary: "Updated summary" }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    const updated = await webLibraryService.patchMovie("movie-1", {
+      userTitle: "Updated title",
+    })
+
+    expect(apiMocks.patchMovie).toHaveBeenCalledWith("movie-1", {
+      userTitle: "Updated title",
+    })
+    expect(updated?.title).toBe("Updated title")
+    expect(updated?.summary).toBe("Updated summary")
+    expect(webLibraryService.getMovieById("movie-1")?.title).toBe("Updated title")
+  })
+
+  it("loads a missing movie into cache before patching it", async () => {
+    apiMocks.listMovies.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 500,
+      offset: 0,
+    })
+    apiMocks.getMovie.mockResolvedValueOnce(
+      movieDetailDto("movie-1", { title: "Loaded before patch" }),
+    )
+    apiMocks.patchMovie.mockResolvedValueOnce(
+      movieDetailDto("movie-1", { title: "Patched after load" }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    const updated = await webLibraryService.patchMovie("movie-1", {
+      userTitle: "Patched after load",
+    })
+
+    expect(apiMocks.getMovie).toHaveBeenCalledWith("movie-1")
+    expect(apiMocks.patchMovie).toHaveBeenCalledWith("movie-1", {
+      userTitle: "Patched after load",
+    })
+    expect(updated?.title).toBe("Patched after load")
+    expect(webLibraryService.getMovieById("movie-1")?.title).toBe("Patched after load")
+  })
+
   it("patches the requested favorite state and updates the movie cache", async () => {
     apiMocks.listMovies.mockResolvedValue({
       items: [movieListDto("movie-1", { isFavorite: false })],

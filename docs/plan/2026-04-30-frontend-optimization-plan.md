@@ -27,7 +27,7 @@
 | 1.2 HTTP Client 添加超时机制 | 已完成 | 所有 `httpClient` 请求统一使用 30s `AbortController` 超时；超时转换为 `HttpClientError(0, COMMON_TIMEOUT)`；`DELETE` 改为复用共享 `handleResponse<void>()` | `src/api/http-client.ts`, `src/api/http-client.test.ts` |
 | 1.3 修复关键操作的错误吞没 | 已完成 | `LibraryView` 收藏/编辑失败改为 destructive toast；资料库加载失败通过 `LibraryService.loadError` 展示 banner；`SettingsPage` 移除库根失败改为 destructive toast；Web adapter 在列表/详情加载失败时写入可消费的 `loadError` | `src/views/LibraryView.vue`, `src/views/LibraryView.test.ts`, `src/components/jav-library/SettingsPage.vue`, `src/services/contracts/library-service.ts`, `src/services/adapters/web/web-library-service.ts`, `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/mock/mock-library-service.ts` |
 | 1.4 补全 i18n locale key 缺口 | 已完成 | 补齐策展帧 tag filter 的英文/日文 key；补齐 `settings.curatedExportFormatSaving` 的中文/日文 key；新增 locale parity 测试防回归 | `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json`, `src/i18n/locales.test.ts` |
-| 3.1 web-library-service 测试 | 部分完成 | 新增 Web adapter 测试骨架，覆盖初始列表加载失败写入 `loadError`、详情加载失败写入 `loadError`、初始分页加载、多并发详情请求合并与缓存写入、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新 | `src/services/adapters/web/web-library-service.test.ts` |
+| 3.1 web-library-service 测试 | 部分完成 | 新增 Web adapter 测试骨架，覆盖初始列表加载失败写入 `loadError`、详情加载失败/API message、初始分页加载、多并发详情请求合并与缓存写入、`patchMovie` 合并响应与缺失缓存预加载、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新 | `src/services/adapters/web/web-library-service.test.ts` |
 | 3.2 playback-progress-storage 测试 | 部分完成 | 已覆盖 route query 解析、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除；localStorage quota/private mode 仍可后续单独补 | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
 | 3.3 PlayerView 基础测试 | 部分完成 | 新增 `PlayerView` 入口测试，覆盖缓存命中渲染 `PlayerPage`、autoplay 路由参数、未找到状态、Web API hydrate loading 与播放记录写入；播放器内部 resume 行为后续在 `PlayerPage`/播放目标测试中继续补 | `src/views/PlayerView.test.ts` |
 | 3.4 Composable 测试补全 | 部分完成 | 新增 `use-scan-task-tracker` 卸载清理测试；新增 `use-backend-health` mock/Web 成功失败、轮询、卸载清理、手动 recheck spinner 测试；新增 `use-app-update` disabled、按需加载、手动失败、自动检查去重测试 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/composables/use-backend-health.test.ts`, `src/composables/use-app-update.test.ts` |
@@ -42,7 +42,7 @@
 
 - `pnpm test -- src/App.test.ts src/i18n/locales.test.ts`：2 files / 4 tests passed
 - `pnpm test -- src/views/LibraryView.test.ts src/services/adapters/web/web-library-service.test.ts src/i18n/locales.test.ts`：3 files / 7 tests passed
-- `pnpm test -- src/services/adapters/web/web-library-service.test.ts`：1 file / 7 tests passed
+- `pnpm test -- src/services/adapters/web/web-library-service.test.ts`：1 file / 10 tests passed
 - `pnpm test -- src/services/adapters/web/web-library-service.test.ts src/views/HistoryView.test.ts`：2 files / 8 tests passed
 - `pnpm test -- src/views/PlayerView.test.ts`：1 file / 3 tests passed
 - `pnpm test -- src/composables/use-backend-health.test.ts`：1 file / 5 tests passed
@@ -57,7 +57,7 @@
 
 ### 下一批优先继续
 
-1. **3.1 web-library-service 测试**：继续扩展 `patchMovie` 乐观更新与回滚、`loadMovieDetail` 404/HTTP 错误路径、`getMovies`/筛选分页相关路径。
+1. **3.1 web-library-service 测试**：继续扩展删除/恢复/回收站、`ensureMovieCached` 空 id/已缓存短路、settings 同步失败恢复路径。
 2. **3.3 PlayerView / PlayerPage 基础测试**：继续覆盖 resume 参数、播放目标解析和 PlayerPage 关键加载态。
 3. **5.1 硬编码文本迁移**：继续处理 preview / scan dock / rating / pick-directory 等可见文本。
 
@@ -272,7 +272,7 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 
 ### 3.1 web-library-service 测试
 
-**状态（2026-05-01）:** 部分完成。已新增 `src/services/adapters/web/web-library-service.test.ts`，覆盖初始列表失败、详情失败、分页加载、并发详情请求合并与缓存写入、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新；后续继续补 `patchMovie` 乐观更新与回滚、404/HTTP 错误路径、筛选分页相关路径。
+**状态（2026-05-01）:** 部分完成。已新增 `src/services/adapters/web/web-library-service.test.ts`，覆盖初始列表失败、详情失败/API message、分页加载、并发详情请求合并与缓存写入、`patchMovie` 响应合并与缺失缓存预加载、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新；后续继续补删除/恢复/回收站、`ensureMovieCached` 短路、settings 同步失败恢复路径。
 
 **目标:** 覆盖生产适配器的核心路径
 
