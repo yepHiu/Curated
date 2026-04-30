@@ -95,6 +95,15 @@ import {
   normalizeProgressTargetSec as normalizePlaybackProgressTargetSec,
   resolvePlaybackTotalDurationSec,
 } from "@/lib/player-playback-timeline"
+import {
+  applyHlsBandwidthEstimateToPlaybackStats,
+  applyHlsFragmentToPlaybackStats,
+  applyHlsLevelToPlaybackStats,
+  applyVideoDimensionsToPlaybackStats,
+  createEmptyPlaybackStats,
+  toFiniteNumber,
+  type PlaybackStatsSnapshot,
+} from "@/lib/player-playback-stats"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
 
@@ -129,15 +138,7 @@ type PlayerContextMenuState = {
   y: number
 }
 
-type PlaybackStatsState = {
-  audioBitrateKbps: number | null
-  videoBitrateKbps: number | null
-  currentBitrateKbps: number | null
-  bandwidthEstimateKbps: number | null
-  width: number | null
-  height: number | null
-  fps: number | null
-}
+type PlaybackStatsState = PlaybackStatsSnapshot
 
 type SessionPlaybackMode = "direct" | "hls"
 
@@ -1632,118 +1633,30 @@ async function releasePlaybackSession(sessionId?: string) {
 }
 
 function resetPlaybackStats() {
-  playbackStats.value = {
-    audioBitrateKbps: null,
-    videoBitrateKbps: null,
-    currentBitrateKbps: null,
-    bandwidthEstimateKbps: null,
-    width: null,
-    height: null,
-    fps: null,
-  }
+  playbackStats.value = createEmptyPlaybackStats()
   stopFpsTracking()
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  const num =
-    typeof value === "number"
-      ? value
-      : typeof value === "string" && value.trim()
-        ? Number(value)
-        : NaN
-  return Number.isFinite(num) ? num : null
 }
 
 function refreshPlaybackStatsFromVideo() {
   const v = videoRef.value
   if (!v) return
-  const width = Number.isFinite(v.videoWidth) && v.videoWidth > 0 ? v.videoWidth : null
-  const height = Number.isFinite(v.videoHeight) && v.videoHeight > 0 ? v.videoHeight : null
-  playbackStats.value = {
-    ...playbackStats.value,
-    width,
-    height,
-  }
+  playbackStats.value = applyVideoDimensionsToPlaybackStats(
+    playbackStats.value,
+    v.videoWidth,
+    v.videoHeight,
+  )
 }
 
 function updatePlaybackStatsFromHlsLevel(level?: HlsLevel | null) {
-  if (!level) return
-  const width = toFiniteNumber(level.width)
-  const height = toFiniteNumber(level.height)
-  const frameRate =
-    toFiniteNumber(level.frameRate) ??
-    toFiniteNumber(level.attrs?.["FRAME-RATE"]) ??
-    toFiniteNumber(level.attrs?.FRAME_RATE)
-  const videoBitrate = toFiniteNumber(level.bitrate)
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    width: width && width > 0 ? width : playbackStats.value.width,
-    height: height && height > 0 ? height : playbackStats.value.height,
-    fps: frameRate && frameRate > 0 ? frameRate : playbackStats.value.fps,
-    videoBitrateKbps:
-      videoBitrate && videoBitrate > 0
-        ? Math.round(videoBitrate / 1000)
-        : playbackStats.value.videoBitrateKbps,
-  }
+  playbackStats.value = applyHlsLevelToPlaybackStats(playbackStats.value, level)
 }
 
 function updatePlaybackStatsFromHlsBandwidthEstimate(value: unknown) {
-  const bandwidthEstimate = toFiniteNumber(value)
-  if (!bandwidthEstimate || bandwidthEstimate <= 0) {
-    return
-  }
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    bandwidthEstimateKbps: Math.round(bandwidthEstimate / 1000),
-  }
+  playbackStats.value = applyHlsBandwidthEstimateToPlaybackStats(playbackStats.value, value)
 }
 
 function updatePlaybackStatsFromHlsFragment(data?: unknown) {
-  if (typeof data !== "object" || data === null) return
-
-  const stats =
-    "stats" in data && typeof (data as { stats?: unknown }).stats === "object"
-      ? ((data as { stats?: Record<string, unknown> }).stats ?? null)
-      : null
-  const frag =
-    "frag" in data && typeof (data as { frag?: unknown }).frag === "object"
-      ? ((data as { frag?: Record<string, unknown> }).frag ?? null)
-      : null
-
-  const loadedBytes =
-    toFiniteNumber(stats?.loaded) ??
-    toFiniteNumber(stats?.total) ??
-    toFiniteNumber(frag?.loaded)
-  const durationSec =
-    toFiniteNumber(frag?.duration) ??
-    toFiniteNumber(frag?.maxStartPts) ??
-    null
-  const bandwidthEstimate =
-    toFiniteNumber(stats?.bwEstimate) ??
-    toFiniteNumber(stats?.bandwidthEstimate) ??
-    null
-
-  let currentBitrateKbps = playbackStats.value.currentBitrateKbps
-  if (loadedBytes && loadedBytes > 0 && durationSec && durationSec > 0) {
-    const measuredBitrateKbps = Math.round((loadedBytes * 8) / durationSec / 1000)
-    if (Number.isFinite(measuredBitrateKbps) && measuredBitrateKbps > 0) {
-      currentBitrateKbps =
-        currentBitrateKbps && currentBitrateKbps > 0
-          ? Math.round(currentBitrateKbps * 0.65 + measuredBitrateKbps * 0.35)
-          : measuredBitrateKbps
-    }
-  }
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    currentBitrateKbps,
-    bandwidthEstimateKbps:
-      bandwidthEstimate && bandwidthEstimate > 0
-        ? Math.round(bandwidthEstimate / 1000)
-        : playbackStats.value.bandwidthEstimateKbps,
-  }
+  playbackStats.value = applyHlsFragmentToPlaybackStats(playbackStats.value, data)
 }
 
 function bindHlsStats(
