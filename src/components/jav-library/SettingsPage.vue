@@ -33,8 +33,6 @@ import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   CheckSquare,
   Database,
-  FolderOpen,
-  FolderPlus,
   ListChecks,
   Sparkles,
   X,
@@ -47,16 +45,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -76,6 +64,7 @@ import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
+import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
@@ -2033,97 +2022,20 @@ async function runMetadataRefreshForSelected() {
             </div>
 
             <div class="flex flex-wrap justify-start gap-2 pt-1">
-              <Dialog v-model:open="addPathDialogOpen">
-                <DialogTrigger as-child>
-                  <Button type="button" class="rounded-2xl">
-                    <FolderPlus data-icon="inline-start" />
-                    {{ t("settings.addPath") }}
-                  </Button>
-                </DialogTrigger>
-
-                <DialogContent
-                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                >
-                  <DialogHeader>
-                    <DialogTitle>{{ t("settings.addPathDialogTitle") }}</DialogTitle>
-                    <DialogDescription>
-                      {{ t("settings.addPathDialogDesc") }}
-                      <span class="font-mono text-xs">D:\Media\JAV</span> 或
-                      <span class="font-mono text-xs">/home/user/Videos</span>。
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" for="new-lib-path">{{ t("settings.absolutePath") }}</label>
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-                        <Input
-                          id="new-lib-path"
-                          v-model="newPath"
-                          class="rounded-xl sm:min-w-0 sm:flex-1"
-                          placeholder="D:\Media\JAV\Library"
-                          autocomplete="off"
-                          @input="clearPathAddError"
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          class="rounded-2xl sm:shrink-0"
-                          :disabled="pickDirectoryBusy"
-                          @click="browseForDirectory"
-                        >
-                          <FolderOpen data-icon="inline-start" />
-                          {{ pickDirectoryBusy ? t("settings.picking") : t("settings.pickFolder") }}
-                        </Button>
-                      </div>
-                      <p
-                        v-if="directoryHintDisplay"
-                        class="text-sm leading-relaxed text-muted-foreground whitespace-pre-line"
-                      >
-                        {{ directoryHintDisplay }}
-                      </p>
-                      <p
-                        v-if="newPath.trim() && !isAbsoluteLibraryPath(newPath)"
-                        class="text-sm text-destructive"
-                      >
-                        {{ t("settings.notAbsolute") }}
-                      </p>
-                      <p v-if="pathAddError" class="text-sm text-destructive">
-                        {{ pathAddError }}
-                      </p>
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" for="new-lib-title">{{ t("settings.optionalPathTitle") }}</label>
-                      <Input
-                        id="new-lib-title"
-                        v-model="newPathTitle"
-                        class="rounded-xl"
-                        :placeholder="t('settings.displayName')"
-                        autocomplete="off"
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose as-child>
-                      <Button type="button" variant="outline" class="rounded-2xl">
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      class="rounded-2xl"
-                      :disabled="addBusy || !canSaveNewPath"
-                      :title="
-                        addBusy || canSaveNewPath ? undefined : t('settings.savePathDisabledTitle')
-                      "
-                      @click="submitAddPath"
-                    >
-                      {{ addBusy ? t("common.saving") : t("settings.savePath") }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <SettingsLibraryPathAddDialog
+                v-model:open="addPathDialogOpen"
+                v-model:new-path="newPath"
+                v-model:new-path-title="newPathTitle"
+                :pick-directory-busy="pickDirectoryBusy"
+                :directory-hint-display="directoryHintDisplay"
+                :path-add-error="pathAddError"
+                :add-busy="addBusy"
+                :can-save-new-path="canSaveNewPath"
+                :content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+                @clear-error="clearPathAddError"
+                @browse="browseForDirectory"
+                @submit="submitAddPath"
+              />
             </div>
           </CardContent>
         </Card>
