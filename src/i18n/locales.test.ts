@@ -33,6 +33,12 @@ const requiredLocaleKeys = [
   "rating.score",
   "movie.expandSummary",
   "movie.collapseSummary",
+  "preview.title",
+  "preview.instructions",
+  "preview.close",
+  "preview.previous",
+  "preview.next",
+  "preview.imageOf",
 ]
 
 function readLocaleKey(messages: Record<string, unknown>, key: string): unknown {

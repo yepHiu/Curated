@@ -339,6 +339,14 @@
     "expandSummary": "Expand summary",
     "collapseSummary": "Collapse summary"
   },
+  "preview": {
+    "title": "{code} Preview",
+    "instructions": "Use arrow keys or side buttons to navigate, Esc to close; click thumbnails to jump.",
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next",
+    "imageOf": "Image {i}"
+  },
   "settings": {
     "language": "Interface language",
     "appearance": "Appearance",

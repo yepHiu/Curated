@@ -339,6 +339,14 @@
     "expandSummary": "展开简介",
     "collapseSummary": "收起简介"
   },
+  "preview": {
+    "title": "{code} 预览图",
+    "instructions": "使用左右方向键或两侧按钮切换图片，Esc 关闭；点击下方缩略图跳转。",
+    "close": "关闭",
+    "previous": "上一张",
+    "next": "下一张",
+    "imageOf": "第 {i} 张"
+  },
   "settings": {
     "language": "界面语言",
     "appearance": "外观",
