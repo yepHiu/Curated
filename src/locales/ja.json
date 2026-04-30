@@ -183,6 +183,14 @@
     "duplicateReviewBody": "同じ作品で {threshold} 秒以内のフレームをここでマークしています。内容を確認して不要なものを削除してください。",
     "duplicateReviewBadge": "重複候補",
     "duplicateReviewDialogHint": "このフレームは同じ作品の他の萃取フレームと {threshold} 秒以内で近接しています。確認して不要なものを削除してください。",
+    "tagFilterTitle": "タグフィルター",
+    "tagFilterAll": "すべて",
+    "tagFilterEmpty": "キュレートフレームのタグはまだありません。タグを追加するとここで絞り込めます。",
+    "tagFilterNoMatches": "このタグに一致するキュレートフレームはありません。",
+    "tagFilterShowMore": "さらにタグを表示（残り {count} 件）",
+    "tagFilterShowLess": "タグを折りたたむ",
+    "ariaFilterFrameTag": "キュレートフレームをタグで絞り込み：{tag}、{count} 枚",
+    "ariaClearFrameTagFilter": "キュレートフレームのタグフィルターを解除",
     "tagSaveDirty": "タグの変更はまだ保存されていません。",
     "tagSaveFailed": "タグの保存に失敗しました。下書きは保持されています。",
     "tagSaveRetry": "再保存"
@@ -622,6 +630,7 @@
     "curatedExportClearFail": "保存したエクスポートフォルダのクリアに失敗しました。",
     "curatedExportFormatTitle": "キュレートフレームの画像書き出し設定",
     "curatedExportFormatHint": "詳細ダイアログからの書き出し、右クリックメニューからの書き出し、一括書き出しは、ここで選んだ形式を使います。",
+    "curatedExportFormatSaving": "保存中…",
     "curatedExportFormatLabel": "書き出し画像形式"
   },
   "detail": {

@@ -630,6 +630,7 @@
     "curatedExportClearFail": "清除已保存的导出目录失败。",
     "curatedExportFormatTitle": "萃取帧导出图片设置",
     "curatedExportFormatHint": "详情弹窗导出、右键菜单导出和批量导出都会使用这里选择的格式。",
+    "curatedExportFormatSaving": "保存中…",
     "curatedExportFormatLabel": "导出图片格式"
   },
   "detail": {
