@@ -59,6 +59,11 @@ import {
   type CuratedFrameTagSaveStatus,
 } from "@/lib/curated-frames/p2-state"
 import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
+import {
+  clearCuratedFrameExportSelection,
+  toggleCuratedFrameExportSelection,
+  type CuratedFrameExportSelectionState,
+} from "@/lib/curated-frames/selection"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useLibraryService } from "@/services/library-service"
@@ -77,8 +82,7 @@ const batchMode = ref(false)
 
 const mainTab = ref<"timeline" | "actors" | "movies">("timeline")
 
-type ExportSelectionBucket = "none" | "anonymous" | "named"
-const exportSelectionBucket = ref<ExportSelectionBucket>("none")
+const exportSelectionBucket = ref<CuratedFrameExportSelectionState["exportSelectionBucket"]>("none")
 const namedActorForExport = ref<string | null>(null)
 const selectedFrameIds = ref<string[]>([])
 const exportToolbarError = ref("")
@@ -91,10 +95,22 @@ function isFrameSelected(id: string) {
   return selectedFrameIds.value.includes(id)
 }
 
+function currentExportSelectionState(): CuratedFrameExportSelectionState {
+  return {
+    selectedFrameIds: selectedFrameIds.value,
+    exportSelectionBucket: exportSelectionBucket.value,
+    namedActorForExport: namedActorForExport.value,
+  }
+}
+
+function applyExportSelectionState(next: CuratedFrameExportSelectionState) {
+  selectedFrameIds.value = next.selectedFrameIds
+  exportSelectionBucket.value = next.exportSelectionBucket
+  namedActorForExport.value = next.namedActorForExport
+}
+
 function clearExportSelection() {
-  selectedFrameIds.value = []
-  exportSelectionBucket.value = "none"
-  namedActorForExport.value = null
+  applyExportSelectionState(clearCuratedFrameExportSelection())
   exportToolbarError.value = ""
 }
 
@@ -110,39 +126,22 @@ watch(mainTab, () => {
 
 function toggleFrameSelection(id: string, sectionActor?: string) {
   exportToolbarError.value = ""
-  const idx = selectedFrameIds.value.indexOf(id)
-  if (idx >= 0) {
-    selectedFrameIds.value = selectedFrameIds.value.filter((x) => x !== id)
-    if (selectedFrameIds.value.length === 0) {
-      exportSelectionBucket.value = "none"
-      namedActorForExport.value = null
-    }
-    return
-  }
-  if (selectedFrameIds.value.length >= batchExportMax) {
+  const result = toggleCuratedFrameExportSelection(currentExportSelectionState(), {
+    id,
+    mainTab: mainTab.value,
+    sectionActor,
+    max: batchExportMax,
+    anonymousActorLabel: noActorLabel.value,
+  })
+  if (result.error === "max") {
     exportToolbarError.value = t("curated.exportSelectMax")
     return
   }
-
-  if (mainTab.value === "actors" && sectionActor !== undefined) {
-    const anonymous = sectionActor === noActorLabel.value
-    if (exportSelectionBucket.value === "none") {
-      exportSelectionBucket.value = anonymous ? "anonymous" : "named"
-      if (!anonymous) {
-        namedActorForExport.value = sectionActor
-      }
-    } else if (exportSelectionBucket.value === "anonymous") {
-      if (!anonymous) {
-        exportToolbarError.value = t("curated.exportActorMixed")
-        return
-      }
-    } else if (namedActorForExport.value !== sectionActor || anonymous) {
-      exportToolbarError.value = t("curated.exportActorMixed")
-      return
-    }
+  if (result.error === "mixed-actor") {
+    exportToolbarError.value = t("curated.exportActorMixed")
+    return
   }
-
-  selectedFrameIds.value = [...selectedFrameIds.value, id]
+  applyExportSelectionState(result.state)
 }
 
 const batchExportMax = 20
