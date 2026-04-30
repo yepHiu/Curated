@@ -31,7 +31,6 @@ import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
-  Database,
   Sparkles,
 } from "lucide-vue-next"
 import {
@@ -59,10 +58,7 @@ import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
-import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
-import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
-import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
-import SettingsLibraryPathToolbar from "@/components/jav-library/settings/SettingsLibraryPathToolbar.vue"
+import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
@@ -1819,102 +1815,50 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navLibrary')"
     >
     <h2 class="sr-only">{{ t("settings.navLibrary") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-        <p
-          v-if="scanFeedbackError"
-          class="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          role="alert"
-        >
-          {{ scanFeedbackError }}
-        </p>
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Database class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.storageCardTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.storageCardDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <SettingsLibraryPathToolbar
-              :batch-mode="libraryPathsBatchMode"
-              :library-paths-count="libraryPathsList.length"
-              :has-metadata-path-selection="hasMetadataPathSelection"
-              :metadata-refresh-busy="metadataRefreshBusy"
-              @enter-batch-mode="enterLibraryPathsBatchMode"
-              @select-all="selectAllMetadataPaths"
-              @clear-selection="clearMetadataPathSelection"
-              @refresh-metadata="runMetadataRefreshForSelected"
-              @exit-batch-mode="exitLibraryPathsBatchMode"
-            />
-
-            <SettingsLibraryPathRemoveDialog
-              v-model:open="removePathDialogOpen"
-              :pending="removePathPending"
-              :busy="removePathBusy"
-              :content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-              @confirm="confirmRemoveLibraryPath"
-            />
-
-            <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
-              {{ metadataRefreshSuccess }}
-            </p>
-            <p
-              v-if="metadataRefreshError"
-              class="text-sm text-destructive"
-              role="alert"
-            >
-              {{ metadataRefreshError }}
-            </p>
-
-            <SettingsLibraryPathList
-              v-model:edit-library-title-draft="editLibraryTitleDraft"
-              :paths="libraryPathsList"
-              :batch-mode="libraryPathsBatchMode"
-              :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
-              :editing-library-path-id="editingLibraryPathId"
-              :edit-title-busy="editTitleBusy"
-              :edit-title-error="editTitleError"
-              :reveal-path-busy="revealPathBusy"
-              :scan-path-busy="scanPathBusy"
-              @save-title="saveLibraryPathTitle"
-              @cancel-edit="cancelEditLibraryTitle"
-              @toggle-metadata-path-selection="toggleMetadataPathSelection"
-              @reveal="revealLibraryPath"
-              @edit="startEditLibraryTitle"
-              @rescan="rescanPath($event.path)"
-              @remove="openRemovePathConfirm"
-            />
-
-            <div class="flex flex-wrap justify-start gap-2 pt-1">
-              <SettingsLibraryPathAddDialog
-                v-model:open="addPathDialogOpen"
-                v-model:new-path="newPath"
-                v-model:new-path-title="newPathTitle"
-                :pick-directory-busy="pickDirectoryBusy"
-                :directory-hint-display="directoryHintDisplay"
-                :path-add-error="pathAddError"
-                :add-busy="addBusy"
-                :can-save-new-path="canSaveNewPath"
-                :content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                @clear-error="clearPathAddError"
-                @browse="browseForDirectory"
-                @submit="submitAddPath"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <SettingsLibraryPathsSection
+        v-model:remove-path-dialog-open="removePathDialogOpen"
+        v-model:edit-library-title-draft="editLibraryTitleDraft"
+        v-model:add-path-dialog-open="addPathDialogOpen"
+        v-model:new-path="newPath"
+        v-model:new-path-title="newPathTitle"
+        :scan-feedback-error="scanFeedbackError"
+        :paths="libraryPathsList"
+        :batch-mode="libraryPathsBatchMode"
+        :has-metadata-path-selection="hasMetadataPathSelection"
+        :metadata-refresh-busy="metadataRefreshBusy"
+        :metadata-refresh-success="metadataRefreshSuccess"
+        :metadata-refresh-error="metadataRefreshError"
+        :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
+        :remove-path-pending="removePathPending"
+        :remove-path-busy="removePathBusy"
+        :editing-library-path-id="editingLibraryPathId"
+        :edit-title-busy="editTitleBusy"
+        :edit-title-error="editTitleError"
+        :reveal-path-busy="revealPathBusy"
+        :scan-path-busy="scanPathBusy"
+        :pick-directory-busy="pickDirectoryBusy"
+        :directory-hint-display="directoryHintDisplay"
+        :path-add-error="pathAddError"
+        :add-busy="addBusy"
+        :can-save-new-path="canSaveNewPath"
+        :dialog-content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+        @enter-batch-mode="enterLibraryPathsBatchMode"
+        @select-all="selectAllMetadataPaths"
+        @clear-selection="clearMetadataPathSelection"
+        @refresh-metadata="runMetadataRefreshForSelected"
+        @exit-batch-mode="exitLibraryPathsBatchMode"
+        @confirm-remove="confirmRemoveLibraryPath"
+        @save-title="saveLibraryPathTitle"
+        @cancel-edit="cancelEditLibraryTitle"
+        @toggle-metadata-path-selection="toggleMetadataPathSelection"
+        @reveal="revealLibraryPath"
+        @edit="startEditLibraryTitle"
+        @rescan="rescanPath($event.path)"
+        @remove="openRemovePathConfirm"
+        @clear-error="clearPathAddError"
+        @browse="browseForDirectory"
+        @submit="submitAddPath"
+      />
 
       <SettingsOrganizeSection
         :organize-library="organizeLibrary"
@@ -1922,8 +1866,6 @@ async function runMetadataRefreshForSelected() {
         :organize-library-error="organizeLibraryError"
         @change-organize-library="onOrganizeLibraryChange"
       />
-
-      </div>
     </section>
     </TabsContent>
 
