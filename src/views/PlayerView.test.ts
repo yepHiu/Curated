@@ -17,6 +17,12 @@ vi.mock("vue-router", () => ({
   useRoute: () => routeState,
 }))
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
+}))
+
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     getMovieById: (id?: string) => (id ? serviceState.movies.get(id) : undefined),
@@ -92,7 +98,8 @@ describe("PlayerView", () => {
 
     const wrapper = await mountPlayerView()
 
-    expect(wrapper.get("[data-not-found]").text()).toContain("Player target not found")
+    expect(wrapper.get("[data-not-found]").text()).toContain("player.notFoundTitle")
+    expect(wrapper.get("[data-not-found]").text()).toContain("player.notFoundDesc")
     expect(serviceMocks.ensureMovieCached).not.toHaveBeenCalled()
   })
 
@@ -109,7 +116,7 @@ describe("PlayerView", () => {
     const wrapper = await mountPlayerView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain("正在加载播放目标")
+    expect(wrapper.text()).toContain("player.loadingTarget")
     expect(serviceMocks.ensureMovieCached).toHaveBeenCalledWith("movie-1")
   })
 })

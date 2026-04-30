@@ -667,6 +667,9 @@
     "revealFailGeneric": "无法在文件管理器中打开"
   },
   "player": {
+    "loadingTarget": "正在加载播放目标…",
+    "notFoundTitle": "播放目标未找到",
+    "notFoundDesc": "此播放路由指向的影片 ID 在当前库中不可用。",
     "mockNoPlay": "本地演示模式无法播放主视频，请在 .env 中启用 VITE_USE_WEB_API 并连接后端。",
     "autoplayBlocked": "浏览器未允许自动播放，请再点一次画面或下方播放键。",
     "decodeError": "当前浏览器无法解码该视频格式，可尝试转为 MP4（H.264 + AAC）或使用后续桌面版播放器。",

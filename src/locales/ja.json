@@ -667,6 +667,9 @@
     "revealFailGeneric": "ファイルマネージャーを開けませんでした"
   },
   "player": {
+    "loadingTarget": "再生ターゲットを読み込み中…",
+    "notFoundTitle": "再生ターゲットが見つかりません",
+    "notFoundDesc": "このプレイヤールートが参照する動画 ID は現在のライブラリで利用できません。",
     "mockNoPlay": "デモモードでは再生できません。.env で VITE_USE_WEB_API を有効にしバックエンドに接続してください。",
     "autoplayBlocked": "自動再生がブロックされました。画面または再生ボタンをもう一度押してください。",
     "decodeError": "このブラウザは形式をデコードできません。MP4（H.264 + AAC）を試すかデスクトップ版をお待ちください。",

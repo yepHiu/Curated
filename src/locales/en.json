@@ -667,6 +667,9 @@
     "revealFailGeneric": "Could not open file manager"
   },
   "player": {
+    "loadingTarget": "Loading playback target…",
+    "notFoundTitle": "Player target not found",
+    "notFoundDesc": "This player route points to a movie id that is not available in the current library.",
     "mockNoPlay": "Demo mode cannot play video. Set VITE_USE_WEB_API in .env and connect the backend.",
     "autoplayBlocked": "Autoplay was blocked; click the video or play button again.",
     "decodeError": "This browser cannot decode the format. Try MP4 (H.264 + AAC) or a future desktop player.",
