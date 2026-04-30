@@ -21,6 +21,18 @@ export type ToggleCuratedFrameExportSelectionResult = {
   error: CuratedFrameExportSelectionError | null
 }
 
+export type ReconcileCuratedFrameActorExportSelectionInput = {
+  selectedFrameIds: readonly string[]
+  actorGroups: readonly (readonly [actorLabel: string, frameIds: readonly string[]])[]
+  currentNamedActorForExport: string | null
+  anonymousActorLabel: string
+}
+
+export type ReconcileCuratedFrameActorExportSelectionResult = Pick<
+  CuratedFrameExportSelectionState,
+  "exportSelectionBucket" | "namedActorForExport"
+>
+
 export function clearCuratedFrameExportSelection(): CuratedFrameExportSelectionState {
   return {
     selectedFrameIds: [],
@@ -76,5 +88,42 @@ export function toggleCuratedFrameExportSelection(
       namedActorForExport,
     },
     error: null,
+  }
+}
+
+export function reconcileCuratedFrameActorExportSelection(
+  input: ReconcileCuratedFrameActorExportSelectionInput,
+): ReconcileCuratedFrameActorExportSelectionResult {
+  if (input.selectedFrameIds.length === 0) {
+    return {
+      exportSelectionBucket: "none",
+      namedActorForExport: null,
+    }
+  }
+
+  const selectedSet = new Set(input.selectedFrameIds)
+  const candidates: string[] = []
+  for (const [label, frameIds] of input.actorGroups) {
+    const groupIdSet = new Set(frameIds)
+    if ([...selectedSet].every((id) => groupIdSet.has(id))) {
+      candidates.push(label)
+    }
+  }
+
+  if (candidates.length === 0) {
+    return {
+      exportSelectionBucket: "none",
+      namedActorForExport: null,
+    }
+  }
+
+  let label = candidates[0]!
+  if (input.currentNamedActorForExport && candidates.includes(input.currentNamedActorForExport)) {
+    label = input.currentNamedActorForExport
+  }
+  const anonymous = label === input.anonymousActorLabel
+  return {
+    exportSelectionBucket: anonymous ? "anonymous" : "named",
+    namedActorForExport: anonymous ? null : label,
   }
 }

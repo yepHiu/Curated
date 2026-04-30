@@ -61,6 +61,7 @@ import {
 import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 import {
   clearCuratedFrameExportSelection,
+  reconcileCuratedFrameActorExportSelection,
   toggleCuratedFrameExportSelection,
   type CuratedFrameExportSelectionState,
 } from "@/lib/curated-frames/selection"
@@ -213,33 +214,17 @@ function reconcileActorsTabExportBucket() {
   if (mainTab.value !== "actors") {
     return
   }
-  const sel = selectedFrameIds.value
-  if (sel.length === 0) {
-    exportSelectionBucket.value = "none"
-    namedActorForExport.value = null
-    return
-  }
-  const selSet = new Set(sel)
-  const candidates: string[] = []
-  for (const [label, groupItems] of actorGroups.value) {
-    const gids = new Set(groupItems.map((x) => x.row.id))
-    if ([...selSet].every((id) => gids.has(id))) {
-      candidates.push(label)
-    }
-  }
-  if (candidates.length === 0) {
-    exportSelectionBucket.value = "none"
-    namedActorForExport.value = null
-    return
-  }
-  const prefer = namedActorForExport.value
-  let label = candidates[0]!
-  if (prefer && candidates.includes(prefer)) {
-    label = prefer
-  }
-  const anonymous = label === noActorLabel.value
-  exportSelectionBucket.value = anonymous ? "anonymous" : "named"
-  namedActorForExport.value = anonymous ? null : label
+  const result = reconcileCuratedFrameActorExportSelection({
+    selectedFrameIds: selectedFrameIds.value,
+    actorGroups: actorGroups.value.map(([label, items]) => [
+      label,
+      items.map((item) => item.row.id),
+    ]),
+    currentNamedActorForExport: namedActorForExport.value,
+    anonymousActorLabel: noActorLabel.value,
+  })
+  exportSelectionBucket.value = result.exportSelectionBucket
+  namedActorForExport.value = result.namedActorForExport
 }
 
 function onActorGroupHeaderCheckboxChange(actor: string, items: RowWithUrl[], ev: Event) {

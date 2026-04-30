@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   clearCuratedFrameExportSelection,
+  reconcileCuratedFrameActorExportSelection,
   toggleCuratedFrameExportSelection,
   type CuratedFrameExportSelectionState,
 } from "@/lib/curated-frames/selection"
@@ -117,5 +118,55 @@ describe("curated frame export selection", () => {
     })
     expect(mixed.error).toBe("mixed-actor")
     expect(mixed.state).toEqual(first.state)
+  })
+
+  it("reconciles actor export bucket from remaining selected ids", () => {
+    expect(
+      reconcileCuratedFrameActorExportSelection({
+        selectedFrameIds: [],
+        actorGroups: [["Alice", ["a"]]],
+        currentNamedActorForExport: "Alice",
+        anonymousActorLabel: "No actor",
+      }),
+    ).toEqual({
+      exportSelectionBucket: "none",
+      namedActorForExport: null,
+    })
+    expect(
+      reconcileCuratedFrameActorExportSelection({
+        selectedFrameIds: ["a"],
+        actorGroups: [["Alice", ["a", "b"]]],
+        currentNamedActorForExport: null,
+        anonymousActorLabel: "No actor",
+      }),
+    ).toEqual({
+      exportSelectionBucket: "named",
+      namedActorForExport: "Alice",
+    })
+    expect(
+      reconcileCuratedFrameActorExportSelection({
+        selectedFrameIds: ["x"],
+        actorGroups: [
+          ["Alice", ["x"]],
+          ["Bob", ["x"]],
+        ],
+        currentNamedActorForExport: "Bob",
+        anonymousActorLabel: "No actor",
+      }),
+    ).toEqual({
+      exportSelectionBucket: "named",
+      namedActorForExport: "Bob",
+    })
+    expect(
+      reconcileCuratedFrameActorExportSelection({
+        selectedFrameIds: ["z"],
+        actorGroups: [["No actor", ["z"]]],
+        currentNamedActorForExport: null,
+        anonymousActorLabel: "No actor",
+      }),
+    ).toEqual({
+      exportSelectionBucket: "anonymous",
+      namedActorForExport: null,
+    })
   })
 })
