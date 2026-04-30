@@ -31,6 +31,7 @@
 | 3.2 playback-progress-storage 测试 | 部分完成 | 已覆盖 route query 解析、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除；localStorage quota/private mode 仍可后续单独补 | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
 | 3.3 PlayerView 基础测试 | 部分完成 | 新增 `PlayerView` 入口测试，覆盖缓存命中渲染 `PlayerPage`、autoplay 路由参数及严格边界、非字符串路由 id 播放目标解析、未找到状态、Web API hydrate loading 与播放记录写入/抑制；`playback-targets` 已覆盖 resume query 优先级、descriptor fallback、无效值和 HLS local seek 边界；播放器内部加载态后续继续补 | `src/views/PlayerView.test.ts`, `src/lib/playback-targets.test.ts` |
 | 3.4 Composable 测试补全 | 部分完成 | 新增 `use-scan-task-tracker` 卸载清理测试；新增 `use-backend-health` mock/Web 成功失败、轮询、卸载清理、手动 recheck spinner 测试；新增 `use-app-update` disabled、按需加载、手动失败、自动检查去重测试 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/composables/use-backend-health.test.ts`, `src/composables/use-app-update.test.ts` |
+| 3.5 现有测试扩展 | 已完成 | `DetailView` 覆盖详情加载、未找到、收藏/评分转发、删除后返回、元数据刷新任务跟踪、Escape 返回；`HistoryView` 覆盖空态、单条删除、批量删除和 batch toolbar；`DetailPanel` 覆盖用户评分、清除评分、删除/永久删除、恢复、用户标签建议 | `src/views/DetailView.test.ts`, `src/views/HistoryView.test.ts`, `src/components/jav-library/DetailPanel.test.ts` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
@@ -61,10 +62,11 @@
 - `pnpm test -- src/views/PlayerView.test.ts`：1 file / 5 tests passed
 - `pnpm test -- src/services/adapters/mock/mock-library-service.test.ts`：1 file / 10 tests passed
 - `pnpm test -- src/lib/playback-targets.test.ts`：1 file / 8 tests passed
+- `pnpm test -- src/components/jav-library/DetailPanel.test.ts src/views/DetailView.test.ts src/views/HistoryView.test.ts`：3 files / 15 tests passed
 - `pnpm test -- src/api/http-client.test.ts src/composables/use-scan-task-tracker.test.ts src/lib/playback-progress-storage.test.ts src/i18n/locales.test.ts src/lib/native-player-launch.test.ts`：5 files / 15 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
-- `pnpm test`：81 files / 289 tests passed
+- `pnpm test`：81 files / 301 tests passed
 - `pnpm build`：passed（包含 `pnpm typecheck && vite build`）
 - `git diff --check`：exit 0（仅 Windows CRLF 提示）
 
@@ -72,7 +74,7 @@
 
 1. **3.3 PlayerView / PlayerPage 基础测试**：继续覆盖 PlayerPage 关键加载态。
 2. **4.6 Mock / Web 适配器行为差异**：继续补错误类型一致性。
-3. **3.5 现有测试扩展**：继续补 `DetailView`、`HistoryView`、`DetailPanel` 的关键用户流程。
+3. **3.2 / 3.4 测试边界补齐**：继续补 localStorage quota/private mode、curated-frames DB/capture 等剩余边界。
 
 ---
 
@@ -365,6 +367,8 @@ CuratedFramesLibrary.vue (保留为入口 ~200 行)
 ---
 
 ### 3.5 现有测试扩展
+
+**状态（2026-05-01）:** 已完成。`DetailView.test.ts` 已覆盖加载、未找到、favorite、rating、delete、metadata refresh 与 Escape 返回；`HistoryView.test.ts` 已覆盖渲染/空态、单条删除、批量删除和批量 toolbar；`DetailPanel.test.ts` 已覆盖 tag 建议、rating 交互、清除本地评分、delete/permanent delete 与 restore 事件。
 
 | 文件 | 当前 | 目标 |
 |------|------|------|

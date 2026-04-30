@@ -89,7 +89,12 @@ vi.mock("@/components/jav-library/MediaStill.vue", () => ({
 }))
 
 vi.mock("@/components/jav-library/MovieDeleteConfirmDialog.vue", () => ({
-  default: { name: "MovieDeleteConfirmDialog", template: "<div />" },
+  default: {
+    name: "MovieDeleteConfirmDialog",
+    props: ["variant"],
+    emits: ["confirm", "update:open"],
+    template: '<button :data-delete-variant="variant" @click="$emit(\'confirm\')" />',
+  },
 }))
 
 vi.mock("@/components/jav-library/MovieEditDialog.vue", () => ({
@@ -97,7 +102,12 @@ vi.mock("@/components/jav-library/MovieEditDialog.vue", () => ({
 }))
 
 vi.mock("@/components/jav-library/MovieRatingStars.vue", () => ({
-  default: { name: "MovieRatingStars", template: "<div />" },
+  default: {
+    name: "MovieRatingStars",
+    props: ["modelValue"],
+    emits: ["commit"],
+    template: '<button data-rating-stars @click="$emit(\'commit\', 3.5)" />',
+  },
 }))
 
 vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
@@ -105,6 +115,86 @@ vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
 }))
 
 describe("DetailPanel", () => {
+  it("emits user rating updates from the rating stars", async () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    await wrapper.get("[data-rating-stars]").trigger("click")
+
+    expect(wrapper.emitted("updateUserRating")).toEqual([
+      [
+        {
+          movieId: "movie-1",
+          value: 3.5,
+        },
+      ],
+    ])
+  })
+
+  it("clears the local user rating override", async () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ userRating: 4 }),
+      },
+    })
+
+    const clearButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("detailPanel.clearLocalRating"))
+
+    expect(clearButton).toBeDefined()
+    await clearButton!.trigger("click")
+
+    expect(wrapper.emitted("updateUserRating")).toEqual([
+      [
+        {
+          movieId: "movie-1",
+          value: null,
+        },
+      ],
+    ])
+  })
+
+  it("emits trash and permanent delete confirmations", async () => {
+    const activeWrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    await activeWrapper.get('[data-delete-variant="trash"]').trigger("click")
+    expect(activeWrapper.emitted("deleteMovie")).toEqual([["movie-1"]])
+
+    const trashedWrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ trashedAt: "2026-04-02T00:00:00.000Z" }),
+      },
+    })
+
+    await trashedWrapper.get('[data-delete-variant="permanent"]').trigger("click")
+    expect(trashedWrapper.emitted("deleteMoviePermanently")).toEqual([["movie-1"]])
+  })
+
+  it("emits restore for trashed movies", async () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ trashedAt: "2026-04-02T00:00:00.000Z" }),
+      },
+    })
+
+    const restoreButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("detailPanel.restoreMovie"))
+
+    expect(restoreButton).toBeDefined()
+    await restoreButton!.trigger("click")
+
+    expect(wrapper.emitted("restoreMovie")).toEqual([["movie-1"]])
+  })
+
   it("adds a suggested user tag immediately when clicked", async () => {
     const wrapper = mount(DetailPanel, {
       props: {
