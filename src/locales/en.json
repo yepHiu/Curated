@@ -313,6 +313,10 @@
     "moveUp": "Move up",
     "moveDown": "Move down"
   },
+  "pickDir": {
+    "unsupported": "Cannot read the absolute disk path in this environment. Open the folder in your local file manager and copy the full path into the Absolute path field.",
+    "selected": "Selected folder \"{name}\". The web page cannot read the absolute local path due to browser security limits. Open this folder in your file manager and copy the address-bar path into the Absolute path field above."
+  },
   "settings": {
     "language": "Interface language",
     "appearance": "Appearance",
