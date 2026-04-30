@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { X } from "lucide-vue-next"
@@ -34,7 +34,7 @@ const actorTagSuggestionPool = computed(() => {
   return [...s].sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true }))
 })
 
-const actors = ref<ActorListItemDTO[]>([])
+const actors = shallowRef<ActorListItemDTO[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadingMore = ref(false)

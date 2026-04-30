@@ -32,6 +32,7 @@
 | 3.4 Composable 测试补全 | 部分完成 | 新增 `use-scan-task-tracker` 卸载清理测试；`use-backend-health` 与 `use-app-update` 测试尚未开始 | `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts` |
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
+| 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
 | 4.7 Native player URL 安全加固 | 已完成 | `looksLikeBrowserProtocolLaunchTarget` 显式拒绝 `javascript:` / `data:` / `vbscript:`，保留 `potplayer:` 等外部播放器协议 | `src/lib/native-player-launch.ts`, `src/lib/native-player-launch.test.ts` |
 | Lint 本地工作区排除 | 已完成（计划外支撑项） | `eslint .` 排除 `.workspace/**` 与 `.local/**`，避免扫描本地 Go/cache 临时目录导致 EPERM，符合仓库本地临时目录政策 | `eslint.config.js` |
 
@@ -40,6 +41,7 @@
 - `pnpm test -- src/App.test.ts src/i18n/locales.test.ts`：2 files / 4 tests passed
 - `pnpm test -- src/views/LibraryView.test.ts src/services/adapters/web/web-library-service.test.ts src/i18n/locales.test.ts`：3 files / 7 tests passed
 - `pnpm test -- src/services/adapters/web/web-library-service.test.ts`：1 file / 7 tests passed
+- `pnpm test -- src/services/adapters/web/web-library-service.test.ts src/views/HistoryView.test.ts`：2 files / 8 tests passed
 - `pnpm test -- src/api/http-client.test.ts src/composables/use-scan-task-tracker.test.ts src/lib/playback-progress-storage.test.ts src/i18n/locales.test.ts src/lib/native-player-launch.test.ts`：5 files / 15 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
@@ -51,7 +53,7 @@
 
 1. **3.1 web-library-service 测试**：继续扩展 `patchMovie` 乐观更新与回滚、`loadMovieDetail` 404/HTTP 错误路径、`getMovies`/筛选分页相关路径。
 2. **3.3 PlayerView 基础测试**：加载、未找到、loading、resume 参数。
-3. **4.5 shallowRef 优化**：`web-library-service.ts`、`HistoryView.vue`、`ActorsPage.vue`。
+3. **3.4 Composable 测试补全**：`use-backend-health`、`use-app-update`。
 
 ---
 
@@ -479,6 +481,8 @@ export function useScanTaskTracker() {
 ---
 
 ### 4.5 shallowRef 优化
+
+**状态（2026-05-01）:** 已完成。`web-library-service.ts` 的 `moviesState` / `trashedMoviesState`、`HistoryView.vue` 的 `batchSelectedIds`、`ActorsPage.vue` 的 `actors` 已切换为 `shallowRef`；这些状态均通过整体赋值触发响应更新。
 
 **目标:** 减少深层响应追踪开销
 

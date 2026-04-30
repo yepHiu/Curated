@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from "vue"
+import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
   CuratedFrameExportFormat,
@@ -30,10 +30,10 @@ import type { LibraryService } from "@/services/contracts/library-service"
 import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
-const moviesState: Ref<Movie[]> = ref([])
+const moviesState: Ref<Movie[]> = shallowRef([])
 const moviesLoadedState = ref(false)
 const loadErrorState = ref<string | null>(null)
-const trashedMoviesState: Ref<Movie[]> = ref([])
+const trashedMoviesState: Ref<Movie[]> = shallowRef([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
