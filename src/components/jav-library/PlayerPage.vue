@@ -74,6 +74,19 @@ import {
   shouldEnterSeekWaitingState,
   shouldReconcileDisplayedPlaybackTime,
 } from "@/lib/player-playback-clock"
+import {
+  formatBitrateLabel,
+  formatCountLabel,
+  formatFpsLabel,
+  formatPercentLabel,
+  formatReasonLabel,
+  formatResolutionLabel,
+  formatSessionKindLabel,
+  formatSourceFormatLabel,
+  formatTimecodeLabel,
+  formatTranscodeProfileLabel,
+  isPlaybackStatUnavailable,
+} from "@/lib/player-playback-stats-format"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
 
@@ -1909,12 +1922,6 @@ function startFpsTracking() {
   }, 1000)
 }
 
-function formatBitrateLabel(kbps: number | null): string {
-  if (!kbps || kbps <= 0) return "N/A"
-  if (kbps >= 1000) return `${(kbps / 1000).toFixed(2)} Mbps`
-  return `${Math.round(kbps)} kbps`
-}
-
 function playbackTimelineOffsetSec(descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value): number {
   if (!descriptor || descriptor.mode !== "hls") {
     return 0
@@ -2036,82 +2043,6 @@ async function seekToAbsolutePlaybackTime(
       isSwitchingPlaybackSession.value = false
     }
   }
-}
-
-function formatResolutionLabel(width: number | null, height: number | null): string {
-  if (!width || !height) return "N/A"
-  return `${width} × ${height}`
-}
-
-function formatFpsLabel(fps: number | null): string {
-  if (!fps || fps <= 0) return "N/A"
-  return `${fps.toFixed(fps >= 100 ? 0 : 2)} fps`
-}
-
-function formatTimecodeLabel(seconds: number | null | undefined): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "N/A"
-  return formatClock(seconds)
-}
-
-function formatPercentLabel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "N/A"
-  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`
-}
-
-function formatCountLabel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "N/A"
-  return String(Math.max(0, Math.trunc(value)))
-}
-
-function formatReasonLabel(reason: string | null | undefined): string {
-  const text = reason?.trim() || ""
-  if (!text) return "N/A"
-  return text
-}
-
-function formatSessionKindLabel(sessionKind: string | null | undefined): string {
-  switch ((sessionKind ?? "").trim().toLowerCase()) {
-    case "direct-file":
-      return "Direct File"
-    case "remux-hls":
-      return "Remux HLS"
-    case "transcode-hls":
-      return "Transcode HLS"
-    default:
-      return "N/A"
-  }
-}
-
-function formatSourceFormatLabel(descriptor: PlaybackDescriptorDTO | null | undefined): string {
-  const container = descriptor?.sourceContainer?.trim()
-  const videoCodec = descriptor?.sourceVideoCodec?.trim()
-  const audioCodec = descriptor?.sourceAudioCodec?.trim()
-  const parts = [container, videoCodec, audioCodec].filter((value) => Boolean(value))
-  if (parts.length === 0) return "N/A"
-  return parts.join(" / ")
-}
-
-function formatTranscodeProfileLabel(profile: string | null | undefined): string {
-  switch ((profile ?? "").trim().toLowerCase()) {
-    case "remux_copy":
-      return "FFmpeg Stream Copy"
-    case "h264_amf":
-      return "AMD AMF"
-    case "h264_qsv":
-      return "Intel QSV"
-    case "h264_nvenc":
-      return "NVIDIA NVENC"
-    case "h264_videotoolbox":
-      return "VideoToolbox"
-    case "libx264":
-      return "libx264"
-    default:
-      return "N/A"
-  }
-}
-
-function isPlaybackStatUnavailable(value: string): boolean {
-  return value === "N/A"
 }
 
 const playbackStateLabel = computed(() => {
