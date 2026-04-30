@@ -24,6 +24,8 @@ export interface LibraryService {
   movies: ComputedRef<readonly Movie[]>
   /** 电影主列表首轮加载是否已完成；true 代表拿到过一次明确结果，不代表一定有数据。 */
   moviesLoaded: ComputedRef<boolean>
+  /** 最近一次资料库列表/详情加载错误；用于视图层展示用户可见反馈。 */
+  loadError: ComputedRef<string | null>
   /** 回收站列表（Web：mode=trash；Mock：带 trashedAt 的条目） */
   trashedMovies: ComputedRef<readonly Movie[]>
   libraryStats: ComputedRef<readonly LibraryStat[]>

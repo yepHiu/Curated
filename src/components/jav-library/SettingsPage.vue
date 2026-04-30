@@ -1473,6 +1473,13 @@ async function confirmRemoveLibraryPath() {
     removePathDialogOpen.value = false
   } catch (err) {
     console.error("[settings] remove library path failed", err)
+    const message =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message.trim()
+          ? err.message
+          : t("settings.removePathFailed")
+    pushAppToast(message, { variant: "destructive" })
   } finally {
     removePathBusy.value = false
   }

@@ -32,6 +32,7 @@ import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
 const moviesState: Ref<Movie[]> = ref([])
 const moviesLoadedState = ref(false)
+const loadErrorState = ref<string | null>(null)
 const trashedMoviesState: Ref<Movie[]> = ref([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
@@ -160,6 +161,20 @@ function isTrashHashRoute(): boolean {
   return hash === "#/trash" || hash.startsWith("#/trash?")
 }
 
+function formatLoadError(err: unknown, fallback: string): string {
+  if (err instanceof HttpClientError) {
+    return err.apiError?.message?.trim() || err.message || fallback
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message
+  }
+  return fallback
+}
+
+function setLoadError(err: unknown, fallbackKey: string) {
+  loadErrorState.value = formatLoadError(err, i18n.global.t(fallbackKey))
+}
+
 async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }) {
   if (reloadMoviesDebounce) {
     clearTimeout(reloadMoviesDebounce)
@@ -171,7 +186,9 @@ async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }
       trashedMoviesState.value = await loadTrashedMovies()
     }
     moviesLoadedState.value = true
+    loadErrorState.value = null
   } catch (err) {
+    setLoadError(err, "library.loadFailed")
     console.error("[web-library-service] failed to reload movies", err)
   }
 }
@@ -184,7 +201,9 @@ async function ensureLoaded(options?: { includeTrash?: boolean }) {
       trashedMoviesState.value = await loadTrashedMovies()
     }
     moviesLoadedState.value = true
+    loadErrorState.value = null
   } catch (err) {
+    setLoadError(err, "library.loadFailed")
     console.error("[web-library-service] failed to load movies", err)
   }
 }
@@ -313,6 +332,7 @@ function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
     moviesLoaded: computed(() => moviesLoadedState.value),
+    loadError: computed(() => loadErrorState.value),
     trashedMovies: computed(() => trashedMoviesState.value),
     libraryStats: computed(() => {
       const loc = i18n.global.locale.value as string
@@ -445,7 +465,9 @@ function createWebLibraryService(): LibraryService {
     async ensureTrashLoaded() {
       try {
         trashedMoviesState.value = await loadTrashedMovies()
+        loadErrorState.value = null
       } catch (err) {
+        setLoadError(err, "library.loadFailed")
         console.error("[web-library-service] failed to load trashed movies", err)
       }
     },
@@ -853,8 +875,10 @@ export async function loadMovieDetail(movieId: string): Promise<Movie | undefine
       const dto = await api.getMovie(id)
       const mapped = mapMovieDetail(dto)
       mergeMovieIntoListState(mapped)
+      loadErrorState.value = null
       return mapped
     } catch (err) {
+      setLoadError(err, "detail.loadError")
       const extra = err instanceof HttpClientError ? ` status=${err.status}` : ""
       console.error(`[web-library-service] loadMovieDetail failed${extra}`, id, err)
       return undefined

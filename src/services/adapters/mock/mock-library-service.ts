@@ -424,6 +424,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
   moviesLoaded: computed(() => true),
+  loadError: computed(() => null),
   trashedMovies: computed(() =>
     moviesState.value
       .filter((m) => Boolean(m.trashedAt?.trim()))
