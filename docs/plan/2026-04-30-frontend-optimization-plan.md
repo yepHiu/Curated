@@ -38,7 +38,7 @@
 | 4.3 统一 `httpClient.delete` 错误处理 | 已完成 | `delete()` 不再自行 `response.json()`，统一走共享响应解析，支持 204 空 body | `src/api/http-client.ts` |
 | 4.4 修复 `use-scan-task-tracker` 清理 | 已完成 | 使用消费者计数，最后一个消费者卸载后清理轮询、dismiss timer 和模块级状态，避免页面卸载后孤儿轮询 | `src/composables/use-scan-task-tracker.ts` |
 | 4.5 shallowRef 优化 | 已完成 | 将 Web adapter 的影片列表/回收站列表、观看历史批量选择 Set、演员列表切换为 `shallowRef`，保留原有整体替换触发模式，减少大列表深层响应追踪 | `src/services/adapters/web/web-library-service.ts`, `src/views/HistoryView.vue`, `src/components/jav-library/ActorsPage.vue` |
-| 4.6 Mock / Web 适配器行为差异 | 部分完成 | Mock adapter 的 `getMovieById` / `loadMovieDetail` 已对齐 Web adapter 的 trimmed id 查找，并覆盖回收站影片查找；`loadMovieDetail` 显式跨 microtask 返回以保持异步语义 | `src/services/adapters/mock/mock-library-service.ts`, `src/services/adapters/mock/mock-library-service.test.ts` |
+| 4.6 Mock / Web 适配器行为差异 | 已完成 | Mock adapter 的 `getMovieById` / `loadMovieDetail` 已对齐 Web adapter 的 trimmed id 查找，并覆盖回收站影片查找；`loadMovieDetail` 显式跨 microtask 返回以保持异步语义；Mock 主动抛出的不支持、校验失败、not found 错误统一改为 `HttpClientError`，带 status / code / retryable | `src/services/adapters/mock/mock-library-service.ts`, `src/services/adapters/mock/mock-library-service.test.ts` |
 | 4.7 Native player URL 安全加固 | 已完成 | `looksLikeBrowserProtocolLaunchTarget` 显式拒绝 `javascript:` / `data:` / `vbscript:`，保留 `potplayer:` 等外部播放器协议 | `src/lib/native-player-launch.ts`, `src/lib/native-player-launch.test.ts` |
 | 5.1 硬编码中文迁移到 locale 文件 | 已完成 | Review 清单内用户可见硬编码文本已迁移：`PlayerView` loading / not found 到 `player.*`；目录选择提示到 `pickDir.*`；扫描进度 dock 到 `scan.*`，扫描任务 fallback 到 `scanTask.fetchFailed`；评分组件 aria 到 `rating.*`；展开文本默认按钮到 `movie.*`；预览图查看器到 `preview.*`；PlayerPage stats 到 `player.hideStats` / `player.showStats`。相关路径由 `PlayerView.test.ts`、`pick-directory.test.ts`、`ScanProgressDock.test.ts`、`use-scan-task-tracker.test.ts`、`MovieRatingStars.test.ts`、`ExpandableText.test.ts`、`PreviewImageViewerInner.test.ts`、`PlayerPage.i18n.test.ts` 与 locale parity 测试覆盖 | `src/views/PlayerView.vue`, `src/views/PlayerView.test.ts`, `src/lib/pick-directory.ts`, `src/lib/pick-directory.test.ts`, `src/components/jav-library/ScanProgressDock.vue`, `src/components/jav-library/ScanProgressDock.test.ts`, `src/components/jav-library/MovieRatingStars.vue`, `src/components/jav-library/MovieRatingStars.test.ts`, `src/components/jav-library/ExpandableText.vue`, `src/components/jav-library/ExpandableText.test.ts`, `src/components/jav-library/PreviewImageViewerInner.vue`, `src/components/jav-library/PreviewImageViewerInner.test.ts`, `src/components/jav-library/PlayerPage.vue`, `src/components/jav-library/PlayerPage.i18n.test.ts`, `src/composables/use-scan-task-tracker.ts`, `src/composables/use-scan-task-tracker.test.ts`, `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json` |
 | Lint 本地工作区排除 | 已完成（计划外支撑项） | `eslint .` 排除 `.workspace/**` 与 `.local/**`，避免扫描本地 Go/cache 临时目录导致 EPERM，符合仓库本地临时目录政策 | `eslint.config.js` |
@@ -75,6 +75,7 @@
 - `pnpm test -- src/api/endpoints.validation.test.ts`：1 file / 4 tests passed
 - `pnpm test -- src/api/endpoints.validation.test.ts src/api/http-client.test.ts src/services/adapters/web/web-library-service.test.ts`：3 files / 26 tests passed
 - `pnpm test -- src/services/library-service-boundary.test.ts src/components/jav-library/ActorProfileCard.test.ts src/components/jav-library/PlayerPage.loading.test.ts src/components/jav-library/settings/SettingsHomepageDevTools.test.ts src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts`：6 files / 43 tests passed
+- `pnpm test -- src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts src/components/jav-library/ActorProfileCard.test.ts`：3 files / 38 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
 - `pnpm test`：84 files / 320 tests passed
@@ -83,8 +84,8 @@
 
 ### 下一批优先继续
 
-1. **3.1 web-library-service 测试**：继续补 `patchMovie` 失败回滚、并发竞态等更细粒度路径。
-2. **4.6 Mock / Web 适配器行为差异**：继续补错误类型一致性。
+1. **5.2 性能微优化**：PortalModel 播放进度更新防抖，以及关键静态片段 `v-once`。
+2. **Phase 2 组件拆分**：按 SettingsPage、PlayerPage、CuratedFramesLibrary 顺序拆分并保持回归测试。
 3. **3.6 curated-frames 边界测试**：如接受新增测试依赖，可继续用 fake IndexedDB 覆盖本地 IndexedDB 读写/查询/删除全链路；当前已覆盖 Web API 分支和本地写入前置校验。
 
 ---
@@ -562,7 +563,7 @@ export function useScanTaskTracker() {
 
 ### 4.6 修复 Mock / Web 适配器行为差异
 
-**状态（2026-05-01）:** 部分完成。Mock adapter 的 `getMovieById` / `loadMovieDetail` 已改为按 trimmed id 查找，覆盖回收站影片；`loadMovieDetail` 已显式跨 microtask 返回，相关回归见 `src/services/adapters/mock/mock-library-service.test.ts`。后续若需要继续收敛，可补错误类型一致性。
+**状态（2026-05-01）:** 已完成。Mock adapter 的 `getMovieById` / `loadMovieDetail` 已改为按 trimmed id 查找，覆盖回收站影片；`loadMovieDetail` 已显式跨 microtask 返回；Mock 主动抛出的不支持、校验失败、not found 错误已统一为 `HttpClientError`，相关回归见 `src/services/adapters/mock/mock-library-service.test.ts`。
 
 **文件:** `src/services/adapters/mock/mock-library-service.ts`
 

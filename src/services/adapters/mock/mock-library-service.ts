@@ -33,6 +33,7 @@ import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
+import { HttpClientError } from "@/api/http-client"
 
 function normalizeMockLibraryPath(p: string): string {
   return p.trim().replace(/\\/g, "/")
@@ -82,6 +83,14 @@ const playerSettingsMock = ref<PlayerSettingsDTO>({
   seekBackwardStepSec: 10,
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
+
+function mockHttpError(status: number, code: string, message = code): HttpClientError {
+  return new HttpClientError(status, {
+    code,
+    message,
+    retryable: false,
+  })
+}
 
 function normalizeNativePlayerPreset(
   preset: PlayerSettingsDTO["nativePlayerPreset"],
@@ -170,7 +179,7 @@ function findMockActor(name: string): ActorListItemDTO | undefined {
 function buildMockActorProfile(name: string): ActorProfileDTO {
   const actor = findMockActor(name)
   if (!actor) {
-    throw new Error("actor not found")
+    throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
   }
   return {
     name: actor.name,
@@ -665,13 +674,17 @@ export const mockLibraryService: LibraryService = {
   async setMetadataMovieProvider(name: string) {
     const trimmed = name.trim()
     if (trimmed !== "" && metadataMovieProvidersMock.value.length === 0) {
-      throw new Error("Mock mode has no provider list; use Web API to pick a source.")
+      throw mockHttpError(
+        400,
+        "MOCK_METADATA_PROVIDER_UNAVAILABLE",
+        "Mock mode has no provider list; use Web API to pick a source.",
+      )
     }
     if (
       trimmed !== "" &&
       !metadataMovieProvidersMock.value.some((p) => p.toLowerCase() === trimmed.toLowerCase())
     ) {
-      throw new Error("Unknown metadata provider in mock.")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "Unknown metadata provider in mock.")
     }
     metadataMovieProviderMock.value = trimmed
     metadataMovieScrapeModeMock.value = trimmed === "" ? "auto" : "specified"
@@ -698,7 +711,7 @@ export const mockLibraryService: LibraryService = {
     const trimmed = path.trim()
     if (!trimmed) return null
     if (!isAbsoluteLibraryPath(trimmed)) {
-      throw new Error("library path must be an absolute path")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "library path must be an absolute path")
     }
     const id = `mock-${Date.now()}`
     libraryPathsState.value = [
@@ -730,7 +743,7 @@ export const mockLibraryService: LibraryService = {
   },
 
   async revealLibraryPathInFileManager() {
-    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
+    throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
   },
 
   async scanLibraryPaths() {
@@ -747,7 +760,7 @@ export const mockLibraryService: LibraryService = {
   },
 
   async revealMovieInFileManager() {
-    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
+    throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
   },
 
   async refreshMetadataForLibraryPaths(): Promise<MetadataRefreshQueuedDTO> {
@@ -863,10 +876,10 @@ export const mockLibraryService: LibraryService = {
   async patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
     const n = name.trim()
     if (!n) {
-      throw new Error("actor name is required")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "actor name is required")
     }
     if (!mockActorsFromMovies().some((r) => r.name === n)) {
-      throw new Error("actor not found")
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
     }
     const normalized = [
       ...new Set(
@@ -880,7 +893,7 @@ export const mockLibraryService: LibraryService = {
     mockActorUserTags.value = next
     const row = mockActorsFromMovies().find((r) => r.name === n)
     if (!row) {
-      throw new Error("actor not found")
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
     }
     return row
   },
@@ -914,6 +927,6 @@ export const mockLibraryService: LibraryService = {
   },
 
   async exportCuratedFrames(): Promise<{ blob: Blob; filename: string }> {
-    throw new Error("MOCK_CURATED_EXPORT_NOT_SUPPORTED")
+    throw mockHttpError(501, "MOCK_CURATED_EXPORT_NOT_SUPPORTED")
   },
 }
