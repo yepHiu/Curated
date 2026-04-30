@@ -1,3 +1,4 @@
+// Package contracts defines DTOs, error codes, and shared types for the Curated backend API.
 package contracts
 
 import (
@@ -21,12 +22,14 @@ var ErrScrapeMovieNoLocation = errors.New("movie has no video path")
 // ErrActorNotFound is returned when no actors row exists for the given display name.
 var ErrActorNotFound = errors.New("actor not found")
 
+// Command represents a request message in the stdio JSONL transport.
 type Command struct {
 	ID      string          `json:"id"`
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
+// Response answers a command, carrying ok/error status and optional data in stdio JSONL transport.
 type Response struct {
 	Kind      string    `json:"kind"`
 	ID        string    `json:"id,omitempty"`
@@ -36,6 +39,7 @@ type Response struct {
 	Timestamp string    `json:"timestamp"`
 }
 
+// Event is an asynchronous notification pushed by the backend.
 type Event struct {
 	Kind      string `json:"kind"`
 	Type      string `json:"type"`
@@ -43,6 +47,7 @@ type Event struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// AppError represents a structured API error with a stable machine-readable code.
 type AppError struct {
 	Code      string         `json:"code"`
 	Message   string         `json:"message"`
@@ -50,6 +55,7 @@ type AppError struct {
 	Details   map[string]any `json:"details,omitempty"`
 }
 
+// HealthDTO reports backend identity, version, and runtime information.
 type HealthDTO struct {
 	Name             string `json:"name"`
 	Version          string `json:"version"` // Build stamp YYYYMMDD.HHMMSS (UTC) or git.* / unknown; see Channel
@@ -59,6 +65,7 @@ type HealthDTO struct {
 	DatabasePath     string `json:"databasePath"`
 }
 
+// DevPerformanceSummaryDTO carries sampled CPU usage for the dev-only performance monitor bar.
 type DevPerformanceSummaryDTO struct {
 	Supported         bool    `json:"supported"`
 	SampledAt         string  `json:"sampledAt,omitempty"`
@@ -66,6 +73,7 @@ type DevPerformanceSummaryDTO struct {
 	BackendCPUPercent float64 `json:"backendCpuPercent,omitempty"`
 }
 
+// AppUpdateStatusDTO reports the packaged-app update state vs the latest GitHub Release.
 type AppUpdateStatusDTO struct {
 	Supported           bool   `json:"supported"`
 	Status              string `json:"status"`
@@ -81,6 +89,7 @@ type AppUpdateStatusDTO struct {
 	ErrorMessage        string `json:"errorMessage,omitempty"`
 }
 
+// ListMoviesRequest filters the library movie listing by mode, query, actor, group, or studio.
 type ListMoviesRequest struct {
 	Mode   string `json:"mode,omitempty"`
 	Query  string `json:"query,omitempty"`
@@ -158,10 +167,12 @@ type PutMovieCommentBody struct {
 	Body string `json:"body"`
 }
 
+// GetMovieDetailRequest identifies a movie by its ID.
 type GetMovieDetailRequest struct {
 	MovieID string `json:"movieId"`
 }
 
+// StartScanRequest optionally restricts a library scan to specific paths.
 type StartScanRequest struct {
 	Paths []string `json:"paths,omitempty"`
 }
@@ -179,10 +190,12 @@ type MetadataRefreshQueuedDTO struct {
 	InvalidPaths []string `json:"invalidPaths"`
 }
 
+// GetTaskStatusRequest identifies an async task by its ID.
 type GetTaskStatusRequest struct {
 	TaskID string `json:"taskId"`
 }
 
+// ScanFileResultDTO is a per-file scan outcome (imported, updated, or skipped).
 type ScanFileResultDTO struct {
 	TaskID       string `json:"taskId"`
 	Path         string `json:"path"`
@@ -194,6 +207,7 @@ type ScanFileResultDTO struct {
 	ImportLayout string `json:"importLayout,omitempty"` // deprecated layout hint field; no longer populated by scans
 }
 
+// ScanSummaryDTO aggregates scan results (files discovered, imported, updated, skipped).
 type ScanSummaryDTO struct {
 	TaskID           string              `json:"taskId"`
 	Paths            []string            `json:"paths"`
@@ -205,6 +219,7 @@ type ScanSummaryDTO struct {
 	Results          []ScanFileResultDTO `json:"results,omitempty"`
 }
 
+// MovieListItemDTO is a compact movie row for library list views.
 type MovieListItemDTO struct {
 	ID             string   `json:"id"`
 	Title          string   `json:"title"`
@@ -227,6 +242,7 @@ type MovieListItemDTO struct {
 	TrashedAt string `json:"trashedAt,omitempty"`
 }
 
+// MovieDetailDTO extends MovieListItemDTO with full details for the detail page.
 type MovieDetailDTO struct {
 	MovieListItemDTO
 	Summary         string   `json:"summary"`
@@ -329,6 +345,7 @@ func yearPrefixFromReleaseDate(s string) (int, bool) {
 	return y, true
 }
 
+// MoviesPageDTO is a paginated library movie listing.
 type MoviesPageDTO struct {
 	Items  []MovieListItemDTO `json:"items"`
 	Total  int                `json:"total"`
@@ -336,6 +353,7 @@ type MoviesPageDTO struct {
 	Offset int                `json:"offset"`
 }
 
+// LibraryPathDTO represents a configured library root path.
 type LibraryPathDTO struct {
 	ID                      string `json:"id"`
 	Path                    string `json:"path"`
@@ -360,6 +378,7 @@ type UpdateLibraryPathRequest struct {
 	Title string `json:"title"`
 }
 
+// SettingsDTO carries all application settings exposed to the frontend.
 type SettingsDTO struct {
 	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
 	Player          PlayerSettingsDTO `json:"player"`
@@ -447,6 +466,7 @@ type PatchSettingsRequest struct {
 	BackendLog *PatchBackendLogSettings `json:"backendLog,omitempty"`
 }
 
+// PlayerSettingsDTO holds player/playback preferences exposed to the Settings UI.
 type PlayerSettingsDTO struct {
 	HardwareDecode      bool   `json:"hardwareDecode"`
 	HardwareEncoder     string `json:"hardwareEncoder,omitempty"`
@@ -461,6 +481,7 @@ type PlayerSettingsDTO struct {
 	SeekBackwardStepSec int    `json:"seekBackwardStepSec"`
 }
 
+// PatchPlayerSettingsDTO is the partial-update body for player settings.
 type PatchPlayerSettingsDTO struct {
 	HardwareDecode      *bool   `json:"hardwareDecode,omitempty"`
 	HardwareEncoder     *string `json:"hardwareEncoder,omitempty"`
@@ -483,6 +504,7 @@ type PlaybackProgressItemDTO struct {
 	UpdatedAt   string  `json:"updatedAt"`
 }
 
+// PlaybackProgressListDTO holds the full playback progress map.
 type PlaybackProgressListDTO struct {
 	Items []PlaybackProgressItemDTO `json:"items"`
 }
@@ -493,20 +515,24 @@ type PutPlaybackProgressBody struct {
 	DurationSec float64 `json:"durationSec"`
 }
 
+// PlaybackMode describes how a media file is delivered to the player.
 type PlaybackMode string
 
+// Delivery modes for media playback.
 const (
 	PlaybackModeDirect PlaybackMode = "direct"
 	PlaybackModeHLS    PlaybackMode = "hls"
 	PlaybackModeNative PlaybackMode = "native"
 )
 
+// PlaybackAudioTrackDTO describes an audio track for selection.
 type PlaybackAudioTrackDTO struct {
 	ID      string `json:"id"`
 	Label   string `json:"label"`
 	Default bool   `json:"default"`
 }
 
+// PlaybackSubtitleTrackDTO describes a subtitle track for selection.
 type PlaybackSubtitleTrackDTO struct {
 	ID      string `json:"id"`
 	Label   string `json:"label"`
@@ -514,6 +540,7 @@ type PlaybackSubtitleTrackDTO struct {
 	Default bool   `json:"default"`
 }
 
+// PlaybackDescriptorDTO tells the frontend how to play a movie (direct stream, HLS session, or native player).
 type PlaybackDescriptorDTO struct {
 	MovieID           string                     `json:"movieId"`
 	Mode              PlaybackMode               `json:"mode"`
@@ -537,11 +564,13 @@ type PlaybackDescriptorDTO struct {
 	SubtitleTracks    []PlaybackSubtitleTrackDTO `json:"subtitleTracks,omitempty"`
 }
 
+// CreatePlaybackSessionRequest allows the client to request a specific playback mode.
 type CreatePlaybackSessionRequest struct {
 	Mode             PlaybackMode `json:"mode,omitempty"`
 	StartPositionSec float64      `json:"startPositionSec,omitempty"`
 }
 
+// PlaybackSessionStatusDTO is a snapshot of a playback session for diagnostics.
 type PlaybackSessionStatusDTO struct {
 	SessionID        string  `json:"sessionId"`
 	MovieID          string  `json:"movieId"`
@@ -556,14 +585,17 @@ type PlaybackSessionStatusDTO struct {
 	LastError        string  `json:"lastError,omitempty"`
 }
 
+// PlaybackSessionListDTO lists recent active or archived playback sessions.
 type PlaybackSessionListDTO struct {
 	Items []PlaybackSessionStatusDTO `json:"items"`
 }
 
+// NativePlaybackLaunchRequest optionally specifies a start position for native player launch.
 type NativePlaybackLaunchRequest struct {
 	StartPositionSec float64 `json:"startPositionSec,omitempty"`
 }
 
+// NativePlaybackLaunchDTO reports the result of launching an external player.
 type NativePlaybackLaunchDTO struct {
 	OK        bool   `json:"ok"`
 	Command   string `json:"command,omitempty"`
@@ -586,6 +618,7 @@ type CuratedFrameItemDTO struct {
 	Tags        []string `json:"tags"`
 }
 
+// CuratedFramesListDTO is a paginated curated frame listing.
 type CuratedFramesListDTO struct {
 	Items  []CuratedFrameItemDTO `json:"items"`
 	Total  int                   `json:"total"`
@@ -606,15 +639,18 @@ type CreateCuratedFrameBody struct {
 	ImageBase64 string   `json:"imageBase64"`
 }
 
+// CuratedFrameStatsDTO reports the total curated frame count.
 type CuratedFrameStatsDTO struct {
 	Total int `json:"total"`
 }
 
+// CuratedFrameFacetItemDTO is one (name, count) facet row.
 type CuratedFrameFacetItemDTO struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
 }
 
+// CuratedFrameFacetListDTO holds a list of curated frame facet items.
 type CuratedFrameFacetListDTO struct {
 	Items []CuratedFrameFacetItemDTO `json:"items"`
 }
@@ -637,6 +673,7 @@ type PlayedMoviesListDTO struct {
 	MovieIDs []string `json:"movieIds"`
 }
 
+// HomepageDailyRecommendationsDTO carries the hero and recommendation movie IDs for a UTC day.
 type HomepageDailyRecommendationsDTO struct {
 	DateUTC                string   `json:"dateUtc"`
 	GeneratedAt            string   `json:"generatedAt"`
@@ -645,6 +682,7 @@ type HomepageDailyRecommendationsDTO struct {
 	RecommendationMovieIDs []string `json:"recommendationMovieIds"`
 }
 
+// TaskDTO represents an async background task (scan, scrape, download).
 type TaskDTO struct {
 	TaskID        string         `json:"taskId"`
 	Type          string         `json:"type"`
@@ -666,10 +704,12 @@ type RecentTasksDTO struct {
 	Tasks []TaskDTO `json:"tasks"`
 }
 
+// TaskEventDTO wraps a task status update as an event payload.
 type TaskEventDTO struct {
 	Task TaskDTO `json:"task"`
 }
 
+// Command and event type constants for the stdio JSONL transport.
 const (
 	CommandSystemHealth  = "system.health"
 	CommandLibraryList   = "library.list"
@@ -724,6 +764,7 @@ const (
 // ProviderHealthStatus indicates the availability status of a metadata provider.
 type ProviderHealthStatus string
 
+// Provider health status values.
 const (
 	ProviderHealthOK       ProviderHealthStatus = "ok"
 	ProviderHealthDegraded ProviderHealthStatus = "degraded"

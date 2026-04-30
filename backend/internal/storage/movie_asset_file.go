@@ -211,6 +211,7 @@ func (s *SQLiteStore) listPreviewImageAssetRows(ctx context.Context, movieID str
 	return out, rows.Err()
 }
 
+// GetMoviePreviewSourceURL returns the remote source URL and referer URL for a numbered preview image (1-based seq).
 func (s *SQLiteStore) GetMoviePreviewSourceURL(ctx context.Context, movieID string, seq int) (string, string, error) {
 	if seq < 1 {
 		return "", "", fmt.Errorf("invalid preview sequence")

@@ -379,6 +379,7 @@ func (s *SQLiteStore) ActorListItemByName(ctx context.Context, name string) (con
 	}, nil
 }
 
+// UpdateActorAvatarCache records the fetch outcome for a cached actor avatar (local path, HTTP status, last error).
 func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, localPath string, httpStatus int, lastErr string) error {
 	actorName = strings.TrimSpace(actorName)
 	if actorName == "" {
@@ -410,6 +411,7 @@ func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, loc
 	return nil
 }
 
+// GetActorAvatarSource returns the remote avatar URL for an actor, or empty string if none set.
 func (s *SQLiteStore) GetActorAvatarSource(ctx context.Context, actorName string) (string, error) {
 	actorName = strings.TrimSpace(actorName)
 	if actorName == "" {
@@ -427,6 +429,7 @@ func (s *SQLiteStore) GetActorAvatarSource(ctx context.Context, actorName string
 	}
 }
 
+// BatchActorAvatarLocalReady returns which actor names have a cached avatar file on disk within allowed paths.
 func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string) (map[string]bool, error) {
 	out := make(map[string]bool, len(actorNames))
 	if len(actorNames) == 0 {
@@ -474,6 +477,7 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 	return out, rows.Err()
 }
 
+// OpenActorAvatarFile opens the local cached avatar file for an actor after path-policy validation.
 func (s *SQLiteStore) OpenActorAvatarFile(ctx context.Context, actorName, cacheDir string) (*os.File, error) {
 	actorName = strings.TrimSpace(actorName)
 	if actorName == "" {

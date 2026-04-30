@@ -1,3 +1,4 @@
+// Package movieroot classifies how a video file is organized on disk (loose, curated-manifest, or external number directory).
 package movieroot
 
 import (
@@ -8,16 +9,19 @@ import (
 	"curated-backend/internal/library/moviecode"
 )
 
-// LayoutKind describes how a video file sits on disk relative to a 番号 folder.
+// LayoutKind classifies how a video file is organized on disk relative to its number directory.
 type LayoutKind string
 
 const (
+	// LayoutLoose means the video sits directly inside a library root without a number subdirectory.
 	LayoutLoose    LayoutKind = "loose"
+	// LayoutCurated means the video is organized under a Curated.json manifest.
 	LayoutCurated  LayoutKind = "curated"
+	// LayoutExternal means the video resides in a directory whose name matches the number (no Curated.json).
 	LayoutExternal LayoutKind = "external"
 )
 
-// ClassifyVideoRoot inspects the directory containing the video when extended first-scan import is active.
+// ClassifyVideoRoot determines the layout kind and movie root directory for a scanned video file.
 func ClassifyVideoRoot(videoAbsPath, number string, extendedImport, firstScanPendingForRoot bool) (kind LayoutKind, movieRootDir string) {
 	movieRootDir = filepath.Dir(filepath.Clean(videoAbsPath))
 	if !extendedImport || !firstScanPendingForRoot || strings.TrimSpace(number) == "" {

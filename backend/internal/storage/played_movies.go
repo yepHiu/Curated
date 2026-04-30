@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// ListPlayedMovieIDs returns movie IDs ever played, ordered by first played time ascending.
 func (s *SQLiteStore) ListPlayedMovieIDs(ctx context.Context) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT movie_id FROM library_played_movies ORDER BY first_played_at ASC`)
 	if err != nil {
@@ -25,6 +26,7 @@ func (s *SQLiteStore) ListPlayedMovieIDs(ctx context.Context) ([]string, error) 
 	return out, rows.Err()
 }
 
+// RecordPlayedMovie records the movie play timestamp. No-op if the row already exists.
 func (s *SQLiteStore) RecordPlayedMovie(ctx context.Context, movieID string) error {
 	if movieID == "" {
 		return errors.New("empty movie id")
@@ -37,6 +39,7 @@ func (s *SQLiteStore) RecordPlayedMovie(ctx context.Context, movieID string) err
 	return err
 }
 
+// CountPlayedMovies returns the total number of unique played movies.
 func (s *SQLiteStore) CountPlayedMovies(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM library_played_movies`).Scan(&n)
@@ -46,6 +49,7 @@ func (s *SQLiteStore) CountPlayedMovies(ctx context.Context) (int, error) {
 // ErrPlayedMovieMovieNotFound is returned when the movie row does not exist.
 var ErrPlayedMovieMovieNotFound = errors.New("movie not found")
 
+// RecordPlayedMovieIfMovieExists records a play only if the movie row exists, otherwise returns ErrPlayedMovieMovieNotFound.
 func (s *SQLiteStore) RecordPlayedMovieIfMovieExists(ctx context.Context, movieID string) error {
 	if movieID == "" {
 		return errors.New("empty movie id")

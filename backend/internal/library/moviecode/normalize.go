@@ -1,3 +1,4 @@
+// Package moviecode normalizes video ID strings into stable storage IDs.
 package moviecode
 
 import "strings"

@@ -31,6 +31,7 @@ type movieRow struct {
 	TrashedAt       string
 }
 
+// ListMovies returns paginated movie list items with actors, tags, and user preferences applied as display overrides.
 func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMoviesRequest) (contracts.MoviesPageDTO, error) {
 	limit := request.Limit
 	if limit <= 0 {
@@ -147,6 +148,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	}, nil
 }
 
+// GetMovieDetail loads the full movie detail including summary, preview images, and actor avatars.
 func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contracts.MovieDetailDTO, error) {
 	var row movieRow
 	err := s.db.QueryRowContext(
@@ -441,6 +443,7 @@ func (s *SQLiteStore) lookupStringRelations(ctx context.Context, movieIDs []stri
 }
 
 // pathHasLibraryRoot reports whether loc (media file path) lies under root (library directory).
+// Uses case-insensitive prefix matching for case-insensitive filesystems (e.g. Windows).
 func pathHasLibraryRoot(loc, root string) bool {
 	if loc == "" || root == "" {
 		return false

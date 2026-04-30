@@ -1,3 +1,4 @@
+// Package logging builds a Zap logger that writes to stdout and optionally to daily rotated log files.
 package logging
 
 import (
@@ -88,6 +89,7 @@ func New(level string, sink FileSink) (*zap.Logger, error) {
 	), nil
 }
 
+// Error is a convenience wrapper that creates a zap.Error field.
 func Error(err error) zap.Field {
 	return zap.Error(err)
 }

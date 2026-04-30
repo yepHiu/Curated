@@ -11,11 +11,13 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+// ErrInvalidActorExternalLinks is returned when external link validation fails (length, count, URL format, scheme).
 var ErrInvalidActorExternalLinks = errors.New("invalid actor external links")
 
 const maxActorExternalLinks = 16
 const maxActorExternalLinkLength = 2048
 
+// NormalizeActorExternalLinksForPatch trims, dedupes, and validates external links (scheme, URL format, count/length caps).
 func NormalizeActorExternalLinksForPatch(raw []string) ([]string, error) {
 	if raw == nil {
 		raw = []string{}
@@ -81,6 +83,7 @@ func (s *SQLiteStore) loadActorExternalLinksForIDs(ctx context.Context, ids []in
 	return out, rows.Err()
 }
 
+// ReplaceActorExternalLinksByName replaces all external links for the given actor name.
 func (s *SQLiteStore) ReplaceActorExternalLinksByName(ctx context.Context, name string, rawLinks []string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {

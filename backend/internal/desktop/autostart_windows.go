@@ -23,6 +23,7 @@ type runKeyStore interface {
 
 var osExecutable = os.Executable
 
+// LaunchAtLoginSupported reports whether the current executable qualifies for launch-at-login on Windows.
 func LaunchAtLoginSupported() bool {
 	exe, err := osExecutable()
 	if err != nil {
@@ -31,6 +32,7 @@ func LaunchAtLoginSupported() bool {
 	return isLaunchAtLoginExecutableSupported(exe)
 }
 
+// SyncLaunchAtLogin enables or disables the launch-at-login registry entry for Windows.
 func SyncLaunchAtLogin(enabled bool) error {
 	command := ""
 	if enabled {

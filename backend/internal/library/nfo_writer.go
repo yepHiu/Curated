@@ -10,7 +10,7 @@ import (
 	"curated-backend/internal/scraper"
 )
 
-// WriteMovieNFO writes a Kodi-oriented movie.nfo into dir (番号目录，与视频同级).
+// WriteMovieNFO writes a Kodi-oriented movie.nfo into the movie's number-named directory (alongside the video file).
 func WriteMovieNFO(dir string, m scraper.Metadata) error {
 	if strings.TrimSpace(dir) == "" {
 		return nil

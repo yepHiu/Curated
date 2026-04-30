@@ -1,3 +1,4 @@
+// Package metatube implements the scraper.Service interface via the metatube-sdk-go engine, with provider health tracking and FC2-specific routing.
 package metatube
 
 import (
@@ -44,6 +45,7 @@ func isFC2MovieProviderName(name string) bool {
 	}
 }
 
+// Service wraps the metatube-sdk-go engine for movie and actor scraping, with runtime provider health tracking.
 type Service struct {
 	logger   *zap.Logger
 	engine   *engine.Engine
@@ -51,6 +53,7 @@ type Service struct {
 	health   map[string]ProviderRuntimeHealth
 }
 
+// ProviderRuntimeHealth tracks the outcome of recent provider health probes for cooldown decisions.
 type ProviderRuntimeHealth struct {
 	LastOKAt            string
 	LastFailAt          string
@@ -60,6 +63,7 @@ type ProviderRuntimeHealth struct {
 	ErrorCategory       string
 }
 
+// NewService initializes the metatube engine with an in-memory SQLite database and runs auto-migration.
 func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, error) {
 	if requestTimeout <= 0 {
 		requestTimeout = 45 * time.Second
@@ -85,6 +89,7 @@ func NewService(logger *zap.Logger, requestTimeout time.Duration) (*Service, err
 	}, nil
 }
 
+// Engine returns the underlying metatube engine for direct access (e.g. asset downloading).
 func (s *Service) Engine() *engine.Engine {
 	return s.engine
 }
@@ -100,12 +105,14 @@ func (s *Service) ListMovieProviderNames() []string {
 	return out
 }
 
+// ProviderRuntimeHealth returns the cached health snapshot for a named provider.
 func (s *Service) ProviderRuntimeHealth(name string) ProviderRuntimeHealth {
 	s.healthMu.RLock()
 	defer s.healthMu.RUnlock()
 	return s.health[strings.TrimSpace(name)]
 }
 
+// PreferredMovieProviderChain returns an ordered provider list for the given strategy (e.g. "auto-cn-friendly").
 func (s *Service) PreferredMovieProviderChain(strategy string) []string {
 	all := s.ListMovieProviderNames()
 	if len(all) == 0 {
@@ -184,6 +191,7 @@ func (s *Service) searchMovieFC2Providers(ctx context.Context, keyword string) (
 	return s.rankMovieSearchResults(mtnum.Trim(keyword), merged), nil
 }
 
+// Scrape fetches movie metadata via a provider chain, single provider, or automatic search depending on options and FC2 detection.
 func (s *Service) Scrape(ctx context.Context, movieID string, number string, opts scraper.MovieScrapeOptions) (scraper.Metadata, error) {
 	select {
 	case <-ctx.Done():
@@ -450,6 +458,7 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 	}, nil
 }
 
+// ScrapeActor fetches actor profile metadata, trying multiple search keyword variations to improve match rates.
 func (s *Service) ScrapeActor(ctx context.Context, displayName string) (scraper.ActorProfile, error) {
 	out := scraper.ActorProfile{DisplayName: strings.TrimSpace(displayName)}
 	if out.DisplayName == "" {
@@ -509,7 +518,7 @@ func (s *Service) ScrapeActor(ctx context.Context, displayName string) (scraper.
 	default:
 	}
 
-	// lazy=false：避免引擎本地 actor_metadata 里不完整旧记录被当成有效结果，从而跳过站点拉取与 Gfriends 头像注入。
+	// lazy=false avoids treating cached stale actor_metadata as valid results, preventing missed live fetches and Gfriends avatar injection.
 	info, err := s.engine.GetActorInfoByProviderID(pid, false)
 	if err != nil {
 		return out, fmt.Errorf("get actor info failed for %q (provider=%s): %w", out.DisplayName, best.Provider, err)
@@ -543,7 +552,7 @@ func (s *Service) ScrapeActor(ctx context.Context, displayName string) (scraper.
 	}, nil
 }
 
-// actorSearchKeywords 尝试多种写法，提高与刮削元数据里演员名的匹配率（空格、全角空格等）。
+// actorSearchKeywords generates variant spellings of the name to improve match rates against scraped metadata (handles space, full-width space, etc.).
 func actorSearchKeywords(displayName string) []string {
 	s := strings.TrimSpace(displayName)
 	if s == "" {
@@ -595,8 +604,8 @@ func actorBirthdayString(d datatypes.Date) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-// formatReleaseDate 将 Metatube 的 datatypes.Date（底层 time.Time）规范为 UTC 日历日 YYYY-MM-DD。
-// 原先使用 fmt.Sprint 会得到 "2006-01-02 00:00:00 +0000 UTC" 等字符串，入库/展示容易误判为「日期错了」。
+// formatReleaseDate normalizes a Metatube datatypes.Date (backed by time.Time) into a UTC calendar day YYYY-MM-DD.
+// Using fmt.Sprint would produce strings like "2006-01-02 00:00:00 +0000 UTC", which get misinterpreted as "wrong date" in storage and UI.
 func formatReleaseDate(value any) string {
 	switch v := value.(type) {
 	case datatypes.Date:
@@ -608,7 +617,7 @@ func formatReleaseDate(value any) string {
 		if s == "" || strings.HasPrefix(s, "0001-01-01") {
 			return ""
 		}
-		// 兼容历史或异常路径里已存在的 "YYYY-MM-DD ..." 前缀
+		// Handle legacy or edge-case values that already have a "YYYY-MM-DD ..." prefix
 		if i := strings.IndexByte(s, ' '); i == 10 {
 			head := s[:i]
 			if _, err := time.Parse("2006-01-02", head); err == nil {

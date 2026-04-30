@@ -12,6 +12,7 @@ import (
 	"curated-backend/internal/config"
 )
 
+// TrayOptions configures the system tray (no-op on non-Windows).
 type TrayOptions struct {
 	Logger      *zap.Logger
 	Config      config.Config
@@ -21,14 +22,17 @@ type TrayOptions struct {
 	Cancel      context.CancelFunc
 }
 
+// RunTray returns an error on non-Windows platforms.
 func RunTray(_ context.Context, _ TrayOptions) error {
 	return fmt.Errorf("tray mode is only supported on Windows")
 }
 
+// WaitForServerReady is a no-op on non-Windows platforms.
 func WaitForServerReady(ctx context.Context, _ string) error {
 	return ctx.Err()
 }
 
+// ResolveBaseURL normalizes an address into a localhost HTTP base URL.
 func ResolveBaseURL(addr string) string {
 	host := strings.TrimSpace(addr)
 	if host == "" {
@@ -45,6 +49,7 @@ func ResolveBaseURL(addr string) string {
 	return strings.TrimRight(host, "/")
 }
 
+// ResolveDefaultLogDir returns the configured log directory or a fallback.
 func ResolveDefaultLogDir(cfg config.Config) string {
 	if dir := config.ResolveLogDir(cfg.LogDir); dir != "" {
 		return dir

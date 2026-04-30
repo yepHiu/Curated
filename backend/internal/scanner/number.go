@@ -44,7 +44,7 @@ var numberPatterns = []struct {
 		re:     regexp.MustCompile(`(?i)\b(CARIBBEANCOM|CARIB)[-_ ]?(\d{6,10}[-_ ]?\d{0,4})\b`),
 		format: func(m []string) string { return "CARIBBEANCOM-" + strings.ReplaceAll(m[2], " ", "") },
 	},
-	// Standard番号: 2-6 alpha prefix + 2-5 digit suffix (e.g. IPZZ-788, ABP-123, START-483)
+	// Standard video ID: 2-6 alpha prefix + 2-5 digit suffix (e.g. IPZZ-788, ABP-123, START-483)
 	{
 		re:     regexp.MustCompile(`(?i)\b([a-z]{2,6})[-_ ]?(\d{2,5})\b`),
 		format: func(m []string) string { return strings.ToUpper(m[1]) + "-" + m[2] },
@@ -67,7 +67,7 @@ func CleanFilename(rawName string) string {
 	return strings.TrimSpace(name)
 }
 
-// ExtractNumber parses a番号 from a filename.
+// ExtractNumber parses a video ID from a filename.
 // It first cleans the filename, then tries each pattern in priority order.
 func ExtractNumber(filename string) string {
 	cleaned := CleanFilename(filename)

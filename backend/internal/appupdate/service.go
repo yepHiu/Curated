@@ -1,3 +1,4 @@
+// Package appupdate checks for new packaged-app releases from GitHub Releases and caches the status in SQLite.
 package appupdate
 
 import (
@@ -17,13 +18,16 @@ import (
 )
 
 const (
+	// DefaultLatestReleaseAPIURL is the GitHub API endpoint for the latest stable release.
 	DefaultLatestReleaseAPIURL = "https://api.github.com/repos/yepHiu/Curated/releases/latest"
+	// DefaultReleasePageURL is the public GitHub Releases page for the repository.
 	DefaultReleasePageURL      = "https://github.com/yepHiu/Curated/releases"
 	defaultCacheTTL            = 24 * time.Hour
 	defaultRequestTimeout      = 8 * time.Second
 	updateSourceGitHubReleases = "github-releases"
 )
 
+// Service checks and caches packaged-app update availability from GitHub Releases.
 type Service struct {
 	store               *storage.SQLiteStore
 	logger              *zap.Logger
@@ -50,6 +54,7 @@ type semanticVersion struct {
 	Patch int
 }
 
+// NewService creates an app update Service that uses ProxyFromEnvironment for outbound requests.
 func NewService(store *storage.SQLiteStore, logger *zap.Logger) *Service {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = http.ProxyFromEnvironment
@@ -65,10 +70,12 @@ func NewService(store *storage.SQLiteStore, logger *zap.Logger) *Service {
 	}
 }
 
+// GetStatus returns the cached app update status, refreshing only when the cache is stale.
 func (s *Service) GetStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
 	return s.getStatus(ctx, false)
 }
 
+// CheckNow forces a fresh GitHub Releases check regardless of cache age.
 func (s *Service) CheckNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
 	return s.getStatus(ctx, true)
 }

@@ -40,6 +40,7 @@ type ffprobeMediaInfo struct {
 
 var mediaInfoCache sync.Map
 
+// ProbeMediaInfo returns a lightweight MediaInfo snapshot using a size+modtime cache and ffprobe.
 func ProbeMediaInfo(ctx context.Context, sourcePath string, ffmpegCommand string) (MediaInfo, error) {
 	cleanPath := strings.TrimSpace(sourcePath)
 	if cleanPath == "" {

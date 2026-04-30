@@ -7,6 +7,7 @@ import (
 
 const appUpdateStatusKey = "app-update"
 
+// AppUpdateStatusSnapshot holds the cached packaged-app update check result.
 type AppUpdateStatusSnapshot struct {
 	InstalledVersion    string
 	LatestVersion       string
@@ -20,6 +21,7 @@ type AppUpdateStatusSnapshot struct {
 	ErrorMessage        string
 }
 
+// GetAppUpdateStatusSnapshot returns the cached app update status. The bool is false when no snapshot exists.
 func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdateStatusSnapshot, bool, error) {
 	var snapshot AppUpdateStatusSnapshot
 
@@ -59,6 +61,7 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 	return snapshot, true, nil
 }
 
+// UpsertAppUpdateStatusSnapshot inserts or replaces the cached app update status snapshot.
 func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapshot AppUpdateStatusSnapshot) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO app_update_status (

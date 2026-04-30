@@ -1,3 +1,5 @@
+// Package playback manages HLS stream push sessions for video playback,
+// including remux and hardware-accelerated transcode profiles via ffmpeg.
 package playback
 
 import (
@@ -21,7 +23,9 @@ import (
 )
 
 var (
+	// ErrSessionNotFound is returned when a playback session ID is not found in the active registry or recent snapshots.
 	ErrSessionNotFound    = errors.New("playback session not found")
+	// ErrStreamPushDisabled is returned when stream push is not enabled in the manager configuration.
 	ErrStreamPushDisabled = errors.New("stream push is disabled")
 )
 
@@ -31,6 +35,7 @@ const (
 	hlsStartupSegmentAheadTimeout = 2500 * time.Millisecond
 )
 
+// Config holds playback stream push settings including ffmpeg invocation and session lifecycle.
 type Config struct {
 	Enabled                bool
 	HardwareDecode         bool
@@ -41,6 +46,7 @@ type Config struct {
 	SessionJanitorInterval time.Duration
 }
 
+// Session represents an active HLS playback session with its on-disk playlist and segment files.
 type Session struct {
 	ID               string
 	MovieID          string
@@ -70,6 +76,7 @@ type transcodeProfile struct {
 	TimelineOriginSec float64
 }
 
+// StartHLSSessionOptions controls HLS startup behavior including seek position and remux preference.
 type StartHLSSessionOptions struct {
 	StartPositionSec float64
 	PreferRemux      bool
@@ -85,6 +92,7 @@ type buildProfileOptions struct {
 	SourceAudioCodec string
 }
 
+// Manager governs HLS stream push sessions, including lifecycle, file resolution, and diagnostics.
 type Manager struct {
 	cfg                   Config
 	lastSuccessfulProfile string
@@ -98,6 +106,7 @@ type Manager struct {
 	janitorDone     chan struct{}
 }
 
+// SessionSnapshot is a point-in-time view of a session for diagnostics endpoints.
 type SessionSnapshot struct {
 	Session        Session
 	LastAccessedAt time.Time
@@ -110,6 +119,7 @@ type SessionSnapshot struct {
 
 const recentSessionHistoryLimit = 32
 
+// New creates a playback Manager and starts its idle-session janitor loop.
 func New(cfg Config) *Manager {
 	manager := &Manager{
 		cfg:             cfg,
@@ -121,6 +131,7 @@ func New(cfg Config) *Manager {
 	return manager
 }
 
+// Enabled reports whether stream push is enabled, safe to call on a nil receiver.
 func (m *Manager) Enabled() bool {
 	if m == nil {
 		return false
@@ -130,6 +141,7 @@ func (m *Manager) Enabled() bool {
 	return m.cfg.Enabled
 }
 
+// SetConfig replaces the playback configuration, safe to call on a nil receiver.
 func (m *Manager) SetConfig(cfg Config) {
 	if m == nil {
 		return
@@ -139,6 +151,7 @@ func (m *Manager) SetConfig(cfg Config) {
 	m.mu.Unlock()
 }
 
+// StartHLSSession launches a new HLS stream push session, preferring remux and falling back through transcode profiles.
 func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePath string, options StartHLSSessionOptions) (Session, error) {
 	if m == nil {
 		return Session{}, ErrStreamPushDisabled
@@ -227,6 +240,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	return Session{}, lastErr
 }
 
+// ResolveFile maps a session-relative filename to an absolute path, serving HLS segments and playlists.
 func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	if m == nil {
 		return "", ErrSessionNotFound
@@ -256,6 +270,7 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	return abs, nil
 }
 
+// DeleteSession stops and removes a playback session, archiving its terminal snapshot.
 func (m *Manager) DeleteSession(sessionID string) error {
 	if m == nil {
 		return ErrSessionNotFound
@@ -274,6 +289,7 @@ func (m *Manager) DeleteSession(sessionID string) error {
 	return nil
 }
 
+// GetSessionSnapshot returns a diagnostic snapshot for the given session, checking both active and recent archives.
 func (m *Manager) GetSessionSnapshot(sessionID string) (SessionSnapshot, error) {
 	if m == nil {
 		return SessionSnapshot{}, ErrSessionNotFound
@@ -294,6 +310,7 @@ func (m *Manager) GetSessionSnapshot(sessionID string) (SessionSnapshot, error) 
 	return buildSessionSnapshot(state, sessionIdleTimeout(cfg)), nil
 }
 
+// ListSessionSnapshots returns combined active and recent session snapshots sorted by start time, with active entries overriding archived ones.
 func (m *Manager) ListSessionSnapshots(limit int) []SessionSnapshot {
 	if m == nil {
 		return nil
@@ -331,6 +348,7 @@ func (m *Manager) ListSessionSnapshots(limit int) []SessionSnapshot {
 	return snapshots
 }
 
+// Close stops the janitor loop and all active sessions.
 func (m *Manager) Close() {
 	if m == nil {
 		return
