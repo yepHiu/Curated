@@ -30,16 +30,6 @@ import {
 import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
-import {
-  Sparkles,
-} from "lucide-vue-next"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getStoredDirectoryHandle,
@@ -60,11 +50,7 @@ import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCu
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
-import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
-import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
-import SettingsMetadataProviderChainSection from "@/components/jav-library/settings/SettingsMetadataProviderChainSection.vue"
-import SettingsMetadataProviderSelectSection from "@/components/jav-library/settings/SettingsMetadataProviderSelectSection.vue"
-import SettingsMetadataTriggerScrapeSection from "@/components/jav-library/settings/SettingsMetadataTriggerScrapeSection.vue"
+import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
@@ -887,16 +873,6 @@ const providerPingAllBusy = ref(false)
 const providerPingOneName = ref<string | null>(null)
 const providerHealthPingAllSummary = ref("")
 const providerHealthPingError = ref("")
-
-function healthForProvider(name: string): ProviderHealthDTO | undefined {
-  const map = providerHealthByName.value
-  if (map[name]) return map[name]
-  const lower = name.toLowerCase()
-  for (const [k, v] of Object.entries(map)) {
-    if (k.toLowerCase() === lower) return v
-  }
-  return undefined
-}
 
 async function pingAllMetadataProviders() {
   if (!useWebApi) return
@@ -1880,123 +1856,52 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navMetadata')"
     >
     <h2 class="sr-only">{{ t("settings.navMetadata") }}</h2>
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle
-              class="flex flex-wrap items-center gap-2.5 text-lg font-semibold tracking-tight"
-            >
-              <span class="flex min-w-0 items-center gap-2.5">
-                <span
-                  class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                  aria-hidden="true"
-                >
-                  <Sparkles class="size-4" />
-                </span>
-                <span class="min-w-0">{{ t("settings.metadataMovieProviderTitle") }}</span>
-              </span>
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.metadataMovieProviderDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <SettingsMetadataAutomationSection
-              :use-web-api="useWebApi"
-              :provider-ping-all-busy="providerPingAllBusy"
-              :provider-ping-one-name="providerPingOneName"
-              :provider-health-ping-all-summary="providerHealthPingAllSummary"
-              :provider-health-ping-error="providerHealthPingError"
-              :auto-library-watch="autoLibraryWatch"
-              :auto-library-watch-saving="autoLibraryWatchSaving"
-              :auto-library-watch-error="autoLibraryWatchError"
-              :auto-actor-profile-scrape="autoActorProfileScrape"
-              :auto-actor-profile-scrape-saving="autoActorProfileScrapeSaving"
-              :auto-actor-profile-scrape-error="autoActorProfileScrapeError"
-              @ping-all-providers="pingAllMetadataProviders"
-              @change-auto-library-watch="onAutoLibraryWatchChange"
-              @change-auto-actor-profile-scrape="onAutoActorProfileScrapeChange"
-            />
-
-            <SettingsMetadataModeSection
-              :metadata-movie-mode-ui="metadataMovieModeUi"
-              :metadata-movie-saving="metadataMovieSaving"
-              :metadata-movie-chain-saving="metadataMovieChainSaving"
-              :provider-ping-all-busy="providerPingAllBusy"
-              :can-pick-specified-metadata="canPickSpecifiedMetadata"
-              :can-use-metadata-chain-mode="canUseMetadataChainMode"
-              @select-auto="onMetadataMovieModeAuto"
-              @select-specified="onMetadataMovieModeSpecified"
-              @select-chain="onMetadataMovieModeChain"
-            />
-
-            <!-- Single Provider Selection -->
-            <SettingsMetadataProviderSelectSection
-              v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
-              :use-web-api="useWebApi"
-              :metadata-movie-provider="metadataMovieProvider"
-              :metadata-movie-select-options="metadataMovieSelectOptions"
-              :metadata-movie-saving="metadataMovieSaving"
-              :provider-ping-all-busy="providerPingAllBusy"
-              :provider-ping-one-name="providerPingOneName"
-              :current-provider-health="
-                healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '') ?? null
-              "
-              @select-provider="onMetadataMovieSelect"
-              @ping-provider="pingOneMetadataProvider"
-            />
-
-            <SettingsMetadataProviderChainSection
-              v-if="metadataMovieModeUi === 'chain'"
-              :use-web-api="useWebApi"
-              :can-pick-specified-metadata="canPickSpecifiedMetadata"
-              :provider-chain-draft="providerChainDraft"
-              :available-providers-for-chain="availableProvidersForChain"
-              :selected-provider-to-add="selectedProviderToAdd"
-              :chain-drag-from-index="chainDragFromIndex"
-              :metadata-movie-chain-saving="metadataMovieChainSaving"
-              :metadata-movie-chain-error="metadataMovieChainError"
-              :provider-ping-all-busy="providerPingAllBusy"
-              :provider-ping-one-name="providerPingOneName"
-              :provider-health-by-name="providerHealthByName"
-              @drag-start="onChainDragStart"
-              @drag-over="onChainDragOver"
-              @drop-provider="onChainDrop"
-              @drag-end="onChainDragEnd"
-              @ping-provider="pingOneMetadataProvider"
-              @remove-provider="removeProviderFromChain"
-              @update:selected-provider-to-add="selectedProviderToAdd = $event"
-              @add-provider="addProviderToChain"
-              @save-provider-chain="saveProviderChain"
-            />
-
-            <p
-              v-if="!canPickSpecifiedMetadata && metadataMovieModeUi !== 'chain'"
-              class="text-sm text-muted-foreground"
-            >
-              {{ t("settings.metadataMovieProviderNoList") }}
-            </p>
-            <p
-              v-if="metadataMovieSaving"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.metadataMovieProviderSyncing") }}
-            </p>
-            <p v-if="metadataMovieError" class="text-sm text-destructive">
-              {{ metadataMovieError }}
-            </p>
-
-            <SettingsMetadataTriggerScrapeSection
-              :busy="triggerScrapeCardBusy"
-              :success="triggerScrapeCardSuccess"
-              :error="triggerScrapeCardError"
-              @run="runTriggerScrapeAllLibraryRoots"
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <SettingsMetadataSection
+        v-model:selected-provider-to-add="selectedProviderToAdd"
+        :use-web-api="useWebApi"
+        :provider-ping-all-busy="providerPingAllBusy"
+        :provider-ping-one-name="providerPingOneName"
+        :provider-health-ping-all-summary="providerHealthPingAllSummary"
+        :provider-health-ping-error="providerHealthPingError"
+        :auto-library-watch="autoLibraryWatch"
+        :auto-library-watch-saving="autoLibraryWatchSaving"
+        :auto-library-watch-error="autoLibraryWatchError"
+        :auto-actor-profile-scrape="autoActorProfileScrape"
+        :auto-actor-profile-scrape-saving="autoActorProfileScrapeSaving"
+        :auto-actor-profile-scrape-error="autoActorProfileScrapeError"
+        :metadata-movie-mode-ui="metadataMovieModeUi"
+        :metadata-movie-saving="metadataMovieSaving"
+        :metadata-movie-chain-saving="metadataMovieChainSaving"
+        :can-pick-specified-metadata="canPickSpecifiedMetadata"
+        :can-use-metadata-chain-mode="canUseMetadataChainMode"
+        :metadata-movie-provider="metadataMovieProvider"
+        :metadata-movie-select-options="metadataMovieSelectOptions"
+        :metadata-movie-error="metadataMovieError"
+        :provider-chain-draft="providerChainDraft"
+        :available-providers-for-chain="availableProvidersForChain"
+        :chain-drag-from-index="chainDragFromIndex"
+        :metadata-movie-chain-error="metadataMovieChainError"
+        :provider-health-by-name="providerHealthByName"
+        :trigger-scrape-card-busy="triggerScrapeCardBusy"
+        :trigger-scrape-card-success="triggerScrapeCardSuccess"
+        :trigger-scrape-card-error="triggerScrapeCardError"
+        @ping-all-providers="pingAllMetadataProviders"
+        @change-auto-library-watch="onAutoLibraryWatchChange"
+        @change-auto-actor-profile-scrape="onAutoActorProfileScrapeChange"
+        @select-auto="onMetadataMovieModeAuto"
+        @select-specified="onMetadataMovieModeSpecified"
+        @select-chain="onMetadataMovieModeChain"
+        @select-provider="onMetadataMovieSelect"
+        @ping-provider="pingOneMetadataProvider"
+        @drag-start="onChainDragStart"
+        @drag-over="onChainDragOver"
+        @drop-provider="onChainDrop"
+        @drag-end="onChainDragEnd"
+        @remove-provider="removeProviderFromChain"
+        @add-provider="addProviderToChain"
+        @save-provider-chain="saveProviderChain"
+        @run-trigger-scrape="runTriggerScrapeAllLibraryRoots"
+      />
     </section>
     </TabsContent>
 
