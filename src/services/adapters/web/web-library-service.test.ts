@@ -8,6 +8,8 @@ const apiMocks = vi.hoisted(() => ({
   listMovies: vi.fn(),
   getMovie: vi.fn(),
   patchMovie: vi.fn(),
+  deleteMovie: vi.fn(),
+  restoreMovie: vi.fn(),
 }))
 
 function movieListDto(id: string, overrides: Partial<MovieListItemDTO> = {}): MovieListItemDTO {
@@ -54,9 +56,12 @@ vi.mock("@/i18n", () => ({
 
 beforeEach(() => {
   vi.resetModules()
+  window.location.hash = ""
   apiMocks.listMovies.mockReset()
   apiMocks.getMovie.mockReset()
   apiMocks.patchMovie.mockReset()
+  apiMocks.deleteMovie.mockReset()
+  apiMocks.restoreMovie.mockReset()
   vi.useRealTimers()
 })
 
@@ -100,6 +105,118 @@ describe("webLibraryService loadError", () => {
 })
 
 describe("webLibraryService mutations", () => {
+  it("moves a deleted movie out of active cache and refreshes trash cache", async () => {
+    apiMocks.listMovies
+      .mockResolvedValueOnce({
+        items: [movieListDto("movie-1"), movieListDto("movie-2")],
+        total: 2,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          movieListDto("movie-1", {
+            trashedAt: "2026-01-02T00:00:00.000Z",
+          }),
+        ],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      })
+    apiMocks.deleteMovie.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await webLibraryService.deleteMovie(" movie-1 ")
+
+    expect(apiMocks.deleteMovie).toHaveBeenCalledWith("movie-1")
+    expect(apiMocks.listMovies).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mode: "trash" }),
+    )
+    expect(webLibraryService.movies.value.map((movie) => movie.id)).toEqual(["movie-2"])
+    expect(webLibraryService.trashedMovies.value.map((movie) => movie.id)).toEqual([
+      "movie-1",
+    ])
+  })
+
+  it("reloads active and trash caches after restoring a movie", async () => {
+    window.location.hash = "#/trash"
+    apiMocks.listMovies
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          movieListDto("movie-1", {
+            trashedAt: "2026-01-02T00:00:00.000Z",
+          }),
+        ],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [movieListDto("movie-1")],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        limit: 500,
+        offset: 0,
+      })
+    apiMocks.restoreMovie.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await webLibraryService.restoreMovie(" movie-1 ")
+
+    expect(apiMocks.restoreMovie).toHaveBeenCalledWith("movie-1")
+    expect(webLibraryService.movies.value.map((movie) => movie.id)).toEqual(["movie-1"])
+    expect(webLibraryService.trashedMovies.value).toEqual([])
+  })
+
+  it("removes a permanently deleted movie from trash cache", async () => {
+    window.location.hash = "#/trash"
+    apiMocks.listMovies
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          movieListDto("movie-1", {
+            trashedAt: "2026-01-02T00:00:00.000Z",
+          }),
+          movieListDto("movie-2", {
+            trashedAt: "2026-01-03T00:00:00.000Z",
+          }),
+        ],
+        total: 2,
+        limit: 500,
+        offset: 0,
+      })
+    apiMocks.deleteMovie.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    apiMocks.listMovies.mockClear()
+    await webLibraryService.deleteMoviePermanently(" movie-1 ")
+
+    expect(apiMocks.deleteMovie).toHaveBeenCalledWith("movie-1", { permanent: true })
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+    expect(webLibraryService.trashedMovies.value.map((movie) => movie.id)).toEqual([
+      "movie-2",
+    ])
+  })
+
   it("patches a cached movie and merges the returned detail into cache", async () => {
     apiMocks.listMovies.mockResolvedValue({
       items: [movieListDto("movie-1", { title: "Original title" })],
