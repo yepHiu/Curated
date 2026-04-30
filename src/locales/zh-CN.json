@@ -743,6 +743,8 @@
     "nativeLaunchRequested": "已请求浏览器拉起 {player}。",
     "nativeLaunchStillHere": "如果浏览器没有弹出 {player}，通常说明本机未安装该播放器，或浏览器拦截了外部应用拉起。",
     "nativeLaunchFailed": "无法通过浏览器拉起 {player}。",
+    "hideStats": "隐藏详细统计信息",
+    "showStats": "详细统计信息",
     "preparingPlayback": "正在准备播放流…",
     "preparingSeek": "正在切换播放片段…",
     "buffering": "正在缓冲播放数据…",

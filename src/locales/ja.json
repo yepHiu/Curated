@@ -743,6 +743,8 @@
     "nativeLaunchRequested": "ブラウザーに {player} を開くよう依頼しました。",
     "nativeLaunchStillHere": "何も開かなければ、この PC に {player} が入っていないか、ブラウザーが外部アプリ起動をブロックした可能性があります。",
     "nativeLaunchFailed": "ブラウザー経由で {player} を開けませんでした。",
+    "hideStats": "詳細統計を非表示",
+    "showStats": "詳細統計",
     "preparingPlayback": "再生ストリームを準備しています…",
     "preparingSeek": "新しい再生区間へ切り替えています…",
     "buffering": "再生データをバッファしています…",

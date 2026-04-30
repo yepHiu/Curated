@@ -743,6 +743,8 @@
     "nativeLaunchRequested": "Asked the browser to open {player}.",
     "nativeLaunchStillHere": "If nothing opened, {player} is probably not installed on this computer, or the browser blocked the external-app handoff.",
     "nativeLaunchFailed": "Could not ask the browser to open {player}.",
+    "hideStats": "Hide Detailed Stats",
+    "showStats": "Detailed Stats",
     "preparingPlayback": "Preparing the playback stream…",
     "preparingSeek": "Switching to a new playback window…",
     "buffering": "Buffering playback data…",

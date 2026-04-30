@@ -2393,7 +2393,7 @@ const videoPreloadMode = computed(() =>
               variant="ghost"
               size="icon"
               class="stats-close-button h-6 w-auto shrink-0 rounded-none px-1.5 text-[12px] font-semibold leading-none text-white/68 hover:bg-transparent hover:text-white"
-              aria-label="关闭详细统计信息"
+              :aria-label="t('player.hideStats')"
               @click="closeDetailedStats"
             >
               [X]
@@ -2722,7 +2722,7 @@ const videoPreloadMode = computed(() =>
           @click="toggleDetailedStats"
         >
           <Info class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          {{ detailedStatsVisible ? "隐藏详细统计信息" : "详细统计信息" }}
+          {{ detailedStatsVisible ? t("player.hideStats") : t("player.showStats") }}
         </button>
       </div>
     </div>

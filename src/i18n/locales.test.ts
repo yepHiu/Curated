@@ -39,6 +39,8 @@ const requiredLocaleKeys = [
   "preview.previous",
   "preview.next",
   "preview.imageOf",
+  "player.hideStats",
+  "player.showStats",
 ]
 
 function readLocaleKey(messages: Record<string, unknown>, key: string): unknown {
