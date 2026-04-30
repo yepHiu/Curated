@@ -33,12 +33,10 @@ import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
   Activity,
-  ChevronDown,
   CheckSquare,
   Database,
   FolderOpen,
   FolderPlus,
-  Globe,
   GripVertical,
   Info,
   ListChecks,
@@ -103,6 +101,7 @@ import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCu
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
+import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
@@ -131,7 +130,6 @@ const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
 type ProxyScheme = "http" | "socks5"
-const PROXY_SCHEME_OPTIONS: readonly ProxyScheme[] = ["http", "socks5"]
 const DEFAULT_PROXY_HOST = "127.0.0.1"
 
 function setThemeFromSelect(v: unknown) {
@@ -363,10 +361,6 @@ function parseProxyUrlDraftParts(rawUrl?: string | null): {
       port: match[3]?.trim() || "",
     }
   }
-}
-
-function proxySchemeLabel(value: ProxyScheme): string {
-  return value === "socks5" ? t("settings.proxySchemeSocks5") : t("settings.proxySchemeHttp")
 }
 
 function normalizeProxyHostDraft(): string {
@@ -2808,205 +2802,24 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navNetwork')"
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Globe class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.proxyTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.proxyDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <p
-              v-if="!useWebApi"
-              class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
-            >
-              {{ t("settings.proxyMockHint") }}
-            </p>
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
-              :aria-busy="proxySaving"
-            >
-              <div class="min-w-0 flex-1 space-y-1">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyEnabled") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.proxyEnabledHint") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="proxyEnabledDraft"
-                :disabled="proxySaving"
-                @update:model-value="proxyEnabledDraft = $event"
-              />
-            </div>
-            <div
-              v-if="proxyEnabledDraft"
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="grid gap-3 md:grid-cols-[11rem_minmax(0,1fr)_10rem]">
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyScheme") }}</p>
-                  <Select v-model="proxySchemeDraft" :disabled="proxySaving">
-                    <SelectTrigger>
-                      <SelectValue :placeholder="t('settings.proxySchemeHttp')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        v-for="option in PROXY_SCHEME_OPTIONS"
-                        :key="option"
-                        :value="option"
-                      >
-                        {{ proxySchemeLabel(option) }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyHost") }}</p>
-                  <Input
-                    v-model="proxyHostDraft"
-                    autocomplete="off"
-                    class="rounded-xl border-border/50"
-                    :placeholder="t('settings.proxyHostPlaceholder')"
-                    :disabled="proxySaving"
-                  />
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyPort") }}</p>
-                  <Input
-                    v-model="proxyPortDraft"
-                    inputmode="numeric"
-                    class="rounded-xl border-border/50"
-                    :placeholder="t('settings.proxyPortPlaceholder')"
-                    :disabled="proxySaving"
-                  />
-                </div>
-              </div>
-              <div class="flex flex-col gap-3">
-                <button
-                  type="button"
-                  class="flex h-8 min-h-8 w-full max-h-8 items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/30 px-3 py-0 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
-                  :disabled="proxySaving"
-                  :aria-expanded="proxyAuthExpanded"
-                  @click="proxyAuthExpanded = !proxyAuthExpanded"
-                >
-                  <span>{{ t("settings.proxyAuthToggle") }}</span>
-                  <ChevronDown
-                    class="size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-safe:transition-transform"
-                    :class="proxyAuthExpanded ? 'rotate-180' : ''"
-                    aria-hidden="true"
-                  />
-                </button>
-                <div
-                  v-show="proxyAuthExpanded"
-                  class="flex flex-col gap-3 border-t border-border/50 pt-3"
-                >
-                  <div class="flex flex-col gap-3">
-                    <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
-                    <Input
-                      v-model="proxyUsernameDraft"
-                      autocomplete="off"
-                      class="rounded-xl border-border/50"
-                      :disabled="proxySaving"
-                    />
-                  </div>
-                  <div class="flex flex-col gap-3">
-                    <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
-                    <Input
-                      v-model="proxyPasswordDraft"
-                      type="password"
-                      autocomplete="new-password"
-                      class="rounded-xl border-border/50"
-                      :disabled="proxySaving"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p
-              v-if="useWebApi"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.proxyPingJavbusHint") }}
-            </p>
-            <p
-              v-if="useWebApi"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.proxyPingGoogleHint") }}
-            </p>
-            <div class="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                @click="saveProxySettings"
-              >
-                {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
-              </Button>
-              <Button
-                v-if="useWebApi"
-                type="button"
-                variant="outline"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                :aria-busy="proxyJavbusBusy"
-                @click="testProxyJavbus"
-              >
-                <Loader2
-                  v-if="proxyJavbusBusy"
-                  class="mr-2 size-4 motion-safe:animate-spin"
-                  aria-hidden="true"
-                />
-                {{
-                  proxyJavbusBusy
-                    ? t("settings.proxyPingJavbusTesting")
-                    : t("settings.proxyPingJavbus")
-                }}
-              </Button>
-              <Button
-                v-if="useWebApi"
-                type="button"
-                variant="outline"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                :aria-busy="proxyGoogleBusy"
-                @click="testProxyGoogle"
-              >
-                <Loader2
-                  v-if="proxyGoogleBusy"
-                  class="mr-2 size-4 motion-safe:animate-spin"
-                  aria-hidden="true"
-                />
-                {{
-                  proxyGoogleBusy
-                    ? t("settings.proxyPingGoogleTesting")
-                    : t("settings.proxyPingGoogle")
-                }}
-              </Button>
-            </div>
-            <p
-              class="min-h-5 text-sm transition-colors"
-              :class="proxyStatusMessage?.className ?? 'text-transparent'"
-            >
-              {{ proxyStatusMessage?.text ?? " " }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
+      <SettingsNetworkSection
+        v-model:proxy-enabled="proxyEnabledDraft"
+        v-model:proxy-scheme="proxySchemeDraft"
+        v-model:proxy-host="proxyHostDraft"
+        v-model:proxy-port="proxyPortDraft"
+        v-model:proxy-username="proxyUsernameDraft"
+        v-model:proxy-password="proxyPasswordDraft"
+        v-model:proxy-auth-expanded="proxyAuthExpanded"
+        :use-web-api="useWebApi"
+        :proxy-saving="proxySaving"
+        :proxy-outbound-ping-busy="proxyOutboundPingBusy"
+        :proxy-javbus-busy="proxyJavbusBusy"
+        :proxy-google-busy="proxyGoogleBusy"
+        :proxy-status-message="proxyStatusMessage"
+        @save-proxy="saveProxySettings"
+        @test-proxy-javbus="testProxyJavbus"
+        @test-proxy-google="testProxyGoogle"
+      />
     </section>
     </TabsContent>
 
