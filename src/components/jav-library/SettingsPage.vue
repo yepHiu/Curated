@@ -31,11 +31,8 @@ import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import {
-  CheckSquare,
   Database,
-  ListChecks,
   Sparkles,
-  X,
 } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
@@ -67,6 +64,7 @@ import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGe
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
+import SettingsLibraryPathToolbar from "@/components/jav-library/settings/SettingsLibraryPathToolbar.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
@@ -1854,69 +1852,17 @@ async function runMetadataRefreshForSelected() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-2">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
-              </div>
-              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <template v-if="!libraryPathsBatchMode">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    @click="enterLibraryPathsBatchMode"
-                  >
-                    <ListChecks class="size-4 opacity-80" aria-hidden="true" />
-                    {{ t("library.batchManage") }}
-                  </Button>
-                </template>
-                <template v-else>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    :disabled="libraryPathsList.length === 0"
-                    @click="selectAllMetadataPaths"
-                  >
-                    <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
-                    {{ t("settings.selectAllPaths") }}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    @click="clearMetadataPathSelection"
-                  >
-                    {{ t("settings.clearSelection") }}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
-                    @click="runMetadataRefreshForSelected"
-                  >
-                    <Sparkles class="size-4 shrink-0" aria-hidden="true" />
-                    {{
-                      metadataRefreshBusy ? t("settings.submitting") : t("settings.refreshMetadata")
-                    }}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                    @click="exitLibraryPathsBatchMode"
-                  >
-                    <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-                    {{ t("library.batchExitToolbar") }}
-                  </Button>
-                </template>
-              </div>
-            </div>
+            <SettingsLibraryPathToolbar
+              :batch-mode="libraryPathsBatchMode"
+              :library-paths-count="libraryPathsList.length"
+              :has-metadata-path-selection="hasMetadataPathSelection"
+              :metadata-refresh-busy="metadataRefreshBusy"
+              @enter-batch-mode="enterLibraryPathsBatchMode"
+              @select-all="selectAllMetadataPaths"
+              @clear-selection="clearMetadataPathSelection"
+              @refresh-metadata="runMetadataRefreshForSelected"
+              @exit-batch-mode="exitLibraryPathsBatchMode"
+            />
 
             <SettingsLibraryPathRemoveDialog
               v-model:open="removePathDialogOpen"
