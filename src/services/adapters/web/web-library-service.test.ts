@@ -1,13 +1,15 @@
 import { flushPromises } from "@vue/test-utils"
 import { ref } from "vue"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { MovieDetailDTO, MovieListItemDTO } from "@/api/types"
 
 const apiMocks = vi.hoisted(() => ({
   listMovies: vi.fn(),
   getMovie: vi.fn(),
+  patchMovie: vi.fn(),
 }))
 
-function movieListDto(id: string) {
+function movieListDto(id: string, overrides: Partial<MovieListItemDTO> = {}): MovieListItemDTO {
   return {
     id,
     title: `Title ${id}`,
@@ -22,15 +24,17 @@ function movieListDto(id: string) {
     location: `D:/media/${id}.mp4`,
     resolution: "1080p",
     year: 2026,
+    ...overrides,
   }
 }
 
-function movieDetailDto(id: string) {
+function movieDetailDto(id: string, overrides: Partial<MovieDetailDTO> = {}): MovieDetailDTO {
   return {
     ...movieListDto(id),
     summary: `Summary ${id}`,
     previewImages: [],
     metadataRating: 4,
+    ...overrides,
   }
 }
 
@@ -51,6 +55,8 @@ beforeEach(() => {
   vi.resetModules()
   apiMocks.listMovies.mockReset()
   apiMocks.getMovie.mockReset()
+  apiMocks.patchMovie.mockReset()
+  vi.useRealTimers()
 })
 
 describe("webLibraryService loadError", () => {
@@ -72,6 +78,79 @@ describe("webLibraryService loadError", () => {
     await expect(webLibraryService.loadMovieDetail("movie-1")).resolves.toBeUndefined()
 
     expect(webLibraryService.loadError.value).toBe("detail failed")
+  })
+})
+
+describe("webLibraryService mutations", () => {
+  it("patches the requested favorite state and updates the movie cache", async () => {
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-1", { isFavorite: false })],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+    apiMocks.patchMovie.mockResolvedValueOnce(
+      movieDetailDto("movie-1", { isFavorite: true }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    const updated = await webLibraryService.toggleFavorite("movie-1", true)
+
+    expect(apiMocks.patchMovie).toHaveBeenCalledWith("movie-1", { isFavorite: true })
+    expect(updated?.isFavorite).toBe(true)
+    expect(webLibraryService.getMovieById("movie-1")?.isFavorite).toBe(true)
+  })
+
+  it("keeps the cached movie unchanged when favorite patching fails", async () => {
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-1", { isFavorite: false })],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+    apiMocks.patchMovie.mockRejectedValueOnce(new Error("patch failed"))
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await expect(webLibraryService.toggleFavorite("movie-1", true)).rejects.toThrow(
+      "patch failed",
+    )
+
+    expect(webLibraryService.getMovieById("movie-1")?.isFavorite).toBe(false)
+  })
+})
+
+describe("webLibraryService reloadMoviesFromApi", () => {
+  it("debounces repeated reload requests into one API refresh", async () => {
+    vi.useFakeTimers()
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-1")],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    apiMocks.listMovies.mockClear()
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-2")],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+
+    await webLibraryService.reloadMoviesFromApi()
+    await webLibraryService.reloadMoviesFromApi()
+    await vi.advanceTimersByTimeAsync(449)
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushPromises()
+
+    expect(apiMocks.listMovies).toHaveBeenCalledTimes(1)
+    expect(webLibraryService.movies.value.map((movie) => movie.id)).toEqual(["movie-2"])
   })
 })
 
