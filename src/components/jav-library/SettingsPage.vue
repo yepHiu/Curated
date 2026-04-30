@@ -73,7 +73,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   TooltipContent,
@@ -101,6 +100,7 @@ import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCu
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
+import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
@@ -2262,105 +2262,22 @@ async function runMetadataRefreshForSelected() {
             </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              v-if="useWebApi"
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium">{{ t("settings.providerHealthTitle") }}</p>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{ t("settings.providerHealthHint") }}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="shrink-0 rounded-xl"
-                  :disabled="providerPingAllBusy || providerPingOneName != null"
-                  @click="pingAllMetadataProviders"
-                >
-                  <RefreshCw
-                    class="mr-1.5 size-4"
-                    :class="{ 'motion-safe:animate-spin': providerPingAllBusy }"
-                  />
-                  {{
-                    providerPingAllBusy
-                      ? t("settings.providerHealthPinging")
-                      : t("settings.providerHealthPingAll")
-                  }}
-                </Button>
-              </div>
-              <p v-if="providerHealthPingAllSummary" class="text-xs text-muted-foreground">
-                {{ providerHealthPingAllSummary }}
-              </p>
-              <p v-if="providerHealthPingError" class="text-sm text-destructive">
-                {{ providerHealthPingError }}
-              </p>
-            </div>
-            <p
-              v-else
-              class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-sm text-muted-foreground"
-            >
-              {{ t("settings.providerHealthMockHint") }}
-            </p>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
-              :aria-busy="autoLibraryWatchSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{
-                  t("settings.autoScrape")
-                }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.autoScrapeHint") }}
-                </p>
-                <p
-                  v-if="autoLibraryWatchSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoLibraryWatchSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoLibraryWatch"
-                @update:model-value="onAutoLibraryWatchChange"
-              />
-            </div>
-            <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
-              {{ autoLibraryWatchError }}
-            </p>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/[0.08] p-4"
-              :aria-busy="autoActorProfileScrapeSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{
-                  t("settings.autoActorProfileScrape")
-                }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.autoActorProfileScrapeHint") }}
-                </p>
-                <p
-                  v-if="autoActorProfileScrapeSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoActorProfileScrapeSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoActorProfileScrape"
-                @update:model-value="onAutoActorProfileScrapeChange"
-              />
-            </div>
-            <p v-if="autoActorProfileScrapeError" class="text-sm text-destructive">
-              {{ autoActorProfileScrapeError }}
-            </p>
+            <SettingsMetadataAutomationSection
+              :use-web-api="useWebApi"
+              :provider-ping-all-busy="providerPingAllBusy"
+              :provider-ping-one-name="providerPingOneName"
+              :provider-health-ping-all-summary="providerHealthPingAllSummary"
+              :provider-health-ping-error="providerHealthPingError"
+              :auto-library-watch="autoLibraryWatch"
+              :auto-library-watch-saving="autoLibraryWatchSaving"
+              :auto-library-watch-error="autoLibraryWatchError"
+              :auto-actor-profile-scrape="autoActorProfileScrape"
+              :auto-actor-profile-scrape-saving="autoActorProfileScrapeSaving"
+              :auto-actor-profile-scrape-error="autoActorProfileScrapeError"
+              @ping-all-providers="pingAllMetadataProviders"
+              @change-auto-library-watch="onAutoLibraryWatchChange"
+              @change-auto-actor-profile-scrape="onAutoActorProfileScrapeChange"
+            />
 
             <fieldset
               class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
