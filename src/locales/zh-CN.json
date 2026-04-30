@@ -1,4 +1,9 @@
 {
+  "app": {
+    "faultTitle": "Curated 暂时无法渲染当前页面",
+    "faultDescription": "页面发生未捕获错误。你可以刷新应用，或返回上一页后重试。",
+    "reload": "刷新应用"
+  },
   "nav": {
     "home": "首页",
     "browse": "浏览",

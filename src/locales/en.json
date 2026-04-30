@@ -1,4 +1,9 @@
 {
+  "app": {
+    "faultTitle": "Curated could not render this page",
+    "faultDescription": "An unexpected page error occurred. Refresh the app or go back and try again.",
+    "reload": "Reload app"
+  },
   "nav": {
     "browse": "Browse",
     "yours": "Yours",
