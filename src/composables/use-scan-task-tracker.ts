@@ -1,4 +1,4 @@
-import { ref, shallowRef } from "vue"
+import { onUnmounted, ref, shallowRef } from "vue"
 import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
 import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
@@ -19,6 +19,7 @@ const pollError = ref<string | null>(null)
 let intervalId: ReturnType<typeof setInterval> | null = null
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 let trackedTaskId: string | null = null
+let consumerCount = 0
 
 function clearDismissTimer() {
   if (dismissTimer) {
@@ -94,6 +95,20 @@ function dismiss() {
 }
 
 export function useScanTaskTracker() {
+  consumerCount += 1
+
+  onUnmounted(() => {
+    consumerCount = Math.max(0, consumerCount - 1)
+    if (consumerCount > 0) {
+      return
+    }
+    clearDismissTimer()
+    stopPolling()
+    trackedTaskId = null
+    activeTask.value = null
+    pollError.value = null
+  })
+
   function start(taskId: string) {
     clearDismissTimer()
     stopPolling()
