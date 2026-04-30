@@ -755,9 +755,9 @@ function createWebLibraryService(): LibraryService {
     },
 
     async ensureMovieCached(movieId: string) {
-      await ensureLoaded()
       const trimmed = movieId.trim()
       if (!trimmed) return
+      await ensureLoaded()
       if (
         moviesState.value.some((m) => m.id === trimmed) ||
         trashedMoviesState.value.some((m) => m.id === trimmed)

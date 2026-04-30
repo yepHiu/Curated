@@ -105,6 +105,85 @@ describe("webLibraryService loadError", () => {
 })
 
 describe("webLibraryService mutations", () => {
+  it("short-circuits blank movie ids without waiting for library loading", async () => {
+    let resolveList: (value: {
+      items: MovieListItemDTO[]
+      total: number
+      limit: number
+      offset: number
+    }) => void
+    const pendingList = new Promise<{
+      items: MovieListItemDTO[]
+      total: number
+      limit: number
+      offset: number
+    }>((resolve) => {
+      resolveList = resolve
+    })
+    apiMocks.listMovies.mockReturnValueOnce(pendingList)
+
+    const { webLibraryService } = await import("./web-library-service")
+    let resolved = false
+    const ensurePromise = webLibraryService.ensureMovieCached("   ").then(() => {
+      resolved = true
+    })
+
+    try {
+      await Promise.resolve()
+      expect(resolved).toBe(true)
+      expect(apiMocks.getMovie).not.toHaveBeenCalled()
+    } finally {
+      resolveList!({ items: [], total: 0, limit: 500, offset: 0 })
+      await ensurePromise
+    }
+  })
+
+  it("does not load detail when the movie is already cached in the active list", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({
+      items: [movieListDto("movie-1")],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    apiMocks.listMovies.mockClear()
+    await webLibraryService.ensureMovieCached(" movie-1 ")
+
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+    expect(apiMocks.getMovie).not.toHaveBeenCalled()
+  })
+
+  it("does not load detail when the movie is already cached in trash", async () => {
+    window.location.hash = "#/trash"
+    apiMocks.listMovies
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          movieListDto("movie-1", {
+            trashedAt: "2026-01-02T00:00:00.000Z",
+          }),
+        ],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      })
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    apiMocks.listMovies.mockClear()
+    await webLibraryService.ensureMovieCached(" movie-1 ")
+
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+    expect(apiMocks.getMovie).not.toHaveBeenCalled()
+  })
+
   it("moves a deleted movie out of active cache and refreshes trash cache", async () => {
     apiMocks.listMovies
       .mockResolvedValueOnce({
