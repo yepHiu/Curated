@@ -93,6 +93,30 @@ describe("PlayerView", () => {
     expect(recordMoviePlayedMock).toHaveBeenCalledWith("movie-1")
   })
 
+  it("passes autoplay false unless the route query is exactly one", async () => {
+    routeState.params = { id: "movie-1" }
+    routeState.query = { autoplay: "true" }
+    serviceState.movies.set("movie-1", movie("movie-1"))
+
+    const wrapper = await mountPlayerView()
+
+    expect(wrapper.get("[data-player-page]").attributes("data-autoplay")).toBe("false")
+    expect(recordMoviePlayedMock).toHaveBeenCalledWith("movie-1")
+  })
+
+  it("treats non-string route ids as unavailable playback targets", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    routeState.params = { id: ["movie-1"] }
+    serviceState.movies.set("movie-1", movie("movie-1"))
+
+    const wrapper = await mountPlayerView()
+
+    expect(wrapper.find("[data-player-page]").exists()).toBe(false)
+    expect(wrapper.get("[data-not-found]").text()).toContain("player.notFoundTitle")
+    expect(serviceMocks.ensureMovieCached).not.toHaveBeenCalled()
+    expect(recordMoviePlayedMock).not.toHaveBeenCalled()
+  })
+
   it("renders NotFoundState when the target movie is unavailable", async () => {
     routeState.params = { id: "missing" }
 
@@ -118,5 +142,6 @@ describe("PlayerView", () => {
 
     expect(wrapper.text()).toContain("player.loadingTarget")
     expect(serviceMocks.ensureMovieCached).toHaveBeenCalledWith("movie-1")
+    expect(recordMoviePlayedMock).not.toHaveBeenCalled()
   })
 })
