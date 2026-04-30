@@ -27,7 +27,7 @@
 | 1.2 HTTP Client 添加超时机制 | 已完成 | 所有 `httpClient` 请求统一使用 30s `AbortController` 超时；超时转换为 `HttpClientError(0, COMMON_TIMEOUT)`；`DELETE` 改为复用共享 `handleResponse<void>()` | `src/api/http-client.ts`, `src/api/http-client.test.ts` |
 | 1.3 修复关键操作的错误吞没 | 已完成 | `LibraryView` 收藏/编辑失败改为 destructive toast；资料库加载失败通过 `LibraryService.loadError` 展示 banner；`SettingsPage` 移除库根失败改为 destructive toast；Web adapter 在列表/详情加载失败时写入可消费的 `loadError` | `src/views/LibraryView.vue`, `src/views/LibraryView.test.ts`, `src/components/jav-library/SettingsPage.vue`, `src/services/contracts/library-service.ts`, `src/services/adapters/web/web-library-service.ts`, `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/mock/mock-library-service.ts` |
 | 1.4 补全 i18n locale key 缺口 | 已完成 | 补齐策展帧 tag filter 的英文/日文 key；补齐 `settings.curatedExportFormatSaving` 的中文/日文 key；新增 locale parity 测试防回归 | `src/locales/en.json`, `src/locales/ja.json`, `src/locales/zh-CN.json`, `src/i18n/locales.test.ts` |
-| 2.1 SettingsPage 拆分 | 进行中 | 已先抽出低耦合的维护工具区为 `SettingsMaintenanceSection`，父组件仅保留路由 tab 与事件转发；新增组件测试覆盖渲染、full scan 事件与 busy 禁用态 | `src/components/jav-library/SettingsPage.vue`, `src/components/jav-library/settings/SettingsMaintenanceSection.vue`, `src/components/jav-library/settings/SettingsMaintenanceSection.test.ts` |
+| 2.1 SettingsPage 拆分 | 进行中 | 已抽出低耦合的维护工具区 `SettingsMaintenanceSection` 与关于页 `SettingsAboutSection`，父组件仅保留路由 tab、状态计算与事件转发；新增组件测试覆盖渲染、full scan 事件、busy 禁用态、Web API 版本区与首页推荐刷新事件 | `src/components/jav-library/SettingsPage.vue`, `src/components/jav-library/settings/SettingsMaintenanceSection.vue`, `src/components/jav-library/settings/SettingsMaintenanceSection.test.ts`, `src/components/jav-library/settings/SettingsAboutSection.vue`, `src/components/jav-library/settings/SettingsAboutSection.test.ts` |
 | 3.1 web-library-service 测试 | 部分完成 | 新增 Web adapter 测试骨架，覆盖初始列表加载失败写入 `loadError`、详情加载失败/API message、初始分页加载、多并发详情请求合并与缓存写入、`patchMovie` 合并响应与缺失缓存预加载、`toggleFavorite` 成功/失败缓存行为、`reloadMoviesFromApi` debounce 合并刷新、删除/恢复/永久删除后的 active/trash 缓存同步、`ensureMovieCached` 空 id / active cache / trash cache 短路，以及 settings 写入失败恢复和 stale save 防覆盖 | `src/services/adapters/web/web-library-service.test.ts`, `src/services/adapters/web/web-library-service.ts` |
 | 3.2 playback-progress-storage 测试 | 已完成 | 已覆盖 route query 解析与无效值、localStorage 坏数据恢复、保存 position clamp、续播阈值、排序、删除、Web API hydrate 失败保留缓存、Web API 写入/删除，以及 localStorage quota/private mode 下保存/删除失败仍更新内存与 revision | `src/lib/playback-progress-storage.ts`, `src/lib/playback-progress-storage.test.ts` |
 | 3.3 PlayerView / PlayerPage 基础测试 | 已完成 | `PlayerView` 入口测试覆盖缓存命中渲染 `PlayerPage`、autoplay 路由参数及严格边界、非字符串路由 id 播放目标解析、未找到状态、Web API hydrate loading 与播放记录写入/抑制；`playback-targets` 覆盖 resume query 优先级、descriptor fallback、无效值和 HLS local seek 边界；`PlayerPage.loading.test.ts` 覆盖 descriptor 加载中、无片源、加载失败、Web API no-stream hint | `src/views/PlayerView.test.ts`, `src/lib/playback-targets.test.ts`, `src/components/jav-library/PlayerPage.loading.test.ts` |
@@ -80,6 +80,7 @@
 - `pnpm test -- src/services/adapters/mock/mock-library-service.test.ts src/services/adapters/web/web-library-service.test.ts src/components/jav-library/ActorProfileCard.test.ts`：3 files / 38 tests passed
 - `pnpm test -- src/components/jav-library/render-hints.test.ts src/views/HomeView.test.ts src/components/jav-library/ScanProgressDock.test.ts src/components/jav-library/DetailPage.test.ts src/components/jav-library/LibraryBatchActionBar.test.ts src/components/jav-library/LibraryBatchActionBar.integration.test.ts`：6 files / 17 tests passed
 - `pnpm test -- src/components/jav-library/settings/SettingsMaintenanceSection.test.ts`：1 file / 2 tests passed
+- `pnpm test -- src/components/jav-library/settings/SettingsAboutSection.test.ts src/components/jav-library/settings/SettingsMaintenanceSection.test.ts src/components/jav-library/settings/SettingsHomepageDevTools.test.ts src/components/jav-library/settings/SettingsLoggingSection.test.ts src/components/jav-library/settings/SettingsPlaybackSection.test.ts`：4 files / 7 tests passed
 - `pnpm typecheck`：passed
 - `pnpm lint`：passed
 - `pnpm test`：84 files / 320 tests passed
@@ -221,7 +222,7 @@ async function request<T>(path, options) {
 
 ### 2.1 SettingsPage 拆分（3727 行）
 
-**状态（2026-05-01）:** 进行中。已抽出 `SettingsMaintenanceSection.vue`，将维护工具区从 `SettingsPage.vue` 中移出；父组件保留 `fullScanBusy` 与 `runFullScan`，通过 props/emits 对接。回归测试见 `src/components/jav-library/settings/SettingsMaintenanceSection.test.ts`。
+**状态（2026-05-01）:** 进行中。已抽出 `SettingsMaintenanceSection.vue`，将维护工具区从 `SettingsPage.vue` 中移出；已抽出 `SettingsAboutSection.vue`，将关于页版本/构建信息、更新状态与首页推荐开发工具从父组件中移出。父组件保留 `fullScanBusy`、`runFullScan`、后端健康状态计算与 `loadAboutHealth()`，通过 props/emits 对接。回归测试见 `src/components/jav-library/settings/SettingsMaintenanceSection.test.ts` 与 `src/components/jav-library/settings/SettingsAboutSection.test.ts`。
 
 **目标:** 每个 section 独立组件，共享 settings composable
 

@@ -105,8 +105,7 @@ import {
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
 import SettingsCuratedShortcutSection from "@/components/jav-library/settings/SettingsCuratedShortcutSection.vue"
-import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
-import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
+import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
 import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
@@ -3535,113 +3534,17 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navAbout')"
     >
     <h2 class="sr-only">{{ t("settings.navAbout") }}</h2>
-    <div class="flex w-full flex-col gap-6">
-    <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-4 pb-2">
-          <CardTitle class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight">
-            <span class="flex min-w-0 items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Info class="size-[1.15rem]" />
-              </span>
-              <span class="min-w-0">{{ t("settings.aboutCardTitle") }}</span>
-            </span>
-          </CardTitle>
-          <div class="flex w-full justify-center pt-1">
-            <div
-              class="font-curated inline-flex w-fit max-w-full items-center gap-3 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
-              title="Curated"
-            >
-              <Sparkles class="size-6 shrink-0 text-primary sm:size-7" aria-hidden="true" />
-              <span class="truncate">Curated</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent class="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
-          <!-- 开发：版本号、数据模式、前端构建模式 -->
-          <template v-if="isViteDev">
-            <dl class="space-y-4">
-              <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutVersionLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                  <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3">
-                    <Loader2 class="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-                    {{ t("settings.aboutVersionLoading") }}
-                  </span>
-                  <span v-else-if="aboutHealthError" class="text-destructive">{{ aboutHealthError }}</span>
-                  <span v-else-if="aboutHealth" class="font-mono text-foreground/90">
-                    {{ formatAboutBackendVersion(aboutHealth) }}
-                  </span>
-                  <span v-else>—</span>
-                </dd>
-              </div>
-              <SettingsAppUpdateSection
-                v-if="useWebApi"
-                :backend-version-display="aboutBackendVersionDisplay"
-                :backend-version-status="aboutBackendVersionStatus"
-              />
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutDataModeLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  {{
-                    useWebApi
-                      ? t("settings.aboutDataModeWebApi")
-                      : t("settings.aboutDataModeMock")
-                  }}
-                </dd>
-              </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutFrontendBuildLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
-                </dd>
-              </div>
-            </dl>
-            <p class="text-xs text-muted-foreground/90">
-              {{ t("settings.aboutDevProxyHint") }}
-            </p>
-          </template>
-          <!-- 生产：仅版本号 -->
-          <template v-else>
-            <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-              <p class="font-medium text-foreground">
-                {{ t("settings.aboutVersionLabel") }}
-              </p>
-              <p class="mt-1.5 font-mono text-sm text-foreground/90">
-                <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3 font-sans text-muted-foreground">
-                  <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
-                  {{ t("settings.aboutVersionLoading") }}
-                </span>
-                <span v-else-if="aboutHealthError" class="font-sans text-destructive">{{ aboutHealthError }}</span>
-                <span v-else-if="aboutHealth">{{ formatAboutBackendVersion(aboutHealth) }}</span>
-                <span v-else>—</span>
-              </p>
-            </div>
-            <SettingsAppUpdateSection
-              v-if="useWebApi"
-              :backend-version-display="aboutBackendVersionDisplay"
-              :backend-version-status="aboutBackendVersionStatus"
-            />
-          </template>
-          <SettingsHomepageDevTools
-            v-if="isViteDev && useWebApi"
-            @refreshed="void loadAboutHealth()"
-          />
-        </CardContent>
-      </Card>
-    </div>
-    </div>
+    <SettingsAboutSection
+      :is-vite-dev="isViteDev"
+      :use-web-api="useWebApi"
+      :vite-mode="viteMode"
+      :about-health="aboutHealth"
+      :about-health-loading="aboutHealthLoading"
+      :about-health-error="aboutHealthError"
+      :backend-version-display="aboutBackendVersionDisplay"
+      :backend-version-status="aboutBackendVersionStatus"
+      @refresh-health="void loadAboutHealth()"
+    />
     </section>
     </TabsContent>
     </div>
