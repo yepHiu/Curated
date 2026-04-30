@@ -81,7 +81,7 @@ async function poll() {
   } catch (e) {
     stopPolling()
     activeTask.value = null
-    pollError.value = e instanceof Error ? e.message : "无法获取扫描任务状态"
+    pollError.value = e instanceof Error ? e.message : i18n.global.t("scanTask.fetchFailed")
     trackedTaskId = null
   }
 }

@@ -19,6 +19,16 @@ const requiredLocaleKeys = [
   "curated.ariaFilterFrameTag",
   "curated.ariaClearFrameTagFilter",
   "settings.curatedExportFormatSaving",
+  "scan.statusLabel",
+  "scan.completed",
+  "scan.finished",
+  "scan.scanning",
+  "scan.close",
+  "scan.processed",
+  "scan.newItems",
+  "scan.updated",
+  "scan.skipped",
+  "scanTask.fetchFailed",
 ]
 
 function readLocaleKey(messages: Record<string, unknown>, key: string): unknown {

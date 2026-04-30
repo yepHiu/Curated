@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +12,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 
+const { t } = useI18n()
 const { activeTask, pollError, dismiss } = useScanTaskTracker()
 
 const visible = computed(() => activeTask.value != null || pollError.value != null)
@@ -29,12 +31,12 @@ function metaNum(m: Record<string, unknown> | undefined, key: string): string {
 }
 
 const dockTitle = computed(() => {
-  if (pollError.value && !activeTask.value) return "扫描状态"
-  const t = activeTask.value
-  if (!t) return ""
-  if (t.status === "completed") return "扫描完成"
-  if (t.status === "failed" || t.status === "partial_failed") return "扫描结束"
-  return "正在扫描库"
+  if (pollError.value && !activeTask.value) return t("scan.statusLabel")
+  const task = activeTask.value
+  if (!task) return ""
+  if (task.status === "completed") return t("scan.completed")
+  if (task.status === "failed" || task.status === "partial_failed") return t("scan.finished")
+  return t("scan.scanning")
 })
 
 const progressModel = computed(() => {
@@ -64,7 +66,7 @@ const detailLine = computed(() => {
             variant="ghost"
             size="icon"
             class="shrink-0 rounded-xl"
-            aria-label="关闭"
+            :aria-label="t('scan.close')"
             @click="dismiss"
           >
             <X class="size-4" />
@@ -77,20 +79,20 @@ const detailLine = computed(() => {
               {{ detailLine }}
             </p>
             <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>已处理</span>
+              <span>{{ t("scan.processed") }}</span>
               <span class="text-right font-mono text-foreground">
                 {{ metaNum(activeTask.metadata, "scanProcessed") }} /
                 {{ metaNum(activeTask.metadata, "scanTotal") }}
               </span>
-              <span>新入库</span>
+              <span>{{ t("scan.newItems") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanImported")
               }}</span>
-              <span>更新</span>
+              <span>{{ t("scan.updated") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanUpdated")
               }}</span>
-              <span>跳过</span>
+              <span>{{ t("scan.skipped") }}</span>
               <span class="text-right font-mono text-foreground">{{
                 metaNum(activeTask.metadata, "scanSkipped")
               }}</span>

@@ -317,6 +317,20 @@
     "unsupported": "当前环境无法自动读取磁盘绝对路径。请在本机资源管理器中打开该文件夹，将地址栏中的完整路径复制到「绝对路径」输入框。",
     "selected": "已选择文件夹「{name}」。网页出于安全限制无法读取本机绝对路径，请在资源管理器中进入该文件夹，将地址栏路径复制到上方「绝对路径」。"
   },
+  "scan": {
+    "statusLabel": "扫描状态",
+    "completed": "扫描完成",
+    "finished": "扫描结束",
+    "scanning": "正在扫描库",
+    "close": "关闭",
+    "processed": "已处理",
+    "newItems": "新入库",
+    "updated": "更新",
+    "skipped": "跳过"
+  },
+  "scanTask": {
+    "fetchFailed": "无法获取扫描任务状态"
+  },
   "settings": {
     "language": "界面语言",
     "appearance": "外观",

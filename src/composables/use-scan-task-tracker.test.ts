@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { defineComponent } from "vue"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { TaskDTO } from "@/api/types"
@@ -78,5 +78,23 @@ describe("useScanTaskTracker", () => {
     await vi.advanceTimersByTimeAsync(500)
 
     expect(mocks.getTaskStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses a localized fallback when polling fails without an Error object", async () => {
+    mocks.getTaskStatus.mockRejectedValueOnce("network down")
+
+    const Harness = defineComponent({
+      setup() {
+        const { pollError, start } = useScanTaskTracker()
+        start("task-1")
+        return { pollError }
+      },
+      template: "<p>{{ pollError }}</p>",
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(wrapper.text()).toBe("scanTask.fetchFailed")
   })
 })
