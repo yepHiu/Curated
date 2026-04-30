@@ -45,7 +45,6 @@ import {
   Sparkles,
   X,
 } from "lucide-vue-next"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -94,6 +93,7 @@ import SettingsLibraryPathActions from "@/components/jav-library/settings/Settin
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataAutomationSection from "@/components/jav-library/settings/SettingsMetadataAutomationSection.vue"
 import SettingsMetadataModeSection from "@/components/jav-library/settings/SettingsMetadataModeSection.vue"
+import SettingsMetadataProviderSelectSection from "@/components/jav-library/settings/SettingsMetadataProviderSelectSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
@@ -934,10 +934,6 @@ function providerHealthTone(status: ProviderHealthStatus): StatusTone {
   if (status === "ok") return "success"
   if (status === "degraded") return "warning"
   return "danger"
-}
-
-function providerHealthStatusVariant(status: ProviderHealthStatus): StatusTone {
-  return providerHealthTone(status)
 }
 
 function providerHealthStatusLabel(status: ProviderHealthStatus): string {
@@ -2285,90 +2281,20 @@ async function runMetadataRefreshForSelected() {
             />
 
             <!-- Single Provider Selection -->
-            <div
+            <SettingsMetadataProviderSelectSection
               v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
-              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
-            >
-              <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
-              <div class="flex flex-wrap items-start gap-3">
-                <Select
-                  class="min-w-0 flex-1"
-                  :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
-                  :disabled="metadataMovieSaving"
-                  @update:model-value="onMetadataMovieSelect"
-                >
-                  <SelectTrigger class="w-full max-w-md rounded-2xl">
-                    <SelectValue :placeholder="t('settings.metadataMovieProviderSelectPh')" />
-                  </SelectTrigger>
-                  <SelectContent class="rounded-xl border-border/50">
-                    <SelectItem
-                      v-for="p in metadataMovieSelectOptions"
-                      :key="p"
-                      class="rounded-lg"
-                      :value="p"
-                    >
-                      {{ p }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  v-if="useWebApi"
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  class="size-10 shrink-0 rounded-xl"
-                  :disabled="
-                    providerPingAllBusy ||
-                    providerPingOneName != null ||
-                    !(metadataMovieProvider || metadataMovieSelectOptions[0])
-                  "
-                  :aria-label="t('settings.providerHealthPingCurrentAria')"
-                  @click="
-                    pingOneMetadataProvider(
-                      metadataMovieProvider || metadataMovieSelectOptions[0] || '',
-                    )
-                  "
-                >
-                  <Activity
-                    class="size-4"
-                    :class="{
-                      'motion-safe:animate-pulse':
-                        providerPingOneName ===
-                        (metadataMovieProvider || metadataMovieSelectOptions[0] || ''),
-                    }"
-                  />
-                </Button>
-              </div>
-              <div
-                v-if="useWebApi && healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')"
-                class="flex flex-wrap items-center gap-3"
-              >
-                <Badge
-                  :variant="
-                    providerHealthStatusVariant(
-                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
-                    )
-                  "
-                  class="text-xs font-normal"
-                >
-                  {{
-                    providerHealthStatusLabel(
-                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
-                    )
-                  }}
-                  ·
-                  {{
-                    healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.latencyMs
-                  }}ms
-                </Badge>
-                <span
-                  v-if="healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message"
-                  class="text-xs text-muted-foreground"
-                >
-                  {{ healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message }}
-                </span>
-              </div>
-            </div>
+              :use-web-api="useWebApi"
+              :metadata-movie-provider="metadataMovieProvider"
+              :metadata-movie-select-options="metadataMovieSelectOptions"
+              :metadata-movie-saving="metadataMovieSaving"
+              :provider-ping-all-busy="providerPingAllBusy"
+              :provider-ping-one-name="providerPingOneName"
+              :current-provider-health="
+                healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '') ?? null
+              "
+              @select-provider="onMetadataMovieSelect"
+              @ping-provider="pingOneMetadataProvider"
+            />
 
             <!-- Provider Chain Management（与 canPickSpecifiedMetadata 解耦：无站点列表时仍显示已保存的链） -->
             <div
