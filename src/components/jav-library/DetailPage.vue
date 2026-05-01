@@ -89,6 +89,15 @@ function previewCardStyle(index: number) {
   }
 }
 
+function previewImageLoading(index: number): "eager" | "lazy" {
+  return index < 4 ? "eager" : "lazy"
+}
+
+function previewImageFetchPriority(index: number): "high" | "low" | "auto" {
+  if (index === 0) return "high"
+  return index < 4 ? "auto" : "low"
+}
+
 function updatePreviewAspectRatio(index: number, payload: PreviewImageLoadPayload) {
   const { naturalWidth, naturalHeight } = payload
   if (naturalWidth <= 0 || naturalHeight <= 0) return
@@ -214,8 +223,8 @@ function openPosterInViewer() {
             :alt="t('detailPage.previewAlt', { code: movie.code, n: index + 1 })"
             class="absolute inset-0 z-0"
             fit="cover"
-            loading="eager"
-            :fetch-priority="index < 8 ? 'high' : undefined"
+            :loading="previewImageLoading(index)"
+            :fetch-priority="previewImageFetchPriority(index)"
             @load="updatePreviewAspectRatio(index, $event)"
           />
           <span class="sr-only">{{ t("detailPage.previewSrOpen", { n: index + 1 }) }}</span>

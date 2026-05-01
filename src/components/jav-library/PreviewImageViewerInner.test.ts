@@ -77,4 +77,21 @@ describe("PreviewImageViewerInner", () => {
 
     expect(visibleAltTexts).toEqual(["ABC-123 preview.imageOf:1", "ABC-123 preview.imageOf:2"])
   })
+
+  it("tracks main image loading state and prioritizes only the selected full-size image", async () => {
+    const wrapper = await mountViewer()
+    const mainImages = wrapper
+      .findAll("img")
+      .filter((img) => (img.attributes("alt") ?? "") !== "")
+
+    expect(mainImages[0]!.attributes("data-loaded")).toBe("false")
+    expect(mainImages[0]!.attributes("loading")).toBe("eager")
+    expect(mainImages[0]!.attributes("fetchpriority")).toBe("high")
+    expect(mainImages[1]!.attributes("loading")).toBe("eager")
+    expect(mainImages[1]!.attributes("fetchpriority")).toBe("low")
+
+    await mainImages[0]!.trigger("load")
+
+    expect(mainImages[0]!.attributes("data-loaded")).toBe("true")
+  })
 })

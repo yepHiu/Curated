@@ -92,6 +92,7 @@ watch(
 const total = computed(() => props.images.length)
 const canPrev = computed(() => selectedIndex.value > 0)
 const canNext = computed(() => selectedIndex.value < props.images.length - 1)
+const loadedMainImageSrcs = ref<Set<string>>(new Set())
 const previewTitle = computed(() =>
   t("preview.title", { code: props.movieCode?.trim() ?? "" }).trim(),
 )
@@ -110,11 +111,39 @@ function reinitCarousels() {
   getThumbApi()?.reInit()
 }
 
+function isSelectedOrNeighbor(index: number): boolean {
+  return Math.abs(index - selectedIndex.value) <= 1
+}
+
+function mainImageLoading(index: number): "eager" | "lazy" {
+  return isSelectedOrNeighbor(index) ? "eager" : "lazy"
+}
+
+function mainImageFetchPriority(index: number): "high" | "low" {
+  return index === selectedIndex.value ? "high" : "low"
+}
+
+function isMainImageLoaded(src: string): boolean {
+  return loadedMainImageSrcs.value.has(src)
+}
+
+function markMainImageLoaded(src: string) {
+  loadedMainImageSrcs.value = new Set([...loadedMainImageSrcs.value, src])
+}
+
+watch(
+  () => props.images,
+  () => {
+    loadedMainImageSrcs.value = new Set()
+  },
+)
+
 watch(
   () => [props.initialIndex, props.images] as const,
   async ([initialIndex, images]) => {
     if (images.length === 0) return
     const start = Math.max(0, Math.min(images.length - 1, initialIndex ?? 0))
+    selectedIndex.value = start
     await nextTick()
     reinitCarousels()
     requestAnimationFrame(() => {
@@ -216,15 +245,25 @@ defineExpose({
               class="relative h-full min-h-0 min-w-0 shrink-0 grow-0 basis-full"
             >
               <div
-                class="flex h-full min-h-[200px] w-full min-w-0 items-center justify-center px-0.5"
+                class="relative flex h-full min-h-[200px] w-full min-w-0 items-center justify-center overflow-hidden px-0.5"
               >
                 <img
                   v-if="src"
                   :src="src"
                   :alt="previewImageAlt(i + 1)"
-                  class="max-h-full max-w-full object-contain"
+                  :data-loaded="isMainImageLoaded(src) ? 'true' : 'false'"
+                  :loading="mainImageLoading(i)"
+                  :fetchpriority="mainImageFetchPriority(i)"
+                  class="relative z-10 max-h-full max-w-full object-contain transition-opacity duration-200 motion-reduce:transition-none"
+                  :class="isMainImageLoaded(src) ? 'opacity-100' : 'opacity-0'"
                   decoding="async"
                   draggable="false"
+                  @load="markMainImageLoaded(src)"
+                />
+                <div
+                  v-if="src && !isMainImageLoaded(src)"
+                  class="absolute inset-0 z-0 animate-pulse rounded-xl bg-zinc-900"
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -258,6 +297,8 @@ defineExpose({
                   v-if="src"
                   :src="src"
                   alt=""
+                  loading="lazy"
+                  fetchpriority="low"
                   class="max-h-full w-auto max-w-[7.5rem] object-contain"
                   decoding="async"
                   draggable="false"
