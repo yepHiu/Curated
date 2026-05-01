@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import CuratedFrameGrid from "@/components/jav-library/CuratedFrameGrid.vue"
+import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -224,8 +225,11 @@ function reconcileActorsTabExportBucket() {
   namedActorForExport.value = result.namedActorForExport
 }
 
-function onActorGroupHeaderCheckboxChange(actor: string, items: RowWithUrl[], ev: Event) {
-  const checked = (ev.target as HTMLInputElement).checked
+function onActorGroupHeaderSelectionChange(
+  actor: string,
+  items: readonly RowWithUrl[],
+  checked: boolean,
+) {
   exportToolbarError.value = ""
   if (checked) {
     selectAllInActorSection(actor)
@@ -1316,42 +1320,18 @@ defineExpose({
       </TabsContent>
 
       <TabsContent value="actors" class="mt-0 outline-none">
-        <div class="flex flex-col gap-8">
-          <section v-for="[actor, items] in actorGroups" :key="actor">
-            <div class="mb-3">
-              <label
-                v-if="batchMode"
-                class="flex cursor-pointer items-start gap-2.5"
-              >
-                <input
-                  type="checkbox"
-                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
-                  :disabled="items.length === 0"
-                  :checked="isGroupHeaderFullySelected(items)"
-                  :aria-label="t('curated.batchSelectActorGroup')"
-                  @change="onActorGroupHeaderCheckboxChange(actor, items, $event)"
-                />
-                <span class="min-w-0 text-lg font-semibold leading-snug">{{ actor }}</span>
-              </label>
-              <h2
-                v-else
-                class="text-lg font-semibold"
-              >
-                {{ actor }}
-              </h2>
-            </div>
-            <CuratedFrameGrid
-              :items="items"
-              :batch-mode="batchMode"
-              :selected-ids="selectedFrameIds"
-              :near-duplicate-ids="nearDuplicateFrameIdList"
-              :section-actor="actor"
-              @toggle-selection="toggleFrameSelection"
-              @contextmenu="onFrameCardContextMenu"
-              @open="openFrameCardDialog"
-            />
-          </section>
-        </div>
+        <CuratedFrameActorsTab
+          :actor-groups="actorGroups"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          :select-group-aria-label="t('curated.batchSelectActorGroup')"
+          :batch-export-max="batchExportMax"
+          @group-selection-change="onActorGroupHeaderSelectionChange"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
 
       <TabsContent value="movies" class="mt-0 outline-none">
