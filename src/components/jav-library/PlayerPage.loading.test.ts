@@ -17,6 +17,10 @@ const serviceMocks = vi.hoisted(() => ({
   createPlaybackSession: vi.fn(),
   deletePlaybackSession: vi.fn(),
 }))
+const activePlaybackMocks = vi.hoisted(() => ({
+  updateActivePlaybackSession: vi.fn(),
+  clearActivePlaybackSession: vi.fn(),
+}))
 
 const serviceState = vi.hoisted(() => ({
   playerSettings: {
@@ -57,6 +61,11 @@ vi.mock("@/services/library-service", () => ({
     createPlaybackSession: serviceMocks.createPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,
   }),
+}))
+
+vi.mock("@/composables/use-active-playback-session", () => ({
+  updateActivePlaybackSession: activePlaybackMocks.updateActivePlaybackSession,
+  clearActivePlaybackSession: activePlaybackMocks.clearActivePlaybackSession,
 }))
 
 vi.mock("@/lib/hls-player", () => ({
@@ -142,12 +151,15 @@ async function mountPlayerPage(props: { movie?: Movie; autoplay?: boolean } = {}
 beforeEach(() => {
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "false")
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
   routeState.query = {}
   routeState.hash = ""
   routerMocks.replace.mockReset()
   serviceMocks.getMoviePlayback.mockReset()
   serviceMocks.createPlaybackSession.mockReset()
   serviceMocks.deletePlaybackSession.mockReset()
+  activePlaybackMocks.updateActivePlaybackSession.mockReset()
+  activePlaybackMocks.clearActivePlaybackSession.mockReset()
   serviceState.playerSettings.value = {
     seekBackwardStepSec: 10,
     seekForwardStepSec: 10,
@@ -158,6 +170,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
 
@@ -214,6 +227,61 @@ describe("PlayerPage loading states", () => {
       await nextTick()
       expect(wrapper.text()).toContain("player.noOnlineSrc")
       expect(wrapper.text()).toContain("player.errNoSrc")
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it("publishes active playback state and clears it after playback ends", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "direct",
+      url: "/api/library/movies/movie-1/stream",
+      durationSec: 120,
+      canDirectPlay: true,
+    })
+    routeState.query = { back: "browse", browse: "library", autoplay: "1" }
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+
+      expect(activePlaybackMocks.updateActivePlaybackSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          movieId: "movie-1",
+          title: "Movie title",
+          positionSec: 0,
+          durationSec: 120,
+          status: "paused",
+          routeQuery: routeState.query,
+        }),
+      )
+
+      const video = wrapper.get("video").element as HTMLVideoElement
+      Object.defineProperty(video, "duration", {
+        configurable: true,
+        value: 120,
+      })
+      video.currentTime = 42
+
+      await wrapper.get("video").trigger("loadedmetadata")
+      await wrapper.get("video").trigger("timeupdate")
+
+      expect(activePlaybackMocks.updateActivePlaybackSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          movieId: "movie-1",
+          title: "Movie title",
+          positionSec: 42,
+          durationSec: 120,
+          status: "paused",
+          routeQuery: routeState.query,
+        }),
+      )
+
+      await wrapper.get("video").trigger("ended")
+
+      expect(activePlaybackMocks.clearActivePlaybackSession).toHaveBeenCalledWith("movie-1")
     } finally {
       wrapper.unmount()
     }

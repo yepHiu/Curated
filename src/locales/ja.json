@@ -23,7 +23,11 @@
     "backendMock": "デモ（API なし）",
     "backendRecheck": "再接続を確認",
     "actors": "出演者",
-    "trash": "ゴミ箱"
+    "trash": "ゴミ箱",
+    "continuePlayback": "再生を続ける",
+    "continuePlaybackAt": "{time} まで再生",
+    "continuePlaybackAria": "プレイヤーに戻って「{title}」を {time} から再生します",
+    "dismissContinuePlayback": "再生再開の表示を隠す"
   },
   "actors": {
     "title": "出演者ライブラリ",

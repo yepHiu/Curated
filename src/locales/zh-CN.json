@@ -23,7 +23,11 @@
     "backendMock": "演示模式（无后端）",
     "backendRecheck": "重新检测后端",
     "actors": "演员",
-    "trash": "回收站"
+    "trash": "回收站",
+    "continuePlayback": "继续播放",
+    "continuePlaybackAt": "刚才播放至 {time}",
+    "continuePlaybackAria": "回到播放页继续播放《{title}》，刚才播放至 {time}",
+    "dismissContinuePlayback": "隐藏继续播放入口"
   },
   "actors": {
     "title": "演员库",

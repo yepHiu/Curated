@@ -7,20 +7,24 @@ import {
   History,
   House,
   LibraryBig,
+  Play,
   RefreshCw,
   Settings2,
   Sparkles,
   Tags,
   Trash2,
   Users,
+  X,
 } from "lucide-vue-next"
 import { RouterLink, useRoute } from "vue-router"
 import type { AppPage, LibraryMode } from "@/domain/library/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useAppUpdate } from "@/composables/use-app-update"
+import { useActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
@@ -61,6 +65,10 @@ const {
   checkNow: checkBackendHealth,
 } = useBackendHealth()
 const { hasUpdateBadge, summary: appUpdateSummary } = useAppUpdate()
+const {
+  activePlaybackSession,
+  dismissActivePlaybackSession,
+} = useActivePlaybackSession()
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -167,6 +175,52 @@ const brandUpdateTitle = computed(() => {
   return latest
     ? `Curated\nNew version ${latest}`
     : "Curated\nNew version available"
+})
+
+function formatSidebarPlaybackClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+  }
+  return `${minutes}:${String(secs).padStart(2, "0")}`
+}
+
+const isSameActivePlayerRoute = computed(() => {
+  const active = activePlaybackSession.value
+  if (!active || route.name !== "player") return false
+  return typeof route.params.id === "string" && route.params.id === active.movieId
+})
+
+const showActivePlaybackEntry = computed(() =>
+  Boolean(activePlaybackSession.value && !isSameActivePlayerRoute.value),
+)
+
+const activePlaybackTimeLabel = computed(() => {
+  const active = activePlaybackSession.value
+  if (!active) return ""
+  return formatSidebarPlaybackClock(active.positionSec)
+})
+
+const activePlaybackProgressValue = computed(() =>
+  Math.max(0, Math.min(100, activePlaybackSession.value?.progressPercent ?? 0)),
+)
+
+const activePlaybackAriaLabel = computed(() => {
+  const active = activePlaybackSession.value
+  if (!active) return t("nav.continuePlayback")
+  return t("nav.continuePlaybackAria", {
+    title: active.title,
+    time: activePlaybackTimeLabel.value,
+  })
+})
+
+const activePlaybackCompactTitle = computed(() => {
+  const active = activePlaybackSession.value
+  if (!active) return t("nav.continuePlayback")
+  return `${t("nav.continuePlayback")}: ${active.title} · ${activePlaybackTimeLabel.value}`
 })
 
 const getNavigationTarget = (page: AppPage) => {
@@ -306,6 +360,76 @@ const getNavigationTarget = (page: AppPage) => {
       class="my-2.5 shrink-0 bg-sidebar-border/80"
       :class="props.compact ? 'w-10' : ''"
     />
+
+    <section
+      v-if="showActivePlaybackEntry && activePlaybackSession"
+      class="mb-2 min-w-0"
+      :class="props.compact ? 'flex justify-center' : 'flex flex-col'"
+    >
+      <div
+        v-if="!props.compact"
+        class="relative min-w-0 rounded-lg border border-border/60 bg-background/45"
+      >
+        <RouterLink
+          data-active-playback-card
+          :to="activePlaybackSession.resumeRouteTarget"
+          class="group flex min-w-0 flex-col gap-2 rounded-lg px-3 py-2.5 pr-10 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
+          :aria-label="activePlaybackAriaLabel"
+        >
+          <span class="flex min-w-0 items-center justify-between gap-2">
+            <span class="inline-flex min-w-0 items-center gap-2 text-xs font-medium text-primary">
+              <span class="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.16)]" aria-hidden="true" />
+              <span class="truncate">{{ t("nav.continuePlayback") }}</span>
+            </span>
+            <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Play class="size-3.5 fill-current" aria-hidden="true" />
+            </span>
+          </span>
+          <span class="line-clamp-2 min-w-0 text-sm font-medium leading-snug">
+            {{ activePlaybackSession.title }}
+          </span>
+          <span class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span class="truncate">
+              {{ t("nav.continuePlaybackAt", { time: activePlaybackTimeLabel }) }}
+            </span>
+            <span class="shrink-0 tabular-nums">{{ Math.round(activePlaybackProgressValue) }}%</span>
+          </span>
+          <Progress
+            :model-value="activePlaybackProgressValue"
+            class="h-1 bg-primary/15"
+            aria-hidden="true"
+          />
+        </RouterLink>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-active-playback-dismiss
+          class="absolute right-1.5 top-1.5 size-7 rounded-lg text-muted-foreground hover:text-foreground"
+          :aria-label="t('nav.dismissContinuePlayback')"
+          @click="dismissActivePlaybackSession(activePlaybackSession.movieId)"
+        >
+          <X class="size-3.5" aria-hidden="true" />
+        </Button>
+      </div>
+
+      <RouterLink
+        v-else
+        data-active-playback-compact
+        :to="activePlaybackSession.resumeRouteTarget"
+        class="relative mx-auto inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/45 text-primary outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
+        :title="activePlaybackCompactTitle"
+        :aria-label="activePlaybackAriaLabel"
+      >
+        <Play class="size-4 fill-current" aria-hidden="true" />
+        <span class="absolute inset-x-1.5 bottom-1.5 h-0.5 overflow-hidden rounded-full bg-primary/15" aria-hidden="true">
+          <span
+            class="block h-full rounded-full bg-primary"
+            :style="{ width: `${activePlaybackProgressValue}%` }"
+          />
+        </span>
+      </RouterLink>
+    </section>
 
     <section
       v-if="!props.compact"

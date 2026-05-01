@@ -23,7 +23,11 @@
     "backendMock": "Demo mode (no API)",
     "backendRecheck": "Recheck backend",
     "actors": "Actors",
-    "trash": "Trash"
+    "trash": "Trash",
+    "continuePlayback": "Continue playing",
+    "continuePlaybackAt": "Last watched at {time}",
+    "continuePlaybackAria": "Return to the player and continue {title} at {time}",
+    "dismissContinuePlayback": "Hide continue playing"
   },
   "actors": {
     "title": "Actors",

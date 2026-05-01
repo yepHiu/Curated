@@ -23,6 +23,11 @@ import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackS
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import {
+  clearActivePlaybackSession,
+  updateActivePlaybackSession,
+  type ActivePlaybackStatus,
+} from "@/composables/use-active-playback-session"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
   buildHlsPlaybackConfig,
@@ -201,6 +206,28 @@ const playbackMuted = ref(initialAudio.muted)
 const pipSupported = ref(false)
 const isPipActive = ref(false)
 const isSurfaceFullscreen = ref(false)
+
+function resolveActivePlaybackStatus(statusOverride?: ActivePlaybackStatus): ActivePlaybackStatus {
+  if (statusOverride) return statusOverride
+  if (playbackError.value) return "error"
+  if (isPlaybackWaiting.value) return "waiting"
+  return isPlaying.value ? "playing" : "paused"
+}
+
+function publishActivePlaybackSession(statusOverride?: ActivePlaybackStatus) {
+  const movieId = props.movie.id.trim()
+  if (!movieId || !playbackSrc.value) return
+  updateActivePlaybackSession({
+    movieId,
+    title: props.movie.title || props.movie.code || movieId,
+    positionSec: currentTime.value,
+    durationSec: resolveTotalDurationSec(playbackDescriptor.value, duration.value),
+    status: resolveActivePlaybackStatus(statusOverride),
+    routeQuery: route.query,
+    routeHash: route.hash,
+    posterUrl: props.movie.thumbUrl ?? props.movie.coverUrl,
+  })
+}
 
 function refreshPipSupport() {
   try {
@@ -626,6 +653,7 @@ async function loadPlayback() {
     void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
+    publishActivePlaybackSession("paused")
     const fallbackReason = descriptor?.reason?.trim() || ""
     const fallbackKey = `${movieId}:${descriptor?.mode ?? ""}:${fallbackReason}`
     if (
@@ -702,6 +730,7 @@ function flushPlaybackProgress() {
   if (!Number.isFinite(pos) || pos < 0) return
   saveProgress(props.movie.id, pos, dur)
   recordMoviePlayed(props.movie.id)
+  publishActivePlaybackSession()
 }
 
 function stripTFromRoute() {
@@ -846,6 +875,7 @@ function onTimeUpdate() {
   if (v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
     isPlaybackWaiting.value = false
   }
+  publishActivePlaybackSession()
   const now = Date.now()
   if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
   lastProgressSaveAt = now
@@ -866,6 +896,7 @@ function onLoadedMetadata() {
   v.muted = playbackMuted.value
   syncBufferedRangeFromVideo()
   flushScheduledPlaybackSessionCleanup()
+  publishActivePlaybackSession()
 
   const fromQuery = parseResumeSecondsFromQuery(route.query.t)
   const targetSec = resolvePreferredPlaybackTargetSec(
@@ -1058,11 +1089,13 @@ function onPlay() {
   isPlaying.value = true
   markPlaybackReady()
   startFpsTracking()
+  publishActivePlaybackSession("playing")
 }
 
 function onPause() {
   isPlaying.value = false
   flushPlaybackProgress()
+  publishActivePlaybackSession("paused")
 }
 
 async function terminateActiveHlsPlaybackSession(reason?: string) {
@@ -1086,6 +1119,7 @@ function onVideoEnded() {
   flushPlaybackProgress()
   isPlaying.value = false
   markPlaybackReady()
+  clearActivePlaybackSession(props.movie.id)
   void terminateActiveHlsPlaybackSession("HLS session closed after playback ended")
 }
 
@@ -1093,6 +1127,7 @@ function onVideoError() {
   stopFpsTracking()
   optimisticSeekTargetSec.value = null
   isPlaybackWaiting.value = false
+  clearActivePlaybackSession(props.movie.id)
   const v = videoRef.value
   if (playbackDescriptor.value?.mode === "hls") {
     void fallbackHlsToDirect("video element failed while playing HLS")
@@ -1189,22 +1224,26 @@ function seekDelta(deltaSec: number) {
 function onVideoWaiting() {
   if (!playbackSrc.value) return
   isPlaybackWaiting.value = true
+  publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeking() {
   if (!playbackSrc.value) return
   isPlaybackWaiting.value = true
+  publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeked() {
   currentTime.value = getAbsolutePlaybackTime()
   syncBufferedRangeFromVideo()
   markPlaybackReady()
+  publishActivePlaybackSession()
 }
 
 function onVideoLoadedData() {
   syncBufferedRangeFromVideo()
   markPlaybackReady()
+  publishActivePlaybackSession()
   void tryStartPlaybackIfRequested()
 }
 
