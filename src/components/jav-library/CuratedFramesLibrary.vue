@@ -6,9 +6,7 @@ import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
   Camera,
-  CheckSquare,
   Download,
-  ListChecks,
   PlayCircle,
   Plus,
   Trash2,
@@ -20,6 +18,7 @@ import CuratedFrameTimelineTab from "@/components/jav-library/CuratedFrameTimeli
 import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
 import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
 import CuratedFrameTagFilterBar from "@/components/jav-library/CuratedFrameTagFilterBar.vue"
+import CuratedFrameLibraryToolbar from "@/components/jav-library/CuratedFrameLibraryToolbar.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -30,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
 import {
   getCuratedFrameSearchQuery,
@@ -1139,56 +1138,16 @@ defineExpose({
       v-model="mainTab"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
     >
-      <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
-            <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
-            <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
-            <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
-          </TabsList>
-          <p class="text-xs text-muted-foreground">
-            {{ t("curated.pageSummary", { shown: rawRows.length, total: totalRows }) }}
-          </p>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
-          <template v-if="!batchMode">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              class="gap-1.5 rounded-xl"
-              @click="batchMode = true"
-            >
-              <ListChecks class="size-4 opacity-80" aria-hidden="true" />
-              {{ t("library.batchManage") }}
-            </Button>
-          </template>
-          <template v-else>
-            <Button
-              v-if="batchShowSelectVisible"
-              type="button"
-              variant="outline"
-              size="sm"
-              class="gap-1.5 rounded-xl"
-              :disabled="listWithUrls.length === 0"
-              @click="selectAllVisibleUpTo20"
-            >
-              <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
-              {{ t("library.batchSelectVisible") }}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              @click="exitBatchMode"
-            >
-              <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-              {{ t("library.batchExitToolbar") }}
-            </Button>
-          </template>
-        </div>
-      </div>
+      <CuratedFrameLibraryToolbar
+        :shown-count="rawRows.length"
+        :total-rows="totalRows"
+        :batch-mode="batchMode"
+        :show-select-visible="batchShowSelectVisible"
+        :select-visible-disabled="listWithUrls.length === 0"
+        @enter-batch-mode="batchMode = true"
+        @select-visible="selectAllVisibleUpTo20"
+        @exit-batch-mode="exitBatchMode"
+      />
 
       <CuratedFrameTagFilterBar
         :facets="curatedTagFacets"
