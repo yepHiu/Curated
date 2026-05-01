@@ -69,6 +69,9 @@ func TestBatchMoviePosterLocalReady_UnderCacheDir(t *testing.T) {
 	if !f.Cover || f.Thumb {
 		t.Fatalf("flags = %+v, want Cover=true Thumb=false", f)
 	}
+	if f.CoverVersion == "" {
+		t.Fatalf("CoverVersion is empty, want local asset cache-busting version")
+	}
 
 	f2, err := store.OpenMovieAssetFile(ctx, outcome.MovieID, "cover", cacheDir)
 	if err != nil {
@@ -190,6 +193,9 @@ func TestRewritePreviewImageURLsPreferLocal(t *testing.T) {
 	if !strings.Contains(out[0], "/asset/preview/1") {
 		t.Fatalf("slot 0 want local API path: %q", out[0])
 	}
+	if !strings.Contains(out[0], "?v=") {
+		t.Fatalf("slot 0 local API path should include cache-busting version: %q", out[0])
+	}
 	if out[0] == p1 {
 		t.Fatalf("slot 0 should not stay remote: %q", out[0])
 	}
@@ -254,8 +260,11 @@ func TestOpenActorAvatarFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("batch actor avatar: %v", err)
 	}
-	if !ready["Alice"] {
+	if !ready["Alice"].Ready {
 		t.Fatal("expected actor avatar to be locally ready")
+	}
+	if ready["Alice"].Version == "" {
+		t.Fatal("expected actor avatar local version")
 	}
 	f, err := store.OpenActorAvatarFile(ctx, "Alice", cacheDir)
 	if err != nil {

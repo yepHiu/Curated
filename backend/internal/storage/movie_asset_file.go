@@ -21,8 +21,10 @@ var (
 
 // MoviePosterLocalFlags reports which poster assets exist on disk and pass path policy checks.
 type MoviePosterLocalFlags struct {
-	Cover bool
-	Thumb bool
+	Cover        bool
+	CoverVersion string
+	Thumb        bool
+	ThumbVersion string
 }
 
 // posterPathPolicy is resolved once per batch or per HTTP request; must not be recomputed per media_assets row.
@@ -63,23 +65,35 @@ func (s *SQLiteStore) loadPosterPathPolicy(ctx context.Context, cacheDir string)
 	return p
 }
 
-func mediaAssetPathAllowedWithPolicy(absPath string, policy posterPathPolicy) bool {
+func localAssetVersionFromStat(st os.FileInfo) string {
+	if st == nil {
+		return ""
+	}
+	return strconv.FormatInt(st.ModTime().UTC().UnixNano(), 10) + "-" + strconv.FormatInt(st.Size(), 10)
+}
+
+func mediaAssetFileInfoAllowedWithPolicy(absPath string, policy posterPathPolicy) (os.FileInfo, bool) {
 	if policy.cacheAbs == "" && len(policy.rootAbs) == 0 {
-		return false
+		return nil, false
 	}
 	st, err := os.Stat(absPath)
 	if err != nil || !st.Mode().IsRegular() {
-		return false
+		return nil, false
 	}
 	if policy.cacheAbs != "" && pathUnderLibraryRoot(absPath, policy.cacheAbs) {
-		return true
+		return st, true
 	}
 	for _, r := range policy.rootAbs {
 		if pathUnderLibraryRoot(absPath, r) {
-			return true
+			return st, true
 		}
 	}
-	return false
+	return nil, false
+}
+
+func mediaAssetPathAllowedWithPolicy(absPath string, policy posterPathPolicy) bool {
+	_, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+	return ok
 }
 
 // mediaAssetPathAllowed reports whether absPath is a regular file under cacheDir or any library root.
@@ -125,15 +139,19 @@ func (s *SQLiteStore) BatchMoviePosterLocalReady(ctx context.Context, movieIDs [
 		if err != nil {
 			continue
 		}
-		if !mediaAssetPathAllowedWithPolicy(absPath, policy) {
+		st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+		if !ok {
 			continue
 		}
+		version := localAssetVersionFromStat(st)
 		flags := out[movieID]
 		switch assetType {
 		case "cover":
 			flags.Cover = true
+			flags.CoverVersion = version
 		case "thumb":
 			flags.Thumb = true
+			flags.ThumbVersion = version
 		}
 		out[movieID] = flags
 	}
@@ -261,10 +279,15 @@ func (s *SQLiteStore) RewritePreviewImageURLsPreferLocal(ctx context.Context, mo
 		if err != nil {
 			continue
 		}
-		if !mediaAssetPathAllowedWithPolicy(absPath, policy) {
+		st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+		if !ok {
 			continue
 		}
-		out[i] = "/api/library/movies/" + enc + "/asset/preview/" + strconv.Itoa(i+1)
+		localURL := "/api/library/movies/" + enc + "/asset/preview/" + strconv.Itoa(i+1)
+		if version := localAssetVersionFromStat(st); version != "" {
+			localURL += "?v=" + url.QueryEscape(version)
+		}
+		out[i] = localURL
 	}
 	return out
 }

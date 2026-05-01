@@ -16,22 +16,30 @@ import (
 	"curated-backend/internal/storage"
 )
 
-func posterLocalAPIPath(movieID, kind string) string {
-	return "/api/library/movies/" + url.PathEscape(movieID) + "/asset/" + kind
+func posterLocalAPIPath(movieID, kind, version string) string {
+	p := "/api/library/movies/" + url.PathEscape(movieID) + "/asset/" + kind
+	if version = strings.TrimSpace(version); version != "" {
+		p += "?v=" + url.QueryEscape(version)
+	}
+	return p
 }
 
 func applyLocalPosterURLs(item *contracts.MovieListItemDTO, flags storage.MoviePosterLocalFlags) {
 	if flags.Thumb {
-		item.ThumbURL = posterLocalAPIPath(item.ID, "thumb")
+		item.ThumbURL = posterLocalAPIPath(item.ID, "thumb", flags.ThumbVersion)
 	} else if flags.Cover {
-		item.ThumbURL = posterLocalAPIPath(item.ID, "cover")
+		item.ThumbURL = posterLocalAPIPath(item.ID, "cover", flags.CoverVersion)
 	}
 
 	if flags.Cover {
-		item.CoverURL = posterLocalAPIPath(item.ID, "cover")
+		item.CoverURL = posterLocalAPIPath(item.ID, "cover", flags.CoverVersion)
 	} else if flags.Thumb {
-		item.CoverURL = posterLocalAPIPath(item.ID, "thumb")
+		item.CoverURL = posterLocalAPIPath(item.ID, "thumb", flags.ThumbVersion)
 	}
+}
+
+func setReusableLocalImageCacheHeaders(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "private, max-age=604800, immutable")
 }
 
 func (h *Handler) enrichMovieListItemsLocalPosters(ctx context.Context, items []contracts.MovieListItemDTO) {
@@ -113,8 +121,7 @@ func (h *Handler) handleGetMovieAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := kind + pickImageExtFromPath(f.Name())
-	// Same URL after rescrape must revalidate: browsers otherwise keep stale bytes (paths are stable).
-	w.Header().Set("Cache-Control", "private, no-cache")
+	setReusableLocalImageCacheHeaders(w)
 	http.ServeContent(w, r, name, st.ModTime(), f)
 }
 
@@ -163,7 +170,7 @@ func (h *Handler) handleGetMoviePreviewAsset(w http.ResponseWriter, r *http.Requ
 	}
 
 	name := "preview-" + strconv.Itoa(seq) + pickImageExtFromPath(f.Name())
-	w.Header().Set("Cache-Control", "private, no-cache")
+	setReusableLocalImageCacheHeaders(w)
 	http.ServeContent(w, r, name, st.ModTime(), f)
 }
 

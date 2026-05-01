@@ -548,6 +548,60 @@ describe("webLibraryService reloadMoviesFromApi", () => {
 })
 
 describe("webLibraryService loading", () => {
+  it("marks the movie list loaded after the first page while remaining pages continue in the background", async () => {
+    let resolveSecondPage: (value: {
+      items: MovieListItemDTO[]
+      total: number
+      limit: number
+      offset: number
+    }) => void
+    const secondPage = new Promise<{
+      items: MovieListItemDTO[]
+      total: number
+      limit: number
+      offset: number
+    }>((resolve) => {
+      resolveSecondPage = resolve
+    })
+
+    apiMocks.listMovies
+      .mockResolvedValueOnce({
+        items: [movieListDto("movie-1")],
+        total: 2,
+        limit: 500,
+        offset: 0,
+      })
+      .mockReturnValueOnce(secondPage)
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+
+    expect(apiMocks.listMovies).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ limit: 500, offset: 0 }),
+    )
+    expect(apiMocks.listMovies).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ limit: 500, offset: 1 }),
+    )
+    expect(webLibraryService.moviesLoaded.value).toBe(true)
+    expect(webLibraryService.movies.value.map((movie) => movie.id)).toEqual(["movie-1"])
+
+    resolveSecondPage!({
+      items: [movieListDto("movie-2")],
+      total: 2,
+      limit: 500,
+      offset: 1,
+    })
+    await flushPromises()
+
+    expect(webLibraryService.movies.value.map((movie) => movie.id)).toEqual([
+      "movie-1",
+      "movie-2",
+    ])
+    expect(webLibraryService.loadError.value).toBeNull()
+  })
+
   it("loads all movie list pages on first initialization", async () => {
     apiMocks.listMovies
       .mockResolvedValueOnce({

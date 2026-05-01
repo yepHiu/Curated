@@ -429,9 +429,15 @@ func (s *SQLiteStore) GetActorAvatarSource(ctx context.Context, actorName string
 	}
 }
 
+// ActorAvatarLocalStatus reports whether an actor avatar exists on disk and the URL version for that file.
+type ActorAvatarLocalStatus struct {
+	Ready   bool
+	Version string
+}
+
 // BatchActorAvatarLocalReady returns which actor names have a cached avatar file on disk within allowed paths.
-func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string) (map[string]bool, error) {
-	out := make(map[string]bool, len(actorNames))
+func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames []string, cacheDir string) (map[string]ActorAvatarLocalStatus, error) {
+	out := make(map[string]ActorAvatarLocalStatus, len(actorNames))
 	if len(actorNames) == 0 {
 		return out, nil
 	}
@@ -469,10 +475,14 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 		if err != nil {
 			continue
 		}
-		if !mediaAssetPathAllowedWithPolicy(absPath, policy) {
+		st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+		if !ok {
 			continue
 		}
-		out[name] = true
+		out[name] = ActorAvatarLocalStatus{
+			Ready:   true,
+			Version: localAssetVersionFromStat(st),
+		}
 	}
 	return out, rows.Err()
 }

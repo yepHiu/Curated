@@ -90,6 +90,10 @@ const pendingMovieDetailLoads = new Map<string, Promise<Movie | undefined>>()
 const LIST_BATCH_SIZE = 500
 const MAX_MOVIES_PREFETCH = 10_000
 
+type FetchPagedMoviesOptions = {
+  onFirstPage?: (movies: Movie[]) => void
+}
+
 function mapLibraryPathsFromSettings(
   paths: { id: string; path: string; title: string; firstLibraryScanPending?: boolean }[],
 ): LibrarySetting[] {
@@ -101,9 +105,13 @@ function mapLibraryPathsFromSettings(
   }))
 }
 
-async function fetchPagedMovies(mode?: "trash"): Promise<Movie[]> {
+async function fetchPagedMovies(
+  mode?: "trash",
+  options: FetchPagedMoviesOptions = {},
+): Promise<Movie[]> {
   const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0, mode })
   const all: Movie[] = first.items.map(mapMovieListItem)
+  options.onFirstPage?.([...all])
   let offset = all.length
   const { total } = first
 
@@ -124,7 +132,13 @@ function loadActiveMovies(): Promise<Movie[]> {
   if (activeMoviesPromise) {
     return activeMoviesPromise
   }
-  activeMoviesPromise = fetchPagedMovies().finally(() => {
+  activeMoviesPromise = fetchPagedMovies(undefined, {
+    onFirstPage(movies) {
+      moviesState.value = movies
+      moviesLoadedState.value = true
+      loadErrorState.value = null
+    },
+  }).finally(() => {
     activeMoviesPromise = null
   })
   return activeMoviesPromise
@@ -134,7 +148,12 @@ function loadTrashedMovies(): Promise<Movie[]> {
   if (trashedMoviesPromise) {
     return trashedMoviesPromise
   }
-  trashedMoviesPromise = fetchPagedMovies("trash").finally(() => {
+  trashedMoviesPromise = fetchPagedMovies("trash", {
+    onFirstPage(movies) {
+      trashedMoviesState.value = movies
+      loadErrorState.value = null
+    },
+  }).finally(() => {
     trashedMoviesPromise = null
   })
   return trashedMoviesPromise
