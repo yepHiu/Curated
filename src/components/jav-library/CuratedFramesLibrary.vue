@@ -16,6 +16,7 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import CuratedFrameCard from "@/components/jav-library/CuratedFrameCard.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -715,6 +716,18 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   dialogOpen.value = true
 }
 
+function openFrameCardDialog(item: RowWithUrl, fromActorSection?: string) {
+  openDialog(item, fromActorSection ?? null)
+}
+
+function onFrameCardContextMenu(
+  event: MouseEvent,
+  item: RowWithUrl,
+  fromActorSection?: string,
+) {
+  onFrameContextMenu(event, item, fromActorSection ?? null)
+}
+
 watch(
   dialogTags,
   (nextTags) => {
@@ -1297,54 +1310,19 @@ defineExpose({
         <div
           class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
         >
-          <div
+          <CuratedFrameCard
             v-for="item in listWithUrls"
             :key="item.row.id"
-            class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-            :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-          >
-            <label
-              v-if="batchMode"
-              class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-              :title="t('curated.exportToggleAria')"
-              @click.stop
-            >
-              <input
-                type="checkbox"
-                class="size-4 cursor-pointer rounded accent-primary"
-                :checked="isFrameSelected(item.row.id)"
-                :aria-label="t('curated.exportToggleAria')"
-                @change="toggleFrameSelection(item.row.id)"
-              />
-            </label>
-            <span
-              v-if="isNearDuplicateFrame(item.row.id)"
-              class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-            >
-              {{ t("curated.duplicateReviewBadge") }}
-            </span>
-            <button
-              type="button"
-              class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              @contextmenu.prevent="onFrameContextMenu($event, item)"
-              @click="openDialog(item)"
-            >
-              <div class="relative aspect-video w-full bg-black/80">
-                <img
-                  :src="item.url"
-                  :alt="item.row.code"
-                  class="h-full w-full object-contain"
-                  loading="lazy"
-                />
-              </div>
-              <div class="space-y-1 p-3">
-                <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                </p>
-              </div>
-            </button>
-          </div>
+            :row="item.row"
+            :image-url="item.url"
+            :position-label="formatClock(item.row.positionSec)"
+            :batch-mode="batchMode"
+            :selected="isFrameSelected(item.row.id)"
+            :near-duplicate="isNearDuplicateFrame(item.row.id)"
+            @toggle-selection="toggleFrameSelection"
+            @contextmenu="onFrameCardContextMenu($event, item)"
+            @open="openFrameCardDialog(item)"
+          />
         </div>
       </TabsContent>
 
@@ -1379,51 +1357,17 @@ defineExpose({
               <div
                 v-for="item in items"
                 :key="`${actor}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-              >
-                <label
-                  v-if="batchMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-                  :title="t('curated.exportToggleAria')"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    class="size-4 cursor-pointer rounded accent-primary"
-                    :checked="isFrameSelected(item.row.id)"
-                    :aria-label="t('curated.exportToggleAria')"
-                    @change="toggleFrameSelection(item.row.id, actor)"
-                  />
-                </label>
-                <span
-                  v-if="isNearDuplicateFrame(item.row.id)"
-                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-                >
-                  {{ t("curated.duplicateReviewBadge") }}
-                </span>
-                <button
-                  type="button"
-                  class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @contextmenu.prevent="onFrameContextMenu($event, item, actor)"
-                  @click="openDialog(item, actor)"
-                >
-                  <div class="relative aspect-video w-full bg-black/80">
-                    <img
-                      :src="item.url"
-                      :alt="item.row.code"
-                      class="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div class="space-y-1 p-3">
-                    <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                    </p>
-                  </div>
-                </button>
-              </div>
+                :row="item.row"
+                :image-url="item.url"
+                :position-label="formatClock(item.row.positionSec)"
+                :batch-mode="batchMode"
+                :selected="isFrameSelected(item.row.id)"
+                :near-duplicate="isNearDuplicateFrame(item.row.id)"
+                :section-actor="actor"
+                @toggle-selection="toggleFrameSelection"
+                @contextmenu="onFrameCardContextMenu($event, item, actor)"
+                @open="openFrameCardDialog(item, actor)"
+              />
             </div>
           </section>
         </div>
@@ -1471,51 +1415,16 @@ defineExpose({
               <div
                 v-for="item in g.items"
                 :key="`${g.movieKey}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-              >
-                <label
-                  v-if="batchMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-                  :title="t('curated.exportToggleAria')"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    class="size-4 cursor-pointer rounded accent-primary"
-                    :checked="isFrameSelected(item.row.id)"
-                    :aria-label="t('curated.exportToggleAria')"
-                    @change="toggleFrameSelection(item.row.id)"
-                  />
-                </label>
-                <span
-                  v-if="isNearDuplicateFrame(item.row.id)"
-                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-                >
-                  {{ t("curated.duplicateReviewBadge") }}
-                </span>
-                <button
-                  type="button"
-                  class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @contextmenu.prevent="onFrameContextMenu($event, item)"
-                  @click="openDialog(item)"
-                >
-                  <div class="relative aspect-video w-full bg-black/80">
-                    <img
-                      :src="item.url"
-                      :alt="item.row.code"
-                      class="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div class="space-y-1 p-3">
-                    <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                    </p>
-                  </div>
-                </button>
-              </div>
+                :row="item.row"
+                :image-url="item.url"
+                :position-label="formatClock(item.row.positionSec)"
+                :batch-mode="batchMode"
+                :selected="isFrameSelected(item.row.id)"
+                :near-duplicate="isNearDuplicateFrame(item.row.id)"
+                @toggle-selection="toggleFrameSelection"
+                @contextmenu="onFrameCardContextMenu($event, item)"
+                @open="openFrameCardDialog(item)"
+              />
             </div>
           </section>
         </div>
