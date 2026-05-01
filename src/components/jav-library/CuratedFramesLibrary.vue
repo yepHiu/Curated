@@ -5,7 +5,6 @@ import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
-  Camera,
   Download,
   PlayCircle,
   Plus,
@@ -20,6 +19,7 @@ import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTa
 import CuratedFrameTagFilterBar from "@/components/jav-library/CuratedFrameTagFilterBar.vue"
 import CuratedFrameLibraryToolbar from "@/components/jav-library/CuratedFrameLibraryToolbar.vue"
 import CuratedFrameDeleteConfirmDialog from "@/components/jav-library/CuratedFrameDeleteConfirmDialog.vue"
+import CuratedFrameEmptyState from "@/components/jav-library/CuratedFrameEmptyState.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -1123,13 +1123,11 @@ defineExpose({
       </div>
     </div>
 
-    <div
+    <CuratedFrameEmptyState
       v-if="isLibraryEmpty"
-      class="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-16 text-center"
-    >
-      <Camera class="size-12 text-muted-foreground" />
-      <p class="text-sm text-muted-foreground">{{ t("curated.empty") }}</p>
-    </div>
+      variant="library"
+      :show-clear-filter="false"
+    />
 
     <Tabs
       v-else
@@ -1161,23 +1159,12 @@ defineExpose({
       <div
         class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
       >
-      <div
+      <CuratedFrameEmptyState
         v-if="isFilteredEmpty"
-        class="mb-4 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-12 text-center"
-      >
-        <Camera class="size-10 text-muted-foreground" />
-        <p class="text-sm text-muted-foreground">{{ t("curated.tagFilterNoMatches") }}</p>
-        <Button
-          v-if="activeTagFilter"
-          type="button"
-          variant="outline"
-          size="sm"
-          class="rounded-2xl"
-          @click="setCuratedFrameTagFilter(undefined)"
-        >
-          {{ t("curated.tagFilterAll") }}
-        </Button>
-      </div>
+        variant="filtered"
+        :show-clear-filter="Boolean(activeTagFilter)"
+        @clear-filter="setCuratedFrameTagFilter(undefined)"
+      />
       <TabsContent value="timeline" class="mt-0 outline-none">
         <CuratedFrameTimelineTab
           :items="listWithUrls"
