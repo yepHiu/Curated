@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import CuratedFrameGrid from "@/components/jav-library/CuratedFrameGrid.vue"
 import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
+import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -189,24 +190,6 @@ function selectAllInMovieSection(movieKey: string) {
   namedActorForExport.value = null
 }
 
-function getCappedUniqueIdsForGroupItems(items: RowWithUrl[]): string[] {
-  return [...new Set(items.map((x) => x.row.id))].slice(0, batchExportMax)
-}
-
-/** 分组头勾选：与「全选本组」一致，按导出上限截断 */
-function isGroupHeaderFullySelected(items: RowWithUrl[]): boolean {
-  const target = getCappedUniqueIdsForGroupItems(items)
-  if (target.length === 0) {
-    return false
-  }
-  const sel = selectedFrameIds.value
-  if (sel.length !== target.length) {
-    return false
-  }
-  const tset = new Set(target)
-  return sel.every((id) => tset.has(id))
-}
-
 /** 取消分组头勾选后，在「按演员」下根据仍选中的 id 推断导出桶 */
 function reconcileActorsTabExportBucket() {
   if (mainTab.value !== "actors") {
@@ -245,8 +228,11 @@ function onActorGroupHeaderSelectionChange(
   }
 }
 
-function onMovieGroupHeaderCheckboxChange(movieKey: string, items: RowWithUrl[], ev: Event) {
-  const checked = (ev.target as HTMLInputElement).checked
+function onMovieGroupHeaderSelectionChange(
+  movieKey: string,
+  items: readonly RowWithUrl[],
+  checked: boolean,
+) {
   exportToolbarError.value = ""
   if (checked) {
     selectAllInMovieSection(movieKey)
@@ -1335,52 +1321,18 @@ defineExpose({
       </TabsContent>
 
       <TabsContent value="movies" class="mt-0 outline-none">
-        <div class="flex flex-col gap-8">
-          <section v-for="g in movieGroups" :key="g.movieKey">
-            <div class="mb-3">
-              <label
-                v-if="batchMode"
-                class="flex cursor-pointer items-start gap-2.5"
-              >
-                <input
-                  type="checkbox"
-                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
-                  :disabled="g.items.length === 0"
-                  :checked="isGroupHeaderFullySelected(g.items)"
-                  :aria-label="t('curated.batchSelectMovieGroup')"
-                  @change="onMovieGroupHeaderCheckboxChange(g.movieKey, g.items, $event)"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="block text-lg font-semibold leading-snug">{{ g.heading }}</span>
-                  <p
-                    v-if="g.sub"
-                    class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
-                  >
-                    {{ g.sub }}
-                  </p>
-                </span>
-              </label>
-              <template v-else>
-                <h2 class="text-lg font-semibold">{{ g.heading }}</h2>
-                <p
-                  v-if="g.sub"
-                  class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
-                >
-                  {{ g.sub }}
-                </p>
-              </template>
-            </div>
-            <CuratedFrameGrid
-              :items="g.items"
-              :batch-mode="batchMode"
-              :selected-ids="selectedFrameIds"
-              :near-duplicate-ids="nearDuplicateFrameIdList"
-              @toggle-selection="toggleFrameSelection"
-              @contextmenu="onFrameCardContextMenu"
-              @open="openFrameCardDialog"
-            />
-          </section>
-        </div>
+        <CuratedFrameMoviesTab
+          :movie-groups="movieGroups"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          :select-group-aria-label="t('curated.batchSelectMovieGroup')"
+          :batch-export-max="batchExportMax"
+          @group-selection-change="onMovieGroupHeaderSelectionChange"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
       <div v-if="hasMoreRows" class="flex justify-center py-5">
         <Button
