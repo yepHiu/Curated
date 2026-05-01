@@ -16,7 +16,7 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import CuratedFrameCard from "@/components/jav-library/CuratedFrameCard.vue"
+import CuratedFrameGrid from "@/components/jav-library/CuratedFrameGrid.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -92,10 +92,6 @@ const exportBusy = ref(false)
 const batchDeleteBusy = ref(false)
 const dialogOpenedFromActor = ref<string | null>(null)
 const dialogExportError = ref("")
-
-function isFrameSelected(id: string) {
-  return selectedFrameIds.value.includes(id)
-}
 
 function currentExportSelectionState(): CuratedFrameExportSelectionState {
   return {
@@ -480,6 +476,7 @@ const nearDuplicateGroups = computed(() =>
   findCuratedFrameNearDuplicateGroups(rawRows.value, curatedFrameNearDuplicateThresholdSec),
 )
 const nearDuplicateFrameIds = computed(() => buildCuratedFrameNearDuplicateIndex(nearDuplicateGroups.value))
+const nearDuplicateFrameIdList = computed(() => [...nearDuplicateFrameIds.value])
 const nearDuplicateSummaryGroups = computed(() => nearDuplicateGroups.value.slice(0, 3))
 
 /** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
@@ -1079,10 +1076,6 @@ function formatCapturedAt(iso: string) {
   }
 }
 
-function isNearDuplicateFrame(frameId: string) {
-  return nearDuplicateFrameIds.value.has(frameId)
-}
-
 function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithUrl["row"]>) {
   const lead = group.items[0]
   if (!lead) {
@@ -1091,6 +1084,10 @@ function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithU
   const label = lead.code.trim() || lead.title.trim() || lead.movieId.trim()
   const positions = group.items.map((item) => formatClock(item.positionSec)).join(" / ")
   return `${label} · ${positions}`
+}
+
+function isNearDuplicateFrame(frameId: string) {
+  return nearDuplicateFrameIds.value.has(frameId)
 }
 
 defineExpose({
@@ -1307,23 +1304,15 @@ defineExpose({
         </Button>
       </div>
       <TabsContent value="timeline" class="mt-0 outline-none">
-        <div
-          class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-        >
-          <CuratedFrameCard
-            v-for="item in listWithUrls"
-            :key="item.row.id"
-            :row="item.row"
-            :image-url="item.url"
-            :position-label="formatClock(item.row.positionSec)"
-            :batch-mode="batchMode"
-            :selected="isFrameSelected(item.row.id)"
-            :near-duplicate="isNearDuplicateFrame(item.row.id)"
-            @toggle-selection="toggleFrameSelection"
-            @contextmenu="onFrameCardContextMenu($event, item)"
-            @open="openFrameCardDialog(item)"
-          />
-        </div>
+        <CuratedFrameGrid
+          :items="listWithUrls"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
 
       <TabsContent value="actors" class="mt-0 outline-none">
@@ -1351,24 +1340,16 @@ defineExpose({
                 {{ actor }}
               </h2>
             </div>
-            <div
-              class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-            >
-              <div
-                v-for="item in items"
-                :key="`${actor}-${item.row.id}`"
-                :row="item.row"
-                :image-url="item.url"
-                :position-label="formatClock(item.row.positionSec)"
-                :batch-mode="batchMode"
-                :selected="isFrameSelected(item.row.id)"
-                :near-duplicate="isNearDuplicateFrame(item.row.id)"
-                :section-actor="actor"
-                @toggle-selection="toggleFrameSelection"
-                @contextmenu="onFrameCardContextMenu($event, item, actor)"
-                @open="openFrameCardDialog(item, actor)"
-              />
-            </div>
+            <CuratedFrameGrid
+              :items="items"
+              :batch-mode="batchMode"
+              :selected-ids="selectedFrameIds"
+              :near-duplicate-ids="nearDuplicateFrameIdList"
+              :section-actor="actor"
+              @toggle-selection="toggleFrameSelection"
+              @contextmenu="onFrameCardContextMenu"
+              @open="openFrameCardDialog"
+            />
           </section>
         </div>
       </TabsContent>
@@ -1409,23 +1390,15 @@ defineExpose({
                 </p>
               </template>
             </div>
-            <div
-              class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-            >
-              <div
-                v-for="item in g.items"
-                :key="`${g.movieKey}-${item.row.id}`"
-                :row="item.row"
-                :image-url="item.url"
-                :position-label="formatClock(item.row.positionSec)"
-                :batch-mode="batchMode"
-                :selected="isFrameSelected(item.row.id)"
-                :near-duplicate="isNearDuplicateFrame(item.row.id)"
-                @toggle-selection="toggleFrameSelection"
-                @contextmenu="onFrameCardContextMenu($event, item)"
-                @open="openFrameCardDialog(item)"
-              />
-            </div>
+            <CuratedFrameGrid
+              :items="g.items"
+              :batch-mode="batchMode"
+              :selected-ids="selectedFrameIds"
+              :near-duplicate-ids="nearDuplicateFrameIdList"
+              @toggle-selection="toggleFrameSelection"
+              @contextmenu="onFrameCardContextMenu"
+              @open="openFrameCardDialog"
+            />
           </section>
         </div>
       </TabsContent>
