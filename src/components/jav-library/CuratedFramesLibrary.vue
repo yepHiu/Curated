@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import CuratedFrameTimelineTab from "@/components/jav-library/CuratedFrameTimelineTab.vue"
 import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
 import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
+import CuratedFrameTagFilterBar from "@/components/jav-library/CuratedFrameTagFilterBar.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
@@ -1189,89 +1190,16 @@ defineExpose({
         </div>
       </div>
 
-      <section
-        class="shrink-0 rounded-3xl border border-border/70 bg-card/85 px-4 py-3 shadow-lg shadow-black/5"
-        :aria-label="t('curated.tagFilterTitle')"
-      >
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {{ t("curated.tagFilterTitle") }}
-            </p>
-            <div v-if="curatedTagFacets.length > 0" class="flex flex-wrap gap-2">
-              <Badge
-                as-child
-                :variant="!activeTagFilter ? 'default' : 'secondary'"
-                :class="[
-                  'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-                  !activeTagFilter
-                    ? 'border-primary/40'
-                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-                ]"
-              >
-                <button
-                  type="button"
-                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-                  :aria-pressed="!activeTagFilter"
-                  :aria-label="t('curated.ariaClearFrameTagFilter')"
-                  @click="setCuratedFrameTagFilter(undefined)"
-                >
-                  {{ t("curated.tagFilterAll") }}
-                </button>
-              </Badge>
-              <Badge
-                v-for="tag in visibleCuratedTagFacets"
-                :key="tag.name"
-                as-child
-                :variant="isCuratedTagFilterActive(tag.name) ? 'default' : 'secondary'"
-                :class="[
-                  'max-w-[14rem] rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-                  isCuratedTagFilterActive(tag.name)
-                    ? 'border-primary/40'
-                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-                ]"
-              >
-                <button
-                  type="button"
-                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-                  :aria-pressed="isCuratedTagFilterActive(tag.name)"
-                  :aria-label="t('curated.ariaFilterFrameTag', { tag: tag.name, count: tag.count })"
-                  @click="toggleCuratedFrameTagFilter(tag.name)"
-                >
-                  <span class="truncate">{{ tag.name }}</span>
-                  <span
-                    class="tabular-nums text-xs opacity-80"
-                    :class="
-                      isCuratedTagFilterActive(tag.name)
-                        ? 'text-primary-foreground/90'
-                        : 'text-muted-foreground'
-                    "
-                  >
-                    · {{ tag.count }}
-                  </span>
-                </button>
-              </Badge>
-            </div>
-            <p v-else class="text-sm text-muted-foreground">
-              {{ t("curated.tagFilterEmpty") }}
-            </p>
-          </div>
-          <Button
-            v-if="hiddenCuratedTagFacetCount > 0"
-            type="button"
-            variant="ghost"
-            size="sm"
-            class="h-8 shrink-0 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-            @click="tagFiltersExpanded = !tagFiltersExpanded"
-          >
-            {{
-              tagFiltersExpanded
-                ? t("curated.tagFilterShowLess")
-                : t("curated.tagFilterShowMore", { count: hiddenCuratedTagFacetCount })
-            }}
-          </Button>
-        </div>
-      </section>
+      <CuratedFrameTagFilterBar
+        :facets="curatedTagFacets"
+        :visible-facets="visibleCuratedTagFacets"
+        :active-tag="activeTagFilter"
+        :hidden-count="hiddenCuratedTagFacetCount"
+        :expanded="tagFiltersExpanded"
+        @clear="setCuratedFrameTagFilter(undefined)"
+        @toggle-tag="toggleCuratedFrameTagFilter"
+        @update-expanded="tagFiltersExpanded = $event"
+      />
 
       <div
         class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
