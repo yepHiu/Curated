@@ -6,7 +6,7 @@ import vueParser from "vue-eslint-parser"
 
 export default [
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**"],
+    ignores: ["dist/**", "coverage/**", "node_modules/**", ".workspace/**", ".local/**"],
   },
   {
     files: ["src/**/*.{ts,vue}"],

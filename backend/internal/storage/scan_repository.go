@@ -12,12 +12,14 @@ import (
 	"curated-backend/internal/library/moviecode"
 )
 
+// ScanPersistOutcome describes the result of persisting a single scanned movie file.
 type ScanPersistOutcome struct {
 	MovieID string
 	Status  string
 	Reason  string
 }
 
+// SaveTask inserts or updates an async task record (scan, scrape, etc.) in scan_jobs.
 func (s *SQLiteStore) SaveTask(ctx context.Context, task contracts.TaskDTO) error {
 	_, err := s.db.ExecContext(
 		ctx,
@@ -48,6 +50,7 @@ func (s *SQLiteStore) SaveTask(ctx context.Context, task contracts.TaskDTO) erro
 	return err
 }
 
+// SaveScanItem inserts or updates a single file scan result row in scan_items.
 func (s *SQLiteStore) SaveScanItem(ctx context.Context, result contracts.ScanFileResultDTO) error {
 	_, err := s.db.ExecContext(
 		ctx,
@@ -74,6 +77,7 @@ func (s *SQLiteStore) SaveScanItem(ctx context.Context, result contracts.ScanFil
 	return err
 }
 
+// PersistScanMovie inserts a new movie or updates location for an existing one, deduplicating by code and path.
 func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.ScanFileResultDTO) (ScanPersistOutcome, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

@@ -1,4 +1,9 @@
 {
+  "app": {
+    "faultTitle": "Curated could not render this page",
+    "faultDescription": "An unexpected page error occurred. Refresh the app or go back and try again.",
+    "reload": "Reload app"
+  },
   "nav": {
     "browse": "Browse",
     "yours": "Yours",
@@ -18,7 +23,11 @@
     "backendMock": "Demo mode (no API)",
     "backendRecheck": "Recheck backend",
     "actors": "Actors",
-    "trash": "Trash"
+    "trash": "Trash",
+    "continuePlayback": "Continue playing",
+    "continuePlaybackAt": "Last watched at {time}",
+    "continuePlaybackAria": "Return to the player and continue {title} at {time}",
+    "dismissContinuePlayback": "Hide continue playing"
   },
   "actors": {
     "title": "Actors",
@@ -183,6 +192,14 @@
     "duplicateReviewBody": "Frames from the same movie within {threshold} seconds are marked here. Review them and delete the extras you do not want.",
     "duplicateReviewBadge": "Possible duplicate",
     "duplicateReviewDialogHint": "This frame is close to other captures from the same movie within {threshold} seconds. Review them before deleting the extras.",
+    "tagFilterTitle": "Tag filter",
+    "tagFilterAll": "All",
+    "tagFilterEmpty": "No frame tags yet. Add tags to frames to filter them here.",
+    "tagFilterNoMatches": "No curated frames match this tag.",
+    "tagFilterShowMore": "More tags ({count} remaining)",
+    "tagFilterShowLess": "Show fewer tags",
+    "ariaFilterFrameTag": "Filter curated frames by tag: {tag}, {count} frames",
+    "ariaClearFrameTagFilter": "Clear curated frame tag filter",
     "tagSaveDirty": "Tag changes are not saved yet.",
     "tagSaveFailed": "Saving tags failed. Draft kept in place.",
     "tagSaveRetry": "Retry save"
@@ -210,6 +227,8 @@
     "tabTop": "Rating",
     "trashEmptyTitle": "Trash is empty",
     "trashEmptyDesc": "Titles you move to trash from the library appear here. You can restore them or delete permanently.",
+    "loadFailed": "Failed to load the library. Ensure the backend is running and try again.",
+    "favoriteToggleFailed": "Failed to update favorite. Try again later.",
     "ariaFilterTag": "Filter by tag {tag}, {count} movies",
     "ariaFilterUserTag": "Filter by user tag {tag}, {count} movies",
     "actorCardTitle": "Actor",
@@ -298,6 +317,40 @@
     "moveUp": "Move up",
     "moveDown": "Move down"
   },
+  "pickDir": {
+    "unsupported": "Cannot read the absolute disk path in this environment. Open the folder in your local file manager and copy the full path into the Absolute path field.",
+    "selected": "Selected folder \"{name}\". The web page cannot read the absolute local path due to browser security limits. Open this folder in your file manager and copy the address-bar path into the Absolute path field above."
+  },
+  "scan": {
+    "statusLabel": "Scan status",
+    "completed": "Scan complete",
+    "finished": "Scan finished",
+    "scanning": "Scanning library",
+    "close": "Close",
+    "processed": "Processed",
+    "newItems": "New",
+    "updated": "Updated",
+    "skipped": "Skipped"
+  },
+  "scanTask": {
+    "fetchFailed": "Failed to fetch scan task status"
+  },
+  "rating": {
+    "ariaLabel": "My rating, half-star steps",
+    "score": "Rate {s}"
+  },
+  "movie": {
+    "expandSummary": "Expand summary",
+    "collapseSummary": "Collapse summary"
+  },
+  "preview": {
+    "title": "{code} Preview",
+    "instructions": "Use arrow keys or side buttons to navigate, Esc to close; click thumbnails to jump.",
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next",
+    "imageOf": "Image {i}"
+  },
   "settings": {
     "language": "Interface language",
     "appearance": "Appearance",
@@ -347,6 +400,7 @@
     "removePathConfirmDesc": "This removes “{title}” from your configuration. Files on disk are not deleted.",
     "removePathConfirmAction": "Remove",
     "removePathConfirmWorking": "Removing…",
+    "removePathFailed": "Failed to remove the library root. Try again later.",
     "includeInMetadataRefresh": "Include \"{title}\" in batch metadata refresh",
     "organizeTitle": "Automated management",
     "organizeDesc": "Provides automated management for your library.",
@@ -651,6 +705,9 @@
     "revealFailGeneric": "Could not open file manager"
   },
   "player": {
+    "loadingTarget": "Loading playback target…",
+    "notFoundTitle": "Player target not found",
+    "notFoundDesc": "This player route points to a movie id that is not available in the current library.",
     "mockNoPlay": "Demo mode cannot play video. Set VITE_USE_WEB_API in .env and connect the backend.",
     "autoplayBlocked": "Autoplay was blocked; click the video or play button again.",
     "decodeError": "This browser cannot decode the format. Try MP4 (H.264 + AAC) or a future desktop player.",
@@ -690,6 +747,8 @@
     "nativeLaunchRequested": "Asked the browser to open {player}.",
     "nativeLaunchStillHere": "If nothing opened, {player} is probably not installed on this computer, or the browser blocked the external-app handoff.",
     "nativeLaunchFailed": "Could not ask the browser to open {player}.",
+    "hideStats": "Hide Detailed Stats",
+    "showStats": "Detailed Stats",
     "preparingPlayback": "Preparing the playback stream…",
     "preparingSeek": "Switching to a new playback window…",
     "buffering": "Buffering playback data…",

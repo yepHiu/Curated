@@ -967,6 +967,111 @@ func TestHandleStreamMovie_NotFoundUnknownMovie(t *testing.T) {
 	}
 }
 
+func TestHandleMovieLocalAssetsUseReusableBrowserCache(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	root := t.TempDir()
+	cacheDir := filepath.Join(root, "cache")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoPath := filepath.Join(root, "CACHE-ASSET.mp4")
+	if err := os.WriteFile(videoPath, []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	coverPath := filepath.Join(cacheDir, "cover.jpg")
+	if err := os.WriteFile(coverPath, []byte("cover"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	previewPath := filepath.Join(cacheDir, "preview.jpg")
+	if err := os.WriteFile(previewPath, []byte("preview"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "t-cache-asset",
+		Path:     videoPath,
+		FileName: "CACHE-ASSET.mp4",
+		Number:   "CACHE-ASSET",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const coverURL = "https://example.test/cover.jpg"
+	const previewURL = "https://example.test/preview.jpg"
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:       outcome.MovieID,
+		Number:        "CACHE-ASSET",
+		Title:         "Cache Asset",
+		CoverURL:      coverURL,
+		PreviewImages: []string{previewURL},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateMediaAssetLocalPath(ctx, outcome.MovieID, "cover", coverURL, coverPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateMediaAssetLocalPath(ctx, outcome.MovieID, "preview_image", previewURL, previewPath); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{CacheDir: cacheDir},
+		Logger: zap.NewNop(),
+		Store:  store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	for _, path := range []string{
+		"/api/library/movies/" + outcome.MovieID + "/asset/cover",
+		"/api/library/movies/" + outcome.MovieID + "/asset/preview/1",
+	} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200", path, resp.StatusCode)
+		}
+		cacheControl := resp.Header.Get("Cache-Control")
+		if !strings.Contains(cacheControl, "max-age=") || strings.Contains(cacheControl, "no-cache") {
+			t.Fatalf("%s Cache-Control = %q, want reusable private cache", path, cacheControl)
+		}
+	}
+}
+
+func TestApplyLocalPosterURLsIncludesAssetVersion(t *testing.T) {
+	t.Parallel()
+
+	item := contracts.MovieListItemDTO{ID: "movie 1"}
+	applyLocalPosterURLs(&item, storage.MoviePosterLocalFlags{
+		Cover:        true,
+		CoverVersion: "cover-version",
+		Thumb:        true,
+		ThumbVersion: "thumb-version",
+	})
+
+	if !strings.Contains(item.CoverURL, "/api/library/movies/movie%201/asset/cover?v=cover-version") {
+		t.Fatalf("CoverURL = %q, want versioned local cover URL", item.CoverURL)
+	}
+	if !strings.Contains(item.ThumbURL, "/api/library/movies/movie%201/asset/thumb?v=thumb-version") {
+		t.Fatalf("ThumbURL = %q, want versioned local thumb URL", item.ThumbURL)
+	}
+}
+
 func TestHandlePatchMovie_SQLiteFavoriteAndRating(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

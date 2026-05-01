@@ -1,3 +1,4 @@
+// Package config manages application configuration: loading from JSON, build-tag-based defaults, and library-config.cfg merges.
 package config
 
 import (
@@ -10,6 +11,7 @@ import (
 	"time"
 )
 
+// Config holds all application configuration merged from config.yaml and library-config.cfg.
 type Config struct {
 	LogLevel string `json:"logLevel"`
 	// LogDir stores the effective backend log directory. Empty config values are normalized
@@ -57,10 +59,12 @@ type Config struct {
 	Proxy ProxyConfig `json:"proxy,omitempty"`
 }
 
+// TaskConfig holds timeout and concurrency settings for background tasks.
 type TaskConfig struct {
 	ScanTimeoutSeconds int `json:"scanTimeoutSeconds"`
 }
 
+// ScraperConfig holds timeout and concurrency settings for metadata scraping.
 type ScraperConfig struct {
 	RequestTimeoutSeconds int `json:"requestTimeoutSeconds"`
 	TaskTimeoutSeconds    int `json:"taskTimeoutSeconds"`
@@ -68,6 +72,7 @@ type ScraperConfig struct {
 	MaxConcurrent int `json:"maxConcurrent,omitempty"`
 }
 
+// AssetConfig holds timeout and concurrency settings for media asset downloads.
 type AssetConfig struct {
 	RequestTimeoutSeconds int `json:"requestTimeoutSeconds"`
 	TaskTimeoutSeconds    int `json:"taskTimeoutSeconds"`
@@ -77,6 +82,7 @@ type AssetConfig struct {
 	MaxResponseBodyMB int `json:"maxResponseBodyMB,omitempty"`
 }
 
+// PlayerConfig holds all playback-related settings (codecs, external player, HLS streaming).
 type PlayerConfig struct {
 	HardwareDecode bool `json:"hardwareDecode"`
 	// HardwareEncoder sets the preferred hardware encoder order for HLS stream push:
@@ -108,6 +114,7 @@ type PlayerConfig struct {
 	SeekBackwardStepSec int `json:"seekBackwardStepSec,omitempty"`
 }
 
+// ProxyConfig configures outbound HTTP/SOCKS5 proxy for metadata scraping.
 type ProxyConfig struct {
 	// Enabled toggles HTTP proxy for outbound scraper and metadata requests.
 	Enabled bool `json:"enabled"`
@@ -125,6 +132,7 @@ func DefaultHTTPAddr() string {
 	return defaultHTTPAddr()
 }
 
+// Default returns a Config with sensible defaults for all fields.
 func Default() Config {
 	cacheDir := defaultCacheDir()
 	return Config{
@@ -168,6 +176,7 @@ func Default() Config {
 	}
 }
 
+// Load reads a JSON config file, falling back to Default() when path is empty or the file is missing.
 func Load(path string) (Config, error) {
 	cfg := Default()
 	if path == "" {
@@ -299,6 +308,7 @@ func defaultDatabasePath() string {
 	return filepath.FromSlash("backend/runtime/curated.db")
 }
 
+// NormalizeHardwareEncoderPreference validates and lowercases a hardware encoder preference string.
 func NormalizeHardwareEncoderPreference(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "auto":
@@ -310,6 +320,7 @@ func NormalizeHardwareEncoderPreference(value string) string {
 	}
 }
 
+// NormalizeNativePlayerPreset validates and lowercases a native player preset string.
 func NormalizeNativePlayerPreset(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "mpv":
@@ -321,6 +332,7 @@ func NormalizeNativePlayerPreset(value string) string {
 	}
 }
 
+// NormalizeCuratedFrameExportFormat validates a curated frame export format string, defaulting to "jpg".
 func NormalizeCuratedFrameExportFormat(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "webp":

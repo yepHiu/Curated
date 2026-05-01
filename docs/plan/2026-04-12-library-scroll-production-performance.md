@@ -175,9 +175,49 @@ Do not start here unless simpler changes fail.
 - `backend/internal/server/movie_poster_local.go`
   - cache policy for stable local poster assets
 
-## Recommendation to execute next
+## 2026-05-01 Loading Regression Follow-Up
 
-The highest-value first slice is:
+### Additional symptom
+
+Home, the full library page, and navigation into movie detail can feel slower than older builds even when the UI itself is not doing an obviously expensive render.
+
+The slow path is a combination of startup data loading and image revalidation:
+
+- Web mode imports `webLibraryService`, which begins loading the active movie cache immediately.
+- That cache loader pages through the full library in `500` item batches up to `10000` movies.
+- `HomeView` uses `moviesLoaded` to leave the homepage skeleton, so it was waiting for the entire paged prefetch instead of the first usable page.
+- Movie detail can be opened while the full list prefetch is still occupying the API/database path.
+- Local cover, thumb, preview, and actor avatar routes used `Cache-Control: private, no-cache`, so repeated visits still revalidated many stable image URLs.
+- Homepage daily recommendations are cached after generation, but a stale or missing snapshot can still trigger a backend `ListMovies(limit=10000)` candidate pass. That remains a secondary contributor when the daily snapshot regenerates.
+
+### Implemented slice
+
+The first optimization slice landed on 2026-05-01:
+
+- `src/services/adapters/web/web-library-service.ts` now marks the active movie list loaded after the first page is received, then continues loading remaining pages in the background.
+- The full cache is still completed after the remaining pages return, so library-wide search and sort behavior continues to converge to the full local cache.
+- Trash loading uses the same first-page update behavior for its own cache.
+- `backend/internal/server/movie_poster_local.go` now serves movie cover, thumb, and locally cached preview asset responses with reusable private cache headers.
+- `backend/internal/server/actor_avatar_local.go` uses the same reusable cache policy for actor avatars.
+- Local movie image and actor avatar URLs now include a file-version query parameter based on local asset mtime and size, so browsers can reuse stable bytes without pinning stale images after a rescrape or avatar refresh.
+- Existing frontend image versioning remains an additional in-session freshness mechanism after metadata refresh tasks call `bumpMovieImageVersion`.
+- Remote preview proxy fallback responses remain conservative (`private, no-cache`) because those bytes are not guaranteed to be stable local cache files.
+
+### Regression coverage
+
+New tests cover the intended behavior:
+
+- `src/services/adapters/web/web-library-service.test.ts` verifies `moviesLoaded` becomes true after the first page while the next page is still pending, then the cache completes when the background page resolves.
+- `backend/internal/server/server_test.go` verifies local movie cover and preview assets are not served with `no-cache`, include a reusable `max-age`, and local poster URLs include asset versions.
+- `backend/internal/storage/movie_asset_file_test.go` verifies local poster, preview, and actor avatar cache hits expose URL versions.
+
+### Remaining follow-up
+
+If large-library users still report slow first load after this slice, the next step should be server-side pagination, filtering, and sorting for the library route instead of requiring the browser to own a complete `10000` item cache before every workflow is fully accurate.
+
+## Original Scroll Recommendation to Execute Next
+
+For the original scroll blank-gap problem, the highest-value first slice remains:
 
 1. increase virtual scroller headroom
 2. stop treating every library poster as unconditional eager-load

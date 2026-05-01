@@ -1,4 +1,9 @@
 {
+  "app": {
+    "faultTitle": "Curated はこのページを表示できません",
+    "faultDescription": "予期しないページエラーが発生しました。アプリを再読み込みするか、戻ってもう一度お試しください。",
+    "reload": "アプリを再読み込み"
+  },
   "nav": {
     "home": "ホーム",
     "browse": "ブラウズ",
@@ -18,7 +23,11 @@
     "backendMock": "デモ（API なし）",
     "backendRecheck": "再接続を確認",
     "actors": "出演者",
-    "trash": "ゴミ箱"
+    "trash": "ゴミ箱",
+    "continuePlayback": "再生を続ける",
+    "continuePlaybackAt": "{time} まで再生",
+    "continuePlaybackAria": "プレイヤーに戻って「{title}」を {time} から再生します",
+    "dismissContinuePlayback": "再生再開の表示を隠す"
   },
   "actors": {
     "title": "出演者ライブラリ",
@@ -183,6 +192,14 @@
     "duplicateReviewBody": "同じ作品で {threshold} 秒以内のフレームをここでマークしています。内容を確認して不要なものを削除してください。",
     "duplicateReviewBadge": "重複候補",
     "duplicateReviewDialogHint": "このフレームは同じ作品の他の萃取フレームと {threshold} 秒以内で近接しています。確認して不要なものを削除してください。",
+    "tagFilterTitle": "タグフィルター",
+    "tagFilterAll": "すべて",
+    "tagFilterEmpty": "キュレートフレームのタグはまだありません。タグを追加するとここで絞り込めます。",
+    "tagFilterNoMatches": "このタグに一致するキュレートフレームはありません。",
+    "tagFilterShowMore": "さらにタグを表示（残り {count} 件）",
+    "tagFilterShowLess": "タグを折りたたむ",
+    "ariaFilterFrameTag": "キュレートフレームをタグで絞り込み：{tag}、{count} 枚",
+    "ariaClearFrameTagFilter": "キュレートフレームのタグフィルターを解除",
     "tagSaveDirty": "タグの変更はまだ保存されていません。",
     "tagSaveFailed": "タグの保存に失敗しました。下書きは保持されています。",
     "tagSaveRetry": "再保存"
@@ -210,6 +227,8 @@
     "tabTop": "評価",
     "trashEmptyTitle": "ゴミ箱は空です",
     "trashEmptyDesc": "ライブラリからゴミ箱に移した作品がここに表示されます。復元するか完全削除できます。",
+    "loadFailed": "ライブラリの読み込みに失敗しました。バックエンドを確認して再試行してください。",
+    "favoriteToggleFailed": "お気に入りの更新に失敗しました。後でもう一度お試しください。",
     "ariaFilterTag": "タグで絞り込み：{tag}、{count} 作品",
     "ariaFilterUserTag": "ユーザータグで絞り込み：{tag}、{count} 作品",
     "actorCardTitle": "出演者",
@@ -298,6 +317,40 @@
     "moveUp": "上へ",
     "moveDown": "下へ"
   },
+  "pickDir": {
+    "unsupported": "現在の環境ではディスクの絶対パスを自動で読み取れません。ローカルのファイルマネージャーでこのフォルダーを開き、アドレスバーの完全なパスを「絶対パス」入力欄へコピーしてください。",
+    "selected": "フォルダー「{name}」を選択しました。ブラウザーのセキュリティ制限により、Web ページからローカルの絶対パスは読み取れません。ファイルマネージャーでこのフォルダーを開き、アドレスバーのパスを上の「絶対パス」欄へコピーしてください。"
+  },
+  "scan": {
+    "statusLabel": "スキャン状態",
+    "completed": "スキャン完了",
+    "finished": "スキャン終了",
+    "scanning": "ライブラリをスキャン中",
+    "close": "閉じる",
+    "processed": "処理済み",
+    "newItems": "新規",
+    "updated": "更新",
+    "skipped": "スキップ"
+  },
+  "scanTask": {
+    "fetchFailed": "スキャンタスクの状態を取得できません"
+  },
+  "rating": {
+    "ariaLabel": "自分の評価、半星ステップ",
+    "score": "{s}点を付ける"
+  },
+  "movie": {
+    "expandSummary": "概要を展開",
+    "collapseSummary": "概要を折りたたむ"
+  },
+  "preview": {
+    "title": "{code} プレビュー",
+    "instructions": "矢印キーまたは左右のボタンで画像を切り替え、Esc で閉じます。下のサムネイルをクリックして移動できます。",
+    "close": "閉じる",
+    "previous": "前へ",
+    "next": "次へ",
+    "imageOf": "{i}枚目"
+  },
   "settings": {
     "language": "表示言語",
     "appearance": "外観",
@@ -347,6 +400,7 @@
     "removePathConfirmDesc": "構成から「{title}」を外します。ディスク上のファイルは削除されません。",
     "removePathConfirmAction": "削除",
     "removePathConfirmWorking": "削除中…",
+    "removePathFailed": "ライブラリルートの削除に失敗しました。後でもう一度お試しください。",
     "includeInMetadataRefresh": "「{title}」を一括メタデータ更新に含める",
     "organizeTitle": "自動化管理",
     "organizeDesc": "ライブラリの自動管理機能を提供します。",
@@ -622,6 +676,7 @@
     "curatedExportClearFail": "保存したエクスポートフォルダのクリアに失敗しました。",
     "curatedExportFormatTitle": "キュレートフレームの画像書き出し設定",
     "curatedExportFormatHint": "詳細ダイアログからの書き出し、右クリックメニューからの書き出し、一括書き出しは、ここで選んだ形式を使います。",
+    "curatedExportFormatSaving": "保存中…",
     "curatedExportFormatLabel": "書き出し画像形式"
   },
   "detail": {
@@ -650,6 +705,9 @@
     "revealFailGeneric": "ファイルマネージャーを開けませんでした"
   },
   "player": {
+    "loadingTarget": "再生ターゲットを読み込み中…",
+    "notFoundTitle": "再生ターゲットが見つかりません",
+    "notFoundDesc": "このプレイヤールートが参照する動画 ID は現在のライブラリで利用できません。",
     "mockNoPlay": "デモモードでは再生できません。.env で VITE_USE_WEB_API を有効にしバックエンドに接続してください。",
     "autoplayBlocked": "自動再生がブロックされました。画面または再生ボタンをもう一度押してください。",
     "decodeError": "このブラウザは形式をデコードできません。MP4（H.264 + AAC）を試すかデスクトップ版をお待ちください。",
@@ -689,6 +747,8 @@
     "nativeLaunchRequested": "ブラウザーに {player} を開くよう依頼しました。",
     "nativeLaunchStillHere": "何も開かなければ、この PC に {player} が入っていないか、ブラウザーが外部アプリ起動をブロックした可能性があります。",
     "nativeLaunchFailed": "ブラウザー経由で {player} を開けませんでした。",
+    "hideStats": "詳細統計を非表示",
+    "showStats": "詳細統計",
     "preparingPlayback": "再生ストリームを準備しています…",
     "preparingSeek": "新しい再生区間へ切り替えています…",
     "buffering": "再生データをバッファしています…",

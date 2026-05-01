@@ -21,6 +21,52 @@ export interface PlaybackProgressEntry {
 
 type StoreShape = Record<string, PlaybackProgressEntry>
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+}
+
+function isPlaybackProgressEntry(value: unknown): value is PlaybackProgressEntry {
+  if (!isObjectRecord(value)) {
+    return false
+  }
+  return (
+    typeof value.movieId === "string" &&
+    value.movieId.trim() !== "" &&
+    isNonNegativeFiniteNumber(value.positionSec) &&
+    isNonNegativeFiniteNumber(value.durationSec) &&
+    typeof value.updatedAt === "string" &&
+    value.updatedAt.trim() !== ""
+  )
+}
+
+function normalizeEntry(row: PlaybackProgressEntry): PlaybackProgressEntry {
+  return {
+    movieId: row.movieId.trim(),
+    positionSec: row.positionSec,
+    durationSec: row.durationSec,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function normalizeStore(value: unknown): StoreShape {
+  if (!isObjectRecord(value)) {
+    return {}
+  }
+  const next: StoreShape = {}
+  for (const row of Object.values(value)) {
+    if (!isPlaybackProgressEntry(row)) {
+      continue
+    }
+    const normalized = normalizeEntry(row)
+    next[normalized.movieId] = normalized
+  }
+  return next
+}
+
 function loadStore(): StoreShape {
   if (typeof localStorage === "undefined") {
     return {}
@@ -29,10 +75,7 @@ function loadStore(): StoreShape {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {}
-    }
-    return parsed as StoreShape
+    return normalizeStore(parsed)
   } catch {
     return {}
   }
@@ -95,13 +138,14 @@ export function getProgress(movieId: string): PlaybackProgressEntry | undefined 
   const id = movieId.trim()
   if (!id) return undefined
   const row = cache[id]
-  if (!row || typeof row.movieId !== "string") return undefined
-  return row
+  if (!isPlaybackProgressEntry(row)) return undefined
+  return normalizeEntry(row)
 }
 
 export function listSortedByUpdatedDesc(): PlaybackProgressEntry[] {
   return Object.values(cache)
-    .filter((e) => e && typeof e.movieId === "string" && e.movieId.trim() !== "")
+    .filter(isPlaybackProgressEntry)
+    .map(normalizeEntry)
     .sort((a, b) => {
       const ta = Date.parse(a.updatedAt) || 0
       const tb = Date.parse(b.updatedAt) || 0

@@ -5,10 +5,10 @@ import SettingsHomepageDevTools from "./SettingsHomepageDevTools.vue"
 const refreshHomepageDailyRecommendationsMock = vi.hoisted(() => vi.fn())
 const pushAppToastMock = vi.hoisted(() => vi.fn())
 
-vi.mock("@/api/endpoints", () => ({
-  api: {
+vi.mock("@/services/library-service", () => ({
+  useLibraryService: () => ({
     refreshHomepageDailyRecommendations: refreshHomepageDailyRecommendationsMock,
-  },
+  }),
 }))
 
 vi.mock("@/composables/use-app-toast", () => ({

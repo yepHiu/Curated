@@ -12,6 +12,7 @@ import (
 	"curated-backend/internal/library/moviecode"
 )
 
+// ManifestFileName is the canonical on-disk manifest filename.
 const ManifestFileName = "Curated.json"
 
 const maxManifestBytes = 64 * 1024

@@ -1,3 +1,4 @@
+// Package app is the application container that wires services together, manages lifecycle, and provides runtime controls.
 package app
 
 import (
@@ -48,6 +49,7 @@ var (
 	syncLaunchAtLoginFn      = desktop.SyncLaunchAtLogin
 )
 
+// App is the application container that wires all services, manages settings, and runs background loops.
 type App struct {
 	cfg           config.Config
 	logger        *zap.Logger
@@ -182,6 +184,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	return app, nil
 }
 
+// Close drains in-flight scrape goroutines and stops the library watch loop.
 func (a *App) Close() {
 	if a == nil {
 		return
@@ -325,6 +328,7 @@ func (a *App) LaunchAtLoginSupported() bool {
 	return launchAtLoginSupportedFn()
 }
 
+// CuratedFrameExportFormat returns the current curated-frame export output format.
 func (a *App) CuratedFrameExportFormat() string {
 	a.curatedFrameExportFormatMu.RLock()
 	defer a.curatedFrameExportFormatMu.RUnlock()
@@ -409,6 +413,7 @@ func (a *App) SetLaunchAtLogin(v bool) error {
 	return nil
 }
 
+// SetCuratedFrameExportFormat persists the curated-frame export format to library-config.cfg and updates memory.
 func (a *App) SetCuratedFrameExportFormat(v string) error {
 	path := a.librarySettingsPath
 	if path == "" {
@@ -521,6 +526,7 @@ func (a *App) MetadataMovieScrapeMode() string {
 	return a.effectiveMetadataMovieScrapeModeLocked()
 }
 
+// MetadataMovieStrategy returns the active provider scheduling strategy for settings UI.
 func (a *App) MetadataMovieStrategy() string {
 	a.metadataMovieMu.RLock()
 	defer a.metadataMovieMu.RUnlock()
@@ -671,6 +677,7 @@ func (a *App) SetMetadataMovieScrapeMode(mode string) error {
 	return nil
 }
 
+// SetMetadataMovieStrategy persists the provider scheduling strategy to library-config.cfg and updates memory.
 func (a *App) SetMetadataMovieStrategy(strategy string) error {
 	path := a.librarySettingsPath
 	if path == "" {
@@ -980,6 +987,7 @@ func (a *App) SetBackendLogPatch(p contracts.PatchBackendLogSettings) error {
 	return nil
 }
 
+// Run reads JSONL commands from input, dispatches them, and writes responses to output (stdio mode).
 func (a *App) Run(ctx context.Context, input io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -2042,10 +2050,12 @@ func (a *App) StartTaskJanitor(ctx context.Context) {
 	}()
 }
 
+// StartScan starts a library scan, optionally restricted to the given paths.
 func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error) {
 	return a.startLibraryScan(ctx, io.Discard, paths, nil)
 }
 
+// ResolvePlayback builds a playback descriptor deciding between direct, HLS, and native playback.
 func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error) {
 	detail, err := a.store.GetMovieDetail(ctx, movieID)
 	if err != nil {
@@ -2104,6 +2114,7 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string) (contracts.Pl
 	return descriptor, nil
 }
 
+// CreatePlaybackSession explicitly creates an HLS playback session and returns its descriptor.
 func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
 	if mode == "" || mode == contracts.PlaybackModeDirect {
 		return a.ResolvePlayback(ctx, movieID)
@@ -2161,6 +2172,7 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 	}
 }
 
+// LaunchNativePlayback launches an external native player for the given movie.
 func (a *App) LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error) {
 	targetPath, err := a.store.ResolvePrimaryVideoPath(ctx, movieID)
 	if err != nil {
@@ -2188,14 +2200,17 @@ func (a *App) LaunchNativePlayback(ctx context.Context, movieID string, startPos
 	}, nil
 }
 
+// ResolvePlaybackSessionFile resolves a file path inside a playback session (e.g. HLS segments).
 func (a *App) ResolvePlaybackSessionFile(sessionID string, name string) (string, error) {
 	return a.streams.ResolveFile(sessionID, name)
 }
 
+// DeletePlaybackSession stops and removes a playback session by its ID.
 func (a *App) DeletePlaybackSession(sessionID string) error {
 	return a.streams.DeleteSession(sessionID)
 }
 
+// GetPlaybackSession returns a status snapshot for a playback session.
 func (a *App) GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error) {
 	_ = ctx
 	snapshot, err := a.streams.GetSessionSnapshot(sessionID)
@@ -2205,6 +2220,7 @@ func (a *App) GetPlaybackSession(ctx context.Context, sessionID string) (contrac
 	return playbackSessionStatusDTO(snapshot), nil
 }
 
+// ListRecentPlaybackSessions lists active and recently archived playback sessions for diagnostics.
 func (a *App) ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error) {
 	_ = ctx
 	snapshots := a.streams.ListSessionSnapshots(limit)
@@ -2418,6 +2434,7 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 	return task, nil
 }
 
+// HTTPHandler builds the HTTP request multiplexer for the web API server.
 func (a *App) HTTPHandler() http.Handler {
 	apiHandler := server.NewHandler(server.Deps{
 		Cfg:                         a.cfg,
@@ -2447,6 +2464,7 @@ func (a *App) HTTPHandler() http.Handler {
 	return webui.WrapHandler(apiHandler)
 }
 
+// GetAppUpdateStatus returns the cached packaged-app update check result.
 func (a *App) GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
 	if a == nil || a.appUpdate == nil {
 		return contracts.AppUpdateStatusDTO{
@@ -2460,6 +2478,7 @@ func (a *App) GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatus
 	return a.appUpdate.GetStatus(ctx)
 }
 
+// CheckAppUpdateNow forces a fresh GitHub Release check and returns the result.
 func (a *App) CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
 	if a == nil || a.appUpdate == nil {
 		return contracts.AppUpdateStatusDTO{
@@ -2473,6 +2492,7 @@ func (a *App) CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusD
 	return a.appUpdate.CheckNow(ctx)
 }
 
+// GetDevPerformanceSummary samples CPU usage for the dev-only performance monitor bar.
 func (a *App) GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO {
 	if a == nil || a.devCPUSampler == nil {
 		return contracts.DevPerformanceSummaryDTO{Supported: false}

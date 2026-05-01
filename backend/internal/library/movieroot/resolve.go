@@ -7,7 +7,7 @@ import (
 	"curated-backend/internal/contracts"
 )
 
-// ResolveConfiguredLibraryPath returns the longest configured library root that contains filePath.
+// ResolveConfiguredLibraryPath returns the longest-configured library root that contains filePath, or nil.
 func ResolveConfiguredLibraryPath(filePath string, libraryPaths []contracts.LibraryPathDTO) *contracts.LibraryPathDTO {
 	filePath = filepath.Clean(filePath)
 	var best *contracts.LibraryPathDTO

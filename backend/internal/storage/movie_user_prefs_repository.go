@@ -17,6 +17,7 @@ var (
 	ErrInvalidUserRating = errors.New("user rating must be between 0 and 5")
 )
 
+// PatchMovieUserPrefs applies a partial update to movie user preferences, user tags, and metadata tags in one transaction.
 func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, patch contracts.PatchMovieInput) error {
 	if movieID == "" {
 		return ErrMovieNotFoundForPatch

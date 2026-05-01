@@ -13,8 +13,12 @@ import (
 	"curated-backend/internal/storage"
 )
 
-func actorAvatarLocalAPIPath(name string) string {
-	return "/api/library/actors/" + url.PathEscape(name) + "/asset/avatar"
+func actorAvatarLocalAPIPath(name, version string) string {
+	p := "/api/library/actors/" + url.PathEscape(name) + "/asset/avatar"
+	if version = strings.TrimSpace(version); version != "" {
+		p += "?v=" + url.QueryEscape(version)
+	}
+	return p
 }
 
 func (h *Handler) enrichActorProfileLocalAvatar(ctx context.Context, profile *contracts.ActorProfileDTO) {
@@ -28,9 +32,9 @@ func (h *Handler) enrichActorProfileLocalAvatar(ctx context.Context, profile *co
 		}
 		return
 	}
-	if ready[profile.Name] {
+	if status := ready[profile.Name]; status.Ready {
 		profile.HasLocalAvatar = true
-		profile.AvatarLocalURL = actorAvatarLocalAPIPath(profile.Name)
+		profile.AvatarLocalURL = actorAvatarLocalAPIPath(profile.Name, status.Version)
 		profile.AvatarURL = profile.AvatarLocalURL
 	}
 }
@@ -53,11 +57,12 @@ func (h *Handler) enrichActorListLocalAvatars(ctx context.Context, items []contr
 		return
 	}
 	for i := range items {
-		if !ready[items[i].Name] {
+		status := ready[items[i].Name]
+		if !status.Ready {
 			continue
 		}
 		items[i].HasLocalAvatar = true
-		items[i].AvatarLocalURL = actorAvatarLocalAPIPath(items[i].Name)
+		items[i].AvatarLocalURL = actorAvatarLocalAPIPath(items[i].Name, status.Version)
 		items[i].AvatarURL = items[i].AvatarLocalURL
 	}
 }
@@ -74,8 +79,8 @@ func (h *Handler) enrichMovieDetailLocalActorAvatars(ctx context.Context, movie 
 		return
 	}
 	for name := range movie.ActorAvatarURLs {
-		if ready[name] {
-			movie.ActorAvatarURLs[name] = actorAvatarLocalAPIPath(name)
+		if status := ready[name]; status.Ready {
+			movie.ActorAvatarURLs[name] = actorAvatarLocalAPIPath(name, status.Version)
 		}
 	}
 }
@@ -109,6 +114,6 @@ func (h *Handler) handleGetActorAvatarAsset(w http.ResponseWriter, r *http.Reque
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to read asset")
 		return
 	}
-	w.Header().Set("Cache-Control", "private, no-cache")
+	setReusableLocalImageCacheHeaders(w)
 	http.ServeContent(w, r, "avatar"+pickImageExtFromPath(f.Name()), st.ModTime(), f)
 }

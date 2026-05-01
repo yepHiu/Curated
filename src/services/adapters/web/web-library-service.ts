@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from "vue"
+import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
   CuratedFrameExportFormat,
@@ -30,9 +30,10 @@ import type { LibraryService } from "@/services/contracts/library-service"
 import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
-const moviesState: Ref<Movie[]> = ref([])
+const moviesState: Ref<Movie[]> = shallowRef([])
 const moviesLoadedState = ref(false)
-const trashedMoviesState: Ref<Movie[]> = ref([])
+const loadErrorState = ref<string | null>(null)
+const trashedMoviesState: Ref<Movie[]> = shallowRef([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
@@ -89,6 +90,10 @@ const pendingMovieDetailLoads = new Map<string, Promise<Movie | undefined>>()
 const LIST_BATCH_SIZE = 500
 const MAX_MOVIES_PREFETCH = 10_000
 
+type FetchPagedMoviesOptions = {
+  onFirstPage?: (movies: Movie[]) => void
+}
+
 function mapLibraryPathsFromSettings(
   paths: { id: string; path: string; title: string; firstLibraryScanPending?: boolean }[],
 ): LibrarySetting[] {
@@ -100,9 +105,13 @@ function mapLibraryPathsFromSettings(
   }))
 }
 
-async function fetchPagedMovies(mode?: "trash"): Promise<Movie[]> {
+async function fetchPagedMovies(
+  mode?: "trash",
+  options: FetchPagedMoviesOptions = {},
+): Promise<Movie[]> {
   const first = await api.listMovies({ limit: LIST_BATCH_SIZE, offset: 0, mode })
   const all: Movie[] = first.items.map(mapMovieListItem)
+  options.onFirstPage?.([...all])
   let offset = all.length
   const { total } = first
 
@@ -123,7 +132,13 @@ function loadActiveMovies(): Promise<Movie[]> {
   if (activeMoviesPromise) {
     return activeMoviesPromise
   }
-  activeMoviesPromise = fetchPagedMovies().finally(() => {
+  activeMoviesPromise = fetchPagedMovies(undefined, {
+    onFirstPage(movies) {
+      moviesState.value = movies
+      moviesLoadedState.value = true
+      loadErrorState.value = null
+    },
+  }).finally(() => {
     activeMoviesPromise = null
   })
   return activeMoviesPromise
@@ -133,7 +148,12 @@ function loadTrashedMovies(): Promise<Movie[]> {
   if (trashedMoviesPromise) {
     return trashedMoviesPromise
   }
-  trashedMoviesPromise = fetchPagedMovies("trash").finally(() => {
+  trashedMoviesPromise = fetchPagedMovies("trash", {
+    onFirstPage(movies) {
+      trashedMoviesState.value = movies
+      loadErrorState.value = null
+    },
+  }).finally(() => {
     trashedMoviesPromise = null
   })
   return trashedMoviesPromise
@@ -160,6 +180,20 @@ function isTrashHashRoute(): boolean {
   return hash === "#/trash" || hash.startsWith("#/trash?")
 }
 
+function formatLoadError(err: unknown, fallback: string): string {
+  if (err instanceof HttpClientError) {
+    return err.apiError?.message?.trim() || err.message || fallback
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message
+  }
+  return fallback
+}
+
+function setLoadError(err: unknown, fallbackKey: string) {
+  loadErrorState.value = formatLoadError(err, i18n.global.t(fallbackKey))
+}
+
 async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }) {
   if (reloadMoviesDebounce) {
     clearTimeout(reloadMoviesDebounce)
@@ -171,7 +205,9 @@ async function reloadMoviesFromApiImmediate(options?: { includeTrash?: boolean }
       trashedMoviesState.value = await loadTrashedMovies()
     }
     moviesLoadedState.value = true
+    loadErrorState.value = null
   } catch (err) {
+    setLoadError(err, "library.loadFailed")
     console.error("[web-library-service] failed to reload movies", err)
   }
 }
@@ -184,7 +220,9 @@ async function ensureLoaded(options?: { includeTrash?: boolean }) {
       trashedMoviesState.value = await loadTrashedMovies()
     }
     moviesLoadedState.value = true
+    loadErrorState.value = null
   } catch (err) {
+    setLoadError(err, "library.loadFailed")
     console.error("[web-library-service] failed to load movies", err)
   }
 }
@@ -313,6 +351,7 @@ function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
     moviesLoaded: computed(() => moviesLoadedState.value),
+    loadError: computed(() => loadErrorState.value),
     trashedMovies: computed(() => trashedMoviesState.value),
     libraryStats: computed(() => {
       const loc = i18n.global.locale.value as string
@@ -445,7 +484,9 @@ function createWebLibraryService(): LibraryService {
     async ensureTrashLoaded() {
       try {
         trashedMoviesState.value = await loadTrashedMovies()
+        loadErrorState.value = null
       } catch (err) {
+        setLoadError(err, "library.loadFailed")
         console.error("[web-library-service] failed to load trashed movies", err)
       }
     },
@@ -649,8 +690,32 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
+    async health() {
+      return await api.health()
+    },
+
+    async pingProxyJavbus(body) {
+      return await api.pingProxyJavbus(body)
+    },
+
+    async pingProxyGoogle(body) {
+      return await api.pingProxyGoogle(body)
+    },
+
+    async pingProvider(name: string) {
+      return await api.pingProvider(name)
+    },
+
+    async pingAllProviders() {
+      return await api.pingAllProviders()
+    },
+
     async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
       return await api.getHomepageDailyRecommendations()
+    },
+
+    async refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+      return await api.refreshHomepageDailyRecommendations()
     },
 
     async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
@@ -678,6 +743,10 @@ function createWebLibraryService(): LibraryService {
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {
       return await api.startScan(paths?.length ? { paths } : undefined)
+    },
+
+    async getTaskStatus(taskId: string): Promise<TaskDTO> {
+      return await api.getTaskStatus(taskId)
     },
 
     async refreshMovieMetadata(movieId: string): Promise<TaskDTO | null> {
@@ -732,10 +801,18 @@ function createWebLibraryService(): LibraryService {
       return await api.launchNativePlayback(id, startPositionSec)
     },
 
+    async deletePlaybackSession(sessionId: string) {
+      const id = sessionId.trim()
+      if (!id) {
+        return
+      }
+      await api.deletePlaybackSession(id)
+    },
+
     async ensureMovieCached(movieId: string) {
-      await ensureLoaded()
       const trimmed = movieId.trim()
       if (!trimmed) return
+      await ensureLoaded()
       if (
         moviesState.value.some((m) => m.id === trimmed) ||
         trashedMoviesState.value.some((m) => m.id === trimmed)
@@ -833,8 +910,32 @@ function createWebLibraryService(): LibraryService {
       return await api.listActors(params)
     },
 
+    async getActorProfile(name: string) {
+      return await api.getActorProfile(name)
+    },
+
+    async scrapeActorProfile(name: string) {
+      return await api.scrapeActorProfile(name)
+    },
+
     async patchActorUserTags(name: string, userTags: string[]) {
       return await api.patchActorUserTags(name.trim(), userTags)
+    },
+
+    async patchActorExternalLinks(name: string, externalLinks: string[]) {
+      return await api.patchActorExternalLinks(name.trim(), externalLinks)
+    },
+
+    async getMovieComment(movieId: string) {
+      return await api.getMovieComment(movieId.trim())
+    },
+
+    async putMovieComment(movieId: string, body) {
+      return await api.putMovieComment(movieId.trim(), body)
+    },
+
+    async exportCuratedFrames(body) {
+      return await api.postCuratedFramesExport(body)
     },
   }
 
@@ -853,8 +954,10 @@ export async function loadMovieDetail(movieId: string): Promise<Movie | undefine
       const dto = await api.getMovie(id)
       const mapped = mapMovieDetail(dto)
       mergeMovieIntoListState(mapped)
+      loadErrorState.value = null
       return mapped
     } catch (err) {
+      setLoadError(err, "detail.loadError")
       const extra = err instanceof HttpClientError ? ` status=${err.status}` : ""
       console.error(`[web-library-service] loadMovieDetail failed${extra}`, id, err)
       return undefined

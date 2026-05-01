@@ -114,4 +114,29 @@ describe("DetailPage", () => {
     expect(previewCard.attributes("data-aspect-ratio")).toBe("0.5625")
     expect(previewCard.classes()).not.toContain("aspect-[16/9]")
   })
+
+  it("only prioritizes the first preview images to avoid flooding detail page image loading", () => {
+    const previewImages = Array.from(
+      { length: 6 },
+      (_, index) => `https://example.com/preview-${index + 1}.jpg`,
+    )
+    const wrapper = mount(DetailPage, {
+      props: {
+        movie: makeMovie({ previewImages }),
+        relatedMovies: [],
+      },
+    })
+    const stills = wrapper.findAllComponents({ name: "MediaStill" })
+
+    expect(stills).toHaveLength(6)
+    expect(stills[0]!.props("loading")).toBe("eager")
+    expect(stills[0]!.props("fetchPriority")).toBe("high")
+    expect(stills[1]!.props("loading")).toBe("eager")
+    expect(stills[1]!.props("fetchPriority")).toBe("auto")
+    expect(stills[3]!.props("loading")).toBe("eager")
+    expect(stills[4]!.props("loading")).toBe("lazy")
+    expect(stills[4]!.props("fetchPriority")).toBe("low")
+    expect(stills[5]!.props("loading")).toBe("lazy")
+    expect(stills[5]!.props("fetchPriority")).toBe("low")
+  })
 })

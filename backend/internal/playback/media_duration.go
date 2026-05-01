@@ -26,6 +26,7 @@ var mediaDurationCache sync.Map
 
 var ffmpegDurationPattern = regexp.MustCompile(`Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)`)
 
+// ProbeMediaDuration returns a video's duration in seconds, using a size+modtime cache and ffprobe with ffmpeg fallback.
 func ProbeMediaDuration(ctx context.Context, sourcePath string, ffmpegCommand string) (float64, error) {
 	cleanPath := strings.TrimSpace(sourcePath)
 	if cleanPath == "" {

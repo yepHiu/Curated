@@ -1,4 +1,9 @@
 {
+  "app": {
+    "faultTitle": "Curated 暂时无法渲染当前页面",
+    "faultDescription": "页面发生未捕获错误。你可以刷新应用，或返回上一页后重试。",
+    "reload": "刷新应用"
+  },
   "nav": {
     "home": "首页",
     "browse": "浏览",
@@ -18,7 +23,11 @@
     "backendMock": "演示模式（无后端）",
     "backendRecheck": "重新检测后端",
     "actors": "演员",
-    "trash": "回收站"
+    "trash": "回收站",
+    "continuePlayback": "继续播放",
+    "continuePlaybackAt": "刚才播放至 {time}",
+    "continuePlaybackAria": "回到播放页继续播放《{title}》，刚才播放至 {time}",
+    "dismissContinuePlayback": "隐藏继续播放入口"
   },
   "actors": {
     "title": "演员库",
@@ -218,6 +227,8 @@
     "tabTop": "评分",
     "trashEmptyTitle": "回收站是空的",
     "trashEmptyDesc": "在资料库中将影片移入回收站后，会显示在此；可恢复或彻底删除。",
+    "loadFailed": "加载资料库失败，请确认后端已启动并重试。",
+    "favoriteToggleFailed": "更新收藏失败，请稍后重试。",
     "ariaFilterTag": "按标签筛选：{tag}，{count} 部影片",
     "ariaFilterUserTag": "按用户标签筛选：{tag}，{count} 部影片",
     "actorCardTitle": "演员资料",
@@ -306,6 +317,40 @@
     "moveUp": "上移",
     "moveDown": "下移"
   },
+  "pickDir": {
+    "unsupported": "当前环境无法自动读取磁盘绝对路径。请在本机资源管理器中打开该文件夹，将地址栏中的完整路径复制到「绝对路径」输入框。",
+    "selected": "已选择文件夹「{name}」。网页出于安全限制无法读取本机绝对路径，请在资源管理器中进入该文件夹，将地址栏路径复制到上方「绝对路径」。"
+  },
+  "scan": {
+    "statusLabel": "扫描状态",
+    "completed": "扫描完成",
+    "finished": "扫描结束",
+    "scanning": "正在扫描库",
+    "close": "关闭",
+    "processed": "已处理",
+    "newItems": "新入库",
+    "updated": "更新",
+    "skipped": "跳过"
+  },
+  "scanTask": {
+    "fetchFailed": "无法获取扫描任务状态"
+  },
+  "rating": {
+    "ariaLabel": "我的评分，半星步进",
+    "score": "打 {s} 分"
+  },
+  "movie": {
+    "expandSummary": "展开简介",
+    "collapseSummary": "收起简介"
+  },
+  "preview": {
+    "title": "{code} 预览图",
+    "instructions": "使用左右方向键或两侧按钮切换图片，Esc 关闭；点击下方缩略图跳转。",
+    "close": "关闭",
+    "previous": "上一张",
+    "next": "下一张",
+    "imageOf": "第 {i} 张"
+  },
   "settings": {
     "language": "界面语言",
     "appearance": "外观",
@@ -355,6 +400,7 @@
     "removePathConfirmDesc": "将从配置中移除「{title}」；不会删除磁盘上的文件。",
     "removePathConfirmAction": "移除",
     "removePathConfirmWorking": "移除中…",
+    "removePathFailed": "移除库根失败，请稍后重试。",
     "includeInMetadataRefresh": "将「{title}」纳入批量元数据刷新",
     "organizeTitle": "自动化管理",
     "organizeDesc": "提供资料库自动化管理功能。",
@@ -630,6 +676,7 @@
     "curatedExportClearFail": "清除已保存的导出目录失败。",
     "curatedExportFormatTitle": "萃取帧导出图片设置",
     "curatedExportFormatHint": "详情弹窗导出、右键菜单导出和批量导出都会使用这里选择的格式。",
+    "curatedExportFormatSaving": "保存中…",
     "curatedExportFormatLabel": "导出图片格式"
   },
   "detail": {
@@ -658,6 +705,9 @@
     "revealFailGeneric": "无法在文件管理器中打开"
   },
   "player": {
+    "loadingTarget": "正在加载播放目标…",
+    "notFoundTitle": "播放目标未找到",
+    "notFoundDesc": "此播放路由指向的影片 ID 在当前库中不可用。",
     "mockNoPlay": "本地演示模式无法播放主视频，请在 .env 中启用 VITE_USE_WEB_API 并连接后端。",
     "autoplayBlocked": "浏览器未允许自动播放，请再点一次画面或下方播放键。",
     "decodeError": "当前浏览器无法解码该视频格式，可尝试转为 MP4（H.264 + AAC）或使用后续桌面版播放器。",
@@ -697,6 +747,8 @@
     "nativeLaunchRequested": "已请求浏览器拉起 {player}。",
     "nativeLaunchStillHere": "如果浏览器没有弹出 {player}，通常说明本机未安装该播放器，或浏览器拦截了外部应用拉起。",
     "nativeLaunchFailed": "无法通过浏览器拉起 {player}。",
+    "hideStats": "隐藏详细统计信息",
+    "showStats": "详细统计信息",
     "preparingPlayback": "正在准备播放流…",
     "preparingSeek": "正在切换播放片段…",
     "buffering": "正在缓冲播放数据…",

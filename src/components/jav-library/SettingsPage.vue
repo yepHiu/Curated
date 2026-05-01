@@ -13,13 +13,11 @@ import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
-import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type {
   CuratedFrameExportFormat,
   HealthDTO,
   ProviderHealthDTO,
-  ProviderHealthStatus,
   ProxySettingsDTO,
 } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
@@ -32,67 +30,7 @@ import {
 import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
-import {
-  Activity,
-  BookOpen,
-  ChevronDown,
-  CheckSquare,
-  Database,
-  FolderOpen,
-  FolderPlus,
-  Globe,
-  GripVertical,
-  ImageDown,
-  Info,
-  Languages,
-  LayoutDashboard,
-  Layers,
-  ListChecks,
-  Loader2,
-  Plus,
-  Power,
-  RefreshCw,
-  ScanSearch,
-  Sparkles,
-  Wrench,
-  X,
-} from "lucide-vue-next"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  TooltipContent,
-  TooltipPortal,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from "reka-ui"
 import {
   getStoredDirectoryHandle,
   setStoredDirectoryHandle,
@@ -107,11 +45,15 @@ import {
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
-import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
-import SettingsCuratedShortcutSection from "@/components/jav-library/settings/SettingsCuratedShortcutSection.vue"
-import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
-import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
-import SettingsLibraryPathActions from "@/components/jav-library/settings/SettingsLibraryPathActions.vue"
+import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
+import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
+import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
+import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
+import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
+import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
+import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
+import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
+import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
@@ -120,10 +62,7 @@ import {
   isSettingsSectionSlug,
 } from "@/lib/settings-nav"
 import {
-  statusDotClass,
-  statusPanelClass,
   statusTextClass,
-  type StatusTone,
 } from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
 
@@ -138,7 +77,6 @@ const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =
 const { t, locale } = useI18n()
 const { themePreference, setThemePreference } = useTheme()
 type ProxyScheme = "http" | "socks5"
-const PROXY_SCHEME_OPTIONS: readonly ProxyScheme[] = ["http", "socks5"]
 const DEFAULT_PROXY_HOST = "127.0.0.1"
 
 function setThemeFromSelect(v: unknown) {
@@ -372,10 +310,6 @@ function parseProxyUrlDraftParts(rawUrl?: string | null): {
   }
 }
 
-function proxySchemeLabel(value: ProxyScheme): string {
-  return value === "socks5" ? t("settings.proxySchemeSocks5") : t("settings.proxySchemeHttp")
-}
-
 function normalizeProxyHostDraft(): string {
   return proxyHostDraft.value.trim() || DEFAULT_PROXY_HOST
 }
@@ -508,7 +442,7 @@ function applySavedProxyGoogleResult(
 
 async function verifySavedProxyInBackground(seq: number) {
   try {
-    const verifyResult = await api.pingProxyGoogle()
+    const verifyResult = await libraryService.pingProxyGoogle()
     applySavedProxyGoogleResult(seq, verifyResult)
   } catch (err) {
     const detail =
@@ -728,7 +662,7 @@ async function testProxyJavbus() {
         const body = {
           proxy: draft,
         }
-        const res = await api.pingProxyJavbus(body)
+        const res = await libraryService.pingProxyJavbus(body)
         if (res.ok) {
           proxyJavbusResultOk.value = true
           proxyJavbusResult.value = t("settings.proxyPingJavbusOk", {
@@ -773,7 +707,7 @@ async function testProxyGoogle() {
         const body = {
           proxy: draft,
         }
-        const res = await api.pingProxyGoogle(body)
+        const res = await libraryService.pingProxyGoogle(body)
         if (res.ok) {
           proxyGoogleResultOk.value = true
           proxyGoogleResult.value = t("settings.proxyPingGoogleOk", {
@@ -817,6 +751,7 @@ const curatedExportFormatOptions = computed(
     { value: "png", label: "PNG" },
   ],
 )
+const curatedDirectorySupported = computed(() => supportsFileSystemAccess())
 
 const metadataMovieProvider = computed(() => libraryService.metadataMovieProvider.value.trim())
 const metadataMovieProviders = computed(() => [...libraryService.metadataMovieProviders.value])
@@ -910,7 +845,7 @@ async function loadAboutHealth() {
   aboutHealthLoading.value = true
   aboutHealthError.value = ""
   try {
-    aboutHealth.value = await api.health()
+    aboutHealth.value = await libraryService.health()
   } catch (err) {
     aboutHealth.value = null
     if (err instanceof HttpClientError && err.apiError?.message) {
@@ -939,32 +874,6 @@ const providerPingOneName = ref<string | null>(null)
 const providerHealthPingAllSummary = ref("")
 const providerHealthPingError = ref("")
 
-function healthForProvider(name: string): ProviderHealthDTO | undefined {
-  const map = providerHealthByName.value
-  if (map[name]) return map[name]
-  const lower = name.toLowerCase()
-  for (const [k, v] of Object.entries(map)) {
-    if (k.toLowerCase() === lower) return v
-  }
-  return undefined
-}
-
-function providerHealthTone(status: ProviderHealthStatus): StatusTone {
-  if (status === "ok") return "success"
-  if (status === "degraded") return "warning"
-  return "danger"
-}
-
-function providerHealthStatusVariant(status: ProviderHealthStatus): StatusTone {
-  return providerHealthTone(status)
-}
-
-function providerHealthStatusLabel(status: ProviderHealthStatus): string {
-  if (status === "ok") return t("settings.providerHealthStatusOk")
-  if (status === "degraded") return t("settings.providerHealthStatusDegraded")
-  return t("settings.providerHealthStatusFail")
-}
-
 async function pingAllMetadataProviders() {
   if (!useWebApi) return
   providerHealthPingError.value = ""
@@ -973,7 +882,7 @@ async function pingAllMetadataProviders() {
     await withPreservedScroll(async () => {
       providerPingAllBusy.value = true
       try {
-        const res = await api.pingAllProviders()
+        const res = await libraryService.pingAllProviders()
         const next: Record<string, ProviderHealthDTO> = { ...providerHealthByName.value }
         for (const p of res.providers) {
           next[p.name] = p
@@ -1007,7 +916,7 @@ async function pingOneMetadataProvider(name: string) {
     await withPreservedScroll(async () => {
       providerPingOneName.value = name
       try {
-        const dto = await api.pingProvider(name.trim())
+        const dto = await libraryService.pingProvider(name.trim())
         providerHealthByName.value = { ...providerHealthByName.value, [dto.name]: dto }
       } finally {
         providerPingOneName.value = null
@@ -1063,14 +972,6 @@ function onChainDrop(toIndex: number) {
 
 function onChainDragEnd() {
   chainDragFromIndex.value = null
-}
-
-function providerChainRowPinging(name: string): boolean {
-  return providerPingAllBusy.value || providerPingOneName.value === name
-}
-
-function providerHealthDotClass(status: ProviderHealthStatus): string {
-  return statusDotClass(providerHealthTone(status))
 }
 
 const triggerScrapeCardBusy = ref(false)
@@ -1260,10 +1161,6 @@ async function clearCuratedExportDirectory() {
 
 
 const hasMetadataPathSelection = computed(() => selectedMetadataRefreshPaths.value.length > 0)
-
-function isMetadataPathChecked(path: string) {
-  return selectedMetadataRefreshPaths.value.includes(path)
-}
 
 function toggleMetadataPathSelection(path: string) {
   const cur = selectedMetadataRefreshPaths.value
@@ -1473,6 +1370,13 @@ async function confirmRemoveLibraryPath() {
     removePathDialogOpen.value = false
   } catch (err) {
     console.error("[settings] remove library path failed", err)
+    const message =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message.trim()
+          ? err.message
+          : t("settings.removePathFailed")
+    pushAppToast(message, { variant: "destructive" })
   } finally {
     removePathBusy.value = false
   }
@@ -1846,40 +1750,7 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navOverview')"
     >
     <h2 class="sr-only">{{ t("settings.navOverview") }}</h2>
-    <div class="flex w-full flex-col gap-6">
-    <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <LayoutDashboard class="size-[1.15rem]" />
-            </span>
-            {{ t("settings.navOverview") }}
-          </CardTitle>
-        </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
-          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Card
-              v-for="stat in dashboardStats"
-              :key="stat.labelKey"
-              class="rounded-lg border border-border/50 bg-muted/5 shadow-none"
-            >
-              <CardHeader class="gap-3">
-                <CardDescription>{{ t(stat.labelKey) }}</CardDescription>
-                <CardTitle class="text-2xl">{{ stat.value }}</CardTitle>
-              </CardHeader>
-              <CardContent v-if="stat.detailKey">
-                <p class="text-sm text-muted-foreground">{{ t(stat.detailKey) }}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-    </div>
+    <SettingsOverviewSection :dashboard-stats="dashboardStats" />
     </section>
     </TabsContent>
 
@@ -1894,136 +1765,18 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navGeneral')"
     >
     <h2 class="sr-only">{{ t("settings.navGeneral") }}</h2>
-    <div class="flex w-full flex-col gap-8">
-    <div class="space-y-4">
-    <div class="break-inside-avoid">
-    <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="space-y-3 pb-2">
-        <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-          <span
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-            aria-hidden="true"
-          >
-            <Languages class="size-4" />
-          </span>
-          {{ t("settings.generalSubsectionLocaleAppearance") }}
-        </CardTitle>
-        <CardDescription
-          class="text-xs leading-relaxed text-pretty text-muted-foreground"
-        >
-          {{ t("settings.languageHint") }}
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-3 pt-2">
-        <div
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p class="text-sm font-medium text-foreground">{{ t("settings.language") }}</p>
-          <Select v-model="locale">
-            <SelectTrigger
-              size="sm"
-              class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
-              :aria-label="t('settings.language')"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end" class="rounded-xl border-border/50">
-              <SelectItem value="zh-CN">{{ t("settings.langZh") }}</SelectItem>
-              <SelectItem value="en">{{ t("settings.langEn") }}</SelectItem>
-              <SelectItem value="ja">{{ t("settings.langJa") }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div class="min-w-0 space-y-1">
-            <p class="text-sm font-medium text-foreground">{{ t("settings.appearance") }}</p>
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              {{ t("settings.appearanceHint") }}
-            </p>
-          </div>
-          <Select
-            :model-value="themePreference"
-            @update:model-value="setThemeFromSelect"
-          >
-            <SelectTrigger
-              size="sm"
-              class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
-              :aria-label="t('settings.appearance')"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end" class="rounded-xl border-border/50">
-              <SelectItem value="light">{{ t("settings.themeLight") }}</SelectItem>
-              <SelectItem value="dark">{{ t("settings.themeDark") }}</SelectItem>
-              <SelectItem value="system">{{ t("settings.themeSystem") }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-    </Card>
-    </div>
-    <div class="break-inside-avoid">
-    <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="space-y-3 pb-2">
-        <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-          <span
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-            aria-hidden="true"
-          >
-            <Power class="size-4" />
-          </span>
-          {{ t("settings.launchAtLoginTitle") }}
-        </CardTitle>
-        <CardDescription
-          class="text-xs leading-relaxed text-pretty text-muted-foreground"
-        >
-          {{ t("settings.launchAtLoginDesc") }}
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-3 pt-2">
-        <div
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          :aria-busy="launchAtLoginSaving"
-        >
-          <div class="min-w-0 space-y-1">
-            <p class="text-sm font-medium text-foreground">
-              {{ t("settings.launchAtLoginSwitch") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              {{ t("settings.launchAtLoginHint") }}
-            </p>
-            <p
-              v-if="launchAtLoginSaving"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.launchAtLoginSyncing") }}
-            </p>
-            <p
-              v-else-if="launchAtLoginUnavailableHint"
-              class="text-xs leading-relaxed text-muted-foreground"
-            >
-              {{ launchAtLoginUnavailableHint }}
-            </p>
-          </div>
-          <Switch
-            class="motion-safe:transition-colors motion-safe:duration-200"
-            :model-value="launchAtLogin"
-            :disabled="launchAtLoginDisabled"
-            :aria-label="t('settings.launchAtLoginSwitch')"
-            @update:model-value="onLaunchAtLoginChange"
-          />
-        </div>
-        <p v-if="launchAtLoginError" class="text-sm text-destructive">
-          {{ launchAtLoginError }}
-        </p>
-      </CardContent>
-    </Card>
-    </div>
-    </div>
-    <SettingsLoggingSection :auto-save-ready="settingsAutoSaveReady" />
-    </div>
+    <SettingsGeneralSection
+      v-model:locale="locale"
+      :theme-preference="themePreference"
+      :launch-at-login="launchAtLogin"
+      :launch-at-login-saving="launchAtLoginSaving"
+      :launch-at-login-disabled="launchAtLoginDisabled"
+      :launch-at-login-unavailable-hint="launchAtLoginUnavailableHint"
+      :launch-at-login-error="launchAtLoginError"
+      :auto-save-ready="settingsAutoSaveReady"
+      @change-theme="setThemeFromSelect"
+      @change-launch-at-login="onLaunchAtLoginChange"
+    />
     </section>
     </TabsContent>
 
@@ -2038,390 +1791,57 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navLibrary')"
     >
     <h2 class="sr-only">{{ t("settings.navLibrary") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-        <p
-          v-if="scanFeedbackError"
-          class="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          role="alert"
-        >
-          {{ scanFeedbackError }}
-        </p>
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Database class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.storageCardTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.storageCardDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="font-medium">{{ t("settings.libraryPaths") }}</p>
-              </div>
-              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <template v-if="!libraryPathsBatchMode">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    @click="enterLibraryPathsBatchMode"
-                  >
-                    <ListChecks class="size-4 opacity-80" aria-hidden="true" />
-                    {{ t("library.batchManage") }}
-                  </Button>
-                </template>
-                <template v-else>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    :disabled="libraryPathsList.length === 0"
-                    @click="selectAllMetadataPaths"
-                  >
-                    <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
-                    {{ t("settings.selectAllPaths") }}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    @click="clearMetadataPathSelection"
-                  >
-                    {{ t("settings.clearSelection") }}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    class="gap-1.5 rounded-xl"
-                    :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
-                    @click="runMetadataRefreshForSelected"
-                  >
-                    <Sparkles class="size-4 shrink-0" aria-hidden="true" />
-                    {{
-                      metadataRefreshBusy ? t("settings.submitting") : t("settings.refreshMetadata")
-                    }}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                    @click="exitLibraryPathsBatchMode"
-                  >
-                    <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-                    {{ t("library.batchExitToolbar") }}
-                  </Button>
-                </template>
-              </div>
-            </div>
+      <SettingsLibraryPathsSection
+        v-model:remove-path-dialog-open="removePathDialogOpen"
+        v-model:edit-library-title-draft="editLibraryTitleDraft"
+        v-model:add-path-dialog-open="addPathDialogOpen"
+        v-model:new-path="newPath"
+        v-model:new-path-title="newPathTitle"
+        :scan-feedback-error="scanFeedbackError"
+        :paths="libraryPathsList"
+        :batch-mode="libraryPathsBatchMode"
+        :has-metadata-path-selection="hasMetadataPathSelection"
+        :metadata-refresh-busy="metadataRefreshBusy"
+        :metadata-refresh-success="metadataRefreshSuccess"
+        :metadata-refresh-error="metadataRefreshError"
+        :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
+        :remove-path-pending="removePathPending"
+        :remove-path-busy="removePathBusy"
+        :editing-library-path-id="editingLibraryPathId"
+        :edit-title-busy="editTitleBusy"
+        :edit-title-error="editTitleError"
+        :reveal-path-busy="revealPathBusy"
+        :scan-path-busy="scanPathBusy"
+        :pick-directory-busy="pickDirectoryBusy"
+        :directory-hint-display="directoryHintDisplay"
+        :path-add-error="pathAddError"
+        :add-busy="addBusy"
+        :can-save-new-path="canSaveNewPath"
+        :dialog-content-class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
+        @enter-batch-mode="enterLibraryPathsBatchMode"
+        @select-all="selectAllMetadataPaths"
+        @clear-selection="clearMetadataPathSelection"
+        @refresh-metadata="runMetadataRefreshForSelected"
+        @exit-batch-mode="exitLibraryPathsBatchMode"
+        @confirm-remove="confirmRemoveLibraryPath"
+        @save-title="saveLibraryPathTitle"
+        @cancel-edit="cancelEditLibraryTitle"
+        @toggle-metadata-path-selection="toggleMetadataPathSelection"
+        @reveal="revealLibraryPath"
+        @edit="startEditLibraryTitle"
+        @rescan="rescanPath($event.path)"
+        @remove="openRemovePathConfirm"
+        @clear-error="clearPathAddError"
+        @browse="browseForDirectory"
+        @submit="submitAddPath"
+      />
 
-            <Dialog v-model:open="removePathDialogOpen">
-                <DialogContent
-                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                >
-                  <DialogHeader>
-                    <DialogTitle>{{ t("settings.removePathConfirmTitle") }}</DialogTitle>
-                    <DialogDescription>
-                      <div class="space-y-2">
-                        <p class="text-pretty">
-                          {{
-                            t("settings.removePathConfirmDesc", {
-                              title: removePathPending?.title ?? "—",
-                            })
-                          }}
-                        </p>
-                        <p
-                          v-if="removePathPending?.path"
-                          class="break-all font-mono text-xs text-muted-foreground"
-                        >
-                          {{ removePathPending.path }}
-                        </p>
-                      </div>
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter class="gap-3">
-                    <DialogClose as-child>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="removePathBusy"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      class="rounded-2xl"
-                      :disabled="removePathBusy || !removePathPending"
-                      @click="confirmRemoveLibraryPath"
-                    >
-                      {{
-                        removePathBusy
-                          ? t("settings.removePathConfirmWorking")
-                          : t("settings.removePathConfirmAction")
-                      }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-            <p v-if="metadataRefreshSuccess" class="text-sm text-primary">
-              {{ metadataRefreshSuccess }}
-            </p>
-            <p
-              v-if="metadataRefreshError"
-              class="text-sm text-destructive"
-              role="alert"
-            >
-              {{ metadataRefreshError }}
-            </p>
-
-            <div class="flex flex-col gap-3">
-              <div
-                v-for="path in libraryPathsList"
-                :key="path.id"
-                class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-              >
-                <template v-if="editingLibraryPathId === path.id">
-                  <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-3">
-                      <p class="text-xs font-medium text-muted-foreground">{{ t("settings.pathReadonly") }}</p>
-                      <p class="break-all font-mono text-sm text-muted-foreground">{{ path.path }}</p>
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" :for="`edit-title-${path.id}`">{{
-                        t("settings.pathTitleLabel")
-                      }}</label>
-                      <Input
-                        :id="`edit-title-${path.id}`"
-                        v-model="editLibraryTitleDraft"
-                        class="rounded-xl"
-                        :placeholder="t('settings.displayName')"
-                        autocomplete="off"
-                        @keydown.enter.prevent="saveLibraryPathTitle(path.id)"
-                      />
-                      <p class="text-xs text-muted-foreground">
-                        {{ t("settings.editTitleHint") }}
-                      </p>
-                      <p v-if="editTitleError" class="text-sm text-destructive">
-                        {{ editTitleError }}
-                      </p>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="saveLibraryPathTitle(path.id)"
-                      >
-                        {{ editTitleBusy ? t("common.saving") : t("settings.saveTitle") }}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="rounded-2xl"
-                        :disabled="editTitleBusy"
-                        @click="cancelEditLibraryTitle"
-                      >
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex min-w-0 flex-1 items-start gap-3">
-                      <input
-                        v-if="libraryPathsBatchMode"
-                        type="checkbox"
-                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border border-input accent-primary"
-                        :checked="isMetadataPathChecked(path.path)"
-                        :aria-label="t('settings.includeInMetadataRefresh', { title: path.title })"
-                        @change="toggleMetadataPathSelection(path.path)"
-                      />
-                      <div class="flex min-w-0 flex-1 flex-col gap-3">
-                        <p class="font-medium">{{ path.title }}</p>
-                        <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
-                      </div>
-                    </div>
-                    <div class="library-path-toolbar flex flex-wrap items-center gap-2">
-                      <SettingsLibraryPathActions
-                        :path="path"
-                        :reveal-busy="revealPathBusy === path.id"
-                        :scan-busy="scanPathBusy === path.path"
-                        @reveal="revealLibraryPath"
-                        @edit="startEditLibraryTitle"
-                        @rescan="rescanPath($event.path)"
-                        @remove="openRemovePathConfirm"
-                      />
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap justify-start gap-2 pt-1">
-              <Dialog v-model:open="addPathDialogOpen">
-                <DialogTrigger as-child>
-                  <Button type="button" class="rounded-2xl">
-                    <FolderPlus data-icon="inline-start" />
-                    {{ t("settings.addPath") }}
-                  </Button>
-                </DialogTrigger>
-
-                <DialogContent
-                  :class="cn('rounded-3xl border-border/50 sm:max-w-md', SETTINGS_CONTROL_H32_CLASS)"
-                >
-                  <DialogHeader>
-                    <DialogTitle>{{ t("settings.addPathDialogTitle") }}</DialogTitle>
-                    <DialogDescription>
-                      {{ t("settings.addPathDialogDesc") }}
-                      <span class="font-mono text-xs">D:\Media\JAV</span> 或
-                      <span class="font-mono text-xs">/home/user/Videos</span>。
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div class="flex flex-col gap-3">
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" for="new-lib-path">{{ t("settings.absolutePath") }}</label>
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-                        <Input
-                          id="new-lib-path"
-                          v-model="newPath"
-                          class="rounded-xl sm:min-w-0 sm:flex-1"
-                          placeholder="D:\Media\JAV\Library"
-                          autocomplete="off"
-                          @input="clearPathAddError"
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          class="rounded-2xl sm:shrink-0"
-                          :disabled="pickDirectoryBusy"
-                          @click="browseForDirectory"
-                        >
-                          <FolderOpen data-icon="inline-start" />
-                          {{ pickDirectoryBusy ? t("settings.picking") : t("settings.pickFolder") }}
-                        </Button>
-                      </div>
-                      <p
-                        v-if="directoryHintDisplay"
-                        class="text-sm leading-relaxed text-muted-foreground whitespace-pre-line"
-                      >
-                        {{ directoryHintDisplay }}
-                      </p>
-                      <p
-                        v-if="newPath.trim() && !isAbsoluteLibraryPath(newPath)"
-                        class="text-sm text-destructive"
-                      >
-                        {{ t("settings.notAbsolute") }}
-                      </p>
-                      <p v-if="pathAddError" class="text-sm text-destructive">
-                        {{ pathAddError }}
-                      </p>
-                    </div>
-                    <div class="flex flex-col gap-3">
-                      <label class="text-sm font-medium" for="new-lib-title">{{ t("settings.optionalPathTitle") }}</label>
-                      <Input
-                        id="new-lib-title"
-                        v-model="newPathTitle"
-                        class="rounded-xl"
-                        :placeholder="t('settings.displayName')"
-                        autocomplete="off"
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose as-child>
-                      <Button type="button" variant="outline" class="rounded-2xl">
-                        {{ t("common.cancel") }}
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="button"
-                      class="rounded-2xl"
-                      :disabled="addBusy || !canSaveNewPath"
-                      :title="
-                        addBusy || canSaveNewPath ? undefined : t('settings.savePathDisabledTitle')
-                      "
-                      @click="submitAddPath"
-                    >
-                      {{ addBusy ? t("common.saving") : t("settings.savePath") }}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Layers class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.organizeTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.organizeDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
-              :aria-busy="organizeLibrarySaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.organizeSwitch") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.organizeHint") }}
-                </p>
-                <p
-                  v-if="organizeLibrarySaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.organizeSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="organizeLibrary"
-                @update:model-value="onOrganizeLibraryChange"
-              />
-            </div>
-            <p v-if="organizeLibraryError" class="text-sm text-destructive">
-              {{ organizeLibraryError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      </div>
+      <SettingsOrganizeSection
+        :organize-library="organizeLibrary"
+        :organize-library-saving="organizeLibrarySaving"
+        :organize-library-error="organizeLibraryError"
+        @change-organize-library="onOrganizeLibraryChange"
+      />
     </section>
     </TabsContent>
 
@@ -2436,555 +1856,52 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navMetadata')"
     >
     <h2 class="sr-only">{{ t("settings.navMetadata") }}</h2>
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle
-              class="flex flex-wrap items-center gap-2.5 text-lg font-semibold tracking-tight"
-            >
-              <span class="flex min-w-0 items-center gap-2.5">
-                <span
-                  class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                  aria-hidden="true"
-                >
-                  <Sparkles class="size-4" />
-                </span>
-                <span class="min-w-0">{{ t("settings.metadataMovieProviderTitle") }}</span>
-              </span>
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.metadataMovieProviderDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              v-if="useWebApi"
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium">{{ t("settings.providerHealthTitle") }}</p>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{ t("settings.providerHealthHint") }}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="shrink-0 rounded-xl"
-                  :disabled="providerPingAllBusy || providerPingOneName != null"
-                  @click="pingAllMetadataProviders"
-                >
-                  <RefreshCw
-                    class="mr-1.5 size-4"
-                    :class="{ 'motion-safe:animate-spin': providerPingAllBusy }"
-                  />
-                  {{
-                    providerPingAllBusy
-                      ? t("settings.providerHealthPinging")
-                      : t("settings.providerHealthPingAll")
-                  }}
-                </Button>
-              </div>
-              <p v-if="providerHealthPingAllSummary" class="text-xs text-muted-foreground">
-                {{ providerHealthPingAllSummary }}
-              </p>
-              <p v-if="providerHealthPingError" class="text-sm text-destructive">
-                {{ providerHealthPingError }}
-              </p>
-            </div>
-            <p
-              v-else
-              class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-sm text-muted-foreground"
-            >
-              {{ t("settings.providerHealthMockHint") }}
-            </p>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
-              :aria-busy="autoLibraryWatchSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{
-                  t("settings.autoScrape")
-                }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.autoScrapeHint") }}
-                </p>
-                <p
-                  v-if="autoLibraryWatchSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoLibraryWatchSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoLibraryWatch"
-                @update:model-value="onAutoLibraryWatchChange"
-              />
-            </div>
-            <p v-if="autoLibraryWatchError" class="text-sm text-destructive">
-              {{ autoLibraryWatchError }}
-            </p>
-
-            <div
-              class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/[0.08] p-4"
-              :aria-busy="autoActorProfileScrapeSaving"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{
-                  t("settings.autoActorProfileScrape")
-                }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.autoActorProfileScrapeHint") }}
-                </p>
-                <p
-                  v-if="autoActorProfileScrapeSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoActorProfileScrapeSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoActorProfileScrape"
-                @update:model-value="onAutoActorProfileScrapeChange"
-              />
-            </div>
-            <p v-if="autoActorProfileScrapeError" class="text-sm text-destructive">
-              {{ autoActorProfileScrapeError }}
-            </p>
-
-            <fieldset
-              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
-              :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
-            >
-              <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
-              <div class="mb-0.5 flex items-center gap-3 px-0.5">
-                <span class="text-sm font-medium text-foreground">{{
-                  t("settings.metadataMovieProviderMode")
-                }}</span>
-                <TooltipProvider :delay-duration="280">
-                  <TooltipRoot>
-                    <TooltipTrigger as-child>
-                      <button
-                        type="button"
-                        class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      >
-                        <Info class="size-4" aria-hidden="true" />
-                        <span class="sr-only">{{
-                          t("settings.metadataMovieProviderModeAria")
-                        }}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipPortal>
-                      <TooltipContent
-                        side="top"
-                        :side-offset="6"
-                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-                      >
-                        {{ t("settings.metadataMovieProviderModeTooltip") }}
-                      </TooltipContent>
-                    </TooltipPortal>
-                  </TooltipRoot>
-                </TooltipProvider>
-              </div>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
-              >
-                <input
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="metadata-movie-mode"
-                  value="auto"
-                  :disabled="metadataMovieSaving"
-                  :checked="metadataMovieModeUi === 'auto'"
-                  @change="onMetadataMovieModeAuto"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.metadataMovieProviderAutoHint") }}
-                  </span>
-                </span>
-              </label>
-              <label
-                class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
-                :class="
-                  canPickSpecifiedMetadata
-                    ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
-                    : 'cursor-not-allowed opacity-60'
-                "
-              >
-                <input
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="metadata-movie-mode"
-                  value="specified"
-                  :checked="metadataMovieModeUi === 'specified'"
-                  :disabled="metadataMovieSaving || !canPickSpecifiedMetadata"
-                  @change="onMetadataMovieModeSpecified"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{
-                    t("settings.metadataMovieProviderSpecified")
-                  }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.metadataMovieProviderSpecifiedHint") }}
-                  </span>
-                </span>
-              </label>
-              <label
-                class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
-                :class="
-                  canUseMetadataChainMode
-                    ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
-                    : 'cursor-not-allowed opacity-60'
-                "
-              >
-                <input
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="metadata-movie-mode"
-                  value="chain"
-                  :checked="metadataMovieModeUi === 'chain'"
-                  :disabled="metadataMovieSaving || metadataMovieChainSaving || !canUseMetadataChainMode"
-                  @change="onMetadataMovieModeChain"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.metadataMovieProviderChainHint") }}
-                  </span>
-                </span>
-              </label>
-            </fieldset>
-
-            <!-- Single Provider Selection -->
-            <div
-              v-if="metadataMovieModeUi === 'specified' && canPickSpecifiedMetadata"
-              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
-            >
-              <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
-              <div class="flex flex-wrap items-start gap-3">
-                <Select
-                  class="min-w-0 flex-1"
-                  :model-value="metadataMovieProvider || metadataMovieSelectOptions[0] || ''"
-                  :disabled="metadataMovieSaving"
-                  @update:model-value="onMetadataMovieSelect"
-                >
-                  <SelectTrigger class="w-full max-w-md rounded-2xl">
-                    <SelectValue :placeholder="t('settings.metadataMovieProviderSelectPh')" />
-                  </SelectTrigger>
-                  <SelectContent class="rounded-xl border-border/50">
-                    <SelectItem
-                      v-for="p in metadataMovieSelectOptions"
-                      :key="p"
-                      class="rounded-lg"
-                      :value="p"
-                    >
-                      {{ p }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  v-if="useWebApi"
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  class="size-10 shrink-0 rounded-xl"
-                  :disabled="
-                    providerPingAllBusy ||
-                    providerPingOneName != null ||
-                    !(metadataMovieProvider || metadataMovieSelectOptions[0])
-                  "
-                  :aria-label="t('settings.providerHealthPingCurrentAria')"
-                  @click="
-                    pingOneMetadataProvider(
-                      metadataMovieProvider || metadataMovieSelectOptions[0] || '',
-                    )
-                  "
-                >
-                  <Activity
-                    class="size-4"
-                    :class="{
-                      'motion-safe:animate-pulse':
-                        providerPingOneName ===
-                        (metadataMovieProvider || metadataMovieSelectOptions[0] || ''),
-                    }"
-                  />
-                </Button>
-              </div>
-              <div
-                v-if="useWebApi && healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')"
-                class="flex flex-wrap items-center gap-3"
-              >
-                <Badge
-                  :variant="
-                    providerHealthStatusVariant(
-                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
-                    )
-                  "
-                  class="text-xs font-normal"
-                >
-                  {{
-                    providerHealthStatusLabel(
-                      healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.status,
-                    )
-                  }}
-                  ·
-                  {{
-                    healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')!.latencyMs
-                  }}ms
-                </Badge>
-                <span
-                  v-if="healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message"
-                  class="text-xs text-muted-foreground"
-                >
-                  {{ healthForProvider(metadataMovieProvider || metadataMovieSelectOptions[0] || '')?.message }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Provider Chain Management（与 canPickSpecifiedMetadata 解耦：无站点列表时仍显示已保存的链） -->
-            <div
-              v-if="metadataMovieModeUi === 'chain'"
-              class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3"
-            >
-              <p
-                v-if="!canPickSpecifiedMetadata"
-                :class="cn(statusPanelClass('warning'), 'rounded-xl px-3 py-2 text-sm')"
-              >
-                {{ t("settings.metadataMovieProviderChainNoList") }}
-              </p>
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderChainLabel") }}</p>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{ t("settings.metadataMovieProviderChainDragHint") }}
-                  </p>
-                </div>
-                <span class="shrink-0 text-xs text-muted-foreground">
-                  {{ providerChainDraft.length }} {{ t("settings.providersSelected") }}
-                </span>
-              </div>
-
-              <!-- Provider Chain List -->
-              <div class="flex flex-col gap-3">
-                <div
-                  v-for="(provider, index) in providerChainDraft"
-                  :key="provider + '-' + index"
-                  class="flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-background/50 px-2 py-2 transition-[opacity,box-shadow] sm:px-3"
-                  :class="{
-                    'opacity-55': chainDragFromIndex === index,
-                    'ring-2 ring-primary/25 ring-offset-2 ring-offset-background':
-                      chainDragFromIndex === index,
-                  }"
-                  draggable="true"
-                  @dragstart="onChainDragStart($event, index)"
-                  @dragover="onChainDragOver"
-                  @drop.prevent="onChainDrop(index)"
-                  @dragend="onChainDragEnd"
-                >
-                  <span
-                    class="inline-flex cursor-grab touch-none items-center rounded-md p-1 text-muted-foreground active:cursor-grabbing"
-                    :aria-label="t('settings.metadataMovieProviderChainDragHandleAria')"
-                  >
-                    <GripVertical class="size-4 shrink-0" aria-hidden="true" />
-                  </span>
-                  <div
-                    class="flex shrink-0 items-center gap-3"
-                    :title="
-                      useWebApi && healthForProvider(provider)
-                        ? providerHealthStatusLabel(healthForProvider(provider)!.status) +
-                          ' · ' +
-                          healthForProvider(provider)!.latencyMs +
-                          'ms'
-                        : undefined
-                    "
-                  >
-                    <Loader2
-                      v-if="useWebApi && providerChainRowPinging(provider)"
-                      class="size-3.5 shrink-0 animate-spin text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-else-if="useWebApi && healthForProvider(provider)"
-                      class="size-2.5 shrink-0 rounded-full"
-                      :class="providerHealthDotClass(healthForProvider(provider)!.status)"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-else
-                      class="size-2.5 shrink-0 rounded-full bg-muted-foreground/25"
-                      aria-hidden="true"
-                    />
-                    <span
-                      v-if="useWebApi && healthForProvider(provider) && !providerChainRowPinging(provider)"
-                      class="w-[3.25rem] shrink-0 tabular-nums text-[0.65rem] text-muted-foreground"
-                    >
-                      {{ healthForProvider(provider)!.latencyMs }}ms
-                    </span>
-                  </div>
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ provider }}</span>
-                  <Button
-                    v-if="useWebApi"
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-lg"
-                    :disabled="providerPingAllBusy || providerPingOneName === provider"
-                    :aria-label="t('settings.providerHealthPingOneAria', { name: provider })"
-                    @click="pingOneMetadataProvider(provider)"
-                  >
-                    <Activity
-                      class="size-4"
-                      :class="{ 'motion-safe:animate-pulse': providerPingOneName === provider }"
-                    />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                    :aria-label="
-                      t('settings.metadataMovieProviderRemoveFromChainAria', { name: provider })
-                    "
-                    @click="removeProviderFromChain(index)"
-                  >
-                    <X class="size-4" />
-                  </Button>
-                </div>
-
-                <!-- Empty State -->
-                <div
-                  v-if="providerChainDraft.length === 0"
-                  class="rounded-xl border border-dashed border-border/60 bg-background/30 px-3 py-6 text-center text-sm text-muted-foreground"
-                >
-                  {{ t("settings.metadataMovieProviderChainEmpty") }}
-                </div>
-              </div>
-
-              <!-- Add Provider -->
-              <div v-if="availableProvidersForChain.length > 0" class="flex items-center gap-3 pt-2">
-                <Select v-model="selectedProviderToAdd">
-                  <SelectTrigger class="h-9 flex-1 rounded-xl text-sm">
-                    <SelectValue :placeholder="t('settings.selectProviderToAdd')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="p in availableProvidersForChain"
-                      :key="p"
-                      :value="p"
-                    >
-                      {{ p }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="h-9 rounded-xl px-3"
-                  :disabled="!selectedProviderToAdd"
-                  @click="addProviderToChain"
-                >
-                  <Plus class="mr-1 size-4" />
-                  {{ t("common.add") }}
-                </Button>
-              </div>
-
-              <!-- Manual save：与自动保存相同；无变更时为 no-op -->
-              <div class="flex flex-col gap-3 pt-2">
-                <p class="text-xs text-muted-foreground">
-                  {{ t("settings.metadataMovieProviderChainAutoSave") }}
-                </p>
-                <Button
-                  type="button"
-                  variant="default"
-                  class="w-fit rounded-xl font-medium"
-                  :disabled="metadataMovieChainSaving"
-                  @click="saveProviderChain"
-                >
-                  {{ metadataMovieChainSaving ? t("common.saving") : t("common.save") }}
-                </Button>
-              </div>
-
-              <p
-                v-if="metadataMovieChainSaving"
-                class="text-xs text-muted-foreground motion-safe:animate-pulse"
-              >
-                {{ t("settings.metadataMovieProviderSyncing") }}
-              </p>
-              <p v-if="metadataMovieChainError" class="text-sm text-destructive">
-                {{ metadataMovieChainError }}
-              </p>
-            </div>
-
-            <p
-              v-if="!canPickSpecifiedMetadata && metadataMovieModeUi !== 'chain'"
-              class="text-sm text-muted-foreground"
-            >
-              {{ t("settings.metadataMovieProviderNoList") }}
-            </p>
-            <p
-              v-if="metadataMovieSaving"
-              class="text-xs text-muted-foreground motion-safe:animate-pulse"
-            >
-              {{ t("settings.metadataMovieProviderSyncing") }}
-            </p>
-            <p v-if="metadataMovieError" class="text-sm text-destructive">
-              {{ metadataMovieError }}
-            </p>
-
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div class="min-w-0 flex flex-col gap-3">
-                <p class="text-sm font-semibold">{{ t("settings.triggerScrape") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.triggerScrapeHint") }}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                class="h-11 shrink-0 rounded-2xl px-5 font-medium"
-                :disabled="triggerScrapeCardBusy"
-                @click="runTriggerScrapeAllLibraryRoots"
-              >
-                <RefreshCw
-                  data-icon="inline-start"
-                  class="size-4"
-                  :class="{ 'motion-safe:animate-spin': triggerScrapeCardBusy }"
-                />
-                {{
-                  triggerScrapeCardBusy
-                    ? t("settings.triggerScrapeRunning")
-                    : t("settings.triggerScrapeRunButton")
-                }}
-              </Button>
-            </div>
-            <p
-              v-if="triggerScrapeCardSuccess"
-              class="text-sm text-primary"
-            >
-              {{ triggerScrapeCardSuccess }}
-            </p>
-            <p
-              v-if="triggerScrapeCardError"
-              class="text-sm text-destructive"
-              role="alert"
-            >
-              {{ triggerScrapeCardError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <SettingsMetadataSection
+        v-model:selected-provider-to-add="selectedProviderToAdd"
+        :use-web-api="useWebApi"
+        :provider-ping-all-busy="providerPingAllBusy"
+        :provider-ping-one-name="providerPingOneName"
+        :provider-health-ping-all-summary="providerHealthPingAllSummary"
+        :provider-health-ping-error="providerHealthPingError"
+        :auto-library-watch="autoLibraryWatch"
+        :auto-library-watch-saving="autoLibraryWatchSaving"
+        :auto-library-watch-error="autoLibraryWatchError"
+        :auto-actor-profile-scrape="autoActorProfileScrape"
+        :auto-actor-profile-scrape-saving="autoActorProfileScrapeSaving"
+        :auto-actor-profile-scrape-error="autoActorProfileScrapeError"
+        :metadata-movie-mode-ui="metadataMovieModeUi"
+        :metadata-movie-saving="metadataMovieSaving"
+        :metadata-movie-chain-saving="metadataMovieChainSaving"
+        :can-pick-specified-metadata="canPickSpecifiedMetadata"
+        :can-use-metadata-chain-mode="canUseMetadataChainMode"
+        :metadata-movie-provider="metadataMovieProvider"
+        :metadata-movie-select-options="metadataMovieSelectOptions"
+        :metadata-movie-error="metadataMovieError"
+        :provider-chain-draft="providerChainDraft"
+        :available-providers-for-chain="availableProvidersForChain"
+        :chain-drag-from-index="chainDragFromIndex"
+        :metadata-movie-chain-error="metadataMovieChainError"
+        :provider-health-by-name="providerHealthByName"
+        :trigger-scrape-card-busy="triggerScrapeCardBusy"
+        :trigger-scrape-card-success="triggerScrapeCardSuccess"
+        :trigger-scrape-card-error="triggerScrapeCardError"
+        @ping-all-providers="pingAllMetadataProviders"
+        @change-auto-library-watch="onAutoLibraryWatchChange"
+        @change-auto-actor-profile-scrape="onAutoActorProfileScrapeChange"
+        @select-auto="onMetadataMovieModeAuto"
+        @select-specified="onMetadataMovieModeSpecified"
+        @select-chain="onMetadataMovieModeChain"
+        @select-provider="onMetadataMovieSelect"
+        @ping-provider="pingOneMetadataProvider"
+        @drag-start="onChainDragStart"
+        @drag-over="onChainDragOver"
+        @drop-provider="onChainDrop"
+        @drag-end="onChainDragEnd"
+        @remove-provider="removeProviderFromChain"
+        @add-provider="addProviderToChain"
+        @save-provider-chain="saveProviderChain"
+        @run-trigger-scrape="runTriggerScrapeAllLibraryRoots"
+      />
     </section>
     </TabsContent>
 
@@ -2999,205 +1916,24 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navNetwork')"
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Globe class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.proxyTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.proxyDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <p
-              v-if="!useWebApi"
-              class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
-            >
-              {{ t("settings.proxyMockHint") }}
-            </p>
-            <div
-              class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
-              :aria-busy="proxySaving"
-            >
-              <div class="min-w-0 flex-1 space-y-1">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyEnabled") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.proxyEnabledHint") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="proxyEnabledDraft"
-                :disabled="proxySaving"
-                @update:model-value="proxyEnabledDraft = $event"
-              />
-            </div>
-            <div
-              v-if="proxyEnabledDraft"
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-            >
-              <div class="grid gap-3 md:grid-cols-[11rem_minmax(0,1fr)_10rem]">
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyScheme") }}</p>
-                  <Select v-model="proxySchemeDraft" :disabled="proxySaving">
-                    <SelectTrigger>
-                      <SelectValue :placeholder="t('settings.proxySchemeHttp')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        v-for="option in PROXY_SCHEME_OPTIONS"
-                        :key="option"
-                        :value="option"
-                      >
-                        {{ proxySchemeLabel(option) }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyHost") }}</p>
-                  <Input
-                    v-model="proxyHostDraft"
-                    autocomplete="off"
-                    class="rounded-xl border-border/50"
-                    :placeholder="t('settings.proxyHostPlaceholder')"
-                    :disabled="proxySaving"
-                  />
-                </div>
-                <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyPort") }}</p>
-                  <Input
-                    v-model="proxyPortDraft"
-                    inputmode="numeric"
-                    class="rounded-xl border-border/50"
-                    :placeholder="t('settings.proxyPortPlaceholder')"
-                    :disabled="proxySaving"
-                  />
-                </div>
-              </div>
-              <div class="flex flex-col gap-3">
-                <button
-                  type="button"
-                  class="flex h-8 min-h-8 w-full max-h-8 items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/30 px-3 py-0 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/25 disabled:opacity-60"
-                  :disabled="proxySaving"
-                  :aria-expanded="proxyAuthExpanded"
-                  @click="proxyAuthExpanded = !proxyAuthExpanded"
-                >
-                  <span>{{ t("settings.proxyAuthToggle") }}</span>
-                  <ChevronDown
-                    class="size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-safe:transition-transform"
-                    :class="proxyAuthExpanded ? 'rotate-180' : ''"
-                    aria-hidden="true"
-                  />
-                </button>
-                <div
-                  v-show="proxyAuthExpanded"
-                  class="flex flex-col gap-3 border-t border-border/50 pt-3"
-                >
-                  <div class="flex flex-col gap-3">
-                    <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
-                    <Input
-                      v-model="proxyUsernameDraft"
-                      autocomplete="off"
-                      class="rounded-xl border-border/50"
-                      :disabled="proxySaving"
-                    />
-                  </div>
-                  <div class="flex flex-col gap-3">
-                    <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
-                    <Input
-                      v-model="proxyPasswordDraft"
-                      type="password"
-                      autocomplete="new-password"
-                      class="rounded-xl border-border/50"
-                      :disabled="proxySaving"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p
-              v-if="useWebApi"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.proxyPingJavbusHint") }}
-            </p>
-            <p
-              v-if="useWebApi"
-              class="text-xs text-muted-foreground"
-            >
-              {{ t("settings.proxyPingGoogleHint") }}
-            </p>
-            <div class="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                @click="saveProxySettings"
-              >
-                {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
-              </Button>
-              <Button
-                v-if="useWebApi"
-                type="button"
-                variant="outline"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                :aria-busy="proxyJavbusBusy"
-                @click="testProxyJavbus"
-              >
-                <Loader2
-                  v-if="proxyJavbusBusy"
-                  class="mr-2 size-4 motion-safe:animate-spin"
-                  aria-hidden="true"
-                />
-                {{
-                  proxyJavbusBusy
-                    ? t("settings.proxyPingJavbusTesting")
-                    : t("settings.proxyPingJavbus")
-                }}
-              </Button>
-              <Button
-                v-if="useWebApi"
-                type="button"
-                variant="outline"
-                class="rounded-lg"
-                :disabled="proxySaving || proxyOutboundPingBusy"
-                :aria-busy="proxyGoogleBusy"
-                @click="testProxyGoogle"
-              >
-                <Loader2
-                  v-if="proxyGoogleBusy"
-                  class="mr-2 size-4 motion-safe:animate-spin"
-                  aria-hidden="true"
-                />
-                {{
-                  proxyGoogleBusy
-                    ? t("settings.proxyPingGoogleTesting")
-                    : t("settings.proxyPingGoogle")
-                }}
-              </Button>
-            </div>
-            <p
-              class="min-h-5 text-sm transition-colors"
-              :class="proxyStatusMessage?.className ?? 'text-transparent'"
-            >
-              {{ proxyStatusMessage?.text ?? " " }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
+      <SettingsNetworkSection
+        v-model:proxy-enabled="proxyEnabledDraft"
+        v-model:proxy-scheme="proxySchemeDraft"
+        v-model:proxy-host="proxyHostDraft"
+        v-model:proxy-port="proxyPortDraft"
+        v-model:proxy-username="proxyUsernameDraft"
+        v-model:proxy-password="proxyPasswordDraft"
+        v-model:proxy-auth-expanded="proxyAuthExpanded"
+        :use-web-api="useWebApi"
+        :proxy-saving="proxySaving"
+        :proxy-outbound-ping-busy="proxyOutboundPingBusy"
+        :proxy-javbus-busy="proxyJavbusBusy"
+        :proxy-google-busy="proxyGoogleBusy"
+        :proxy-status-message="proxyStatusMessage"
+        @save-proxy="saveProxySettings"
+        @test-proxy-javbus="testProxyJavbus"
+        @test-proxy-google="testProxyGoogle"
+      />
     </section>
     </TabsContent>
 
@@ -3212,278 +1948,21 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navCurated')"
     >
     <h2 class="sr-only">{{ t("settings.navCurated") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-4 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <ImageDown class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.curatedCardTitle") }}
-            </CardTitle>
-            <CardDescription class="space-y-3 text-foreground">
-              <p class="text-xs leading-relaxed text-muted-foreground">
-                {{ t("settings.curatedCardDescShort") }}
-              </p>
-              <div
-                class="flex flex-wrap items-center gap-3 text-sm font-medium text-foreground/95"
-              >
-                <span class="font-normal text-muted-foreground">{{
-                  t("settings.curatedCardHow")
-                }}</span>
-                <kbd
-                  class="pointer-events-none inline-flex h-7 min-w-7 select-none items-center justify-center rounded-lg border border-border bg-muted px-2 font-mono text-xs font-semibold text-foreground shadow-sm"
-                >
-                  {{ curatedCaptureShortcutLabel }}
-                </kbd>
-                <span class="font-normal text-muted-foreground">{{
-                  t("settings.curatedCardOr")
-                }}</span>
-                <span
-                  class="inline-flex items-center rounded-lg border border-border/80 bg-background px-2.5 py-1 text-xs font-semibold tracking-wide text-foreground shadow-xs"
-                >
-                  {{ t("player.curatedLabel") }}
-                </span>
-              </div>
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-3">
-              <legend class="sr-only">{{ t("settings.savePolicy") }}</legend>
-              <div class="mb-0.5 flex items-center gap-3 px-0.5">
-                <span class="text-sm font-medium text-foreground">{{
-                  t("settings.savePolicy")
-                }}</span>
-                <TooltipProvider :delay-duration="280">
-                  <TooltipRoot>
-                    <TooltipTrigger as-child>
-                      <button
-                        type="button"
-                        class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      >
-                        <Info class="size-4" aria-hidden="true" />
-                        <span class="sr-only">{{
-                          t("settings.curatedStorageTechAria")
-                        }}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipPortal>
-                      <TooltipContent
-                        side="top"
-                        :side-offset="6"
-                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-                      >
-                        {{ t("settings.curatedStorageTechTooltip") }}
-                      </TooltipContent>
-                    </TooltipPortal>
-                  </TooltipRoot>
-                </TooltipProvider>
-              </div>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
-              >
-                <input
-                  v-model="curatedSaveMode"
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="curated-save-mode"
-                  value="app"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{ t("settings.curatedApp") }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.curatedAppHint") }}
-                  </span>
-                </span>
-              </label>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
-              >
-                <input
-                  v-model="curatedSaveMode"
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="curated-save-mode"
-                  value="download"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{ t("settings.curatedDownload") }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.curatedDownloadHint") }}
-                  </span>
-                </span>
-              </label>
-              <label
-                class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
-              >
-                <input
-                  v-model="curatedSaveMode"
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  type="radio"
-                  name="curated-save-mode"
-                  value="directory"
-                  :disabled="!supportsFileSystemAccess()"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="text-sm font-medium">{{ t("settings.curatedDir") }}</span>
-                  <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.curatedDirHint") }}
-                  </span>
-                  <span
-                    v-if="!supportsFileSystemAccess()"
-                    :class="cn('mt-1 block text-xs', statusTextClass('warning'))"
-                  >
-                    {{ t("settings.curatedDirUnsupported") }}
-                  </span>
-                </span>
-              </label>
-            </fieldset>
-
-            <SettingsCuratedShortcutSection />
-
-            <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-3">
-              <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
-              <div
-                class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-              >
-                <div class="min-w-0 flex-1 space-y-1">
-                  <p class="text-sm font-medium text-foreground">
-                    {{ t("settings.curatedExportFormatTitle") }}
-                  </p>
-                  <p class="text-xs leading-relaxed text-muted-foreground">
-                    {{ t("settings.curatedExportFormatHint") }}
-                  </p>
-                </div>
-                <div
-                  class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-shrink-0"
-                >
-                  <span
-                    v-if="curatedExportFormatSaving"
-                    class="shrink-0 text-xs text-muted-foreground"
-                  >
-                    {{ t("common.saving") }}
-                  </span>
-                  <Select
-                    :model-value="curatedFrameExportFormat"
-                    :disabled="curatedExportFormatSaving"
-                    @update:model-value="onCuratedExportFormatSelect"
-                  >
-                    <SelectTrigger
-                      class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-32 sm:min-w-0 sm:shrink-0"
-                      :aria-label="t('settings.curatedExportFormatLabel')"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent class="rounded-xl border-border/50">
-                      <SelectItem
-                        v-for="option in curatedExportFormatOptions"
-                        :key="`curated-export-format-${option.value}`"
-                        class="rounded-lg"
-                        :value="option.value"
-                      >
-                        {{ option.label }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </fieldset>
-
-            <div
-              v-if="curatedSaveMode === 'directory' && supportsFileSystemAccess()"
-              class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4"
-            >
-              <p class="text-sm font-medium">{{ t("settings.exportFolder") }}</p>
-              <p class="text-sm text-muted-foreground">
-                {{
-                  curatedExportDirLabel
-                    ? t("settings.exportChosen", { name: curatedExportDirLabel })
-                    : t("settings.exportNone")
-                }}
-              </p>
-              <div class="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  class="rounded-2xl"
-                  :disabled="curatedExportPickBusy"
-                  @click="pickCuratedExportDirectory"
-                >
-                  <FolderOpen data-icon="inline-start" />
-                  {{
-                    curatedExportPickBusy
-                      ? t("settings.picking")
-                      : curatedExportDirLabel
-                        ? t("settings.changeExportFolder")
-                        : t("settings.pickExportFolder")
-                  }}
-                </Button>
-                <Button
-                  v-if="curatedExportDirLabel"
-                  type="button"
-                  variant="outline"
-                  class="rounded-2xl"
-                  :disabled="curatedExportPickBusy"
-                  @click="clearCuratedExportDirectory"
-                >
-                  {{ t("settings.clearExportFolder") }}
-                </Button>
-              </div>
-              <div
-                v-if="curatedExportDirLabel"
-                class="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <p class="text-xs leading-relaxed text-muted-foreground">
-                  {{ t("settings.curatedReauthorizeHelp") }}
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 shrink-0 rounded-xl px-3 text-xs font-medium"
-                  :disabled="curatedExportPickBusy"
-                  @click="pickCuratedExportDirectory"
-                >
-                  {{ t("settings.curatedReauthorizeExport") }}
-                </Button>
-              </div>
-            </div>
-
-            <p v-if="curatedExportError" class="text-sm text-destructive" role="alert">
-              {{ curatedExportError }}
-            </p>
-            <p v-if="curatedExportFormatError" class="text-sm text-destructive" role="alert">
-              {{ curatedExportFormatError }}
-            </p>
-
-            <div
-              :class="statusPanelClass('info')"
-              role="note"
-            >
-              <p :class="cn('text-sm font-medium', statusTextClass('info'))">
-                {{ t("settings.curatedCorsTitle") }}
-              </p>
-              <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                {{ t("settings.curatedCorsNote") }}
-              </p>
-              <a
-                class="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline"
-                href="https://developer.mozilla.org/en-US/docs/Web/HTML/Cross-origin_images_and_canvas"
-                target="_blank"
-                rel="noopener noreferrer"
-                :aria-label="t('settings.curatedCorsLearnAria')"
-              >
-                {{ t("settings.curatedCorsLearnMore") }}
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      </div>
+      <SettingsCuratedSection
+        v-model:curated-save-mode="curatedSaveMode"
+        :capture-shortcut-label="curatedCaptureShortcutLabel"
+        :directory-supported="curatedDirectorySupported"
+        :curated-frame-export-format="curatedFrameExportFormat"
+        :curated-export-format-options="curatedExportFormatOptions"
+        :curated-export-format-saving="curatedExportFormatSaving"
+        :curated-export-dir-label="curatedExportDirLabel"
+        :curated-export-pick-busy="curatedExportPickBusy"
+        :curated-export-error="curatedExportError"
+        :curated-export-format-error="curatedExportFormatError"
+        @change-export-format="onCuratedExportFormatSelect"
+        @pick-export-directory="pickCuratedExportDirectory"
+        @clear-export-directory="clearCuratedExportDirectory"
+      />
     </section>
     </TabsContent>
 
@@ -3513,92 +1992,10 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navMaintenance')"
     >
     <h2 class="sr-only">{{ t("settings.navMaintenance") }}</h2>
-      <div class="flex w-full flex-col gap-6">
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Wrench class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.manualCardTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.manualCardDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div class="min-w-0 flex flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.triggerFullScan") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.triggerFullScanHint") }}
-                </p>
-              </div>
-              <Button
-                type="button"
-                class="h-11 shrink-0 rounded-2xl px-5 font-medium"
-                :disabled="fullScanBusy"
-                @click="runFullScan"
-              >
-                <ScanSearch
-                  data-icon="inline-start"
-                  class="size-4"
-                  :class="fullScanBusy ? 'animate-pulse' : ''"
-                />
-                {{ t("common.run") }}
-              </Button>
-            </div>
-
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div class="min-w-0 flex flex-col gap-3">
-                <p class="text-sm font-semibold text-foreground">{{ t("settings.rebuildCache") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.rebuildCacheHint") }}
-                </p>
-              </div>
-              <Button variant="secondary" class="h-11 shrink-0 rounded-2xl px-5 font-medium">
-                <RefreshCw data-icon="inline-start" class="size-4" />
-                {{ t("common.run") }}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <BookOpen class="size-[1.15rem]" />
-              </span>
-              {{ t("settings.configCardTitle") }}
-            </CardTitle>
-            <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
-            >
-              {{ t("settings.configCardDesc") }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="pt-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm sm:leading-6">
-            {{ t("settings.configCardBody") }}
-          </CardContent>
-        </Card>
-      </div>
-      </div>
+      <SettingsMaintenanceSection
+        :full-scan-busy="fullScanBusy"
+        @run-full-scan="runFullScan"
+      />
     </section>
     </TabsContent>
 
@@ -3613,113 +2010,17 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navAbout')"
     >
     <h2 class="sr-only">{{ t("settings.navAbout") }}</h2>
-    <div class="flex w-full flex-col gap-6">
-    <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-4 pb-2">
-          <CardTitle class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight">
-            <span class="flex min-w-0 items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Info class="size-[1.15rem]" />
-              </span>
-              <span class="min-w-0">{{ t("settings.aboutCardTitle") }}</span>
-            </span>
-          </CardTitle>
-          <div class="flex w-full justify-center pt-1">
-            <div
-              class="font-curated inline-flex w-fit max-w-full items-center gap-3 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
-              title="Curated"
-            >
-              <Sparkles class="size-6 shrink-0 text-primary sm:size-7" aria-hidden="true" />
-              <span class="truncate">Curated</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent class="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
-          <!-- 开发：版本号、数据模式、前端构建模式 -->
-          <template v-if="isViteDev">
-            <dl class="space-y-4">
-              <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutVersionLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                  <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3">
-                    <Loader2 class="size-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-                    {{ t("settings.aboutVersionLoading") }}
-                  </span>
-                  <span v-else-if="aboutHealthError" class="text-destructive">{{ aboutHealthError }}</span>
-                  <span v-else-if="aboutHealth" class="font-mono text-foreground/90">
-                    {{ formatAboutBackendVersion(aboutHealth) }}
-                  </span>
-                  <span v-else>—</span>
-                </dd>
-              </div>
-              <SettingsAppUpdateSection
-                v-if="useWebApi"
-                :backend-version-display="aboutBackendVersionDisplay"
-                :backend-version-status="aboutBackendVersionStatus"
-              />
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutDataModeLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  {{
-                    useWebApi
-                      ? t("settings.aboutDataModeWebApi")
-                      : t("settings.aboutDataModeMock")
-                  }}
-                </dd>
-              </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
-                  {{ t("settings.aboutFrontendBuildLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
-                </dd>
-              </div>
-            </dl>
-            <p class="text-xs text-muted-foreground/90">
-              {{ t("settings.aboutDevProxyHint") }}
-            </p>
-          </template>
-          <!-- 生产：仅版本号 -->
-          <template v-else>
-            <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-              <p class="font-medium text-foreground">
-                {{ t("settings.aboutVersionLabel") }}
-              </p>
-              <p class="mt-1.5 font-mono text-sm text-foreground/90">
-                <span v-if="!useWebApi">{{ t("settings.aboutVersionMock") }}</span>
-                <span v-else-if="aboutHealthLoading" class="inline-flex items-center gap-3 font-sans text-muted-foreground">
-                  <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
-                  {{ t("settings.aboutVersionLoading") }}
-                </span>
-                <span v-else-if="aboutHealthError" class="font-sans text-destructive">{{ aboutHealthError }}</span>
-                <span v-else-if="aboutHealth">{{ formatAboutBackendVersion(aboutHealth) }}</span>
-                <span v-else>—</span>
-              </p>
-            </div>
-            <SettingsAppUpdateSection
-              v-if="useWebApi"
-              :backend-version-display="aboutBackendVersionDisplay"
-              :backend-version-status="aboutBackendVersionStatus"
-            />
-          </template>
-          <SettingsHomepageDevTools
-            v-if="isViteDev && useWebApi"
-            @refreshed="void loadAboutHealth()"
-          />
-        </CardContent>
-      </Card>
-    </div>
-    </div>
+    <SettingsAboutSection
+      :is-vite-dev="isViteDev"
+      :use-web-api="useWebApi"
+      :vite-mode="viteMode"
+      :about-health="aboutHealth"
+      :about-health-loading="aboutHealthLoading"
+      :about-health-error="aboutHealthError"
+      :backend-version-display="aboutBackendVersionDisplay"
+      :backend-version-status="aboutBackendVersionStatus"
+      @refresh-health="void loadAboutHealth()"
+    />
     </section>
     </TabsContent>
     </div>

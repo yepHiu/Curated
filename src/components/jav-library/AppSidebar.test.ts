@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { computed, ref } from "vue"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import AppSidebar from "./AppSidebar.vue"
 
@@ -21,6 +21,12 @@ const trashedMovies = ref([
     userTags: [],
   },
 ])
+const routeState = ref({
+  name: "home" as unknown,
+  params: {} as Record<string, unknown>,
+  query: {} as Record<string, unknown>,
+})
+const activePlaybackSessionState = ref<unknown>(null)
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -35,7 +41,7 @@ vi.mock("vue-router", () => ({
     props: ["to"],
     template: "<a :data-to=\"JSON.stringify(to)\"><slot /></a>",
   },
-  useRoute: () => ({ name: "home", query: {} }),
+  useRoute: () => routeState.value,
 }))
 
 vi.mock("@/services/library-service", () => ({
@@ -95,6 +101,13 @@ vi.mock("@/lib/playback-progress-storage", () => ({
   playbackProgressRevision: ref(0),
 }))
 
+vi.mock("@/composables/use-active-playback-session", () => ({
+  useActivePlaybackSession: () => ({
+    activePlaybackSession: activePlaybackSessionState,
+    dismissActivePlaybackSession: vi.fn(),
+  }),
+}))
+
 vi.mock("@/components/ui/scroll-area", () => ({
   ScrollArea: { name: "ScrollArea", template: "<div><slot /></div>" },
 }))
@@ -110,6 +123,33 @@ vi.mock("@/components/ui/badge", () => ({
 vi.mock("@/components/ui/separator", () => ({
   Separator: { name: "Separator", template: "<hr />" },
 }))
+
+function setActivePlaybackSession() {
+  activePlaybackSessionState.value = {
+    movieId: "movie-1",
+    title: "Movie title",
+    positionSec: 42,
+    durationSec: 120,
+    progressPercent: 35,
+    status: "paused",
+    updatedAt: "2026-05-01T00:00:00.000Z",
+    resumeRouteTarget: {
+      name: "player",
+      params: { id: "movie-1" },
+      query: { autoplay: "1", t: "42", back: "browse" },
+    },
+  }
+}
+
+beforeEach(() => {
+  updateAvailable.value = false
+  routeState.value = {
+    name: "home",
+    params: {},
+    query: {},
+  }
+  activePlaybackSessionState.value = null
+})
 
 describe("AppSidebar", () => {
   it("does not show numeric sidebar counts when movie data exists", async () => {
@@ -159,5 +199,42 @@ describe("AppSidebar", () => {
 
     expect(expandedLinks.length).toBeGreaterThan(0)
     expect(expandedLinks).toHaveLength(compactLinks.length)
+  })
+
+  it("shows an expanded continue playback card above backend status", async () => {
+    setActivePlaybackSession()
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const card = wrapper.get("[data-active-playback-card]")
+    expect(card.text()).toContain("nav.continuePlayback")
+    expect(card.text()).toContain("Movie title")
+    expect(card.attributes("data-to")).toContain('"t":"42"')
+  })
+
+  it("shows an icon-only continue playback entry in compact mode", async () => {
+    setActivePlaybackSession()
+
+    const wrapper = mount(AppSidebar, { props: { compact: true } })
+    await flushPromises()
+
+    expect(wrapper.find("[data-active-playback-card]").exists()).toBe(false)
+    expect(wrapper.find("[data-active-playback-compact]").exists()).toBe(true)
+  })
+
+  it("hides the continue playback entry on the same player route", async () => {
+    setActivePlaybackSession()
+    routeState.value = {
+      name: "player",
+      params: { id: "movie-1" },
+      query: {},
+    }
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    expect(wrapper.find("[data-active-playback-card]").exists()).toBe(false)
+    expect(wrapper.find("[data-active-playback-compact]").exists()).toBe(false)
   })
 })

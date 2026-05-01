@@ -1,3 +1,4 @@
+// Package library manages the in-memory movie catalogue: ingest, search, filter, and metadata application.
 package library
 
 import (
@@ -14,12 +15,14 @@ import (
 
 var errMovieNotFound = errors.New("movie not found")
 
+// Service is the thread-safe in-memory movie store with search and metadata application.
 type Service struct {
 	mu          sync.RWMutex
 	movies      []contracts.MovieDetailDTO
 	searchTexts map[string]string // movieID → pre-computed searchable text
 }
 
+// NewService creates an empty movie Service.
 func NewService() *Service {
 	return &Service{
 		movies:      nil,
@@ -27,6 +30,7 @@ func NewService() *Service {
 	}
 }
 
+// ListMovies filters, sorts, and paginates the in-memory movie list by mode, query, actor, and studio.
 func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.MoviesPageDTO {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -106,6 +110,7 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 	}
 }
 
+// GetMovie returns the movie with the given ID, or errMovieNotFound.
 func (s *Service) GetMovie(movieID string) (contracts.MovieDetailDTO, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -120,10 +125,12 @@ func (s *Service) GetMovie(movieID string) (contracts.MovieDetailDTO, error) {
 	return contracts.MovieDetailDTO{}, errMovieNotFound
 }
 
+// IsNotFound reports whether err is errMovieNotFound.
 func IsNotFound(err error) bool {
 	return errors.Is(err, errMovieNotFound)
 }
 
+// UpsertScannedMovie inserts or updates a movie record from a scan result, deduplicating by ID, code, or file location.
 func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 	if result.MovieID == "" || result.Number == "" {
 		return
@@ -172,6 +179,7 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 	})
 }
 
+// ApplyScrapedMetadata merges scraped metadata fields into the matching movie, preserving local-only fields like UserTags.
 func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 	if metadata.MovieID == "" {
 		return

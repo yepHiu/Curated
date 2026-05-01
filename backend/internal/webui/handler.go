@@ -1,3 +1,4 @@
+// Package webui serves the production frontend dist and delegates /api requests to the backend handler.
 package webui
 
 import (

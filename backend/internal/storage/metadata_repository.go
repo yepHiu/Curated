@@ -13,6 +13,7 @@ import (
 // ErrMovieNotFoundForMetadata is returned when SaveMovieMetadata updates zero rows (unknown movie id).
 var ErrMovieNotFoundForMetadata = errors.New("movie not found for metadata update")
 
+// SaveMovieMetadata persists scraped metadata for a movie, replacing actors, tags, and media assets in one transaction.
 func (s *SQLiteStore) SaveMovieMetadata(ctx context.Context, metadata scraper.Metadata) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

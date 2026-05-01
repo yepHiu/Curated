@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Curated 继续播放侧边栏入口原型</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f14;
+        --workspace: #10141c;
+        --sidebar: #121722;
+        --sidebar-2: #151b28;
+        --surface: #171d2a;
+        --surface-2: #1b2332;
+        --line: rgba(232, 238, 247, 0.12);
+        --line-strong: rgba(232, 238, 247, 0.2);
+        --text: #f4f7fb;
+        --muted: #9da8ba;
+        --muted-2: #727d8f;
+        --brand: #fe628e;
+        --brand-soft: rgba(254, 98, 142, 0.15);
+        --success: #80d8b2;
+        --warning: #f4c76f;
+        --focus: rgba(254, 98, 142, 0.46);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "Segoe UI",
+          "Microsoft YaHei",
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+
+      svg {
+        display: block;
+      }
+
+      button,
+      a {
+        font: inherit;
+      }
+
+      .page {
+        width: min(1360px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 22px;
+      }
+
+      .intro p,
+      .panel-note,
+      .meta,
+      .copy {
+        color: var(--muted);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #ffc7d7;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .intro p {
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .showcase {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+        gap: 18px;
+      }
+
+      .panel {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #0f131b;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .panel-header h2 {
+        font-size: 16px;
+      }
+
+      .panel-note {
+        font-size: 12px;
+      }
+
+      .browser {
+        height: 760px;
+        background: var(--workspace);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 304px minmax(0, 1fr);
+        height: 100%;
+      }
+
+      .shell.compact {
+        grid-template-columns: 76px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        min-width: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: var(--sidebar);
+      }
+
+      .brand {
+        display: flex;
+        min-height: 72px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand.compact-brand {
+        justify-content: center;
+        padding: 0;
+      }
+
+      .brand-mark {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius);
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .brand-name {
+        min-width: 0;
+        color: var(--brand);
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .nav-scroll {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 16px 14px;
+      }
+
+      .section {
+        margin-bottom: 22px;
+      }
+
+      .section-label {
+        margin: 0 0 8px;
+        padding: 0 8px;
+        color: var(--muted-2);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .nav-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        gap: 10px;
+        border-radius: var(--radius);
+        padding: 0 10px;
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .nav-icon {
+        width: 18px;
+        height: 18px;
+        color: var(--muted);
+      }
+
+      .bottom {
+        display: grid;
+        gap: 10px;
+        padding: 12px 14px 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .continue-card {
+        display: block;
+        width: 100%;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: inherit;
+        text-align: left;
+        text-decoration: none;
+        outline: none;
+      }
+
+      .continue-card:focus-visible,
+      .compact-continue:focus-visible {
+        box-shadow: 0 0 0 3px var(--focus);
+      }
+
+      .continue-inner {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .continue-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .continue-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: #ffd7e2;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pulse {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--brand);
+        box-shadow: 0 0 0 6px rgba(254, 98, 142, 0.14);
+      }
+
+      .play-button {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius);
+        background: var(--brand);
+        color: #240f16;
+      }
+
+      .movie-title {
+        display: -webkit-box;
+        overflow: hidden;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.35;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .bar {
+        height: 4px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .bar span {
+        display: block;
+        width: 36%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--brand);
+      }
+
+      .backend-card,
+      .settings-row {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        gap: 10px;
+        border-radius: var(--radius);
+        padding: 0 10px;
+      }
+
+      .backend-card {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .status-dot {
+        width: 9px;
+        height: 9px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--success);
+      }
+
+      .backend-text {
+        min-width: 0;
+      }
+
+      .backend-text strong,
+      .settings-row strong {
+        display: block;
+        overflow: hidden;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .backend-text span {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .settings-row {
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .content {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 72px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .back-pill,
+      .theme-pill {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 0 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 16px;
+        min-height: 0;
+        flex: 1;
+        padding: 20px;
+      }
+
+      .library-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        align-content: start;
+      }
+
+      .poster {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .poster-art {
+        aspect-ratio: 0.72;
+        background:
+          linear-gradient(145deg, rgba(254, 98, 142, 0.22), transparent 46%),
+          #252d3d;
+      }
+
+      .poster-body {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .skeleton-1,
+      .skeleton-2 {
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .skeleton-2 {
+        width: 58%;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .detail-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px;
+      }
+
+      .detail-panel h3 {
+        margin-bottom: 8px;
+        font-size: 17px;
+      }
+
+      .copy {
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .compact .sidebar {
+        align-items: center;
+      }
+
+      .compact-nav {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        width: 100%;
+        padding-top: 14px;
+      }
+
+      .compact-item,
+      .compact-continue,
+      .compact-backend,
+      .compact-settings {
+        display: inline-flex;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius);
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .compact-item.active {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+      }
+
+      .compact-bottom {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        width: 100%;
+        margin-top: auto;
+        padding: 12px 0 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .compact-continue {
+        position: relative;
+        border: 1px solid var(--line-strong);
+        background: var(--surface);
+        color: var(--brand);
+      }
+
+      .compact-progress {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        left: 6px;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .compact-progress span {
+        display: block;
+        width: 36%;
+        height: 100%;
+        background: var(--brand);
+      }
+
+      .compact-backend {
+        color: var(--success);
+      }
+
+      .tooltip {
+        position: absolute;
+        left: 66px;
+        bottom: 82px;
+        width: 238px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: #171d2a;
+        padding: 12px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+      }
+
+      .tooltip strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .tooltip span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .side-notes {
+        display: grid;
+        gap: 18px;
+      }
+
+      .note-block {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 16px;
+      }
+
+      .note-block h2 {
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .note-block ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.75;
+      }
+
+      .mobile-demo {
+        margin-top: 18px;
+      }
+
+      .mobile-frame {
+        display: grid;
+        grid-template-columns: 304px minmax(0, 1fr);
+        height: 420px;
+        background: var(--workspace);
+      }
+
+      .mobile-scrim {
+        background: rgba(0, 0, 0, 0.5);
+      }
+
+      @media (max-width: 1180px) {
+        .intro,
+        .showcase,
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .browser {
+          height: auto;
+          min-height: 760px;
+        }
+
+        .library-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          width: min(100vw - 20px, 740px);
+          padding-top: 18px;
+        }
+
+        .shell {
+          grid-template-columns: minmax(250px, 80vw) minmax(0, 1fr);
+        }
+
+        .topbar,
+        .workspace {
+          padding-inline: 14px;
+        }
+
+        .mobile-frame {
+          grid-template-columns: minmax(250px, 82vw) minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="intro">
+        <div>
+          <p class="eyebrow">Curated / Playback Return Entry</p>
+          <h1>侧边栏「继续播放」入口原型</h1>
+        </div>
+        <p>
+          这份原型只验证全局入口的位置、层级和文案。它不是 mini player，也不表示离开播放页后视频仍在后台播放。
+          推荐语义是「继续播放」，让用户快速回到刚才的播放页。
+        </p>
+      </header>
+
+      <section class="showcase">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>展开侧边栏：后端状态上方的可点击卡片</h2>
+              <p class="panel-note">主页面仍然保持浏览任务，提示只占用底部全局状态区。</p>
+            </div>
+          </div>
+          <div class="browser">
+            <div class="shell">
+              <aside class="sidebar">
+                <div class="brand">
+                  <span class="brand-mark" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <strong class="brand-name">Curated</strong>
+                </div>
+
+                <nav class="nav-scroll" aria-label="主导航">
+                  <section class="section">
+                    <p class="section-label">浏览</p>
+                    <div class="nav-list">
+                      <a class="nav-item active" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M4 10.5 12 4l8 6.5V20H5v-9.5z" stroke="currentColor" stroke-width="1.8" /></svg>首页</a>
+                      <a class="nav-item" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M5 6h14M5 12h14M5 18h14" stroke="currentColor" stroke-width="1.8" /></svg>全部影片</a>
+                      <a class="nav-item" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" stroke="currentColor" stroke-width="1.8" /></svg>演员</a>
+                      <a class="nav-item" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M5 5h6l8 8-6 6-8-8V5z" stroke="currentColor" stroke-width="1.8" /></svg>标签</a>
+                    </div>
+                  </section>
+
+                  <section class="section">
+                    <p class="section-label">我的</p>
+                    <div class="nav-list">
+                      <a class="nav-item" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M5 5h14v14H5zM8 9h8M8 13h5" stroke="currentColor" stroke-width="1.8" /></svg>萃取帧</a>
+                      <a class="nav-item" href="#"><svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M12 7v6l4 2M4 12a8 8 0 1 0 3-6.2" stroke="currentColor" stroke-width="1.8" /></svg>观看历史</a>
+                    </div>
+                  </section>
+                </nav>
+
+                <div class="bottom">
+                  <a class="continue-card" href="#" aria-label="回到播放页继续播放当前影片，刚才播放至 42 分 16 秒">
+                    <span class="continue-inner">
+                      <span class="continue-top">
+                        <span class="continue-label"><span class="pulse" aria-hidden="true"></span>继续播放</span>
+                        <span class="play-button" aria-hidden="true">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </span>
+                      </span>
+                      <span class="movie-title">SSIS-001 片名示例：夜晚临时离开播放器后还能回来</span>
+                      <span class="meta"><span>刚才播放至 42:16</span><span>36%</span></span>
+                      <span class="bar" aria-hidden="true"><span></span></span>
+                    </span>
+                  </a>
+
+                  <div class="backend-card" role="status" aria-label="后端 API：后端在线，版本 20260501">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span class="backend-text">
+                      <strong>后端在线</strong>
+                      <span>20260501.010203</span>
+                    </span>
+                  </div>
+
+                  <a class="settings-row" href="#">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Zm0-12v3m0 11v3M4.2 6.2l2.1 2.1m11.4 7.4 2.1 2.1M3 12h3m12 0h3M4.2 17.8l2.1-2.1m11.4-7.4 2.1-2.1" stroke="currentColor" stroke-width="1.6" /></svg>
+                    <strong>设置</strong>
+                  </a>
+                </div>
+              </aside>
+
+              <section class="content">
+                <div class="topbar">
+                  <span class="back-pill">当前在首页查看信息</span>
+                  <span class="theme-pill">深色外观</span>
+                </div>
+                <div class="workspace">
+                  <div class="library-grid">
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                    <article class="poster"><div class="poster-art"></div><div class="poster-body"><span class="skeleton-1"></span><span class="skeleton-2"></span></div></article>
+                  </div>
+                  <aside class="detail-panel">
+                    <h3>设计意图</h3>
+                    <p class="copy">
+                      用户离开播放器后，入口固定出现在全局状态区；它比后端状态更靠上，说明优先级更高，但仍然不打断浏览。
+                    </p>
+                  </aside>
+                </div>
+              </section>
+            </div>
+          </div>
+        </article>
+
+        <aside class="side-notes">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>收起侧边栏</h2>
+              <p class="panel-note">icon-only + tooltip</p>
+            </div>
+            <div class="browser" style="height: 360px; min-height: 360px">
+              <div class="shell compact">
+                <aside class="sidebar" style="position: relative">
+                  <div class="brand compact-brand">
+                    <span class="brand-mark" aria-hidden="true">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                  </div>
+                  <nav class="compact-nav" aria-label="收起侧边栏导航">
+                    <a class="compact-item active" href="#" title="首页"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 10.5 12 4l8 6.5V20H5v-9.5z" stroke="currentColor" stroke-width="1.8" /></svg></a>
+                    <a class="compact-item" href="#" title="全部影片"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 6h14M5 12h14M5 18h14" stroke="currentColor" stroke-width="1.8" /></svg></a>
+                    <a class="compact-item" href="#" title="观看历史"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 7v6l4 2M4 12a8 8 0 1 0 3-6.2" stroke="currentColor" stroke-width="1.8" /></svg></a>
+                  </nav>
+                  <div class="compact-bottom">
+                    <a class="compact-continue" href="#" title="继续播放：SSIS-001，42:16" aria-label="继续播放：SSIS-001，42 分 16 秒">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                      <span class="compact-progress" aria-hidden="true"><span></span></span>
+                    </a>
+                    <span class="compact-backend" title="后端在线" aria-label="后端在线"><span class="status-dot"></span></span>
+                    <a class="compact-settings" href="#" title="设置"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Zm0-12v3m0 11v3M4.2 6.2l2.1 2.1m11.4 7.4 2.1 2.1M3 12h3m12 0h3M4.2 17.8l2.1-2.1m11.4-7.4 2.1-2.1" stroke="currentColor" stroke-width="1.6" /></svg></a>
+                  </div>
+                  <div class="tooltip">
+                    <strong>继续播放</strong>
+                    <span>SSIS-001 已看到 42:16。点击回到播放页并从这里继续。</span>
+                  </div>
+                </aside>
+                <section class="content">
+                  <div class="topbar"><span class="back-pill">侧栏收起时不显示标题</span></div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section class="note-block">
+            <h2>推荐规则</h2>
+            <ul>
+              <li>只在离开播放页后显示，同一播放器页面内隐藏。</li>
+              <li>点击后带上最新 `t` 和 `autoplay=1`。</li>
+              <li>播放结束、接近结尾或手动关闭后隐藏。</li>
+              <li>收起态只保留 icon，完整信息放到 tooltip / aria-label。</li>
+            </ul>
+          </section>
+
+          <section class="note-block">
+            <h2>不推荐文案</h2>
+            <ul>
+              <li>首版不默认写「正在播放」，因为离开播放页后视频实际不会继续后台播放。</li>
+              <li>首版不展示完整观看历史，避免变成第二个历史入口。</li>
+            </ul>
+          </section>
+        </aside>
+      </section>
+
+      <section class="panel mobile-demo">
+        <div class="panel-header">
+          <div>
+            <h2>移动端抽屉：复用展开卡片</h2>
+            <p class="panel-note">移动端打开导航抽屉时，继续播放入口仍在后端状态上方。</p>
+          </div>
+        </div>
+        <div class="mobile-frame">
+          <aside class="sidebar">
+            <div class="brand">
+              <span class="brand-mark" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <strong class="brand-name">Curated</strong>
+            </div>
+            <nav class="nav-scroll">
+              <div class="nav-list">
+                <a class="nav-item active" href="#">首页</a>
+                <a class="nav-item" href="#">全部影片</a>
+                <a class="nav-item" href="#">演员</a>
+                <a class="nav-item" href="#">观看历史</a>
+              </div>
+            </nav>
+            <div class="bottom">
+              <a class="continue-card" href="#">
+                <span class="continue-inner">
+                  <span class="continue-top">
+                    <span class="continue-label"><span class="pulse" aria-hidden="true"></span>继续播放</span>
+                    <span class="play-button" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg></span>
+                  </span>
+                  <span class="movie-title">SSIS-001 片名示例</span>
+                  <span class="meta"><span>刚才播放至 42:16</span><span>36%</span></span>
+                  <span class="bar" aria-hidden="true"><span></span></span>
+                </span>
+              </a>
+              <div class="backend-card"><span class="status-dot"></span><span class="backend-text"><strong>后端在线</strong><span>20260501.010203</span></span></div>
+            </div>
+          </aside>
+          <div class="mobile-scrim" aria-hidden="true"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

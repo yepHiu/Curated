@@ -125,6 +125,7 @@ export function buildNativePlayerLaunchUrl(
 
 export function looksLikeBrowserProtocolLaunchTarget(value: string): boolean {
   const trimmed = value.trim()
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) return false
   if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return false
   return !/^https?:/i.test(trimmed)
 }

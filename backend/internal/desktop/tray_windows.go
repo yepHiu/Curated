@@ -102,6 +102,7 @@ var (
 	}
 )
 
+// TrayOptions configures the Windows system tray.
 type TrayOptions struct {
 	Logger      *zap.Logger
 	Config      config.Config
@@ -168,6 +169,7 @@ type notifyIconData struct {
 	BalloonIcon                windows.Handle
 }
 
+// RunTray starts the Windows system tray icon with context menu.
 func RunTray(ctx context.Context, opts TrayOptions) error {
 	if opts.Cancel == nil {
 		return fmt.Errorf("nil tray cancel func")
@@ -591,6 +593,7 @@ func copyTooltip(dst *[128]uint16, text string) {
 	copy(dst[:], utf16Text)
 }
 
+// WaitForServerReady polls the health endpoint until the server responds.
 func WaitForServerReady(ctx context.Context, baseURL string) error {
 	client := &http.Client{Timeout: 2 * time.Second}
 	healthURL := strings.TrimRight(baseURL, "/") + "/api/health"
@@ -617,6 +620,7 @@ func WaitForServerReady(ctx context.Context, baseURL string) error {
 	}
 }
 
+// ResolveBaseURL normalizes an address into a localhost HTTP base URL.
 func ResolveBaseURL(addr string) string {
 	host := strings.TrimSpace(addr)
 	if host == "" {
@@ -633,6 +637,7 @@ func ResolveBaseURL(addr string) string {
 	return strings.TrimRight(host, "/")
 }
 
+// ResolveDefaultLogDir returns the configured log directory or a fallback, resolving to an absolute path on Windows.
 func ResolveDefaultLogDir(cfg config.Config) string {
 	dir := config.ResolveLogDir(cfg.LogDir)
 	if strings.TrimSpace(dir) != "" {

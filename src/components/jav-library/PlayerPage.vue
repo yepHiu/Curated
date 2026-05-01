@@ -18,12 +18,16 @@ import {
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
-import { api } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import {
+  clearActivePlaybackSession,
+  updateActivePlaybackSession,
+  type ActivePlaybackStatus,
+} from "@/composables/use-active-playback-session"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
   buildHlsPlaybackConfig,
@@ -75,6 +79,36 @@ import {
   shouldEnterSeekWaitingState,
   shouldReconcileDisplayedPlaybackTime,
 } from "@/lib/player-playback-clock"
+import {
+  formatBitrateLabel,
+  formatCountLabel,
+  formatFpsLabel,
+  formatPercentLabel,
+  formatReasonLabel,
+  formatResolutionLabel,
+  formatSessionKindLabel,
+  formatSourceFormatLabel,
+  formatTimecodeLabel,
+  formatTranscodeProfileLabel,
+  isPlaybackStatUnavailable,
+} from "@/lib/player-playback-stats-format"
+import {
+  clampAbsolutePlaybackTarget as clampPlaybackTarget,
+  formatPlaybackClock as formatClock,
+  getAbsolutePlaybackTimeSec,
+  getPlaybackTimelineOffsetSec,
+  normalizeProgressTargetSec as normalizePlaybackProgressTargetSec,
+  resolvePlaybackTotalDurationSec,
+} from "@/lib/player-playback-timeline"
+import {
+  applyHlsBandwidthEstimateToPlaybackStats,
+  applyHlsFragmentToPlaybackStats,
+  applyHlsLevelToPlaybackStats,
+  applyVideoDimensionsToPlaybackStats,
+  createEmptyPlaybackStats,
+  toFiniteNumber,
+  type PlaybackStatsSnapshot,
+} from "@/lib/player-playback-stats"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
 
@@ -109,15 +143,7 @@ type PlayerContextMenuState = {
   y: number
 }
 
-type PlaybackStatsState = {
-  audioBitrateKbps: number | null
-  videoBitrateKbps: number | null
-  currentBitrateKbps: number | null
-  bandwidthEstimateKbps: number | null
-  width: number | null
-  height: number | null
-  fps: number | null
-}
+type PlaybackStatsState = PlaybackStatsSnapshot
 
 type SessionPlaybackMode = "direct" | "hls"
 
@@ -180,6 +206,28 @@ const playbackMuted = ref(initialAudio.muted)
 const pipSupported = ref(false)
 const isPipActive = ref(false)
 const isSurfaceFullscreen = ref(false)
+
+function resolveActivePlaybackStatus(statusOverride?: ActivePlaybackStatus): ActivePlaybackStatus {
+  if (statusOverride) return statusOverride
+  if (playbackError.value) return "error"
+  if (isPlaybackWaiting.value) return "waiting"
+  return isPlaying.value ? "playing" : "paused"
+}
+
+function publishActivePlaybackSession(statusOverride?: ActivePlaybackStatus) {
+  const movieId = props.movie.id.trim()
+  if (!movieId || !playbackSrc.value) return
+  updateActivePlaybackSession({
+    movieId,
+    title: props.movie.title || props.movie.code || movieId,
+    positionSec: currentTime.value,
+    durationSec: resolveTotalDurationSec(playbackDescriptor.value, duration.value),
+    status: resolveActivePlaybackStatus(statusOverride),
+    routeQuery: route.query,
+    routeHash: route.hash,
+    posterUrl: props.movie.thumbUrl ?? props.movie.coverUrl,
+  })
+}
 
 function refreshPipSupport() {
   try {
@@ -605,6 +653,7 @@ async function loadPlayback() {
     void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
+    publishActivePlaybackSession("paused")
     const fallbackReason = descriptor?.reason?.trim() || ""
     const fallbackKey = `${movieId}:${descriptor?.mode ?? ""}:${fallbackReason}`
     if (
@@ -681,6 +730,7 @@ function flushPlaybackProgress() {
   if (!Number.isFinite(pos) || pos < 0) return
   saveProgress(props.movie.id, pos, dur)
   recordMoviePlayed(props.movie.id)
+  publishActivePlaybackSession()
 }
 
 function stripTFromRoute() {
@@ -760,28 +810,11 @@ onUnmounted(() => {
   closePlayerContextMenu()
 })
 
-function formatClock(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "00:00"
-  const s = Math.floor(seconds % 60)
-  const m = Math.floor(seconds / 60) % 60
-  const h = Math.floor(seconds / 3600)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`
-  return `${pad(m)}:${pad(s)}`
-}
-
-function getDescriptorDurationSec(descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value): number {
-  const raw = descriptor?.durationSec
-  return raw != null && Number.isFinite(raw) && raw > 0 ? raw : 0
-}
-
 function resolveTotalDurationSec(
   descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value,
   mediaDurationSec: number = duration.value,
 ): number {
-  const finiteMediaDuration =
-    Number.isFinite(mediaDurationSec) && mediaDurationSec > 0 ? mediaDurationSec : 0
-  return Math.max(finiteMediaDuration, getDescriptorDurationSec(descriptor))
+  return resolvePlaybackTotalDurationSec(descriptor, mediaDurationSec)
 }
 
 const totalDurationSec = computed(() => resolveTotalDurationSec())
@@ -842,6 +875,7 @@ function onTimeUpdate() {
   if (v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
     isPlaybackWaiting.value = false
   }
+  publishActivePlaybackSession()
   const now = Date.now()
   if (now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return
   lastProgressSaveAt = now
@@ -862,6 +896,7 @@ function onLoadedMetadata() {
   v.muted = playbackMuted.value
   syncBufferedRangeFromVideo()
   flushScheduledPlaybackSessionCleanup()
+  publishActivePlaybackSession()
 
   const fromQuery = parseResumeSecondsFromQuery(route.query.t)
   const targetSec = resolvePreferredPlaybackTargetSec(
@@ -910,12 +945,7 @@ function onLoadedMetadata() {
 }
 
 function normalizeProgressTargetSec(rawValue: number): number {
-  const normalized = Number.isFinite(rawValue) ? rawValue : 0
-  const total = totalDurationSec.value
-  if (total <= 0) {
-    return Math.max(0, normalized)
-  }
-  return Math.min(Math.max(0, normalized), total)
+  return normalizePlaybackProgressTargetSec(rawValue, totalDurationSec.value)
 }
 
 function syncBufferedRangeFromVideo() {
@@ -1059,11 +1089,13 @@ function onPlay() {
   isPlaying.value = true
   markPlaybackReady()
   startFpsTracking()
+  publishActivePlaybackSession("playing")
 }
 
 function onPause() {
   isPlaying.value = false
   flushPlaybackProgress()
+  publishActivePlaybackSession("paused")
 }
 
 async function terminateActiveHlsPlaybackSession(reason?: string) {
@@ -1087,6 +1119,7 @@ function onVideoEnded() {
   flushPlaybackProgress()
   isPlaying.value = false
   markPlaybackReady()
+  clearActivePlaybackSession(props.movie.id)
   void terminateActiveHlsPlaybackSession("HLS session closed after playback ended")
 }
 
@@ -1094,6 +1127,7 @@ function onVideoError() {
   stopFpsTracking()
   optimisticSeekTargetSec.value = null
   isPlaybackWaiting.value = false
+  clearActivePlaybackSession(props.movie.id)
   const v = videoRef.value
   if (playbackDescriptor.value?.mode === "hls") {
     void fallbackHlsToDirect("video element failed while playing HLS")
@@ -1190,22 +1224,26 @@ function seekDelta(deltaSec: number) {
 function onVideoWaiting() {
   if (!playbackSrc.value) return
   isPlaybackWaiting.value = true
+  publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeking() {
   if (!playbackSrc.value) return
   isPlaybackWaiting.value = true
+  publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeked() {
   currentTime.value = getAbsolutePlaybackTime()
   syncBufferedRangeFromVideo()
   markPlaybackReady()
+  publishActivePlaybackSession()
 }
 
 function onVideoLoadedData() {
   syncBufferedRangeFromVideo()
   markPlaybackReady()
+  publishActivePlaybackSession()
   void tryStartPlaybackIfRequested()
 }
 
@@ -1627,125 +1665,37 @@ async function releasePlaybackSession(sessionId?: string) {
   const id = sessionId?.trim()
   if (!id) return
   try {
-    await api.deletePlaybackSession(id)
+    await libraryService.deletePlaybackSession(id)
   } catch {
     // ignore session cleanup failures
   }
 }
 
 function resetPlaybackStats() {
-  playbackStats.value = {
-    audioBitrateKbps: null,
-    videoBitrateKbps: null,
-    currentBitrateKbps: null,
-    bandwidthEstimateKbps: null,
-    width: null,
-    height: null,
-    fps: null,
-  }
+  playbackStats.value = createEmptyPlaybackStats()
   stopFpsTracking()
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  const num =
-    typeof value === "number"
-      ? value
-      : typeof value === "string" && value.trim()
-        ? Number(value)
-        : NaN
-  return Number.isFinite(num) ? num : null
 }
 
 function refreshPlaybackStatsFromVideo() {
   const v = videoRef.value
   if (!v) return
-  const width = Number.isFinite(v.videoWidth) && v.videoWidth > 0 ? v.videoWidth : null
-  const height = Number.isFinite(v.videoHeight) && v.videoHeight > 0 ? v.videoHeight : null
-  playbackStats.value = {
-    ...playbackStats.value,
-    width,
-    height,
-  }
+  playbackStats.value = applyVideoDimensionsToPlaybackStats(
+    playbackStats.value,
+    v.videoWidth,
+    v.videoHeight,
+  )
 }
 
 function updatePlaybackStatsFromHlsLevel(level?: HlsLevel | null) {
-  if (!level) return
-  const width = toFiniteNumber(level.width)
-  const height = toFiniteNumber(level.height)
-  const frameRate =
-    toFiniteNumber(level.frameRate) ??
-    toFiniteNumber(level.attrs?.["FRAME-RATE"]) ??
-    toFiniteNumber(level.attrs?.FRAME_RATE)
-  const videoBitrate = toFiniteNumber(level.bitrate)
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    width: width && width > 0 ? width : playbackStats.value.width,
-    height: height && height > 0 ? height : playbackStats.value.height,
-    fps: frameRate && frameRate > 0 ? frameRate : playbackStats.value.fps,
-    videoBitrateKbps:
-      videoBitrate && videoBitrate > 0
-        ? Math.round(videoBitrate / 1000)
-        : playbackStats.value.videoBitrateKbps,
-  }
+  playbackStats.value = applyHlsLevelToPlaybackStats(playbackStats.value, level)
 }
 
 function updatePlaybackStatsFromHlsBandwidthEstimate(value: unknown) {
-  const bandwidthEstimate = toFiniteNumber(value)
-  if (!bandwidthEstimate || bandwidthEstimate <= 0) {
-    return
-  }
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    bandwidthEstimateKbps: Math.round(bandwidthEstimate / 1000),
-  }
+  playbackStats.value = applyHlsBandwidthEstimateToPlaybackStats(playbackStats.value, value)
 }
 
 function updatePlaybackStatsFromHlsFragment(data?: unknown) {
-  if (typeof data !== "object" || data === null) return
-
-  const stats =
-    "stats" in data && typeof (data as { stats?: unknown }).stats === "object"
-      ? ((data as { stats?: Record<string, unknown> }).stats ?? null)
-      : null
-  const frag =
-    "frag" in data && typeof (data as { frag?: unknown }).frag === "object"
-      ? ((data as { frag?: Record<string, unknown> }).frag ?? null)
-      : null
-
-  const loadedBytes =
-    toFiniteNumber(stats?.loaded) ??
-    toFiniteNumber(stats?.total) ??
-    toFiniteNumber(frag?.loaded)
-  const durationSec =
-    toFiniteNumber(frag?.duration) ??
-    toFiniteNumber(frag?.maxStartPts) ??
-    null
-  const bandwidthEstimate =
-    toFiniteNumber(stats?.bwEstimate) ??
-    toFiniteNumber(stats?.bandwidthEstimate) ??
-    null
-
-  let currentBitrateKbps = playbackStats.value.currentBitrateKbps
-  if (loadedBytes && loadedBytes > 0 && durationSec && durationSec > 0) {
-    const measuredBitrateKbps = Math.round((loadedBytes * 8) / durationSec / 1000)
-    if (Number.isFinite(measuredBitrateKbps) && measuredBitrateKbps > 0) {
-      currentBitrateKbps =
-        currentBitrateKbps && currentBitrateKbps > 0
-          ? Math.round(currentBitrateKbps * 0.65 + measuredBitrateKbps * 0.35)
-          : measuredBitrateKbps
-    }
-  }
-
-  playbackStats.value = {
-    ...playbackStats.value,
-    currentBitrateKbps,
-    bandwidthEstimateKbps:
-      bandwidthEstimate && bandwidthEstimate > 0
-        ? Math.round(bandwidthEstimate / 1000)
-        : playbackStats.value.bandwidthEstimateKbps,
-  }
+  playbackStats.value = applyHlsFragmentToPlaybackStats(playbackStats.value, data)
 }
 
 function bindHlsStats(
@@ -1910,26 +1860,15 @@ function startFpsTracking() {
   }, 1000)
 }
 
-function formatBitrateLabel(kbps: number | null): string {
-  if (!kbps || kbps <= 0) return "N/A"
-  if (kbps >= 1000) return `${(kbps / 1000).toFixed(2)} Mbps`
-  return `${Math.round(kbps)} kbps`
-}
-
 function playbackTimelineOffsetSec(descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value): number {
-  if (!descriptor || descriptor.mode !== "hls") {
-    return 0
-  }
-  const offset = Number(descriptor.startPositionSec ?? 0)
-  return Number.isFinite(offset) && offset > 0 ? offset : 0
+  return getPlaybackTimelineOffsetSec(descriptor)
 }
 
 function getAbsolutePlaybackTime(
   localTimeSec: number = Number(videoRef.value?.currentTime ?? 0),
   descriptor: PlaybackDescriptorDTO | null = playbackDescriptor.value,
 ): number {
-  const local = Number.isFinite(localTimeSec) && localTimeSec > 0 ? localTimeSec : 0
-  return local + playbackTimelineOffsetSec(descriptor)
+  return getAbsolutePlaybackTimeSec(localTimeSec, descriptor)
 }
 
 function schedulePlaybackSessionCleanup(sessionId?: string) {
@@ -1946,12 +1885,7 @@ function flushScheduledPlaybackSessionCleanup() {
 }
 
 function clampAbsolutePlaybackTarget(targetSec: number): number {
-  const total = totalDurationSec.value
-  const normalized = Number.isFinite(targetSec) ? targetSec : 0
-  if (total <= 0) {
-    return Math.max(0, normalized)
-  }
-  return Math.min(Math.max(0, normalized), Math.max(0, total - 0.25))
+  return clampPlaybackTarget(targetSec, totalDurationSec.value)
 }
 
 async function seekToAbsolutePlaybackTime(
@@ -2037,82 +1971,6 @@ async function seekToAbsolutePlaybackTime(
       isSwitchingPlaybackSession.value = false
     }
   }
-}
-
-function formatResolutionLabel(width: number | null, height: number | null): string {
-  if (!width || !height) return "N/A"
-  return `${width} × ${height}`
-}
-
-function formatFpsLabel(fps: number | null): string {
-  if (!fps || fps <= 0) return "N/A"
-  return `${fps.toFixed(fps >= 100 ? 0 : 2)} fps`
-}
-
-function formatTimecodeLabel(seconds: number | null | undefined): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "N/A"
-  return formatClock(seconds)
-}
-
-function formatPercentLabel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "N/A"
-  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`
-}
-
-function formatCountLabel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "N/A"
-  return String(Math.max(0, Math.trunc(value)))
-}
-
-function formatReasonLabel(reason: string | null | undefined): string {
-  const text = reason?.trim() || ""
-  if (!text) return "N/A"
-  return text
-}
-
-function formatSessionKindLabel(sessionKind: string | null | undefined): string {
-  switch ((sessionKind ?? "").trim().toLowerCase()) {
-    case "direct-file":
-      return "Direct File"
-    case "remux-hls":
-      return "Remux HLS"
-    case "transcode-hls":
-      return "Transcode HLS"
-    default:
-      return "N/A"
-  }
-}
-
-function formatSourceFormatLabel(descriptor: PlaybackDescriptorDTO | null | undefined): string {
-  const container = descriptor?.sourceContainer?.trim()
-  const videoCodec = descriptor?.sourceVideoCodec?.trim()
-  const audioCodec = descriptor?.sourceAudioCodec?.trim()
-  const parts = [container, videoCodec, audioCodec].filter((value) => Boolean(value))
-  if (parts.length === 0) return "N/A"
-  return parts.join(" / ")
-}
-
-function formatTranscodeProfileLabel(profile: string | null | undefined): string {
-  switch ((profile ?? "").trim().toLowerCase()) {
-    case "remux_copy":
-      return "FFmpeg Stream Copy"
-    case "h264_amf":
-      return "AMD AMF"
-    case "h264_qsv":
-      return "Intel QSV"
-    case "h264_nvenc":
-      return "NVIDIA NVENC"
-    case "h264_videotoolbox":
-      return "VideoToolbox"
-    case "libx264":
-      return "libx264"
-    default:
-      return "N/A"
-  }
-}
-
-function isPlaybackStatUnavailable(value: string): boolean {
-  return value === "N/A"
 }
 
 const playbackStateLabel = computed(() => {
@@ -2393,7 +2251,7 @@ const videoPreloadMode = computed(() =>
               variant="ghost"
               size="icon"
               class="stats-close-button h-6 w-auto shrink-0 rounded-none px-1.5 text-[12px] font-semibold leading-none text-white/68 hover:bg-transparent hover:text-white"
-              aria-label="关闭详细统计信息"
+              :aria-label="t('player.hideStats')"
               @click="closeDetailedStats"
             >
               [X]
@@ -2722,7 +2580,7 @@ const videoPreloadMode = computed(() =>
           @click="toggleDetailedStats"
         >
           <Info class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          {{ detailedStatsVisible ? "隐藏详细统计信息" : "详细统计信息" }}
+          {{ detailedStatsVisible ? t("player.hideStats") : t("player.showStats") }}
         </button>
       </div>
     </div>

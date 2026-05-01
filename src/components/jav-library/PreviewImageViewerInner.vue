@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useEventListener } from "@vueuse/core"
 import emblaCarouselVue from "embla-carousel-vue"
 import { ChevronLeft, ChevronRight, X } from "lucide-vue-next"
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t } = useI18n()
 const selectedIndex = ref(0)
 
 const [mainViewportRef, mainApiRef] = emblaCarouselVue({
@@ -90,17 +92,58 @@ watch(
 const total = computed(() => props.images.length)
 const canPrev = computed(() => selectedIndex.value > 0)
 const canNext = computed(() => selectedIndex.value < props.images.length - 1)
+const loadedMainImageSrcs = ref<Set<string>>(new Set())
+const previewTitle = computed(() =>
+  t("preview.title", { code: props.movieCode?.trim() ?? "" }).trim(),
+)
+
+function previewImageLabel(i: number): string {
+  return t("preview.imageOf", { i })
+}
+
+function previewImageAlt(i: number): string {
+  const label = previewImageLabel(i)
+  return props.movieCode ? `${props.movieCode} ${label}` : label
+}
 
 function reinitCarousels() {
   getMainApi()?.reInit()
   getThumbApi()?.reInit()
 }
 
+function isSelectedOrNeighbor(index: number): boolean {
+  return Math.abs(index - selectedIndex.value) <= 1
+}
+
+function mainImageLoading(index: number): "eager" | "lazy" {
+  return isSelectedOrNeighbor(index) ? "eager" : "lazy"
+}
+
+function mainImageFetchPriority(index: number): "high" | "low" {
+  return index === selectedIndex.value ? "high" : "low"
+}
+
+function isMainImageLoaded(src: string): boolean {
+  return loadedMainImageSrcs.value.has(src)
+}
+
+function markMainImageLoaded(src: string) {
+  loadedMainImageSrcs.value = new Set([...loadedMainImageSrcs.value, src])
+}
+
+watch(
+  () => props.images,
+  () => {
+    loadedMainImageSrcs.value = new Set()
+  },
+)
+
 watch(
   () => [props.initialIndex, props.images] as const,
   async ([initialIndex, images]) => {
     if (images.length === 0) return
     const start = Math.max(0, Math.min(images.length - 1, initialIndex ?? 0))
+    selectedIndex.value = start
     await nextTick()
     reinitCarousels()
     requestAnimationFrame(() => {
@@ -148,10 +191,10 @@ defineExpose({
 <template>
   <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden select-none">
     <DialogTitle class="sr-only">
-      {{ movieCode ? `${movieCode} 预览图` : "预览图" }} {{ selectedIndex + 1 }} / {{ total }}
+      {{ previewTitle }} {{ selectedIndex + 1 }} / {{ total }}
     </DialogTitle>
     <DialogDescription class="sr-only">
-      使用左右方向键或两侧按钮切换图片，Esc 关闭；点击下方缩略图跳转。
+      {{ t("preview.instructions") }}
     </DialogDescription>
 
     <div
@@ -167,7 +210,7 @@ defineExpose({
         variant="ghost"
         size="icon"
         class="group size-9 justify-self-end rounded-lg text-zinc-400 outline-none ring-offset-0 hover:bg-transparent hover:text-white focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 focus-visible:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.22)] dark:hover:bg-transparent sm:size-10"
-        aria-label="关闭"
+        :aria-label="t('preview.close')"
         @click="emit('close')"
       >
         <span
@@ -187,7 +230,7 @@ defineExpose({
         size="icon"
         class="size-10 shrink-0 self-center rounded-xl border-0 bg-transparent text-zinc-200 shadow-none hover:bg-white/10 hover:text-white focus-visible:ring-offset-0 dark:hover:bg-white/10 disabled:opacity-25 sm:size-11"
         :disabled="!canPrev"
-        aria-label="上一张"
+        :aria-label="t('preview.previous')"
         @click="scrollMainPrev"
       >
         <ChevronLeft class="size-5 sm:size-6" />
@@ -202,17 +245,25 @@ defineExpose({
               class="relative h-full min-h-0 min-w-0 shrink-0 grow-0 basis-full"
             >
               <div
-                class="flex h-full min-h-[200px] w-full min-w-0 items-center justify-center px-0.5"
+                class="relative flex h-full min-h-[200px] w-full min-w-0 items-center justify-center overflow-hidden px-0.5"
               >
                 <img
                   v-if="src"
                   :src="src"
-                  :alt="
-                    movieCode ? `${movieCode} 预览 ${i + 1}` : `预览 ${i + 1}`
-                  "
-                  class="max-h-full max-w-full object-contain"
+                  :alt="previewImageAlt(i + 1)"
+                  :data-loaded="isMainImageLoaded(src) ? 'true' : 'false'"
+                  :loading="mainImageLoading(i)"
+                  :fetchpriority="mainImageFetchPriority(i)"
+                  class="relative z-10 max-h-full max-w-full object-contain transition-opacity duration-200 motion-reduce:transition-none"
+                  :class="isMainImageLoaded(src) ? 'opacity-100' : 'opacity-0'"
                   decoding="async"
                   draggable="false"
+                  @load="markMainImageLoaded(src)"
+                />
+                <div
+                  v-if="src && !isMainImageLoaded(src)"
+                  class="absolute inset-0 z-0 animate-pulse rounded-xl bg-zinc-900"
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -238,7 +289,7 @@ defineExpose({
                     ? 'border-primary ring-1 ring-primary/40'
                     : 'border-zinc-700 opacity-80 hover:border-zinc-500 hover:opacity-100'
                 "
-                :aria-label="`第 ${i + 1} 张`"
+                :aria-label="previewImageLabel(i + 1)"
                 :aria-current="selectedIndex === i ? 'true' : undefined"
                 @click="scrollMainTo(i)"
               >
@@ -246,6 +297,8 @@ defineExpose({
                   v-if="src"
                   :src="src"
                   alt=""
+                  loading="lazy"
+                  fetchpriority="low"
                   class="max-h-full w-auto max-w-[7.5rem] object-contain"
                   decoding="async"
                   draggable="false"
@@ -262,7 +315,7 @@ defineExpose({
         size="icon"
         class="size-10 shrink-0 self-center rounded-xl border-0 bg-transparent text-zinc-200 shadow-none hover:bg-white/10 hover:text-white focus-visible:ring-offset-0 dark:hover:bg-white/10 disabled:opacity-25 sm:size-11"
         :disabled="!canNext"
-        aria-label="下一张"
+        :aria-label="t('preview.next')"
         @click="scrollMainNext"
       >
         <ChevronRight class="size-5 sm:size-6" />

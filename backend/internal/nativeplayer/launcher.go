@@ -1,3 +1,4 @@
+// Package nativeplayer launches external media players for native playback handoff.
 package nativeplayer
 
 import (
@@ -11,6 +12,7 @@ import (
 	"curated-backend/internal/executil"
 )
 
+// Config holds the native player configuration (preset name, command path, extra args).
 type Config struct {
 	Enabled bool
 	Preset  string
@@ -18,15 +20,18 @@ type Config struct {
 	Args    []string
 }
 
+// Launcher starts external media players and supports runtime configuration updates.
 type Launcher struct {
 	cfg Config
 	mu  sync.RWMutex
 }
 
+// New creates a Launcher with the given configuration.
 func New(cfg Config) *Launcher {
 	return &Launcher{cfg: cfg}
 }
 
+// Enabled reports whether native player launch is configured and enabled.
 func (l *Launcher) Enabled() bool {
 	if l == nil {
 		return false
@@ -36,6 +41,7 @@ func (l *Launcher) Enabled() bool {
 	return l.cfg.Enabled
 }
 
+// Command returns the configured player command or the preset default.
 func (l *Launcher) Command() string {
 	if l == nil {
 		return ""
@@ -49,6 +55,7 @@ func (l *Launcher) Command() string {
 	return DefaultCommandForPreset(l.cfg.Preset)
 }
 
+// SetConfig updates the launcher configuration at runtime.
 func (l *Launcher) SetConfig(cfg Config) {
 	if l == nil {
 		return
@@ -58,6 +65,7 @@ func (l *Launcher) SetConfig(cfg Config) {
 	l.mu.Unlock()
 }
 
+// Launch starts the configured player with the given media target.
 func (l *Launcher) Launch(ctx context.Context, mediaTarget string, startPositionSec float64, title string) error {
 	if l == nil {
 		return fmt.Errorf("native player is disabled")
@@ -89,6 +97,7 @@ func (l *Launcher) Launch(ctx context.Context, mediaTarget string, startPosition
 	return nil
 }
 
+// NormalizePreset maps a preset value and command path to a canonical preset name.
 func NormalizePreset(value string, command string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "mpv":
@@ -110,6 +119,7 @@ func NormalizePreset(value string, command string) string {
 	}
 }
 
+// DefaultCommandForPreset returns the default executable name for a given preset.
 func DefaultCommandForPreset(preset string) string {
 	switch NormalizePreset(preset, "") {
 	case "potplayer":

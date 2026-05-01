@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import PlayerPage from "@/components/jav-library/PlayerPage.vue"
@@ -10,6 +11,7 @@ const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
 
 const route = useRoute()
 const libraryService = useLibraryService()
+const { t } = useI18n()
 
 const movieId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
@@ -64,7 +66,7 @@ watch(
       v-if="hydrating"
       class="rounded-3xl border border-border/70 bg-card/80 p-8 text-sm text-muted-foreground"
     >
-      正在加载播放目标…
+      {{ t("player.loadingTarget") }}
     </div>
     <PlayerPage
       v-else-if="selectedMovie"
@@ -73,8 +75,8 @@ watch(
     />
     <NotFoundState
       v-else
-      title="Player target not found"
-      description="This player route points to a movie id that is not available in the current library."
+      :title="t('player.notFoundTitle')"
+      :description="t('player.notFoundDesc')"
     />
   </div>
 </template>

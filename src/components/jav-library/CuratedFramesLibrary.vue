@@ -3,13 +3,9 @@ import { useFocusWithin, onClickOutside } from "@vueuse/core"
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { api } from "@/api/endpoints"
 import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
-  Camera,
-  CheckSquare,
   Download,
-  ListChecks,
   PlayCircle,
   Plus,
   Trash2,
@@ -17,17 +13,21 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import CuratedFrameTimelineTab from "@/components/jav-library/CuratedFrameTimelineTab.vue"
+import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
+import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
+import CuratedFrameTagFilterBar from "@/components/jav-library/CuratedFrameTagFilterBar.vue"
+import CuratedFrameLibraryToolbar from "@/components/jav-library/CuratedFrameLibraryToolbar.vue"
+import CuratedFrameDeleteConfirmDialog from "@/components/jav-library/CuratedFrameDeleteConfirmDialog.vue"
+import CuratedFrameEmptyState from "@/components/jav-library/CuratedFrameEmptyState.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
 import {
   getCuratedFrameSearchQuery,
@@ -60,6 +60,12 @@ import {
   type CuratedFrameTagSaveStatus,
 } from "@/lib/curated-frames/p2-state"
 import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
+import {
+  clearCuratedFrameExportSelection,
+  reconcileCuratedFrameActorExportSelection,
+  toggleCuratedFrameExportSelection,
+  type CuratedFrameExportSelectionState,
+} from "@/lib/curated-frames/selection"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useLibraryService } from "@/services/library-service"
@@ -78,8 +84,7 @@ const batchMode = ref(false)
 
 const mainTab = ref<"timeline" | "actors" | "movies">("timeline")
 
-type ExportSelectionBucket = "none" | "anonymous" | "named"
-const exportSelectionBucket = ref<ExportSelectionBucket>("none")
+const exportSelectionBucket = ref<CuratedFrameExportSelectionState["exportSelectionBucket"]>("none")
 const namedActorForExport = ref<string | null>(null)
 const selectedFrameIds = ref<string[]>([])
 const exportToolbarError = ref("")
@@ -88,14 +93,22 @@ const batchDeleteBusy = ref(false)
 const dialogOpenedFromActor = ref<string | null>(null)
 const dialogExportError = ref("")
 
-function isFrameSelected(id: string) {
-  return selectedFrameIds.value.includes(id)
+function currentExportSelectionState(): CuratedFrameExportSelectionState {
+  return {
+    selectedFrameIds: selectedFrameIds.value,
+    exportSelectionBucket: exportSelectionBucket.value,
+    namedActorForExport: namedActorForExport.value,
+  }
+}
+
+function applyExportSelectionState(next: CuratedFrameExportSelectionState) {
+  selectedFrameIds.value = next.selectedFrameIds
+  exportSelectionBucket.value = next.exportSelectionBucket
+  namedActorForExport.value = next.namedActorForExport
 }
 
 function clearExportSelection() {
-  selectedFrameIds.value = []
-  exportSelectionBucket.value = "none"
-  namedActorForExport.value = null
+  applyExportSelectionState(clearCuratedFrameExportSelection())
   exportToolbarError.value = ""
 }
 
@@ -111,39 +124,22 @@ watch(mainTab, () => {
 
 function toggleFrameSelection(id: string, sectionActor?: string) {
   exportToolbarError.value = ""
-  const idx = selectedFrameIds.value.indexOf(id)
-  if (idx >= 0) {
-    selectedFrameIds.value = selectedFrameIds.value.filter((x) => x !== id)
-    if (selectedFrameIds.value.length === 0) {
-      exportSelectionBucket.value = "none"
-      namedActorForExport.value = null
-    }
-    return
-  }
-  if (selectedFrameIds.value.length >= batchExportMax) {
+  const result = toggleCuratedFrameExportSelection(currentExportSelectionState(), {
+    id,
+    mainTab: mainTab.value,
+    sectionActor,
+    max: batchExportMax,
+    anonymousActorLabel: noActorLabel.value,
+  })
+  if (result.error === "max") {
     exportToolbarError.value = t("curated.exportSelectMax")
     return
   }
-
-  if (mainTab.value === "actors" && sectionActor !== undefined) {
-    const anonymous = sectionActor === noActorLabel.value
-    if (exportSelectionBucket.value === "none") {
-      exportSelectionBucket.value = anonymous ? "anonymous" : "named"
-      if (!anonymous) {
-        namedActorForExport.value = sectionActor
-      }
-    } else if (exportSelectionBucket.value === "anonymous") {
-      if (!anonymous) {
-        exportToolbarError.value = t("curated.exportActorMixed")
-        return
-      }
-    } else if (namedActorForExport.value !== sectionActor || anonymous) {
-      exportToolbarError.value = t("curated.exportActorMixed")
-      return
-    }
+  if (result.error === "mixed-actor") {
+    exportToolbarError.value = t("curated.exportActorMixed")
+    return
   }
-
-  selectedFrameIds.value = [...selectedFrameIds.value, id]
+  applyExportSelectionState(result.state)
 }
 
 const batchExportMax = 20
@@ -192,60 +188,29 @@ function selectAllInMovieSection(movieKey: string) {
   namedActorForExport.value = null
 }
 
-function getCappedUniqueIdsForGroupItems(items: RowWithUrl[]): string[] {
-  return [...new Set(items.map((x) => x.row.id))].slice(0, batchExportMax)
-}
-
-/** 分组头勾选：与「全选本组」一致，按导出上限截断 */
-function isGroupHeaderFullySelected(items: RowWithUrl[]): boolean {
-  const target = getCappedUniqueIdsForGroupItems(items)
-  if (target.length === 0) {
-    return false
-  }
-  const sel = selectedFrameIds.value
-  if (sel.length !== target.length) {
-    return false
-  }
-  const tset = new Set(target)
-  return sel.every((id) => tset.has(id))
-}
-
 /** 取消分组头勾选后，在「按演员」下根据仍选中的 id 推断导出桶 */
 function reconcileActorsTabExportBucket() {
   if (mainTab.value !== "actors") {
     return
   }
-  const sel = selectedFrameIds.value
-  if (sel.length === 0) {
-    exportSelectionBucket.value = "none"
-    namedActorForExport.value = null
-    return
-  }
-  const selSet = new Set(sel)
-  const candidates: string[] = []
-  for (const [label, groupItems] of actorGroups.value) {
-    const gids = new Set(groupItems.map((x) => x.row.id))
-    if ([...selSet].every((id) => gids.has(id))) {
-      candidates.push(label)
-    }
-  }
-  if (candidates.length === 0) {
-    exportSelectionBucket.value = "none"
-    namedActorForExport.value = null
-    return
-  }
-  const prefer = namedActorForExport.value
-  let label = candidates[0]!
-  if (prefer && candidates.includes(prefer)) {
-    label = prefer
-  }
-  const anonymous = label === noActorLabel.value
-  exportSelectionBucket.value = anonymous ? "anonymous" : "named"
-  namedActorForExport.value = anonymous ? null : label
+  const result = reconcileCuratedFrameActorExportSelection({
+    selectedFrameIds: selectedFrameIds.value,
+    actorGroups: actorGroups.value.map(([label, items]) => [
+      label,
+      items.map((item) => item.row.id),
+    ]),
+    currentNamedActorForExport: namedActorForExport.value,
+    anonymousActorLabel: noActorLabel.value,
+  })
+  exportSelectionBucket.value = result.exportSelectionBucket
+  namedActorForExport.value = result.namedActorForExport
 }
 
-function onActorGroupHeaderCheckboxChange(actor: string, items: RowWithUrl[], ev: Event) {
-  const checked = (ev.target as HTMLInputElement).checked
+function onActorGroupHeaderSelectionChange(
+  actor: string,
+  items: readonly RowWithUrl[],
+  checked: boolean,
+) {
   exportToolbarError.value = ""
   if (checked) {
     selectAllInActorSection(actor)
@@ -261,8 +226,11 @@ function onActorGroupHeaderCheckboxChange(actor: string, items: RowWithUrl[], ev
   }
 }
 
-function onMovieGroupHeaderCheckboxChange(movieKey: string, items: RowWithUrl[], ev: Event) {
-  const checked = (ev.target as HTMLInputElement).checked
+function onMovieGroupHeaderSelectionChange(
+  movieKey: string,
+  items: readonly RowWithUrl[],
+  checked: boolean,
+) {
   exportToolbarError.value = ""
   if (checked) {
     selectAllInMovieSection(movieKey)
@@ -309,7 +277,7 @@ async function runExport(
     body.actorName = actorName
   }
   try {
-    const { blob, filename } = await api.postCuratedFramesExport(body)
+    const { blob, filename } = await libraryService.exportCuratedFrames(body)
     triggerDownloadBlob(blob, filename)
   } catch (err) {
     console.error("[curated-frames] export failed", err)
@@ -496,6 +464,7 @@ const nearDuplicateGroups = computed(() =>
   findCuratedFrameNearDuplicateGroups(rawRows.value, curatedFrameNearDuplicateThresholdSec),
 )
 const nearDuplicateFrameIds = computed(() => buildCuratedFrameNearDuplicateIndex(nearDuplicateGroups.value))
+const nearDuplicateFrameIdList = computed(() => [...nearDuplicateFrameIds.value])
 const nearDuplicateSummaryGroups = computed(() => nearDuplicateGroups.value.slice(0, 3))
 
 /** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
@@ -730,6 +699,18 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   resetTagInputState()
   resetDialogTagSaveState(item.row.tags)
   dialogOpen.value = true
+}
+
+function openFrameCardDialog(item: RowWithUrl, fromActorSection?: string) {
+  openDialog(item, fromActorSection ?? null)
+}
+
+function onFrameCardContextMenu(
+  event: MouseEvent,
+  item: RowWithUrl,
+  fromActorSection?: string,
+) {
+  onFrameContextMenu(event, item, fromActorSection ?? null)
 }
 
 watch(
@@ -1083,10 +1064,6 @@ function formatCapturedAt(iso: string) {
   }
 }
 
-function isNearDuplicateFrame(frameId: string) {
-  return nearDuplicateFrameIds.value.has(frameId)
-}
-
 function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithUrl["row"]>) {
   const lead = group.items[0]
   if (!lead) {
@@ -1095,6 +1072,10 @@ function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithU
   const label = lead.code.trim() || lead.title.trim() || lead.movieId.trim()
   const positions = group.items.map((item) => formatClock(item.positionSec)).join(" / ")
   return `${label} · ${positions}`
+}
+
+function isNearDuplicateFrame(frameId: string) {
+  return nearDuplicateFrameIds.value.has(frameId)
 }
 
 defineExpose({
@@ -1142,400 +1123,88 @@ defineExpose({
       </div>
     </div>
 
-    <div
+    <CuratedFrameEmptyState
       v-if="isLibraryEmpty"
-      class="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-16 text-center"
-    >
-      <Camera class="size-12 text-muted-foreground" />
-      <p class="text-sm text-muted-foreground">{{ t("curated.empty") }}</p>
-    </div>
+      variant="library"
+      :show-clear-filter="false"
+    />
 
     <Tabs
       v-else
       v-model="mainTab"
       class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-hidden"
     >
-      <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
-            <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>
-            <TabsTrigger value="actors" class="rounded-xl px-4 py-2">{{ t("curated.tabActors") }}</TabsTrigger>
-            <TabsTrigger value="movies" class="rounded-xl px-4 py-2">{{ t("curated.tabMovies") }}</TabsTrigger>
-          </TabsList>
-          <p class="text-xs text-muted-foreground">
-            {{ t("curated.pageSummary", { shown: rawRows.length, total: totalRows }) }}
-          </p>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
-          <template v-if="!batchMode">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              class="gap-1.5 rounded-xl"
-              @click="batchMode = true"
-            >
-              <ListChecks class="size-4 opacity-80" aria-hidden="true" />
-              {{ t("library.batchManage") }}
-            </Button>
-          </template>
-          <template v-else>
-            <Button
-              v-if="batchShowSelectVisible"
-              type="button"
-              variant="outline"
-              size="sm"
-              class="gap-1.5 rounded-xl"
-              :disabled="listWithUrls.length === 0"
-              @click="selectAllVisibleUpTo20"
-            >
-              <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
-              {{ t("library.batchSelectVisible") }}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              @click="exitBatchMode"
-            >
-              <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-              {{ t("library.batchExitToolbar") }}
-            </Button>
-          </template>
-        </div>
-      </div>
+      <CuratedFrameLibraryToolbar
+        :shown-count="rawRows.length"
+        :total-rows="totalRows"
+        :batch-mode="batchMode"
+        :show-select-visible="batchShowSelectVisible"
+        :select-visible-disabled="listWithUrls.length === 0"
+        @enter-batch-mode="batchMode = true"
+        @select-visible="selectAllVisibleUpTo20"
+        @exit-batch-mode="exitBatchMode"
+      />
 
-      <section
-        class="shrink-0 rounded-3xl border border-border/70 bg-card/85 px-4 py-3 shadow-lg shadow-black/5"
-        :aria-label="t('curated.tagFilterTitle')"
-      >
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="min-w-0 space-y-2">
-            <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {{ t("curated.tagFilterTitle") }}
-            </p>
-            <div v-if="curatedTagFacets.length > 0" class="flex flex-wrap gap-2">
-              <Badge
-                as-child
-                :variant="!activeTagFilter ? 'default' : 'secondary'"
-                :class="[
-                  'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-                  !activeTagFilter
-                    ? 'border-primary/40'
-                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-                ]"
-              >
-                <button
-                  type="button"
-                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-                  :aria-pressed="!activeTagFilter"
-                  :aria-label="t('curated.ariaClearFrameTagFilter')"
-                  @click="setCuratedFrameTagFilter(undefined)"
-                >
-                  {{ t("curated.tagFilterAll") }}
-                </button>
-              </Badge>
-              <Badge
-                v-for="tag in visibleCuratedTagFacets"
-                :key="tag.name"
-                as-child
-                :variant="isCuratedTagFilterActive(tag.name) ? 'default' : 'secondary'"
-                :class="[
-                  'max-w-[14rem] rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-                  isCuratedTagFilterActive(tag.name)
-                    ? 'border-primary/40'
-                    : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-                ]"
-              >
-                <button
-                  type="button"
-                  class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-                  :aria-pressed="isCuratedTagFilterActive(tag.name)"
-                  :aria-label="t('curated.ariaFilterFrameTag', { tag: tag.name, count: tag.count })"
-                  @click="toggleCuratedFrameTagFilter(tag.name)"
-                >
-                  <span class="truncate">{{ tag.name }}</span>
-                  <span
-                    class="tabular-nums text-xs opacity-80"
-                    :class="
-                      isCuratedTagFilterActive(tag.name)
-                        ? 'text-primary-foreground/90'
-                        : 'text-muted-foreground'
-                    "
-                  >
-                    · {{ tag.count }}
-                  </span>
-                </button>
-              </Badge>
-            </div>
-            <p v-else class="text-sm text-muted-foreground">
-              {{ t("curated.tagFilterEmpty") }}
-            </p>
-          </div>
-          <Button
-            v-if="hiddenCuratedTagFacetCount > 0"
-            type="button"
-            variant="ghost"
-            size="sm"
-            class="h-8 shrink-0 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-            @click="tagFiltersExpanded = !tagFiltersExpanded"
-          >
-            {{
-              tagFiltersExpanded
-                ? t("curated.tagFilterShowLess")
-                : t("curated.tagFilterShowMore", { count: hiddenCuratedTagFacetCount })
-            }}
-          </Button>
-        </div>
-      </section>
+      <CuratedFrameTagFilterBar
+        :facets="curatedTagFacets"
+        :visible-facets="visibleCuratedTagFacets"
+        :active-tag="activeTagFilter"
+        :hidden-count="hiddenCuratedTagFacetCount"
+        :expanded="tagFiltersExpanded"
+        @clear="setCuratedFrameTagFilter(undefined)"
+        @toggle-tag="toggleCuratedFrameTagFilter"
+        @update-expanded="tagFiltersExpanded = $event"
+      />
 
       <div
         class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
       >
-      <div
+      <CuratedFrameEmptyState
         v-if="isFilteredEmpty"
-        class="mb-4 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/20 py-12 text-center"
-      >
-        <Camera class="size-10 text-muted-foreground" />
-        <p class="text-sm text-muted-foreground">{{ t("curated.tagFilterNoMatches") }}</p>
-        <Button
-          v-if="activeTagFilter"
-          type="button"
-          variant="outline"
-          size="sm"
-          class="rounded-2xl"
-          @click="setCuratedFrameTagFilter(undefined)"
-        >
-          {{ t("curated.tagFilterAll") }}
-        </Button>
-      </div>
+        variant="filtered"
+        :show-clear-filter="Boolean(activeTagFilter)"
+        @clear-filter="setCuratedFrameTagFilter(undefined)"
+      />
       <TabsContent value="timeline" class="mt-0 outline-none">
-        <div
-          class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-        >
-          <div
-            v-for="item in listWithUrls"
-            :key="item.row.id"
-            class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-            :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-          >
-            <label
-              v-if="batchMode"
-              class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-              :title="t('curated.exportToggleAria')"
-              @click.stop
-            >
-              <input
-                type="checkbox"
-                class="size-4 cursor-pointer rounded accent-primary"
-                :checked="isFrameSelected(item.row.id)"
-                :aria-label="t('curated.exportToggleAria')"
-                @change="toggleFrameSelection(item.row.id)"
-              />
-            </label>
-            <span
-              v-if="isNearDuplicateFrame(item.row.id)"
-              class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-            >
-              {{ t("curated.duplicateReviewBadge") }}
-            </span>
-            <button
-              type="button"
-              class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              @contextmenu.prevent="onFrameContextMenu($event, item)"
-              @click="openDialog(item)"
-            >
-              <div class="relative aspect-video w-full bg-black/80">
-                <img
-                  :src="item.url"
-                  :alt="item.row.code"
-                  class="h-full w-full object-contain"
-                  loading="lazy"
-                />
-              </div>
-              <div class="space-y-1 p-3">
-                <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                </p>
-              </div>
-            </button>
-          </div>
-        </div>
+        <CuratedFrameTimelineTab
+          :items="listWithUrls"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
 
       <TabsContent value="actors" class="mt-0 outline-none">
-        <div class="flex flex-col gap-8">
-          <section v-for="[actor, items] in actorGroups" :key="actor">
-            <div class="mb-3">
-              <label
-                v-if="batchMode"
-                class="flex cursor-pointer items-start gap-2.5"
-              >
-                <input
-                  type="checkbox"
-                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
-                  :disabled="items.length === 0"
-                  :checked="isGroupHeaderFullySelected(items)"
-                  :aria-label="t('curated.batchSelectActorGroup')"
-                  @change="onActorGroupHeaderCheckboxChange(actor, items, $event)"
-                />
-                <span class="min-w-0 text-lg font-semibold leading-snug">{{ actor }}</span>
-              </label>
-              <h2
-                v-else
-                class="text-lg font-semibold"
-              >
-                {{ actor }}
-              </h2>
-            </div>
-            <div
-              class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-            >
-              <div
-                v-for="item in items"
-                :key="`${actor}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-              >
-                <label
-                  v-if="batchMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-                  :title="t('curated.exportToggleAria')"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    class="size-4 cursor-pointer rounded accent-primary"
-                    :checked="isFrameSelected(item.row.id)"
-                    :aria-label="t('curated.exportToggleAria')"
-                    @change="toggleFrameSelection(item.row.id, actor)"
-                  />
-                </label>
-                <span
-                  v-if="isNearDuplicateFrame(item.row.id)"
-                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-                >
-                  {{ t("curated.duplicateReviewBadge") }}
-                </span>
-                <button
-                  type="button"
-                  class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @contextmenu.prevent="onFrameContextMenu($event, item, actor)"
-                  @click="openDialog(item, actor)"
-                >
-                  <div class="relative aspect-video w-full bg-black/80">
-                    <img
-                      :src="item.url"
-                      :alt="item.row.code"
-                      class="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div class="space-y-1 p-3">
-                    <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
+        <CuratedFrameActorsTab
+          :actor-groups="actorGroups"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          :select-group-aria-label="t('curated.batchSelectActorGroup')"
+          :batch-export-max="batchExportMax"
+          @group-selection-change="onActorGroupHeaderSelectionChange"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
 
       <TabsContent value="movies" class="mt-0 outline-none">
-        <div class="flex flex-col gap-8">
-          <section v-for="g in movieGroups" :key="g.movieKey">
-            <div class="mb-3">
-              <label
-                v-if="batchMode"
-                class="flex cursor-pointer items-start gap-2.5"
-              >
-                <input
-                  type="checkbox"
-                  class="mt-1 size-4 shrink-0 cursor-pointer rounded accent-primary"
-                  :disabled="g.items.length === 0"
-                  :checked="isGroupHeaderFullySelected(g.items)"
-                  :aria-label="t('curated.batchSelectMovieGroup')"
-                  @change="onMovieGroupHeaderCheckboxChange(g.movieKey, g.items, $event)"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="block text-lg font-semibold leading-snug">{{ g.heading }}</span>
-                  <p
-                    v-if="g.sub"
-                    class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
-                  >
-                    {{ g.sub }}
-                  </p>
-                </span>
-              </label>
-              <template v-else>
-                <h2 class="text-lg font-semibold">{{ g.heading }}</h2>
-                <p
-                  v-if="g.sub"
-                  class="mt-0.5 line-clamp-2 text-sm text-muted-foreground"
-                >
-                  {{ g.sub }}
-                </p>
-              </template>
-            </div>
-            <div
-              class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-            >
-              <div
-                v-for="item in g.items"
-                :key="`${g.movieKey}-${item.row.id}`"
-                class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
-                :class="isNearDuplicateFrame(item.row.id) ? 'border-amber-400/70' : 'border-border/70'"
-              >
-                <label
-                  v-if="batchMode"
-                  class="absolute top-2 left-2 z-10 flex cursor-pointer items-center justify-center rounded-md p-1.5 text-primary transition-colors hover:bg-foreground/12 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring dark:hover:bg-black/50"
-                  :title="t('curated.exportToggleAria')"
-                  @click.stop
-                >
-                  <input
-                    type="checkbox"
-                    class="size-4 cursor-pointer rounded accent-primary"
-                    :checked="isFrameSelected(item.row.id)"
-                    :aria-label="t('curated.exportToggleAria')"
-                    @change="toggleFrameSelection(item.row.id)"
-                  />
-                </label>
-                <span
-                  v-if="isNearDuplicateFrame(item.row.id)"
-                  class="absolute top-2 right-2 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm"
-                >
-                  {{ t("curated.duplicateReviewBadge") }}
-                </span>
-                <button
-                  type="button"
-                  class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @contextmenu.prevent="onFrameContextMenu($event, item)"
-                  @click="openDialog(item)"
-                >
-                  <div class="relative aspect-video w-full bg-black/80">
-                    <img
-                      :src="item.url"
-                      :alt="item.row.code"
-                      class="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div class="space-y-1 p-3">
-                    <p class="line-clamp-2 text-sm font-medium">{{ item.row.title }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {{ item.row.code }} · {{ formatClock(item.row.positionSec) }}
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
+        <CuratedFrameMoviesTab
+          :movie-groups="movieGroups"
+          :batch-mode="batchMode"
+          :selected-ids="selectedFrameIds"
+          :near-duplicate-ids="nearDuplicateFrameIdList"
+          :select-group-aria-label="t('curated.batchSelectMovieGroup')"
+          :batch-export-max="batchExportMax"
+          @group-selection-change="onMovieGroupHeaderSelectionChange"
+          @toggle-selection="toggleFrameSelection"
+          @contextmenu="onFrameCardContextMenu"
+          @open="openFrameCardDialog"
+        />
       </TabsContent>
       <div v-if="hasMoreRows" class="flex justify-center py-5">
         <Button
@@ -1795,34 +1464,12 @@ defineExpose({
       @delete="openDeleteConfirmFromContextMenu"
     />
 
-    <Dialog v-model:open="deleteConfirmOpen">
-      <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{{ t("curated.deleteCard") }}</DialogTitle>
-          <DialogDescription class="text-pretty">
-            {{ t("curated.deleteConfirm", { label: deleteTargetLabel }) }}
-          </DialogDescription>
-        </DialogHeader>
-        <p v-if="deleteFrameError" class="text-sm text-destructive" role="alert">
-          {{ deleteFrameError }}
-        </p>
-        <DialogFooter class="gap-3">
-          <DialogClose as-child>
-            <Button type="button" variant="outline" class="rounded-2xl" :disabled="deleteFrameBusy">
-              {{ t("curated.cancel") }}
-            </Button>
-          </DialogClose>
-          <Button
-            type="button"
-            variant="destructive"
-            class="rounded-2xl"
-            :disabled="deleteFrameBusy"
-            @click="executeDeleteCuratedFrame"
-          >
-            {{ deleteFrameBusy ? t("curated.deleteWorking") : t("curated.confirmDelete") }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <CuratedFrameDeleteConfirmDialog
+      v-model:open="deleteConfirmOpen"
+      :label="deleteTargetLabel"
+      :error="deleteFrameError"
+      :busy="deleteFrameBusy"
+      @confirm="executeDeleteCuratedFrame"
+    />
   </div>
 </template>

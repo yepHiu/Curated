@@ -1,3 +1,4 @@
+// Package assets downloads and caches remote images (cover, thumb, previews, actor avatars).
 package assets
 
 import (
@@ -21,6 +22,7 @@ import (
 	"curated-backend/internal/scraper"
 )
 
+// DownloadedAsset describes a single downloaded asset with its local path.
 type DownloadedAsset struct {
 	Type       string
 	SourceURL  string
@@ -28,10 +30,12 @@ type DownloadedAsset struct {
 	HTTPStatus int
 }
 
+// ImageFetchOptions carries optional request parameters for image downloads.
 type ImageFetchOptions struct {
 	Referer string
 }
 
+// Service downloads and caches remote assets with controlled concurrency and body size limits.
 type Service struct {
 	logger          *zap.Logger
 	cacheDir        string
@@ -65,6 +69,7 @@ func NewService(logger *zap.Logger, cacheDir string, requestTimeout time.Duratio
 	}
 }
 
+// DownloadAll downloads cover, thumb and preview images into the cache directory for a movie.
 func (s *Service) DownloadAll(ctx context.Context, metadata scraper.Metadata) ([]DownloadedAsset, error) {
 	destDir := filepath.Join(s.cacheDir, metadata.MovieID)
 	return s.DownloadAllTo(ctx, metadata, destDir)
@@ -213,6 +218,7 @@ func (s *Service) downloadOne(ctx context.Context, destDir, number, assetType st
 	return localPath, nil
 }
 
+// DownloadActorAvatar downloads an actor avatar image and caches it locally.
 func (s *Service) DownloadActorAvatar(ctx context.Context, actorName, sourceURL string, opts ImageFetchOptions) (string, int, error) {
 	destDir := filepath.Join(s.cacheDir, "actors")
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
@@ -234,6 +240,7 @@ func (s *Service) DownloadActorAvatar(ctx context.Context, actorName, sourceURL 
 	return localPath, httpStatus, nil
 }
 
+// FetchRemoteImage fetches a remote image and returns the response without saving to disk.
 func (s *Service) FetchRemoteImage(ctx context.Context, sourceURL string, opts ImageFetchOptions) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {

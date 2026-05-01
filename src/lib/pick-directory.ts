@@ -5,6 +5,8 @@
  * - 回退：`<input webkitdirectory>`，在部分壳环境里 `File.path` 存在时可解析出目录。
  */
 
+import { i18n } from "@/i18n"
+
 export type PickDirectoryOutcome =
   | { status: "ok"; path: string }
   | { status: "hint"; message: string; suggestedTitle?: string }
@@ -25,6 +27,10 @@ function directoryFromFilePath(filePath: string): string {
   const fwd = filePath.lastIndexOf("/")
   const i = Math.max(back, fwd)
   return i > 0 ? filePath.slice(0, i) : filePath
+}
+
+function t(key: string, params?: Record<string, unknown>): string {
+  return i18n.global.t(key, params ?? {})
 }
 
 function pickDirectoryViaFileInput(): Promise<PickDirectoryOutcome> {
@@ -57,8 +63,7 @@ function pickDirectoryViaFileInput(): Promise<PickDirectoryOutcome> {
       finish({
         status: "hint",
         suggestedTitle: seg || undefined,
-        message:
-          "当前环境无法自动读取磁盘绝对路径。请在本机资源管理器中打开该文件夹，将地址栏中的完整路径复制到「绝对路径」输入框。",
+        message: t("pickDir.unsupported"),
       })
     })
 
@@ -93,7 +98,7 @@ export async function pickLibraryDirectory(): Promise<PickDirectoryOutcome> {
       return {
         status: "hint",
         suggestedTitle: name,
-        message: `已选择文件夹「${name}」。网页出于安全限制无法读取本机绝对路径，请在资源管理器中进入该文件夹，将地址栏路径复制到上方「绝对路径」。`,
+        message: t("pickDir.selected", { name }),
       }
     } catch (e) {
       const name = (e as { name?: string }).name

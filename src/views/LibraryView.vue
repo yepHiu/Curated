@@ -53,6 +53,7 @@ const metadataRefreshBusy = ref(false)
 const actorUserTagSuggestionPool = computed(() =>
   buildUserTagSuggestionPool(libraryService.movies.value, []),
 )
+const libraryLoadError = computed(() => libraryService.loadError.value)
 
 const BATCH_SELECT_VISIBLE_MAX = 100
 
@@ -262,7 +263,9 @@ function patchMovieDisplayForLibraryEdit(body: PatchMovieBody, done: (err?: unkn
       done()
     } catch (err) {
       console.error("[LibraryView] patch movie display failed", err)
-      done(err)
+      const message = formatClientError(err, t("detailPanel.movieEditSaveFailed"))
+      pushAppToast(message, { variant: "destructive" })
+      done(new Error(message))
     }
   })()
 }
@@ -719,6 +722,9 @@ const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) 
   try {
     await libraryService.toggleFavorite(payload.movieId, payload.nextValue)
   } catch (err) {
+    pushAppToast(formatClientError(err, t("library.favoriteToggleFailed")), {
+      variant: "destructive",
+    })
     console.error("[LibraryView] toggle favorite failed", err)
   }
 }
@@ -773,6 +779,14 @@ const activeStudioForPage = computed(() =>
 <template>
   <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7">
+      <p
+        v-if="libraryLoadError"
+        data-library-load-error
+        role="alert"
+        class="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        {{ libraryLoadError }}
+      </p>
       <LibraryPage
         :mode="libraryMode"
         :all-movies="libraryMovies"

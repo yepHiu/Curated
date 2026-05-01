@@ -4,7 +4,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useId
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
 import { Plus, X } from "lucide-vue-next"
-import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type { ActorProfileDTO, TaskDTO } from "@/api/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -198,7 +197,7 @@ function isTerminalStatus(s: TaskDTO["status"]): boolean {
 
 async function pollTaskToEnd(taskId: string): Promise<TaskDTO | null> {
   while (!disposed) {
-    const task = await api.getTaskStatus(taskId)
+    const task = await libraryService.getTaskStatus(taskId)
     if (isTerminalStatus(task.status)) {
       return task
     }
@@ -208,7 +207,7 @@ async function pollTaskToEnd(taskId: string): Promise<TaskDTO | null> {
 }
 
 async function fetchProfileForSeq(seq: number, name: string): Promise<void> {
-  const data = await api.getActorProfile(name)
+  const data = await libraryService.getActorProfile(name)
   if (seq !== loadSeq) {
     return
   }
@@ -238,7 +237,7 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
   scraping.value = true
   scrapeError.value = null
   try {
-    const started = await api.scrapeActorProfile(name)
+    const started = await libraryService.scrapeActorProfile(name)
     if (seq !== loadSeq) {
       return
     }
@@ -399,7 +398,7 @@ async function patchActorExternalLinks(next: string[]) {
   externalLinksSaving.value = true
   externalLinkFormError.value = ""
   try {
-    profile.value = await api.patchActorExternalLinks(name, next)
+    profile.value = await libraryService.patchActorExternalLinks(name, next)
     return true
   } catch (e) {
     if (e instanceof HttpClientError && e.status === 404) {

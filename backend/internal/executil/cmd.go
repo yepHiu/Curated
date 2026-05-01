@@ -1,3 +1,4 @@
+// Package executil provides platform-aware process startup helpers.
 package executil
 
 import (

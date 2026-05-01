@@ -12,6 +12,7 @@ const (
 	mbOk        = 0x00000000
 )
 
+// ShowErrorDialog displays a native Windows error message box.
 func ShowErrorDialog(title string, message string) {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	messageBox := user32.NewProc("MessageBoxW")

@@ -1,3 +1,5 @@
+// Package proxyenv applies outbound HTTP proxy settings from library config to the process environment
+// and provides an HTTP client builder for one-off proxy test requests.
 package proxyenv
 
 import (

@@ -51,6 +51,7 @@ type homepageDailyExclusionPolicy struct {
 	movieIDs   map[string]struct{}
 }
 
+// GetOrCreateHomepageDailyRecommendations returns the cached daily hero+recommendation snapshot, regenerating if stale or missing.
 func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
 	if strings.TrimSpace(dateUTC) == "" {
 		dateUTC = time.Now().UTC().Format("2006-01-02")
@@ -89,6 +90,7 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 	return dto, nil
 }
 
+// RegenerateHomepageDailyRecommendations force-regenerates the daily recommendation snapshot, ignoring any cached version.
 func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
 	if strings.TrimSpace(dateUTC) == "" {
 		dateUTC = time.Now().UTC().Format("2006-01-02")

@@ -1,3 +1,4 @@
+// Package curatedthumb generates downscaled PNG thumbnails for curated frames.
 package curatedthumb
 
 import (
@@ -12,7 +13,9 @@ import (
 )
 
 const (
+	// MaxThumbnailWidth is the maximum width of generated thumbnails.
 	MaxThumbnailWidth  = 320
+	// MaxThumbnailHeight is the maximum height of generated thumbnails.
 	MaxThumbnailHeight = 180
 )
 
@@ -40,6 +43,7 @@ func fitWithin(width, height, maxWidth, maxHeight int) (int, int) {
 	return outW, outH
 }
 
+// PNG scales an image to fit within MaxThumbnailWidth x MaxThumbnailHeight, returning the original bytes if already within bounds.
 func PNG(imageBytes []byte) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(imageBytes))
 	if err != nil {

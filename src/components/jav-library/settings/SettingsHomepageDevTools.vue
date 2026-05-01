@@ -2,24 +2,25 @@
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { Loader2, RefreshCw } from "lucide-vue-next"
-import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type { HomepageDailyRecommendationsDTO } from "@/api/types"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { Button } from "@/components/ui/button"
+import { useLibraryService } from "@/services/library-service"
 
 const emit = defineEmits<{
   refreshed: [snapshot: HomepageDailyRecommendationsDTO]
 }>()
 
 const { t } = useI18n()
+const libraryService = useLibraryService()
 const refreshing = ref(false)
 
 async function refreshHomepageRecommendations() {
   if (refreshing.value) return
   refreshing.value = true
   try {
-    const snapshot = await api.refreshHomepageDailyRecommendations()
+    const snapshot = await libraryService.refreshHomepageDailyRecommendations()
     emit("refreshed", snapshot)
     pushAppToast(t("settings.aboutHomepageRefreshSuccess", {
       date: snapshot.dateUtc,

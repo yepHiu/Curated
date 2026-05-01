@@ -1,3 +1,4 @@
+// Package server provides HTTP handlers and routing for the Curated REST API.
 package server
 
 import (
@@ -37,6 +38,7 @@ var (
 	revealInFileManagerFn = shellopen.RevealInFileManager
 )
 
+// ScanStarter starts an async library scan task and returns its task descriptor.
 type ScanStarter interface {
 	StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error)
 }
@@ -52,7 +54,7 @@ type ActorProfileRefresher interface {
 	StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error)
 }
 
-// OrganizeLibraryController exposes 整理库开关；值来自启动时合并的 library-config.cfg，PATCH 会写回该文件。
+// OrganizeLibraryController exposes whether the library auto-organize feature is enabled (persisted in library-config.cfg).
 type OrganizeLibraryController interface {
 	OrganizeLibrary() bool
 	SetOrganizeLibrary(v bool) error
@@ -101,17 +103,20 @@ type BackendLogSettingsController interface {
 	SetBackendLogPatch(p contracts.PatchBackendLogSettings) error
 }
 
+// PlayerSettingsController exposes and updates player configuration (persisted in library-config.cfg).
 type PlayerSettingsController interface {
 	PlayerSettings() contracts.PlayerSettingsDTO
 	SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error
 }
 
+// LaunchAtLoginController exposes whether Windows login autostart is enabled and whether the current runtime supports it.
 type LaunchAtLoginController interface {
 	LaunchAtLogin() bool
 	LaunchAtLoginSupported() bool
 	SetLaunchAtLogin(v bool) error
 }
 
+// CuratedFrameExportFormatController exposes and updates the export format preference for curated frames.
 type CuratedFrameExportFormatController interface {
 	CuratedFrameExportFormat() string
 	SetCuratedFrameExportFormat(v string) error
@@ -122,10 +127,12 @@ type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
 }
 
+// DevPerformanceProvider returns a development-only CPU and runtime performance summary.
 type DevPerformanceProvider interface {
 	GetDevPerformanceSummary(ctx context.Context) contracts.DevPerformanceSummaryDTO
 }
 
+// PlaybackResolver resolves movie playback descriptors and manages HLS playback sessions.
 type PlaybackResolver interface {
 	ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error)
 	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
@@ -135,20 +142,24 @@ type PlaybackResolver interface {
 	DeletePlaybackSession(sessionID string) error
 }
 
+// NativePlaybackLauncher launches an external native player process for a movie.
 type NativePlaybackLauncher interface {
 	LaunchNativePlayback(ctx context.Context, movieID string, startPositionSec float64) (contracts.NativePlaybackLaunchDTO, error)
 }
 
+// HomepageRecommendationsProvider generates and persists daily UTC-day homepage recommendation snapshots.
 type HomepageRecommendationsProvider interface {
 	GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
 	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
 }
 
+// AppUpdateProvider checks and returns packaged-app update status from GitHub Releases.
 type AppUpdateProvider interface {
 	GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
 	CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
 }
 
+// Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
 	cfg                         config.Config
 	logger                      *zap.Logger
@@ -175,6 +186,7 @@ type Handler struct {
 	appUpdateProvider           AppUpdateProvider
 }
 
+// Deps bundles all dependencies needed to construct a Handler.
 type Deps struct {
 	Cfg                         config.Config
 	Logger                      *zap.Logger
@@ -201,6 +213,7 @@ type Deps struct {
 	AppUpdateProvider           AppUpdateProvider
 }
 
+// NewHandler creates a Handler wired with all provided dependencies.
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
 		cfg:                         deps.Cfg,
@@ -229,6 +242,7 @@ func NewHandler(deps Deps) *Handler {
 	}
 }
 
+// Routes builds the HTTP mux with all registered API routes, access logging, and CORS.
 func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 
@@ -2153,6 +2167,7 @@ func (h *Handler) reloadLibraryWatchIfAny(ctx context.Context) {
 	}
 }
 
+// ListenAndServe starts an HTTP server on addr and gracefully shuts down when ctx is cancelled.
 func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logger *zap.Logger) error {
 	srv := &http.Server{
 		Addr:         addr,

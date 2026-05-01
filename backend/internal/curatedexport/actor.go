@@ -1,3 +1,5 @@
+// Package curatedexport provides JPEG, PNG+iTXt, and WebP encoding with embedded curated-frame metadata,
+// plus filename sanitization and actor lookup helpers for export.
 package curatedexport
 
 import (

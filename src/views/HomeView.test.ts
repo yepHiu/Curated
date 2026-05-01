@@ -57,6 +57,25 @@ const homepageSnapshotState = vi.hoisted(() => ({
   },
 }))
 const moviesLoadedState = vi.hoisted(() => ({ value: true }))
+const playbackProgressRevisionRef = vi.hoisted(() => ({
+  current: null as null | { value: number },
+}))
+const listSortedByUpdatedDescMock = vi.hoisted(() =>
+  vi.fn(() => [
+    {
+      movieId: "m1",
+      positionSec: 180,
+      durationSec: 1200,
+      updatedAt: "2026-04-12T08:00:00.000Z",
+    },
+    {
+      movieId: "m2",
+      positionSec: 300,
+      durationSec: 1200,
+      updatedAt: "2026-04-12T10:00:00.000Z",
+    },
+  ]),
+)
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -85,22 +104,13 @@ vi.mock("@/services/library-service", () => ({
 }))
 
 vi.mock("@/lib/playback-progress-storage", () => ({
-  listSortedByUpdatedDesc: vi.fn(() => [
-    {
-      movieId: "m1",
-      positionSec: 180,
-      durationSec: 1200,
-      updatedAt: "2026-04-12T08:00:00.000Z",
-    },
-    {
-      movieId: "m2",
-      positionSec: 300,
-      durationSec: 1200,
-      updatedAt: "2026-04-12T10:00:00.000Z",
-    },
-  ]),
+  listSortedByUpdatedDesc: listSortedByUpdatedDescMock,
   getProgress: vi.fn(),
-  playbackProgressRevision: ref(0),
+  playbackProgressRevision: (() => {
+    const revision = ref(0)
+    playbackProgressRevisionRef.current = revision
+    return revision
+  })(),
 }))
 
 vi.mock("@/composables/use-homepage-daily-recommendations", () => ({
@@ -142,6 +152,10 @@ describe("HomeView", () => {
     homepageSnapshotState.value = null
     moviesLoadedState.value = true
     moviesState.value = defaultMockMovies
+    listSortedByUpdatedDescMock.mockClear()
+    if (playbackProgressRevisionRef.current) {
+      playbackProgressRevisionRef.current.value = 0
+    }
   })
 
   it("renders homepage skeleton until movies are loaded", () => {
@@ -218,6 +232,39 @@ describe("HomeView", () => {
       "m2",
     ])
     expect(model.recommendations.map((entry) => entry.movie.id)).toEqual(["m11", "m10", "m1"])
+  })
+
+  it("debounces portal model rebuilds caused only by playback progress revision changes", async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(HomeView)
+      expect(wrapper.getComponent({ name: "HomepagePortal" }).props("model")).toBeTruthy()
+      const initialReadCount = listSortedByUpdatedDescMock.mock.calls.length
+      expect(initialReadCount).toBeGreaterThan(0)
+
+      expect(playbackProgressRevisionRef.current).toBeTruthy()
+      if (!playbackProgressRevisionRef.current) return
+
+      playbackProgressRevisionRef.current.value += 1
+      await wrapper.vm.$nextTick()
+      playbackProgressRevisionRef.current.value += 1
+      await wrapper.vm.$nextTick()
+      playbackProgressRevisionRef.current.value += 1
+      await wrapper.vm.$nextTick()
+
+      expect(listSortedByUpdatedDescMock).toHaveBeenCalledTimes(initialReadCount)
+
+      await vi.advanceTimersByTimeAsync(4_999)
+      await wrapper.vm.$nextTick()
+      expect(listSortedByUpdatedDescMock).toHaveBeenCalledTimes(initialReadCount)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.getComponent({ name: "HomepagePortal" }).props("model")).toBeTruthy()
+      expect(listSortedByUpdatedDescMock.mock.calls.length).toBeGreaterThan(initialReadCount)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("opens library filters from taste radar chips", async () => {

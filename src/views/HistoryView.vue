@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { RouterLink, useRouter } from "vue-router"
 import { CheckSquare, ListChecks, Trash2, X } from "lucide-vue-next"
@@ -43,7 +43,7 @@ const pendingRemoveRow = ref<HistoryRow | null>(null)
 const batchMode = ref(false)
 const batchBusy = ref(false)
 const batchRemoveDialogOpen = ref(false)
-const batchSelectedIds = ref<Set<string>>(new Set())
+const batchSelectedIds = shallowRef<Set<string>>(new Set())
 
 const historyRows = computed((): HistoryRow[] => {
   void playbackProgressRevision.value

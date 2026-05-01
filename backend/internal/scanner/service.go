@@ -1,5 +1,4 @@
-// Package scanner 在配置的库目录下递归遍历视频文件，按扩展名筛选后从文件名解析番号，
-// 并通过 Hooks 将每条结果交给上层（例如入库、任务进度上报）。
+// Package scanner walks configured library directories for video files, extracts video IDs from filenames, and reports results via Hooks.
 package scanner
 
 import (
@@ -15,23 +14,23 @@ import (
 	"curated-backend/internal/contracts"
 )
 
-// errNoPathsConfigured 在 Scan 收到空路径列表时返回。
+// errNoPathsConfigured is returned when Scan receives an empty path list.
 var errNoPathsConfigured = errors.New("no scan paths configured")
 
-// Service 执行库目录扫描：发现候选视频文件、解析番号，并通过 Hooks 回调驱动后续流程。
+// Service scans library directories for video files, extracts video IDs, and drives downstream processing via Hooks.
 type Service struct {
 	logger     *zap.Logger
-	extensions map[string]struct{} // 允许的视频扩展名（不含点，小写）
+	extensions map[string]struct{} // allowed video extensions (lowercase, no dot)
 }
 
-// Hooks 由调用方注入，用于进度通知与每条扫描结果的处理（如同步入库）。
-// 任一回调返回错误时 Scan 会提前结束并向上传递该错误。
+// Hooks lets callers inject progress reporting and per-file handling (e.g. synchronous ingest).
+// When any callback returns an error, Scan stops early and propagates the error.
 type Hooks struct {
 	OnProgress     func(processed, total int, message string)
 	OnFileDetected func(result contracts.ScanFileResultDTO) error
 }
 
-// NewService 构造扫描器，默认识别常见容器扩展名：mp4、mkv、avi、mov、ts。
+// NewService creates a scanner that recognizes common container extensions (mp4, mkv, avi, mov, ts).
 func NewService(logger *zap.Logger) *Service {
 	return &Service{
 		logger: logger,
@@ -45,9 +44,8 @@ func NewService(logger *zap.Logger) *Service {
 	}
 }
 
-// Scan 在给定根路径下查找视频文件，逐条填充 ScanFileResultDTO（含 Path、FileName、Number、Status 等），
-// 并汇总为 ScanSummaryDTO。支持 ctx 取消：取消时返回已累积的 summary 与 ctx.Err()。
-// paths 为空时返回 errNoPathsConfigured。
+// Scan discovers video files under the given roots, populates ScanFileResultDTO per file, and aggregates a ScanSummaryDTO.
+// Context cancellation returns the partial summary alongside ctx.Err(). An empty path list returns errNoPathsConfigured.
 func (s *Service) Scan(ctx context.Context, taskID string, paths []string, hooks Hooks) (contracts.ScanSummaryDTO, error) {
 	if len(paths) == 0 {
 		return contracts.ScanSummaryDTO{}, errNoPathsConfigured
@@ -82,7 +80,7 @@ func (s *Service) Scan(ctx context.Context, taskID string, paths []string, hooks
 			FileName: filepath.Base(filePath),
 		}
 
-		// 从文件名解析番号；无法识别则记为 skipped，仍回调 OnFileDetected 供上层决定是否忽略。
+		// Extract the video ID from filename; unrecognized files are marked skipped but still reported via OnFileDetected.
 		number := ExtractNumber(result.FileName)
 		if number == "" {
 			result.Status = "skipped"
@@ -114,8 +112,7 @@ func (s *Service) Scan(ctx context.Context, taskID string, paths []string, hooks
 	return summary, nil
 }
 
-// findVideoFiles 对每个根路径做 filepath.Walk，收集扩展名在白名单内的普通文件路径，
-// 按 Clean 后的路径去重，最终按字典序排序后返回。
+// findVideoFiles walks each root with filepath.Walk, collects regular files with allowed extensions, deduplicates by cleaned path, and returns them in lexicographic order.
 func (s *Service) findVideoFiles(ctx context.Context, paths []string) ([]string, error) {
 	files := make([]string, 0)
 	seen := make(map[string]struct{})
@@ -163,7 +160,7 @@ func (s *Service) findVideoFiles(ctx context.Context, paths []string) ([]string,
 	return files, nil
 }
 
-// isVideoFile 根据扩展名（小写、无点）判断是否为配置中的视频类型。
+// isVideoFile checks whether path has a configured video extension (lowercase, no dot).
 func (s *Service) isVideoFile(path string) bool {
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
 	_, ok := s.extensions[ext]

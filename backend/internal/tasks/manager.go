@@ -1,3 +1,4 @@
+// Package tasks provides an in-memory task manager with lifecycle tracking, progress updates, and purging.
 package tasks
 
 import (
@@ -9,17 +10,20 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+// Manager is a thread-safe in-memory task registry with lifecycle tracking and automatic eviction.
 type Manager struct {
 	mu    sync.RWMutex
 	tasks map[string]contracts.TaskDTO
 }
 
+// NewManager creates an empty task Manager.
 func NewManager() *Manager {
 	return &Manager{
 		tasks: make(map[string]contracts.TaskDTO),
 	}
 }
 
+// Create registers a new pending task with a unique ID and enforces the in-memory cap.
 func (m *Manager) Create(taskType string, metadata map[string]any) contracts.TaskDTO {
 	now := nowUTC()
 	task := contracts.TaskDTO{
@@ -39,6 +43,7 @@ func (m *Manager) Create(taskType string, metadata map[string]any) contracts.Tas
 	return task
 }
 
+// Start transitions a task to running and records the start timestamp.
 func (m *Manager) Start(taskID, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
 		task.Status = contracts.TaskRunning
@@ -48,6 +53,7 @@ func (m *Manager) Start(taskID, message string) contracts.TaskDTO {
 	})
 }
 
+// Progress updates a running task's progress percentage and status message.
 func (m *Manager) Progress(taskID string, progress int, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
 		task.Status = contracts.TaskRunning
@@ -73,6 +79,7 @@ func (m *Manager) ProgressWithMetadata(taskID string, progress int, message stri
 	})
 }
 
+// Complete marks a task as completed with 100% progress and records the finish timestamp.
 func (m *Manager) Complete(taskID, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
 		task.Status = contracts.TaskCompleted
@@ -83,6 +90,7 @@ func (m *Manager) Complete(taskID, message string) contracts.TaskDTO {
 	})
 }
 
+// Fail marks a task as failed with an error code, error message, and finish timestamp.
 func (m *Manager) Fail(taskID, code, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
 		task.Status = contracts.TaskFailed
@@ -93,6 +101,7 @@ func (m *Manager) Fail(taskID, code, message string) contracts.TaskDTO {
 	})
 }
 
+// Get returns the task snapshot for taskID, or false if not found.
 func (m *Manager) Get(taskID string) (contracts.TaskDTO, bool) {
 	m.mu.RLock()
 	task, ok := m.tasks[taskID]

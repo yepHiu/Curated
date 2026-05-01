@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 )
 
+// HomepageDailyRecommendationSnapshot is a UTC-day homepage recommendation display snapshot persisted in SQLite.
 type HomepageDailyRecommendationSnapshot struct {
 	DateUTC                string
 	HeroMovieIDs           []string
@@ -14,6 +15,7 @@ type HomepageDailyRecommendationSnapshot struct {
 	GenerationVersion      string
 }
 
+// HomepageRecommendationState tracks long-lived per-movie recommendation state (last recommended, count, skip window).
 type HomepageRecommendationState struct {
 	MovieID           string
 	LastRecommendedAt string
@@ -22,6 +24,7 @@ type HomepageRecommendationState struct {
 	UpdatedAt         string
 }
 
+// GetHomepageDailyRecommendationSnapshot returns the snapshot for the given UTC date. The bool is false when none exists.
 func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context, dateUTC string) (HomepageDailyRecommendationSnapshot, bool, error) {
 	var heroJSON string
 	var recommendationJSON string
@@ -54,6 +57,7 @@ func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context
 	return snapshot, true, nil
 }
 
+// UpsertHomepageDailyRecommendationSnapshot inserts or replaces the daily snapshot for the snapshot's DateUTC.
 func (s *SQLiteStore) UpsertHomepageDailyRecommendationSnapshot(ctx context.Context, snapshot HomepageDailyRecommendationSnapshot) error {
 	heroJSON, err := json.Marshal(snapshot.HeroMovieIDs)
 	if err != nil {
@@ -87,6 +91,7 @@ func (s *SQLiteStore) UpsertHomepageDailyRecommendationSnapshot(ctx context.Cont
 	return err
 }
 
+// ListHomepageDailyRecommendationSnapshotsInRange returns snapshots between startDateUTC and endDateUTC (inclusive), newest first.
 func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 	ctx context.Context,
 	startDateUTC string,
@@ -132,6 +137,7 @@ func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 	return snapshots, nil
 }
 
+// ListHomepageRecommendationStates returns all per-movie recommendation states ordered by movie_id.
 func (s *SQLiteStore) ListHomepageRecommendationStates(ctx context.Context) ([]HomepageRecommendationState, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT movie_id, last_recommended_at, recommend_count, skip_until, updated_at
@@ -163,6 +169,7 @@ func (s *SQLiteStore) ListHomepageRecommendationStates(ctx context.Context) ([]H
 	return states, nil
 }
 
+// UpsertHomepageRecommendationStates bulk-inserts or updates per-movie recommendation states in a single transaction.
 func (s *SQLiteStore) UpsertHomepageRecommendationStates(ctx context.Context, states []HomepageRecommendationState) error {
 	if len(states) == 0 {
 		return nil

@@ -1,18 +1,25 @@
 import { computed, ref, watch } from "vue"
 import type {
   ActorListItemDTO,
+  ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
   CuratedFrameExportFormat,
+  HealthDTO,
   HomepageDailyRecommendationsDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  MovieCommentDTO,
   PatchPlayerSettingsBody,
   PlayerSettingsDTO,
   PatchBackendLogBody,
   PatchMovieBody,
+  PingAllProvidersResponse,
+  ProviderHealthDTO,
+  ProxyJavBusPingResponse,
+  PutMovieCommentBody,
   TaskDTO,
 } from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
@@ -25,6 +32,8 @@ import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
+import { HttpClientError } from "@/api/http-client"
 
 function normalizeMockLibraryPath(p: string): string {
   return p.trim().replace(/\\/g, "/")
@@ -75,6 +84,14 @@ const playerSettingsMock = ref<PlayerSettingsDTO>({
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
 
+function mockHttpError(status: number, code: string, message = code): HttpClientError {
+  return new HttpClientError(status, {
+    code,
+    message,
+    retryable: false,
+  })
+}
+
 function normalizeNativePlayerPreset(
   preset: PlayerSettingsDTO["nativePlayerPreset"],
   command?: string,
@@ -116,6 +133,7 @@ void refreshCuratedFramesCountMock()
 
 /** Mock：演员用户标签（与影片 userTags 隔离） */
 const mockActorUserTags = ref<Map<string, string[]>>(new Map())
+const mockActorExternalLinks = ref<Map<string, string[]>>(new Map())
 
 function mockActorsFromMovies(): ActorListItemDTO[] {
   const counts = new Map<string, number>()
@@ -134,6 +152,42 @@ function mockActorsFromMovies(): ActorListItemDTO[] {
     movieCount: counts.get(name) ?? 0,
     userTags: [...(mockActorUserTags.value.get(name) ?? [])].sort((x, y) => x.localeCompare(y)),
   }))
+}
+
+function buildMockCompletedTask(taskId: string, type: string, message = ""): TaskDTO {
+  const now = new Date().toISOString()
+  return {
+    taskId,
+    type,
+    status: "completed",
+    createdAt: now,
+    startedAt: now,
+    finishedAt: now,
+    progress: 1,
+    message,
+  }
+}
+
+function findMockActor(name: string): ActorListItemDTO | undefined {
+  const normalized = name.trim()
+  if (!normalized) {
+    return undefined
+  }
+  return mockActorsFromMovies().find((actor) => actor.name === normalized)
+}
+
+function buildMockActorProfile(name: string): ActorProfileDTO {
+  const actor = findMockActor(name)
+  if (!actor) {
+    throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
+  }
+  return {
+    name: actor.name,
+    avatarUrl: actor.avatarUrl,
+    userTags: actor.userTags ?? [],
+    externalLinks: [...(mockActorExternalLinks.value.get(actor.name) ?? [])],
+    summary: "",
+  }
 }
 
 const libraryPathsState = ref<LibrarySetting[]>([
@@ -424,6 +478,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 export const mockLibraryService: LibraryService = {
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
   moviesLoaded: computed(() => true),
+  loadError: computed(() => null),
   trashedMovies: computed(() =>
     moviesState.value
       .filter((m) => Boolean(m.trashedAt?.trim()))
@@ -529,6 +584,42 @@ export const mockLibraryService: LibraryService = {
     }
   },
 
+  async health(): Promise<HealthDTO> {
+    return {
+      name: "curated-mock",
+      version: "mock",
+      channel: "dev",
+      transport: "mock",
+      databasePath: "mock",
+    }
+  },
+
+  async pingProxyJavbus(): Promise<ProxyJavBusPingResponse> {
+    return { ok: true, latencyMs: 0, httpStatus: 200, message: "mock" }
+  },
+
+  async pingProxyGoogle(): Promise<ProxyJavBusPingResponse> {
+    return { ok: true, latencyMs: 0, httpStatus: 200, message: "mock" }
+  },
+
+  async pingProvider(name: string): Promise<ProviderHealthDTO> {
+    return {
+      name: name.trim(),
+      status: "ok",
+      latencyMs: 0,
+      message: "mock",
+    }
+  },
+
+  async pingAllProviders(): Promise<PingAllProvidersResponse> {
+    return {
+      providers: [],
+      total: 0,
+      ok: 0,
+      fail: 0,
+    }
+  },
+
   async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
     const dateUtc = getCurrentUtcDayKey()
     const model = buildHomepagePortalModel({
@@ -542,6 +633,10 @@ export const mockLibraryService: LibraryService = {
       heroMovieIds: model.heroMovies.map((movie) => movie.id),
       recommendationMovieIds: model.recommendations.map((entry) => entry.movie.id),
     }
+  },
+
+  async refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+    return await this.getHomepageDailyRecommendations()
   },
 
   async refreshSettings() {
@@ -579,13 +674,17 @@ export const mockLibraryService: LibraryService = {
   async setMetadataMovieProvider(name: string) {
     const trimmed = name.trim()
     if (trimmed !== "" && metadataMovieProvidersMock.value.length === 0) {
-      throw new Error("Mock mode has no provider list; use Web API to pick a source.")
+      throw mockHttpError(
+        400,
+        "MOCK_METADATA_PROVIDER_UNAVAILABLE",
+        "Mock mode has no provider list; use Web API to pick a source.",
+      )
     }
     if (
       trimmed !== "" &&
       !metadataMovieProvidersMock.value.some((p) => p.toLowerCase() === trimmed.toLowerCase())
     ) {
-      throw new Error("Unknown metadata provider in mock.")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "Unknown metadata provider in mock.")
     }
     metadataMovieProviderMock.value = trimmed
     metadataMovieScrapeModeMock.value = trimmed === "" ? "auto" : "specified"
@@ -612,7 +711,7 @@ export const mockLibraryService: LibraryService = {
     const trimmed = path.trim()
     if (!trimmed) return null
     if (!isAbsoluteLibraryPath(trimmed)) {
-      throw new Error("library path must be an absolute path")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "library path must be an absolute path")
     }
     const id = `mock-${Date.now()}`
     libraryPathsState.value = [
@@ -644,7 +743,7 @@ export const mockLibraryService: LibraryService = {
   },
 
   async revealLibraryPathInFileManager() {
-    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
+    throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
   },
 
   async scanLibraryPaths() {
@@ -652,12 +751,16 @@ export const mockLibraryService: LibraryService = {
     return null
   },
 
+  async getTaskStatus(taskId: string): Promise<TaskDTO> {
+    return buildMockCompletedTask(taskId.trim() || "mock-task", "mock")
+  },
+
   async refreshMovieMetadata() {
     return null
   },
 
   async revealMovieInFileManager() {
-    throw new Error("MOCK_REVEAL_NOT_SUPPORTED")
+    throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
   },
 
   async refreshMetadataForLibraryPaths(): Promise<MetadataRefreshQueuedDTO> {
@@ -676,15 +779,24 @@ export const mockLibraryService: LibraryService = {
     return null
   },
 
+  async deletePlaybackSession() {
+    // Mock: no playback sessions to release.
+  },
+
   async ensureMovieCached() {
     // Mock 数据全在内存，无需远程补全。
   },
 
   getMovieById(movieId) {
-    return moviesState.value.find((movie) => movie.id === movieId)
+    const id = movieId?.trim()
+    if (!id) return undefined
+    return moviesState.value.find((movie) => movie.id === id)
   },
   async loadMovieDetail(movieId: string) {
-    return moviesState.value.find((movie) => movie.id === movieId)
+    const id = movieId.trim()
+    if (!id) return undefined
+    await Promise.resolve()
+    return moviesState.value.find((movie) => movie.id === id)
   },
   getRelatedMovies(movieId, limit = 6) {
     const id = movieId.trim()
@@ -764,10 +876,10 @@ export const mockLibraryService: LibraryService = {
   async patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
     const n = name.trim()
     if (!n) {
-      throw new Error("actor name is required")
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "actor name is required")
     }
     if (!mockActorsFromMovies().some((r) => r.name === n)) {
-      throw new Error("actor not found")
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
     }
     const normalized = [
       ...new Set(
@@ -781,8 +893,40 @@ export const mockLibraryService: LibraryService = {
     mockActorUserTags.value = next
     const row = mockActorsFromMovies().find((r) => r.name === n)
     if (!row) {
-      throw new Error("actor not found")
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "actor not found")
     }
     return row
+  },
+
+  async getActorProfile(name: string): Promise<ActorProfileDTO> {
+    return buildMockActorProfile(name)
+  },
+
+  async scrapeActorProfile(name: string): Promise<TaskDTO> {
+    return buildMockCompletedTask(`mock-actor-scrape-${name.trim() || "unknown"}`, "actor-scrape")
+  },
+
+  async patchActorExternalLinks(name: string, externalLinks: string[]): Promise<ActorProfileDTO> {
+    const profile = buildMockActorProfile(name)
+    const normalized = externalLinks.map((link) => link.trim()).filter(Boolean)
+    const next = new Map(mockActorExternalLinks.value)
+    next.set(profile.name, normalized)
+    mockActorExternalLinks.value = next
+    return {
+      ...profile,
+      externalLinks: normalized,
+    }
+  },
+
+  async getMovieComment(movieId: string): Promise<MovieCommentDTO> {
+    return getLocalMovieComment(movieId.trim())
+  },
+
+  async putMovieComment(movieId: string, body: PutMovieCommentBody): Promise<MovieCommentDTO> {
+    return putLocalMovieComment(movieId.trim(), body.body)
+  },
+
+  async exportCuratedFrames(): Promise<{ blob: Blob; filename: string }> {
+    throw mockHttpError(501, "MOCK_CURATED_EXPORT_NOT_SUPPORTED")
   },
 }

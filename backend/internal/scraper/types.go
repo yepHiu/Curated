@@ -1,7 +1,9 @@
+// Package scraper defines metadata types and the Service interface for movie and actor scraping.
 package scraper
 
 import "context"
 
+// Metadata holds the scraped movie metadata fields that are merged into the library record.
 type Metadata struct {
 	MovieID         string
 	Number          string
@@ -37,7 +39,7 @@ type ActorProfile struct {
 }
 
 // MovieScrapeOptions controls movie metadata scraping. Provider empty means all registered sources (Metatube SearchMovieAll),
-// except FC2 番号 (common/number.IsFC2) which is limited to FC2 + fc2hub providers only.
+// except FC2 IDs (common/number.IsFC2) which is limited to FC2 + fc2hub providers only.
 type MovieScrapeOptions struct {
 	Provider string
 	// ProviderChain is an ordered list of providers to try in sequence; takes precedence over Provider when non-empty.
@@ -45,6 +47,7 @@ type MovieScrapeOptions struct {
 	ProviderChain []string
 }
 
+// Service defines the metadata scraping contract for movies and actors.
 type Service interface {
 	Scrape(ctx context.Context, movieID string, number string, opts MovieScrapeOptions) (Metadata, error)
 	ScrapeActor(ctx context.Context, displayName string) (ActorProfile, error)

@@ -9,10 +9,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// InstanceLock holds a Windows named mutex for single-instance enforcement.
 type InstanceLock struct {
 	handle windows.Handle
 }
 
+// AcquireSingleInstance creates or opens a named Windows mutex, returning false if another instance already holds it.
 func AcquireSingleInstance(name string) (*InstanceLock, bool, error) {
 	if name == "" {
 		return nil, false, fmt.Errorf("empty mutex name")
@@ -35,6 +37,7 @@ func AcquireSingleInstance(name string) (*InstanceLock, bool, error) {
 	return lock, true, nil
 }
 
+// Release closes the Windows mutex handle.
 func (l *InstanceLock) Release() error {
 	if l == nil || l.handle == 0 {
 		return nil

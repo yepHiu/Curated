@@ -17,6 +17,7 @@ type windowsCPUSampler struct {
 	process *process.Process
 }
 
+// NewCPUSampler returns a Windows CPU sampler backed by gopsutil, falling back to unsupported if it cannot open the current process.
 func NewCPUSampler() CPUSampler {
 	proc, err := process.NewProcess(int32(os.Getpid()))
 	if err != nil {

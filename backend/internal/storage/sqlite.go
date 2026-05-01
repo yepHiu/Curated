@@ -1,3 +1,4 @@
+// Package storage provides SQLite-based persistence for the Curated media library.
 package storage
 
 import (
@@ -15,10 +16,12 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
+// SQLiteStore is the primary persistence store backed by a SQLite database.
 type SQLiteStore struct {
 	db *sql.DB
 }
 
+// NewSQLiteStore opens the SQLite database at path, creates parent directories, and verifies connectivity.
 func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -29,6 +32,7 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		return nil, err
 	}
 
+	// Single writer to avoid SQLite busy/locked errors.
 	db.SetMaxOpenConns(1)
 
 	if err := db.Ping(); err != nil {
@@ -39,10 +43,12 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db}, nil
 }
 
+// Close shuts down the underlying database connection.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
+// Migrate runs embedded SQL migration files in name order, tracking applied migrations in schema_migrations.
 func (s *SQLiteStore) Migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (

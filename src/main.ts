@@ -33,7 +33,11 @@ function hydrateWebStateAfterMount() {
 }
 
 function boot() {
-  createApp(App).use(i18n).use(router).mount("#app")
+  const app = createApp(App)
+  app.config.errorHandler = (err, _instance, info) => {
+    console.error("[global error handler]", err, info)
+  }
+  app.use(i18n).use(router).mount("#app")
   hydrateWebStateAfterMount()
 }
 

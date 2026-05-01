@@ -2,6 +2,7 @@ package storage
 
 import "context"
 
+// UpdateMediaAssetLocalPath records the downloaded local path for a movie media asset.
 func (s *SQLiteStore) UpdateMediaAssetLocalPath(ctx context.Context, movieID, assetType, sourceURL, localPath string) error {
 	_, err := s.db.ExecContext(
 		ctx,
@@ -18,6 +19,7 @@ func (s *SQLiteStore) UpdateMediaAssetLocalPath(ctx context.Context, movieID, as
 	return err
 }
 
+// UpdateMediaAssetFetchState records HTTP fetch results (status code, error) for a media asset.
 func (s *SQLiteStore) UpdateMediaAssetFetchState(ctx context.Context, movieID, assetType, sourceURL string, httpStatus int, lastErr string) error {
 	_, err := s.db.ExecContext(
 		ctx,
