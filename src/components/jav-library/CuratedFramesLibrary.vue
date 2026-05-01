@@ -19,13 +19,11 @@ import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTa
 import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
 import CuratedFrameTagFilterBar from "@/components/jav-library/CuratedFrameTagFilterBar.vue"
 import CuratedFrameLibraryToolbar from "@/components/jav-library/CuratedFrameLibraryToolbar.vue"
+import CuratedFrameDeleteConfirmDialog from "@/components/jav-library/CuratedFrameDeleteConfirmDialog.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -1479,34 +1477,12 @@ defineExpose({
       @delete="openDeleteConfirmFromContextMenu"
     />
 
-    <Dialog v-model:open="deleteConfirmOpen">
-      <DialogContent class="rounded-3xl border-border/70 sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{{ t("curated.deleteCard") }}</DialogTitle>
-          <DialogDescription class="text-pretty">
-            {{ t("curated.deleteConfirm", { label: deleteTargetLabel }) }}
-          </DialogDescription>
-        </DialogHeader>
-        <p v-if="deleteFrameError" class="text-sm text-destructive" role="alert">
-          {{ deleteFrameError }}
-        </p>
-        <DialogFooter class="gap-3">
-          <DialogClose as-child>
-            <Button type="button" variant="outline" class="rounded-2xl" :disabled="deleteFrameBusy">
-              {{ t("curated.cancel") }}
-            </Button>
-          </DialogClose>
-          <Button
-            type="button"
-            variant="destructive"
-            class="rounded-2xl"
-            :disabled="deleteFrameBusy"
-            @click="executeDeleteCuratedFrame"
-          >
-            {{ deleteFrameBusy ? t("curated.deleteWorking") : t("curated.confirmDelete") }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <CuratedFrameDeleteConfirmDialog
+      v-model:open="deleteConfirmOpen"
+      :label="deleteTargetLabel"
+      :error="deleteFrameError"
+      :busy="deleteFrameBusy"
+      @confirm="executeDeleteCuratedFrame"
+    />
   </div>
 </template>
