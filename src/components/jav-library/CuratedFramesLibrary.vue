@@ -16,7 +16,7 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import CuratedFrameGrid from "@/components/jav-library/CuratedFrameGrid.vue"
+import CuratedFrameTimelineTab from "@/components/jav-library/CuratedFrameTimelineTab.vue"
 import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
 import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
 import CuratedFrameContextMenu from "@/components/jav-library/CuratedFrameContextMenu.vue"
@@ -1294,7 +1294,7 @@ defineExpose({
         </Button>
       </div>
       <TabsContent value="timeline" class="mt-0 outline-none">
-        <CuratedFrameGrid
+        <CuratedFrameTimelineTab
           :items="listWithUrls"
           :batch-mode="batchMode"
           :selected-ids="selectedFrameIds"
