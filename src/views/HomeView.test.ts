@@ -56,6 +56,7 @@ const homepageSnapshotState = vi.hoisted(() => ({
     recommendationMovieIds: string[]
   },
 }))
+const homepageRecommendationsLoadingState = vi.hoisted(() => ({ value: false }))
 const refreshRecommendationsOnlyMock = vi.hoisted(() => vi.fn())
 const moviesLoadedState = vi.hoisted(() => ({ value: true }))
 const playbackProgressRevisionRef = vi.hoisted(() => ({
@@ -117,7 +118,7 @@ vi.mock("@/lib/playback-progress-storage", () => ({
 vi.mock("@/composables/use-homepage-daily-recommendations", () => ({
   useHomepageDailyRecommendations: () => ({
     snapshot: homepageSnapshotState,
-    loading: ref(false),
+    loading: homepageRecommendationsLoadingState,
     error: ref<unknown>(null),
     refresh: vi.fn(),
     refreshRecommendationsOnly: refreshRecommendationsOnlyMock,
@@ -152,6 +153,7 @@ describe("HomeView", () => {
     routerPushMock.mockReset()
     armHomeDetailReturnRestoreMock.mockReset()
     homepageSnapshotState.value = null
+    homepageRecommendationsLoadingState.value = false
     refreshRecommendationsOnlyMock.mockReset()
     refreshRecommendationsOnlyMock.mockResolvedValue(homepageSnapshotState.value)
     moviesLoadedState.value = true
@@ -262,6 +264,17 @@ describe("HomeView", () => {
       preserveHeroMovieIds: heroMovieIds,
       excludeRecommendationMovieIds: recommendationMovieIds,
     })
+  })
+
+  it("uses a slower refresh icon spin while today's recommendation row is refreshing", () => {
+    homepageRecommendationsLoadingState.value = true
+
+    const wrapper = mount(HomeView)
+    const refreshButton = wrapper.get("[data-home-refresh-recommendations]")
+    const loadingIcon = refreshButton.get("svg")
+
+    expect(loadingIcon.classes()).toContain("animate-spin")
+    expect(loadingIcon.classes()).toContain("[animation-duration:1.25s]")
   })
 
   it("debounces portal model rebuilds caused only by playback progress revision changes", async () => {

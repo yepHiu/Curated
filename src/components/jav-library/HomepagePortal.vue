@@ -109,7 +109,7 @@ function onHomeScroll() {
                 >
                   <Loader2
                     v-if="recommendationsRefreshing"
-                    class="animate-spin"
+                    class="animate-spin [animation-duration:1.25s]"
                     aria-hidden="true"
                   />
                   <RefreshCw
