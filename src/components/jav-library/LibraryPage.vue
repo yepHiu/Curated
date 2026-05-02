@@ -56,6 +56,7 @@ const emit = defineEmits<{
   exitBatchMode: []
   selectAllVisibleInBatch: []
   toggleBatchSelect: [movieId: string]
+  columnsChange: [count: number]
 }>()
 
 const { t, locale } = useI18n()
@@ -410,6 +411,7 @@ function isChipActive(tag: string): boolean {
         @toggle-favorite="emit('toggleFavorite', $event)"
         @context-menu="emit('contextMenu', $event)"
         @toggle-batch-select="emit('toggleBatchSelect', $event)"
+        @columns-change="emit('columnsChange', $event)"
       >
         <template v-if="props.mode !== 'tags' && activeActorTrimmed" #header>
           <ActorProfileCard

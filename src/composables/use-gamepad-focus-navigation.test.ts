@@ -142,6 +142,50 @@ describe("useGamepadFocusNavigation", () => {
     expect(wrapper.get("#left").attributes("data-controller-focused")).toBeUndefined()
   })
 
+  it("leaves directional focus to specialized library grid navigation", async () => {
+    const Harness = defineComponent({
+      setup() {
+        useGamepadFocusNavigation()
+        return {}
+      },
+      template: `
+        <div data-gamepad-grid-navigation="library">
+          <button id="left">Left</button>
+          <button id="right">Right</button>
+        </div>
+      `,
+    })
+    const wrapper = mount(Harness, { attachTo: document.body })
+    mockRect(wrapper.get("#left").element, { left: 450, top: 380, width: 40, height: 40 })
+    mockRect(wrapper.get("#right").element, { left: 540, top: 380, width: 40, height: 40 })
+
+    pressDirection("right")
+    await nextTick()
+
+    expect(wrapper.get("#left").attributes("data-controller-focused")).toBeUndefined()
+    expect(wrapper.get("#right").attributes("data-controller-focused")).toBeUndefined()
+  })
+
+  it("leaves Cross to specialized library grid navigation", () => {
+    const onClick = vi.fn()
+    const Harness = defineComponent({
+      setup() {
+        useGamepadFocusNavigation()
+        return { onClick }
+      },
+      template: `
+        <div data-gamepad-grid-navigation="library">
+          <button id="left" data-controller-focused="true" @click="onClick">Left</button>
+        </div>
+      `,
+    })
+    mount(Harness, { attachTo: document.body })
+
+    pressButton("cross")
+
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
   it("disables global navigation on the player route", () => {
     mocks.route.name = "player"
 

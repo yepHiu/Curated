@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useSlots } from "vue"
+import { computed, nextTick, ref, useSlots, watch } from "vue"
 import { useResizeObserver } from "@vueuse/core"
 import { ChevronUp } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
@@ -52,6 +52,7 @@ const emit = defineEmits<{
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   contextMenu: [payload: { event: MouseEvent; movie: Movie }]
   toggleBatchSelect: [movieId: string]
+  columnsChange: [count: number]
 }>()
 
 const hasHeaderSlot = computed(() => Boolean(slots.header))
@@ -145,6 +146,14 @@ const effectiveColumnCount = computed(() =>
   measuredGridColumns.value > 0 ? measuredGridColumns.value : columnCountFallback.value,
 )
 
+watch(
+  effectiveColumnCount,
+  (count) => {
+    emit("columnsChange", count)
+  },
+  { immediate: true },
+)
+
 const chunkCapacity = computed(() => Math.max(1, effectiveColumnCount.value * ROWS_PER_CHUNK))
 
 const estimatedChunkHeight = computed(() =>
@@ -228,10 +237,50 @@ const focusChunkIndex = computed(() =>
 function posterLoadPolicyForChunk(index: number) {
   return resolveVirtualMoviePosterLoadPolicy(index, focusChunkIndex.value)
 }
+
+function findMovieCardElement(movieId: string): HTMLElement | null {
+  const cards = rootEl.value?.querySelectorAll<HTMLElement>("[data-movie-card-id]") ?? []
+  return Array.from(cards).find((card) => card.dataset.movieCardId === movieId) ?? null
+}
+
+async function scrollMovieIntoView(movieId: string | undefined) {
+  const id = movieId?.trim()
+  if (!id) return
+
+  await nextTick()
+  const rendered = findMovieCardElement(id)
+  if (rendered) {
+    rendered.scrollIntoView({ block: "nearest", inline: "nearest" })
+    return
+  }
+
+  const movieIndex = props.movies.findIndex((movie) => movie.id === id)
+  if (movieIndex < 0 || !scrollEl.value) return
+  const chunkIndex = Math.floor(movieIndex / chunkCapacity.value)
+  scrollEl.value.scrollTo({
+    top: Math.max(0, chunkIndex * estimatedChunkHeight.value),
+    behavior: "smooth",
+  })
+
+  await nextTick()
+  findMovieCardElement(id)?.scrollIntoView({ block: "nearest", inline: "nearest" })
+}
+
+watch(
+  () => props.selectedMovieId,
+  (movieId) => {
+    void scrollMovieIntoView(movieId)
+  },
+)
 </script>
 
 <template>
-  <div v-if="props.movies.length || hasHeaderSlot" ref="rootEl" class="relative h-full min-h-0">
+  <div
+    v-if="props.movies.length || hasHeaderSlot"
+    ref="rootEl"
+    class="relative h-full min-h-0"
+    data-gamepad-grid-navigation="library"
+  >
     <DynamicScroller
       v-if="props.movies.length"
       :ref="setScrollerRef"

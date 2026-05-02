@@ -84,6 +84,10 @@ function clickElement(el: HTMLElement) {
   el.click()
 }
 
+function hasSpecializedGridNavigation(): boolean {
+  return Boolean(getBrowserDocument()?.querySelector("[data-gamepad-grid-navigation]"))
+}
+
 export function useGamepadFocusNavigation(
   options: UseGamepadFocusNavigationOptions = {},
 ): UseGamepadFocusNavigationReturn {
@@ -129,7 +133,7 @@ export function useGamepadFocusNavigation(
   }
 
   function moveFocus(direction: GamepadDirection) {
-    if (!enabled.value) return
+    if (!enabled.value || hasSpecializedGridNavigation()) return
     const items = collectItems()
     const next = findNextFocusable(items, currentItem(items), direction, viewportCenter())
     if (!next) return
@@ -138,7 +142,7 @@ export function useGamepadFocusNavigation(
   }
 
   function clickFocusedElement() {
-    if (!enabled.value) return
+    if (!enabled.value || hasSpecializedGridNavigation()) return
     const items = collectItems()
     const current = currentItem(items)
     if (current) {
