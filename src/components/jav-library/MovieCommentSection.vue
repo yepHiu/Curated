@@ -119,10 +119,8 @@ watch(
   <Card class="rounded-3xl border-border/70 bg-card/85">
     <CardHeader>
       <CardTitle>{{ t("detailPage.commentTitle") }}</CardTitle>
-      <CardDescription class="text-pretty">
-        {{
-          props.readonly ? t("detailPage.commentReadonlyTrashHint") : t("detailPage.commentHint")
-        }}
+      <CardDescription v-if="props.readonly" class="text-pretty">
+        {{ t("detailPage.commentReadonlyTrashHint") }}
       </CardDescription>
     </CardHeader>
     <CardContent class="flex flex-col gap-3">

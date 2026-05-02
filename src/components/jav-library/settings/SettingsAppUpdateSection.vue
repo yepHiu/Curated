@@ -97,7 +97,13 @@ async function handleCheckNow() {
       t("settings.appUpdateToastAvailable", {
         version: next.latestVersion ?? "-",
       }),
-      { variant: "warning" },
+      {
+        variant: "warning",
+        notification: {
+          type: "update",
+          title: t("notificationCenter.titles.updateAvailable"),
+        },
+      },
     )
     return
   }

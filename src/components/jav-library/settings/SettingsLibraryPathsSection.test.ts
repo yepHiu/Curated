@@ -20,6 +20,24 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: { name: "CardTitle", template: "<h3><slot /></h3>" },
 }))
 
+vi.mock("@/components/ui/select", () => ({
+  Select: {
+    name: "Select",
+    props: ["modelValue", "disabled"],
+    emits: ["update:modelValue"],
+    template:
+      "<div class=\"select-stub\" :data-model-value=\"modelValue\" :data-disabled=\"String(!!disabled)\"><slot /></div>",
+  },
+  SelectContent: { name: "SelectContent", template: "<div><slot /></div>" },
+  SelectItem: { name: "SelectItem", props: ["value"], template: "<div><slot /></div>" },
+  SelectTrigger: { name: "SelectTrigger", template: "<div><slot /></div>" },
+  SelectValue: {
+    name: "SelectValue",
+    props: ["placeholder"],
+    template: "<div>{{ placeholder }}<slot /></div>",
+  },
+}))
+
 vi.mock("./SettingsLibraryPathToolbar.vue", () => ({
   default: {
     name: "SettingsLibraryPathToolbar",
@@ -107,9 +125,18 @@ const libraryPath = {
   path: "D:/Media/JAV/Main",
 }
 
+const secondaryLibraryPath = {
+  id: "library-b",
+  title: "Downloads",
+  path: "E:/Inbox/Movies",
+}
+
 const baseProps = {
   scanFeedbackError: "",
-  paths: [libraryPath],
+  paths: [libraryPath, secondaryLibraryPath],
+  defaultImportLibraryPathId: "library-a",
+  defaultImportPathSaving: false,
+  defaultImportPathError: "",
   batchMode: true,
   hasMetadataPathSelection: true,
   metadataRefreshBusy: false,
@@ -144,14 +171,42 @@ describe("SettingsLibraryPathsSection", () => {
         scanFeedbackError: "scan failed",
         metadataRefreshSuccess: "metadata queued",
         metadataRefreshError: "metadata failed",
+        defaultImportPathError: "default path failed",
       },
     })
 
     expect(wrapper.text()).toContain("settings.storageCardTitle")
     expect(wrapper.text()).toContain("settings.storageCardDesc")
+    expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
+    expect(wrapper.text()).toContain("settings.defaultImportPathDesc")
     expect(wrapper.text()).toContain("scan failed")
     expect(wrapper.text()).toContain("metadata queued")
     expect(wrapper.text()).toContain("metadata failed")
+    expect(wrapper.text()).toContain("default path failed")
+  })
+
+  it("emits default import path changes", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: baseProps,
+    })
+
+    wrapper.getComponent({ name: "Select" }).vm.$emit("update:modelValue", "library-b")
+
+    expect(wrapper.get(".select-stub").attributes("data-model-value")).toBe("library-a")
+    expect(wrapper.emitted("changeDefaultImportLibraryPath")).toEqual([["library-b"]])
+  })
+
+  it("disables default import path selection when no library paths exist", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: {
+        ...baseProps,
+        paths: [],
+        defaultImportLibraryPathId: "",
+      },
+    })
+
+    expect(wrapper.get(".select-stub").attributes("data-disabled")).toBe("true")
+    expect(wrapper.text()).toContain("settings.defaultImportPathNone")
   })
 
   it("forwards toolbar, list, remove dialog, and add dialog events", async () => {

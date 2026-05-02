@@ -25,7 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 pnpm install
 
-# Start development server (proxies /api to localhost:8080)
+# Start development server (proxies /api to 127.0.0.1:8080)
 pnpm dev
 
 # Build for production
@@ -92,7 +92,7 @@ pnpm dev
 
 **Environment Variables:**
 - `VITE_USE_WEB_API=true` - Use real backend API (set in root `.env` by default)
-- `VITE_API_BASE_URL` - Override API base URL (default: `/api`)
+- `VITE_API_BASE_URL` - Override API base URL; when unset, loopback Web API dev connects directly to dev backend `:8080` to avoid Vite proxying large uploads, while release hosting on `:8081` and other modes default to same-origin `/api`
 - `VITE_LOG_LEVEL` - Optional default for browser `loglevel` (`trace`|`debug`|`info`|`warn`|`error`|`silent`); overridden by `localStorage['curated-client-log-level']` when set (Settings → Logging)
 
 ### Library Behavior Configuration
@@ -105,6 +105,7 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`launchAtLogin`** - Whether Windows login autostart is enabled for the current user (default: `false`); supported runtimes sync `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` to launch `curated(.exe) -mode tray -autostart`, which starts silently in tray mode without opening the browser on that login launch
 - **`metadataMovieProvider`** - Primary metadata provider for movie scraping
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
+- **`defaultImportLibraryPathId`** - Library path id used as the target for top-bar movie imports; persisted by Settings -> Library & storage and consumed by `POST /api/import/movies` and resumable upload endpoints under `/api/import/movies/uploads`
 - **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); empty **`logDir`** means "use the default log directory" instead of disabling file logging: dev builds default to **`backend/runtime/logs`**, while release builds default to **`LOCALAPPDATA\\Curated\\logs`**. **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
@@ -142,6 +143,7 @@ src/
 - State management defaults to composables plus the service layer; Pinia may be introduced later through a small, bounded service/new feature, not a broad upfront migration
 - Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `settings`
 - Playback progress: dual storage (backend SQLite in Web API mode, `localStorage` in Mock mode)
+- Daily watch-time: Settings -> Overview statistics use player-reported watch-time deltas; Web API mode stores per-day/per-movie aggregates in SQLite, Mock mode stores them in `localStorage`
 - History page: `src/views/HistoryView.vue` displays watch history grouped by date
 - Virtual scrolling: uses `vue-virtual-scroller` for large poster grids
 - i18n: uses `vue-i18n` with locale files in `src/locales/`
@@ -215,6 +217,12 @@ POST   /api/library/paths/{id}/reveal       # Open configured library root in OS
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
+POST   /api/import/movies                   # Copy uploaded movie files into the configured default library path (returns import.movies task)
+POST   /api/import/movies/uploads           # Create resumable movie import upload session for large browser uploads
+GET    /api/import/movies/uploads/{id}      # Get resumable upload status
+PUT    /api/import/movies/uploads/{id}/files/{fileId}/chunks/{chunkIndex} # Upload one raw binary chunk
+POST   /api/import/movies/uploads/{id}/commit # Commit staged chunks into the library and trigger scan
+DELETE /api/import/movies/uploads/{id}      # Abort resumable upload and remove staging files
 GET    /api/settings                        # Get settings (includes launchAtLogin / launchAtLoginSupported)
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
@@ -225,6 +233,8 @@ GET    /api/tasks/{taskId}                  # Get task status
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
+GET    /api/playback/watch-time/daily       # List daily watch-time totals for Settings overview
+POST   /api/playback/watch-time/daily       # Add one bounded watch-time delta
 GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset; returns total/limit/offset)
 GET    /api/curated-frames/stats            # Curated frames total count
 GET    /api/curated-frames/tags             # Curated frame tag facets
@@ -339,6 +349,12 @@ Playback progress has dual storage depending on mode:
 - **Web API mode (`VITE_USE_WEB_API=true`):** Synced to backend SQLite via `GET/PUT/DELETE /api/playback/progress`
 - **Mock mode:** Stored in browser `localStorage` (key: `jav-library-playback-progress-v1`)
 
+Daily watch-time uses a separate aggregate path:
+
+- **Web API mode (`VITE_USE_WEB_API=true`):** Player reports bounded wall-clock deltas to `POST /api/playback/watch-time/daily`; Settings reads `GET /api/playback/watch-time/daily?days=91`
+- **Mock mode:** Stored in browser `localStorage` (key: `curated-playback-watch-time-daily-v1`)
+- The Settings overview renders watch-time summary metrics for a fixed 91-day window; heatmap visualization is not shown.
+
 ### Playback Descriptor Seam
 
 Player startup should consume `GET /api/library/movies/{id}/playback` instead of assuming playback is only a raw `/stream` URL.
@@ -426,7 +442,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 
 ## Development Notes
 
-- The frontend Vite dev server proxies `/api` to `http://localhost:8080` (backend)
+- The frontend Vite dev server proxies `/api` to `http://127.0.0.1:8080` (backend)
 - Backend supports three modes: `http` (default), `stdio`, `both`
 - Dev builds now expose backend name `curated-dev`; release builds keep `curated`
 - Windows dev backend binary naming is an explicit constraint: keep dev builds as `curated-dev.exe` and reserve `curated.exe` for release/package builds only
@@ -434,7 +450,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Settings -> About now includes packaged-app update status, a manual update-check action, and a release-page link; when an update is available, the sidebar shows a lightweight `New` badge (expanded) or dot (compact) that links to `Settings -> About`, while the `Curated` brand text/icon links to the home page
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
-- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), Windows login autostart (`launchAtLogin`), and curated-frame export format (`curatedFrameExportFormat`, default `jpg`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
+- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), default movie import target (`defaultImportLibraryPathId`), Windows login autostart (`launchAtLogin`), and curated-frame export format (`curatedFrameExportFormat`, default `jpg`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)

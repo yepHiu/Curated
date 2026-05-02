@@ -10,6 +10,7 @@ import type {
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
+  MovieImportUploadProgress,
   NativePlaybackLaunchDTO,
   MovieCommentDTO,
   PlaybackDescriptorDTO,
@@ -39,6 +40,7 @@ export interface LibraryService {
   trashedMovies: ComputedRef<readonly Movie[]>
   libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
+  defaultImportLibraryPathId: ComputedRef<string>
   refreshSettings(): Promise<void>
   /** Web：自 API 重新拉取全库列表（扫描/监听入库后更新计数与海报）；Mock：空操作 */
   reloadMoviesFromApi(): Promise<void>
@@ -90,6 +92,11 @@ export interface LibraryService {
   updateLibraryPathTitle(id: string, title: string): Promise<void>
   removeLibraryPath(id: string): Promise<void>
   revealLibraryPathInFileManager(id: string): Promise<void>
+  setDefaultImportLibraryPathId(id: string): Promise<void>
+  importMovies(
+    files: File[],
+    options?: { onUploadProgress?: (progress: MovieImportUploadProgress) => void },
+  ): Promise<TaskDTO | null>
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>

@@ -28,6 +28,8 @@ const requiredLocaleKeys = [
   "scan.newItems",
   "scan.updated",
   "scan.skipped",
+  "toasts.libraryWatchScanDoneWithChanges",
+  "toasts.libraryWatchScanDoneNoChanges",
   "scanTask.fetchFailed",
   "rating.ariaLabel",
   "rating.score",

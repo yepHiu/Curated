@@ -17,10 +17,10 @@ Implementation references:
 Common local development URLs:
 
 - frontend dev server: `http://localhost:5173`
-- backend dev API base: `http://localhost:8080/api`
+- backend dev API base: `http://127.0.0.1:8080/api`
 - backend release API base: `http://127.0.0.1:8081/api`
 
-The Vite development server proxies `/api` to `http://localhost:8080`.
+The Vite development server proxies `/api` to `http://127.0.0.1:8080`.
 
 ## Conventions
 
@@ -277,6 +277,97 @@ Important notes:
 - the backend validates that the stored path still exists on disk and is a directory
 - this opens the folder only; it does not modify library configuration or disk files
 
+## Movie Imports
+
+### `POST /api/import/movies`
+
+Purpose:
+
+- copy browser-uploaded movie files into the configured default library root
+
+Request:
+
+- `multipart/form-data`
+- repeated `files` parts contain uploaded movie files
+- repeated `relativePath` fields may be supplied before each file to preserve folder-relative names from browser folder selection
+- optional `totalBytes` is used for progress metadata
+
+Important notes:
+
+- requires `defaultImportLibraryPathId` to be configured through `GET/PATCH /api/settings`
+- only video-like extensions are accepted by the import handler
+- imported files are copied into the target library root; source files are not moved or deleted
+- existing target files are treated as per-file conflicts and are not overwritten
+- the response is a `TaskDTO` with type `import.movies`
+- task metadata can include `targetLibraryPathId`, `targetPath`, `stage`, `totalFiles`, `completedFiles`, `failedFiles`, `copiedBytes`, `totalBytes`, `currentFileName`, `errorItems`, and optional `scanTaskId` / `scanError`
+- a successful or partially successful copy triggers the existing restricted library scan for the target root
+
+### `POST /api/import/movies/uploads`
+
+Purpose:
+
+- create a resumable movie import upload session for large browser uploads
+
+Request:
+
+- JSON body with `files`
+- each file manifest includes `relativePath`, `size`, and optional `lastModified`
+
+Response:
+
+- `uploadId`
+- `chunkSize`
+- `targetPath`
+- per-file `fileId`, `relativePath`, `size`, `bytesReceived`, and `complete`
+- an `import.movies` task snapshot
+
+Important notes:
+
+- requires `defaultImportLibraryPathId`
+- staging files are created under `<target-library-root>/.curated-import/<uploadId>/`
+- the first implementation keeps upload session state in backend memory; interrupted browser uploads can resume while the backend process is still running
+- final movie files are not visible in the library until commit succeeds
+
+### `GET /api/import/movies/uploads/{uploadId}`
+
+Purpose:
+
+- return resumable upload status, including per-file received bytes and completion flags
+
+### `PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}`
+
+Purpose:
+
+- upload one raw binary chunk for a resumable movie import file
+
+Request:
+
+- raw `application/octet-stream` body
+- required header `X-Curated-Offset`
+- optional header `X-Curated-Chunk-Size`
+
+Important notes:
+
+- chunk bytes are written by offset into the file's staging `.part` file
+- duplicate chunk indexes with the same range are treated as idempotent status reads
+- duplicate chunk indexes with a different range are rejected
+
+### `POST /api/import/movies/uploads/{uploadId}/commit`
+
+Purpose:
+
+- validate that all upload files are complete, flush staging files, commit them without overwriting existing target files, and start the restricted library scan
+
+Response:
+
+- `TaskDTO` with type `import.movies`
+
+### `DELETE /api/import/movies/uploads/{uploadId}`
+
+Purpose:
+
+- abort a resumable upload session and remove its staging directory
+
 ## Playback
 
 ### `GET /api/library/movies/{id}/playback`
@@ -343,6 +434,28 @@ Purpose:
 Purpose:
 
 - clear playback progress for one movie
+
+### `GET /api/playback/watch-time/daily`
+
+Purpose:
+
+- list daily watch-time totals for Settings -> Overview statistics
+
+Query:
+
+- `days` (optional): number of local calendar days to include; defaults to the 91-day statistics window and is capped at 91
+
+### `POST /api/playback/watch-time/daily`
+
+Purpose:
+
+- add one bounded watch-time delta for a movie and local day
+
+Body:
+
+- `movieId`: movie id
+- `dayKey`: local day key in `YYYY-MM-DD`
+- `watchedSec`: positive watch-time delta in seconds; backend rejects unusually large single deltas
 
 ### `GET /api/library/played-movies`
 
@@ -436,6 +549,7 @@ Purpose:
 Important notes:
 
 - updates are written back to `config/library-config.cfg` for library-level keys
+- `defaultImportLibraryPathId` stores the default target library path used by `POST /api/import/movies`
 - playback runtime preferences are also surfaced through this settings contract
 - `curatedFrameExportFormat` is a persisted library-level setting; accepted values are `jpg`, `webp`, and `png`, with `jpg` as the default
 - `autoActorProfileScrape` is an opt-in library-level setting; when enabled, successful movie metadata scrapes may enqueue missing actor-profile scrape tasks for actors that still lack both avatar and summary

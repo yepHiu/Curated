@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { api } from "./endpoints"
+import { HttpClientError, httpClient } from "./http-client"
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {
@@ -10,6 +11,7 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -80,4 +82,217 @@ describe("api endpoint response validation", () => {
       "Invalid API response for GET /library/movies/:id",
     )
   })
+
+  it("keeps small movie imports on the multipart endpoint", async () => {
+    const task = {
+      taskId: "import.movies-1",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-02T00:00:00Z",
+      progress: 100,
+    }
+    const postForm = vi.spyOn(httpClient, "postFormWithProgress").mockResolvedValueOnce(task)
+    const post = vi.spyOn(httpClient, "post")
+    const putBinary = vi.spyOn(httpClient as typeof httpClient & {
+      putBinaryWithProgress: typeof httpClient.postFormWithProgress
+    }, "putBinaryWithProgress")
+
+    const file = new File(["small"], "IMP-SMALL.mp4", { type: "video/mp4" })
+
+    await expect(
+      api.importMovies([file], {
+        resumableThresholdBytes: 1024,
+      }),
+    ).resolves.toEqual(task)
+
+    expect(postForm).toHaveBeenCalledTimes(1)
+    expect(postForm).toHaveBeenCalledWith("/import/movies", expect.any(FormData), {
+      onUploadProgress: undefined,
+    })
+    expect(post).not.toHaveBeenCalledWith("/import/movies/uploads", expect.anything())
+    expect(putBinary).not.toHaveBeenCalled()
+  })
+
+  it("uses resumable chunk upload for large movie imports", async () => {
+    const task = {
+      taskId: "import.movies-upload-1",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-02T00:00:00Z",
+      progress: 100,
+    }
+    const createUpload = {
+      uploadId: "upload_1",
+      targetPath: "D:/Library",
+      chunkSize: 4,
+      bytesReceived: 0,
+      totalBytes: 8,
+      state: "uploading",
+      files: [
+        {
+          fileId: "file_1",
+          relativePath: "IMP-LARGE.mp4",
+          size: 8,
+          bytesReceived: 0,
+          complete: false,
+        },
+      ],
+      task,
+    }
+    const post = vi.spyOn(httpClient, "post")
+    post.mockResolvedValueOnce(createUpload)
+    post.mockResolvedValueOnce(task)
+    const putBinary = vi.spyOn(httpClient as typeof httpClient & {
+      putBinaryWithProgress: (
+        path: string,
+        body: Blob,
+        options?: {
+          headers?: Record<string, string>
+          diagnosticContext?: {
+            uploadId?: string
+            fileId?: string
+            chunkIndex?: number
+            offset?: number
+          }
+          onUploadProgress?: (progress: { loaded: number; total: number; percent: number }) => void
+        },
+      ) => Promise<unknown>
+    }, "putBinaryWithProgress")
+    putBinary.mockImplementation(async (_path, _body, options) => {
+      const total = Number(options?.headers?.["X-Curated-Chunk-Size"] ?? 0)
+      options?.onUploadProgress?.({ loaded: total, total, percent: 100 })
+      return createUpload
+    })
+    const postForm = vi.spyOn(httpClient, "postFormWithProgress")
+    const onUploadProgress = vi.fn()
+    const file = new File(["fake-mp4"], "IMP-LARGE.mp4", { type: "video/mp4" })
+
+    await expect(
+      api.importMovies([file], {
+        onUploadProgress,
+        resumableThresholdBytes: 1,
+      }),
+    ).resolves.toEqual(task)
+
+    expect(post).toHaveBeenNthCalledWith(1, "/import/movies/uploads", {
+      files: [{ relativePath: "IMP-LARGE.mp4", size: 8, lastModified: file.lastModified }],
+    })
+    expect(putBinary).toHaveBeenCalledTimes(2)
+    expect(putBinary).toHaveBeenNthCalledWith(
+      1,
+      "/import/movies/uploads/upload_1/files/file_1/chunks/0",
+      expect.any(Blob),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Curated-Offset": "0",
+          "X-Curated-Chunk-Size": "4",
+        },
+        diagnosticContext: {
+          uploadId: "upload_1",
+          fileId: "file_1",
+          chunkIndex: 0,
+          offset: 0,
+        },
+      }),
+    )
+    expect(putBinary).toHaveBeenNthCalledWith(
+      2,
+      "/import/movies/uploads/upload_1/files/file_1/chunks/1",
+      expect.any(Blob),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Curated-Offset": "4",
+          "X-Curated-Chunk-Size": "4",
+        },
+        diagnosticContext: {
+          uploadId: "upload_1",
+          fileId: "file_1",
+          chunkIndex: 1,
+          offset: 4,
+        },
+      }),
+    )
+    expect(post).toHaveBeenNthCalledWith(2, "/import/movies/uploads/upload_1/commit")
+    expect(postForm).not.toHaveBeenCalled()
+    expect(onUploadProgress).toHaveBeenLastCalledWith({ loaded: 8, total: 8, percent: 100 })
+  })
+
+  it("retries retryable network failures during resumable chunk upload", async () => {
+    const task = {
+      taskId: "import.movies-upload-retry",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-02T00:00:00Z",
+      progress: 100,
+    }
+    const createUpload = {
+      uploadId: "upload_retry",
+      targetPath: "D:/Library",
+      chunkSize: 4,
+      bytesReceived: 0,
+      totalBytes: 8,
+      state: "uploading",
+      files: [
+        {
+          fileId: "file_retry",
+          relativePath: "IMP-RETRY.mp4",
+          size: 8,
+          bytesReceived: 0,
+          complete: false,
+        },
+      ],
+      task,
+    }
+    const post = vi.spyOn(httpClient, "post")
+    post.mockResolvedValueOnce(createUpload)
+    post.mockResolvedValueOnce(task)
+    const putBinary = vi.spyOn(httpClient as typeof httpClient & {
+      putBinaryWithProgress: (
+        path: string,
+        body: Blob,
+        options?: {
+          headers?: Record<string, string>
+          diagnosticContext?: {
+            uploadId?: string
+            fileId?: string
+            chunkIndex?: number
+            offset?: number
+          }
+          onUploadProgress?: (progress: { loaded: number; total: number; percent: number }) => void
+        },
+      ) => Promise<unknown>
+    }, "putBinaryWithProgress")
+    putBinary.mockImplementation(async (path, _body, options) => {
+      if (path.endsWith("/chunks/1") && putBinary.mock.calls.filter(([calledPath]) => calledPath === path).length === 1) {
+        throw new HttpClientError(0, {
+          code: "COMMON_NETWORK_ERROR",
+          message:
+            "Network request failed (uploadId=upload_retry, fileId=file_retry, chunkIndex=1, offset=4)",
+          retryable: true,
+        })
+      }
+      const total = Number(options?.headers?.["X-Curated-Chunk-Size"] ?? 0)
+      options?.onUploadProgress?.({ loaded: total, total, percent: 100 })
+      return createUpload
+    })
+    const file = new File(["fake-mp4"], "IMP-RETRY.mp4", { type: "video/mp4" })
+
+    await expect(
+      api.importMovies([file], {
+        resumableThresholdBytes: 1,
+        resumableChunkRetryDelayMs: 0,
+      }),
+    ).resolves.toEqual(task)
+
+    expect(putBinary).toHaveBeenCalledTimes(3)
+    expect(putBinary.mock.calls.map(([path]) => path)).toEqual([
+      "/import/movies/uploads/upload_retry/files/file_retry/chunks/0",
+      "/import/movies/uploads/upload_retry/files/file_retry/chunks/1",
+      "/import/movies/uploads/upload_retry/files/file_retry/chunks/1",
+    ])
+    expect(post).toHaveBeenNthCalledWith(2, "/import/movies/uploads/upload_retry/commit")
+  })
+
 })

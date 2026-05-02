@@ -37,6 +37,8 @@ type Config struct {
 	LaunchAtLogin bool `json:"launchAtLogin,omitempty"`
 	// CuratedFrameExportFormat controls curated frame export output format. Persisted in library-config.cfg.
 	CuratedFrameExportFormat string `json:"curatedFrameExportFormat,omitempty"`
+	// DefaultImportLibraryPathID is the library_paths row id used by top-bar movie import. Empty means not configured.
+	DefaultImportLibraryPathID string `json:"defaultImportLibraryPathId,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.

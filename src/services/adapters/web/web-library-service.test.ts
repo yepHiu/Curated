@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   restoreMovie: vi.fn(),
   getSettings: vi.fn(),
   patchSettings: vi.fn(),
+  importMovies: vi.fn(),
 }))
 
 function movieListDto(id: string, overrides: Partial<MovieListItemDTO> = {}): MovieListItemDTO {
@@ -101,6 +102,7 @@ beforeEach(() => {
   apiMocks.restoreMovie.mockReset()
   apiMocks.getSettings.mockReset()
   apiMocks.patchSettings.mockReset()
+  apiMocks.importMovies.mockReset()
   vi.useRealTimers()
 })
 
@@ -229,6 +231,42 @@ describe("webLibraryService mutations", () => {
     })
     expect(apiMocks.getSettings).toHaveBeenCalledTimes(1)
     expect(webLibraryService.proxy.value).toEqual({ enabled: false })
+  })
+
+  it("persists the default import library path through settings", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.patchSettings.mockResolvedValueOnce(
+      settingsDto({ defaultImportLibraryPathId: "library-b" }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await webLibraryService.setDefaultImportLibraryPathId(" library-b ")
+
+    expect(apiMocks.patchSettings).toHaveBeenCalledWith({
+      defaultImportLibraryPathId: "library-b",
+    })
+    expect(webLibraryService.defaultImportLibraryPathId.value).toBe("library-b")
+  })
+
+  it("forwards movie import files and upload progress options to the API", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.importMovies.mockResolvedValueOnce({
+      taskId: "import-1",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-01T00:00:00.000Z",
+      progress: 100,
+    })
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    const file = new File(["movie"], "IMP-001.mp4", { type: "video/mp4" })
+    const onUploadProgress = vi.fn()
+    const task = await webLibraryService.importMovies([file], { onUploadProgress })
+
+    expect(apiMocks.importMovies).toHaveBeenCalledWith([file], { onUploadProgress })
+    expect(task?.taskId).toBe("import-1")
   })
 
   it("short-circuits blank movie ids without waiting for library loading", async () => {

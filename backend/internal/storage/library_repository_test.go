@@ -2,12 +2,67 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/scraper"
 )
+
+func TestListMovies_EmptyRelationsEncodeAsArrays(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() {
+		_ = store.Close()
+	}()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	if _, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-empty-relations",
+		Path:     "D:/Media/JAV/Main/NOACT-001.mp4",
+		FileName: "NOACT-001.mp4",
+		Number:   "NOACT-001",
+	}); err != nil {
+		t.Fatalf("failed to persist scan movie: %v", err)
+	}
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil {
+		t.Fatalf("failed to list movies: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("items = %d, want 1", len(page.Items))
+	}
+	if page.Items[0].Actors == nil {
+		t.Fatal("Actors is nil, want empty slice")
+	}
+	if page.Items[0].Tags == nil {
+		t.Fatal("Tags is nil, want empty slice")
+	}
+
+	b, err := json.Marshal(page)
+	if err != nil {
+		t.Fatalf("marshal page: %v", err)
+	}
+	body := string(b)
+	if strings.Contains(body, `"actors":null`) || strings.Contains(body, `"tags":null`) {
+		t.Fatalf("empty relation arrays encoded as null: %s", body)
+	}
+	if !strings.Contains(body, `"actors":[]`) || !strings.Contains(body, `"tags":[]`) {
+		t.Fatalf("empty relation arrays not encoded as arrays: %s", body)
+	}
+}
 
 func TestListMoviesAndGetMovieDetail(t *testing.T) {
 	t.Parallel()

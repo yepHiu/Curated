@@ -13,7 +13,7 @@ alwaysApply: true
 - **开发态 Windows 后端二进制**：`pnpm backend:build:dev`，产物必须是 `backend/runtime/curated-dev.exe`，不要生成开发态 `curated.exe`。
 - **release 构建默认端口**：`-tags release` 时默认 `:8081`，健康名 `curated`。
 - **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
-- **Vite 代理**：`vite.config.ts` 将 `/api` 代理到 `http://localhost:8080`。
+- **Vite 代理 / 直连后端**：`vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`（长上传关闭 proxy 超时）；仅本地 loopback Web API 开发态下，`src/api/http-client.ts` 和播放器媒体流会直连开发后端 `:8080`，避免大文件上传/大视频流经过 Vite proxy；release `:8081` 静态托管继续走同源 `/api`。
 - **本地静态托管**：存在 `frontend-dist/` 或 `dist/` 时，后端会直接托管前端静态文件并对非 `/api` 路由做 SPA fallback。
 
 ## 根目录政策（阶段 1）

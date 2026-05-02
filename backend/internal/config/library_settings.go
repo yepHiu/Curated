@@ -77,6 +77,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(s)
 	}
+	if v, ok := m["defaultImportLibraryPathId"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: defaultImportLibraryPathId: %w", path, err)
+		}
+		cfg.DefaultImportLibraryPathID = s
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

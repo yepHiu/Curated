@@ -33,6 +33,12 @@ import (
 	"curated-backend/internal/version"
 )
 
+const (
+	importCopyBufferSize          = 4 * 1024 * 1024
+	importTaskSnapshotMinBytes    = 64 * 1024 * 1024
+	importTaskSnapshotMinInterval = time.Second
+)
+
 var (
 	openDirectoryFn       = shellopen.OpenDirectory
 	revealInFileManagerFn = shellopen.RevealInFileManager
@@ -122,6 +128,12 @@ type CuratedFrameExportFormatController interface {
 	SetCuratedFrameExportFormat(v string) error
 }
 
+// DefaultImportLibraryPathController exposes the library root used by top-bar movie import.
+type DefaultImportLibraryPathController interface {
+	DefaultImportLibraryPathID() string
+	SetDefaultImportLibraryPathID(id string) error
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
@@ -171,6 +183,7 @@ type Handler struct {
 	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
 	launchAtLoginCtl            LaunchAtLoginController
 	curatedFrameExportFormatCtl CuratedFrameExportFormatController
+	defaultImportLibraryPathCtl DefaultImportLibraryPathController
 	metadataScrapeCtl           MetadataScrapeSettings
 	providerHealthChecker       ProviderHealthChecker
 	proxyCtl                    ProxyController
@@ -184,6 +197,7 @@ type Handler struct {
 	nativePlaybackLauncher      NativePlaybackLauncher
 	homepageRecommendations     HomepageRecommendationsProvider
 	appUpdateProvider           AppUpdateProvider
+	importUploads               *movieImportUploadSessionStore
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -198,6 +212,7 @@ type Deps struct {
 	AutoActorProfileScrapeCtl   AutoActorProfileScrapeController
 	LaunchAtLoginCtl            LaunchAtLoginController
 	CuratedFrameExportFormatCtl CuratedFrameExportFormatController
+	DefaultImportLibraryPathCtl DefaultImportLibraryPathController
 	MetadataScrapeCtl           MetadataScrapeSettings
 	ProviderHealthChecker       ProviderHealthChecker
 	ProxyCtl                    ProxyController
@@ -226,6 +241,7 @@ func NewHandler(deps Deps) *Handler {
 		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
 		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
+		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
 		metadataScrapeCtl:           deps.MetadataScrapeCtl,
 		providerHealthChecker:       deps.ProviderHealthChecker,
 		proxyCtl:                    deps.ProxyCtl,
@@ -239,6 +255,7 @@ func NewHandler(deps Deps) *Handler {
 		nativePlaybackLauncher:      deps.NativePlaybackLauncher,
 		homepageRecommendations:     deps.HomepageRecommendations,
 		appUpdateProvider:           deps.AppUpdateProvider,
+		importUploads:               newMovieImportUploadSessionStore(),
 	}
 }
 
@@ -282,6 +299,12 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
+	mux.HandleFunc("POST /api/import/movies", h.handleImportMovies)
+	mux.HandleFunc("POST /api/import/movies/uploads", h.handleCreateMovieImportUpload)
+	mux.HandleFunc("GET /api/import/movies/uploads/{uploadId}", h.handleGetMovieImportUpload)
+	mux.HandleFunc("DELETE /api/import/movies/uploads/{uploadId}", h.handleAbortMovieImportUpload)
+	mux.HandleFunc("PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}", h.handlePutMovieImportUploadChunk)
+	mux.HandleFunc("POST /api/import/movies/uploads/{uploadId}/commit", h.handleCommitMovieImportUpload)
 	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
 	mux.HandleFunc("POST /api/library/paths/{id}/reveal", h.handleRevealLibraryPathInFileManager)
 	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
@@ -293,6 +316,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/playback/progress", h.handleListPlaybackProgress)
 	mux.HandleFunc("PUT /api/playback/progress/{movieId}", h.handlePutPlaybackProgress)
 	mux.HandleFunc("DELETE /api/playback/progress/{movieId}", h.handleDeletePlaybackProgress)
+	mux.HandleFunc("GET /api/playback/watch-time/daily", h.handleListPlaybackWatchTimeDaily)
+	mux.HandleFunc("POST /api/playback/watch-time/daily", h.handlePostPlaybackWatchTimeDaily)
 
 	mux.HandleFunc("GET /api/curated-frames", h.handleListCuratedFrames)
 	mux.HandleFunc("GET /api/curated-frames/stats", h.handleGetCuratedFrameStats)
@@ -1488,8 +1513,13 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.curatedFrameExportFormatCtl != nil {
 		curatedFrameExportFormat = config.NormalizeCuratedFrameExportFormat(h.curatedFrameExportFormatCtl.CuratedFrameExportFormat())
 	}
+	defaultImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultImportLibraryPathID)
+	if h.defaultImportLibraryPathCtl != nil {
+		defaultImportLibraryPathID = strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
+	}
 	dto := contracts.SettingsDTO{
-		LibraryPaths: libraryPaths,
+		LibraryPaths:               libraryPaths,
+		DefaultImportLibraryPathID: defaultImportLibraryPathID,
 		Player: contracts.PlayerSettingsDTO{
 			HardwareDecode:      h.cfg.Player.HardwareDecode,
 			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
@@ -1653,7 +1683,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1667,12 +1697,12 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
 
-	ops := make([]settingsPatchOperation, 0, 12)
+	ops := make([]settingsPatchOperation, 0, 13)
 
 	if body.OrganizeLibrary != nil {
 		if h.organizeLibraryCtl == nil {
@@ -1773,6 +1803,38 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				status:  http.StatusBadRequest,
 				code:    contracts.ErrorCodeBadRequest,
 				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	if body.DefaultImportLibraryPathID != nil {
+		if h.defaultImportLibraryPathCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "default import library path settings not available")
+			return
+		}
+		target := strings.TrimSpace(*body.DefaultImportLibraryPathID)
+		if target != "" {
+			if _, err := h.store.GetLibraryPath(r.Context(), target); err != nil {
+				if errors.Is(err, storage.ErrLibraryPathNotFound) {
+					writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "unknown defaultImportLibraryPathId")
+					return
+				}
+				if h.logger != nil {
+					h.logger.Warn("validate default import library path failed", zap.Error(err))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to validate default import library path")
+				return
+			}
+		}
+		prev := h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID()
+		ops = append(ops, settingsPatchOperation{
+			name:     "defaultImportLibraryPathId",
+			apply:    func() error { return h.defaultImportLibraryPathCtl.SetDefaultImportLibraryPathID(target) },
+			rollback: func() error { return h.defaultImportLibraryPathCtl.SetDefaultImportLibraryPathID(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
 			},
 		})
 	}
@@ -1981,6 +2043,480 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, dto)
 }
 
+func (h *Handler) handleImportMovies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.store == nil || h.tasks == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "movie import runtime not available")
+		return
+	}
+
+	targetID := h.defaultImportLibraryPathID()
+	if targetID == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeImportTargetNotConfigured, "default import library path is not configured")
+		return
+	}
+	target, err := h.store.GetLibraryPath(r.Context(), targetID)
+	if err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeImportTargetUnavailable, "default import library path was not found")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Warn("load default import library path failed", zap.Error(err), zap.String("libraryPathId", targetID))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to load default import library path")
+		return
+	}
+	targetRoot := filepath.Clean(strings.TrimSpace(target.Path))
+	if targetRoot == "" || targetRoot == "." {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeImportTargetUnavailable, "default import library path is invalid")
+		return
+	}
+	if stat, err := os.Stat(targetRoot); err != nil || !stat.IsDir() {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeImportTargetUnavailable, "default import library path is unavailable")
+		return
+	}
+
+	reader, err := r.MultipartReader()
+	if err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "multipart form data is required")
+		return
+	}
+
+	task := h.tasks.Create(contracts.TaskTypeImportMovies, map[string]any{
+		"targetLibraryPathId": target.ID,
+		"targetPath":          targetRoot,
+		"stage":               "copying",
+		"completedFiles":      0,
+		"failedFiles":         0,
+	})
+	task = h.tasks.Start(task.TaskID, "Importing movies")
+	h.saveTaskSnapshot(r.Context(), task)
+	snapshotThrottle := newImportTaskSnapshotThrottle(time.Now(), importTaskSnapshotMinInterval, importTaskSnapshotMinBytes)
+
+	var (
+		totalFiles      int
+		completedFiles  int
+		failedFiles     int
+		copiedBytes     int64
+		declaredBytes   int64
+		pendingRelPath  string
+		errorItems      []map[string]any
+		copiedAny       bool
+		lastCurrentName string
+	)
+
+	progressPatch := func(extra map[string]any) map[string]any {
+		patch := map[string]any{
+			"targetLibraryPathId": target.ID,
+			"targetPath":          targetRoot,
+			"stage":               "copying",
+			"totalFiles":          totalFiles,
+			"completedFiles":      completedFiles,
+			"failedFiles":         failedFiles,
+			"copiedBytes":         copiedBytes,
+			"totalBytes":          declaredBytes,
+			"currentFileName":     lastCurrentName,
+			"errorItems":          errorItems,
+		}
+		for k, v := range extra {
+			patch[k] = v
+		}
+		return patch
+	}
+
+	for {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			task = h.tasks.ProgressWithMetadata(task.TaskID, task.Progress, "Failed to read import payload", progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			task = h.tasks.Fail(task.TaskID, contracts.ErrorCodeImportSourceUnavailable, "failed to read import payload")
+			h.saveTaskSnapshot(r.Context(), task)
+			writeJSON(w, http.StatusAccepted, task)
+			return
+		}
+
+		formName := part.FormName()
+		fileName := strings.TrimSpace(part.FileName())
+		if fileName == "" {
+			value, _ := io.ReadAll(io.LimitReader(part, 64*1024))
+			switch formName {
+			case "relativePath":
+				pendingRelPath = strings.TrimSpace(string(value))
+			case "totalBytes":
+				if n, err := strconv.ParseInt(strings.TrimSpace(string(value)), 10, 64); err == nil && n > 0 {
+					declaredBytes = n
+				}
+			}
+			_ = part.Close()
+			continue
+		}
+
+		totalFiles++
+		lastCurrentName = fileName
+		relPath := sanitizeImportRelativePath(pendingRelPath, fileName)
+		pendingRelPath = ""
+		if !isSupportedImportVideoPath(relPath) {
+			failedFiles++
+			errorItems = append(errorItems, importErrorItem(fileName, contracts.ErrorCodeImportSourceUnavailable, "unsupported video file type"))
+			_, _ = io.Copy(io.Discard, part)
+			_ = part.Close()
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Skipped unsupported file "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+
+		destPath, err := importDestinationPath(targetRoot, relPath)
+		if err != nil {
+			failedFiles++
+			errorItems = append(errorItems, importErrorItem(fileName, contracts.ErrorCodeImportSourceUnavailable, "invalid destination path"))
+			_, _ = io.Copy(io.Discard, part)
+			_ = part.Close()
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Skipped invalid path "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+
+		if _, err := os.Stat(destPath); err == nil {
+			failedFiles++
+			errorItems = append(errorItems, importErrorItem(fileName, contracts.ErrorCodeImportConflict, "target file already exists"))
+			_, _ = io.Copy(io.Discard, part)
+			_ = part.Close()
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Skipped existing file "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			failedFiles++
+			code := classifyImportCopyError(err)
+			errorItems = append(errorItems, importErrorItem(fileName, code, err.Error()))
+			_, _ = io.Copy(io.Discard, part)
+			_ = part.Close()
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Failed to prepare "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			failedFiles++
+			code := classifyImportCopyError(err)
+			errorItems = append(errorItems, importErrorItem(fileName, code, err.Error()))
+			_, _ = io.Copy(io.Discard, part)
+			_ = part.Close()
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Failed to prepare "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+
+		tempPath := destPath + "." + task.TaskID + ".tmp"
+		n, err := copyImportPartToFile(tempPath, part, func(delta int64) {
+			copiedBytes += delta
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Copying "+fileName, progressPatch(nil))
+			if snapshotThrottle.ShouldSave(time.Now(), copiedBytes, false) {
+				h.saveTaskSnapshot(r.Context(), task)
+			}
+		})
+		_ = part.Close()
+		if err != nil {
+			_ = os.Remove(tempPath)
+			failedFiles++
+			code := classifyImportCopyError(err)
+			errorItems = append(errorItems, importErrorItem(fileName, code, err.Error()))
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Failed to copy "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+		if err := os.Rename(tempPath, destPath); err != nil {
+			_ = os.Remove(tempPath)
+			copiedBytes -= n
+			if copiedBytes < 0 {
+				copiedBytes = 0
+			}
+			failedFiles++
+			code := classifyImportCopyError(err)
+			errorItems = append(errorItems, importErrorItem(fileName, code, err.Error()))
+			task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Failed to finish "+fileName, progressPatch(nil))
+			h.saveTaskSnapshot(r.Context(), task)
+			continue
+		}
+		completedFiles++
+		copiedAny = true
+		task = h.tasks.ProgressWithMetadata(task.TaskID, importProgressPercent(copiedBytes, declaredBytes), "Copied "+fileName, progressPatch(nil))
+		h.saveTaskSnapshot(r.Context(), task)
+	}
+
+	finalPatch := progressPatch(map[string]any{"stage": "completed"})
+	if totalFiles == 0 {
+		finalPatch["stage"] = "failed"
+		task = h.tasks.ProgressWithMetadata(task.TaskID, 100, "No movie files were provided", finalPatch)
+		h.saveTaskSnapshot(r.Context(), task)
+		task = h.tasks.Fail(task.TaskID, contracts.ErrorCodeBadRequest, "no movie files were provided")
+		h.saveTaskSnapshot(r.Context(), task)
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no movie files were provided")
+		return
+	}
+
+	var scanErr error
+	if copiedAny && h.scanStarter != nil {
+		var scanTask contracts.TaskDTO
+		scanTask, scanErr = h.scanStarter.StartScan(r.Context(), []string{targetRoot})
+		if scanErr == nil && scanTask.TaskID != "" {
+			finalPatch["scanTaskId"] = scanTask.TaskID
+		}
+	}
+	if scanErr != nil {
+		finalPatch["scanError"] = scanErr.Error()
+		if failedFiles == 0 {
+			finalPatch["stage"] = "partial_failed"
+			task = h.tasks.ProgressWithMetadata(task.TaskID, 100, "Movies copied, but scan could not start", finalPatch)
+			h.saveTaskSnapshot(r.Context(), task)
+			task = h.tasks.PartialFail(task.TaskID, contracts.ErrorCodeImportScanFailed, "movies copied, but scan could not start", finalPatch)
+			h.saveTaskSnapshot(r.Context(), task)
+			writeJSON(w, http.StatusAccepted, task)
+			return
+		}
+	}
+
+	if failedFiles > 0 {
+		finalPatch["stage"] = "partial_failed"
+		if completedFiles == 0 {
+			finalPatch["stage"] = "failed"
+			task = h.tasks.ProgressWithMetadata(task.TaskID, 100, "Movie import failed", finalPatch)
+			h.saveTaskSnapshot(r.Context(), task)
+			task = h.tasks.Fail(task.TaskID, contracts.ErrorCodeImportCopyFailed, "movie import failed")
+			h.saveTaskSnapshot(r.Context(), task)
+			writeJSON(w, http.StatusAccepted, task)
+			return
+		}
+		task = h.tasks.PartialFail(task.TaskID, contracts.ErrorCodeImportCopyFailed, "movie import partially completed", finalPatch)
+		h.saveTaskSnapshot(r.Context(), task)
+		writeJSON(w, http.StatusAccepted, task)
+		return
+	}
+
+	task = h.tasks.ProgressWithMetadata(task.TaskID, 100, "Movie import completed", finalPatch)
+	h.saveTaskSnapshot(r.Context(), task)
+	task = h.tasks.Complete(task.TaskID, "Movie import completed")
+	h.saveTaskSnapshot(r.Context(), task)
+	writeJSON(w, http.StatusAccepted, task)
+}
+
+func (h *Handler) defaultImportLibraryPathID() string {
+	if h.defaultImportLibraryPathCtl != nil {
+		return strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
+	}
+	return strings.TrimSpace(h.cfg.DefaultImportLibraryPathID)
+}
+
+func (h *Handler) saveTaskSnapshot(ctx context.Context, task contracts.TaskDTO) {
+	if h.store == nil {
+		return
+	}
+	if err := h.store.SaveTask(ctx, task); err != nil && h.logger != nil {
+		h.logger.Warn("save task snapshot failed", zap.Error(err), zap.String("taskId", task.TaskID))
+	}
+}
+
+type importTaskSnapshotThrottle struct {
+	lastSavedAt    time.Time
+	lastSavedBytes int64
+	minInterval    time.Duration
+	minBytes       int64
+}
+
+func newImportTaskSnapshotThrottle(start time.Time, minInterval time.Duration, minBytes int64) *importTaskSnapshotThrottle {
+	return &importTaskSnapshotThrottle{
+		lastSavedAt: start,
+		minInterval: minInterval,
+		minBytes:    minBytes,
+	}
+}
+
+func (t *importTaskSnapshotThrottle) ShouldSave(now time.Time, copiedBytes int64, force bool) bool {
+	if force {
+		t.markSaved(now, copiedBytes)
+		return true
+	}
+	if t.minBytes > 0 && copiedBytes-t.lastSavedBytes >= t.minBytes {
+		t.markSaved(now, copiedBytes)
+		return true
+	}
+	if t.minInterval > 0 && now.Sub(t.lastSavedAt) >= t.minInterval {
+		t.markSaved(now, copiedBytes)
+		return true
+	}
+	return false
+}
+
+func (t *importTaskSnapshotThrottle) markSaved(now time.Time, copiedBytes int64) {
+	t.lastSavedAt = now
+	t.lastSavedBytes = copiedBytes
+}
+
+func mergeTaskMetadata(current map[string]any, patch map[string]any) map[string]any {
+	if current == nil && patch == nil {
+		return nil
+	}
+	out := make(map[string]any, len(current)+len(patch))
+	for k, v := range current {
+		out[k] = v
+	}
+	for k, v := range patch {
+		out[k] = v
+	}
+	return out
+}
+
+func importErrorItem(fileName, code, message string) map[string]any {
+	return map[string]any{
+		"fileName": fileName,
+		"code":     code,
+		"message":  message,
+	}
+}
+
+func sanitizeImportRelativePath(relativePath string, fallbackFileName string) string {
+	raw := strings.TrimSpace(relativePath)
+	if raw == "" {
+		raw = strings.TrimSpace(fallbackFileName)
+	}
+	raw = strings.ReplaceAll(raw, "\\", "/")
+	parts := strings.Split(raw, "/")
+	clean := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = sanitizeImportPathSegment(part)
+		if part == "" || part == "." || part == ".." {
+			continue
+		}
+		clean = append(clean, part)
+	}
+	if len(clean) == 0 {
+		name := sanitizeImportPathSegment(filepath.Base(strings.TrimSpace(fallbackFileName)))
+		if name == "" {
+			name = "movie"
+		}
+		clean = append(clean, name)
+	}
+	return filepath.Join(clean...)
+}
+
+func sanitizeImportPathSegment(segment string) string {
+	segment = strings.TrimSpace(segment)
+	segment = filepath.Base(segment)
+	segment = strings.TrimSpace(segment)
+	if segment == "" || segment == "." || segment == ".." {
+		return ""
+	}
+	replacer := strings.NewReplacer(
+		"<", "_",
+		">", "_",
+		":", "_",
+		`"`, "_",
+		"|", "_",
+		"?", "_",
+		"*", "_",
+	)
+	segment = replacer.Replace(segment)
+	segment = strings.Map(func(r rune) rune {
+		if r < 32 {
+			return '_'
+		}
+		return r
+	}, segment)
+	return strings.Trim(segment, " .")
+}
+
+func importDestinationPath(root string, relativePath string) (string, error) {
+	root = filepath.Clean(root)
+	dest := filepath.Clean(filepath.Join(root, relativePath))
+	rel, err := filepath.Rel(root, dest)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("destination escapes import root")
+	}
+	return dest, nil
+}
+
+func isSupportedImportVideoPath(path string) bool {
+	switch strings.ToLower(filepath.Ext(strings.TrimSpace(path))) {
+	case ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".ts", ".m2ts", ".flv", ".mpeg", ".mpg", ".ogv", ".rmvb", ".iso":
+		return true
+	default:
+		return false
+	}
+}
+
+func copyImportPartToFile(tempPath string, src io.Reader, onProgress func(delta int64)) (int64, error) {
+	dst, err := os.OpenFile(tempPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = dst.Close() }()
+
+	buf := make([]byte, importCopyBufferSize)
+	var copied int64
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[:nr])
+			if nw > 0 {
+				copied += int64(nw)
+				if onProgress != nil {
+					onProgress(int64(nw))
+				}
+			}
+			if ew != nil {
+				return copied, ew
+			}
+			if nw != nr {
+				return copied, io.ErrShortWrite
+			}
+		}
+		if er != nil {
+			if errors.Is(er, io.EOF) {
+				break
+			}
+			return copied, er
+		}
+	}
+	if err := dst.Sync(); err != nil {
+		return copied, err
+	}
+	return copied, nil
+}
+
+func importProgressPercent(copiedBytes int64, declaredTotalBytes int64) int {
+	if declaredTotalBytes <= 0 {
+		return 0
+	}
+	p := int((copiedBytes * 100) / declaredTotalBytes)
+	if p < 0 {
+		return 0
+	}
+	if p > 99 {
+		return 99
+	}
+	return p
+}
+
+func classifyImportCopyError(err error) string {
+	if err == nil {
+		return contracts.ErrorCodeImportCopyFailed
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "no space left") || strings.Contains(msg, "not enough space") || strings.Contains(msg, "disk full") {
+		return contracts.ErrorCodeImportNotEnoughSpace
+	}
+	return contracts.ErrorCodeImportCopyFailed
+}
+
 func (h *Handler) handleAddLibraryPath(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -2167,15 +2703,18 @@ func (h *Handler) reloadLibraryWatchIfAny(ctx context.Context) {
 	}
 }
 
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+}
+
 // ListenAndServe starts an HTTP server on addr and gracefully shuts down when ctx is cancelled.
 func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logger *zap.Logger) error {
-	srv := &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	srv := newHTTPServer(addr, handler)
 
 	go func() {
 		<-ctx.Done()
@@ -2438,7 +2977,7 @@ func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Curated-Offset, X-Curated-Chunk-Size, X-Curated-Chunk-SHA256")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

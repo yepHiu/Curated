@@ -35,6 +35,45 @@ func TestProgressWithMetadata_MergesPatch(t *testing.T) {
 	}
 }
 
+func TestPartialFail_PreservesProgressAndMergesMetadata(t *testing.T) {
+	t.Parallel()
+
+	m := NewManager()
+	task := m.Create("import.movies", map[string]any{"totalFiles": 2})
+	m.Start(task.TaskID, "copying")
+	m.ProgressWithMetadata(task.TaskID, 50, "copied one", map[string]any{"completedFiles": 1})
+
+	m.PartialFail(task.TaskID, "IMPORT_PARTIAL_FAILED", "1 file copied, 1 failed", map[string]any{
+		"failedFiles": 1,
+		"errorItems": []map[string]any{
+			{"sourceName": "bad.mp4", "errorCode": "IMPORT_COPY_FAILED"},
+		},
+	})
+
+	got, ok := m.Get(task.TaskID)
+	if !ok {
+		t.Fatal("task missing")
+	}
+	if got.Status != contracts.TaskPartialFailed {
+		t.Fatalf("Status = %q, want %q", got.Status, contracts.TaskPartialFailed)
+	}
+	if got.ErrorCode != "IMPORT_PARTIAL_FAILED" || got.ErrorMessage != "1 file copied, 1 failed" {
+		t.Fatalf("error fields: %+v", got)
+	}
+	if got.Progress != 50 {
+		t.Fatalf("Progress = %d, want preserved 50", got.Progress)
+	}
+	if got.FinishedAt == "" {
+		t.Fatal("expected FinishedAt set")
+	}
+	if got.Metadata["totalFiles"] != 2 || got.Metadata["completedFiles"] != 1 || got.Metadata["failedFiles"] != 1 {
+		t.Fatalf("metadata = %+v", got.Metadata)
+	}
+	if _, ok := got.Metadata["errorItems"].([]map[string]any); !ok {
+		t.Fatalf("errorItems type = %T", got.Metadata["errorItems"])
+	}
+}
+
 func TestListRecentFinished_LimitAndDescendingOrder(t *testing.T) {
 	t.Parallel()
 	m := NewManager()

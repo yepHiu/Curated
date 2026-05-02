@@ -5,6 +5,7 @@ import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vue
 import { LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
+import MovieImportDialog from "@/components/jav-library/MovieImportDialog.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
@@ -37,6 +38,7 @@ import {
   resolveLibraryMode,
 } from "@/lib/library-query"
 import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
+import NotificationCenter from "@/components/notification-center/NotificationCenter.vue"
 import { useTheme } from "@/composables/use-theme"
 import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
@@ -110,9 +112,13 @@ const currentMovie = computed(() => {
 const currentMovieId = computed(() => currentMovie.value?.id)
 const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
 const isHomeRoute = computed(() => route.name === "home")
-/** 回收站不显示资料库顶栏搜索 */
+/** 回收站不显示资料库顶栏搜索；首页也显示搜索框 */
 const showLibraryBrowseSearch = computed(
-  () => isLibraryRoute.value && resolveLibraryMode(route) !== "trash",
+  () => (isLibraryRoute.value && resolveLibraryMode(route) !== "trash") || isHomeRoute.value,
+)
+/** 资料库搜索建议导航目标：首页时跳资料库，否则留在当前路由 */
+const librarySearchTargetRoute = computed(() =>
+  isHomeRoute.value ? "library" : (route.name ?? "library"),
 )
 const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(
@@ -294,7 +300,7 @@ function onLibrarySearchInput() {
 function applyLibrarySuggestActor(canonical: string) {
   librarySuggestionsOpen.value = false
   void router.replace({
-    name: route.name ?? "library",
+    name: librarySearchTargetRoute.value,
     query: mergeLibraryQuery(route.query, {
       actor: canonical,
       q: undefined,
@@ -307,7 +313,7 @@ function applyLibrarySuggestActor(canonical: string) {
 function applyLibrarySuggestTag(canonical: string) {
   librarySuggestionsOpen.value = false
   void router.replace({
-    name: route.name ?? "library",
+    name: librarySearchTargetRoute.value,
     query: mergeLibraryQuery(route.query, {
       tag: canonical,
       q: undefined,
@@ -320,7 +326,7 @@ function applyLibrarySuggestTag(canonical: string) {
 function applyLibrarySuggestCode(code: string) {
   librarySuggestionsOpen.value = false
   void router.replace({
-    name: route.name ?? "library",
+    name: librarySearchTargetRoute.value,
     query: mergeLibraryQuery(route.query, {
       q: code,
       tag: undefined,
@@ -372,6 +378,20 @@ function onLibrarySearchKeydown(e: KeyboardEvent) {
   if (e.key === "Enter") {
     const idx = librarySuggestHighlightIndex.value
     if (idx < 0) {
+      // 首页无高亮建议时，回车跳转资料库全文搜索
+      if (isHomeRoute.value && searchDraft.value.trim()) {
+        e.preventDefault()
+        librarySuggestionsOpen.value = false
+        void router.push({
+          name: "library",
+          query: mergeLibraryQuery(route.query, {
+            q: searchDraft.value.trim(),
+            tag: undefined,
+            actor: undefined,
+            studio: undefined,
+          }),
+        })
+      }
       return
     }
     const row = librarySuggestRows.value.find(
@@ -431,6 +451,10 @@ watchDebounced(
     if (!showLibraryBrowseSearch.value) {
       return
     }
+    // 首页不自动同步搜索到 URL，由 Enter 或搜索建议点击主动导航
+    if (isHomeRoute.value) {
+      return
+    }
     const normalized = value.trim()
     const currentQ = getLibrarySearchQuery(route.query).trim()
     const currentTag = getLibraryTagExactQuery(route.query).trim()
@@ -461,7 +485,7 @@ watchDebounced(
       return
     }
     void router.replace({
-      name: route.name ?? "library",
+      name: librarySearchTargetRoute.value,
       query: mergeLibraryQuery(route.query, {
         q: normalized || undefined,
         tag: undefined,
@@ -477,6 +501,10 @@ function clearLibrarySearch() {
   searchDraft.value = ""
   librarySuggestionsOpen.value = false
   if (!showLibraryBrowseSearch.value) {
+    return
+  }
+  // 首页清除搜索仅清空输入框，留在首页
+  if (isHomeRoute.value) {
     return
   }
   void router.replace({
@@ -794,23 +822,29 @@ function clearActorsSearch() {
             </div>
 
             <div
-              class="flex shrink-0 items-center gap-1.5 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
-              :title="t('shell.themeToggleHint')"
+              class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
             >
-              <Sun
-                class="size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <Switch
-                :model-value="resolvedMode === 'dark'"
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :aria-label="t('shell.themeToggleAria')"
-                @update:model-value="onShellAppearanceSwitch"
-              />
-              <Moon
-                class="size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
+              <MovieImportDialog />
+              <NotificationCenter />
+              <div
+                class="flex items-center gap-1.5"
+                :title="t('shell.themeToggleHint')"
+              >
+                <Sun
+                  class="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Switch
+                  :model-value="resolvedMode === 'dark'"
+                  class="motion-safe:transition-colors motion-safe:duration-200"
+                  :aria-label="t('shell.themeToggleAria')"
+                  @update:model-value="onShellAppearanceSwitch"
+                />
+                <Moon
+                  class="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
           </div>
 

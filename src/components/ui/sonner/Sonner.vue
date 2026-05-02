@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 const props = withDefaults(defineProps<ToasterProps>(), {
   theme: undefined,
-  position: "bottom-center",
+  position: "top-right",
   closeButton: true,
   visibleToasts: 4,
   expand: true,
@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<ToasterProps>(), {
   <Sonner
     :class="
       cn(
-        'toaster group pointer-events-auto z-[110] !bottom-6',
+        'toaster group pointer-events-auto z-[110] !top-4 !right-4',
         props.class,
       )
     "

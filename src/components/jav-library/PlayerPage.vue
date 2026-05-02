@@ -18,7 +18,7 @@ import {
 } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
-import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
+import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,6 +47,7 @@ import {
   parseResumeSecondsFromQuery,
   saveProgress,
 } from "@/lib/playback-progress-storage"
+import { createPlaybackWatchTimeTracker } from "@/lib/playback-watch-time-tracker"
 import {
   descriptorMatchesRequestedPlaybackTarget,
   resolveHlsLocalSeekTargetSec,
@@ -125,6 +126,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const watchTimeTracker = createPlaybackWatchTimeTracker({ movieId: props.movie.id })
 const playbackSeekBackwardStep = computed(() =>
   Math.max(1, Number(libraryService.playerSettings.value.seekBackwardStepSec ?? 10)),
 )
@@ -649,7 +651,7 @@ async function loadPlayback() {
       return
     }
     playbackDescriptor.value = descriptor
-    playbackSrc.value = descriptor?.url?.trim() || null
+    playbackSrc.value = descriptor ? resolveMoviePlaybackSourceUrl(movieId, descriptor.url) : null
     void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
@@ -730,6 +732,9 @@ function flushPlaybackProgress() {
   if (!Number.isFinite(pos) || pos < 0) return
   saveProgress(props.movie.id, pos, dur)
   recordMoviePlayed(props.movie.id)
+  void watchTimeTracker.flush(pos).catch(() => {
+    // Best effort: progress save should not be blocked by analytics sync.
+  })
   publishActivePlaybackSession()
 }
 
@@ -748,6 +753,8 @@ function stripTFromRoute() {
 watch(
   () => props.movie.id,
   async () => {
+    const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
+    void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
     resumeAppliedForMovieId.value = null
     lastProgressSaveAt = 0
@@ -870,6 +877,7 @@ function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
   currentTime.value = getAbsolutePlaybackTime(v.currentTime)
+  watchTimeTracker.onTimeUpdate(currentTime.value)
   syncBufferedRangeFromVideo()
   clearOptimisticSeekIfSettled(currentTime.value)
   if (v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
@@ -1087,12 +1095,14 @@ async function onCanPlayForAutoplay() {
 
 function onPlay() {
   isPlaying.value = true
+  watchTimeTracker.onPlay(getAbsolutePlaybackTime())
   markPlaybackReady()
   startFpsTracking()
   publishActivePlaybackSession("playing")
 }
 
 function onPause() {
+  watchTimeTracker.onPause(getAbsolutePlaybackTime())
   isPlaying.value = false
   flushPlaybackProgress()
   publishActivePlaybackSession("paused")
@@ -1116,6 +1126,7 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
 }
 
 function onVideoEnded() {
+  watchTimeTracker.onPause(getAbsolutePlaybackTime())
   flushPlaybackProgress()
   isPlaying.value = false
   markPlaybackReady()
@@ -1223,18 +1234,21 @@ function seekDelta(deltaSec: number) {
 
 function onVideoWaiting() {
   if (!playbackSrc.value) return
+  watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
   isPlaybackWaiting.value = true
   publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeking() {
   if (!playbackSrc.value) return
+  watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
   isPlaybackWaiting.value = true
   publishActivePlaybackSession("waiting")
 }
 
 function onVideoSeeked() {
   currentTime.value = getAbsolutePlaybackTime()
+  watchTimeTracker.onSeeking(currentTime.value)
   syncBufferedRangeFromVideo()
   markPlaybackReady()
   publishActivePlaybackSession()
@@ -1357,7 +1371,7 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
     resumeAppliedForMovieId.value = null
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = normalizedDescriptor
-    playbackSrc.value = normalizedDescriptor.url?.trim() || null
+    playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, normalizedDescriptor.url)
     void prewarmHlsDescriptor(normalizedDescriptor)
     currentTime.value = targetSec
     progressSliderValue.value = [targetSec]
@@ -1949,7 +1963,7 @@ async function seekToAbsolutePlaybackTime(
     resumeAppliedForMovieId.value = null
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = nextDescriptor
-    playbackSrc.value = nextDescriptor.url?.trim() || null
+    playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, nextDescriptor.url)
     void prewarmHlsDescriptor(nextDescriptor)
     currentTime.value = clampedTarget
     progressSliderValue.value = [clampedTarget]
@@ -2302,6 +2316,7 @@ const videoPreloadMode = computed(() =>
           ref="videoRef"
           class="h-full max-h-full w-full max-w-full object-contain"
           :class="videoAreaCursorClass"
+          crossorigin="anonymous"
           playsinline
           :preload="videoPreloadMode"
           @click.stop="onVideoSurfaceClick"

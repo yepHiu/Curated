@@ -60,6 +60,27 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.curatedFrameExportFormat.value).toBe("jpg")
   })
 
+  it("tracks default import library path and returns a mock import task", async () => {
+    expect(mockLibraryService.defaultImportLibraryPathId.value).toBe("library-a")
+
+    await mockLibraryService.setDefaultImportLibraryPathId("library-b")
+    expect(mockLibraryService.defaultImportLibraryPathId.value).toBe("library-b")
+
+    const task = await mockLibraryService.importMovies([
+      new File(["movie"], "IMP-001.mp4", { type: "video/mp4" }),
+    ])
+    expect(task?.type).toBe("import.movies")
+    expect(task?.status).toBe("completed")
+    expect(task?.metadata).toMatchObject({
+      targetLibraryPathId: "library-b",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 0,
+    })
+
+    await mockLibraryService.setDefaultImportLibraryPathId("library-a")
+  })
+
   it("ensureMovieCached resolves (mock is fully in-memory)", async () => {
     await expect(mockLibraryService.ensureMovieCached("any-id")).resolves.toBeUndefined()
   })

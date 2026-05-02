@@ -60,6 +60,22 @@ function parentScanId(task: TaskDTO): string {
   return typeof p === "string" ? p : ""
 }
 
+function taskHasMetadata(task: TaskDTO, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(task.metadata ?? {}, key)
+}
+
+function taskMetaNumber(task: TaskDTO, key: string): number {
+  const value = task.metadata?.[key]
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === "string") {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
+}
+
 /** Polls GET /api/tasks/recent and shows toasts for fsnotify-driven scan + linked scrape completions. */
 /** 仅处理本会话开始后结束的任务，避免首次拉 recent 时对历史 asset.download 全员 bump */
 let libraryWatchAppMountedAtMs = 0
@@ -84,6 +100,31 @@ export function useLibraryWatchToasts() {
     persistSeenToastIds(seenToastIds)
   }
 
+  function libraryWatchScanToastMessage(task: TaskDTO): string {
+    const hasScanCounters =
+      taskHasMetadata(task, "scanTotal") ||
+      taskHasMetadata(task, "scanImported") ||
+      taskHasMetadata(task, "scanUpdated") ||
+      taskHasMetadata(task, "scanSkipped")
+    if (!hasScanCounters) {
+      return t("toasts.libraryWatchScanDone", { message: task.message ?? "" })
+    }
+
+    const discovered = taskMetaNumber(task, "scanTotal")
+    const imported = taskMetaNumber(task, "scanImported")
+    const updated = taskMetaNumber(task, "scanUpdated")
+    const skipped = taskMetaNumber(task, "scanSkipped")
+    if (imported + updated === 0) {
+      return t("toasts.libraryWatchScanDoneNoChanges", { discovered, skipped })
+    }
+    return t("toasts.libraryWatchScanDoneWithChanges", {
+      discovered,
+      imported,
+      updated,
+      skipped,
+    })
+  }
+
   async function poll() {
     try {
       const { tasks } = await api.getRecentTasks(40)
@@ -99,9 +140,13 @@ export function useLibraryWatchToasts() {
         }
         markToastSeen(task.taskId)
         needsMovieReload = true
-        const msg = task.message ?? ""
-        pushAppToast(t("toasts.libraryWatchScanDone", { message: msg }), {
+        pushAppToast(libraryWatchScanToastMessage(task), {
           variant: taskTerminalToastVariant(task.status),
+          notification: {
+            type: "scan",
+            title: t("notificationCenter.titles.scanDone"),
+            source: { taskId: task.taskId },
+          },
         })
       }
 
@@ -121,6 +166,11 @@ export function useLibraryWatchToasts() {
         const msg = task.message ?? ""
         pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
           variant: taskTerminalToastVariant(task.status),
+          notification: {
+            type: "scrape",
+            title: t("notificationCenter.titles.scrapeDone"),
+            source: { taskId: task.taskId },
+          },
         })
       }
 

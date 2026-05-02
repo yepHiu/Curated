@@ -83,6 +83,7 @@ const playerSettingsMock = ref<PlayerSettingsDTO>({
   seekBackwardStepSec: 10,
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
+const defaultImportLibraryPathIdMock = ref("library-a")
 
 function mockHttpError(status: number, code: string, message = code): HttpClientError {
   return new HttpClientError(status, {
@@ -493,6 +494,7 @@ export const mockLibraryService: LibraryService = {
     ),
   ),
   libraryPaths: computed(() => libraryPathsState.value),
+  defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdMock.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
@@ -731,6 +733,9 @@ export const mockLibraryService: LibraryService = {
   async removeLibraryPath(id: string) {
     const removed = libraryPathsState.value.find((p) => p.id === id)
     libraryPathsState.value = libraryPathsState.value.filter((p) => p.id !== id)
+    if (defaultImportLibraryPathIdMock.value === id) {
+      defaultImportLibraryPathIdMock.value = libraryPathsState.value[0]?.id ?? ""
+    }
     if (!removed) return
     const removedRoot = normalizeMockLibraryPath(removed.path)
     const remainingRoots = libraryPathsState.value.map((p) => normalizeMockLibraryPath(p.path))
@@ -744,6 +749,53 @@ export const mockLibraryService: LibraryService = {
 
   async revealLibraryPathInFileManager() {
     throw mockHttpError(501, "MOCK_REVEAL_NOT_SUPPORTED")
+  },
+
+  async setDefaultImportLibraryPathId(id: string) {
+    const trimmed = id.trim()
+    if (trimmed && !libraryPathsState.value.some((path) => path.id === trimmed)) {
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "unknown defaultImportLibraryPathId")
+    }
+    defaultImportLibraryPathIdMock.value = trimmed
+  },
+
+  async importMovies(files: File[]): Promise<TaskDTO | null> {
+    const selected = files.filter((file) => file.name.trim())
+    if (selected.length === 0) {
+      return null
+    }
+    const targetId = defaultImportLibraryPathIdMock.value.trim()
+    if (!targetId) {
+      throw mockHttpError(
+        400,
+        "IMPORT_TARGET_NOT_CONFIGURED",
+        "default import library path is not configured",
+      )
+    }
+    const target = libraryPathsState.value.find((path) => path.id === targetId)
+    if (!target) {
+      throw mockHttpError(404, "IMPORT_TARGET_UNAVAILABLE", "default import library path was not found")
+    }
+    const now = new Date().toISOString()
+    return {
+      taskId: `mock-import-${Date.now()}`,
+      type: "import.movies",
+      status: "completed",
+      createdAt: now,
+      startedAt: now,
+      finishedAt: now,
+      progress: 100,
+      message: "Movie import completed",
+      metadata: {
+        targetLibraryPathId: target.id,
+        targetPath: target.path,
+        totalFiles: selected.length,
+        completedFiles: selected.length,
+        failedFiles: 0,
+        copiedBytes: selected.reduce((sum, file) => sum + file.size, 0),
+        totalBytes: selected.reduce((sum, file) => sum + file.size, 0),
+      },
+    }
   },
 
   async scanLibraryPaths() {

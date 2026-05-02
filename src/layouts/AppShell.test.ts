@@ -96,6 +96,10 @@ vi.mock("@/components/jav-library/ScanProgressDock.vue", () => ({
   default: { name: "ScanProgressDock", template: "<div />" },
 }))
 
+vi.mock("@/components/jav-library/MovieImportDialog.vue", () => ({
+  default: { name: "MovieImportDialog", template: "<button data-movie-import>import.trigger</button>" },
+}))
+
 vi.mock("@/components/ui/sonner", () => ({
   Toaster: { name: "Toaster", template: "<div />" },
 }))
@@ -162,6 +166,12 @@ describe("AppShell library search route sync", () => {
 
     expect(wrapper.find('[data-sidebar-toggle="desktop"]').exists()).toBe(true)
     expect(wrapper.find('[data-show-collapse-toggle="true"]').exists()).toBe(false)
+  })
+
+  it("renders the movie import entry near the header actions", () => {
+    const wrapper = shallowMount(AppShell)
+
+    expect(wrapper.findComponent({ name: "MovieImportDialog" }).exists()).toBe(true)
   })
 
   it("uses the tightened desktop sidebar grid transition", () => {

@@ -103,6 +103,22 @@ func TestMergeLibrarySettingsFile_AutoActorProfileScrapeTrue(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_DefaultImportLibraryPathID(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"defaultImportLibraryPathId": "  lib-main  "}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.DefaultImportLibraryPathID, "lib-main"; got != want {
+		t.Fatalf("DefaultImportLibraryPathID = %q, want %q", got, want)
+	}
+}
+
 func TestMergeLibrarySettingsFile_LaunchAtLoginTrue(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -173,6 +189,35 @@ func TestWriteLibrarySettingsMerge_MetadataMovieProvider(t *testing.T) {
 	}
 	if !cfg.OrganizeLibrary {
 		t.Fatal("expected organizeLibrary preserved true")
+	}
+}
+
+func TestWriteLibrarySettingsMerge_DefaultImportLibraryPathID(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"futureKey": "keep-me"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["defaultImportLibraryPathId"] = "lib-new"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.DefaultImportLibraryPathID, "lib-new"; got != want {
+		t.Fatalf("DefaultImportLibraryPathID = %q, want %q", got, want)
+	}
+	m, err := readLibrarySettingsMap(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(m["futureKey"]); got != "keep-me" {
+		t.Fatalf("futureKey = %q, want keep-me", got)
 	}
 }
 

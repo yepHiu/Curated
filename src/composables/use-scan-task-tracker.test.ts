@@ -51,6 +51,19 @@ function makeTask(status: TaskDTO["status"]): TaskDTO {
   }
 }
 
+function makeImportTask(status: TaskDTO["status"]): TaskDTO {
+  return {
+    ...makeTask(status),
+    type: "import.movies",
+    progress: 100,
+    message: "Movie import completed",
+    metadata: {
+      completedFiles: 2,
+      failedFiles: 0,
+    },
+  }
+}
+
 afterEach(() => {
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -96,5 +109,29 @@ describe("useScanTaskTracker", () => {
     await flushPromises()
 
     expect(wrapper.text()).toBe("scanTask.fetchFailed")
+  })
+
+  it("toasts and reloads the library when movie import completes", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeImportTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("import-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.movieImportDone",
+      expect.objectContaining({ variant: "success" }),
+    )
+    expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
   })
 })

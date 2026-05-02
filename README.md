@@ -27,7 +27,8 @@ The product name is **Curated**. The repository folder and npm package may still
 
 - Local-first architecture with a Vue SPA frontend and a Go HTTP API backend.
 - Real API mode and mock mode for fast UI iteration.
-- SQLite-backed persistence for library data, playback progress, comments, ratings, and curated frames.
+- SQLite-backed persistence for library data, playback progress, daily watch-time aggregates, comments, ratings, and curated frames.
+- Top-bar movie import can copy selected files or browser-selected folders into the configured default library root, with progress, large-file resumable upload, and failure notifications.
 - UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
 - Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
@@ -74,7 +75,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 - Set `VITE_USE_WEB_API=true` in the repository root `.env` to use the real backend API.
 - Any other value keeps the frontend in mock mode.
-- The Vite dev server proxies `/api` to `http://localhost:8080`.
+- In local loopback Web API development, the frontend connects directly to `http://127.0.0.1:8080` for API calls; the Vite `/api` proxy remains available for fallback and non-loopback development.
 
 ## Features
 
@@ -82,12 +83,14 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 - Virtualized poster-grid browsing for large libraries.
 - Favorites, ratings, tags, and library organization controls.
+- Add-movie import copies selected local videos into the default storage path configured in Settings -> Library & storage, switching large uploads to chunked resumable transfer.
 - Real backend mode and mock adapter mode behind the same frontend service layer.
 - Homepage hero and "today's recommendations" can be sourced from a backend-generated daily snapshot that rolls over automatically on the UTC day boundary and tries to avoid same-day actor/studio clustering.
 
 ### Playback
 
 - Resume playback support with persisted progress in Web API mode.
+- Daily watch-time statistics in Settings -> Overview, backed by bounded playback deltas in Web API mode and `localStorage` in mock mode.
 - Browser playback, external player handoff, and HLS session support in the current playback pipeline.
 - Session diagnostics and richer playback decision metadata for direct play, remux, and transcode paths.
 
@@ -114,7 +117,7 @@ Runtime configuration is split between frontend environment variables and backen
 ### Frontend
 
 - `VITE_USE_WEB_API=true`: use the real backend
-- `VITE_API_BASE_URL`: override the API base URL; when unset, the frontend uses same-origin `/api`
+- `VITE_API_BASE_URL`: override the API base URL; when unset, local loopback Web API development connects directly to dev backend `:8080` to avoid proxying large uploads through Vite, while release hosting on `:8081` and other modes use same-origin `/api`
 - `VITE_LOG_LEVEL`: optional browser log level default
 
 ### Backend
@@ -128,6 +131,7 @@ Common library-level settings include:
 - `organizeLibrary`
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
+- `defaultImportLibraryPathId`
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `launchAtLogin`
@@ -144,6 +148,8 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 Curated exposes a Go HTTP API for library, playback, actor, settings, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
+
+Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
 
 ## Repository Layout
 

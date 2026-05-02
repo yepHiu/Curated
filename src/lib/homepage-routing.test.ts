@@ -108,6 +108,10 @@ vi.mock("@/components/jav-library/ScanProgressDock.vue", () => ({
   default: { name: "ScanProgressDock", template: "<div />" },
 }))
 
+vi.mock("@/components/jav-library/MovieImportDialog.vue", () => ({
+  default: { name: "MovieImportDialog", template: "<button />" },
+}))
+
 vi.mock("@/components/ui/sonner", () => ({
   Toaster: { name: "Toaster", template: "<div />" },
 }))

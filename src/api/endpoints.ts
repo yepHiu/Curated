@@ -1,4 +1,4 @@
-import { httpClient } from "./http-client"
+import { HttpClientError, httpClient } from "./http-client"
 import {
   assertApiResponse,
   isHealthDTO,
@@ -30,8 +30,10 @@ import type {
   ActorsListDTO,
   AddLibraryPathBody,
   AddLibraryPathResultDTO,
+  AddPlaybackWatchTimeBody,
   AppUpdateStatusDTO,
   CreateCuratedFrameBody,
+  CreateMovieImportUploadBody,
   CuratedFrameFacetListDTO,
   CuratedFrameStatsDTO,
   CreatePlaybackSessionBody,
@@ -45,8 +47,10 @@ import type {
   ListCuratedFramesParams,
   ListMoviesParams,
   MetadataRefreshQueuedDTO,
+  MovieImportUploadProgress,
   NativePlaybackLaunchDTO,
   MetadataScrapeByPathsBody,
+  MovieImportUploadDTO,
   MovieCommentDTO,
   MovieDetailDTO,
   MoviesPageDTO,
@@ -58,6 +62,7 @@ import type {
   PatchSettingsBody,
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
+  PlaybackWatchTimeDailyListDTO,
   ProxyJavBusPingRequestBody,
   ProxyJavBusPingResponse,
   PutMovieCommentBody,
@@ -67,6 +72,148 @@ import type {
   RecentTasksDTO,
   TaskDTO,
 } from "./types"
+
+const DEFAULT_RESUMABLE_IMPORT_THRESHOLD_BYTES = 512 * 1024 * 1024
+const DEFAULT_UPLOAD_CHUNK_MAX_ATTEMPTS = 3
+const DEFAULT_UPLOAD_CHUNK_RETRY_DELAY_MS = 500
+
+interface MovieImportApiOptions {
+  onUploadProgress?: (progress: MovieImportUploadProgress) => void
+  resumableThresholdBytes?: number
+  resumableChunkMaxAttempts?: number
+  resumableChunkRetryDelayMs?: number
+}
+
+function relativePathForFile(file: File): string {
+  const candidate = (file as File & { webkitRelativePath?: string }).webkitRelativePath
+  return candidate?.trim() || file.name
+}
+
+function shouldUseResumableImport(
+  files: File[],
+  thresholdBytes = DEFAULT_RESUMABLE_IMPORT_THRESHOLD_BYTES,
+): boolean {
+  return thresholdBytes > 0 && files.some((file) => file.size >= thresholdBytes)
+}
+
+function movieImportUploadManifest(files: File[]): CreateMovieImportUploadBody {
+  return {
+    files: files.map((file) => ({
+      relativePath: relativePathForFile(file),
+      size: file.size,
+      lastModified: file.lastModified,
+    })),
+  }
+}
+
+function findUploadFileSource(files: File[], relativePath: string, fallbackIndex: number): File {
+  const fallback = files[fallbackIndex]
+  const matched = files.find((file) => relativePathForFile(file) === relativePath)
+  if (matched) return matched
+  if (fallback) return fallback
+  throw new Error(`Missing source file for upload path ${relativePath}`)
+}
+
+function isRetryableUploadError(error: unknown): boolean {
+  return error instanceof HttpClientError && error.retryable
+}
+
+function waitForUploadRetry(delayMs: number): Promise<void> {
+  if (delayMs <= 0) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => window.setTimeout(resolve, delayMs))
+}
+
+async function putMovieImportChunkWithRetry(
+  path: string,
+  chunk: Blob,
+  options: Parameters<typeof httpClient.putBinaryWithProgress<MovieImportUploadDTO>>[2],
+  retryOptions: {
+    maxAttempts: number
+    retryDelayMs: number
+  },
+): Promise<void> {
+  const maxAttempts = Math.max(1, retryOptions.maxAttempts)
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await httpClient.putBinaryWithProgress<MovieImportUploadDTO>(path, chunk, options)
+      return
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetryableUploadError(error)) {
+        throw error
+      }
+      await waitForUploadRetry(retryOptions.retryDelayMs * attempt)
+    }
+  }
+}
+
+async function uploadMovieFileChunks(
+  upload: MovieImportUploadDTO,
+  files: File[],
+  options: {
+    onUploadProgress?: (progress: MovieImportUploadProgress) => void
+    chunkMaxAttempts?: number
+    chunkRetryDelayMs?: number
+  } = {},
+): Promise<void> {
+  const chunkSize = upload.chunkSize > 0 ? upload.chunkSize : 32 * 1024 * 1024
+  let completedBytes = 0
+  const chunkRetryOptions = {
+    maxAttempts: options.chunkMaxAttempts ?? DEFAULT_UPLOAD_CHUNK_MAX_ATTEMPTS,
+    retryDelayMs: options.chunkRetryDelayMs ?? DEFAULT_UPLOAD_CHUNK_RETRY_DELAY_MS,
+  }
+
+  for (let fileIndex = 0; fileIndex < upload.files.length; fileIndex += 1) {
+    const uploadFile = upload.files[fileIndex]
+    const sourceFile = findUploadFileSource(files, uploadFile.relativePath, fileIndex)
+    for (let offset = 0, chunkIndex = 0; offset < sourceFile.size; chunkIndex += 1) {
+      const end = Math.min(offset + chunkSize, sourceFile.size)
+      const chunk = sourceFile.slice(offset, end)
+      const chunkBytes = end - offset
+      const chunkOffset = offset
+      await putMovieImportChunkWithRetry(
+        `/import/movies/uploads/${encodeURIComponent(upload.uploadId)}/files/${encodeURIComponent(uploadFile.fileId)}/chunks/${chunkIndex}`,
+        chunk,
+        {
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Curated-Offset": String(chunkOffset),
+            "X-Curated-Chunk-Size": String(chunkBytes),
+          },
+          diagnosticContext: {
+            uploadId: upload.uploadId,
+            fileId: uploadFile.fileId,
+            chunkIndex,
+            offset: chunkOffset,
+          },
+          onUploadProgress: (progress) => {
+            const loaded = Math.min(upload.totalBytes, completedBytes + progress.loaded)
+            options.onUploadProgress?.({
+              loaded,
+              total: upload.totalBytes,
+              percent:
+                upload.totalBytes > 0
+                  ? Math.min(100, Math.max(0, Math.round((loaded / upload.totalBytes) * 100)))
+                  : 0,
+            })
+          },
+        },
+        chunkRetryOptions,
+      )
+      completedBytes += chunkBytes
+      offset = end
+      options.onUploadProgress?.({
+        loaded: Math.min(upload.totalBytes, completedBytes),
+        total: upload.totalBytes,
+        percent:
+          upload.totalBytes > 0
+            ? Math.min(100, Math.max(0, Math.round((completedBytes / upload.totalBytes) * 100)))
+            : 0,
+      })
+    }
+  }
+}
 
 export const api = {
   health(): Promise<HealthDTO> {
@@ -193,6 +340,40 @@ export const api = {
     return httpClient.patch<SettingsDTO>("/settings", body)
   },
 
+  importMovies(
+    files: File[],
+    options?: MovieImportApiOptions,
+  ): Promise<TaskDTO> {
+    if (shouldUseResumableImport(files, options?.resumableThresholdBytes)) {
+      return httpClient
+        .post<MovieImportUploadDTO>("/import/movies/uploads", movieImportUploadManifest(files))
+        .then(async (upload) => {
+          await uploadMovieFileChunks(upload, files, {
+            onUploadProgress: options?.onUploadProgress,
+            chunkMaxAttempts: options?.resumableChunkMaxAttempts,
+            chunkRetryDelayMs: options?.resumableChunkRetryDelayMs,
+          })
+          return httpClient.post<TaskDTO>(
+            `/import/movies/uploads/${encodeURIComponent(upload.uploadId)}/commit`,
+          )
+        })
+    }
+
+    const form = new FormData()
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    if (totalBytes > 0) {
+      form.set("totalBytes", String(totalBytes))
+    }
+    for (const file of files) {
+      const relativePath = relativePathForFile(file)
+      form.append("relativePath", relativePath)
+      form.append("files", file, relativePath)
+    }
+    return httpClient.postFormWithProgress<TaskDTO>("/import/movies", form, {
+      onUploadProgress: options?.onUploadProgress,
+    })
+  },
+
   addLibraryPath(body: AddLibraryPathBody): Promise<AddLibraryPathResultDTO> {
     return httpClient.post<AddLibraryPathResultDTO>("/library/paths", body)
   },
@@ -245,6 +426,16 @@ export const api = {
 
   deletePlaybackProgress(movieId: string): Promise<void> {
     return httpClient.delete(`/playback/progress/${encodeURIComponent(movieId)}`)
+  },
+
+  listPlaybackWatchTimeDaily(days?: number): Promise<PlaybackWatchTimeDailyListDTO> {
+    return httpClient.get<PlaybackWatchTimeDailyListDTO>("/playback/watch-time/daily", {
+      days: days ?? undefined,
+    })
+  },
+
+  addPlaybackWatchTimeDaily(body: AddPlaybackWatchTimeBody): Promise<void> {
+    return httpClient.post<void>("/playback/watch-time/daily", body)
   },
 
   listCuratedFrames(params?: ListCuratedFramesParams): Promise<CuratedFramesListDTO> {

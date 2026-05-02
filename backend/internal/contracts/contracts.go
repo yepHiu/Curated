@@ -380,9 +380,10 @@ type UpdateLibraryPathRequest struct {
 
 // SettingsDTO carries all application settings exposed to the frontend.
 type SettingsDTO struct {
-	LibraryPaths    []LibraryPathDTO  `json:"libraryPaths"`
-	Player          PlayerSettingsDTO `json:"player"`
-	OrganizeLibrary bool              `json:"organizeLibrary"`
+	LibraryPaths               []LibraryPathDTO  `json:"libraryPaths"`
+	DefaultImportLibraryPathID string            `json:"defaultImportLibraryPathId,omitempty"`
+	Player                     PlayerSettingsDTO `json:"player"`
+	OrganizeLibrary            bool              `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
@@ -447,13 +448,14 @@ type ProxyJavBusPingResponse struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary          *bool                   `json:"organizeLibrary,omitempty"`
-	AutoLibraryWatch         *bool                   `json:"autoLibraryWatch,omitempty"`
-	AutoActorProfileScrape   *bool                   `json:"autoActorProfileScrape,omitempty"`
-	LaunchAtLogin            *bool                   `json:"launchAtLogin,omitempty"`
-	CuratedFrameExportFormat *string                 `json:"curatedFrameExportFormat,omitempty"`
-	Player                   *PatchPlayerSettingsDTO `json:"player,omitempty"`
-	MetadataMovieProvider    *string                 `json:"metadataMovieProvider,omitempty"`
+	OrganizeLibrary            *bool                   `json:"organizeLibrary,omitempty"`
+	AutoLibraryWatch           *bool                   `json:"autoLibraryWatch,omitempty"`
+	AutoActorProfileScrape     *bool                   `json:"autoActorProfileScrape,omitempty"`
+	LaunchAtLogin              *bool                   `json:"launchAtLogin,omitempty"`
+	CuratedFrameExportFormat   *string                 `json:"curatedFrameExportFormat,omitempty"`
+	DefaultImportLibraryPathID *string                 `json:"defaultImportLibraryPathId,omitempty"`
+	Player                     *PatchPlayerSettingsDTO `json:"player,omitempty"`
+	MetadataMovieProvider      *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
@@ -465,6 +467,42 @@ type PatchSettingsRequest struct {
 	// BackendLog: nil = no change; non-empty partial fields merge into current and persist.
 	BackendLog *PatchBackendLogSettings `json:"backendLog,omitempty"`
 }
+
+// MovieImportUploadFileManifest describes one file in a resumable movie import upload.
+type MovieImportUploadFileManifest struct {
+	RelativePath string `json:"relativePath"`
+	Size         int64  `json:"size"`
+	LastModified int64  `json:"lastModified,omitempty"`
+}
+
+// CreateMovieImportUploadRequest is the body for POST /api/import/movies/uploads.
+type CreateMovieImportUploadRequest struct {
+	Files []MovieImportUploadFileManifest `json:"files"`
+}
+
+// MovieImportUploadFileDTO reports server-side state for one resumable import file.
+type MovieImportUploadFileDTO struct {
+	FileID        string `json:"fileId"`
+	RelativePath  string `json:"relativePath"`
+	Size          int64  `json:"size"`
+	BytesReceived int64  `json:"bytesReceived"`
+	Complete      bool   `json:"complete"`
+}
+
+// MovieImportUploadDTO reports resumable import upload session state.
+type MovieImportUploadDTO struct {
+	UploadID      string                     `json:"uploadId"`
+	TargetPath    string                     `json:"targetPath"`
+	ChunkSize     int64                      `json:"chunkSize"`
+	BytesReceived int64                      `json:"bytesReceived"`
+	TotalBytes    int64                      `json:"totalBytes"`
+	State         string                     `json:"state"`
+	Files         []MovieImportUploadFileDTO `json:"files"`
+	Task          TaskDTO                    `json:"task"`
+}
+
+// CreateMovieImportUploadResponse is returned after creating a resumable movie import upload.
+type CreateMovieImportUploadResponse = MovieImportUploadDTO
 
 // PlayerSettingsDTO holds player/playback preferences exposed to the Settings UI.
 type PlayerSettingsDTO struct {
@@ -513,6 +551,28 @@ type PlaybackProgressListDTO struct {
 type PutPlaybackProgressBody struct {
 	PositionSec float64 `json:"positionSec"`
 	DurationSec float64 `json:"durationSec"`
+}
+
+// PlaybackWatchTimeDailyItemDTO is one day in the watch-time heatmap.
+type PlaybackWatchTimeDailyItemDTO struct {
+	DayKey     string  `json:"dayKey"`
+	WatchedSec float64 `json:"watchedSec"`
+}
+
+// PlaybackWatchTimeDailyListDTO returns daily watch-time rows and summary metrics.
+type PlaybackWatchTimeDailyListDTO struct {
+	Items             []PlaybackWatchTimeDailyItemDTO `json:"items"`
+	TotalWatchedSec   float64                         `json:"totalWatchedSec"`
+	ActiveDays        int                             `json:"activeDays"`
+	MaxDayWatchedSec  float64                         `json:"maxDayWatchedSec"`
+	LongestStreakDays int                             `json:"longestStreakDays"`
+}
+
+// AddPlaybackWatchTimeBody records one bounded watch-time delta.
+type AddPlaybackWatchTimeBody struct {
+	MovieID    string  `json:"movieId"`
+	DayKey     string  `json:"dayKey"`
+	WatchedSec float64 `json:"watchedSec"`
 }
 
 // PlaybackMode describes how a media file is delivered to the player.
@@ -740,6 +800,8 @@ const (
 	TaskFailed        = "failed"
 	TaskCancelled     = "cancelled"
 
+	TaskTypeImportMovies = "import.movies"
+
 	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
 	ErrorCodeNotFound      = "COMMON_NOT_FOUND"
 	ErrorCodeInternal      = "COMMON_INTERNAL"
@@ -752,6 +814,15 @@ const (
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
 	ErrorCodeConflict      = "COMMON_CONFLICT"
+
+	ErrorCodeImportSourceUnavailable   = "IMPORT_SOURCE_UNAVAILABLE"
+	ErrorCodeImportTargetNotConfigured = "IMPORT_TARGET_NOT_CONFIGURED"
+	ErrorCodeImportTargetUnavailable   = "IMPORT_TARGET_UNAVAILABLE"
+	ErrorCodeImportNotEnoughSpace      = "IMPORT_NOT_ENOUGH_SPACE"
+	ErrorCodeImportConflict            = "IMPORT_CONFLICT"
+	ErrorCodeImportCopyFailed          = "IMPORT_COPY_FAILED"
+	ErrorCodeImportCancelled           = "IMPORT_CANCELLED"
+	ErrorCodeImportScanFailed          = "IMPORT_SCAN_FAILED"
 
 	// Curated frames export
 	ErrorCodeCuratedExportActorMismatch = "CURATED_EXPORT_ACTOR_MISMATCH"

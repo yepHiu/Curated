@@ -4,7 +4,7 @@
 
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
 - `docs/product/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
-- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** + Vite 代理 **`/api` → `:8080`** 联通真实 HTTP API（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
+- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`:8080`**，Vite 代理 **`/api` → `:8080`** 仍作为 fallback / 非 loopback 路径保留；release **`:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
 
 ## 2. 当前代码事实

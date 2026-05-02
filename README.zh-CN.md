@@ -73,7 +73,7 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 
 - 在仓库根目录 `.env` 中设置 `VITE_USE_WEB_API=true`，即可启用真实后端 API。
 - 其他值会保持为 Mock 模式。
-- Vite 开发服务器会把 `/api` 代理到 `http://localhost:8080`。
+- 本机 loopback 的 Web API 开发态会直连 `http://127.0.0.1:8080`；Vite 的 `/api` 代理仍作为 fallback 和非 loopback 开发路径保留。
 
 ## 功能
 
@@ -112,7 +112,7 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 ### 前端
 
 - `VITE_USE_WEB_API=true`：启用真实后端
-- `VITE_API_BASE_URL`：覆盖 API 基地址；未设置时默认使用同源 `/api`
+- `VITE_API_BASE_URL`：覆盖 API 基地址；未设置时，本机 loopback 的 Web API 开发态会直连开发后端 `:8080`，避免大文件上传经过 Vite 代理；release `:8081` 静态托管和其他模式仍使用同源 `/api`
 - `VITE_LOG_LEVEL`：浏览器日志级别默认值
 
 ### 后端

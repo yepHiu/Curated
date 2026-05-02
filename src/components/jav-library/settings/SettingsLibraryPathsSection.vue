@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Database } from "lucide-vue-next"
 import type { LibraryPathDTO } from "@/api/types"
@@ -9,14 +10,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
 import SettingsLibraryPathToolbar from "@/components/jav-library/settings/SettingsLibraryPathToolbar.vue"
 
-defineProps<{
+const props = defineProps<{
   scanFeedbackError: string
   paths: readonly LibraryPathDTO[]
+  defaultImportLibraryPathId: string
+  defaultImportPathSaving: boolean
+  defaultImportPathError: string
   batchMode: boolean
   hasMetadataPathSelection: boolean
   metadataRefreshBusy: boolean
@@ -62,12 +73,24 @@ const emit = defineEmits<{
   edit: [path: LibraryPathDTO]
   rescan: [path: LibraryPathDTO]
   remove: [path: LibraryPathDTO]
+  changeDefaultImportLibraryPath: [id: string]
   clearError: []
   browse: []
   submit: []
 }>()
 
 const { t } = useI18n()
+
+const defaultImportPathSelectValue = computed(() =>
+  props.paths.some((path) => path.id === props.defaultImportLibraryPathId)
+    ? props.defaultImportLibraryPathId
+    : undefined,
+)
+
+function onDefaultImportPathChange(value: unknown) {
+  if (typeof value !== "string" || value === props.defaultImportLibraryPathId) return
+  emit("changeDefaultImportLibraryPath", value)
+}
 </script>
 
 <template>
@@ -99,6 +122,63 @@ const { t } = useI18n()
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-2">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
+            :aria-busy="defaultImportPathSaving"
+          >
+            <div class="min-w-0 space-y-1">
+              <p class="text-sm font-medium text-foreground">
+                {{ t("settings.defaultImportPathLabel") }}
+              </p>
+              <p class="text-xs leading-relaxed text-muted-foreground">
+                {{ t("settings.defaultImportPathDesc") }}
+              </p>
+              <p
+                v-if="defaultImportPathSaving"
+                class="text-xs text-muted-foreground motion-safe:animate-pulse"
+              >
+                {{ t("common.saving") }}
+              </p>
+            </div>
+            <Select
+              :model-value="defaultImportPathSelectValue"
+              :disabled="defaultImportPathSaving || paths.length === 0"
+              @update:model-value="onDefaultImportPathChange"
+            >
+              <SelectTrigger
+                size="sm"
+                class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-72 sm:shrink-0"
+                :aria-label="t('settings.defaultImportPathLabel')"
+              >
+                <SelectValue
+                  :placeholder="
+                    paths.length > 0
+                      ? t('settings.defaultImportPathPlaceholder')
+                      : t('settings.defaultImportPathNone')
+                  "
+                />
+              </SelectTrigger>
+              <SelectContent align="end" class="rounded-xl border-border/50">
+                <SelectItem
+                  v-for="path in paths"
+                  :key="`default-import-path-${path.id}`"
+                  class="rounded-lg"
+                  :value="path.id"
+                >
+                  <span class="flex min-w-0 flex-col gap-0.5">
+                    <span class="truncate text-sm">{{ path.title || path.path }}</span>
+                    <span class="truncate font-mono text-xs text-muted-foreground">
+                      {{ path.path }}
+                    </span>
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p v-if="defaultImportPathError" class="text-sm text-destructive" role="alert">
+            {{ defaultImportPathError }}
+          </p>
+
           <SettingsLibraryPathToolbar
             :batch-mode="batchMode"
             :library-paths-count="paths.length"

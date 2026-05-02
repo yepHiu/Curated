@@ -65,6 +65,14 @@ import {
   statusTextClass,
 } from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
+import {
+  listDailyWatchTime,
+  watchTimeRevision,
+} from "@/lib/playback-watch-time-storage"
+import {
+  createEmptyDailyWatchTimeSummary,
+  type DailyWatchTimeSummary,
+} from "@/lib/watch-time-heatmap"
 
 /** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
 const SETTINGS_CONTROL_H32_CLASS =
@@ -138,6 +146,9 @@ watch(activeSlug, (slug) => {
   if (slug === "about") {
     void ensureAboutHealthLoaded()
   }
+  if (slug === "overview") {
+    void loadWatchTimeSummary()
+  }
   void nextTick(() => scrollSettingsRootToTop())
   if (route.query.section !== slug) {
     router.replace({ query: { ...route.query, section: slug } }).catch(() => {})
@@ -176,6 +187,7 @@ const scanTaskTracker = useScanTaskTracker()
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
+const defaultImportLibraryPathId = computed(() => libraryService.defaultImportLibraryPathId.value)
 
 const addPathDialogOpen = ref(false)
 const removePathDialogOpen = ref(false)
@@ -216,6 +228,8 @@ const autoActorProfileScrapeSaving = ref(false)
 const autoActorProfileScrapeError = ref("")
 const launchAtLoginSaving = ref(false)
 const launchAtLoginError = ref("")
+const defaultImportPathSaving = ref(false)
+const defaultImportPathError = ref("")
 const curatedExportFormatSaving = ref(false)
 const curatedExportFormatError = ref("")
 const metadataMovieSaving = ref(false)
@@ -1107,6 +1121,35 @@ async function onMetadataMovieModeChain() {
 }
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
+const watchTimeSummary = ref<DailyWatchTimeSummary>(createEmptyDailyWatchTimeSummary())
+const watchTimeLoading = ref(false)
+const watchTimeError = ref("")
+let watchTimeLoadSeq = 0
+
+async function loadWatchTimeSummary() {
+  const seq = ++watchTimeLoadSeq
+  watchTimeLoading.value = true
+  watchTimeError.value = ""
+  try {
+    const summary = await listDailyWatchTime()
+    if (seq !== watchTimeLoadSeq) return
+    watchTimeSummary.value = summary
+  } catch (err) {
+    console.error("[settings] load watch time summary failed", err)
+    if (seq !== watchTimeLoadSeq) return
+    watchTimeError.value = t("settings.watchTimeError")
+  } finally {
+    if (seq === watchTimeLoadSeq) {
+      watchTimeLoading.value = false
+    }
+  }
+}
+
+watch(watchTimeRevision, () => {
+  if (activeSlug.value === "overview") {
+    void loadWatchTimeSummary()
+  }
+})
 
 /** 萃取帧：保存策略 */
 const curatedSaveMode = ref<CuratedFrameSaveMode>("app")
@@ -1222,6 +1265,7 @@ onMounted(async () => {
   syncMetadataMovieModeUiFromServer()
   initProviderChainDraft()
   syncProxyDraftFromService()
+  void loadWatchTimeSummary()
   let mode = getCuratedFrameSaveMode()
   if (mode === "directory" && !supportsFileSystemAccess()) {
     mode = "app"
@@ -1448,6 +1492,28 @@ async function onOrganizeLibraryChange(next: boolean) {
       organizeLibraryError.value = err.apiError.message
     } else {
       organizeLibraryError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
+async function onDefaultImportLibraryPathChange(next: string) {
+  if (!next || next === defaultImportLibraryPathId.value) return
+  defaultImportPathError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      defaultImportPathSaving.value = true
+      try {
+        await libraryService.setDefaultImportLibraryPathId(next)
+      } finally {
+        defaultImportPathSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] default import library path change failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      defaultImportPathError.value = err.apiError.message
+    } else {
+      defaultImportPathError.value = t("settings.defaultImportPathSaveError")
     }
   }
 }
@@ -1750,7 +1816,13 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navOverview')"
     >
     <h2 class="sr-only">{{ t("settings.navOverview") }}</h2>
-    <SettingsOverviewSection :dashboard-stats="dashboardStats" />
+    <SettingsOverviewSection
+      :dashboard-stats="dashboardStats"
+      :watch-time-days="watchTimeSummary.items"
+      :watch-time-summary="watchTimeSummary"
+      :watch-time-loading="watchTimeLoading"
+      :watch-time-error="watchTimeError"
+    />
     </section>
     </TabsContent>
 
@@ -1799,6 +1871,9 @@ async function runMetadataRefreshForSelected() {
         v-model:new-path-title="newPathTitle"
         :scan-feedback-error="scanFeedbackError"
         :paths="libraryPathsList"
+        :default-import-library-path-id="defaultImportLibraryPathId"
+        :default-import-path-saving="defaultImportPathSaving"
+        :default-import-path-error="defaultImportPathError"
         :batch-mode="libraryPathsBatchMode"
         :has-metadata-path-selection="hasMetadataPathSelection"
         :metadata-refresh-busy="metadataRefreshBusy"
@@ -1831,6 +1906,7 @@ async function runMetadataRefreshForSelected() {
         @edit="startEditLibraryTitle"
         @rescan="rescanPath($event.path)"
         @remove="openRemovePathConfirm"
+        @change-default-import-library-path="onDefaultImportLibraryPathChange"
         @clear-error="clearPathAddError"
         @browse="browseForDirectory"
         @submit="submitAddPath"

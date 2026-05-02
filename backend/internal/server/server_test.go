@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -23,6 +24,67 @@ import (
 	"curated-backend/internal/storage"
 	"curated-backend/internal/tasks"
 )
+
+func TestNewHTTPServerTimeoutsAllowLargeMovieImports(t *testing.T) {
+	t.Parallel()
+
+	srv := newHTTPServer("127.0.0.1:0", http.NewServeMux())
+	if srv.ReadTimeout != 0 {
+		t.Fatalf("ReadTimeout = %s, want 0 so large request bodies are not cut off", srv.ReadTimeout)
+	}
+	if srv.WriteTimeout != 0 {
+		t.Fatalf("WriteTimeout = %s, want 0 so long-running import responses are not cut off", srv.WriteTimeout)
+	}
+	if srv.ReadHeaderTimeout != 15*time.Second {
+		t.Fatalf("ReadHeaderTimeout = %s, want 15s", srv.ReadHeaderTimeout)
+	}
+	if srv.IdleTimeout != 60*time.Second {
+		t.Fatalf("IdleTimeout = %s, want 60s", srv.IdleTimeout)
+	}
+}
+
+func TestCORSAllowsResumableUploadChunkHeaders(t *testing.T) {
+	t.Parallel()
+
+	h := NewHandler(Deps{Logger: zap.NewNop()})
+	req := httptest.NewRequest(http.MethodOptions, "/api/import/movies/uploads/upload_1/files/file_1/chunks/0", nil)
+	rr := httptest.NewRecorder()
+
+	h.Routes().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rr.Code)
+	}
+	allowHeaders := rr.Header().Get("Access-Control-Allow-Headers")
+	for _, header := range []string{"Content-Type", "X-Curated-Offset", "X-Curated-Chunk-Size", "X-Curated-Chunk-SHA256"} {
+		if !strings.Contains(allowHeaders, header) {
+			t.Fatalf("Access-Control-Allow-Headers = %q, want %s", allowHeaders, header)
+		}
+	}
+}
+
+func TestImportTaskSnapshotThrottle(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(100, 0)
+	throttle := newImportTaskSnapshotThrottle(now, time.Second, 64*1024*1024)
+
+	if throttle.ShouldSave(now.Add(100*time.Millisecond), 256*1024, false) {
+		t.Fatal("small byte delta before interval should not save")
+	}
+	if !throttle.ShouldSave(now.Add(200*time.Millisecond), 64*1024*1024, false) {
+		t.Fatal("large byte delta should save")
+	}
+	if throttle.ShouldSave(now.Add(300*time.Millisecond), 64*1024*1024+256*1024, false) {
+		t.Fatal("small byte delta after recent save should not save")
+	}
+	if !throttle.ShouldSave(now.Add(1500*time.Millisecond), 64*1024*1024+512*1024, false) {
+		t.Fatal("elapsed interval should save even for a small byte delta")
+	}
+	if !throttle.ShouldSave(now.Add(1600*time.Millisecond), 64*1024*1024+512*1024, true) {
+		t.Fatal("forced save should always save")
+	}
+}
 
 // testMovieMetadataRefresher registers a scrape.movie task in tm without running a real scraper.
 type testMovieMetadataRefresher struct {

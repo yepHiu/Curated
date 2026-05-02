@@ -90,6 +90,24 @@ func (m *Manager) Complete(taskID, message string) contracts.TaskDTO {
 	})
 }
 
+// PartialFail marks a task as partially failed and shallow-merges diagnostic metadata.
+func (m *Manager) PartialFail(taskID, code, message string, patch map[string]any) contracts.TaskDTO {
+	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
+		task.Status = contracts.TaskPartialFailed
+		task.ErrorCode = code
+		task.ErrorMessage = message
+		task.Message = message
+		task.FinishedAt = nowUTC()
+		if task.Metadata == nil {
+			task.Metadata = map[string]any{}
+		}
+		for k, v := range patch {
+			task.Metadata[k] = v
+		}
+		return task
+	})
+}
+
 // Fail marks a task as failed with an error code, error message, and finish timestamp.
 func (m *Manager) Fail(taskID, code, message string) contracts.TaskDTO {
 	return m.update(taskID, func(task contracts.TaskDTO) contracts.TaskDTO {
@@ -146,8 +164,8 @@ func (m *Manager) ListRecentFinished(limit int) []contracts.TaskDTO {
 }
 
 const (
-	defaultTaskMaxAge  = 24 * time.Hour
-	maxInMemoryTasks   = 5000
+	defaultTaskMaxAge = 24 * time.Hour
+	maxInMemoryTasks  = 5000
 )
 
 // PurgeOldTasks removes terminal tasks whose FinishedAt is older than maxAge.
@@ -201,8 +219,12 @@ func (m *Manager) enforceCap() int {
 	}
 
 	slices.SortFunc(terminal, func(a, b entry) int {
-		if a.finishedAt < b.finishedAt { return -1 }
-		if a.finishedAt > b.finishedAt { return 1 }
+		if a.finishedAt < b.finishedAt {
+			return -1
+		}
+		if a.finishedAt > b.finishedAt {
+			return 1
+		}
 		return 0
 	})
 

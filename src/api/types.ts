@@ -146,6 +146,8 @@ export type CuratedFrameExportFormat = "jpg" | "webp" | "png"
 
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
+  /** Library path id used as the target for top-bar movie imports. Empty or missing means not configured. */
+  defaultImportLibraryPathId?: string
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
@@ -214,6 +216,7 @@ export interface PatchSettingsBody {
   autoActorProfileScrape?: boolean
   launchAtLogin?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
+  defaultImportLibraryPathId?: string
   player?: PatchPlayerSettingsBody
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string
@@ -246,6 +249,41 @@ export interface TaskDTO {
 
 export interface RecentTasksDTO {
   tasks: TaskDTO[]
+}
+
+export interface MovieImportUploadProgress {
+  loaded: number
+  total: number
+  percent: number
+}
+
+export interface MovieImportUploadFileManifest {
+  relativePath: string
+  size: number
+  lastModified?: number
+}
+
+export interface CreateMovieImportUploadBody {
+  files: MovieImportUploadFileManifest[]
+}
+
+export interface MovieImportUploadFileDTO {
+  fileId: string
+  relativePath: string
+  size: number
+  bytesReceived: number
+  complete: boolean
+}
+
+export interface MovieImportUploadDTO {
+  uploadId: string
+  targetPath: string
+  chunkSize: number
+  bytesReceived: number
+  totalBytes: number
+  state: string
+  files: MovieImportUploadFileDTO[]
+  task: TaskDTO
 }
 
 export interface ActorProfileDTO {
@@ -363,6 +401,27 @@ export interface PlaybackProgressItemDTO {
 
 export interface PlaybackProgressListDTO {
   items: PlaybackProgressItemDTO[]
+}
+
+/** GET /playback/watch-time/daily */
+export interface PlaybackWatchTimeDailyItemDTO {
+  dayKey: string
+  watchedSec: number
+}
+
+export interface PlaybackWatchTimeDailyListDTO {
+  items: PlaybackWatchTimeDailyItemDTO[]
+  totalWatchedSec: number
+  activeDays: number
+  maxDayWatchedSec: number
+  longestStreakDays: number
+}
+
+/** POST /playback/watch-time/daily */
+export interface AddPlaybackWatchTimeBody {
+  movieId: string
+  dayKey: string
+  watchedSec: number
 }
 
 /** Provider health status */

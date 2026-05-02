@@ -286,4 +286,24 @@ describe("PlayerPage loading states", () => {
       wrapper.unmount()
     }
   })
+
+  it("loads video media with anonymous CORS for direct backend playback streams", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "direct",
+      url: "http://127.0.0.1:8080/api/library/movies/movie-1/stream",
+      durationSec: 120,
+      canDirectPlay: true,
+    })
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+
+      expect(wrapper.get("video").attributes("crossorigin")).toBe("anonymous")
+    } finally {
+      wrapper.unmount()
+    }
+  })
 })

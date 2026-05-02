@@ -35,6 +35,7 @@ const moviesLoadedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const trashedMoviesState: Ref<Movie[]> = shallowRef([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
+const defaultImportLibraryPathIdState = ref("")
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
 /** 与后端默认一致：关，避免误触新库「首次扫描」扩展逻辑 */
@@ -73,6 +74,7 @@ let autoLibraryWatchSaveSeq = 0
 let autoActorProfileScrapeSaveSeq = 0
 let launchAtLoginSaveSeq = 0
 let curatedFrameExportFormatSaveSeq = 0
+let defaultImportLibraryPathSaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
@@ -327,6 +329,7 @@ async function refreshLibraryPathsFromApi() {
   try {
     const settings = await api.getSettings()
     libraryPathsState.value = mapLibraryPathsFromSettings(settings.libraryPaths)
+    defaultImportLibraryPathIdState.value = settings.defaultImportLibraryPathId?.trim() ?? ""
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
@@ -358,6 +361,7 @@ function createWebLibraryService(): LibraryService {
       return buildSettingsDashboardStats(moviesState.value, curatedFramesCountState.value, loc)
     }),
     libraryPaths: computed(() => libraryPathsState.value),
+    defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
@@ -739,6 +743,35 @@ function createWebLibraryService(): LibraryService {
 
     async revealLibraryPathInFileManager(id: string): Promise<void> {
       await api.revealLibraryPathInFileManager(id)
+    },
+
+    async setDefaultImportLibraryPathId(id: string) {
+      const nextId = id.trim()
+      const seq = ++defaultImportLibraryPathSaveSeq
+      defaultImportLibraryPathIdState.value = nextId
+      try {
+        const next = await api.patchSettings({ defaultImportLibraryPathId: nextId })
+        if (seq === defaultImportLibraryPathSaveSeq) {
+          defaultImportLibraryPathIdState.value = next.defaultImportLibraryPathId?.trim() ?? ""
+        }
+      } catch (err) {
+        if (seq === defaultImportLibraryPathSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async importMovies(files, options) {
+      const selected = files.filter((file) => file.size >= 0)
+      if (selected.length === 0) {
+        return null
+      }
+      return await api.importMovies(selected, options)
     },
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {

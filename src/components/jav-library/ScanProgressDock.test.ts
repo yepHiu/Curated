@@ -30,6 +30,15 @@ function scanTask(status: TaskDTO["status"], metadata?: Record<string, unknown>)
   }
 }
 
+function importTask(status: TaskDTO["status"], metadata?: Record<string, unknown>): TaskDTO {
+  return {
+    ...scanTask(status, metadata),
+    type: "import.movies",
+    progress: 62,
+    message: "Copying IMP-001.mp4",
+  }
+}
+
 async function mountDock() {
   const { default: ScanProgressDock } = await import("./ScanProgressDock.vue")
   return mount(ScanProgressDock, {
@@ -85,5 +94,26 @@ describe("ScanProgressDock", () => {
     const wrapper = await mountDock()
 
     expect(wrapper.text()).toContain("scan.statusLabel")
+  })
+
+  it("renders import progress metadata instead of scan counters", async () => {
+    trackerState.activeTask.value = importTask("running", {
+      currentFileName: "IMP-001.mp4",
+      completedFiles: 1,
+      totalFiles: 3,
+      failedFiles: 0,
+      copiedBytes: 1048576,
+      totalBytes: 2097152,
+    })
+    trackerState.pollError.value = null
+
+    const wrapper = await mountDock()
+
+    expect(wrapper.text()).toContain("import.scanning")
+    expect(wrapper.text()).toContain("import.currentFile")
+    expect(wrapper.text()).toContain("IMP-001.mp4")
+    expect(wrapper.text()).toContain("import.files")
+    expect(wrapper.text()).toContain("import.copiedBytes")
+    expect(wrapper.text()).not.toContain("scan.newItems")
   })
 })

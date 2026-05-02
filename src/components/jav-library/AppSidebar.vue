@@ -304,9 +304,13 @@ const getNavigationTarget = (page: AppPage) => {
     </div>
 
     <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
-      <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5 pr-2.5'">
+      <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5'">
         <template v-for="(section, sectionIndex) in sidebarSections" :key="section.key">
-          <section class="flex flex-col gap-2" :aria-label="section.title">
+          <section
+            class="flex flex-col gap-2"
+            :class="{ 'pr-2.5': !props.compact }"
+            :aria-label="section.title"
+          >
             <span
               class="overflow-hidden text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground transition-[opacity,max-height,padding] duration-200 motion-reduce:transition-none"
               :class="props.compact ? 'max-h-0 px-0 opacity-0' : 'max-h-8 px-2 opacity-100'"
@@ -349,7 +353,7 @@ const getNavigationTarget = (page: AppPage) => {
 
           <Separator
             v-if="sectionIndex === 0"
-            class="shrink-0 bg-sidebar-border/80"
+            class="my-2.5 shrink-0 bg-sidebar-border/80"
             :class="props.compact ? 'mx-auto w-10' : ''"
           />
         </template>
@@ -358,7 +362,7 @@ const getNavigationTarget = (page: AppPage) => {
 
     <Separator
       class="my-2.5 shrink-0 bg-sidebar-border/80"
-      :class="props.compact ? 'w-10' : ''"
+      :class="props.compact ? 'mx-auto w-10' : ''"
     />
 
     <section
@@ -436,7 +440,7 @@ const getNavigationTarget = (page: AppPage) => {
       class="mb-2 flex min-w-0 flex-col gap-2"
     >
       <div
-        class="flex min-w-0 items-center gap-2 rounded-2xl border border-border/50 bg-background/35 px-3 py-2"
+        class="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/45 px-3 py-2"
         role="status"
         :aria-label="backendAriaLabel"
         :aria-live="backendUseWebApi ? 'polite' : 'off'"

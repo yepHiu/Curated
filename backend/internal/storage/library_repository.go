@@ -334,6 +334,10 @@ func (s *SQLiteStore) lookupActors(ctx context.Context, movieIDs []string) (map[
 func (s *SQLiteStore) lookupTagsGrouped(ctx context.Context, movieIDs []string) (metadata map[string][]string, user map[string][]string, err error) {
 	metadata = make(map[string][]string, len(movieIDs))
 	user = make(map[string][]string, len(movieIDs))
+	for _, movieID := range movieIDs {
+		metadata[movieID] = []string{}
+		user[movieID] = []string{}
+	}
 	if len(movieIDs) == 0 {
 		return metadata, user, nil
 	}
@@ -414,6 +418,9 @@ func (s *SQLiteStore) lookupPreviewImageURLs(ctx context.Context, movieIDs []str
 
 func (s *SQLiteStore) lookupStringRelations(ctx context.Context, movieIDs []string, queryTemplate string) (map[string][]string, error) {
 	result := make(map[string][]string, len(movieIDs))
+	for _, movieID := range movieIDs {
+		result[movieID] = []string{}
+	}
 	if len(movieIDs) == 0 {
 		return result, nil
 	}

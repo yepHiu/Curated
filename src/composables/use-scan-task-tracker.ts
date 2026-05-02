@@ -9,6 +9,18 @@ function isFsnotifyLibraryScan(task: TaskDTO): boolean {
   return task.type === "scan.library" && task.metadata?.trigger === "fsnotify"
 }
 
+function taskMetaNumber(task: TaskDTO, key: string): number {
+  const value = task.metadata?.[key]
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === "string") {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
+}
+
 const POLL_MS = 500
 
 const libraryService = useLibraryService()
@@ -52,9 +64,9 @@ async function poll() {
     const t = await api.getTaskStatus(taskId)
     if (trackedTaskId !== taskId) return
     activeTask.value = t
-    if (isTerminalStatus(t.status)) {
-      stopPolling()
-      if (t.type === "scan.library") {
+      if (isTerminalStatus(t.status)) {
+        stopPolling()
+        if (t.type === "scan.library") {
         if (!isFsnotifyLibraryScan(t)) {
           const msg = t.message ?? ""
           const tr = i18n.global.t
@@ -62,7 +74,40 @@ async function poll() {
             t.status === "completed"
               ? tr("toasts.manualLibraryScanDone", { message: msg })
               : tr("toasts.manualLibraryScanFailed", { message: msg }),
+            {
+              variant: taskTerminalToastVariant(t.status),
+              notification: {
+                type: "scan",
+                title: t.status === "completed"
+                  ? tr("notificationCenter.titles.scanDone")
+                  : tr("notificationCenter.titles.scanFailed"),
+                source: { taskId: t.taskId },
+              },
+            },
+          )
+        }
+        void libraryService.reloadMoviesFromApi()
+      } else if (t.type === "import.movies") {
+        const tr = i18n.global.t
+        if (t.status === "completed") {
+          pushAppToast(
+            tr("toasts.movieImportDone", {
+              completed: taskMetaNumber(t, "completedFiles"),
+            }),
             { variant: taskTerminalToastVariant(t.status) },
+          )
+        } else if (t.status === "partial_failed") {
+          pushAppToast(
+            tr("toasts.movieImportPartial", {
+              completed: taskMetaNumber(t, "completedFiles"),
+              failed: taskMetaNumber(t, "failedFiles"),
+            }),
+            { variant: taskTerminalToastVariant(t.status), durationMs: 6500 },
+          )
+        } else if (t.status === "failed") {
+          pushAppToast(
+            tr("toasts.movieImportFailed", { message: t.errorMessage ?? t.message ?? "" }),
+            { variant: taskTerminalToastVariant(t.status), durationMs: 6500 },
           )
         }
         void libraryService.reloadMoviesFromApi()

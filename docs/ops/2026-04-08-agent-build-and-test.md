@@ -14,7 +14,7 @@
 | 前端工作目录 | **仓库根目录**（含 `package.json`、`vite.config.ts`） |
 | 后端工作目录 | **`backend/`**（Go 模块 `curated-backend`） |
 | Go 构建/模块缓存 | **默认使用** `go env GOCACHE`、`go env GOMODCACHE`（一般在用户目录）；**禁止**为跑测试而把缓存指到仓库内路径（见 §5.1） |
-| 联调端口 | 前端 Vite 常见 **5173**；后端开发 HTTP 常见 **8080**（`vite` 将 `/api` 代理到该端口） |
+| 联调端口 | 前端 Vite 常见 **5173**；后端开发 HTTP 常见 **8080**（`vite` 仍提供 `/api` 代理；本地 loopback Web API 开发态默认直连开发后端 `:8080`，避免大上传经过代理）；release 默认 **8081** 仍走同源 `/api` |
 | 环境变量 | 前端见根目录 `.env` / `.env.example`；联调常用 `VITE_USE_WEB_API=true` |
 
 **禁止（除非用户明确要求）**
@@ -59,7 +59,7 @@ pnpm install
 
 | 角色 | 工作目录 | 默认地址 | 说明 |
 |------|-----------|----------|------|
-| 后端 HTTP API | `backend/` | `http://127.0.0.1:8080` | `vite` 把前端的 `/api` 代理到此端口 |
+| 后端 HTTP API | `backend/` | `http://127.0.0.1:8080` | 本地 loopback Web API 开发态默认直连此开发端口；`vite` 仍把 `/api` 代理到此端口作为非 loopback / fallback 路径；release `:8081` 静态托管使用同源 `/api` |
 | 前端 Vite | 仓库根目录 | `http://127.0.0.1:5173` | 浏览器访问此地址 |
 
 **终端 1 — 后端**
@@ -84,7 +84,7 @@ pnpm dev
 **与后端真实联调（非 Mock）**
 
 1. 在仓库根目录 `.env` 中设置 **`VITE_USE_WEB_API=true`**（可参考 `.env.example`）。
-2. 确保后端已启动且端口与 **`vite.config.ts`** 里 `/api` 代理目标一致（默认 **`http://localhost:8080`**）。
+2. 确保后端已启动在默认 **`http://127.0.0.1:8080`**（本地 loopback Web API 开发态会直连该端口；非 loopback / fallback 仍由 **`vite.config.ts`** 里的 `/api` 代理转发）。
 3. 改 `.env` 后需**重启** `pnpm dev` 才会生效。
 
 **端口被占用时**：先结束占用 **5173** / **8080** 的旧进程，再重新启动前后端。

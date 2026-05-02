@@ -79,6 +79,9 @@ type App struct {
 	// curatedFrameExportFormat controls curated-frame export output format via Settings.
 	curatedFrameExportFormat   string
 	curatedFrameExportFormatMu sync.RWMutex
+	// defaultImportLibraryPathID controls where top-bar movie imports are copied.
+	defaultImportLibraryPathID   string
+	defaultImportLibraryPathIDMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapePendingMu sync.Mutex
@@ -165,6 +168,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
 		launchAtLogin:                 cfg.LaunchAtLogin,
 		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
+		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
 		autoActorProfileScrapePending: make(map[string]struct{}),
 		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
 		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
@@ -335,6 +339,13 @@ func (a *App) CuratedFrameExportFormat() string {
 	return config.NormalizeCuratedFrameExportFormat(a.curatedFrameExportFormat)
 }
 
+// DefaultImportLibraryPathID returns the configured library_paths row id used by movie import.
+func (a *App) DefaultImportLibraryPathID() string {
+	a.defaultImportLibraryPathIDMu.RLock()
+	defer a.defaultImportLibraryPathIDMu.RUnlock()
+	return strings.TrimSpace(a.defaultImportLibraryPathID)
+}
+
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
 func (a *App) SetAutoLibraryWatch(v bool) error {
 	path := a.librarySettingsPath
@@ -433,6 +444,26 @@ func (a *App) SetCuratedFrameExportFormat(v string) error {
 	a.curatedFrameExportFormat = next
 	a.cfg.CuratedFrameExportFormat = next
 	a.curatedFrameExportFormatMu.Unlock()
+	return nil
+}
+
+// SetDefaultImportLibraryPathID persists the default import destination library path id.
+func (a *App) SetDefaultImportLibraryPathID(id string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	id = strings.TrimSpace(id)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["defaultImportLibraryPathId"] = id
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.defaultImportLibraryPathIDMu.Lock()
+	a.defaultImportLibraryPathID = id
+	a.cfg.DefaultImportLibraryPathID = id
+	a.defaultImportLibraryPathIDMu.Unlock()
 	return nil
 }
 
@@ -1085,6 +1116,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 		p := a.Proxy()
 		settings := contracts.SettingsDTO{
 			LibraryPaths:               libraryPaths,
+			DefaultImportLibraryPathID: a.DefaultImportLibraryPathID(),
 			Player:                     a.PlayerSettings(),
 			OrganizeLibrary:            a.OrganizeLibrary(),
 			AutoLibraryWatch:           a.AutoLibraryWatch(),
@@ -2447,6 +2479,7 @@ func (a *App) HTTPHandler() http.Handler {
 		AutoActorProfileScrapeCtl:   a,
 		LaunchAtLoginCtl:            a,
 		CuratedFrameExportFormatCtl: a,
+		DefaultImportLibraryPathCtl: a,
 		MetadataScrapeCtl:           a,
 		ProviderHealthChecker:       a.scraper,
 		ProxyCtl:                    a,

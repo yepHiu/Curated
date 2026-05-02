@@ -8,6 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import SettingsWatchTimeHeatmap from "@/components/jav-library/settings/SettingsWatchTimeHeatmap.vue"
+import type {
+  DailyWatchTimeEntry,
+  DailyWatchTimeSummary,
+} from "@/lib/watch-time-heatmap"
 
 type DashboardStat = {
   labelKey: string
@@ -17,6 +22,10 @@ type DashboardStat = {
 
 defineProps<{
   dashboardStats: readonly DashboardStat[]
+  watchTimeDays?: readonly DailyWatchTimeEntry[]
+  watchTimeSummary?: DailyWatchTimeSummary | null
+  watchTimeLoading?: boolean
+  watchTimeError?: string
 }>()
 
 const { t } = useI18n()
@@ -56,5 +65,12 @@ const { t } = useI18n()
         </CardContent>
       </Card>
     </div>
+
+    <SettingsWatchTimeHeatmap
+      :days="watchTimeDays ?? []"
+      :summary="watchTimeSummary"
+      :loading="watchTimeLoading"
+      :error="watchTimeError"
+    />
   </div>
 </template>
