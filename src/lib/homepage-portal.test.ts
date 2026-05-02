@@ -191,4 +191,27 @@ describe("buildHomepagePortalModel", () => {
     expect(model.heroMovies.map((movie) => movie.id)).toEqual(["m4", "m2", "m8", "m1"])
     expect(model.recommendations.map((entry) => entry.movie.id)).toEqual(["m9", "m6", "m5"])
   })
+
+  it("treats malformed null daily recommendation ids as an empty selection", () => {
+    const movies = Array.from({ length: 10 }, (_, index) =>
+      makeMovie(`m${index + 1}`, {
+        rating: 5 - index * 0.1,
+      }),
+    )
+
+    const model = buildHomepagePortalModel({
+      movies,
+      daySeed: "2026-04-15",
+      heroLimit: 4,
+      recommendationLimit: 2,
+      dailyRecommendations: {
+        heroMovieIds: ["m4", "m2", "m1", "m3"],
+        recommendationMovieIds: null,
+      } as unknown as Parameters<typeof buildHomepagePortalModel>[0]["dailyRecommendations"],
+    })
+
+    expect(model.heroMovies.map((movie) => movie.id)).toEqual(["m4", "m2", "m1", "m3"])
+    expect(model.recommendations.length).toBeGreaterThan(0)
+    expect(model.recommendations.some((entry) => entry.movie.id === "m4")).toBe(false)
+  })
 })

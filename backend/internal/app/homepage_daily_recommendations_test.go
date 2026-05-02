@@ -187,6 +187,34 @@ func TestGetOrCreateHomepageDailyRecommendationsRegeneratesStaleGenerationVersio
 	}
 }
 
+func TestGetOrCreateHomepageDailyRecommendationsReturnsEmptyArraysForCachedSnapshot(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 6)
+	if err := fixture.store.UpsertHomepageDailyRecommendationSnapshot(ctx, storage.HomepageDailyRecommendationSnapshot{
+		DateUTC:                "2026-04-15",
+		HeroMovieIDs:           []string{"m01", "m02", "m03", "m04", "m05", "m06"},
+		RecommendationMovieIDs: []string{},
+		GeneratedAt:            "2026-04-15T00:00:00Z",
+		GenerationVersion:      homepageDailyRecommendationGenerationVersion,
+	}); err != nil {
+		t.Fatalf("UpsertHomepageDailyRecommendationSnapshot() error = %v", err)
+	}
+
+	dto, err := fixture.app.GetOrCreateHomepageDailyRecommendations(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetOrCreateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	if dto.RecommendationMovieIDs == nil {
+		t.Fatal("RecommendationMovieIDs is nil, want empty non-nil slice")
+	}
+	if len(dto.RecommendationMovieIDs) != 0 {
+		t.Fatalf("len(RecommendationMovieIDs) = %d, want 0", len(dto.RecommendationMovieIDs))
+	}
+}
+
 func TestRegenerateHomepageDailyRecommendationsPreservesRequestedHeroMovieIDs(t *testing.T) {
 	t.Parallel()
 

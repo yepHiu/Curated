@@ -60,19 +60,20 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 	if snapshot, ok, err := a.store.GetHomepageDailyRecommendationSnapshot(ctx, dateUTC); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	} else if ok && snapshot.GenerationVersion == homepageDailyRecommendationGenerationVersion {
-		return contracts.HomepageDailyRecommendationsDTO{
+		return normalizeHomepageDailyRecommendationsDTOArrays(contracts.HomepageDailyRecommendationsDTO{
 			DateUTC:                snapshot.DateUTC,
 			GeneratedAt:            snapshot.GeneratedAt,
 			GenerationVersion:      snapshot.GenerationVersion,
-			HeroMovieIDs:           append([]string(nil), snapshot.HeroMovieIDs...),
-			RecommendationMovieIDs: append([]string(nil), snapshot.RecommendationMovieIDs...),
-		}, nil
+			HeroMovieIDs:           snapshot.HeroMovieIDs,
+			RecommendationMovieIDs: snapshot.RecommendationMovieIDs,
+		}), nil
 	}
 
 	dto, err := a.generateHomepageDailyRecommendations(ctx, dateUTC)
 	if err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
+	dto = normalizeHomepageDailyRecommendationsDTOArrays(dto)
 
 	if err := a.store.UpsertHomepageDailyRecommendationSnapshot(ctx, storage.HomepageDailyRecommendationSnapshot{
 		DateUTC:                dto.DateUTC,
@@ -101,6 +102,7 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 	dto = applyHomepageDailyRefreshOptions(dto, options...)
+	dto = normalizeHomepageDailyRecommendationsDTOArrays(dto)
 
 	if err := a.store.UpsertHomepageDailyRecommendationSnapshot(ctx, storage.HomepageDailyRecommendationSnapshot{
 		DateUTC:                dto.DateUTC,
@@ -116,6 +118,19 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	}
 
 	return dto, nil
+}
+
+func normalizeHomepageDailyRecommendationsDTOArrays(dto contracts.HomepageDailyRecommendationsDTO) contracts.HomepageDailyRecommendationsDTO {
+	dto.HeroMovieIDs = cloneHomepageMovieIDs(dto.HeroMovieIDs)
+	dto.RecommendationMovieIDs = cloneHomepageMovieIDs(dto.RecommendationMovieIDs)
+	return dto
+}
+
+func cloneHomepageMovieIDs(movieIDs []string) []string {
+	if len(movieIDs) == 0 {
+		return []string{}
+	}
+	return append([]string(nil), movieIDs...)
 }
 
 func applyHomepageDailyRefreshOptions(

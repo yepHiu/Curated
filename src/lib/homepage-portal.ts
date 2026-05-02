@@ -48,8 +48,8 @@ export interface BuildHomepagePortalInput {
 }
 
 export interface HomepageDailyRecommendationsSelection {
-  heroMovieIds: readonly string[]
-  recommendationMovieIds: readonly string[]
+  heroMovieIds?: readonly string[] | null
+  recommendationMovieIds?: readonly string[] | null
 }
 
 function stableDateSeed(daySeed?: string): string {
@@ -195,6 +195,10 @@ function pickMoviesBySnapshotIds(
   return ordered
 }
 
+function snapshotIdsOrEmpty(ids: readonly string[] | null | undefined): readonly string[] {
+  return Array.isArray(ids) ? ids : []
+}
+
 function withHomepageDailyRecommendations(
   model: HomepagePortalModel,
   activeMovies: readonly Movie[],
@@ -205,15 +209,17 @@ function withHomepageDailyRecommendations(
   }
 
   const movieById = new Map(activeMovies.map((movie) => [movie.id, movie] as const))
+  const selectionHeroMovieIds = snapshotIdsOrEmpty(selection.heroMovieIds)
+  const selectionRecommendationMovieIds = snapshotIdsOrEmpty(selection.recommendationMovieIds)
   const selectedHeroIds = new Set<string>()
   const heroMovies = pickMoviesBySnapshotIds(
-    selection.heroMovieIds,
+    selectionHeroMovieIds,
     movieById,
     model.heroMovies.length,
     selectedHeroIds,
   )
 
-  if (heroMovies.length === 0 && selection.heroMovieIds.length > 0) {
+  if (heroMovies.length === 0 && selectionHeroMovieIds.length > 0) {
     heroMovies.push(...model.heroMovies)
     for (const movie of model.heroMovies) {
       selectedHeroIds.add(movie.id)
@@ -229,7 +235,7 @@ function withHomepageDailyRecommendations(
 
   const selectedRecommendationIds = new Set(selectedHeroIds)
   const recommendationMovies = pickMoviesBySnapshotIds(
-    selection.recommendationMovieIds,
+    selectionRecommendationMovieIds,
     movieById,
     model.recommendations.length,
     selectedRecommendationIds,
@@ -246,7 +252,7 @@ function withHomepageDailyRecommendations(
     }
   ))
 
-  if (recommendations.length === 0 && selection.recommendationMovieIds.length > 0) {
+  if (recommendations.length === 0 && selectionRecommendationMovieIds.length > 0) {
     recommendations.push(...model.recommendations)
   } else {
     for (const entry of model.recommendations) {
