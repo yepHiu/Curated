@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { ref } from "vue"
 import {
   formatImmersiveSeekFeedbackLabel,
+  formatImmersiveVolumeFeedbackLabel,
   usePlayerImmersiveChrome,
 } from "@/lib/player-immersive-chrome"
 
@@ -10,6 +11,13 @@ describe("player immersive chrome", () => {
     expect(formatImmersiveSeekFeedbackLabel(10)).toBe("+10s")
     expect(formatImmersiveSeekFeedbackLabel(-7)).toBe("-7s")
     expect(formatImmersiveSeekFeedbackLabel(0)).toBe("+0s")
+  })
+
+  it("formats compact volume feedback labels", () => {
+    expect(formatImmersiveVolumeFeedbackLabel(55)).toBe("55%")
+    expect(formatImmersiveVolumeFeedbackLabel(100.4)).toBe("100%")
+    expect(formatImmersiveVolumeFeedbackLabel(-8)).toBe("0%")
+    expect(formatImmersiveVolumeFeedbackLabel(140)).toBe("100%")
   })
 
   it("hides chrome after page idle while playback is active", () => {
@@ -55,9 +63,11 @@ describe("player immersive chrome", () => {
 
     immersiveChrome.showSeekFeedback(-10)
     expect(immersiveChrome.chromeVisible.value).toBe(false)
-    expect(immersiveChrome.feedback.value?.kind).toBe("seek")
-    expect(immersiveChrome.feedback.value?.label).toBe("-10s")
-    expect(immersiveChrome.feedback.value?.direction).toBe("backward")
+    expect(immersiveChrome.feedback.value).toMatchObject({
+      kind: "seek",
+      label: "-10s",
+      direction: "backward",
+    })
 
     vi.advanceTimersByTime(649)
     expect(immersiveChrome.feedback.value?.label).toBe("-10s")
@@ -93,6 +103,70 @@ describe("player immersive chrome", () => {
 
     vi.advanceTimersByTime(650)
     expect(immersiveChrome.feedback.value).toBeNull()
+
+    immersiveChrome.dispose()
+    vi.useRealTimers()
+  })
+
+  it("keeps chrome hidden while showing transient playback feedback", () => {
+    vi.useFakeTimers()
+
+    const hasPlayback = ref(true)
+    const isPlaying = ref(true)
+    const immersiveChrome = usePlayerImmersiveChrome({
+      hasPlayback,
+      isPlaying,
+      hideDelayMs: 5000,
+      feedbackDurationMs: 650,
+    })
+
+    immersiveChrome.onPageMouseMove()
+    vi.advanceTimersByTime(5000)
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
+
+    immersiveChrome.showPlaybackFeedback("pause", "Paused")
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
+    expect(immersiveChrome.feedback.value).toMatchObject({
+      kind: "playback",
+      label: "Paused",
+      action: "pause",
+    })
+
+    vi.advanceTimersByTime(650)
+    expect(immersiveChrome.feedback.value).toBeNull()
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
+
+    immersiveChrome.dispose()
+    vi.useRealTimers()
+  })
+
+  it("keeps chrome hidden while showing transient volume feedback", () => {
+    vi.useFakeTimers()
+
+    const hasPlayback = ref(true)
+    const isPlaying = ref(true)
+    const immersiveChrome = usePlayerImmersiveChrome({
+      hasPlayback,
+      isPlaying,
+      hideDelayMs: 5000,
+      feedbackDurationMs: 650,
+    })
+
+    immersiveChrome.onPageMouseMove()
+    vi.advanceTimersByTime(5000)
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
+
+    immersiveChrome.showVolumeFeedback(42)
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
+    expect(immersiveChrome.feedback.value).toMatchObject({
+      kind: "volume",
+      label: "42%",
+      volumePercent: 42,
+    })
+
+    vi.advanceTimersByTime(650)
+    expect(immersiveChrome.feedback.value).toBeNull()
+    expect(immersiveChrome.chromeVisible.value).toBe(false)
 
     immersiveChrome.dispose()
     vi.useRealTimers()

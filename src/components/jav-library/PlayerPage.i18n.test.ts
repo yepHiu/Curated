@@ -9,4 +9,9 @@ describe("PlayerPage i18n", () => {
     expect(source).not.toContain("隐藏详细统计信息")
     expect(source).not.toContain('"详细统计信息"')
   })
+
+  it("uses locale keys for immersive playback feedback labels", () => {
+    expect(source).toMatch(/t\(["']player\.feedbackPlay["']\)/)
+    expect(source).toMatch(/t\(["']player\.feedbackPause["']\)/)
+  })
 })

@@ -7,6 +7,8 @@ describe("PlayerPage gamepad integration", () => {
     expect(source).toContain("togglePlayPause")
     expect(source).toContain("seekDelta")
     expect(source).toContain("adjustVolume")
+    expect(source).toContain("showPlaybackFeedback")
+    expect(source).toContain("showVolumeFeedback")
     expect(source).toContain("runCuratedCapture")
     expect(source).toContain("resolveNavigationBackLink")
     expect(source).toContain("useGamepadControlsPreference")

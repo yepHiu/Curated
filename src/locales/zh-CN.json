@@ -799,6 +799,8 @@
     "playStartError": "无法开始播放（浏览器可能阻止自动播放，请再试一次）。",
     "curatedCaptureErrorPrefix": "无法写入",
     "curatedLabel": "Curated",
+    "feedbackPlay": "\u7ee7\u7eed\u64ad\u653e",
+    "feedbackPause": "\u5df2\u6682\u505c",
     "ariaCurated": "萃取当前帧",
     "errFileMissing": "无法播放该视频，请检查文件是否存在或已被移动。",
     "errGeneric": "播放出错，请稍后重试。",

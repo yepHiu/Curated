@@ -41,6 +41,8 @@ const requiredLocaleKeys = [
   "preview.previous",
   "preview.next",
   "preview.imageOf",
+  "player.feedbackPlay",
+  "player.feedbackPause",
   "player.hideStats",
   "player.showStats",
 ]

@@ -799,6 +799,8 @@
     "playStartError": "Playback could not start (autoplay blocked—try again).",
     "curatedCaptureErrorPrefix": "Could not save",
     "curatedLabel": "Curated",
+    "feedbackPlay": "Playing",
+    "feedbackPause": "Paused",
     "ariaCurated": "Capture current frame (Curated)",
     "errFileMissing": "Cannot play this video. Check that the file exists and was not moved.",
     "errGeneric": "Playback error. Try again later.",

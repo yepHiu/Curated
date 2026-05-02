@@ -295,6 +295,20 @@ const immersiveFeedback = immersiveChrome.feedback
 const scheduleChromeIdleHide = immersiveChrome.scheduleChromeIdleHide
 const clearIdleHideTimer = immersiveChrome.clearIdleHideTimer
 
+function resolvePlaybackFeedbackLabel(action: "play" | "pause") {
+  return action === "play" ? t("player.feedbackPlay") : t("player.feedbackPause")
+}
+
+function showPlaybackFeedbackIfChromeHidden(action: "play" | "pause") {
+  if (chromeVisible.value) return
+  immersiveChrome.showPlaybackFeedback(action, resolvePlaybackFeedbackLabel(action))
+}
+
+function showVolumeFeedbackIfChromeHidden(percent: number) {
+  if (chromeVisible.value) return
+  immersiveChrome.showVolumeFeedback(percent)
+}
+
 const CHROME_LAYER_TRANSITION =
   "transition-opacity duration-300 ease-out motion-reduce:transition-none"
 
@@ -1178,16 +1192,21 @@ async function togglePlayPause() {
           forceSessionSwap: true,
           resumeAfterSwap: true,
         })
+        showPlaybackFeedbackIfChromeHidden("play")
         return
       }
       autoplayConsumedForMovieId.value = props.movie.id
       resumePlaybackWhenReady = true
       const started = await tryStartPlaybackIfRequested()
+      if (started) {
+        showPlaybackFeedbackIfChromeHidden("play")
+      }
       if (!started && resumePlaybackWhenReady) {
         isPlaybackWaiting.value = true
       }
     } else {
       v.pause()
+      showPlaybackFeedbackIfChromeHidden("pause")
     }
   } catch {
     playbackError.value = t("player.playStartError")
@@ -1321,6 +1340,7 @@ function adjustVolume(delta: number) {
   const cur = volume.value[0] ?? 100
   const next = Math.max(0, Math.min(100, Math.round(cur + delta)))
   onVolumeSlider([next])
+  showVolumeFeedbackIfChromeHidden(next)
 }
 
 async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
@@ -2283,8 +2303,28 @@ const videoPreloadMode = computed(() =>
               class="size-4"
               aria-hidden="true"
             />
+            <Pause
+              v-else-if="immersiveFeedback.kind === 'playback' && immersiveFeedback.action === 'pause'"
+              class="size-4"
+              aria-hidden="true"
+            />
+            <Play
+              v-else-if="immersiveFeedback.kind === 'playback'"
+              class="size-4"
+              aria-hidden="true"
+            />
+            <VolumeX
+              v-else-if="immersiveFeedback.kind === 'volume' && immersiveFeedback.volumePercent <= 0"
+              class="size-4"
+              aria-hidden="true"
+            />
+            <Volume2
+              v-else-if="immersiveFeedback.kind === 'volume'"
+              class="size-4"
+              aria-hidden="true"
+            />
             <span
-              :class="immersiveFeedback.kind === 'seek' ? 'tabular-nums' : ''"
+              :class="immersiveFeedback.kind === 'seek' || immersiveFeedback.kind === 'volume' ? 'tabular-nums' : ''"
             >{{ immersiveFeedback.label }}</span>
           </div>
         </div>

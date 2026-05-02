@@ -1,14 +1,40 @@
 import { ref, watch, type Ref } from "vue"
 
-export type ImmersiveChromeFeedback = {
-  kind: "seek" | "curated"
-  label: string
-  direction?: "backward" | "forward"
-}
+export type ImmersiveChromePlaybackAction = "play" | "pause"
+
+export type ImmersiveChromeFeedback =
+  | {
+      kind: "seek"
+      label: string
+      direction: "backward" | "forward"
+    }
+  | {
+      kind: "curated"
+      label: string
+    }
+  | {
+      kind: "playback"
+      label: string
+      action: ImmersiveChromePlaybackAction
+    }
+  | {
+      kind: "volume"
+      label: string
+      volumePercent: number
+    }
 
 export function formatImmersiveSeekFeedbackLabel(deltaSec: number): string {
   const rounded = Math.max(0, Math.round(Math.abs(deltaSec)))
   return `${deltaSec < 0 ? "-" : "+"}${rounded}s`
+}
+
+function clampImmersiveVolumePercent(percent: number): number {
+  if (!Number.isFinite(percent)) return 0
+  return Math.max(0, Math.min(100, Math.round(percent)))
+}
+
+export function formatImmersiveVolumeFeedbackLabel(percent: number): string {
+  return `${clampImmersiveVolumePercent(percent)}%`
 }
 
 export function usePlayerImmersiveChrome(options: {
@@ -95,6 +121,28 @@ export function usePlayerImmersiveChrome(options: {
     })
   }
 
+  function showPlaybackFeedback(action: ImmersiveChromePlaybackAction, label: string) {
+    const normalized = label.trim()
+    if (!normalized) return
+
+    showFeedback({
+      kind: "playback",
+      action,
+      label: normalized,
+    })
+  }
+
+  function showVolumeFeedback(percent: number) {
+    if (!Number.isFinite(percent)) return
+
+    const volumePercent = clampImmersiveVolumePercent(percent)
+    showFeedback({
+      kind: "volume",
+      label: formatImmersiveVolumeFeedbackLabel(volumePercent),
+      volumePercent,
+    })
+  }
+
   function dispose() {
     clearIdleHideTimer()
     clearFeedbackTimer()
@@ -128,6 +176,8 @@ export function usePlayerImmersiveChrome(options: {
     showFeedback,
     showSeekFeedback,
     showCuratedFeedback,
+    showPlaybackFeedback,
+    showVolumeFeedback,
     dispose,
   }
 }
