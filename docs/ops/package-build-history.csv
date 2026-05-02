@@ -86,3 +86,81 @@ e11161db docs(ui): add display scaling checklist
 9ab3b9e3 fix(frontend): keep native player optional behind services
 45b04287 chore(dev): add Curated dev start skill
 1b932bd0 chore(release): prepare 1.3.3 package",versionSource=auto-patch; BuildStamp=20260428.180530; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-02,1.4.1,dca2e846,feature/settings-watch-time-heatmap,release:publish,release/portable/Curated-1.4.1-windows-x64.zip; release/installer/Curated-Setup-1.4.1.exe; release/manifest/release.json,成功,wujiahui,"dca2e846 docs(plan): add May feature planning notes
+b17ae9f9 feat: add movie import and watch time insights
+36e04b0e fix(release): align packaging preview history path
+b83e5d69 test: normalize render hint source line endings
+37c1f71e merge: frontend optimization 20260501
+76027dbc perf: improve library first-load caching
+5c61862d feat(frontend): add active playback sidebar return
+4bcd4313 docs: plan active playback sidebar return
+d47282b0 perf(frontend): smooth detail image loading
+8cbc80f7 refactor(frontend): extract curated frame empty states
+1799bdfe refactor(frontend): extract curated frame delete dialog
+dd51ad89 refactor(frontend): extract curated frame toolbar
+fb78ade6 refactor(frontend): extract curated frame tag filter
+bec5b071 refactor(frontend): extract curated frame timeline tab
+58618767 refactor(frontend): extract curated frame movies tab
+7566f22d refactor(frontend): extract curated frame actors tab
+7fbf0e16 refactor(frontend): extract curated frame grid
+1443ab77 refactor(frontend): extract curated frame card
+ab392fb1 refactor(frontend): extract curated actor selection reconciliation
+331cd716 refactor(frontend): extract curated frame selection reducer
+92a0752c refactor(frontend): extract player stats reducers
+e376631c refactor(frontend): extract player timeline helpers
+b15ec8a9 refactor(frontend): extract player stats format helpers
+8b9e9341 refactor(frontend): extract settings metadata section
+6653de93 refactor(frontend): extract settings library paths section
+ba59c4d0 refactor(frontend): extract settings library path list
+aea39603 refactor(frontend): extract settings library path toolbar
+31d58d0e refactor(frontend): extract settings library path add dialog
+66ba0edc refactor(frontend): extract settings library path remove dialog
+e568a33f refactor(frontend): extract settings metadata trigger scrape
+2b0dadee refactor(frontend): extract settings metadata provider chain
+46fc8175 refactor(frontend): extract settings metadata provider select
+40ea74d7 refactor(frontend): extract settings metadata mode
+0b56b294 refactor(frontend): extract settings metadata automation
+396a1620 refactor(frontend): extract settings network section
+e9ff809d refactor(frontend): extract settings curated section
+2928d28f refactor(frontend): extract settings organize section
+4a8e191e refactor(frontend): extract settings general section
+9f5c3dec refactor(frontend): extract settings overview section
+def44dad refactor(frontend): extract settings about section
+6aa9c8f5 refactor(frontend): extract settings maintenance section
+d00660cb perf(frontend): debounce homepage portal updates
+2b081ea5 fix(frontend): align mock service error shapes
+46386c06 refactor(frontend): route library components through service
+0f5e767c docs(backend): add godoc comments to all packages
+e881b616 feat(api): validate critical response shapes
+98e8eea8 test(frontend): cover remaining playback and curated edges
+ccf1f548 test(detail): cover detail and history flows
+b9aa597d test(player): cover playback target selection
+a5c61641 fix(mock-library): align detail lookup behavior
+eadbe885 test(player): cover route boundaries
+9b9a61b8 test(web-library): cover settings recovery
+d393fa59 test(web-library): cover cache short circuits
+f57c49a1 test(web-library): cover trash mutations
+1d5a2f17 fix(i18n): localize player stats labels
+62d86411 fix(i18n): localize preview viewer labels
+005a7e2f fix(i18n): localize expandable text defaults
+89074b82 fix(i18n): localize rating labels
+e6ce72c9 fix(i18n): localize scan progress dock
+6d9f0e9a fix(i18n): localize directory picker hints
+9154598b test(web-library): cover patch detail paths
+93b87382 fix(i18n): localize player view states
+f62247ca test(update): cover app update composable
+0445f68d test(health): cover backend health composable
+7ef75b85 test(player): cover player view states
+cdd9cbb9 perf(frontend): use shallow refs for large state
+735d9edb test(web-library): cover mutation and reload paths
+8bf6b27a test(web-library): cover loading cache paths
+6134d2a3 fix(library): surface frontend operation failures
+aff6586e fix(app): add root error boundary
+b952d7a5 docs(frontend): add optimization review plan
+2ba463e5 chore(lint): ignore local workspace dirs
+59d12c70 fix(i18n): align curated frame locale keys
+1901e34d fix(player): reject unsafe launch protocols
+5f2b66d9 fix(playback): validate progress cache
+86c449a7 fix(scan): clean up task tracker polling
+2ee92cda fix(api): add client request timeout
+def4e00e chore(release): prepare 1.3.4 package",versionSource=auto-patch; BuildStamp=20260502.093720; portable=versionSource=explicit; installer=versionSource=explicit
