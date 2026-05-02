@@ -53,14 +53,14 @@ describe("gamepad input utilities", () => {
   })
 
   it("detects dual-rumble support without throwing for missing browser capabilities", () => {
-    const unsupported = {} as Gamepad
+    const unsupported = {}
     expect(supportsDualRumble(unsupported)).toBe(false)
 
     const supported = {
       vibrationActuator: {
         playEffect: () => Promise.resolve("complete" as GamepadHapticsResult),
       },
-    } as Gamepad
+    }
     expect(supportsDualRumble(supported)).toBe(true)
   })
 })

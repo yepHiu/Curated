@@ -22,6 +22,15 @@ export interface RepeatGate {
   reset(direction?: GamepadDirection): void
 }
 
+export type DualRumbleGamepad = Gamepad & {
+  vibrationActuator: {
+    playEffect: (
+      type: "dual-rumble",
+      params?: GamepadEffectParameters,
+    ) => Promise<GamepadHapticsResult>
+  }
+}
+
 export function applyDeadzone(
   value: number,
   threshold = DEFAULT_GAMEPAD_DEADZONE,
@@ -107,8 +116,7 @@ export function createRepeatGate(options: RepeatGateOptions): RepeatGate {
   }
 }
 
-export function supportsDualRumble(gamepad: Gamepad | null | undefined): boolean {
-  const actuator = (gamepad as { vibrationActuator?: { playEffect?: unknown } } | null | undefined)
-    ?.vibrationActuator
+export function supportsDualRumble(gamepad: unknown): gamepad is DualRumbleGamepad {
+  const actuator = (gamepad as Partial<DualRumbleGamepad> | null | undefined)?.vibrationActuator
   return typeof actuator?.playEffect === "function"
 }
