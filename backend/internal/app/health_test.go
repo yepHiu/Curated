@@ -14,8 +14,6 @@ import (
 )
 
 func TestHandleCommand_SystemHealthIncludesInstallerVersion(t *testing.T) {
-	t.Parallel()
-
 	prev := version.InstallerVersion
 	version.InstallerVersion = "1.1.3"
 	t.Cleanup(func() {
@@ -61,8 +59,6 @@ func TestHandleCommand_SystemHealthIncludesInstallerVersion(t *testing.T) {
 }
 
 func TestHandleCommand_SystemHealthUsesDevFallbackInstallerVersion(t *testing.T) {
-	t.Parallel()
-
 	prev := version.InstallerVersion
 	version.InstallerVersion = ""
 	t.Cleanup(func() {
