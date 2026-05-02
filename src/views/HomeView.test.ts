@@ -273,8 +273,8 @@ describe("HomeView", () => {
     const refreshButton = wrapper.get("[data-home-refresh-recommendations]")
     const loadingIcon = refreshButton.get("svg")
 
-    expect(loadingIcon.classes()).toContain("animate-spin")
-    expect(loadingIcon.classes()).toContain("[animation-duration:1.25s]")
+    expect(loadingIcon.classes()).toContain("motion-safe:animate-spin")
+    expect(loadingIcon.attributes("style")).toContain("animation-duration: 4s")
   })
 
   it("debounces portal model rebuilds caused only by playback progress revision changes", async () => {
