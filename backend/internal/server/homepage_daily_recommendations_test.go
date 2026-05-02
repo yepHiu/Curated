@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 
 	"go.uber.org/zap"
@@ -24,10 +26,13 @@ func (s stubHomepageRecommendationsProvider) GetOrCreateHomepageDailyRecommendat
 	return s.dto, nil
 }
 
-func (s stubHomepageRecommendationsProvider) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
+func (s stubHomepageRecommendationsProvider) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string, options ...contracts.HomepageDailyRecommendationsRefreshOptions) (contracts.HomepageDailyRecommendationsDTO, error) {
 	_ = ctx
 	_ = dateUTC
 	s.forcedCount++
+	if len(options) > 0 && len(options[0].PreserveHeroMovieIDs) > 0 {
+		s.dto.HeroMovieIDs = append([]string(nil), options[0].PreserveHeroMovieIDs...)
+	}
 	return s.dto, nil
 }
 
@@ -73,6 +78,56 @@ func TestHomepageRecommendationsReturnsPersistedSnapshot(t *testing.T) {
 	}
 	if len(dto.Hero) != 8 || len(dto.Reco) != 6 {
 		t.Fatalf("hero=%d reco=%d", len(dto.Hero), len(dto.Reco))
+	}
+}
+
+func TestHomepageRecommendationsRefreshCanPreserveHeroMovieIDs(t *testing.T) {
+	t.Parallel()
+
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		HomepageRecommendations: stubHomepageRecommendationsProvider{
+			dto: contracts.HomepageDailyRecommendationsDTO{
+				DateUTC:                "2026-04-16",
+				GeneratedAt:            "2026-04-16T00:00:00Z",
+				GenerationVersion:      "v3",
+				HeroMovieIDs:           []string{"m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08"},
+				RecommendationMovieIDs: []string{"m09", "m10", "m11", "m12", "m13", "m14"},
+			},
+		},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		srv.URL+"/api/homepage/recommendations/refresh",
+		strings.NewReader(`{"preserveHeroMovieIds":["hero-old-1","hero-old-2"]}`),
+	)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST homepage recommendations refresh: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+
+	var dto struct {
+		Hero []string `json:"heroMovieIds"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !reflect.DeepEqual(dto.Hero, []string{"hero-old-1", "hero-old-2"}) {
+		t.Fatalf("HeroMovieIDs = %#v, want preserved hero ids", dto.Hero)
 	}
 }
 

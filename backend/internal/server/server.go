@@ -162,7 +162,7 @@ type NativePlaybackLauncher interface {
 // HomepageRecommendationsProvider generates and persists daily UTC-day homepage recommendation snapshots.
 type HomepageRecommendationsProvider interface {
 	GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
-	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error)
+	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string, options ...contracts.HomepageDailyRecommendationsRefreshOptions) (contracts.HomepageDailyRecommendationsDTO, error)
 }
 
 // AppUpdateProvider checks and returns packaged-app update status from GitHub Releases.

@@ -604,3 +604,7 @@ export interface HomepageDailyRecommendationsDTO {
   heroMovieIds: string[]
   recommendationMovieIds: string[]
 }
+
+export interface RefreshHomepageDailyRecommendationsBody {
+  preserveHeroMovieIds?: string[]
+}

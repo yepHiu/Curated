@@ -41,6 +41,7 @@ import type {
   DevPerformanceSummaryDTO,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  RefreshHomepageDailyRecommendationsBody,
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListActorsParams,
@@ -242,8 +243,10 @@ export const api = {
     return httpClient.get<HomepageDailyRecommendationsDTO>("/homepage/recommendations")
   },
 
-  refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
-    return httpClient.post<HomepageDailyRecommendationsDTO>("/homepage/recommendations/refresh")
+  refreshHomepageDailyRecommendations(
+    body?: RefreshHomepageDailyRecommendationsBody,
+  ): Promise<HomepageDailyRecommendationsDTO> {
+    return httpClient.post<HomepageDailyRecommendationsDTO>("/homepage/recommendations/refresh", body)
   },
 
   recordPlayedMovie(movieId: string): Promise<void> {

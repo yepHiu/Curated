@@ -77,7 +77,11 @@ export function useHomepageDailyRecommendations(
       : options?.preserveHeroMovieIds
 
     return runSnapshotRequest(
-      () => libraryService.refreshHomepageDailyRecommendations(),
+      () => libraryService.refreshHomepageDailyRecommendations(
+        heroMovieIds && heroMovieIds.length > 0
+          ? { preserveHeroMovieIds: [...heroMovieIds] }
+          : undefined,
+      ),
       (next) => {
         if (!heroMovieIds || heroMovieIds.length === 0) {
           return next

@@ -7,6 +7,7 @@ import type {
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  RefreshHomepageDailyRecommendationsBody,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -637,8 +638,25 @@ export const mockLibraryService: LibraryService = {
     }
   },
 
-  async refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
-    return await this.getHomepageDailyRecommendations()
+  async refreshHomepageDailyRecommendations(
+    body?: RefreshHomepageDailyRecommendationsBody,
+  ): Promise<HomepageDailyRecommendationsDTO> {
+    const snapshot = await this.getHomepageDailyRecommendations()
+    const preservedHeroMovieIds = body?.preserveHeroMovieIds
+      ?.map((movieId) => movieId.trim())
+      .filter(Boolean)
+
+    if (!preservedHeroMovieIds || preservedHeroMovieIds.length === 0) {
+      return snapshot
+    }
+
+    return {
+      ...snapshot,
+      heroMovieIds: preservedHeroMovieIds,
+      recommendationMovieIds: snapshot.recommendationMovieIds.filter(
+        (movieId) => !preservedHeroMovieIds.includes(movieId),
+      ),
+    }
   },
 
   async refreshSettings() {

@@ -102,6 +102,9 @@ describe("useHomepageDailyRecommendations", () => {
     await flushPromises()
 
     expect(refreshHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
+    expect(refreshHomepageDailyRecommendations).toHaveBeenCalledWith({
+      preserveHeroMovieIds: ["hero-old"],
+    })
     expect(getHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
     expect(next).toEqual(makeSnapshot("2026-04-15", ["hero-old"], ["rec-new"]))
     expect(state?.snapshot.value).toEqual(makeSnapshot("2026-04-15", ["hero-old"], ["rec-new"]))

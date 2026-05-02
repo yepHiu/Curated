@@ -7,6 +7,7 @@ import type {
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  RefreshHomepageDailyRecommendationsBody,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
@@ -86,7 +87,7 @@ export interface LibraryService {
   pingProvider(name: string): Promise<ProviderHealthDTO>
   pingAllProviders(): Promise<PingAllProvidersResponse>
   getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO>
-  refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO>
+  refreshHomepageDailyRecommendations(body?: RefreshHomepageDailyRecommendationsBody): Promise<HomepageDailyRecommendationsDTO>
   /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>

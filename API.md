@@ -149,6 +149,8 @@ Important notes:
 - intended primarily for development and verification workflows
 - returns the same DTO shape as `GET /api/homepage/recommendations`
 - uses the same UTC day key and persistence table, but bypasses reuse of the existing snapshot for that day
+- accepts an optional JSON body `{ "preserveHeroMovieIds": ["..."] }`; when provided, the backend keeps those IDs as the persisted `heroMovieIds` while regenerating `recommendationMovieIds`
+- the homepage "Today's Recommendations" refresh uses `preserveHeroMovieIds` so clicking it refreshes only the recommendation rail and does not change the current hero carousel
 - the frontend exposes this through a development-only button in Settings -> About when running in dev mode with `VITE_USE_WEB_API=true`
 
 ## Movies

@@ -29,7 +29,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - Real API mode and mock mode for fast UI iteration.
 - SQLite-backed persistence for library data, playback progress, daily watch-time aggregates, comments, ratings, and curated frames.
 - Top-bar movie import can copy selected files or browser-selected folders into the configured default library root, with progress, large-file resumable upload, and failure notifications.
-- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
+- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices; the homepage can refresh today's picks while preserving the current hero slate, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
 - Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.

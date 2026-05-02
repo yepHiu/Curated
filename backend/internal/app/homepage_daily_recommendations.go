@@ -91,7 +91,7 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 }
 
 // RegenerateHomepageDailyRecommendations force-regenerates the daily recommendation snapshot, ignoring any cached version.
-func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {
+func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string, options ...contracts.HomepageDailyRecommendationsRefreshOptions) (contracts.HomepageDailyRecommendationsDTO, error) {
 	if strings.TrimSpace(dateUTC) == "" {
 		dateUTC = time.Now().UTC().Format("2006-01-02")
 	}
@@ -100,6 +100,7 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	if err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
+	dto = applyHomepageDailyRefreshOptions(dto, options...)
 
 	if err := a.store.UpsertHomepageDailyRecommendationSnapshot(ctx, storage.HomepageDailyRecommendationSnapshot{
 		DateUTC:                dto.DateUTC,
@@ -115,6 +116,102 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	}
 
 	return dto, nil
+}
+
+func applyHomepageDailyRefreshOptions(
+	dto contracts.HomepageDailyRecommendationsDTO,
+	options ...contracts.HomepageDailyRecommendationsRefreshOptions,
+) contracts.HomepageDailyRecommendationsDTO {
+	if len(options) == 0 {
+		return dto
+	}
+
+	heroLimit := len(dto.HeroMovieIDs)
+	preservedHeroMovieIDs := normalizeHomepageMovieIDs(options[0].PreserveHeroMovieIDs, heroLimit)
+	if len(preservedHeroMovieIDs) == 0 {
+		return dto
+	}
+
+	generatedHeroMovieIDs := append([]string(nil), dto.HeroMovieIDs...)
+	heroSeen := make(map[string]struct{}, heroLimit)
+	for _, movieID := range preservedHeroMovieIDs {
+		heroSeen[movieID] = struct{}{}
+	}
+	for _, movieID := range generatedHeroMovieIDs {
+		if len(preservedHeroMovieIDs) >= heroLimit {
+			break
+		}
+		normalizedMovieID := strings.TrimSpace(movieID)
+		if normalizedMovieID == "" {
+			continue
+		}
+		if _, ok := heroSeen[normalizedMovieID]; ok {
+			continue
+		}
+		preservedHeroMovieIDs = append(preservedHeroMovieIDs, normalizedMovieID)
+		heroSeen[normalizedMovieID] = struct{}{}
+	}
+
+	recommendationLimit := len(dto.RecommendationMovieIDs)
+	recommendationCandidates := append(
+		append([]string(nil), dto.RecommendationMovieIDs...),
+		generatedHeroMovieIDs...,
+	)
+
+	return contracts.HomepageDailyRecommendationsDTO{
+		DateUTC:                dto.DateUTC,
+		GeneratedAt:            dto.GeneratedAt,
+		GenerationVersion:      dto.GenerationVersion,
+		HeroMovieIDs:           preservedHeroMovieIDs,
+		RecommendationMovieIDs: normalizeHomepageMovieIDsExcluding(recommendationCandidates, recommendationLimit, heroSeen),
+	}
+}
+
+func normalizeHomepageMovieIDs(movieIDs []string, limit int) []string {
+	out := make([]string, 0, len(movieIDs))
+	seen := make(map[string]struct{}, len(movieIDs))
+	for _, movieID := range movieIDs {
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+		normalizedMovieID := strings.TrimSpace(movieID)
+		if normalizedMovieID == "" {
+			continue
+		}
+		if _, ok := seen[normalizedMovieID]; ok {
+			continue
+		}
+		seen[normalizedMovieID] = struct{}{}
+		out = append(out, normalizedMovieID)
+	}
+	return out
+}
+
+func normalizeHomepageMovieIDsExcluding(
+	movieIDs []string,
+	limit int,
+	excluded map[string]struct{},
+) []string {
+	out := make([]string, 0, len(movieIDs))
+	seen := make(map[string]struct{}, len(movieIDs))
+	for _, movieID := range movieIDs {
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+		normalizedMovieID := strings.TrimSpace(movieID)
+		if normalizedMovieID == "" {
+			continue
+		}
+		if _, ok := excluded[normalizedMovieID]; ok {
+			continue
+		}
+		if _, ok := seen[normalizedMovieID]; ok {
+			continue
+		}
+		seen[normalizedMovieID] = struct{}{}
+		out = append(out, normalizedMovieID)
+	}
+	return out
 }
 
 func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC string) (contracts.HomepageDailyRecommendationsDTO, error) {

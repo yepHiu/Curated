@@ -742,6 +742,12 @@ type HomepageDailyRecommendationsDTO struct {
 	RecommendationMovieIDs []string `json:"recommendationMovieIds"`
 }
 
+// HomepageDailyRecommendationsRefreshOptions customizes a forced homepage snapshot refresh.
+type HomepageDailyRecommendationsRefreshOptions struct {
+	// PreserveHeroMovieIDs keeps the current homepage hero slate while regenerating today's recommendations.
+	PreserveHeroMovieIDs []string `json:"preserveHeroMovieIds,omitempty"`
+}
+
 // TaskDTO represents an async background task (scan, scrape, download).
 type TaskDTO struct {
 	TaskID        string         `json:"taskId"`

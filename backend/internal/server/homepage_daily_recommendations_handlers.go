@@ -1,6 +1,9 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -38,7 +41,16 @@ func (h *Handler) handleRefreshHomepageRecommendations(w http.ResponseWriter, r 
 		return
 	}
 
-	dto, err := h.homepageRecommendations.RegenerateHomepageDailyRecommendations(r.Context(), "")
+	var options contracts.HomepageDailyRecommendationsRefreshOptions
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&options); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
+	dto, err := h.homepageRecommendations.RegenerateHomepageDailyRecommendations(r.Context(), "", options)
 	if err != nil {
 		h.logger.Error("refresh homepage recommendations", zap.Error(err))
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to refresh homepage recommendations")

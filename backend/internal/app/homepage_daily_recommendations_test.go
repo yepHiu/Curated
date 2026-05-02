@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -183,6 +184,36 @@ func TestGetOrCreateHomepageDailyRecommendationsRegeneratesStaleGenerationVersio
 	}
 	if len(dto.HeroMovieIDs) != 8 || len(dto.RecommendationMovieIDs) != 6 {
 		t.Fatalf("stale snapshot was reused: hero=%#v recommendations=%#v", dto.HeroMovieIDs, dto.RecommendationMovieIDs)
+	}
+}
+
+func TestRegenerateHomepageDailyRecommendationsPreservesRequestedHeroMovieIDs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 28)
+	preservedHeroMovieIDs := []string{"m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08"}
+
+	dto, err := fixture.app.RegenerateHomepageDailyRecommendations(ctx, "2026-04-15", contracts.HomepageDailyRecommendationsRefreshOptions{
+		PreserveHeroMovieIDs: preservedHeroMovieIDs,
+	})
+	if err != nil {
+		t.Fatalf("RegenerateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(dto.HeroMovieIDs, preservedHeroMovieIDs) {
+		t.Fatalf("HeroMovieIDs = %#v, want preserved %#v", dto.HeroMovieIDs, preservedHeroMovieIDs)
+	}
+
+	snapshot, ok, err := fixture.store.GetHomepageDailyRecommendationSnapshot(ctx, "2026-04-15")
+	if err != nil {
+		t.Fatalf("GetHomepageDailyRecommendationSnapshot() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("expected persisted homepage snapshot")
+	}
+	if !reflect.DeepEqual(snapshot.HeroMovieIDs, preservedHeroMovieIDs) {
+		t.Fatalf("persisted HeroMovieIDs = %#v, want preserved %#v", snapshot.HeroMovieIDs, preservedHeroMovieIDs)
 	}
 }
 

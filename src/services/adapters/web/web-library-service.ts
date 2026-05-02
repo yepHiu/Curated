@@ -3,6 +3,7 @@ import type {
   BackendLogSettingsDTO,
   CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
+  RefreshHomepageDailyRecommendationsBody,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -718,8 +719,10 @@ function createWebLibraryService(): LibraryService {
       return await api.getHomepageDailyRecommendations()
     },
 
-    async refreshHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
-      return await api.refreshHomepageDailyRecommendations()
+    async refreshHomepageDailyRecommendations(
+      body?: RefreshHomepageDailyRecommendationsBody,
+    ): Promise<HomepageDailyRecommendationsDTO> {
+      return await api.refreshHomepageDailyRecommendations(body)
     },
 
     async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
