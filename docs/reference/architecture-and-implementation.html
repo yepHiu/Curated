@@ -454,6 +454,7 @@
     <thead><tr><th>功能</th><th>前端</th><th>后端</th></tr></thead>
     <tbody>
       <tr><td>影片列表 / 虚拟滚动</td><td><code>LibraryView</code>、<code>VirtualMovieMasonry</code>、<code>MovieGrid</code>、<code>library-query.ts</code></td><td><code>store.ListMovies</code></td></tr>
+      <tr><td>Web 手柄导航</td><td><code>use-gamepad.ts</code>、<code>use-gamepad-focus-navigation.ts</code>、<code>use-player-gamepad-controls.ts</code>、<code>library-grid-navigation.ts</code>、设置页 Playback 手柄开关（<code>localStorage: curated-gamepad-controls-v1</code>）</td><td>无后端依赖；WebHID / node-hid / Electron 深度集成仍为未来目标</td></tr>
       <tr><td>搜索 / 模式</td><td><code>movie-search.ts</code>、路由 <code>mode</code> query</td><td><code>ListMoviesRequest</code></td></tr>
       <tr><td>详情与预览图</td><td><code>DetailPanel</code>、<code>PreviewImageViewer</code></td><td><code>GetMovieDetail</code></td></tr>
       <tr><td>用户评分 / 收藏</td><td><code>MovieRatingStars</code>、Mock <code>mock-movie-prefs-storage</code></td><td><code>PatchMovieUserPrefs</code>、迁移 SQL</td></tr>

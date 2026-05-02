@@ -265,12 +265,14 @@ POST   /api/providers/ping-all              # Ping all providers
 - REST API at `/api`
 - Frontend connects via HTTP when `VITE_USE_WEB_API=true`
 - Playback uses HTML5 `<video>` with HTTP Range streaming
+- Web Gamepad API MVP for standard controllers, including DualSense standard mapping: player controls, global focus navigation, library-grid navigation, and a browser-local Settings toggle
 - Trash/restore functionality (soft delete with `trashedAt` timestamp)
 
 **Not Yet Implemented (Documented as Targets):**
 - Electron shell, preload script, main process IPC
 - mpv player integration with named pipes
 - Desktop file system bridge
+- WebHID / node-hid controller depth features such as touchpad gestures, adaptive triggers, LED control, and Electron main-process controller integration
 
 **Design Principle:** Frontend code should not assume Electron, mpv, PotPlayer, or any native-player executable exists. All business logic goes through composables plus the service layer (`useLibraryService()`, service contracts, and adapter-owned `src/api`) to allow swapping transport (HTTP now, IPC later). Shared state defaults to composables and services; Pinia can be evaluated later from a small, bounded service/new feature when it reduces complexity, rather than as a broad upfront migration.
 

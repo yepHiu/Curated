@@ -351,6 +351,16 @@
 - README 只补充当前 Web 阶段能力，不写 Electron / WebHID 已实现。
 - `project-facts.mdc` 同步记录“Gamepad API Web MVP 已实现，Electron 深度集成仍为未来目标”。
 
+### 当前实现状态（2026-05-02）
+
+- **已完成 Task 1**：新增 `src/lib/gamepad/standard-gamepad.ts`、`gamepad-input.ts` 与测试，覆盖死区、方向解析、按钮边沿、repeat gate 与 dual-rumble 能力检测。
+- **已完成 Task 2**：新增 `src/composables/use-gamepad.ts` 与测试，支持标准映射手柄选择、按钮 / 方向事件、rAF 轮询、连接状态与可选震动降级。
+- **已完成 Task 3**：播放器接入 `use-player-gamepad-controls.ts`；Cross 播放 / 暂停，Circle 退出全屏或返回，D-pad seek / 音量，Square 萃取帧，Triangle 统计面板，Options 控制层，PS/Home 静音，L1/R1 大步进 seek。
+- **已完成 Task 4**：`AppShell.vue` 挂载全局手柄焦点导航；播放器路由禁用全局导航；资料库专用网格存在时让路给数据级导航；鼠标 / 键盘输入会清理手柄焦点框。
+- **已完成 Task 5**：资料库虚拟瀑布流基于 `visibleMovies`、URL `selected` 与当前列数做左右 / 上下 / page up / page down；Cross 打开详情；Square 进入或切换批量选择；`VirtualMovieMasonry.vue` 会在选中影片变化时滚动到对应虚拟块。
+- **已完成 Task 6 MVP**：Settings -> Playback 增加手柄控制开关，偏好保存在 `localStorage` 键 `curated-gamepad-controls-v1`；README、翻译 README、`.cursor/rules/project-facts.mdc`、`CLAUDE.md` 与架构概览已同步 Web Gamepad API MVP 范围。
+- **暂缓项**：设置页显示“未连接 / 已连接 / 浏览器不支持 / 震动不可用”的能力状态未纳入本次 MVP；WebHID、node-hid、触摸板、陀螺仪、自适应扳机、LED 与 Electron 主进程深度集成仍为未来阶段。
+
 ### 验证计划
 
 自动化验证：

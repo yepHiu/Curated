@@ -33,6 +33,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
+- Web Gamepad API controls for standard controllers, including DualSense: global focus navigation, library-grid selection, player playback controls, and a browser-local Settings toggle.
 
 ## Quick Start
 
@@ -82,6 +83,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 ### Library
 
 - Virtualized poster-grid browsing for large libraries.
+- Standard gamepad navigation for the virtualized poster grid, using URL-backed selection so large lists do not depend on every card being rendered in the DOM.
 - Favorites, ratings, tags, and library organization controls.
 - Add-movie import copies selected local videos into the default storage path configured in Settings -> Library & storage, switching large uploads to chunked resumable transfer.
 - Real backend mode and mock adapter mode behind the same frontend service layer.
@@ -91,6 +93,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 - Resume playback support with persisted progress in Web API mode.
 - Daily watch-time statistics in Settings -> Overview, backed by bounded playback deltas in Web API mode and `localStorage` in mock mode.
+- Standard gamepad playback controls for play/pause, seek, volume, mute, Curated frame capture, stats/chrome toggles, fullscreen exit, and route-back behavior.
 - Browser playback, external player handoff, and HLS session support in the current playback pipeline.
 - Session diagnostics and richer playback decision metadata for direct play, remux, and transcode paths.
 
@@ -119,6 +122,8 @@ Runtime configuration is split between frontend environment variables and backen
 - `VITE_USE_WEB_API=true`: use the real backend
 - `VITE_API_BASE_URL`: override the API base URL; when unset, local loopback Web API development connects directly to dev backend `:8080` to avoid proxying large uploads through Vite, while release hosting on `:8081` and other modes use same-origin `/api`
 - `VITE_LOG_LEVEL`: optional browser log level default
+
+Gamepad controls are a browser-local preference saved in `localStorage` under `curated-gamepad-controls-v1`. They use the Web Gamepad API only; WebHID, node-hid, adaptive triggers, LED control, and Electron main-process controller integration remain future target-direction items.
 
 ### Backend
 
