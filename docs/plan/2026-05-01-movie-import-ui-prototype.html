@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curated 导入影片 UI 原稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #f4f6fc;
+      --foreground: #0f1219;
+      --card: #ffffff;
+      --muted: #ebeef5;
+      --muted-foreground: #5a6378;
+      --border: rgb(15 18 25 / 10%);
+      --border-strong: rgb(15 18 25 / 18%);
+      --primary: #fe628e;
+      --primary-foreground: #1d0910;
+      --success: #2f9e78;
+      --warning: #d89a1b;
+      --danger: #e14b6d;
+      --sidebar: #eef1f8;
+      --sidebar-accent: #e2e7f2;
+      --shadow: 0 24px 80px rgb(15 18 25 / 20%);
+      --radius: 18px;
+      font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html.dark {
+      color-scheme: dark;
+      --background: #0d0f1a;
+      --foreground: #f8f7fb;
+      --card: #141826;
+      --muted: #121827;
+      --muted-foreground: #a2abc2;
+      --border: rgb(255 255 255 / 10%);
+      --border-strong: rgb(255 255 255 / 18%);
+      --primary: #fe628e;
+      --primary-foreground: #1d0910;
+      --success: #8fd6bf;
+      --warning: #f5b971;
+      --danger: #ff6f87;
+      --sidebar: #101423;
+      --sidebar-accent: #1f2639;
+      --shadow: 0 28px 90px rgb(0 0 0 / 42%);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% -10%, rgb(254 98 142 / 14%), transparent 34%),
+        var(--background);
+      color: var(--foreground);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid rgb(254 98 142 / 70%);
+      outline-offset: 2px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 304px minmax(0, 1fr);
+      height: 100vh;
+      min-height: 0;
+    }
+
+    .sidebar {
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--sidebar) 96%, transparent);
+      padding: 0 14px 14px;
+    }
+
+    .brand {
+      display: flex;
+      min-height: 72px;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding: 15px 8px;
+      color: var(--primary);
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .nav-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 18px;
+    }
+
+    .nav-label {
+      padding: 0 8px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      min-height: 40px;
+      align-items: center;
+      gap: 10px;
+      border-radius: 16px;
+      padding: 0 12px;
+      color: var(--foreground);
+      text-decoration: none;
+    }
+
+    .nav-item.active,
+    .nav-item:hover {
+      background: var(--sidebar-accent);
+    }
+
+    .workspace {
+      display: flex;
+      min-width: 0;
+      min-height: 0;
+      flex-direction: column;
+      background: color-mix(in srgb, var(--background) 96%, transparent);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) minmax(280px, 560px) minmax(270px, 1fr);
+      min-height: 72px;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+    }
+
+    .icon-button,
+    .btn {
+      display: inline-flex;
+      min-height: 40px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      padding: 0 14px;
+      background: transparent;
+      color: var(--foreground);
+      font-weight: 600;
+    }
+
+    .icon-button {
+      width: 40px;
+      padding: 0;
+      color: var(--muted-foreground);
+    }
+
+    .icon-button:hover,
+    .btn.secondary:hover {
+      background: var(--muted);
+      color: var(--foreground);
+    }
+
+    .btn.primary {
+      border-color: rgb(254 98 142 / 35%);
+      background: var(--primary);
+      color: var(--primary-foreground);
+      box-shadow: 0 12px 30px rgb(254 98 142 / 22%);
+    }
+
+    .btn.secondary {
+      border-color: var(--border);
+      background: color-mix(in srgb, var(--card) 72%, transparent);
+      color: var(--foreground);
+    }
+
+    .btn.ghost {
+      color: var(--muted-foreground);
+    }
+
+    .search {
+      position: relative;
+      width: 100%;
+    }
+
+    .search input {
+      width: 100%;
+      height: 40px;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--background) 70%, var(--card));
+      color: var(--foreground);
+      padding: 0 14px 0 42px;
+    }
+
+    .search svg {
+      position: absolute;
+      top: 50%;
+      left: 14px;
+      transform: translateY(-50%);
+      color: var(--muted-foreground);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .theme-group {
+      display: inline-flex;
+      min-height: 40px;
+      align-items: center;
+      gap: 8px;
+      border-left: 1px solid var(--border);
+      padding-left: 14px;
+      color: var(--muted-foreground);
+    }
+
+    .switch {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--primary);
+      padding: 2px;
+    }
+
+    .switch::after {
+      display: block;
+      width: 20px;
+      height: 20px;
+      margin-left: 18px;
+      border-radius: 50%;
+      background: #fff;
+      content: "";
+    }
+
+    .content {
+      min-height: 0;
+      overflow: auto;
+      padding: 28px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
+      gap: 20px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--card) 92%, transparent);
+      box-shadow: 0 16px 50px rgb(0 0 0 / 10%);
+    }
+
+    .library-preview {
+      min-height: 440px;
+      padding: 20px;
+    }
+
+    .panel h1,
+    .panel h2,
+    .panel h3,
+    .modal h2,
+    .modal h3 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    .muted {
+      color: var(--muted-foreground);
+    }
+
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .poster {
+      min-height: 220px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background:
+        linear-gradient(160deg, rgb(254 98 142 / 20%), transparent 48%),
+        linear-gradient(180deg, color-mix(in srgb, var(--muted) 80%, transparent), color-mix(in srgb, var(--card) 76%, transparent));
+      padding: 12px;
+    }
+
+    .poster-title {
+      margin-top: 132px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .settings-preview {
+      padding: 18px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--background) 45%, transparent);
+      padding: 14px;
+    }
+
+    .path-pill {
+      display: inline-flex;
+      max-width: 100%;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--muted);
+      padding: 7px 10px;
+      color: var(--foreground);
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .prototype-note {
+      margin-top: 18px;
+      border: 1px dashed var(--border-strong);
+      border-radius: 16px;
+      padding: 14px;
+      color: var(--muted-foreground);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .scrim {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgb(0 0 0 / 56%);
+      padding: 24px;
+      z-index: 50;
+    }
+
+    .scrim.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(980px, calc(100vw - 48px));
+      max-height: min(780px, calc(100vh - 48px));
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: 28px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding: 22px 24px 18px;
+    }
+
+    .modal-header p {
+      margin: 6px 0 0;
+      color: var(--muted-foreground);
+      line-height: 1.55;
+    }
+
+    .modal-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 18px;
+      max-height: calc(min(780px, 100vh - 48px) - 162px);
+      overflow: auto;
+      padding: 20px 24px 22px;
+    }
+
+    .dropzone {
+      display: flex;
+      min-height: 246px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      border: 1.5px dashed rgb(254 98 142 / 55%);
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 50% 0, rgb(254 98 142 / 14%), transparent 45%),
+        color-mix(in srgb, var(--muted) 42%, transparent);
+      padding: 24px;
+      text-align: center;
+    }
+
+    .dropzone-icon {
+      display: flex;
+      width: 58px;
+      height: 58px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 18px;
+      background: rgb(254 98 142 / 14%);
+      color: var(--primary);
+    }
+
+    .dropzone h3 {
+      font-size: 18px;
+    }
+
+    .dropzone p {
+      max-width: 390px;
+      margin: 0;
+      color: var(--muted-foreground);
+      line-height: 1.6;
+    }
+
+    .dropzone-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .support-line {
+      font-size: 12px;
+    }
+
+    .selection-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .file-row {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--background) 40%, transparent);
+      padding: 10px;
+    }
+
+    .file-icon {
+      display: flex;
+      width: 36px;
+      height: 36px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      background: var(--muted);
+      color: var(--primary);
+    }
+
+    .file-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+    }
+
+    .file-meta {
+      margin-top: 3px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: rgb(254 98 142 / 12%);
+      color: var(--primary);
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .flow-card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--background) 38%, transparent);
+      padding: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      color: var(--foreground);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .field select {
+      min-height: 40px;
+      width: 100%;
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--card) 82%, var(--muted));
+      color: var(--foreground);
+      padding: 0 12px;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .summary-item {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--card) 75%, transparent);
+      padding: 12px;
+    }
+
+    .summary-value {
+      font-size: 18px;
+      font-weight: 760;
+    }
+
+    .summary-label {
+      margin-top: 3px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .preview-path {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--muted);
+      padding: 12px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .mini-switch {
+      width: 38px;
+      height: 22px;
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--primary) 80%, var(--muted));
+      padding: 2px;
+    }
+
+    .mini-switch::after {
+      display: block;
+      width: 18px;
+      height: 18px;
+      margin-left: 16px;
+      border-radius: 50%;
+      background: #fff;
+      content: "";
+    }
+
+    .warning {
+      border: 1px solid color-mix(in srgb, var(--warning) 42%, transparent);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--warning) 12%, transparent);
+      padding: 12px;
+      color: var(--foreground);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .progress-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--card) 78%, transparent);
+      padding: 12px;
+    }
+
+    .progress-head,
+    .progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .progress-bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--primary) 14%, var(--muted));
+    }
+
+    .progress-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--primary);
+      box-shadow: 0 0 18px rgb(254 98 142 / 34%);
+    }
+
+    .progress-row {
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .progress-row strong {
+      color: var(--foreground);
+      font-size: 13px;
+    }
+
+    .task-dock {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 40;
+      width: min(420px, calc(100vw - 48px));
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--card) 94%, transparent);
+      box-shadow: 0 18px 60px rgb(0 0 0 / 30%);
+      padding: 14px;
+    }
+
+    .task-dock-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+
+    .footer-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .hero-grid,
+      .modal-body {
+        grid-template-columns: 1fr;
+      }
+
+      .movie-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .summary-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" aria-label="Curated 导入影片 UI 原稿">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8L12 3z" stroke="currentColor" /></svg>
+        Curated
+      </div>
+      <nav class="nav-section" aria-label="主导航">
+        <span class="nav-label">Browse</span>
+        <a class="nav-item active" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-8z" stroke="currentColor" /></svg>首页</a>
+        <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM8 5v14M16 5v14" stroke="currentColor" /></svg>全部影片</a>
+        <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" /></svg>演员</a>
+        <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.6 13.2l-7.4 7.4a2 2 0 0 1-2.8 0l-7-7V4h9.6l7.6 7.6a1.1 1.1 0 0 1 0 1.6zM7.5 7.5h.01" stroke="currentColor" /></svg>标签</a>
+      </nav>
+      <nav class="nav-section" aria-label="个人导航">
+        <span class="nav-label">Yours</span>
+        <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M9 4v16" stroke="currentColor" /></svg>精选帧</a>
+        <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2" stroke="currentColor" /></svg>观看历史</a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <button class="icon-button" type="button" aria-label="收起侧栏">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM9 5v14" stroke="currentColor" /></svg>
+          </button>
+        </div>
+
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" /><path d="M20 20l-3.5-3.5" stroke="currentColor" /></svg>
+          <input aria-label="搜索影片" value="" placeholder="搜索番号、标题、演员或标签" />
+        </div>
+
+        <div class="top-actions">
+          <button class="btn primary" type="button" id="openImport">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" /></svg>
+            添加影片
+          </button>
+          <div class="theme-group" title="明暗模式切换旁边新增添加入口">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" /></svg>
+            <button class="switch" type="button" aria-label="切换深浅色"></button>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" stroke="currentColor" /></svg>
+          </div>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="hero-grid">
+          <section class="panel library-preview" aria-label="首页示意">
+            <h1>今日入口更短</h1>
+            <p class="muted">添加影片入口固定在顶栏右侧，不打断浏览路径；拖入文件后，弹窗统一处理目标路径、复制策略和入库扫描。</p>
+            <div class="movie-grid" aria-hidden="true">
+              <div class="poster"><div class="poster-title">ABP-123</div><div class="muted">最近导入</div></div>
+              <div class="poster"><div class="poster-title">MIDV-456</div><div class="muted">继续观看</div></div>
+              <div class="poster"><div class="poster-title">SSIS-789</div><div class="muted">推荐</div></div>
+              <div class="poster"><div class="poster-title">IPX-001</div><div class="muted">收藏</div></div>
+            </div>
+          </section>
+
+          <aside class="panel settings-preview" aria-label="设置页默认路径示意">
+            <h2>设置页新增默认导入目标</h2>
+            <p class="muted">位于“设置 → 资料库 → 存储目录”卡片中，复用已有影片存储路径列表。</p>
+            <div class="setting-row">
+              <div>
+                <strong>默认导入路径</strong>
+                <div class="muted" style="margin-top: 4px; font-size: 13px;">添加影片时默认复制到这里</div>
+              </div>
+              <span class="badge">默认</span>
+            </div>
+            <div style="margin-top: 12px;">
+              <span class="path-pill">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" stroke="currentColor" /></svg>
+                D:\Media\Curated\Movies
+              </span>
+            </div>
+            <div class="prototype-note">
+              原稿假设：已有多个库路径时，用户需要显式选择一个“默认导入目标”。如果没有设置默认值，弹窗打开后要求先选择目标路径，并提供跳转设置页的入口。
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="scrim open" id="importScrim" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle" aria-describedby="importDesc">
+      <div class="modal-header">
+        <div>
+          <h2 id="importTitle">添加影片</h2>
+          <p id="importDesc">拖入影片文件或选择文件夹，确认目标路径后复制到资料库，并在完成后触发扫描和元数据识别。</p>
+        </div>
+        <button class="icon-button" type="button" id="closeImport" aria-label="关闭添加影片弹窗">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" /></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div>
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M20 16.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.5" stroke="currentColor" /></svg>
+            </div>
+            <div>
+              <h3>拖放影片或文件夹到这里</h3>
+              <p>支持单个影片、多个影片、以及包含影片的目录。目录导入会先列出识别到的视频文件，再统一复制到默认存储路径。</p>
+            </div>
+            <div class="dropzone-actions">
+              <button class="btn secondary" type="button" id="sampleFiles">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" /><path d="M14 2v6h6" stroke="currentColor" /></svg>
+                选择影片
+              </button>
+              <button class="btn secondary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" stroke="currentColor" /></svg>
+                选择文件夹
+              </button>
+            </div>
+            <div class="support-line muted">原稿状态：已选择 4 个影片，含 1 个可能重复番号。</div>
+          </div>
+
+          <div class="selection-list" aria-label="待导入影片列表">
+            <div class="file-row">
+              <span class="file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM10 9l6 3-6 3V9z" stroke="currentColor" /></svg></span>
+              <div>
+                <div class="file-name">ABP-123.mp4</div>
+                <div class="file-meta">12.4 GB · 识别番号 ABP-123 · 将创建 ABP-123 文件夹</div>
+              </div>
+              <span class="badge">就绪</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM10 9l6 3-6 3V9z" stroke="currentColor" /></svg></span>
+              <div>
+                <div class="file-name">MIDV-456-C.mp4</div>
+                <div class="file-meta">8.9 GB · 从文件名推断番号 MIDV-456</div>
+              </div>
+              <span class="badge">就绪</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM10 9l6 3-6 3V9z" stroke="currentColor" /></svg></span>
+              <div>
+                <div class="file-name">Downloads\SSIS-789\SSIS-789.mkv</div>
+                <div class="file-meta">15.1 GB · 来自导入目录 · 保留原始扩展名</div>
+              </div>
+              <span class="badge">就绪</span>
+            </div>
+            <div class="file-row">
+              <span class="file-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM10 9l6 3-6 3V9z" stroke="currentColor" /></svg></span>
+              <div>
+                <div class="file-name">ABP-123-CD2.mp4</div>
+                <div class="file-meta">6.2 GB · 可能是 ABP-123 分段文件，导入前需要确认合并目录</div>
+              </div>
+              <span class="badge">待确认</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="flow-card" aria-label="导入设置">
+          <div class="summary-strip">
+            <div class="summary-item">
+              <div class="summary-value">4</div>
+              <div class="summary-label">待导入影片</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-value">42.6 GB</div>
+              <div class="summary-label">预计复制</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-value">683 GB</div>
+              <div class="summary-label">目标剩余</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="targetPath">导入到</label>
+            <select id="targetPath">
+              <option selected>D:\Media\Curated\Movies（默认）</option>
+              <option>E:\Archive\Curated Library</option>
+              <option>F:\Temp\To Review</option>
+            </select>
+            <div class="muted" style="font-size: 12px;">默认值来自设置页“影片存储路径”的默认导入目标。</div>
+          </div>
+
+          <div>
+            <h3 style="font-size: 15px;">目标结构预览</h3>
+            <div class="preview-path" style="margin-top: 10px;">
+              <span>D:\Media\Curated\Movies\ABP-123\ABP-123.mp4</span>
+              <span>D:\Media\Curated\Movies\MIDV-456\MIDV-456-C.mp4</span>
+              <span>D:\Media\Curated\Movies\SSIS-789\SSIS-789.mkv</span>
+              <span>D:\Media\Curated\Movies\ABP-123\ABP-123-CD2.mp4</span>
+            </div>
+          </div>
+
+          <div class="option-row">
+            <div>
+              <strong>复制完成后自动扫描</strong>
+              <div class="muted" style="margin-top: 4px; font-size: 13px;">复制成功后对目标路径触发扫描，并进入现有任务进度。</div>
+            </div>
+            <button class="mini-switch" type="button" aria-label="复制完成后自动扫描"></button>
+          </div>
+
+          <div class="option-row">
+            <div>
+              <strong>自动刮削影片元数据</strong>
+              <div class="muted" style="margin-top: 4px; font-size: 13px;">沿用设置页的元数据源策略。失败时保留影片并提示重试。</div>
+            </div>
+            <button class="mini-switch" type="button" aria-label="自动刮削影片元数据"></button>
+          </div>
+
+          <div class="option-row">
+            <div>
+              <strong>保留原始文件</strong>
+              <div class="muted" style="margin-top: 4px; font-size: 13px;">MVP 建议默认复制，不删除来源。后续再提供“移动源文件”的高级选项。</div>
+            </div>
+            <button class="mini-switch" type="button" aria-label="保留原始文件"></button>
+          </div>
+
+          <div class="warning">
+            如果目标目录已有同名文件，导入前会停在确认状态：可选择跳过、重命名、覆盖，或把分段文件放入同一个番号目录。
+          </div>
+
+          <div class="progress-card" aria-label="复制进度示意">
+            <div class="progress-head">
+              <strong>复制进度</strong>
+              <span class="badge">38%</span>
+            </div>
+            <div class="progress-bar" aria-hidden="true">
+              <span class="progress-fill" style="width: 38%;"></span>
+            </div>
+            <div class="progress-row">
+              <strong>正在复制 ABP-123.mp4</strong>
+              <span>4.7 GB / 12.4 GB</span>
+            </div>
+            <div class="progress-row">
+              <span>总进度 16.2 GB / 42.6 GB</span>
+              <span>约 11 分钟剩余</span>
+            </div>
+            <div class="progress-row">
+              <span>阶段：复制文件 → 扫描资料库 → 刮削元数据</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="modal-footer">
+        <span class="muted">确认后进入后台导入任务，可在底部任务进度 Dock 查看复制与扫描进度。</span>
+        <div class="footer-actions">
+          <button class="btn secondary" type="button" id="cancelImport">取消</button>
+          <button class="btn primary" type="button">开始导入 4 个影片</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <aside class="task-dock" aria-label="导入任务进度 Dock">
+    <div class="task-dock-title">
+      <div>
+        <strong>导入影片进行中</strong>
+        <div class="muted" style="margin-top: 3px; font-size: 12px;">复制 4 个影片到默认资料库</div>
+      </div>
+      <span class="badge">38%</span>
+    </div>
+    <div class="progress-bar" aria-hidden="true">
+      <span class="progress-fill" style="width: 38%;"></span>
+    </div>
+    <div class="progress-row" style="margin-top: 10px;">
+      <span>ABP-123.mp4</span>
+      <span>4.7 GB / 12.4 GB</span>
+    </div>
+  </aside>
+
+  <script>
+    const scrim = document.getElementById("importScrim");
+    const openButton = document.getElementById("openImport");
+    const closeButton = document.getElementById("closeImport");
+    const cancelButton = document.getElementById("cancelImport");
+    const sampleFiles = document.getElementById("sampleFiles");
+    const dropzone = document.getElementById("dropzone");
+
+    function openImport() {
+      scrim.classList.add("open");
+    }
+
+    function closeImport() {
+      scrim.classList.remove("open");
+    }
+
+    openButton.addEventListener("click", openImport);
+    closeButton.addEventListener("click", closeImport);
+    cancelButton.addEventListener("click", closeImport);
+    sampleFiles.addEventListener("click", openImport);
+    dropzone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      dropzone.style.borderColor = "var(--primary)";
+    });
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.style.borderColor = "rgb(254 98 142 / 55%)";
+    });
+    dropzone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropzone.style.borderColor = "rgb(254 98 142 / 55%)";
+      openImport();
+    });
+  </script>
+</body>
+</html>

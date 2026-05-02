@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Curated 通知中心 UI 原型</title>
+    <style>
+      :root {
+        --bg: #0b0f18;
+        --sidebar: rgba(255, 255, 255, 0.03);
+        --panel: rgba(255, 255, 255, 0.05);
+        --panel-strong: rgba(255, 255, 255, 0.08);
+        --line: rgba(255, 255, 255, 0.1);
+        --text: #f6f7fb;
+        --muted: #9ba6ba;
+        --brand: #fe628e;
+        --red: #f87171;
+        --yellow: #fbbf24;
+        --green: #4ade80;
+        --blue: #60a5fa;
+        --radius: 0.75rem;
+        --radius-sm: 0.5rem;
+        --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.45);
+        --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.35);
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body { min-height: 100%; }
+
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(254, 98, 142, 0.14), transparent 28rem),
+          radial-gradient(circle at 85% 10%, rgba(116, 125, 255, 0.10), transparent 28rem),
+          linear-gradient(180deg, #0a0d15, #0d111c 42%, #090c13);
+        color: var(--text);
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+        display: flex; align-items: flex-start; justify-content: center;
+        padding: 60px 20px 40px;
+      }
+
+      /* ── 整体场景 ── */
+      .scene {
+        width: min(1100px, 100%);
+        display: flex; flex-direction: column; gap: 32px;
+      }
+
+      .section-label {
+        font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em;
+        color: var(--muted); margin-bottom: 8px;
+      }
+
+      /* ── 模拟应用的顶栏 ── */
+      .app-topbar {
+        display: flex; align-items: center; gap: 16px;
+        height: 56px; padding: 0 20px;
+        background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--radius);
+      }
+      .topbar-center { flex: 1; display: flex; align-items: center; gap: 10px; }
+      .topbar-search {
+        width: 100%; max-width: 420px; height: 36px;
+        background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+        border-radius: var(--radius-sm); padding: 0 12px 0 36px;
+        color: var(--text); font-size: 0.875rem; outline: none;
+        position: relative;
+      }
+      .topbar-search::placeholder { color: var(--muted); }
+      .search-icon {
+        position: absolute; left: 30px; top: 50%; transform: translateY(-50%);
+        color: var(--muted); font-size: 0.9rem; pointer-events: none;
+      }
+
+      .topbar-right {
+        display: flex; align-items: center; gap: 12px;
+        padding-left: 16px; border-left: 1px solid var(--line);
+      }
+
+      /* ── 主题开关 ── */
+      .theme-toggle {
+        display: flex; align-items: center; gap: 6px;
+        color: var(--muted); font-size: 0.85rem;
+      }
+      .theme-switch {
+        width: 40px; height: 24px; background: rgba(255,255,255,0.15);
+        border-radius: 999px; position: relative; cursor: pointer;
+        transition: background 0.2s;
+      }
+      .theme-switch.on { background: var(--brand); }
+      .theme-switch::after {
+        content: ""; position: absolute; top: 3px; left: 3px;
+        width: 18px; height: 18px; background: white; border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .theme-switch.on::after { transform: translateX(16px); }
+
+      /* ── 铃铛按钮 ── */
+      .bell-btn {
+        position: relative;
+        width: 36px; height: 36px;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; color: var(--muted);
+        cursor: pointer; border-radius: var(--radius-sm);
+        transition: background 0.15s, color 0.15s;
+        font-size: 1.2rem;
+      }
+      .bell-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+      .bell-btn.active { color: var(--text); background: rgba(255,255,255,0.06); }
+      .bell-badge {
+        position: absolute; top: 4px; right: 6px;
+        width: 8px; height: 8px; background: #ef4444; border-radius: 50%;
+        box-shadow: 0 0 6px rgba(239,68,68,0.6);
+        opacity: 0; transform: scale(0.6); transition: all 0.2s;
+      }
+      .bell-badge.show { opacity: 1; transform: scale(1); }
+      .bell-badge.count {
+        width: auto; min-width: 16px; height: 16px; padding: 0 4px;
+        font-size: 0.6rem; line-height: 16px; text-align: center;
+        color: #fff; font-weight: 600;
+        top: 2px; right: 2px;
+      }
+
+      /* ── 下拉面板容器 ── */
+      .dropdown-anchor { position: relative; }
+      .dropdown-panel {
+        position: absolute; top: calc(100% + 8px); right: 0; z-index: 200;
+        width: 380px; max-height: 480px;
+        background: #111620; border: 1px solid var(--line); border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        display: flex; flex-direction: column; overflow: hidden;
+        opacity: 0; transform: translateY(-6px) scale(0.96);
+        pointer-events: none;
+        transition: opacity 0.18s, transform 0.18s;
+      }
+      .dropdown-panel.open {
+        opacity: 1; transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+
+      /* ── 面板头部 ── */
+      .panel-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 16px; border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .panel-title {
+        font-size: 0.9rem; font-weight: 600; color: var(--text);
+        display: flex; align-items: center; gap: 6px;
+      }
+      .panel-title-icon { font-size: 1rem; }
+      .panel-action {
+        font-size: 0.78rem; color: var(--brand); cursor: pointer;
+        background: none; border: none; padding: 4px 8px; border-radius: 4px;
+        transition: background 0.15s;
+      }
+      .panel-action:hover { background: rgba(254,98,142,0.12); }
+
+      /* ── 通知列表 ── */
+      .notif-list {
+        flex: 1; overflow-y: auto; padding: 6px;
+        min-height: 0;
+      }
+      .notif-list::-webkit-scrollbar { width: 4px; }
+      .notif-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+      .notif-item {
+        display: flex; gap: 10px; padding: 10px 12px;
+        border-radius: var(--radius-sm); cursor: pointer;
+        transition: background 0.12s;
+        position: relative;
+      }
+      .notif-item:hover { background: rgba(255,255,255,0.05); }
+      .notif-item.unread { background: rgba(254,98,142,0.06); }
+      .notif-item.unread:hover { background: rgba(254,98,142,0.12); }
+
+      .notif-dot {
+        width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
+      }
+      .notif-dot.scan { background: var(--blue); }
+      .notif-dot.scrape { background: var(--green); }
+      .notif-dot.error { background: var(--red); }
+      .notif-dot.update { background: var(--yellow); }
+      .notif-dot.system { background: var(--muted); }
+
+      .notif-body { flex: 1; min-width: 0; }
+      .notif-title { font-size: 0.85rem; font-weight: 500; color: var(--text); line-height: 1.3; }
+      .notif-msg { font-size: 0.78rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+      .notif-time { font-size: 0.7rem; color: rgba(255,255,255,0.25); margin-top: 4px; }
+
+      .notif-close {
+        width: 24px; height: 24px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; color: rgba(255,255,255,0.2); cursor: pointer;
+        border-radius: 4px; font-size: 0.8rem; opacity: 0;
+        transition: opacity 0.12s, color 0.12s; margin-top: 2px;
+      }
+      .notif-item:hover .notif-close { opacity: 1; }
+      .notif-close:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+
+      /* ── 已读折叠区 ── */
+      .read-section {
+        border-top: 1px solid var(--line); flex-shrink: 0;
+      }
+      .read-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 16px; cursor: pointer;
+        color: var(--muted); font-size: 0.78rem;
+        transition: background 0.12s;
+        background: none; border: none; width: 100%; text-align: left;
+      }
+      .read-toggle:hover { background: rgba(255,255,255,0.03); }
+      .read-toggle-arrow { transition: transform 0.2s; font-size: 0.65rem; }
+      .read-toggle-arrow.open { transform: rotate(180deg); }
+
+      /* ── 空状态 ── */
+      .empty-state {
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        padding: 36px 20px; color: var(--muted);
+      }
+      .empty-icon { font-size: 2rem; opacity: 0.4; }
+      .empty-text { font-size: 0.85rem; }
+
+      /* ── 历史视图（面板内切换） ── */
+      .history-back {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 0.82rem; color: var(--muted); cursor: pointer;
+        background: none; border: none; padding: 4px 8px; border-radius: 4px;
+        transition: color 0.12s;
+      }
+      .history-back:hover { color: var(--text); }
+      .history-clear {
+        font-size: 0.78rem; color: var(--red); cursor: pointer;
+        background: none; border: none; padding: 4px 8px; border-radius: 4px;
+        opacity: 0.7; transition: opacity 0.12s;
+      }
+      .history-clear:hover { opacity: 1; }
+
+      .notif-item.read { opacity: 0.55; }
+      .notif-item.read .notif-dot { opacity: 0.3; }
+      .read-badge {
+        font-size: 0.65rem; color: var(--green); font-weight: 500;
+        margin-left: auto; flex-shrink: 0; align-self: flex-start; margin-top: 4px;
+      }
+
+      /* ── Toast 模拟 ── */
+      .toast-area {
+        position: fixed; top: 16px; right: 16px; z-index: 300;
+        display: flex; flex-direction: column; gap: 8px;
+        pointer-events: none;
+      }
+      .toast-card {
+        background: #1a1f2e; border: 1px solid var(--line); border-radius: var(--radius-sm);
+        padding: 12px 16px; font-size: 0.85rem; color: var(--text);
+        box-shadow: var(--shadow-md);
+        display: flex; align-items: flex-start; gap: 10px;
+        pointer-events: auto; max-width: 360px;
+        animation: toastIn 0.3s ease-out;
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .toast-icon { flex-shrink: 0; font-size: 1rem; margin-top: 1px; }
+      .toast-card.success .toast-icon { color: var(--green); }
+      .toast-card.error .toast-icon { color: var(--red); }
+      .toast-card.warning .toast-icon { color: var(--yellow); }
+      .toast-card.info .toast-icon { color: var(--blue); }
+
+      /* ── 图例 ── */
+      .legend {
+        display: flex; gap: 20px; flex-wrap: wrap;
+        padding: 12px 16px;
+        background: rgba(255,255,255,0.02); border: 1px solid var(--line);
+        border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--muted);
+      }
+      .legend-item { display: flex; align-items: center; gap: 6px; }
+      .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+      /* ── 辅助按钮 ── */
+      .demo-actions {
+        display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+        font-size: 0.78rem; color: var(--muted);
+      }
+      .demo-btn {
+        padding: 6px 14px; background: rgba(255,255,255,0.06);
+        border: 1px solid var(--line); border-radius: var(--radius-sm);
+        color: var(--text); cursor: pointer; font-size: 0.8rem;
+        transition: background 0.12s;
+      }
+      .demo-btn:hover { background: rgba(255,255,255,0.12); }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+
+      <!-- Toast 区域 —— 右上角 -->
+      <div class="toast-area" id="toastArea">
+        <div class="toast-card success">
+          <span class="toast-icon">&#10003;</span>
+          <div>资料库扫描完成 — 新增 3 部影片</div>
+        </div>
+      </div>
+
+      <!-- ======== 场景说明 ======== -->
+      <div>
+        <div class="section-label">原型预览 — 通知中心</div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span> 扫描</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span> 刮削</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span> 错误</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span> 更新</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--muted)"></span> 系统</span>
+          <span style="margin-left:auto">Toast 已移至右上角 →</span>
+        </div>
+        <div class="demo-actions">
+          <span>模拟推送：</span>
+          <button class="demo-btn" onclick="pushDemoNotif('scan','success','扫描完成','资料库扫描完成 — 新增 3 部影片')">扫描成功</button>
+          <button class="demo-btn" onclick="pushDemoNotif('scrape','error','刮削失败','ABC-123 元数据刮削失败：网络超时')">刮削失败</button>
+          <button class="demo-btn" onclick="pushDemoNotif('update','info','更新可用','Curated v2.1.0 已发布，点击查看更新日志')">更新可用</button>
+          <button class="demo-btn" onclick="pushDemoNotif('error','error','播放错误','无法打开视频文件：权限不足')">播放错误</button>
+          <button class="demo-btn" onclick="pushDemoNotif('system','info','设置已保存','库目录监听设置已更新')">系统消息</button>
+          <button class="demo-btn" onclick="resetDemo()" style="border-color:rgba(255,255,255,0.2)">重置演示</button>
+        </div>
+      </div>
+
+      <!-- ======== 模拟应用顶栏 ======== -->
+      <div>
+        <div class="section-label">应用顶栏（AppShell 局部）</div>
+        <div class="app-topbar">
+          <div class="topbar-center">
+            <span style="color:var(--muted);font-size:0.85rem;">☰</span>
+            <span style="color:var(--muted);font-size:0.8rem;">← 返回</span>
+            <div style="position:relative;flex:1;max-width:420px;">
+              <span class="search-icon">🔍</span>
+              <input class="topbar-search" placeholder="按番号、标题、演员或标签搜索…" />
+            </div>
+          </div>
+
+          <!-- 主题切换 + 通知铃铛 -->
+          <div class="topbar-right">
+            <div class="theme-toggle">
+              <span>☀️</span>
+              <div class="theme-switch on" onclick="this.classList.toggle('on')"></div>
+              <span>🌙</span>
+            </div>
+
+            <!-- 铃铛入口 -->
+            <div class="dropdown-anchor" id="bellAnchor">
+              <button class="bell-btn" id="bellBtn" onclick="toggleDropdown()" title="通知中心">
+                🔔
+                <span class="bell-badge count show" id="bellBadge">3</span>
+              </button>
+
+              <!-- 下拉面板 -->
+              <div class="dropdown-panel" id="dropdown">
+                <!-- 标题栏 -->
+                <div class="panel-header" id="panelHeader">
+                  <span class="panel-title">
+                    <span class="panel-title-icon">🔔</span> 通知中心
+                  </span>
+                  <button class="panel-action" onclick="markAllRead()">全部已读</button>
+                </div>
+
+                <!-- 通知列表 -->
+                <div class="notif-list" id="notifList"></div>
+
+                <!-- 已读折叠 -->
+                <div class="read-section" id="readSection">
+                  <button class="read-toggle" onclick="toggleReadSection()">
+                    <span id="readToggleLabel">已读通知 (0)</span>
+                    <span class="read-toggle-arrow" id="readToggleArrow">▾</span>
+                  </button>
+                  <div id="readList" style="display:none;"></div>
+                </div>
+
+                <!-- 空状态 -->
+                <div class="empty-state" id="emptyState" style="display:none;">
+                  <span class="empty-icon">🔔</span>
+                  <span class="empty-text">暂无新通知</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== 独立展示：通知面板各种状态 ======== -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:24px;">
+        <!-- 面板：有未读通知 -->
+        <div>
+          <div class="section-label">面板状态 A：3 条未读 + 已读折叠</div>
+          <div style="background:#111620;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-md);">
+            <div class="panel-header">
+              <span class="panel-title"><span class="panel-title-icon">🔔</span> 通知中心</span>
+              <button class="panel-action">全部已读</button>
+            </div>
+            <div class="notif-list" style="max-height:220px;">
+              <div class="notif-item unread">
+                <span class="notif-dot scan"></span>
+                <div class="notif-body">
+                  <div class="notif-title">扫描完成</div>
+                  <div class="notif-msg">资料库扫描完成 — 新增 3 部影片</div>
+                  <div class="notif-time">2 分钟前</div>
+                </div>
+                <button class="notif-close" style="opacity:1">✕</button>
+              </div>
+              <div class="notif-item unread">
+                <span class="notif-dot scrape"></span>
+                <div class="notif-body">
+                  <div class="notif-title">刮削完成</div>
+                  <div class="notif-msg">ABC-123 元数据刮削成功</div>
+                  <div class="notif-time">15 分钟前</div>
+                </div>
+                <button class="notif-close" style="opacity:1">✕</button>
+              </div>
+              <div class="notif-item unread">
+                <span class="notif-dot update"></span>
+                <div class="notif-body">
+                  <div class="notif-title">更新可用</div>
+                  <div class="notif-msg">Curated v2.1.0 已发布，点击查看更新日志</div>
+                  <div class="notif-time">1 小时前</div>
+                </div>
+                <button class="notif-close" style="opacity:1">✕</button>
+              </div>
+            </div>
+            <div class="read-section">
+              <button class="read-toggle">
+                <span>已读通知 (3)</span>
+                <span class="read-toggle-arrow">▾</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 面板：空状态 -->
+        <div>
+          <div class="section-label">面板状态 B：全部已读（空状态）</div>
+          <div style="background:#111620;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-md);">
+            <div class="panel-header">
+              <span class="panel-title"><span class="panel-title-icon">🔔</span> 通知中心</span>
+              <button class="panel-action" style="opacity:0.4">全部已读</button>
+            </div>
+            <div class="empty-state">
+              <span class="empty-icon">🔔</span>
+              <span class="empty-text">暂无新通知</span>
+            </div>
+            <div class="read-section">
+              <button class="read-toggle">
+                <span>已读通知 (5)</span>
+                <span class="read-toggle-arrow">▾</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 面板：完整历史视图 -->
+        <div>
+          <div class="section-label">面板状态 C：已读历史展开</div>
+          <div style="background:#111620;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-md);max-height:440px;">
+            <div class="panel-header">
+              <button class="history-back">← 返回</button>
+              <span class="panel-title" style="font-size:0.82rem;">通知历史</span>
+              <button class="history-clear">清空</button>
+            </div>
+            <div class="notif-list" style="max-height:340px;">
+              <div class="notif-item read">
+                <span class="notif-dot scan"></span>
+                <div class="notif-body">
+                  <div class="notif-title">扫描完成</div>
+                  <div class="notif-msg">资料库扫描完成 — 新增 3 部影片</div>
+                  <div class="notif-time">2 分钟前</div>
+                </div>
+                <span class="read-badge">✓ 已读</span>
+              </div>
+              <div class="notif-item read">
+                <span class="notif-dot error"></span>
+                <div class="notif-body">
+                  <div class="notif-title">刮削失败</div>
+                  <div class="notif-msg">ABC-123 元数据刮削失败：网络超时</div>
+                  <div class="notif-time">15 分钟前</div>
+                </div>
+                <span class="read-badge">✓ 已读</span>
+              </div>
+              <div class="notif-item read">
+                <span class="notif-dot update"></span>
+                <div class="notif-body">
+                  <div class="notif-title">更新可用</div>
+                  <div class="notif-msg">Curated v2.1.0 已发布</div>
+                  <div class="notif-time">1 小时前</div>
+                </div>
+                <span class="read-badge">✓ 已读</span>
+              </div>
+              <div class="notif-item read">
+                <span class="notif-dot system"></span>
+                <div class="notif-body">
+                  <div class="notif-title">设置已保存</div>
+                  <div class="notif-msg">库目录监听设置已更新</div>
+                  <div class="notif-time">3 小时前</div>
+                </div>
+                <span class="read-badge">✓ 已读</span>
+              </div>
+              <div class="notif-item read">
+                <span class="notif-dot error"></span>
+                <div class="notif-body">
+                  <div class="notif-title">播放错误</div>
+                  <div class="notif-msg">无法打开视频文件：权限不足</div>
+                  <div class="notif-time">昨天</div>
+                </div>
+                <span class="read-badge">✓ 已读</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      // ── 通知数据 ──
+      let notifId = 0;
+      const now = Date.now();
+
+      const initialNotifs = [
+        { id: ++notifId, type:'scan', severity:'success', title:'扫描完成', msg:'资料库扫描完成 — 新增 3 部影片', time: now - 2*60*1000, read: false },
+        { id: ++notifId, type:'scrape', severity:'success', title:'刮削完成', msg:'ABC-123 元数据刮削成功', time: now - 15*60*1000, read: false },
+        { id: ++notifId, type:'update', severity:'info', title:'更新可用', msg:'Curated v2.1.0 已发布，点击查看更新日志', time: now - 60*60*1000, read: false },
+        { id: ++notifId, type:'scrape', severity:'error', title:'刮削失败', msg:'DEF-456 元数据刮削失败：网络超时', time: now - 2*60*60*1000, read: true },
+        { id: ++notifId, type:'scan', severity:'success', title:'扫描完成', msg:'fsnotify 自动扫描 — 新增 1 部影片', time: now - 5*60*60*1000, read: true },
+        { id: ++notifId, type:'system', severity:'info', title:'设置已保存', msg:'库目录监听设置已更新', time: now - 8*60*60*1000, read: true },
+      ];
+
+      let notifications = [...initialNotifs];
+
+      function unreadCount() { return notifications.filter(n => !n.read).length; }
+      function readCount() { return notifications.filter(n => n.read).length; }
+      function unreadNotifs() { return notifications.filter(n => !n.read).sort((a,b) => b.time - a.time); }
+      function readNotifs() { return notifications.filter(n => n.read).sort((a,b) => b.time - a.time); }
+
+      function timeAgo(ts) {
+        const diff = Date.now() - ts;
+        const mins = Math.floor(diff/60000);
+        if (mins < 1) return '刚刚';
+        if (mins < 60) return mins + ' 分钟前';
+        const hours = Math.floor(mins/60);
+        if (hours < 24) return hours + ' 小时前';
+        return Math.floor(hours/24) + ' 天前';
+      }
+
+      function dotClass(type) {
+        return type === 'scan' ? 'scan' : type === 'scrape' ? 'scrape' : type === 'error' ? 'error' : type === 'update' ? 'update' : 'system';
+      }
+
+      // ── 渲染 ──
+      function renderAll() {
+        renderDropdown();
+        renderBadge();
+      }
+
+      let readExpanded = false;
+
+      function renderDropdown() {
+        const list = document.getElementById('notifList');
+        const empty = document.getElementById('emptyState');
+        const readSection = document.getElementById('readSection');
+        const readLabel = document.getElementById('readToggleLabel');
+        const readList = document.getElementById('readList');
+        const unread = unreadNotifs();
+        const read = readNotifs();
+
+        if (unread.length === 0 && read.length === 0) {
+          list.innerHTML = '';
+          empty.style.display = 'flex';
+          readSection.style.display = 'none';
+        } else if (unread.length === 0) {
+          // 没有未读，但有已读：显示空状态 + 已读折叠
+          list.innerHTML = '';
+          empty.style.display = 'flex';
+          readSection.style.display = 'block';
+          readLabel.textContent = '已读通知 (' + read.length + ')';
+          renderReadList(readList, read);
+        } else {
+          empty.style.display = 'none';
+          readSection.style.display = read.length > 0 ? 'block' : 'none';
+          readLabel.textContent = '已读通知 (' + read.length + ')';
+          list.innerHTML = unread.map(n => `
+            <div class="notif-item unread">
+              <span class="notif-dot ${dotClass(n.type)}"></span>
+              <div class="notif-body">
+                <div class="notif-title">${esc(n.title)}</div>
+                <div class="notif-msg">${esc(n.msg)}</div>
+                <div class="notif-time">${timeAgo(n.time)}</div>
+              </div>
+              <button class="notif-close" style="opacity:1" onclick="event.stopPropagation();dismissOne(${n.id})">✕</button>
+            </div>
+          `).join('');
+          if (read.length > 0) {
+            renderReadList(readList, read);
+          }
+        }
+      }
+
+      function renderReadList(container, read) {
+        if (readExpanded) {
+          container.style.display = 'block';
+          container.innerHTML = read.slice(0, 20).map(n => `
+            <div class="notif-item read">
+              <span class="notif-dot ${dotClass(n.type)}"></span>
+              <div class="notif-body">
+                <div class="notif-title">${esc(n.title)}</div>
+                <div class="notif-msg">${esc(n.msg)}</div>
+                <div class="notif-time">${timeAgo(n.time)}</div>
+              </div>
+              <span class="read-badge">✓ 已读</span>
+            </div>
+          `).join('');
+          document.getElementById('readToggleArrow').classList.add('open');
+        } else {
+          container.style.display = 'none';
+          container.innerHTML = '';
+          document.getElementById('readToggleArrow').classList.remove('open');
+        }
+      }
+
+      function renderBadge() {
+        const badge = document.getElementById('bellBadge');
+        const count = unreadCount();
+        if (count > 0) {
+          badge.textContent = count;
+          badge.classList.add('show');
+        } else {
+          badge.classList.remove('show');
+        }
+      }
+
+      function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      // ── 交互 ──
+      let dropdownOpen = false;
+
+      function toggleDropdown() {
+        const panel = document.getElementById('dropdown');
+        const btn = document.getElementById('bellBtn');
+        dropdownOpen = !dropdownOpen;
+        if (dropdownOpen) {
+          panel.classList.add('open');
+          btn.classList.add('active');
+          // 打开即标记全部已读
+          markAllReadSilent();
+        } else {
+          panel.classList.remove('open');
+          btn.classList.remove('active');
+          // 关闭时折叠已读区
+          readExpanded = false;
+          renderDropdown();
+        }
+      }
+
+      function markAllReadSilent() {
+        notifications.forEach(n => n.read = true);
+        readExpanded = false;
+        renderAll();
+      }
+
+      function markAllRead() {
+        notifications.forEach(n => n.read = true);
+        readExpanded = false;
+        renderAll();
+      }
+
+      function dismissOne(id) {
+        notifications = notifications.filter(n => n.id !== id);
+        renderAll();
+      }
+
+      function toggleReadSection() {
+        readExpanded = !readExpanded;
+        renderAll();
+      }
+
+      function pushDemoNotif(type, severity, title, msg) {
+        const n = { id: ++notifId, type, severity, title, msg, time: Date.now(), read: false };
+        notifications.unshift(n);
+        renderAll();
+        // 模拟 toast
+        showToast(severity, msg);
+      }
+
+      function showToast(severity, msg) {
+        const area = document.getElementById('toastArea');
+        const card = document.createElement('div');
+        const iconMap = { success:'✓', error:'✕', warning:'⚠', info:'ℹ' };
+        card.className = 'toast-card ' + (severity === 'error' ? 'error' : severity === 'success' ? 'success' : severity === 'warning' ? 'warning' : 'info');
+        card.innerHTML = '<span class="toast-icon">' + (iconMap[severity]||'ℹ') + '</span><div>' + esc(msg) + '</div>';
+        area.appendChild(card);
+        setTimeout(() => { card.style.opacity='0'; card.style.transition='opacity 0.3s'; setTimeout(() => card.remove(), 300); }, 4000);
+      }
+
+      function resetDemo() {
+        notifications = [
+          { id: 1, type:'scan', severity:'success', title:'扫描完成', msg:'资料库扫描完成 — 新增 3 部影片', time: Date.now() - 2*60*1000, read: false },
+          { id: 2, type:'scrape', severity:'success', title:'刮削完成', msg:'ABC-123 元数据刮削成功', time: Date.now() - 15*60*1000, read: false },
+          { id: 3, type:'update', severity:'info', title:'更新可用', msg:'Curated v2.1.0 已发布，点击查看更新日志', time: Date.now() - 60*60*1000, read: false },
+          { id: 4, type:'scrape', severity:'error', title:'刮削失败', msg:'DEF-456 元数据刮削失败：网络超时', time: Date.now() - 2*60*60*1000, read: true },
+          { id: 5, type:'scan', severity:'success', title:'扫描完成', msg:'fsnotify 自动扫描 — 新增 1 部影片', time: Date.now() - 5*60*60*1000, read: true },
+          { id: 6, type:'system', severity:'info', title:'设置已保存', msg:'库目录监听设置已更新', time: Date.now() - 8*60*60*1000, read: true },
+        ];
+        notifId = 6;
+        dropdownOpen = false;
+        readExpanded = false;
+        document.getElementById('dropdown').classList.remove('open');
+        document.getElementById('bellBtn').classList.remove('active');
+        document.getElementById('toastArea').innerHTML = `
+          <div class="toast-card success">
+            <span class="toast-icon">✓</span>
+            <div>资料库扫描完成 — 新增 3 部影片</div>
+          </div>
+        `;
+        renderAll();
+      }
+
+      // 点击面板外关闭
+      document.addEventListener('click', function(e) {
+        if (dropdownOpen && !document.getElementById('bellAnchor').contains(e.target)) {
+          dropdownOpen = false;
+          readExpanded = false;
+          document.getElementById('dropdown').classList.remove('open');
+          document.getElementById('bellBtn').classList.remove('active');
+          renderDropdown();
+        }
+      });
+
+      // 初始化
+      renderAll();
+    </script>
+  </body>
+</html>
