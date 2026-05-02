@@ -164,3 +164,26 @@ b952d7a5 docs(frontend): add optimization review plan
 86c449a7 fix(scan): clean up task tracker polling
 2ee92cda fix(api): add client request timeout
 def4e00e chore(release): prepare 1.3.4 package",versionSource=auto-patch; BuildStamp=20260502.093720; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-03,1.4.2,c9f96c30,master,release:publish,release/portable/Curated-1.4.2-windows-x64.zip; release/installer/Curated-Setup-1.4.2.exe; release/manifest/release.json,成功,wujiahui,"c9f96c30 docs: refine electron migration plan
+19e5ac3b test: serialize installer version health checks
+4683336b docs: add electron migration plan
+b576770d feat: download latest installer from update card
+b006f80d feat: show hidden player action feedback
+9c2b729a docs: document gamepad web mvp
+72d3d331 feat: add gamepad page and large seek jumps
+e8734d8d feat: add library grid gamepad navigation
+b581906f feat: add global gamepad focus navigation
+4ddf725a feat: add player gamepad controls setting
+c31022a3 fix: type gamepad rumble support
+6a7d787a feat: add gamepad composable
+984c2c5b feat: add gamepad input utilities
+f7bee472 docs: plan ps5 controller integration
+38f3ddd4 fix: make homepage refresh spinner visibly slower
+92eb57ca fix: slow homepage refresh spinner
+e1a98d00 fix: refresh homepage recommendation rail
+a0c7f87b fix: keep homepage recommendation ids as arrays
+4aaa9ae7 feat: preserve homepage hero on recommendation refresh
+a8870e7b feat: refresh homepage recommendations only
+118192c5 docs(plan): record notification center optimization
+0ac13b5f fix: harden notification center behavior
+b5c077f1 chore(release): prepare 1.4.1 package",versionSource=auto-patch; BuildStamp=20260502.165208; portable=versionSource=explicit; installer=versionSource=explicit
