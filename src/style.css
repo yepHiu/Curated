@@ -263,3 +263,11 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@layer components {
+  [data-controller-focused="true"] {
+    outline: 3px solid var(--ring);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px rgb(254 98 142 / 0.18);
+  }
+}

@@ -38,12 +38,14 @@ import {
   resolveLibraryMode,
 } from "@/lib/library-query"
 import { useLibraryWatchToasts } from "@/composables/use-library-watch-toasts"
+import { useGamepadFocusNavigation } from "@/composables/use-gamepad-focus-navigation"
 import NotificationCenter from "@/components/notification-center/NotificationCenter.vue"
 import { useTheme } from "@/composables/use-theme"
 import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
 
 useLibraryWatchToasts()
+useGamepadFocusNavigation()
 
 const { resolvedMode, setThemePreference } = useTheme()
 
