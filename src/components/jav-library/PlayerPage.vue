@@ -110,7 +110,10 @@ import {
   toFiniteNumber,
   type PlaybackStatsSnapshot,
 } from "@/lib/player-playback-stats"
+import { usePlayerGamepadControls } from "@/composables/use-player-gamepad-controls"
+import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
+import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -126,6 +129,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const { gamepadControlsEnabled } = useGamepadControlsPreference()
 const watchTimeTracker = createPlaybackWatchTimeTracker({ movieId: props.movie.id })
 const playbackSeekBackwardStep = computed(() =>
   Math.max(1, Number(libraryService.playerSettings.value.seekBackwardStepSec ?? 10)),
@@ -1504,6 +1508,29 @@ async function toggleFullscreen() {
   }
 }
 
+async function exitPlayerFullscreen() {
+  const el = surfaceRef.value
+  if (!el || document.fullscreenElement !== el) return
+  try {
+    await document.exitFullscreen()
+  } catch {
+    // ignore
+  } finally {
+    syncSurfaceFullscreenFromDocument()
+  }
+}
+
+async function exitPlayerRoute() {
+  await router.push(resolveNavigationBackLink(route, props.movie.id).to)
+}
+
+function toggleChromeVisibility() {
+  chromeVisible.value = !chromeVisible.value
+  if (chromeVisible.value && isPlaying.value) {
+    scheduleChromeIdleHide()
+  }
+}
+
 async function togglePictureInPicture() {
   const v = videoRef.value
   if (!v || !playbackSrc.value || !pipSupported.value) return
@@ -1517,6 +1544,24 @@ async function togglePictureInPicture() {
     // 需用户手势或编解码器不支持时可能失败，静默处理
   }
 }
+
+usePlayerGamepadControls({
+  enabled: gamepadControlsEnabled,
+  isFullscreen: isSurfaceFullscreen,
+  seekBackwardStepSec: playbackSeekBackwardStep,
+  seekForwardStepSec: playbackSeekForwardStep,
+  actions: {
+    togglePlayPause,
+    seekDelta,
+    adjustVolume,
+    toggleMute,
+    toggleChrome: toggleChromeVisibility,
+    toggleDetailedStats,
+    runCuratedCapture,
+    exitFullscreen: exitPlayerFullscreen,
+    exitPlayer: exitPlayerRoute,
+  },
+})
 
 const fileBasename = computed(() => {
   const loc = props.movie.location?.trim() ?? ""

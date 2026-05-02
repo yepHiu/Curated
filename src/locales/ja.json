@@ -585,6 +585,8 @@
     "curatedCorsLearnAria": "MDN を新しいタブで開く",
     "playbackCardTitle": "再生の設定",
     "playbackCardDesc": "ブラウザ再生、HLS ストリーム配信、外部プレイヤーの既定動作を設定します。開発環境またはテスト環境では追加のデバッグ項目も表示されます。",
+    "gamepadControlsTitle": "ゲームパッド操作",
+    "gamepadControlsHint": "DualSense を含む標準 Gamepad API 対応コントローラーで再生を操作します。この設定は現在のブラウザー端末に保存されます。",
     "hardwareDecode": "ハードウェアデコード",
     "hardwareDecodeHint": "HLS 再生チェーン向けのハードウェアアクセラレーション設定です。有効時はハードウェア映像トランスコードを優先し、失敗時はソフトウェアへ自動フォールバックします。",
     "playbackHardwareEncoder": "優先するハードウェアエンコーダ",
