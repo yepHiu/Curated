@@ -92,10 +92,18 @@
     "back": "Back",
     "clearAll": "Clear all",
     "noHistory": "No notification history",
+    "emptyFiltered": "No notifications in this filter",
+    "unreadCountAria": "{n} unread notifications",
     "justNow": "Just now",
     "minutesAgo": "{n} min ago",
     "hoursAgo": "{n} hr ago",
     "daysAgo": "{n} d ago",
+    "filters": {
+      "all": "All",
+      "attention": "Needs attention",
+      "tasks": "Tasks",
+      "system": "System"
+    },
     "titles": {
       "scanDone": "Scan complete",
       "scanFailed": "Scan failed",

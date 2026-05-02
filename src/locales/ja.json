@@ -92,10 +92,18 @@
     "back": "戻る",
     "clearAll": "すべて削除",
     "noHistory": "通知履歴はありません",
+    "emptyFiltered": "このフィルターの通知はありません",
+    "unreadCountAria": "未読通知 {n} 件",
     "justNow": "たった今",
     "minutesAgo": "{n} 分前",
     "hoursAgo": "{n} 時間前",
     "daysAgo": "{n} 日前",
+    "filters": {
+      "all": "すべて",
+      "attention": "要確認",
+      "tasks": "タスク",
+      "system": "システム"
+    },
     "titles": {
       "scanDone": "スキャン完了",
       "scanFailed": "スキャン失敗",

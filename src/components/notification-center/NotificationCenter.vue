@@ -3,6 +3,7 @@ import { ref, computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { ArrowLeft, ArrowRight, Bell, Check, ChevronDown } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,20 +25,31 @@ const {
   markAllRead,
   dismissOne,
   clearAll,
+  setCenterOpen,
 } = useNotificationCenter()
 
 const popoverOpen = ref(false)
 const showHistory = ref(false)
 const readExpanded = ref(false)
+const notificationFilter = ref<NotificationFilter>("all")
+
+type NotificationFilter = "all" | "attention" | "tasks" | "system"
+
+const notificationFilters: Array<{ value: NotificationFilter; labelKey: string }> = [
+  { value: "all", labelKey: "notificationCenter.filters.all" },
+  { value: "attention", labelKey: "notificationCenter.filters.attention" },
+  { value: "tasks", labelKey: "notificationCenter.filters.tasks" },
+  { value: "system", labelKey: "notificationCenter.filters.system" },
+]
 
 function onPopoverOpenChange(open: boolean) {
   popoverOpen.value = open
+  setCenterOpen(open)
   if (open) {
-    markAllRead()
-  } else {
-    showHistory.value = false
-    readExpanded.value = false
+    return
   }
+  showHistory.value = false
+  readExpanded.value = false
 }
 
 function enterHistory() {
@@ -53,7 +65,29 @@ function handleClearAll() {
   showHistory.value = false
 }
 
-const recentReadNotifications = computed(() => readNotifications.value.slice(0, 20))
+function matchesFilter(notif: AppNotification): boolean {
+  if (notificationFilter.value === "all") {
+    return true
+  }
+  if (notificationFilter.value === "attention") {
+    return notif.severity === "warning" || notif.severity === "error"
+  }
+  if (notificationFilter.value === "tasks") {
+    return notif.type === "scan" || notif.type === "scrape"
+  }
+  return notif.type === "update" || notif.type === "system"
+}
+
+const filteredUnreadNotifications = computed(() => unreadNotifications.value.filter(matchesFilter))
+const filteredReadNotifications = computed(() => readNotifications.value.filter(matchesFilter))
+const recentReadNotifications = computed(() => filteredReadNotifications.value.slice(0, 20))
+const readPreviewNotifications = computed(() => filteredReadNotifications.value.slice(0, 5))
+const unreadBadgeLabel = computed(() => (unreadCount.value > 99 ? "99+" : String(unreadCount.value)))
+const emptyNotificationLabel = computed(() =>
+  notificationFilter.value === "all"
+    ? t("notificationCenter.empty")
+    : t("notificationCenter.emptyFiltered"),
+)
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts
@@ -82,10 +116,13 @@ function dotClass(type: AppNotification["type"]) {
         :aria-label="t('notificationCenter.bellAria')"
       >
         <Bell class="size-5" />
-        <span
+        <Badge
           v-if="unreadCount > 0"
-          class="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_rgba(254,98,142,0.5)]"
-        />
+          class="absolute -top-1 -right-1 min-w-5 px-1 text-[0.65rem] leading-4 shadow-[0_0_6px_rgba(254,98,142,0.5)]"
+          :aria-label="t('notificationCenter.unreadCountAria', { n: unreadBadgeLabel })"
+        >
+          {{ unreadBadgeLabel }}
+        </Badge>
       </Button>
     </PopoverTrigger>
 
@@ -93,19 +130,19 @@ function dotClass(type: AppNotification["type"]) {
       align="end"
       :side-offset="12"
       :align-offset="-8"
-      class="w-[380px] p-0 rounded-2xl shadow-lg shadow-black/15"
+      class="flex max-h-[min(36rem,calc(100vh-6rem))] w-[min(380px,calc(100vw-1rem))] flex-col overflow-hidden p-0 rounded-2xl shadow-lg shadow-black/15"
     >
       <!-- 标题栏 -->
       <div
         v-if="!showHistory"
-        class="flex items-center justify-between px-4 py-3 border-b border-border/60"
+        class="flex shrink-0 items-center justify-between px-4 py-3 border-b border-border/60"
       >
         <span class="text-sm font-semibold flex items-center gap-1.5">
           <Bell class="size-4" />
           {{ t("notificationCenter.title") }}
         </span>
         <Button
-          v-if="unreadNotifications.length > 0"
+          v-if="filteredUnreadNotifications.length > 0"
           type="button"
           variant="ghost"
           size="sm"
@@ -119,7 +156,7 @@ function dotClass(type: AppNotification["type"]) {
       <!-- 历史模式标题栏 -->
       <div
         v-else
-        class="flex items-center justify-between px-4 py-3 border-b border-border/60"
+        class="flex shrink-0 items-center justify-between px-4 py-3 border-b border-border/60"
       >
         <Button
           type="button"
@@ -144,10 +181,25 @@ function dotClass(type: AppNotification["type"]) {
       </div>
 
       <!-- 通知列表 -->
-      <ScrollArea v-if="!showHistory" class="max-h-72">
-        <div v-if="unreadNotifications.length > 0" class="py-1">
+      <div class="flex shrink-0 gap-1 overflow-x-auto border-b border-border/60 px-3 py-2">
+        <Button
+          v-for="filter in notificationFilters"
+          :key="filter.value"
+          type="button"
+          :variant="notificationFilter === filter.value ? 'secondary' : 'ghost'"
+          size="sm"
+          class="h-7 shrink-0 rounded-lg px-2.5 text-xs"
+          :data-test="`notification-filter-${filter.value}`"
+          @click="notificationFilter = filter.value"
+        >
+          {{ t(filter.labelKey) }}
+        </Button>
+      </div>
+
+      <ScrollArea v-if="!showHistory" class="h-[min(18rem,calc(100vh-14rem))] min-h-0 overflow-hidden">
+        <div v-if="filteredUnreadNotifications.length > 0" class="py-1">
           <button
-            v-for="notif in unreadNotifications"
+            v-for="notif in filteredUnreadNotifications"
             :key="notif.id"
             type="button"
             class="flex w-full gap-2.5 px-4 py-3 text-left transition-colors hover:bg-muted/60"
@@ -171,12 +223,12 @@ function dotClass(type: AppNotification["type"]) {
           class="flex flex-col items-center gap-2 py-10 text-muted-foreground"
         >
           <Bell class="size-8 opacity-30" />
-          <p class="text-sm">{{ t("notificationCenter.empty") }}</p>
+          <p class="text-sm">{{ emptyNotificationLabel }}</p>
         </div>
       </ScrollArea>
 
       <!-- 历史模式列表 -->
-      <ScrollArea v-else class="max-h-80">
+      <ScrollArea v-else class="h-[min(20rem,calc(100vh-14rem))] min-h-0 overflow-hidden">
         <div v-if="recentReadNotifications.length > 0" class="py-1">
           <div
             v-for="notif in recentReadNotifications"
@@ -202,20 +254,26 @@ function dotClass(type: AppNotification["type"]) {
           class="flex flex-col items-center gap-2 py-10 text-muted-foreground"
         >
           <Bell class="size-8 opacity-30" />
-          <p class="text-sm">{{ t("notificationCenter.noHistory") }}</p>
+          <p class="text-sm">
+            {{
+              notificationFilter === "all"
+                ? t("notificationCenter.noHistory")
+                : t("notificationCenter.emptyFiltered")
+            }}
+          </p>
         </div>
       </ScrollArea>
 
       <!-- 已读折叠区（非历史模式） -->
       <Collapsible
-        v-if="!showHistory && readNotifications.length > 0"
+        v-if="!showHistory && filteredReadNotifications.length > 0"
         v-model:open="readExpanded"
-        class="border-t border-border/60"
+        class="shrink-0 border-t border-border/60"
       >
         <CollapsibleTrigger
           class="flex w-full items-center justify-between px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/40 transition-colors"
         >
-          <span>{{ t("notificationCenter.readSection", { n: readNotifications.length }) }}</span>
+          <span>{{ t("notificationCenter.readSection", { n: filteredReadNotifications.length }) }}</span>
           <ChevronDown
             class="size-3.5 transition-transform"
             :class="{ 'rotate-180': readExpanded }"
@@ -223,7 +281,7 @@ function dotClass(type: AppNotification["type"]) {
         </CollapsibleTrigger>
         <CollapsibleContent class="pb-1">
           <div
-            v-for="notif in recentReadNotifications"
+            v-for="notif in readPreviewNotifications"
             :key="notif.id"
             class="flex gap-2.5 px-4 py-2.5 opacity-50"
           >
