@@ -75,18 +75,19 @@ type DevPerformanceSummaryDTO struct {
 
 // AppUpdateStatusDTO reports the packaged-app update state vs the latest GitHub Release.
 type AppUpdateStatusDTO struct {
-	Supported           bool   `json:"supported"`
-	Status              string `json:"status"`
-	InstalledVersion    string `json:"installedVersion,omitempty"`
-	LatestVersion       string `json:"latestVersion,omitempty"`
-	HasUpdate           bool   `json:"hasUpdate,omitempty"`
-	CheckedAt           string `json:"checkedAt,omitempty"`
-	PublishedAt         string `json:"publishedAt,omitempty"`
-	ReleaseName         string `json:"releaseName,omitempty"`
-	ReleaseURL          string `json:"releaseUrl,omitempty"`
-	ReleaseNotesSnippet string `json:"releaseNotesSnippet,omitempty"`
-	Source              string `json:"source,omitempty"`
-	ErrorMessage        string `json:"errorMessage,omitempty"`
+	Supported            bool   `json:"supported"`
+	Status               string `json:"status"`
+	InstalledVersion     string `json:"installedVersion,omitempty"`
+	LatestVersion        string `json:"latestVersion,omitempty"`
+	HasUpdate            bool   `json:"hasUpdate,omitempty"`
+	CheckedAt            string `json:"checkedAt,omitempty"`
+	PublishedAt          string `json:"publishedAt,omitempty"`
+	ReleaseName          string `json:"releaseName,omitempty"`
+	ReleaseURL           string `json:"releaseUrl,omitempty"`
+	InstallerDownloadURL string `json:"installerDownloadUrl,omitempty"`
+	ReleaseNotesSnippet  string `json:"releaseNotesSnippet,omitempty"`
+	Source               string `json:"source,omitempty"`
+	ErrorMessage         string `json:"errorMessage,omitempty"`
 }
 
 // ListMoviesRequest filters the library movie listing by mode, query, actor, group, or studio.

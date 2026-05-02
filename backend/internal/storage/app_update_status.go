@@ -9,16 +9,17 @@ const appUpdateStatusKey = "app-update"
 
 // AppUpdateStatusSnapshot holds the cached packaged-app update check result.
 type AppUpdateStatusSnapshot struct {
-	InstalledVersion    string
-	LatestVersion       string
-	Status              string
-	CheckedAt           string
-	PublishedAt         string
-	ReleaseName         string
-	ReleaseURL          string
-	ReleaseNotesSnippet string
-	Source              string
-	ErrorMessage        string
+	InstalledVersion     string
+	LatestVersion        string
+	Status               string
+	CheckedAt            string
+	PublishedAt          string
+	ReleaseName          string
+	ReleaseURL           string
+	InstallerDownloadURL string
+	ReleaseNotesSnippet  string
+	Source               string
+	ErrorMessage         string
 }
 
 // GetAppUpdateStatusSnapshot returns the cached app update status. The bool is false when no snapshot exists.
@@ -34,6 +35,7 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 			published_at,
 			release_name,
 			release_url,
+			installer_download_url,
 			release_notes_snippet,
 			source,
 			error_message
@@ -47,6 +49,7 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 		&snapshot.PublishedAt,
 		&snapshot.ReleaseName,
 		&snapshot.ReleaseURL,
+		&snapshot.InstallerDownloadURL,
 		&snapshot.ReleaseNotesSnippet,
 		&snapshot.Source,
 		&snapshot.ErrorMessage,
@@ -73,10 +76,11 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 			published_at,
 			release_name,
 			release_url,
+			installer_download_url,
 			release_notes_snippet,
 			source,
 			error_message
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(status_key) DO UPDATE SET
 			installed_version = excluded.installed_version,
 			latest_version = excluded.latest_version,
@@ -85,6 +89,7 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 			published_at = excluded.published_at,
 			release_name = excluded.release_name,
 			release_url = excluded.release_url,
+			installer_download_url = excluded.installer_download_url,
 			release_notes_snippet = excluded.release_notes_snippet,
 			source = excluded.source,
 			error_message = excluded.error_message
@@ -97,6 +102,7 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 		snapshot.PublishedAt,
 		snapshot.ReleaseName,
 		snapshot.ReleaseURL,
+		snapshot.InstallerDownloadURL,
 		snapshot.ReleaseNotesSnippet,
 		snapshot.Source,
 		snapshot.ErrorMessage,

@@ -39,13 +39,19 @@ type Service struct {
 }
 
 type latestReleaseResponse struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name"`
-	HTMLURL     string `json:"html_url"`
-	Body        string `json:"body"`
-	PublishedAt string `json:"published_at"`
-	Draft       bool   `json:"draft"`
-	Prerelease  bool   `json:"prerelease"`
+	TagName     string               `json:"tag_name"`
+	Name        string               `json:"name"`
+	HTMLURL     string               `json:"html_url"`
+	Body        string               `json:"body"`
+	PublishedAt string               `json:"published_at"`
+	Draft       bool                 `json:"draft"`
+	Prerelease  bool                 `json:"prerelease"`
+	Assets      []latestReleaseAsset `json:"assets"`
+}
+
+type latestReleaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
 type semanticVersion struct {
@@ -104,16 +110,17 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 	release, err := s.fetchLatestRelease(ctx)
 	if err != nil {
 		snapshot := storage.AppUpdateStatusSnapshot{
-			InstalledVersion:    installedVersion,
-			LatestVersion:       existing.LatestVersion,
-			Status:              "error",
-			CheckedAt:           s.now().UTC().Format(time.RFC3339),
-			PublishedAt:         existing.PublishedAt,
-			ReleaseName:         existing.ReleaseName,
-			ReleaseURL:          firstNonEmpty(existing.ReleaseURL, s.releasePageURL),
-			ReleaseNotesSnippet: existing.ReleaseNotesSnippet,
-			Source:              updateSourceGitHubReleases,
-			ErrorMessage:        err.Error(),
+			InstalledVersion:     installedVersion,
+			LatestVersion:        existing.LatestVersion,
+			Status:               "error",
+			CheckedAt:            s.now().UTC().Format(time.RFC3339),
+			PublishedAt:          existing.PublishedAt,
+			ReleaseName:          existing.ReleaseName,
+			ReleaseURL:           firstNonEmpty(existing.ReleaseURL, s.releasePageURL),
+			InstallerDownloadURL: existing.InstallerDownloadURL,
+			ReleaseNotesSnippet:  existing.ReleaseNotesSnippet,
+			Source:               updateSourceGitHubReleases,
+			ErrorMessage:         err.Error(),
 		}
 		if saveErr := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); saveErr != nil {
 			return contracts.AppUpdateStatusDTO{}, saveErr
@@ -124,14 +131,15 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 	latestVersion, latestSemver, err := normalizedSemver(release.TagName)
 	if err != nil {
 		snapshot := storage.AppUpdateStatusSnapshot{
-			InstalledVersion: installedVersion,
-			Status:           "error",
-			CheckedAt:        s.now().UTC().Format(time.RFC3339),
-			PublishedAt:      release.PublishedAt,
-			ReleaseName:      firstNonEmpty(strings.TrimSpace(release.Name), strings.TrimSpace(release.TagName)),
-			ReleaseURL:       firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
-			Source:           updateSourceGitHubReleases,
-			ErrorMessage:     err.Error(),
+			InstalledVersion:     installedVersion,
+			Status:               "error",
+			CheckedAt:            s.now().UTC().Format(time.RFC3339),
+			PublishedAt:          release.PublishedAt,
+			ReleaseName:          firstNonEmpty(strings.TrimSpace(release.Name), strings.TrimSpace(release.TagName)),
+			ReleaseURL:           firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
+			InstallerDownloadURL: resolveInstallerDownloadURL(release),
+			Source:               updateSourceGitHubReleases,
+			ErrorMessage:         err.Error(),
 		}
 		if saveErr := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); saveErr != nil {
 			return contracts.AppUpdateStatusDTO{}, saveErr
@@ -145,15 +153,16 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 	}
 
 	snapshot := storage.AppUpdateStatusSnapshot{
-		InstalledVersion:    installedVersion,
-		LatestVersion:       latestVersion,
-		Status:              status,
-		CheckedAt:           s.now().UTC().Format(time.RFC3339),
-		PublishedAt:         strings.TrimSpace(release.PublishedAt),
-		ReleaseName:         firstNonEmpty(strings.TrimSpace(release.Name), strings.TrimSpace(release.TagName)),
-		ReleaseURL:          firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
-		ReleaseNotesSnippet: summarizeReleaseNotes(release.Body),
-		Source:              updateSourceGitHubReleases,
+		InstalledVersion:     installedVersion,
+		LatestVersion:        latestVersion,
+		Status:               status,
+		CheckedAt:            s.now().UTC().Format(time.RFC3339),
+		PublishedAt:          strings.TrimSpace(release.PublishedAt),
+		ReleaseName:          firstNonEmpty(strings.TrimSpace(release.Name), strings.TrimSpace(release.TagName)),
+		ReleaseURL:           firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
+		InstallerDownloadURL: resolveInstallerDownloadURL(release),
+		ReleaseNotesSnippet:  summarizeReleaseNotes(release.Body),
+		Source:               updateSourceGitHubReleases,
 	}
 	if err := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); err != nil {
 		return contracts.AppUpdateStatusDTO{}, err
@@ -214,20 +223,46 @@ func (s *Service) fetchLatestRelease(ctx context.Context) (latestReleaseResponse
 
 func snapshotToDTO(snapshot storage.AppUpdateStatusSnapshot) contracts.AppUpdateStatusDTO {
 	dto := contracts.AppUpdateStatusDTO{
-		Supported:           snapshot.Status != "unsupported",
-		Status:              snapshot.Status,
-		InstalledVersion:    snapshot.InstalledVersion,
-		LatestVersion:       snapshot.LatestVersion,
-		CheckedAt:           snapshot.CheckedAt,
-		PublishedAt:         snapshot.PublishedAt,
-		ReleaseName:         snapshot.ReleaseName,
-		ReleaseURL:          snapshot.ReleaseURL,
-		ReleaseNotesSnippet: snapshot.ReleaseNotesSnippet,
-		Source:              snapshot.Source,
-		ErrorMessage:        snapshot.ErrorMessage,
+		Supported:            snapshot.Status != "unsupported",
+		Status:               snapshot.Status,
+		InstalledVersion:     snapshot.InstalledVersion,
+		LatestVersion:        snapshot.LatestVersion,
+		CheckedAt:            snapshot.CheckedAt,
+		PublishedAt:          snapshot.PublishedAt,
+		ReleaseName:          snapshot.ReleaseName,
+		ReleaseURL:           snapshot.ReleaseURL,
+		InstallerDownloadURL: snapshot.InstallerDownloadURL,
+		ReleaseNotesSnippet:  snapshot.ReleaseNotesSnippet,
+		Source:               snapshot.Source,
+		ErrorMessage:         snapshot.ErrorMessage,
 	}
 	dto.HasUpdate = snapshot.Status == "update-available"
 	return dto
+}
+
+func resolveInstallerDownloadURL(release latestReleaseResponse) string {
+	var fallback string
+	for _, asset := range release.Assets {
+		name := strings.TrimSpace(asset.Name)
+		downloadURL := strings.TrimSpace(asset.BrowserDownloadURL)
+		if downloadURL == "" {
+			continue
+		}
+
+		normalizedName := strings.ToLower(name)
+		normalizedURL := strings.ToLower(strings.Split(downloadURL, "?")[0])
+		if !strings.HasSuffix(normalizedName, ".exe") && !strings.HasSuffix(normalizedURL, ".exe") {
+			continue
+		}
+		if fallback == "" {
+			fallback = downloadURL
+		}
+		searchText := normalizedName + " " + normalizedURL
+		if strings.Contains(searchText, "setup") || strings.Contains(searchText, "installer") {
+			return downloadURL
+		}
+	}
+	return fallback
 }
 
 func normalizedSemver(raw string) (display string, parsed semanticVersion, err error) {

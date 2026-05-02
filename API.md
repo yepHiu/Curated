@@ -103,9 +103,10 @@ Purpose:
 Important notes:
 
 - the backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`
+- successful release checks also expose `installerDownloadUrl` when the latest release includes a Windows `.exe` installer asset
 - development runtimes use `0.0.0` as the local installed version so the full update-check path remains testable before packaging
 - successful checks are cached in SQLite so routine reads do not hit GitHub on every app start
-- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `releaseNotesSnippet`, and optional `errorMessage`
+- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `releaseNotesSnippet`, and optional `errorMessage`
 
 ### `POST /api/app-update/check`
 

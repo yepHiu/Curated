@@ -37,6 +37,16 @@ Curated 目前在 Settings -> About 中已经能展示：
 
 让正式安装包用户可以在 Curated 内部低成本确认是否有可用更新，并在发现更新时获得明确、可信、低打扰的升级引导。
 
+## 2026-05-03 Scope Update
+
+本需求已从“只打开 GitHub Release 页面”扩展为“优先直接下载最新 Windows `.exe` 安装包”：
+
+- 后端仍以 GitHub latest Release 作为唯一更新来源。
+- 当 latest Release 的 assets 中包含 `.exe` 安装包时，API 返回 `installerDownloadUrl`。
+- Settings -> About 的主操作按钮优先链接该 `.exe` 安装包，让浏览器直接开始下载。
+- 如果 latest Release 没有可识别的 `.exe` asset，界面继续降级为打开官方 Release 页面。
+- “不做应用内自动下载/静默安装”的边界仍成立：Curated 不在后台替用户下载或替换程序，只提供用户点击触发的浏览器下载入口。
+
 ## Non-Goals
 
 本期不做以下内容：

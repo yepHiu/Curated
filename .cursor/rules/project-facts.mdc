@@ -94,6 +94,12 @@ alwaysApply: true
 - Frontend rollover: `src/composables/use-homepage-daily-recommendations.ts` watches the current UTC day key and re-fetches automatically after a day change; if a later refresh fails, the previous snapshot is kept in memory.
 - Dev verification: `SettingsPage.vue` renders `SettingsHomepageDevTools.vue` only in dev mode with Web API enabled, exposing a manual refresh button in Settings -> About that calls `POST /api/homepage/recommendations/refresh` without a preserve body. The homepage "Today's Recommendations" refresh button sends `preserveHeroMovieIds` plus `excludeRecommendationMovieIds` and therefore refreshes the rail without rotating the hero carousel.
 
+## 2026-05 App Update Installer Download
+
+- `GET /api/app-update/status` and `POST /api/app-update/check` now include optional `installerDownloadUrl` when the latest GitHub Release exposes a Windows `.exe` installer asset. The backend prefers assets whose name or URL ends in `.exe` and contain `setup` or `installer`, then falls back to any `.exe` asset.
+- SQLite caches the installer download URL in `app_update_status.installer_download_url`, so Settings -> About can keep showing a direct download action until the cache expires or a manual check refreshes it.
+- Settings -> About uses `installerDownloadUrl` as the primary update action and falls back to `releaseUrl` when no installer asset is available. The sidebar update badge still links to Settings -> About.
+
 ## 2026-05 Movie Import
 
 - Frontend now exposes a top-bar `MovieImportDialog` next to the theme switch. It supports drag/drop, multi-file selection, and browser folder selection via `webkitdirectory`; selected videos are uploaded through the service layer and unsupported/duplicate files are skipped before submit.

@@ -14,6 +14,7 @@ vi.mock("vue-i18n", () => ({
         "settings.appUpdateAvailableBody": "可前往 Release 页面下载安装。",
         "settings.appUpdateCheckAction": "检查更新",
         "settings.appUpdateDownloadAction": "打开 Release 页面",
+        "settings.appUpdateDownloadInstallerAction": "下载最新安装包",
         "settings.aboutVersionLabel": "版本号",
         "settings.aboutInstallerVersionLabel": "安装包版本号",
         "settings.appUpdateReleaseNotesExpand": "展开摘要",
@@ -40,6 +41,7 @@ vi.mock("@/composables/use-app-update", () => ({
       checkedAt: "2026-04-19T13:00:00Z",
       releaseName: "v1.2.8",
       releaseUrl: "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
+      installerDownloadUrl: "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
       releaseNotesSnippet: "Bug fixes",
     })),
     status: computed(() => "update-available"),
@@ -83,6 +85,12 @@ describe("SettingsAppUpdateSection", () => {
     expect(text).not.toContain("settings.appUpdateLatestVersionLabel")
     expect(text).not.toContain("settings.appUpdatePublishedAtLabel")
     expect(text).not.toContain("settings.appUpdateCheckedAtLabel")
+
+    const download = wrapper.get("[data-app-update-download]")
+    expect(download.attributes("href")).toBe(
+      "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
+    )
+    expect(download.attributes("download")).toBe("Curated-Setup-1.2.8.exe")
 
     const notes = wrapper.get("[data-app-update-release-notes]")
     expect(notes.classes()).toContain("line-clamp-1")

@@ -30,7 +30,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - SQLite-backed persistence for library data, playback progress, daily watch-time aggregates, comments, ratings, and curated frames.
 - Top-bar movie import can copy selected files or browser-selected folders into the configured default library root, with progress, large-file resumable upload, and failure notifications.
 - UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices; the homepage can refresh today's picks away from the current rail while preserving the current hero slate, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
-- Packaged-app update checks in Settings -> About, backed by GitHub Releases with a lightweight sidebar badge when a newer installer is available.
+- Packaged-app update checks in Settings -> About, backed by GitHub Releases with direct latest-installer download and a lightweight sidebar badge when a newer installer is available.
 - Windows release flow with tray-mode startup, local web serving, and installer packaging.
 - Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
 - Web Gamepad API controls for standard controllers, including DualSense: global focus navigation, library-grid selection, player playback controls, and a browser-local Settings toggle.
@@ -111,7 +111,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 - Windows-oriented release workflow.
 - Tray-mode release runtime with local frontend hosting beside the backend executable.
-- Settings -> About can compare the current packaged installer version with the latest GitHub Release and open the official release page for manual upgrade.
+- Settings -> About can compare the current packaged installer version with the latest GitHub Release and download the latest `.exe` installer directly when the release exposes one, falling back to the official release page.
 
 ## Configuration
 

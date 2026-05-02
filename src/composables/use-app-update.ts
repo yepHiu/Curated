@@ -77,6 +77,7 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
       status: "error",
       errorMessage: message,
       releaseUrl: summary.value?.releaseUrl,
+      installerDownloadUrl: summary.value?.installerDownloadUrl,
       installedVersion: summary.value?.installedVersion,
       latestVersion: summary.value?.latestVersion,
       checkedAt: summary.value?.checkedAt,

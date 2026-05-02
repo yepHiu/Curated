@@ -40,6 +40,7 @@ export interface AppUpdateStatusDTO {
   publishedAt?: string
   releaseName?: string
   releaseUrl?: string
+  installerDownloadUrl?: string
   releaseNotesSnippet?: string
   source?: string
   errorMessage?: string

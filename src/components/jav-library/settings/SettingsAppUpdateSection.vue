@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { ArrowUpRight, Loader2, RefreshCw } from "lucide-vue-next"
+import { ArrowUpRight, Download, Loader2, RefreshCw } from "lucide-vue-next"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useAppUpdate } from "@/composables/use-app-update"
 import { Button } from "@/components/ui/button"
@@ -87,6 +87,29 @@ const installerVersionSummary = computed(() => {
   return installed || latest
 })
 const releaseUrl = computed(() => summary.value?.releaseUrl?.trim() ?? "")
+const installerDownloadUrl = computed(() => summary.value?.installerDownloadUrl?.trim() ?? "")
+const updateActionUrl = computed(() => installerDownloadUrl.value || releaseUrl.value)
+
+function decodeDownloadFilename(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+const installerDownloadFilename = computed(() => {
+  const raw = installerDownloadUrl.value
+  if (!raw) return ""
+  try {
+    const pathname = new URL(raw).pathname
+    const filename = decodeDownloadFilename(pathname.split("/").pop() ?? "")
+    return filename.toLowerCase().endsWith(".exe") ? filename : ""
+  } catch {
+    const filename = decodeDownloadFilename(raw.split(/[/?#]/).filter(Boolean).pop() ?? "")
+    return filename.toLowerCase().endsWith(".exe") ? filename : ""
+  }
+})
 const releaseTitle = computed(() => summary.value?.releaseName?.trim() || summary.value?.latestVersion || "")
 const releaseNotesSnippet = computed(() => summary.value?.releaseNotesSnippet?.trim() ?? "")
 
@@ -164,14 +187,25 @@ async function handleCheckNow() {
           </Button>
 
           <Button
-            v-if="releaseUrl"
+            v-if="updateActionUrl"
             as-child
             class="rounded-2xl"
             :variant="status === 'update-available' ? 'default' : 'secondary'"
           >
-            <a :href="releaseUrl" target="_blank" rel="noopener noreferrer" data-app-update-download>
-              <ArrowUpRight class="mr-2 size-4" aria-hidden="true" />
-              {{ t("settings.appUpdateDownloadAction") }}
+            <a
+              :href="updateActionUrl"
+              :target="installerDownloadUrl ? undefined : '_blank'"
+              :rel="installerDownloadUrl ? undefined : 'noopener noreferrer'"
+              :download="installerDownloadFilename || undefined"
+              data-app-update-download
+            >
+              <Download v-if="installerDownloadUrl" class="mr-2 size-4" aria-hidden="true" />
+              <ArrowUpRight v-else class="mr-2 size-4" aria-hidden="true" />
+              {{
+                installerDownloadUrl
+                  ? t("settings.appUpdateDownloadInstallerAction")
+                  : t("settings.appUpdateDownloadAction")
+              }}
             </a>
           </Button>
         </div>

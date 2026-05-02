@@ -41,6 +41,7 @@ const requiredLocaleKeys = [
   "preview.previous",
   "preview.next",
   "preview.imageOf",
+  "settings.appUpdateDownloadInstallerAction",
   "player.feedbackPlay",
   "player.feedbackPause",
   "player.hideStats",
