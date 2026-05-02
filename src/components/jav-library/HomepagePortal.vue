@@ -1,25 +1,35 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import { Loader2, RefreshCw } from "lucide-vue-next"
 import type { HomepagePortalModel, HomepageTasteEntry } from "@/lib/homepage-portal"
 import HomeContinueRow from "@/components/jav-library/HomeContinueRow.vue"
 import HomeHeroCarousel from "@/components/jav-library/HomeHeroCarousel.vue"
 import HomeSectionRow from "@/components/jav-library/HomeSectionRow.vue"
 import { useHomeScrollPreserve } from "@/composables/use-home-scroll-preserve"
+import { Button } from "@/components/ui/button"
 
 const props = defineProps<{
   model: HomepagePortalModel
+  recommendationsRefreshing?: boolean
 }>()
 
 const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   browseTaste: [payload: { kind: HomepageTasteEntry["kind"]; label: string }]
+  refreshRecommendations: []
 }>()
 
 const { t } = useI18n()
 const homeScrollRegionRef = ref<HTMLElement | null>(null)
 const { persist } = useHomeScrollPreserve({ scrollElRef: homeScrollRegionRef })
+
+const recommendationsRefreshLabel = computed(() =>
+  props.recommendationsRefreshing
+    ? t("home.refreshingRecommendations")
+    : t("home.refreshRecommendations"),
+)
 
 const recommendationMovies = computed(() =>
   props.model.recommendations.map((entry) => entry.movie),
@@ -76,7 +86,32 @@ function onHomeScroll() {
         :movies="recommendationMovies"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
-      />
+      >
+        <template #action>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            :disabled="recommendationsRefreshing"
+            :aria-label="t('home.refreshRecommendations')"
+            data-home-refresh-recommendations
+            @click="emit('refreshRecommendations')"
+          >
+            <Loader2
+              v-if="recommendationsRefreshing"
+              data-icon="inline-start"
+              class="animate-spin"
+              aria-hidden="true"
+            />
+            <RefreshCw
+              v-else
+              data-icon="inline-start"
+              aria-hidden="true"
+            />
+            {{ recommendationsRefreshLabel }}
+          </Button>
+        </template>
+      </HomeSectionRow>
 
       <HomeContinueRow
         :entries="model.continueWatching"

@@ -5,12 +5,17 @@ import { useLibraryService } from "@/services/library-service"
 
 type HomepageDailyRecommendationLoader = Pick<
   ReturnType<typeof useLibraryService>,
-  "getHomepageDailyRecommendations"
+  "getHomepageDailyRecommendations" | "refreshHomepageDailyRecommendations"
 >
 
 export interface UseHomepageDailyRecommendationsOptions {
   libraryService?: HomepageDailyRecommendationLoader
   utcDayKey?: Ref<string>
+}
+
+export interface RefreshHomepageRecommendationsOnlyOptions {
+  preserveOnError?: boolean
+  preserveHeroMovieIds?: readonly string[]
 }
 
 export function useHomepageDailyRecommendations(
@@ -23,19 +28,23 @@ export function useHomepageDailyRecommendations(
   const error = ref<unknown>(null)
   let requestSeq = 0
 
-  const refresh = async (options?: { preserveOnError?: boolean }) => {
+  const runSnapshotRequest = async (
+    loadSnapshot: () => Promise<HomepageDailyRecommendationsDTO>,
+    applySnapshot: (snapshot: HomepageDailyRecommendationsDTO) => HomepageDailyRecommendationsDTO,
+    options?: { preserveOnError?: boolean },
+  ) => {
     const preserveOnError = options?.preserveOnError ?? snapshot.value !== null
     const requestId = ++requestSeq
     loading.value = true
 
     try {
-      const next = await libraryService.getHomepageDailyRecommendations()
+      const next = await loadSnapshot()
       if (requestId !== requestSeq) {
         return snapshot.value
       }
-      snapshot.value = next
+      snapshot.value = applySnapshot(next)
       error.value = null
-      return next
+      return snapshot.value
     } catch (err) {
       if (requestId !== requestSeq) {
         return snapshot.value
@@ -50,6 +59,37 @@ export function useHomepageDailyRecommendations(
         loading.value = false
       }
     }
+  }
+
+  const refresh = async (options?: { preserveOnError?: boolean }) =>
+    runSnapshotRequest(
+      () => libraryService.getHomepageDailyRecommendations(),
+      (next) => next,
+      options,
+    )
+
+  const refreshRecommendationsOnly = async (
+    options?: RefreshHomepageRecommendationsOnlyOptions,
+  ) => {
+    const currentHeroMovieIds = snapshot.value?.heroMovieIds
+    const heroMovieIds = currentHeroMovieIds && currentHeroMovieIds.length > 0
+      ? currentHeroMovieIds
+      : options?.preserveHeroMovieIds
+
+    return runSnapshotRequest(
+      () => libraryService.refreshHomepageDailyRecommendations(),
+      (next) => {
+        if (!heroMovieIds || heroMovieIds.length === 0) {
+          return next
+        }
+
+        return {
+          ...next,
+          heroMovieIds: [...heroMovieIds],
+        }
+      },
+      options,
+    )
   }
 
   watch(
@@ -68,5 +108,6 @@ export function useHomepageDailyRecommendations(
     loading: readonly(loading),
     error: readonly(error),
     refresh,
+    refreshRecommendationsOnly,
   }
 }

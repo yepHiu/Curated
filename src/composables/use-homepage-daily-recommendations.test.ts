@@ -30,6 +30,7 @@ describe("useHomepageDailyRecommendations", () => {
       utcDayKey,
       libraryService: {
         getHomepageDailyRecommendations,
+        refreshHomepageDailyRecommendations: vi.fn(),
       },
     }))
 
@@ -60,6 +61,7 @@ describe("useHomepageDailyRecommendations", () => {
       utcDayKey,
       libraryService: {
         getHomepageDailyRecommendations,
+        refreshHomepageDailyRecommendations: vi.fn(),
       },
     }))
 
@@ -72,6 +74,37 @@ describe("useHomepageDailyRecommendations", () => {
     expect(getHomepageDailyRecommendations).toHaveBeenCalledTimes(2)
     expect(state?.snapshot.value).toEqual(makeSnapshot("2026-04-15", ["m1"], ["m2"]))
     expect(state?.error.value).toBe(refreshError)
+
+    scope.stop()
+  })
+
+  it("refreshes recommendation movie ids without replacing the current hero movie ids", async () => {
+    const utcDayKey = ref("2026-04-15")
+    const initialSnapshot = makeSnapshot("2026-04-15", ["hero-old"], ["rec-old"])
+    const refreshedSnapshot = makeSnapshot("2026-04-15", ["hero-new"], ["rec-new"])
+    const getHomepageDailyRecommendations = vi.fn().mockResolvedValue(initialSnapshot)
+    const refreshHomepageDailyRecommendations = vi.fn().mockResolvedValue(refreshedSnapshot)
+    const libraryService = {
+      getHomepageDailyRecommendations,
+      refreshHomepageDailyRecommendations,
+    }
+
+    const scope = effectScope()
+    const state = scope.run(() => useHomepageDailyRecommendations({
+      utcDayKey,
+      libraryService,
+    }))
+
+    expect(state).toBeTruthy()
+    await flushPromises()
+
+    const next = await state?.refreshRecommendationsOnly()
+    await flushPromises()
+
+    expect(refreshHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
+    expect(getHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
+    expect(next).toEqual(makeSnapshot("2026-04-15", ["hero-old"], ["rec-new"]))
+    expect(state?.snapshot.value).toEqual(makeSnapshot("2026-04-15", ["hero-old"], ["rec-new"]))
 
     scope.stop()
   })

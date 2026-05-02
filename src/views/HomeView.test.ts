@@ -56,6 +56,7 @@ const homepageSnapshotState = vi.hoisted(() => ({
     recommendationMovieIds: string[]
   },
 }))
+const refreshRecommendationsOnlyMock = vi.hoisted(() => vi.fn())
 const moviesLoadedState = vi.hoisted(() => ({ value: true }))
 const playbackProgressRevisionRef = vi.hoisted(() => ({
   current: null as null | { value: number },
@@ -119,6 +120,7 @@ vi.mock("@/composables/use-homepage-daily-recommendations", () => ({
     loading: ref(false),
     error: ref<unknown>(null),
     refresh: vi.fn(),
+    refreshRecommendationsOnly: refreshRecommendationsOnlyMock,
   }),
 }))
 
@@ -150,6 +152,8 @@ describe("HomeView", () => {
     routerPushMock.mockReset()
     armHomeDetailReturnRestoreMock.mockReset()
     homepageSnapshotState.value = null
+    refreshRecommendationsOnlyMock.mockReset()
+    refreshRecommendationsOnlyMock.mockResolvedValue(homepageSnapshotState.value)
     moviesLoadedState.value = true
     moviesState.value = defaultMockMovies
     listSortedByUpdatedDescMock.mockClear()
@@ -232,6 +236,26 @@ describe("HomeView", () => {
       "m2",
     ])
     expect(model.recommendations.map((entry) => entry.movie.id)).toEqual(["m11", "m10", "m1"])
+  })
+
+  it("refreshes today's recommendation row while preserving the current hero ids", async () => {
+    const heroMovieIds = ["m9", "m8", "m7", "m6", "m5", "m4", "m3", "m2"]
+    homepageSnapshotState.value = {
+      dateUtc: "2026-04-15",
+      generatedAt: "2026-04-15T00:00:01Z",
+      generationVersion: "v1",
+      heroMovieIds,
+      recommendationMovieIds: ["m11", "m10", "m1"],
+    }
+
+    const wrapper = mount(HomeView)
+
+    await wrapper.get("[data-home-refresh-recommendations]").trigger("click")
+
+    expect(refreshRecommendationsOnlyMock).toHaveBeenCalledTimes(1)
+    expect(refreshRecommendationsOnlyMock).toHaveBeenCalledWith({
+      preserveHeroMovieIds: heroMovieIds,
+    })
   })
 
   it("debounces portal model rebuilds caused only by playback progress revision changes", async () => {

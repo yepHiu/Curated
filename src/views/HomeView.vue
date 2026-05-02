@@ -91,6 +91,12 @@ function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string 
     query: payload.kind === "actor" ? { actor: label } : { studio: label },
   })
 }
+
+function refreshRecommendations() {
+  void homepageDailyRecommendations.refreshRecommendationsOnly({
+    preserveHeroMovieIds: portalModel.value.heroMovies.map((movie) => movie.id),
+  })
+}
 </script>
 
 <template>
@@ -99,8 +105,10 @@ function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string 
   <HomepagePortal
     v-else
     :model="portalModel"
+    :recommendations-refreshing="homepageDailyRecommendations.loading.value"
     @open-details="openDetails"
     @open-player="openPlayer"
     @browse-taste="browseTaste"
+    @refresh-recommendations="refreshRecommendations"
   />
 </template>

@@ -153,6 +153,8 @@
     "sectionRecentBody": "刚进入影片库的新内容，可以先从这里开始看。",
     "sectionRecommendTitle": "今日推荐",
     "sectionRecommendBody": "根据你的收藏、评分、播放行为和偏好信号排出的今日片单。",
+    "refreshRecommendations": "刷新今日推荐",
+    "refreshingRecommendations": "刷新中…",
     "sectionContinueTitle": "继续观看",
     "sectionContinueBody": "把没看完的片子拉回来，不用再去历史里翻。",
     "sectionTasteTitle": "偏好雷达",

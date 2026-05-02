@@ -25,6 +25,10 @@ const emit = defineEmits<{
           {{ subtitle }}
         </p>
       </div>
+
+      <div v-if="$slots.action" class="shrink-0">
+        <slot name="action" />
+      </div>
     </div>
 
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

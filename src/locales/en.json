@@ -153,6 +153,8 @@
     "sectionRecentBody": "Fresh titles that just landed in your library.",
     "sectionRecommendTitle": "Today's Recommendations",
     "sectionRecommendBody": "Suggestions ranked from your favorites, ratings, playback signals, and recurring tastes.",
+    "refreshRecommendations": "Refresh recommendations",
+    "refreshingRecommendations": "Refreshing…",
     "sectionContinueTitle": "Continue Watching",
     "sectionContinueBody": "Jump back into unfinished sessions without digging through history.",
     "sectionTasteTitle": "Taste Radar",

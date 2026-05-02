@@ -153,6 +153,8 @@
     "sectionRecentBody": "ライブラリに入ったばかりの作品をすぐ見つけられます。",
     "sectionRecommendTitle": "今日のおすすめ",
     "sectionRecommendBody": "お気に入り、評価、再生履歴、好みの傾向から並べた提案です。",
+    "refreshRecommendations": "おすすめを更新",
+    "refreshingRecommendations": "更新中…",
     "sectionContinueTitle": "続きを見る",
     "sectionContinueBody": "履歴を掘り返さずに、途中の作品へすぐ戻れます。",
     "sectionTasteTitle": "好みレーダー",
