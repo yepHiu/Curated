@@ -10,7 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RELEASE_CLI = REPO_ROOT / "scripts" / "release" / "release_cli.py"
-HISTORY_CSV = REPO_ROOT / "docs" / "package-build-history.csv"
+HISTORY_CSV = REPO_ROOT / "docs" / "ops" / "package-build-history.csv"
 
 
 def parse_args() -> argparse.Namespace:
