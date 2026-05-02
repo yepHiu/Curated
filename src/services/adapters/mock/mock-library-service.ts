@@ -645,17 +645,28 @@ export const mockLibraryService: LibraryService = {
     const preservedHeroMovieIds = body?.preserveHeroMovieIds
       ?.map((movieId) => movieId.trim())
       .filter(Boolean)
+    const excludedRecommendationMovieIds = new Set(
+      body?.excludeRecommendationMovieIds
+        ?.map((movieId) => movieId.trim())
+        .filter(Boolean) ?? [],
+    )
 
     if (!preservedHeroMovieIds || preservedHeroMovieIds.length === 0) {
       return snapshot
     }
 
+    const blockedMovieIds = new Set([...preservedHeroMovieIds, ...excludedRecommendationMovieIds])
+    const recommendationMovieIds = [
+      ...snapshot.recommendationMovieIds.filter((movieId) => !blockedMovieIds.has(movieId)),
+      ...moviesState.value
+        .map((movie) => movie.id)
+        .filter((movieId) => !blockedMovieIds.has(movieId)),
+    ].slice(0, Math.max(snapshot.recommendationMovieIds.length, 6))
+
     return {
       ...snapshot,
       heroMovieIds: preservedHeroMovieIds,
-      recommendationMovieIds: snapshot.recommendationMovieIds.filter(
-        (movieId) => !preservedHeroMovieIds.includes(movieId),
-      ),
+      recommendationMovieIds,
     }
   },
 

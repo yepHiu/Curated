@@ -18,6 +18,8 @@ import (
 const homepageDailyRecommendationGenerationVersion = "v6"
 
 const (
+	homepageDailyHeroLimit              = 8
+	homepageDailyRecommendationLimit    = 6
 	homepageDailyExposureLookbackDays   = 28
 	homepageDailyExposurePenaltyFloor   = 0.75
 	homepageDailyExposurePenaltyScale   = 3.0
@@ -96,12 +98,25 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	if strings.TrimSpace(dateUTC) == "" {
 		dateUTC = time.Now().UTC().Format("2006-01-02")
 	}
+	refreshOptions, hasRefreshOptions := firstHomepageDailyRefreshOptions(options...)
 
 	dto, err := a.generateHomepageDailyRecommendations(ctx, dateUTC)
 	if err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 	dto = applyHomepageDailyRefreshOptions(dto, options...)
+	if hasRefreshOptions && len(normalizeHomepageMovieIDs(refreshOptions.PreserveHeroMovieIDs, homepageDailyHeroLimit)) > 0 {
+		recommendationMovieIDs, err := a.generateHomepageDailyRecommendationIDsForPreservedHero(
+			ctx,
+			dateUTC,
+			dto.HeroMovieIDs,
+			refreshOptions.ExcludeRecommendationMovieIDs,
+		)
+		if err != nil {
+			return contracts.HomepageDailyRecommendationsDTO{}, err
+		}
+		dto.RecommendationMovieIDs = recommendationMovieIDs
+	}
 	dto = normalizeHomepageDailyRecommendationsDTOArrays(dto)
 
 	if err := a.store.UpsertHomepageDailyRecommendationSnapshot(ctx, storage.HomepageDailyRecommendationSnapshot{
@@ -113,11 +128,24 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	}); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
-	if err := a.persistHomepageRecommendationStates(ctx, dto); err != nil {
+	selectedForState := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	if hasRefreshOptions && len(normalizeHomepageMovieIDs(refreshOptions.PreserveHeroMovieIDs, homepageDailyHeroLimit)) > 0 {
+		selectedForState = append([]string{}, dto.RecommendationMovieIDs...)
+	}
+	if err := a.persistHomepageRecommendationStateMovieIDs(ctx, dto, selectedForState); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
 
 	return dto, nil
+}
+
+func firstHomepageDailyRefreshOptions(
+	options ...contracts.HomepageDailyRecommendationsRefreshOptions,
+) (contracts.HomepageDailyRecommendationsRefreshOptions, bool) {
+	if len(options) == 0 {
+		return contracts.HomepageDailyRecommendationsRefreshOptions{}, false
+	}
+	return options[0], true
 }
 
 func normalizeHomepageDailyRecommendationsDTOArrays(dto contracts.HomepageDailyRecommendationsDTO) contracts.HomepageDailyRecommendationsDTO {
@@ -269,7 +297,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		allCandidates,
 		selected,
 		selectionState,
-		8,
+		homepageDailyHeroLimit,
 		true,
 		exclusionLadder,
 		random,
@@ -278,7 +306,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		allCandidates,
 		selected,
 		selectionState,
-		6,
+		homepageDailyRecommendationLimit,
 		false,
 		exclusionLadder,
 		random,
@@ -309,6 +337,99 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 	return dto, nil
 }
 
+func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
+	ctx context.Context,
+	dateUTC string,
+	preservedHeroMovieIDs []string,
+	excludedRecommendationMovieIDs []string,
+) ([]string, error) {
+	page, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{
+		Limit:  10000,
+		Offset: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	exposurePenaltyByMovieID, err := a.buildHomepageExposurePenaltyMap(ctx, dateUTC)
+	if err != nil {
+		return nil, err
+	}
+
+	recentSnapshots, err := a.listHomepageRecentSnapshots(ctx, dateUTC, homepageDailyExposureLookbackDays)
+	if err != nil {
+		return nil, err
+	}
+	exclusionLadder, err := buildHomepageDailyExclusionLadder(dateUTC, recentSnapshots, homepageDailyRecentExclusionWindows)
+	if err != nil {
+		return nil, err
+	}
+
+	recommendationStates, err := a.listHomepageRecommendationStateMap(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	allCandidates := rankHomepageDailyCandidates(
+		page.Items,
+		dateUTC,
+		exposurePenaltyByMovieID,
+		relaxHomepageDailyRecommendationCooling(recommendationStates),
+	)
+	candidateByMovieID := make(map[string]homepageDailyCandidate, len(allCandidates))
+	for _, candidate := range allCandidates {
+		candidateByMovieID[candidate.movie.ID] = candidate
+	}
+
+	selected := make(map[string]struct{})
+	selectionState := homepageDailySelectionState{
+		actorCounts:  make(map[string]int),
+		studioCounts: make(map[string]int),
+	}
+
+	for _, movieID := range normalizeHomepageMovieIDs(preservedHeroMovieIDs, homepageDailyHeroLimit) {
+		selected[movieID] = struct{}{}
+		if candidate, ok := candidateByMovieID[movieID]; ok {
+			accumulateHomepageDiversityFast(selectionState, candidate)
+		}
+	}
+	for _, movieID := range normalizeHomepageMovieIDs(excludedRecommendationMovieIDs, 0) {
+		selected[movieID] = struct{}{}
+	}
+
+	randomSeed := strings.Join([]string{
+		dateUTC,
+		homepageDailyRecommendationGenerationVersion,
+		"recommendation-refresh",
+		strings.Join(normalizeHomepageMovieIDs(preservedHeroMovieIDs, homepageDailyHeroLimit), ","),
+		strings.Join(normalizeHomepageMovieIDs(excludedRecommendationMovieIDs, 0), ","),
+	}, "|")
+	random := rand.New(rand.NewSource(int64(homepageDailyHash(randomSeed))))
+
+	recommendationIDs, _ := selectHomepageDailyIDs(
+		allCandidates,
+		selected,
+		selectionState,
+		homepageDailyRecommendationLimit,
+		false,
+		exclusionLadder,
+		random,
+	)
+	return recommendationIDs, nil
+}
+
+func relaxHomepageDailyRecommendationCooling(
+	states map[string]storage.HomepageRecommendationState,
+) map[string]storage.HomepageRecommendationState {
+	out := make(map[string]storage.HomepageRecommendationState, len(states))
+	for movieID, state := range states {
+		state.LastRecommendedAt = ""
+		state.SkipUntil = ""
+		out[movieID] = state
+	}
+	return out
+}
+
 func (a *App) listHomepageRecommendationStateMap(ctx context.Context) (map[string]storage.HomepageRecommendationState, error) {
 	states, err := a.store.ListHomepageRecommendationStates(ctx)
 	if err != nil {
@@ -326,6 +447,15 @@ func (a *App) listHomepageRecommendationStateMap(ctx context.Context) (map[strin
 }
 
 func (a *App) persistHomepageRecommendationStates(ctx context.Context, dto contracts.HomepageDailyRecommendationsDTO) error {
+	selected := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
+	return a.persistHomepageRecommendationStateMovieIDs(ctx, dto, selected)
+}
+
+func (a *App) persistHomepageRecommendationStateMovieIDs(
+	ctx context.Context,
+	dto contracts.HomepageDailyRecommendationsDTO,
+	selected []string,
+) error {
 	currentStates, err := a.listHomepageRecommendationStateMap(ctx)
 	if err != nil {
 		return err
@@ -347,7 +477,6 @@ func (a *App) persistHomepageRecommendationStates(ctx context.Context, dto contr
 	recommendedAt := recommendedTime.Format(time.RFC3339)
 	skipUntil := recommendedTime.AddDate(0, 0, homepageDailyHardCoolingDays).Format(time.RFC3339)
 
-	selected := append(append([]string{}, dto.HeroMovieIDs...), dto.RecommendationMovieIDs...)
 	updates := make([]storage.HomepageRecommendationState, 0, len(selected))
 	seen := make(map[string]struct{}, len(selected))
 	for _, movieID := range selected {

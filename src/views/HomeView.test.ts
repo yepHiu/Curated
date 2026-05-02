@@ -240,21 +240,27 @@ describe("HomeView", () => {
 
   it("refreshes today's recommendation row while preserving the current hero ids", async () => {
     const heroMovieIds = ["m9", "m8", "m7", "m6", "m5", "m4", "m3", "m2"]
+    const recommendationMovieIds = ["m11", "m10", "m1"]
     homepageSnapshotState.value = {
       dateUtc: "2026-04-15",
       generatedAt: "2026-04-15T00:00:01Z",
       generationVersion: "v1",
       heroMovieIds,
-      recommendationMovieIds: ["m11", "m10", "m1"],
+      recommendationMovieIds,
     }
 
     const wrapper = mount(HomeView)
+
+    const refreshButton = wrapper.get("[data-home-refresh-recommendations]")
+    expect(refreshButton.attributes("data-variant")).toBe("ghost")
+    expect(refreshButton.attributes("data-size")).toBe("icon-sm")
 
     await wrapper.get("[data-home-refresh-recommendations]").trigger("click")
 
     expect(refreshRecommendationsOnlyMock).toHaveBeenCalledTimes(1)
     expect(refreshRecommendationsOnlyMock).toHaveBeenCalledWith({
       preserveHeroMovieIds: heroMovieIds,
+      excludeRecommendationMovieIds: recommendationMovieIds,
     })
   })
 

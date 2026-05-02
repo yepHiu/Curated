@@ -607,4 +607,5 @@ export interface HomepageDailyRecommendationsDTO {
 
 export interface RefreshHomepageDailyRecommendationsBody {
   preserveHeroMovieIds?: string[]
+  excludeRecommendationMovieIds?: string[]
 }

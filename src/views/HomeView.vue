@@ -95,6 +95,7 @@ function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string 
 function refreshRecommendations() {
   void homepageDailyRecommendations.refreshRecommendationsOnly({
     preserveHeroMovieIds: portalModel.value.heroMovies.map((movie) => movie.id),
+    excludeRecommendationMovieIds: portalModel.value.recommendations.map((entry) => entry.movie.id),
   })
 }
 </script>

@@ -16,6 +16,7 @@ export interface UseHomepageDailyRecommendationsOptions {
 export interface RefreshHomepageRecommendationsOnlyOptions {
   preserveOnError?: boolean
   preserveHeroMovieIds?: readonly string[]
+  excludeRecommendationMovieIds?: readonly string[]
 }
 
 export function useHomepageDailyRecommendations(
@@ -75,11 +76,20 @@ export function useHomepageDailyRecommendations(
     const heroMovieIds = currentHeroMovieIds && currentHeroMovieIds.length > 0
       ? currentHeroMovieIds
       : options?.preserveHeroMovieIds
+    const currentRecommendationMovieIds = snapshot.value?.recommendationMovieIds
+    const excludeRecommendationMovieIds = currentRecommendationMovieIds && currentRecommendationMovieIds.length > 0
+      ? currentRecommendationMovieIds
+      : options?.excludeRecommendationMovieIds
 
     return runSnapshotRequest(
       () => libraryService.refreshHomepageDailyRecommendations(
         heroMovieIds && heroMovieIds.length > 0
-          ? { preserveHeroMovieIds: [...heroMovieIds] }
+          ? {
+              preserveHeroMovieIds: [...heroMovieIds],
+              ...(excludeRecommendationMovieIds && excludeRecommendationMovieIds.length > 0
+                ? { excludeRecommendationMovieIds: [...excludeRecommendationMovieIds] }
+                : {}),
+            }
           : undefined,
       ),
       (next) => {

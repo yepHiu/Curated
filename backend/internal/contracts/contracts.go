@@ -746,6 +746,8 @@ type HomepageDailyRecommendationsDTO struct {
 type HomepageDailyRecommendationsRefreshOptions struct {
 	// PreserveHeroMovieIDs keeps the current homepage hero slate while regenerating today's recommendations.
 	PreserveHeroMovieIDs []string `json:"preserveHeroMovieIds,omitempty"`
+	// ExcludeRecommendationMovieIDs avoids returning the recommendation rail currently visible to the caller.
+	ExcludeRecommendationMovieIDs []string `json:"excludeRecommendationMovieIds,omitempty"`
 }
 
 // TaskDTO represents an async background task (scan, scrape, download).

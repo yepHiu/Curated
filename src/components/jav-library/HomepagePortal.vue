@@ -2,6 +2,13 @@
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { Loader2, RefreshCw } from "lucide-vue-next"
+import {
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "reka-ui"
 import type { HomepagePortalModel, HomepageTasteEntry } from "@/lib/homepage-portal"
 import HomeContinueRow from "@/components/jav-library/HomeContinueRow.vue"
 import HomeHeroCarousel from "@/components/jav-library/HomeHeroCarousel.vue"
@@ -88,28 +95,40 @@ function onHomeScroll() {
         @open-player="emit('openPlayer', $event)"
       >
         <template #action>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            :disabled="recommendationsRefreshing"
-            :aria-label="t('home.refreshRecommendations')"
-            data-home-refresh-recommendations
-            @click="emit('refreshRecommendations')"
-          >
-            <Loader2
-              v-if="recommendationsRefreshing"
-              data-icon="inline-start"
-              class="animate-spin"
-              aria-hidden="true"
-            />
-            <RefreshCw
-              v-else
-              data-icon="inline-start"
-              aria-hidden="true"
-            />
-            {{ recommendationsRefreshLabel }}
-          </Button>
+          <TooltipProvider :delay-duration="240">
+            <TooltipRoot>
+              <TooltipTrigger as-child>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  :disabled="recommendationsRefreshing"
+                  :aria-label="recommendationsRefreshLabel"
+                  data-home-refresh-recommendations
+                  @click="emit('refreshRecommendations')"
+                >
+                  <Loader2
+                    v-if="recommendationsRefreshing"
+                    class="animate-spin"
+                    aria-hidden="true"
+                  />
+                  <RefreshCw
+                    v-else
+                    aria-hidden="true"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent
+                  side="top"
+                  :side-offset="6"
+                  class="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                >
+                  {{ recommendationsRefreshLabel }}
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+          </TooltipProvider>
         </template>
       </HomeSectionRow>
 

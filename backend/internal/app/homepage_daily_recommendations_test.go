@@ -245,6 +245,54 @@ func TestRegenerateHomepageDailyRecommendationsPreservesRequestedHeroMovieIDs(t 
 	}
 }
 
+func TestRegenerateHomepageDailyRecommendationsRefreshesRecommendationsWhenCandidatesAreCooling(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	fixture := newHomepageRecommendationFixture(t, 28)
+	preservedHeroMovieIDs := []string{"m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08"}
+	excludedRecommendationMovieIDs := []string{"m09", "m10", "m11", "m12", "m13", "m14"}
+
+	coolingStates := make([]storage.HomepageRecommendationState, 0, 28)
+	for i := 1; i <= 28; i++ {
+		coolingStates = append(coolingStates, storage.HomepageRecommendationState{
+			MovieID:           strings.ToLower(testMovieCode(i)),
+			LastRecommendedAt: "2026-04-15T00:00:00Z",
+			RecommendCount:    1,
+			SkipUntil:         "2026-04-18T00:00:00Z",
+			UpdatedAt:         "2026-04-15T00:00:00Z",
+		})
+	}
+	if err := fixture.store.UpsertHomepageRecommendationStates(ctx, coolingStates); err != nil {
+		t.Fatalf("UpsertHomepageRecommendationStates() error = %v", err)
+	}
+
+	dto, err := fixture.app.RegenerateHomepageDailyRecommendations(ctx, "2026-04-15", contracts.HomepageDailyRecommendationsRefreshOptions{
+		PreserveHeroMovieIDs:          preservedHeroMovieIDs,
+		ExcludeRecommendationMovieIDs: excludedRecommendationMovieIDs,
+	})
+	if err != nil {
+		t.Fatalf("RegenerateHomepageDailyRecommendations() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(dto.HeroMovieIDs, preservedHeroMovieIDs) {
+		t.Fatalf("HeroMovieIDs = %#v, want preserved %#v", dto.HeroMovieIDs, preservedHeroMovieIDs)
+	}
+	if len(dto.RecommendationMovieIDs) == 0 {
+		t.Fatal("RecommendationMovieIDs is empty, want refreshed recommendations")
+	}
+
+	disallowed := make(map[string]struct{}, len(preservedHeroMovieIDs)+len(excludedRecommendationMovieIDs))
+	for _, movieID := range append(append([]string{}, preservedHeroMovieIDs...), excludedRecommendationMovieIDs...) {
+		disallowed[movieID] = struct{}{}
+	}
+	for _, movieID := range dto.RecommendationMovieIDs {
+		if _, ok := disallowed[movieID]; ok {
+			t.Fatalf("RecommendationMovieIDs includes disallowed movie %q in %#v", movieID, dto.RecommendationMovieIDs)
+		}
+	}
+}
+
 func TestGenerateHomepageDailyRecommendationsPersistsSelectedMovieState(t *testing.T) {
 	t.Parallel()
 

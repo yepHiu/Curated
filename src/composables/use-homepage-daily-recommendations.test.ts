@@ -104,6 +104,7 @@ describe("useHomepageDailyRecommendations", () => {
     expect(refreshHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
     expect(refreshHomepageDailyRecommendations).toHaveBeenCalledWith({
       preserveHeroMovieIds: ["hero-old"],
+      excludeRecommendationMovieIds: ["rec-old"],
     })
     expect(getHomepageDailyRecommendations).toHaveBeenCalledTimes(1)
     expect(next).toEqual(makeSnapshot("2026-04-15", ["hero-old"], ["rec-new"]))
