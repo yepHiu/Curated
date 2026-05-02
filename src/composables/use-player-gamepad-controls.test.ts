@@ -131,6 +131,26 @@ describe("usePlayerGamepadControls", () => {
     expect(actions.adjustVolume).toHaveBeenNthCalledWith(2, -5)
   })
 
+  it("maps L1 and R1 to larger seek jumps", () => {
+    const actions = {
+      togglePlayPause: vi.fn(),
+      seekDelta: vi.fn(),
+    }
+
+    usePlayerGamepadControls({
+      enabled: true,
+      seekBackwardStepSec: ref(12),
+      seekForwardStepSec: ref(18),
+      actions,
+    })
+
+    pressButton("l1")
+    pressButton("r1")
+
+    expect(actions.seekDelta).toHaveBeenNthCalledWith(1, -36)
+    expect(actions.seekDelta).toHaveBeenNthCalledWith(2, 54)
+  })
+
   it("passes the enabled flag through to the gamepad input layer", () => {
     const enabled = ref(false)
 

@@ -36,6 +36,7 @@ import { useGamepad } from "@/composables/use-gamepad"
 import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
 import {
   resolveLibraryGridAction,
+  resolveLibraryGridPageSelection,
   resolveLibraryGridSelection,
 } from "@/lib/gamepad/library-grid-navigation"
 import type { GamepadDirection, StandardGamepadButtonName } from "@/lib/gamepad/standard-gamepad"
@@ -745,6 +746,17 @@ function navigateLibraryGrid(direction: GamepadDirection) {
   void selectMovie(nextMovie.id)
 }
 
+function navigateLibraryGridPage(direction: "up" | "down") {
+  const nextMovie = resolveLibraryGridPageSelection({
+    movies: visibleMovies.value,
+    currentMovieId: selectedMovie.value?.id,
+    direction,
+    columnCount: libraryGridColumnCount.value,
+  })
+  if (!nextMovie || nextMovie.id === selectedMovie.value?.id) return
+  void selectMovie(nextMovie.id)
+}
+
 function runLibraryGridButtonAction(button: StandardGamepadButtonName) {
   const movieId = selectedMovie.value?.id
   if (!movieId) return
@@ -771,6 +783,8 @@ const libraryGamepadCleanups = [
   libraryGamepad.onDirectionPress("down", () => navigateLibraryGrid("down")),
   libraryGamepad.onButtonPress("cross", () => runLibraryGridButtonAction("cross")),
   libraryGamepad.onButtonPress("square", () => runLibraryGridButtonAction("square")),
+  libraryGamepad.onButtonPress("l2", () => navigateLibraryGridPage("up")),
+  libraryGamepad.onButtonPress("r2", () => navigateLibraryGridPage("down")),
 ]
 
 onUnmounted(() => {

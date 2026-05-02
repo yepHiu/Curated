@@ -204,4 +204,17 @@ describe("LibraryView gamepad grid navigation", () => {
 
     expect(wrapper.get("[data-batch-bar]").text()).toBe("1")
   })
+
+  it("uses R2 to jump a page through the selected movie list", () => {
+    mount(LibraryView)
+
+    pressButton("r2")
+
+    expect(routerMocks.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "library",
+        query: expect.objectContaining({ selected: "movie-11" }),
+      }),
+    )
+  })
 })

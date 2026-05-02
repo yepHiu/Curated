@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   resolveLibraryGridAction,
+  resolveLibraryGridPageSelection,
   resolveLibraryGridSelection,
 } from "@/lib/gamepad/library-grid-navigation"
 
@@ -46,5 +47,23 @@ describe("library grid gamepad navigation", () => {
   it("uses Square to enter batch mode before toggling existing batch selections", () => {
     expect(resolveLibraryGridAction({ button: "square", batchMode: false })).toBe("enter-batch-select")
     expect(resolveLibraryGridAction({ button: "square", batchMode: true })).toBe("toggle-batch-select")
+  })
+
+  it("uses page navigation for L2 and R2 jumps", () => {
+    expect(resolveLibraryGridPageSelection({
+      movies,
+      currentMovieId: "movie-7",
+      direction: "up",
+      columnCount: 5,
+      rowsPerPage: 4,
+    })?.id).toBe("movie-0")
+
+    expect(resolveLibraryGridPageSelection({
+      movies,
+      currentMovieId: "movie-2",
+      direction: "down",
+      columnCount: 5,
+      rowsPerPage: 4,
+    })?.id).toBe("movie-11")
   })
 })

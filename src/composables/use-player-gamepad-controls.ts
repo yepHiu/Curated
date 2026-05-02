@@ -1,9 +1,10 @@
-import { onUnmounted, unref, type Ref } from "vue"
+import { getCurrentInstance, onUnmounted, unref, type Ref } from "vue"
 import { useGamepad } from "@/composables/use-gamepad"
 import type { UseGamepadReturn } from "@/composables/use-gamepad"
 
 type MaybeRef<T> = Ref<T> | T
 type MaybeAsyncAction = () => void | Promise<void>
+const PLAYER_GAMEPAD_LARGE_SEEK_MULTIPLIER = 3
 
 export interface PlayerGamepadActions {
   togglePlayPause: MaybeAsyncAction
@@ -76,6 +77,16 @@ export function usePlayerGamepadControls(
     gamepad.onButtonPress("psOrHome", () => {
       runAction(options.actions.toggleMute)
     }),
+    gamepad.onButtonPress("l1", () => {
+      options.actions.seekDelta?.(
+        -readMaybeRefNumber(options.seekBackwardStepSec) * PLAYER_GAMEPAD_LARGE_SEEK_MULTIPLIER,
+      )
+    }),
+    gamepad.onButtonPress("r1", () => {
+      options.actions.seekDelta?.(
+        readMaybeRefNumber(options.seekForwardStepSec) * PLAYER_GAMEPAD_LARGE_SEEK_MULTIPLIER,
+      )
+    }),
     gamepad.onDirectionPress("left", () => {
       options.actions.seekDelta?.(-readMaybeRefNumber(options.seekBackwardStepSec))
     }),
@@ -90,11 +101,13 @@ export function usePlayerGamepadControls(
     }),
   ]
 
-  onUnmounted(() => {
-    for (const cleanup of cleanups) {
-      cleanup()
-    }
-  })
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      for (const cleanup of cleanups) {
+        cleanup()
+      }
+    })
+  }
 
   return { gamepad }
 }
