@@ -16,7 +16,8 @@ import {
   getProgress,
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
-import { getMovieImageVersion } from "@/lib/image-version"
+import { isImageUrlLoaded } from "@/lib/image-load-cache"
+import { buildVersionedImageUrl, getMovieImageVersion } from "@/lib/image-version"
 
 const props = withDefaults(
   defineProps<{
@@ -95,14 +96,16 @@ const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl ||
 
 /** 图片版本号 - 用于强制刷新重新搜刮后的海报 */
 const imageVersion = computed(() => getMovieImageVersion(props.movie.id))
+const versionedPosterSrc = computed(() => buildVersionedImageUrl(posterSrc.value, imageVersion.value))
 
 /** 渐变叠层仅在海报解码完成后显示，避免盖住骨架屏（见 MediaStill 内 Skeleton） */
 const posterImageLoaded = ref(false)
 watch(
-  () => `${props.movie.id}\0${posterSrc.value}`,
+  () => `${props.movie.id}\0${versionedPosterSrc.value ?? ""}`,
   () => {
-    posterImageLoaded.value = false
+    posterImageLoaded.value = isImageUrlLoaded(versionedPosterSrc.value)
   },
+  { immediate: true },
 )
 
 /** 与 PlaybackHistoryCard 相同算法；依赖 revision 以便播放器回写进度后卡片更新 */

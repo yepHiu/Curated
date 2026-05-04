@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { Skeleton } from "@/components/ui/skeleton"
+import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/image-load-cache"
 import { buildVersionedImageUrl } from "@/lib/image-version"
 
 type MediaStillLoadPayload = {
@@ -36,14 +37,16 @@ const loaded = ref(false)
 const versionedSrc = computed(() => buildVersionedImageUrl(props.src, props.version))
 
 watch(
-  () => props.src,
-  () => {
+  versionedSrc,
+  (src) => {
     failed.value = false
-    loaded.value = false
+    loaded.value = isImageUrlLoaded(src)
   },
+  { immediate: true },
 )
 
 const handleLoad = (event: Event) => {
+  markImageUrlLoaded(versionedSrc.value)
   loaded.value = true
   const target = event.target as HTMLImageElement | null
   emit("load", {
