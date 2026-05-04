@@ -259,7 +259,10 @@ func (s *SQLiteStore) lookupActorAvatarURLsByMovieID(ctx context.Context, movieI
 	return out, nil
 }
 
-// movieSelectEffectiveColumns selects list/detail fields with user_* display overrides applied (alias m).
+// movieSelectEffectiveColumns 是复用的 SELECT 片段：查询 movies 时表别名必须为 m。
+// 列表/详情里对用户可见的文本类字段优先用 user_*（非空且 trim 后非空则覆盖元数据列）；
+// year：若 user_release_date 前 4 位可解析为 1800–3000 的年份则用其作为年，否则用 m.year；
+// release_date 同样 user 优先；trashed_at 用 IFNULL 归一为 ''，便于 Scan 与下游判断。
 const movieSelectEffectiveColumns = `
 SELECT m.id,
 	COALESCE(NULLIF(TRIM(m.user_title), ''), m.title) AS title,
@@ -279,6 +282,11 @@ SELECT m.id,
 	m.cover_url, m.thumb_url, m.preview_video_url,
 	IFNULL(m.trashed_at, '') AS trashed_at`
 
+// buildMovieFilters 根据列表请求拼 WHERE 子句与参数，供 ListMovies 等 COUNT/LIMIT 查询复用。
+// - mode=trash：仅回收站；否则仅非回收站（见 sqlMovie*Clause）。
+// - request.Mode==favorites：额外要求 is_favorite。
+// - Query：在「生效」标题、番号、片商、简介上做不区分大小写的子串匹配（LIKE）。
+// - Actor：EXISTS 精确匹配演员名；Studio：与「生效」片商 TRIM 后全等。
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	clauses := make([]string, 0, 4)
 	args := make([]any, 0, 8)
