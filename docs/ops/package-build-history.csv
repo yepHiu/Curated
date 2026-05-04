@@ -187,3 +187,8 @@ a8870e7b feat: refresh homepage recommendations only
 118192c5 docs(plan): record notification center optimization
 0ac13b5f fix: harden notification center behavior
 b5c077f1 chore(release): prepare 1.4.1 package",versionSource=auto-patch; BuildStamp=20260502.165208; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-04,1.4.3,4c2dbd49,master,release:publish,release/portable/Curated-1.4.3-windows-x64.zip; release/installer/Curated-Setup-1.4.3.exe; release/manifest/release.json,成功,wujiahui,"4c2dbd49 docs(storage): explain movie query helpers
+8e355681 fix: preserve loaded poster state
+817d986c docs: add connected clients design
+24b4e9e0 docs: add feature inventory
+78df7735 chore(release): prepare 1.4.2 package",versionSource=auto-patch; BuildStamp=20260504.085202; portable=versionSource=explicit; installer=versionSource=explicit
