@@ -19,19 +19,26 @@
 
 # Curated
 
-Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库已经具备以 Web 为先的架构、面向 Windows 的发布打包流程、托盘模式运行、元数据刮削、播放链路以及萃取帧管理能力。
+Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库已经具备以 Web 为先的架构、面向 Windows 的发布打包流程、托盘模式运行、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
+
+完整功能清单请参见 [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)。
 
 产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。Go 模块名为 **`curated-backend`**，服务端入口位于 **`backend/cmd/curated`**。
 
 ## 项目亮点
 
-- 本地优先架构，前端为 Vue SPA，后端为 Go HTTP API。
-- 同时支持真实 API 模式与 Mock 模式，便于快速迭代界面。
-- 使用 SQLite 持久化资料库数据、播放进度、评论、评分与萃取帧。
-- Web API 模式下，首页 hero 与“今日推荐”使用基于 UTC 日切换的 SQLite 持久化快照，保证跨浏览器与跨设备一致，并通过每部影片的推荐状态、硬冷却、加权采样、推荐次数衰减加上演员、厂牌均衡约束，尽量减少连续几天或隔周重复出镜和同一天扎堆。
-- Windows 发布流程已支持托盘模式启动、本地托管前端和安装包构建。
-- 当前 Web 阶段已经接入演员元数据、萃取帧导出和播放会话诊断能力。
-- 当前 Web 阶段已支持标准 Gamepad API 手柄控制（包括 DualSense）：全局焦点导航、资料库网格选择、播放器控制，以及设置页中的浏览器本机开关。
+- **本地优先** — Vue 3 SPA 前端 + Go HTTP API 后端 + SQLite 持久化。
+- **双模式开发** — 真实 API 模式（全链路后端）与 Mock 模式（快速 UI 迭代）共用同一服务层。
+- **完善的资料库管理** — 虚拟化海报网格、收藏、评分、标签、演员资料、回收站/恢复、影片笔记，以及支持 fsnotify 自动扫描的多目录资料库。
+- **影片导入** — 支持拖拽、文件选择或文件夹选择导入，带进度跟踪与大文件断点续传。
+- **元数据刮削** — 多数据源支持，可配置策略（自动全局 / 国内友好 / 自定义链路 / 指定源），数据源健康检查，机器可读的故障分类。
+- **播放能力** — HTML5 视频播放（Range 流）、续播进度、每日观看统计、HLS 会话（remux/转码管线）、外部播放器接力、播放会话诊断。
+- **首页每日推荐** — 基于 UTC 日的 hero 轮播与推荐栏，通过 SQLite 持久化保证跨设备一致，含加权采样、冷却窗口与演员/厂牌均衡。
+- **萃取帧** — 帧截图、浏览、打标、筛选与多格式导出（JPG/WebP/PNG），导出的图片包含嵌入式元数据。
+- **演员管理** — 演员浏览、资料详情、用户标签、外部链接、同源头像缓存与异步元数据刮削。
+- **手柄控制** — 基于 Web Gamepad API 的标准手柄支持（含 DualSense）：全局焦点导航、资料库网格选择、播放器控制。
+- **Windows 发布打包** — 托盘模式运行、本地前端托管、Inno Setup 安装器、便携包、FFmpeg 集成、开机自启，以及基于 GitHub Releases 的更新检查与安装器直接下载。
+- **设置与配置** — 完整的设置界面（概览、常规、资料库与存储、元数据、网络、萃取帧、关于、维护），支持资料库级配置持久化、代理与日志控制。
 
 ## 快速开始
 
@@ -80,33 +87,102 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 
 ### 资料库
 
-- 面向大规模资料库的虚拟化海报网格浏览。
-- 虚拟化海报网格支持标准手柄导航，并复用 URL 中的选中影片状态，避免依赖所有卡片都已渲染到 DOM。
-- 收藏、评分、标签和入库整理能力。
-- 同一套前端服务层同时支持真实后端和 Mock 适配器。
-- 首页 hero 和“今日推荐”会在 UTC 跨天后自动重算，并优先读取后端持久化的每日推荐快照，同时尽量避免同一天里演员和厂牌过度集中。
+- 面向大规模资料库的虚拟化海报网格浏览，选中状态基于 URL。
+- 虚拟化海报网格支持标准手柄导航。
+- 收藏、评分（0-5）、用户标签与元数据标签。
+- 多目录资料库管理：添加、编辑、删除、在文件管理器中打开。
+- 入库整理（`organizeLibrary` 设置）与回收站/恢复流程。
+- 影片笔记/备注持久化。
+- 按演员浏览时显示演员资料卡片。
+- 支持按关键词、演员或标签搜索。
+
+### 扫描与元数据
+
+- 手动与自动扫描，后台任务跟踪。
+- 基于 fsnotify 的目录监听与防抖自动扫描（`autoLibraryWatch`）。
+- 通过 metatube-sdk-go 刮削影片元数据，异步任务执行。
+- 多数据源支持，可配置策略：`auto-global`、`auto-cn-friendly`、`custom-chain`、`specified`。
+- 数据源健康检查（单个/全部），带故障分类。
+- 影片刮削成功后自动补刮演员资料（`autoActorProfileScrape`）。
+
+### 导入
+
+- 顶栏影片导入：支持拖拽、文件选择或文件夹选择。
+- 进度跟踪，含文件级状态与失败通知。
+- 大文件分块断点续传，支持提交/取消生命周期。
+- 冲突检测（不覆盖已存在的目标文件）。
+- 可配置默认导入目标资料库路径。
 
 ### 播放
 
-- Web API 模式下支持持久化续播进度。
-- 标准手柄可控制播放 / 暂停、快退 / 快进、音量、静音、萃取帧截图、统计面板 / 控制层显示、退出全屏与返回。
-- 当前播放链路已支持浏览器播放、外部播放器接力和 HLS 会话。
-- 提供更丰富的播放决策诊断信息，用于解释直播、remux 与转码路径。
+- HTML5 视频播放，支持 HTTP Range 流。
+- 续播进度持久化（Web API 模式存 SQLite，Mock 模式存 localStorage）。
+- 播放描述符层：统一直播、remux 与转码路径。
+- HLS 会话支持，含会话诊断与最近会话列表。
+- 外部播放器接力，基于可配置的浏览器协议模板（PotPlayer 预设）。
+- 每日观看统计（设置 → 概览，91 天窗口）。
+- 播放统计叠加层、时间轴缩略图预览与萃取帧截图。
+- 路由导航上下文：时间戳（`?t=`）与返回路径（`?from=history`）。
+- 播放中侧栏返回。
 
 ### 演员
 
-- 支持演员库浏览、资料加载与用户标签编辑。
-- 演员头像通过后端缓存后以同源方式提供。
+- 演员浏览：支持搜索、标签筛选、排序与分页。
+- 演员资料详情与元数据展示。
+- 用户标签编辑与外部链接管理。
+- 同源头像交付（后端缓存）。
+- 演员元数据异步刮削。
 
 ### 萃取帧
 
-- 支持萃取帧截图、浏览、打标、筛选与导出。
-- 支持带元数据的 WebP / PNG 导出。
+- 播放中截取帧。
+- 浏览：分页、文本搜索、按标签/演员/影片筛选。
+- 标签编辑与帧删除。
+- 统计概览、标签分类与演员分类。
+- 导出为 JPG（EXIF）、WebP（EXIF）、PNG（iTXt）或 ZIP，包含嵌入式元数据（tags、schemaVersion、exportedAt、appName、appVersion）。
+- 可配置导出格式偏好（`curatedFrameExportFormat`）。
+
+### 首页与推荐
+
+- 基于 UTC 日的每日推荐快照，SQLite 持久化。
+- Hero 轮播与推荐栏，跨设备一致。
+- 无放回加权采样，含冷却窗口与推荐次数衰减。
+- 演员与厂牌多样性均衡。
+- 强制刷新，支持保留 hero 与排除当前推荐。
+
+### 设置与配置
+
+- 完整设置界面：概览、常规、资料库与存储、元数据、网络、萃取帧、关于、维护。
+- 资料库级配置持久化到 `config/library-config.cfg`，原子写入。
+- 代理配置，含 JavBus 与 Google 连通性测试。
+- 后端日志：可配置目录、保留天数与级别。
+- 基于 GitHub Releases 的应用更新检查，含侧栏角标与安装器直接下载。
+- Windows 开机自启（`launchAtLogin`）。
+
+### 手柄控制
+
+- 基于 Web Gamepad API 的标准手柄支持，含 DualSense。
+- 全局焦点导航、资料库网格选择、播放器控制。
+- 大步进退、萃取帧截图与统计/控制层切换。
+- 浏览器本地设置开关（localStorage 持久化）。
 
 ### 打包发布
 
-- 提供面向 Windows 的发布流程。
-- 发布态可使用托盘模式启动，并在可执行文件旁直接托管构建后的前端资源。
+- Windows 发布流程：`pnpm release:publish`（Python CLI 编排）。
+- 托盘模式运行，本地前端托管于 `:8081`。
+- Inno Setup 安装器与便携 zip 分发。
+- FFmpeg 集成与发布清单生成。
+- 打包历史台账（`docs/ops/package-build-history.csv`）。
+
+### 开发者体验
+
+- 双模式开发：真实 API 模式与 Mock 模式快速迭代。
+- 前端：Vue 3 + TypeScript + Vite 8 + Tailwind CSS v4 + shadcn-vue。
+- 后端：Go 1.25+ + SQLite (modernc) + Zap 日志 + 整洁架构。
+- 国际化：English、简体中文、日本語（vue-i18n）。
+- 开发版性能监控栏（仅 dev 构建）。
+- 错误边界与客户端请求超时。
+- 全领域结构化错误码。
 
 ## 配置
 
@@ -129,12 +205,15 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 - `organizeLibrary`
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
+- `defaultImportLibraryPathId`
 - `autoLibraryWatch`
+- `autoActorProfileScrape`
 - `launchAtLogin`
+- `curatedFrameExportFormat`（默认 `jpg`；可选：`jpg`、`webp`、`png`）
 - `proxy`
 - 后端日志目录与保留设置
 
-  空 `logDir` 表示“使用默认日志目录”，而不是关闭文件日志：
+  空 `logDir` 表示”使用默认日志目录”，而不是关闭文件日志：
   正式包写入 `LOCALAPPDATA\\Curated\\logs`，开发态写入 `backend/runtime/logs`。
 
 发布构建默认使用端口 `:8081`，除非被配置覆盖。
@@ -178,7 +257,7 @@ pnpm release:publish
 关键说明：
 
 - 生产包版本号统一由 `scripts/release/version.json` 管理。
-- 当前版本基线为 `1.3.1`。
+- 当前版本基线为 `1.4.2`。
 - `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
 - 发布流程会生成 Windows 发布目录、便携包、安装器可执行文件和发布清单。
 - 打包历史台账已经迁移到 `docs/ops/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
@@ -195,6 +274,7 @@ pnpm release:publish
 ## 文档
 
 - [API.md](API.md)：公开 HTTP API 参考
+- [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)：完整功能清单（所有已实现特性）
 - [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md)：产品设计与目标架构
 - [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md)：实现事实与稳定项目记忆
 - [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html)：架构总览

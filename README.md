@@ -19,21 +19,26 @@
 
 # Curated
 
-Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships a web-first architecture with Windows-friendly release packaging, tray-mode runtime support, metadata scraping, playback workflows, and curated-frame management.
+Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships a web-first architecture with Windows-friendly release packaging, tray-mode runtime support, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
+
+See [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) for the full catalog of implemented features.
 
 The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**. The Go module is **`curated-backend`** and the server entrypoint is **`backend/cmd/curated`**.
 
 ## Highlights
 
-- Local-first architecture with a Vue SPA frontend and a Go HTTP API backend.
-- Real API mode and mock mode for fast UI iteration.
-- SQLite-backed persistence for library data, playback progress, daily watch-time aggregates, comments, ratings, and curated frames.
-- Top-bar movie import can copy selected files or browser-selected folders into the configured default library root, with progress, large-file resumable upload, and failure notifications.
-- UTC-based homepage daily recommendations in Web API mode, persisted in SQLite so the hero carousel and today's picks stay identical across browsers and devices; the homepage can refresh today's picks away from the current rail while preserving the current hero slate, backed by per-movie recommendation state, hard cooling, weighted sampling, recommendation-count decay, and actor/studio diversity balancing to reduce repeated titles across days.
-- Packaged-app update checks in Settings -> About, backed by GitHub Releases with direct latest-installer download and a lightweight sidebar badge when a newer installer is available.
-- Windows release flow with tray-mode startup, local web serving, and installer packaging.
-- Actor metadata, curated-frame export, and playback-session diagnostics already integrated into the current web phase.
-- Web Gamepad API controls for standard controllers, including DualSense: global focus navigation, library-grid selection, player playback controls, and a browser-local Settings toggle.
+- **Local-first** — Vue 3 SPA frontend + Go HTTP API backend + SQLite persistence.
+- **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
+- **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
+- **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
+- **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
+- **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
+- **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
+- **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
+- **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
+- **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
+- **Windows release packaging** — Tray-mode startup, local frontend hosting, Inno Setup installer, portable zip, FFmpeg bundling, Windows login autostart, and GitHub Releases-based update checks with direct installer download.
+- **Settings & configuration** — Full settings UI (Overview, General, Library & storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
 
 ## Quick Start
 
@@ -82,36 +87,103 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 ### Library
 
-- Virtualized poster-grid browsing for large libraries.
-- Standard gamepad navigation for the virtualized poster grid, using URL-backed selection so large lists do not depend on every card being rendered in the DOM.
-- Favorites, ratings, tags, and library organization controls.
-- Add-movie import copies selected local videos into the default storage path configured in Settings -> Library & storage, switching large uploads to chunked resumable transfer.
-- Real backend mode and mock adapter mode behind the same frontend service layer.
-- Homepage hero and "today's recommendations" can be sourced from a backend-generated daily snapshot that rolls over automatically on the UTC day boundary and tries to avoid same-day actor/studio clustering.
+- Virtualized poster-grid browsing for large libraries with URL-backed selection.
+- Standard gamepad navigation for the virtualized poster grid.
+- Favorites, ratings (0-5), user tags, and metadata tags.
+- Multi-root library paths: add, edit, delete, and reveal in OS file manager.
+- Library organization with structured folder naming (`organizeLibrary` setting).
+- Trash/restore workflow: soft-delete, restore, or permanent-delete.
+- Movie comments/notes persisted per movie.
+- Actor profile card overlay when browsing by actor.
+- Search by query, actor, or tag.
+
+### Scanning & Metadata
+
+- Manual and auto-scan with background task tracking.
+- fsnotify-based directory watch with debounced auto-scan (`autoLibraryWatch`).
+- Movie metadata scraping via metatube-sdk-go with async task execution.
+- Multiple metadata providers with configurable strategies: `auto-global`, `auto-cn-friendly`, `custom-chain`, `specified`.
+- Provider health checks (ping single / ping all) with failure categories.
+- Auto actor profile scrape on successful movie scrape (`autoActorProfileScrape`).
+
+### Import
+
+- Top-bar movie import via drag-and-drop, file selection, or folder selection.
+- Progress tracking with per-file status and failure notifications.
+- Resumable chunked upload for large files with commit/abort lifecycle.
+- Conflict detection (existing target files are not overwritten).
+- Configurable default import library path.
 
 ### Playback
 
-- Resume playback support with persisted progress in Web API mode.
-- Daily watch-time statistics in Settings -> Overview, backed by bounded playback deltas in Web API mode and `localStorage` in mock mode.
-- Standard gamepad playback controls for play/pause, seek, volume, mute, Curated frame capture, stats/chrome toggles, fullscreen exit, and route-back behavior.
-- Browser playback, external player handoff, and HLS session support in the current playback pipeline.
-- Session diagnostics and richer playback decision metadata for direct play, remux, and transcode paths.
+- HTML5 video playback with HTTP Range streaming.
+- Resume playback with persisted progress (SQLite in Web API mode, localStorage in mock mode).
+- Playback descriptor seam for direct-play, remux, and transcode paths.
+- HLS session support with session diagnostics and recent-session listing.
+- External player handoff via configurable browser protocol template (PotPlayer preset).
+- Daily watch-time statistics in Settings → Overview (91-day window).
+- Player stats overlay, preview timeline thumbnails, and curated-frame capture.
+- Route navigation context: timestamp (`?t=`) and return path (`?from=history`).
+- Active playback sidebar return.
 
 ### Actors
 
-- Actor browsing, profile loading, and user-tag editing.
+- Actor browsing with search, tag filter, sort, and pagination.
+- Actor profile detail with metadata display.
+- User tag editing and external links management.
 - Same-origin actor avatar delivery through backend-managed caching.
+- Actor metadata scraping as async task.
 
 ### Curated Frames
 
-- Frame capture, browsing, tagging, filtering, and export workflows.
-- WebP / PNG export with embedded metadata.
+- Frame capture from player during playback.
+- Browsing with pagination, text search, and filtering by tag, actor, or movie.
+- Tag editing and frame deletion.
+- Stats overview, tag facets, and actor facets.
+- Export in JPG (EXIF), WebP (EXIF), PNG (iTXt), or ZIP with embedded metadata (tags, schemaVersion, exportedAt, appName, appVersion).
+- Configurable export format preference (`curatedFrameExportFormat`).
 
-### Packaging
+### Homepage & Recommendations
 
-- Windows-oriented release workflow.
-- Tray-mode release runtime with local frontend hosting beside the backend executable.
-- Settings -> About can compare the current packaged installer version with the latest GitHub Release and download the latest `.exe` installer directly when the release exposes one, falling back to the official release page.
+- UTC-based daily recommendation snapshot persisted in SQLite.
+- Hero carousel and recommendation rail with cross-device consistency.
+- Weighted sampling without replacement with cooling windows and count decay.
+- Actor and studio diversity balancing.
+- Force-refresh with hero preservation and recommendation exclusion.
+
+### Settings & Configuration
+
+- Full settings UI: Overview, General, Library & storage, Metadata, Network, Curated frames, About, Maintenance.
+- Library-level config persisted to `config/library-config.cfg` with atomic writes.
+- Proxy configuration with JavBus and Google ping tests.
+- Backend logging: configurable directory, retention, and level.
+- App update checks against GitHub Releases with sidebar badge and direct installer download.
+- Windows login autostart (`launchAtLogin`).
+
+### Gamepad Controls
+
+- Web Gamepad API support for standard controllers including DualSense.
+- Global focus navigation, library-grid selection, and player playback controls.
+- Large seek jumps, curated-frame capture, and stats/chrome toggle.
+- Browser-local settings toggle persisted in localStorage.
+
+### Packaging & Release
+
+- Windows release workflow: `pnpm release:publish` via Python CLI.
+- Tray-mode runtime with local frontend hosting on `:8081`.
+- Inno Setup installer and portable zip distribution.
+- FFmpeg bundling and release manifest generation.
+- Package build history ledger (`docs/ops/package-build-history.csv`).
+
+### Developer Experience
+
+- Dual-mode development: real API mode and mock mode for fast UI iteration.
+- Frontend: Vue 3 + TypeScript + Vite 8 + Tailwind CSS v4 + shadcn-vue.
+- Backend: Go 1.25+ + SQLite (modernc) + Zap logging + clean architecture.
+- i18n: English, 简体中文, 日本語 via vue-i18n.
+- Dev performance monitor bar (dev builds only).
+- Error boundary and client request timeout.
+- Structured error codes across all backend domains.
 
 ## Configuration
 
@@ -189,7 +261,7 @@ pnpm release:publish
 Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.3.2`.
+- The current base line is `1.4.2`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
 - Release packaging assembles a Windows-oriented staging directory, portable zip, installer executable, and release manifest.
 - Release packaging bundles FFmpeg into `third_party/ffmpeg/bin/`: it first uses `backend/third_party/ffmpeg/bin/`, then falls back to a real local FFmpeg installation discovered from Scoop or PATH, and fails fast if no runtime is available.
@@ -207,6 +279,7 @@ Additional release references:
 ## Documentation
 
 - [API.md](API.md): public HTTP API reference
+- [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md): comprehensive feature catalog (all implemented features)
 - [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md): product design and target architecture
 - [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md): implementation facts and stable project memory
 - [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html): architecture overview
