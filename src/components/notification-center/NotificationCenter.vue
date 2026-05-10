@@ -132,7 +132,7 @@ function dotClass(type: AppNotification["type"]) {
         <Bell class="size-5" />
         <Badge
           v-if="unreadCount > 0"
-          class="absolute -top-1 -right-1 min-w-5 px-1 text-[0.65rem] leading-4 shadow-[0_0_6px_rgba(254,98,142,0.5)]"
+          class="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center px-[3px] !py-0 text-[10px] leading-none tabular-nums shadow-[0_0_4px_rgba(254,98,142,0.4)]"
           :aria-label="t('notificationCenter.unreadCountAria', { n: unreadBadgeLabel })"
         >
           {{ unreadBadgeLabel }}
