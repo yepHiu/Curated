@@ -36,6 +36,7 @@ describe("SettingsMetadataModeSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.metadataMovieProviderMode")
+    expect(wrapper.text()).toContain("settings.metadataMovieProviderModeTooltip")
     expect(wrapper.text()).toContain("settings.metadataMovieProviderAuto")
     expect(wrapper.text()).toContain("settings.metadataMovieProviderSpecified")
     expect(wrapper.text()).toContain("settings.metadataMovieProviderChain")

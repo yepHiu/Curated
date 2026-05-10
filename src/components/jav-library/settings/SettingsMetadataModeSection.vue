@@ -35,34 +35,41 @@ const { t } = useI18n()
     :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
   >
     <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
-    <div class="mb-0.5 flex items-center gap-3">
-      <span class="text-sm font-semibold text-foreground">{{
-        t("settings.metadataMovieProviderMode")
-      }}</span>
-      <TooltipProvider :delay-duration="280">
-        <TooltipRoot>
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <CircleHelp class="size-4" aria-hidden="true" />
-              <span class="sr-only">{{
-                t("settings.metadataMovieProviderModeAria")
-              }}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipPortal>
-            <TooltipContent
-              side="top"
-              :side-offset="6"
-              class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-            >
-              {{ t("settings.metadataMovieProviderModeTooltip") }}
-            </TooltipContent>
-          </TooltipPortal>
-        </TooltipRoot>
-      </TooltipProvider>
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-sm font-semibold text-foreground">{{
+          t("settings.metadataMovieProviderMode")
+        }}</span>
+        <TooltipProvider :delay-duration="280">
+          <TooltipRoot>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <CircleHelp class="size-4" aria-hidden="true" />
+                <span class="sr-only">{{
+                  t("settings.metadataMovieProviderModeAria")
+                }}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent
+                side="top"
+                :side-offset="6"
+                class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+              >
+                {{ t("settings.metadataMovieProviderModeTooltip") }}
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
+        </TooltipProvider>
+      </div>
+      <p
+        class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
+      >
+        {{ t("settings.metadataMovieProviderModeTooltip") }}
+      </p>
     </div>
     <label
       class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
