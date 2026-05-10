@@ -82,11 +82,11 @@ function onProviderToAddChange(value: unknown) {
     >
       {{ t("settings.metadataMovieProviderChainNoList") }}
     </p>
-    <div class="min-w-0 text-left">
+    <div class="flex min-w-0 flex-1 flex-col gap-3 text-left">
       <p class="text-sm font-semibold text-foreground">
         {{ t("settings.metadataMovieProviderChainLabel") }}
       </p>
-      <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
         {{ t("settings.metadataMovieProviderChainDragHint") }}
       </p>
     </div>
