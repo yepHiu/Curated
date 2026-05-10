@@ -2,7 +2,7 @@
 
 ## Overview
 
-Curated exposes a Go HTTP API for library browsing, playback workflows, actor metadata, settings, curated-frame management, scans, and task tracking.
+Curated exposes a Go HTTP API for library browsing, playback workflows, actor metadata, settings, curated-frame management, storage presence checks, scans, and task tracking.
 
 This document is the single public API reference for the repository.
 
@@ -279,6 +279,67 @@ Important notes:
 
 - the backend validates that the stored path still exists on disk and is a directory
 - this opens the folder only; it does not modify library configuration or disk files
+
+### `GET /api/library/paths/storage-status`
+
+Purpose:
+
+- return the current storage availability snapshot for each configured library root
+
+Response:
+
+- `items`: array of `LibraryPathStorageStatusDTO`
+
+Status values:
+
+- `online`: the configured directory is reachable, readable, and matches the stored backing-volume identity when one is known
+- `offline`: the backing storage root appears unavailable or disconnected
+- `volume_mismatch`: the path resolves to a different volume than the one previously bound to this library path
+- `path_missing`: the backing storage is present, but the configured library directory is missing or is not a directory
+- `permission_denied`: Curated can see the path, but cannot read it
+- `unknown`: Curated could not classify the storage state
+
+Important notes:
+
+- Windows is the primary supported platform for volume identity detection in this phase
+- macOS and Linux currently use the platform-neutral fallback and are future adaptation targets
+- responses include `canRescan` and `canImport`; the frontend uses these to block scans or imports that would target unavailable storage
+- responses can include `rootPath`, `driveType`, `volumeLabel`, `fileSystem`, `identityConfidence`, `expectedVolumeId`, and `currentVolumeId` for diagnostics
+
+### `POST /api/library/paths/storage-status/check`
+
+Purpose:
+
+- perform a fresh storage availability probe for configured library roots
+
+Request:
+
+- optional JSON body `{ "libraryPathIds": ["..."] }`
+- omit the body or pass an empty list to check all configured library roots
+
+Response:
+
+- same shape as `GET /api/library/paths/storage-status`
+
+Important notes:
+
+- online checks persist the current backing-volume binding for the library path
+- the frontend calls this during app startup in Web API mode and before storage-sensitive actions such as full scans and movie imports
+
+### `POST /api/library/paths/{id}/storage-binding/rebind`
+
+Purpose:
+
+- replace the stored backing-volume binding for one configured library root with the currently detected volume identity
+
+Response:
+
+- one `LibraryPathStorageStatusDTO`
+
+Important notes:
+
+- intended for deliberate recovery from `volume_mismatch`, for example after replacing a disk or moving a library root to a new volume
+- the new binding is persisted only when the current path is classified as `online`
 
 ## Movie Imports
 

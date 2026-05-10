@@ -214,6 +214,9 @@ GET    /api/library/played-movies           # List played movies with timestamps
 POST   /api/library/played-movies/{id}      # Mark movie as played
 POST   /api/library/paths                   # Add library path
 POST   /api/library/paths/{id}/reveal       # Open configured library root in OS file manager
+GET    /api/library/paths/storage-status    # List storage availability for configured library roots
+POST   /api/library/paths/storage-status/check # Fresh storage probe; optional body libraryPathIds narrows scope
+POST   /api/library/paths/{id}/storage-binding/rebind # Bind a library path to the currently detected backing volume
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
@@ -255,6 +258,8 @@ POST   /api/providers/ping-all              # Ping all providers
 
 **Homepage daily recommendations:** `GET /api/homepage/recommendations` returns the UTC-day snapshot used by the homepage hero and today's recommendations. In Web API mode the backend persists this display snapshot in SQLite so all browsers/devices see the same daily selection, while long-lived recommendation memory lives in `homepage_recommendation_states` per movie (`last_recommended_at`, `recommend_count`, `skip_until`). Generation uses weighted sampling without replacement: hard-cooling movies are skipped, recently recommended movies recover over a 14-day cooling window, long-unseen movies gain weight, repeated recommendations receive a logarithmic count penalty, and actor/studio diversity penalties still apply. Same-day snapshots are reused only when `generationVersion` matches the current algorithm. `POST /api/homepage/recommendations/refresh` force-regenerates that same-day snapshot for development verification; callers may send `{ "preserveHeroMovieIds": [...], "excludeRecommendationMovieIds": [...] }` to persist the current hero slate while regenerating today's recommendation rail and avoiding the caller's current rail where inventory allows. Settings -> About exposes the full dev-only snapshot refresh when `import.meta.env.DEV` and `VITE_USE_WEB_API=true`; the homepage recommendation refresh button uses the preserve-hero and exclude-current body.
 
+**Library storage presence:** `GET /api/library/paths/storage-status`, `POST /api/library/paths/storage-status/check`, and `POST /api/library/paths/{id}/storage-binding/rebind` report whether configured library roots are online, offline, mismatched to their previously bound volume, missing, permission denied, or unknown. Windows is the primary supported volume-identity implementation; macOS/Linux currently rely on the fallback path probe and are future adaptation targets. The frontend checks storage on Web API startup, surfaces abnormal paths through the new toast/notification center, blocks scan/import actions when `canRescan` or `canImport` is false, and exposes manual rebind in Settings -> Library & storage for deliberate disk replacement or path migration.
+
 **App update checks:** `GET /api/app-update/status` returns the packaged-app update state used by Settings -> About and the sidebar brand badge, while `POST /api/app-update/check` forces a refresh. The backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`, returns `installerDownloadUrl` when the release includes a Windows `.exe` installer asset, caches the result in SQLite, reuses the process proxy settings for outbound requests, and uses `0.0.0` as the dev-runtime fallback when no packaged installer version was injected.
 
 ## Architecture Boundaries
@@ -264,6 +269,7 @@ POST   /api/providers/ping-all              # Ping all providers
 - File scanning, metadata scraping, task system
 - REST API at `/api`
 - Frontend connects via HTTP when `VITE_USE_WEB_API=true`
+- Library storage presence checks for configured roots are implemented Windows-first, with macOS/Linux kept as fallback/future adaptation targets
 - Playback uses HTML5 `<video>` with HTTP Range streaming
 - Web Gamepad API MVP for standard controllers, including DualSense standard mapping: player controls, global focus navigation, library-grid navigation, and a browser-local Settings toggle
 - Trash/restore functionality (soft delete with `trashedAt` timestamp)

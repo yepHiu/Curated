@@ -4,6 +4,7 @@ import type {
   CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
+  LibraryPathStorageStatusDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -36,6 +37,7 @@ const moviesLoadedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const trashedMoviesState: Ref<Movie[]> = shallowRef([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
+const libraryPathStorageStatusesState: Ref<LibraryPathStorageStatusDTO[]> = ref([])
 const defaultImportLibraryPathIdState = ref("")
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
@@ -106,6 +108,14 @@ function mapLibraryPathsFromSettings(
     title: p.title,
     firstLibraryScanPending: p.firstLibraryScanPending,
   }))
+}
+
+function mergeLibraryPathStorageStatuses(items: readonly LibraryPathStorageStatusDTO[]) {
+  const next = new Map(libraryPathStorageStatusesState.value.map((item) => [item.libraryPathId, item]))
+  for (const item of items) {
+    next.set(item.libraryPathId, item)
+  }
+  libraryPathStorageStatusesState.value = [...next.values()]
 }
 
 async function fetchPagedMovies(
@@ -349,6 +359,15 @@ async function refreshLibraryPathsFromApi() {
   }
 }
 
+async function refreshLibraryPathStorageStatusesFromApi() {
+  try {
+    const dto = await api.listLibraryPathStorageStatus()
+    libraryPathStorageStatusesState.value = dto.items ?? []
+  } catch (err) {
+    console.error("[web-library-service] failed to load library path storage status", err)
+  }
+}
+
 function createWebLibraryService(): LibraryService {
   void ensureLoaded({ includeTrash: isTrashHashRoute() })
 
@@ -362,6 +381,7 @@ function createWebLibraryService(): LibraryService {
       return buildSettingsDashboardStats(moviesState.value, curatedFramesCountState.value, loc)
     }),
     libraryPaths: computed(() => libraryPathsState.value),
+    libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesState.value),
     defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
@@ -472,7 +492,30 @@ function createWebLibraryService(): LibraryService {
     },
 
     async refreshSettings() {
-      await Promise.all([refreshLibraryPathsFromApi(), refreshCuratedFramesCountFromApi()])
+      await Promise.all([
+        refreshLibraryPathsFromApi(),
+        refreshLibraryPathStorageStatusesFromApi(),
+        refreshCuratedFramesCountFromApi(),
+      ])
+    },
+
+    async checkLibraryPathStorageStatus(libraryPathIds?: string[]) {
+      const cleaned = libraryPathIds?.map((id) => id.trim()).filter(Boolean) ?? []
+      const dto = await api.checkLibraryPathStorageStatus(
+        cleaned.length > 0 ? { libraryPathIds: cleaned } : undefined,
+      )
+      if (cleaned.length > 0) {
+        mergeLibraryPathStorageStatuses(dto.items ?? [])
+      } else {
+        libraryPathStorageStatusesState.value = dto.items ?? []
+      }
+    },
+
+    async rebindLibraryPathStorage(id: string) {
+      const trimmed = id.trim()
+      if (!trimmed) return
+      const dto = await api.rebindLibraryPathStorage(trimmed)
+      mergeLibraryPathStorageStatuses([dto])
     },
 
     async reloadMoviesFromApi() {
@@ -730,6 +773,7 @@ function createWebLibraryService(): LibraryService {
       if (!trimmed) return null
       const res = await api.addLibraryPath({ path: trimmed, title: title?.trim() || undefined })
       await refreshLibraryPathsFromApi()
+      await impl.checkLibraryPathStorageStatus([res.id])
       return res.scanTask ?? null
     },
 
@@ -740,6 +784,9 @@ function createWebLibraryService(): LibraryService {
 
     async removeLibraryPath(id: string) {
       await api.deleteLibraryPath(id)
+      libraryPathStorageStatusesState.value = libraryPathStorageStatusesState.value.filter(
+        (status) => status.libraryPathId !== id,
+      )
       await refreshLibraryPathsFromApi()
       await reloadMoviesFromApiImmediate({ includeTrash: isTrashHashRoute() })
     },

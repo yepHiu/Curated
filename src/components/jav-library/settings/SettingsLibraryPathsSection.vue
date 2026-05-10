@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Database } from "lucide-vue-next"
-import type { LibraryPathDTO } from "@/api/types"
+import { Database, RefreshCw } from "lucide-vue-next"
+import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
 import {
   Card,
   CardContent,
@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -25,6 +26,10 @@ import SettingsLibraryPathToolbar from "@/components/jav-library/settings/Settin
 const props = defineProps<{
   scanFeedbackError: string
   paths: readonly LibraryPathDTO[]
+  storageStatuses: readonly LibraryPathStorageStatusDTO[]
+  storageStatusBusy: boolean
+  storageStatusError: string
+  storageBindingBusy: string | null
   defaultImportLibraryPathId: string
   defaultImportPathSaving: boolean
   defaultImportPathError: string
@@ -72,6 +77,8 @@ const emit = defineEmits<{
   reveal: [path: LibraryPathDTO]
   edit: [path: LibraryPathDTO]
   rescan: [path: LibraryPathDTO]
+  checkStorage: []
+  rebindStorage: [path: LibraryPathDTO]
   remove: [path: LibraryPathDTO]
   changeDefaultImportLibraryPath: [id: string]
   clearError: []
@@ -191,6 +198,35 @@ function onDefaultImportPathChange(value: unknown) {
             @exit-batch-mode="emit('exitBatchMode')"
           />
 
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-xs leading-relaxed text-muted-foreground">
+              {{ t("settings.storageStatusHint") }}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              class="h-8 shrink-0 rounded-lg"
+              :disabled="storageStatusBusy"
+              data-check-storage-status
+              @click="emit('checkStorage')"
+            >
+              <RefreshCw
+                data-icon="inline-start"
+                :class="storageStatusBusy ? 'animate-spin' : ''"
+                aria-hidden="true"
+              />
+              {{
+                storageStatusBusy
+                  ? t("settings.storageStatusChecking")
+                  : t("settings.storageStatusRecheck")
+              }}
+            </Button>
+          </div>
+          <p v-if="storageStatusError" class="text-sm text-destructive" role="alert">
+            {{ storageStatusError }}
+          </p>
+
           <SettingsLibraryPathRemoveDialog
             :open="removePathDialogOpen"
             :pending="removePathPending"
@@ -214,6 +250,8 @@ function onDefaultImportPathChange(value: unknown) {
           <SettingsLibraryPathList
             :edit-library-title-draft="editLibraryTitleDraft"
             :paths="paths"
+            :storage-statuses="storageStatuses"
+            :storage-binding-busy="storageBindingBusy"
             :batch-mode="batchMode"
             :selected-metadata-refresh-paths="selectedMetadataRefreshPaths"
             :editing-library-path-id="editingLibraryPathId"
@@ -228,6 +266,7 @@ function onDefaultImportPathChange(value: unknown) {
             @reveal="emit('reveal', $event)"
             @edit="emit('edit', $event)"
             @rescan="emit('rescan', $event)"
+            @rebind-storage="emit('rebindStorage', $event)"
             @remove="emit('remove', $event)"
           />
 

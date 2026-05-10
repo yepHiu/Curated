@@ -42,6 +42,9 @@ import type {
   HealthDTO,
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
+  CheckLibraryPathStorageStatusBody,
+  LibraryPathStorageStatusDTO,
+  LibraryPathStorageStatusListDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListActorsParams,
@@ -387,6 +390,25 @@ export const api = {
 
   updateLibraryPathTitle(id: string, body: UpdateLibraryPathBody): Promise<LibraryPathDTO> {
     return httpClient.patch<LibraryPathDTO>(`/library/paths/${encodeURIComponent(id)}`, body)
+  },
+
+  listLibraryPathStorageStatus(): Promise<LibraryPathStorageStatusListDTO> {
+    return httpClient.get<LibraryPathStorageStatusListDTO>("/library/paths/storage-status")
+  },
+
+  checkLibraryPathStorageStatus(
+    body?: CheckLibraryPathStorageStatusBody,
+  ): Promise<LibraryPathStorageStatusListDTO> {
+    return httpClient.post<LibraryPathStorageStatusListDTO>(
+      "/library/paths/storage-status/check",
+      body ?? {},
+    )
+  },
+
+  rebindLibraryPathStorage(id: string): Promise<LibraryPathStorageStatusDTO> {
+    return httpClient.post<LibraryPathStorageStatusDTO>(
+      `/library/paths/${encodeURIComponent(id)}/storage-binding/rebind`,
+    )
   },
 
   startScan(body?: StartScanBody): Promise<TaskDTO> {

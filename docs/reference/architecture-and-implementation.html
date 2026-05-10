@@ -302,7 +302,7 @@
   </figure>
 
   <h2 id="overview">1. 总览</h2>
-  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削与资源缓存。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
+  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
   <div class="flow">
     <span>浏览器</span> → <span>直连 Go :8080（loopback 开发）或 Vite <code>/api</code> 代理</span> → <span>SQLite + 文件系统</span>
   </div>
@@ -348,6 +348,7 @@
 
   <h3>2.3 Web 适配器</h3>
   <p><span class="path">src/services/adapters/web/web-library-service.ts</span> 将 UI 需要的操作映射为 <span class="path">src/api/endpoints.ts</span> 中的方法（如 <code>listMovies</code>、<code>getMovie</code>、<code>patchMovie</code>、<code>startScan</code>、<code>getTaskStatus</code> 等），并在适当时合并列表缓存、处理播放地址（见 <span class="path">src/api/playback-url.ts</span>）。</p>
+  <p>库路径存储状态同样走服务层：Web API 模式通过 <code>GET/POST /api/library/paths/storage-status</code> 刷新 <code>libraryPathStorageStatuses</code>；<span class="path">AppShell.vue</span> 启动时挂载 <span class="path">use-library-storage-status-alerts.ts</span>，把异常路径推送到新的 toast 与通知中心。设置页和导入弹窗根据 <code>canRescan</code> / <code>canImport</code> 阻断对离线或卷不匹配硬盘的操作。</p>
   <p><span class="path">src/api/http-client.ts</span> 中 <code>BASE_URL</code> 在本地 loopback Web API 开发态默认直连开发后端 <code>:8080</code>，release <code>:8081</code> 与其他模式默认为同源 <code>/api</code>；也可通过 <code>VITE_API_BASE_URL</code> 覆盖。</p>
 
   <h3>2.4 Mock 适配器</h3>
@@ -371,7 +372,7 @@
     <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code>）。</li>
     <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>metadataMovieStrategy</code>、<code>defaultImportLibraryPathId</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code> 等）。</li>
     <li>打开 SQLite：<code>storage.NewSQLiteStore(cfg.DatabasePath)</code>，执行 <code>Migrate</code>，必要时 <code>SeedLibraryPathsIfEmpty</code>。</li>
-    <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。若 <code>autoActorProfileScrape</code> 为真，则影片元数据刮削成功后会继续为仍缺头像与简介的演员自动排队 <code>scrape.actor</code>。</li>
+    <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存与 <code>internal/storagehealth</code> 存储在线检测器等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。若 <code>autoActorProfileScrape</code> 为真，则影片元数据刮削成功后会继续为仍缺头像与简介的演员自动排队 <code>scrape.actor</code>。</li>
     <li><code>http</code> 模式下 <code>server.ListenAndServe</code> 挂载 <code>backendApp.HTTPHandler()</code>。</li>
   </ol>
 
@@ -380,7 +381,7 @@
   <ul>
     <li><code>store *storage.SQLiteStore</code>：影片、路径、任务、用户偏好等持久化。</li>
     <li><code>library *library.Service</code>：<strong>内存种子服务</strong>（开发/演示用数据集）。</li>
-    <li><code>scanner</code>、<code>scraper</code>（Metatube）、<code>assets</code>（缓存下载）、<code>tasks.Manager</code> 等。</li>
+    <li><code>scanner</code>、<code>scraper</code>（Metatube）、<code>assets</code>（缓存下载）、<code>tasks.Manager</code>、<code>storagehealth.Checker</code> 等。</li>
   </ul>
   <p><code>HTTPHandler()</code> 构造 <span class="path">server.Handler</span>，注入上述依赖。</p>
 
@@ -403,6 +404,7 @@
     <li><code>GET /api/curated-frames/{id}/image</code>、<code>GET /api/curated-frames/{id}/thumbnail</code> — 分别提供原图与缩略图；历史行缺少缩略图时可回退原图。</li>
     <li><code>POST /api/curated-frames/export</code> — WebP EXIF 与 PNG iTXt 导出元数据统一补齐 <code>tags</code>、<code>schemaVersion</code>、<code>exportedAt</code>、<code>appName</code>、<code>appVersion</code>。</li>
     <li><code>POST/PATCH/DELETE /api/library/paths</code> — 库路径 CRUD。</li>
+    <li><code>GET /api/library/paths/storage-status</code>、<code>POST /api/library/paths/storage-status/check</code>、<code>POST /api/library/paths/{id}/storage-binding/rebind</code> — 库路径背后硬盘的在线/离线、卷不匹配、路径缺失和权限状态检测；Windows 优先支持卷身份，macOS/Linux 作为后续适配项。</li>
     <li><code>POST /api/import/movies</code> — 将浏览器上传的影片文件复制到设置中的默认库路径，并返回 <code>import.movies</code> 任务。</li>
     <li><code>/api/import/movies/uploads</code> — 大文件导入的分块续传端点：<code>POST</code> 创建 session，<code>PUT .../chunks/{chunkIndex}</code> 按 offset 写入 <code>.curated-import</code> 暂存文件，前端对 retryable 的 chunk 网络/超时失败会重试同一块，<code>GET</code> 查询状态，<code>POST .../commit</code> flush 后以不覆盖已有文件的方式提交并触发扫描，<code>DELETE</code> 取消并清理暂存。</li>
     <li><code>POST /api/scans</code>、<code>GET /api/tasks/recent</code>、<code>GET /api/tasks/{taskId}</code> — 扫描与任务状态。</li>
@@ -419,7 +421,7 @@
   <p class="note"><strong>注意</strong>：<code>GET .../stream</code> 仅走 SQLite（打开磁盘上的视频文件），不走内存种子库；真实播放依赖扫描入库后的文件路径。</p>
 
   <h3>3.5 扫描、刮削与任务</h3>
-  <p>扫描由 <code>App</code> 协调：<code>scanner</code> 遍历配置的库路径，解析番号、写库；若开启整理（<code>organizeLibrary</code>），会按规则移动/组织文件。导入影片通过 <code>POST /api/import/movies</code> 将浏览器上传文件复制到 <code>defaultImportLibraryPathId</code> 指向的库根；大文件可走 <code>/api/import/movies/uploads</code> 分块续传，上传中字节暂存在目标库根下的 <code>.curated-import/&lt;uploadId&gt;</code>，commit 成功后再 flush 并以不覆盖已有文件的方式提交到最终路径。复制或 commit 成功/部分成功后触发受限扫描；复制进度、冲突与失败明细通过 <code>import.movies</code> 任务元数据展示。刮削通过 Metatube SDK 拉取元数据，<code>assets</code> 可把封面、预览图、演员头像等缓存到 <code>cacheDir</code>；预览图本地缺失时，后端还会基于保存的 <code>source_url</code> / <code>referer_url</code> 做同源兜底转发。长时间操作通过 <code>tasks.Manager</code> 生成 <code>taskId</code>，前端轮询 <code>GET /api/tasks/{taskId}</code> 展示进度（如 <span class="path">ScanProgressDock.vue</span>、<span class="path">use-scan-task-tracker.ts</span>），同时任务和 provider 健康结果会带 <code>errorCategory</code> 等机器可读诊断字段。另：<strong>fsnotify</strong> 路径下扫描任务元数据常带 <code>trigger: fsnotify</code>，由 <code>autoLibraryWatch</code> 与主配置 <code>libraryWatchEnabled</code> 共同决定是否启用监听；若 <code>autoActorProfileScrape</code> 打开，则电影元数据保存后还会为头像与简介都缺失的演员自动排队 <code>scrape.actor</code>。</p>
+  <p>扫描由 <code>App</code> 协调：<code>scanner</code> 遍历配置的库路径，解析番号、写库；若开启整理（<code>organizeLibrary</code>），会按规则移动/组织文件。导入影片通过 <code>POST /api/import/movies</code> 将浏览器上传文件复制到 <code>defaultImportLibraryPathId</code> 指向的库根；大文件可走 <code>/api/import/movies/uploads</code> 分块续传，上传中字节暂存在目标库根下的 <code>.curated-import/&lt;uploadId&gt;</code>，commit 成功后再 flush 并以不覆盖已有文件的方式提交到最终路径。复制或 commit 成功/部分成功后触发受限扫描；复制进度、冲突与失败明细通过 <code>import.movies</code> 任务元数据展示。存储在线检测会在启动、手动检查、扫描或导入前探测库路径背后的卷；若外置硬盘离线、路径缺失或卷身份不匹配，前端会通过 toast/通知中心提醒，并阻断对应扫描或导入，避免把离线盘误判为路径删除。刮削通过 Metatube SDK 拉取元数据，<code>assets</code> 可把封面、预览图、演员头像等缓存到 <code>cacheDir</code>；预览图本地缺失时，后端还会基于保存的 <code>source_url</code> / <code>referer_url</code> 做同源兜底转发。长时间操作通过 <code>tasks.Manager</code> 生成 <code>taskId</code>，前端轮询 <code>GET /api/tasks/{taskId}</code> 展示进度（如 <span class="path">ScanProgressDock.vue</span>、<span class="path">use-scan-task-tracker.ts</span>），同时任务和 provider 健康结果会带 <code>errorCategory</code> 等机器可读诊断字段。另：<strong>fsnotify</strong> 路径下扫描任务元数据常带 <code>trigger: fsnotify</code>，由 <code>autoLibraryWatch</code> 与主配置 <code>libraryWatchEnabled</code> 共同决定是否启用监听；若 <code>autoActorProfileScrape</code> 打开，则电影元数据保存后还会为头像与简介都缺失的演员自动排队 <code>scrape.actor</code>。</p>
 
   <h2 id="api-contract">4. HTTP API 与契约</h2>
   <p>前后端共享的 DTO 与错误码在 Go 侧 <span class="path">backend/internal/contracts/</span> 定义；前端 TypeScript 类型在 <span class="path">src/api/types.ts</span> 等与之一致（字段命名一般为 camelCase JSON）。</p>
@@ -458,9 +460,9 @@
       <tr><td>搜索 / 模式</td><td><code>movie-search.ts</code>、路由 <code>mode</code> query</td><td><code>ListMoviesRequest</code></td></tr>
       <tr><td>详情与预览图</td><td><code>DetailPanel</code>、<code>PreviewImageViewer</code></td><td><code>GetMovieDetail</code></td></tr>
       <tr><td>用户评分 / 收藏</td><td><code>MovieRatingStars</code>、Mock <code>mock-movie-prefs-storage</code></td><td><code>PatchMovieUserPrefs</code>、迁移 SQL</td></tr>
-      <tr><td>设置与库路径</td><td><code>SettingsView</code>、<code>SettingsPage</code></td><td><code>handleGetSettings</code>、paths CRUD</td></tr>
+      <tr><td>设置与库路径</td><td><code>SettingsView</code>、<code>SettingsPage</code></td><td><code>handleGetSettings</code>、paths CRUD、库路径存储状态检测与重绑</td></tr>
       <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
-      <tr><td>导入影片</td><td><code>MovieImportDialog</code>、设置页默认导入路径选择器、<code>ScanProgressDock</code></td><td><code>POST /api/import/movies</code>、<code>/api/import/movies/uploads</code> 分块续传、<code>defaultImportLibraryPathId</code>、<code>import.movies</code> 任务</td></tr>
+      <tr><td>导入影片</td><td><code>MovieImportDialog</code>、设置页默认导入路径选择器、<code>ScanProgressDock</code></td><td><code>POST /api/import/movies</code>、<code>/api/import/movies/uploads</code> 分块续传、<code>defaultImportLibraryPathId</code>、<code>import.movies</code> 任务、默认路径 <code>canImport</code> 检查</td></tr>
       <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
       <tr><td>监听触发的自动扫描</td><td>设置 UI（自动刮削）</td><td><code>AutoLibraryWatchController</code> + <code>librarywatch.Watcher</code>；<code>autoLibraryWatch</code> 写入 <code>library-config.cfg</code></td></tr>
       <tr><td>影片刮削后自动补演员资料</td><td>设置 UI（自动刮削）</td><td><code>AutoActorProfileScrapeController</code> + <code>scrape.actor</code> 自动排队；<code>autoActorProfileScrape</code> 写入 <code>library-config.cfg</code></td></tr>

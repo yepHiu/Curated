@@ -352,6 +352,9 @@ function dotClass(type: AppNotification["type"]) {
 .notif-dot-scrape {
   background-color: #4ade80;
 }
+.notif-dot-storage {
+  background-color: #f59e0b;
+}
 .notif-dot-error {
   background-color: #f87171;
 }

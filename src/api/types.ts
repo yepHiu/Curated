@@ -98,6 +98,40 @@ export interface LibraryPathDTO {
   firstLibraryScanPending?: boolean
 }
 
+export type LibraryPathStorageStatus =
+  | "online"
+  | "offline"
+  | "volume_mismatch"
+  | "path_missing"
+  | "permission_denied"
+  | "unknown"
+
+export interface LibraryPathStorageStatusDTO {
+  libraryPathId: string
+  path: string
+  title: string
+  status: LibraryPathStorageStatus
+  message: string
+  checkedAt: string
+  rootPath?: string
+  driveType?: string
+  volumeLabel?: string
+  fileSystem?: string
+  identityConfidence?: string
+  expectedVolumeId?: string
+  currentVolumeId?: string
+  canRescan: boolean
+  canImport: boolean
+}
+
+export interface LibraryPathStorageStatusListDTO {
+  items: LibraryPathStorageStatusDTO[]
+}
+
+export interface CheckLibraryPathStorageStatusBody {
+  libraryPathIds?: string[]
+}
+
 export type HardwareEncoderPreference =
   | "auto"
   | "amf"

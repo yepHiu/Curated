@@ -8,7 +8,9 @@ const serviceState = vi.hoisted(() => ({
     { id: "library-a", path: "D:/Media/JAV/Main", title: "Primary archive" },
   ],
   defaultImportLibraryPathId: "library-a",
+  libraryPathStorageStatuses: [] as Array<Record<string, unknown>>,
   refreshSettings: vi.fn(),
+  checkLibraryPathStorageStatus: vi.fn(),
   importMovies: vi.fn(),
 }))
 
@@ -33,7 +35,9 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     libraryPaths: computed(() => serviceState.libraryPaths),
     defaultImportLibraryPathId: computed(() => serviceState.defaultImportLibraryPathId),
+    libraryPathStorageStatuses: computed(() => serviceState.libraryPathStorageStatuses),
     refreshSettings: serviceState.refreshSettings,
+    checkLibraryPathStorageStatus: serviceState.checkLibraryPathStorageStatus,
     importMovies: serviceState.importMovies,
   }),
 }))
@@ -73,7 +77,9 @@ beforeEach(() => {
     { id: "library-a", path: "D:/Media/JAV/Main", title: "Primary archive" },
   ]
   serviceState.defaultImportLibraryPathId = "library-a"
+  serviceState.libraryPathStorageStatuses = []
   serviceState.refreshSettings.mockReset()
+  serviceState.checkLibraryPathStorageStatus.mockReset()
   serviceState.importMovies.mockReset()
   tracker.start.mockReset()
 })
@@ -162,5 +168,31 @@ describe("MovieImportDialog", () => {
 
     expect(wrapper.find("[data-import-mode-local]").exists()).toBe(false)
     expect(wrapper.find("[data-import-local-paths]").exists()).toBe(false)
+  })
+
+  it("disables submit when the default import storage is offline", async () => {
+    serviceState.libraryPathStorageStatuses = [
+      {
+        libraryPathId: "library-a",
+        path: "D:/Media/JAV/Main",
+        title: "Primary archive",
+        status: "offline",
+        message: "drive is offline",
+        canImport: false,
+        canRescan: false,
+      },
+    ]
+    const wrapper = mount(MovieImportDialog)
+    const file = new File(["movie"], "IMP-001.mp4", { type: "video/mp4" })
+    const input = wrapper.get<HTMLInputElement>("[data-import-file-input]")
+    Object.defineProperty(input.element, "files", {
+      value: [file],
+      configurable: true,
+    })
+
+    await input.trigger("change")
+
+    expect(wrapper.get("[data-import-submit]").attributes("disabled")).toBeDefined()
+    expect(wrapper.text()).toContain("import.storageUnavailable")
   })
 })

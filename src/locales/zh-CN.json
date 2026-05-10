@@ -61,7 +61,9 @@
     "manualMovieScrapeFailed": "元数据刷新结束（未完全成功）— {message}",
     "movieImportDone": "影片导入完成：已复制 {completed} 个文件。",
     "movieImportPartial": "影片导入部分完成：{completed} 个成功，{failed} 个失败。",
-    "movieImportFailed": "影片导入失败：{message}"
+    "movieImportFailed": "影片导入失败：{message}",
+    "storagePathOffline": "存储目录「{title}」需要处理：{message}",
+    "storagePathsAbnormal": "{count} 个存储目录需要处理。请到设置 > 资料库中检查。"
   },
   "shell": {
     "openMenu": "打开导航菜单",
@@ -116,7 +118,9 @@
       "scrapeFailed": "刮削失败",
       "updateAvailable": "更新可用",
       "importDone": "导入完成",
-      "importFailed": "导入失败"
+      "importFailed": "导入失败",
+      "storageOffline": "存储设备离线",
+      "storageRebound": "存储绑定已更新"
     }
   },
   "history": {
@@ -383,6 +387,7 @@
     "dialogDescription": "选择文件或拖拽影片到这里，Curated 会复制到设置中的默认影片存储路径。",
     "targetPath": "目标目录",
     "noDefaultPath": "尚未设置默认导入目录",
+    "storageUnavailable": "默认导入目录所在的存储设备当前不可用。",
     "dropTitle": "拖拽影片到这里",
     "dropHint": "支持选择单个文件、多个文件，或选择整个文件夹。",
     "chooseFiles": "选择文件",
@@ -439,6 +444,21 @@
     "pageSubtitle": "存储路径、播放与元数据相关选项；扫描仅通过手动触发（全库或单路径）。",
     "storageCardTitle": "存储目录",
     "storageCardDesc": "可配置多个库根目录。勾选目录后点击「刷新元数据」仅对已入库条目重新刮削（不重新扫盘）；「重新扫描」会遍历磁盘并索引新文件。",
+    "storageStatusHint": "Curated 会在扫描或导入前检查已配置的存储设备当前是否在线。",
+    "storageStatusRecheck": "检查存储",
+    "storageStatusChecking": "检查中...",
+    "storageStatusOnline": "在线",
+    "storageStatusOffline": "离线",
+    "storageStatusVolumeMismatch": "硬盘不匹配",
+    "storageStatusPathMissing": "路径不存在",
+    "storageStatusPermissionDenied": "无读取权限",
+    "storageStatusUnknown": "未知",
+    "storageStatusRebind": "使用当前硬盘",
+    "storageStatusRebinding": "更新中...",
+    "storageStatusRebindSuccess": "存储绑定已更新。",
+    "storageStatusRebindFailed": "更新存储绑定失败。",
+    "storageStatusCheckFailed": "检查存储状态失败。",
+    "storageStatusActionBlocked": "这个存储目录当前不可用，请先检查硬盘再扫描或导入。",
     "defaultImportPathLabel": "默认导入目录",
     "defaultImportPathDesc": "导入影片会复制到这个资料库路径。修改后，顶部“添加影片”入口会直接使用新的目标目录。",
     "defaultImportPathPlaceholder": "选择默认导入目录",

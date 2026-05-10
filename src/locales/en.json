@@ -61,7 +61,9 @@
     "manualMovieScrapeFailed": "Metadata refresh ended without full success — {message}",
     "movieImportDone": "Movie import complete: {completed} files copied.",
     "movieImportPartial": "Movie import partially complete: {completed} succeeded, {failed} failed.",
-    "movieImportFailed": "Movie import failed: {message}"
+    "movieImportFailed": "Movie import failed: {message}",
+    "storagePathOffline": "Storage path \"{title}\" needs attention: {message}",
+    "storagePathsAbnormal": "{count} storage paths need attention. Open Settings > Library to review them."
   },
   "shell": {
     "openMenu": "Open navigation menu",
@@ -116,7 +118,9 @@
       "scrapeFailed": "Scrape failed",
       "updateAvailable": "Update available",
       "importDone": "Import complete",
-      "importFailed": "Import failed"
+      "importFailed": "Import failed",
+      "storageOffline": "Storage offline",
+      "storageRebound": "Storage binding updated"
     }
   },
   "history": {
@@ -383,6 +387,7 @@
     "dialogDescription": "Choose files or drop movies here. Curated copies them into the default movie storage path from Settings.",
     "targetPath": "Target folder",
     "noDefaultPath": "No default import folder set",
+    "storageUnavailable": "The default import storage is not available.",
     "dropTitle": "Drop movies here",
     "dropHint": "Choose one file, multiple files, or an entire folder.",
     "chooseFiles": "Choose files",
@@ -439,6 +444,21 @@
     "pageSubtitle": "Storage paths, playback and metadata options; scans are manual only (full or per path).",
     "storageCardTitle": "Storage directories",
     "storageCardDesc": "Multiple library roots. After checking paths, Refresh metadata re-scrapes indexed items only (no disk walk); Rescan walks disk for new files.",
+    "storageStatusHint": "Curated checks whether each configured storage device is currently online before scan or import actions.",
+    "storageStatusRecheck": "Check storage",
+    "storageStatusChecking": "Checking storage...",
+    "storageStatusOnline": "Online",
+    "storageStatusOffline": "Offline",
+    "storageStatusVolumeMismatch": "Different disk",
+    "storageStatusPathMissing": "Path missing",
+    "storageStatusPermissionDenied": "Permission denied",
+    "storageStatusUnknown": "Unknown",
+    "storageStatusRebind": "Use this disk",
+    "storageStatusRebinding": "Updating...",
+    "storageStatusRebindSuccess": "Storage binding updated.",
+    "storageStatusRebindFailed": "Failed to update storage binding.",
+    "storageStatusCheckFailed": "Failed to check storage status.",
+    "storageStatusActionBlocked": "This storage path is not available. Check the disk before scanning or importing.",
     "defaultImportPathLabel": "Default import folder",
     "defaultImportPathDesc": "Imported movies are copied into this library path. The Add movies entry uses this target for future imports.",
     "defaultImportPathPlaceholder": "Choose default import folder",

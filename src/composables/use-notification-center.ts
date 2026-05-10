@@ -1,11 +1,12 @@
 import { computed, ref } from "vue"
 
-export type NotificationType = "scan" | "scrape" | "update" | "error" | "system"
+export type NotificationType = "scan" | "scrape" | "storage" | "update" | "error" | "system"
 export type NotificationSeverity = "info" | "success" | "warning" | "error"
 
 export interface NotificationSource {
   taskId?: string
   movieId?: string
+  libraryPathId?: string
   route?: string
 }
 
@@ -23,7 +24,7 @@ export interface AppNotification {
 const STORAGE_KEY = "curated-notification-center-v1"
 const MAX_NOTIFICATIONS = 200
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000
-const NOTIFICATION_TYPES = ["scan", "scrape", "update", "error", "system"] as const
+const NOTIFICATION_TYPES = ["scan", "scrape", "storage", "update", "error", "system"] as const
 const NOTIFICATION_SEVERITIES = ["info", "success", "warning", "error"] as const
 
 let nextSeq = 0
@@ -56,6 +57,9 @@ function sanitizeSource(value: unknown): NotificationSource | undefined {
   }
   if (typeof value.movieId === "string" && value.movieId.trim()) {
     source.movieId = value.movieId
+  }
+  if (typeof value.libraryPathId === "string" && value.libraryPathId.trim()) {
+    source.libraryPathId = value.libraryPathId
   }
   if (typeof value.route === "string" && value.route.trim()) {
     source.route = value.route
@@ -147,12 +151,13 @@ function notificationDedupKey(
   if (notif.source?.taskId) {
     return `task:${notif.source.taskId}`
   }
-  if (notif.source?.movieId || notif.source?.route) {
+  if (notif.source?.movieId || notif.source?.libraryPathId || notif.source?.route) {
     return [
       "source",
       notif.type,
       notif.title,
       notif.source.movieId ?? "",
+      notif.source.libraryPathId ?? "",
       notif.source.route ?? "",
     ].join("\u001f")
   }

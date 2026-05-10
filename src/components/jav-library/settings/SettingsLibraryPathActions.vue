@@ -26,6 +26,7 @@ defineProps<{
   path: LibraryPathActionTarget
   revealBusy?: boolean
   scanBusy?: boolean
+  scanDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -70,7 +71,7 @@ const { t } = useI18n()
           {{ t("settings.editTitle") }}
         </DropdownMenuItem>
         <DropdownMenuItem
-          :disabled="scanBusy"
+          :disabled="scanBusy || scanDisabled"
           @click="emit('rescan', path)"
         >
           <RefreshCw

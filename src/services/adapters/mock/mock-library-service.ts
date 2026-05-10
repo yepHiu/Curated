@@ -8,6 +8,7 @@ import type {
   HealthDTO,
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
+  LibraryPathStorageStatusDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -85,6 +86,50 @@ const playerSettingsMock = ref<PlayerSettingsDTO>({
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
 const defaultImportLibraryPathIdMock = ref("library-a")
+const libraryPathStorageStatusesMock = ref<LibraryPathStorageStatusDTO[]>([
+  {
+    libraryPathId: "library-a",
+    path: "D:/Media/JAV/Main",
+    title: "Primary archive",
+    status: "online",
+    message: "Storage path is online.",
+    checkedAt: new Date().toISOString(),
+    rootPath: "D:/",
+    driveType: "fixed",
+    volumeLabel: "Media",
+    identityConfidence: "mock",
+    canRescan: true,
+    canImport: true,
+  },
+  {
+    libraryPathId: "library-b",
+    path: "E:/Vault/JAV/New",
+    title: "Recently imported",
+    status: "online",
+    message: "Storage path is online.",
+    checkedAt: new Date().toISOString(),
+    rootPath: "E:/",
+    driveType: "removable",
+    volumeLabel: "Vault",
+    identityConfidence: "mock",
+    canRescan: true,
+    canImport: true,
+  },
+  {
+    libraryPathId: "library-c",
+    path: "F:/Offline/Collections",
+    title: "Cold storage",
+    status: "offline",
+    message: "Mock: this external archive is offline.",
+    checkedAt: new Date().toISOString(),
+    rootPath: "F:/",
+    driveType: "removable",
+    volumeLabel: "Cold",
+    identityConfidence: "mock",
+    canRescan: false,
+    canImport: false,
+  },
+])
 
 function mockHttpError(status: number, code: string, message = code): HttpClientError {
   return new HttpClientError(status, {
@@ -495,6 +540,7 @@ export const mockLibraryService: LibraryService = {
     ),
   ),
   libraryPaths: computed(() => libraryPathsState.value),
+  libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesMock.value),
   defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdMock.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
@@ -674,6 +720,75 @@ export const mockLibraryService: LibraryService = {
     // Mock: paths are in-memory only; no remote settings.
   },
 
+  async checkLibraryPathStorageStatus(libraryPathIds?: string[]) {
+    const wanted = new Set((libraryPathIds ?? []).map((id) => id.trim()).filter(Boolean))
+    const now = new Date().toISOString()
+    const checked = libraryPathsState.value
+      .filter((path) => wanted.size === 0 || wanted.has(path.id))
+      .map((path) => {
+        const existing = libraryPathStorageStatusesMock.value.find(
+          (status) => status.libraryPathId === path.id,
+        )
+        return {
+          libraryPathId: path.id,
+          path: path.path,
+          title: path.title,
+          status: existing?.status ?? "online",
+          message: existing?.message ?? "Storage path is online.",
+          checkedAt: now,
+          rootPath: existing?.rootPath,
+          driveType: existing?.driveType,
+          volumeLabel: existing?.volumeLabel,
+          identityConfidence: existing?.identityConfidence ?? "mock",
+          expectedVolumeId: existing?.expectedVolumeId,
+          currentVolumeId: existing?.currentVolumeId,
+          canRescan: existing?.status ? existing.canRescan : true,
+          canImport: existing?.status ? existing.canImport : true,
+        }
+      })
+    if (wanted.size === 0) {
+      libraryPathStorageStatusesMock.value = checked
+      return
+    }
+    const next = new Map(libraryPathStorageStatusesMock.value.map((status) => [status.libraryPathId, status]))
+    for (const status of checked) {
+      next.set(status.libraryPathId, status)
+    }
+    libraryPathStorageStatusesMock.value = [...next.values()]
+  },
+
+  async rebindLibraryPathStorage(id: string) {
+    const trimmed = id.trim()
+    const path = libraryPathsState.value.find((entry) => entry.id === trimmed)
+    if (!path) {
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "library path not found")
+    }
+    const now = new Date().toISOString()
+    const rebound = {
+      libraryPathId: trimmed,
+      path: path.path,
+      title: path.title,
+      status: "online" as const,
+      message: "Storage path is online.",
+      checkedAt: now,
+      identityConfidence: "mock",
+      canRescan: true,
+      canImport: true,
+    }
+    const found = libraryPathStorageStatusesMock.value.some((status) => status.libraryPathId === trimmed)
+    libraryPathStorageStatusesMock.value = found
+      ? libraryPathStorageStatusesMock.value.map((status) =>
+          status.libraryPathId === trimmed
+            ? {
+                ...status,
+                ...rebound,
+                expectedVolumeId: status.currentVolumeId ?? status.expectedVolumeId,
+              }
+            : status,
+        )
+      : [...libraryPathStorageStatusesMock.value, rebound]
+  },
+
   async reloadMoviesFromApi() {
     // Mock: 列表为本地种子，无远端同步。
   },
@@ -749,6 +864,20 @@ export const mockLibraryService: LibraryService = {
       ...libraryPathsState.value,
       { id, path: trimmed, title: (title?.trim() || trimmed) },
     ]
+    libraryPathStorageStatusesMock.value = [
+      ...libraryPathStorageStatusesMock.value,
+      {
+        libraryPathId: id,
+        path: trimmed,
+        title: title?.trim() || trimmed,
+        status: "online",
+        message: "Storage path is online.",
+        checkedAt: new Date().toISOString(),
+        identityConfidence: "mock",
+        canRescan: true,
+        canImport: true,
+      },
+    ]
     return null
   },
 
@@ -762,6 +891,9 @@ export const mockLibraryService: LibraryService = {
   async removeLibraryPath(id: string) {
     const removed = libraryPathsState.value.find((p) => p.id === id)
     libraryPathsState.value = libraryPathsState.value.filter((p) => p.id !== id)
+    libraryPathStorageStatusesMock.value = libraryPathStorageStatusesMock.value.filter(
+      (status) => status.libraryPathId !== id,
+    )
     if (defaultImportLibraryPathIdMock.value === id) {
       defaultImportLibraryPathIdMock.value = libraryPathsState.value[0]?.id ?? ""
     }

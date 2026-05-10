@@ -8,6 +8,7 @@ import type {
   HealthDTO,
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
+  LibraryPathStorageStatusDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
@@ -41,8 +42,11 @@ export interface LibraryService {
   trashedMovies: ComputedRef<readonly Movie[]>
   libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
+  libraryPathStorageStatuses: ComputedRef<readonly LibraryPathStorageStatusDTO[]>
   defaultImportLibraryPathId: ComputedRef<string>
   refreshSettings(): Promise<void>
+  checkLibraryPathStorageStatus(libraryPathIds?: string[]): Promise<void>
+  rebindLibraryPathStorage(id: string): Promise<void>
   /** Web：自 API 重新拉取全库列表（扫描/监听入库后更新计数与海报）；Mock：空操作 */
   reloadMoviesFromApi(): Promise<void>
   /** Web：仅在需要展示回收站时再拉取 trashed 列表；Mock：空操作 */

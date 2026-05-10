@@ -17,6 +17,7 @@ import { HttpClientError } from "@/api/http-client"
 import type {
   CuratedFrameExportFormat,
   HealthDTO,
+  LibraryPathStorageStatusDTO,
   ProviderHealthDTO,
   ProxySettingsDTO,
 } from "@/api/types"
@@ -187,6 +188,7 @@ const scanTaskTracker = useScanTaskTracker()
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
+const libraryPathStorageStatuses = computed(() => libraryService.libraryPathStorageStatuses.value)
 const defaultImportLibraryPathId = computed(() => libraryService.defaultImportLibraryPathId.value)
 
 const addPathDialogOpen = ref(false)
@@ -210,6 +212,9 @@ const editLibraryTitleDraft = ref("")
 const editTitleBusy = ref(false)
 const editTitleError = ref("")
 const scanFeedbackError = ref("")
+const storageStatusBusy = ref(false)
+const storageStatusError = ref("")
+const storageBindingBusy = ref<string | null>(null)
 /** 按目录批量元数据刷新：成功摘要 */
 const metadataRefreshSuccess = ref("")
 /** 按目录批量元数据刷新：错误文案 */
@@ -1426,8 +1431,90 @@ async function confirmRemoveLibraryPath() {
   }
 }
 
+function storageStatusForPath(path: string): LibraryPathStorageStatusDTO | undefined {
+  return libraryPathStorageStatuses.value.find((status) => status.path === path)
+}
+
+function abnormalStorageStatuses(): LibraryPathStorageStatusDTO[] {
+  return libraryPathStorageStatuses.value.filter((status) => status.status !== "online")
+}
+
+function storageBlockedMessage(status: LibraryPathStorageStatusDTO): string {
+  return status.message?.trim() || t("settings.storageStatusActionBlocked")
+}
+
+function notifyStorageBlocked(status: LibraryPathStorageStatusDTO) {
+  const message = storageBlockedMessage(status)
+  scanFeedbackError.value = message
+  pushAppToast(message, {
+    variant: "warning",
+    durationMs: 6500,
+    notification: {
+      type: "storage",
+      title: t("notificationCenter.titles.storageOffline"),
+      source: {
+        route: "/settings?section=library",
+        libraryPathId: status.libraryPathId,
+      },
+    },
+  })
+}
+
+async function checkLibraryStorageStatus(ids?: string[]) {
+  storageStatusError.value = ""
+  storageStatusBusy.value = true
+  try {
+    await libraryService.checkLibraryPathStorageStatus(ids)
+  } catch (err) {
+    console.error("[settings] check library path storage status failed", err)
+    storageStatusError.value =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message.trim()
+          ? err.message
+          : t("settings.storageStatusCheckFailed")
+  } finally {
+    storageStatusBusy.value = false
+  }
+}
+
+async function rebindLibraryPathStorage(path: { id: string }) {
+  storageStatusError.value = ""
+  storageBindingBusy.value = path.id
+  try {
+    await libraryService.rebindLibraryPathStorage(path.id)
+    pushAppToast(t("settings.storageStatusRebindSuccess"), {
+      variant: "success",
+      durationMs: 3200,
+      notification: {
+        type: "storage",
+        title: t("notificationCenter.titles.storageRebound"),
+        source: {
+          route: "/settings?section=library",
+          libraryPathId: path.id,
+        },
+      },
+    })
+  } catch (err) {
+    console.error("[settings] rebind library path storage failed", err)
+    storageStatusError.value =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message.trim()
+          ? err.message
+          : t("settings.storageStatusRebindFailed")
+  } finally {
+    storageBindingBusy.value = null
+  }
+}
+
 async function rescanPath(path: string) {
   scanFeedbackError.value = ""
+  const status = storageStatusForPath(path)
+  if (status && !status.canRescan) {
+    notifyStorageBlocked(status)
+    return
+  }
   try {
     await withPreservedScroll(async () => {
       scanPathBusy.value = path
@@ -1693,6 +1780,16 @@ async function onMetadataMovieSelect(next: unknown) {
 async function runFullScan() {
   scanFeedbackError.value = ""
   try {
+    try {
+      await libraryService.checkLibraryPathStorageStatus()
+      const blocked = abnormalStorageStatuses().find((status) => !status.canRescan)
+      if (blocked) {
+        notifyStorageBlocked(blocked)
+        return
+      }
+    } catch (err) {
+      console.warn("[settings] storage status check before full scan failed", err)
+    }
     await withPreservedScroll(async () => {
       fullScanBusy.value = true
       try {
@@ -1877,6 +1974,10 @@ async function runMetadataRefreshForSelected() {
         v-model:new-path-title="newPathTitle"
         :scan-feedback-error="scanFeedbackError"
         :paths="libraryPathsList"
+        :storage-statuses="libraryPathStorageStatuses"
+        :storage-status-busy="storageStatusBusy"
+        :storage-status-error="storageStatusError"
+        :storage-binding-busy="storageBindingBusy"
         :default-import-library-path-id="defaultImportLibraryPathId"
         :default-import-path-saving="defaultImportPathSaving"
         :default-import-path-error="defaultImportPathError"
@@ -1911,6 +2012,8 @@ async function runMetadataRefreshForSelected() {
         @reveal="revealLibraryPath"
         @edit="startEditLibraryTitle"
         @rescan="rescanPath($event.path)"
+        @check-storage="checkLibraryStorageStatus()"
+        @rebind-storage="rebindLibraryPathStorage"
         @remove="openRemovePathConfirm"
         @change-default-import-library-path="onDefaultImportLibraryPathChange"
         @clear-error="clearPathAddError"

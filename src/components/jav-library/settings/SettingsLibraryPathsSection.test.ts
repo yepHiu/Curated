@@ -10,6 +10,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("lucide-vue-next", () => ({
   Database: { name: "Database", template: "<span />" },
+  RefreshCw: { name: "RefreshCw", template: "<span />" },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -18,6 +19,15 @@ vi.mock("@/components/ui/card", () => ({
   CardDescription: { name: "CardDescription", template: "<p><slot /></p>" },
   CardHeader: { name: "CardHeader", template: "<header><slot /></header>" },
   CardTitle: { name: "CardTitle", template: "<h3><slot /></h3>" },
+}))
+
+vi.mock("@/components/ui/button", () => ({
+  Button: {
+    name: "Button",
+    props: ["disabled"],
+    emits: ["click"],
+    template: "<button :disabled='disabled' @click=\"$emit('click', $event)\"><slot /></button>",
+  },
 }))
 
 vi.mock("@/components/ui/select", () => ({
@@ -68,6 +78,8 @@ vi.mock("./SettingsLibraryPathList.vue", () => ({
     name: "SettingsLibraryPathList",
     props: [
       "paths",
+      "storageStatuses",
+      "storageBindingBusy",
       "batchMode",
       "selectedMetadataRefreshPaths",
       "editingLibraryPathId",
@@ -85,10 +97,11 @@ vi.mock("./SettingsLibraryPathList.vue", () => ({
       "reveal",
       "edit",
       "rescan",
+      "rebindStorage",
       "remove",
     ],
     template:
-      "<div data-list><button data-draft @click=\"$emit('update:editLibraryTitleDraft', 'Renamed')\">draft</button><button data-save @click=\"$emit('saveTitle', paths[0].id)\">save</button><button data-cancel @click=\"$emit('cancelEdit')\">cancel</button><button data-toggle @click=\"$emit('toggleMetadataPathSelection', paths[0].path)\">toggle</button><button data-reveal @click=\"$emit('reveal', paths[0])\">reveal</button><button data-edit @click=\"$emit('edit', paths[0])\">edit</button><button data-rescan @click=\"$emit('rescan', paths[0])\">rescan</button><button data-remove @click=\"$emit('remove', paths[0])\">remove</button></div>",
+      "<div data-list><button data-draft @click=\"$emit('update:editLibraryTitleDraft', 'Renamed')\">draft</button><button data-save @click=\"$emit('saveTitle', paths[0].id)\">save</button><button data-cancel @click=\"$emit('cancelEdit')\">cancel</button><button data-toggle @click=\"$emit('toggleMetadataPathSelection', paths[0].path)\">toggle</button><button data-reveal @click=\"$emit('reveal', paths[0])\">reveal</button><button data-edit @click=\"$emit('edit', paths[0])\">edit</button><button data-rescan @click=\"$emit('rescan', paths[0])\">rescan</button><button data-rebind @click=\"$emit('rebindStorage', paths[0])\">rebind</button><button data-remove @click=\"$emit('remove', paths[0])\">remove</button></div>",
   },
 }))
 
@@ -134,6 +147,10 @@ const secondaryLibraryPath = {
 const baseProps = {
   scanFeedbackError: "",
   paths: [libraryPath, secondaryLibraryPath],
+  storageStatuses: [],
+  storageStatusBusy: false,
+  storageStatusError: "",
+  storageBindingBusy: null,
   defaultImportLibraryPathId: "library-a",
   defaultImportPathSaving: false,
   defaultImportPathError: "",
@@ -172,6 +189,7 @@ describe("SettingsLibraryPathsSection", () => {
         metadataRefreshSuccess: "metadata queued",
         metadataRefreshError: "metadata failed",
         defaultImportPathError: "default path failed",
+        storageStatusError: "storage failed",
       },
     })
 
@@ -183,6 +201,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.text()).toContain("metadata queued")
     expect(wrapper.text()).toContain("metadata failed")
     expect(wrapper.text()).toContain("default path failed")
+    expect(wrapper.text()).toContain("storage failed")
   })
 
   it("emits default import path changes", () => {
@@ -218,6 +237,7 @@ describe("SettingsLibraryPathsSection", () => {
     await wrapper.get("[data-select-all]").trigger("click")
     await wrapper.get("[data-clear]").trigger("click")
     await wrapper.get("[data-refresh]").trigger("click")
+    await wrapper.get("[data-check-storage-status]").trigger("click")
     await wrapper.get("[data-exit]").trigger("click")
     await wrapper.get("[data-remove-open]").trigger("click")
     await wrapper.get("[data-remove-confirm]").trigger("click")
@@ -228,6 +248,7 @@ describe("SettingsLibraryPathsSection", () => {
     await wrapper.get("[data-reveal]").trigger("click")
     await wrapper.get("[data-edit]").trigger("click")
     await wrapper.get("[data-rescan]").trigger("click")
+    await wrapper.get("[data-rebind]").trigger("click")
     await wrapper.get("[data-remove]").trigger("click")
     await wrapper.get("[data-add-open]").trigger("click")
     await wrapper.get("[data-new-path]").trigger("click")
@@ -240,6 +261,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.emitted("selectAll")).toHaveLength(1)
     expect(wrapper.emitted("clearSelection")).toHaveLength(1)
     expect(wrapper.emitted("refreshMetadata")).toHaveLength(1)
+    expect(wrapper.emitted("checkStorage")).toHaveLength(1)
     expect(wrapper.emitted("exitBatchMode")).toHaveLength(1)
     expect(wrapper.emitted("update:removePathDialogOpen")).toEqual([[false]])
     expect(wrapper.emitted("confirmRemove")).toHaveLength(1)
@@ -250,6 +272,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.emitted("reveal")).toEqual([[libraryPath]])
     expect(wrapper.emitted("edit")).toEqual([[libraryPath]])
     expect(wrapper.emitted("rescan")).toEqual([[libraryPath]])
+    expect(wrapper.emitted("rebindStorage")).toEqual([[libraryPath]])
     expect(wrapper.emitted("remove")).toEqual([[libraryPath]])
     expect(wrapper.emitted("update:addPathDialogOpen")).toEqual([[true]])
     expect(wrapper.emitted("update:newPath")).toEqual([["E:/Movies"]])

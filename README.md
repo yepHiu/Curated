@@ -31,6 +31,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
 - **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
+- **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
 - **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
@@ -113,6 +114,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 - Resumable chunked upload for large files with commit/abort lifecycle.
 - Conflict detection (existing target files are not overwritten).
 - Configurable default import library path.
+- Imports are blocked with a storage warning when the default target drive is offline or no longer matches the bound volume.
 
 ### Playback
 
@@ -222,11 +224,13 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 
 ## API
 
-Curated exposes a Go HTTP API for library, playback, actor, settings, and curated-frame workflows.
+Curated exposes a Go HTTP API for library, playback, actor, settings, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 
 Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
+
+Library storage presence uses endpoints under `/api/library/paths/storage-status` to detect offline or mismatched backing volumes. The current implementation is Windows-first; macOS and Linux use a fallback path probe and remain future adaptation targets.
 
 ## Repository Layout
 

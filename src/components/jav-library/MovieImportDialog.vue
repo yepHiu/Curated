@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { FilePlus2, FolderInput, UploadCloud, X } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
-import type { MovieImportUploadProgress } from "@/api/types"
+import type { LibraryPathStorageStatusDTO, MovieImportUploadProgress } from "@/api/types"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { Button } from "@/components/ui/button"
@@ -56,10 +56,24 @@ const defaultImportPathId = computed(() => libraryService.defaultImportLibraryPa
 const targetLibraryPath = computed(() =>
   libraryService.libraryPaths.value.find((path) => path.id === defaultImportPathId.value),
 )
-const hasDefaultImportPath = computed(() => Boolean(targetLibraryPath.value))
-const canSubmit = computed(() =>
-  selectedFiles.value.length > 0 && hasDefaultImportPath.value && !busy.value,
+const targetStorageStatus = computed<LibraryPathStorageStatusDTO | undefined>(() =>
+  libraryService.libraryPathStorageStatuses.value.find(
+    (status) => status.libraryPathId === defaultImportPathId.value,
+  ),
 )
+const hasDefaultImportPath = computed(() => Boolean(targetLibraryPath.value))
+const targetStorageReady = computed(() => targetStorageStatus.value?.canImport !== false)
+const canSubmit = computed(() =>
+  selectedFiles.value.length > 0 &&
+  hasDefaultImportPath.value &&
+  targetStorageReady.value &&
+  !busy.value,
+)
+const targetStorageUnavailableMessage = computed(() => {
+  const status = targetStorageStatus.value
+  if (!status || status.canImport !== false) return ""
+  return status.message?.trim() || t("import.storageUnavailable")
+})
 const progressValue = computed(() => {
   if (!busy.value) return selectedFiles.value.length > 0 ? 100 : 0
   return uploadProgress.value?.percent ?? 0
@@ -75,7 +89,12 @@ const selectedTotalBytes = computed(() =>
 watch(open, (next) => {
   if (next) {
     importError.value = ""
-    void libraryService.refreshSettings()
+    void libraryService.refreshSettings().then(() => {
+      const id = defaultImportPathId.value
+      if (id) {
+        void libraryService.checkLibraryPathStorageStatus([id])
+      }
+    })
   }
 })
 
@@ -166,6 +185,23 @@ function errorMessage(err: unknown): string {
 
 async function submitImport() {
   if (!canSubmit.value) return
+  const id = defaultImportPathId.value
+  if (id) {
+    await libraryService.checkLibraryPathStorageStatus([id])
+    if (!targetStorageReady.value) {
+      importError.value = targetStorageUnavailableMessage.value || t("import.storageUnavailable")
+      pushAppToast(importError.value, {
+        variant: "warning",
+        durationMs: 6500,
+        notification: {
+          type: "storage",
+          title: t("notificationCenter.titles.storageOffline"),
+          source: { route: "/settings?section=library", libraryPathId: id },
+        },
+      })
+      return
+    }
+  }
   importError.value = ""
   busy.value = true
   uploadProgress.value = { loaded: 0, total: selectedTotalBytes.value, percent: 0 }
@@ -261,6 +297,13 @@ async function submitImport() {
             </span>
           </div>
         </div>
+
+        <p
+          v-if="targetStorageUnavailableMessage"
+          class="text-sm text-amber-700 dark:text-amber-300"
+        >
+          {{ t("import.storageUnavailable") }} {{ targetStorageUnavailableMessage }}
+        </p>
 
         <div
           class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors"

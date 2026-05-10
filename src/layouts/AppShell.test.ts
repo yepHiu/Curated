@@ -65,6 +65,10 @@ vi.mock("@/composables/use-library-watch-toasts", () => ({
   useLibraryWatchToasts: vi.fn(),
 }))
 
+vi.mock("@/composables/use-library-storage-status-alerts", () => ({
+  useLibraryStorageStatusAlerts: vi.fn(),
+}))
+
 vi.mock("@/composables/use-theme", () => ({
   useTheme: () => ({
     resolvedMode: { value: "light" },

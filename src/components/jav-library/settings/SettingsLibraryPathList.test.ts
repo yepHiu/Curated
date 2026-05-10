@@ -44,6 +44,8 @@ const paths = [
 
 const baseProps = {
   paths,
+  storageStatuses: [],
+  storageBindingBusy: "",
   batchMode: true,
   selectedMetadataRefreshPaths: ["D:/Media/A"],
   editingLibraryPathId: null,
@@ -110,5 +112,45 @@ describe("SettingsLibraryPathList", () => {
     })
 
     expect(wrapper.find("input[type='checkbox']").exists()).toBe(false)
+  })
+
+  it("renders storage status labels and emits rebind actions", async () => {
+    const wrapper = mount(SettingsLibraryPathList, {
+      props: {
+        ...baseProps,
+        storageStatuses: [
+          {
+            libraryPathId: "a",
+            path: "D:/Media/A",
+            title: "Archive A",
+            status: "online",
+            message: "online",
+            checkedAt: "2026-05-11T00:00:00Z",
+            canRescan: true,
+            canImport: true,
+          },
+          {
+            libraryPathId: "b",
+            path: "E:/Media/B",
+            title: "Archive B",
+            status: "volume_mismatch",
+            message: "wrong disk",
+            checkedAt: "2026-05-11T00:00:00Z",
+            expectedVolumeId: "OLD",
+            currentVolumeId: "NEW",
+            canRescan: false,
+            canImport: false,
+          },
+        ],
+      },
+    })
+
+    expect(wrapper.text()).toContain("settings.storageStatusOnline")
+    expect(wrapper.text()).toContain("settings.storageStatusVolumeMismatch")
+    expect(wrapper.text()).toContain("wrong disk")
+
+    await wrapper.get("[data-rebind-storage='b']").trigger("click")
+
+    expect(wrapper.emitted("rebindStorage")).toEqual([[paths[1]]])
   })
 })
