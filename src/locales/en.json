@@ -507,7 +507,6 @@
     "organizeHint": "When new videos are detected, Curated automatically organizes each title and its related files into that title's folder.",
     "organizeSyncing": "Syncing to server…",
     "metadataMovieProviderTitle": "Movie metadata scrape source",
-    "metadataMovieProviderDesc": "Auto: query every registered provider in parallel and pick the best weighted match. Specified: only the site you choose. See the sections below for details; preferences are saved to your library config and applied by the backend.",
     "metadataMovieProviderHelpAria": "Scrape & configuration help",
     "metadataMovieProviderHelpP1": "“Scrape” means fetching artwork, synopsis, cast, and tags from provider sites and saving them into your library.",
     "metadataMovieProviderHelpP2": "Preferences on this page are written to library-config.cfg under the app config directory; some changes apply fully after restarting the Curated backend.",

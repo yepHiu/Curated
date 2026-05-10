@@ -15,7 +15,6 @@ vi.mock("lucide-vue-next", () => ({
 vi.mock("@/components/ui/card", () => ({
   Card: { name: "Card", template: "<section><slot /></section>" },
   CardContent: { name: "CardContent", template: "<div><slot /></div>" },
-  CardDescription: { name: "CardDescription", template: "<p><slot /></p>" },
   CardHeader: { name: "CardHeader", template: "<header><slot /></header>" },
   CardTitle: { name: "CardTitle", template: "<h3><slot /></h3>" },
 }))
@@ -165,7 +164,6 @@ describe("SettingsMetadataSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.metadataMovieProviderTitle")
-    expect(wrapper.text()).toContain("settings.metadataMovieProviderDesc")
     expect(wrapper.find("[data-provider-select]").exists()).toBe(true)
     expect(wrapper.find("[data-chain]").exists()).toBe(false)
     expect(wrapper.get("[data-current-health]").text()).toBe("ok")

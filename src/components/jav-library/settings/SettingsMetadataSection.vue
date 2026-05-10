@@ -6,7 +6,6 @@ import type { ProviderHealthDTO } from "@/api/types"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -91,22 +90,17 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
     <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="pb-2">
         <div
-          class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 gap-y-3"
+          class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5"
         >
           <span
-            class="col-start-1 row-start-1 flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
             aria-hidden="true"
           >
             <Sparkles class="size-4" />
           </span>
-          <CardTitle class="col-start-2 row-start-1 min-w-0 text-lg tracking-tight">
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.metadataMovieProviderTitle") }}
           </CardTitle>
-          <CardDescription
-            class="col-start-2 row-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.metadataMovieProviderDesc") }}
-          </CardDescription>
         </div>
       </CardHeader>
       <CardContent class="flex flex-col gap-3 pt-2">
