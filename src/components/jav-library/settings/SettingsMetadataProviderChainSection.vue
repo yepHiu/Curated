@@ -82,18 +82,13 @@ function onProviderToAddChange(value: unknown) {
     >
       {{ t("settings.metadataMovieProviderChainNoList") }}
     </p>
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div class="min-w-0 text-left">
-        <p class="text-sm font-semibold text-foreground">
-          {{ t("settings.metadataMovieProviderChainLabel") }}
-        </p>
-        <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.metadataMovieProviderChainDragHint") }}
-        </p>
-      </div>
-      <span class="shrink-0 text-xs text-muted-foreground">
-        {{ providerChainDraft.length }} {{ t("settings.providersSelected") }}
-      </span>
+    <div class="min-w-0 text-left">
+      <p class="text-sm font-semibold text-foreground">
+        {{ t("settings.metadataMovieProviderChainLabel") }}
+      </p>
+      <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+        {{ t("settings.metadataMovieProviderChainDragHint") }}
+      </p>
     </div>
 
     <div class="flex flex-col gap-3">

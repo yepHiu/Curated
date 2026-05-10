@@ -525,7 +525,6 @@
     "metadataMovieProviderChainDragHandleAria": "拖动以调整源顺序",
     "metadataMovieProviderRemoveFromChainAria": "从链中移除 {name}",
     "metadataMovieProviderChainAutoSave": "调整顺序、添加或删除源后会自动保存到后端。",
-    "providersSelected": "个源已选择",
     "metadataMovieProviderChainEmpty": "链中暂无源。请从下方列表添加。",
     "metadataMovieProviderChainNoList": "当前无法从后端获取可用站点列表，无法向链中添加新源；若配置里已有链，仍可查看、调整顺序、删除或保存。请确认 Curated 后端已连接且 Metatube 引擎已注册影片源。",
     "selectProviderToAdd": "选择要添加的源",

@@ -525,7 +525,6 @@
     "metadataMovieProviderChainDragHandleAria": "ドラッグしてプロバイダー順を変更",
     "metadataMovieProviderRemoveFromChainAria": "チェーンから {name} を削除",
     "metadataMovieProviderChainAutoSave": "並べ替え・追加・削除の変更は自動的にサーバーへ保存されます。",
-    "providersSelected": "件選択中",
     "metadataMovieProviderChainEmpty": "チェーンにプロバイダーがありません。下のリストから追加してください。",
     "metadataMovieProviderChainNoList": "サーバーから利用可能なプロバイダー一覧が取得できないため、チェーンへの新規追加はできません。既に保存されたチェーンがあれば表示・並べ替え・削除・保存は可能です。Curated バックエンドが動作し Metatube が映画プロバイダーを公開しているか確認してください。",
     "selectProviderToAdd": "追加するプロバイダーを選択",
