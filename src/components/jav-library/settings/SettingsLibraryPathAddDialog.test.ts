@@ -119,7 +119,7 @@ describe("SettingsLibraryPathAddDialog", () => {
 
     const addPathTriggerClass = wrapper.findAll("button")[0]!.attributes("class")
 
-    expect(addPathTriggerClass).toContain("h-9")
+    expect(addPathTriggerClass).toContain("h-8")
     expect(addPathTriggerClass).toContain("min-w-32")
     expect(addPathTriggerClass).toContain("px-4")
   })

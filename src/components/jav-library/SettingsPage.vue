@@ -75,9 +75,9 @@ import {
   type DailyWatchTimeSummary,
 } from "@/lib/watch-time-heatmap"
 
-/** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8） */
+/** 设置页内按钮、选择器触发器、侧栏 Tab 统一高度 32px（h-8）；DialogTrigger as-child 根节点为 dialog-trigger，需一并约束 */
 const SETTINGS_CONTROL_H32_CLASS =
-  "[&_[data-slot=button]]:!h-8 [&_[data-slot=button]]:!min-h-8 [&_[data-slot=button]]:!max-h-8 [&_[data-slot=button][data-size=icon]]:!size-8 [&_[data-slot=button][data-size=icon-sm]]:!size-8 [&_[data-slot=button][data-size=icon-lg]]:!size-8 [&_[data-slot=select-trigger]]:!h-8 [&_[data-slot=select-trigger]]:!min-h-8 [&_[data-slot=select-trigger]]:!max-h-8 [&_[data-slot=select-trigger]]:!py-0 [&_[data-slot=tabs-trigger]]:!h-8 [&_[data-slot=tabs-trigger]]:!min-h-8 [&_[data-slot=tabs-trigger]]:!max-h-8 [&_[data-slot=tabs-trigger]]:!py-0"
+  "[&_[data-slot=button]]:!h-8 [&_[data-slot=button]]:!min-h-8 [&_[data-slot=button]]:!max-h-8 [&_[data-slot=button][data-size=icon]]:!size-8 [&_[data-slot=button][data-size=icon-sm]]:!size-8 [&_[data-slot=button][data-size=icon-lg]]:!size-8 [&_[data-slot=dialog-trigger]]:!h-8 [&_[data-slot=dialog-trigger]]:!min-h-8 [&_[data-slot=dialog-trigger]]:!max-h-8 [&_[data-slot=dialog-trigger][data-size=icon]]:!size-8 [&_[data-slot=dialog-trigger][data-size=icon-sm]]:!size-8 [&_[data-slot=dialog-trigger][data-size=icon-lg]]:!size-8 [&_[data-slot=select-trigger]]:!h-8 [&_[data-slot=select-trigger]]:!min-h-8 [&_[data-slot=select-trigger]]:!max-h-8 [&_[data-slot=select-trigger]]:!py-0 [&_[data-slot=tabs-trigger]]:!h-8 [&_[data-slot=tabs-trigger]]:!min-h-8 [&_[data-slot=tabs-trigger]]:!max-h-8 [&_[data-slot=tabs-trigger]]:!py-0"
 /** 资料库路径行：铅笔 / 扫描 / 移除 三枚图标按钮，统一 36×36 圆角矩形（覆盖上方全局 icon size-8） */
 /** 资料库路径行：除「更多 ⋮」外，其它图标按钮 36×36（更多菜单为 ghost 竖三点，不强制放大，见 `data-overflow-menu-trigger`） */
 const SETTINGS_LIBRARY_PATH_ACTION_ICONS_CLASS =

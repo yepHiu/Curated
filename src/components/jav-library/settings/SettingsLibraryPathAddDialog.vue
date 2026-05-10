@@ -53,7 +53,7 @@ function updateNewPathTitle(value: unknown) {
     @update:open="emit('update:open', $event)"
   >
     <DialogTrigger as-child>
-      <Button type="button" class="h-9 min-w-32 rounded-2xl px-4">
+      <Button type="button" class="h-8 min-w-32 rounded-2xl px-4">
         <FolderPlus data-icon="inline-start" />
         {{ t("settings.addPath") }}
       </Button>
