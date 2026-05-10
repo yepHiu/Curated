@@ -507,7 +507,7 @@
     "organizeHint": "检测到新增影片后，会自动将影片及其相关文件整理到对应影片的目录中。",
     "organizeSyncing": "正在同步到服务端…",
     "metadataMovieProviderTitle": "影片元数据刮削源",
-    "metadataMovieProviderDesc": "自动：并行查询全部已注册源并加权选优；指定：只查所选单一站点。标题旁问号可了解「刮削」含义与配置如何保存。",
+    "metadataMovieProviderDesc": "自动：并行查询全部已注册源并加权选优；指定：只查所选单一站点。下方各区块有更详细的说明；偏好会写入资料库配置并由后端生效。",
     "metadataMovieProviderHelpAria": "刮削与配置说明",
     "metadataMovieProviderHelpP1": "「刮削」指向影片站点自动获取封面、简介、演员、标签等元数据并写入资料库的过程。",
     "metadataMovieProviderHelpP2": "本页偏好会写入应用配置中的 library-config.cfg；部分项在重启 Curated 后端后会按新策略完全生效。",

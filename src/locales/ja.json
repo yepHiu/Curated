@@ -507,7 +507,7 @@
     "organizeHint": "新しい動画を検出すると、動画と関連ファイルをその作品用のフォルダへ自動で整理します。",
     "organizeSyncing": "サーバーに同期中…",
     "metadataMovieProviderTitle": "映画メタデータのスクレイプ元",
-    "metadataMovieProviderDesc": "自動：登録済み全プロバイダーを並行検索し最良を採用。指定：選んだ1サイトのみ。タイトル横のヘルプで「スクレイプ」の意味と設定の保存先を確認できます。",
+    "metadataMovieProviderDesc": "自動：登録済み全プロバイダーを並行検索し最良を採用。指定：選んだ1サイトのみ。詳細は下の各セクションを参照。設定はライブラリ構成に保存されバックエンドが適用します。",
     "metadataMovieProviderHelpAria": "スクレイプと設定の説明",
     "metadataMovieProviderHelpP1": "「スクレイプ」とは、サイトからポスター・あらすじ・出演者・タグなどのメタデータを取得してライブラリに保存する処理です。",
     "metadataMovieProviderHelpP2": "このページの設定はアプリ設定内の library-config.cfg に書き込まれます。一部は Curated バックエンド再起動後に完全に反映されます。",
