@@ -281,4 +281,15 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.emitted("browse")).toHaveLength(1)
     expect(wrapper.emitted("submit")).toHaveLength(1)
   })
+
+  it("places the storage check action next to the add path action", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: baseProps,
+    })
+
+    const addActionParent = wrapper.get("[data-add-dialog]").element.parentElement
+    const checkActionParent = wrapper.get("[data-check-storage-status]").element.parentElement
+
+    expect(checkActionParent).toBe(addActionParent)
+  })
 })

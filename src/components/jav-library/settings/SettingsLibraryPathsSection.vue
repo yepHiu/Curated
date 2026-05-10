@@ -198,31 +198,9 @@ function onDefaultImportPathChange(value: unknown) {
             @exit-batch-mode="emit('exitBatchMode')"
           />
 
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              {{ t("settings.storageStatusHint") }}
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              class="h-8 shrink-0 rounded-lg"
-              :disabled="storageStatusBusy"
-              data-check-storage-status
-              @click="emit('checkStorage')"
-            >
-              <RefreshCw
-                data-icon="inline-start"
-                :class="storageStatusBusy ? 'animate-spin' : ''"
-                aria-hidden="true"
-              />
-              {{
-                storageStatusBusy
-                  ? t("settings.storageStatusChecking")
-                  : t("settings.storageStatusRecheck")
-              }}
-            </Button>
-          </div>
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            {{ t("settings.storageStatusHint") }}
+          </p>
           <p v-if="storageStatusError" class="text-sm text-destructive" role="alert">
             {{ storageStatusError }}
           </p>
@@ -288,6 +266,25 @@ function onDefaultImportPathChange(value: unknown) {
               @browse="emit('browse')"
               @submit="emit('submit')"
             />
+            <Button
+              type="button"
+              variant="outline"
+              class="rounded-2xl"
+              :disabled="storageStatusBusy"
+              data-check-storage-status
+              @click="emit('checkStorage')"
+            >
+              <RefreshCw
+                data-icon="inline-start"
+                :class="storageStatusBusy ? 'animate-spin' : ''"
+                aria-hidden="true"
+              />
+              {{
+                storageStatusBusy
+                  ? t("settings.storageStatusChecking")
+                  : t("settings.storageStatusRecheck")
+              }}
+            </Button>
           </div>
         </CardContent>
       </Card>
