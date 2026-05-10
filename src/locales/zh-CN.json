@@ -503,6 +503,7 @@
     "organizeTitle": "自动化管理",
     "organizeDesc": "提供资料库自动化管理功能。",
     "organizeSwitch": "影片自动整理",
+    "organizeHelpAria": "影片自动整理说明",
     "organizeHint": "检测到新增影片后，会自动将影片及其相关文件整理到对应影片的目录中。",
     "organizeSyncing": "正在同步到服务端…",
     "metadataMovieProviderTitle": "影片元数据刮削源",

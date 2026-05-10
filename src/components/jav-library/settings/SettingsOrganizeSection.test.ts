@@ -10,6 +10,15 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("lucide-vue-next", () => ({
   Layers: { name: "Layers", template: "<span />" },
+  CircleHelp: { name: "CircleHelp", template: "<span />" },
+}))
+
+vi.mock("reka-ui", () => ({
+  TooltipContent: { name: "TooltipContent", template: "<div><slot /></div>" },
+  TooltipPortal: { name: "TooltipPortal", template: "<div><slot /></div>" },
+  TooltipProvider: { name: "TooltipProvider", template: "<div><slot /></div>" },
+  TooltipRoot: { name: "TooltipRoot", template: "<div><slot /></div>" },
+  TooltipTrigger: { name: "TooltipTrigger", template: "<div><slot /></div>" },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -42,6 +51,8 @@ describe("SettingsOrganizeSection", () => {
 
     expect(wrapper.text()).toContain("settings.organizeTitle")
     expect(wrapper.text()).toContain("settings.organizeSwitch")
+    expect(wrapper.text()).toContain("settings.organizeHelpAria")
+    expect(wrapper.text()).toContain("settings.organizeHint")
     expect(wrapper.text()).toContain("settings.organizeSyncing")
     expect(wrapper.text()).toContain("save failed")
   })

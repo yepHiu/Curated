@@ -503,6 +503,7 @@
     "organizeTitle": "Automated management",
     "organizeDesc": "Provides automated management for your library.",
     "organizeSwitch": "Auto-organize movie files",
+    "organizeHelpAria": "More about auto-organizing movie files",
     "organizeHint": "When new videos are detected, Curated automatically organizes each title and its related files into that title's folder.",
     "organizeSyncing": "Syncing to server…",
     "metadataMovieProviderTitle": "Movie metadata scrape source",

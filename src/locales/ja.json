@@ -503,6 +503,7 @@
     "organizeTitle": "自動化管理",
     "organizeDesc": "ライブラリの自動管理機能を提供します。",
     "organizeSwitch": "動画の自動整理",
+    "organizeHelpAria": "動画の自動整理の説明",
     "organizeHint": "新しい動画を検出すると、動画と関連ファイルをその作品用のフォルダへ自動で整理します。",
     "organizeSyncing": "サーバーに同期中…",
     "metadataMovieProviderTitle": "映画メタデータのスクレイプ元",
