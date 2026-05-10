@@ -101,6 +101,22 @@ const defaultImportPathSelectValue = computed(() =>
     : undefined,
 )
 
+const selectedDefaultImportPath = computed(() => {
+  const id = defaultImportPathSelectValue.value
+  if (!id) return undefined
+  return props.paths.find((p) => p.id === id)
+})
+
+/** Reka SelectItemText flattens nested spans into one string for the trigger; keep separator here. */
+function defaultImportPathTriggerLabel(path: LibraryPathDTO): string {
+  const title = (path.title ?? "").trim()
+  const diskPath = path.path
+  if (!title || title === diskPath) {
+    return diskPath
+  }
+  return `${title} · ${diskPath}`
+}
+
 function onDefaultImportPathChange(value: unknown) {
   if (typeof value !== "string" || value === props.defaultImportLibraryPathId) return
   emit("changeDefaultImportLibraryPath", value)
@@ -194,7 +210,14 @@ function onDefaultImportPathChange(value: unknown) {
                       ? t('settings.defaultImportPathPlaceholder')
                       : t('settings.defaultImportPathNone')
                   "
-                />
+                >
+                  <span
+                    v-if="selectedDefaultImportPath"
+                    class="block min-w-0 flex-1 truncate text-left"
+                  >
+                    {{ defaultImportPathTriggerLabel(selectedDefaultImportPath) }}
+                  </span>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent align="end" class="rounded-xl border-border/50">
                 <SelectItem

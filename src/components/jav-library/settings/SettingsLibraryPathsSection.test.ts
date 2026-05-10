@@ -53,7 +53,7 @@ vi.mock("@/components/ui/select", () => ({
   SelectValue: {
     name: "SelectValue",
     props: ["placeholder"],
-    template: "<div>{{ placeholder }}<slot /></div>",
+    template: "<div><slot>{{ placeholder }}</slot></div>",
   },
 }))
 
@@ -205,6 +205,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.text()).toContain("settings.storageCardTitle")
     expect(wrapper.text()).toContain("settings.storageCardDesc")
     expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
+    expect(wrapper.text()).toContain("Primary archive · D:/Media/JAV/Main")
     expect(wrapper.text()).toContain("settings.defaultImportPathDesc")
     expect(wrapper.text()).toContain("settings.defaultImportPathHelpAria")
     expect(wrapper.text()).toContain("scan failed")
