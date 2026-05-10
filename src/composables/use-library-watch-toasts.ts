@@ -60,6 +60,16 @@ function parentScanId(task: TaskDTO): string {
   return typeof p === "string" ? p : ""
 }
 
+function movieId(task: TaskDTO): string {
+  const mid = task.metadata?.movieId
+  return typeof mid === "string" ? mid : ""
+}
+
+function taskMetaString(task: TaskDTO, key: string): string {
+  const value = task.metadata?.[key]
+  return typeof value === "string" ? value : ""
+}
+
 function taskHasMetadata(task: TaskDTO, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(task.metadata ?? {}, key)
 }
@@ -150,12 +160,17 @@ export function useLibraryWatchToasts() {
         })
       }
 
+      const isFsnotifyLinkedScrape = (task: TaskDTO) => {
+        const parent = parentScanId(task)
+        return (
+          taskMetaString(task, "parentScanTrigger") === "fsnotify" ||
+          taskMetaString(task, "trigger") === "fsnotify" ||
+          (!!parent && fsnotifyScanParents.has(parent))
+        )
+      }
+
       for (const task of tasks) {
         if (!isTerminalStatus(task.status) || task.type !== "scrape.movie") {
-          continue
-        }
-        const parent = parentScanId(task)
-        if (!parent || !fsnotifyScanParents.has(parent)) {
           continue
         }
         if (seenToastIds.has(task.taskId)) {
@@ -163,6 +178,13 @@ export function useLibraryWatchToasts() {
         }
         markToastSeen(task.taskId)
         needsMovieReload = true
+        const mid = movieId(task)
+        if (mid && task.status === "completed") {
+          bumpMovieImageVersion(mid)
+        }
+        if (!isFsnotifyLinkedScrape(task)) {
+          continue
+        }
         const msg = task.message ?? ""
         pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
           variant: taskTerminalToastVariant(task.status),
@@ -188,8 +210,8 @@ export function useLibraryWatchToasts() {
         }
         if (bumpedAssetDownloadTaskIds.has(task.taskId)) continue
         if (!taskFinishedAfterSessionStart(task)) continue
-        const mid = task.metadata?.movieId
-        if (typeof mid !== "string" || !mid) continue
+        const mid = movieId(task)
+        if (!mid) continue
         bumpedAssetDownloadTaskIds.add(task.taskId)
         bumpMovieImageVersion(mid)
       }

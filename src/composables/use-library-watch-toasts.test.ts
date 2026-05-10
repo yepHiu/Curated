@@ -64,6 +64,23 @@ function makeFsnotifyScanTask(): TaskDTO {
   }
 }
 
+function makeLinkedScrapeTask(): TaskDTO {
+  return {
+    taskId: "scrape-1",
+    type: "scrape.movie",
+    status: "completed",
+    createdAt: "2026-05-02T00:00:03.000Z",
+    startedAt: "2026-05-02T00:00:04.000Z",
+    finishedAt: "2026-05-02T00:00:05.000Z",
+    progress: 100,
+    message: "Metadata saved for ABC-100",
+    metadata: {
+      movieId: "movie-1",
+      parentScanTaskId: "scan-1",
+    },
+  }
+}
+
 async function mountLibraryWatchHarness() {
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "true")
@@ -102,6 +119,20 @@ describe("useLibraryWatchToasts", () => {
       expect.anything(),
     )
     expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("reloads the library when a linked scrape completion appears without its parent scan", async () => {
+    vi.useFakeTimers()
+    mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [makeLinkedScrapeTask()] })
+
+    const wrapper = await mountLibraryWatchHarness()
+    await flushPromises()
+
+    expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+    expect(mocks.bumpMovieImageVersion).toHaveBeenCalledWith("movie-1")
+    expect(mocks.pushAppToast).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

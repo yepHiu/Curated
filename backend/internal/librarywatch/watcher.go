@@ -63,7 +63,7 @@ func New(opts Options) (*Watcher, error) {
 		return nil, os.ErrInvalid
 	}
 	return &Watcher{
-		opts:   opts,
+		opts:    opts,
 		watched: make(map[string]struct{}),
 	}, nil
 }
@@ -232,25 +232,9 @@ func (w *Watcher) handleEvent(ctx context.Context, ev fsnotify.Event) {
 	}
 
 	switch {
-	case ev.Has(fsnotify.Create):
-		if st, err := os.Stat(path); err == nil && st.IsDir() {
-			w.mu.Lock()
-			if w.watcher != nil {
-				_ = filepath.WalkDir(path, func(p string, d os.DirEntry, we error) error {
-					if we != nil || !d.IsDir() {
-						return nil
-					}
-					if err := w.addWatchLocked(p); err != nil {
-						w.opts.Logger.Debug("library watch: add subtree", zap.String("path", p), zap.Error(err))
-					}
-					return nil
-				})
-			}
-			w.mu.Unlock()
-		} else if isVideoPath(path) {
-			w.scheduleScanForPath(ctx, path)
-		}
-	case ev.Has(fsnotify.Write), ev.Has(fsnotify.Rename):
+	case ev.Has(fsnotify.Create), ev.Has(fsnotify.Rename):
+		w.handleCreatedOrRenamedPath(ctx, path)
+	case ev.Has(fsnotify.Write):
 		if isVideoPath(path) {
 			w.scheduleScanForPath(ctx, path)
 		}
@@ -260,6 +244,29 @@ func (w *Watcher) handleEvent(ctx context.Context, ev fsnotify.Event) {
 			w.removeWatchLocked(path)
 		}
 		w.mu.Unlock()
+	}
+}
+
+func (w *Watcher) handleCreatedOrRenamedPath(ctx context.Context, path string) {
+	if st, err := os.Stat(path); err == nil && st.IsDir() {
+		w.mu.Lock()
+		if w.watcher != nil {
+			_ = filepath.WalkDir(path, func(p string, d os.DirEntry, we error) error {
+				if we != nil || !d.IsDir() {
+					return nil
+				}
+				if err := w.addWatchLocked(p); err != nil {
+					w.opts.Logger.Debug("library watch: add subtree", zap.String("path", p), zap.Error(err))
+				}
+				return nil
+			})
+		}
+		w.mu.Unlock()
+		w.scheduleScanForPath(ctx, path)
+		return
+	}
+	if isVideoPath(path) {
+		w.scheduleScanForPath(ctx, path)
 	}
 }
 
