@@ -19,10 +19,12 @@ const { t } = useI18n()
 <template>
   <div class="flex flex-col gap-3">
     <div
-      class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
     >
-      <div class="min-w-0 flex flex-col gap-3">
-        <p class="text-sm font-semibold">{{ t("settings.triggerScrape") }}</p>
+      <div class="min-w-0 flex flex-col gap-3 text-left">
+        <p class="text-sm font-semibold text-foreground">
+          {{ t("settings.triggerScrape") }}
+        </p>
         <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.triggerScrapeHint") }}
         </p>
