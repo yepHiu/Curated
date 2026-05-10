@@ -32,15 +32,38 @@
 - `AppShell` 桌面端采用 split shell：左侧 `AppSidebar` 作为持久导航面，右侧内容区作为同层工作区；不再用一个共同的大圆角卡片容器包住侧栏和内容区。
 - 设置页仍然是常规业务页面，不承担大型实验性展示画布职责。
 
-### 4.1 设置页：卡片内嵌区块的标题与说明
+### 4.1 设置页：Tab 大卡片与内嵌区块（当前范式）
 
-适用于 `SettingsPage` 等页面中，大卡片（`Card`）内再嵌套的浅色块（如元数据、自动化配置中的 `rounded-* border bg-muted/…` 分区）。
+适用于 `SettingsPage` 等以 **`Card` 分 Tab / 分区** 的界面（**元数据** 大区以 `SettingsMetadataSection.vue` 为参考实现）。
 
+**信息架构**
+
+- **卡片级 `CardTitle`**：只写**短标题**（分区名），不写长说明。
+- **`CardDescription`**：**可选**；若下方各 nested 块已自带说明，**勿**再加大段顶栏描述，以免重复。
+
+**卡片标题行（`CardHeader`）**
+
+- 布局：`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5`；左 **`size-9`** 图标区（弱 primary 表面），右 **`CardTitle`**：`text-lg tracking-tight` + `min-w-0`；装饰图标 `aria-hidden="true"`。
+
+**垂直节奏**
+
+- 单张业务卡片可收紧标题与正文首块间距：对 **`Card`** 使用 **`gap-2`**，**`CardHeader`** **`pb-0`**，**`CardContent`** **`pt-0`**（与 `SettingsMetadataSection` 一致）。
+- **`CardContent`** 内并列子区块栈间距：**`gap-3`**（与同页其它 settings 一致），除非全 Tab 统一改用其它 spacing 令牌。
+
+**nested 浅色块（MUST）**
+
+- 容器：`rounded-* border border-border/… bg-muted/…`，统一 **`p-4`**，各块标题与说明**左缘对齐**；勿在仅标题一行加 **`px-*`** 破坏对齐。
 - **块标题**：`text-sm font-semibold text-foreground`。
-- **说明 / 提示文案**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`。
-- **标题与说明在同一列时**：父级使用 `flex flex-col gap-3` 控制垂直间距。
-- **与嵌套容器左缘的距离**：同一父级 `CardContent` 下的多个嵌套块应统一使用 **`p-4`**，使各块标题与说明的左边缘对齐；避免在某个块仅标题行增加 `px-*` 而破坏与其它 `p-4` 块的对齐。
-- **Cursor 规则索引**：详见 `.cursor/rules/ui-component-spec.mdc`「设置页内嵌卡片：标题与说明（MUST）」；实现参考 `src/components/jav-library/settings/SettingsMetadata*.vue`。
+- **块说明**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`（长文可加 `text-pretty`）。
+- **块内标题与说明间距**：默认 **`flex flex-col gap-3`**；紧凑块可用 **`gap-2`**（如源连通性）。
+
+**选项与横向操作**
+
+- 互斥策略：**`fieldset`** + **`legend.sr-only`**；**`label` + `radio`** 行用 **`items-center`**。
+- 选项主文：`text-sm font-medium`；选项下说明：与「块说明」同款 token。
+- 文案 + 按钮/开关：**`justify-between`**；**`sm:flex-row`** 时整块 **`items-center`**，避免操作控件相对多行文案贴顶。
+
+**索引**：`.cursor/rules/ui-component-spec.mdc`「设置页 Tab 大卡片与内嵌区块」；实现目录 **`src/components/jav-library/settings/SettingsMetadata*.vue`**。
 
 ## 5. 业务组件约束
 

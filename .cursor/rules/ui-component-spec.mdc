@@ -35,18 +35,48 @@ alwaysApply: false
 - **浏览**（`library` / `favorites` / `recent` / `tags`）：海报优先、卡片紧凑；整张可点进详情；网格与「相关推荐」尺寸变更时保持一致，除非任务明确要求分叉。
 - **详情**：左海报右元数据，层次清晰；避免巨型 hero 营销布局。
 - **播放**：video-first、低干扰控件；勿加与视频竞争注意力的说明卡片（除非明确要求）。
-- **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。同一大卡片内的 nested 区块排版见下节 **「设置页内嵌卡片」**。
+- **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。Tab 大卡片的信息架构、标题行、间距与 nested 块规范见下节 **「设置页 Tab 大卡片与内嵌区块」**。
 - **壳层**：保留 **`AppShell`** 内滚动：内容区滚动，避免整页壳跟着滚。
 
-## 设置页内嵌卡片：标题与说明（MUST）
+## 设置页 Tab 大卡片与内嵌区块（MUST / SHOULD）
 
-同一 `Card`/`CardContent` 下的多条**浅色 nested 区块**（元数据、自动化等卡片内的 `rounded-* border bg-muted/…` 容器）须保持**各块标题与说明的左边缘彼此对齐**，并与各自容器左内边距一致。
+面向 **`SettingsPage`** 等以 **Tab / 分区大卡片**（`Card`）组织的界面：须区分 **卡片级标题**、**内嵌功能块标题** 与 **说明文案**，并保持对齐、字号与垂直节奏可预期。
 
-- **标题**：`text-sm font-semibold text-foreground`。
-- **说明 / 提示**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`。
-- **标题与说明纵向间距**：同列内父级使用 `flex flex-col gap-3`（同一列内多段说明之间如需统一节奏，亦用 `gap-3`）。
-- **相对容器左缘**：此类 nested 区块统一使用 **`p-4`**；**禁止**仅在标题行额外增加 `px-*` / `px-0.5` 等，导致与同卡内其它 **`p-4`** 块的水平起点不一致。
-- **参考实现**：`SettingsMetadataAutomationSection.vue`、`SettingsMetadataModeSection.vue`、`SettingsMetadataProviderChainSection.vue`、`SettingsMetadataProviderSelectSection.vue`、`SettingsMetadataTriggerScrapeSection.vue`。
+### 信息架构（SHOULD）
+
+- **`CardTitle`（卡片级）**：只承载本 Tab 或分区的**短标题**（例如元数据：`SettingsMetadataSection` 中「影片元数据刮削源」）。不在这里堆长说明。
+- **`CardDescription`（卡片级）**：**可选**。若下方各 **nested 浅色块** / 选项已自带足够说明，**不要**再叠加一段总述，避免与块内文案重复（当前元数据大区以**无顶栏描述**为范）。
+- **说明下沉**：规则说明、操作后果放在 **nested 块内**或 **单选项下的 hint**，而非依赖单独帮助按钮，除非产品有明确的次要说明入口需求。
+
+### 卡片标题行布局（SHOULD）
+
+- **`CardHeader`** 内采用 **`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5`**：左侧 **`size-9`** 图标区（`rounded-lg border border-primary/25 bg-primary/10 text-primary`），右侧 **`CardTitle`**：`min-w-0 text-lg tracking-tight`（字重沿用 `CardTitle` 默认 `font-semibold`）。
+- 纯装饰图标使用 **`aria-hidden="true"`**。
+
+### 大卡片垂直节奏（SHOULD）
+
+- 单张业务 `Card` 可收紧 **标题栏与 `CardContent` 首行** 的间距：在 **`SettingsMetadataSection`** 范式下——**`Card` 追加 `gap-2`**（覆盖基类较大 `gap`）、**`CardHeader` 使用 `pb-0`**、**`CardContent` 使用 `pt-0`**。
+- **`CardContent`** 内多个子组件 / 嵌套块之间：**`flex flex-col gap-3`**（与同页其它 settings 栈一致），除非整 Tab 统一改为另一种间距令牌。
+
+### 内嵌浅色块：标题与说明（MUST）
+
+同一 **`CardContent`** 下并列的 **nested 区块**（`rounded-* border border-border/… bg-muted/…`，如连通性、自动化开关、策略、列表、触发操作）须保持 **块标题与块说明左缘对齐**，且彼此 **`p-4`** 一致（与项目既有 nested 卡片规则一致）。
+
+- **块标题**：`text-sm font-semibold text-foreground`。
+- **块说明 / 提示**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`；长段落可加 `text-pretty`。
+- **块内标题与说明纵向间距**：同列默认 **`flex flex-col gap-3`**；需要更紧凑时（如首块工具行旁短文）可用 **`gap-2`**（见 **`SettingsMetadataAutomationSection`** 源连通性）。
+- **禁止**：仅在某一嵌套块的标题行增加额外 **`px-*`** / **`px-0.5`**，导致与同卡其它 **`p-4`** 块水平起点错位。
+
+### 选项组与横向操作（SHOULD）
+
+- **互斥策略**：使用 **`fieldset`** + **`legend.sr-only`**；每项为 **`label` > `input[type=radio]` + 文案**；行布局 **`items-center`**，使圆点与多行主副文案垂直居中（**`SettingsMetadataModeSection`**）。
+- **选项主文案**：`text-sm font-medium`；**选项下说明**：与上节「块说明」同款 token（`text-xs … sm:text-sm`）。
+- **文案列 + 主行动**：**`flex justify-between gap-3`**；在 **`sm:flex-row`** 下对整块使用 **`items-center`**，避免按钮相对双行说明「贴顶」（**`SettingsMetadataTriggerScrapeSection`**）。
+
+### 参考实现
+
+- **`SettingsMetadataSection.vue`**（大卡片壳层、`CardHeader` 网格、间距范式）
+- **`SettingsMetadataAutomationSection.vue`**、**`SettingsMetadataModeSection.vue`**、**`SettingsMetadataProviderChainSection.vue`**、**`SettingsMetadataProviderSelectSection.vue`**、**`SettingsMetadataTriggerScrapeSection.vue`**
 
 ## 显示缩放（MUST）
 
