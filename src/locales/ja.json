@@ -459,6 +459,7 @@
     "storageStatusCheckFailed": "ストレージ状態の確認に失敗しました。",
     "storageStatusActionBlocked": "この保存先は現在利用できません。スキャンやインポートの前にディスクを確認してください。",
     "defaultImportPathLabel": "既定のインポート先",
+    "defaultImportPathHelpAria": "既定のインポート先の説明",
     "defaultImportPathDesc": "インポートした動画はこのライブラリパスへコピーされます。上部の「動画を追加」は今後この保存先を使用します。",
     "defaultImportPathPlaceholder": "既定のインポート先を選択",
     "defaultImportPathNone": "先にライブラリパスを追加してください",

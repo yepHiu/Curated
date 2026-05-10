@@ -459,6 +459,7 @@
     "storageStatusCheckFailed": "Failed to check storage status.",
     "storageStatusActionBlocked": "This storage path is not available. Check the disk before scanning or importing.",
     "defaultImportPathLabel": "Default import folder",
+    "defaultImportPathHelpAria": "More about the default import folder",
     "defaultImportPathDesc": "Imported movies are copied into this library path. The Add movies entry uses this target for future imports.",
     "defaultImportPathPlaceholder": "Choose default import folder",
     "defaultImportPathNone": "Add a library path first",

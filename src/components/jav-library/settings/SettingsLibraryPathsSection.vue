@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Database, RefreshCw } from "lucide-vue-next"
+import { CircleHelp, Database, RefreshCw } from "lucide-vue-next"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
 import {
   Card,
@@ -18,6 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "reka-ui"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
@@ -134,12 +141,36 @@ function onDefaultImportPathChange(value: unknown) {
             :aria-busy="defaultImportPathSaving"
           >
             <div class="min-w-0 space-y-1">
-              <p class="text-sm font-medium text-foreground">
-                {{ t("settings.defaultImportPathLabel") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground">
-                {{ t("settings.defaultImportPathDesc") }}
-              </p>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <p class="text-sm font-medium text-foreground">
+                  {{ t("settings.defaultImportPathLabel") }}
+                </p>
+                <TooltipProvider :delay-duration="280">
+                  <TooltipRoot>
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        data-default-import-path-help
+                        class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <CircleHelp class="size-4" aria-hidden="true" />
+                        <span class="sr-only">{{
+                          t("settings.defaultImportPathHelpAria")
+                        }}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipPortal>
+                      <TooltipContent
+                        side="top"
+                        :side-offset="6"
+                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+                      >
+                        {{ t("settings.defaultImportPathDesc") }}
+                      </TooltipContent>
+                    </TooltipPortal>
+                  </TooltipRoot>
+                </TooltipProvider>
+              </div>
               <p
                 v-if="defaultImportPathSaving"
                 class="text-xs text-muted-foreground motion-safe:animate-pulse"

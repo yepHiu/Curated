@@ -459,6 +459,7 @@
     "storageStatusCheckFailed": "检查存储状态失败。",
     "storageStatusActionBlocked": "这个存储目录当前不可用，请先检查硬盘再扫描或导入。",
     "defaultImportPathLabel": "默认导入目录",
+    "defaultImportPathHelpAria": "默认导入目录说明",
     "defaultImportPathDesc": "导入影片会复制到这个资料库路径。修改后，顶部“添加影片”入口会直接使用新的目标目录。",
     "defaultImportPathPlaceholder": "选择默认导入目录",
     "defaultImportPathNone": "请先添加资料库路径",

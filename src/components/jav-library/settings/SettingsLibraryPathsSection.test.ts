@@ -11,6 +11,15 @@ vi.mock("vue-i18n", () => ({
 vi.mock("lucide-vue-next", () => ({
   Database: { name: "Database", template: "<span />" },
   RefreshCw: { name: "RefreshCw", template: "<span />" },
+  CircleHelp: { name: "CircleHelp", template: "<span />" },
+}))
+
+vi.mock("reka-ui", () => ({
+  TooltipContent: { name: "TooltipContent", template: "<div><slot /></div>" },
+  TooltipPortal: { name: "TooltipPortal", template: "<div><slot /></div>" },
+  TooltipProvider: { name: "TooltipProvider", template: "<div><slot /></div>" },
+  TooltipRoot: { name: "TooltipRoot", template: "<div><slot /></div>" },
+  TooltipTrigger: { name: "TooltipTrigger", template: "<div><slot /></div>" },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -197,6 +206,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.text()).toContain("settings.storageCardDesc")
     expect(wrapper.text()).toContain("settings.defaultImportPathLabel")
     expect(wrapper.text()).toContain("settings.defaultImportPathDesc")
+    expect(wrapper.text()).toContain("settings.defaultImportPathHelpAria")
     expect(wrapper.text()).toContain("scan failed")
     expect(wrapper.text()).toContain("metadata queued")
     expect(wrapper.text()).toContain("metadata failed")
