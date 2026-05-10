@@ -49,7 +49,7 @@ function providerHealthStatusLabel(status: ProviderHealthStatus): string {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3">
+  <div class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-4">
     <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
     <div class="flex flex-wrap items-start gap-3">
       <Select

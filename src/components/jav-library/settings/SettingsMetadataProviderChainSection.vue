@@ -75,7 +75,7 @@ function onProviderToAddChange(value: unknown) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-3">
+  <div class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-4">
     <p
       v-if="!canPickSpecifiedMetadata"
       :class="[statusPanelClass('warning'), 'rounded-xl px-3 py-2 text-sm']"

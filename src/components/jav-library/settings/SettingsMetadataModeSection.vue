@@ -31,11 +31,11 @@ const { t } = useI18n()
 
 <template>
   <fieldset
-    class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-3 dark:bg-muted/10"
+    class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/[0.11] p-4 dark:bg-muted/10"
     :aria-busy="metadataMovieSaving || metadataMovieChainSaving || providerPingAllBusy"
   >
     <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
-    <div class="mb-0.5 flex items-center gap-3 px-0.5">
+    <div class="mb-0.5 flex items-center gap-3">
       <span class="text-sm font-semibold text-foreground">{{
         t("settings.metadataMovieProviderMode")
       }}</span>
