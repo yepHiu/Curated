@@ -51,7 +51,7 @@ const { t } = useI18n()
       />
       <span class="min-w-0 flex-1">
         <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderAuto") }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.metadataMovieProviderAutoHint") }}
         </span>
       </span>
@@ -77,7 +77,7 @@ const { t } = useI18n()
         <span class="text-sm font-medium">{{
           t("settings.metadataMovieProviderSpecified")
         }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.metadataMovieProviderSpecifiedHint") }}
         </span>
       </span>
@@ -101,7 +101,7 @@ const { t } = useI18n()
       />
       <span class="min-w-0 flex-1">
         <span class="text-sm font-medium">{{ t("settings.metadataMovieProviderChain") }}</span>
-        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+        <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.metadataMovieProviderChainHint") }}
         </span>
       </span>

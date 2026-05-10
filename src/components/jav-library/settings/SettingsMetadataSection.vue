@@ -104,7 +104,7 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
           </span>
         </CardTitle>
         <CardDescription
-          class="text-xs leading-relaxed text-pretty text-muted-foreground"
+          class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
         >
           {{ t("settings.metadataMovieProviderDesc") }}
         </CardDescription>
