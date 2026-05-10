@@ -65,10 +65,10 @@ const { t } = useI18n()
       </TooltipProvider>
     </div>
     <label
-      class="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
+      class="flex cursor-pointer items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]"
     >
       <input
-        class="mt-0.5 size-4 shrink-0 accent-primary"
+        class="size-4 shrink-0 accent-primary"
         type="radio"
         name="metadata-movie-mode"
         value="auto"
@@ -84,7 +84,7 @@ const { t } = useI18n()
       </span>
     </label>
     <label
-      class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
+      class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
       :class="
         canPickSpecifiedMetadata
           ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
@@ -92,7 +92,7 @@ const { t } = useI18n()
       "
     >
       <input
-        class="mt-0.5 size-4 shrink-0 accent-primary"
+        class="size-4 shrink-0 accent-primary"
         type="radio"
         name="metadata-movie-mode"
         value="specified"
@@ -110,7 +110,7 @@ const { t } = useI18n()
       </span>
     </label>
     <label
-      class="flex items-start gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
+      class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors"
       :class="
         canUseMetadataChainMode
           ? 'cursor-pointer hover:bg-muted/35 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/[0.06]'
@@ -118,7 +118,7 @@ const { t } = useI18n()
       "
     >
       <input
-        class="mt-0.5 size-4 shrink-0 accent-primary"
+        class="size-4 shrink-0 accent-primary"
         type="radio"
         name="metadata-movie-mode"
         value="chain"
