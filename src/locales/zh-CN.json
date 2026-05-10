@@ -444,7 +444,6 @@
     "pageSubtitle": "存储路径、播放与元数据相关选项；扫描仅通过手动触发（全库或单路径）。",
     "storageCardTitle": "存储目录",
     "storageCardDesc": "可配置多个库根目录。勾选目录后点击「刷新元数据」仅对已入库条目重新刮削（不重新扫盘）；「重新扫描」会遍历磁盘并索引新文件。",
-    "storageStatusHint": "Curated 会在扫描或导入前检查已配置的存储设备当前是否在线。",
     "storageStatusRecheck": "检查存储",
     "storageStatusChecking": "检查中...",
     "storageStatusOnline": "在线",

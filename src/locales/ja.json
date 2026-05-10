@@ -444,7 +444,6 @@
     "pageSubtitle": "保存パス、再生・メタデータ関連。スキャンは手動のみ（全庫またはパス単位）。",
     "storageCardTitle": "ストレージディレクトリ",
     "storageCardDesc": "複数のライブラリルート。パスにチェック後「メタデータ更新」はインデックス済みのみ再スクレイプ（ディスク走査なし）。「再スキャン」は新規ファイル用にディスクを走査。",
-    "storageStatusHint": "Curated はスキャンやインポートの前に、設定済みストレージがオンラインか確認します。",
     "storageStatusRecheck": "ストレージ確認",
     "storageStatusChecking": "確認中...",
     "storageStatusOnline": "オンライン",

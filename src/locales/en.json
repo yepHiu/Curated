@@ -444,7 +444,6 @@
     "pageSubtitle": "Storage paths, playback and metadata options; scans are manual only (full or per path).",
     "storageCardTitle": "Storage directories",
     "storageCardDesc": "Multiple library roots. After checking paths, Refresh metadata re-scrapes indexed items only (no disk walk); Rescan walks disk for new files.",
-    "storageStatusHint": "Curated checks whether each configured storage device is currently online before scan or import actions.",
     "storageStatusRecheck": "Check storage",
     "storageStatusChecking": "Checking storage...",
     "storageStatusOnline": "Online",

@@ -198,9 +198,6 @@ function onDefaultImportPathChange(value: unknown) {
             @exit-batch-mode="emit('exitBatchMode')"
           />
 
-          <p class="text-xs leading-relaxed text-muted-foreground">
-            {{ t("settings.storageStatusHint") }}
-          </p>
           <p v-if="storageStatusError" class="text-sm text-destructive" role="alert">
             {{ storageStatusError }}
           </p>
