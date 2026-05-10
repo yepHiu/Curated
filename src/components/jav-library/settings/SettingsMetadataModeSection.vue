@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import { Info } from "lucide-vue-next"
+import { CircleHelp } from "lucide-vue-next"
 import {
   TooltipContent,
   TooltipPortal,
@@ -46,7 +46,7 @@ const { t } = useI18n()
               type="button"
               class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <Info class="size-4" aria-hidden="true" />
+              <CircleHelp class="size-4" aria-hidden="true" />
               <span class="sr-only">{{
                 t("settings.metadataMovieProviderModeAria")
               }}</span>

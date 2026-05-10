@@ -9,7 +9,7 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("lucide-vue-next", () => ({
-  Info: { name: "Info", template: "<span />" },
+  CircleHelp: { name: "CircleHelp", template: "<span />" },
 }))
 
 vi.mock("reka-ui", () => ({
