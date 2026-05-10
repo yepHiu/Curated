@@ -292,4 +292,16 @@ describe("SettingsLibraryPathsSection", () => {
 
     expect(checkActionParent).toBe(addActionParent)
   })
+
+  it("uses the standard storage action button size for the storage check action", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: baseProps,
+    })
+
+    const checkStorageClass = wrapper.get("[data-check-storage-status]").attributes("class")
+
+    expect(checkStorageClass).toContain("h-9")
+    expect(checkStorageClass).toContain("min-w-32")
+    expect(checkStorageClass).toContain("px-4")
+  })
 })

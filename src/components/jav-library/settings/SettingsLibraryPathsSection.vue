@@ -269,7 +269,7 @@ function onDefaultImportPathChange(value: unknown) {
             <Button
               type="button"
               variant="outline"
-              class="rounded-2xl"
+              class="h-9 min-w-32 rounded-2xl px-4"
               :disabled="storageStatusBusy"
               data-check-storage-status
               @click="emit('checkStorage')"

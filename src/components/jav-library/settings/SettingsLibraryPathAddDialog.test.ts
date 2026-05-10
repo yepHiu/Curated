@@ -111,4 +111,16 @@ describe("SettingsLibraryPathAddDialog", () => {
       "settings.savePathDisabledTitle",
     )
   })
+
+  it("uses the standard storage action button size for the add path trigger", () => {
+    const wrapper = mount(SettingsLibraryPathAddDialog, {
+      props: baseProps,
+    })
+
+    const addPathTriggerClass = wrapper.findAll("button")[0]!.attributes("class")
+
+    expect(addPathTriggerClass).toContain("h-9")
+    expect(addPathTriggerClass).toContain("min-w-32")
+    expect(addPathTriggerClass).toContain("px-4")
+  })
 })
