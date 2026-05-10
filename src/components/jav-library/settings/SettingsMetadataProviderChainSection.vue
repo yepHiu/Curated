@@ -224,7 +224,7 @@ function onProviderToAddChange(value: unknown) {
       <Button
         type="button"
         variant="default"
-        class="w-fit rounded-xl font-medium"
+        class="h-11 w-fit shrink-0 rounded-2xl px-5 font-medium"
         :disabled="metadataMovieChainSaving"
         data-provider-chain-save
         @click="emit('saveProviderChain')"
