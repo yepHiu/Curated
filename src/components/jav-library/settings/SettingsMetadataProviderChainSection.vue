@@ -89,6 +89,9 @@ function onProviderToAddChange(value: unknown) {
       <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
         {{ t("settings.metadataMovieProviderChainDragHint") }}
       </p>
+      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+        {{ t("settings.metadataMovieProviderChainAutoSave") }}
+      </p>
     </div>
 
     <div class="flex flex-col gap-3">
@@ -218,9 +221,6 @@ function onProviderToAddChange(value: unknown) {
     </div>
 
     <div class="flex flex-col gap-3 pt-2">
-      <p class="text-xs text-muted-foreground">
-        {{ t("settings.metadataMovieProviderChainAutoSave") }}
-      </p>
       <Button
         type="button"
         variant="default"

@@ -72,6 +72,7 @@ describe("SettingsMetadataProviderChainSection", () => {
 
     expect(wrapper.text()).toContain("settings.metadataMovieProviderChainLabel")
     expect(wrapper.text()).toContain("settings.metadataMovieProviderChainDragHint")
+    expect(wrapper.text()).toContain("settings.metadataMovieProviderChainAutoSave")
     expect(wrapper.text()).toContain("javbus")
     expect(wrapper.text()).toContain("javdb")
     expect(wrapper.text()).toContain("123ms")
