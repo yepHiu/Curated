@@ -14,6 +14,7 @@ vi.mock("lucide-vue-next", () => ({
   GripVertical: { name: "GripVertical", template: "<span />" },
   Loader2: { name: "Loader2", template: "<span />" },
   Plus: { name: "Plus", template: "<span />" },
+  Save: { name: "Save", template: "<span />" },
   X: { name: "X", template: "<span />" },
 }))
 

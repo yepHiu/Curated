@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import { Activity, GripVertical, Loader2, Plus, X } from "lucide-vue-next"
+import { Activity, GripVertical, Loader2, Plus, Save, X } from "lucide-vue-next"
 import type { ProviderHealthDTO, ProviderHealthStatus } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
@@ -229,6 +229,16 @@ function onProviderToAddChange(value: unknown) {
         data-provider-chain-save
         @click="emit('saveProviderChain')"
       >
+        <Loader2
+          v-if="metadataMovieChainSaving"
+          class="mr-1.5 size-4 motion-safe:animate-spin"
+          aria-hidden="true"
+        />
+        <Save
+          v-else
+          class="mr-1.5 size-4"
+          aria-hidden="true"
+        />
         {{ metadataMovieChainSaving ? t("common.saving") : t("common.save") }}
       </Button>
     </div>
