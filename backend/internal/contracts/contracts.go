@@ -362,6 +362,47 @@ type LibraryPathDTO struct {
 	FirstLibraryScanPending bool   `json:"firstLibraryScanPending"`
 }
 
+// LibraryPathStorageStatus describes whether a configured library path's backing storage is available.
+type LibraryPathStorageStatus string
+
+const (
+	LibraryPathStorageStatusOnline           LibraryPathStorageStatus = "online"
+	LibraryPathStorageStatusOffline          LibraryPathStorageStatus = "offline"
+	LibraryPathStorageStatusVolumeMismatch   LibraryPathStorageStatus = "volume_mismatch"
+	LibraryPathStorageStatusPathMissing      LibraryPathStorageStatus = "path_missing"
+	LibraryPathStorageStatusPermissionDenied LibraryPathStorageStatus = "permission_denied"
+	LibraryPathStorageStatusUnknown          LibraryPathStorageStatus = "unknown"
+)
+
+// LibraryPathStorageStatusDTO is the API-facing storage availability snapshot for one library path.
+type LibraryPathStorageStatusDTO struct {
+	LibraryPathID      string                   `json:"libraryPathId"`
+	Path               string                   `json:"path"`
+	Title              string                   `json:"title"`
+	Status             LibraryPathStorageStatus `json:"status"`
+	Message            string                   `json:"message"`
+	CheckedAt          string                   `json:"checkedAt"`
+	RootPath           string                   `json:"rootPath,omitempty"`
+	DriveType          string                   `json:"driveType,omitempty"`
+	VolumeLabel        string                   `json:"volumeLabel,omitempty"`
+	FileSystem         string                   `json:"fileSystem,omitempty"`
+	IdentityConfidence string                   `json:"identityConfidence,omitempty"`
+	ExpectedVolumeID   string                   `json:"expectedVolumeId,omitempty"`
+	CurrentVolumeID    string                   `json:"currentVolumeId,omitempty"`
+	CanRescan          bool                     `json:"canRescan"`
+	CanImport          bool                     `json:"canImport"`
+}
+
+// LibraryPathStorageStatusListDTO wraps storage status snapshots for configured library paths.
+type LibraryPathStorageStatusListDTO struct {
+	Items []LibraryPathStorageStatusDTO `json:"items"`
+}
+
+// CheckLibraryPathStorageStatusRequest optionally narrows a fresh storage check to specific library paths.
+type CheckLibraryPathStorageStatusRequest struct {
+	LibraryPathIDs []string `json:"libraryPathIds,omitempty"`
+}
+
 // AddLibraryPathRequest is the body for POST /api/library/paths.
 type AddLibraryPathRequest struct {
 	Path  string `json:"path"`

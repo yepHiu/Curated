@@ -134,6 +134,13 @@ type DefaultImportLibraryPathController interface {
 	SetDefaultImportLibraryPathID(id string) error
 }
 
+// LibraryPathStorageStatusProvider checks whether configured library paths' backing storage is available.
+type LibraryPathStorageStatusProvider interface {
+	ListLibraryPathStorageStatus(ctx context.Context) (contracts.LibraryPathStorageStatusListDTO, error)
+	CheckLibraryPathStorageStatus(ctx context.Context, libraryPathIDs []string) (contracts.LibraryPathStorageStatusListDTO, error)
+	RebindLibraryPathStorage(ctx context.Context, libraryPathID string) (contracts.LibraryPathStorageStatusDTO, error)
+}
+
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
@@ -184,6 +191,7 @@ type Handler struct {
 	launchAtLoginCtl            LaunchAtLoginController
 	curatedFrameExportFormatCtl CuratedFrameExportFormatController
 	defaultImportLibraryPathCtl DefaultImportLibraryPathController
+	libraryPathStorageStatus    LibraryPathStorageStatusProvider
 	metadataScrapeCtl           MetadataScrapeSettings
 	providerHealthChecker       ProviderHealthChecker
 	proxyCtl                    ProxyController
@@ -202,30 +210,31 @@ type Handler struct {
 
 // Deps bundles all dependencies needed to construct a Handler.
 type Deps struct {
-	Cfg                         config.Config
-	Logger                      *zap.Logger
-	Store                       *storage.SQLiteStore
-	Tasks                       *tasks.Manager
-	ScanStarter                 ScanStarter
-	OrganizeLibraryCtl          OrganizeLibraryController
-	AutoLibraryWatchCtl         AutoLibraryWatchController
-	AutoActorProfileScrapeCtl   AutoActorProfileScrapeController
-	LaunchAtLoginCtl            LaunchAtLoginController
-	CuratedFrameExportFormatCtl CuratedFrameExportFormatController
-	DefaultImportLibraryPathCtl DefaultImportLibraryPathController
-	MetadataScrapeCtl           MetadataScrapeSettings
-	ProviderHealthChecker       ProviderHealthChecker
-	ProxyCtl                    ProxyController
-	BackendLogCtl               BackendLogSettingsController
-	PlayerSettingsCtl           PlayerSettingsController
-	MovieMetadataRefresher      MovieMetadataRefresher
-	ActorProfileRefresher       ActorProfileRefresher
-	LibraryWatchReloader        LibraryWatchReloader
-	DevPerformanceProvider      DevPerformanceProvider
-	PlaybackResolver            PlaybackResolver
-	NativePlaybackLauncher      NativePlaybackLauncher
-	HomepageRecommendations     HomepageRecommendationsProvider
-	AppUpdateProvider           AppUpdateProvider
+	Cfg                              config.Config
+	Logger                           *zap.Logger
+	Store                            *storage.SQLiteStore
+	Tasks                            *tasks.Manager
+	ScanStarter                      ScanStarter
+	OrganizeLibraryCtl               OrganizeLibraryController
+	AutoLibraryWatchCtl              AutoLibraryWatchController
+	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
+	LaunchAtLoginCtl                 LaunchAtLoginController
+	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
+	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
+	LibraryPathStorageStatusProvider LibraryPathStorageStatusProvider
+	MetadataScrapeCtl                MetadataScrapeSettings
+	ProviderHealthChecker            ProviderHealthChecker
+	ProxyCtl                         ProxyController
+	BackendLogCtl                    BackendLogSettingsController
+	PlayerSettingsCtl                PlayerSettingsController
+	MovieMetadataRefresher           MovieMetadataRefresher
+	ActorProfileRefresher            ActorProfileRefresher
+	LibraryWatchReloader             LibraryWatchReloader
+	DevPerformanceProvider           DevPerformanceProvider
+	PlaybackResolver                 PlaybackResolver
+	NativePlaybackLauncher           NativePlaybackLauncher
+	HomepageRecommendations          HomepageRecommendationsProvider
+	AppUpdateProvider                AppUpdateProvider
 }
 
 // NewHandler creates a Handler wired with all provided dependencies.
@@ -242,6 +251,7 @@ func NewHandler(deps Deps) *Handler {
 		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
 		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
+		libraryPathStorageStatus:    deps.LibraryPathStorageStatusProvider,
 		metadataScrapeCtl:           deps.MetadataScrapeCtl,
 		providerHealthChecker:       deps.ProviderHealthChecker,
 		proxyCtl:                    deps.ProxyCtl,
@@ -306,7 +316,10 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}", h.handlePutMovieImportUploadChunk)
 	mux.HandleFunc("POST /api/import/movies/uploads/{uploadId}/commit", h.handleCommitMovieImportUpload)
 	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
+	mux.HandleFunc("GET /api/library/paths/storage-status", h.handleGetLibraryPathStorageStatus)
+	mux.HandleFunc("POST /api/library/paths/storage-status/check", h.handleCheckLibraryPathStorageStatus)
 	mux.HandleFunc("POST /api/library/paths/{id}/reveal", h.handleRevealLibraryPathInFileManager)
+	mux.HandleFunc("POST /api/library/paths/{id}/storage-binding/rebind", h.handleRebindLibraryPathStorage)
 	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
@@ -2571,6 +2584,75 @@ func (h *Handler) handleAddLibraryPath(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) handleGetLibraryPathStorageStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.libraryPathStorageStatus == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "library path storage status is not available")
+		return
+	}
+	dto, err := h.libraryPathStorageStatus.ListLibraryPathStorageStatus(r.Context())
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to read library path storage status")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleCheckLibraryPathStorageStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.libraryPathStorageStatus == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "library path storage status is not available")
+		return
+	}
+
+	var body contracts.CheckLibraryPathStorageStatusRequest
+	if r.Body != nil && r.Body != http.NoBody {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid storage status check request")
+			return
+		}
+	}
+
+	dto, err := h.libraryPathStorageStatus.CheckLibraryPathStorageStatus(r.Context(), body.LibraryPathIDs)
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to check library path storage status")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleRebindLibraryPathStorage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.libraryPathStorageStatus == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "library path storage status is not available")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "library path id is required")
+		return
+	}
+	dto, err := h.libraryPathStorageStatus.RebindLibraryPathStorage(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, storage.ErrLibraryPathNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "library path not found")
+			return
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to rebind library path storage")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) handleDeleteLibraryPath(w http.ResponseWriter, r *http.Request) {

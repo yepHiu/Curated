@@ -39,6 +39,7 @@ import (
 	"curated-backend/internal/scraper/metatube"
 	"curated-backend/internal/server"
 	"curated-backend/internal/storage"
+	"curated-backend/internal/storagehealth"
 	"curated-backend/internal/tasks"
 	"curated-backend/internal/version"
 	"curated-backend/internal/webui"
@@ -63,6 +64,7 @@ type App struct {
 	streams       *playback.Manager
 	devCPUSampler devmetrics.CPUSampler
 	appUpdate     *appupdate.Service
+	storageHealth *storagehealth.Checker
 
 	// organizeLibrary is toggled via Settings UI / PATCH and persisted to library-config.cfg.
 	organizeLibrary bool
@@ -163,6 +165,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		}),
 		devCPUSampler:                 devmetrics.NewCPUSampler(),
 		appUpdate:                     appupdate.NewService(store, logger),
+		storageHealth:                 storagehealth.NewChecker(storagehealth.NewDefaultProbe(), store),
 		organizeLibrary:               cfg.OrganizeLibrary,
 		autoLibraryWatch:              cfg.AutoLibraryWatch,
 		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
@@ -465,6 +468,81 @@ func (a *App) SetDefaultImportLibraryPathID(id string) error {
 	a.cfg.DefaultImportLibraryPathID = id
 	a.defaultImportLibraryPathIDMu.Unlock()
 	return nil
+}
+
+// ListLibraryPathStorageStatus checks every configured library path's backing storage.
+func (a *App) ListLibraryPathStorageStatus(ctx context.Context) (contracts.LibraryPathStorageStatusListDTO, error) {
+	return a.CheckLibraryPathStorageStatus(ctx, nil)
+}
+
+// CheckLibraryPathStorageStatus checks configured library paths, optionally restricted by library path IDs.
+func (a *App) CheckLibraryPathStorageStatus(ctx context.Context, libraryPathIDs []string) (contracts.LibraryPathStorageStatusListDTO, error) {
+	if a == nil || a.store == nil {
+		return contracts.LibraryPathStorageStatusListDTO{Items: []contracts.LibraryPathStorageStatusDTO{}}, nil
+	}
+
+	paths, err := a.store.ListLibraryPaths(ctx)
+	if err != nil {
+		return contracts.LibraryPathStorageStatusListDTO{}, err
+	}
+	wanted := make(map[string]struct{}, len(libraryPathIDs))
+	for _, id := range libraryPathIDs {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			wanted[id] = struct{}{}
+		}
+	}
+
+	items := make([]contracts.LibraryPathStorageStatusDTO, 0, len(paths))
+	for _, path := range paths {
+		if len(wanted) > 0 {
+			if _, ok := wanted[path.ID]; !ok {
+				continue
+			}
+		}
+		item, err := a.checkLibraryPathStorage(ctx, path)
+		if err != nil {
+			return contracts.LibraryPathStorageStatusListDTO{}, err
+		}
+		items = append(items, item)
+	}
+
+	return contracts.LibraryPathStorageStatusListDTO{Items: items}, nil
+}
+
+// RebindLibraryPathStorage stores the current backing storage identity as the expected identity for one library path.
+func (a *App) RebindLibraryPathStorage(ctx context.Context, libraryPathID string) (contracts.LibraryPathStorageStatusDTO, error) {
+	if a == nil || a.store == nil {
+		return contracts.LibraryPathStorageStatusDTO{}, storage.ErrLibraryPathNotFound
+	}
+	path, err := a.store.GetLibraryPath(ctx, strings.TrimSpace(libraryPathID))
+	if err != nil {
+		return contracts.LibraryPathStorageStatusDTO{}, err
+	}
+	if a.storageHealth == nil {
+		return unavailableLibraryPathStorageStatus(path), nil
+	}
+	return a.storageHealth.RebindPath(ctx, path)
+}
+
+func (a *App) checkLibraryPathStorage(ctx context.Context, path contracts.LibraryPathDTO) (contracts.LibraryPathStorageStatusDTO, error) {
+	if a.storageHealth == nil {
+		return unavailableLibraryPathStorageStatus(path), nil
+	}
+	return a.storageHealth.CheckPath(ctx, path)
+}
+
+func unavailableLibraryPathStorageStatus(path contracts.LibraryPathDTO) contracts.LibraryPathStorageStatusDTO {
+	return contracts.LibraryPathStorageStatusDTO{
+		LibraryPathID: path.ID,
+		Path:          path.Path,
+		Title:         path.Title,
+		Status:        contracts.LibraryPathStorageStatusUnknown,
+		Message:       "Storage status checker is not available.",
+		CheckedAt:     nowUTC(),
+		CanRescan:     false,
+		CanImport:     false,
+	}
 }
 
 // EnsureLibraryWatchRunning starts the fsnotify Run loop when yaml LibraryWatchOn and AutoLibraryWatch are true.
@@ -2469,30 +2547,31 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 // HTTPHandler builds the HTTP request multiplexer for the web API server.
 func (a *App) HTTPHandler() http.Handler {
 	apiHandler := server.NewHandler(server.Deps{
-		Cfg:                         a.cfg,
-		Logger:                      a.logger,
-		Store:                       a.store,
-		Tasks:                       a.tasks,
-		ScanStarter:                 a,
-		OrganizeLibraryCtl:          a,
-		AutoLibraryWatchCtl:         a,
-		AutoActorProfileScrapeCtl:   a,
-		LaunchAtLoginCtl:            a,
-		CuratedFrameExportFormatCtl: a,
-		DefaultImportLibraryPathCtl: a,
-		MetadataScrapeCtl:           a,
-		ProviderHealthChecker:       a.scraper,
-		ProxyCtl:                    a,
-		BackendLogCtl:               a,
-		PlayerSettingsCtl:           a,
-		MovieMetadataRefresher:      a,
-		ActorProfileRefresher:       a,
-		LibraryWatchReloader:        a,
-		DevPerformanceProvider:      a,
-		PlaybackResolver:            a,
-		NativePlaybackLauncher:      a,
-		HomepageRecommendations:     a,
-		AppUpdateProvider:           a,
+		Cfg:                              a.cfg,
+		Logger:                           a.logger,
+		Store:                            a.store,
+		Tasks:                            a.tasks,
+		ScanStarter:                      a,
+		OrganizeLibraryCtl:               a,
+		AutoLibraryWatchCtl:              a,
+		AutoActorProfileScrapeCtl:        a,
+		LaunchAtLoginCtl:                 a,
+		CuratedFrameExportFormatCtl:      a,
+		DefaultImportLibraryPathCtl:      a,
+		MetadataScrapeCtl:                a,
+		ProviderHealthChecker:            a.scraper,
+		ProxyCtl:                         a,
+		BackendLogCtl:                    a,
+		PlayerSettingsCtl:                a,
+		MovieMetadataRefresher:           a,
+		ActorProfileRefresher:            a,
+		LibraryWatchReloader:             a,
+		DevPerformanceProvider:           a,
+		PlaybackResolver:                 a,
+		NativePlaybackLauncher:           a,
+		HomepageRecommendations:          a,
+		AppUpdateProvider:                a,
+		LibraryPathStorageStatusProvider: a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)
 }
