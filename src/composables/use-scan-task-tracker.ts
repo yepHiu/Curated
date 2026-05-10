@@ -1,4 +1,4 @@
-import { onUnmounted, ref, shallowRef } from "vue"
+import { computed, onUnmounted, ref, shallowRef } from "vue"
 import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
 import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
@@ -29,14 +29,23 @@ const activeTask = shallowRef<TaskDTO | null>(null)
 const pollError = ref<string | null>(null)
 
 interface ScanTaskTrackerStartOptions {
+  hideProgressDock?: boolean
+  notifyScanStart?: boolean
   notifyMovieScrape?: boolean
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 let trackedTaskId: string | null = null
-let trackedTaskOptions: ScanTaskTrackerStartOptions = {}
+const trackedTaskOptions = ref<ScanTaskTrackerStartOptions>({})
 let consumerCount = 0
+
+const progressTask = computed(() =>
+  trackedTaskOptions.value.hideProgressDock ? null : activeTask.value,
+)
+const progressPollError = computed(() =>
+  trackedTaskOptions.value.hideProgressDock ? null : pollError.value,
+)
 
 function clearDismissTimer() {
   if (dismissTimer) {
@@ -62,6 +71,13 @@ function isTerminalStatus(status: TaskDTO["status"]): boolean {
 }
 
 function importNotificationSource(taskId: string) {
+  return {
+    taskId,
+    route: "/settings?section=library",
+  }
+}
+
+function libraryScanNotificationSource(taskId: string) {
   return {
     taskId,
     route: "/settings?section=library",
@@ -118,13 +134,13 @@ async function poll() {
                   t.status === "completed"
                     ? tr("notificationCenter.titles.scanDone")
                     : tr("notificationCenter.titles.scanFailed"),
-                source: { taskId: t.taskId },
+                source: libraryScanNotificationSource(t.taskId),
               },
             },
           )
         }
         void libraryService.reloadMoviesFromApi()
-      } else if (t.type === "scrape.movie" && trackedTaskOptions.notifyMovieScrape) {
+      } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
         const tr = i18n.global.t
         pushAppToast(movieScrapeToastMessage(t), {
           variant: taskTerminalToastVariant(t.status),
@@ -201,7 +217,7 @@ async function poll() {
     activeTask.value = null
     pollError.value = e instanceof Error ? e.message : i18n.global.t("scanTask.fetchFailed")
     trackedTaskId = null
-    trackedTaskOptions = {}
+    trackedTaskOptions.value = {}
   }
 }
 
@@ -209,7 +225,7 @@ function dismiss() {
   clearDismissTimer()
   stopPolling()
   trackedTaskId = null
-  trackedTaskOptions = {}
+  trackedTaskOptions.value = {}
   activeTask.value = null
   pollError.value = null
 }
@@ -225,7 +241,7 @@ export function useScanTaskTracker() {
     clearDismissTimer()
     stopPolling()
     trackedTaskId = null
-    trackedTaskOptions = {}
+    trackedTaskOptions.value = {}
     activeTask.value = null
     pollError.value = null
   })
@@ -234,16 +250,30 @@ export function useScanTaskTracker() {
     clearDismissTimer()
     stopPolling()
     trackedTaskId = taskId
-    trackedTaskOptions = { ...options }
+    trackedTaskOptions.value = { ...options }
     activeTask.value = null
     pollError.value = null
+    if (options.notifyScanStart) {
+      const tr = i18n.global.t
+      pushAppToast(tr("toasts.manualLibraryScanStarted"), {
+        variant: "default",
+        durationMs: 2600,
+        notification: {
+          type: "scan",
+          title: tr("notificationCenter.titles.scanStarted"),
+          source: libraryScanNotificationSource(taskId),
+        },
+      })
+    }
     void poll()
     intervalId = setInterval(() => void poll(), POLL_MS)
   }
 
   return {
     activeTask,
+    progressTask,
     pollError,
+    progressPollError,
     start,
     dismiss,
   }

@@ -1434,7 +1434,10 @@ async function rescanPath(path: string) {
       try {
         const task = await libraryService.scanLibraryPaths([path])
         if (task?.taskId) {
-          scanTaskTracker.start(task.taskId)
+          scanTaskTracker.start(task.taskId, {
+            hideProgressDock: true,
+            notifyScanStart: true,
+          })
         }
       } finally {
         scanPathBusy.value = null
@@ -1695,7 +1698,10 @@ async function runFullScan() {
       try {
         const task = await libraryService.scanLibraryPaths()
         if (task?.taskId) {
-          scanTaskTracker.start(task.taskId)
+          scanTaskTracker.start(task.taskId, {
+            hideProgressDock: true,
+            notifyScanStart: true,
+          })
         }
       } finally {
         fullScanBusy.value = false

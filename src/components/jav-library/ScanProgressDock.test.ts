@@ -1,10 +1,12 @@
 import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { TaskDTO } from "@/api/types"
 
 const trackerState = vi.hoisted(() => ({
   activeTask: { value: null as TaskDTO | null },
+  progressTask: { value: null as TaskDTO | null },
   pollError: { value: null as string | null },
+  progressPollError: { value: null as string | null },
   dismiss: vi.fn(),
 }))
 
@@ -51,15 +53,24 @@ async function mountDock() {
 }
 
 describe("ScanProgressDock", () => {
+  beforeEach(() => {
+    trackerState.activeTask.value = null
+    trackerState.progressTask.value = null
+    trackerState.pollError.value = null
+    trackerState.progressPollError.value = null
+    trackerState.dismiss.mockClear()
+  })
+
   it("renders scan progress labels from locale keys", async () => {
-    trackerState.activeTask.value = scanTask("running", {
+    const task = scanTask("running", {
       scanProcessed: 7,
       scanTotal: 10,
       scanImported: 2,
       scanUpdated: 3,
       scanSkipped: 1,
     })
-    trackerState.pollError.value = null
+    trackerState.activeTask.value = task
+    trackerState.progressTask.value = task
 
     const wrapper = await mountDock()
 
@@ -78,8 +89,9 @@ describe("ScanProgressDock", () => {
   ] satisfies Array<[TaskDTO["status"], string]>)(
     "renders %s title from locale keys",
     async (status, titleKey) => {
-      trackerState.activeTask.value = scanTask(status)
-      trackerState.pollError.value = null
+      const task = scanTask(status)
+      trackerState.activeTask.value = task
+      trackerState.progressTask.value = task
 
       const wrapper = await mountDock()
 
@@ -90,6 +102,7 @@ describe("ScanProgressDock", () => {
   it("renders poll error title from locale keys", async () => {
     trackerState.activeTask.value = null
     trackerState.pollError.value = "scanTask.fetchFailed"
+    trackerState.progressPollError.value = "scanTask.fetchFailed"
 
     const wrapper = await mountDock()
 
@@ -97,7 +110,7 @@ describe("ScanProgressDock", () => {
   })
 
   it("renders import progress metadata instead of scan counters", async () => {
-    trackerState.activeTask.value = importTask("running", {
+    const task = importTask("running", {
       currentFileName: "IMP-001.mp4",
       completedFiles: 1,
       totalFiles: 3,
@@ -105,7 +118,8 @@ describe("ScanProgressDock", () => {
       copiedBytes: 1048576,
       totalBytes: 2097152,
     })
-    trackerState.pollError.value = null
+    trackerState.activeTask.value = task
+    trackerState.progressTask.value = task
 
     const wrapper = await mountDock()
 
@@ -115,5 +129,14 @@ describe("ScanProgressDock", () => {
     expect(wrapper.text()).toContain("import.files")
     expect(wrapper.text()).toContain("import.copiedBytes")
     expect(wrapper.text()).not.toContain("scan.newItems")
+  })
+
+  it("does not render when the active task is hidden from progress UI", async () => {
+    trackerState.activeTask.value = scanTask("running")
+    trackerState.progressTask.value = null
+
+    const wrapper = await mountDock()
+
+    expect(wrapper.text()).toBe("")
   })
 })

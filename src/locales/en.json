@@ -54,6 +54,7 @@
     "libraryWatchScanDoneWithChanges": "Library watch: found {discovered} files, imported {imported}, updated {updated}, skipped {skipped}.",
     "libraryWatchScanDoneNoChanges": "Library watch: scan complete, found {discovered} files, no new library items.",
     "libraryWatchScrapeDone": "Library watch: metadata scrape — {message}",
+    "manualLibraryScanStarted": "Library scan started.",
     "manualLibraryScanDone": "Library scan finished — {message}",
     "manualLibraryScanFailed": "Library scan ended without full success — {message}",
     "manualMovieScrapeDone": "Metadata refresh finished — {message}",
@@ -108,6 +109,7 @@
       "system": "System"
     },
     "titles": {
+      "scanStarted": "Scan started",
       "scanDone": "Scan complete",
       "scanFailed": "Scan failed",
       "scrapeDone": "Scrape complete",

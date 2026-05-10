@@ -54,6 +54,7 @@
     "libraryWatchScanDoneWithChanges": "库目录监听：已发现 {discovered} 个文件，新入库 {imported} 部，更新 {updated} 部，跳过 {skipped} 个。",
     "libraryWatchScanDoneNoChanges": "库目录监听：扫描完成，发现 {discovered} 个文件，未发现可入库的新内容。",
     "libraryWatchScrapeDone": "库目录监听：元数据刮削 — {message}",
+    "manualLibraryScanStarted": "资料库扫描已开始。",
     "manualLibraryScanDone": "资料库扫描完成 — {message}",
     "manualLibraryScanFailed": "资料库扫描结束（未完全成功）— {message}",
     "manualMovieScrapeDone": "元数据刷新完成 — {message}",
@@ -108,6 +109,7 @@
       "system": "系统"
     },
     "titles": {
+      "scanStarted": "扫描已开始",
       "scanDone": "扫描完成",
       "scanFailed": "扫描失败",
       "scrapeDone": "刮削完成",

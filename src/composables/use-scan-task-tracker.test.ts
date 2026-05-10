@@ -192,6 +192,93 @@ describe("useScanTaskTracker", () => {
     wrapper.unmount()
   })
 
+  it("shows a persisted start notification when a manual scan opts in", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeTask("running"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("task-1", { notifyScanStart: true, hideProgressDock: true })
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualLibraryScanStarted",
+      expect.objectContaining({
+        variant: "default",
+        notification: expect.objectContaining({
+          type: "scan",
+          title: "notificationCenter.titles.scanStarted",
+          source: { taskId: "task-1", route: "/settings?section=library" },
+        }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it("keeps hidden progress tasks out of the progress dock state", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeTask("running"))
+
+    const Harness = defineComponent({
+      setup() {
+        const { activeTask, progressTask, start } = useScanTaskTracker()
+        start("task-1", { hideProgressDock: true })
+        return { activeTask, progressTask }
+      },
+      template: `
+        <div>
+          <span data-active>{{ activeTask?.taskId ?? "" }}</span>
+          <span data-progress>{{ progressTask?.taskId ?? "" }}</span>
+        </div>
+      `,
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(wrapper.get("[data-active]").text()).toBe("task-1")
+    expect(wrapper.get("[data-progress]").text()).toBe("")
+
+    wrapper.unmount()
+  })
+
+  it("routes manual scan terminal notifications back to settings", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("task-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualLibraryScanDone",
+      expect.objectContaining({
+        variant: "success",
+        notification: expect.objectContaining({
+          type: "scan",
+          title: "notificationCenter.titles.scanDone",
+          source: { taskId: "task-1", route: "/settings?section=library" },
+        }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
   it("persists single movie scrape task notifications when requested", async () => {
     vi.useFakeTimers()
     mocks.getTaskStatus.mockResolvedValueOnce(makeMovieScrapeTask("completed"))

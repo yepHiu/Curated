@@ -13,11 +13,11 @@ import { Progress } from "@/components/ui/progress"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 
 const { t } = useI18n()
-const { activeTask, pollError, dismiss } = useScanTaskTracker()
+const { progressTask, progressPollError, dismiss } = useScanTaskTracker()
 
 const emptyValue = "-"
-const visible = computed(() => activeTask.value != null || pollError.value != null)
-const isImportTask = computed(() => activeTask.value?.type === "import.movies")
+const visible = computed(() => progressTask.value != null || progressPollError.value != null)
+const isImportTask = computed(() => progressTask.value?.type === "import.movies")
 
 function metaNum(m: Record<string, unknown> | undefined, key: string): string {
   const n = metaNumberValue(m, key)
@@ -55,8 +55,8 @@ function formatBytes(value: number): string {
 }
 
 const dockTitle = computed(() => {
-  if (pollError.value && !activeTask.value) return t("scan.statusLabel")
-  const task = activeTask.value
+  if (progressPollError.value && !progressTask.value) return t("scan.statusLabel")
+  const task = progressTask.value
   if (!task) return ""
   if (task.type === "import.movies") {
     if (task.status === "completed") return t("import.completed")
@@ -69,18 +69,18 @@ const dockTitle = computed(() => {
 })
 
 const progressModel = computed(() => {
-  const task = activeTask.value
+  const task = progressTask.value
   if (!task) return 0
   return Math.min(100, Math.max(0, task.progress))
 })
 
-const detailLine = computed(() => activeTask.value?.message ?? "")
+const detailLine = computed(() => progressTask.value?.message ?? "")
 
-const importCurrentFile = computed(() => metaText(activeTask.value?.metadata, "currentFileName"))
+const importCurrentFile = computed(() => metaText(progressTask.value?.metadata, "currentFileName"))
 
 const importCopiedBytes = computed(() => {
-  const copied = metaNumberValue(activeTask.value?.metadata, "copiedBytes")
-  const total = metaNumberValue(activeTask.value?.metadata, "totalBytes")
+  const copied = metaNumberValue(progressTask.value?.metadata, "copiedBytes")
+  const total = metaNumberValue(progressTask.value?.metadata, "totalBytes")
   if (Number.isFinite(total) && total > 0) {
     return `${formatBytes(copied)} / ${formatBytes(total)}`
   }
@@ -109,7 +109,7 @@ const importCopiedBytes = computed(() => {
           </Button>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
-          <template v-if="activeTask">
+          <template v-if="progressTask">
             <Progress :model-value="progressModel" />
             <p v-if="detailLine" class="text-xs leading-snug text-muted-foreground">
               {{ detailLine }}
@@ -125,46 +125,46 @@ const importCopiedBytes = computed(() => {
               </span>
               <span v-once>{{ t("import.files") }}</span>
               <span class="text-right font-mono text-foreground">
-                {{ metaNum(activeTask.metadata, "completedFiles") }} /
-                {{ metaNum(activeTask.metadata, "totalFiles") }}
+                {{ metaNum(progressTask.metadata, "completedFiles") }} /
+                {{ metaNum(progressTask.metadata, "totalFiles") }}
               </span>
               <span v-once>{{ t("import.copiedBytes") }}</span>
               <span class="text-right font-mono text-foreground">{{ importCopiedBytes }}</span>
               <span v-once>{{ t("import.failedFiles") }}</span>
               <span class="text-right font-mono text-foreground">{{
-                metaNum(activeTask.metadata, "failedFiles")
+                metaNum(progressTask.metadata, "failedFiles")
               }}</span>
             </div>
 
             <div v-else class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span v-once>{{ t("scan.processed") }}</span>
               <span class="text-right font-mono text-foreground">
-                {{ metaNum(activeTask.metadata, "scanProcessed") }} /
-                {{ metaNum(activeTask.metadata, "scanTotal") }}
+                {{ metaNum(progressTask.metadata, "scanProcessed") }} /
+                {{ metaNum(progressTask.metadata, "scanTotal") }}
               </span>
               <span v-once>{{ t("scan.newItems") }}</span>
               <span class="text-right font-mono text-foreground">{{
-                metaNum(activeTask.metadata, "scanImported")
+                metaNum(progressTask.metadata, "scanImported")
               }}</span>
               <span v-once>{{ t("scan.updated") }}</span>
               <span class="text-right font-mono text-foreground">{{
-                metaNum(activeTask.metadata, "scanUpdated")
+                metaNum(progressTask.metadata, "scanUpdated")
               }}</span>
               <span v-once>{{ t("scan.skipped") }}</span>
               <span class="text-right font-mono text-foreground">{{
-                metaNum(activeTask.metadata, "scanSkipped")
+                metaNum(progressTask.metadata, "scanSkipped")
               }}</span>
             </div>
 
             <p
-              v-if="(activeTask.status === 'failed' || activeTask.status === 'partial_failed') && activeTask.errorMessage"
+              v-if="(progressTask.status === 'failed' || progressTask.status === 'partial_failed') && progressTask.errorMessage"
               class="text-xs text-destructive"
             >
-              {{ activeTask.errorMessage }}
+              {{ progressTask.errorMessage }}
             </p>
           </template>
-          <p v-else-if="pollError" class="text-sm text-destructive">
-            {{ pollError }}
+          <p v-else-if="progressPollError" class="text-sm text-destructive">
+            {{ progressPollError }}
           </p>
         </CardContent>
       </Card>
