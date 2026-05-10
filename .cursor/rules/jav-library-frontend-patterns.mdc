@@ -20,6 +20,7 @@ alwaysApply: false
 - Detail pages should follow the current media-library pattern: left poster, right metadata, clear hierarchy, and no oversized hero banners.
 - Player pages should stay video-first and low-chrome; avoid adding extra explanatory cards or secondary panels unless explicitly requested.
 - Settings pages should follow the current centered content band with top stats and vertically stacked setting cards; avoid wide admin-dashboard layouts unless requested.
+- **设置页 nested 卡片内「块标题 + 说明」**：排版与左侧对齐须遵守 **`ui-component-spec.mdc`**「**设置页内嵌卡片：标题与说明（MUST）**」：`text-sm font-semibold` 标题、`text-xs … sm:text-sm` 说明、`flex flex-col gap-3`、nested 容器统一 **`p-4`**，勿在标题行单独加水平 inset。
 - Prefer semantic theme tokens and existing `shadcn-vue` primitives; do not add raw color values or custom base components when existing UI components already fit. **Exception:** the **Curated** wordmark in `AppSidebar` uses `text-primary` and `font-curated` (Outfit via `--font-curated` in `src/style.css`).
 - **Dialog / form fields** (detail edit, settings paths, etc.): use **`Input`** from `@/components/ui/input` with **explicit import**; follow **`vue-frontend-standards.mdc`** for contrast, `dark:` caveats, and keeping inputs + textareas visually consistent on dark surfaces.
 - **Global notifications**: use **`pushAppToast`** from `@/composables/use-app-toast` (backed by **vue-sonner** via shadcn **`Toaster`** in `AppShell`); do not add parallel toast systems.

@@ -32,6 +32,16 @@
 - `AppShell` 桌面端采用 split shell：左侧 `AppSidebar` 作为持久导航面，右侧内容区作为同层工作区；不再用一个共同的大圆角卡片容器包住侧栏和内容区。
 - 设置页仍然是常规业务页面，不承担大型实验性展示画布职责。
 
+### 4.1 设置页：卡片内嵌区块的标题与说明
+
+适用于 `SettingsPage` 等页面中，大卡片（`Card`）内再嵌套的浅色块（如元数据、自动化配置中的 `rounded-* border bg-muted/…` 分区）。
+
+- **块标题**：`text-sm font-semibold text-foreground`。
+- **说明 / 提示文案**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`。
+- **标题与说明在同一列时**：父级使用 `flex flex-col gap-3` 控制垂直间距。
+- **与嵌套容器左缘的距离**：同一父级 `CardContent` 下的多个嵌套块应统一使用 **`p-4`**，使各块标题与说明的左边缘对齐；避免在某个块仅标题行增加 `px-*` 而破坏与其它 `p-4` 块的对齐。
+- **Cursor 规则索引**：详见 `.cursor/rules/ui-component-spec.mdc`「设置页内嵌卡片：标题与说明（MUST）」；实现参考 `src/components/jav-library/settings/SettingsMetadata*.vue`。
+
 ## 5. 业务组件约束
 
 - `MovieCard`、`ActorLibraryCard`、`PlaybackHistoryCard`、`DetailPanel` 等业务组件优先保持产品语义，不应为临时展示环境或内部实验区引入专用 props。

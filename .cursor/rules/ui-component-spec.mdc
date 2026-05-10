@@ -35,8 +35,18 @@ alwaysApply: false
 - **浏览**（`library` / `favorites` / `recent` / `tags`）：海报优先、卡片紧凑；整张可点进详情；网格与「相关推荐」尺寸变更时保持一致，除非任务明确要求分叉。
 - **详情**：左海报右元数据，层次清晰；避免巨型 hero 营销布局。
 - **播放**：video-first、低干扰控件；勿加与视频竞争注意力的说明卡片（除非明确要求）。
-- **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。
+- **设置**：居中内容带、纵向设置卡片；避免无故改成宽表格式后台。同一大卡片内的 nested 区块排版见下节 **「设置页内嵌卡片」**。
 - **壳层**：保留 **`AppShell`** 内滚动：内容区滚动，避免整页壳跟着滚。
+
+## 设置页内嵌卡片：标题与说明（MUST）
+
+同一 `Card`/`CardContent` 下的多条**浅色 nested 区块**（元数据、自动化等卡片内的 `rounded-* border bg-muted/…` 容器）须保持**各块标题与说明的左边缘彼此对齐**，并与各自容器左内边距一致。
+
+- **标题**：`text-sm font-semibold text-foreground`。
+- **说明 / 提示**：`text-xs leading-relaxed text-muted-foreground sm:text-sm`。
+- **标题与说明纵向间距**：同列内父级使用 `flex flex-col gap-3`（同一列内多段说明之间如需统一节奏，亦用 `gap-3`）。
+- **相对容器左缘**：此类 nested 区块统一使用 **`p-4`**；**禁止**仅在标题行额外增加 `px-*` / `px-0.5` 等，导致与同卡内其它 **`p-4`** 块的水平起点不一致。
+- **参考实现**：`SettingsMetadataAutomationSection.vue`、`SettingsMetadataModeSection.vue`、`SettingsMetadataProviderChainSection.vue`、`SettingsMetadataProviderSelectSection.vue`、`SettingsMetadataTriggerScrapeSection.vue`。
 
 ## 显示缩放（MUST）
 
