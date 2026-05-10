@@ -513,7 +513,6 @@
     "metadataMovieProviderHelpP2": "本页偏好会写入应用配置中的 library-config.cfg；部分项在重启 Curated 后端后会按新策略完全生效。",
     "metadataMovieProviderMode": "刮削策略",
     "metadataMovieProviderModeTooltip": "自动：同时查询所有已注册影片源并按权重取最优。指定：只查所选单一站点。链式：按下方列表顺序依次尝试，当前源失败则换下一个。设置会持久化并由后端执行。",
-    "metadataMovieProviderModeAria": "刮削策略说明",
     "metadataMovieProviderAuto": "自动（全源加权排序）",
     "metadataMovieProviderAutoHint": "与默认行为一致：并发搜索全部影片源并取排序后的最优一条。",
     "metadataMovieProviderSpecified": "指定单一站点",

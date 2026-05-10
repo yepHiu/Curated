@@ -513,7 +513,6 @@
     "metadataMovieProviderHelpP2": "Preferences on this page are written to library-config.cfg under the app config directory; some changes apply fully after restarting the Curated backend.",
     "metadataMovieProviderMode": "Scrape strategy",
     "metadataMovieProviderModeTooltip": "Auto: query every registered movie provider in parallel and take the best weighted match. Specified: only the site you pick. Chain: try providers in list order and fall back when one fails. Settings persist and the backend runs the scrape.",
-    "metadataMovieProviderModeAria": "Scrape strategy help",
     "metadataMovieProviderAuto": "Auto (all sources, weighted)",
     "metadataMovieProviderAutoHint": "Same as default: search every movie provider concurrently and take the top-ranked result.",
     "metadataMovieProviderSpecified": "Single provider",

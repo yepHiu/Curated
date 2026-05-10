@@ -1,13 +1,5 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import { CircleHelp } from "lucide-vue-next"
-import {
-  TooltipContent,
-  TooltipPortal,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from "reka-ui"
 
 type MetadataMovieMode = "auto" | "specified" | "chain"
 
@@ -36,35 +28,9 @@ const { t } = useI18n()
   >
     <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
     <div class="flex flex-col gap-3">
-      <div class="flex items-center gap-3">
-        <span class="text-sm font-semibold text-foreground">{{
-          t("settings.metadataMovieProviderMode")
-        }}</span>
-        <TooltipProvider :delay-duration="280">
-          <TooltipRoot>
-            <TooltipTrigger as-child>
-              <button
-                type="button"
-                class="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <CircleHelp class="size-4" aria-hidden="true" />
-                <span class="sr-only">{{
-                  t("settings.metadataMovieProviderModeAria")
-                }}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipPortal>
-              <TooltipContent
-                side="top"
-                :side-offset="6"
-                class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-              >
-                {{ t("settings.metadataMovieProviderModeTooltip") }}
-              </TooltipContent>
-            </TooltipPortal>
-          </TooltipRoot>
-        </TooltipProvider>
-      </div>
+      <span class="text-sm font-semibold text-foreground">{{
+        t("settings.metadataMovieProviderMode")
+      }}</span>
       <p
         class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
       >

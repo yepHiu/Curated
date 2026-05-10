@@ -8,18 +8,6 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-vi.mock("lucide-vue-next", () => ({
-  CircleHelp: { name: "CircleHelp", template: "<span />" },
-}))
-
-vi.mock("reka-ui", () => ({
-  TooltipContent: { name: "TooltipContent", template: "<div><slot /></div>" },
-  TooltipPortal: { name: "TooltipPortal", template: "<div><slot /></div>" },
-  TooltipProvider: { name: "TooltipProvider", template: "<div><slot /></div>" },
-  TooltipRoot: { name: "TooltipRoot", template: "<div><slot /></div>" },
-  TooltipTrigger: { name: "TooltipTrigger", template: "<div><slot /></div>" },
-}))
-
 const baseProps = {
   metadataMovieModeUi: "auto" as const,
   metadataMovieSaving: false,
