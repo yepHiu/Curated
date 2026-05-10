@@ -35,7 +35,7 @@ const { t } = useI18n()
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <p class="text-sm font-semibold text-foreground">{{ t("settings.providerHealthTitle") }}</p>
-        <p class="mt-0.5 text-xs text-muted-foreground">
+        <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.providerHealthHint") }}
         </p>
       </div>
