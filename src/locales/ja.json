@@ -56,6 +56,8 @@
     "libraryWatchScrapeDone": "ライブラリ監視：メタデータ取得 — {message}",
     "manualLibraryScanDone": "ライブラリスキャン完了 — {message}",
     "manualLibraryScanFailed": "ライブラリスキャン終了（未完了）— {message}",
+    "manualMovieScrapeDone": "メタデータ更新完了 — {message}",
+    "manualMovieScrapeFailed": "メタデータ更新終了（未完了）— {message}",
     "movieImportDone": "動画のインポートが完了しました：{completed} 件をコピーしました。",
     "movieImportPartial": "動画のインポートが一部完了しました：成功 {completed} 件、失敗 {failed} 件。",
     "movieImportFailed": "動画のインポートに失敗しました：{message}"
@@ -91,6 +93,7 @@
     "historyTitle": "通知履歴",
     "back": "戻る",
     "clearAll": "すべて削除",
+    "dismiss": "通知を閉じる",
     "noHistory": "通知履歴はありません",
     "emptyFiltered": "このフィルターの通知はありません",
     "unreadCountAria": "未読通知 {n} 件",

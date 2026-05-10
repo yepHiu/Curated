@@ -6,8 +6,27 @@ const apiMocks = vi.hoisted(() => ({
   checkAppUpdateNow: vi.fn(),
 }))
 
+const notificationMocks = vi.hoisted(() => ({
+  addNotification: vi.fn(),
+}))
+
 vi.mock("@/api/endpoints", () => ({
   api: apiMocks,
+}))
+
+vi.mock("@/composables/use-notification-center", () => ({
+  useNotificationCenter: () => ({
+    addNotification: notificationMocks.addNotification,
+  }),
+}))
+
+vi.mock("@/i18n", () => ({
+  i18n: {
+    global: {
+      t: (key: string, params?: Record<string, unknown>) =>
+        params?.version ? `${key}:${params.version}` : key,
+    },
+  },
 }))
 
 async function loadUseAppUpdate() {
@@ -21,6 +40,7 @@ beforeEach(() => {
   vi.useRealTimers()
   apiMocks.getAppUpdateStatus.mockReset()
   apiMocks.checkAppUpdateNow.mockReset()
+  notificationMocks.addNotification.mockReset()
 })
 
 afterEach(() => {
@@ -102,5 +122,29 @@ describe("useAppUpdate", () => {
     expect(first.status.value).toBe("up-to-date")
     expect(second.status.value).toBe("up-to-date")
     expect(first.loading.value).toBe(false)
+  })
+
+  it("records a notification when a silent auto check finds an update", async () => {
+    vi.useFakeTimers()
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      installedVersion: "1.0.0",
+      latestVersion: "1.1.0",
+    })
+
+    await loadUseAppUpdate()
+    await vi.advanceTimersByTimeAsync(12_000)
+    await flushPromises()
+
+    expect(notificationMocks.addNotification).toHaveBeenCalledWith({
+      type: "update",
+      severity: "warning",
+      title: "notificationCenter.titles.updateAvailable",
+      message: "settings.appUpdateToastAvailable:1.1.0",
+      source: { route: "/settings?section=about" },
+    })
   })
 })

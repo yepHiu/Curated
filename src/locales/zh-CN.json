@@ -56,6 +56,8 @@
     "libraryWatchScrapeDone": "库目录监听：元数据刮削 — {message}",
     "manualLibraryScanDone": "资料库扫描完成 — {message}",
     "manualLibraryScanFailed": "资料库扫描结束（未完全成功）— {message}",
+    "manualMovieScrapeDone": "元数据刷新完成 — {message}",
+    "manualMovieScrapeFailed": "元数据刷新结束（未完全成功）— {message}",
     "movieImportDone": "影片导入完成：已复制 {completed} 个文件。",
     "movieImportPartial": "影片导入部分完成：{completed} 个成功，{failed} 个失败。",
     "movieImportFailed": "影片导入失败：{message}"
@@ -91,6 +93,7 @@
     "historyTitle": "通知历史",
     "back": "返回",
     "clearAll": "清空",
+    "dismiss": "关闭通知",
     "noHistory": "暂无历史通知",
     "emptyFiltered": "当前筛选下暂无通知",
     "unreadCountAria": "{n} 条未读通知",

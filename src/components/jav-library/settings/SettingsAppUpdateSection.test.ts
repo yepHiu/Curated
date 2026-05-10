@@ -1,8 +1,12 @@
-import { mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { computed, ref } from "vue"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import SettingsAppUpdateSection from "./SettingsAppUpdateSection.vue"
+
+const checkNowMock = vi.hoisted(() => vi.fn())
+const ensureLoadedMock = vi.hoisted(() => vi.fn())
+const pushAppToastMock = vi.hoisted(() => vi.fn())
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -47,17 +51,17 @@ vi.mock("@/composables/use-app-update", () => ({
     status: computed(() => "update-available"),
     loading: ref(false),
     hasUpdateBadge: computed(() => true),
-    ensureLoaded: vi.fn(),
-    checkNow: vi.fn(),
+    ensureLoaded: ensureLoadedMock,
+    checkNow: checkNowMock,
   }),
 }))
 
 vi.mock("@/composables/use-app-toast", () => ({
-  pushAppToast: vi.fn(),
+  pushAppToast: pushAppToastMock,
 }))
 
 vi.mock("@/components/ui/button", () => ({
-  Button: { name: "Button", template: "<button><slot /></button>" },
+  Button: { name: "Button", template: "<button v-bind=\"$attrs\"><slot /></button>" },
 }))
 
 vi.mock("@/components/ui/badge", () => ({
@@ -65,6 +69,12 @@ vi.mock("@/components/ui/badge", () => ({
 }))
 
 describe("SettingsAppUpdateSection", () => {
+  beforeEach(() => {
+    checkNowMock.mockReset()
+    ensureLoadedMock.mockReset()
+    pushAppToastMock.mockReset()
+  })
+
   it("renders backend build version plus a merged installer version summary", async () => {
     const wrapper = mount(SettingsAppUpdateSection, {
       props: {
@@ -98,5 +108,31 @@ describe("SettingsAppUpdateSection", () => {
     await wrapper.get("[data-app-update-release-notes-toggle]").trigger("click")
 
     expect(notes.classes()).not.toContain("line-clamp-1")
+  })
+
+  it("adds a route source when manual update checks find an update", async () => {
+    checkNowMock.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      latestVersion: "1.3.0",
+    })
+
+    const wrapper = mount(SettingsAppUpdateSection)
+
+    await wrapper.get("[data-app-update-check]").trigger("click")
+    await flushPromises()
+
+    expect(pushAppToastMock).toHaveBeenCalledWith(
+      "settings.appUpdateToastAvailable:1.3.0",
+      expect.objectContaining({
+        variant: "warning",
+        notification: expect.objectContaining({
+          type: "update",
+          title: "notificationCenter.titles.updateAvailable",
+          source: { route: "/settings?section=about" },
+        }),
+      }),
+    )
   })
 })

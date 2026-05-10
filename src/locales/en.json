@@ -56,6 +56,8 @@
     "libraryWatchScrapeDone": "Library watch: metadata scrape — {message}",
     "manualLibraryScanDone": "Library scan finished — {message}",
     "manualLibraryScanFailed": "Library scan ended without full success — {message}",
+    "manualMovieScrapeDone": "Metadata refresh finished — {message}",
+    "manualMovieScrapeFailed": "Metadata refresh ended without full success — {message}",
     "movieImportDone": "Movie import complete: {completed} files copied.",
     "movieImportPartial": "Movie import partially complete: {completed} succeeded, {failed} failed.",
     "movieImportFailed": "Movie import failed: {message}"
@@ -91,6 +93,7 @@
     "historyTitle": "Notification history",
     "back": "Back",
     "clearAll": "Clear all",
+    "dismiss": "Dismiss notification",
     "noHistory": "No notification history",
     "emptyFiltered": "No notifications in this filter",
     "unreadCountAria": "{n} unread notifications",

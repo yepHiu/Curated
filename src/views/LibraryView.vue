@@ -154,7 +154,7 @@ async function handleContextRefreshMetadata() {
       })
       return
     }
-    scanTaskTracker.start(task.taskId)
+    scanTaskTracker.start(task.taskId, { notifyMovieScrape: true })
   } catch (err) {
     const message =
       err instanceof HttpClientError

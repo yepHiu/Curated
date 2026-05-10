@@ -7,6 +7,7 @@ const patchActorExternalLinks = vi.fn()
 const patchActorUserTags = vi.fn()
 const scrapeActorProfile = vi.fn()
 const getTaskStatus = vi.fn()
+const pushAppToastMock = vi.hoisted(() => vi.fn())
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -58,7 +59,7 @@ vi.mock("@/services/library-service", () => ({
 }))
 
 vi.mock("@/composables/use-app-toast", () => ({
-  pushAppToast: vi.fn(),
+  pushAppToast: pushAppToastMock,
 }))
 
 vi.mock("@/composables/use-user-tag-suggest-keyboard", () => ({
@@ -69,6 +70,7 @@ vi.mock("@/composables/use-user-tag-suggest-keyboard", () => ({
 }))
 
 vi.mock("@/lib/actors-route-query", () => ({
+  ACTORS_SEARCH_QUERY_KEY: "actorsQ",
   mergeActorsQuery: vi.fn(() => ({})),
 }))
 
@@ -141,6 +143,7 @@ describe("ActorProfileCard", () => {
     patchActorUserTags.mockReset()
     scrapeActorProfile.mockReset()
     getTaskStatus.mockReset()
+    pushAppToastMock.mockReset()
   })
 
   it("opens the actor edit dialog and replaces the saved external link", async () => {
@@ -308,5 +311,79 @@ describe("ActorProfileCard", () => {
 
     expect(count).toBe(1)
     expect(text).toContain("https://example.com/a")
+  })
+
+  it("persists a notification when automatic actor scraping completes", async () => {
+    getActorProfile
+      .mockResolvedValueOnce({
+        name: "Alpha Star",
+        externalLinks: [],
+        userTags: [],
+        summary: "",
+        avatarUrl: "",
+      })
+      .mockResolvedValueOnce({
+        name: "Alpha Star",
+        externalLinks: [],
+        userTags: [],
+        summary: "Bio",
+        avatarUrl: "https://example.com/avatar.jpg",
+      })
+    scrapeActorProfile.mockResolvedValue({ taskId: "actor-task-1" })
+    getTaskStatus.mockResolvedValue({
+      taskId: "actor-task-1",
+      type: "scrape.actor",
+      status: "completed",
+      message: "done",
+    })
+
+    await mountComponent()
+    await flushPromises()
+
+    expect(pushAppToastMock).toHaveBeenCalledWith(
+      "library.actorAutoScrapeToastDone",
+      expect.objectContaining({
+        variant: "success",
+        durationMs: 4000,
+        notification: expect.objectContaining({
+          type: "scrape",
+          title: "notificationCenter.titles.scrapeDone",
+          source: { route: "/actors?actorsQ=Alpha%20Star" },
+        }),
+      }),
+    )
+  })
+
+  it("persists a notification when automatic actor scraping fails", async () => {
+    getActorProfile.mockResolvedValue({
+      name: "Alpha Star",
+      externalLinks: [],
+      userTags: [],
+      summary: "",
+      avatarUrl: "",
+    })
+    scrapeActorProfile.mockResolvedValue({ taskId: "actor-task-1" })
+    getTaskStatus.mockResolvedValue({
+      taskId: "actor-task-1",
+      type: "scrape.actor",
+      status: "failed",
+      errorMessage: "network unavailable",
+    })
+
+    await mountComponent()
+    await flushPromises()
+
+    expect(pushAppToastMock).toHaveBeenCalledWith(
+      "library.actorAutoScrapeToastFail",
+      expect.objectContaining({
+        variant: "destructive",
+        durationMs: 6000,
+        notification: expect.objectContaining({
+          type: "scrape",
+          title: "notificationCenter.titles.scrapeFailed",
+          source: { route: "/actors?actorsQ=Alpha%20Star" },
+        }),
+      }),
+    )
   })
 })

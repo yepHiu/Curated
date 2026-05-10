@@ -64,6 +64,19 @@ function makeImportTask(status: TaskDTO["status"]): TaskDTO {
   }
 }
 
+function makeMovieScrapeTask(status: TaskDTO["status"]): TaskDTO {
+  return {
+    ...makeTask(status),
+    taskId: "scrape-1",
+    type: "scrape.movie",
+    progress: status === "completed" ? 100 : 1,
+    message: "Metadata updated",
+    metadata: {
+      movieId: "movie-1",
+    },
+  }
+}
+
 afterEach(() => {
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -128,9 +141,107 @@ describe("useScanTaskTracker", () => {
 
     expect(mocks.pushAppToast).toHaveBeenCalledWith(
       "toasts.movieImportDone",
-      expect.objectContaining({ variant: "success" }),
+      expect.objectContaining({
+        variant: "success",
+        notification: expect.objectContaining({
+          type: "system",
+          title: "notificationCenter.titles.importDone",
+          source: { taskId: "task-1", route: "/settings?section=library" },
+        }),
+      }),
     )
     expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("persists failed movie import task notifications", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce({
+      ...makeImportTask("failed"),
+      errorMessage: "Disk is full",
+      metadata: {
+        completedFiles: 1,
+        failedFiles: 2,
+      },
+    })
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("import-2")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.movieImportFailed",
+      expect.objectContaining({
+        variant: "destructive",
+        notification: expect.objectContaining({
+          type: "system",
+          title: "notificationCenter.titles.importFailed",
+          source: { taskId: "task-1", route: "/settings?section=library" },
+        }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it("persists single movie scrape task notifications when requested", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeMovieScrapeTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("scrape-1", { notifyMovieScrape: true })
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualMovieScrapeDone",
+      expect.objectContaining({
+        variant: "success",
+        notification: expect.objectContaining({
+          type: "scrape",
+          title: "notificationCenter.titles.scrapeDone",
+          source: {
+            taskId: "scrape-1",
+            movieId: "movie-1",
+            route: "/detail/movie-1",
+          },
+        }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it("keeps movie scrape task notifications opt-in for batch refreshes", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeMovieScrapeTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("scrape-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

@@ -349,7 +349,7 @@ const handleRefreshMetadata = async (id: string) => {
         : t("detail.refreshMockMode")
       return
     }
-    scanTaskTracker.start(task.taskId)
+    scanTaskTracker.start(task.taskId, { notifyMovieScrape: true })
   } catch (err) {
     const message =
       err instanceof HttpClientError

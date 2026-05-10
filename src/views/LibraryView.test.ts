@@ -14,7 +14,9 @@ const serviceState = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   toggleFavorite: vi.fn(),
   ensureTrashLoaded: vi.fn(),
+  refreshMovieMetadata: vi.fn(),
 }))
+const scanTrackerStartMock = vi.hoisted(() => vi.fn())
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -39,7 +41,7 @@ vi.mock("@/composables/use-app-toast", () => ({
 vi.mock("@/composables/use-scan-task-tracker", () => ({
   useScanTaskTracker: () => ({
     activeTask: ref(null),
-    start: vi.fn(),
+    start: scanTrackerStartMock,
   }),
 }))
 
@@ -50,15 +52,27 @@ vi.mock("@/services/library-service", () => ({
     loadError: computed(() => serviceState.loadError),
     ensureTrashLoaded: serviceMocks.ensureTrashLoaded,
     toggleFavorite: serviceMocks.toggleFavorite,
+    refreshMovieMetadata: serviceMocks.refreshMovieMetadata,
   }),
 }))
 
 vi.mock("@/components/jav-library/LibraryPage.vue", () => ({
   default: {
     name: "LibraryPage",
-    emits: ["toggleFavorite"],
-    template:
-      '<button type="button" data-toggle-favorite @click="$emit(\'toggleFavorite\', { movieId: \'movie-1\', nextValue: true })">Favorite</button>',
+    emits: ["toggleFavorite", "contextMenu"],
+    template: `
+      <div>
+        <button type="button" data-toggle-favorite @click="$emit('toggleFavorite', { movieId: 'movie-1', nextValue: true })">Favorite</button>
+        <button
+          type="button"
+          data-open-context-menu
+          @click="$emit('contextMenu', {
+            event: { clientX: 24, clientY: 24 },
+            movie: { id: 'movie-1', title: 'Movie 1' }
+          })"
+        >Context</button>
+      </div>
+    `,
   },
 }))
 
@@ -75,13 +89,19 @@ vi.mock("@/components/jav-library/MovieEditDialog.vue", () => ({
 }))
 
 vi.mock("@/components/jav-library/MovieLibraryContextMenu.vue", () => ({
-  default: { name: "MovieLibraryContextMenu", template: "<div />" },
+  default: {
+    name: "MovieLibraryContextMenu",
+    emits: ["refreshMetadata"],
+    template: "<button type=\"button\" data-context-refresh-metadata @click=\"$emit('refreshMetadata')\">Refresh</button>",
+  },
 }))
 
 afterEach(() => {
   serviceState.loadError = null
   serviceMocks.toggleFavorite.mockReset()
   serviceMocks.ensureTrashLoaded.mockReset()
+  serviceMocks.refreshMovieMetadata.mockReset()
+  scanTrackerStartMock.mockReset()
   pushAppToastMock.mockReset()
   routerMocks.push.mockReset()
   routerMocks.replace.mockReset()
@@ -108,5 +128,23 @@ describe("LibraryView feedback", () => {
     expect(pushAppToastMock).toHaveBeenCalledWith("favorite failed", {
       variant: "destructive",
     })
+  })
+
+  it("opts single context metadata refresh tasks into scrape notifications", async () => {
+    serviceMocks.refreshMovieMetadata.mockResolvedValueOnce({
+      taskId: "task-1",
+      type: "scrape.movie",
+      status: "pending",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      progress: 0,
+    })
+    const wrapper = mount(LibraryView)
+
+    await wrapper.get("[data-open-context-menu]").trigger("click")
+    await wrapper.get("[data-context-refresh-metadata]").trigger("click")
+    await flushPromises()
+
+    expect(serviceMocks.refreshMovieMetadata).toHaveBeenCalledWith("movie-1")
+    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", { notifyMovieScrape: true })
   })
 })

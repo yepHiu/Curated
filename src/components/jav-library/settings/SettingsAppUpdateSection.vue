@@ -125,6 +125,7 @@ async function handleCheckNow() {
         notification: {
           type: "update",
           title: t("notificationCenter.titles.updateAvailable"),
+          source: { route: "/settings?section=about" },
         },
       },
     )

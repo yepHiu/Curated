@@ -238,7 +238,7 @@ describe("DetailView", () => {
     await flushPromises()
 
     expect(serviceMocks.refreshMovieMetadata).toHaveBeenCalledWith("movie-1")
-    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1")
+    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", { notifyMovieScrape: true })
   })
 
   it("returns to the browse route when Escape is pressed", async () => {

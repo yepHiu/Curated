@@ -10,6 +10,8 @@ const notificationState = vi.hoisted(() => ({
   setCenterOpen: vi.fn(),
 }))
 
+const routerPush = vi.hoisted(() => vi.fn())
+
 type TestNotification = {
   id: string
   type: "scan" | "scrape" | "update" | "error" | "system"
@@ -18,12 +20,19 @@ type TestNotification = {
   message: string
   timestamp: number
   read: boolean
+  source?: { route?: string }
 }
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
       params?.n == null ? key : `${key} ${params.n}`,
+  }),
+}))
+
+vi.mock("vue-router", () => ({
+  useRouter: () => ({
+    push: routerPush,
   }),
 }))
 
@@ -89,6 +98,7 @@ beforeEach(() => {
   notificationState.dismissOne.mockClear()
   notificationState.clearAll.mockClear()
   notificationState.setCenterOpen.mockClear()
+  routerPush.mockClear()
 })
 
 describe("NotificationCenter", () => {
@@ -151,5 +161,45 @@ describe("NotificationCenter", () => {
     expect(wrapper.text()).not.toContain("Informational")
     expect(wrapper.text()).toContain("Warning item")
     expect(wrapper.text()).toContain("Error item")
+  })
+
+  it("navigates source-backed rows without dismissing them", async () => {
+    notificationState.unread = [
+      {
+        ...makeNotification(1, {
+          read: false,
+          type: "update",
+          title: "Update available",
+          message: "Curated v1.4.3 is ready",
+        }),
+        source: { route: "/settings?section=about" },
+      },
+    ]
+
+    const wrapper = await mountCenter()
+    await wrapper.get('[data-test="notification-row-action"]').trigger("click")
+
+    expect(routerPush).toHaveBeenCalledWith("/settings?section=about")
+    expect(notificationState.dismissOne).not.toHaveBeenCalled()
+  })
+
+  it("dismisses a row only through the explicit dismiss action", async () => {
+    notificationState.unread = [
+      {
+        ...makeNotification(1, {
+          read: false,
+          type: "update",
+          title: "Update available",
+          message: "Curated v1.4.3 is ready",
+        }),
+        source: { route: "/settings?section=about" },
+      },
+    ]
+
+    const wrapper = await mountCenter()
+    await wrapper.get('[data-test="notification-row-dismiss"]').trigger("click")
+
+    expect(notificationState.dismissOne).toHaveBeenCalledWith("unread-1")
+    expect(routerPush).not.toHaveBeenCalled()
   })
 })

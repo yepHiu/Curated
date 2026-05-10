@@ -29,7 +29,7 @@ import {
   isValidActorExternalLink,
   normalizeActorExternalLinkDraft,
 } from "@/lib/actor-external-links"
-import { mergeActorsQuery } from "@/lib/actors-route-query"
+import { ACTORS_SEARCH_QUERY_KEY, mergeActorsQuery } from "@/lib/actors-route-query"
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { useLibraryService } from "@/services/library-service"
 
@@ -218,6 +218,10 @@ function needsAutoScrape(p: ActorProfileDTO): boolean {
   return !p.avatarUrl?.trim() && !p.summary?.trim()
 }
 
+function actorNotificationSource(name: string) {
+  return { route: `/actors?${ACTORS_SEARCH_QUERY_KEY}=${encodeURIComponent(name)}` }
+}
+
 async function runScrapePipeline(seq: number, name: string, force: boolean): Promise<void> {
   if (seq !== loadSeq || disposed) {
     return
@@ -255,6 +259,11 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
         pushAppToast(t("library.actorAutoScrapeToastFail", { name, msg }), {
           variant: "destructive",
           durationMs: 6000,
+          notification: {
+            type: "scrape",
+            title: t("notificationCenter.titles.scrapeFailed"),
+            source: actorNotificationSource(name),
+          },
         })
       }
       return
@@ -266,6 +275,11 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
         pushAppToast(t("library.actorAutoScrapeToastDone", { name }), {
           variant: "success",
           durationMs: 4000,
+          notification: {
+            type: "scrape",
+            title: t("notificationCenter.titles.scrapeDone"),
+            source: actorNotificationSource(name),
+          },
         })
       }
     }
@@ -280,6 +294,11 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
       pushAppToast(t("library.actorAutoScrapeToastFail", { name, msg }), {
         variant: "destructive",
         durationMs: 6000,
+        notification: {
+          type: "scrape",
+          title: t("notificationCenter.titles.scrapeFailed"),
+          source: actorNotificationSource(name),
+        },
       })
     }
   } finally {

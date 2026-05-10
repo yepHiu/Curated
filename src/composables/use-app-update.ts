@@ -2,6 +2,8 @@ import { computed, readonly, ref } from "vue"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
 import type { AppUpdateStatusDTO } from "@/api/types"
+import { i18n } from "@/i18n"
+import { useNotificationCenter } from "@/composables/use-notification-center"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 const AUTO_CHECK_DELAY_MS = 12_000
@@ -30,6 +32,27 @@ const errorMessage = ref("")
 
 let requestSeq = 0
 let autoCheckScheduled = false
+const notifiedUpdateVersions = new Set<string>()
+
+function maybeRecordUpdateAvailableNotification(next: AppUpdateStatusDTO) {
+  if (next.status !== "update-available" || next.hasUpdate !== true) {
+    return
+  }
+  const version = next.latestVersion?.trim() || next.releaseUrl?.trim() || "unknown"
+  if (notifiedUpdateVersions.has(version)) {
+    return
+  }
+  notifiedUpdateVersions.add(version)
+  useNotificationCenter().addNotification({
+    type: "update",
+    severity: "warning",
+    title: i18n.global.t("notificationCenter.titles.updateAvailable"),
+    message: i18n.global.t("settings.appUpdateToastAvailable", {
+      version: next.latestVersion ?? "-",
+    }),
+    source: { route: "/settings?section=about" },
+  })
+}
 
 async function runRequest(kind: "status" | "check", options?: { silent?: boolean }) {
   if (!USE_WEB) {
@@ -56,6 +79,9 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
     errorMessage.value = next.errorMessage?.trim() ?? ""
     status.value = next.status
     loaded.value = true
+    if (kind === "status") {
+      maybeRecordUpdateAvailableNotification(next)
+    }
     return next
   } catch (err) {
     if (requestId !== requestSeq) {
