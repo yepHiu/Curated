@@ -300,8 +300,8 @@ describe("SettingsLibraryPathsSection", () => {
 
     const checkStorageClass = wrapper.get("[data-check-storage-status]").attributes("class")
 
-    expect(checkStorageClass).toContain("h-9")
-    expect(checkStorageClass).toContain("min-w-32")
-    expect(checkStorageClass).toContain("px-4")
+    expect(checkStorageClass).toContain("h-8")
+    expect(checkStorageClass).toContain("min-w-28")
+    expect(checkStorageClass).toContain("px-3")
   })
 })
