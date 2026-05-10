@@ -86,11 +86,8 @@ function onProviderToAddChange(value: unknown) {
       <p class="text-sm font-semibold text-foreground">
         {{ t("settings.metadataMovieProviderChainLabel") }}
       </p>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.metadataMovieProviderChainDragHint") }}
-      </p>
-      <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        {{ t("settings.metadataMovieProviderChainAutoSave") }}
+      <p class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
+        {{ t("settings.metadataMovieProviderChainHelp") }}
       </p>
     </div>
 
