@@ -36,7 +36,7 @@ const { t } = useI18n()
   >
     <legend class="sr-only">{{ t("settings.metadataMovieProviderMode") }}</legend>
     <div class="mb-0.5 flex items-center gap-3 px-0.5">
-      <span class="text-sm font-medium text-foreground">{{
+      <span class="text-sm font-semibold text-foreground">{{
         t("settings.metadataMovieProviderMode")
       }}</span>
       <TooltipProvider :delay-duration="280">
