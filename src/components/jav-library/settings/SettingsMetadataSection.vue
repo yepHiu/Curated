@@ -87,8 +87,8 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
 
 <template>
   <div class="break-inside-avoid">
-    <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="pb-2">
+    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+      <CardHeader class="pb-0">
         <div
           class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5"
         >
@@ -103,7 +103,7 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent class="flex flex-col gap-3 pt-2">
+      <CardContent class="flex flex-col gap-3 pt-0">
         <SettingsMetadataAutomationSection
           :use-web-api="useWebApi"
           :provider-ping-all-busy="providerPingAllBusy"

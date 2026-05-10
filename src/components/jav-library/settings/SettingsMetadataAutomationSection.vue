@@ -30,10 +30,10 @@ const { t } = useI18n()
 <template>
   <div
     v-if="useWebApi"
-    class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+    class="flex flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-4"
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex min-w-0 flex-1 flex-col gap-3">
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
         <p class="text-sm font-semibold text-foreground">{{ t("settings.providerHealthTitle") }}</p>
         <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.providerHealthHint") }}
