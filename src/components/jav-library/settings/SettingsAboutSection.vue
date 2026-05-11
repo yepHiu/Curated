@@ -33,34 +33,32 @@ const { t } = useI18n()
 <template>
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-4 pb-2">
-          <CardTitle class="flex flex-wrap items-center gap-3 text-xl font-semibold tracking-tight">
-            <span class="flex min-w-0 items-center gap-3">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Info class="size-[1.15rem]" />
-              </span>
-              <span class="min-w-0">{{ t("settings.aboutCardTitle") }}</span>
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Info class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
+            {{ t("settings.aboutCardTitle") }}
           </CardTitle>
-          <div class="flex w-full justify-center pt-1">
+          <div class="col-span-full flex w-full justify-center pt-1">
             <div
               class="font-curated inline-flex w-fit max-w-full items-center gap-3 px-1 py-1.5 text-xl font-semibold tracking-wide text-primary sm:text-2xl"
               title="Curated"
             >
-              <Sparkles class="size-6 shrink-0 text-primary sm:size-7" aria-hidden="true" />
+              <Sparkles class="size-8 shrink-0 text-primary sm:size-9" aria-hidden="true" />
               <span class="truncate">Curated</span>
             </div>
           </div>
         </CardHeader>
-        <CardContent class="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
+        <CardContent class="space-y-3 pt-0 text-xs leading-relaxed text-muted-foreground sm:text-sm">
           <template v-if="isViteDev">
             <dl class="space-y-4">
-              <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
+              <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutVersionLabel") }}
                 </dt>
                 <dd class="mt-1.5">
@@ -83,8 +81,8 @@ const { t } = useI18n()
                 :backend-version-display="backendVersionDisplay"
                 :backend-version-status="backendVersionStatus"
               />
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
+              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutDataModeLabel") }}
                 </dt>
                 <dd class="mt-1.5">
@@ -95,8 +93,8 @@ const { t } = useI18n()
                   }}
                 </dd>
               </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-                <dt class="font-medium text-foreground">
+              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutFrontendBuildLabel") }}
                 </dt>
                 <dd class="mt-1.5">
@@ -104,13 +102,13 @@ const { t } = useI18n()
                 </dd>
               </div>
             </dl>
-            <p class="text-xs text-muted-foreground/90">
+            <p class="text-xs leading-relaxed text-muted-foreground/90 sm:text-sm">
               {{ t("settings.aboutDevProxyHint") }}
             </p>
           </template>
           <template v-else>
-            <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 px-4 py-3">
-              <p class="font-medium text-foreground">
+            <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 p-4">
+              <p class="font-semibold text-foreground">
                 {{ t("settings.aboutVersionLabel") }}
               </p>
               <p class="mt-1.5 font-mono text-sm text-foreground/90">
