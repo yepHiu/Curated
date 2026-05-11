@@ -742,7 +742,7 @@
     "autoPersistSaved": "保存しました",
     "navLibrary": "動画の保存先",
     "navMetadata": "メタデータ取得",
-    "navNetwork": "ネットワークとプロキシ",
+    "navNetwork": "ネットワーク",
     "backendLogTitle": "バックエンドログ",
     "backendLogDesc": "設定とともに保存されます。ログファイルへの反映を完了するには Curated を再起動してください。フォルダを空にすると、この PC 既定のログ保存場所が使われます。",
     "backendLogDir": "ログディレクトリ（絶対パス）",

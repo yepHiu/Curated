@@ -742,7 +742,7 @@
     "autoPersistSaved": "已保存",
     "navLibrary": "影片存储",
     "navMetadata": "元数据刮削",
-    "navNetwork": "网络与代理",
+    "navNetwork": "网络",
     "backendLogTitle": "后端日志",
     "backendLogDesc": "日志目录与保留策略会随设置保存；要完全应用到写入磁盘的日志文件，请重启 Curated。目录留空时使用本机为应用分配的默认日志位置。",
     "backendLogDir": "日志目录（绝对路径）",

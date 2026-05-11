@@ -751,7 +751,7 @@
     "autoPersistSaved": "Saved",
     "navLibrary": "Video storage",
     "navMetadata": "Metadata scraping",
-    "navNetwork": "Network & proxy",
+    "navNetwork": "Network",
     "backendLogTitle": "Backend logs",
     "backendLogDesc": "These options are saved with your settings. Restart Curated for changes to fully apply to log files on disk. Leave the folder blank to use the default log location on this computer.",
     "backendLogDir": "Log directory (absolute path)",
