@@ -97,27 +97,27 @@ function updateProxyPassword(value: unknown) {
 <template>
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <Globe class="size-[1.15rem]" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Globe class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.proxyTitle") }}
           </CardTitle>
           <CardDescription
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
           >
             {{ t("settings.proxyDesc") }}
           </CardDescription>
         </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
+        <CardContent class="flex flex-col gap-3 pt-0">
           <p
             v-if="!useWebApi"
-            class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
+            class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
             {{ t("settings.proxyMockHint") }}
           </p>
@@ -144,7 +144,7 @@ function updateProxyPassword(value: unknown) {
           >
             <div class="grid gap-3 md:grid-cols-[11rem_minmax(0,1fr)_10rem]">
               <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.proxyScheme") }}</p>
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyScheme") }}</p>
                 <Select
                   :model-value="proxyScheme"
                   :disabled="proxySaving"
@@ -165,7 +165,7 @@ function updateProxyPassword(value: unknown) {
                 </Select>
               </div>
               <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.proxyHost") }}</p>
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyHost") }}</p>
                 <Input
                   :model-value="proxyHost"
                   autocomplete="off"
@@ -177,7 +177,7 @@ function updateProxyPassword(value: unknown) {
                 />
               </div>
               <div class="flex flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.proxyPort") }}</p>
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyPort") }}</p>
                 <Input
                   :model-value="proxyPort"
                   inputmode="numeric"
@@ -210,7 +210,7 @@ function updateProxyPassword(value: unknown) {
                 class="flex flex-col gap-3 border-t border-border/50 pt-3"
               >
                 <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyUsername") }}</p>
+                  <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyUsername") }}</p>
                   <Input
                     :model-value="proxyUsername"
                     autocomplete="off"
@@ -221,7 +221,7 @@ function updateProxyPassword(value: unknown) {
                   />
                 </div>
                 <div class="flex flex-col gap-3">
-                  <p class="text-sm font-medium">{{ t("settings.proxyPassword") }}</p>
+                  <p class="text-sm font-semibold text-foreground">{{ t("settings.proxyPassword") }}</p>
                   <Input
                     :model-value="proxyPassword"
                     type="password"
@@ -237,20 +237,20 @@ function updateProxyPassword(value: unknown) {
           </div>
           <p
             v-if="useWebApi"
-            class="text-xs text-muted-foreground"
+            class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
             {{ t("settings.proxyPingJavbusHint") }}
           </p>
           <p
             v-if="useWebApi"
-            class="text-xs text-muted-foreground"
+            class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
             {{ t("settings.proxyPingGoogleHint") }}
           </p>
           <div class="flex flex-wrap items-center gap-3">
             <Button
               type="button"
-              class="rounded-lg"
+              class="rounded-full"
               :disabled="proxySaving || proxyOutboundPingBusy"
               data-proxy-save
               @click="emit('saveProxy')"
@@ -261,7 +261,7 @@ function updateProxyPassword(value: unknown) {
               v-if="useWebApi"
               type="button"
               variant="outline"
-              class="rounded-lg"
+              class="rounded-full"
               :disabled="proxySaving || proxyOutboundPingBusy"
               :aria-busy="proxyJavbusBusy"
               data-proxy-javbus
@@ -282,7 +282,7 @@ function updateProxyPassword(value: unknown) {
               v-if="useWebApi"
               type="button"
               variant="outline"
-              class="rounded-lg"
+              class="rounded-full"
               :disabled="proxySaving || proxyOutboundPingBusy"
               :aria-busy="proxyGoogleBusy"
               data-proxy-google
