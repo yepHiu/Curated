@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -61,18 +60,18 @@ const { t } = useI18n()
 <template>
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <ImageDown class="size-[1.15rem]" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <ImageDown class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.curatedCardTitle") }}
           </CardTitle>
-          <CardDescription class="space-y-2 text-xs leading-relaxed text-pretty text-muted-foreground">
+          <div class="col-start-2 flex flex-col gap-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
             <p>
               {{ t("settings.curatedCardDescShort") }}
             </p>
@@ -94,13 +93,13 @@ const { t } = useI18n()
                 {{ t("player.curatedLabel") }}
               </span>
             </div>
-          </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
-          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-3">
+        <CardContent class="flex flex-col gap-3 pt-0">
+          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.savePolicy") }}</legend>
-            <div class="mb-0.5 flex items-center gap-3 px-0.5">
-              <span class="text-sm font-medium text-foreground">{{
+            <div class="mb-0.5 flex items-center gap-3">
+              <span class="text-sm font-semibold text-foreground">{{
                 t("settings.savePolicy")
               }}</span>
               <TooltipProvider :delay-duration="280">
@@ -141,7 +140,7 @@ const { t } = useI18n()
               />
               <span class="min-w-0 flex-1">
                 <span class="text-sm font-medium">{{ t("settings.curatedApp") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.curatedAppHint") }}
                 </span>
               </span>
@@ -159,7 +158,7 @@ const { t } = useI18n()
               />
               <span class="min-w-0 flex-1">
                 <span class="text-sm font-medium">{{ t("settings.curatedDownload") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.curatedDownloadHint") }}
                 </span>
               </span>
@@ -178,7 +177,7 @@ const { t } = useI18n()
               />
               <span class="min-w-0 flex-1">
                 <span class="text-sm font-medium">{{ t("settings.curatedDir") }}</span>
-                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.curatedDirHint") }}
                 </span>
                 <span
@@ -193,21 +192,21 @@ const { t } = useI18n()
 
           <SettingsCuratedShortcutSection />
 
-          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-3">
+          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
             <div
               class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
             >
               <div class="min-w-0 flex-1 space-y-1">
-                <p class="text-sm font-medium text-foreground">
+                <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportFormatTitle") }}
                 </p>
-                <p class="text-xs leading-relaxed text-muted-foreground">
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.curatedExportFormatHint") }}
                 </p>
               </div>
               <div
-                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-shrink-0"
+                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2"
               >
                 <span
                   v-if="curatedExportFormatSaving"
@@ -245,8 +244,8 @@ const { t } = useI18n()
             v-if="curatedSaveMode === 'directory' && directorySupported"
             class="flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/20 p-4"
           >
-            <p class="text-sm font-medium">{{ t("settings.exportFolder") }}</p>
-            <p class="text-sm text-muted-foreground">
+            <p class="text-sm font-semibold text-foreground">{{ t("settings.exportFolder") }}</p>
+            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {{
                 curatedExportDirLabel
                   ? t("settings.exportChosen", { name: curatedExportDirLabel })
@@ -287,7 +286,7 @@ const { t } = useI18n()
               v-if="curatedExportDirLabel"
               class="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 bg-background/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
             >
-              <p class="text-xs leading-relaxed text-muted-foreground">
+              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.curatedReauthorizeHelp") }}
               </p>
               <Button
@@ -317,7 +316,7 @@ const { t } = useI18n()
             <p :class="cn('text-sm font-medium', statusTextClass('info'))">
               {{ t("settings.curatedCorsTitle") }}
             </p>
-            <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+            <p class="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {{ t("settings.curatedCorsNote") }}
             </p>
             <a
