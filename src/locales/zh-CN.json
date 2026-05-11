@@ -605,7 +605,7 @@
     "curatedCorsLearnAria": "在新标签页打开 MDN 说明",
     "playbackCardTitle": "播放偏好",
     "playbackCardDesc": "配置浏览器播放、HLS 推流与原生播放器的默认行为；修改后会自动保存到后端设置。测试环境下还会显示额外的调试开关。",
-    "gamepadControlsTitle": "手柄控制",
+    "gamepadControlsTitle": "手柄控制（实验性功能）",
     "gamepadControlsHint": "使用支持标准 Gamepad API 的手柄（包括 DualSense）控制播放。该偏好只保存在当前浏览器设备上。",
     "hardwareDecode": "硬件解码",
     "hardwareDecodeHint": "用于 HLS 推流链路的硬件加速开关。启用后会优先尝试硬件视频转码，失败时自动回退到软件转码。",

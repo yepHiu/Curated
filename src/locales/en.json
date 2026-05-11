@@ -614,7 +614,7 @@
     "curatedCorsLearnAria": "Open MDN in a new tab",
     "playbackCardTitle": "Playback preferences",
     "playbackCardDesc": "Configure browser playback, HLS stream push, and native-player defaults. In development or test builds, extra debugging switches appear here as well.",
-    "gamepadControlsTitle": "Gamepad controls",
+    "gamepadControlsTitle": "Gamepad controls (experimental)",
     "gamepadControlsHint": "Use a standard Gamepad API controller, including DualSense, to control playback. This browser-local preference is saved on this device.",
     "hardwareDecode": "Hardware decode",
     "hardwareDecodeHint": "Controls HLS playback hardware acceleration. When enabled, Curated tries hardware video transcode first and falls back to software when needed.",
