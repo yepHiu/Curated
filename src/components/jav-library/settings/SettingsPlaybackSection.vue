@@ -367,29 +367,29 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <PlayCircle class="size-[1.15rem]" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <PlayCircle class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.playbackCardTitle") }}
           </CardTitle>
           <CardDescription
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
           >
             {{ t("settings.playbackCardDesc") }}
           </CardDescription>
         </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
+        <CardContent class="flex flex-col gap-3 pt-0">
           <div
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.gamepadControlsTitle") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -408,7 +408,7 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">{{ t("settings.hardwareDecode") }}</p>
+              <p class="text-sm font-semibold text-foreground">{{ t("settings.hardwareDecode") }}</p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.hardwareDecodeHint") }}
               </p>
@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackHardwareEncoder") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackStreamPushEnabled") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -461,7 +461,7 @@ onBeforeUnmount(() => {
           >
             <div class="flex items-center justify-between gap-3">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
+                <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.playbackForceStreamPush") }}
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -477,7 +477,7 @@ onBeforeUnmount(() => {
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackFfmpegCommand") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackNativePlayerEnabled") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -504,18 +504,16 @@ onBeforeUnmount(() => {
             <Switch v-model="playbackNativePlayerEnabledDraft" />
           </div>
 
-          <div
-            class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-          >
-            <div class="min-w-0 flex-1 flex flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+          <div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+            <div class="min-w-0 flex flex-col gap-3">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackNativePlayerPreset") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 {{ t("settings.playbackNativePlayerPresetHint") }}
               </p>
             </div>
-            <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
+            <div class="flex w-full min-w-0 justify-center">
               <Select
                 :model-value="playbackNativePlayerPresetDraft"
                 @update:model-value="onPlaybackNativePlayerPresetChange"
@@ -538,7 +536,7 @@ onBeforeUnmount(() => {
 
           <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackNativePlayerCommand") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -555,7 +553,7 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >
             <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-medium text-foreground">
+              <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackPreferNativePlayer") }}
               </p>
               <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -568,7 +566,7 @@ onBeforeUnmount(() => {
           <div class="grid gap-3 md:grid-cols-2">
             <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
+                <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.playbackSeekBackwardStep") }}
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -585,7 +583,7 @@ onBeforeUnmount(() => {
 
             <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
               <div class="flex min-w-0 flex-1 flex-col gap-3">
-                <p class="text-sm font-medium text-foreground">
+                <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.playbackSeekForwardStep") }}
                 </p>
                 <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
