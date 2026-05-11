@@ -416,8 +416,10 @@ onBeforeUnmount(() => {
             <Switch v-model="playbackHardwareDecodeDraft" />
           </div>
 
-          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-            <div class="flex min-w-0 flex-1 flex-col gap-3">
+          <div
+            class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <div class="min-w-0 flex-1 flex flex-col gap-3">
               <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackHardwareEncoder") }}
               </p>
@@ -425,20 +427,22 @@ onBeforeUnmount(() => {
                 {{ t("settings.playbackHardwareEncoderHint") }}
               </p>
             </div>
-            <Select v-model="playbackHardwareEncoderDraft" :disabled="!playbackHardwareDecodeDraft">
-              <SelectTrigger>
-                <SelectValue :placeholder="t('settings.playbackHardwareEncoderAuto')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in PLAYBACK_HARDWARE_ENCODER_OPTIONS"
-                  :key="option"
-                  :value="option"
-                >
-                  {{ playbackHardwareEncoderLabel(option) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
+              <Select v-model="playbackHardwareEncoderDraft" :disabled="!playbackHardwareDecodeDraft">
+                <SelectTrigger size="sm" class="w-full min-w-0 sm:w-fit">
+                  <SelectValue :placeholder="t('settings.playbackHardwareEncoderAuto')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in PLAYBACK_HARDWARE_ENCODER_OPTIONS"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ playbackHardwareEncoderLabel(option) }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div
