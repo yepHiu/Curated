@@ -76,7 +76,7 @@ const { t } = useI18n()
                   <span v-else>-</span>
                 </dd>
               </div>
-              <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <dl class="grid grid-cols-1 gap-3">
                 <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
                   <dt class="font-semibold text-foreground">
                     {{ t("settings.aboutCopyrightLabel") }}
@@ -153,7 +153,7 @@ const { t } = useI18n()
                 <span v-else>-</span>
               </p>
             </div>
-            <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <dl class="grid grid-cols-1 gap-3">
               <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
                 <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutCopyrightLabel") }}
