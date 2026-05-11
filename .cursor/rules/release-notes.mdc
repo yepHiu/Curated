@@ -1,0 +1,13 @@
+---
+description: Release note writing rules for production GitHub Releases
+globs: docs/release-notes/**/*.md
+alwaysApply: true
+---
+
+# Release Notes Rules
+
+- Production release notes live in `docs/release-notes/`.
+- When preparing a repository GitHub Release, write the release note section as the final publish-ready body. Do not label it as a draft, suggested draft, or temporary copy.
+- Use the heading `## GitHub Release Body` for the text that should be pasted into the GitHub Release description.
+- Keep the body self-contained: summarize user-visible changes, important fixes, artifact names, checksums when useful, and operational notes needed by users of the packaged build.
+- Avoid including process-only wording such as "draft", "suggested", "copy later", or "to be edited before publishing" unless the user explicitly asks for an internal planning note.

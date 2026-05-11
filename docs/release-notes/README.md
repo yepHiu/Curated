@@ -12,4 +12,5 @@ Convention:
   - short summary of changes
   - artifact names
   - checksums when available
-  - a GitHub Release body draft when useful
+  - a `## GitHub Release Body` section containing the final publish-ready body for the repository GitHub Release
+- Do not label the GitHub Release body as a draft or suggested draft. The release note should contain the actual release description to publish.
