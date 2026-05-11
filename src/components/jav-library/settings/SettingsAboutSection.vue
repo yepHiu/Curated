@@ -76,32 +76,34 @@ const { t } = useI18n()
                   <span v-else>-</span>
                 </dd>
               </div>
-              <dl class="grid grid-cols-1 gap-3">
-                <div class="rounded-lg bg-muted/5 p-4">
-                  <dt class="font-semibold text-foreground">
-                    {{ t("settings.aboutCopyrightLabel") }}
-                  </dt>
-                  <dd class="mt-1.5">
-                    {{ t("settings.aboutCopyrightValue") }}
-                  </dd>
-                </div>
-                <div class="rounded-lg bg-muted/5 p-4">
-                  <dt class="font-semibold text-foreground">
-                    {{ t("settings.aboutLicenseLabel") }}
-                  </dt>
-                  <dd class="mt-1.5 font-mono text-foreground/90">
-                    {{ t("settings.aboutLicenseValue") }}
-                  </dd>
-                </div>
-                <div class="rounded-lg bg-muted/5 p-4">
-                  <dt class="font-semibold text-foreground">
-                    {{ t("settings.aboutRepositoryLabel") }}
-                  </dt>
-                  <dd class="mt-1.5 break-all font-mono text-foreground/90">
-                    {{ t("settings.aboutRepositoryValue") }}
-                  </dd>
-                </div>
-              </dl>
+              <div class="rounded-lg bg-muted/5 p-4">
+                <dl class="space-y-4">
+                  <div>
+                    <dt class="font-semibold text-foreground">
+                      {{ t("settings.aboutCopyrightLabel") }}
+                    </dt>
+                    <dd class="mt-1.5">
+                      {{ t("settings.aboutCopyrightValue") }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="font-semibold text-foreground">
+                      {{ t("settings.aboutLicenseLabel") }}
+                    </dt>
+                    <dd class="mt-1.5 font-mono text-foreground/90">
+                      {{ t("settings.aboutLicenseValue") }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="font-semibold text-foreground">
+                      {{ t("settings.aboutRepositoryLabel") }}
+                    </dt>
+                    <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                      {{ t("settings.aboutRepositoryValue") }}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
               <SettingsAppUpdateSection
                 v-if="useWebApi"
                 :backend-version-display="backendVersionDisplay"
@@ -153,32 +155,34 @@ const { t } = useI18n()
                 <span v-else>-</span>
               </p>
             </div>
-            <dl class="grid grid-cols-1 gap-3">
-              <div class="rounded-lg bg-muted/5 p-4">
-                <dt class="font-semibold text-foreground">
-                  {{ t("settings.aboutCopyrightLabel") }}
-                </dt>
-                <dd class="mt-1.5">
-                  {{ t("settings.aboutCopyrightValue") }}
-                </dd>
-              </div>
-              <div class="rounded-lg bg-muted/5 p-4">
-                <dt class="font-semibold text-foreground">
-                  {{ t("settings.aboutLicenseLabel") }}
-                </dt>
-                <dd class="mt-1.5 font-mono text-foreground/90">
-                  {{ t("settings.aboutLicenseValue") }}
-                </dd>
-              </div>
-              <div class="rounded-lg bg-muted/5 p-4">
-                <dt class="font-semibold text-foreground">
-                  {{ t("settings.aboutRepositoryLabel") }}
-                </dt>
-                <dd class="mt-1.5 break-all font-mono text-foreground/90">
-                  {{ t("settings.aboutRepositoryValue") }}
-                </dd>
-              </div>
-            </dl>
+            <div class="rounded-lg bg-muted/5 p-4">
+              <dl class="space-y-4">
+                <div>
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutCopyrightLabel") }}
+                  </dt>
+                  <dd class="mt-1.5">
+                    {{ t("settings.aboutCopyrightValue") }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutLicenseLabel") }}
+                  </dt>
+                  <dd class="mt-1.5 font-mono text-foreground/90">
+                    {{ t("settings.aboutLicenseValue") }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutRepositoryLabel") }}
+                  </dt>
+                  <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                    {{ t("settings.aboutRepositoryValue") }}
+                  </dd>
+                </div>
+              </dl>
+            </div>
             <SettingsAppUpdateSection
               v-if="useWebApi"
               :backend-version-display="backendVersionDisplay"
