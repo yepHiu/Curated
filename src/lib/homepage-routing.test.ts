@@ -27,6 +27,12 @@ vi.mock("@vueuse/core", async () => {
 })
 
 vi.mock("vue-i18n", () => ({
+  createI18n: () => ({
+    global: {
+      locale: ref("en"),
+      t: (key: string) => key,
+    },
+  }),
   useI18n: () => ({
     locale: ref("en"),
     t: (key: string) => key,
