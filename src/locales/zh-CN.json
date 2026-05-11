@@ -632,7 +632,7 @@
     "playbackNativePlayerPresetPotplayer": "PotPlayer",
     "playbackNativePlayerPresetCustom": "自定义",
     "playbackNativePlayerCommand": "浏览器拉起协议模板",
-    "playbackNativePlayerCommandHint": "这是当前浏览器本机使用的协议模板，不会让后端执行文件。可用占位符：{url}、{urlEncoded}、{path}、{pathEncoded}、{startSec}、{startMs}；PotPlayer 默认建议 `potplayer:{url}`。",
+    "playbackNativePlayerCommandHint": "在本机用外部播放器打开影片时，由浏览器按此模板拼装打开方式；实际由系统已注册的播放协议处理，Curated 不会在后台替你启动播放器程序。可按需填入播放地址、本地路径或起播时间等信息，不熟悉时可直接沿用上方预设的示例格式。",
     "playbackNativePlayerCommandPlaceholder": "potplayer:{url}",
     "playbackNativePlayerCommandPlaceholderCustom": "your-player:{url}",
     "playbackPreferNativePlayer": "默认偏向原生播放器",

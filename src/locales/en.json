@@ -641,7 +641,7 @@
     "playbackNativePlayerPresetPotplayer": "PotPlayer",
     "playbackNativePlayerPresetCustom": "Custom",
     "playbackNativePlayerCommand": "Browser launch template",
-    "playbackNativePlayerCommandHint": "This template is used by the local browser only; it does not ask the backend to execute a file. Available placeholders: {url}, {urlEncoded}, {path}, {pathEncoded}, {startSec}, and {startMs}. PotPlayer usually works with `potplayer:{url}`.",
+    "playbackNativePlayerCommandHint": "When you hand off playback to an external player, the browser builds the launch URL from this template using protocols registered on your device—Curated does not start player executables from the backend. Use the preset or placeholder as a guide for URL, file path, and resume time. Advanced users can still customize the pattern.",
     "playbackNativePlayerCommandPlaceholder": "potplayer:{url}",
     "playbackNativePlayerCommandPlaceholderCustom": "your-player:{url}",
     "playbackPreferNativePlayer": "Prefer native player by default",

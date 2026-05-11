@@ -632,7 +632,7 @@
     "playbackNativePlayerPresetPotplayer": "PotPlayer",
     "playbackNativePlayerPresetCustom": "カスタム",
     "playbackNativePlayerCommand": "ブラウザー起動テンプレート",
-    "playbackNativePlayerCommandHint": "このテンプレートは現在のブラウザーだけで使われ、バックエンドに実行ファイルを起動させません。利用できるプレースホルダー: {url}, {urlEncoded}, {path}, {pathEncoded}, {startSec}, {startMs}。PotPlayer では通常 `potplayer:{url}` が使えます。",
+    "playbackNativePlayerCommandHint": "外部プレーヤーで開くとき、ブラウザーがこのテンプレートから起動用の URL を組み立てます。OS に登録されたプロトコルで処理され、Curated バックエンドがプレーヤーを直接起動するわけではありません。上のプリセットやプレースホルダーを目安に、URL・ファイルパス・再生開始位置などを埋め込めます。詳しく書きたい場合はそのまま編集してください。",
     "playbackNativePlayerCommandPlaceholder": "potplayer:{url}",
     "playbackNativePlayerCommandPlaceholderCustom": "your-player:{url}",
     "playbackPreferNativePlayer": "既定でネイティブプレイヤーを優先",
