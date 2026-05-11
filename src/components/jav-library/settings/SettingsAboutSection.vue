@@ -77,7 +77,7 @@ const { t } = useI18n()
                 </dd>
               </div>
               <dl class="grid grid-cols-1 gap-3">
-                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <div class="rounded-lg bg-muted/5 p-4">
                   <dt class="font-semibold text-foreground">
                     {{ t("settings.aboutCopyrightLabel") }}
                   </dt>
@@ -85,7 +85,7 @@ const { t } = useI18n()
                     {{ t("settings.aboutCopyrightValue") }}
                   </dd>
                 </div>
-                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <div class="rounded-lg bg-muted/5 p-4">
                   <dt class="font-semibold text-foreground">
                     {{ t("settings.aboutLicenseLabel") }}
                   </dt>
@@ -93,7 +93,7 @@ const { t } = useI18n()
                     {{ t("settings.aboutLicenseValue") }}
                   </dd>
                 </div>
-                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <div class="rounded-lg bg-muted/5 p-4">
                   <dt class="font-semibold text-foreground">
                     {{ t("settings.aboutRepositoryLabel") }}
                   </dt>
@@ -154,7 +154,7 @@ const { t } = useI18n()
               </p>
             </div>
             <dl class="grid grid-cols-1 gap-3">
-              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="rounded-lg bg-muted/5 p-4">
                 <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutCopyrightLabel") }}
                 </dt>
@@ -162,7 +162,7 @@ const { t } = useI18n()
                   {{ t("settings.aboutCopyrightValue") }}
                 </dd>
               </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="rounded-lg bg-muted/5 p-4">
                 <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutLicenseLabel") }}
                 </dt>
@@ -170,7 +170,7 @@ const { t } = useI18n()
                   {{ t("settings.aboutLicenseValue") }}
                 </dd>
               </div>
-              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="rounded-lg bg-muted/5 p-4">
                 <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutRepositoryLabel") }}
                 </dt>
