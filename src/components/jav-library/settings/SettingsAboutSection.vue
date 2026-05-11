@@ -56,7 +56,7 @@ const { t } = useI18n()
         </CardHeader>
         <CardContent class="space-y-3 pt-0 text-xs leading-relaxed text-muted-foreground sm:text-sm">
           <template v-if="isViteDev">
-            <dl class="space-y-4">
+            <div class="space-y-4">
               <div v-if="!useWebApi" class="rounded-lg border border-border/50 bg-muted/5 p-4">
                 <dt class="font-semibold text-foreground">
                   {{ t("settings.aboutVersionLabel") }}
@@ -76,6 +76,32 @@ const { t } = useI18n()
                   <span v-else>-</span>
                 </dd>
               </div>
+              <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutCopyrightLabel") }}
+                  </dt>
+                  <dd class="mt-1.5">
+                    {{ t("settings.aboutCopyrightValue") }}
+                  </dd>
+                </div>
+                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutLicenseLabel") }}
+                  </dt>
+                  <dd class="mt-1.5 font-mono text-foreground/90">
+                    {{ t("settings.aboutLicenseValue") }}
+                  </dd>
+                </div>
+                <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                  <dt class="font-semibold text-foreground">
+                    {{ t("settings.aboutRepositoryLabel") }}
+                  </dt>
+                  <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                    {{ t("settings.aboutRepositoryValue") }}
+                  </dd>
+                </div>
+              </dl>
               <SettingsAppUpdateSection
                 v-if="useWebApi"
                 :backend-version-display="backendVersionDisplay"
@@ -101,7 +127,7 @@ const { t } = useI18n()
                   {{ t("settings.aboutFrontendBuildDev", { mode: viteMode }) }}
                 </dd>
               </div>
-            </dl>
+            </div>
             <p class="text-xs leading-relaxed text-muted-foreground/90 sm:text-sm">
               {{ t("settings.aboutDevProxyHint") }}
             </p>
@@ -127,6 +153,32 @@ const { t } = useI18n()
                 <span v-else>-</span>
               </p>
             </div>
+            <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
+                  {{ t("settings.aboutCopyrightLabel") }}
+                </dt>
+                <dd class="mt-1.5">
+                  {{ t("settings.aboutCopyrightValue") }}
+                </dd>
+              </div>
+              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
+                  {{ t("settings.aboutLicenseLabel") }}
+                </dt>
+                <dd class="mt-1.5 font-mono text-foreground/90">
+                  {{ t("settings.aboutLicenseValue") }}
+                </dd>
+              </div>
+              <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+                <dt class="font-semibold text-foreground">
+                  {{ t("settings.aboutRepositoryLabel") }}
+                </dt>
+                <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                  {{ t("settings.aboutRepositoryValue") }}
+                </dd>
+              </div>
+            </dl>
             <SettingsAppUpdateSection
               v-if="useWebApi"
               :backend-version-display="backendVersionDisplay"
