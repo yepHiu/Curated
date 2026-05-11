@@ -63,4 +63,17 @@ describe("SettingsAboutSection", () => {
 
     expect(wrapper.emitted("refreshHealth")).toHaveLength(1)
   })
+
+  it("renders authorship and open-source license information", () => {
+    const wrapper = mount(SettingsAboutSection, {
+      props: baseProps,
+    })
+
+    expect(wrapper.text()).toContain("settings.aboutCopyrightLabel")
+    expect(wrapper.text()).toContain("settings.aboutCopyrightValue")
+    expect(wrapper.text()).toContain("settings.aboutLicenseLabel")
+    expect(wrapper.text()).toContain("settings.aboutLicenseValue")
+    expect(wrapper.text()).toContain("settings.aboutRepositoryLabel")
+    expect(wrapper.text()).toContain("settings.aboutRepositoryValue")
+  })
 })

@@ -2,6 +2,7 @@
   "name": "jav-shadcn",
   "description": "Curated — local-first media library (Vue + Go)",
   "private": true,
+  "license": "MIT",
   "version": "0.0.1-master",
   "type": "module",
   "scripts": {
