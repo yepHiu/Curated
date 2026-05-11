@@ -97,7 +97,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 		if err != nil {
 			return contracts.AppUpdateStatusDTO{}, err
 		}
-		if ok && snapshot.InstalledVersion == installedVersion && s.isSnapshotFresh(snapshot.CheckedAt) {
+		if ok && snapshot.InstalledVersion == installedVersion && s.isSnapshotFresh(snapshot.CheckedAt) && !hasLegacyReleaseNotesSnippet(snapshot) {
 			return snapshotToDTO(snapshot), nil
 		}
 	}
@@ -161,7 +161,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 		ReleaseName:          firstNonEmpty(strings.TrimSpace(release.Name), strings.TrimSpace(release.TagName)),
 		ReleaseURL:           firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
 		InstallerDownloadURL: resolveInstallerDownloadURL(release),
-		ReleaseNotesSnippet:  summarizeReleaseNotes(release.Body),
+		ReleaseNotesSnippet:  normalizeReleaseNotesForCache(release.Body),
 		Source:               updateSourceGitHubReleases,
 	}
 	if err := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); err != nil {
@@ -191,6 +191,37 @@ func (s *Service) isSnapshotFresh(checkedAt string) bool {
 		return false
 	}
 	return s.now().UTC().Sub(parsed.UTC()) < s.cacheTTL
+}
+
+func hasLegacyReleaseNotesSnippet(snapshot storage.AppUpdateStatusSnapshot) bool {
+	notes := strings.TrimSpace(snapshot.ReleaseNotesSnippet)
+	if notes == "" || strings.Contains(notes, "\n") {
+		return false
+	}
+	if strings.HasSuffix(notes, "...") && len([]rune(notes)) <= 280 {
+		return true
+	}
+	if !strings.HasPrefix(notes, "#") {
+		return false
+	}
+
+	title := normalizeReleaseNotesTitle(notes)
+	if title == "" {
+		return false
+	}
+	if normalizeReleaseNotesTitle(snapshot.ReleaseName) == title {
+		return true
+	}
+	latest := normalizeReleaseNotesTitle(snapshot.LatestVersion)
+	return latest != "" && strings.Contains(title, latest)
+}
+
+func normalizeReleaseNotesTitle(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimLeft(value, "#")
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "v")
+	return strings.ToLower(value)
 }
 
 func (s *Service) fetchLatestRelease(ctx context.Context) (latestReleaseResponse, error) {
@@ -293,25 +324,18 @@ func normalizedSemver(raw string) (display string, parsed semanticVersion, err e
 	}, nil
 }
 
-func summarizeReleaseNotes(body string) string {
+func normalizeReleaseNotesForCache(body string) string {
 	body = strings.TrimSpace(body)
 	if body == "" {
 		return ""
 	}
-	parts := strings.Split(body, "\n\n")
-	for _, part := range parts {
-		candidate := strings.TrimSpace(part)
-		if candidate == "" {
-			continue
-		}
-		candidate = strings.ReplaceAll(candidate, "\n", " ")
-		candidate = strings.Join(strings.Fields(candidate), " ")
-		if len(candidate) <= 220 {
-			return candidate
-		}
-		return strings.TrimSpace(candidate[:217]) + "..."
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	const maxRunes = 100_000
+	runes := []rune(body)
+	if len(runes) <= maxRunes {
+		return body
 	}
-	return ""
+	return strings.TrimSpace(string(runes[:maxRunes])) + "\n\n…"
 }
 
 func firstNonEmpty(values ...string) string {

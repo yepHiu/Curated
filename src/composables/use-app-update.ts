@@ -88,6 +88,7 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
       return summary.value
     }
 
+    const previous = summary.value
     const message =
       err instanceof HttpClientError && err.apiError?.message
         ? err.apiError.message
@@ -102,11 +103,15 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
       supported: true,
       status: "error",
       errorMessage: message,
-      releaseUrl: summary.value?.releaseUrl,
-      installerDownloadUrl: summary.value?.installerDownloadUrl,
-      installedVersion: summary.value?.installedVersion,
-      latestVersion: summary.value?.latestVersion,
-      checkedAt: summary.value?.checkedAt,
+      releaseUrl: previous?.releaseUrl,
+      installerDownloadUrl: previous?.installerDownloadUrl,
+      installedVersion: previous?.installedVersion,
+      latestVersion: previous?.latestVersion,
+      checkedAt: previous?.checkedAt,
+      publishedAt: previous?.publishedAt,
+      releaseName: previous?.releaseName,
+      releaseNotesSnippet: previous?.releaseNotesSnippet,
+      source: previous?.source,
     }
     return summary.value
   } finally {
@@ -125,6 +130,10 @@ function ensureLoaded() {
 
 function checkNow() {
   return runRequest("check")
+}
+
+function checkNowSilent() {
+  return runRequest("check", { silent: true })
 }
 
 function scheduleAutoCheck() {
@@ -153,5 +162,6 @@ export function useAppUpdate() {
     hasUpdateBadge: computed(() => status.value === "update-available" && summary.value?.hasUpdate === true),
     ensureLoaded,
     checkNow,
+    checkNowSilent,
   }
 }

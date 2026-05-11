@@ -106,7 +106,7 @@ Important notes:
 - successful release checks also expose `installerDownloadUrl` when the latest release includes a Windows `.exe` installer asset
 - development runtimes use `0.0.0` as the local installed version so the full update-check path remains testable before packaging
 - successful checks are cached in SQLite so routine reads do not hit GitHub on every app start
-- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `releaseNotesSnippet`, and optional `errorMessage`
+- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `releaseNotesSnippet` (full GitHub release body text, newline-preserved, capped around 100k runes for cache size), and optional `errorMessage`
 
 ### `POST /api/app-update/check`
 

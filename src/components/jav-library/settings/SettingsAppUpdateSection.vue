@@ -21,7 +21,8 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
-const { summary, status, loading, hasUpdateBadge, ensureLoaded, checkNow } = useAppUpdate()
+const { summary, status, loading, hasUpdateBadge, ensureLoaded, checkNow, checkNowSilent } =
+  useAppUpdate()
 const releaseNotesExpanded = ref(false)
 
 onMounted(() => {
@@ -113,6 +114,22 @@ const installerDownloadFilename = computed(() => {
 const releaseTitle = computed(() => summary.value?.releaseName?.trim() || summary.value?.latestVersion || "")
 const releaseNotesSnippet = computed(() => summary.value?.releaseNotesSnippet?.trim() ?? "")
 
+const lastSilentNotesRefreshAt = ref(0)
+
+async function toggleReleaseNotes() {
+  const next = !releaseNotesExpanded.value
+  releaseNotesExpanded.value = next
+  if (!next || !releaseNotesSnippet.value) {
+    return
+  }
+  const now = Date.now()
+  if (now - lastSilentNotesRefreshAt.value < 60_000) {
+    return
+  }
+  lastSilentNotesRefreshAt.value = now
+  await checkNowSilent()
+}
+
 async function handleCheckNow() {
   const next = await checkNow()
   if (next?.status === "update-available") {
@@ -159,7 +176,7 @@ async function handleCheckNow() {
             <Badge
               v-if="hasUpdateBadge"
               variant="secondary"
-              class="rounded-full border border-amber-600/35 bg-amber-500/20 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100"
+              class="max-h-5 shrink-0 !h-5 !min-h-0 !py-0 rounded-full border border-amber-600/35 bg-amber-500/20 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-normal text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100"
             >
               New
             </Badge>
@@ -167,7 +184,7 @@ async function handleCheckNow() {
           <p :class="cn('text-sm font-medium', statusTextClass(panelTone))">
             {{ title }}
           </p>
-          <p class="text-sm leading-6 text-muted-foreground">
+          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {{ description }}
           </p>
         </div>
@@ -217,7 +234,7 @@ async function handleCheckNow() {
           v-if="backendVersionDisplay"
           class="rounded-lg border border-border/50 bg-background/55 px-3 py-2.5"
         >
-          <dt class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <dt class="text-xs font-medium text-muted-foreground">
             {{ t("settings.aboutVersionLabel") }}
           </dt>
           <dd
@@ -235,7 +252,7 @@ async function handleCheckNow() {
           v-if="installerVersionSummary"
           class="rounded-lg border border-border/50 bg-background/55 px-3 py-2.5"
         >
-          <dt class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          <dt class="text-xs font-medium text-muted-foreground">
             {{ t("settings.aboutInstallerVersionLabel") }}
           </dt>
           <dd class="mt-1 font-mono text-sm text-foreground">
@@ -248,24 +265,32 @@ async function handleCheckNow() {
         v-if="releaseTitle || releaseNotesSnippet"
         class="rounded-lg border border-dashed border-border/60 bg-background/25 px-3 py-3"
       >
-        <p v-if="releaseTitle" class="text-sm font-medium text-foreground">
+        <p v-if="releaseTitle" class="text-sm font-semibold text-foreground">
           {{ releaseTitle }}
         </p>
-        <p
-          v-if="releaseNotesSnippet"
+        <div
+          v-if="releaseNotesSnippet && !releaseNotesExpanded"
+          key="notes-collapsed"
           data-app-update-release-notes
-          class="mt-1 text-sm leading-6 text-muted-foreground"
-          :class="{ 'line-clamp-1': !releaseNotesExpanded }"
+          class="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground sm:text-sm"
         >
           {{ releaseNotesSnippet }}
-        </p>
+        </div>
+        <div
+          v-else-if="releaseNotesSnippet"
+          key="notes-expanded"
+          data-app-update-release-notes
+          class="mt-1 block max-h-[min(85vh,44rem)] min-h-0 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-md border border-border/40 bg-background/50 px-3 py-2 text-xs leading-relaxed text-muted-foreground [overflow-anchor:none] sm:text-sm"
+        >
+          {{ releaseNotesSnippet }}
+        </div>
         <Button
           v-if="releaseNotesSnippet"
           type="button"
           variant="ghost"
           class="mt-2 h-auto rounded-xl px-2 py-1 text-xs text-muted-foreground"
           data-app-update-release-notes-toggle
-          @click="releaseNotesExpanded = !releaseNotesExpanded"
+          @click="toggleReleaseNotes"
         >
           {{
             releaseNotesExpanded

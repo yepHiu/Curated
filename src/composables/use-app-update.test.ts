@@ -85,6 +85,55 @@ describe("useAppUpdate", () => {
     expect(state.summary.value?.latestVersion).toBe("1.1.0")
   })
 
+  it("runs a silent manual check without toggling loading", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.checkAppUpdateNow.mockResolvedValueOnce({
+      supported: true,
+      status: "up-to-date",
+      hasUpdate: false,
+      installedVersion: "1.0.0",
+      latestVersion: "1.0.0",
+    })
+
+    const state = await loadUseAppUpdate()
+    expect(state.loading.value).toBe(false)
+
+    const resultPromise = state.checkNowSilent()
+    expect(state.loading.value).toBe(false)
+
+    const result = await resultPromise
+    expect(apiMocks.checkAppUpdateNow).toHaveBeenCalledTimes(1)
+    expect(result?.status).toBe("up-to-date")
+    expect(state.loading.value).toBe(false)
+  })
+
+  it("keeps cached release notes when a silent manual check fails", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      installedVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      releaseName: "v1.1.0",
+      releaseUrl: "https://example.com/releases/v1.1.0",
+      releaseNotesSnippet: "Bug fixes",
+    })
+    apiMocks.checkAppUpdateNow.mockRejectedValueOnce(new Error("offline"))
+
+    const state = await loadUseAppUpdate()
+    state.ensureLoaded()
+    await flushPromises()
+
+    expect(state.summary.value?.releaseNotesSnippet).toBe("Bug fixes")
+
+    const result = await state.checkNowSilent()
+
+    expect(result?.status).toBe("error")
+    expect(state.summary.value?.releaseName).toBe("v1.1.0")
+    expect(state.summary.value?.releaseNotesSnippet).toBe("Bug fixes")
+  })
+
   it("runs a manual update check and stores errors", async () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.checkAppUpdateNow.mockRejectedValueOnce(new Error("release lookup failed"))

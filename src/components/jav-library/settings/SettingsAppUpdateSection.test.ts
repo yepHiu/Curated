@@ -5,8 +5,41 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsAppUpdateSection from "./SettingsAppUpdateSection.vue"
 
 const checkNowMock = vi.hoisted(() => vi.fn())
+const checkNowSilentMock = vi.hoisted(() => vi.fn())
 const ensureLoadedMock = vi.hoisted(() => vi.fn())
 const pushAppToastMock = vi.hoisted(() => vi.fn())
+const appUpdateSummaryRef = vi.hoisted(() => ({ current: null as { value: AppUpdateSummary } | null }))
+
+type AppUpdateSummary = {
+  supported: boolean
+  status: "unsupported" | "up-to-date" | "update-available" | "error"
+  installedVersion?: string
+  latestVersion?: string
+  hasUpdate?: boolean
+  publishedAt?: string
+  checkedAt?: string
+  releaseName?: string
+  releaseUrl?: string
+  installerDownloadUrl?: string
+  releaseNotesSnippet?: string
+}
+
+function createAppUpdateSummary(overrides: Partial<AppUpdateSummary> = {}): AppUpdateSummary {
+  return {
+    supported: true,
+    status: "update-available",
+    installedVersion: "0.0.0",
+    latestVersion: "1.2.8",
+    hasUpdate: true,
+    publishedAt: "2026-04-19T12:00:00Z",
+    checkedAt: "2026-04-19T13:00:00Z",
+    releaseName: "v1.2.8",
+    releaseUrl: "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
+    installerDownloadUrl: "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
+    releaseNotesSnippet: "Bug fixes",
+    ...overrides,
+  }
+}
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -19,10 +52,10 @@ vi.mock("vue-i18n", () => ({
         "settings.appUpdateCheckAction": "检查更新",
         "settings.appUpdateDownloadAction": "打开 Release 页面",
         "settings.appUpdateDownloadInstallerAction": "下载最新安装包",
-        "settings.aboutVersionLabel": "版本号",
+        "settings.aboutVersionLabel": "Curated Server 版本号",
         "settings.aboutInstallerVersionLabel": "安装包版本号",
-        "settings.appUpdateReleaseNotesExpand": "展开摘要",
-        "settings.appUpdateReleaseNotesCollapse": "收起摘要",
+        "settings.appUpdateReleaseNotesExpand": "展开全文",
+        "settings.appUpdateReleaseNotesCollapse": "收起全文",
       }
 
       if (params) {
@@ -34,26 +67,19 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("@/composables/use-app-update", () => ({
-  useAppUpdate: () => ({
-    summary: computed(() => ({
-      supported: true,
-      status: "update-available",
-      installedVersion: "0.0.0",
-      latestVersion: "1.2.8",
-      hasUpdate: true,
-      publishedAt: "2026-04-19T12:00:00Z",
-      checkedAt: "2026-04-19T13:00:00Z",
-      releaseName: "v1.2.8",
-      releaseUrl: "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
-      installerDownloadUrl: "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
-      releaseNotesSnippet: "Bug fixes",
-    })),
+  useAppUpdate: () => {
+    const summary = ref(createAppUpdateSummary())
+    appUpdateSummaryRef.current = summary
+    return {
+      summary: computed(() => summary.value),
     status: computed(() => "update-available"),
     loading: ref(false),
     hasUpdateBadge: computed(() => true),
     ensureLoaded: ensureLoadedMock,
     checkNow: checkNowMock,
-  }),
+    checkNowSilent: checkNowSilentMock,
+    }
+  },
 }))
 
 vi.mock("@/composables/use-app-toast", () => ({
@@ -71,8 +97,12 @@ vi.mock("@/components/ui/badge", () => ({
 describe("SettingsAppUpdateSection", () => {
   beforeEach(() => {
     checkNowMock.mockReset()
+    checkNowSilentMock.mockReset()
     ensureLoadedMock.mockReset()
     pushAppToastMock.mockReset()
+    if (appUpdateSummaryRef.current) {
+      appUpdateSummaryRef.current.value = createAppUpdateSummary()
+    }
   })
 
   it("renders backend build version plus a merged installer version summary", async () => {
@@ -83,7 +113,7 @@ describe("SettingsAppUpdateSection", () => {
     })
     const text = wrapper.text()
 
-    expect(text).toContain("版本号")
+    expect(text).toContain("Curated Server 版本号")
     expect(text).toContain("20260419.102030-dev")
     expect(text).toContain("安装包版本号")
     expect(text).toContain("0.0.0")
@@ -103,11 +133,43 @@ describe("SettingsAppUpdateSection", () => {
     expect(download.attributes("download")).toBe("Curated-Setup-1.2.8.exe")
 
     const notes = wrapper.get("[data-app-update-release-notes]")
-    expect(notes.classes()).toContain("line-clamp-1")
+    expect(notes.classes()).toContain("line-clamp-3")
 
     await wrapper.get("[data-app-update-release-notes-toggle]").trigger("click")
+    await flushPromises()
 
-    expect(notes.classes()).not.toContain("line-clamp-1")
+    const notesExpanded = wrapper.get("[data-app-update-release-notes]")
+    expect(notesExpanded.classes()).not.toContain("line-clamp-3")
+    expect(notesExpanded.classes()).toContain("overflow-y-auto")
+  })
+
+  it("refreshes release notes on first expand so legacy short cached notes can show the full body", async () => {
+    const legacySnippet = "Bug fixes"
+    const fullNotes = "Bug fixes\n\n- Fixed updater download naming\n- Added full release notes"
+    if (appUpdateSummaryRef.current) {
+      appUpdateSummaryRef.current.value = createAppUpdateSummary({
+        releaseNotesSnippet: legacySnippet,
+      })
+    }
+    checkNowSilentMock.mockImplementationOnce(async () => {
+      if (appUpdateSummaryRef.current) {
+        appUpdateSummaryRef.current.value = createAppUpdateSummary({
+          releaseNotesSnippet: fullNotes,
+        })
+      }
+      return appUpdateSummaryRef.current?.value
+    })
+
+    const wrapper = mount(SettingsAppUpdateSection)
+
+    expect(wrapper.get("[data-app-update-release-notes]").text()).toBe(legacySnippet)
+
+    await wrapper.get("[data-app-update-release-notes-toggle]").trigger("click")
+    await flushPromises()
+
+    const notesExpanded = wrapper.get("[data-app-update-release-notes]")
+    expect(checkNowSilentMock).toHaveBeenCalledTimes(1)
+    expect(notesExpanded.text()).toContain("Added full release notes")
   })
 
   it("adds a route source when manual update checks find an update", async () => {
