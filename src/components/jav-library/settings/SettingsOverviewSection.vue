@@ -4,7 +4,6 @@ import { LayoutDashboard } from "lucide-vue-next"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -48,19 +47,17 @@ const { t } = useI18n()
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Card
+            <div
               v-for="stat in dashboardStats"
               :key="stat.labelKey"
-              class="gap-2 py-3 shadow-none rounded-lg border border-border/50 bg-muted/5"
+              class="rounded-lg border border-border/50 bg-muted/5 px-3.5 py-3"
             >
-              <CardHeader class="gap-1 px-4 pt-3 pb-0">
-                <CardDescription class="text-xs">{{ t(stat.labelKey) }}</CardDescription>
-                <CardTitle class="text-xl tabular-nums leading-snug">{{ stat.value }}</CardTitle>
-              </CardHeader>
-              <CardContent v-if="stat.detailKey" class="px-4 pb-3 pt-0">
-                <p class="text-sm text-muted-foreground">{{ t(stat.detailKey) }}</p>
-              </CardContent>
-            </Card>
+              <p class="text-xs font-medium text-muted-foreground">{{ t(stat.labelKey) }}</p>
+              <p class="mt-1 text-xl font-semibold tabular-nums">{{ stat.value }}</p>
+              <p v-if="stat.detailKey" class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                {{ t(stat.detailKey) }}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
