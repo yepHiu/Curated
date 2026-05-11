@@ -508,8 +508,10 @@ onBeforeUnmount(() => {
             <Switch v-model="playbackNativePlayerEnabledDraft" />
           </div>
 
-          <div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-            <div class="min-w-0 flex flex-col gap-3">
+          <div
+            class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <div class="min-w-0 flex-1 flex flex-col gap-3">
               <p class="text-sm font-semibold text-foreground">
                 {{ t("settings.playbackNativePlayerPreset") }}
               </p>
@@ -517,12 +519,12 @@ onBeforeUnmount(() => {
                 {{ t("settings.playbackNativePlayerPresetHint") }}
               </p>
             </div>
-            <div class="flex w-full min-w-0 justify-center">
+            <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
               <Select
                 :model-value="playbackNativePlayerPresetDraft"
                 @update:model-value="onPlaybackNativePlayerPresetChange"
               >
-                <SelectTrigger class="w-full min-w-0 sm:w-fit">
+                <SelectTrigger size="sm" class="w-full min-w-0 sm:w-fit">
                   <SelectValue :placeholder="t('settings.playbackNativePlayerPresetMpv')" />
                 </SelectTrigger>
                 <SelectContent>
