@@ -78,27 +78,33 @@ const { t } = useI18n()
               </div>
               <div class="rounded-lg bg-muted/5 p-4">
                 <dl class="space-y-4">
-                  <div>
-                    <dt class="font-semibold text-foreground">
+                  <div
+                    class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                  >
+                    <dt class="shrink-0 font-semibold text-foreground">
                       {{ t("settings.aboutCopyrightLabel") }}
                     </dt>
-                    <dd class="mt-1.5">
+                    <dd class="min-w-0 break-words text-end text-foreground/90">
                       {{ t("settings.aboutCopyrightValue") }}
                     </dd>
                   </div>
-                  <div>
-                    <dt class="font-semibold text-foreground">
+                  <div
+                    class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                  >
+                    <dt class="shrink-0 font-semibold text-foreground">
                       {{ t("settings.aboutLicenseLabel") }}
                     </dt>
-                    <dd class="mt-1.5 font-mono text-foreground/90">
+                    <dd class="min-w-0 text-end font-mono text-foreground/90">
                       {{ t("settings.aboutLicenseValue") }}
                     </dd>
                   </div>
-                  <div>
-                    <dt class="font-semibold text-foreground">
+                  <div
+                    class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                  >
+                    <dt class="shrink-0 font-semibold text-foreground">
                       {{ t("settings.aboutRepositoryLabel") }}
                     </dt>
-                    <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                    <dd class="min-w-0 break-all text-end font-mono text-foreground/90">
                       {{ t("settings.aboutRepositoryValue") }}
                     </dd>
                   </div>
@@ -157,27 +163,33 @@ const { t } = useI18n()
             </div>
             <div class="rounded-lg bg-muted/5 p-4">
               <dl class="space-y-4">
-                <div>
-                  <dt class="font-semibold text-foreground">
+                <div
+                  class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                >
+                  <dt class="shrink-0 font-semibold text-foreground">
                     {{ t("settings.aboutCopyrightLabel") }}
                   </dt>
-                  <dd class="mt-1.5">
+                  <dd class="min-w-0 break-words text-end text-foreground/90">
                     {{ t("settings.aboutCopyrightValue") }}
                   </dd>
                 </div>
-                <div>
-                  <dt class="font-semibold text-foreground">
+                <div
+                  class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                >
+                  <dt class="shrink-0 font-semibold text-foreground">
                     {{ t("settings.aboutLicenseLabel") }}
                   </dt>
-                  <dd class="mt-1.5 font-mono text-foreground/90">
+                  <dd class="min-w-0 text-end font-mono text-foreground/90">
                     {{ t("settings.aboutLicenseValue") }}
                   </dd>
                 </div>
-                <div>
-                  <dt class="font-semibold text-foreground">
+                <div
+                  class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                >
+                  <dt class="shrink-0 font-semibold text-foreground">
                     {{ t("settings.aboutRepositoryLabel") }}
                   </dt>
-                  <dd class="mt-1.5 break-all font-mono text-foreground/90">
+                  <dd class="min-w-0 break-all text-end font-mono text-foreground/90">
                     {{ t("settings.aboutRepositoryValue") }}
                   </dd>
                 </div>
