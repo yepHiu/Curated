@@ -4,7 +4,7 @@
 
 **Goal:** Build a Windows-first storage presence check for configured Curated library paths, with backend API, settings-page status, and startup notification-center alerts.
 
-**Architecture:** Add a backend `storagehealth` domain module that resolves each configured library path to a platform probe result, compares it with a persisted volume binding, and returns a normalized status. Expose the result through `/api/library/paths/storage-status` endpoints, then surface it through the frontend service layer, Settings -> Library & storage, and the existing app toast / notification center.
+**Architecture:** Add a backend `storagehealth` domain module that resolves each configured library path to a platform probe result, compares it with a persisted volume binding, and returns a normalized status. Expose the result through `/api/library/paths/storage-status` endpoints, then surface it through the frontend service layer, Settings -> Video storage, and the existing app toast / notification center.
 
 **Tech Stack:** Go 1.25 backend, SQLite migrations, Windows API via `golang.org/x/sys/windows`, Vue 3 + TypeScript + Vite, Vitest, Go test.
 

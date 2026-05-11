@@ -195,7 +195,7 @@ This document catalogs all features implemented in the current **web-first** pha
 |---|---|---|
 | Overview dashboard | Shipped | Stats cards (movies, tags, frames); watch-time summary |
 | General settings | Shipped | Library organization, auto-watch, language |
-| Library & storage | Shipped | Library paths, default import path, auto-scan |
+| Video storage | Shipped | Library paths, default import path, auto-scan |
 | Metadata settings | Shipped | Provider selection, strategy, provider chain, auto-scrape |
 | Network settings | Shipped | Proxy configuration with ping tests |
 | Curated frames settings | Shipped | Export format preference |

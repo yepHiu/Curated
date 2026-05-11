@@ -39,7 +39,7 @@ alwaysApply: true
 - **领域类型**：`src/domain/**`；与后端对齐的 DTO/请求类型：**`src/api/types.ts`**；HTTP 封装：**`src/api/http-client.ts`**、**`src/api/endpoints.ts`**。
 - **服务层 / 状态边界**：契约 **`src/services/contracts/library-service.ts`**；实现 **`src/services/adapters/web/web-library-service.ts`**（真实 API）与 **`mock/mock-library-service.ts`**（本地演示）。当前前端状态管理以 **Composables + 服务层** 为默认；后续若 Pinia 等状态库能降低真实复杂度，可从小型服务或新增功能渐进试点，避免一开始做全局大迁移；views/components 不直接导入具体 Web/Mock adapter。
 - 切换方式：环境变量 **`VITE_USE_WEB_API`**（如根目录 `.env` 中 `true`）→ Web 适配器；否则 Mock。
-- **存储状态前端接入**：服务层暴露 `libraryPathStorageStatuses`、`checkLibraryPathStorageStatus()`、`rebindLibraryPathStorage()`；`AppShell.vue` 在 Web API 模式启动时挂载 `use-library-storage-status-alerts.ts`，异常库路径进入新的 toast 与通知中心。设置页 Library & storage 展示状态、手动检测与重绑，并在 `canRescan=false` 时阻断扫描；影片导入在默认目标 `canImport=false` 时阻断提交。
+- **存储状态前端接入**：服务层暴露 `libraryPathStorageStatuses`、`checkLibraryPathStorageStatus()`、`rebindLibraryPathStorage()`；`AppShell.vue` 在 Web API 模式启动时挂载 `use-library-storage-status-alerts.ts`，异常库路径进入新的 toast 与通知中心。设置页「影片存储」展示状态、手动检测与重绑，并在 `canRescan=false` 时阻断扫描；影片导入在默认目标 `canImport=false` 时阻断提交。
 - 资料库路由带 **`actor=`**（精确演员名）且 **`VITE_USE_WEB_API=true`** 时，**`LibraryPage`** 顶部展示 **`ActorProfileCard`**（`GET /api/library/actors/profile`，必要时 **`POST /api/library/actors/scrape`** 并轮询任务后刷新）；Mock 模式不展示该卡。
 - 长任务（扫描、单部刮削、**演员资料刮削**）：**`src/composables/use-scan-task-tracker.ts`** 轮询 **`GET /api/tasks/{taskId}`**（演员卡内为本地轮询）；详情页在刮削完成后会通过 **`libraryService.loadMovieDetail`** 刷新。
 - **观看进度 / 历史**：`src/lib/playback-progress-storage.ts`；**`VITE_USE_WEB_API=true`** 时启动 **`hydratePlaybackProgress()`**（`main.ts`）并从 **`GET/PUT/DELETE /api/playback/progress`** 读写服务端 SQLite；Mock 时用 **`localStorage`**（`jav-library-playback-progress-v1`）。`player-route`、`navigation-intent`、`playback-history-groups`；**`HistoryView`** + **`PlaybackHistoryCard`**。
@@ -83,7 +83,7 @@ alwaysApply: true
 - Backend storage presence checks live in `backend/internal/storagehealth` and persist expected backing-volume identities through `library_path_storage_bindings` in SQLite.
 - Windows is the primary platform for volume identity in this phase; macOS/Linux use the fallback path probe and are future adaptation targets.
 - New endpoints are `GET /api/library/paths/storage-status`, `POST /api/library/paths/storage-status/check`, and `POST /api/library/paths/{id}/storage-binding/rebind`.
-- Frontend Web API startup checks abnormal paths, pushes storage warnings into the new toast/notification center, blocks scan/import actions when storage is unavailable, and allows deliberate rebind from Settings -> Library & storage.
+- Frontend Web API startup checks abnormal paths, pushes storage warnings into the new toast/notification center, blocks scan/import actions when storage is unavailable, and allows deliberate rebind from Settings -> Video storage.
 
 ## 2026-04 Network Stability Update
 
@@ -112,7 +112,7 @@ alwaysApply: true
 ## 2026-05 Movie Import
 
 - Frontend now exposes a top-bar `MovieImportDialog` next to the theme switch. It supports drag/drop, multi-file selection, and browser folder selection via `webkitdirectory`; selected videos are uploaded through the service layer and unsupported/duplicate files are skipped before submit.
-- Settings -> Library & storage now has a `defaultImportLibraryPathId` selector. The value is returned by `GET /api/settings`, updated through `PATCH /api/settings`, persisted in `config/library-config.cfg`, and used as the target for movie imports.
+- Settings -> Video storage now has a `defaultImportLibraryPathId` selector. The value is returned by `GET /api/settings`, updated through `PATCH /api/settings`, persisted in `config/library-config.cfg`, and used as the target for movie imports.
 - Backend endpoint `POST /api/import/movies` accepts multipart form data with repeated `relativePath` + `files` fields and optional `totalBytes`. It copies accepted video files into the configured default library root, does not delete source files, does not overwrite conflicts, and returns a task of type `import.movies`.
 - Large browser uploads can use resumable session endpoints under `/api/import/movies/uploads`: `POST` creates a session and `.curated-import/<uploadId>` staging files under the target library root, `PUT /{uploadId}/files/{fileId}/chunks/{chunkIndex}` writes raw binary chunks by offset, `GET /{uploadId}` reports status, `POST /{uploadId}/commit` flushes and commits without overwriting existing library files before starting a scan, and `DELETE /{uploadId}` aborts and removes staging. Current session state is in-memory while bytes are staged on disk.
 - Import task metadata includes `targetLibraryPathId`, `targetPath`, `stage`, `totalFiles`, `completedFiles`, `failedFiles`, `copiedBytes`, `totalBytes`, `currentFileName`, `errorItems`, and optional `scanTaskId` / `scanError`. `ScanProgressDock` renders import-specific progress and `use-scan-task-tracker` shows success, partial-failure, and failure toasts before reloading movies.

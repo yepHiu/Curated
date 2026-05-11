@@ -39,7 +39,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Tray-mode startup, local frontend hosting, Inno Setup installer, portable zip, FFmpeg bundling, Windows login autostart, and GitHub Releases-based update checks with direct installer download.
-- **Settings & configuration** — Full settings UI (Overview, General, Library & storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
+- **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
 
 ## Quick Start
 
@@ -155,7 +155,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 
 ### Settings & Configuration
 
-- Full settings UI: Overview, General, Library & storage, Metadata, Network, Curated frames, About, Maintenance.
+- Full settings UI: Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.
