@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Info, Loader2, Sparkles } from "lucide-vue-next"
 import type { HealthDTO } from "@/api/types"
@@ -28,6 +29,17 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+function repositoryHrefFromDisplay(raw: string): string {
+  const s = raw.trim()
+  if (!s) return "#"
+  if (/^https?:\/\//i.test(s)) return s
+  return `https://${s}`
+}
+
+const aboutRepositoryHref = computed(() =>
+  repositoryHrefFromDisplay(t("settings.aboutRepositoryValue")),
+)
 </script>
 
 <template>
@@ -104,8 +116,15 @@ const { t } = useI18n()
                     <dt class="shrink-0 font-semibold text-foreground">
                       {{ t("settings.aboutRepositoryLabel") }}
                     </dt>
-                    <dd class="min-w-0 break-all text-end font-mono text-foreground/90">
-                      {{ t("settings.aboutRepositoryValue") }}
+                    <dd class="min-w-0 break-all text-end font-mono">
+                      <a
+                        :href="aboutRepositoryHref"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {{ t("settings.aboutRepositoryValue") }}
+                      </a>
                     </dd>
                   </div>
                 </dl>
@@ -189,8 +208,15 @@ const { t } = useI18n()
                   <dt class="shrink-0 font-semibold text-foreground">
                     {{ t("settings.aboutRepositoryLabel") }}
                   </dt>
-                  <dd class="min-w-0 break-all text-end font-mono text-foreground/90">
-                    {{ t("settings.aboutRepositoryValue") }}
+                  <dd class="min-w-0 break-all text-end font-mono">
+                    <a
+                      :href="aboutRepositoryHref"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {{ t("settings.aboutRepositoryValue") }}
+                    </a>
                   </dd>
                 </div>
               </dl>
