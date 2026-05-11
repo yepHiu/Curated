@@ -192,3 +192,76 @@ b5c077f1 chore(release): prepare 1.4.1 package",versionSource=auto-patch; BuildS
 817d986c docs: add connected clients design
 24b4e9e0 docs: add feature inventory
 78df7735 chore(release): prepare 1.4.2 package",versionSource=auto-patch; BuildStamp=20260504.085202; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-12,1.4.4,4ef6e215,master,release:publish,release/portable/Curated-1.4.4-windows-x64.zip; release/installer/Curated-Setup-1.4.4.exe; release/manifest/release.json,成功,wujiahui,"4ef6e215 chore(license): declare MIT project license
+559bc507 style(settings): align card titles and hints
+4fce3e1a feat(detail): autosave movie comments
+f86b398f fix(app-update): show full release notes on expand
+2d05c2e4 docs(release): require publish-ready release bodies
+5e0423f8 test: fix homepage routing i18n mock
+4c8ad564 settings(about): make repository line an external link
+4ce6210a settings(about): align copyright/license/repo values to the right
+f009e236 settings(about): combine copyright/license/repo into one card
+8a42c12a settings(about): remove borders from copyright/license/repo rows
+51d7c28b settings(about): stack copyright/license/repo cards vertically
+5391e139 settings(about): move copyright/license/repo above app update section
+ec099c26 i18n: shorten settings nav Maintenance tab label (维护)
+9d72a000 i18n: shorten settings nav Network tab label (网络)
+ed751324 i18n: rename settings nav Library to Video storage (影片存储)
+9f2abcfb style(settings): match overview stat tiles to watch-time metric chips
+ac1e7f73 style(settings): tighten overview dashboard stat card padding
+3ac1c89e style(settings): nudge default import path select downward
+9b805e2c style(settings): enlarge about card Curated brand sparkles icon
+543b4107 style(settings): nudge curated export format select downward
+575dca40 copy(i18n): mark gamepad controls as experimental in settings title
+8ca858fa copy(i18n): productize browser launch template hint; avoid i18n brace eat
+47637a8d style(settings): stack seek step fields vertically in playback card
+5e685c2e style(settings): right-align seek step inputs and match h-8 controls
+9c945b36 style(settings): right-align native player preset select like encoder row
+f43d2436 style(settings): align hardware encoder select to trailing edge in playback
+eed4b71d style(settings): center native player preset select in playback card
+81cc7b70 copy(i18n): merge proxy connectivity hints into one product line
+bdc5a538 fix(settings): right-align proxy actions with save on trailing edge
+64491851 style(settings): align network proxy field control heights to h-8
+196d0463 copy(i18n): productize outbound proxy description on settings network
+a01b82c5 style(settings): pill proxy action buttons on network tab
+3e5f24e6 style(settings): use pill shape for library path toolbar buttons
+a52d217b style(settings): compact library path storage status badge height
+d605ae04 fix(settings): merge provider chain intro copy into one i18n string
+faac02b0 fix(settings): move provider chain auto-save hint with drag hint
+d72bd978 feat(settings): add save icon to provider chain save button
+b5ca8af8 fix(settings): match provider chain save button radius to trigger scrape
+e6238772 docs(rules): settings tab card and nested block semantics
+0a969ce3 fix(settings): tighten metadata card header and provider health spacing
+8e67c7c6 fix(settings): drop metadata card header description
+77bb5691 fix(settings): align metadata card description with title column; refresh desc copy
+ef5aeec6 fix(settings): unify metadata card hint typography (sm:text-sm)
+9ceba014 fix(settings): remove scrape strategy CircleHelp tooltip (hint stays visible)
+98c62cc6 fix(settings): show metadata scrape strategy hint below title
+0a530783 fix(settings): center metadata mode radio controls in option rows
+ac16b0d5 fix(settings): vertically center trigger scrape button on sm+ layout
+29011e65 docs(rules): settings nested card title and hint typography
+4d2066a3 fix(settings): align metadata card horizontal padding
+d44fa91d style(settings): chain list header title-hint gap matches actor auto-scrape
+f06f4d30 style(settings): match provider health title-hint gap to auto-scrape row
+75a2f495 style(settings): use CircleHelp for metadata mode tooltip trigger
+b52932c3 chore(settings): remove provider chain selected count hint
+a144a5bc style(settings): align metadata chain and trigger-scrape headings
+7e1208ab style(settings): semibold metadata scrape strategy legend label
+94fd6ab4 style(settings): align provider health hint type with auto-scrape hint
+7856eb90 style(settings): match provider health title weight to auto-scrape row
+9ca55cbd feat(settings): organize switch hint in tooltip by label
+9a55c229 fix(settings): separate default import select title and path in trigger
+74d6dcde feat(settings): default import hint via tooltip next to label
+2d5ff339 chore(settings): drop library storage status hint paragraph
+7b0b1b7b style(notification): shrink unread count badge on bell trigger
+64db03a4 style(settings): narrow library storage add/check action buttons
+10f1f434 fix(settings): align library storage action buttons to h-8
+81254c73 fix: align storage path action button sizes
+1d54d278 fix: place storage check beside add path
+b376c118 feat: surface library storage status alerts
+21be2991 feat: add library storage status backend
+9b75b165 docs: plan storage device presence checks
+cad1249b fix: route manual scan feedback through notifications
+0642a4f0 fix: refresh library after watched scrapes
+f13f497a feat: expand notification coverage
+9f79f31c chore(release): prepare 1.4.3 package",versionSource=auto-patch; BuildStamp=20260511.170115; portable=versionSource=explicit; installer=versionSource=explicit
