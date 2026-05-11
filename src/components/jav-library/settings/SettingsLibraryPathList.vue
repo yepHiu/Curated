@@ -165,7 +165,7 @@ function canRebindStorage(status?: LibraryPathStorageStatusDTO): boolean {
                 <p class="min-w-0 font-medium">{{ path.title }}</p>
                 <span
                   v-if="storageStatusFor(path)"
-                  class="inline-flex min-h-6 items-center rounded-full border px-2 py-0.5 text-xs font-medium"
+                  class="inline-flex h-5 items-center rounded-full border px-1.5 py-0 text-xs font-medium leading-none"
                   :class="storageStatusClass(storageStatusFor(path)!.status)"
                 >
                   {{ t(storageStatusLabelKey(storageStatusFor(path)!.status)) }}
