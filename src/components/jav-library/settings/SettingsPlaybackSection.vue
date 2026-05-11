@@ -570,10 +570,8 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="grid gap-3 md:grid-cols-2">
-            <div
-              class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-            >
-              <div class="min-w-0 flex-1 flex flex-col gap-3">
+            <div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="min-w-0 flex flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.playbackSeekBackwardStep") }}
                 </p>
@@ -581,21 +579,17 @@ onBeforeUnmount(() => {
                   {{ t("settings.playbackSeekBackwardStepHint") }}
                 </p>
               </div>
-              <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
-                <Input
-                  v-model="playbackSeekBackwardStepDraft"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                  class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50 sm:max-w-[7rem]"
-                />
-              </div>
+              <Input
+                v-model="playbackSeekBackwardStepDraft"
+                type="number"
+                min="1"
+                inputmode="numeric"
+                class="h-8 min-h-8 max-h-8 w-full py-0 text-sm rounded-xl border-border/50"
+              />
             </div>
 
-            <div
-              class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-            >
-              <div class="min-w-0 flex-1 flex flex-col gap-3">
+            <div class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+              <div class="min-w-0 flex flex-col gap-3">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.playbackSeekForwardStep") }}
                 </p>
@@ -603,15 +597,13 @@ onBeforeUnmount(() => {
                   {{ t("settings.playbackSeekForwardStepHint") }}
                 </p>
               </div>
-              <div class="flex w-full min-w-0 justify-stretch sm:w-auto sm:shrink-0 sm:justify-end">
-                <Input
-                  v-model="playbackSeekForwardStepDraft"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                  class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50 sm:max-w-[7rem]"
-                />
-              </div>
+              <Input
+                v-model="playbackSeekForwardStepDraft"
+                type="number"
+                min="1"
+                inputmode="numeric"
+                class="h-8 min-h-8 max-h-8 w-full py-0 text-sm rounded-xl border-border/50"
+              />
             </div>
           </div>
 
