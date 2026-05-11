@@ -239,13 +239,7 @@ function updateProxyPassword(value: unknown) {
             v-if="useWebApi"
             class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
-            {{ t("settings.proxyPingJavbusHint") }}
-          </p>
-          <p
-            v-if="useWebApi"
-            class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.proxyPingGoogleHint") }}
+            {{ t("settings.proxyConnectivityTestHint") }}
           </p>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <Button
