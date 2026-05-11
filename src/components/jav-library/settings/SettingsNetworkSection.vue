@@ -150,7 +150,7 @@ function updateProxyPassword(value: unknown) {
                   :disabled="proxySaving"
                   @update:model-value="updateProxyScheme"
                 >
-                  <SelectTrigger>
+                  <SelectTrigger size="sm" class="w-full rounded-xl border-border/50">
                     <SelectValue :placeholder="t('settings.proxySchemeHttp')" />
                   </SelectTrigger>
                   <SelectContent>
@@ -169,7 +169,7 @@ function updateProxyPassword(value: unknown) {
                 <Input
                   :model-value="proxyHost"
                   autocomplete="off"
-                  class="rounded-xl border-border/50"
+                  class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50"
                   :placeholder="t('settings.proxyHostPlaceholder')"
                   :disabled="proxySaving"
                   data-proxy-host
@@ -181,7 +181,7 @@ function updateProxyPassword(value: unknown) {
                 <Input
                   :model-value="proxyPort"
                   inputmode="numeric"
-                  class="rounded-xl border-border/50"
+                  class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50"
                   :placeholder="t('settings.proxyPortPlaceholder')"
                   :disabled="proxySaving"
                   data-proxy-port
@@ -214,7 +214,7 @@ function updateProxyPassword(value: unknown) {
                   <Input
                     :model-value="proxyUsername"
                     autocomplete="off"
-                    class="rounded-xl border-border/50"
+                    class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50"
                     :disabled="proxySaving"
                     data-proxy-username
                     @update:model-value="updateProxyUsername"
@@ -226,7 +226,7 @@ function updateProxyPassword(value: unknown) {
                     :model-value="proxyPassword"
                     type="password"
                     autocomplete="new-password"
-                    class="rounded-xl border-border/50"
+                    class="h-8 min-h-8 max-h-8 py-0 text-sm rounded-xl border-border/50"
                     :disabled="proxySaving"
                     data-proxy-password
                     @update:model-value="updateProxyPassword"
