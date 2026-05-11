@@ -764,7 +764,7 @@
     "navLibraryBehavior": "库目录行为",
     "navCurated": "萃取帧",
     "navPlayback": "播放设置",
-    "navMaintenance": "维护与说明",
+    "navMaintenance": "维护",
     "navAbout": "关于",
     "errSaveTitle": "保存失败，请稍后重试。",
     "errPickUnsupported": "当前环境无法打开目录选择器，请手动粘贴绝对路径。集成桌面客户端后可使用系统原生文件夹对话框并自动填入路径。",

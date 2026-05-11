@@ -773,7 +773,7 @@
     "navLibraryBehavior": "Library folders",
     "navCurated": "Curated frames",
     "navPlayback": "Playback settings",
-    "navMaintenance": "Maintenance & notes",
+    "navMaintenance": "Maintenance",
     "navAbout": "About",
     "errSaveTitle": "Save failed. Try again later.",
     "errPickUnsupported": "Cannot open a folder picker here; paste an absolute path. A desktop client could use a native dialog.",
