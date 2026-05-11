@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { CircleHelp, Database, RefreshCw } from "lucide-vue-next"
+import { Database, RefreshCw } from "lucide-vue-next"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
 import {
   Card,
@@ -18,13 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  TooltipContent,
-  TooltipPortal,
-  TooltipProvider,
-  TooltipRoot,
-  TooltipTrigger,
-} from "reka-ui"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 import SettingsLibraryPathList from "@/components/jav-library/settings/SettingsLibraryPathList.vue"
 import SettingsLibraryPathRemoveDialog from "@/components/jav-library/settings/SettingsLibraryPathRemoveDialog.vue"
@@ -134,59 +127,35 @@ function onDefaultImportPathChange(value: unknown) {
     </p>
 
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <Database class="size-[1.15rem]" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Database class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.storageCardTitle") }}
           </CardTitle>
           <CardDescription
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
           >
             {{ t("settings.storageCardDesc") }}
           </CardDescription>
         </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
+        <CardContent class="flex flex-col gap-3 pt-0">
           <div
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
             :aria-busy="defaultImportPathSaving"
           >
             <div class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-center gap-1.5">
-                <p class="text-sm font-medium text-foreground">
-                  {{ t("settings.defaultImportPathLabel") }}
-                </p>
-                <TooltipProvider :delay-duration="280">
-                  <TooltipRoot>
-                    <TooltipTrigger as-child>
-                      <button
-                        type="button"
-                        data-default-import-path-help
-                        class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      >
-                        <CircleHelp class="size-4" aria-hidden="true" />
-                        <span class="sr-only">{{
-                          t("settings.defaultImportPathHelpAria")
-                        }}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipPortal>
-                      <TooltipContent
-                        side="top"
-                        :side-offset="6"
-                        class="z-50 max-w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
-                      >
-                        {{ t("settings.defaultImportPathDesc") }}
-                      </TooltipContent>
-                    </TooltipPortal>
-                  </TooltipRoot>
-                </TooltipProvider>
-              </div>
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.defaultImportPathLabel") }}
+              </p>
+              <p class="text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm">
+                {{ t("settings.defaultImportPathDesc") }}
+              </p>
               <p
                 v-if="defaultImportPathSaving"
                 class="text-xs text-muted-foreground motion-safe:animate-pulse"
@@ -194,47 +163,49 @@ function onDefaultImportPathChange(value: unknown) {
                 {{ t("common.saving") }}
               </p>
             </div>
-            <Select
-              :model-value="defaultImportPathSelectValue"
-              :disabled="defaultImportPathSaving || paths.length === 0"
-              @update:model-value="onDefaultImportPathChange"
-            >
-              <SelectTrigger
-                size="sm"
-                class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-72 sm:shrink-0"
-                :aria-label="t('settings.defaultImportPathLabel')"
+            <div class="w-full pt-1 sm:w-auto sm:shrink-0 sm:pt-2">
+              <Select
+                :model-value="defaultImportPathSelectValue"
+                :disabled="defaultImportPathSaving || paths.length === 0"
+                @update:model-value="onDefaultImportPathChange"
               >
-                <SelectValue
-                  :placeholder="
-                    paths.length > 0
-                      ? t('settings.defaultImportPathPlaceholder')
-                      : t('settings.defaultImportPathNone')
-                  "
+                <SelectTrigger
+                  size="sm"
+                  class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-72 sm:shrink-0"
+                  :aria-label="t('settings.defaultImportPathLabel')"
                 >
-                  <span
-                    v-if="selectedDefaultImportPath"
-                    class="block min-w-0 flex-1 truncate text-left"
+                  <SelectValue
+                    :placeholder="
+                      paths.length > 0
+                        ? t('settings.defaultImportPathPlaceholder')
+                        : t('settings.defaultImportPathNone')
+                    "
                   >
-                    {{ defaultImportPathTriggerLabel(selectedDefaultImportPath) }}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="end" class="rounded-xl border-border/50">
-                <SelectItem
-                  v-for="path in paths"
-                  :key="`default-import-path-${path.id}`"
-                  class="rounded-lg"
-                  :value="path.id"
-                >
-                  <span class="flex min-w-0 flex-col gap-0.5">
-                    <span class="truncate text-sm">{{ path.title || path.path }}</span>
-                    <span class="truncate font-mono text-xs text-muted-foreground">
-                      {{ path.path }}
+                    <span
+                      v-if="selectedDefaultImportPath"
+                      class="block min-w-0 flex-1 truncate text-left"
+                    >
+                      {{ defaultImportPathTriggerLabel(selectedDefaultImportPath) }}
                     </span>
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end" class="rounded-xl border-border/50">
+                  <SelectItem
+                    v-for="path in paths"
+                    :key="`default-import-path-${path.id}`"
+                    class="rounded-lg"
+                    :value="path.id"
+                  >
+                    <span class="flex min-w-0 flex-col gap-0.5">
+                      <span class="truncate text-sm">{{ path.title || path.path }}</span>
+                      <span class="truncate font-mono text-xs text-muted-foreground">
+                        {{ path.path }}
+                      </span>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <p v-if="defaultImportPathError" class="text-sm text-destructive" role="alert">
             {{ defaultImportPathError }}
