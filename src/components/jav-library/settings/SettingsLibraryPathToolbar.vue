@@ -32,7 +32,7 @@ const { t } = useI18n()
           type="button"
           variant="outline"
           size="sm"
-          class="gap-1.5 rounded-xl"
+          class="gap-1.5 rounded-full"
           data-library-paths-enter-batch
           @click="emit('enterBatchMode')"
         >
@@ -45,7 +45,7 @@ const { t } = useI18n()
           type="button"
           variant="outline"
           size="sm"
-          class="gap-1.5 rounded-xl"
+          class="gap-1.5 rounded-full"
           :disabled="libraryPathsCount === 0"
           data-library-paths-select-all
           @click="emit('selectAll')"
@@ -57,7 +57,7 @@ const { t } = useI18n()
           type="button"
           variant="outline"
           size="sm"
-          class="gap-1.5 rounded-xl"
+          class="gap-1.5 rounded-full"
           data-library-paths-clear-selection
           @click="emit('clearSelection')"
         >
@@ -66,7 +66,7 @@ const { t } = useI18n()
         <Button
           type="button"
           size="sm"
-          class="gap-1.5 rounded-xl"
+          class="gap-1.5 rounded-full"
           :disabled="!hasMetadataPathSelection || metadataRefreshBusy"
           data-library-paths-refresh-metadata
           @click="emit('refreshMetadata')"
@@ -78,7 +78,7 @@ const { t } = useI18n()
           type="button"
           variant="ghost"
           size="sm"
-          class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+          class="gap-1.5 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground"
           data-library-paths-exit-batch
           @click="emit('exitBatchMode')"
         >
