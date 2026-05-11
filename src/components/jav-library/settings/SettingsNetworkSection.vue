@@ -247,16 +247,7 @@ function updateProxyPassword(value: unknown) {
           >
             {{ t("settings.proxyPingGoogleHint") }}
           </p>
-          <div class="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              class="rounded-full"
-              :disabled="proxySaving || proxyOutboundPingBusy"
-              data-proxy-save
-              @click="emit('saveProxy')"
-            >
-              {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
-            </Button>
+          <div class="flex flex-wrap items-center justify-end gap-3">
             <Button
               v-if="useWebApi"
               type="button"
@@ -298,6 +289,15 @@ function updateProxyPassword(value: unknown) {
                   ? t("settings.proxyPingGoogleTesting")
                   : t("settings.proxyPingGoogle")
               }}
+            </Button>
+            <Button
+              type="button"
+              class="rounded-full"
+              :disabled="proxySaving || proxyOutboundPingBusy"
+              data-proxy-save
+              @click="emit('saveProxy')"
+            >
+              {{ proxySaving ? t("common.saving") : t("settings.proxySave") }}
             </Button>
           </div>
           <p
