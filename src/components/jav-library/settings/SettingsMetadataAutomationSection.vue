@@ -59,7 +59,10 @@ const { t } = useI18n()
         }}
       </Button>
     </div>
-    <p v-if="providerHealthPingAllSummary" class="text-xs text-muted-foreground">
+    <p
+      v-if="providerHealthPingAllSummary"
+      class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
+    >
       {{ providerHealthPingAllSummary }}
     </p>
     <p v-if="providerHealthPingError" class="text-sm text-destructive">
@@ -68,7 +71,7 @@ const { t } = useI18n()
   </div>
   <p
     v-else
-    class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-sm text-muted-foreground"
+    class="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:text-sm"
   >
     {{ t("settings.providerHealthMockHint") }}
   </p>

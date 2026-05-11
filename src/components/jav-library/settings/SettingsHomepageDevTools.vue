@@ -45,10 +45,10 @@ async function refreshHomepageRecommendations() {
   <div class="rounded-lg border border-dashed border-border/60 bg-muted/10 px-4 py-3">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="space-y-1">
-        <p class="text-sm font-medium text-foreground">
+        <p class="text-sm font-semibold text-foreground">
           {{ t("settings.aboutHomepageRefreshTitle") }}
         </p>
-        <p class="text-xs leading-5 text-muted-foreground">
+        <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.aboutHomepageRefreshBody") }}
         </p>
       </div>
@@ -56,6 +56,7 @@ async function refreshHomepageRecommendations() {
       <Button
         type="button"
         variant="outline"
+        class="rounded-full"
         :disabled="refreshing"
         data-homepage-dev-refresh
         @click="refreshHomepageRecommendations"

@@ -295,7 +295,7 @@ const getNavigationTarget = (page: AppPage) => {
           <Badge
             data-update-badge
             variant="secondary"
-            class="pointer-events-none rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary"
+            class="pointer-events-none rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-primary"
           >
             New
           </Badge>

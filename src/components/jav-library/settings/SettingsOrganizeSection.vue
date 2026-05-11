@@ -32,24 +32,24 @@ const { t } = useI18n()
 
 <template>
   <div class="break-inside-avoid">
-    <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="space-y-3 pb-2">
-        <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-          <span
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-            aria-hidden="true"
-          >
-            <Layers class="size-[1.15rem]" />
-          </span>
+    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+        <span
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+          aria-hidden="true"
+        >
+          <Layers class="size-[1.15rem]" />
+        </span>
+        <CardTitle class="min-w-0 text-lg tracking-tight">
           {{ t("settings.organizeTitle") }}
         </CardTitle>
         <CardDescription
-          class="text-xs leading-relaxed text-pretty text-muted-foreground"
+          class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
         >
           {{ t("settings.organizeDesc") }}
         </CardDescription>
       </CardHeader>
-      <CardContent class="flex flex-col gap-3 pt-2">
+      <CardContent class="flex flex-col gap-3 pt-0">
         <div
           class="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
           :aria-busy="organizeLibrarySaving"

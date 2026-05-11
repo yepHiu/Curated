@@ -14,11 +14,11 @@ vi.mock("lucide-vue-next", () => ({
 }))
 
 vi.mock("@/components/ui/card", () => ({
-  Card: { name: "Card", template: "<div><slot /></div>" },
-  CardContent: { name: "CardContent", template: "<div><slot /></div>" },
-  CardDescription: { name: "CardDescription", template: "<div><slot /></div>" },
-  CardHeader: { name: "CardHeader", template: "<div><slot /></div>" },
-  CardTitle: { name: "CardTitle", template: "<div><slot /></div>" },
+  Card: { name: "Card", template: "<section data-card><slot /></section>" },
+  CardContent: { name: "CardContent", template: "<div data-card-content><slot /></div>" },
+  CardDescription: { name: "CardDescription", template: "<p data-card-description><slot /></p>" },
+  CardHeader: { name: "CardHeader", template: "<header data-card-header><slot /></header>" },
+  CardTitle: { name: "CardTitle", template: "<h3 data-card-title><slot /></h3>" },
 }))
 
 vi.mock("@/components/ui/select", () => {
@@ -67,6 +67,39 @@ const baseProps = {
 }
 
 describe("SettingsGeneralSection", () => {
+  it("uses the settings card title and hint layout contract", () => {
+    const wrapper = mount(SettingsGeneralSection, {
+      props: baseProps,
+    })
+
+    const firstCard = wrapper.get("[data-card]")
+    const firstHeader = wrapper.get("[data-card-header]")
+    const firstTitle = wrapper.get("[data-card-title]")
+    const firstDescription = wrapper.get("[data-card-description]")
+    const firstContent = wrapper.get("[data-card-content]")
+
+    expect(firstCard.classes()).toContain("gap-2")
+    expect(firstHeader.classes()).toContain("pb-0")
+    expect(firstHeader.classes()).toContain("gap-y-1")
+    expect(firstHeader.classes()).toContain("grid-cols-[auto_minmax(0,1fr)]")
+    expect(firstTitle.classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "text-lg", "tracking-tight"]),
+    )
+    expect(firstDescription.classes()).toEqual(
+      expect.arrayContaining([
+        "col-start-2",
+        "text-xs",
+        "leading-relaxed",
+        "text-pretty",
+        "text-muted-foreground",
+        "sm:text-sm",
+      ]),
+    )
+    expect(firstContent.classes()).toEqual(
+      expect.arrayContaining(["flex", "flex-col", "gap-3", "pt-0"]),
+    )
+  })
+
   it("renders locale, appearance, launch-at-login and logging controls", () => {
     const wrapper = mount(SettingsGeneralSection, {
       props: baseProps,

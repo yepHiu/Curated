@@ -85,10 +85,10 @@ onBeforeUnmount(() => {
         class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4"
       >
         <div class="min-w-0 flex-1 space-y-1">
-          <div class="text-sm font-medium text-foreground">
+          <div class="text-sm font-semibold text-foreground">
             {{ t("settings.curatedShortcutTitle") }}
           </div>
-          <p class="text-xs leading-5 text-muted-foreground">
+          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {{ t("settings.curatedShortcutBody", { keys: reservedLabels.join(" · ") }) }}
           </p>
         </div>

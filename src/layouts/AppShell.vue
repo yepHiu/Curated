@@ -673,7 +673,7 @@ function clearActorsSearch() {
               >
                 <Menu class="size-5" />
               </Button>
-              <Button v-if="showHeaderBack" as-child variant="secondary" class="rounded-2xl">
+              <Button v-if="showHeaderBack" as-child variant="secondary" class="rounded-full">
                 <RouterLink :to="headerBackTarget">
                   <LayoutDashboard data-icon="inline-start" />
                   {{ headerBackLabel }}

@@ -50,28 +50,28 @@ function updateLocale(value: unknown) {
   <div class="flex w-full flex-col gap-8">
     <div class="space-y-4">
       <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Languages class="size-4" />
-              </span>
+        <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+          <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+            <span
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+              aria-hidden="true"
+            >
+              <Languages class="size-4" />
+            </span>
+            <CardTitle class="min-w-0 text-lg tracking-tight">
               {{ t("settings.generalSubsectionLocaleAppearance") }}
             </CardTitle>
             <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+              class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
             >
               {{ t("settings.languageHint") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-0">
             <div
               class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <p class="text-sm font-medium text-foreground">{{ t("settings.language") }}</p>
+              <p class="text-sm font-semibold text-foreground">{{ t("settings.language") }}</p>
               <Select
                 :model-value="locale"
                 @update:model-value="updateLocale"
@@ -94,8 +94,8 @@ function updateLocale(value: unknown) {
               class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div class="min-w-0 space-y-1">
-                <p class="text-sm font-medium text-foreground">{{ t("settings.appearance") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground">
+                <p class="text-sm font-semibold text-foreground">{{ t("settings.appearance") }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.appearanceHint") }}
                 </p>
               </div>
@@ -121,33 +121,33 @@ function updateLocale(value: unknown) {
         </Card>
       </div>
       <div class="break-inside-avoid">
-        <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="space-y-3 pb-2">
-            <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-                aria-hidden="true"
-              >
-                <Power class="size-4" />
-              </span>
+        <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+          <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+            <span
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+              aria-hidden="true"
+            >
+              <Power class="size-4" />
+            </span>
+            <CardTitle class="min-w-0 text-lg tracking-tight">
               {{ t("settings.launchAtLoginTitle") }}
             </CardTitle>
             <CardDescription
-              class="text-xs leading-relaxed text-pretty text-muted-foreground"
+              class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
             >
               {{ t("settings.launchAtLoginDesc") }}
             </CardDescription>
           </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-2">
+          <CardContent class="flex flex-col gap-3 pt-0">
             <div
               class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
               :aria-busy="launchAtLoginSaving"
             >
               <div class="min-w-0 space-y-1">
-                <p class="text-sm font-medium text-foreground">
+                <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.launchAtLoginSwitch") }}
                 </p>
-                <p class="text-xs leading-relaxed text-muted-foreground">
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                   {{ t("settings.launchAtLoginHint") }}
                 </p>
                 <p
@@ -158,7 +158,7 @@ function updateLocale(value: unknown) {
                 </p>
                 <p
                   v-else-if="launchAtLoginUnavailableHint"
-                  class="text-xs leading-relaxed text-muted-foreground"
+                  class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
                 >
                   {{ launchAtLoginUnavailableHint }}
                 </p>

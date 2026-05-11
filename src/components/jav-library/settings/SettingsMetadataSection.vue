@@ -88,20 +88,16 @@ function healthForProvider(name: string): ProviderHealthDTO | undefined {
 <template>
   <div class="break-inside-avoid">
     <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="pb-0">
-        <div
-          class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5"
+      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+        <span
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+          aria-hidden="true"
         >
-          <span
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-            aria-hidden="true"
-          >
-            <Sparkles class="size-4" />
-          </span>
-          <CardTitle class="min-w-0 text-lg tracking-tight">
-            {{ t("settings.metadataMovieProviderTitle") }}
-          </CardTitle>
-        </div>
+          <Sparkles class="size-4" />
+        </span>
+        <CardTitle class="min-w-0 text-lg tracking-tight">
+          {{ t("settings.metadataMovieProviderTitle") }}
+        </CardTitle>
       </CardHeader>
       <CardContent class="flex flex-col gap-3 pt-0">
         <SettingsMetadataAutomationSection

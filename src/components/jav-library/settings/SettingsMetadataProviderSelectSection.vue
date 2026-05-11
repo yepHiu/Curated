@@ -50,7 +50,9 @@ function providerHealthStatusLabel(status: ProviderHealthStatus): string {
 
 <template>
   <div class="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/10 p-4">
-    <p class="text-sm font-medium">{{ t("settings.metadataMovieProviderSelectLabel") }}</p>
+    <p class="text-sm font-semibold text-foreground">
+      {{ t("settings.metadataMovieProviderSelectLabel") }}
+    </p>
     <div class="flex flex-wrap items-start gap-3">
       <Select
         class="min-w-0 flex-1"
@@ -105,7 +107,7 @@ function providerHealthStatusLabel(status: ProviderHealthStatus): string {
       </Badge>
       <span
         v-if="currentProviderHealth.message"
-        class="text-xs text-muted-foreground"
+        class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
       >
         {{ currentProviderHealth.message }}
       </span>

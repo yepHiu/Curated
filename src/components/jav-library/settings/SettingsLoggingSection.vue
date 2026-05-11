@@ -246,19 +246,19 @@ onBeforeUnmount(() => {
 <template>
   <div id="settings-section-logging" class="flex flex-col gap-6">
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-2 pb-0">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <ScrollText class="size-4" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <ScrollText class="size-4" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.backendLogTitle") }}
           </CardTitle>
           <CardDescription
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
           >
             {{ t("settings.backendLogDesc") }}
           </CardDescription>
@@ -266,20 +266,28 @@ onBeforeUnmount(() => {
         <CardContent class="flex flex-col gap-3 pt-0">
           <p
             v-if="!useWebApi"
-            class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
+            class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
             {{ t("settings.backendLogMockHint") }}
           </p>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
-            <div class="flex flex-col gap-3">
-              <p class="text-sm font-medium">{{ t("settings.backendLogDir") }}</p>
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <p class="shrink-0 text-sm font-semibold text-foreground sm:pt-2">
+              {{ t("settings.backendLogDir") }}
+            </p>
+            <div
+              class="flex min-w-0 flex-1 flex-col gap-3 sm:items-end"
+            >
+              <div
+                class="flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-3"
+              >
                 <Input
                   id="backend-log-dir"
                   v-model="backendLogDirDraft"
                   type="text"
                   autocomplete="off"
-                  class="min-w-0 rounded-xl border-border/50 sm:flex-1"
+                  class="min-w-0 flex-1 rounded-xl border-border/50"
                   :placeholder="t('settings.backendLogDirPlaceholder')"
                   :disabled="backendLogSaving || pickBackendLogDirBusy"
                   @input="backendLogDirPickHint = ''"
@@ -287,7 +295,7 @@ onBeforeUnmount(() => {
                 <Button
                   type="button"
                   variant="secondary"
-                  class="rounded-2xl sm:shrink-0"
+                  class="shrink-0 rounded-2xl"
                   :disabled="backendLogSaving || pickBackendLogDirBusy"
                   @click="pickBackendLogDirectory"
                 >
@@ -299,61 +307,65 @@ onBeforeUnmount(() => {
               </div>
               <p
                 v-if="backendLogDirPickHint"
-                class="whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
+                class="w-full max-w-2xl whitespace-pre-line text-xs leading-relaxed text-muted-foreground sm:text-right sm:text-sm"
               >
                 {{ backendLogDirPickHint }}
               </p>
             </div>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div class="flex min-w-0 flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.backendLogMaxAge") }}</p>
-                <Select
-                  v-model="backendLogMaxAgeDaysChoice"
-                  :disabled="backendLogSaving"
+          </div>
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p class="text-sm font-semibold text-foreground">{{ t("settings.backendLogMaxAge") }}</p>
+            <Select
+              v-model="backendLogMaxAgeDaysChoice"
+              :disabled="backendLogSaving"
+            >
+              <SelectTrigger
+                size="sm"
+                class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
+                :aria-label="t('settings.backendLogMaxAge')"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" class="rounded-xl border-border/50">
+                <SelectItem
+                  v-for="item in backendLogMaxAgeSelectItems"
+                  :key="`blog-maxage-${item.value}`"
+                  class="rounded-lg"
+                  :value="item.value"
                 >
-                  <SelectTrigger
-                    class="h-9 w-full min-w-0 rounded-xl border-border/50"
-                    :aria-label="t('settings.backendLogMaxAge')"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent class="rounded-xl border-border/50">
-                    <SelectItem
-                      v-for="item in backendLogMaxAgeSelectItems"
-                      :key="`blog-maxage-${item.value}`"
-                      class="rounded-lg"
-                      :value="item.value"
-                    >
-                      {{ item.label }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div class="flex min-w-0 flex-col gap-3">
-                <p class="text-sm font-medium">{{ t("settings.backendLogLevel") }}</p>
-                <Select
-                  v-model="backendLogLevelDraft"
-                  :disabled="backendLogSaving"
+                  {{ item.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p class="text-sm font-semibold text-foreground">{{ t("settings.backendLogLevel") }}</p>
+            <Select
+              v-model="backendLogLevelDraft"
+              :disabled="backendLogSaving"
+            >
+              <SelectTrigger
+                size="sm"
+                class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
+                :aria-label="t('settings.backendLogLevel')"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" class="rounded-xl border-border/50">
+                <SelectItem
+                  v-for="lvl in BACKEND_LOG_LEVEL_OPTIONS"
+                  :key="`blog-${lvl}`"
+                  class="rounded-lg"
+                  :value="lvl"
                 >
-                  <SelectTrigger
-                    class="h-9 w-full min-w-0 rounded-xl border-border/50"
-                    :aria-label="t('settings.backendLogLevel')"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent class="rounded-xl border-border/50">
-                    <SelectItem
-                      v-for="lvl in BACKEND_LOG_LEVEL_OPTIONS"
-                      :key="`blog-${lvl}`"
-                      class="rounded-lg"
-                      :value="lvl"
-                    >
-                      {{ lvl }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  {{ lvl }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button
             v-if="!useWebApi"
@@ -384,28 +396,28 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="break-inside-avoid">
-      <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-        <CardHeader class="space-y-3 pb-2">
-          <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
-              <Activity class="size-4" />
-            </span>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Activity class="size-4" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.clientLogTitle") }}
           </CardTitle>
           <CardDescription
-            class="text-xs leading-relaxed text-pretty text-muted-foreground"
+            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
           >
             {{ t("settings.clientLogDesc") }}
           </CardDescription>
         </CardHeader>
-        <CardContent class="flex flex-col gap-3 pt-2">
+        <CardContent class="flex flex-col gap-3 pt-0">
           <div
             class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <p class="text-sm font-medium text-foreground">{{ t("settings.clientLogLevel") }}</p>
+            <p class="text-sm font-semibold text-foreground">{{ t("settings.clientLogLevel") }}</p>
             <Select
               :model-value="clientLogLevelUi"
               @update:model-value="onClientLogLevelSelect"

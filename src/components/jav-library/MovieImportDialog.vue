@@ -232,15 +232,15 @@ async function submitImport() {
       <Button
         data-import-trigger
         type="button"
-        variant="secondary"
-        class="rounded-2xl"
+        variant="default"
+        class="rounded-full"
         :aria-label="t('import.trigger')"
       >
         <svg
           v-if="busy"
           data-import-trigger-progress
           data-icon="inline-start"
-          class="size-4 -rotate-90 text-primary"
+          class="size-4 -rotate-90 text-primary-foreground"
           viewBox="0 0 36 36"
           role="progressbar"
           :aria-valuenow="progressValue"
@@ -249,7 +249,7 @@ async function submitImport() {
           :aria-label="t('import.importing')"
         >
           <circle
-            class="text-muted-foreground/30"
+            class="text-primary-foreground/35"
             cx="18"
             cy="18"
             r="15.9155"

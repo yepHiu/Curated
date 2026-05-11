@@ -66,21 +66,25 @@ const metricItems = computed(() => [
 </script>
 
 <template>
-  <Card class="gap-4 rounded-xl border border-border bg-card shadow-sm">
-    <CardHeader class="gap-3 pb-2">
-      <CardTitle class="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
-        <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-          aria-hidden="true"
-        >
-          <CalendarDays class="size-[1.15rem]" />
-        </span>
+  <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+    <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+      <span
+        class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+        aria-hidden="true"
+      >
+        <CalendarDays class="size-[1.15rem]" />
+      </span>
+      <CardTitle class="min-w-0 text-lg tracking-tight">
         {{ t("settings.watchTimeTitle") }}
       </CardTitle>
-      <CardDescription>{{ t("settings.watchTimeDesc") }}</CardDescription>
+      <CardDescription
+        class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
+      >
+        {{ t("settings.watchTimeDesc") }}
+      </CardDescription>
     </CardHeader>
 
-    <CardContent class="flex flex-col gap-4 pt-2">
+    <CardContent class="flex flex-col gap-3 pt-0">
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div
           v-for="item in metricItems"
