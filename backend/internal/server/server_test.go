@@ -2054,6 +2054,16 @@ func (s *stubAutoActorScrapeCtl) SetAutoActorProfileScrape(v bool) error {
 	return nil
 }
 
+type stubAutoDownloadUpdatesCtl struct {
+	v bool
+}
+
+func (s *stubAutoDownloadUpdatesCtl) AutoDownloadUpdates() bool { return s.v }
+func (s *stubAutoDownloadUpdatesCtl) SetAutoDownloadUpdates(v bool) error {
+	s.v = v
+	return nil
+}
+
 type stubLaunchAtLoginCtl struct {
 	v         bool
 	supported bool
@@ -2383,6 +2393,47 @@ func TestHandleGetSettings_AutoActorProfileScrapeFromController(t *testing.T) {
 	}
 }
 
+func TestHandleGetSettings_AutoDownloadUpdatesFromController(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:                    config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:                 zap.NewNop(),
+		Store:                  store,
+		OrganizeLibraryCtl:     stubOrganizeCtl{},
+		AutoLibraryWatchCtl:    stubAutoWatchCtl{},
+		AutoDownloadUpdatesCtl: &stubAutoDownloadUpdatesCtl{v: true},
+		MetadataScrapeCtl:      stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !dto.AutoDownloadUpdates {
+		t.Fatal("expected autoDownloadUpdates true from controller")
+	}
+}
+
 func TestHandleGetSettings_LaunchAtLoginFromController(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -2473,6 +2524,54 @@ func TestHandlePatchSettings_AutoActorProfileScrape(t *testing.T) {
 	}
 	if !ctl.v || !dto.AutoActorProfileScrape {
 		t.Fatalf("autoActorProfileScrape not enabled: ctl=%v dto=%v", ctl.v, dto.AutoActorProfileScrape)
+	}
+}
+
+func TestHandlePatchSettings_AutoDownloadUpdates(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctl := &stubAutoDownloadUpdatesCtl{v: false}
+	h := NewHandler(Deps{
+		Cfg:                    config.Config{Player: config.PlayerConfig{HardwareDecode: true}},
+		Logger:                 zap.NewNop(),
+		Store:                  store,
+		OrganizeLibraryCtl:     stubOrganizeCtl{},
+		AutoLibraryWatchCtl:    stubAutoWatchCtl{},
+		AutoDownloadUpdatesCtl: ctl,
+		MetadataScrapeCtl:      stubMetadataCtl{},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"autoDownloadUpdates":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if !ctl.v || !dto.AutoDownloadUpdates {
+		t.Fatalf("autoDownloadUpdates not enabled: ctl=%v dto=%v", ctl.v, dto.AutoDownloadUpdates)
 	}
 }
 

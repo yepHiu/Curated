@@ -208,6 +208,7 @@ export interface SettingsDTO {
   /** 为 true 时库根目录监听新文件并防抖触发扫描（及后续刮削）；与主配置 libraryWatchEnabled 共同生效 */
   autoLibraryWatch: boolean
   autoActorProfileScrape: boolean
+  autoDownloadUpdates: boolean
   launchAtLogin: boolean
   launchAtLoginSupported: boolean
   curatedFrameExportFormat: CuratedFrameExportFormat
@@ -265,6 +266,7 @@ export interface PatchSettingsBody {
   organizeLibrary?: boolean
   autoLibraryWatch?: boolean
   autoActorProfileScrape?: boolean
+  autoDownloadUpdates?: boolean
   launchAtLogin?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
   defaultImportLibraryPathId?: string

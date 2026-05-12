@@ -75,6 +75,9 @@ type App struct {
 	// autoActorProfileScrape gates scan/import-time actor profile scrape enqueue; persisted to library-config.cfg.
 	autoActorProfileScrape   bool
 	autoActorProfileScrapeMu sync.RWMutex
+	// autoDownloadUpdates allows startup update checks to auto-download and verify installers; persisted to library-config.cfg.
+	autoDownloadUpdates   bool
+	autoDownloadUpdatesMu sync.RWMutex
 	// launchAtLogin persists whether Curated should register Windows login autostart via the current-user Run key.
 	launchAtLogin   bool
 	launchAtLoginMu sync.RWMutex
@@ -169,6 +172,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		organizeLibrary:               cfg.OrganizeLibrary,
 		autoLibraryWatch:              cfg.AutoLibraryWatch,
 		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
+		autoDownloadUpdates:           cfg.AutoDownloadUpdates,
 		launchAtLogin:                 cfg.LaunchAtLogin,
 		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
@@ -325,6 +329,13 @@ func (a *App) AutoActorProfileScrape() bool {
 	return a.autoActorProfileScrape
 }
 
+// AutoDownloadUpdates reports whether startup update checks may download and verify newer installers.
+func (a *App) AutoDownloadUpdates() bool {
+	a.autoDownloadUpdatesMu.RLock()
+	defer a.autoDownloadUpdatesMu.RUnlock()
+	return a.autoDownloadUpdates
+}
+
 // LaunchAtLogin reports whether the persisted login autostart preference is enabled.
 func (a *App) LaunchAtLogin() bool {
 	a.launchAtLoginMu.RLock()
@@ -390,6 +401,25 @@ func (a *App) SetAutoActorProfileScrape(v bool) error {
 	a.autoActorProfileScrape = v
 	a.cfg.AutoActorProfileScrape = v
 	a.autoActorProfileScrapeMu.Unlock()
+	return nil
+}
+
+// SetAutoDownloadUpdates persists autoDownloadUpdates to library-config.cfg and updates in-memory state.
+func (a *App) SetAutoDownloadUpdates(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["autoDownloadUpdates"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.autoDownloadUpdatesMu.Lock()
+	a.autoDownloadUpdates = v
+	a.cfg.AutoDownloadUpdates = v
+	a.autoDownloadUpdatesMu.Unlock()
 	return nil
 }
 
@@ -1201,6 +1231,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			OrganizeLibrary:            a.OrganizeLibrary(),
 			AutoLibraryWatch:           a.AutoLibraryWatch(),
 			AutoActorProfileScrape:     a.AutoActorProfileScrape(),
+			AutoDownloadUpdates:        a.AutoDownloadUpdates(),
 			CuratedFrameExportFormat:   a.CuratedFrameExportFormat(),
 			MetadataMovieProvider:      a.MetadataMovieProvider(),
 			MetadataMovieProviders:     a.ListMetadataMovieProviders(),
@@ -2557,6 +2588,7 @@ func (a *App) HTTPHandler() http.Handler {
 		OrganizeLibraryCtl:               a,
 		AutoLibraryWatchCtl:              a,
 		AutoActorProfileScrapeCtl:        a,
+		AutoDownloadUpdatesCtl:           a,
 		LaunchAtLoginCtl:                 a,
 		CuratedFrameExportFormatCtl:      a,
 		DefaultImportLibraryPathCtl:      a,

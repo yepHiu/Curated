@@ -63,6 +63,7 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
     organizeLibrary: true,
     autoLibraryWatch: true,
     autoActorProfileScrape: false,
+    autoDownloadUpdates: false,
     launchAtLogin: false,
     launchAtLoginSupported: false,
     curatedFrameExportFormat: "jpg",
@@ -203,6 +204,20 @@ describe("webLibraryService mutations", () => {
 
     expect(apiMocks.getSettings).not.toHaveBeenCalled()
     expect(webLibraryService.organizeLibrary.value).toBe(true)
+  })
+
+  it("persists auto-download updates through settings", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.patchSettings.mockResolvedValueOnce(
+      settingsDto({ autoDownloadUpdates: true }),
+    )
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+    await webLibraryService.setAutoDownloadUpdates(true)
+
+    expect(apiMocks.patchSettings).toHaveBeenCalledWith({ autoDownloadUpdates: true })
+    expect(webLibraryService.autoDownloadUpdates.value).toBe(true)
   })
 
   it("recovers proxy settings from settings when saving fails", async () => {

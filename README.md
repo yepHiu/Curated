@@ -159,7 +159,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.
-- App update checks against GitHub Releases with sidebar badge, in-app installer download, SHA256 verification, and explicit user-confirmed installer launch.
+- App update checks against GitHub Releases with sidebar badge, in-app installer download, SHA256 verification, an opt-in General-settings auto-download toggle, and explicit user-confirmed installer launch.
 - Windows login autostart (`launchAtLogin`).
 
 ### Gamepad Controls
@@ -213,6 +213,7 @@ Common library-level settings include:
 - `defaultImportLibraryPathId`
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
+- `autoDownloadUpdates`
 - `launchAtLogin`
 - `curatedFrameExportFormat` (default `jpg`; accepted values: `jpg`, `webp`, `png`)
 - `proxy`

@@ -38,6 +38,7 @@ alwaysApply: true
   - `metadataMovieStrategy`
   - `autoLibraryWatch`
   - `autoActorProfileScrape`
+  - `autoDownloadUpdates`
   - `launchAtLogin`
   - `proxy`
   - `logDir` / `logFilePrefix` / `logMaxAgeDays` / `logLevel`

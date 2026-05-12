@@ -231,6 +231,8 @@ const autoLibraryWatchSaving = ref(false)
 const autoLibraryWatchError = ref("")
 const autoActorProfileScrapeSaving = ref(false)
 const autoActorProfileScrapeError = ref("")
+const autoDownloadUpdatesSaving = ref(false)
+const autoDownloadUpdatesError = ref("")
 const launchAtLoginSaving = ref(false)
 const launchAtLoginError = ref("")
 const defaultImportPathSaving = ref(false)
@@ -760,6 +762,7 @@ async function testProxyGoogle() {
 const organizeLibrary = computed(() => libraryService.organizeLibrary.value)
 const autoLibraryWatch = computed(() => libraryService.autoLibraryWatch.value)
 const autoActorProfileScrape = computed(() => libraryService.autoActorProfileScrape.value)
+const autoDownloadUpdates = computed(() => libraryService.autoDownloadUpdates.value)
 const launchAtLogin = computed(() => libraryService.launchAtLogin.value)
 const launchAtLoginSupported = computed(() => libraryService.launchAtLoginSupported.value)
 const curatedFrameExportFormat = computed(() => libraryService.curatedFrameExportFormat.value)
@@ -1650,6 +1653,27 @@ async function onAutoActorProfileScrapeChange(next: boolean) {
   }
 }
 
+async function onAutoDownloadUpdatesChange(next: boolean) {
+  autoDownloadUpdatesError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      autoDownloadUpdatesSaving.value = true
+      try {
+        await libraryService.setAutoDownloadUpdates(next)
+      } finally {
+        autoDownloadUpdatesSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] auto download updates toggle failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      autoDownloadUpdatesError.value = err.apiError.message
+    } else {
+      autoDownloadUpdatesError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
 async function onLaunchAtLoginChange(next: boolean) {
   launchAtLoginError.value = ""
   try {
@@ -1943,6 +1967,9 @@ async function runMetadataRefreshForSelected() {
     <SettingsGeneralSection
       v-model:locale="locale"
       :theme-preference="themePreference"
+      :auto-download-updates="autoDownloadUpdates"
+      :auto-download-updates-saving="autoDownloadUpdatesSaving"
+      :auto-download-updates-error="autoDownloadUpdatesError"
       :launch-at-login="launchAtLogin"
       :launch-at-login-saving="launchAtLoginSaving"
       :launch-at-login-disabled="launchAtLoginDisabled"
@@ -1950,6 +1977,7 @@ async function runMetadataRefreshForSelected() {
       :launch-at-login-error="launchAtLoginError"
       :auto-save-ready="settingsAutoSaveReady"
       @change-theme="setThemeFromSelect"
+      @change-auto-download-updates="onAutoDownloadUpdatesChange"
       @change-launch-at-login="onLaunchAtLoginChange"
     />
     </section>

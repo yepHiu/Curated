@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 const apiMocks = vi.hoisted(() => ({
   getAppUpdateStatus: vi.fn(),
   checkAppUpdateNow: vi.fn(),
+  getSettings: vi.fn(),
   downloadAppUpdateInstaller: vi.fn(),
   installAppUpdate: vi.fn(),
   clearDownloadedAppUpdateInstaller: vi.fn(),
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.useRealTimers()
   apiMocks.getAppUpdateStatus.mockReset()
   apiMocks.checkAppUpdateNow.mockReset()
+  apiMocks.getSettings.mockReset()
   apiMocks.downloadAppUpdateInstaller.mockReset()
   apiMocks.installAppUpdate.mockReset()
   apiMocks.clearDownloadedAppUpdateInstaller.mockReset()
@@ -245,5 +247,39 @@ describe("useAppUpdate", () => {
       message: "settings.appUpdateToastAvailable:1.1.0",
       source: { route: "/settings?section=about" },
     })
+  })
+
+  it("auto-downloads a verified installer after the scheduled update check when enabled", async () => {
+    vi.useFakeTimers()
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      installedVersion: "1.0.0",
+      latestVersion: "1.1.0",
+      installerDownloadUrl: "https://example.com/Curated-Setup-1.1.0.exe",
+      installerSha256: "A".repeat(64),
+    })
+    apiMocks.getSettings.mockResolvedValueOnce({
+      autoDownloadUpdates: true,
+    })
+    apiMocks.downloadAppUpdateInstaller.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      latestVersion: "1.1.0",
+      artifactStatus: "verified",
+      installReady: true,
+    })
+
+    const state = await loadUseAppUpdate()
+    await vi.advanceTimersByTimeAsync(12_000)
+    await flushPromises()
+
+    expect(apiMocks.getSettings).toHaveBeenCalledTimes(1)
+    expect(apiMocks.downloadAppUpdateInstaller).toHaveBeenCalledTimes(1)
+    expect(state.summary.value?.artifactStatus).toBe("verified")
+    expect(state.summary.value?.installReady).toBe(true)
   })
 })

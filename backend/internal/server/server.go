@@ -78,6 +78,12 @@ type AutoActorProfileScrapeController interface {
 	SetAutoActorProfileScrape(v bool) error
 }
 
+// AutoDownloadUpdatesController exposes whether startup update checks may auto-download verified installers.
+type AutoDownloadUpdatesController interface {
+	AutoDownloadUpdates() bool
+	SetAutoDownloadUpdates(v bool) error
+}
+
 // MetadataScrapeSettings exposes Metatube movie provider preference (empty = auto) and the list of valid provider names.
 type MetadataScrapeSettings interface {
 	MetadataMovieProvider() string
@@ -191,6 +197,7 @@ type Handler struct {
 	organizeLibraryCtl          OrganizeLibraryController
 	autoLibraryWatchCtl         AutoLibraryWatchController
 	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
+	autoDownloadUpdatesCtl      AutoDownloadUpdatesController
 	launchAtLoginCtl            LaunchAtLoginController
 	curatedFrameExportFormatCtl CuratedFrameExportFormatController
 	defaultImportLibraryPathCtl DefaultImportLibraryPathController
@@ -221,6 +228,7 @@ type Deps struct {
 	OrganizeLibraryCtl               OrganizeLibraryController
 	AutoLibraryWatchCtl              AutoLibraryWatchController
 	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
+	AutoDownloadUpdatesCtl           AutoDownloadUpdatesController
 	LaunchAtLoginCtl                 LaunchAtLoginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
@@ -251,6 +259,7 @@ func NewHandler(deps Deps) *Handler {
 		organizeLibraryCtl:          deps.OrganizeLibraryCtl,
 		autoLibraryWatchCtl:         deps.AutoLibraryWatchCtl,
 		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
+		autoDownloadUpdatesCtl:      deps.AutoDownloadUpdatesCtl,
 		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
 		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
@@ -1522,6 +1531,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.autoActorProfileScrapeCtl != nil {
 		autoActorProfileScrape = h.autoActorProfileScrapeCtl.AutoActorProfileScrape()
 	}
+	autoDownloadUpdates := h.cfg.AutoDownloadUpdates
+	if h.autoDownloadUpdatesCtl != nil {
+		autoDownloadUpdates = h.autoDownloadUpdatesCtl.AutoDownloadUpdates()
+	}
 	launchAtLogin := h.cfg.LaunchAtLogin
 	launchAtLoginSupported := false
 	if h.launchAtLoginCtl != nil {
@@ -1553,6 +1566,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		OrganizeLibrary:          org,
 		AutoLibraryWatch:         autoWatch,
 		AutoActorProfileScrape:   autoActorProfileScrape,
+		AutoDownloadUpdates:      autoDownloadUpdates,
 		LaunchAtLogin:            launchAtLogin,
 		LaunchAtLoginSupported:   launchAtLoginSupported,
 		CuratedFrameExportFormat: curatedFrameExportFormat,
@@ -1702,7 +1716,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1716,7 +1730,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -1772,6 +1786,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "autoActorProfileScrape",
 			apply:    func() error { return h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(target) },
 			rollback: func() error { return h.autoActorProfileScrapeCtl.SetAutoActorProfileScrape(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.AutoDownloadUpdates != nil {
+		if h.autoDownloadUpdatesCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "auto download update settings not available")
+			return
+		}
+		prev := h.autoDownloadUpdatesCtl.AutoDownloadUpdates()
+		target := *body.AutoDownloadUpdates
+		ops = append(ops, settingsPatchOperation{
+			name:     "autoDownloadUpdates",
+			apply:    func() error { return h.autoDownloadUpdatesCtl.SetAutoDownloadUpdates(target) },
+			rollback: func() error { return h.autoDownloadUpdatesCtl.SetAutoDownloadUpdates(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,

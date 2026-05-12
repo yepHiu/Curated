@@ -59,6 +59,8 @@ export interface LibraryService {
   setAutoLibraryWatch(value: boolean): Promise<void>
   autoActorProfileScrape: ComputedRef<boolean>
   setAutoActorProfileScrape(value: boolean): Promise<void>
+  autoDownloadUpdates: ComputedRef<boolean>
+  setAutoDownloadUpdates(value: boolean): Promise<void>
   launchAtLogin: ComputedRef<boolean>
   launchAtLoginSupported: ComputedRef<boolean>
   setLaunchAtLogin(value: boolean): Promise<void>

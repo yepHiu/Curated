@@ -447,6 +447,8 @@ type SettingsDTO struct {
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape"`
+	// AutoDownloadUpdates: when true, startup update checks may automatically download and verify a newer installer.
+	AutoDownloadUpdates bool `json:"autoDownloadUpdates"`
 	// LaunchAtLogin: when true, Curated registers a current-user login autostart entry and starts silently in tray mode.
 	LaunchAtLogin bool `json:"launchAtLogin"`
 	// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
@@ -510,6 +512,7 @@ type PatchSettingsRequest struct {
 	OrganizeLibrary            *bool                   `json:"organizeLibrary,omitempty"`
 	AutoLibraryWatch           *bool                   `json:"autoLibraryWatch,omitempty"`
 	AutoActorProfileScrape     *bool                   `json:"autoActorProfileScrape,omitempty"`
+	AutoDownloadUpdates        *bool                   `json:"autoDownloadUpdates,omitempty"`
 	LaunchAtLogin              *bool                   `json:"launchAtLogin,omitempty"`
 	CuratedFrameExportFormat   *string                 `json:"curatedFrameExportFormat,omitempty"`
 	DefaultImportLibraryPathID *string                 `json:"defaultImportLibraryPathId,omitempty"`

@@ -35,6 +35,7 @@ const errorMessage = ref("")
 let requestSeq = 0
 let autoCheckScheduled = false
 const notifiedUpdateVersions = new Set<string>()
+const autoDownloadAttemptedVersions = new Set<string>()
 
 function maybeRecordUpdateAvailableNotification(next: AppUpdateStatusDTO) {
   if (next.status !== "update-available" || next.hasUpdate !== true) {
@@ -213,6 +214,39 @@ function clearDownloadedInstaller() {
   return runMutation(() => api.clearDownloadedAppUpdateInstaller(), downloading)
 }
 
+function autoDownloadVersionKey(next: AppUpdateStatusDTO): string {
+  return next.latestVersion?.trim() || next.releaseUrl?.trim() || ""
+}
+
+function canAutoDownloadInstaller(next: AppUpdateStatusDTO | null): next is AppUpdateStatusDTO {
+  if (!next) return false
+  if (next.status !== "update-available" || next.hasUpdate !== true) return false
+  if (next.installReady === true || next.artifactStatus === "verified") return false
+  if (!next.installerDownloadUrl?.trim() || !next.installerSha256?.trim()) return false
+  return autoDownloadVersionKey(next) !== ""
+}
+
+async function maybeAutoDownloadInstaller(next: AppUpdateStatusDTO | null) {
+  if (!canAutoDownloadInstaller(next)) {
+    return
+  }
+  const versionKey = autoDownloadVersionKey(next)
+  if (autoDownloadAttemptedVersions.has(versionKey)) {
+    return
+  }
+  autoDownloadAttemptedVersions.add(versionKey)
+
+  try {
+    const settings = await api.getSettings()
+    if (settings.autoDownloadUpdates !== true) {
+      return
+    }
+    await downloadInstaller()
+  } catch {
+    // Auto-download is opportunistic. About keeps the manual download/install CTA available.
+  }
+}
+
 function scheduleAutoCheck() {
   if (!USE_WEB || autoCheckScheduled) {
     return
@@ -222,7 +256,7 @@ function scheduleAutoCheck() {
     if (loaded.value || loading.value) {
       return
     }
-    void runRequest("status", { silent: true })
+    void runRequest("status", { silent: true }).then((next) => maybeAutoDownloadInstaller(next))
   }, AUTO_CHECK_DELAY_MS)
 }
 

@@ -38,6 +38,14 @@ func TestDefault_LaunchAtLoginFalse(t *testing.T) {
 	}
 }
 
+func TestDefault_AutoDownloadUpdatesFalse(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	if cfg.AutoDownloadUpdates {
+		t.Fatal("Default() should keep autoDownloadUpdates false")
+	}
+}
+
 func TestDefaultPlayerSettings_DisableHardwareDecodeAndStreamPush(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
@@ -100,6 +108,22 @@ func TestMergeLibrarySettingsFile_AutoActorProfileScrapeTrue(t *testing.T) {
 	}
 	if !cfg.AutoActorProfileScrape {
 		t.Fatal("expected autoActorProfileScrape true from file")
+	}
+}
+
+func TestMergeLibrarySettingsFile_AutoDownloadUpdatesTrue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"autoDownloadUpdates": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoDownloadUpdates {
+		t.Fatal("expected autoDownloadUpdates true from file")
 	}
 }
 

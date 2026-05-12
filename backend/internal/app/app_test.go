@@ -90,6 +90,33 @@ func TestSetLaunchAtLogin_RevertsConfigWhenDesktopSyncFails(t *testing.T) {
 	}
 }
 
+func TestSetAutoDownloadUpdates_Persists(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+
+	a := &App{
+		cfg:                 config.Default(),
+		librarySettingsPath: path,
+	}
+
+	if err := a.SetAutoDownloadUpdates(true); err != nil {
+		t.Fatal(err)
+	}
+
+	if !a.AutoDownloadUpdates() {
+		t.Fatal("expected AutoDownloadUpdates true in memory")
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"autoDownloadUpdates": true`) &&
+		!strings.Contains(string(raw), `"autoDownloadUpdates":true`) {
+		t.Fatalf("expected autoDownloadUpdates true in file, got %s", string(raw))
+	}
+}
+
 func containsLaunchAtLoginValue(raw string, want bool) bool {
 	if want {
 		return strings.Contains(raw, `"launchAtLogin": true`) || strings.Contains(raw, `"launchAtLogin":true`)

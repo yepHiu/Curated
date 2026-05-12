@@ -44,6 +44,7 @@ const organizeLibraryState = ref(true)
 /** 与后端默认一致：关，避免误触新库「首次扫描」扩展逻辑 */
 const autoLibraryWatchState = ref(true)
 const autoActorProfileScrapeState = ref(false)
+const autoDownloadUpdatesState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
 const curatedFrameExportFormatState = ref<CuratedFrameExportFormat>("jpg")
@@ -75,6 +76,7 @@ const curatedFramesCountState = ref(0)
 let organizeLibrarySaveSeq = 0
 let autoLibraryWatchSaveSeq = 0
 let autoActorProfileScrapeSaveSeq = 0
+let autoDownloadUpdatesSaveSeq = 0
 let launchAtLoginSaveSeq = 0
 let curatedFrameExportFormatSaveSeq = 0
 let defaultImportLibraryPathSaveSeq = 0
@@ -344,6 +346,7 @@ async function refreshLibraryPathsFromApi() {
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
+    autoDownloadUpdatesState.value = Boolean(settings.autoDownloadUpdates)
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
     curatedFrameExportFormatState.value = settings.curatedFrameExportFormat ?? "jpg"
@@ -386,6 +389,7 @@ function createWebLibraryService(): LibraryService {
     organizeLibrary: computed(() => organizeLibraryState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
+    autoDownloadUpdates: computed(() => autoDownloadUpdatesState.value),
     launchAtLogin: computed(() => launchAtLoginState.value),
     launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
     curatedFrameExportFormat: computed(() => curatedFrameExportFormatState.value),
@@ -589,6 +593,26 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === autoActorProfileScrapeSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    async setAutoDownloadUpdates(value: boolean) {
+      const seq = ++autoDownloadUpdatesSaveSeq
+      autoDownloadUpdatesState.value = value
+      try {
+        const next = await api.patchSettings({ autoDownloadUpdates: value })
+        if (seq === autoDownloadUpdatesSaveSeq) {
+          autoDownloadUpdatesState.value = Boolean(next.autoDownloadUpdates)
+        }
+      } catch (err) {
+        if (seq === autoDownloadUpdatesSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {

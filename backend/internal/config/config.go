@@ -33,6 +33,8 @@ type Config struct {
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, successful movie metadata scrapes may enqueue missing actor profile scrapes. Persisted in library-config.cfg and default-off to avoid surprise outbound requests.
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape,omitempty"`
+	// AutoDownloadUpdates: when true, frontend startup update checks may download and verify an available installer. Persisted in library-config.cfg and default-off.
+	AutoDownloadUpdates bool `json:"autoDownloadUpdates,omitempty"`
 	// LaunchAtLogin persists the Windows login autostart preference in library-config.cfg. Default false.
 	LaunchAtLogin bool `json:"launchAtLogin,omitempty"`
 	// CuratedFrameExportFormat controls curated frame export output format. Persisted in library-config.cfg.
@@ -173,6 +175,7 @@ func Default() Config {
 		},
 		OrganizeLibrary:          true,
 		AutoLibraryWatch:         true,
+		AutoDownloadUpdates:      false,
 		LaunchAtLogin:            false,
 		CuratedFrameExportFormat: "jpg",
 	}

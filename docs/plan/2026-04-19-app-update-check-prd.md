@@ -2,7 +2,13 @@
 
 Status: Draft, expanded with auto download / install feasibility
 Date: 2026-04-19
-Last updated: 2026-05-12
+Last updated: 2026-05-13
+
+## 2026-05-13 Implementation Update
+
+- `autoDownloadUpdates` 已落地为 Settings -> General 中的持久化开关，默认 `false`，经 `GET/PATCH /api/settings` 与 `config/library-config.cfg` 读写。
+- 启动后的后台更新检查若发现较新的 installer，且该开关已开启，会自动下载并完成 SHA256 校验。
+- 该能力只覆盖“后台下载并准备安装包”；真正安装仍在 Settings -> About 中由用户显式确认，不等同于默认静默安装。
 
 ## Background
 
@@ -46,7 +52,7 @@ Curated 目前在 Settings -> About 中已经能展示：
 - 当 latest Release 的 assets 中包含 `.exe` 安装包时，API 返回 `installerDownloadUrl`。
 - Settings -> About 的主操作按钮优先链接该 `.exe` 安装包，让浏览器直接开始下载。
 - 如果 latest Release 没有可识别的 `.exe` asset，界面继续降级为打开官方 Release 页面。
-- “不做应用内自动下载/静默安装”的边界仍成立：Curated 不在后台替用户下载或替换程序，只提供用户点击触发的浏览器下载入口。
+- 该阶段“不默认后台下载 / 不默认静默安装”的边界仍成立；自 2026-05-13 起，Curated 仅在用户显式开启 `autoDownloadUpdates` 后执行后台下载与 SHA256 校验，仍不会自动替换程序或默认静默安装。
 
 ## 2026-05-12 Auto Download / Install Feasibility Update
 
@@ -105,10 +111,10 @@ Curated 目前在 Settings -> About 中已经能展示：
 | --- | --- | --- | --- | --- |
 | 自动发现新版本 | 已实现 GitHub latest Release 检查、SQLite 缓存、侧边栏提示 | 高 | 已完成 / 保持 | GitHub 网络、代理、限流、tag 语义版本 |
 | 自动获取 installer URL | 已实现 `installerDownloadUrl` 解析 | 高 | 已完成 / 保持 | asset 命名不稳定，需要 manifest 兜底 |
-| 后台下载安装包 | 尚未实现；后端已有 HTTP 客户端和代理 | 高 | Phase 1 | 断点续传、磁盘空间、取消、缓存清理 |
-| SHA256 校验 | release manifest 已生成但未作为远端可信输入使用 | 高 | Phase 1 | manifest 发布流程必须固定 |
+| 后台下载安装包 | 已实现 opt-in `autoDownloadUpdates` 后台准备安装包 | 高 | 已完成 / 保持 | 断点续传、磁盘空间、取消、缓存清理 |
+| SHA256 校验 | 已实现下载后 SHA256 完整性校验 | 高 | 已完成 / 保持 | manifest 发布流程仍需继续固定 |
 | Authenticode 签名校验 | 尚未实现签名发布和校验 | 中高 | Phase 1 / 2 前置 | 证书成本、CI secret 管理、时间戳 |
-| 显式触发安装 | 尚未实现；Windows 可启动 installer | 高 | Phase 1 | 关闭当前进程、单实例锁、安装日志、失败恢复 |
+| 显式触发安装 | 已实现 About 页用户确认后的 installer 启动 | 高 | 已完成 / 保持 | 关闭当前进程、单实例锁、安装日志、失败恢复 |
 | 静默安装 | Inno Setup 支持静默参数 | 中 | Phase 2 | UAC 仍可能出现；错误提示可能被压低 |
 | 完全无感自动安装 | 当前 Program Files + admin installer 架构不满足 | 低到中 | Phase 3+ | 需要 per-user install 或 updater service |
 | 增量更新 | 当前发布物是完整 installer / portable zip | 低 | 暂不做 | 包格式、回滚、差分生成与校验复杂度 |
@@ -265,7 +271,7 @@ Windows installer 启动建议由后端新增 `internal/appupdate/install_window
 - 非 GitHub Release 来源的更新检查
 - 开发态 / Mock 模式下伪造“有更新”结果
 
-说明：2026-05-12 后，`应用内自动下载安装包`、`显式触发安装`、`用户授权静默安装` 已进入后续阶段候选范围；它们不再是长期 Non-Goal，但仍不属于已完成的 2026-05-03 下载入口能力。
+说明：2026-05-13 后，`应用内下载 installer`、`显式触发安装` 以及 opt-in `autoDownloadUpdates` 后台准备安装包能力均已落地；`用户授权静默安装` 仍属于后续候选范围，不属于当前默认能力。
 
 ## Scope
 
@@ -770,19 +776,19 @@ About 页新增一个明确按钮：
 
 ### Phase 3
 
-- 应用内下载 installer
-- 下载进度、取消、失败重试
-- SHA256 校验和 manifest 解析
-- About 页提供“下载并安装 / 立即安装”
-- 安装前退出当前 Curated 进程并释放单实例锁
+- 已实现：应用内下载 installer
+- 待补：下载进度、取消、失败重试
+- 已实现：下载后 SHA256 校验；manifest 解析与发布流程约束继续补齐
+- 已实现：About 页提供“下载并安装 / 立即安装”
+- 待补：安装前退出当前 Curated 进程并释放单实例锁
 
 ### Phase 4
 
-- 自动后台下载更新包
-- 下载完成后非阻塞通知
-- 用户确认后安装
-- 用户明确开启后支持 Inno Setup 静默参数
-- 引入安装器和主程序代码签名校验
+- 已实现：opt-in `autoDownloadUpdates` 自动后台下载更新包
+- 待补：下载完成后非阻塞通知
+- 已实现：用户确认后安装
+- 待补：用户明确开启后支持 Inno Setup 静默参数
+- 待补：引入安装器和主程序代码签名校验
 
 ### Phase 5
 

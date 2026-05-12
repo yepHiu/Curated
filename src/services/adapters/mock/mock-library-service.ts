@@ -60,6 +60,7 @@ import type { LibraryService } from "@/services/contracts/library-service"
 const organizeLibraryMock = ref(false)
 const autoLibraryWatchMock = ref(true)
 const autoActorProfileScrapeMock = ref(false)
+const autoDownloadUpdatesMock = ref(false)
 const launchAtLoginMock = ref(false)
 const launchAtLoginSupportedMock = ref(false)
 const curatedFrameExportFormatMock = ref<CuratedFrameExportFormat>("jpg")
@@ -545,6 +546,7 @@ export const mockLibraryService: LibraryService = {
   organizeLibrary: computed(() => organizeLibraryMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
+  autoDownloadUpdates: computed(() => autoDownloadUpdatesMock.value),
   launchAtLogin: computed(() => launchAtLoginMock.value),
   launchAtLoginSupported: computed(() => launchAtLoginSupportedMock.value),
   curatedFrameExportFormat: computed(() => curatedFrameExportFormatMock.value),
@@ -807,6 +809,10 @@ export const mockLibraryService: LibraryService = {
 
   async setAutoActorProfileScrape(value: boolean) {
     autoActorProfileScrapeMock.value = value
+  },
+
+  async setAutoDownloadUpdates(value: boolean) {
+    autoDownloadUpdatesMock.value = value
   },
 
   async setLaunchAtLogin(value: boolean) {
