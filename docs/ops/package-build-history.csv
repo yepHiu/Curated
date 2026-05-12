@@ -265,3 +265,6 @@ cad1249b fix: route manual scan feedback through notifications
 0642a4f0 fix: refresh library after watched scrapes
 f13f497a feat: expand notification coverage
 9f79f31c chore(release): prepare 1.4.3 package",versionSource=auto-patch; BuildStamp=20260511.170115; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-13,1.4.5,76b75ec3,master,release:publish,release/portable/Curated-1.4.5-windows-x64.zip; release/installer/Curated-Setup-1.4.5.exe; release/manifest/release.json,成功,wujiahui,"76b75ec3 feat(app-update): add auto-download setting
+fd1d5b46 feat(app-update): add verified installer flow
+d63c281b chore(release): prepare 1.4.4 package",versionSource=auto-patch; BuildStamp=20260512.174356; portable=versionSource=explicit; installer=versionSource=explicit
