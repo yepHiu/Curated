@@ -387,11 +387,11 @@ export const httpClient = {
     return handleResponse<T>(response)
   },
 
-  async delete(path: string): Promise<void> {
+  async delete<T = void>(path: string): Promise<T> {
     const response = await monitoredFetch("DELETE", path, {
       headers: { "Accept": "application/json" },
     })
-    await handleResponse<void>(response)
+    return handleResponse<T>(response)
   },
 
   async postBlob(

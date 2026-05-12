@@ -179,6 +179,8 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		scrapeSem:                     make(chan struct{}, scrapeConc),
 		watchScanPending:              make(map[string]struct{}),
 	}
+	app.appUpdate.SetCacheDir(cfg.CacheDir)
+	app.appUpdate.SetTaskManager(app.tasks)
 
 	// 与设置页「保存代理设置」相同：持久化写回 + proxyenv.Sync。进程重启后仅依赖启动时第一次 Sync
 	// 时，部分出站路径可能仍不按 HTTP_PROXY 生效；此处再应用一次，避免必须手动再点保存。
@@ -2602,6 +2604,48 @@ func (a *App) CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusD
 		}, nil
 	}
 	return a.appUpdate.CheckNow(ctx)
+}
+
+// DownloadAppUpdateInstaller downloads and verifies the latest available installer.
+func (a *App) DownloadAppUpdateInstaller(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
+	if a == nil || a.appUpdate == nil {
+		return contracts.AppUpdateStatusDTO{
+			Supported:    false,
+			Status:       "unsupported",
+			ReleaseURL:   appupdate.DefaultReleasePageURL,
+			Source:       "github-releases",
+			ErrorMessage: "app update service unavailable",
+		}, nil
+	}
+	return a.appUpdate.DownloadInstaller(ctx)
+}
+
+// InstallAppUpdate launches the verified downloaded installer.
+func (a *App) InstallAppUpdate(ctx context.Context, req contracts.AppUpdateInstallRequest) (contracts.AppUpdateStatusDTO, error) {
+	if a == nil || a.appUpdate == nil {
+		return contracts.AppUpdateStatusDTO{
+			Supported:    false,
+			Status:       "unsupported",
+			ReleaseURL:   appupdate.DefaultReleasePageURL,
+			Source:       "github-releases",
+			ErrorMessage: "app update service unavailable",
+		}, nil
+	}
+	return a.appUpdate.Install(ctx, req)
+}
+
+// ClearDownloadedAppUpdateInstaller removes the cached downloaded installer.
+func (a *App) ClearDownloadedAppUpdateInstaller(ctx context.Context) (contracts.AppUpdateStatusDTO, error) {
+	if a == nil || a.appUpdate == nil {
+		return contracts.AppUpdateStatusDTO{
+			Supported:    false,
+			Status:       "unsupported",
+			ReleaseURL:   appupdate.DefaultReleasePageURL,
+			Source:       "github-releases",
+			ErrorMessage: "app update service unavailable",
+		}, nil
+	}
+	return a.appUpdate.ClearDownloadedInstaller(ctx)
 }
 
 // GetDevPerformanceSummary samples CPU usage for the dev-only performance monitor bar.

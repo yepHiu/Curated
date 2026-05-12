@@ -41,9 +41,25 @@ export interface AppUpdateStatusDTO {
   releaseName?: string
   releaseUrl?: string
   installerDownloadUrl?: string
+  installerSha256?: string
+  artifactStatus?: "downloading" | "downloaded" | "verified" | "failed" | "installing" | "install-launched" | ""
+  downloadedVersion?: string
+  downloadedFileName?: string
+  downloadedBytes?: number
+  totalBytes?: number
+  downloadProgress?: number
+  signatureStatus?: string
+  installReady?: boolean
+  lastInstallAttemptAt?: string
+  lastInstallError?: string
+  downloadTaskId?: string
   releaseNotesSnippet?: string
   source?: string
   errorMessage?: string
+}
+
+export interface AppUpdateInstallBody {
+  mode?: "interactive" | "silent" | "verysilent"
 }
 
 export interface MovieListItemDTO {

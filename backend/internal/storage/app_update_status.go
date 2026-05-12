@@ -17,6 +17,17 @@ type AppUpdateStatusSnapshot struct {
 	ReleaseName          string
 	ReleaseURL           string
 	InstallerDownloadURL string
+	InstallerSHA256      string
+	ArtifactStatus       string
+	DownloadedVersion    string
+	DownloadedFileName   string
+	DownloadedFilePath   string
+	DownloadedBytes      int64
+	TotalBytes           int64
+	SignatureStatus      string
+	InstallReady         bool
+	LastInstallAttemptAt string
+	LastInstallError     string
 	ReleaseNotesSnippet  string
 	Source               string
 	ErrorMessage         string
@@ -25,6 +36,7 @@ type AppUpdateStatusSnapshot struct {
 // GetAppUpdateStatusSnapshot returns the cached app update status. The bool is false when no snapshot exists.
 func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdateStatusSnapshot, bool, error) {
 	var snapshot AppUpdateStatusSnapshot
+	var installReadyInt int
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT
@@ -36,6 +48,17 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 			release_name,
 			release_url,
 			installer_download_url,
+			installer_sha256,
+			artifact_status,
+			downloaded_version,
+			downloaded_file_name,
+			downloaded_file_path,
+			downloaded_bytes,
+			total_bytes,
+			signature_status,
+			install_ready,
+			last_install_attempt_at,
+			last_install_error,
 			release_notes_snippet,
 			source,
 			error_message
@@ -50,6 +73,17 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 		&snapshot.ReleaseName,
 		&snapshot.ReleaseURL,
 		&snapshot.InstallerDownloadURL,
+		&snapshot.InstallerSHA256,
+		&snapshot.ArtifactStatus,
+		&snapshot.DownloadedVersion,
+		&snapshot.DownloadedFileName,
+		&snapshot.DownloadedFilePath,
+		&snapshot.DownloadedBytes,
+		&snapshot.TotalBytes,
+		&snapshot.SignatureStatus,
+		&installReadyInt,
+		&snapshot.LastInstallAttemptAt,
+		&snapshot.LastInstallError,
 		&snapshot.ReleaseNotesSnippet,
 		&snapshot.Source,
 		&snapshot.ErrorMessage,
@@ -61,6 +95,7 @@ func (s *SQLiteStore) GetAppUpdateStatusSnapshot(ctx context.Context) (AppUpdate
 		return AppUpdateStatusSnapshot{}, false, err
 	}
 
+	snapshot.InstallReady = installReadyInt != 0
 	return snapshot, true, nil
 }
 
@@ -77,10 +112,21 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 			release_name,
 			release_url,
 			installer_download_url,
+			installer_sha256,
+			artifact_status,
+			downloaded_version,
+			downloaded_file_name,
+			downloaded_file_path,
+			downloaded_bytes,
+			total_bytes,
+			signature_status,
+			install_ready,
+			last_install_attempt_at,
+			last_install_error,
 			release_notes_snippet,
 			source,
 			error_message
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(status_key) DO UPDATE SET
 			installed_version = excluded.installed_version,
 			latest_version = excluded.latest_version,
@@ -90,6 +136,17 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 			release_name = excluded.release_name,
 			release_url = excluded.release_url,
 			installer_download_url = excluded.installer_download_url,
+			installer_sha256 = excluded.installer_sha256,
+			artifact_status = excluded.artifact_status,
+			downloaded_version = excluded.downloaded_version,
+			downloaded_file_name = excluded.downloaded_file_name,
+			downloaded_file_path = excluded.downloaded_file_path,
+			downloaded_bytes = excluded.downloaded_bytes,
+			total_bytes = excluded.total_bytes,
+			signature_status = excluded.signature_status,
+			install_ready = excluded.install_ready,
+			last_install_attempt_at = excluded.last_install_attempt_at,
+			last_install_error = excluded.last_install_error,
 			release_notes_snippet = excluded.release_notes_snippet,
 			source = excluded.source,
 			error_message = excluded.error_message
@@ -103,9 +160,27 @@ func (s *SQLiteStore) UpsertAppUpdateStatusSnapshot(ctx context.Context, snapsho
 		snapshot.ReleaseName,
 		snapshot.ReleaseURL,
 		snapshot.InstallerDownloadURL,
+		snapshot.InstallerSHA256,
+		snapshot.ArtifactStatus,
+		snapshot.DownloadedVersion,
+		snapshot.DownloadedFileName,
+		snapshot.DownloadedFilePath,
+		snapshot.DownloadedBytes,
+		snapshot.TotalBytes,
+		snapshot.SignatureStatus,
+		boolToInt(snapshot.InstallReady),
+		snapshot.LastInstallAttemptAt,
+		snapshot.LastInstallError,
 		snapshot.ReleaseNotesSnippet,
 		snapshot.Source,
 		snapshot.ErrorMessage,
 	)
 	return err
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }

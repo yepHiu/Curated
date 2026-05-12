@@ -32,6 +32,7 @@ import type {
   AddLibraryPathResultDTO,
   AddPlaybackWatchTimeBody,
   AppUpdateStatusDTO,
+  AppUpdateInstallBody,
   CreateCuratedFrameBody,
   CreateMovieImportUploadBody,
   CuratedFrameFacetListDTO,
@@ -236,6 +237,18 @@ export const api = {
 
   checkAppUpdateNow(): Promise<AppUpdateStatusDTO> {
     return httpClient.post<AppUpdateStatusDTO>("/app-update/check")
+  },
+
+  downloadAppUpdateInstaller(): Promise<AppUpdateStatusDTO> {
+    return httpClient.post<AppUpdateStatusDTO>("/app-update/download")
+  },
+
+  installAppUpdate(body: AppUpdateInstallBody = {}): Promise<AppUpdateStatusDTO> {
+    return httpClient.post<AppUpdateStatusDTO>("/app-update/install", body)
+  },
+
+  clearDownloadedAppUpdateInstaller(): Promise<AppUpdateStatusDTO> {
+    return httpClient.delete<AppUpdateStatusDTO>("/app-update/downloaded-installer")
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

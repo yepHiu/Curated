@@ -176,6 +176,9 @@ type HomepageRecommendationsProvider interface {
 type AppUpdateProvider interface {
 	GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
 	CheckAppUpdateNow(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
+	DownloadAppUpdateInstaller(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
+	InstallAppUpdate(ctx context.Context, req contracts.AppUpdateInstallRequest) (contracts.AppUpdateStatusDTO, error)
+	ClearDownloadedAppUpdateInstaller(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
 }
 
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
@@ -277,6 +280,9 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
 	mux.HandleFunc("POST /api/app-update/check", h.handleCheckAppUpdate)
+	mux.HandleFunc("POST /api/app-update/download", h.handleDownloadAppUpdateInstaller)
+	mux.HandleFunc("POST /api/app-update/install", h.handleInstallAppUpdate)
+	mux.HandleFunc("DELETE /api/app-update/downloaded-installer", h.handleClearDownloadedAppUpdateInstaller)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

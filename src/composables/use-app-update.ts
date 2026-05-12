@@ -1,7 +1,7 @@
 import { computed, readonly, ref } from "vue"
 import { api } from "@/api/endpoints"
 import { HttpClientError } from "@/api/http-client"
-import type { AppUpdateStatusDTO } from "@/api/types"
+import type { AppUpdateInstallBody, AppUpdateStatusDTO } from "@/api/types"
 import { i18n } from "@/i18n"
 import { useNotificationCenter } from "@/composables/use-notification-center"
 
@@ -27,6 +27,8 @@ const summary = ref<AppUpdateStatusDTO | null>(
 )
 const status = ref<AppUpdateUiStatus>(USE_WEB ? "idle" : "unsupported")
 const loading = ref(false)
+const downloading = ref(false)
+const installing = ref(false)
 const loaded = ref(!USE_WEB)
 const errorMessage = ref("")
 
@@ -54,6 +56,41 @@ function maybeRecordUpdateAvailableNotification(next: AppUpdateStatusDTO) {
   })
 }
 
+function applySummary(next: AppUpdateStatusDTO) {
+  summary.value = next
+  errorMessage.value = next.errorMessage?.trim() ?? next.lastInstallError?.trim() ?? ""
+  status.value = next.status
+  loaded.value = true
+}
+
+function errorSummary(message: string, previous: AppUpdateStatusDTO | null): AppUpdateStatusDTO {
+  return {
+    supported: true,
+    status: "error",
+    errorMessage: message,
+    releaseUrl: previous?.releaseUrl,
+    installerDownloadUrl: previous?.installerDownloadUrl,
+    installerSha256: previous?.installerSha256,
+    installedVersion: previous?.installedVersion,
+    latestVersion: previous?.latestVersion,
+    checkedAt: previous?.checkedAt,
+    publishedAt: previous?.publishedAt,
+    releaseName: previous?.releaseName,
+    releaseNotesSnippet: previous?.releaseNotesSnippet,
+    source: previous?.source,
+    artifactStatus: previous?.artifactStatus,
+    downloadedVersion: previous?.downloadedVersion,
+    downloadedFileName: previous?.downloadedFileName,
+    downloadedBytes: previous?.downloadedBytes,
+    totalBytes: previous?.totalBytes,
+    downloadProgress: previous?.downloadProgress,
+    signatureStatus: previous?.signatureStatus,
+    installReady: previous?.installReady,
+    lastInstallAttemptAt: previous?.lastInstallAttemptAt,
+    lastInstallError: previous?.lastInstallError,
+  }
+}
+
 async function runRequest(kind: "status" | "check", options?: { silent?: boolean }) {
   if (!USE_WEB) {
     status.value = "unsupported"
@@ -75,10 +112,7 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
       return summary.value
     }
 
-    summary.value = next
-    errorMessage.value = next.errorMessage?.trim() ?? ""
-    status.value = next.status
-    loaded.value = true
+    applySummary(next)
     if (kind === "status") {
       maybeRecordUpdateAvailableNotification(next)
     }
@@ -99,24 +133,55 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
     errorMessage.value = message
     status.value = "error"
     loaded.value = true
-    summary.value = {
-      supported: true,
-      status: "error",
-      errorMessage: message,
-      releaseUrl: previous?.releaseUrl,
-      installerDownloadUrl: previous?.installerDownloadUrl,
-      installedVersion: previous?.installedVersion,
-      latestVersion: previous?.latestVersion,
-      checkedAt: previous?.checkedAt,
-      publishedAt: previous?.publishedAt,
-      releaseName: previous?.releaseName,
-      releaseNotesSnippet: previous?.releaseNotesSnippet,
-      source: previous?.source,
-    }
+    summary.value = errorSummary(message, previous)
     return summary.value
   } finally {
     if (!silent && requestId === requestSeq) {
       loading.value = false
+    }
+  }
+}
+
+async function runMutation(
+  request: () => Promise<AppUpdateStatusDTO>,
+  busyRef: typeof downloading | typeof installing,
+) {
+  if (!USE_WEB) {
+    status.value = "unsupported"
+    loaded.value = true
+    return summary.value
+  }
+
+  const requestId = ++requestSeq
+  busyRef.value = true
+
+  try {
+    const next = await request()
+    if (requestId !== requestSeq) {
+      return summary.value
+    }
+    applySummary(next)
+    return next
+  } catch (err) {
+    if (requestId !== requestSeq) {
+      return summary.value
+    }
+    const previous = summary.value
+    const message =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : err instanceof Error && err.message
+          ? err.message
+          : "Failed to update app"
+
+    errorMessage.value = message
+    status.value = "error"
+    loaded.value = true
+    summary.value = errorSummary(message, previous)
+    return summary.value
+  } finally {
+    if (requestId === requestSeq) {
+      busyRef.value = false
     }
   }
 }
@@ -134,6 +199,18 @@ function checkNow() {
 
 function checkNowSilent() {
   return runRequest("check", { silent: true })
+}
+
+function downloadInstaller() {
+  return runMutation(() => api.downloadAppUpdateInstaller(), downloading)
+}
+
+function installUpdate(mode: AppUpdateInstallBody["mode"] = "interactive") {
+  return runMutation(() => api.installAppUpdate({ mode }), installing)
+}
+
+function clearDownloadedInstaller() {
+  return runMutation(() => api.clearDownloadedAppUpdateInstaller(), downloading)
 }
 
 function scheduleAutoCheck() {
@@ -157,11 +234,16 @@ export function useAppUpdate() {
     summary: readonly(summary),
     status: readonly(status),
     loading: readonly(loading),
+    downloading: readonly(downloading),
+    installing: readonly(installing),
     loaded: readonly(loaded),
     errorMessage: readonly(errorMessage),
     hasUpdateBadge: computed(() => status.value === "update-available" && summary.value?.hasUpdate === true),
     ensureLoaded,
     checkNow,
     checkNowSilent,
+    downloadInstaller,
+    installUpdate,
+    clearDownloadedInstaller,
   }
 }

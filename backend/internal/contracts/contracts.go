@@ -85,9 +85,26 @@ type AppUpdateStatusDTO struct {
 	ReleaseName          string `json:"releaseName,omitempty"`
 	ReleaseURL           string `json:"releaseUrl,omitempty"`
 	InstallerDownloadURL string `json:"installerDownloadUrl,omitempty"`
+	InstallerSHA256      string `json:"installerSha256,omitempty"`
+	ArtifactStatus       string `json:"artifactStatus,omitempty"`
+	DownloadedVersion    string `json:"downloadedVersion,omitempty"`
+	DownloadedFileName   string `json:"downloadedFileName,omitempty"`
+	DownloadedBytes      int64  `json:"downloadedBytes,omitempty"`
+	TotalBytes           int64  `json:"totalBytes,omitempty"`
+	DownloadProgress     int    `json:"downloadProgress,omitempty"`
+	SignatureStatus      string `json:"signatureStatus,omitempty"`
+	InstallReady         bool   `json:"installReady,omitempty"`
+	LastInstallAttemptAt string `json:"lastInstallAttemptAt,omitempty"`
+	LastInstallError     string `json:"lastInstallError,omitempty"`
+	DownloadTaskID       string `json:"downloadTaskId,omitempty"`
 	ReleaseNotesSnippet  string `json:"releaseNotesSnippet,omitempty"`
 	Source               string `json:"source,omitempty"`
 	ErrorMessage         string `json:"errorMessage,omitempty"`
+}
+
+// AppUpdateInstallRequest is the body for POST /api/app-update/install.
+type AppUpdateInstallRequest struct {
+	Mode string `json:"mode,omitempty"`
 }
 
 // ListMoviesRequest filters the library movie listing by mode, query, actor, group, or studio.
@@ -873,6 +890,9 @@ const (
 	ErrorCodeImportCopyFailed          = "IMPORT_COPY_FAILED"
 	ErrorCodeImportCancelled           = "IMPORT_CANCELLED"
 	ErrorCodeImportScanFailed          = "IMPORT_SCAN_FAILED"
+
+	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
+	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"
 
 	// Curated frames export
 	ErrorCodeCuratedExportActorMismatch = "CURATED_EXPORT_ACTOR_MISMATCH"

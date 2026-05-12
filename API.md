@@ -103,10 +103,12 @@ Purpose:
 Important notes:
 
 - the backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`
-- successful release checks also expose `installerDownloadUrl` when the latest release includes a Windows `.exe` installer asset
+- successful release checks expose `installerDownloadUrl` when the latest release includes a Windows `.exe` installer asset
+- when the release asset includes a SHA256 digest, the response also exposes `installerSha256`
+- downloaded installer state is reflected through `artifactStatus`, `downloadedVersion`, `downloadedFileName`, `downloadedBytes`, `totalBytes`, `downloadProgress`, `signatureStatus`, `installReady`, `lastInstallAttemptAt`, and `lastInstallError`
 - development runtimes use `0.0.0` as the local installed version so the full update-check path remains testable before packaging
 - successful checks are cached in SQLite so routine reads do not hit GitHub on every app start
-- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `releaseNotesSnippet` (full GitHub release body text, newline-preserved, capped around 100k runes for cache size), and optional `errorMessage`
+- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `installerSha256`, `releaseNotesSnippet` (full GitHub release body text, newline-preserved, capped around 100k runes for cache size), artifact fields, and optional `errorMessage`
 
 ### `POST /api/app-update/check`
 
@@ -119,6 +121,42 @@ Important notes:
 - bypasses the cached status used by `GET /api/app-update/status`
 - returns the same DTO shape as the status endpoint
 - used by the manual "Check for updates" action in Settings -> About
+
+### `POST /api/app-update/download`
+
+Purpose:
+
+- download the latest Windows installer into Curated's controlled update cache and verify it with SHA256
+
+Important notes:
+
+- requires the cached update state to be `update-available`
+- requires `installerDownloadUrl` and `installerSha256`
+- downloads to the backend cache under an `updates/<version>/` directory
+- returns the same DTO shape as the status endpoint with `artifactStatus=verified` and `installReady=true` after verification
+- unsigned installers can still be downloaded and SHA256 verified, but signature status remains `not_checked`
+
+### `POST /api/app-update/install`
+
+Purpose:
+
+- launch the verified downloaded installer after explicit user action
+
+Request body:
+
+- `mode`: optional `interactive`, `silent`, or `verysilent`; default is `interactive`
+
+Important notes:
+
+- requires `installReady=true`
+- `silent` and `verysilent` only pass Inno Setup quiet flags; Windows UAC can still appear when the install target requires administrator privileges
+- returns the same DTO shape with `artifactStatus=install-launched` after the installer process is started
+
+### `DELETE /api/app-update/downloaded-installer`
+
+Purpose:
+
+- remove the cached downloaded installer and clear artifact metadata from the app-update status row
 
 ## Homepage
 

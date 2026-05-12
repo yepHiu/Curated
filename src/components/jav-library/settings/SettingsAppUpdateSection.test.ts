@@ -6,9 +6,13 @@ import SettingsAppUpdateSection from "./SettingsAppUpdateSection.vue"
 
 const checkNowMock = vi.hoisted(() => vi.fn())
 const checkNowSilentMock = vi.hoisted(() => vi.fn())
+const downloadInstallerMock = vi.hoisted(() => vi.fn())
+const installUpdateMock = vi.hoisted(() => vi.fn())
+const clearDownloadedInstallerMock = vi.hoisted(() => vi.fn())
 const ensureLoadedMock = vi.hoisted(() => vi.fn())
 const pushAppToastMock = vi.hoisted(() => vi.fn())
 const appUpdateSummaryRef = vi.hoisted(() => ({ current: null as { value: AppUpdateSummary } | null }))
+const appUpdateSummarySeed = vi.hoisted(() => ({ current: null as AppUpdateSummary | null }))
 
 type AppUpdateSummary = {
   supported: boolean
@@ -21,6 +25,14 @@ type AppUpdateSummary = {
   releaseName?: string
   releaseUrl?: string
   installerDownloadUrl?: string
+  installerSha256?: string
+  artifactStatus?: string
+  downloadedVersion?: string
+  downloadedFileName?: string
+  downloadedBytes?: number
+  totalBytes?: number
+  downloadProgress?: number
+  installReady?: boolean
   releaseNotesSnippet?: string
 }
 
@@ -36,6 +48,7 @@ function createAppUpdateSummary(overrides: Partial<AppUpdateSummary> = {}): AppU
     releaseName: "v1.2.8",
     releaseUrl: "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
     installerDownloadUrl: "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
+    installerSha256: "ABCDEF",
     releaseNotesSnippet: "Bug fixes",
     ...overrides,
   }
@@ -52,6 +65,11 @@ vi.mock("vue-i18n", () => ({
         "settings.appUpdateCheckAction": "检查更新",
         "settings.appUpdateDownloadAction": "打开 Release 页面",
         "settings.appUpdateDownloadInstallerAction": "下载最新安装包",
+        "settings.appUpdateDownloadAndInstallAction": "下载并安装",
+        "settings.appUpdateDownloadingAction": "正在下载…",
+        "settings.appUpdateInstallReadyAction": "立即安装",
+        "settings.appUpdateInstallingAction": "正在启动…",
+        "settings.appUpdateOpenReleaseAction": "打开 Release 页面",
         "settings.aboutVersionLabel": "Curated Server 版本号",
         "settings.aboutInstallerVersionLabel": "安装包版本号",
         "settings.appUpdateReleaseNotesExpand": "展开全文",
@@ -68,16 +86,21 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@/composables/use-app-update", () => ({
   useAppUpdate: () => {
-    const summary = ref(createAppUpdateSummary())
+    const summary = ref(appUpdateSummarySeed.current ?? createAppUpdateSummary())
     appUpdateSummaryRef.current = summary
     return {
       summary: computed(() => summary.value),
-    status: computed(() => "update-available"),
-    loading: ref(false),
-    hasUpdateBadge: computed(() => true),
-    ensureLoaded: ensureLoadedMock,
-    checkNow: checkNowMock,
-    checkNowSilent: checkNowSilentMock,
+      status: computed(() => "update-available"),
+      loading: ref(false),
+      downloading: ref(false),
+      installing: ref(false),
+      hasUpdateBadge: computed(() => true),
+      ensureLoaded: ensureLoadedMock,
+      checkNow: checkNowMock,
+      checkNowSilent: checkNowSilentMock,
+      downloadInstaller: downloadInstallerMock,
+      installUpdate: installUpdateMock,
+      clearDownloadedInstaller: clearDownloadedInstallerMock,
     }
   },
 }))
@@ -98,8 +121,12 @@ describe("SettingsAppUpdateSection", () => {
   beforeEach(() => {
     checkNowMock.mockReset()
     checkNowSilentMock.mockReset()
+    downloadInstallerMock.mockReset()
+    installUpdateMock.mockReset()
+    clearDownloadedInstallerMock.mockReset()
     ensureLoadedMock.mockReset()
     pushAppToastMock.mockReset()
+    appUpdateSummarySeed.current = null
     if (appUpdateSummaryRef.current) {
       appUpdateSummaryRef.current.value = createAppUpdateSummary()
     }
@@ -126,11 +153,16 @@ describe("SettingsAppUpdateSection", () => {
     expect(text).not.toContain("settings.appUpdatePublishedAtLabel")
     expect(text).not.toContain("settings.appUpdateCheckedAtLabel")
 
-    const download = wrapper.get("[data-app-update-download]")
-    expect(download.attributes("href")).toBe(
-      "https://github.com/yepHiu/Curated/releases/download/v1.2.8/Curated-Setup-1.2.8.exe",
+    const download = wrapper.get("[data-app-update-download-installer]")
+    expect(download.text()).toContain("下载并安装")
+
+    await download.trigger("click")
+    expect(downloadInstallerMock).toHaveBeenCalledTimes(1)
+
+    const release = wrapper.get("[data-app-update-release]")
+    expect(release.attributes("href")).toBe(
+      "https://github.com/yepHiu/Curated/releases/tag/v1.2.8",
     )
-    expect(download.attributes("download")).toBe("Curated-Setup-1.2.8.exe")
 
     const notes = wrapper.get("[data-app-update-release-notes]")
     expect(notes.classes()).toContain("line-clamp-3")
@@ -143,14 +175,29 @@ describe("SettingsAppUpdateSection", () => {
     expect(notesExpanded.classes()).toContain("overflow-y-auto")
   })
 
+  it("launches the installer when the verified update is ready", async () => {
+    appUpdateSummarySeed.current = createAppUpdateSummary({
+      artifactStatus: "verified",
+      downloadedVersion: "1.2.8",
+      downloadedFileName: "Curated-Setup-1.2.8.exe",
+      installReady: true,
+    })
+
+    const wrapper = mount(SettingsAppUpdateSection)
+    const install = wrapper.get("[data-app-update-install]")
+
+    expect(install.text()).toContain("立即安装")
+
+    await install.trigger("click")
+    expect(installUpdateMock).toHaveBeenCalledWith("interactive")
+  })
+
   it("refreshes release notes on first expand so legacy short cached notes can show the full body", async () => {
     const legacySnippet = "Bug fixes"
     const fullNotes = "Bug fixes\n\n- Fixed updater download naming\n- Added full release notes"
-    if (appUpdateSummaryRef.current) {
-      appUpdateSummaryRef.current.value = createAppUpdateSummary({
-        releaseNotesSnippet: legacySnippet,
-      })
-    }
+    appUpdateSummarySeed.current = createAppUpdateSummary({
+      releaseNotesSnippet: legacySnippet,
+    })
     checkNowSilentMock.mockImplementationOnce(async () => {
       if (appUpdateSummaryRef.current) {
         appUpdateSummaryRef.current.value = createAppUpdateSummary({

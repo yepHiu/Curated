@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { ArrowUpRight, Download, Loader2, RefreshCw } from "lucide-vue-next"
+import { ArrowUpRight, Download, Loader2, Play, RefreshCw } from "lucide-vue-next"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useAppUpdate } from "@/composables/use-app-update"
 import { Button } from "@/components/ui/button"
@@ -21,8 +21,19 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
-const { summary, status, loading, hasUpdateBadge, ensureLoaded, checkNow, checkNowSilent } =
-  useAppUpdate()
+const {
+  summary,
+  status,
+  loading,
+  downloading,
+  installing,
+  hasUpdateBadge,
+  ensureLoaded,
+  checkNow,
+  checkNowSilent,
+  downloadInstaller,
+  installUpdate,
+} = useAppUpdate()
 const releaseNotesExpanded = ref(false)
 
 onMounted(() => {
@@ -89,28 +100,18 @@ const installerVersionSummary = computed(() => {
 })
 const releaseUrl = computed(() => summary.value?.releaseUrl?.trim() ?? "")
 const installerDownloadUrl = computed(() => summary.value?.installerDownloadUrl?.trim() ?? "")
-const updateActionUrl = computed(() => installerDownloadUrl.value || releaseUrl.value)
-
-function decodeDownloadFilename(value: string): string {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return value
-  }
-}
-
-const installerDownloadFilename = computed(() => {
-  const raw = installerDownloadUrl.value
-  if (!raw) return ""
-  try {
-    const pathname = new URL(raw).pathname
-    const filename = decodeDownloadFilename(pathname.split("/").pop() ?? "")
-    return filename.toLowerCase().endsWith(".exe") ? filename : ""
-  } catch {
-    const filename = decodeDownloadFilename(raw.split(/[/?#]/).filter(Boolean).pop() ?? "")
-    return filename.toLowerCase().endsWith(".exe") ? filename : ""
-  }
-})
+const installerSha256 = computed(() => summary.value?.installerSha256?.trim() ?? "")
+const artifactStatus = computed(() => summary.value?.artifactStatus?.trim() ?? "")
+const installReady = computed(
+  () => summary.value?.installReady === true && artifactStatus.value === "verified",
+)
+const canDownloadInstaller = computed(
+  () =>
+    status.value === "update-available" &&
+    !!installerDownloadUrl.value &&
+    !!installerSha256.value &&
+    !installReady.value,
+)
 const releaseTitle = computed(() => summary.value?.releaseName?.trim() || summary.value?.latestVersion || "")
 const releaseNotesSnippet = computed(() => summary.value?.releaseNotesSnippet?.trim() ?? "")
 
@@ -154,6 +155,32 @@ async function handleCheckNow() {
   }
   if (next?.status === "error") {
     pushAppToast(next.errorMessage?.trim() || t("settings.appUpdateErrorBody"), {
+      variant: "destructive",
+    })
+  }
+}
+
+async function handleDownloadInstaller() {
+  const next = await downloadInstaller()
+  if (next?.artifactStatus === "verified" && next.installReady) {
+    pushAppToast(t("settings.appUpdateInstallReadyAction"), { variant: "success" })
+    return
+  }
+  if (next?.artifactStatus === "failed" || next?.status === "error") {
+    pushAppToast(next.lastInstallError?.trim() || next.errorMessage?.trim() || t("settings.appUpdateErrorBody"), {
+      variant: "destructive",
+    })
+  }
+}
+
+async function handleInstallUpdate() {
+  const next = await installUpdate("interactive")
+  if (next?.artifactStatus === "install-launched") {
+    pushAppToast(t("settings.appUpdateInstallingAction"), { variant: "success" })
+    return
+  }
+  if (next?.lastInstallError?.trim() || next?.status === "error") {
+    pushAppToast(next.lastInstallError?.trim() || next.errorMessage?.trim() || t("settings.appUpdateErrorBody"), {
       variant: "destructive",
     })
   }
@@ -205,25 +232,49 @@ async function handleCheckNow() {
           </Button>
 
           <Button
-            v-if="updateActionUrl"
+            v-if="installReady"
+            type="button"
+            class="rounded-2xl"
+            :disabled="installing"
+            data-app-update-install
+            @click="handleInstallUpdate"
+          >
+            <Loader2 v-if="installing" class="mr-2 size-4 animate-spin" aria-hidden="true" />
+            <Play v-else class="mr-2 size-4" aria-hidden="true" />
+            {{ installing ? t("settings.appUpdateInstallingAction") : t("settings.appUpdateInstallReadyAction") }}
+          </Button>
+
+          <Button
+            v-else-if="canDownloadInstaller"
+            type="button"
+            class="rounded-2xl"
+            :disabled="downloading"
+            data-app-update-download-installer
+            @click="handleDownloadInstaller"
+          >
+            <Loader2 v-if="downloading" class="mr-2 size-4 animate-spin" aria-hidden="true" />
+            <Download v-else class="mr-2 size-4" aria-hidden="true" />
+            {{
+              downloading
+                ? t("settings.appUpdateDownloadingAction")
+                : t("settings.appUpdateDownloadAndInstallAction")
+            }}
+          </Button>
+
+          <Button
+            v-if="releaseUrl"
             as-child
             class="rounded-2xl"
-            :variant="status === 'update-available' ? 'default' : 'secondary'"
+            :variant="status === 'update-available' ? 'secondary' : 'outline'"
           >
             <a
-              :href="updateActionUrl"
-              :target="installerDownloadUrl ? undefined : '_blank'"
-              :rel="installerDownloadUrl ? undefined : 'noopener noreferrer'"
-              :download="installerDownloadFilename || undefined"
-              data-app-update-download
+              :href="releaseUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-app-update-release
             >
-              <Download v-if="installerDownloadUrl" class="mr-2 size-4" aria-hidden="true" />
-              <ArrowUpRight v-else class="mr-2 size-4" aria-hidden="true" />
-              {{
-                installerDownloadUrl
-                  ? t("settings.appUpdateDownloadInstallerAction")
-                  : t("settings.appUpdateDownloadAction")
-              }}
+              <ArrowUpRight class="mr-2 size-4" aria-hidden="true" />
+              {{ t("settings.appUpdateOpenReleaseAction") }}
             </a>
           </Button>
         </div>

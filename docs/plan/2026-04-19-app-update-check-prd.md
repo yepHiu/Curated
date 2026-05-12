@@ -1,7 +1,8 @@
 # App Update Check PRD
 
-Status: Draft, pending user approval
+Status: Draft, expanded with auto download / install feasibility
 Date: 2026-04-19
+Last updated: 2026-05-12
 
 ## Background
 
@@ -47,16 +48,224 @@ Curated 目前在 Settings -> About 中已经能展示：
 - 如果 latest Release 没有可识别的 `.exe` asset，界面继续降级为打开官方 Release 页面。
 - “不做应用内自动下载/静默安装”的边界仍成立：Curated 不在后台替用户下载或替换程序，只提供用户点击触发的浏览器下载入口。
 
+## 2026-05-12 Auto Download / Install Feasibility Update
+
+新的明确需求是把更新能力继续扩展到：
+
+- 自动发现新版本
+- 自动下载安装包
+- 自动安装
+- 低打扰 / 后台 / 静默更新
+- 也允许用户在界面中显式触发更新安装流程
+
+当前本地产物签名状态实测：
+
+- `release/installer/Curated-Setup-1.4.4.exe`: `Get-AuthenticodeSignature` 返回 `NotSigned`
+- `release/Curated/curated.exe`: `Get-AuthenticodeSignature` 返回 `NotSigned`
+
+这意味着 Curated 目前没有生产级 Authenticode 信任链。自动更新仍可先实现下载、SHA256 校验、用户确认安装；但如果要把“静默自动安装”作为默认能力，签名发布和安装前签名校验应作为前置条件。
+
+结论：**可行，但不能把“静默更新”理解为绕过用户知情、绕过系统权限或绕过安全校验的隐蔽替换。** 对 Curated 当前 Windows + Go 后端 + Inno Setup 安装包结构来说，推荐定义为：
+
+- 后台自动检查：可直接沿用现有 `GET /api/app-update/status` 与 `POST /api/app-update/check`。
+- 后台自动下载：可行，应由后端下载到 `LOCALAPPDATA\Curated\updates\` 或当前运行目录旁的安全缓存目录。
+- 包完整性校验：必须做。当前 `pnpm release:publish` 已生成 `release/manifest/release.json`，其中包含 installer / portable artifact 的 `sha256`；后续应把 manifest 作为 GitHub Release asset 发布，并让后端用它校验下载结果。GitHub Release asset 响应本身也可携带 `digest` 字段，但不能假设历史 release 都有，应优先使用 Curated 自己生成的 manifest。
+- 数字签名校验：强烈建议做。下载后至少校验 Authenticode 签名与发布者；发布流程需要给 `Curated-Setup-<version>.exe` 做代码签名并时间戳。
+- 显式安装：可行，优先落地。用户点击“下载并安装”后，后端启动已下载的 installer。
+- 静默安装：技术上可行，Inno Setup 支持 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS` 等参数，但当前安装器默认安装到 `{autopf}\Curated`，且 Inno Setup 的 `PrivilegesRequired` 默认是 `admin`，因此从未提权的 Curated 进程启动安装器时，Windows UAC 仍会出现。这不是应用可以也不应该规避的系统安全边界。
+- 真正无感自动安装：只有在以下架构之一成立时才现实：
+  - 初次安装时选择 per-user 安装目录并将 Inno `PrivilegesRequired=lowest`，之后更新不需要写入 Program Files。
+  - 初次安装时安装一个受信任、已签名、最小权限范围的 updater service / scheduled task，由它负责后续提权安装。
+  - 未来迁移到带成熟更新器的桌面壳或安装框架，但这会改变当前“Go 后端托管 Web UI”的发布边界。
+
+因此，本阶段建议把目标拆成三个级别：
+
+1. **MVP：显式触发下载并安装**
+   - 用户在 Settings -> About 点击“下载并安装”。
+   - 后端发现版本、下载 installer、校验 hash / 签名、启动安装器。
+   - 安装器可以用普通 UI 或 `/SILENT`，默认不要使用完全无界面的 `/VERYSILENT`。
+   - 如果需要管理员权限，允许 Windows UAC 正常弹出。
+
+2. **增强：后台自动下载，用户确认安装**
+   - 启动后低频检查更新。
+   - 发现新版本后后台下载并校验。
+   - 下载完成后只给非阻塞提示：`新版本已准备好`。
+   - 用户点击“立即安装”或“退出后安装”再执行安装流程。
+   - 这是最适合当前 Curated 的默认路线，低打扰但仍透明。
+
+3. **高级：用户明确开启的静默安装**
+   - Settings 中新增开关，例如 `自动下载更新`、`下载完成后静默安装`。
+   - 仅在安装包已签名、hash 校验通过、版本高于本地、release channel 匹配时允许。
+   - 如果当前安装模式需要 admin，仍然会出现 UAC；不能承诺完全无感。
+   - 对 Program Files 安装模式，后台只能做到“静默传参 + 系统权限提示正常出现”。
+
+### Feasibility Matrix
+
+| 能力 | 当前基础 | 可行性 | 推荐阶段 | 关键风险 |
+| --- | --- | --- | --- | --- |
+| 自动发现新版本 | 已实现 GitHub latest Release 检查、SQLite 缓存、侧边栏提示 | 高 | 已完成 / 保持 | GitHub 网络、代理、限流、tag 语义版本 |
+| 自动获取 installer URL | 已实现 `installerDownloadUrl` 解析 | 高 | 已完成 / 保持 | asset 命名不稳定，需要 manifest 兜底 |
+| 后台下载安装包 | 尚未实现；后端已有 HTTP 客户端和代理 | 高 | Phase 1 | 断点续传、磁盘空间、取消、缓存清理 |
+| SHA256 校验 | release manifest 已生成但未作为远端可信输入使用 | 高 | Phase 1 | manifest 发布流程必须固定 |
+| Authenticode 签名校验 | 尚未实现签名发布和校验 | 中高 | Phase 1 / 2 前置 | 证书成本、CI secret 管理、时间戳 |
+| 显式触发安装 | 尚未实现；Windows 可启动 installer | 高 | Phase 1 | 关闭当前进程、单实例锁、安装日志、失败恢复 |
+| 静默安装 | Inno Setup 支持静默参数 | 中 | Phase 2 | UAC 仍可能出现；错误提示可能被压低 |
+| 完全无感自动安装 | 当前 Program Files + admin installer 架构不满足 | 低到中 | Phase 3+ | 需要 per-user install 或 updater service |
+| 增量更新 | 当前发布物是完整 installer / portable zip | 低 | 暂不做 | 包格式、回滚、差分生成与校验复杂度 |
+
+### Recommended Target Behavior
+
+默认行为应是“自动发现 + 自动下载准备 + 用户确认安装”，而不是默认完全静默替换：
+
+- 启动后延迟检查更新，遵守现有 24 小时缓存策略。
+- 发现更新后，若用户开启 `autoDownloadUpdates`，后端排队下载任务。
+- 下载完成且校验通过后，通知中心显示：`新版本已下载，准备安装`。
+- About 页主 CTA 从 `下载最新安装包` 变为：
+  - 未下载：`下载并安装`
+  - 下载中：`正在下载...`
+  - 已就绪：`立即安装`
+  - 安装中：`正在启动安装程序...`
+- 用户点击安装后：
+  - 后端记录安装尝试状态。
+  - 后端启动 installer。
+  - 对显式安装默认使用普通 UI 或 `/SILENT /NORESTART /SP- /CLOSEAPPLICATIONS`。
+  - 对用户开启的静默安装才使用 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS`。
+  - 当前进程需要主动释放单实例锁并退出，避免安装器无法替换 `curated.exe`。
+
+### Proposed Backend Model
+
+建议新增 `internal/appupdate` 的第二层状态机，不复用现有 `status` 字段承载所有下载和安装状态：
+
+- Release check state：继续使用现有 `unsupported | up-to-date | update-available | error`。
+- Installer artifact state：新增 `not-started | downloading | downloaded | verified | failed | installing | install-launched`。
+
+建议新增 DTO 字段：
+
+- `artifactStatus`
+- `downloadedVersion`
+- `downloadedFileName`
+- `downloadedBytes`
+- `totalBytes`
+- `downloadProgress`
+- `sha256`
+- `signatureStatus`
+- `installReady`
+- `installMode`
+- `lastInstallAttemptAt`
+- `lastInstallError`
+
+建议新增接口：
+
+- `POST /api/app-update/download`
+  - 启动或恢复 installer 下载。
+- `POST /api/app-update/install`
+  - 启动安装器。
+  - body 示例：`{ "mode": "interactive" | "silent", "restartApp": true }`。
+- `DELETE /api/app-update/downloaded-installer`
+  - 清理已下载但未安装的安装包。
+
+首版实现暂不提供取消下载接口；若下载改为长时间后台异步任务，再补 `POST /api/app-update/cancel-download`。
+
+下载任务建议纳入现有任务系统，以便通知中心和进度 dock 可以复用 task 事件：
+
+- task type：`app-update.download`
+- task metadata：`version`、`fileName`、`downloadedBytes`、`totalBytes`、`sha256`、`stage`
+
+### Installer Launch Plan
+
+Windows installer 启动建议由后端新增 `internal/appupdate/install_windows.go`：
+
+- 使用 `exec.CommandContext` 启动 installer。
+- 安装参数分层：
+  - 显式普通安装：无静默参数，或仅带 `/NORESTART /SP-`。
+  - 显式低打扰安装：`/SILENT /NORESTART /SP- /CLOSEAPPLICATIONS`。
+  - 用户授权静默安装：`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /CLOSEAPPLICATIONS`。
+- 如果需要保留安装日志，带 `/LOG="<logPath>"`，但不要把 Inno log 当作稳定机器可解析格式。
+- 启动 installer 后，Curated 应准备退出：
+  - 停止 HTTP server 接新请求。
+  - 关闭 tray。
+  - 释放 single-instance mutex。
+  - 允许 installer 关闭 `curated.exe`。
+- 安装器模板当前已有 `CloseApplications=yes`、`CloseApplicationsFilter=curated.exe`、`RestartApplications=no`。未来如果希望安装完成后自动重启 Curated，需要显式设计 restart handoff，而不是依赖 Inno 的默认行为。
+
+### Security And Trust Requirements
+
+自动下载和安装属于高风险路径，必须把以下要求列为实现前置：
+
+- 只接受 HTTPS 下载 URL。
+- 下载 URL 必须属于配置允许的 release host，默认仅允许 `github.com/yepHiu/Curated/releases/download/...`。
+- 下载文件必须写入受控缓存目录，文件名按远端版本和 asset 名生成，避免路径穿越。
+- 下载完成后必须校验 SHA256。
+- 需要尽快引入 Windows code signing；安装器和主 exe 都应签名。
+- 若已签名，安装前校验 Authenticode 证书链与发布者。
+- 只允许升级到版本号高于当前 `installerVersion` 的 release。
+- 不允许 draft / prerelease 自动安装到 stable channel。
+- 静默安装必须是用户明确开启的设置，默认关闭。
+- 所有自动下载、校验、安装尝试都写入日志，About 页能展示最近失败原因。
+
+### Product Setting Proposal
+
+建议新增设置项，默认值保守：
+
+- `checkForUpdatesAutomatically`: `true`
+- `autoDownloadUpdates`: `false` 或后续成熟后改为 `true`
+- `autoInstallUpdates`: `false`
+- `silentInstallUpdates`: `false`
+- `updateChannel`: `stable`
+
+默认推荐：
+
+- 自动检查：开。
+- 自动下载：第一版默认关，功能稳定后可改为开。
+- 自动安装：默认关。
+- 静默安装：默认关，且必须要求包签名校验通过。
+
+### Release Pipeline Impact
+
+为了支撑自动安装，发布流程需要补齐：
+
+- `pnpm release:publish` 生成的 `release/manifest/release.json` 必须作为 GitHub Release asset 上传。
+- manifest 中 artifact 的 `path` 不应作为远端客户端字段使用；应新增 `downloadUrl` 或让客户端按 GitHub asset name 匹配。
+- manifest 应包含：
+  - `version`
+  - `channel`
+  - `artifacts[].type`
+  - `artifacts[].fileName`
+  - `artifacts[].sha256`
+  - `artifacts[].size`
+  - `artifacts[].downloadUrl`（发布后可由 release uploader 回写，或客户端从 asset 列表匹配）
+  - `minimumSupportedVersion`（可选，未来数据库迁移或破坏性升级时使用）
+- 安装器应签名并时间戳。
+- 如果 CI/CD 后续接管 release，需要把签名证书和 GitHub release upload 权限纳入 secret 管理。
+
+### Documentation References
+
+- GitHub REST API 的 latest release 接口返回最新 published full release，且 response assets 中包含 `browser_download_url` 与 `digest` 等字段：https://docs.github.com/en/rest/releases/releases#get-the-latest-release
+- Inno Setup 官方命令行参数支持 `/SILENT`、`/VERYSILENT`、`/SUPPRESSMSGBOXES`、`/NORESTART`、`/CLOSEAPPLICATIONS` 等：https://jrsoftware.org/ishelp/topic_setupcmdline.htm
+- Inno Setup 官方退出码定义可用于安装结果归类；非 0 代表未成功完成：https://jrsoftware.org/ishelp/topic_setupexitcodes.htm
+- Inno Setup `PrivilegesRequired` 默认是 `admin`，会影响是否触发 Windows UAC：https://jrsoftware.org/ishelp/topic_setup_privilegesrequired.htm
+- Microsoft SignTool 可用于签名、时间戳和验证文件签名，`verify` 会检查证书链、吊销状态和策略：https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool
+
+### Open Product Decision
+
+需要用户确认的关键产品决策：
+
+**Curated 的默认自动更新体验要做到哪一级？**
+
+推荐选择：**自动发现 + 可选自动下载 + 用户确认安装**。这能满足低打扰，同时不引入绕过权限和用户知情的风险。若未来要做到完全无感安装，应单独评估 per-user 安装模式或受限 updater service。
+
 ## Non-Goals
 
 本期不做以下内容：
 
-- 应用内自动下载安装包
-- 静默更新或后台自动替换当前安装
+- 未经用户知情和授权的隐蔽更新
+- 绕过 Windows UAC、SmartScreen、签名校验或系统权限边界
 - 增量补丁升级
 - 多更新通道切换（如 preview / beta / nightly）
 - 非 GitHub Release 来源的更新检查
 - 开发态 / Mock 模式下伪造“有更新”结果
+
+说明：2026-05-12 后，`应用内自动下载安装包`、`显式触发安装`、`用户授权静默安装` 已进入后续阶段候选范围；它们不再是长期 Non-Goal，但仍不属于已完成的 2026-05-03 下载入口能力。
 
 ## Scope
 
@@ -558,6 +767,28 @@ About 页新增一个明确按钮：
 - 侧边栏品牌 logo 邻近的更新提示 badge / compact 角标
 - 可选“跳过该版本”或“稍后提醒”
 - 可选 preview / beta 渠道支持
+
+### Phase 3
+
+- 应用内下载 installer
+- 下载进度、取消、失败重试
+- SHA256 校验和 manifest 解析
+- About 页提供“下载并安装 / 立即安装”
+- 安装前退出当前 Curated 进程并释放单实例锁
+
+### Phase 4
+
+- 自动后台下载更新包
+- 下载完成后非阻塞通知
+- 用户确认后安装
+- 用户明确开启后支持 Inno Setup 静默参数
+- 引入安装器和主程序代码签名校验
+
+### Phase 5
+
+- 评估 per-user 安装或 updater service
+- 只有在架构允许时再承诺完全无感安装
+- 评估回滚、最小支持版本、数据库迁移兼容和发布通道
 
 ## Docs Impact
 

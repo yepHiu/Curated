@@ -1,0 +1,11 @@
+ALTER TABLE app_update_status ADD COLUMN installer_sha256 TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN artifact_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN downloaded_version TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN downloaded_file_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN downloaded_file_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN downloaded_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_update_status ADD COLUMN total_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_update_status ADD COLUMN signature_status TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN install_ready INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_update_status ADD COLUMN last_install_attempt_at TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_update_status ADD COLUMN last_install_error TEXT NOT NULL DEFAULT '';

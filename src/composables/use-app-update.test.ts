@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 const apiMocks = vi.hoisted(() => ({
   getAppUpdateStatus: vi.fn(),
   checkAppUpdateNow: vi.fn(),
+  downloadAppUpdateInstaller: vi.fn(),
+  installAppUpdate: vi.fn(),
+  clearDownloadedAppUpdateInstaller: vi.fn(),
 }))
 
 const notificationMocks = vi.hoisted(() => ({
@@ -40,6 +43,9 @@ beforeEach(() => {
   vi.useRealTimers()
   apiMocks.getAppUpdateStatus.mockReset()
   apiMocks.checkAppUpdateNow.mockReset()
+  apiMocks.downloadAppUpdateInstaller.mockReset()
+  apiMocks.installAppUpdate.mockReset()
+  apiMocks.clearDownloadedAppUpdateInstaller.mockReset()
   notificationMocks.addNotification.mockReset()
 })
 
@@ -146,6 +152,50 @@ describe("useAppUpdate", () => {
     expect(state.status.value).toBe("error")
     expect(state.loaded.value).toBe(true)
     expect(state.errorMessage.value).toBe("release lookup failed")
+  })
+
+  it("downloads the installer and updates artifact state", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.downloadAppUpdateInstaller.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      hasUpdate: true,
+      latestVersion: "1.4.5",
+      artifactStatus: "verified",
+      downloadedVersion: "1.4.5",
+      downloadedFileName: "Curated-Setup-1.4.5.exe",
+      downloadedBytes: 20,
+      totalBytes: 20,
+      downloadProgress: 100,
+      installReady: true,
+    })
+
+    const state = await loadUseAppUpdate()
+    const result = await state.downloadInstaller()
+
+    expect(apiMocks.downloadAppUpdateInstaller).toHaveBeenCalledTimes(1)
+    expect(result?.artifactStatus).toBe("verified")
+    expect(state.summary.value?.artifactStatus).toBe("verified")
+    expect(state.summary.value?.installReady).toBe(true)
+    expect(state.installing.value).toBe(false)
+  })
+
+  it("starts installer with explicit mode", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.installAppUpdate.mockResolvedValueOnce({
+      supported: true,
+      status: "update-available",
+      artifactStatus: "install-launched",
+      installReady: false,
+    })
+
+    const state = await loadUseAppUpdate()
+    const result = await state.installUpdate("silent")
+
+    expect(apiMocks.installAppUpdate).toHaveBeenCalledWith({ mode: "silent" })
+    expect(result?.artifactStatus).toBe("install-launched")
+    expect(state.summary.value?.artifactStatus).toBe("install-launched")
+    expect(state.installing.value).toBe(false)
   })
 
   it("schedules only one silent auto check for multiple consumers", async () => {
