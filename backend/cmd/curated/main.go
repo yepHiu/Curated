@@ -189,7 +189,23 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 }
 
 func runHTTP(ctx context.Context, boot *bootstrap) error {
-	return server.ListenAndServe(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger)
+	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, serverListeningReporter())
+}
+
+func serverListeningReporter() func(string) {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("CURATED_HOSTED_BY")), "electron") &&
+		strings.TrimSpace(os.Getenv("CURATED_ELECTRON_READY_EVENT")) != "1" {
+		return nil
+	}
+	return func(addr string) {
+		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
+			"kind": "event",
+			"type": "server.listening",
+			"payload": map[string]string{
+				"addr": addr,
+			},
+		})
+	}
 }
 
 func runTrayMode(parentCtx context.Context, cancel context.CancelFunc, boot *bootstrap, opts trayModeOptions) error {

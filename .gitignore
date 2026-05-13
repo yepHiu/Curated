@@ -11,6 +11,7 @@ node_modules
 .pnpm-store/
 dist
 dist-ssr
+electron-dist/
 release/
 scripts/
 !scripts/
@@ -92,6 +93,9 @@ log/
 
 # OpenSpec local workflow (not tracked)
 openspec/
+
+# Claude Code agent skills (local / optional; not part of app source)
+.agents/
 
 # Superpowers skills (local / optional; not part of app source)
 .superpowers/

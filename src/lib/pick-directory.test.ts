@@ -16,6 +16,34 @@ beforeEach(() => {
 })
 
 describe("pickLibraryDirectory", () => {
+  it("returns an absolute path from the desktop directory picker bridge", async () => {
+    ;(window as Window & { javLibrary?: unknown }).javLibrary = {
+      pickDirectory: vi.fn(async () => ({ path: " D:/Media " })),
+    }
+    ;(window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker = vi.fn(
+      async () => ({ name: "Ignored" }) as FileSystemDirectoryHandle,
+    )
+    const { pickLibraryDirectory } = await import("./pick-directory")
+
+    const outcome = await pickLibraryDirectory()
+
+    expect(outcome).toEqual({
+      status: "ok",
+      path: "D:/Media",
+    })
+  })
+
+  it("returns cancelled when the desktop directory picker bridge is cancelled", async () => {
+    ;(window as Window & { javLibrary?: unknown }).javLibrary = {
+      pickDirectory: vi.fn(async () => null),
+    }
+    const { pickLibraryDirectory } = await import("./pick-directory")
+
+    const outcome = await pickLibraryDirectory()
+
+    expect(outcome).toEqual({ status: "cancelled" })
+  })
+
   it("returns a localized hint when Chromium only exposes the selected folder name", async () => {
     ;(window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker = vi.fn(
       async () => ({ name: "Movies" }) as FileSystemDirectoryHandle,

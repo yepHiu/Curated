@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -2835,7 +2836,18 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 
 // ListenAndServe starts an HTTP server on addr and gracefully shuts down when ctx is cancelled.
 func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logger *zap.Logger) error {
+	return ListenAndServeWithReady(ctx, addr, handler, logger, nil)
+}
+
+// ListenAndServeWithReady starts an HTTP server, calls onReady after the TCP
+// listener is bound, and gracefully shuts down when ctx is cancelled.
+func ListenAndServeWithReady(ctx context.Context, addr string, handler http.Handler, logger *zap.Logger, onReady func(addr string)) error {
 	srv := newHTTPServer(addr, handler)
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return err
+	}
+	boundAddr := listener.Addr().String()
 
 	go func() {
 		<-ctx.Done()
@@ -2852,9 +2864,12 @@ func ListenAndServe(ctx context.Context, addr string, handler http.Handler, logg
 	}()
 
 	if logger != nil {
-		logger.Info("HTTP server listening", zap.String("addr", addr))
+		logger.Info("HTTP server listening", zap.String("addr", boundAddr), zap.String("configuredAddr", addr))
 	}
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if onReady != nil {
+		onReady(boundAddr)
+	}
+	if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
