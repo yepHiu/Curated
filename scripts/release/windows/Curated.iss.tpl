@@ -1,7 +1,7 @@
 #define MyAppName "Curated"
 #define MyAppVersion "__APP_VERSION__"
 #define MyAppPublisher "Curated"
-#define MyAppExeName "curated.exe"
+#define MyAppExeName "Curated.exe"
 #define MyAppSourceDir "__APP_DIR__"
 #define MyOutputDir "__OUTPUT_DIR__"
 #define MySetupBaseName "__SETUP_BASENAME__"
@@ -23,7 +23,7 @@ SetupIconFile={#MyAppSourceDir}\curated.ico
 UninstallDisplayIcon={app}\curated.ico
 CloseApplications=yes
 RestartApplications=no
-CloseApplicationsFilter=curated.exe
+CloseApplicationsFilter=Curated.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

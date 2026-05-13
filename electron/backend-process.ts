@@ -60,6 +60,7 @@ export function resolveBackendLaunchPlan(options: BackendLaunchPlanOptions): Bac
   const explicitBackendPath = env[backendPathEnvKey]?.trim()
   const candidates = [
     explicitBackendPath,
+    joinAppPath(options.appPath, executableName),
     joinAppPath(options.appPath, "backend", "runtime", isWindows ? "curated-dev.exe" : "curated-dev"),
     joinAppPath(options.appPath, "release", "Curated", executableName),
     joinAppPath(options.appPath, "backend", executableName),

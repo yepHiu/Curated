@@ -21,6 +21,15 @@ describe("Electron desktop shell integration", () => {
     expect(iconPath).toBe(preferredIcon)
   })
 
+  it("uses the packaged app ico when running from Electron resources", () => {
+    const appPath = "C:/Program Files/Curated/resources/app"
+    const packagedIcon = path.join(appPath, "curated.ico")
+
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon)
+
+    expect(iconPath).toBe(packagedIcon)
+  })
+
   it("falls back to the public png icon when the Windows ico is unavailable", () => {
     const appPath = "C:/repo"
     const fallbackIcon = path.join(appPath, "public", "Curated-icon.png")

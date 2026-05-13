@@ -38,8 +38,8 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
-- **Windows release packaging** — Tray-mode startup, local frontend hosting, Inno Setup installer, portable zip, FFmpeg bundling, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
-- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC.
+- **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
+- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
 - **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
 
 ## Quick Start
@@ -91,7 +91,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 pnpm dev:electron
 ```
 
-The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, Electron continues to load the backend-hosted static UI on `http://127.0.0.1:8081`. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
+The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, the installed `Curated.exe` is the Electron shell, the bundled Go backend lives at `resources/app/curated.exe`, and Electron loads the backend-hosted static UI on `http://127.0.0.1:8081`. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
 
 ## Features
 
@@ -181,6 +181,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 ### Packaging & Release
 
 - Windows release workflow: `pnpm release:publish` via Python CLI.
+- Installed release entrypoint: `Curated.exe` is the Electron desktop shell; the release Go backend is bundled as `resources/app/curated.exe` and started with `-mode http` when Electron owns it.
 - Tray-mode runtime with local frontend hosting on `:8081`.
 - Inno Setup installer and portable zip distribution.
 - FFmpeg bundling and release manifest generation.
@@ -275,13 +276,14 @@ pnpm release:publish
 Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.4.2`.
+- The current base line is `1.4.6`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
-- Release packaging assembles a Windows-oriented staging directory, portable zip, installer executable, and release manifest.
-- Release packaging bundles FFmpeg into `third_party/ffmpeg/bin/`: it first uses `backend/third_party/ffmpeg/bin/`, then falls back to a real local FFmpeg installation discovered from Scoop or PATH, and fails fast if no runtime is available.
+- `pnpm release:publish` builds the Vue frontend, the release Go backend, and the Electron main process before assembling artifacts.
+- Release packaging assembles a Windows-oriented Electron staging directory, portable zip, installer executable, and release manifest.
+- The assembled app copies the Electron runtime to `release/Curated`, renames `electron.exe` to `Curated.exe`, writes `resources/app/package.json`, places `electron-dist/` and `frontend-dist/` under `resources/app/`, and bundles the Go backend as `resources/app/curated.exe`.
+- Release packaging bundles FFmpeg into `resources/app/third_party/ffmpeg/bin/`: it first uses `backend/third_party/ffmpeg/bin/`, then falls back to a real local FFmpeg installation discovered from Scoop or PATH, and fails fast if no runtime is available.
 - The package build ledger now lives in `docs/ops/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
-- Windows release binaries default to tray mode and can host the built frontend locally when `frontend-dist/` is present beside the executable.
-- The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source.
+- The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source and launches `{app}\Curated.exe`.
 - Settings can persist Windows login autostart for the current user; autostart launches Curated silently in tray mode without opening the browser on that login-triggered run.
 
 Additional release references:

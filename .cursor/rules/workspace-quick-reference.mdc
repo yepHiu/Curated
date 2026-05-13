@@ -11,7 +11,7 @@ alwaysApply: true
 - **前端启动**：仓库根目录运行 `pnpm dev`，默认 `http://localhost:5173`。
 - **后端启动**：`cd backend && go run ./cmd/curated`，开发默认端口 `:8080`，健康名 `curated-dev`。
 - **开发态 Windows 后端二进制**：`pnpm backend:build:dev`，产物必须是 `backend/runtime/curated-dev.exe`，不要生成开发态 `curated.exe`。
-- **Electron MVP 桌面壳层**：`pnpm dev:electron` 会先构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，再启动 Electron；开发态会启动或复用 Go 后端 `http://127.0.0.1:8080` 与 Vite 前端 `http://127.0.0.1:5173`，主窗口和托盘 Web 入口加载 `5173`；打包态加载后端静态托管 `http://127.0.0.1:8081`。使用 Curated 图标和托盘；关闭窗口会隐藏到托盘，托盘菜单可恢复窗口 / 浏览器打开 Web 端 / 打开 Settings / 真正退出；preload 仅暴露 `window.javLibrary.pickDirectory()` 用于原生目录选择。
+- **Electron MVP 桌面壳层**：`pnpm dev:electron` 会先构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，再启动 Electron；开发态会启动或复用 Go 后端 `http://127.0.0.1:8080` 与 Vite 前端 `http://127.0.0.1:5173`，主窗口和托盘 Web 入口加载 `5173`；生产安装包的顶层 `Curated.exe` 是 Electron 壳，内置 Go 后端在 `resources/app/curated.exe`，打包态加载后端静态托管 `http://127.0.0.1:8081`。使用 Curated 图标和托盘；关闭窗口会隐藏到托盘，托盘菜单可恢复窗口 / 浏览器打开 Web 端 / 打开 Settings / 真正退出；preload 仅暴露 `window.javLibrary.pickDirectory()` 用于原生目录选择。
 - **release 构建默认端口**：`-tags release` 时默认 `:8081`，健康名 `curated`。
 - **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
 - **Vite 代理 / 直连后端**：`vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`（长上传关闭 proxy 超时）；仅本地 loopback Web API 开发态下，`src/api/http-client.ts` 和播放器媒体流会直连开发后端 `:8080`，避免大文件上传/大视频流经过 Vite proxy；release `:8081` 静态托管继续走同源 `/api`。
@@ -28,7 +28,7 @@ alwaysApply: true
 - **新的本地临时目录优先放到**：`.workspace/`
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
-- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；打包会将真实 FFmpeg 放入 `third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
+- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## 配置与持久化

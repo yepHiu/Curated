@@ -121,22 +121,47 @@ def build_backend(
     return binary_path
 
 
+def build_electron_main(output_dir: str = "electron-dist") -> Path:
+    repo_root = get_repo_root()
+    resolved_output_dir = resolve_release_path(output_dir, repo_root)
+
+    print("==> Building Electron main process")
+    print(f"Output: {resolved_output_dir}")
+
+    _run(["pnpm", "build:electron:main"], cwd=repo_root)
+
+    if not (resolved_output_dir / "main.js").is_file():
+        raise FileNotFoundError(f"Electron main build did not create {resolved_output_dir / 'main.js'}")
+
+    print("Electron main build complete.")
+    return resolved_output_dir
+
+
 def assemble_release(
     version: str,
     build_stamp: str,
     binary_path: str = "release/backend/curated.exe",
     frontend_dist_dir: str = "release/frontend",
+    electron_main_dir: str = "electron-dist",
+    electron_runtime_dir: str = "node_modules/electron/dist",
     output_dir: str = "release/Curated",
 ) -> Path:
     repo_root = get_repo_root()
     resolved_binary_path = resolve_release_path(binary_path, repo_root)
     resolved_frontend_dist_dir = resolve_release_path(frontend_dist_dir, repo_root)
+    resolved_electron_main_dir = resolve_release_path(electron_main_dir, repo_root)
+    resolved_electron_runtime_dir = resolve_release_path(electron_runtime_dir, repo_root)
     resolved_output_dir = resolve_release_path(output_dir, repo_root)
-    runtime_dir = resolved_output_dir / "runtime"
+    app_dir = resolved_output_dir / "resources" / "app"
+    runtime_dir = app_dir / "runtime"
     docs_dir = resolved_output_dir / "docs"
 
     if not resolved_binary_path.exists():
         raise FileNotFoundError(f"Release binary not found: {resolved_binary_path}")
+    if not (resolved_electron_runtime_dir / "electron.exe").is_file():
+        raise FileNotFoundError(f"Electron runtime not found: {resolved_electron_runtime_dir / 'electron.exe'}")
+    if not (resolved_electron_main_dir / "main.js").is_file():
+        raise FileNotFoundError(f"Electron main build not found: {resolved_electron_main_dir / 'main.js'}")
 
     print("==> Assembling release directory")
     print(f"Version : {version}")
@@ -146,23 +171,34 @@ def assemble_release(
     if resolved_output_dir.exists():
         shutil.rmtree(resolved_output_dir)
 
+    shutil.copytree(resolved_electron_runtime_dir, resolved_output_dir, dirs_exist_ok=True)
+    electron_exe = resolved_output_dir / "electron.exe"
+    if not electron_exe.is_file():
+        raise FileNotFoundError(f"Electron executable not found after copy: {electron_exe}")
+    electron_exe.replace(resolved_output_dir / "Curated.exe")
+
+    app_dir.mkdir(parents=True, exist_ok=True)
     (runtime_dir / "config").mkdir(parents=True, exist_ok=True)
     (runtime_dir / "data").mkdir(parents=True, exist_ok=True)
     (runtime_dir / "cache").mkdir(parents=True, exist_ok=True)
     (runtime_dir / "logs").mkdir(parents=True, exist_ok=True)
     docs_dir.mkdir(parents=True, exist_ok=True)
 
-    shutil.copy2(resolved_binary_path, resolved_output_dir / "curated.exe")
-    shutil.copy2(repo_root / "backend" / "internal" / "assets" / "curated.ico", resolved_output_dir / "curated.ico")
+    shutil.copy2(resolved_binary_path, app_dir / "curated.exe")
+    icon_path = repo_root / "backend" / "internal" / "assets" / "curated.ico"
+    shutil.copy2(icon_path, resolved_output_dir / "curated.ico")
+    shutil.copy2(icon_path, app_dir / "curated.ico")
+    shutil.copytree(resolved_electron_main_dir, app_dir / "electron-dist", dirs_exist_ok=True)
+    _write_electron_app_package(app_dir, version)
 
     if resolved_frontend_dist_dir.exists():
         shutil.copytree(
             resolved_frontend_dist_dir,
-            resolved_output_dir / "frontend-dist",
+            app_dir / "frontend-dist",
             dirs_exist_ok=True,
         )
 
-    ffmpeg_bundle_source = _bundle_ffmpeg_runtime(repo_root, resolved_output_dir)
+    ffmpeg_bundle_source = _bundle_ffmpeg_runtime(repo_root, app_dir)
 
     shutil.copy2(
         repo_root / "config" / "library-config.cfg",
@@ -180,23 +216,34 @@ def assemble_release(
         "Channel    : release\n\n"
         "This package is prepared for both installer and portable distribution.\n\n"
         "Runtime data layout:\n"
-        "  config\\\n"
-        "  data\\\n"
-        "  cache\\\n"
-        "  logs\\\n\n"
+        "  %LOCALAPPDATA%\\Curated\\config\\\n"
+        "  %LOCALAPPDATA%\\Curated\\data\\\n"
+        "  %LOCALAPPDATA%\\Curated\\cache\\\n"
+        "  %LOCALAPPDATA%\\Curated\\logs\\\n\n"
         "Current status:\n"
-        "  - curated.exe is the release backend binary.\n"
-        "  - frontend-dist contains the production frontend output.\n"
-        f"  - third_party contains bundled FFmpeg runtime tools. Source: {ffmpeg_bundle_source}.\n"
-        "  - runtime\\config\\library-config.example.cfg is a sample library settings file.\n\n"
+        "  - Curated.exe is the Electron desktop shell.\n"
+        "  - resources\\app\\curated.exe is the release Go backend managed by Electron.\n"
+        "  - resources\\app\\frontend-dist contains the production frontend output.\n"
+        f"  - resources\\app\\third_party contains bundled FFmpeg runtime tools. Source: {ffmpeg_bundle_source}.\n"
+        "  - resources\\app\\runtime\\config\\library-config.example.cfg is a sample library settings file.\n\n"
         "Target production behavior:\n"
-        "  - release builds should use the per-user data directory by default.\n"
-        "  - config, database, cache, and logs should stay outside the install directory.\n"
+        "  - Electron owns the default desktop lifecycle and starts/stops the backend it spawns.\n"
+        "  - config, database, cache, and logs stay outside the install directory.\n"
     )
     (resolved_output_dir / "README-release.txt").write_text(notes, encoding="utf-8")
 
     print("Release directory assembled.")
     return resolved_output_dir
+
+
+def _write_electron_app_package(app_dir: Path, version: str) -> None:
+    package = {
+        "name": "curated-desktop",
+        "version": version,
+        "type": "module",
+        "main": "electron-dist/main.js",
+    }
+    (app_dir / "package.json").write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
 
 def _bundle_ffmpeg_runtime(repo_root: Path, release_dir: Path) -> str:
@@ -520,6 +567,7 @@ def publish_release(
             build_stamp_value,
             output_dir=str(resolved_output_dir / "backend"),
         )
+        build_electron_main()
         assemble_release(
             version_info["version"],
             build_stamp_value,

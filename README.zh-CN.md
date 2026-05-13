@@ -38,8 +38,8 @@ Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 G
 - **萃取帧** — 帧截图、浏览、打标、筛选与多格式导出（JPG/WebP/PNG），导出的图片包含嵌入式元数据。
 - **演员管理** — 演员浏览、资料详情、用户标签、外部链接、同源头像缓存与异步元数据刮削。
 - **手柄控制** — 基于 Web Gamepad API 的标准手柄支持（含 DualSense）：全局焦点导航、资料库网格选择、播放器控制。
-- **Windows 发布打包** — 托盘模式运行、本地前端托管、Inno Setup 安装器、便携包、FFmpeg 集成、开机自启，以及基于 GitHub Releases 的更新检查与安装器直接下载。
-- **Electron 桌面壳层** — 当前仓库内的 Electron 主进程会启动或复用 Go HTTP 后端，并在开发态启动或复用 Vite 前端；使用 Curated 图标与托盘加载现有 Web UI；关闭窗口会隐藏到托盘，并只暴露原生目录选择这一类窄 preload 能力，不把业务 REST API 搬到 IPC。
+- **Windows 发布打包** — 以 Electron 桌面程序作为安装入口，包含 Inno Setup 安装器、便携包、FFmpeg 集成、发布清单、开机自启，以及基于 GitHub Releases 的更新检查与安装器直接下载。
+- **Electron 桌面壳层** — 当前仓库内的 Electron 主进程会启动或复用 Go HTTP 后端，并在开发态启动或复用 Vite 前端；使用 Curated 图标与托盘加载现有 Web UI；关闭窗口会隐藏到托盘，并只暴露原生目录选择这一类窄 preload 能力，不把业务 REST API 搬到 IPC。生产安装包中的 `Curated.exe` 是 Electron 壳，Go 后端位于 `resources/app/curated.exe`。
 - **设置与配置** — 完整的设置界面（概览、常规、影片存储、元数据、网络、萃取帧、关于、维护），支持资料库级配置持久化、代理与日志控制。
 
 ## 快速开始
@@ -85,7 +85,7 @@ Vite 开发服务器通常运行在 `http://localhost:5173`。
 pnpm dev:electron
 ```
 
-该命令会构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，用 `-mode http` 启动或复用 Go 后端，等待 `/api/health` 后再启动或复用 `http://127.0.0.1:5173` 的 Vite 前端，并在带 Curated 图标的 BrowserWindow 中打开该前端地址。Electron 启动的 Vite 会带上 `VITE_USE_WEB_API=true`，并把 API 指向 Electron 管理的后端；打包态仍加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。关闭窗口会隐藏到托盘，后端与 Web 入口继续运行；托盘菜单可重新打开 Curated、在浏览器打开 Web 端、打开 Settings 或真正退出应用。业务接口仍走 HTTP；preload 仅暴露 `window.javLibrary.pickDirectory()`，让设置页等现有目录选择流程调用 Electron 原生目录对话框。
+该命令会构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，用 `-mode http` 启动或复用 Go 后端，等待 `/api/health` 后再启动或复用 `http://127.0.0.1:5173` 的 Vite 前端，并在带 Curated 图标的 BrowserWindow 中打开该前端地址。Electron 启动的 Vite 会带上 `VITE_USE_WEB_API=true`，并把 API 指向 Electron 管理的后端；打包态安装后的 `Curated.exe` 是 Electron 壳，内置 Go 后端位于 `resources/app/curated.exe`，Electron 会加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。关闭窗口会隐藏到托盘，后端与 Web 入口继续运行；托盘菜单可重新打开 Curated、在浏览器打开 Web 端、打开 Settings 或真正退出应用。业务接口仍走 HTTP；preload 仅暴露 `window.javLibrary.pickDirectory()`，让设置页等现有目录选择流程调用 Electron 原生目录对话框。
 
 ### 真实 API 与 Mock 模式
 
@@ -180,7 +180,8 @@ pnpm dev:electron
 ### 打包发布
 
 - Windows 发布流程：`pnpm release:publish`（Python CLI 编排）。
-- 托盘模式运行，本地前端托管于 `:8081`。
+- 安装后的生产入口：`Curated.exe` 是 Electron 桌面壳；release Go 后端打包为 `resources/app/curated.exe`，由 Electron 拥有生命周期时以 `-mode http` 启动。
+- 托盘常驻运行，本地前端托管于 `:8081`。
 - Inno Setup 安装器与便携 zip 分发。
 - FFmpeg 集成与发布清单生成。
 - 打包历史台账（`docs/ops/package-build-history.csv`）。
@@ -270,12 +271,13 @@ pnpm release:publish
 关键说明：
 
 - 生产包版本号统一由 `scripts/release/version.json` 管理。
-- 当前版本基线为 `1.4.2`。
+- 当前版本基线为 `1.4.6`。
 - `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
-- 发布流程会生成 Windows 发布目录、便携包、安装器可执行文件和发布清单。
+- `pnpm release:publish` 会先构建 Vue 前端、release Go 后端和 Electron main process，再组装产物。
+- 发布流程会生成 Windows Electron 发布目录、便携包、安装器可执行文件和发布清单。
+- 组装目录会复制 Electron runtime 到 `release/Curated`，把 `electron.exe` 重命名为 `Curated.exe`，写入 `resources/app/package.json`，并把 `electron-dist/`、`frontend-dist/` 和 Go 后端 `curated.exe` 放入 `resources/app/`。
 - 打包历史台账已经迁移到 `docs/ops/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
-- Windows 发布构建默认以托盘模式运行，并在 `frontend-dist/` 与可执行文件同目录时直接托管前端。
-- 安装包仍然继续使用 Inno Setup，只是由 Python 负责渲染 `.iss` 模板并调用 `ISCC.exe`。
+- 安装包仍然继续使用 Inno Setup，只是由 Python 负责渲染 `.iss` 模板并调用 `ISCC.exe`；安装后快捷方式和安装完成后的启动入口都指向 `{app}\Curated.exe`。
 - 设置页可以为当前用户持久化 Windows 开机自启动；这类登录触发的启动会静默进入托盘，不会自动打开浏览器页面。
 
 更多发布资料：

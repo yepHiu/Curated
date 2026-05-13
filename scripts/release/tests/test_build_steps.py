@@ -10,7 +10,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import scripts.release.release_lib.build_steps as build_steps  # type: ignore[import-not-found]
-from scripts.release.release_lib.build_steps import build_backend  # type: ignore[import-not-found]
+from scripts.release.release_lib.build_steps import assemble_release, build_backend  # type: ignore[import-not-found]
 
 
 class BuildStepsTests(unittest.TestCase):
@@ -139,6 +139,111 @@ class BuildStepsTests(unittest.TestCase):
         self.assertEqual(runtime.ffprobe, ffprobe_source)
         self.assertEqual(runtime.source, "scoop")
         self.assertNotEqual(runtime.ffmpeg, shim_path)
+
+    def test_assemble_release_stages_electron_desktop_app(self) -> None:
+        backend_binary = self.temp_root / "release" / "backend" / "curated.exe"
+        backend_binary.parent.mkdir(parents=True)
+        backend_binary.write_bytes(b"go backend")
+
+        frontend_dist = self.temp_root / "release" / "frontend"
+        frontend_dist.mkdir(parents=True)
+        (frontend_dist / "index.html").write_text("<!doctype html>", encoding="utf-8")
+
+        electron_dist = self.temp_root / "node_modules" / "electron" / "dist"
+        electron_dist.mkdir(parents=True)
+        (electron_dist / "electron.exe").write_bytes(b"electron runtime")
+        (electron_dist / "resources.pak").write_bytes(b"pak")
+        (electron_dist / "resources").mkdir()
+
+        compiled_main = self.temp_root / "electron-dist"
+        compiled_main.mkdir()
+        (compiled_main / "main.js").write_text("console.log('main')", encoding="utf-8")
+        (compiled_main / "preload.cjs").write_text("", encoding="utf-8")
+
+        asset_dir = self.temp_root / "backend" / "internal" / "assets"
+        asset_dir.mkdir(parents=True)
+        (asset_dir / "curated.ico").write_bytes(b"ico")
+
+        config_dir = self.temp_root / "config"
+        config_dir.mkdir()
+        (config_dir / "library-config.cfg").write_text("{}", encoding="utf-8")
+
+        plan_dir = self.temp_root / "docs" / "plan"
+        plan_dir.mkdir(parents=True)
+        (plan_dir / "2026-03-31-production-packaging-and-config-strategy.md").write_text(
+            "packaging",
+            encoding="utf-8",
+        )
+
+        repo_ffmpeg_dir = self.temp_root / "backend" / "third_party" / "ffmpeg" / "bin"
+        repo_ffmpeg_dir.mkdir(parents=True)
+        (repo_ffmpeg_dir / "ffmpeg.exe").write_bytes(b"ffmpeg")
+        (repo_ffmpeg_dir / "ffprobe.exe").write_bytes(b"ffprobe")
+
+        with patch("scripts.release.release_lib.build_steps.get_repo_root", return_value=self.temp_root):
+            output = assemble_release(
+                "1.4.7",
+                "20260514.010203",
+                binary_path="release/backend/curated.exe",
+                frontend_dist_dir="release/frontend",
+                electron_main_dir="electron-dist",
+                electron_runtime_dir="node_modules/electron/dist",
+                output_dir="release/Curated",
+            )
+
+        app_dir = output / "resources" / "app"
+        self.assertEqual((output / "Curated.exe").read_bytes(), b"electron runtime")
+        self.assertFalse((output / "electron.exe").exists())
+        self.assertEqual((app_dir / "curated.exe").read_bytes(), b"go backend")
+        self.assertTrue((app_dir / "frontend-dist" / "index.html").is_file())
+        self.assertTrue((app_dir / "electron-dist" / "main.js").is_file())
+        self.assertTrue((app_dir / "electron-dist" / "preload.cjs").is_file())
+        self.assertTrue((app_dir / "third_party" / "ffmpeg" / "bin" / "ffmpeg.exe").is_file())
+        self.assertEqual((app_dir / "package.json").read_text(encoding="utf-8"), '{\n  "name": "curated-desktop",\n  "version": "1.4.7",\n  "type": "module",\n  "main": "electron-dist/main.js"\n}\n')
+        release_notes = (output / "README-release.txt").read_text(encoding="utf-8")
+        self.assertIn("Curated.exe is the Electron desktop shell", release_notes)
+        self.assertIn("resources\\app\\curated.exe is the release Go backend", release_notes)
+
+    def test_installer_template_launches_electron_desktop_exe(self) -> None:
+        template = (REPO_ROOT / "scripts" / "release" / "windows" / "Curated.iss.tpl").read_text(encoding="utf-8")
+
+        self.assertIn('#define MyAppExeName "Curated.exe"', template)
+        self.assertIn('Filename: "{app}\\{#MyAppExeName}"', template)
+        self.assertIn("CloseApplicationsFilter=Curated.exe", template)
+
+    def test_publish_release_builds_electron_main_before_assembly(self) -> None:
+        calls: list[str] = []
+
+        def record(name: str):
+            def inner(*args: object, **kwargs: object) -> object:
+                calls.append(name)
+                if name == "package-portable":
+                    return {"status": "success", "artifact_paths": [], "notes": "portable"}
+                if name == "package-installer":
+                    return {"status": "partial", "artifact_paths": [], "notes": "installer"}
+                return None
+
+            return inner
+
+        with patch("scripts.release.release_lib.build_steps.get_repo_root", return_value=self.temp_root):
+            with patch("scripts.release.release_lib.build_steps._resolve_release_version", return_value={"version": "1.4.7", "source": "explicit"}):
+                with patch("scripts.release.release_lib.build_steps.build_frontend", side_effect=record("build-frontend")):
+                    with patch("scripts.release.release_lib.build_steps.build_backend", side_effect=record("build-backend")):
+                        with patch("scripts.release.release_lib.build_steps.build_electron_main", side_effect=record("build-electron-main")):
+                            with patch("scripts.release.release_lib.build_steps.assemble_release", side_effect=record("assemble-release")):
+                                with patch("scripts.release.release_lib.build_steps.package_portable", side_effect=record("package-portable")):
+                                    with patch("scripts.release.release_lib.build_steps.package_installer", side_effect=record("package-installer")):
+                                        build_steps.publish_release(
+                                            version="1.4.7",
+                                            build_stamp="20260514.010203",
+                                            output_dir=str(self.temp_root / "release"),
+                                            history_path=str(self.temp_root / "history.csv"),
+                                        )
+
+        self.assertEqual(
+            calls[:4],
+            ["build-frontend", "build-backend", "build-electron-main", "assemble-release"],
+        )
 
 
 if __name__ == "__main__":

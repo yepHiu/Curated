@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.release.release_lib.build_steps import (
     build_backend,
+    build_electron_main,
     build_frontend,
     migrate_history,
     package_installer,
@@ -47,6 +48,9 @@ def main() -> None:
     backend_parser.add_argument("--build-stamp", default=utc_build_stamp())
     backend_parser.add_argument("--output-dir", default="release/backend")
     backend_parser.add_argument("--binary-name", default="curated.exe")
+
+    electron_parser = subparsers.add_parser("build-electron-main")
+    electron_parser.add_argument("--output-dir", default="electron-dist")
 
     # Packaging commands share the same version source and history ledger defaults.
     portable_parser = subparsers.add_parser("package-portable")
@@ -98,6 +102,10 @@ def main() -> None:
 
     if args.command == "build-backend":
         build_backend(args.version, args.build_stamp, args.output_dir, args.binary_name)
+        return
+
+    if args.command == "build-electron-main":
+        build_electron_main(args.output_dir)
         return
 
     if args.command == "package-portable":

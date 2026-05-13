@@ -35,6 +35,7 @@ export function resolveAppIconPath(
   pathExists: (candidate: string) => boolean = existsSync,
 ): string | undefined {
   const candidates = [
+    path.join(appPath, "curated.ico"),
     path.join(appPath, "backend", "internal", "assets", "curated.ico"),
     path.join(appPath, "public", "Curated-icon.png"),
     path.join(appPath, "icon", "curated-icon-rg-dark-pink.png"),

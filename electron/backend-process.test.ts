@@ -47,6 +47,19 @@ describe("Electron backend launch planning", () => {
     expect(plan.cwd).toBe("C:/repo/backend")
   })
 
+  it("runs the packaged backend from the Electron app resources directory", () => {
+    const plan = resolveBackendLaunchPlan({
+      appPath: "C:/Program Files/Curated/resources/app",
+      env: {},
+      isWindows: true,
+      pathExists: (candidate) => candidate === "C:/Program Files/Curated/resources/app/curated.exe",
+    })
+
+    expect(plan.command).toBe("C:/Program Files/Curated/resources/app/curated.exe")
+    expect(plan.args).toEqual(["-mode", "http"])
+    expect(plan.cwd).toBe("C:/Program Files/Curated/resources/app")
+  })
+
   it("falls back to go run when no backend binary exists in development", () => {
     const plan = resolveBackendLaunchPlan({
       appPath: "C:/repo",
