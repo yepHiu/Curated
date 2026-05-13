@@ -58,29 +58,33 @@ func (s *SQLiteStore) loadActorExternalLinksForIDs(ctx context.Context, ids []in
 		return out, nil
 	}
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
-		`SELECT actor_id, url FROM actor_external_links WHERE actor_id IN (%s) ORDER BY actor_id, sort_order, id`,
-		placeholders,
-	), args...)
-	if err != nil {
+	if err := forEachInClauseBatch(ids, func(batch []int64) error {
+		rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+			`SELECT actor_id, url FROM actor_external_links WHERE actor_id IN (%s) ORDER BY actor_id, sort_order, id`,
+			inClausePlaceholders(len(batch)),
+		), inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
+
+		for rows.Next() {
+			var actorID int64
+			var item string
+			if err := rows.Scan(&actorID, &item); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			out[actorID] = append(out[actorID], item)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var actorID int64
-		var item string
-		if err := rows.Scan(&actorID, &item); err != nil {
-			return nil, err
-		}
-		out[actorID] = append(out[actorID], item)
-	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // ReplaceActorExternalLinksByName replaces all external links for the given actor name.

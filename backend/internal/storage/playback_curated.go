@@ -419,33 +419,34 @@ func (s *SQLiteStore) ListCuratedFramesForExport(ctx context.Context, ids []stri
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	ph := strings.Repeat("?,", len(ids))
-	ph = ph[:len(ph)-1]
-	q := fmt.Sprintf(`
-		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob
-		FROM curated_frames WHERE id IN (%s)
-	`, ph)
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-	rows, err := s.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
 	byID := make(map[string]CuratedFrameExportRow, len(ids))
-	for rows.Next() {
-		var r CuratedFrameExportRow
-		var actorsJSON, tagsJSON string
-		if err := rows.Scan(&r.ID, &r.MovieID, &r.Title, &r.Code, &actorsJSON, &r.PositionSec, &r.CapturedAt, &tagsJSON, &r.ImageBlob); err != nil {
-			return nil, err
+	if err := forEachInClauseBatch(ids, func(batch []string) error {
+		q := fmt.Sprintf(`
+			SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json, image_blob
+			FROM curated_frames WHERE id IN (%s)
+		`, inClausePlaceholders(len(batch)))
+		rows, err := s.db.QueryContext(ctx, q, inClauseArgs(batch)...)
+		if err != nil {
+			return err
 		}
-		_ = scanCuratedMeta(actorsJSON, tagsJSON, &r.CuratedFrameMeta)
-		byID[r.ID] = r
-	}
-	if err := rows.Err(); err != nil {
+
+		for rows.Next() {
+			var r CuratedFrameExportRow
+			var actorsJSON, tagsJSON string
+			if err := rows.Scan(&r.ID, &r.MovieID, &r.Title, &r.Code, &actorsJSON, &r.PositionSec, &r.CapturedAt, &tagsJSON, &r.ImageBlob); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			_ = scanCuratedMeta(actorsJSON, tagsJSON, &r.CuratedFrameMeta)
+			byID[r.ID] = r
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
 

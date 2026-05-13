@@ -350,42 +350,44 @@ func (s *SQLiteStore) lookupTagsGrouped(ctx context.Context, movieIDs []string) 
 		return metadata, user, nil
 	}
 
-	placeholders := make([]string, 0, len(movieIDs))
-	args := make([]any, 0, len(movieIDs))
-	for _, movieID := range movieIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, movieID)
-	}
+	if err := forEachInClauseBatch(movieIDs, func(batch []string) error {
+		rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+			`SELECT mt.movie_id, t.name, t.type
+			FROM movie_tags mt
+			INNER JOIN tags t ON t.id = mt.tag_id
+			WHERE mt.movie_id IN (%s)
+			ORDER BY t.type ASC, t.name ASC`,
+			inClausePlaceholders(len(batch)),
+		), inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
 
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
-		`SELECT mt.movie_id, t.name, t.type
-		FROM movie_tags mt
-		INNER JOIN tags t ON t.id = mt.tag_id
-		WHERE mt.movie_id IN (%s)
-		ORDER BY t.type ASC, t.name ASC`,
-		strings.Join(placeholders, ", "),
-	), args...)
-	if err != nil {
+		for rows.Next() {
+			var movieID, name, tagType string
+			if err := rows.Scan(&movieID, &name, &tagType); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			switch tagType {
+			case tagTypeUser:
+				user[movieID] = append(user[movieID], name)
+			case "nfo":
+				metadata[movieID] = append(metadata[movieID], name)
+			default:
+				metadata[movieID] = append(metadata[movieID], name)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var movieID, name, tagType string
-		if err := rows.Scan(&movieID, &name, &tagType); err != nil {
-			return nil, nil, err
-		}
-		switch tagType {
-		case tagTypeUser:
-			user[movieID] = append(user[movieID], name)
-		case "nfo":
-			metadata[movieID] = append(metadata[movieID], name)
-		default:
-			metadata[movieID] = append(metadata[movieID], name)
-		}
-	}
-
-	return metadata, user, rows.Err()
+	return metadata, user, nil
 }
 
 // lookupPreviewImageURLs returns ordered sample/preview image source URLs per movie (from media_assets).
@@ -395,33 +397,35 @@ func (s *SQLiteStore) lookupPreviewImageURLs(ctx context.Context, movieIDs []str
 		return result, nil
 	}
 
-	placeholders := make([]string, 0, len(movieIDs))
-	args := make([]any, 0, len(movieIDs))
-	for _, movieID := range movieIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, movieID)
-	}
+	if err := forEachInClauseBatch(movieIDs, func(batch []string) error {
+		rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+			`SELECT movie_id, source_url FROM media_assets
+			WHERE movie_id IN (%s) AND type = 'preview_image' AND source_url != ''
+			ORDER BY movie_id ASC, id ASC`,
+			inClausePlaceholders(len(batch)),
+		), inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
 
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
-		`SELECT movie_id, source_url FROM media_assets
-		WHERE movie_id IN (%s) AND type = 'preview_image' AND source_url != ''
-		ORDER BY movie_id ASC, id ASC`,
-		strings.Join(placeholders, ", "),
-	), args...)
-	if err != nil {
+		for rows.Next() {
+			var movieID, url string
+			if err := rows.Scan(&movieID, &url); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			result[movieID] = append(result[movieID], url)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var movieID, url string
-		if err := rows.Scan(&movieID, &url); err != nil {
-			return nil, err
-		}
-		result[movieID] = append(result[movieID], url)
-	}
-
-	return result, rows.Err()
+	return result, nil
 }
 
 func (s *SQLiteStore) lookupStringRelations(ctx context.Context, movieIDs []string, queryTemplate string) (map[string][]string, error) {
@@ -433,28 +437,30 @@ func (s *SQLiteStore) lookupStringRelations(ctx context.Context, movieIDs []stri
 		return result, nil
 	}
 
-	placeholders := make([]string, 0, len(movieIDs))
-	args := make([]any, 0, len(movieIDs))
-	for _, movieID := range movieIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, movieID)
-	}
+	if err := forEachInClauseBatch(movieIDs, func(batch []string) error {
+		rows, err := s.db.QueryContext(ctx, fmt.Sprintf(queryTemplate, inClausePlaceholders(len(batch))), inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
 
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(queryTemplate, strings.Join(placeholders, ", ")), args...)
-	if err != nil {
+		for rows.Next() {
+			var movieID, value string
+			if err := rows.Scan(&movieID, &value); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			result[movieID] = append(result[movieID], value)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var movieID, value string
-		if err := rows.Scan(&movieID, &value); err != nil {
-			return nil, err
-		}
-		result[movieID] = append(result[movieID], value)
-	}
-
-	return result, rows.Err()
+	return result, nil
 }
 
 // pathHasLibraryRoot reports whether loc (media file path) lies under root (library directory).

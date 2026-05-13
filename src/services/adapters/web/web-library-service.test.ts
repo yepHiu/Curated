@@ -689,6 +689,32 @@ describe("webLibraryService loading", () => {
     expect(webLibraryService.loadError.value).toBeNull()
   })
 
+  it("continues loading movie list pages beyond ten thousand items", async () => {
+    const total = 10_001
+    const batchSize = 500
+    for (let offset = 0; offset < total; offset += batchSize) {
+      const count = Math.min(batchSize, total - offset)
+      apiMocks.listMovies.mockResolvedValueOnce({
+        items: Array.from({ length: count }, (_, index) =>
+          movieListDto(`movie-${offset + index}`),
+        ),
+        total,
+        limit: batchSize,
+        offset,
+      })
+    }
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+
+    expect(apiMocks.listMovies).toHaveBeenLastCalledWith(
+      expect.objectContaining({ limit: batchSize, offset: 10_000 }),
+    )
+    expect(webLibraryService.movies.value).toHaveLength(total)
+    expect(webLibraryService.moviesLoaded.value).toBe(true)
+    expect(webLibraryService.loadError.value).toBeNull()
+  })
+
   it("coalesces concurrent movie detail loads and merges the detail into cache", async () => {
     apiMocks.listMovies.mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.getMovie.mockResolvedValueOnce(movieDetailDto("movie-1"))

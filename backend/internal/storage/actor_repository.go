@@ -280,30 +280,35 @@ func (s *SQLiteStore) loadActorUserTagsForIDs(ctx context.Context, ids []int64) 
 	if len(ids) == 0 {
 		return out, nil
 	}
-	placeholders := strings.Repeat("?,", len(ids))
-	placeholders = strings.TrimSuffix(placeholders, ",")
-	query := fmt.Sprintf(
-		`SELECT actor_id, tag FROM actor_user_tags WHERE actor_id IN (%s) ORDER BY actor_id, tag`,
-		placeholders,
-	)
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
+
+	if err := forEachInClauseBatch(ids, func(batch []int64) error {
+		query := fmt.Sprintf(
+			`SELECT actor_id, tag FROM actor_user_tags WHERE actor_id IN (%s) ORDER BY actor_id, tag`,
+			inClausePlaceholders(len(batch)),
+		)
+		rows, err := s.db.QueryContext(ctx, query, inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
+
+		for rows.Next() {
+			var actorID int64
+			var tag string
+			if err := rows.Scan(&actorID, &tag); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			out[actorID] = append(out[actorID], tag)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var actorID int64
-		var tag string
-		if err := rows.Scan(&actorID, &tag); err != nil {
-			return nil, err
-		}
-		out[actorID] = append(out[actorID], tag)
-	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // ReplaceActorUserTagsByName replaces all actor_user_tags for actors.name (exact).
@@ -445,46 +450,55 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 	if policy.cacheAbs == "" && len(policy.rootAbs) == 0 {
 		return out, nil
 	}
-	placeholders := make([]string, 0, len(actorNames))
-	args := make([]any, 0, len(actorNames))
+	names := make([]string, 0, len(actorNames))
 	for _, name := range actorNames {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
-		placeholders = append(placeholders, "?")
-		args = append(args, name)
+		names = append(names, name)
 	}
-	if len(placeholders) == 0 {
+	if len(names) == 0 {
 		return out, nil
 	}
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
-		`SELECT name, avatar_local_path FROM actors WHERE name IN (%s) AND TRIM(avatar_local_path) != ''`,
-		strings.Join(placeholders, ","),
-	), args...)
-	if err != nil {
+
+	if err := forEachInClauseBatch(names, func(batch []string) error {
+		rows, err := s.db.QueryContext(ctx, fmt.Sprintf(
+			`SELECT name, avatar_local_path FROM actors WHERE name IN (%s) AND TRIM(avatar_local_path) != ''`,
+			inClausePlaceholders(len(batch)),
+		), inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
+
+		for rows.Next() {
+			var name, localPath string
+			if err := rows.Scan(&name, &localPath); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			absPath, err := absCleanPath(localPath)
+			if err != nil {
+				continue
+			}
+			st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+			if !ok {
+				continue
+			}
+			out[name] = ActorAvatarLocalStatus{
+				Ready:   true,
+				Version: localAssetVersionFromStat(st),
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var name, localPath string
-		if err := rows.Scan(&name, &localPath); err != nil {
-			return nil, err
-		}
-		absPath, err := absCleanPath(localPath)
-		if err != nil {
-			continue
-		}
-		st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
-		if !ok {
-			continue
-		}
-		out[name] = ActorAvatarLocalStatus{
-			Ready:   true,
-			Version: localAssetVersionFromStat(st),
-		}
-	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // OpenActorAvatarFile opens the local cached avatar file for an actor after path-policy validation.

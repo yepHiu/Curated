@@ -93,9 +93,8 @@ let activeMoviesPromise: Promise<Movie[]> | null = null
 let trashedMoviesPromise: Promise<Movie[]> | null = null
 const pendingMovieDetailLoads = new Map<string, Promise<Movie | undefined>>()
 
-/** 单次请求条数；多页拉取直至 total 或达到上限，避免首屏只看见前 200 条 */
+/** 单次请求条数；多页拉取直至 total，避免首屏只看见前 200 条 */
 const LIST_BATCH_SIZE = 500
-const MAX_MOVIES_PREFETCH = 10_000
 
 type FetchPagedMoviesOptions = {
   onFirstPage?: (movies: Movie[]) => void
@@ -130,7 +129,7 @@ async function fetchPagedMovies(
   let offset = all.length
   const { total } = first
 
-  while (offset < total && all.length < MAX_MOVIES_PREFETCH) {
+  while (offset < total) {
     const page = await api.listMovies({ limit: LIST_BATCH_SIZE, offset, mode })
     const batch = page.items.map(mapMovieListItem)
     if (batch.length === 0) {

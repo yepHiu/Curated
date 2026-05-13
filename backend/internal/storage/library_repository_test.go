@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,6 +62,67 @@ func TestListMovies_EmptyRelationsEncodeAsArrays(t *testing.T) {
 	}
 	if !strings.Contains(body, `"actors":[]`) || !strings.Contains(body, `"tags":[]`) {
 		t.Fatalf("empty relation arrays not encoded as arrays: %s", body)
+	}
+}
+
+func TestListMovies_LargePageDoesNotHitSQLiteVariableLimit(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "large-page.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() {
+		_ = store.Close()
+	}()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	const movieCount = 33_000
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin seed tx: %v", err)
+	}
+	for i := 0; i < movieCount; i++ {
+		code := fmt.Sprintf("BULK-%05d", i)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO movies (
+				id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+				added_at, location, resolution, year, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			strings.ToLower(code),
+			code,
+			code,
+			"Studio",
+			"Summary",
+			0,
+			0,
+			0,
+			"2026-01-01",
+			filepath.Join(root, code+".mp4"),
+			"mp4",
+			0,
+			"2026-01-01T00:00:00Z",
+			"2026-01-01T00:00:00Z",
+		); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("seed movie %d: %v", i, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit seed tx: %v", err)
+	}
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: movieCount})
+	if err != nil {
+		t.Fatalf("large list movies: %v", err)
+	}
+	if page.Total != movieCount || len(page.Items) != movieCount {
+		t.Fatalf("page total=%d items=%d, want %d", page.Total, len(page.Items), movieCount)
 	}
 }
 

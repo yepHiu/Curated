@@ -1310,7 +1310,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 	importedCount := 0
 	updatedCount := 0
 	skippedCount := 0
-	persistedResults := make([]contracts.ScanFileResultDTO, 0)
 
 	const (
 		minScanProgressInterval = 250 * time.Millisecond
@@ -1361,7 +1360,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				if err := a.store.SaveScanItem(ctx, result); err != nil {
 					return err
 				}
-				persistedResults = append(persistedResults, result)
 
 				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
 					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
@@ -1382,7 +1380,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 					if err := a.store.SaveScanItem(ctx, result); err != nil {
 						return err
 					}
-					persistedResults = append(persistedResults, result)
 					if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
 						a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
 					}
@@ -1400,7 +1397,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				if err := a.store.SaveScanItem(ctx, result); err != nil {
 					return err
 				}
-				persistedResults = append(persistedResults, result)
 				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
 					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
 				}
@@ -1445,7 +1441,6 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 				}
 			}
 
-			persistedResults = append(persistedResults, result)
 			return nil
 		},
 	})
@@ -1462,7 +1457,7 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		return
 	}
 
-	summary.Results = persistedResults
+	summary.Results = nil
 	summary.FilesImported = importedCount
 	summary.FilesUpdated = updatedCount
 	summary.FilesSkipped = skippedCount

@@ -113,49 +113,52 @@ func (s *SQLiteStore) BatchMoviePosterLocalReady(ctx context.Context, movieIDs [
 		return out, nil
 	}
 
-	placeholders := make([]string, 0, len(movieIDs))
-	args := make([]any, 0, len(movieIDs))
-	for _, id := range movieIDs {
-		placeholders = append(placeholders, "?")
-		args = append(args, id)
-	}
-	q := fmt.Sprintf(
-		`SELECT movie_id, type, local_path FROM media_assets
-		WHERE movie_id IN (%s) AND type IN ('cover', 'thumb') AND TRIM(local_path) != ''`,
-		strings.Join(placeholders, ","),
-	)
-	rows, err := s.db.QueryContext(ctx, q, args...)
-	if err != nil {
+	if err := forEachInClauseBatch(movieIDs, func(batch []string) error {
+		q := fmt.Sprintf(
+			`SELECT movie_id, type, local_path FROM media_assets
+			WHERE movie_id IN (%s) AND type IN ('cover', 'thumb') AND TRIM(local_path) != ''`,
+			inClausePlaceholders(len(batch)),
+		)
+		rows, err := s.db.QueryContext(ctx, q, inClauseArgs(batch)...)
+		if err != nil {
+			return err
+		}
+
+		for rows.Next() {
+			var movieID, assetType, localPath string
+			if err := rows.Scan(&movieID, &assetType, &localPath); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			absPath, err := absCleanPath(localPath)
+			if err != nil {
+				continue
+			}
+			st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
+			if !ok {
+				continue
+			}
+			version := localAssetVersionFromStat(st)
+			flags := out[movieID]
+			switch assetType {
+			case "cover":
+				flags.Cover = true
+				flags.CoverVersion = version
+			case "thumb":
+				flags.Thumb = true
+				flags.ThumbVersion = version
+			}
+			out[movieID] = flags
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		return rows.Close()
+	}); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var movieID, assetType, localPath string
-		if err := rows.Scan(&movieID, &assetType, &localPath); err != nil {
-			return nil, err
-		}
-		absPath, err := absCleanPath(localPath)
-		if err != nil {
-			continue
-		}
-		st, ok := mediaAssetFileInfoAllowedWithPolicy(absPath, policy)
-		if !ok {
-			continue
-		}
-		version := localAssetVersionFromStat(st)
-		flags := out[movieID]
-		switch assetType {
-		case "cover":
-			flags.Cover = true
-			flags.CoverVersion = version
-		case "thumb":
-			flags.Thumb = true
-			flags.ThumbVersion = version
-		}
-		out[movieID] = flags
-	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // OpenMovieAssetFile opens a downloaded cover or thumb (kind is "cover" or "thumb") after validating path policy.

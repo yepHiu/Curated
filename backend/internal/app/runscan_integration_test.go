@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -303,6 +304,62 @@ func TestIntegration_RunScan_DuplicateMovieRootSecondSkipped(t *testing.T) {
 	}
 	if skipped[0].Reason != "duplicate_movie_root" {
 		t.Fatalf("skip reason = %q", skipped[0].Reason)
+	}
+}
+
+func TestIntegration_RunScan_MoreThan255MovieDirectories(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libRoot := filepath.Join(root, "lib")
+	const movieCount = 260
+	for i := 1; i <= movieCount; i++ {
+		code := "ABCD-" + fmt.Sprintf("%03d", i)
+		dir := filepath.Join(libRoot, code)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, code+".mp4"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dbPath := filepath.Join(root, "app.db")
+	store, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, libRoot, "lib"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.DatabasePath = dbPath
+	cfg.CacheDir = filepath.Join(root, "cache")
+	cfg.OrganizeLibrary = false
+
+	a := newTestApp(t, store, cfg)
+	taskID := startScanTask(a, store, ctx, []string{libRoot})
+	var buf bytes.Buffer
+	a.runScan(ctx, &buf, taskID, []string{libRoot})
+
+	imported, _, skipped := decodeScanFileEvents(t, &buf)
+	if len(skipped) != 0 {
+		t.Fatalf("unexpected skipped files: got %d first=%+v", len(skipped), skipped[0])
+	}
+	if len(imported) != movieCount {
+		t.Fatalf("imported=%d, want %d", len(imported), movieCount)
+	}
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: movieCount})
+	if err != nil {
+		t.Fatalf("list movies after scan: %v", err)
+	}
+	if page.Total != movieCount || len(page.Items) != movieCount {
+		t.Fatalf("movie page total=%d items=%d, want %d", page.Total, len(page.Items), movieCount)
 	}
 }
 
