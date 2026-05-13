@@ -268,3 +268,8 @@ f13f497a feat: expand notification coverage
 2026-05-13,1.4.5,76b75ec3,master,release:publish,release/portable/Curated-1.4.5-windows-x64.zip; release/installer/Curated-Setup-1.4.5.exe; release/manifest/release.json,成功,wujiahui,"76b75ec3 feat(app-update): add auto-download setting
 fd1d5b46 feat(app-update): add verified installer flow
 d63c281b chore(release): prepare 1.4.4 package",versionSource=auto-patch; BuildStamp=20260512.174356; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-14,1.4.6,a30f261a,master,release:publish,release/portable/Curated-1.4.6-windows-x64.zip; release/installer/Curated-Setup-1.4.6.exe; release/manifest/release.json,成功,wujiahui,"a30f261a docs(electron): document desktop shell lifecycle
+711157c5 feat(electron): add desktop shell MVP
+54d179eb fix(homepage): preserve daily recommendation snapshot size
+5c31c8e2 fix(library): handle large scan and list counts
+e2666ad2 chore(release): prepare 1.4.5 package",versionSource=auto-patch; BuildStamp=20260513.180832; portable=versionSource=explicit; installer=versionSource=explicit
