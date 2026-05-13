@@ -8,6 +8,7 @@ import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 const POLL_MS = 2000
+const REDUNDANT_NO_CHANGE_SCAN_WINDOW_MS = 15_000
 
 /** 同标签页刷新后仍会去拉 recent tasks；持久化已弹过的 taskId，避免每次 F5 重复 toast */
 const SEEN_TOAST_STORAGE_KEY = "curated-library-watch-toast-seen-ids"
@@ -70,6 +71,21 @@ function taskMetaString(task: TaskDTO, key: string): string {
   return typeof value === "string" ? value : ""
 }
 
+function taskFinishedMs(task: TaskDTO): number {
+  const raw = task.finishedAt?.trim()
+  if (!raw) return 0
+  const ms = Date.parse(raw)
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function scanPathsKey(task: TaskDTO): string {
+  const raw = task.metadata?.paths
+  if (!Array.isArray(raw)) return ""
+  const paths = raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+  if (paths.length === 0) return ""
+  return [...paths].sort().join("\u0000")
+}
+
 function taskHasMetadata(task: TaskDTO, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(task.metadata ?? {}, key)
 }
@@ -84,6 +100,19 @@ function taskMetaNumber(task: TaskDTO, key: string): number {
     return Number.isFinite(n) ? n : 0
   }
   return 0
+}
+
+function fsnotifyScanChanged(task: TaskDTO): boolean {
+  return taskMetaNumber(task, "scanImported") + taskMetaNumber(task, "scanUpdated") > 0
+}
+
+function fsnotifyScanNoChange(task: TaskDTO): boolean {
+  const hasScanCounters =
+    taskHasMetadata(task, "scanTotal") ||
+    taskHasMetadata(task, "scanImported") ||
+    taskHasMetadata(task, "scanUpdated") ||
+    taskHasMetadata(task, "scanSkipped")
+  return hasScanCounters && !fsnotifyScanChanged(task)
 }
 
 /** Polls GET /api/tasks/recent and shows toasts for fsnotify-driven scan + linked scrape completions. */
@@ -104,6 +133,7 @@ export function useLibraryWatchToasts() {
   const seenToastIds = readSeenToastIds()
   const fsnotifyScanParents = new Set<string>()
   const bumpedAssetDownloadTaskIds = new Set<string>()
+  const changedScanFinishedAtByPaths = new Map<string, number>()
 
   function markToastSeen(taskId: string) {
     seenToastIds.add(taskId)
@@ -135,9 +165,38 @@ export function useLibraryWatchToasts() {
     })
   }
 
+  function rememberChangedFsnotifyScan(task: TaskDTO) {
+    if (!fsnotifyScanChanged(task)) return
+    const key = scanPathsKey(task)
+    const finishedMs = taskFinishedMs(task)
+    if (!key || finishedMs <= 0) return
+    const previous = changedScanFinishedAtByPaths.get(key) ?? 0
+    if (finishedMs > previous) {
+      changedScanFinishedAtByPaths.set(key, finishedMs)
+    }
+  }
+
+  function shouldSuppressRedundantNoChangeScan(task: TaskDTO): boolean {
+    if (!fsnotifyScanNoChange(task)) return false
+    const key = scanPathsKey(task)
+    const finishedMs = taskFinishedMs(task)
+    if (!key || finishedMs <= 0) return false
+    const changedFinishedMs = changedScanFinishedAtByPaths.get(key) ?? 0
+    return (
+      changedFinishedMs > 0 &&
+      finishedMs >= changedFinishedMs &&
+      finishedMs - changedFinishedMs <= REDUNDANT_NO_CHANGE_SCAN_WINDOW_MS
+    )
+  }
+
   async function poll() {
     try {
       const { tasks } = await api.getRecentTasks(40)
+      for (const task of tasks) {
+        if (isTerminalStatus(task.status) && isFsnotifyScan(task)) {
+          rememberChangedFsnotifyScan(task)
+        }
+      }
 
       let needsMovieReload = false
       for (const task of tasks) {
@@ -146,6 +205,10 @@ export function useLibraryWatchToasts() {
         }
         fsnotifyScanParents.add(task.taskId)
         if (seenToastIds.has(task.taskId)) {
+          continue
+        }
+        if (shouldSuppressRedundantNoChangeScan(task)) {
+          markToastSeen(task.taskId)
           continue
         }
         markToastSeen(task.taskId)
@@ -218,6 +281,9 @@ export function useLibraryWatchToasts() {
 
       if (fsnotifyScanParents.size > 300) {
         fsnotifyScanParents.clear()
+      }
+      if (changedScanFinishedAtByPaths.size > 300) {
+        changedScanFinishedAtByPaths.clear()
       }
     } catch {
       // Offline / transient API errors: skip silently

@@ -93,14 +93,43 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		location string
 	)
 
+	pathErr := tx.QueryRowContext(
+		ctx,
+		`SELECT id, code, location FROM movies
+			 WHERE location = ?
+			   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')
+		 LIMIT 1`,
+		result.Path,
+	).Scan(&movieID, &code, &location)
+
+	switch {
+	case pathErr == nil:
+		if err := tx.Commit(); err != nil {
+			return ScanPersistOutcome{}, err
+		}
+		if code == result.Number {
+			return ScanPersistOutcome{
+				MovieID: movieID,
+				Status:  "skipped",
+				Reason:  "already_indexed",
+			}, nil
+		}
+		return ScanPersistOutcome{
+			MovieID: movieID,
+			Status:  "skipped",
+			Reason:  "path_already_indexed",
+		}, nil
+	case !errors.Is(pathErr, sql.ErrNoRows):
+		return ScanPersistOutcome{}, pathErr
+	}
+
 	queryErr := tx.QueryRowContext(
 		ctx,
 		`SELECT id, code, location FROM movies
-			 WHERE (code = ? OR location = ?)
+			 WHERE code = ?
 			   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')
-			 LIMIT 1`,
+		 LIMIT 1`,
 		result.Number,
-		result.Path,
 	).Scan(&movieID, &code, &location)
 
 	switch {
@@ -145,37 +174,15 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		return ScanPersistOutcome{}, queryErr
 	}
 
-	if code == result.Number {
-		if location == result.Path {
-			if err := tx.Commit(); err != nil {
-				return ScanPersistOutcome{}, err
-			}
-			return ScanPersistOutcome{
-				MovieID: movieID,
-				Status:  "skipped",
-				Reason:  "already_indexed",
-			}, nil
-		}
-
-		_, err = tx.ExecContext(
-			ctx,
-			`UPDATE movies SET location = ?, updated_at = ? WHERE id = ?`,
-			result.Path,
-			nowUTC(),
-			movieID,
-		)
-		if err != nil {
-			return ScanPersistOutcome{}, err
-		}
-
-		if err := tx.Commit(); err != nil {
-			return ScanPersistOutcome{}, err
-		}
-		return ScanPersistOutcome{
-			MovieID: movieID,
-			Status:  "updated",
-			Reason:  "path_refreshed",
-		}, nil
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE movies SET location = ?, updated_at = ? WHERE id = ?`,
+		result.Path,
+		nowUTC(),
+		movieID,
+	)
+	if err != nil {
+		return ScanPersistOutcome{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -183,8 +190,8 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 	}
 	return ScanPersistOutcome{
 		MovieID: movieID,
-		Status:  "skipped",
-		Reason:  "path_already_indexed",
+		Status:  "updated",
+		Reason:  "path_refreshed",
 	}, nil
 }
 

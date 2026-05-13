@@ -43,7 +43,17 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-function makeFsnotifyScanTask(): TaskDTO {
+function makeFsnotifyScanTask(overrides: Partial<TaskDTO> = {}): TaskDTO {
+  const metadata = {
+    trigger: "fsnotify",
+    paths: ["E:/JAV/Curated"],
+    scanTotal: 24,
+    scanProcessed: 24,
+    scanImported: 0,
+    scanUpdated: 0,
+    scanSkipped: 24,
+    ...(overrides.metadata ?? {}),
+  }
   return {
     taskId: "scan-1",
     type: "scan.library",
@@ -53,14 +63,8 @@ function makeFsnotifyScanTask(): TaskDTO {
     finishedAt: "2026-05-02T00:00:02.000Z",
     progress: 100,
     message: "Scan finished: 24 discovered, 0 imported, 0 updated, 24 skipped",
-    metadata: {
-      trigger: "fsnotify",
-      scanTotal: 24,
-      scanProcessed: 24,
-      scanImported: 0,
-      scanUpdated: 0,
-      scanSkipped: 24,
-    },
+    ...overrides,
+    metadata,
   }
 }
 
@@ -119,6 +123,50 @@ describe("useLibraryWatchToasts", () => {
       expect.anything(),
     )
     expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("suppresses a redundant no-change scan after a changed scan for the same paths", async () => {
+    vi.useFakeTimers()
+    const changed = makeFsnotifyScanTask({
+      taskId: "scan-changed",
+      finishedAt: "2026-05-02T00:00:02.000Z",
+      message: "Scan finished: 2 discovered, 2 imported, 0 updated, 0 skipped",
+      metadata: {
+        scanTotal: 2,
+        scanProcessed: 2,
+        scanImported: 2,
+        scanUpdated: 0,
+        scanSkipped: 0,
+      },
+    })
+    const noChange = makeFsnotifyScanTask({
+      taskId: "scan-no-change",
+      finishedAt: "2026-05-02T00:00:07.000Z",
+      message: "Scan finished: 2 discovered, 0 imported, 0 updated, 2 skipped",
+      metadata: {
+        scanTotal: 2,
+        scanProcessed: 2,
+        scanImported: 0,
+        scanUpdated: 0,
+        scanSkipped: 2,
+      },
+    })
+    mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [noChange, changed] })
+
+    const wrapper = await mountLibraryWatchHarness()
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledTimes(1)
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.libraryWatchScanDoneWithChanges",
+      expect.objectContaining({ variant: "success" }),
+    )
+    expect(mocks.pushAppToast).not.toHaveBeenCalledWith(
+      "toasts.libraryWatchScanDoneNoChanges",
+      expect.anything(),
+    )
 
     wrapper.unmount()
   })
