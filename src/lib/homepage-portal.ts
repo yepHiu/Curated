@@ -234,10 +234,14 @@ function withHomepageDailyRecommendations(
   }
 
   const selectedRecommendationIds = new Set(selectedHeroIds)
+  const recommendationLimit = Math.max(
+    model.recommendations.length,
+    selectionRecommendationMovieIds.length,
+  )
   const recommendationMovies = pickMoviesBySnapshotIds(
     selectionRecommendationMovieIds,
     movieById,
-    model.recommendations.length,
+    recommendationLimit,
     selectedRecommendationIds,
   )
 
@@ -256,7 +260,7 @@ function withHomepageDailyRecommendations(
     recommendations.push(...model.recommendations)
   } else {
     for (const entry of model.recommendations) {
-      if (recommendations.length >= model.recommendations.length) break
+      if (recommendations.length >= recommendationLimit) break
       if (selectedRecommendationIds.has(entry.movie.id)) continue
       recommendations.push(entry)
       selectedRecommendationIds.add(entry.movie.id)
