@@ -15,9 +15,10 @@ alwaysApply: true
 - Go HTTP backend, SQLite application database, scanning, scraping, task system, and REST API under `backend/` are implemented.
 - The frontend can use real HTTP through `VITE_USE_WEB_API=true`.
 
-## Not Implemented As Current Frontend Assumptions
+## Desktop Shell Boundaries
 
-- Electron, preload/main process IPC, mpv process control, and desktop file/permission bridges are planning or future desktop concerns unless current code proves otherwise.
+- Electron now has an MVP shell under `electron/`: it starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, uses the Curated app icon and tray, loads the existing Web UI in BrowserWindow, and hides to tray when the window is closed. Packaged runtime still loads the backend-hosted static UI on `http://127.0.0.1:8081`.
+- Electron preload/main process IPC remains deliberately narrow: current code exposes only `window.javLibrary.pickDirectory()` for native directory selection. Deep business IPC, mpv process control, and broader desktop file/permission bridges remain future desktop concerns unless current code proves otherwise.
 - Vue renderer code must not assume Electron, mpv, PotPlayer, or any native-player executable exists.
 
 ## Frontend Business Code

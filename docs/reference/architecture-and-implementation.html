@@ -302,7 +302,7 @@
   </figure>
 
   <h2 id="overview">1. 总览</h2>
-  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。长期可演进为 Electron 等桌面壳，但当前以浏览器 + 本地后端为主。</p>
+  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。当前仍以浏览器 + 本地后端为主，同时已有 <code>electron/</code> 最小桌面壳层：Electron 主进程启动或复用 Go HTTP 后端，等待 <code>/api/health</code> 后在开发态启动或复用 <code>http://127.0.0.1:5173</code> 的 Vite 前端并加载 Web UI；打包态仍加载后端静态托管的 <code>http://127.0.0.1:8081</code>；关闭窗口时隐藏到托盘，使后端与 Web 入口继续运行；preload 只暴露 <code>window.javLibrary.pickDirectory()</code>，用于原生目录选择，不承载业务 API。</p>
   <div class="flow">
     <span>浏览器</span> → <span>直连 Go :8080（loopback 开发）或 Vite <code>/api</code> 代理</span> → <span>SQLite + 文件系统</span>
   </div>
@@ -456,6 +456,7 @@
     <thead><tr><th>功能</th><th>前端</th><th>后端</th></tr></thead>
     <tbody>
       <tr><td>影片列表 / 虚拟滚动</td><td><code>LibraryView</code>、<code>VirtualMovieMasonry</code>、<code>MovieGrid</code>、<code>library-query.ts</code></td><td><code>store.ListMovies</code></td></tr>
+      <tr><td>Electron 壳层 MVP</td><td><code>electron/main.ts</code>、<code>electron/backend-process.ts</code>、<code>electron/frontend-process.ts</code>、<code>electron/preload.cjs</code>；主窗口使用 Curated 图标并加载现有 Web UI；开发态启动或复用 Vite <code>:5173</code>，窗口关闭隐藏到托盘</td><td>复用 Go HTTP 后端与 <code>/api/health</code>；打包态加载后端静态托管 <code>:8081</code>；业务仍走 REST API，preload 仅提供 <code>window.javLibrary.pickDirectory()</code> 原生目录选择；托盘退出仅停止 Electron 自己 spawn 的后端 / 前端</td></tr>
       <tr><td>Web 手柄导航</td><td><code>use-gamepad.ts</code>、<code>use-gamepad-focus-navigation.ts</code>、<code>use-player-gamepad-controls.ts</code>、<code>library-grid-navigation.ts</code>、设置页 Playback 手柄开关（<code>localStorage: curated-gamepad-controls-v1</code>）</td><td>无后端依赖；WebHID / node-hid / Electron 深度集成仍为未来目标</td></tr>
       <tr><td>搜索 / 模式</td><td><code>movie-search.ts</code>、路由 <code>mode</code> query</td><td><code>ListMoviesRequest</code></td></tr>
       <tr><td>详情与预览图</td><td><code>DetailPanel</code>、<code>PreviewImageViewer</code></td><td><code>GetMovieDetail</code></td></tr>

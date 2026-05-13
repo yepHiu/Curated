@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Curated** (product name; repo folder `jav-shadcn`) is a desktop-oriented media library application for managing, browsing, scraping, and playing video collections. It consists of a Vue 3 frontend with a Go backend, using SQLite for persistence and metatube-sdk-go for metadata scraping.
 
-**Current Architecture Phase:** Web phase (Vue SPA + Go HTTP API). Future target is Electron desktop app with mpv player integration.
+**Current Architecture Phase:** Web-first phase (Vue SPA + Go HTTP API) with an in-repo Electron desktop-shell MVP. Electron currently starts or reuses the Go backend, starts or reuses Vite in development, uses the Curated app icon, hides to tray on window close, and exposes only a narrow `window.javLibrary.pickDirectory()` preload bridge for native directory selection; deeper Electron IPC bridges and mpv player integration remain target-direction work.
 
 **Public docs rule:** Root `README.md` is the English primary README, `README.zh-CN.md` and `README.ja-JP.md` are full translations, and root `API.md` is the single public API reference. Do not rebuild the full API table inside the README.
 
@@ -59,6 +59,10 @@ go build -o curated-dev.exe ./cmd/curated
 
 # Run in stdio mode (for future Electron bridge)
 ./curated-dev.exe -mode stdio
+
+# Run the Electron shell MVP from the repo root
+# Development Electron starts/reuses backend :8080 and Vite :5173.
+pnpm dev:electron
 
 # Build the release backend binary
 go build -tags release -o curated.exe ./cmd/curated
@@ -273,13 +277,14 @@ POST   /api/providers/ping-all              # Ping all providers
 - File scanning, metadata scraping, task system
 - REST API at `/api`
 - Frontend connects via HTTP when `VITE_USE_WEB_API=true`
+- Electron shell MVP under `electron/`: starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, loads the Web UI in BrowserWindow with the Curated app icon, keeps the app running in the tray when the window is closed, and exposes only `window.javLibrary.pickDirectory()` through preload for native directory selection. Packaged Electron still loads the backend-hosted static UI on `http://127.0.0.1:8081`.
 - Library storage presence checks for configured roots are implemented Windows-first, with macOS/Linux kept as fallback/future adaptation targets
 - Playback uses HTML5 `<video>` with HTTP Range streaming
 - Web Gamepad API MVP for standard controllers, including DualSense standard mapping: player controls, global focus navigation, library-grid navigation, and a browser-local Settings toggle
 - Trash/restore functionality (soft delete with `trashedAt` timestamp)
 
 **Not Yet Implemented (Documented as Targets):**
-- Electron shell, preload script, main process IPC
+- Deep Electron preload/main process IPC for business APIs or broad native desktop bridges
 - mpv player integration with named pipes
 - Desktop file system bridge
 - WebHID / node-hid controller depth features such as touchpad gestures, adaptive triggers, LED control, and Electron main-process controller integration

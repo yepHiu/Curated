@@ -5,7 +5,7 @@
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
 - `docs/product/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
 - 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`:8080`**，Vite 代理 **`/api` → `:8080`** 仍作为 fallback / 非 loopback 路径保留；release **`:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
-- 当前阶段采用 `Web 优先` 策略：先完成 `Vue Web App -> HTTP API -> Go Backend`，后续再考虑 `Electron` 桥接。
+- 当前阶段采用 `Web 优先 + 最小桌面壳层` 策略：核心业务仍是 `Vue Web App -> HTTP API -> Go Backend`，`electron/` 负责启动或复用 Go HTTP 后端、开发态启动或复用 Vite 前端、用带 Curated 图标的 BrowserWindow 加载 Web UI、关闭窗口时退到托盘，并仅通过 preload 暴露 `window.javLibrary.pickDirectory()` 这一类窄原生能力；深度 IPC 桥接仍是后续目标。
 
 ## 2. 当前代码事实
 
@@ -48,7 +48,7 @@
 - 已落地 **library-service 契约**（`src/services/contracts/library-service.ts`）与 **Web / Mock 双适配器**。
 - **Go Backend** 提供 `/api` 下健康检查、影片列表/详情/PATCH/删除、**视频流 Range**、库路径、设置（含 **`organizeLibrary`** / **`autoLibraryWatch`** / 元数据源等）、扫描、**`tasks/recent`** 与按 id 任务查询等（摘要见 `README.md`）。
 - **库行为 JSON**：`config/library-config.cfg` 与 **`PATCH /api/settings`** 同步；**`autoLibraryWatch`**（默认开）控制是否在主配置允许时启用 **fsnotify** 监听并在新文件事件后排队防抖扫描，**不**关闭手动或周期全库扫描。
-- **无 Electron** `preload`、主进程桥接或 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
+- 已有 **Electron MVP**：`electron/main.ts` / `electron/backend-process.ts` / `electron/frontend-process.ts` 启动或复用 Go HTTP 后端，等待 `/api/health` 后在开发态启动或复用 `http://127.0.0.1:5173` 的 Vite 前端并加载 Web UI；打包态仍加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。窗口使用 Curated 图标，关闭窗口会隐藏到托盘，托盘菜单可恢复窗口、在浏览器打开 Web 端、打开 Settings 或真正退出；`preload` 仅暴露 `window.javLibrary.pickDirectory()` 供现有目录选择入口调用原生目录对话框，不承载业务 API。仍无 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
 - **观看进度与历史列表**仅存 **`localStorage`**，**未**写入 SQLite；与产品文档 §6.5 中服务端 `play_history` 表仍为「待决策/未落地」关系。
 
 ## 3. 当前产品信息架构
@@ -89,7 +89,7 @@
 
 ## 5. 当前尚未实现的能力
 
-- 尚未接入 `Electron` 主进程、`preload` 或桌面桥接。
+- 尚未接入深度 `Electron` preload / IPC 桌面桥接；当前 Electron 仍是最小浏览器壳层，只补了托盘生命周期和原生目录选择这一类窄 preload 能力。
 - 尚未实现 **mpv** 与命名管道 / IPC 的桌面播放闭环（Web 阶段为 `<video>` + HTTP Range）。
 - **服务端**观看进度表 / `play_history` API、多设备同步进度：**未实现**（当前仅前端 localStorage）。
 - 测试覆盖与运维观测仍偏薄；部分边界错误与任务事件仍待产品化收敛。
@@ -123,7 +123,7 @@
 2. 先补 `Go Backend` 的 HTTP API，让 Web 前端可直接联通真实后端。
 3. 定义任务状态与事件模型，支撑扫描和搜刮等异步流程。
 4. 将 mock 数据层逐步抽象成可替换的 `web adapter`。
-5. 在 Web 方案稳定后，再评估 `Electron`、真实播放器与桌面桥接。
+5. 在 Electron MVP 稳定后，再评估 tray、原生文件桥、真实播放器与桌面桥接。
 
 ## 9. 表单与文本输入（项目要求）
 

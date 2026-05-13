@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库已经具备以 Web 为先的架构、面向 Windows 的发布打包流程、托盘模式运行、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
+Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库已经具备以 Web 为先的架构、面向 Windows 的发布打包流程、托盘模式运行、Electron 桌面壳层 MVP、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
 
 完整功能清单请参见 [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)。
 
@@ -39,6 +39,7 @@ Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 G
 - **演员管理** — 演员浏览、资料详情、用户标签、外部链接、同源头像缓存与异步元数据刮削。
 - **手柄控制** — 基于 Web Gamepad API 的标准手柄支持（含 DualSense）：全局焦点导航、资料库网格选择、播放器控制。
 - **Windows 发布打包** — 托盘模式运行、本地前端托管、Inno Setup 安装器、便携包、FFmpeg 集成、开机自启，以及基于 GitHub Releases 的更新检查与安装器直接下载。
+- **Electron 桌面壳层** — 当前仓库内的 Electron 主进程会启动或复用 Go HTTP 后端，并在开发态启动或复用 Vite 前端；使用 Curated 图标与托盘加载现有 Web UI；关闭窗口会隐藏到托盘，并只暴露原生目录选择这一类窄 preload 能力，不把业务 REST API 搬到 IPC。
 - **设置与配置** — 完整的设置界面（概览、常规、影片存储、元数据、网络、萃取帧、关于、维护），支持资料库级配置持久化、代理与日志控制。
 
 ## 快速开始
@@ -77,6 +78,14 @@ pnpm dev
 ```
 
 Vite 开发服务器通常运行在 `http://localhost:5173`。
+
+### 启动 Electron 壳层 MVP
+
+```powershell
+pnpm dev:electron
+```
+
+该命令会构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，用 `-mode http` 启动或复用 Go 后端，等待 `/api/health` 后再启动或复用 `http://127.0.0.1:5173` 的 Vite 前端，并在带 Curated 图标的 BrowserWindow 中打开该前端地址。Electron 启动的 Vite 会带上 `VITE_USE_WEB_API=true`，并把 API 指向 Electron 管理的后端；打包态仍加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。关闭窗口会隐藏到托盘，后端与 Web 入口继续运行；托盘菜单可重新打开 Curated、在浏览器打开 Web 端、打开 Settings 或真正退出应用。业务接口仍走 HTTP；preload 仅暴露 `window.javLibrary.pickDirectory()`，让设置页等现有目录选择流程调用 Electron 原生目录对话框。
 
 ### 真实 API 与 Mock 模式
 
@@ -288,5 +297,5 @@ pnpm release:publish
 ## 说明
 
 - 当前仓库仍处于 **Web-first** 实现阶段。
-- Electron 与 mpv 仍然是目标方向，不是当前仓库已交付能力。
+- Electron 当前已作为最小桌面壳层落在 `electron/`，并具备托盘生命周期管理与窄范围原生目录选择 preload 桥；更深的 IPC 桥、mpv/进程控制、更广泛的原生文件桥和手柄硬件集成仍是后续目标方向。
 - `docs/film-scanner/` 主要保存参考资料和夹具，而不是生产模块布局。

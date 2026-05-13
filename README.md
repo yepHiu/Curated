@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships a web-first architecture with Windows-friendly release packaging, tray-mode runtime support, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
+Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships a web-first architecture with Windows-friendly release packaging, tray-mode runtime support, an Electron desktop-shell MVP, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
 
 See [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) for the full catalog of implemented features.
 
@@ -39,6 +39,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Tray-mode startup, local frontend hosting, Inno Setup installer, portable zip, FFmpeg bundling, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
+- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC.
 - **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
 
 ## Quick Start
@@ -83,6 +84,14 @@ The Vite development server usually runs on `http://localhost:5173`.
 - Set `VITE_USE_WEB_API=true` in the repository root `.env` to use the real backend API.
 - Any other value keeps the frontend in mock mode.
 - In local loopback Web API development, the frontend connects directly to `http://127.0.0.1:8080` for API calls; the Vite `/api` proxy remains available for fallback and non-loopback development.
+
+### Start The Electron Shell MVP
+
+```powershell
+pnpm dev:electron
+```
+
+The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, Electron continues to load the backend-hosted static UI on `http://127.0.0.1:8081`. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
 
 ## Features
 
@@ -294,5 +303,5 @@ Additional release references:
 ## Notes
 
 - The current repository is in the **web-first** implementation phase.
-- Electron and mpv remain target-direction items, not shipped features in this repository.
+- Electron currently exists as a minimal desktop shell under `electron/`; it has tray lifecycle management and a narrow native directory-picker preload bridge, while deeper IPC bridges, mpv/process control, broader native file bridges, and controller hardware integrations remain future target-direction items.
 - `docs/film-scanner/` contains reference material and fixtures rather than the production module layout.

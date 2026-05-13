@@ -11,6 +11,7 @@ alwaysApply: true
 - **前端启动**：仓库根目录运行 `pnpm dev`，默认 `http://localhost:5173`。
 - **后端启动**：`cd backend && go run ./cmd/curated`，开发默认端口 `:8080`，健康名 `curated-dev`。
 - **开发态 Windows 后端二进制**：`pnpm backend:build:dev`，产物必须是 `backend/runtime/curated-dev.exe`，不要生成开发态 `curated.exe`。
+- **Electron MVP 桌面壳层**：`pnpm dev:electron` 会先构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，再启动 Electron；开发态会启动或复用 Go 后端 `http://127.0.0.1:8080` 与 Vite 前端 `http://127.0.0.1:5173`，主窗口和托盘 Web 入口加载 `5173`；打包态加载后端静态托管 `http://127.0.0.1:8081`。使用 Curated 图标和托盘；关闭窗口会隐藏到托盘，托盘菜单可恢复窗口 / 浏览器打开 Web 端 / 打开 Settings / 真正退出；preload 仅暴露 `window.javLibrary.pickDirectory()` 用于原生目录选择。
 - **release 构建默认端口**：`-tags release` 时默认 `:8081`，健康名 `curated`。
 - **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
 - **Vite 代理 / 直连后端**：`vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`（长上传关闭 proxy 超时）；仅本地 loopback Web API 开发态下，`src/api/http-client.ts` 和播放器媒体流会直连开发后端 `:8080`，避免大文件上传/大视频流经过 Vite proxy；release `:8081` 静态托管继续走同源 `/api`。
@@ -23,6 +24,7 @@ alwaysApply: true
   - `videos_test/`：测试素材目录，保留原位，不纳入目录重排
   - `config/`：资料库级运行配置目录，暂时继续保留在 repo root，不并入 `backend/internal/config`
 - **允许的开发态运行产物**：`backend/runtime/`，用于开发二进制、数据库、日志等
+- **Electron 编译产物**：`electron-dist/` 为本地构建输出，不纳入源码跟踪
 - **新的本地临时目录优先放到**：`.workspace/`
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
