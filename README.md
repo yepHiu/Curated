@@ -276,7 +276,7 @@ pnpm release:publish
 Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.4.6`.
+- The current base line is `1.4.7`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
 - `pnpm release:publish` builds the Vue frontend, the release Go backend, and the Electron main process before assembling artifacts.
 - Release packaging assembles a Windows-oriented Electron staging directory, portable zip, installer executable, and release manifest.

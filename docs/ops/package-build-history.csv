@@ -273,3 +273,6 @@ d63c281b chore(release): prepare 1.4.4 package",versionSource=auto-patch; BuildS
 54d179eb fix(homepage): preserve daily recommendation snapshot size
 5c31c8e2 fix(library): handle large scan and list counts
 e2666ad2 chore(release): prepare 1.4.5 package",versionSource=auto-patch; BuildStamp=20260513.180832; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-14,1.4.7,ba55b4a2,master,release:publish,release/portable/Curated-1.4.7-windows-x64.zip; release/installer/Curated-Setup-1.4.7.exe; release/manifest/release.json,成功,wujiahui,"ba55b4a2 feat(electron): package desktop shell in release
+d095b028 fix(scan): handle path collisions during library watch
+bf6e848b chore(release): prepare 1.4.6 package",versionSource=auto-patch; BuildStamp=20260513.192311; portable=versionSource=explicit; installer=versionSource=explicit

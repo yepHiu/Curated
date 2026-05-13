@@ -263,7 +263,7 @@ pnpm release:publish
 主なポイント:
 
 - 本番パッケージのバージョンは `scripts/release/version.json` で一元管理されます。
-- 現在のベースラインは `1.4.6` です。
+- 現在のベースラインは `1.4.7` です。
 - `pnpm release:*` は現在 `python scripts/release/release_cli.py` に統一されています。
 - `pnpm release:publish` は Vue フロントエンド、release Go バックエンド、Electron main process をビルドしてから成果物を組み立てます。
 - リリースフローでは、Windows 用 Electron ステージングディレクトリ、ポータブル zip、インストーラー実行ファイル、リリースマニフェストを生成します。

@@ -271,7 +271,7 @@ pnpm release:publish
 关键说明：
 
 - 生产包版本号统一由 `scripts/release/version.json` 管理。
-- 当前版本基线为 `1.4.6`。
+- 当前版本基线为 `1.4.7`。
 - `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
 - `pnpm release:publish` 会先构建 Vue 前端、release Go 后端和 Electron main process，再组装产物。
 - 发布流程会生成 Windows Electron 发布目录、便携包、安装器可执行文件和发布清单。
