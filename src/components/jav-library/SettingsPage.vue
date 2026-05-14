@@ -22,6 +22,7 @@ import type {
   ProxySettingsDTO,
 } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
+import { useConnectedClients } from "@/composables/use-connected-clients"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
   SETTINGS_SCROLL_EL_KEY,
@@ -185,6 +186,10 @@ watch(
 
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
+const connectedClientsState = useConnectedClients(
+  libraryService,
+  computed(() => activeSlug.value === "overview"),
+)
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
 const libraryPathsList = computed(() => libraryService.libraryPaths.value)
@@ -1129,6 +1134,14 @@ async function onMetadataMovieModeChain() {
 }
 
 const dashboardStats = computed(() => libraryService.libraryStats.value)
+const connectedClients = connectedClientsState.clients
+const connectedClientsTotal = connectedClientsState.total
+const connectedClientsLocalCount = connectedClientsState.localCount
+const connectedClientsRemoteCount = connectedClientsState.remoteCount
+const connectedClientsLoading = connectedClientsState.loading
+const connectedClientsError = connectedClientsState.error
+const connectedClientsSampledAt = connectedClientsState.sampledAt
+const refreshConnectedClients = connectedClientsState.refresh
 const watchTimeSummary = ref<DailyWatchTimeSummary>(createEmptyDailyWatchTimeSummary())
 const watchTimeLoading = ref(false)
 const watchTimeError = ref("")
@@ -1949,6 +1962,14 @@ async function runMetadataRefreshForSelected() {
       :watch-time-summary="watchTimeSummary"
       :watch-time-loading="watchTimeLoading"
       :watch-time-error="watchTimeError"
+      :connected-clients="connectedClients"
+      :connected-clients-total="connectedClientsTotal"
+      :connected-clients-local-count="connectedClientsLocalCount"
+      :connected-clients-remote-count="connectedClientsRemoteCount"
+      :connected-clients-loading="connectedClientsLoading"
+      :connected-clients-error="connectedClientsError"
+      :connected-clients-sampled-at="connectedClientsSampledAt"
+      @refresh-connected-clients="refreshConnectedClients"
     />
     </section>
     </TabsContent>

@@ -190,6 +190,7 @@ The backend exposes these HTTP endpoints:
 
 ```
 GET    /api/health                          # Health check (name, version/build stamp, optional installerVersion, channel, databasePath)
+GET    /api/connected-clients               # Process-lifetime client visibility for Settings overview (IP/UA metadata, no MAC)
 GET    /api/dev/performance                 # Dev-only CPU summary for the frontend monitor bar
 GET    /api/app-update/status               # Cached packaged-app update status vs latest GitHub Release
 POST   /api/app-update/check                # Force a fresh packaged-app update check
@@ -374,6 +375,7 @@ Daily watch-time uses a separate aggregate path:
 - **Web API mode (`VITE_USE_WEB_API=true`):** Player reports bounded wall-clock deltas to `POST /api/playback/watch-time/daily`; Settings reads `GET /api/playback/watch-time/daily?days=91`
 - **Mock mode:** Stored in browser `localStorage` (key: `curated-playback-watch-time-daily-v1`)
 - The Settings overview renders watch-time summary metrics for a fixed 91-day window; heatmap visualization is not shown.
+- Settings -> Overview also renders connected clients directly below the watch-time summary. Web API mode polls `GET /api/connected-clients` while Overview is active; Mock mode returns representative local/LAN examples. The backend tracker is process-lifetime in memory, deduplicates by IP + User-Agent, caps at 50 recent clients, and does not collect MAC addresses.
 
 ### Playback Descriptor Seam
 

@@ -83,6 +83,56 @@ describe("api endpoint response validation", () => {
     )
   })
 
+  it("keeps valid connected clients responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse({
+          clients: [
+            {
+              key: "local-chrome",
+              ip: "127.0.0.1",
+              browser: "Chrome",
+              os: "Windows",
+              deviceType: "desktop",
+              accessKind: "local",
+              isLocalMachine: true,
+              firstSeen: "2026-05-15T10:00:00Z",
+              lastSeen: "2026-05-15T10:01:00Z",
+              requestCount: 2,
+            },
+          ],
+          total: 1,
+          localCount: 1,
+          remoteCount: 0,
+          sampledAt: "2026-05-15T10:01:00Z",
+        }),
+      ),
+    )
+
+    await expect(api.listConnectedClients()).resolves.toMatchObject({
+      total: 1,
+      clients: [expect.objectContaining({ ip: "127.0.0.1" })],
+    })
+  })
+
+  it("rejects malformed connected clients responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse({
+          clients: [{ ip: "127.0.0.1" }],
+          total: "1",
+          sampledAt: "2026-05-15T10:01:00Z",
+        }),
+      ),
+    )
+
+    await expect(api.listConnectedClients()).rejects.toThrow(
+      "Invalid API response for GET /connected-clients",
+    )
+  })
+
   it("keeps small movie imports on the multipart endpoint", async () => {
     const task = {
       taskId: "import.movies-1",

@@ -6,6 +6,7 @@ import type { MovieDetailDTO, MovieListItemDTO, SettingsDTO } from "@/api/types"
 
 const apiMocks = vi.hoisted(() => ({
   listMovies: vi.fn(),
+  listConnectedClients: vi.fn(),
   getMovie: vi.fn(),
   patchMovie: vi.fn(),
   deleteMovie: vi.fn(),
@@ -97,6 +98,7 @@ beforeEach(() => {
   vi.resetModules()
   window.location.hash = ""
   apiMocks.listMovies.mockReset()
+  apiMocks.listConnectedClients.mockReset()
   apiMocks.getMovie.mockReset()
   apiMocks.patchMovie.mockReset()
   apiMocks.deleteMovie.mockReset()
@@ -147,6 +149,26 @@ describe("webLibraryService loadError", () => {
 })
 
 describe("webLibraryService mutations", () => {
+  it("forwards connected clients requests to the API", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.listConnectedClients.mockResolvedValueOnce({
+      clients: [],
+      total: 0,
+      localCount: 0,
+      remoteCount: 0,
+      sampledAt: "2026-05-15T10:00:00Z",
+    })
+
+    const { webLibraryService } = await import("./web-library-service")
+    await flushPromises()
+
+    await expect(webLibraryService.listConnectedClients()).resolves.toMatchObject({
+      total: 0,
+      sampledAt: "2026-05-15T10:00:00Z",
+    })
+    expect(apiMocks.listConnectedClients).toHaveBeenCalledTimes(1)
+  })
+
   it("recovers organize library state from settings when saving fails", async () => {
     apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.patchSettings.mockRejectedValueOnce(new Error("save failed"))

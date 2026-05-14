@@ -1,6 +1,6 @@
 # Connected Clients Display — Feature Design
 
-2026-05-03 · Status: Draft
+2026-05-03 · Status: Implemented MVP 2026-05-15
 
 ## Motivation
 
@@ -10,18 +10,18 @@ Curated runs as a local HTTP server. Users may access it from:
 - **Remote devices on the same LAN** — laptop, tablet, phone, another desktop
 - **Different browsers on the same or different machines** — Chrome, Firefox, Safari, Edge
 
-There is currently no visibility into *who is connected*. The Settings → Overview page is the natural place to show a live list of active/connected clients so the user can audit access at a glance.
+Curated now has first-pass visibility into *who is connected*. The Settings → Overview page shows a live list of clients that have accessed the backend during the current backend process lifetime, so the user can audit access at a glance.
 
 ## Scope
 
-A new **Connected Clients** card in **Settings → Overview** that lists every distinct client that has made HTTP requests to the backend in the current process lifetime, with identifying metadata.
+A **Connected Clients** card in **Settings → Overview**, displayed below the watch-time statistics, lists every distinct client that has made HTTP requests to the backend in the current process lifetime, with identifying metadata.
 
 ## What each client entry shows
 
 | Field | Source | Example |
 |---|---|---|
-| **IP address** | `http.Request.RemoteAddr` | `192.168.1.5:52341` |
-| **Hostname** (LAN only) | Reverse-DNS lookup of the IP, best-effort | `macbook-pro.lan` |
+| **IP address / port** | Parsed from `http.Request.RemoteAddr` | `192.168.1.5` / `52341` |
+| **Hostname** | Optional DTO field; backend MVP currently leaves it empty. Mock data may include examples for UI preview. | `macbook-pro.lan` |
 | **Device type** | Inferred from User-Agent OS + form-factor heuristics | `Desktop` / `Laptop` / `Mobile` / `Tablet` |
 | **OS** | Parsed from User-Agent | `Windows 11`, `macOS 15`, `Android 14` |
 | **Browser / Client** | Parsed from User-Agent | `Chrome 132`, `Safari 18`, `Firefox 135` |
@@ -69,16 +69,16 @@ A new middleware `WithClientTracking` wraps the router. It calls `clienttracker.
 
 #### 3. User-Agent parser
 
-Use a lightweight Go UA parser library (e.g. `ua-parser-go` or `user_agent`) to extract:
+The MVP uses in-process User-Agent heuristics rather than adding a parser dependency. It extracts:
 - Browser name + major version
 - OS name + version
-- Device type (desktop / mobile / tablet / bot)
+- Device type (desktop / laptop / mobile / tablet / tool / unknown)
 
-Fallback heuristics in-process when the parser can't identify the UA.
+The current heuristic path covers Edge, Chrome, Firefox, Safari, curl, python-requests, wget, httpie, Windows, macOS, iOS/iPadOS, Android, and Linux. A dedicated parser can still be introduced later if the app needs more precise device model detection.
 
 #### 4. Hostname resolution (best-effort)
 
-For LAN IPs (private ranges: `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`), attempt a reverse-DNS lookup with a short timeout (500ms). If no result or timeout, the hostname field is empty. Never attempt reverse-DNS for public IPs.
+Deferred from the MVP. The response shape includes an optional `hostname` field, but the backend does not perform reverse-DNS yet. This avoids request-time DNS latency and keeps the first implementation deterministic. A later enhancement can add bounded reverse-DNS for private LAN IPs only.
 
 #### 5. Local-interface detection
 
@@ -94,11 +94,15 @@ Response:
 
 ```json
 {
+  "total": 1,
+  "localCount": 0,
+  "remoteCount": 1,
+  "sampledAt": "2026-05-03T15:01:33Z",
   "clients": [
     {
+      "key": "d90e44b93f17f9f6f7d45f71b0b47788",
       "ip": "192.168.1.5",
       "port": 52341,
-      "hostname": "macbook-pro.lan",
       "userAgent": "Mozilla/5.0 (Macintosh; ...) ... Chrome/132.0.0.0 ...",
       "browser": "Chrome",
       "browserVersion": "132",
@@ -119,7 +123,7 @@ Response:
 
 #### 7. Health endpoint enhancement
 
-Optionally add `clientCount` to `GET /api/health` so the frontend can show a badge without an extra request:
+Not implemented in the MVP. `GET /api/connected-clients` is the source of truth for client visibility. A later release can optionally add `clientCount` to `GET /api/health` if a lightweight global badge needs it:
 
 ```json
 {
@@ -135,15 +139,16 @@ Optionally add `clientCount` to `GET /api/health` so the frontend can show a bad
 
 ```typescript
 export interface ConnectedClientDTO {
+  key: string
   ip: string
-  port: number
-  hostname: string
-  userAgent: string
+  port?: number
+  hostname?: string
+  userAgent?: string
   browser: string
-  browserVersion: string
+  browserVersion?: string
   os: string
-  osVersion: string
-  deviceType: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'unknown'
+  osVersion?: string
+  deviceType: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'tool' | 'unknown'
   accessKind: 'local' | 'remote'
   isLocalMachine: boolean
   firstSeen: string  // ISO 8601
@@ -153,13 +158,17 @@ export interface ConnectedClientDTO {
 
 export interface ConnectedClientsDTO {
   clients: ConnectedClientDTO[]
+  total: number
+  localCount: number
+  remoteCount: number
+  sampledAt: string
 }
 ```
 
 #### 2. New API method in `src/api/endpoints.ts`
 
 ```typescript
-getConnectedClients(): Promise<ConnectedClientsDTO> {
+listConnectedClients(): Promise<ConnectedClientsDTO> {
   return httpClient.get<ConnectedClientsDTO>("/connected-clients")
 }
 ```
@@ -168,26 +177,27 @@ getConnectedClients(): Promise<ConnectedClientsDTO> {
 
 `src/components/jav-library/settings/SettingsConnectedClientsSection.vue`
 
-- Renders as a card in the Overview tab, below the three stat cards and above the watch-time heatmap
-- Shows a table or card list of connected clients
+- Renders as a card in the Overview tab, below the watch-time statistics
+- Shows summary metrics and a compact card list of connected clients
 - Each row shows: device icon (based on deviceType), OS + browser, IP + hostname, access kind badge, "This device" badge, last seen relative time
 - Auto-refreshes: polls `GET /api/connected-clients` every 60 seconds while the Overview tab is visible
-- Empty state: "No remote clients connected" when it's only the local machine
+- Empty state: shown when no backend request has been recorded yet
 - No MAC address is collected or displayed (unavailable over HTTP)
 
 #### 4. LibraryService updates
 
-- Add `connectedClients: ComputedRef<ConnectedClientsDTO | null>`
-- Add `refreshConnectedClients(): Promise<void>`
-- Wire into `refreshSettings()` or provide a standalone refresh
+- Add `listConnectedClients(): Promise<ConnectedClientsDTO>` to the service contract.
+- Web adapter forwards to `api.listConnectedClients()`.
+- Mock adapter returns three sample clients for offline UI review.
+- `src/composables/use-connected-clients.ts` owns state, refresh, error handling, and active-tab polling.
 
 #### 5. i18n keys
 
-Add locale strings under `settings.overview.connectedClients.*` in `src/locales/en.json`, `ja.json`, `zh-CN.json`.
+Locale strings were added as flat `settings.connectedClients*` keys in `src/locales/en.json`, `ja.json`, `zh-CN.json`.
 
 ## UI Placement
 
-**Settings → Overview tab**, as a new card between the dashboard stat cards and the watch-time heatmap.
+**Settings → Overview tab**, as a new card below the dashboard stat cards and watch-time statistics.
 
 ```
 ┌──────────────────────────────────────────┐
@@ -196,7 +206,10 @@ Add locale strings under `settings.overview.connectedClients.*` in `src/locales/
 │  │ Movies │ │  Tags  │ │ Frames │        │
 │  └────────┘ └────────┘ └────────┘       │
 ├──────────────────────────────────────────┤
-│  Connected Clients            (new card) │
+│  Watch Time Statistics                   │
+│  ...                                     │
+├──────────────────────────────────────────┤
+│  Connected Clients                       │
 │  ┌──────────────────────────────────────┐│
 │  │ 💻 This device — Windows 11 · Chrome ││
 │  │    127.0.0.1              Local      ││
@@ -210,8 +223,6 @@ Add locale strings under `settings.overview.connectedClients.*` in `src/locales/
 │  │    Last seen 12 min ago              ││
 │  └──────────────────────────────────────┘│
 ├──────────────────────────────────────────┤
-│  Watch Time Heatmap                      │
-│  ...                                     │
 └──────────────────────────────────────────┘
 ```
 
@@ -221,7 +232,7 @@ Add locale strings under `settings.overview.connectedClients.*` in `src/locales/
 2. **Deduplication**: Same IP + same User-Agent = same client. Different browser on same machine = separate client entry. Same browser private/incognito window = same entry (UA does not differ).
 3. **Localhost variants**: Both `127.0.0.1` and `[::1]` are treated as "Local" access. The local-machine detection also covers the host's LAN IP when the request comes from the same machine.
 4. **Stale clients**: No explicit eviction. The list naturally resets on restart. If the list grows very long (e.g. 50+ unique UAs from a single IP), cap at 50 most-recently-seen entries.
-5. **Privacy**: No data leaves the machine. The endpoint is on the local HTTP API (no external exposure). The server MAC is already visible to anyone on the same LAN segment via ARP.
+5. **Privacy**: No data leaves the machine. The endpoint is on the local HTTP API. MAC addresses are not collected or returned.
 6. **Polling**: Frontend polls every 60s when the Overview tab is active. Stop polling when switching to another tab. This avoids unnecessary requests.
 7. **Non-browser clients**: If the User-Agent is not a known browser (e.g. `curl/8.x`, `python-requests`), show the raw UA string under a "Tool / Script" category with a terminal icon.
 
@@ -229,18 +240,18 @@ Add locale strings under `settings.overview.connectedClients.*` in `src/locales/
 
 | Step | Layer | Effort |
 |---|---|---|
-| 1. UA parser dependency + `clienttracker` package | Backend | Medium |
-| 2. Middleware registration in server.go | Backend | Small |
-| 3. `GET /api/connected-clients` endpoint | Backend | Small |
-| 4. Health endpoint enhancement (clientCount) | Backend | Small |
-| 5. DTOs + API method | Frontend | Small |
-| 6. LibraryService wiring | Frontend | Small |
-| 7. `SettingsConnectedClientsSection.vue` | Frontend | Medium |
-| 8. I18n strings (en, ja, zh-CN) | Frontend | Small |
-| 9. Integration testing | Both | Small |
+| 1. In-process UA heuristics + `clienttracker` package | Backend | Done |
+| 2. Middleware registration in server.go | Backend | Done |
+| 3. `GET /api/connected-clients` endpoint | Backend | Done |
+| 4. Health endpoint enhancement (clientCount) | Backend | Deferred |
+| 5. DTOs + validated API method | Frontend | Done |
+| 6. LibraryService wiring + active-tab composable | Frontend | Done |
+| 7. `SettingsConnectedClientsSection.vue` | Frontend | Done |
+| 8. I18n strings (en, ja, zh-CN) | Frontend | Done |
+| 9. Unit, build, backend, and visual integration verification | Both | Done |
 
 ## Open questions
 
-1. **Reverse-DNS**: Worth the complexity? It adds a best-effort hostname that is nice-to-have. Could start without it and add later.
+1. **Reverse-DNS**: Deferred. It adds a best-effort hostname that is nice-to-have, but also adds DNS latency and timeout behavior.
 2. **Polling interval**: 60 seconds, since the Overview tab isn't open all the time and client connections don't change rapidly.
 3. **Persistence**: Currently design says in-memory only (reset on restart). Any value in persisting to SQLite for historical view?

@@ -765,6 +765,10 @@ function createWebLibraryService(): LibraryService {
       return await api.health()
     },
 
+    async listConnectedClients() {
+      return await api.listConnectedClients()
+    },
+
     async pingProxyJavbus(body) {
       return await api.pingProxyJavbus(body)
     },

@@ -1,6 +1,7 @@
 import { HttpClientError, httpClient } from "./http-client"
 import {
   assertApiResponse,
+  isConnectedClientsDTO,
   isHealthDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
@@ -33,6 +34,7 @@ import type {
   AddPlaybackWatchTimeBody,
   AppUpdateStatusDTO,
   AppUpdateInstallBody,
+  ConnectedClientsDTO,
   CreateCuratedFrameBody,
   CreateMovieImportUploadBody,
   CuratedFrameFacetListDTO,
@@ -229,6 +231,12 @@ export const api = {
 
   getDevPerformanceSummary(): Promise<DevPerformanceSummaryDTO> {
     return httpClient.get<DevPerformanceSummaryDTO>("/dev/performance")
+  },
+
+  listConnectedClients(): Promise<ConnectedClientsDTO> {
+    return httpClient
+      .get<unknown>("/connected-clients")
+      .then((value) => assertApiResponse("GET /connected-clients", value, isConnectedClientsDTO))
   },
 
   getAppUpdateStatus(): Promise<AppUpdateStatusDTO> {

@@ -30,6 +30,42 @@ export interface DevPerformanceSummaryDTO {
   backendCpuPercent?: number
 }
 
+export type ConnectedClientDeviceType =
+  | "desktop"
+  | "laptop"
+  | "mobile"
+  | "tablet"
+  | "tool"
+  | "unknown"
+
+export type ConnectedClientAccessKind = "local" | "remote"
+
+export interface ConnectedClientDTO {
+  key: string
+  ip: string
+  port?: number
+  hostname?: string
+  userAgent?: string
+  browser: string
+  browserVersion?: string
+  os: string
+  osVersion?: string
+  deviceType: ConnectedClientDeviceType
+  accessKind: ConnectedClientAccessKind
+  isLocalMachine: boolean
+  firstSeen: string
+  lastSeen: string
+  requestCount: number
+}
+
+export interface ConnectedClientsDTO {
+  clients: ConnectedClientDTO[]
+  total: number
+  localCount: number
+  remoteCount: number
+  sampledAt: string
+}
+
 export interface AppUpdateStatusDTO {
   supported: boolean
   status: "unsupported" | "up-to-date" | "update-available" | "error"

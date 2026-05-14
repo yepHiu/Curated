@@ -65,6 +65,34 @@ type HealthDTO struct {
 	DatabasePath     string `json:"databasePath"`
 }
 
+// ConnectedClientDTO is one client that accessed the HTTP API during this backend process lifetime.
+type ConnectedClientDTO struct {
+	Key            string `json:"key"`
+	IP             string `json:"ip"`
+	Port           int    `json:"port,omitempty"`
+	Hostname       string `json:"hostname,omitempty"`
+	UserAgent      string `json:"userAgent,omitempty"`
+	Browser        string `json:"browser"`
+	BrowserVersion string `json:"browserVersion,omitempty"`
+	OS             string `json:"os"`
+	OSVersion      string `json:"osVersion,omitempty"`
+	DeviceType     string `json:"deviceType"`
+	AccessKind     string `json:"accessKind"`
+	IsLocalMachine bool   `json:"isLocalMachine"`
+	FirstSeen      string `json:"firstSeen"`
+	LastSeen       string `json:"lastSeen"`
+	RequestCount   int64  `json:"requestCount"`
+}
+
+// ConnectedClientsDTO summarizes clients that accessed the HTTP API during this backend process lifetime.
+type ConnectedClientsDTO struct {
+	Clients     []ConnectedClientDTO `json:"clients"`
+	Total       int                  `json:"total"`
+	LocalCount  int                  `json:"localCount"`
+	RemoteCount int                  `json:"remoteCount"`
+	SampledAt   string               `json:"sampledAt"`
+}
+
 // DevPerformanceSummaryDTO carries sampled CPU usage for the dev-only performance monitor bar.
 type DevPerformanceSummaryDTO struct {
 	Supported         bool    `json:"supported"`

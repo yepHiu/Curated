@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap"
 
 	"curated-backend/internal/browserheaders"
+	"curated-backend/internal/clienttracker"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/proxyenv"
@@ -217,6 +218,7 @@ type Handler struct {
 	homepageRecommendations     HomepageRecommendationsProvider
 	appUpdateProvider           AppUpdateProvider
 	importUploads               *movieImportUploadSessionStore
+	clientTracker               *clienttracker.Tracker
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -247,10 +249,15 @@ type Deps struct {
 	NativePlaybackLauncher           NativePlaybackLauncher
 	HomepageRecommendations          HomepageRecommendationsProvider
 	AppUpdateProvider                AppUpdateProvider
+	ClientTracker                    *clienttracker.Tracker
 }
 
 // NewHandler creates a Handler wired with all provided dependencies.
 func NewHandler(deps Deps) *Handler {
+	tracker := deps.ClientTracker
+	if tracker == nil {
+		tracker = clienttracker.New()
+	}
 	return &Handler{
 		cfg:                         deps.Cfg,
 		logger:                      deps.Logger,
@@ -279,6 +286,7 @@ func NewHandler(deps Deps) *Handler {
 		homepageRecommendations:     deps.HomepageRecommendations,
 		appUpdateProvider:           deps.AppUpdateProvider,
 		importUploads:               newMovieImportUploadSessionStore(),
+		clientTracker:               tracker,
 	}
 }
 
@@ -287,6 +295,7 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
+	mux.HandleFunc("GET /api/connected-clients", h.handleConnectedClients)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
 	mux.HandleFunc("POST /api/app-update/check", h.handleCheckAppUpdate)
@@ -365,7 +374,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
 	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
 
-	return WithAccessLog(h.logger, withCORS(mux))
+	return WithAccessLog(h.logger, withClientTracking(withCORS(mux), h.clientTracker))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {

@@ -390,6 +390,7 @@
   <p><span class="path">backend/internal/server/server.go</span> 中 <code>Routes()</code> 注册 REST 风格接口（前缀均为 <code>/api</code>），主要包括：</p>
   <ul>
     <li><code>GET /api/health</code> — 健康检查（含 <code>version</code> 构建标识、可选 <code>installerVersion</code> 安装包版本号、<code>channel</code>、<code>databasePath</code> 等）。</li>
+    <li><code>GET /api/connected-clients</code> — 当前后端进程生命周期内访问过 Curated 的客户端列表；按 IP + User-Agent 去重，最多保留 50 条，返回浏览器 / 系统 / 设备类型、local/remote、first/last seen 与 requestCount；不采集 MAC 地址。</li>
     <li><code>GET /api/dev/performance</code> — 开发环境性能摘要（整机 CPU / 后端进程 CPU），供底部性能监测条轮询。</li>
     <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>limit</code>、<code>offset</code>）。</li>
     <li><code>GET /api/library/movies/{movieId}</code> — 详情。</li>
@@ -470,6 +471,7 @@
       <tr><td>影片刮削后自动补演员资料</td><td>设置 UI（自动刮削）</td><td><code>AutoActorProfileScrapeController</code> + <code>scrape.actor</code> 自动排队；<code>autoActorProfileScrape</code> 写入 <code>library-config.cfg</code></td></tr>
       <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；支持 <code>/api/playback/sessions/recent</code> 与 <code>/api/playback/sessions/{id}</code> 观测会话状态；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
       <tr><td>每日观看时间统计</td><td><code>SettingsWatchTimeHeatmap.vue</code>、<code>watch-time-heatmap.ts</code>、<code>playback-watch-time-tracker.ts</code></td><td><code>GET/POST /api/playback/watch-time/daily</code>；按 <code>day_key + movie_id</code> 聚合，设置概览固定展示 91 天摘要指标</td></tr>
+      <tr><td>已连接客户端可见性</td><td><code>SettingsConnectedClientsSection.vue</code>、<code>use-connected-clients.ts</code>、服务层 <code>listConnectedClients()</code>；设置概览中位于观看时间统计下方，仅 Overview 激活时轮询</td><td><code>backend/internal/clienttracker</code> + <code>GET /api/connected-clients</code>；进程内存追踪、IP + User-Agent 去重、最多 50 条、不返回 MAC</td></tr>
     </tbody>
   </table>
 

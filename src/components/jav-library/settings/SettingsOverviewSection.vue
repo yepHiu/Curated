@@ -8,6 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import SettingsWatchTimeHeatmap from "@/components/jav-library/settings/SettingsWatchTimeHeatmap.vue"
+import SettingsConnectedClientsSection from "@/components/jav-library/settings/SettingsConnectedClientsSection.vue"
+import type { ConnectedClientDTO } from "@/api/types"
 import type {
   DailyWatchTimeEntry,
   DailyWatchTimeSummary,
@@ -25,6 +27,17 @@ defineProps<{
   watchTimeSummary?: DailyWatchTimeSummary | null
   watchTimeLoading?: boolean
   watchTimeError?: string
+  connectedClients?: readonly ConnectedClientDTO[]
+  connectedClientsTotal?: number
+  connectedClientsLocalCount?: number
+  connectedClientsRemoteCount?: number
+  connectedClientsLoading?: boolean
+  connectedClientsError?: string
+  connectedClientsSampledAt?: string
+}>()
+
+defineEmits<{
+  refreshConnectedClients: []
 }>()
 
 const { t } = useI18n()
@@ -68,6 +81,17 @@ const { t } = useI18n()
       :summary="watchTimeSummary"
       :loading="watchTimeLoading"
       :error="watchTimeError"
+    />
+
+    <SettingsConnectedClientsSection
+      :clients="connectedClients ?? []"
+      :total="connectedClientsTotal"
+      :local-count="connectedClientsLocalCount"
+      :remote-count="connectedClientsRemoteCount"
+      :loading="connectedClientsLoading"
+      :error="connectedClientsError"
+      :sampled-at="connectedClientsSampledAt"
+      @refresh="$emit('refreshConnectedClients')"
     />
   </div>
 </template>

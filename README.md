@@ -40,7 +40,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
 - **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
-- **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, and logging controls.
+- **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, connected-client visibility, and logging controls.
 
 ## Quick Start
 
@@ -235,7 +235,7 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 
 ## API
 
-Curated exposes a Go HTTP API for library, playback, actor, settings, storage presence, and curated-frame workflows.
+Curated exposes a Go HTTP API for library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 

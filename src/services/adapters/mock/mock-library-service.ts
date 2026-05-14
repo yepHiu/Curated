@@ -4,6 +4,7 @@ import type {
   ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  ConnectedClientsDTO,
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
@@ -131,6 +132,64 @@ const libraryPathStorageStatusesMock = ref<LibraryPathStorageStatusDTO[]>([
     canImport: false,
   },
 ])
+
+function buildMockConnectedClients(): ConnectedClientsDTO {
+  const sampledAt = new Date().toISOString()
+  const clients = [
+    {
+      key: "mock-local-chrome",
+      ip: "127.0.0.1",
+      hostname: "this-device",
+      browser: "Chrome",
+      browserVersion: "132",
+      os: "Windows",
+      osVersion: "11",
+      deviceType: "desktop" as const,
+      accessKind: "local" as const,
+      isLocalMachine: true,
+      firstSeen: "2026-05-15T09:40:00Z",
+      lastSeen: sampledAt,
+      requestCount: 128,
+    },
+    {
+      key: "mock-iphone-safari",
+      ip: "192.168.1.8",
+      hostname: "iphone.lan",
+      browser: "Safari",
+      browserVersion: "18",
+      os: "iOS",
+      osVersion: "18.2",
+      deviceType: "mobile" as const,
+      accessKind: "remote" as const,
+      isLocalMachine: false,
+      firstSeen: "2026-05-15T09:55:00Z",
+      lastSeen: "2026-05-15T10:05:00Z",
+      requestCount: 34,
+    },
+    {
+      key: "mock-mac-firefox",
+      ip: "192.168.1.22",
+      hostname: "macbook-pro.lan",
+      browser: "Firefox",
+      browserVersion: "135",
+      os: "macOS",
+      osVersion: "15.2",
+      deviceType: "laptop" as const,
+      accessKind: "remote" as const,
+      isLocalMachine: false,
+      firstSeen: "2026-05-15T09:10:00Z",
+      lastSeen: "2026-05-15T09:58:00Z",
+      requestCount: 57,
+    },
+  ]
+  return {
+    clients,
+    total: clients.length,
+    localCount: clients.filter((client) => client.accessKind === "local").length,
+    remoteCount: clients.filter((client) => client.accessKind === "remote").length,
+    sampledAt,
+  }
+}
 
 function mockHttpError(status: number, code: string, message = code): HttpClientError {
   return new HttpClientError(status, {
@@ -643,6 +702,10 @@ export const mockLibraryService: LibraryService = {
       transport: "mock",
       databasePath: "mock",
     }
+  },
+
+  async listConnectedClients(): Promise<ConnectedClientsDTO> {
+    return buildMockConnectedClients()
   },
 
   async pingProxyJavbus(): Promise<ProxyJavBusPingResponse> {

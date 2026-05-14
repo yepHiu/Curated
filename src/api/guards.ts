@@ -1,4 +1,13 @@
-import type { HealthDTO, MovieDetailDTO, MovieListItemDTO, MoviesPageDTO } from "./types"
+import type {
+  ConnectedClientAccessKind,
+  ConnectedClientDeviceType,
+  ConnectedClientDTO,
+  ConnectedClientsDTO,
+  HealthDTO,
+  MovieDetailDTO,
+  MovieListItemDTO,
+  MoviesPageDTO,
+} from "./types"
 
 export class InvalidApiResponseError extends Error {
   readonly endpoint: string
@@ -57,6 +66,10 @@ function isOptionalNullableNumber(value: unknown): boolean {
   return value === undefined || value === null || isFiniteNumber(value)
 }
 
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || isFiniteNumber(value)
+}
+
 function isOptionalStringRecord(value: unknown): boolean {
   if (value === undefined) {
     return true
@@ -76,6 +89,54 @@ export function isHealthDTO(value: unknown): value is HealthDTO {
     isString(value.databasePath) &&
     isOptionalString(value.channel) &&
     isOptionalString(value.installerVersion)
+  )
+}
+
+function isConnectedClientDeviceType(value: unknown): value is ConnectedClientDeviceType {
+  return (
+    value === "desktop" ||
+    value === "laptop" ||
+    value === "mobile" ||
+    value === "tablet" ||
+    value === "tool" ||
+    value === "unknown"
+  )
+}
+
+function isConnectedClientAccessKind(value: unknown): value is ConnectedClientAccessKind {
+  return value === "local" || value === "remote"
+}
+
+export function isConnectedClientDTO(value: unknown): value is ConnectedClientDTO {
+  return (
+    isRecord(value) &&
+    isString(value.key) &&
+    isString(value.ip) &&
+    isOptionalFiniteNumber(value.port) &&
+    isOptionalString(value.hostname) &&
+    isOptionalString(value.userAgent) &&
+    isString(value.browser) &&
+    isOptionalString(value.browserVersion) &&
+    isString(value.os) &&
+    isOptionalString(value.osVersion) &&
+    isConnectedClientDeviceType(value.deviceType) &&
+    isConnectedClientAccessKind(value.accessKind) &&
+    isBoolean(value.isLocalMachine) &&
+    isString(value.firstSeen) &&
+    isString(value.lastSeen) &&
+    isFiniteNumber(value.requestCount)
+  )
+}
+
+export function isConnectedClientsDTO(value: unknown): value is ConnectedClientsDTO {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.clients) &&
+    value.clients.every(isConnectedClientDTO) &&
+    isFiniteNumber(value.total) &&
+    isFiniteNumber(value.localCount) &&
+    isFiniteNumber(value.remoteCount) &&
+    isString(value.sampledAt)
   )
 }
 

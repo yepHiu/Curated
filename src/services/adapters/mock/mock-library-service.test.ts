@@ -40,6 +40,16 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.moviesLoaded.value).toBe(true)
   })
 
+  it("returns visible connected client examples in mock mode", async () => {
+    const dto = await mockLibraryService.listConnectedClients()
+
+    expect(dto.total).toBeGreaterThanOrEqual(3)
+    expect(dto.localCount).toBeGreaterThanOrEqual(1)
+    expect(dto.remoteCount).toBeGreaterThanOrEqual(1)
+    expect(dto.clients.some((client) => client.isLocalMachine)).toBe(true)
+    expect(dto.clients.some((client) => client.accessKind === "remote")).toBe(true)
+  })
+
   it("tracks launch-at-login in local mock state while remaining unsupported", async () => {
     expect(mockLibraryService.launchAtLogin.value).toBe(false)
     expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)

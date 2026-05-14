@@ -4,6 +4,7 @@ import type {
   ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  ConnectedClientsDTO,
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
@@ -87,6 +88,7 @@ export interface LibraryService {
   /** 后端日志目录与级别（Web：library-config.cfg；Mock：内存） */
   backendLog: ComputedRef<BackendLogSettingsDTO>
   patchBackendLog(patch: PatchBackendLogBody): Promise<void>
+  listConnectedClients(): Promise<ConnectedClientsDTO>
   health(): Promise<HealthDTO>
   pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>

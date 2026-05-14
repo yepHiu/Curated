@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curated Connected Clients Prototype</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #0f1117;
+      --card: #151821;
+      --muted: #1b2030;
+      --muted-2: #202638;
+      --border: rgba(228, 231, 239, 0.12);
+      --border-strong: rgba(228, 231, 239, 0.2);
+      --foreground: #f5f7fb;
+      --muted-foreground: #99a2b7;
+      --primary: #f15f91;
+      --primary-soft: rgba(241, 95, 145, 0.12);
+      --primary-border: rgba(241, 95, 145, 0.28);
+      --info: #81a8ff;
+      --info-soft: rgba(129, 168, 255, 0.12);
+      --warning: #f5c66b;
+      --warning-soft: rgba(245, 198, 107, 0.13);
+      --success: #80d49b;
+      --success-soft: rgba(128, 212, 155, 0.12);
+      --danger: #ff7d8a;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow: 0 16px 50px rgba(0, 0, 0, 0.28);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(241, 95, 145, 0.08), transparent 28rem),
+        radial-gradient(circle at 90% 20%, rgba(129, 168, 255, 0.08), transparent 26rem),
+        var(--background);
+      color: var(--foreground);
+      min-height: 100vh;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: rgba(14, 16, 23, 0.84);
+      padding: 22px 16px;
+    }
+
+    .brand {
+      color: var(--primary);
+      font-size: 24px;
+      font-weight: 750;
+      letter-spacing: 0;
+      margin-bottom: 26px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-item {
+      border-radius: 10px;
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    .nav-item.active {
+      background: var(--primary-soft);
+      color: var(--foreground);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.68;
+    }
+
+    .workspace {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .topline {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .topline h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .topline p {
+      margin: 7px 0 0;
+      color: var(--muted-foreground);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tab {
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 14px;
+    }
+
+    .tab.active {
+      border-color: var(--primary-border);
+      background: var(--primary-soft);
+      color: var(--foreground);
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px 12px;
+      align-items: center;
+      padding: 18px 18px 8px;
+    }
+
+    .icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--primary-border);
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+    }
+
+    .icon {
+      width: 19px;
+      height: 19px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .card-title {
+      min-width: 0;
+    }
+
+    .card-title h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .card-title p {
+      margin: 4px 0 0;
+      color: var(--muted-foreground);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .card-body {
+      padding: 8px 18px 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      border: 1px solid rgba(228, 231, 239, 0.1);
+      background: rgba(255, 255, 255, 0.025);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 20px;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .heatmap-placeholder {
+      min-height: 52px;
+      border-radius: 10px;
+      border: 1px dashed rgba(228, 231, 239, 0.13);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted-foreground);
+      font-size: 13px;
+      background:
+        linear-gradient(90deg, rgba(128, 212, 155, 0.08), rgba(241, 95, 145, 0.06)),
+        rgba(255, 255, 255, 0.018);
+    }
+
+    .button {
+      min-height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--foreground);
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+      font-size: 13px;
+      cursor: default;
+    }
+
+    .button svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .client-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .client-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .client-row {
+      border: 1px solid rgba(228, 231, 239, 0.11);
+      background: rgba(255, 255, 255, 0.024);
+      border-radius: 12px;
+      padding: 13px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .device-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(228, 231, 239, 0.1);
+      background: var(--muted);
+      color: var(--muted-foreground);
+      display: grid;
+      place-items: center;
+    }
+
+    .device-icon.local {
+      color: var(--primary);
+      background: var(--primary-soft);
+      border-color: var(--primary-border);
+    }
+
+    .device-main {
+      min-width: 0;
+    }
+
+    .device-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .device-title strong {
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .device-meta {
+      margin-top: 4px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.45;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .device-side {
+      display: grid;
+      justify-items: end;
+      gap: 6px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1;
+      color: var(--muted-foreground);
+      background: rgba(255, 255, 255, 0.03);
+      white-space: nowrap;
+    }
+
+    .badge.primary {
+      border-color: var(--primary-border);
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .badge.info {
+      border-color: rgba(129, 168, 255, 0.28);
+      background: var(--info-soft);
+      color: var(--info);
+    }
+
+    .badge.warning {
+      border-color: rgba(245, 198, 107, 0.26);
+      background: var(--warning-soft);
+      color: var(--warning);
+    }
+
+    .privacy-note {
+      border: 1px solid rgba(228, 231, 239, 0.1);
+      background: rgba(255, 255, 255, 0.022);
+      border-radius: 10px;
+      padding: 11px 12px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .workspace {
+        padding: 18px;
+      }
+
+      .metrics,
+      .client-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card-header {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .card-header .button {
+        grid-column: 1 / -1;
+        justify-self: start;
+      }
+
+      .client-row {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .device-side {
+        grid-column: 1 / -1;
+        justify-items: start;
+        padding-left: 54px;
+      }
+
+      .badges {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .workspace {
+        padding: 14px;
+      }
+
+      .metrics,
+      .client-summary {
+        grid-template-columns: 1fr;
+      }
+
+      .topline {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Prototype sidebar">
+      <div class="brand">Curated</div>
+      <nav class="nav">
+        <div class="nav-item"><span class="dot"></span> 首页</div>
+        <div class="nav-item"><span class="dot"></span> 资料库</div>
+        <div class="nav-item active"><span class="dot"></span> 设置</div>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <section class="page" aria-label="Settings overview prototype">
+        <div class="topline">
+          <div>
+            <h1>设置</h1>
+            <p>Overview 页签中的连接客户端卡片放在观看时间统计下方。</p>
+          </div>
+        </div>
+
+        <div class="tabs" aria-label="Settings sections">
+          <button class="tab active" type="button">总览</button>
+          <button class="tab" type="button">通用</button>
+          <button class="tab" type="button">影片存储</button>
+          <button class="tab" type="button">元数据</button>
+          <button class="tab" type="button">网络</button>
+        </div>
+
+        <div class="stack">
+          <article class="card" aria-label="Overview stats">
+            <header class="card-header">
+              <div class="icon-box" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              </div>
+              <div class="card-title">
+                <h2>总览</h2>
+              </div>
+            </header>
+            <div class="card-body">
+              <div class="metrics">
+                <div class="metric"><span>影片</span><strong>1,284</strong></div>
+                <div class="metric"><span>演员</span><strong>318</strong></div>
+                <div class="metric"><span>标签</span><strong>76</strong></div>
+                <div class="metric"><span>萃取帧</span><strong>142</strong></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card" aria-label="Watch time">
+            <header class="card-header">
+              <div class="icon-box" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>
+              </div>
+              <div class="card-title">
+                <h2>观看时间</h2>
+                <p>过去 91 天的播放时间统计，用于快速了解近期使用节奏。</p>
+              </div>
+            </header>
+            <div class="card-body">
+              <div class="metrics">
+                <div class="metric"><span>本周</span><strong>4h 20m</strong></div>
+                <div class="metric"><span>近三个月</span><strong>38h 15m</strong></div>
+                <div class="metric"><span>最长连续</span><strong>9 天</strong></div>
+                <div class="metric"><span>单日最多</span><strong>3h 40m</strong></div>
+              </div>
+              <div class="heatmap-placeholder">这里保持当前观看时间统计展示；Connected Clients 放在这个卡片下面。</div>
+            </div>
+          </article>
+
+          <article class="card" aria-label="Connected clients">
+            <header class="card-header">
+              <div class="icon-box" aria-hidden="true">
+                <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M17 8h.01"/></svg>
+              </div>
+              <div class="card-title">
+                <h2>连接的客户端</h2>
+                <p>当前后端进程内访问过 Curated 的设备和浏览器。仅展示 HTTP 可见信息，不收集 MAC 地址。</p>
+              </div>
+              <button class="button" type="button" aria-label="刷新连接的客户端">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/></svg>
+                刷新
+              </button>
+            </header>
+
+            <div class="card-body">
+              <div class="client-summary" aria-label="Connected client summary">
+                <div class="metric"><span>客户端</span><strong>4</strong></div>
+                <div class="metric"><span>远程</span><strong>2</strong></div>
+                <div class="metric"><span>本机</span><strong>1</strong></div>
+                <div class="metric"><span>上次刷新</span><strong>刚刚</strong></div>
+              </div>
+
+              <div class="client-list">
+                <section class="client-row" aria-label="Local Chrome client">
+                  <div class="device-icon local" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/></svg>
+                  </div>
+                  <div class="device-main">
+                    <div class="device-title">
+                      <strong>Windows 11 · Chrome 132</strong>
+                      <span class="badge primary">This device</span>
+                      <span class="badge">Local</span>
+                    </div>
+                    <div class="device-meta">
+                      <span>127.0.0.1</span>
+                      <span>localhost</span>
+                      <span>Desktop</span>
+                    </div>
+                  </div>
+                  <div class="device-side">
+                    <div>刚刚访问</div>
+                    <div class="badges"><span class="badge">284 requests</span></div>
+                  </div>
+                </section>
+
+                <section class="client-row" aria-label="Remote iPhone client">
+                  <div class="device-icon" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+                  </div>
+                  <div class="device-main">
+                    <div class="device-title">
+                      <strong>iOS · Safari 18</strong>
+                      <span class="badge info">Remote</span>
+                    </div>
+                    <div class="device-meta">
+                      <span>192.168.1.42</span>
+                      <span>iphone.local</span>
+                      <span>Mobile</span>
+                    </div>
+                  </div>
+                  <div class="device-side">
+                    <div>8 分钟前</div>
+                    <div class="badges"><span class="badge">47 requests</span></div>
+                  </div>
+                </section>
+
+                <section class="client-row" aria-label="Remote macOS client">
+                  <div class="device-icon" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 20h6"/><path d="M12 16v4"/></svg>
+                  </div>
+                  <div class="device-main">
+                    <div class="device-title">
+                      <strong>macOS · Firefox 135</strong>
+                      <span class="badge info">Remote</span>
+                    </div>
+                    <div class="device-meta">
+                      <span>192.168.1.38</span>
+                      <span>macbook-pro.lan</span>
+                      <span>Laptop</span>
+                    </div>
+                  </div>
+                  <div class="device-side">
+                    <div>28 分钟前</div>
+                    <div class="badges"><span class="badge">91 requests</span></div>
+                  </div>
+                </section>
+
+                <section class="client-row" aria-label="Script client">
+                  <div class="device-icon" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="m14 4-4 16"/></svg>
+                  </div>
+                  <div class="device-main">
+                    <div class="device-title">
+                      <strong>Tool / Script · curl 8</strong>
+                      <span class="badge warning">Remote</span>
+                    </div>
+                    <div class="device-meta">
+                      <span>192.168.1.50</span>
+                      <span>hostname unknown</span>
+                      <span>Script</span>
+                    </div>
+                  </div>
+                  <div class="device-side">
+                    <div>1 小时前</div>
+                    <div class="badges"><span class="badge">3 requests</span></div>
+                  </div>
+                </section>
+              </div>
+
+              <p class="privacy-note">
+                说明：这里展示的是当前后端进程内观察到的 HTTP 客户端。重启后端会清空列表。远程设备的 MAC 地址无法通过 HTTP 获得，也不会被 Curated 收集或展示。
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

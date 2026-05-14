@@ -2,7 +2,7 @@
 
 ## Overview
 
-Curated exposes a Go HTTP API for library browsing, playback workflows, actor metadata, settings, curated-frame management, storage presence checks, scans, and task tracking.
+Curated exposes a Go HTTP API for library browsing, playback workflows, actor metadata, settings, connected-client visibility, curated-frame management, storage presence checks, scans, and task tracking.
 
 This document is the single public API reference for the repository.
 
@@ -91,6 +91,40 @@ Important notes:
 
 - intended for development diagnostics
 - not a core product-facing endpoint
+
+## Connected Clients
+
+### `GET /api/connected-clients`
+
+Purpose:
+
+- list clients that have accessed the backend during the current backend process lifetime
+- power the Settings -> Overview connected-clients card below the watch-time statistics
+
+Response shape:
+
+- `clients`: array of tracked client entries
+- `total`: total tracked clients in the current process
+- `localCount`: clients classified as local access
+- `remoteCount`: clients classified as remote access
+- `sampledAt`: server timestamp for the response
+
+Client entry fields:
+
+- `key`: stable in-memory key for the current process, derived from IP + User-Agent
+- `ip`, optional `port`, optional `hostname`
+- `browser`, optional `browserVersion`, `os`, optional `osVersion`
+- `deviceType`: `desktop`, `laptop`, `mobile`, `tablet`, `tool`, or `unknown`
+- `accessKind`: `local` or `remote`
+- `isLocalMachine`: true for loopback or known host-interface IPs
+- `firstSeen`, `lastSeen`, `requestCount`
+
+Important notes:
+
+- tracking is in-memory only; restarting the backend clears the list
+- clients are deduplicated by remote IP + User-Agent, not by TCP port
+- the backend keeps at most 50 most-recent clients
+- MAC addresses are not collected or exposed
 
 ## App Updates
 
