@@ -9,6 +9,7 @@ import {
   selectedDirectoryFromOpenDialogResult,
   shouldHideWindowOnClose,
   shouldStopBackendOnQuit,
+  shouldUseApplicationMenu,
 } from "./desktop-shell"
 
 describe("Electron desktop shell integration", () => {
@@ -56,6 +57,15 @@ describe("Electron desktop shell integration", () => {
 
   it("uses a namespaced IPC channel for directory picking", () => {
     expect(pickDirectoryChannel).toBe("curated:pick-directory")
+  })
+
+  it("removes the native application menu on Windows and Linux desktop shells", () => {
+    expect(shouldUseApplicationMenu("win32")).toBe(false)
+    expect(shouldUseApplicationMenu("linux")).toBe(false)
+  })
+
+  it("keeps the native application menu on macOS", () => {
+    expect(shouldUseApplicationMenu("darwin")).toBe(true)
   })
 
   it("builds a polished tray menu model with app actions and normalized URLs", () => {

@@ -94,6 +94,10 @@ export function shouldStopBackendOnQuit(options: { attachedToExistingBackend: bo
   return !options.attachedToExistingBackend
 }
 
+export function shouldUseApplicationMenu(platform: string = process.platform): boolean {
+  return platform === "darwin"
+}
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, "")
 }

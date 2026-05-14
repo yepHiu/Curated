@@ -20,6 +20,7 @@ import {
   selectedDirectoryFromOpenDialogResult,
   shouldHideWindowOnClose,
   shouldStopBackendOnQuit,
+  shouldUseApplicationMenu,
   type TrayMenuActionId,
   type TrayMenuModelItem,
 } from "./desktop-shell.js"
@@ -55,6 +56,9 @@ if (!singleInstanceLock) {
 
   app.whenReady()
     .then(async () => {
+      if (!shouldUseApplicationMenu(process.platform)) {
+        Menu.setApplicationMenu(null)
+      }
       appIconPath = resolveAppIconPath(app.getAppPath())
       if (process.platform === "darwin" && appIconPath) {
         app.dock?.setIcon(appIconPath)
@@ -123,6 +127,7 @@ function createMainWindow(baseUrl: string, iconPath?: string, initialUrl = baseU
     height: 820,
     minWidth: 960,
     minHeight: 640,
+    autoHideMenuBar: true,
     show: false,
     title: "Curated",
     ...(iconPath ? { icon: iconPath } : {}),
