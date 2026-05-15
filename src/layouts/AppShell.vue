@@ -102,7 +102,11 @@ const shellGridClass = computed(() => {
   if (!isLgUp.value) {
     return base
   }
-  return `${base} ${desktopSidebarCollapsed.value ? "lg:grid-cols-[4.75rem_minmax(0,1fr)]" : "lg:grid-cols-[304px_minmax(0,1fr)]"}`
+  return `${base} ${
+    desktopSidebarCollapsed.value
+      ? "lg:grid-cols-[var(--app-sidebar-collapsed-width)_minmax(0,1fr)]"
+      : "lg:grid-cols-[var(--app-sidebar-width)_minmax(0,1fr)]"
+  }`
 })
 
 const currentMovie = computed(() => {
@@ -139,7 +143,7 @@ const showHeaderBack = computed(() => !isPrimaryBrowseRoute.value)
 const routerViewFrameClass = computed(() =>
   useFlushWorkspaceFrame.value
     ? "flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
-    : "flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7",
+    : "flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]",
 )
 
 const headerBackIntent = computed(() => resolveNavigationBackLink(route, currentMovieId.value))
@@ -645,7 +649,8 @@ function clearActorsSearch() {
         >
           <!-- min-h 与中间栏 h-10 搜索框 + 上下 py-4 对齐，避免仅「返回」时顶栏变矮（如观看历史） -->
           <div
-            class="flex min-h-[4.5rem] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3.5 sm:px-5 lg:px-6 lg:py-4"
+            data-shell-header
+            class="flex min-h-[var(--app-header-min-height)] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-[var(--app-header-px)] py-[var(--app-header-py)] sm:px-[var(--app-header-px-sm)] lg:px-[var(--app-header-px-lg)] lg:py-[var(--app-header-py-lg)]"
           >
             <div class="flex flex-wrap items-center gap-2">
               <Button
@@ -884,7 +889,7 @@ function clearActorsSearch() {
           @click="mobileSidebarOpen = false"
         />
         <aside
-          class="absolute top-0 bottom-0 left-0 flex w-[min(304px,88vw)] max-w-full flex-col border-r border-border/60 bg-sidebar/98 shadow-2xl shadow-black/30 backdrop-blur-md transition-transform duration-200 ease-out"
+          class="absolute top-0 bottom-0 left-0 flex w-[var(--app-sidebar-mobile-width)] max-w-full flex-col border-r border-border/60 bg-sidebar/98 shadow-2xl shadow-black/30 backdrop-blur-md transition-transform duration-200 ease-out"
           :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
           role="dialog"
           aria-modal="true"

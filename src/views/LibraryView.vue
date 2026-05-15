@@ -853,7 +853,7 @@ const activeStudioForPage = computed(() =>
 
 <template>
   <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-5 lg:px-6 lg:py-5 xl:px-7">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]">
       <p
         v-if="libraryLoadError"
         data-library-load-error

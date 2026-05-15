@@ -1,10 +1,14 @@
 import { mount } from "@vue/test-utils"
 import { ref } from "vue"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { Movie } from "@/domain/movie/types"
 
 import VirtualMovieMasonry from "./VirtualMovieMasonry.vue"
+import { estimateVirtualMovieChunkHeight } from "@/lib/library-virtual-scroll"
+import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
+
+const mediaQueryMatches = vi.hoisted(() => ({ value: false, __v_isRef: true }))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -14,6 +18,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@vueuse/core", () => ({
   useResizeObserver: vi.fn(),
+  useMediaQuery: vi.fn(() => mediaQueryMatches),
 }))
 
 vi.mock("lucide-vue-next", () => ({
@@ -101,6 +106,12 @@ function makeMovie(id: string): Movie {
 }
 
 describe("VirtualMovieMasonry", () => {
+  beforeEach(() => {
+    mediaQueryMatches.value = false
+    vi.mocked(estimateVirtualMovieChunkHeight).mockClear()
+    vi.mocked(buildMovieGridChunkStyle).mockClear()
+  })
+
   it("renders header slot inside the dynamic scroller before movie items", () => {
     const wrapper = mount(VirtualMovieMasonry, {
       props: {
@@ -140,5 +151,39 @@ describe("VirtualMovieMasonry", () => {
     expect(wrapper.find("[data-masonry-header]").exists()).toBe(true)
     expect(emptyCardIndex).toBeGreaterThan(headerIndex)
     expect(html).toContain("Nothing here")
+  })
+
+  it("uses default density estimates when the Retina desktop media query does not match", () => {
+    mount(VirtualMovieMasonry, {
+      props: {
+        movies: [makeMovie("m1")],
+      },
+    })
+
+    expect(vi.mocked(buildMovieGridChunkStyle)).toHaveBeenCalledWith({
+      gap: "var(--movie-grid-gap)",
+      minTrackWidth: "var(--movie-grid-min-track)",
+    })
+    expect(vi.mocked(estimateVirtualMovieChunkHeight)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gapPx: 20,
+      }),
+    )
+  })
+
+  it("uses compact density estimates when the Retina desktop media query matches", () => {
+    mediaQueryMatches.value = true
+
+    mount(VirtualMovieMasonry, {
+      props: {
+        movies: [makeMovie("m1")],
+      },
+    })
+
+    expect(vi.mocked(estimateVirtualMovieChunkHeight)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gapPx: 16,
+      }),
+    )
   })
 })

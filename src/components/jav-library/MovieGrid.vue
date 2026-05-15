@@ -32,8 +32,8 @@ const visibleMovies = computed(() => props.movies.slice(0, props.maxVisible))
 
 <template>
   <div v-if="visibleMovies.length" class="overflow-x-auto pb-1">
-    <div class="grid auto-cols-[11.25rem] grid-flow-col justify-start gap-5">
-      <div v-for="movie in visibleMovies" :key="movie.id" class="w-[11.25rem]">
+    <div class="grid auto-cols-[var(--movie-related-card-width)] grid-flow-col justify-start gap-[var(--movie-grid-gap)]">
+      <div v-for="movie in visibleMovies" :key="movie.id" class="w-[var(--movie-related-card-width)]">
         <MovieCard
           :movie="movie"
           :selected="movie.id === props.selectedMovieId"

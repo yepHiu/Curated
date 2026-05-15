@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useSlots, watch } from "vue"
-import { useResizeObserver } from "@vueuse/core"
+import { useMediaQuery, useResizeObserver } from "@vueuse/core"
 import { ChevronUp } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller"
@@ -14,6 +14,10 @@ import {
   getVirtualMovieFocusChunkIndex,
   resolveVirtualMoviePosterLoadPolicy,
 } from "@/lib/library-virtual-scroll"
+import {
+  RETINA_DESKTOP_DENSITY_QUERY,
+  resolveMovieGridDensity,
+} from "@/lib/display-density"
 import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 
 interface MovieChunk {
@@ -64,10 +68,6 @@ const batchSelectedSet = computed(() => new Set(props.batchSelectedIds ?? []))
  * 避免固定 12 张/块在 8 列下变成 8+4 后下一块另起网格造成「阶梯断行」。
  */
 const ROWS_PER_CHUNK = 4
-/** 与 grid minmax 下限大致对齐（≈11.25rem），用于估算列数 */
-const MIN_TRACK_PX = 188
-/** 与 rowGap/columnGap 的 clamp 中间值接近 */
-const GAP_PX_ESTIMATE = 20
 /** 卡片略放大后虚拟行高略增 */
 /** 虚拟滚动缓冲区：上下各多渲染的块数，防止快速滚动白屏（与文档「上下各缓冲 5」对齐） */
 const BUFFER_CHUNKS = 8
@@ -78,6 +78,17 @@ const rootEl = ref<HTMLElement | null>(null)
 const scrollEl = ref<HTMLElement | null>(null)
 const containerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200)
 const containerHeight = ref(typeof window !== "undefined" ? window.innerHeight : 900)
+const retinaDesktopCompact = useMediaQuery(RETINA_DESKTOP_DENSITY_QUERY)
+const movieGridDensity = computed(() => resolveMovieGridDensity(retinaDesktopCompact.value))
+const movieGridChunkStyle = computed(() =>
+  buildMovieGridChunkStyle({
+    minTrackWidth: movieGridDensity.value.minTrackWidth,
+    gap: movieGridDensity.value.gap,
+  }),
+)
+const movieCardFrameStyle = computed(() => ({
+  maxWidth: movieGridDensity.value.cardMaxWidth,
+}))
 
 function setScrollerRef(value: unknown) {
   if (value instanceof HTMLElement) {
@@ -110,7 +121,13 @@ useResizeObserver(rootEl, (entries) => {
 })
 
 const columnCountFallback = computed(() =>
-  Math.max(1, Math.floor((containerWidth.value + GAP_PX_ESTIMATE) / (MIN_TRACK_PX + GAP_PX_ESTIMATE))),
+  Math.max(
+    1,
+    Math.floor(
+      (containerWidth.value + movieGridDensity.value.gapPxEstimate) /
+        (movieGridDensity.value.minTrackPx + movieGridDensity.value.gapPxEstimate),
+    ),
+  ),
 )
 
 /** 首块（或任意可见块）布局后从 getComputedStyle 读取，与 auto-fill 真实列数对齐 */
@@ -161,16 +178,9 @@ const estimatedChunkHeight = computed(() =>
     containerWidth: containerWidth.value,
     columnCount: effectiveColumnCount.value,
     rowsPerChunk: ROWS_PER_CHUNK,
-    gapPx: GAP_PX_ESTIMATE,
+    gapPx: movieGridDensity.value.gapPxEstimate,
   }),
 )
-
-/** 网格列最小宽度：窄屏不过小、随视口变宽、大屏有上限 */
-const GRID_COL_MIN = "clamp(11.25rem, 9vw + 8.75rem, 15rem)"
-/** 单卡最大宽度：避免超宽屏单卡拉得过大；与列 min 解耦 */
-const CARD_MAX_WIDTH = "min(100%, clamp(12rem, 28vw, 19rem))"
-/** 间距随视口在区间内变化 */
-const GRID_GAP = "clamp(1rem, 2vw, 1.5rem)"
 
 function buildChunkSizeKey(items: Movie[]): string {
   if (items.length === 0) {
@@ -309,14 +319,14 @@ watch(
           <div
             class="grid w-full overflow-x-hidden"
             :ref="(el) => onChunkGridRef(el)"
-            :style="buildMovieGridChunkStyle({ minTrackWidth: GRID_COL_MIN, gap: GRID_GAP })"
+            :style="movieGridChunkStyle"
           >
             <div
               v-for="movie in getChunk(item).items"
               :key="movie.id"
               class="flex min-w-0 justify-center"
             >
-              <div class="w-full min-w-0" :style="{ maxWidth: CARD_MAX_WIDTH }">
+              <div class="w-full min-w-0" :style="movieCardFrameStyle">
               <MovieCard
                 :movie="movie"
                 :selected="movie.id === props.selectedMovieId"

@@ -249,8 +249,8 @@ const getNavigationTarget = (page: AppPage) => {
     :class="props.compact ? 'px-2 pb-3 pt-0' : 'px-3.5 pb-3.5 pt-0'"
   >
     <div
-      class="flex min-h-[4.5rem] shrink-0 items-center border-b border-sidebar-border/80"
-      :class="props.compact ? 'justify-center py-3.5 lg:py-4' : 'justify-between gap-2 px-2 py-3.5 sm:px-2 lg:px-2 lg:py-4'"
+      class="flex min-h-[var(--app-header-min-height)] shrink-0 items-center border-b border-sidebar-border/80"
+      :class="props.compact ? 'justify-center py-[var(--app-header-py)] lg:py-[var(--app-header-py-lg)]' : 'justify-between gap-2 px-2 py-[var(--app-header-py)] sm:px-2 lg:px-2 lg:py-[var(--app-header-py-lg)]'"
     >
       <div
         class="flex min-w-0 items-center"

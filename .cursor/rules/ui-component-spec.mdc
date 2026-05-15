@@ -83,6 +83,7 @@ alwaysApply: false
 - 修改 **壳层布局、网格、卡片、播放器 HUD、设置页、对话框、全局字体或 spacing** 时，必须按 **[`docs/reference/frontend-display-scaling-checklist.md`](docs/reference/frontend-display-scaling-checklist.md)** 做多端显示缩放检查。
 - **MUST NOT** 未经用户明确同意主动运行 **`pnpm test:display`** 或其他 display scaling 冒烟测试；该测试耗时较长，只在用户确认、发布前检查或明确需要验证显示缩放回归时运行。
 - 普通布局以 CSS pixel 为基准；不要为每一种 DPR 或物理分辨率写独立业务布局分支。
+- 桌面 Retina 紧凑密度仅通过 `src/style.css` 全局变量和 `(hover: hover) and (pointer: fine) and (min-width: 1024px) and (min-resolution: 2dppx)` 媒体查询实现；DPR `1.5` 外接屏必须继续走默认密度变量。
 - 显示适配不应绕过服务层或把业务能力判断塞进页面组件；浏览器前端不默认假设 Electron / mpv 存在。
 - 不因显示适配一次性引入 Pinia/Vuex 等全局状态管理重构；如后续需要 Pinia，应从小服务或小模块逐步试点。
 

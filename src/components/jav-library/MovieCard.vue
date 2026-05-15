@@ -158,7 +158,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
       @click="handleOpenDetails"
       @contextmenu.prevent="emit('contextMenu', $event)"
     >
-      <div class="p-2.5 pb-0">
+      <div class="p-[var(--movie-card-padding)] pb-0">
         <div
           class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 aspect-[358/537]"
           :class="posterSrc ? 'bg-muted/30' : `bg-gradient-to-br p-2.5 ${movie.tone}`"
@@ -194,7 +194,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
           />
 
           <Badge
-            class="relative z-[2] m-2.5 h-5 w-fit rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
+            class="relative z-[2] m-[var(--movie-card-padding)] h-5 w-fit rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
           >
             {{ movie.code }}
           </Badge>
@@ -238,7 +238,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
       </div>
 
-      <CardContent class="flex min-h-[5.25rem] flex-col justify-between gap-1.5 p-2.5">
+      <CardContent class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]">
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
           <CardTitle class="truncate text-[13px]">{{ movie.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">

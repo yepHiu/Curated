@@ -198,6 +198,19 @@ describe("AppShell library search route sync", () => {
     expect(split.classes().join(" ")).not.toContain("lg:duration-300")
   })
 
+  it("uses density variables for desktop shell dimensions", () => {
+    const wrapper = shallowMount(AppShell)
+    const split = wrapper.get('[data-shell-layout="split"]')
+    const header = wrapper.get("[data-shell-header]")
+    const splitClasses = split.classes().join(" ")
+    const headerClasses = header.classes().join(" ")
+
+    expect(splitClasses).toContain("lg:grid-cols-[var(--app-sidebar-width)_minmax(0,1fr)]")
+    expect(splitClasses).not.toContain("lg:grid-cols-[304px_minmax(0,1fr)]")
+    expect(headerClasses).toContain("min-h-[var(--app-header-min-height)]")
+    expect(headerClasses).not.toContain("min-h-[4.5rem]")
+  })
+
   it("does not wrap batch-toolbar routes in the global workspace padding", () => {
     routerMocks.route.name = "library"
     const wrapper = shallowMount(AppShell)
