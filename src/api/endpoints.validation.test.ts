@@ -133,6 +133,71 @@ describe("api endpoint response validation", () => {
     )
   })
 
+  it("calls auth status endpoint", async () => {
+    const status = {
+      pinEnabled: true,
+      unlocked: false,
+      setupRequired: false,
+      pinLength: 4,
+      trustedForever: false,
+      sessionTtlMinutes: 60,
+      lanRequiresPin: true,
+      lockOnRestart: true,
+    }
+    const get = vi.spyOn(httpClient, "get").mockResolvedValueOnce(status)
+
+    await expect(api.authStatus()).resolves.toEqual(status)
+
+    expect(get).toHaveBeenCalledWith("/auth/status")
+  })
+
+  it("posts trustedForever when unlocking with permanent device trust", async () => {
+    const status = {
+      pinEnabled: true,
+      unlocked: true,
+      setupRequired: false,
+      pinLength: 6,
+      trustedForever: true,
+      sessionTtlMinutes: 60,
+      lanRequiresPin: true,
+      lockOnRestart: true,
+    }
+    const post = vi.spyOn(httpClient, "post").mockResolvedValueOnce(status)
+
+    await expect(api.unlockPin({ pin: "123456", trustedForever: true })).resolves.toEqual(status)
+
+    expect(post).toHaveBeenCalledWith("/auth/unlock", {
+      pin: "123456",
+      trustedForever: true,
+    })
+  })
+
+  it("posts current and new PIN values when changing PIN", async () => {
+    const status = {
+      pinEnabled: true,
+      unlocked: true,
+      setupRequired: false,
+      pinLength: 5,
+      trustedForever: false,
+      sessionTtlMinutes: 60,
+      lanRequiresPin: true,
+      lockOnRestart: true,
+    }
+    const post = vi.spyOn(httpClient, "post").mockResolvedValueOnce(status)
+
+    await expect(api.changePin({
+      currentPin: "1234",
+      newPin: "98765",
+      confirmPin: "98765",
+    })).resolves.toEqual(status)
+
+    expect(post).toHaveBeenCalledWith("/auth/change-pin", {
+      currentPin: "1234",
+      newPin: "98765",
+      confirmPin: "98765",
+    })
+  })
+
   it("keeps small movie imports on the multipart endpoint", async () => {
     const task = {
       taskId: "import.movies-1",

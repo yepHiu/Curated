@@ -460,6 +460,50 @@ type AddLibraryPathResponse struct {
 	ScanTask *TaskDTO `json:"scanTask,omitempty"`
 }
 
+// AuthStatusDTO reports the current PIN app-lock state for the active browser session.
+type AuthStatusDTO struct {
+	PINEnabled        bool   `json:"pinEnabled"`
+	Unlocked          bool   `json:"unlocked"`
+	SetupRequired     bool   `json:"setupRequired"`
+	PINLength         int    `json:"pinLength"`
+	SessionExpiresAt  string `json:"sessionExpiresAt,omitempty"`
+	TrustedForever    bool   `json:"trustedForever"`
+	SessionTTLMinutes int    `json:"sessionTtlMinutes"`
+	LANRequiresPIN    bool   `json:"lanRequiresPin"`
+	LockOnRestart     bool   `json:"lockOnRestart"`
+}
+
+// SetupPINRequest is the body for POST /api/auth/setup-pin.
+type SetupPINRequest struct {
+	PIN               string `json:"pin"`
+	ConfirmPIN        string `json:"confirmPin"`
+	SessionTTLMinutes *int   `json:"sessionTtlMinutes,omitempty"`
+	LANRequiresPIN    *bool  `json:"lanRequiresPin,omitempty"`
+	LockOnRestart     *bool  `json:"lockOnRestart,omitempty"`
+	TrustedForever    bool   `json:"trustedForever,omitempty"`
+}
+
+// UnlockPINRequest is the body for POST /api/auth/unlock.
+type UnlockPINRequest struct {
+	PIN            string `json:"pin"`
+	TrustedForever bool   `json:"trustedForever,omitempty"`
+}
+
+// ChangePINRequest is the body for POST /api/auth/change-pin.
+type ChangePINRequest struct {
+	CurrentPIN string `json:"currentPin"`
+	NewPIN     string `json:"newPin"`
+	ConfirmPIN string `json:"confirmPin"`
+}
+
+// PatchAuthSettingsRequest is the body for PATCH /api/auth/settings.
+type PatchAuthSettingsRequest struct {
+	PINEnabled        *bool `json:"pinEnabled,omitempty"`
+	SessionTTLMinutes *int  `json:"sessionTtlMinutes,omitempty"`
+	LANRequiresPIN    *bool `json:"lanRequiresPin,omitempty"`
+	LockOnRestart     *bool `json:"lockOnRestart,omitempty"`
+}
+
 // UpdateLibraryPathRequest is the body for PATCH /api/library/paths/{id}.
 type UpdateLibraryPathRequest struct {
 	Title string `json:"title"`
@@ -912,6 +956,9 @@ const (
 	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
 	ErrorCodeConflict      = "COMMON_CONFLICT"
+
+	ErrorCodeAuthLocked     = "AUTH_LOCKED"
+	ErrorCodeAuthInvalidPIN = "AUTH_INVALID_PIN"
 
 	ErrorCodeImportSourceUnavailable   = "IMPORT_SOURCE_UNAVAILABLE"
 	ErrorCodeImportTargetNotConfigured = "IMPORT_TARGET_NOT_CONFIGURED"

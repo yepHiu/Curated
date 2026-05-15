@@ -66,6 +66,45 @@ export interface ConnectedClientsDTO {
   sampledAt: string
 }
 
+export interface AuthStatusDTO {
+  pinEnabled: boolean
+  unlocked: boolean
+  setupRequired: boolean
+  pinLength: number
+  sessionExpiresAt?: string
+  trustedForever: boolean
+  sessionTtlMinutes: number
+  lanRequiresPin: boolean
+  lockOnRestart: boolean
+}
+
+export interface SetupPinBody {
+  pin: string
+  confirmPin: string
+  sessionTtlMinutes?: number
+  lanRequiresPin?: boolean
+  lockOnRestart?: boolean
+  trustedForever?: boolean
+}
+
+export interface UnlockPinBody {
+  pin: string
+  trustedForever?: boolean
+}
+
+export interface ChangePinBody {
+  currentPin: string
+  newPin: string
+  confirmPin: string
+}
+
+export interface PatchAuthSettingsBody {
+  pinEnabled?: boolean
+  sessionTtlMinutes?: number
+  lanRequiresPin?: boolean
+  lockOnRestart?: boolean
+}
+
 export interface AppUpdateStatusDTO {
   supported: boolean
   status: "unsupported" | "up-to-date" | "update-available" | "error"

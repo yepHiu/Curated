@@ -6,6 +6,7 @@ import { i18n } from "@/i18n"
 import { initClientLogger } from "@/lib/app-logger"
 import { hydratePlaybackProgress } from "@/lib/playback-progress-storage"
 import { hydratePlayedMovies } from "@/lib/played-movies-storage"
+import { startAuthIdleLockMonitor } from "@/services/auth-idle-lock-service"
 import router from "./router"
 import "./style.css"
 
@@ -38,6 +39,7 @@ function boot() {
     console.error("[global error handler]", err, info)
   }
   app.use(i18n).use(router).mount("#app")
+  startAuthIdleLockMonitor(router)
   hydrateWebStateAfterMount()
 }
 

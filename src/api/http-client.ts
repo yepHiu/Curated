@@ -112,6 +112,7 @@ async function monitoredFetch(
       method,
       ...init,
       signal: controller.signal,
+      credentials: "include",
     })
     if (requestId) {
       devRequestMonitor.finishRequest(requestId, {
@@ -240,6 +241,7 @@ export const httpClient = {
     return await new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open("POST", buildUrl(path))
+      xhr.withCredentials = true
       xhr.setRequestHeader("Accept", "application/json")
       xhr.timeout = options.timeoutMs ?? 0
 
@@ -308,6 +310,7 @@ export const httpClient = {
       const xhr = new XMLHttpRequest()
       const diagnosticSuffix = formatUploadDiagnosticContext(options.diagnosticContext)
       xhr.open("PUT", buildUrl(path))
+      xhr.withCredentials = true
       xhr.setRequestHeader("Accept", "application/json")
       for (const [key, value] of Object.entries(options.headers ?? {})) {
         xhr.setRequestHeader(key, value)

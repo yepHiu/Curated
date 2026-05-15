@@ -150,6 +150,11 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 		_ = logger.Sync()
 		return nil, fmt.Errorf("run sqlite migrations: %w", err)
 	}
+	if err := store.ApplyAuthStartupPolicy(ctx); err != nil {
+		_ = store.Close()
+		_ = logger.Sync()
+		return nil, fmt.Errorf("apply auth startup policy: %w", err)
+	}
 	if err := store.SeedLibraryPathsIfEmpty(ctx, cfg.LibraryPaths); err != nil {
 		_ = store.Close()
 		_ = logger.Sync()

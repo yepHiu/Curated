@@ -1,8 +1,14 @@
 import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
+import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: "/lock",
+      name: "lock",
+      component: () => import("@/views/LockView.vue"),
+    },
     {
       path: "/",
       component: () => import("@/layouts/AppShell.vue"),
@@ -81,6 +87,26 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (!isAuthLockEnabled() || to.name === "lock") {
+    return true
+  }
+  try {
+    const status = await authLockService.refreshStatus()
+    if (status.pinEnabled && !status.unlocked) {
+      return {
+        name: "lock",
+        query: {
+          redirect: to.fullPath,
+        },
+      }
+    }
+  } catch (error) {
+    console.warn("[router] auth status check failed", error)
+  }
+  return true
 })
 
 export default router

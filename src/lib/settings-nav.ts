@@ -2,6 +2,7 @@
 export type SettingsSectionSlug =
   | "overview"
   | "general"
+  | "security"
   | "library"
   | "metadata"
   | "network"
@@ -17,6 +18,7 @@ export function settingsSectionDomId(slug: SettingsSectionSlug): string {
 export const SETTINGS_NAV_ITEMS: { slug: SettingsSectionSlug; labelKey: string }[] = [
   { slug: "overview", labelKey: "settings.navOverview" },
   { slug: "general", labelKey: "settings.navGeneral" },
+  { slug: "security", labelKey: "settings.navSecurity" },
   { slug: "library", labelKey: "settings.navLibrary" },
   { slug: "metadata", labelKey: "settings.navMetadata" },
   { slug: "network", labelKey: "settings.navNetwork" },

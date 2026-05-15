@@ -295,6 +295,12 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
+	mux.HandleFunc("GET /api/auth/status", h.handleAuthStatus)
+	mux.HandleFunc("POST /api/auth/setup-pin", h.handleSetupPIN)
+	mux.HandleFunc("POST /api/auth/unlock", h.handleUnlockPIN)
+	mux.HandleFunc("POST /api/auth/change-pin", h.handleChangePIN)
+	mux.HandleFunc("POST /api/auth/lock", h.handleLockPIN)
+	mux.HandleFunc("PATCH /api/auth/settings", h.handlePatchAuthSettings)
 	mux.HandleFunc("GET /api/connected-clients", h.handleConnectedClients)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
@@ -374,7 +380,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
 	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
 
-	return WithAccessLog(h.logger, withClientTracking(withCORS(mux), h.clientTracker))
+	return WithAccessLog(h.logger, withClientTracking(withCORS(h.withAuthLock(mux)), h.clientTracker))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -3120,7 +3126,13 @@ func (h *Handler) handleProxyPingURL(w http.ResponseWriter, r *http.Request, tar
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Curated-Offset, X-Curated-Chunk-Size, X-Curated-Chunk-SHA256")
 

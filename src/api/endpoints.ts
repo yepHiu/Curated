@@ -34,6 +34,8 @@ import type {
   AddPlaybackWatchTimeBody,
   AppUpdateStatusDTO,
   AppUpdateInstallBody,
+  AuthStatusDTO,
+  ChangePinBody,
   ConnectedClientsDTO,
   CreateCuratedFrameBody,
   CreateMovieImportUploadBody,
@@ -63,6 +65,7 @@ import type {
   MoviesPageDTO,
   PlaybackDescriptorDTO,
   PatchActorExternalLinksBody,
+  PatchAuthSettingsBody,
   PatchCuratedFrameTagsBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
@@ -75,9 +78,11 @@ import type {
   PutMovieCommentBody,
   PutPlaybackProgressBody,
   SettingsDTO,
+  SetupPinBody,
   StartScanBody,
   RecentTasksDTO,
   TaskDTO,
+  UnlockPinBody,
 } from "./types"
 
 const DEFAULT_RESUMABLE_IMPORT_THRESHOLD_BYTES = 512 * 1024 * 1024
@@ -237,6 +242,30 @@ export const api = {
     return httpClient
       .get<unknown>("/connected-clients")
       .then((value) => assertApiResponse("GET /connected-clients", value, isConnectedClientsDTO))
+  },
+
+  authStatus(): Promise<AuthStatusDTO> {
+    return httpClient.get<AuthStatusDTO>("/auth/status")
+  },
+
+  setupPin(body: SetupPinBody): Promise<AuthStatusDTO> {
+    return httpClient.post<AuthStatusDTO>("/auth/setup-pin", body)
+  },
+
+  unlockPin(body: UnlockPinBody): Promise<AuthStatusDTO> {
+    return httpClient.post<AuthStatusDTO>("/auth/unlock", body)
+  },
+
+  changePin(body: ChangePinBody): Promise<AuthStatusDTO> {
+    return httpClient.post<AuthStatusDTO>("/auth/change-pin", body)
+  },
+
+  lockApp(): Promise<AuthStatusDTO> {
+    return httpClient.post<AuthStatusDTO>("/auth/lock", {})
+  },
+
+  patchAuthSettings(body: PatchAuthSettingsBody): Promise<AuthStatusDTO> {
+    return httpClient.patch<AuthStatusDTO>("/auth/settings", body)
   },
 
   getAppUpdateStatus(): Promise<AppUpdateStatusDTO> {

@@ -57,6 +57,7 @@ import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNe
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
+import SettingsSecuritySection from "@/components/jav-library/settings/SettingsSecuritySection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
   SETTINGS_NAV_ITEMS,
@@ -2001,6 +2002,21 @@ async function runMetadataRefreshForSelected() {
       @change-auto-download-updates="onAutoDownloadUpdatesChange"
       @change-launch-at-login="onLaunchAtLoginChange"
     />
+    </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('security')"
+      value="security"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
+    <section
+      id="settings-section-security"
+      class="space-y-6"
+      :aria-label="t('settings.navSecurity')"
+    >
+    <h2 class="sr-only">{{ t("settings.navSecurity") }}</h2>
+      <SettingsSecuritySection />
     </section>
     </TabsContent>
 
