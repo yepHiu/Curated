@@ -15,10 +15,12 @@ import { fileURLToPath } from "node:url"
 import { startBackend, type ManagedBackend } from "./backend-process.js"
 import {
   buildTrayMenuModel,
+  shouldMarkCuratedDesktopRequest,
   pickDirectoryChannel,
   resolveAppIconPath,
   selectedDirectoryFromOpenDialogResult,
   shouldHideWindowOnClose,
+  withCuratedDesktopRequestHeaders,
   shouldStopBackendOnQuit,
   shouldUseApplicationMenu,
   type TrayMenuActionId,
@@ -78,7 +80,7 @@ if (!singleInstanceLock) {
       }
       rendererBaseUrl = managedFrontend?.baseUrl ?? managedBackend.baseUrl
       createAppTray(managedBackend, rendererBaseUrl)
-      mainWindow = createMainWindow(rendererBaseUrl, appIconPath)
+      mainWindow = createMainWindow(rendererBaseUrl, appIconPath, rendererBaseUrl, managedBackend.baseUrl)
     })
     .catch((error: unknown) => {
       console.error("Curated Electron startup failed", error)
@@ -121,7 +123,12 @@ app.on("will-quit", async (event) => {
   app.exit(0)
 })
 
-function createMainWindow(baseUrl: string, iconPath?: string, initialUrl = baseUrl): BrowserWindow {
+function createMainWindow(
+  baseUrl: string,
+  iconPath?: string,
+  initialUrl = baseUrl,
+  backendBaseUrl = baseUrl,
+): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -167,8 +174,21 @@ function createMainWindow(baseUrl: string, iconPath?: string, initialUrl = baseU
     void shell.openExternal(url)
   })
 
+  installDesktopClientMarker(window, backendBaseUrl)
   void window.loadURL(initialUrl)
   return window
+}
+
+function installDesktopClientMarker(window: BrowserWindow, backendBaseUrl: string): void {
+  window.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (!shouldMarkCuratedDesktopRequest(details.url, backendBaseUrl)) {
+      callback({ requestHeaders: details.requestHeaders })
+      return
+    }
+    callback({
+      requestHeaders: withCuratedDesktopRequestHeaders(details.requestHeaders, app.getVersion()),
+    })
+  })
 }
 
 function createAppTray(backend: ManagedBackend, appUrl: string): void {
@@ -235,7 +255,7 @@ function showMainWindow(initialUrl?: string): void {
     return
   }
   if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = createMainWindow(rendererBaseUrl, appIconPath, initialUrl ?? rendererBaseUrl)
+    mainWindow = createMainWindow(rendererBaseUrl, appIconPath, initialUrl ?? rendererBaseUrl, managedBackend.baseUrl)
     return
   }
   if (initialUrl) {

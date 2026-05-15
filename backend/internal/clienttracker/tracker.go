@@ -19,7 +19,15 @@ const (
 	AccessKindRemote AccessKind = "remote"
 )
 
-const defaultMaxEntries = 50
+const (
+	defaultMaxEntries                 = 50
+	curatedDesktopClientHeader        = "X-Curated-Client"
+	curatedDesktopClientVersionHeader = "X-Curated-Client-Version"
+	curatedDesktopOSHeader            = "X-Curated-OS"
+	curatedDesktopOSVersionHeader     = "X-Curated-OS-Version"
+	curatedDesktopClientHeaderValue   = "desktop-electron"
+	curatedDesktopClientDisplayName   = "Curated Desktop"
+)
 
 type ClientSnapshot struct {
 	Key            string
@@ -115,9 +123,23 @@ func (t *Tracker) Record(r *http.Request) {
 	if userAgent == "" {
 		userAgent = "Unknown Client"
 	}
-	key := clientKey(ip, userAgent)
+	clientIdentity := userAgent
 	now := t.now().UTC()
 	parsed := ParseUserAgent(userAgent)
+	applyClientHintOS(r, &parsed)
+	if marker, version, ok := curatedDesktopClientMarker(r); ok {
+		clientIdentity = marker + "\x00" + userAgent
+		parsed.Browser = curatedDesktopClientDisplayName
+		parsed.BrowserVersion = version
+		if osName, osVersion, ok := curatedDesktopOS(r); ok {
+			parsed.OS = osName
+			parsed.OSVersion = osVersion
+		}
+		if parsed.DeviceType == DeviceTypeUnknown {
+			parsed.DeviceType = DeviceTypeDesktop
+		}
+	}
+	key := clientKey(ip, clientIdentity)
 	accessKind := AccessKindRemote
 	parsedIP := net.ParseIP(ip)
 	if parsedIP != nil && parsedIP.IsLoopback() {
@@ -156,6 +178,7 @@ func (t *Tracker) Record(r *http.Request) {
 
 	record.RemoteAddr = r.RemoteAddr
 	record.Port = port
+	record.UserAgent = userAgent
 	record.Browser = parsed.Browser
 	record.BrowserVersion = parsed.BrowserVersion
 	record.OS = parsed.OS
@@ -200,6 +223,70 @@ func (t *Tracker) trimOldestLocked() {
 		delete(t.clients, records[0].Key)
 		records = records[1:]
 	}
+}
+
+func curatedDesktopClientMarker(r *http.Request) (string, string, bool) {
+	if r == nil {
+		return "", "", false
+	}
+	marker := strings.TrimSpace(r.Header.Get(curatedDesktopClientHeader))
+	if !strings.EqualFold(marker, curatedDesktopClientHeaderValue) {
+		return "", "", false
+	}
+	return curatedDesktopClientHeaderValue, strings.TrimSpace(r.Header.Get(curatedDesktopClientVersionHeader)), true
+}
+
+func curatedDesktopOS(r *http.Request) (string, string, bool) {
+	if r == nil {
+		return "", "", false
+	}
+	osName := strings.TrimSpace(r.Header.Get(curatedDesktopOSHeader))
+	if osName == "" {
+		return "", "", false
+	}
+	return osName, strings.TrimSpace(r.Header.Get(curatedDesktopOSVersionHeader)), true
+}
+
+func applyClientHintOS(r *http.Request, info *UserAgentInfo) {
+	if r == nil || info == nil {
+		return
+	}
+	platform := cleanClientHintHeader(r.Header.Get("Sec-CH-UA-Platform"))
+	if !strings.EqualFold(platform, "Windows") {
+		return
+	}
+	version := cleanClientHintHeader(r.Header.Get("Sec-CH-UA-Platform-Version"))
+	if version == "" {
+		return
+	}
+	displayVersion := windowsClientHintVersion(version)
+	if displayVersion == "" {
+		return
+	}
+	info.OS = "Windows"
+	info.OSVersion = displayVersion
+	if info.DeviceType == DeviceTypeUnknown {
+		info.DeviceType = DeviceTypeDesktop
+	}
+}
+
+func windowsClientHintVersion(platformVersion string) string {
+	majorText := strings.Split(strings.TrimSpace(platformVersion), ".")[0]
+	major, err := strconv.Atoi(majorText)
+	if err != nil {
+		return ""
+	}
+	if major >= 13 {
+		return "11"
+	}
+	if major >= 1 {
+		return "10"
+	}
+	return ""
+}
+
+func cleanClientHintHeader(value string) string {
+	return strings.Trim(strings.TrimSpace(value), `"`)
 }
 
 func parseRemoteAddr(remoteAddr string) (string, int, bool) {

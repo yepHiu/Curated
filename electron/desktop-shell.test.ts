@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildTrayMenuModel,
+  curatedDesktopClientHeaderName,
+  curatedDesktopClientHeaderValue,
+  curatedDesktopClientOSHeaderName,
+  curatedDesktopClientOSVersionHeaderName,
+  curatedDesktopClientVersionHeaderName,
+  desktopOSInfo,
+  shouldMarkCuratedDesktopRequest,
+  withCuratedDesktopRequestHeaders,
   pickDirectoryChannel,
   resolveAppIconPath,
   selectedDirectoryFromOpenDialogResult,
@@ -57,6 +65,32 @@ describe("Electron desktop shell integration", () => {
 
   it("uses a namespaced IPC channel for directory picking", () => {
     expect(pickDirectoryChannel).toBe("curated:pick-directory")
+  })
+
+  it("marks backend requests as Curated Desktop without changing unrelated origins", () => {
+    expect(shouldMarkCuratedDesktopRequest("http://127.0.0.1:8080/api/health", "http://127.0.0.1:8080")).toBe(true)
+    expect(shouldMarkCuratedDesktopRequest("http://127.0.0.1:5173/@vite/client", "http://127.0.0.1:8080")).toBe(false)
+  })
+
+  it("adds stable Curated Desktop request headers", () => {
+    expect(
+      withCuratedDesktopRequestHeaders(
+        { Accept: "application/json" },
+        "0.0.1-test",
+        { os: "Windows", version: "11" },
+      ),
+    ).toEqual({
+      Accept: "application/json",
+      [curatedDesktopClientHeaderName]: curatedDesktopClientHeaderValue,
+      [curatedDesktopClientVersionHeaderName]: "0.0.1-test",
+      [curatedDesktopClientOSHeaderName]: "Windows",
+      [curatedDesktopClientOSVersionHeaderName]: "11",
+    })
+  })
+
+  it("maps Windows build numbers to user-facing Windows versions", () => {
+    expect(desktopOSInfo("win32", "10.0.22631")).toEqual({ os: "Windows", version: "11" })
+    expect(desktopOSInfo("win32", "10.0.19045")).toEqual({ os: "Windows", version: "10" })
   })
 
   it("removes the native application menu on Windows and Linux desktop shells", () => {

@@ -80,6 +80,10 @@ const metricItems = computed(() => [
   },
 ])
 
+function shouldHideBrowserVersion(browser: string): boolean {
+  return browser.trim().toLowerCase() === "chrome"
+}
+
 function deviceIcon(client: ConnectedClientDTO) {
   switch (client.deviceType) {
     case "mobile":
@@ -99,12 +103,24 @@ function clientTitle(client: ConnectedClientDTO): string {
   if (client.deviceType === "tool") {
     return client.browser || t("settings.connectedClientsTool")
   }
-  const browser = [client.browser, client.browserVersion].filter(Boolean).join(" ")
-  const os = [client.os, client.osVersion].filter(Boolean).join(" ")
+  const browserVersion =
+    client.browserVersion && !shouldHideBrowserVersion(client.browser) ? client.browserVersion : ""
+  const browser = [client.browser, browserVersion].filter(Boolean).join(" ")
+  const osVersion = displayOSVersion(client.os, client.osVersion)
+  const os = [client.os, osVersion].filter(Boolean).join(" ")
   if (browser && os) {
     return `${browser} · ${os}`
   }
   return browser || os || t("settings.connectedClientsUnknownDevice")
+}
+
+function displayOSVersion(os: string, version?: string): string {
+  const normalizedOS = os.trim().toLowerCase()
+  const normalizedVersion = String(version ?? "").trim()
+  if (normalizedOS === "windows" && normalizedVersion === "10.0") {
+    return ""
+  }
+  return normalizedVersion
 }
 
 function clientAddress(client: ConnectedClientDTO): string {
@@ -148,7 +164,7 @@ function formatTimestamp(value?: string): string {
       <Button
         variant="outline"
         size="sm"
-        class="row-span-2 self-start"
+        class="row-span-2 self-start rounded-xl"
         :disabled="loading"
         @click="emit('refresh')"
       >

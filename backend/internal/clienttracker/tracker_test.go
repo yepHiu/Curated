@@ -56,6 +56,110 @@ func TestTrackerDeduplicatesByIPAndUserAgent(t *testing.T) {
 	}
 }
 
+func TestTrackerRecognizesCuratedDesktopMarker(t *testing.T) {
+	base := time.Date(2026, 5, 16, 10, 0, 0, 0, time.UTC)
+	tracker := New(
+		WithNow(func() time.Time { return base }),
+		WithLocalIPs([]net.IP{net.ParseIP("127.0.0.1")}),
+	)
+
+	ua := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+	req := requestFrom("127.0.0.1:50001", ua)
+	req.Header.Set("X-Curated-Client", "desktop-electron")
+	req.Header.Set("X-Curated-Client-Version", "0.0.1-test")
+
+	tracker.Record(req)
+
+	clients := tracker.Snapshot()
+	if len(clients) != 1 {
+		t.Fatalf("client count = %d, want 1", len(clients))
+	}
+	client := clients[0]
+	if client.Browser != "Curated Desktop" {
+		t.Fatalf("Browser = %q, want Curated Desktop", client.Browser)
+	}
+	if client.BrowserVersion != "0.0.1-test" {
+		t.Fatalf("BrowserVersion = %q, want 0.0.1-test", client.BrowserVersion)
+	}
+	if client.OS != "Windows" {
+		t.Fatalf("OS = %q, want Windows", client.OS)
+	}
+	if client.DeviceType != DeviceTypeDesktop {
+		t.Fatalf("DeviceType = %q, want desktop", client.DeviceType)
+	}
+}
+
+func TestTrackerUsesCuratedDesktopOSHeaders(t *testing.T) {
+	base := time.Date(2026, 5, 16, 10, 0, 0, 0, time.UTC)
+	tracker := New(
+		WithNow(func() time.Time { return base }),
+		WithLocalIPs([]net.IP{net.ParseIP("127.0.0.1")}),
+	)
+
+	ua := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+	req := requestFrom("127.0.0.1:50001", ua)
+	req.Header.Set("X-Curated-Client", "desktop-electron")
+	req.Header.Set("X-Curated-OS", "Windows")
+	req.Header.Set("X-Curated-OS-Version", "11")
+
+	tracker.Record(req)
+
+	clients := tracker.Snapshot()
+	if len(clients) != 1 {
+		t.Fatalf("client count = %d, want 1", len(clients))
+	}
+	client := clients[0]
+	if client.OS != "Windows" || client.OSVersion != "11" {
+		t.Fatalf("OS = %q version %q, want Windows 11", client.OS, client.OSVersion)
+	}
+}
+
+func TestTrackerUsesClientHintsForWindows11(t *testing.T) {
+	base := time.Date(2026, 5, 16, 10, 0, 0, 0, time.UTC)
+	tracker := New(WithNow(func() time.Time { return base }))
+
+	ua := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+	req := requestFrom("192.168.1.20:50001", ua)
+	req.Header.Set("Sec-CH-UA-Platform", `"Windows"`)
+	req.Header.Set("Sec-CH-UA-Platform-Version", `"13.0.0"`)
+
+	tracker.Record(req)
+
+	clients := tracker.Snapshot()
+	if len(clients) != 1 {
+		t.Fatalf("client count = %d, want 1", len(clients))
+	}
+	client := clients[0]
+	if client.OS != "Windows" || client.OSVersion != "11" {
+		t.Fatalf("OS = %q version %q, want Windows 11", client.OS, client.OSVersion)
+	}
+}
+
+func TestTrackerSeparatesCuratedDesktopFromChromeWithSameUserAgent(t *testing.T) {
+	base := time.Date(2026, 5, 16, 10, 0, 0, 0, time.UTC)
+	now := base
+	tracker := New(WithNow(func() time.Time { return now }))
+	ua := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+
+	tracker.Record(requestFrom("127.0.0.1:50001", ua))
+	now = base.Add(time.Second)
+	desktopReq := requestFrom("127.0.0.1:50002", ua)
+	desktopReq.Header.Set("X-Curated-Client", "desktop-electron")
+	tracker.Record(desktopReq)
+
+	clients := tracker.Snapshot()
+	if len(clients) != 2 {
+		t.Fatalf("client count = %d, want 2", len(clients))
+	}
+	browsers := map[string]bool{}
+	for _, client := range clients {
+		browsers[client.Browser] = true
+	}
+	if !browsers["Chrome"] || !browsers["Curated Desktop"] {
+		t.Fatalf("browsers = %#v, want Chrome and Curated Desktop", browsers)
+	}
+}
+
 func TestTrackerSeparatesSameIPDifferentUserAgentAndIdentifiesLocalMachine(t *testing.T) {
 	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	now := base

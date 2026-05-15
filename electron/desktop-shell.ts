@@ -1,10 +1,21 @@
 import { existsSync } from "node:fs"
+import { release as osRelease } from "node:os"
 import path from "node:path"
 
 export const pickDirectoryChannel = "curated:pick-directory"
+export const curatedDesktopClientHeaderName = "X-Curated-Client"
+export const curatedDesktopClientHeaderValue = "desktop-electron"
+export const curatedDesktopClientVersionHeaderName = "X-Curated-Client-Version"
+export const curatedDesktopClientOSHeaderName = "X-Curated-OS"
+export const curatedDesktopClientOSVersionHeaderName = "X-Curated-OS-Version"
 
 export interface NativeDirectoryPickResult {
   path: string
+}
+
+export interface DesktopOSInfo {
+  os: string
+  version: string
 }
 
 export type TrayMenuActionId =
@@ -96,6 +107,58 @@ export function shouldStopBackendOnQuit(options: { attachedToExistingBackend: bo
 
 export function shouldUseApplicationMenu(platform: string = process.platform): boolean {
   return platform === "darwin"
+}
+
+export function shouldMarkCuratedDesktopRequest(candidateUrl: string, backendBaseUrl: string): boolean {
+  try {
+    return new URL(candidateUrl).origin === new URL(backendBaseUrl).origin
+  } catch {
+    return false
+  }
+}
+
+export function withCuratedDesktopRequestHeaders(
+  requestHeaders: Record<string, string>,
+  appVersion: string,
+  osInfo: DesktopOSInfo = desktopOSInfo(),
+): Record<string, string> {
+  const headers = {
+    ...requestHeaders,
+    [curatedDesktopClientHeaderName]: curatedDesktopClientHeaderValue,
+    [curatedDesktopClientVersionHeaderName]: appVersion,
+  }
+  if (osInfo.os) {
+    headers[curatedDesktopClientOSHeaderName] = osInfo.os
+  }
+  if (osInfo.version) {
+    headers[curatedDesktopClientOSVersionHeaderName] = osInfo.version
+  }
+  return headers
+}
+
+export function desktopOSInfo(platform: NodeJS.Platform = process.platform, releaseText: string = osRelease()): DesktopOSInfo {
+  if (platform === "win32") {
+    return { os: "Windows", version: windowsDisplayVersion(releaseText) }
+  }
+  if (platform === "darwin") {
+    return { os: "macOS", version: releaseText.trim() }
+  }
+  if (platform === "linux") {
+    return { os: "Linux", version: releaseText.trim() }
+  }
+  return { os: platform, version: releaseText.trim() }
+}
+
+function windowsDisplayVersion(releaseText: string): string {
+  const parts = releaseText.trim().split(".")
+  const build = Number(parts[2] ?? "")
+  if (Number.isFinite(build) && build >= 22000) {
+    return "11"
+  }
+  if (Number.isFinite(build) && build >= 10240) {
+    return "10"
+  }
+  return releaseText.trim()
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

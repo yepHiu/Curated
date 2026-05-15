@@ -56,10 +56,24 @@ func TestCORSAllowsResumableUploadChunkHeaders(t *testing.T) {
 		t.Fatalf("status = %d, want 204", rr.Code)
 	}
 	allowHeaders := rr.Header().Get("Access-Control-Allow-Headers")
-	for _, header := range []string{"Content-Type", "X-Curated-Offset", "X-Curated-Chunk-Size", "X-Curated-Chunk-SHA256"} {
+	for _, header := range []string{
+		"Content-Type",
+		"X-Curated-Offset",
+		"X-Curated-Chunk-Size",
+		"X-Curated-Chunk-SHA256",
+		"X-Curated-Client",
+		"X-Curated-Client-Version",
+		"X-Curated-OS",
+		"X-Curated-OS-Version",
+		"Sec-CH-UA-Platform",
+		"Sec-CH-UA-Platform-Version",
+	} {
 		if !strings.Contains(allowHeaders, header) {
 			t.Fatalf("Access-Control-Allow-Headers = %q, want %s", allowHeaders, header)
 		}
+	}
+	if acceptCH := rr.Header().Get("Accept-CH"); !strings.Contains(acceptCH, "Sec-CH-UA-Platform-Version") {
+		t.Fatalf("Accept-CH = %q, want Sec-CH-UA-Platform-Version", acceptCH)
 	}
 }
 

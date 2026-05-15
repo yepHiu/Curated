@@ -3134,7 +3134,8 @@ func withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Curated-Offset, X-Curated-Chunk-Size, X-Curated-Chunk-SHA256")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Curated-Offset, X-Curated-Chunk-Size, X-Curated-Chunk-SHA256, X-Curated-Client, X-Curated-Client-Version, X-Curated-OS, X-Curated-OS-Version, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version")
+		w.Header().Set("Accept-CH", "Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
