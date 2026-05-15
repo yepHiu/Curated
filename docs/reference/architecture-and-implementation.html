@@ -302,7 +302,7 @@
   </figure>
 
   <h2 id="overview">1. 总览</h2>
-  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。当前仍以浏览器 + 本地后端为主，同时已有 <code>electron/</code> 最小桌面壳层：Electron 主进程启动或复用 Go HTTP 后端，等待 <code>/api/health</code> 后在开发态启动或复用 <code>http://127.0.0.1:5173</code> 的 Vite 前端并加载 Web UI；打包态仍加载后端静态托管的 <code>http://127.0.0.1:8081</code>；关闭窗口时隐藏到托盘，使后端与 Web 入口继续运行；preload 只暴露 <code>window.javLibrary.pickDirectory()</code>，用于原生目录选择，不承载业务 API。</p>
+  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。当前仍以浏览器 + 本地后端为主，同时已有 <code>electron/</code> 最小桌面壳层：Electron 主进程启动或复用 Go HTTP 后端，等待 <code>/api/health</code> 后在开发态启动或复用 <code>http://127.0.0.1:5173</code> 的 Vite 前端并加载 Web UI；打包态仍加载后端静态托管的 <code>http://127.0.0.1:8081</code>；Electron 对后端请求注入 <code>X-Curated-Client: desktop-electron</code>、版本 header 与桌面 OS header，使后端可在已连接客户端中显示 <code>Curated Desktop</code> 而不是普通 Chrome，并能显示 Windows 11 而不是 Chromium 兼容 UA 中的 <code>Windows NT 10.0</code>；关闭窗口时隐藏到托盘，使后端与 Web 入口继续运行；preload 只暴露 <code>window.javLibrary.pickDirectory()</code>，用于原生目录选择，不承载业务 API。</p>
   <p>生产安装包的默认入口已经切换为 Electron：顶层 <code>Curated.exe</code> 是 Electron 桌面壳，Go release 后端位于 <code>resources/app/curated.exe</code>，Electron 以 <code>-mode http</code> 启动自己拥有的后端并加载 <code>http://127.0.0.1:8081</code>。窗口关闭默认隐藏到托盘，只有托盘退出或系统级 quit 才会停止 Electron 自己 spawn 的后端；attach 到已有后端时不停止该进程。</p>
   <div class="flow">
     <span>浏览器</span> → <span>直连 Go :8080（loopback 开发）或 Vite <code>/api</code> 代理</span> → <span>SQLite + 文件系统</span>
@@ -326,6 +326,7 @@
         <li><code>/detail/:id</code> → <span class="path">views/DetailView.vue</span></li>
         <li><code>/player/:id?</code> → <span class="path">views/PlayerView.vue</span></li>
         <li><code>/settings</code> → <span class="path">views/SettingsView.vue</span></li>
+        <li><code>/lock</code> - PIN App Lock screen using <span class="path">views/LockView.vue</span>; the router and idle-lock monitor redirect locked Web API sessions here with a <code>redirect</code> query.</li>
       </ul>
     </li>
   </ul>
@@ -390,7 +391,8 @@
   <p><span class="path">backend/internal/server/server.go</span> 中 <code>Routes()</code> 注册 REST 风格接口（前缀均为 <code>/api</code>），主要包括：</p>
   <ul>
     <li><code>GET /api/health</code> — 健康检查（含 <code>version</code> 构建标识、可选 <code>installerVersion</code> 安装包版本号、<code>channel</code>、<code>databasePath</code> 等）。</li>
-    <li><code>GET /api/connected-clients</code> — 当前后端进程生命周期内访问过 Curated 的客户端列表；按 IP + User-Agent 去重，最多保留 50 条，返回浏览器 / 系统 / 设备类型、local/remote、first/last seen 与 requestCount；不采集 MAC 地址。</li>
+        <li><code>GET /api/auth/status</code>, <code>POST /api/auth/setup-pin</code>, <code>POST /api/auth/unlock</code>, <code>POST /api/auth/change-pin</code>, <code>POST /api/auth/lock</code>, <code>PATCH /api/auth/settings</code> - PIN App Lock status, setup, unlock, PIN change, current-session lock, and non-secret settings including <code>pinLength</code> for the lock screen cell count. Regular sessions use an idle deadline that is extended by activity; protected API routes return <code>423 AUTH_LOCKED</code> when PIN is enabled and no valid HTTP-only <code>curated_auth</code> session exists.</li>
+    <li><code>GET /api/connected-clients</code> — 当前后端进程生命周期内访问过 Curated 的客户端列表；普通浏览器按 IP + User-Agent 去重，Curated Desktop 额外使用 <code>X-Curated-Client</code> marker 与同 UA 的 Chrome 区分，并使用桌面 OS header 显示 Windows 11；普通浏览器若发送 <code>Sec-CH-UA-Platform-Version</code> 也会用于区分 Windows 版本；最多保留 50 条，返回浏览器 / 系统 / 设备类型、local/remote、first/last seen 与 requestCount；不采集 MAC 地址。</li>
     <li><code>GET /api/dev/performance</code> — 开发环境性能摘要（整机 CPU / 后端进程 CPU），供底部性能监测条轮询。</li>
     <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>limit</code>、<code>offset</code>）。</li>
     <li><code>GET /api/library/movies/{movieId}</code> — 详情。</li>
@@ -463,6 +465,7 @@
       <tr><td>搜索 / 模式</td><td><code>movie-search.ts</code>、路由 <code>mode</code> query</td><td><code>ListMoviesRequest</code></td></tr>
       <tr><td>详情与预览图</td><td><code>DetailPanel</code>、<code>PreviewImageViewer</code></td><td><code>GetMovieDetail</code></td></tr>
       <tr><td>用户评分 / 收藏</td><td><code>MovieRatingStars</code>、Mock <code>mock-movie-prefs-storage</code></td><td><code>PatchMovieUserPrefs</code>、迁移 SQL</td></tr>
+      <tr><td>PIN App Lock</td><td><code>LockView.vue</code>, <code>auth-lock-service.ts</code>, <code>auth-idle-lock-service.ts</code>, Settings Security section, router guard</td><td><code>auth_handlers.go</code>, <code>auth_middleware.go</code>, <code>security_repository.go</code>, SQLite <code>app_security_settings</code> with Argon2id hash plus <code>pin_length</code> metadata and <code>auth_sessions</code>; HTTP-only <code>curated_auth</code> cookie, sliding idle expiry for regular sessions, and optional trusted-forever sessions</td></tr>
       <tr><td>设置与库路径</td><td><code>SettingsView</code>、<code>SettingsPage</code></td><td><code>handleGetSettings</code>、paths CRUD、库路径存储状态检测与重绑</td></tr>
       <tr><td>扫描进度</td><td><code>ScanProgressDock</code>、<code>use-scan-task-tracker</code></td><td><code>POST /api/scans</code>、任务持久化</td></tr>
       <tr><td>导入影片</td><td><code>MovieImportDialog</code>、设置页默认导入路径选择器、<code>ScanProgressDock</code></td><td><code>POST /api/import/movies</code>、<code>/api/import/movies/uploads</code> 分块续传、<code>defaultImportLibraryPathId</code>、<code>import.movies</code> 任务、默认路径 <code>canImport</code> 检查</td></tr>
@@ -471,7 +474,7 @@
       <tr><td>影片刮削后自动补演员资料</td><td>设置 UI（自动刮削）</td><td><code>AutoActorProfileScrapeController</code> + <code>scrape.actor</code> 自动排队；<code>autoActorProfileScrape</code> 写入 <code>library-config.cfg</code></td></tr>
       <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；支持 <code>/api/playback/sessions/recent</code> 与 <code>/api/playback/sessions/{id}</code> 观测会话状态；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
       <tr><td>每日观看时间统计</td><td><code>SettingsWatchTimeHeatmap.vue</code>、<code>watch-time-heatmap.ts</code>、<code>playback-watch-time-tracker.ts</code></td><td><code>GET/POST /api/playback/watch-time/daily</code>；按 <code>day_key + movie_id</code> 聚合，设置概览固定展示 91 天摘要指标</td></tr>
-      <tr><td>已连接客户端可见性</td><td><code>SettingsConnectedClientsSection.vue</code>、<code>use-connected-clients.ts</code>、服务层 <code>listConnectedClients()</code>；设置概览中位于观看时间统计下方，仅 Overview 激活时轮询</td><td><code>backend/internal/clienttracker</code> + <code>GET /api/connected-clients</code>；进程内存追踪、IP + User-Agent 去重、最多 50 条、不返回 MAC</td></tr>
+      <tr><td>已连接客户端可见性</td><td><code>SettingsConnectedClientsSection.vue</code>、<code>use-connected-clients.ts</code>、服务层 <code>listConnectedClients()</code>；设置概览中位于观看时间统计下方，仅 Overview 激活时轮询</td><td><code>backend/internal/clienttracker</code> + <code>GET /api/connected-clients</code>；进程内存追踪、普通浏览器按 IP + User-Agent 去重，Curated Desktop 使用 <code>X-Curated-Client</code> marker 显示为桌面客户端并与 Chrome 分开，同时使用 OS header 修正 Windows 11 显示；最多 50 条、不返回 MAC</td></tr>
     </tbody>
   </table>
 

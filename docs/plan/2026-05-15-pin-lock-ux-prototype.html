@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curated PIN App Lock UX Prototype</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --radius: 0.625rem;
+      --background: #0d0f1a;
+      --foreground: #f8f7fb;
+      --card: #141826;
+      --card-foreground: #f8f7fb;
+      --muted: #121827;
+      --muted-foreground: #a2abc2;
+      --primary: #fe628e;
+      --primary-foreground: #1d0910;
+      --secondary: #1b2234;
+      --secondary-foreground: #f7f5fb;
+      --accent: #252d43;
+      --accent-foreground: #fff4f7;
+      --destructive: #ff6f87;
+      --border: rgb(255 255 255 / 10%);
+      --border-strong: rgb(255 255 255 / 18%);
+      --input: rgb(255 255 255 / 14%);
+      --ring: rgb(254 98 142 / 45%);
+      --sidebar: #101423;
+      --sidebar-foreground: #f8f7fb;
+      --sidebar-accent: #1f2639;
+      --font-curated: "Outfit", ui-sans-serif, system-ui, sans-serif;
+      font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--background);
+      color: var(--foreground);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      width: min(1280px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark,
+    .card-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      border: 1px solid rgb(254 98 142 / 25%);
+      border-radius: 0.5rem;
+      background: rgb(254 98 142 / 10%);
+      color: var(--primary);
+      font-family: var(--font-curated);
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+
+    .card-icon {
+      width: 2.25rem;
+      height: 2.25rem;
+      font-size: 0.9rem;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+      font-weight: 650;
+    }
+
+    .description {
+      margin-top: 0.25rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      line-height: 1.55;
+    }
+
+    .tabs-list {
+      display: inline-flex;
+      height: 2.25rem;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 0.625rem;
+      border: 1px solid var(--border);
+      background: var(--muted);
+      padding: 0.25rem;
+    }
+
+    .tab {
+      height: 1.75rem;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      background: var(--card);
+      color: var(--foreground);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    }
+
+    .prototype-frame {
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--card);
+      overflow: hidden;
+    }
+
+    .screen {
+      display: none;
+      min-height: 640px;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .settings-shell {
+      display: grid;
+      grid-template-columns: 14rem minmax(0, 1fr);
+      gap: 1.5rem;
+      min-height: 640px;
+      padding: 1.5rem;
+      background: var(--background);
+    }
+
+    .settings-nav {
+      align-self: start;
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--card);
+      padding: 0.5rem;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      min-height: 2.25rem;
+      border-radius: 0.5rem;
+      padding: 0 0.75rem;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      text-align: left;
+    }
+
+    .nav-item.active {
+      background: rgb(254 98 142 / 10%);
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .content-stack {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--card);
+      color: var(--card-foreground);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+    }
+
+    .card-header {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 1.25rem 1.25rem 0;
+    }
+
+    .card-header.simple {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .card-title {
+      min-width: 0;
+      font-size: 1.125rem;
+      line-height: 1.35;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .card-description {
+      grid-column: 2 / -1;
+      color: var(--muted-foreground);
+      font-size: 0.875rem;
+      line-height: 1.55;
+    }
+
+    .card-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem 1.25rem;
+    }
+
+    .nested {
+      border: 1px solid rgb(255 255 255 / 8%);
+      border-radius: 0.625rem;
+      background: rgb(18 24 39 / 50%);
+      padding: 1rem;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .row-title {
+      font-size: 0.875rem;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+
+    .row-description,
+    .fine-print {
+      color: var(--muted-foreground);
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+
+    .row-description {
+      margin-top: 0.25rem;
+    }
+
+    .button {
+      display: inline-flex;
+      height: 2rem;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      padding: 0 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+    }
+
+    .button.outline {
+      border-color: var(--border);
+      background: var(--card);
+      color: var(--foreground);
+    }
+
+    .button.ghost {
+      background: transparent;
+      color: var(--muted-foreground);
+    }
+
+    .button.destructive {
+      border-color: rgb(255 111 135 / 28%);
+      background: rgb(255 111 135 / 10%);
+      color: var(--destructive);
+    }
+
+    .switch {
+      position: relative;
+      flex: 0 0 auto;
+      width: 2.25rem;
+      height: 1.25rem;
+      border-radius: 999px;
+      border: 1px solid rgb(254 98 142 / 40%);
+      background: var(--primary);
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 0.125rem;
+      right: 0.125rem;
+      width: 0.875rem;
+      height: 0.875rem;
+      border-radius: 999px;
+      background: var(--primary-foreground);
+    }
+
+    .select-mock {
+      display: inline-flex;
+      height: 2rem;
+      min-width: 9.5rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      border: 1px solid var(--input);
+      border-radius: 0.5rem;
+      background: var(--background);
+      padding: 0 0.75rem;
+      color: var(--foreground);
+      font-size: 0.8125rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.125rem 0.5rem;
+      font-size: 0.75rem;
+      line-height: 1.25rem;
+      font-weight: 600;
+      color: var(--foreground);
+      background: var(--secondary);
+    }
+
+    .badge.primary {
+      border-color: rgb(254 98 142 / 28%);
+      background: rgb(254 98 142 / 10%);
+      color: var(--primary);
+    }
+
+    .badge.warning {
+      border-color: rgb(245 185 113 / 30%);
+      background: rgb(245 185 113 / 10%);
+      color: #f5b971;
+    }
+
+    .badge.destructive {
+      border-color: rgb(255 111 135 / 28%);
+      background: rgb(255 111 135 / 10%);
+      color: var(--destructive);
+    }
+
+    .dot {
+      width: 0.375rem;
+      height: 0.375rem;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .lock-canvas {
+      display: grid;
+      min-height: 640px;
+      place-items: center;
+      padding: 1.5rem;
+      background: var(--background);
+    }
+
+    .lock-card {
+      width: min(100%, 24rem);
+    }
+
+    .otp-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 0.5rem 0 0.25rem;
+    }
+
+    .otp-cell {
+      display: inline-flex;
+      width: 2.625rem;
+      height: 2.625rem;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--input);
+      border-radius: 0.5rem;
+      background: var(--background);
+      color: var(--foreground);
+      font-size: 1rem;
+      font-weight: 700;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    .otp-cell.active {
+      border-color: var(--ring);
+      outline-color: rgb(254 98 142 / 18%);
+    }
+
+    .error-text {
+      color: var(--destructive);
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .device-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .device-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.75rem;
+      border: 1px solid rgb(255 255 255 / 8%);
+      border-radius: 0.625rem;
+      background: rgb(18 24 39 / 50%);
+      padding: 0.875rem;
+    }
+
+    .device-icon {
+      display: inline-flex;
+      width: 2.25rem;
+      height: 2.25rem;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--background);
+      color: var(--muted-foreground);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .device-name {
+      min-width: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .device-meta {
+      margin-top: 0.2rem;
+      color: var(--muted-foreground);
+      font-size: 0.75rem;
+      line-height: 1.45;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .metric {
+      border: 1px solid rgb(255 255 255 / 8%);
+      border-radius: 0.625rem;
+      background: rgb(18 24 39 / 50%);
+      padding: 0.875rem;
+    }
+
+    .metric-label {
+      color: var(--muted-foreground);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .metric-value {
+      margin-top: 0.25rem;
+      font-size: 1.25rem;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .alert {
+      border: 1px solid rgb(245 185 113 / 30%);
+      border-radius: 0.625rem;
+      background: rgb(245 185 113 / 10%);
+      padding: 1rem;
+    }
+
+    .alert-title {
+      color: #f5b971;
+      font-size: 0.875rem;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .alert-description {
+      margin-top: 0.35rem;
+      color: var(--muted-foreground);
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+
+    .two-column {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      gap: 1rem;
+    }
+
+    @media (max-width: 920px) {
+      .page {
+        width: min(100vw - 24px, 1280px);
+      }
+
+      .page-header,
+      .setting-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .page-header {
+        display: flex;
+      }
+
+      .tabs-list {
+        width: 100%;
+        height: auto;
+        flex-wrap: wrap;
+      }
+
+      .settings-shell,
+      .two-column,
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .settings-nav {
+        display: none;
+      }
+
+      .card-header {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .card-description {
+        grid-column: 1 / -1;
+      }
+
+      .device-row {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .device-row .badge {
+        grid-column: 2;
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div class="brand-row">
+        <div class="brand-mark">C</div>
+        <div>
+          <h1>PIN App Lock / Privacy Lock 原型 v2</h1>
+          <p class="description">改为 shadcn-vue 设置页风格：Card、Tabs、Badge、Switch、InputOTP 密度与语义。</p>
+        </div>
+      </div>
+      <nav class="tabs-list" aria-label="prototype views">
+        <button class="tab" aria-selected="true" data-target="settings">Settings</button>
+        <button class="tab" aria-selected="false" data-target="lock">Lock Screen</button>
+        <button class="tab" aria-selected="false" data-target="devices">Devices</button>
+        <button class="tab" aria-selected="false" data-target="recovery">Forgot PIN</button>
+      </nav>
+    </header>
+
+    <section class="prototype-frame">
+      <div id="settings" class="screen active">
+        <div class="settings-shell">
+          <aside class="settings-nav" aria-label="settings nav">
+            <div class="nav-item">Overview</div>
+            <div class="nav-item">General</div>
+            <div class="nav-item">Video storage</div>
+            <div class="nav-item">Metadata</div>
+            <div class="nav-item">Network</div>
+            <div class="nav-item active">Security</div>
+            <div class="nav-item">About</div>
+          </aside>
+
+          <div class="content-stack">
+            <article class="card">
+              <div class="card-header">
+                <span class="card-icon">L</span>
+                <div class="card-title">Security</div>
+                <button class="button outline">Change PIN</button>
+                <p class="card-description">保护本地媒体库入口。开启后，本机和 LAN 设备都通过后端会话解锁。</p>
+              </div>
+
+              <div class="card-content">
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">Require PIN to open Curated</div>
+                    <p class="row-description">进入资料库、播放、导入、设置等敏感功能前必须解锁。</p>
+                  </div>
+                  <span class="switch" aria-label="enabled"></span>
+                </section>
+
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">Keep unlocked after successful PIN</div>
+                    <p class="row-description">当前设备解锁后保持有效。到期后自动回到锁屏。</p>
+                  </div>
+                  <div class="select-mock">1 hour <span aria-hidden="true">⌄</span></div>
+                </section>
+
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">Require PIN when Curated restarts</div>
+                    <p class="row-description">重启后清空会话，避免后台服务常驻后直接进入。</p>
+                  </div>
+                  <span class="switch" aria-label="enabled"></span>
+                </section>
+
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">LAN access always requires PIN</div>
+                    <p class="row-description">非本机 loopback 的浏览器访问时，必须先完成 PIN 解锁。</p>
+                  </div>
+                  <span class="switch" aria-label="enabled"></span>
+                </section>
+
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">Lock Curated now</div>
+                    <p class="row-description">撤销当前浏览器会话，并让其它页面下次请求时进入锁屏。</p>
+                  </div>
+                  <button class="button outline">Lock now</button>
+                </section>
+              </div>
+            </article>
+
+            <div class="two-column">
+              <article class="card">
+                <div class="card-header simple">
+                  <span class="card-icon">S</span>
+                  <div class="card-title">Storage and API boundary</div>
+                </div>
+                <div class="card-content">
+                  <section class="nested">
+                    <div class="row-title">PIN storage</div>
+                    <p class="row-description">不存明文。后端保存 KDF hash、salt、算法参数和更新时间，cookie 只保存 session id。</p>
+                  </section>
+                  <section class="nested">
+                    <div class="row-title">Protected APIs</div>
+                    <p class="row-description">library、playback、import、scans、tasks、settings、curated-frames 由后端中间件判断会话。</p>
+                  </section>
+                </div>
+              </article>
+
+              <aside class="alert">
+                <div class="alert-title">Forgot PIN MVP</div>
+                <p class="alert-description">第一版建议明确提示：忘记 PIN 需要在本机删除安全设置并重启，所有已解锁会话都会失效。后续可增加 recovery key。</p>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="lock" class="screen">
+        <div class="lock-canvas">
+          <article class="card lock-card">
+            <div class="card-header simple">
+              <span class="card-icon">C</span>
+              <div>
+                <div class="card-title">Unlock Curated</div>
+                <p class="description">Use your keyboard to enter the owner PIN.</p>
+              </div>
+            </div>
+
+            <div class="card-content">
+              <div class="otp-row" aria-label="PIN input">
+                <span class="otp-cell">•</span>
+                <span class="otp-cell">•</span>
+                <span class="otp-cell">•</span>
+                <span class="otp-cell active"></span>
+                <span class="otp-cell"></span>
+                <span class="otp-cell"></span>
+              </div>
+              <p class="error-text">PIN 不正确。还可尝试 2 次，之后将锁定 1 分钟。</p>
+              <div class="setting-row">
+                <button class="button primary">Unlock</button>
+                <button class="button ghost">Forgot PIN?</button>
+              </div>
+              <p class="fine-print">按 Enter 解锁，Backspace 删除。锁屏不展示影片海报、标题、最近播放、库路径等敏感信息。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div id="devices" class="screen">
+        <div class="settings-shell">
+          <aside class="settings-nav" aria-label="settings nav">
+            <div class="nav-item">Overview</div>
+            <div class="nav-item active">Security</div>
+            <div class="nav-item">About</div>
+          </aside>
+
+          <div class="content-stack">
+            <article class="card">
+              <div class="card-header">
+                <span class="card-icon">W</span>
+                <div class="card-title">Connected devices</div>
+                <button class="button outline">Refresh</button>
+                <p class="card-description">基于现有 Connected Clients 扩展：显示设备是否有有效解锁会话，并允许撤销。</p>
+              </div>
+
+              <div class="card-content">
+                <div class="metrics">
+                  <div class="metric">
+                    <div class="metric-label">Total</div>
+                    <div class="metric-value">3</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Unlocked</div>
+                    <div class="metric-value">2</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">LAN</div>
+                    <div class="metric-value">2</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Last refresh</div>
+                    <div class="metric-value" style="font-size:1rem">Now</div>
+                  </div>
+                </div>
+
+                <div class="device-list">
+                  <div class="device-row">
+                    <span class="device-icon">PC</span>
+                    <div>
+                      <div class="device-name">This PC · Chrome</div>
+                      <div class="device-meta">127.0.0.1 · Local · last seen now · 184 requests</div>
+                    </div>
+                    <span class="badge primary"><span class="dot"></span> Unlocked · 54m left</span>
+                  </div>
+                  <div class="device-row">
+                    <span class="device-icon">PH</span>
+                    <div>
+                      <div class="device-name">iPhone · Safari</div>
+                      <div class="device-meta">192.168.1.26 · LAN · last seen 12 min ago</div>
+                    </div>
+                    <span class="badge destructive"><span class="dot"></span> Locked</span>
+                  </div>
+                  <div class="device-row">
+                    <span class="device-icon">MB</span>
+                    <div>
+                      <div class="device-name">MacBook · Safari</div>
+                      <div class="device-meta">192.168.1.42 · LAN · first seen today</div>
+                    </div>
+                    <span class="badge primary"><span class="dot"></span> Unlocked · 3h left</span>
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <p class="fine-print">MVP 可以先展示状态；下一切片增加撤销单设备和 Require PIN now。</p>
+                  <button class="button destructive">Revoke all others</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div id="recovery" class="screen">
+        <div class="settings-shell">
+          <aside class="settings-nav" aria-label="settings nav">
+            <div class="nav-item active">Security</div>
+          </aside>
+
+          <div class="content-stack">
+            <article class="card">
+              <div class="card-header simple">
+                <span class="card-icon">R</span>
+                <div>
+                  <div class="card-title">Forgot PIN</div>
+                  <p class="card-description" style="grid-column:auto">第一版不做云账号、不存明文、不通过邮箱恢复。</p>
+                </div>
+              </div>
+              <div class="card-content">
+                <section class="nested">
+                  <div class="row-title">Recommended MVP copy</div>
+                  <p class="row-description">Curated cannot show or recover your PIN because it is not stored in plain text. If you forget it, reset Privacy Lock from this computer by deleting the local security setting. This will revoke all trusted sessions.</p>
+                </section>
+                <section class="nested">
+                  <div class="row-title">用户看到的信息</div>
+                  <p class="row-description">忘记 PIN 后需要在本机执行重置。重置不会删除影片、数据库或普通设置，但会关闭 PIN Lock，并撤销所有已解锁设备。</p>
+                </section>
+                <section class="nested setting-row">
+                  <div>
+                    <div class="row-title">Later option</div>
+                    <p class="row-description">后续可以做 recovery key：设置 PIN 时生成一次，只展示一次；忘记 PIN 时用它重置。</p>
+                  </div>
+                  <span class="badge warning">Not MVP</span>
+                </section>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const screens = document.querySelectorAll(".screen");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
+        screens.forEach((screen) => screen.classList.remove("active"));
+        tab.setAttribute("aria-selected", "true");
+        document.getElementById(tab.dataset.target).classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

@@ -37,9 +37,10 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
+- **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, and an opt-in trusted-device mode that can stay unlocked until explicitly locked.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
-- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
+- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, marks backend requests as `Curated Desktop` for connected-client visibility, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
 - **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, connected-client visibility, and logging controls.
 
 ## Quick Start
@@ -91,7 +92,7 @@ The Vite development server usually runs on `http://localhost:5173`.
 pnpm dev:electron
 ```
 
-The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, the installed `Curated.exe` is the Electron shell, the bundled Go backend lives at `resources/app/curated.exe`, and Electron loads the backend-hosted static UI on `http://127.0.0.1:8081`. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
+The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, the installed `Curated.exe` is the Electron shell, the bundled Go backend lives at `resources/app/curated.exe`, and Electron loads the backend-hosted static UI on `http://127.0.0.1:8081`. Electron marks backend requests with `X-Curated-Client: desktop-electron`, the app version, and desktop OS headers so the backend reports the client as `Curated Desktop` instead of plain Chrome and can display Windows 11 instead of Chromium's legacy `Windows NT 10.0` token. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
 
 ## Features
 
@@ -162,9 +163,20 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Actor and studio diversity balancing.
 - Force-refresh with hero preservation and recommendation exclusion.
 
+### Security
+
+- Optional PIN App Lock in Settings -> Security.
+- PIN values are stored as Argon2id salted hashes in SQLite; plaintext PIN values are never persisted. The configured PIN length is stored separately so the lock screen renders the correct number of PIN cells.
+- Unlock sessions are server-side and carried by the browser through an HTTP-only `curated_auth` cookie.
+- Users can choose an idle-lock delay for regular devices. UI activity and protected API use extend the idle deadline, so Curated locks after inactivity rather than on a fixed countdown.
+- After one successful unlock, users can trust the current device indefinitely until it is explicitly locked or the session is revoked.
+- Settings -> Security opens PIN setup and PIN change in shadcn-vue dialogs from entry buttons; changing the configured PIN requires the current PIN plus the new PIN confirmation.
+- The lock screen uses a compact shadcn-vue card with PIN cells based on the configured PIN length and keyboard input only; it does not show library artwork or other sensitive media context.
+- In Web API mode, locked requests to protected `/api/*` endpoints return `423 AUTH_LOCKED`; mock mode keeps PIN disabled for fast UI iteration.
+
 ### Settings & Configuration
 
-- Full settings UI: Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance.
+- Full settings UI: Overview, General, Security, Video storage, Metadata, Network, Curated frames, About, Maintenance.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.
@@ -235,7 +247,7 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 
 ## API
 
-Curated exposes a Go HTTP API for library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
+Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 

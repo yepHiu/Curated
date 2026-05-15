@@ -2,6 +2,14 @@
 
 日期：2026-05-15
 
+## Implementation Status - 2026-05-15
+
+- Accepted direction: implement **方案 B** first. The backend owns PIN verification, stores only Argon2id hash/salt/KDF in SQLite, and protects sensitive `/api/*` routes with auth middleware.
+- MVP device trust decision: after one successful PIN unlock, the user may select "trust this device forever". This creates a trusted-forever server-side session with no expiry and a long-lived HTTP-only `curated_auth` cookie; it remains valid until explicitly locked or revoked.
+- Lock-screen UX decision: no background photo, no media poster/title, no numeric keypad. The screen shows PIN cells based on the configured PIN length and relies on keyboard input.
+- First implemented settings entry: Settings -> Security. It covers initial PIN setup, PIN change, idle lock delay, LAN PIN policy, restart-lock policy, immediate lock, and explanatory copy for forgotten PIN and trusted devices. Initial setup and PIN change are opened from entry buttons into shadcn-vue dialogs instead of rendering PIN fields inline.
+- Deferred from this slice: disabling PIN from UI, automatic PIN recovery, failed-attempt cooldown, connected-client session status, and per-device revocation from Settings.
+
 本文承接 `docs/features/2026-05-03-connected-clients.md` 与 `docs/plan/2026-05-03-electron-migration-plan.md` 里的 LAN 设备可见性、安全边界和 Server Mode 讨论。目标不是一开始做复杂多用户系统，而是先满足单用户本地媒体库的隐私需求：即使别人拿到已解锁电脑或打开同一局域网地址，也不能直接进入影片库。
 
 ## 背景判断
@@ -18,7 +26,7 @@
    第一版只有 Owner PIN，不做用户列表和角色。未来如果需要再扩展 viewer/editor/admin。
 
 2. **默认不破坏当前本机体验**
-   新用户默认可不开启 PIN。开启后，所有敏感页面进入锁屏；已信任会话在设置的有效期内免输入。
+   新用户默认可不开启 PIN。开启后，所有敏感页面进入锁屏；普通会话按“无操作后锁定”滑动续期，持续使用 Curated 时不会因为固定倒计时到期而突然锁屏。
 
 3. **PIN 不等于高强度密码**
    UI 可以叫 PIN，但实现上应允许 4-8 位数字或更长 passcode。短 PIN 必须配合失败限速、短时间锁定和安全提示。
@@ -46,8 +54,8 @@
 - `POST /api/auth/unlock` 校验 PIN，成功后签发后端会话。
 - 前端通过 `GET /api/auth/status` 判断是否解锁。
 - 敏感 API 和静态 SPA 入口都通过中间件保护。
-- 会话存在服务端或签名 cookie 中，带过期时间。
-- Settings 中可设置“记住此设备”时长，例如 15 分钟、1 小时、4 小时、直到应用退出。
+- 会话存在服务端，浏览器只持有 HTTP-only cookie；普通会话用 `last_seen_at` + `expires_at` 表示 idle deadline。
+- Settings 中可设置“无操作后锁定”时长，例如 15 分钟、1 小时、4 小时；持续键盘、鼠标、滚轮、触摸或窗口聚焦活动会刷新后端会话，真正空闲超过该时长后才进入锁屏。
 
 结论：推荐作为第一版。它能防 casual access，也能给 LAN 场景打底，复杂度仍可控。
 
@@ -68,12 +76,13 @@
 - 开启“Require PIN to open Curated”。
 - 首次设置需要输入 PIN + 二次确认。
 - 推荐默认 PIN 长度 6 位，允许 4-8 位数字；也可以保留“使用更长 passcode”的后续扩展。
-- 设置“解锁后保持有效”：
+- 设置“无操作后锁定”：
   - 15 分钟
   - 1 小时
   - 4 小时
-  - 直到 Curated 退出
-  - 永远信任此设备（可选，风险更高，默认不推荐）
+- 解锁时可选择“永远信任此设备”（可选，风险更高，默认不推荐）；该设备只需一次认证，直到用户主动锁定或后续会话管理撤销。
+- Settings -> Security 页面只保留“启用 PIN”或“修改 PIN”入口按钮；点击后在 Dialog 中输入 PIN 表单。
+- 已开启 PIN 后，修改 PIN Dialog 需要输入当前 PIN、新 PIN 和确认 PIN。
 - 设置“重新打开应用时要求 PIN”：默认开启。
 - 设置“LAN 访问总是要求 PIN”：默认开启。
 
@@ -95,7 +104,7 @@
 
 第一版可以支持三种触发：
 
-- 会话过期后重新进入页面需要 PIN。
+- 普通会话在用户无键盘、鼠标、滚轮、触摸或窗口聚焦活动超过 idle lock delay 后重新进入锁屏；用户正在观看或操作 Curated 时不会按固定倒计时强制锁屏。
 - 用户从头像/菜单/托盘选择“Lock Curated”立即锁定。
 - Electron 窗口隐藏到托盘后是否锁定：作为设置项，默认可选“超过 N 分钟后锁定”。
 
@@ -121,7 +130,7 @@
 ### PIN 存储
 
 - 不存明文 PIN。
-- 存 `pinHash`、`salt`、`kdf`、`createdAt`、`updatedAt`。
+- 存 `pinHash`、`salt`、`kdf`、`pinLength`、`createdAt`、`updatedAt`；`pinLength` 只用于锁屏显示正确数量的输入位，不存明文 PIN。
 - Go 侧建议使用 `argon2id` 或 `bcrypt` 这类带成本参数的 KDF；短 PIN 仍需要失败限速，因为 4-6 位 PIN 熵很低。
 - 设置写入位置可以先放 `config/library-config.cfg`，但长期更适合 SQLite 的 `app_security_settings` 表，便于会话、失败计数和设备撤销一起管理。
 
@@ -139,7 +148,7 @@ trusted_until
 revoked_at
 ```
 
-前端拿不到原始会话密钥；浏览器通过 HTTP-only cookie 自动携带。若需要兼容非浏览器 API，可以未来增加显式 Bearer token，但第一版不必做。
+`expires_at` 对普通会话表示 idle deadline，并在有效会话被后端验证时按 `session_ttl_minutes` 滑动延长。`trustedForever` 会话不设置 `expires_at`，使用长期 HTTP-only cookie。前端拿不到原始会话密钥；浏览器通过 HTTP-only cookie 自动携带。若需要兼容非浏览器 API，可以未来增加显式 Bearer token，但第一版不必做。
 
 ## 与 Connected Clients 的结合
 
@@ -148,16 +157,16 @@ Connected Clients 的字段可以扩展为：
 | 字段 | 含义 |
 |---|---|
 | `isUnlocked` | 该设备当前是否有有效解锁会话 |
-| `sessionExpiresAt` | 免输入 PIN 的到期时间 |
+| `sessionExpiresAt` | 普通会话的 idle deadline，用户活动会滑动延长 |
 | `lastUnlockAt` | 最近一次解锁时间 |
 | `failedUnlockCount` | 最近失败次数，谨慎展示 |
 | `canRevokeSession` | 是否可从 Settings 撤销该设备 |
 
 Settings -> Overview 或 Settings -> Security 中可以显示：
 
-- 本机 Chrome：Unlocked，expires in 54 min
+- 本机 Chrome：Unlocked，idle locks after 54 min
 - iPhone Safari：Locked，last seen 12 min ago
-- MacBook Safari：Unlocked，expires tomorrow
+- Curated Desktop：Unlocked，trusted forever
 
 并提供操作：
 
@@ -193,6 +202,7 @@ PIN 锁可以和 LAN 开关分阶段组合：
 
 - 新增安全设置 DTO：
   - `pinEnabled`
+  - `pinLength`
   - `sessionTtlMinutes`
   - `lockOnRestart`
   - `lockOnWindowClose`
@@ -203,7 +213,7 @@ PIN 锁可以和 LAN 开关分阶段组合：
   - `POST /api/auth/unlock`
   - `POST /api/auth/lock`
   - `POST /api/auth/change-pin`
-- Settings -> Security 接入设置 PIN、修改 PIN、关闭 PIN。
+- Settings -> Security 接入设置 PIN、修改 PIN、无操作后锁定时长；设置 PIN 和修改 PIN 均通过入口按钮打开 Dialog。关闭 PIN 作为后续切片。
 
 ### Slice 3：敏感 API 中间件保护
 

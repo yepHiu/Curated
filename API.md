@@ -2,7 +2,7 @@
 
 ## Overview
 
-Curated exposes a Go HTTP API for library browsing, playback workflows, actor metadata, settings, connected-client visibility, curated-frame management, storage presence checks, scans, and task tracking.
+Curated exposes a Go HTTP API for PIN App Lock/authentication, library browsing, playback workflows, actor metadata, settings, connected-client visibility, curated-frame management, storage presence checks, scans, and task tracking.
 
 This document is the single public API reference for the repository.
 
@@ -92,6 +92,115 @@ Important notes:
 - intended for development diagnostics
 - not a core product-facing endpoint
 
+## Authentication And PIN App Lock
+
+PIN App Lock is optional and is disabled by default. When enabled, protected `/api/*`
+endpoints require a valid unlock session. Locked requests return HTTP `423` with
+error code `AUTH_LOCKED`. `/api/health` and the auth endpoints below remain public
+so the frontend can render the lock flow.
+
+PINs are stored only as salted Argon2id hashes in SQLite. Browser unlock state is a
+server-side `auth_sessions` row carried by the HTTP-only `curated_auth` cookie.
+Regular sessions use an idle timeout: activity through the UI or protected API calls
+extends `sessionExpiresAt`; inactivity past that deadline locks the session. The
+`trustedForever` option creates a session without `expiresAt`; that device stays trusted
+until the current session is explicitly locked or a future session-management flow revokes it.
+
+### `GET /api/auth/status`
+
+Purpose:
+
+- return whether PIN lock is enabled and whether the current request has a valid session
+- provide the current idle timeout, LAN PIN policy, restart-lock policy, and trusted-device status
+
+Response shape:
+
+- `pinEnabled`: whether PIN lock is active
+- `unlocked`: whether the current cookie/session is valid, or true when PIN is disabled
+- `setupRequired`: true until a PIN has been configured
+- `pinLength`: configured PIN digit count when known; the lock screen uses this to render the correct number of PIN cells without storing or exposing the PIN itself
+- `trustedForever`: true when the current session was unlocked with permanent device trust
+- `sessionExpiresAt`: current idle deadline for regular sessions; empty for trusted-forever sessions
+- `sessionTtlMinutes`: idle-lock delay in minutes
+- `lanRequiresPin`, `lockOnRestart`
+
+### `POST /api/auth/setup-pin`
+
+Purpose:
+
+- set the first PIN and create an unlock session for the current browser
+- update non-secret PIN lock settings at the same time
+
+Request body:
+
+- `pin`: 4-8 numeric digits
+- `confirmPin`: must match `pin`
+- optional `sessionTtlMinutes`, `lanRequiresPin`, `lockOnRestart`
+- optional `trustedForever`: trust the current browser indefinitely after setup
+
+Important notes:
+
+- when a PIN already exists, this endpoint requires the current request to be unlocked
+- the backend persists only the PIN length as non-secret metadata, alongside the salted Argon2id hash
+- the response sets an HTTP-only `curated_auth` cookie on success
+
+### `POST /api/auth/unlock`
+
+Purpose:
+
+- verify the submitted PIN and create a new unlock session
+
+Request body:
+
+- `pin`: submitted PIN
+- optional `trustedForever`: when true, create a non-expiring trusted-device session
+
+Important notes:
+
+- incorrect PIN returns HTTP `401` with error code `AUTH_INVALID_PIN`
+- success sets an HTTP-only `curated_auth` cookie; regular sessions use a browser-session cookie while the server owns the idle deadline
+
+### `POST /api/auth/change-pin`
+
+Purpose:
+
+- replace the configured PIN after the current request is already unlocked
+
+Request body:
+
+- `currentPin`: existing PIN
+- `newPin`: new 4-8 digit numeric PIN
+- `confirmPin`: must match `newPin`
+
+Important notes:
+
+- the endpoint is protected by the app-lock middleware and also verifies `currentPin`
+- incorrect current PIN returns HTTP `401` with error code `AUTH_INVALID_PIN`
+- plaintext PIN values are never persisted; the response includes the updated `pinLength`
+
+### `POST /api/auth/lock`
+
+Purpose:
+
+- revoke the current session and clear the `curated_auth` cookie
+
+Important notes:
+
+- this also revokes a trusted-forever session for the current device
+
+### `PATCH /api/auth/settings`
+
+Purpose:
+
+- update non-secret PIN lock settings after the current request is already unlocked
+
+Request body:
+
+- optional `pinEnabled`
+- optional `sessionTtlMinutes`
+- optional `lanRequiresPin`
+- optional `lockOnRestart`
+
 ## Connected Clients
 
 ### `GET /api/connected-clients`
@@ -111,9 +220,9 @@ Response shape:
 
 Client entry fields:
 
-- `key`: stable in-memory key for the current process, derived from IP + User-Agent
+- `key`: stable in-memory key for the current process, normally derived from IP + User-Agent; Curated Desktop includes its desktop marker so it stays distinct from a normal Chrome tab with the same Chromium User-Agent
 - `ip`, optional `port`, optional `hostname`
-- `browser`, optional `browserVersion`, `os`, optional `osVersion`
+- `browser`, optional `browserVersion`, `os`, optional `osVersion`; Windows `osVersion` is shown only when the backend can determine a user-facing version such as `10` or `11`
 - `deviceType`: `desktop`, `laptop`, `mobile`, `tablet`, `tool`, or `unknown`
 - `accessKind`: `local` or `remote`
 - `isLocalMachine`: true for loopback or known host-interface IPs
@@ -123,6 +232,8 @@ Important notes:
 
 - tracking is in-memory only; restarting the backend clears the list
 - clients are deduplicated by remote IP + User-Agent, not by TCP port
+- Curated Desktop/Electron adds `X-Curated-Client: desktop-electron`, `X-Curated-Client-Version`, `X-Curated-OS`, and `X-Curated-OS-Version`; the backend reports those entries as `browser: "Curated Desktop"` instead of Chrome and can show Windows 11 even though Chromium's legacy User-Agent still contains `Windows NT 10.0`
+- regular browsers may provide `Sec-CH-UA-Platform` and `Sec-CH-UA-Platform-Version`; when present, the backend uses those Client Hints to map Windows platform version 13+ to `Windows 11`
 - the backend keeps at most 50 most-recent clients
 - MAC addresses are not collected or exposed
 
