@@ -122,7 +122,7 @@ export function withCuratedDesktopRequestHeaders(
   appVersion: string,
   osInfo: DesktopOSInfo = desktopOSInfo(),
 ): Record<string, string> {
-  const headers = {
+  const headers: Record<string, string> = {
     ...requestHeaders,
     [curatedDesktopClientHeaderName]: curatedDesktopClientHeaderValue,
     [curatedDesktopClientVersionHeaderName]: appVersion,
