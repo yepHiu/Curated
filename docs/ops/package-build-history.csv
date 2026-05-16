@@ -276,3 +276,13 @@ e2666ad2 chore(release): prepare 1.4.5 package",versionSource=auto-patch; BuildS
 2026-05-14,1.4.7,ba55b4a2,master,release:publish,release/portable/Curated-1.4.7-windows-x64.zip; release/installer/Curated-Setup-1.4.7.exe; release/manifest/release.json,成功,wujiahui,"ba55b4a2 feat(electron): package desktop shell in release
 d095b028 fix(scan): handle path collisions during library watch
 bf6e848b chore(release): prepare 1.4.6 package",versionSource=auto-patch; BuildStamp=20260513.192311; portable=versionSource=explicit; installer=versionSource=explicit
+2026-05-17,1.4.8,61ba17a7,master,release:publish,release/manifest/release.json,失败,wujiahui,"61ba17a7 feat(frontend): refine curated frames and authenticated playback
+330482ab docs: document PIN lock and desktop clients
+cd550430 feat(electron): identify desktop client OS
+b2929bb1 feat(auth): add PIN app lock
+32d3d833 feat(ui): adapt desktop display density
+a3f7d282 docs(plan): record access control ideas
+38cd9916 feat(settings): show connected clients
+e759ac21 fix(electron): remove desktop menu bar
+aedd5abc chore(release): prepare 1.4.7 package",versionSource=auto-patch; BuildStamp=20260516.174252; error=pnpm build:electron:main failed with exit code 2
+2026-05-17,1.4.8,89726526,master,release:publish,release/portable/Curated-1.4.8-windows-x64.zip; release/installer/Curated-Setup-1.4.8.exe; release/manifest/release.json,成功,wujiahui,89726526 fix(electron): type desktop marker headers,versionSource=explicit; BuildStamp=20260516.174515; portable=versionSource=explicit; installer=versionSource=explicit
