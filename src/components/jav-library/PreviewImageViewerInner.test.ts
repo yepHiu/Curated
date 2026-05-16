@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils"
+import { nextTick } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const carouselApi = vi.hoisted(() => ({
@@ -46,6 +47,7 @@ async function mountViewer() {
 }
 
 beforeEach(() => {
+  carouselApi.selectedScrollSnap.mockReturnValue(0)
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     cb(0)
     return 0
@@ -54,6 +56,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
@@ -65,6 +68,7 @@ describe("PreviewImageViewerInner", () => {
     expect(wrapper.text()).toContain("preview.instructions")
 
     expect(wrapper.find('button[aria-label="preview.close"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="preview.download"]').exists()).toBe(true)
     expect(wrapper.find('button[aria-label="preview.previous"]').exists()).toBe(true)
     expect(wrapper.find('button[aria-label="preview.next"]').exists()).toBe(true)
     expect(wrapper.find('button[aria-label="preview.imageOf:1"]').exists()).toBe(true)
@@ -93,5 +97,27 @@ describe("PreviewImageViewerInner", () => {
     await mainImages[0]!.trigger("load")
 
     expect(mainImages[0]!.attributes("data-loaded")).toBe("true")
+  })
+
+  it("downloads the selected preview image with a stable movie-code filename", async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
+    const appendSpy = vi.spyOn(document.body, "appendChild")
+    const wrapper = await mountViewer()
+
+    carouselApi.selectedScrollSnap.mockReturnValue(1)
+    const selectHandler = carouselApi.on.mock.calls.find(([event]) => event === "select")?.[1]
+    expect(selectHandler).toBeTypeOf("function")
+    ;(selectHandler as () => void)()
+    await nextTick()
+
+    await wrapper.get('button[aria-label="preview.download"]').trigger("click")
+
+    const anchor = appendSpy.mock.calls.at(-1)?.[0] as HTMLAnchorElement | undefined
+    expect(anchor?.tagName).toBe("A")
+    expect(anchor?.href).toBe("https://example.test/2.jpg")
+    expect(anchor?.download).toBe("ABC-123-preview-02.jpg")
+    expect(anchor?.target).toBe("_blank")
+    expect(anchor?.rel).toBe("noopener")
+    expect(clickSpy).toHaveBeenCalledTimes(1)
   })
 })

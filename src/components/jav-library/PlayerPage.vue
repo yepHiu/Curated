@@ -2401,7 +2401,7 @@ const videoPreloadMode = computed(() =>
           ref="videoRef"
           class="h-full max-h-full w-full max-w-full object-contain"
           :class="videoAreaCursorClass"
-          crossorigin="anonymous"
+          crossorigin="use-credentials"
           playsinline
           :preload="videoPreloadMode"
           @click.stop="onVideoSurfaceClick"

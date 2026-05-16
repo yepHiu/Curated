@@ -33,7 +33,9 @@ function formatClock(seconds: number): string {
 </script>
 
 <template>
-  <div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+  <div
+    class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+  >
     <CuratedFrameCard
       v-for="item in items"
       :key="item.row.id"

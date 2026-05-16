@@ -3,7 +3,7 @@ import { computed, nextTick, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useEventListener } from "@vueuse/core"
 import emblaCarouselVue from "embla-carousel-vue"
-import { ChevronLeft, ChevronRight, X } from "lucide-vue-next"
+import { ChevronLeft, ChevronRight, Download, X } from "lucide-vue-next"
 import { DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -92,10 +92,61 @@ watch(
 const total = computed(() => props.images.length)
 const canPrev = computed(() => selectedIndex.value > 0)
 const canNext = computed(() => selectedIndex.value < props.images.length - 1)
+const currentImageSrc = computed(() => props.images[selectedIndex.value]?.trim() ?? "")
+const downloadFileName = computed(() =>
+  buildPreviewDownloadFileName(currentImageSrc.value, props.movieCode, selectedIndex.value),
+)
 const loadedMainImageSrcs = ref<Set<string>>(new Set())
 const previewTitle = computed(() =>
   t("preview.title", { code: props.movieCode?.trim() ?? "" }).trim(),
 )
+
+function sanitizeDownloadStem(value: string | undefined): string {
+  const cleaned =
+    value
+      ?.trim()
+      .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "_")
+      .replace(/\s+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") ?? ""
+  return cleaned || "preview"
+}
+
+function imageExtensionFromUrl(src: string): string {
+  try {
+    const pathname = new URL(src, window.location.href).pathname.toLowerCase()
+    const ext = pathname.match(/\.([a-z0-9]+)$/)?.[1]
+    if (ext === "jpeg") return "jpg"
+    if (ext && ["jpg", "png", "webp", "gif", "avif"].includes(ext)) return ext
+  } catch {
+    // Fall back to jpg for opaque or malformed image URLs.
+  }
+  return "jpg"
+}
+
+function buildPreviewDownloadFileName(
+  src: string,
+  movieCode: string | undefined,
+  index: number,
+): string {
+  const stem = sanitizeDownloadStem(movieCode)
+  const sequence = String(index + 1).padStart(2, "0")
+  return `${stem}-preview-${sequence}.${imageExtensionFromUrl(src)}`
+}
+
+function downloadCurrentImage() {
+  const src = currentImageSrc.value
+  if (!src) return
+
+  const anchor = document.createElement("a")
+  anchor.href = src
+  anchor.download = downloadFileName.value
+  anchor.target = "_blank"
+  anchor.rel = "noopener"
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
 
 function previewImageLabel(i: number): string {
   return t("preview.imageOf", { i })
@@ -198,27 +249,44 @@ defineExpose({
     </DialogDescription>
 
     <div
-      class="grid h-9 shrink-0 grid-cols-[2.25rem_1fr_2.25rem] items-center rounded-t-2xl bg-zinc-950/95 px-0.5 sm:h-10 sm:grid-cols-[2.5rem_1fr_2.5rem]"
+      class="grid h-9 shrink-0 grid-cols-[4.5rem_1fr_4.5rem] items-center rounded-t-2xl bg-zinc-950/95 px-0.5 sm:h-10 sm:grid-cols-[5rem_1fr_5rem]"
     >
-      <span aria-hidden="true" class="size-9 sm:size-10" />
+      <span aria-hidden="true" class="h-9 w-full sm:h-10" />
       <p class="min-w-0 truncate text-center text-xs text-zinc-400 sm:text-sm">
         {{ selectedIndex + 1 }} / {{ total }}
         <span v-if="movieCode" class="ml-2 text-zinc-500">{{ movieCode }}</span>
       </p>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        class="group size-9 justify-self-end rounded-lg text-zinc-400 outline-none ring-offset-0 hover:bg-transparent hover:text-white focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 focus-visible:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.22)] dark:hover:bg-transparent sm:size-10"
-        :aria-label="t('preview.close')"
-        @click="emit('close')"
-      >
-        <span
-          class="inline-flex size-7 items-center justify-center rounded-md transition-colors group-hover:bg-white/10 sm:size-8"
+      <div class="flex justify-self-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="group size-9 rounded-lg text-zinc-400 outline-none ring-offset-0 hover:bg-transparent hover:text-white focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 focus-visible:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.22)] dark:hover:bg-transparent disabled:opacity-40 sm:size-10"
+          :disabled="!currentImageSrc"
+          :aria-label="t('preview.download')"
+          @click="downloadCurrentImage"
         >
-          <X class="size-4" />
-        </span>
-      </Button>
+          <span
+            class="inline-flex size-7 items-center justify-center rounded-md transition-colors group-hover:bg-white/10 sm:size-8"
+          >
+            <Download class="size-4" />
+          </span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="group size-9 rounded-lg text-zinc-400 outline-none ring-offset-0 hover:bg-transparent hover:text-white focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0 focus-visible:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.22)] dark:hover:bg-transparent sm:size-10"
+          :aria-label="t('preview.close')"
+          @click="emit('close')"
+        >
+          <span
+            class="inline-flex size-7 items-center justify-center rounded-md transition-colors group-hover:bg-white/10 sm:size-8"
+          >
+            <X class="size-4" />
+          </span>
+        </Button>
+      </div>
     </div>
 
     <div

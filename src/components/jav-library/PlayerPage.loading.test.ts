@@ -287,7 +287,7 @@ describe("PlayerPage loading states", () => {
     }
   })
 
-  it("loads video media with anonymous CORS for direct backend playback streams", async () => {
+  it("loads video media with credentials for authenticated backend playback streams", async () => {
     serviceMocks.getMoviePlayback.mockResolvedValueOnce({
       movieId: "movie-1",
       mode: "direct",
@@ -301,7 +301,7 @@ describe("PlayerPage loading states", () => {
       await flushPromises()
       await nextTick()
 
-      expect(wrapper.get("video").attributes("crossorigin")).toBe("anonymous")
+      expect(wrapper.get("video").attributes("crossorigin")).toBe("use-credentials")
     } finally {
       wrapper.unmount()
     }

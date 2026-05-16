@@ -202,4 +202,29 @@ describe("NotificationCenter", () => {
     expect(notificationState.dismissOne).toHaveBeenCalledWith("unread-1")
     expect(routerPush).not.toHaveBeenCalled()
   })
+
+  it("keeps read update notifications at normal opacity in history", async () => {
+    notificationState.read = [
+      makeNotification(1, {
+        type: "update",
+        title: "Update available",
+        message: "Curated v1.4.7 is ready",
+      }),
+    ]
+
+    const wrapper = await mountCenter()
+    const historyButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("notificationCenter.viewAll"))
+
+    expect(historyButton).toBeDefined()
+    await historyButton!.trigger("click")
+
+    const updateRow = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Curated v1.4.7 is ready"))
+
+    expect(updateRow).toBeDefined()
+    expect(updateRow!.attributes("class")).not.toMatch(/\bopacity-\d+/)
+  })
 })

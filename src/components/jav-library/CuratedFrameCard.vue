@@ -60,8 +60,7 @@ const { t } = useI18n()
           loading="lazy"
         />
       </div>
-      <div class="space-y-1 p-3">
-        <p class="line-clamp-2 text-sm font-medium">{{ row.title }}</p>
+      <div class="p-3">
         <p class="text-xs text-muted-foreground">
           {{ row.code }} · {{ positionLabel }}
         </p>

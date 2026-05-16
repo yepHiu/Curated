@@ -76,6 +76,10 @@ const canRevealInFileManager = computed(
   () => useWebApi && Boolean(props.movie.location?.trim()) && !isTrashed.value,
 )
 
+const javdbSearchUrl = computed(
+  () => `https://javdb.com/search?q=${encodeURIComponent(props.movie.code.trim())}&f=all`,
+)
+
 const movieEditOpen = ref(false)
 const newUserTagDraft = ref("")
 const userTagFormError = ref("")
@@ -352,7 +356,12 @@ function pickUserTagSuggestion(tag: string) {
 
           <div class="pointer-events-none absolute inset-x-0 top-0 z-[3] flex justify-start p-4">
             <Badge
-              class="pointer-events-auto w-fit rounded-full border border-border/40 bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background/90"
+              as="a"
+              variant="outline"
+              :href="javdbSearchUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="pointer-events-auto w-fit select-none rounded-full border-border/40 bg-background/90 shadow-sm backdrop-blur-sm focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {{ movie.code }}
             </Badge>
@@ -745,7 +754,7 @@ function pickUserTagSuggestion(tag: string) {
         </div>
 
         <div v-if="props.showActions" class="flex flex-wrap items-center gap-3">
-          <Button class="rounded-2xl" @click="emit('openPlayer', movie.id)">
+          <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id)">
             <PlayCircle data-icon="inline-start" />
             {{ t("detailPanel.play") }}
           </Button>

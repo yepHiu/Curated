@@ -22,7 +22,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
+  <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 pt-4 sm:pt-6">
     <div class="flex flex-wrap items-center gap-3">
       <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
         <TabsTrigger value="timeline" class="rounded-xl px-4 py-2">{{ t("curated.tabTimeline") }}</TabsTrigger>

@@ -264,7 +264,7 @@ function dotClass(type: AppNotification["type"]) {
             v-for="notif in recentReadNotifications"
             :key="notif.id"
             type="button"
-            class="flex w-full gap-2.5 px-4 py-3 text-left opacity-55 transition-colors hover:bg-muted/40"
+            class="flex w-full gap-2.5 px-4 py-3 text-left transition-colors hover:bg-muted/40"
             :class="notif.source?.route ? 'cursor-pointer' : 'cursor-default'"
             @click="activateNotification(notif)"
           >
@@ -317,7 +317,7 @@ function dotClass(type: AppNotification["type"]) {
             v-for="notif in readPreviewNotifications"
             :key="notif.id"
             type="button"
-            class="flex w-full gap-2.5 px-4 py-2.5 text-left opacity-50 transition-colors hover:bg-muted/40"
+            class="flex w-full gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
             :class="notif.source?.route ? 'cursor-pointer' : 'cursor-default'"
             @click="activateNotification(notif)"
           >

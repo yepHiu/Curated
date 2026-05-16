@@ -50,6 +50,9 @@ export function buildHlsPlaybackConfig(): Record<string, unknown> {
     maxBufferLength: 30,
     maxMaxBufferLength: 60,
     backBufferLength: 90,
+    xhrSetup(xhr: XMLHttpRequest) {
+      xhr.withCredentials = true
+    },
   }
 }
 
@@ -188,7 +191,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number, signal?: AbortSi
   signal?.addEventListener("abort", abortForwarder, { once: true })
   try {
     return await fetch(url, {
-      credentials: "same-origin",
+      credentials: "include",
       cache: "default",
       signal: controller.signal,
     })

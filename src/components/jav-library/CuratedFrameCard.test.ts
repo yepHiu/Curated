@@ -20,7 +20,7 @@ const row = {
 }
 
 describe("CuratedFrameCard", () => {
-  it("renders frame image, metadata, selection state, and duplicate badge", () => {
+  it("renders frame image, code metadata, selection state, and duplicate badge without the movie title", () => {
     const wrapper = mount(CuratedFrameCard, {
       props: {
         row,
@@ -35,7 +35,7 @@ describe("CuratedFrameCard", () => {
 
     expect(wrapper.get("img").attributes("src")).toBe("blob:frame-a")
     expect(wrapper.get("img").attributes("alt")).toBe("ABC-001")
-    expect(wrapper.text()).toContain("Scene A")
+    expect(wrapper.text()).not.toContain("Scene A")
     expect(wrapper.text()).toContain("ABC-001 · 01:05")
     expect(wrapper.text()).toContain("curated.duplicateReviewBadge")
     expect(wrapper.get("input[type='checkbox']").attributes("checked")).toBeDefined()

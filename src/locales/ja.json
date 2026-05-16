@@ -186,6 +186,8 @@
     "noActor": "（出演者なし）",
     "noMovie": "（作品未設定）",
     "deleteCard": "フレームを削除",
+    "previousFrame": "前の萃取フレーム",
+    "nextFrame": "次の萃取フレーム",
     "deleteLabel": "このフレーム",
     "deleteFailed": "削除に失敗しました。後でもう一度。",
     "tagMaxRunes": "1 タグあたり最大 {n} 文字",
@@ -425,6 +427,7 @@
     "title": "{code} プレビュー",
     "instructions": "矢印キーまたは左右のボタンで画像を切り替え、Esc で閉じます。下のサムネイルをクリックして移動できます。",
     "close": "閉じる",
+    "download": "プレビュー画像をダウンロード",
     "previous": "前へ",
     "next": "次へ",
     "imageOf": "{i}枚目"

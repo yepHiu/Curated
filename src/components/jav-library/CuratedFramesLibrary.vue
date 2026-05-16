@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { useFocusWithin, onClickOutside } from "@vueuse/core"
+import { useFocusWithin, onClickOutside, useEventListener } from "@vueuse/core"
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import type { CuratedFrameFacetItemDTO, PostCuratedFramesExportBody } from "@/api/types"
 import {
+  ChevronLeft,
+  ChevronRight,
   Download,
   PlayCircle,
   Plus,
@@ -13,6 +15,12 @@ import {
 } from "lucide-vue-next"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel"
 import CuratedFrameTimelineTab from "@/components/jav-library/CuratedFrameTimelineTab.vue"
 import CuratedFrameActorsTab from "@/components/jav-library/CuratedFrameActorsTab.vue"
 import CuratedFrameMoviesTab from "@/components/jav-library/CuratedFrameMoviesTab.vue"
@@ -66,6 +74,12 @@ import {
   toggleCuratedFrameExportSelection,
   type CuratedFrameExportSelectionState,
 } from "@/lib/curated-frames/selection"
+import {
+  buildCuratedFrameDialogNavigationEntries,
+  findAdjacentCuratedFrameDialogEntry,
+  type CuratedFrameDialogDirection,
+  type CuratedFrameDialogNavigationEntry,
+} from "@/lib/curated-frames/dialog-navigation"
 import { buildPlayerRouteFromCuratedFrame } from "@/lib/player-route"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useLibraryService } from "@/services/library-service"
@@ -421,6 +435,11 @@ onUnmounted(() => {
     clearTimeout(dialogTagSaveTimer)
     dialogTagSaveTimer = null
   }
+  if (dialogCarouselUserSelectingResetTimer) {
+    clearTimeout(dialogCarouselUserSelectingResetTimer)
+    dialogCarouselUserSelectingResetTimer = null
+  }
+  detachDialogCarouselListeners?.()
   revokeAllUrls()
 })
 
@@ -550,7 +569,8 @@ const movieGroups = computed((): MovieGroupSection[] => {
 
 const dialogOpen = ref(false)
 const selected = ref<CuratedFrameRecord | null>(null)
-const selectedImageUrl = ref("")
+const dialogCarouselApi = ref<CarouselApi | null>(null)
+const dialogCarouselUserSelecting = ref(false)
 type CuratedFrameContextMenuState = {
   x: number
   y: number
@@ -565,8 +585,46 @@ const dialogTagSaveError = ref("")
 const lastSavedDialogTags = ref<string[]>([])
 const dialogTagSaveDebounceMs = 250
 
+const dialogNavigationEntries = computed(() =>
+  buildCuratedFrameDialogNavigationEntries({
+    mainTab: mainTab.value,
+    listItems: listWithUrls.value,
+    actorGroups: actorGroups.value,
+    movieGroups: movieGroups.value,
+  }),
+)
+const previousDialogEntry = computed(() =>
+  findAdjacentCuratedFrameDialogEntry(
+    dialogNavigationEntries.value,
+    selected.value?.id,
+    dialogOpenedFromActor.value,
+    "previous",
+  ),
+)
+const nextDialogEntry = computed(() =>
+  findAdjacentCuratedFrameDialogEntry(
+    dialogNavigationEntries.value,
+    selected.value?.id,
+    dialogOpenedFromActor.value,
+    "next",
+  ),
+)
+const canNavigateDialogPrevious = computed(() => previousDialogEntry.value !== null)
+const canNavigateDialogNext = computed(() => nextDialogEntry.value !== null)
+const selectedDialogNavigationIndex = computed(() => {
+  const id = selected.value?.id
+  if (!id) {
+    return -1
+  }
+  return dialogNavigationEntries.value.findIndex(
+    (entry) => entry.item.row.id === id && entry.sectionActor === dialogOpenedFromActor.value,
+  )
+})
+
 let dialogTagSaveTimer: ReturnType<typeof setTimeout> | null = null
 let dialogTagSaveInFlight = false
+let detachDialogCarouselListeners: (() => void) | null = null
+let dialogCarouselUserSelectingResetTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 与详情页「我的标签」一致：内联添加 */
 const newUserTagDraft = ref("")
@@ -650,10 +708,84 @@ function resetDialogTagSaveState(savedTags: string[] = []) {
 
 function resetDialogState() {
   selected.value = null
-  selectedImageUrl.value = ""
+  resetDialogCarouselUserSelecting()
   resetTagInputState()
   resetDialogTagSaveState()
   dialogOpen.value = false
+}
+
+function dialogEntryImageUrl(entry: CuratedFrameDialogNavigationEntry<RowWithUrl>): string {
+  return entry.item.row.imageBlob ? entry.item.url : curatedFrameImageUrl(entry.item.row.id)
+}
+
+function isDialogEntryCurrent(entry: CuratedFrameDialogNavigationEntry<RowWithUrl>) {
+  return entry.item.row.id === selected.value?.id && entry.sectionActor === dialogOpenedFromActor.value
+}
+
+function resetDialogCarouselUserSelecting() {
+  if (dialogCarouselUserSelectingResetTimer) {
+    clearTimeout(dialogCarouselUserSelectingResetTimer)
+    dialogCarouselUserSelectingResetTimer = null
+  }
+  dialogCarouselUserSelecting.value = false
+}
+
+function markDialogCarouselUserSelecting() {
+  dialogCarouselUserSelecting.value = true
+  if (dialogCarouselUserSelectingResetTimer) {
+    clearTimeout(dialogCarouselUserSelectingResetTimer)
+  }
+  dialogCarouselUserSelectingResetTimer = setTimeout(() => {
+    dialogCarouselUserSelectingResetTimer = null
+    dialogCarouselUserSelecting.value = false
+  }, 1200)
+}
+
+async function syncDialogCarouselToSelected(options: { jump?: boolean } = {}) {
+  await nextTick()
+  const api = dialogCarouselApi.value
+  const index = selectedDialogNavigationIndex.value
+  if (!api || index < 0) {
+    return
+  }
+  api.scrollTo(index, options.jump ?? false)
+}
+
+async function selectDialogEntryFromCarousel(entry: CuratedFrameDialogNavigationEntry<RowWithUrl>) {
+  if (isDialogEntryCurrent(entry)) {
+    return
+  }
+  if (!(await persistDialogTags({ toastOnError: true }))) {
+    await syncDialogCarouselToSelected({ jump: true })
+    return
+  }
+  openDialog(entry.item, entry.sectionActor)
+}
+
+function onDialogCarouselInit(api: CarouselApi) {
+  if (!api) {
+    return
+  }
+  detachDialogCarouselListeners?.()
+  dialogCarouselApi.value = api
+  const handleSelect = () => {
+    const entry = dialogNavigationEntries.value[api.selectedScrollSnap()]
+    if (!entry || !dialogOpen.value || !dialogCarouselUserSelecting.value) {
+      return
+    }
+    resetDialogCarouselUserSelecting()
+    void selectDialogEntryFromCarousel(entry)
+  }
+  const handleReInit = () => {
+    void syncDialogCarouselToSelected({ jump: true })
+  }
+  api.on("select", handleSelect)
+  api.on("reInit", handleReInit)
+  detachDialogCarouselListeners = () => {
+    api.off("select", handleSelect)
+    api.off("reInit", handleReInit)
+  }
+  void syncDialogCarouselToSelected({ jump: true })
 }
 
 function closeFrameContextMenu() {
@@ -694,7 +826,6 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   dialogOpenedFromActor.value = fromActorSection
   dialogExportError.value = ""
   selected.value = meta
-  selectedImageUrl.value = imageBlob ? item.url : curatedFrameImageUrl(item.row.id)
   dialogTags.value = [...item.row.tags]
   resetTagInputState()
   resetDialogTagSaveState(item.row.tags)
@@ -712,6 +843,62 @@ function onFrameCardContextMenu(
 ) {
   onFrameContextMenu(event, item, fromActorSection ?? null)
 }
+
+async function navigateDialogFrame(direction: CuratedFrameDialogDirection) {
+  const target = direction === "previous" ? previousDialogEntry.value : nextDialogEntry.value
+  if (!target) {
+    return
+  }
+  if (!(await persistDialogTags({ toastOnError: true }))) {
+    return
+  }
+  openDialog(target.item, target.sectionActor)
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  const tag = target.tagName.toLowerCase()
+  return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable
+}
+
+useEventListener(
+  "keydown",
+  (event: KeyboardEvent) => {
+    if (
+      !dialogOpen.value ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      isEditableKeyboardTarget(event.target)
+    ) {
+      return
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault()
+      event.stopPropagation()
+      void navigateDialogFrame("previous")
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault()
+      event.stopPropagation()
+      void navigateDialogFrame("next")
+    }
+  },
+  { capture: true },
+)
+
+watch(
+  [dialogOpen, selectedDialogNavigationIndex, dialogCarouselApi],
+  ([open, index]) => {
+    if (!open || index < 0) {
+      return
+    }
+    void syncDialogCarouselToSelected()
+  },
+)
 
 watch(
   dialogTags,
@@ -1005,7 +1192,6 @@ function applyDeletedFrameIds(deletedIds: readonly string[]) {
 
   if (selected.value?.id && deletedSet.has(selected.value.id)) {
     selected.value = null
-    selectedImageUrl.value = ""
     resetTagInputState()
     dialogOpen.value = false
   }
@@ -1098,10 +1284,8 @@ defineExpose({
 
 <template>
   <div
-    class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-3 sm:px-6"
+    class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-[min(100%,120rem)] flex-col gap-6 px-3 sm:px-6"
   >
-    <h1 class="pt-2 text-2xl font-semibold tracking-tight">{{ t("curated.title") }}</h1>
-
     <div
       v-if="nearDuplicateGroups.length > 0"
       class="rounded-3xl border border-amber-300/70 bg-amber-50/80 p-4 text-sm text-amber-950 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
@@ -1231,12 +1415,53 @@ defineExpose({
           <div
             class="relative flex h-[min(52vh,560px)] w-full min-w-0 items-center justify-center bg-black md:h-full md:min-h-0"
           >
-            <img
-              v-if="selectedImageUrl"
-              :src="selectedImageUrl"
-              alt=""
-              class="box-border h-full w-full object-contain p-2 sm:p-4"
-            />
+            <Carousel
+              class="h-full w-full min-w-0 overflow-hidden"
+              :opts="{ align: 'center', loop: false }"
+              @pointerdown.capture="markDialogCarouselUserSelecting"
+              @init-api="onDialogCarouselInit"
+            >
+              <CarouselContent class="h-full ml-0">
+                <CarouselItem
+                  v-for="entry in dialogNavigationEntries"
+                  :key="`${entry.sectionActor ?? mainTab}-${entry.item.row.id}`"
+                  class="h-[min(52vh,560px)] pl-0 md:h-[min(94vh,960px)]"
+                  :aria-current="isDialogEntryCurrent(entry) ? 'true' : undefined"
+                >
+                  <div class="flex h-full w-full min-w-0 items-center justify-center bg-black">
+                    <img
+                      :src="dialogEntryImageUrl(entry)"
+                      alt=""
+                      class="box-border h-full w-full object-contain p-2 sm:p-4"
+                      decoding="async"
+                      draggable="false"
+                    />
+                  </div>
+                </CarouselItem>
+              </CarouselContent>
+            </Carousel>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="absolute top-1/2 left-3 size-10 -translate-y-1/2 rounded-xl bg-black/45 text-white shadow-lg ring-1 ring-white/15 transition hover:bg-black/65 hover:text-white focus-visible:ring-white/60 disabled:opacity-25 dark:hover:bg-black/65 sm:left-4 sm:size-11 sm:rounded-2xl"
+              :disabled="!canNavigateDialogPrevious"
+              :aria-label="t('curated.previousFrame')"
+              @click="navigateDialogFrame('previous')"
+            >
+              <ChevronLeft class="size-5 sm:size-6" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="absolute top-1/2 right-3 size-10 -translate-y-1/2 rounded-xl bg-black/45 text-white shadow-lg ring-1 ring-white/15 transition hover:bg-black/65 hover:text-white focus-visible:ring-white/60 disabled:opacity-25 dark:hover:bg-black/65 sm:right-4 sm:size-11 sm:rounded-2xl"
+              :disabled="!canNavigateDialogNext"
+              :aria-label="t('curated.nextFrame')"
+              @click="navigateDialogFrame('next')"
+            >
+              <ChevronRight class="size-5 sm:size-6" aria-hidden="true" />
+            </Button>
           </div>
           <div
             class="flex min-h-0 flex-col gap-5 overflow-y-auto border-t border-border/70 p-5 sm:p-6 md:max-h-full md:border-t-0 md:border-l"
@@ -1406,47 +1631,39 @@ defineExpose({
 
             <p v-if="dialogExportError" class="text-sm text-destructive" role="alert">{{ dialogExportError }}</p>
 
-            <div
-              class="mt-auto flex shrink-0 flex-col gap-4 border-t border-border/60 pt-5"
-            >
-              <div
+            <div class="mt-auto flex shrink-0 flex-col gap-2 border-t border-border/60 pt-5">
+              <Button
                 v-if="useWebApi"
-                class="grid grid-cols-1 gap-2"
+                type="button"
+                variant="secondary"
+                size="sm"
+                class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
+                :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
+                @click="exportSingleFromDialog"
               >
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                  :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
-                  @click="exportSingleFromDialog"
-                >
-                  <Download class="size-4 shrink-0" aria-hidden="true" />
-                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}</span>
-                </Button>
-              </div>
-              <div class="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  class="h-10 w-full justify-center gap-1.5 rounded-xl"
-                  :disabled="dialogTagSaveStatus === 'saving'"
-                  @click="playFromFrame"
-                >
-                  <PlayCircle class="size-4 shrink-0" aria-hidden="true" />
-                  {{ t("curated.playFromTime") }}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="h-10 w-full justify-center gap-1.5 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10"
-                  @click="openDeleteConfirmFromDialog"
-                >
-                  <Trash2 class="size-4 shrink-0" aria-hidden="true" />
-                  {{ t("curated.deleteThisFrame") }}
-                </Button>
-              </div>
+                <Download class="size-4 shrink-0" aria-hidden="true" />
+                <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                class="h-10 w-full justify-center gap-1.5 rounded-xl"
+                :disabled="dialogTagSaveStatus === 'saving'"
+                @click="playFromFrame"
+              >
+                <PlayCircle class="size-4 shrink-0" aria-hidden="true" />
+                {{ t("curated.playFromTime") }}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class="h-10 w-full justify-center gap-1.5 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10"
+                @click="openDeleteConfirmFromDialog"
+              >
+                <Trash2 class="size-4 shrink-0" aria-hidden="true" />
+                {{ t("curated.deleteThisFrame") }}
+              </Button>
             </div>
           </div>
         </div>

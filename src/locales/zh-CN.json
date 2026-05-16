@@ -186,6 +186,8 @@
     "noActor": "（无演员）",
     "noMovie": "（未关联影片）",
     "deleteCard": "删除萃取帧",
+    "previousFrame": "上一张萃取帧",
+    "nextFrame": "下一张萃取帧",
     "deleteLabel": "该帧",
     "deleteFailed": "删除失败，请稍后重试。",
     "tagMaxRunes": "单个标签最多 {n} 个字符",
@@ -425,6 +427,7 @@
     "title": "{code} 预览图",
     "instructions": "使用左右方向键或两侧按钮切换图片，Esc 关闭；点击下方缩略图跳转。",
     "close": "关闭",
+    "download": "下载预览图",
     "previous": "上一张",
     "next": "下一张",
     "imageOf": "第 {i} 张"

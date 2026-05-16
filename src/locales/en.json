@@ -186,6 +186,8 @@
     "noActor": "(No actor)",
     "noMovie": "(No movie)",
     "deleteCard": "Delete frame",
+    "previousFrame": "Previous curated frame",
+    "nextFrame": "Next curated frame",
     "deleteLabel": "this frame",
     "deleteFailed": "Delete failed. Try again later.",
     "tagMaxRunes": "Each tag may have at most {n} characters",
@@ -425,6 +427,7 @@
     "title": "{code} Preview",
     "instructions": "Use arrow keys or side buttons to navigate, Esc to close; click thumbnails to jump.",
     "close": "Close",
+    "download": "Download preview image",
     "previous": "Previous",
     "next": "Next",
     "imageOf": "Image {i}"

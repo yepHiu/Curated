@@ -54,7 +54,11 @@ vi.mock("@/components/ui/avatar", () => ({
 }))
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: { name: "Badge", template: "<div><slot /></div>" },
+  Badge: {
+    name: "Badge",
+    props: ["as", "variant"],
+    template: '<component :is="as || \'div\'" v-bind="$attrs" :data-variant="variant"><slot /></component>',
+  },
 }))
 
 vi.mock("@/components/ui/button", () => ({
@@ -115,6 +119,24 @@ vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
 }))
 
 describe("DetailPanel", () => {
+  it("renders the cover code badge as an external JAVDB search link", () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ code: "JUR-681" }),
+      },
+    })
+
+    const link = wrapper.findAll("a").find((candidate) => candidate.text() === "JUR-681")
+
+    expect(link).toBeDefined()
+    expect(link!.attributes("href")).toBe("https://javdb.com/search?q=JUR-681&f=all")
+    expect(link!.attributes("target")).toBe("_blank")
+    expect(link!.attributes("rel")).toBe("noopener noreferrer")
+    expect(link!.attributes("data-variant")).toBe("outline")
+    expect(link!.attributes("class")).not.toContain("hover:text-primary")
+    expect(link!.attributes("class")).toContain("select-none")
+  })
+
   it("emits user rating updates from the rating stars", async () => {
     const wrapper = mount(DetailPanel, {
       props: {
