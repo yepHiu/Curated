@@ -59,7 +59,6 @@ import { deleteCuratedFramesBatch } from "@/lib/curated-frames/batch-delete"
 import {
   buildCuratedFrameNearDuplicateIndex,
   findCuratedFrameNearDuplicateGroups,
-  type CuratedFrameNearDuplicateGroup,
 } from "@/lib/curated-frames/near-duplicates"
 import {
   commitCuratedFrameTags,
@@ -484,7 +483,6 @@ const nearDuplicateGroups = computed(() =>
 )
 const nearDuplicateFrameIds = computed(() => buildCuratedFrameNearDuplicateIndex(nearDuplicateGroups.value))
 const nearDuplicateFrameIdList = computed(() => [...nearDuplicateFrameIds.value])
-const nearDuplicateSummaryGroups = computed(() => nearDuplicateGroups.value.slice(0, 3))
 
 /** 「按演员」视图下跨分组全选会混演员，与导出规则冲突，故不提供全选可见 */
 const batchShowSelectVisible = computed(() => mainTab.value !== "actors")
@@ -1250,16 +1248,6 @@ function formatCapturedAt(iso: string) {
   }
 }
 
-function formatNearDuplicateGroup(group: CuratedFrameNearDuplicateGroup<RowWithUrl["row"]>) {
-  const lead = group.items[0]
-  if (!lead) {
-    return ""
-  }
-  const label = lead.code.trim() || lead.title.trim() || lead.movieId.trim()
-  const positions = group.items.map((item) => formatClock(item.positionSec)).join(" / ")
-  return `${label} · ${positions}`
-}
-
 function isNearDuplicateFrame(frameId: string) {
   return nearDuplicateFrameIds.value.has(frameId)
 }
@@ -1286,27 +1274,6 @@ defineExpose({
   <div
     class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-[min(100%,120rem)] flex-col gap-6 px-3 sm:px-6"
   >
-    <div
-      v-if="nearDuplicateGroups.length > 0"
-      class="rounded-3xl border border-amber-300/70 bg-amber-50/80 p-4 text-sm text-amber-950 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
-    >
-      <p class="font-medium">
-        {{ t("curated.duplicateReviewTitle", { count: nearDuplicateGroups.length }) }}
-      </p>
-      <p class="mt-1 text-amber-900/80 dark:text-amber-100/80">
-        {{ t("curated.duplicateReviewBody", { threshold: curatedFrameNearDuplicateThresholdSec }) }}
-      </p>
-      <div class="mt-3 flex flex-wrap gap-2">
-        <span
-          v-for="group in nearDuplicateSummaryGroups"
-          :key="`${group.movieId}-${group.items.map((item) => item.id).join('-')}`"
-          class="rounded-full border border-amber-400/60 bg-background/70 px-2.5 py-1 text-xs text-foreground"
-        >
-          {{ formatNearDuplicateGroup(group) }}
-        </span>
-      </div>
-    </div>
-
     <CuratedFrameEmptyState
       v-if="isLibraryEmpty"
       variant="library"
