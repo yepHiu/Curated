@@ -99,8 +99,14 @@ def build_backend(
         shutil.rmtree(resolved_output_dir)
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
 
-    go_cache_dir = tempfile.mkdtemp(prefix="curated-go-build-cache-")
-    go_tmp_dir = tempfile.mkdtemp(prefix="curated-go-build-tmp-")
+    go_cache_dir = _release_go_build_dir(
+        env_name="CURATED_RELEASE_GOCACHE",
+        prefix="curated-go-build-cache-",
+    )
+    go_tmp_dir = _release_go_build_dir(
+        env_name="CURATED_RELEASE_GOTMPDIR",
+        prefix="curated-go-build-tmp-",
+    )
 
     env = os.environ.copy()
     env["GOCACHE"] = go_cache_dir
@@ -119,6 +125,15 @@ def build_backend(
 
     print("Backend release build complete.")
     return binary_path
+
+
+def _release_go_build_dir(env_name: str, prefix: str) -> str:
+    configured = os.environ.get(env_name)
+    if configured and configured.strip():
+        path = Path(configured).expanduser().resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+    return tempfile.mkdtemp(prefix=prefix)
 
 
 def build_electron_main(output_dir: str = "electron-dist") -> Path:

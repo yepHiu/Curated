@@ -1,3 +1,4 @@
+import os
 import shutil
 import sys
 import unittest
@@ -44,6 +45,34 @@ class BuildStepsTests(unittest.TestCase):
         repo_root_text = str(self.temp_root.resolve())
         self.assertFalse(str(env["GOCACHE"]).startswith(repo_root_text))
         self.assertFalse(str(env["GOTMPDIR"]).startswith(repo_root_text))
+
+    def test_build_backend_uses_explicit_release_go_dirs_from_environment(self) -> None:
+        captured: dict[str, object] = {}
+        go_cache_dir = self.temp_root / ".workspace" / "release-go-cache"
+        go_tmp_dir = self.temp_root / ".workspace" / "release-go-tmp"
+
+        def fake_run(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
+            captured["command"] = command
+            captured["cwd"] = cwd
+            captured["env"] = dict(env or {})
+
+        with patch.dict(
+            os.environ,
+            {
+                "CURATED_RELEASE_GOCACHE": str(go_cache_dir),
+                "CURATED_RELEASE_GOTMPDIR": str(go_tmp_dir),
+            },
+        ):
+            with patch("scripts.release.release_lib.build_steps.get_repo_root", return_value=self.temp_root):
+                with patch("scripts.release.release_lib.build_steps._run", side_effect=fake_run):
+                    build_backend("1.2.3", "20260424.010203", output_dir="release/backend")
+
+        env = captured["env"]
+        self.assertIsInstance(env, dict)
+        self.assertEqual(Path(str(env["GOCACHE"])), go_cache_dir.resolve())
+        self.assertEqual(Path(str(env["GOTMPDIR"])), go_tmp_dir.resolve())
+        self.assertTrue(go_cache_dir.is_dir())
+        self.assertTrue(go_tmp_dir.is_dir())
 
     def test_bundle_ffmpeg_runtime_copies_discovered_real_binaries(self) -> None:
         source_bin_dir = self.temp_root / "tools" / "ffmpeg" / "bin"
