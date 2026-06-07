@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { X } from "lucide-vue-next"
@@ -39,6 +39,9 @@ const total = ref(0)
 const loading = ref(false)
 const loadingMore = ref(false)
 const loadError = ref("")
+const scrollRoot = ref<HTMLElement | null>(null)
+const loadMoreSentinel = ref<HTMLElement | null>(null)
+let loadMoreObserver: IntersectionObserver | null = null
 
 const listBase = computed(() => ({
   q: getActorsSearchQuery(route.query).trim() || undefined,
@@ -61,6 +64,8 @@ async function fetchFirstPage() {
     total.value = 0
   } finally {
     loading.value = false
+    await nextTick()
+    maybeAutoLoadMore()
   }
 }
 
@@ -90,6 +95,8 @@ async function loadMore() {
     loadError.value = e instanceof Error ? e.message : t("actors.loadError")
   } finally {
     loadingMore.value = false
+    await nextTick()
+    maybeAutoLoadMore()
   }
 }
 
@@ -101,6 +108,61 @@ function onTagsUpdated(row: ActorListItemDTO) {
 }
 
 const hasMore = computed(() => actors.value.length < total.value)
+
+function isLoadMoreSentinelNearViewport() {
+  const target = loadMoreSentinel.value
+  if (!target) {
+    return false
+  }
+  const margin = 480
+  const targetRect = target.getBoundingClientRect()
+  const root = scrollRoot.value
+  if (!root) {
+    return targetRect.top <= window.innerHeight + margin && targetRect.bottom >= -margin
+  }
+  const rootRect = root.getBoundingClientRect()
+  return targetRect.top <= rootRect.bottom + margin && targetRect.bottom >= rootRect.top - margin
+}
+
+function maybeAutoLoadMore() {
+  if (!hasMore.value || loading.value || loadingMore.value || loadError.value) {
+    return
+  }
+  if (isLoadMoreSentinelNearViewport()) {
+    void loadMore()
+  }
+}
+
+function observeLoadMoreSentinel() {
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
+
+  const target = loadMoreSentinel.value
+  if (!target || typeof IntersectionObserver === "undefined") {
+    return
+  }
+
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        maybeAutoLoadMore()
+      }
+    },
+    {
+      root: scrollRoot.value,
+      rootMargin: "480px 0px",
+      threshold: 0,
+    },
+  )
+  loadMoreObserver.observe(target)
+}
+
+watch([scrollRoot, loadMoreSentinel], observeLoadMoreSentinel, { flush: "post" })
+
+onBeforeUnmount(() => {
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
+})
 
 const activeActorTagTrimmed = computed(() => getActorsTagQuery(route.query).trim())
 
@@ -174,7 +236,12 @@ function onFilterByActorTag(payload: { tag: string }) {
       </p>
     </div>
 
-    <div v-else class="min-h-0 flex-1 overflow-y-auto">
+    <div
+      ref="scrollRoot"
+      v-else
+      class="min-h-0 flex-1 overflow-y-auto"
+      @scroll.passive="maybeAutoLoadMore"
+    >
       <div
         v-if="loading && actors.length === 0"
         class="flex items-center justify-center py-20 text-sm text-muted-foreground"
@@ -194,16 +261,13 @@ function onFilterByActorTag(payload: { tag: string }) {
             @filter-by-actor-tag="onFilterByActorTag"
           />
         </div>
-        <div v-if="hasMore" class="flex justify-center py-4">
-          <Button
-            type="button"
-            variant="outline"
-            class="rounded-xl"
-            :disabled="loadingMore"
-            @click="loadMore"
-          >
-            {{ loadingMore ? t("actors.loading") : t("actors.loadMore") }}
-          </Button>
+        <div
+          v-if="hasMore"
+          ref="loadMoreSentinel"
+          class="flex min-h-16 items-center justify-center py-4 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          <span v-if="loadingMore">{{ t("actors.loading") }}</span>
         </div>
       </template>
     </div>

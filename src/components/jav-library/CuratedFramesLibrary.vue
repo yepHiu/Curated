@@ -350,8 +350,11 @@ const listWithUrls = ref<RowWithUrl[]>([])
 const totalRows = ref(0)
 const rowsLoading = ref(false)
 const rowsLoadingMore = ref(false)
+const rowsScrollRoot = ref<HTMLElement | null>(null)
+const rowsLoadMoreSentinel = ref<HTMLElement | null>(null)
 const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
 const tagFiltersExpanded = ref(false)
+let rowsLoadMoreObserver: IntersectionObserver | null = null
 
 function revokeAllUrls() {
   for (const x of listWithUrls.value) {
@@ -383,11 +386,13 @@ async function reloadFromDb() {
     totalRows.value = page.total
   } finally {
     rowsLoading.value = false
+    await nextTick()
+    maybeAutoLoadMoreRows()
   }
 }
 
 async function loadMoreRows() {
-  if (rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
+  if (rowsLoading.value || rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
     return
   }
   rowsLoadingMore.value = true
@@ -402,6 +407,8 @@ async function loadMoreRows() {
     totalRows.value = page.total
   } finally {
     rowsLoadingMore.value = false
+    await nextTick()
+    maybeAutoLoadMoreRows()
   }
 }
 
@@ -439,6 +446,8 @@ onUnmounted(() => {
     dialogCarouselUserSelectingResetTimer = null
   }
   detachDialogCarouselListeners?.()
+  rowsLoadMoreObserver?.disconnect()
+  rowsLoadMoreObserver = null
   revokeAllUrls()
 })
 
@@ -459,6 +468,57 @@ const isFilteredEmpty = computed(
   () => !rowsLoading.value && listWithUrls.value.length === 0 && !isLibraryEmpty.value,
 )
 const hasMoreRows = computed(() => rawRows.value.length < totalRows.value)
+
+function isRowsLoadMoreSentinelNearViewport() {
+  const target = rowsLoadMoreSentinel.value
+  if (!target) {
+    return false
+  }
+  const margin = 640
+  const targetRect = target.getBoundingClientRect()
+  const root = rowsScrollRoot.value
+  if (!root) {
+    return targetRect.top <= window.innerHeight + margin && targetRect.bottom >= -margin
+  }
+  const rootRect = root.getBoundingClientRect()
+  return targetRect.top <= rootRect.bottom + margin && targetRect.bottom >= rootRect.top - margin
+}
+
+function maybeAutoLoadMoreRows() {
+  if (!hasMoreRows.value || rowsLoading.value || rowsLoadingMore.value) {
+    return
+  }
+  if (isRowsLoadMoreSentinelNearViewport()) {
+    void loadMoreRows()
+  }
+}
+
+function observeRowsLoadMoreSentinel() {
+  rowsLoadMoreObserver?.disconnect()
+  rowsLoadMoreObserver = null
+
+  const target = rowsLoadMoreSentinel.value
+  if (!target || typeof IntersectionObserver === "undefined") {
+    return
+  }
+
+  rowsLoadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        maybeAutoLoadMoreRows()
+      }
+    },
+    {
+      root: rowsScrollRoot.value,
+      rootMargin: "640px 0px",
+      threshold: 0,
+    },
+  )
+  rowsLoadMoreObserver.observe(target)
+}
+
+watch([rowsScrollRoot, rowsLoadMoreSentinel], observeRowsLoadMoreSentinel, { flush: "post" })
+
 const visibleCuratedTagFacets = computed(() => {
   const facets = visibleCuratedFrameTagFacets(
     curatedTagFacets.value,
@@ -1308,7 +1368,9 @@ defineExpose({
       />
 
       <div
+        ref="rowsScrollRoot"
         class="min-h-0 flex-1 overflow-y-auto pb-2 pr-3 [scrollbar-gutter:stable] sm:pr-4"
+        @scroll.passive="maybeAutoLoadMoreRows"
       >
       <CuratedFrameEmptyState
         v-if="isFilteredEmpty"
@@ -1357,16 +1419,13 @@ defineExpose({
           @open="openFrameCardDialog"
         />
       </TabsContent>
-      <div v-if="hasMoreRows" class="flex justify-center py-5">
-        <Button
-          type="button"
-          variant="outline"
-          class="rounded-2xl"
-          :disabled="rowsLoadingMore"
-          @click="loadMoreRows"
-        >
-          {{ rowsLoadingMore ? t("common.loading") : t("curated.loadMore") }}
-        </Button>
+      <div
+        v-if="hasMoreRows"
+        ref="rowsLoadMoreSentinel"
+        class="flex min-h-20 items-center justify-center py-5 text-sm text-muted-foreground"
+        aria-live="polite"
+      >
+        <span v-if="rowsLoadingMore">{{ t("common.loading") }}</span>
       </div>
       </div>
     </Tabs>
