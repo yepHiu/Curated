@@ -1,934 +1,2378 @@
-# Curated API Reference
+# Curated 后端 API 使用指南
 
-## Overview
+本文档是 Curated 仓库的公开 HTTP API 指南，用于当前 Web 前端、后续 Android App、局域网客户端以及其他衍生项目对接同一个 Go 后端。
 
-Curated exposes a Go HTTP API for PIN App Lock/authentication, library browsing, playback workflows, actor metadata, settings, connected-client visibility, curated-frame management, storage presence checks, scans, and task tracking.
+本文只描述当前 Go HTTP 后端已经实现的接口，不引入新 API 行为。
 
-This document is the single public API reference for the repository.
+实现入口：
 
-Implementation references:
+- 路由注册：`backend/internal/server/server.go`
+- 分散 handler：`backend/internal/server/*.go`
+- 后端 DTO / 错误码：`backend/internal/contracts/contracts.go`
+- 当前前端调用封装：`src/api/endpoints.ts`
+- 当前前端类型：`src/api/types.ts`
 
-- backend routes: `backend/internal/server/server.go`
-- backend DTOs and error contracts: `backend/internal/contracts/contracts.go`
-- frontend API types: `src/api/types.ts`
+最后核对日期：2026-06-07。
 
-## Base URLs
+## 1. 快速接入
 
-Common local development URLs:
+### 1.1 Base URL
 
-- frontend dev server: `http://localhost:5173`
-- backend dev API base: `http://127.0.0.1:8080/api`
-- backend release API base: `http://127.0.0.1:8081/api`
+所有 HTTP API 都挂在 `/api` 前缀下。
 
-The Vite development server proxies `/api` to `http://127.0.0.1:8080`.
+常见地址：
 
-## Conventions
+| 场景 | API Base URL |
+| --- | --- |
+| Go 后端开发模式 | `http://127.0.0.1:8080/api` |
+| Vite 前端代理 | 前端同源 `/api`，由 Vite 转发到 `127.0.0.1:8080` |
+| 打包后的本机后端 | 通常为 `http://127.0.0.1:8081/api`，以发布配置为准 |
+| Android / 局域网客户端 | `http://<运行后端的电脑IP>:<端口>/api`，例如 `http://192.168.1.23:8080/api` |
 
-### Transport
+衍生客户端建议把 Base URL 做成可配置项，并在保存前统一去掉末尾 `/`。
 
-- API routes use the `/api` prefix.
-- Responses are JSON unless the endpoint explicitly serves media or stream content.
+### 1.2 最小连通性检查
+
+```bash
+curl http://127.0.0.1:8080/api/health
+```
+
+典型返回：
+
+```json
+{
+  "name": "curated-dev",
+  "version": "git.abcdef0",
+  "channel": "dev",
+  "installerVersion": "0.0.0",
+  "transport": "http",
+  "databasePath": "C:\\Users\\...\\curated.db"
+}
+```
+
+### 1.3 Android / 非浏览器客户端建议
+
+Android App 使用 OkHttp、Retrofit、Ktor Client 或其他 HTTP 客户端时，需要注意：
+
+- Base URL 指向服务端电脑 IP：`http://<server-ip>:8080/api`。
+- 开发期如果使用明文 HTTP，需要在 Android 网络安全配置中允许对应 IP 的 cleartext traffic。
+- PIN 解锁依赖 `Set-Cookie: curated_auth=...; HttpOnly; SameSite=Lax`。非浏览器客户端不需要读取 cookie 内容，但必须用 CookieJar 保存并自动回传 `Cookie`。
+- DTO 中的媒体 URL 可能是相对路径，例如 `/api/library/movies/{id}/stream`。客户端必须用后端 origin 解析成绝对 URL：`http://<server-ip>:8080/api/...`。
+- 路径参数必须 URL encode，尤其是演员名、影片 ID、精选帧 ID、HLS 文件名。
+- 大文件上传、视频播放、图片资源、导出下载不要按 JSON 解析。
+
+## 2. 通用协议约定
+
+### 2.1 成功响应不是统一 envelope
+
+HTTP API 成功时直接返回 DTO 本体，不包 `{ "ok": true, "data": ... }`。
+
+示例：
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+空成功响应使用 `204 No Content`，例如删除、恢复、记录播放、更新播放进度等。
+
+### 2.2 错误响应
+
+失败响应统一返回 `AppError` JSON：
+
+```json
+{
+  "code": "COMMON_BAD_REQUEST",
+  "message": "invalid json body",
+  "retryable": false,
+  "details": {
+    "field": "example"
+  }
+}
+```
+
+字段含义：
+
+| 字段 | 含义 |
+| --- | --- |
+| `code` | 稳定机器可读错误码 |
+| `message` | 面向调用方的简短说明 |
+| `retryable` | 后端按状态码推导；`5xx` 通常为 `true` |
+| `details` | 可选结构化调试信息 |
+
+常见 HTTP 状态：
+
+| 状态 | 场景 |
+| --- | --- |
+| `200 OK` | 普通查询 / 更新后返回 DTO |
+| `201 Created` | 创建上传会话、添加库路径、创建播放会话 |
+| `202 Accepted` | 扫描、导入、刮削等异步任务已接受 |
+| `204 No Content` | 操作成功但无响应体 |
+| `400 Bad Request` | 参数、JSON、文件、业务前置条件不合法 |
+| `401 Unauthorized` | PIN 错误 |
+| `404 Not Found` | 资源不存在 |
+| `409 Conflict` | 状态冲突，例如扫描进行中、目标文件已存在、回收站状态冲突 |
+| `423 Locked` | PIN App Lock 已启用且当前请求没有有效解锁会话 |
+| `500 Internal Server Error` | 后端内部错误或运行时能力未配置 |
+
+核心错误码：
+
+| 错误码 | 常见含义 |
+| --- | --- |
+| `COMMON_BAD_REQUEST` | 请求参数、JSON、文件或字段值不合法 |
+| `COMMON_NOT_FOUND` | 资源不存在 |
+| `COMMON_INTERNAL` | 后端内部错误 |
+| `COMMON_CONFLICT` | 当前状态不允许该操作 |
+| `AUTH_LOCKED` | 应用已锁定，需要先解锁 |
+| `AUTH_INVALID_PIN` | PIN 校验失败 |
+| `IMPORT_TARGET_NOT_CONFIGURED` | 未配置默认导入库路径 |
+| `IMPORT_TARGET_UNAVAILABLE` | 默认导入库路径不可用 |
+| `IMPORT_CONFLICT` | 导入目标文件已存在 |
+| `IMPORT_NOT_ENOUGH_SPACE` | 磁盘空间不足 |
+| `IMPORT_COPY_FAILED` | 导入复制失败 |
+| `IMPORT_SCAN_FAILED` | 文件已导入但后续扫描启动失败 |
+| `APP_UPDATE_DOWNLOAD_FAILED` | 更新安装包下载失败 |
+| `APP_UPDATE_INSTALL_FAILED` | 更新安装启动失败 |
+| `CURATED_EXPORT_ACTOR_MISMATCH` | 精选帧导出时 `actorName` 不属于某一帧 |
+| `PROVIDER_NOT_FOUND` | 元数据 provider 名称不存在 |
+| `PROVIDER_PING_FAILED` | provider 连通性测试失败 |
+
+### 2.3 认证与 Cookie
+
+Curated 的 PIN App Lock 默认可关闭。开启后，除公开端点外，所有 `/api/*` 都需要有效 `curated_auth` cookie。
+
+公开端点：
+
+| Method | Path |
+| --- | --- |
+| `GET` | `/api/health` |
+| `GET` | `/api/auth/status` |
+| `POST` | `/api/auth/setup-pin` |
+| `POST` | `/api/auth/unlock` |
+| `POST` | `/api/auth/lock` |
+| `OPTIONS` | 任意路径，用于 CORS preflight |
+
+Cookie：
+
+- 名称：`curated_auth`
+- `HttpOnly`
+- `Path=/`
+- `SameSite=Lax`
+- 普通会话使用浏览器 session cookie，服务端保存 idle deadline。
+- `trustedForever=true` 会设置约 10 年 `Max-Age` 和 `Expires`，直到当前设备显式 lock 或未来会话管理能力撤销。
+
+客户端处理建议：
+
+- Web：`fetch` 必须带 `credentials: "include"`。
+- Android：OkHttp 必须配置 CookieJar；Retrofit 只负责接口声明，cookie 仍由底层 client 管理。
+- 收到 `423 AUTH_LOCKED` 时跳转到解锁页或弹出解锁流程，成功后重试原请求。
+
+### 2.4 CORS 与客户端识别 Header
+
+后端 CORS 行为：
+
+- 有 `Origin` 时，`Access-Control-Allow-Origin` 回显该 Origin。
+- `Access-Control-Allow-Credentials: true`
+- 无 `Origin` 时允许 `*`，主要用于非浏览器客户端或工具。
+- 允许方法：`GET, POST, PUT, PATCH, DELETE, OPTIONS`
+
+允许的请求头：
+
+```text
+Content-Type
+Authorization
+X-Curated-Offset
+X-Curated-Chunk-Size
+X-Curated-Chunk-SHA256
+X-Curated-Client
+X-Curated-Client-Version
+X-Curated-OS
+X-Curated-OS-Version
+Sec-CH-UA-Platform
+Sec-CH-UA-Platform-Version
+```
+
+衍生客户端可发送：
+
+```text
+X-Curated-Client: android
+X-Curated-Client-Version: 0.1.0
+X-Curated-OS: Android
+X-Curated-OS-Version: 15
+```
+
+这些字段主要用于 `/api/connected-clients` 识别客户端类型，不参与鉴权。
+
+### 2.5 URL、时间、分页
+
+路径参数：
+
+- `movieId`、`sessionId`、`uploadId`、`fileId`、`id`、`name`、`file` 都必须 URL encode。
+- 演员名如果包含空格、斜杠、日文、中文，必须 encode。
+
+时间：
+
+- 后端大多数时间字段为 RFC3339 或 RFC3339Nano 字符串。
+- `dayKey` 使用本地日历日 `YYYY-MM-DD`。
+- 首页推荐使用 UTC 日期 `dateUtc`。
+
+分页：
+
+| 字段 | 含义 |
+| --- | --- |
+| `limit` | 页大小；不同资源默认值不同 |
+| `offset` | 从 0 开始的偏移 |
+| `total` | 当前过滤条件下总数 |
+
+列表接口默认：
+
+| 接口 | 默认 `limit` | 上限 |
+| --- | --- | --- |
+| `GET /library/movies` | 50 | 当前 HTTP handler 不强制上限 |
+| `GET /library/actors` | 50 | 当前 handler 不强制上限 |
+| `GET /curated-frames` | 50 | 200 |
+| `GET /tasks/recent` | 30 | 当前 handler 不强制上限 |
+| `GET /playback/sessions/recent` | 20 | 当前 handler 不强制上限 |
+| `GET /playback/watch-time/daily` | 91 天 | 91 天 |
+
+### 2.6 媒体、Blob 与 Range
+
+这些端点不是 JSON：
+
+| 端点 | 内容类型 |
+| --- | --- |
+| `GET /api/library/movies/{movieId}/stream` | 视频文件，`http.ServeContent`，支持 Range / 206 |
+| `GET /api/library/movies/{movieId}/asset/{kind}` | 本地封面 / 缩略图 |
+| `GET /api/library/movies/{movieId}/asset/preview/{index}` | 预览图，可能从本地缓存或远端代理返回 |
+| `GET /api/library/actors/{name}/asset/avatar` | 演员头像 |
+| `GET /api/playback/sessions/{sessionId}/hls/{file}` | HLS playlist / segment |
+| `GET /api/curated-frames/{id}/image` | 精选帧原图 |
+| `GET /api/curated-frames/{id}/thumbnail` | 精选帧缩略图 |
+| `POST /api/curated-frames/export` | 单图 `image/jpeg` / `image/png` / `image/webp`，多图 `application/zip` |
+
+播放客户端建议：
+
+- 优先调用 `/library/movies/{movieId}/playback` 获取播放描述，不直接拼 stream URL。
+- `mode=direct` 时使用 `url` 播放；若为相对路径，按后端 origin 解析。
+- `mode=hls` 时使用 `url` 指向的 `.m3u8`，并让播放器继续请求同一 session 下的 segment。
+- Android 推荐使用 Media3 / ExoPlayer；直放 URL 支持 Range，HLS URL 需要按标准 HLS 播放。
+
+### 2.7 异步任务
+
+扫描、导入、元数据刮削、部分更新下载流程使用 `TaskDTO`。
+
+通用流程：
+
+1. 调用触发接口，收到 `202 Accepted` 和 `TaskDTO`。
+2. 用 `taskId` 轮询 `GET /api/tasks/{taskId}`。
+3. 如果只关心最近完成任务，调用 `GET /api/tasks/recent?limit=30`。
+
+任务状态：
+
+| 状态 | 含义 |
+| --- | --- |
+| `pending` | 已创建但未开始 |
+| `running` | 运行中 |
+| `completed` | 成功完成 |
+| `partial_failed` | 部分失败，例如导入成功但扫描失败 |
+| `failed` | 失败 |
+| `cancelled` | 已取消 |
+
+`TaskDTO.metadata` 是面向场景的扩展字段，导入任务会包含拷贝进度、目标路径、失败文件等。
+
+## 3. 推荐客户端工作流
+
+### 3.1 启动连接与认证
+
+1. `GET /health` 判断服务端是否可达，并读取版本。
+2. `GET /auth/status` 判断是否需要 PIN。
+3. 如果 `pinEnabled=true` 且 `unlocked=false`，调用 `POST /auth/unlock`。
+4. 后续所有请求都自动带 cookie。
+5. 任意 protected 请求返回 `423 AUTH_LOCKED` 时，重新执行解锁流程。
+
+示例：
+
+```bash
+curl -i http://127.0.0.1:8080/api/auth/status
 
-### Async Tasks
+curl -i \
+  -H "Content-Type: application/json" \
+  -d "{\"pin\":\"1234\",\"trustedForever\":true}" \
+  http://127.0.0.1:8080/api/auth/unlock
+```
 
-Long-running operations such as scans and metadata scraping use task-based async execution.
+### 3.2 浏览影片
 
-Typical pattern:
+1. `GET /library/movies?limit=50&offset=0` 获取影片页。
+2. 需要搜索时加 `q`，需要筛选演员或片商时加 `actor` / `studio`。
+3. 详情页调用 `GET /library/movies/{movieId}`。
+4. 封面、缩略图、预览图直接使用 DTO 中的 URL；相对 URL 解析为后端绝对 URL。
+5. 收藏、评分、标签、展示字段覆盖使用 `PATCH /library/movies/{movieId}`。
 
-1. create or trigger a task-oriented endpoint
-2. receive a task identifier
-3. poll the task status endpoint
+示例：
 
-Related endpoints:
+```bash
+curl "http://127.0.0.1:8080/api/library/movies?q=ABC&limit=24&offset=0"
+```
 
-- `GET /api/tasks/recent`
-- `GET /api/tasks/{taskId}`
+### 3.3 播放影片
 
-### Pagination
+1. 调用 `GET /library/movies/{movieId}/playback`。
+2. 如果返回 `mode=direct`，将 `url` 传给播放器。
+3. 如果返回 `mode=hls`，将 `url` 传给 HLS 播放器。
+4. 播放中周期性调用 `PUT /playback/progress/{movieId}`，建议 5 到 15 秒一次或在 pause / background 时保存。
+5. 为统计热力图调用 `POST /playback/watch-time/daily`，单次 `watchedSec` 必须 `0 < watchedSec <= 300`。
+6. 播放到达业务意义上的“已看”阈值时调用 `POST /library/played-movies/{movieId}`。
 
-List-style endpoints commonly support pagination fields such as:
+示例：
 
-- `limit`
-- `offset`
+```bash
+curl http://127.0.0.1:8080/api/library/movies/MOVIE_ID/playback
+```
 
-Some responses also include total-count metadata.
+### 3.4 导入影片
 
-### Runtime Configuration
+普通导入适合较小文件：
 
-Library-level settings are persisted through `config/library-config.cfg`, while broader runtime config can come from backend JSON config files and environment setup.
+1. `GET /settings` 获取 `defaultImportLibraryPathId`。
+2. 如果未配置，通过 `PATCH /settings` 设置默认导入库路径。
+3. `POST /import/movies` 上传 `multipart/form-data`。
+4. 收到 `TaskDTO` 后轮询任务。
 
-## Scrape And Provider Notes
+大文件导入推荐分片：
 
-- actor avatars can be cached locally and served through the backend instead of relying on direct browser requests to remote image hosts
-- movie preview images prefer local cache and can fall back to backend fetch behavior when only source-side URLs are available
-- settings support the higher-level `metadataMovieStrategy` in addition to legacy scrape-mode fields
-- provider health responses and task payloads can include machine-readable failure categories for troubleshooting
+1. `POST /import/movies/uploads` 创建上传会话。
+2. 按返回 `chunkSize` 切分文件。
+3. 每片调用 `PUT /import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}`。
+4. 全部完成后 `POST /import/movies/uploads/{uploadId}/commit`。
+5. 用户取消时 `DELETE /import/movies/uploads/{uploadId}`。
 
-## Health
+### 3.5 扫描与元数据刷新
 
-### `GET /api/health`
+库扫描：
 
-Purpose:
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d "{\"paths\":[\"D:\\\\Library\"]}" \
+  http://127.0.0.1:8080/api/scans
+```
 
-- returns backend health and release identity information
+单片元数据刷新：
 
-Important notes:
+```bash
+curl -X POST http://127.0.0.1:8080/api/library/movies/MOVIE_ID/scrape
+```
 
-- development mode reports the `curated-dev` backend identity
-- release mode reports `curated`
-- `version` is the backend build identifier / build stamp shown in Settings -> About
-- `installerVersion` is an optional installer/package version, embedded into release backend binaries at packaging time
-- development runtimes expose `installerVersion: "0.0.0"` as a stable fallback when no packaged version was injected
-- release builds should continue exposing stable version and channel information
+按库路径批量刷新：
 
-### `GET /api/dev/performance`
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d "{\"paths\":[\"D:\\\\Library\"]}" \
+  http://127.0.0.1:8080/api/library/metadata-scrape
+```
 
-Purpose:
+### 3.6 精选帧
 
-- returns development-only CPU summary information used by the frontend performance monitor bar
+当前精选帧流程：
 
-Important notes:
+1. 播放器截帧后调用 `POST /curated-frames` 保存图片和元数据。
+2. 列表页调用 `GET /curated-frames`。
+3. 缩略图调用 `GET /curated-frames/{id}/thumbnail`。
+4. 原图调用 `GET /curated-frames/{id}/image`。
+5. 标签编辑调用 `PATCH /curated-frames/{id}/tags`。
+6. 导出调用 `POST /curated-frames/export`，按响应 `Content-Type` 保存文件。
 
-- intended for development diagnostics
-- not a core product-facing endpoint
+## 4. Endpoint Reference
 
-## Authentication And PIN App Lock
+除 2.3 中列出的公开端点外，本章所有端点都受 PIN App Lock 保护。
 
-PIN App Lock is optional and is disabled by default. When enabled, protected `/api/*`
-endpoints require a valid unlock session. Locked requests return HTTP `423` with
-error code `AUTH_LOCKED`. `/api/health` and the auth endpoints below remain public
-so the frontend can render the lock flow.
+### 4.1 Health / Runtime
 
-PINs are stored only as salted Argon2id hashes in SQLite. Browser unlock state is a
-server-side `auth_sessions` row carried by the HTTP-only `curated_auth` cookie.
-Regular sessions use an idle timeout: activity through the UI or protected API calls
-extends `sessionExpiresAt`; inactivity past that deadline locks the session. The
-`trustedForever` option creates a session without `expiresAt`; that device stays trusted
-until the current session is explicitly locked or a future session-management flow revokes it.
+#### `GET /api/health`
 
-### `GET /api/auth/status`
+用途：检查后端进程、版本、通道、数据库路径。
 
-Purpose:
+认证：公开。
 
-- return whether PIN lock is enabled and whether the current request has a valid session
-- provide the current idle timeout, LAN PIN policy, restart-lock policy, and trusted-device status
+成功：`200 HealthDTO`
 
-Response shape:
+字段：
 
-- `pinEnabled`: whether PIN lock is active
-- `unlocked`: whether the current cookie/session is valid, or true when PIN is disabled
-- `setupRequired`: true until a PIN has been configured
-- `pinLength`: configured PIN digit count when known; the lock screen uses this to render the correct number of PIN cells without storing or exposing the PIN itself
-- `trustedForever`: true when the current session was unlocked with permanent device trust
-- `sessionExpiresAt`: current idle deadline for regular sessions; empty for trusted-forever sessions
-- `sessionTtlMinutes`: idle-lock delay in minutes
-- `lanRequiresPin`, `lockOnRestart`
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `name` | string | `curated-dev` 或 `curated` |
+| `version` | string | 构建戳、git 标识或 `unknown` |
+| `channel` | string | `dev` 或 `release` |
+| `installerVersion` | string | 安装包版本；开发态常为 `0.0.0` |
+| `transport` | string | 当前为 `http` |
+| `databasePath` | string | SQLite 数据库路径 |
 
-### `POST /api/auth/setup-pin`
+#### `GET /api/dev/performance`
 
-Purpose:
+用途：开发态性能监控摘要。
 
-- set the first PIN and create an unlock session for the current browser
-- update non-secret PIN lock settings at the same time
+成功：`200 DevPerformanceSummaryDTO`
 
-Request body:
+```json
+{
+  "supported": true,
+  "sampledAt": "2026-06-07T12:00:00Z",
+  "systemCpuPercent": 12.5,
+  "backendCpuPercent": 1.2
+}
+```
 
-- `pin`: 4-8 numeric digits
-- `confirmPin`: must match `pin`
-- optional `sessionTtlMinutes`, `lanRequiresPin`, `lockOnRestart`
-- optional `trustedForever`: trust the current browser indefinitely after setup
+如果运行时没有配置 provider，会返回 `{ "supported": false }`。
 
-Important notes:
+### 4.2 Auth / PIN App Lock
 
-- when a PIN already exists, this endpoint requires the current request to be unlocked
-- the backend persists only the PIN length as non-secret metadata, alongside the salted Argon2id hash
-- the response sets an HTTP-only `curated_auth` cookie on success
+#### `GET /api/auth/status`
 
-### `POST /api/auth/unlock`
+用途：读取 PIN App Lock 状态和当前请求是否已解锁。
 
-Purpose:
+认证：公开。
 
-- verify the submitted PIN and create a new unlock session
+成功：`200 AuthStatusDTO`
 
-Request body:
+```json
+{
+  "pinEnabled": true,
+  "unlocked": false,
+  "setupRequired": false,
+  "pinLength": 4,
+  "trustedForever": false,
+  "sessionTtlMinutes": 60,
+  "lanRequiresPin": true,
+  "lockOnRestart": true
+}
+```
 
-- `pin`: submitted PIN
-- optional `trustedForever`: when true, create a non-expiring trusted-device session
+#### `POST /api/auth/setup-pin`
 
-Important notes:
+用途：设置初始 PIN，或在已解锁状态下重设 PIN，并创建当前客户端会话。
 
-- incorrect PIN returns HTTP `401` with error code `AUTH_INVALID_PIN`
-- success sets an HTTP-only `curated_auth` cookie; regular sessions use a browser-session cookie while the server owns the idle deadline
+认证：公开；如果已经启用 PIN，则请求本身必须已解锁。
 
-### `POST /api/auth/change-pin`
+Body：
 
-Purpose:
+```json
+{
+  "pin": "1234",
+  "confirmPin": "1234",
+  "sessionTtlMinutes": 60,
+  "lanRequiresPin": true,
+  "lockOnRestart": true,
+  "trustedForever": false
+}
+```
 
-- replace the configured PIN after the current request is already unlocked
+约束：
 
-Request body:
+- `pin` 必须是 4 到 8 位数字。
+- `confirmPin` 必须一致。
+- 成功时设置 `curated_auth` cookie。
 
-- `currentPin`: existing PIN
-- `newPin`: new 4-8 digit numeric PIN
-- `confirmPin`: must match `newPin`
+成功：`200 AuthStatusDTO`
 
-Important notes:
+常见错误：
 
-- the endpoint is protected by the app-lock middleware and also verifies `currentPin`
-- incorrect current PIN returns HTTP `401` with error code `AUTH_INVALID_PIN`
-- plaintext PIN values are never persisted; the response includes the updated `pinLength`
+- `400 COMMON_BAD_REQUEST`：PIN 格式不合法或确认不一致。
+- `423 AUTH_LOCKED`：已经设置 PIN 且当前请求未解锁。
 
-### `POST /api/auth/lock`
+#### `POST /api/auth/unlock`
 
-Purpose:
+用途：校验 PIN 并创建解锁会话。
 
-- revoke the current session and clear the `curated_auth` cookie
+认证：公开。
 
-Important notes:
+Body：
 
-- this also revokes a trusted-forever session for the current device
+```json
+{
+  "pin": "1234",
+  "trustedForever": true
+}
+```
 
-### `PATCH /api/auth/settings`
+成功：`200 AuthStatusDTO`，并设置 `curated_auth` cookie。
 
-Purpose:
+错误：
 
-- update non-secret PIN lock settings after the current request is already unlocked
+- `401 AUTH_INVALID_PIN`
 
-Request body:
+#### `POST /api/auth/change-pin`
 
-- optional `pinEnabled`
-- optional `sessionTtlMinutes`
-- optional `lanRequiresPin`
-- optional `lockOnRestart`
+用途：已解锁状态下修改 PIN。
 
-## Connected Clients
+Body：
 
-### `GET /api/connected-clients`
+```json
+{
+  "currentPin": "1234",
+  "newPin": "5678",
+  "confirmPin": "5678"
+}
+```
 
-Purpose:
+成功：`200 AuthStatusDTO`
 
-- list clients that have accessed the backend during the current backend process lifetime
-- power the Settings -> Overview connected-clients card below the watch-time statistics
+错误：
 
-Response shape:
+- `401 AUTH_INVALID_PIN`：当前 PIN 错误。
+- `400 COMMON_BAD_REQUEST`：新 PIN 格式不合法或确认不一致。
 
-- `clients`: array of tracked client entries
-- `total`: total tracked clients in the current process
-- `localCount`: clients classified as local access
-- `remoteCount`: clients classified as remote access
-- `sampledAt`: server timestamp for the response
+#### `POST /api/auth/lock`
 
-Client entry fields:
+用途：撤销当前会话并清除 cookie。
 
-- `key`: stable in-memory key for the current process, normally derived from IP + User-Agent; Curated Desktop includes its desktop marker so it stays distinct from a normal Chrome tab with the same Chromium User-Agent
-- `ip`, optional `port`, optional `hostname`
-- `browser`, optional `browserVersion`, `os`, optional `osVersion`; Windows `osVersion` is shown only when the backend can determine a user-facing version such as `10` or `11`
-- `deviceType`: `desktop`, `laptop`, `mobile`, `tablet`, `tool`, or `unknown`
-- `accessKind`: `local` or `remote`
-- `isLocalMachine`: true for loopback or known host-interface IPs
-- `firstSeen`, `lastSeen`, `requestCount`
+认证：公开。
 
-Important notes:
+成功：`200 AuthStatusDTO`
 
-- tracking is in-memory only; restarting the backend clears the list
-- clients are deduplicated by remote IP + User-Agent, not by TCP port
-- Curated Desktop/Electron adds `X-Curated-Client: desktop-electron`, `X-Curated-Client-Version`, `X-Curated-OS`, and `X-Curated-OS-Version`; the backend reports those entries as `browser: "Curated Desktop"` instead of Chrome and can show Windows 11 even though Chromium's legacy User-Agent still contains `Windows NT 10.0`
-- regular browsers may provide `Sec-CH-UA-Platform` and `Sec-CH-UA-Platform-Version`; when present, the backend uses those Client Hints to map Windows platform version 13+ to `Windows 11`
-- the backend keeps at most 50 most-recent clients
-- MAC addresses are not collected or exposed
+说明：会把当前请求携带的 `curated_auth` 会话从服务端撤销，包括 trusted-forever 会话。
 
-## App Updates
+#### `PATCH /api/auth/settings`
 
-### `GET /api/app-update/status`
+用途：更新非秘密安全设置。
 
-Purpose:
+Body：
 
-- return the current app-update comparison result used by Settings -> About and the sidebar brand badge
+```json
+{
+  "pinEnabled": true,
+  "sessionTtlMinutes": 60,
+  "lanRequiresPin": true,
+  "lockOnRestart": true
+}
+```
 
-Important notes:
+所有字段可选；只发送要修改的字段。
 
-- the backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`
-- successful release checks expose `installerDownloadUrl` when the latest release includes a Windows `.exe` installer asset
-- when the release asset includes a SHA256 digest, the response also exposes `installerSha256`
-- downloaded installer state is reflected through `artifactStatus`, `downloadedVersion`, `downloadedFileName`, `downloadedBytes`, `totalBytes`, `downloadProgress`, `signatureStatus`, `installReady`, `lastInstallAttemptAt`, and `lastInstallError`
-- development runtimes use `0.0.0` as the local installed version so the full update-check path remains testable before packaging
-- successful checks are cached in SQLite so routine reads do not hit GitHub on every app start
-- response fields include `supported`, `status`, `installedVersion`, optional `latestVersion`, `hasUpdate`, `checkedAt`, `publishedAt`, `releaseName`, `releaseUrl`, `installerDownloadUrl`, `installerSha256`, `releaseNotesSnippet` (full GitHub release body text, newline-preserved, capped around 100k runes for cache size), artifact fields, and optional `errorMessage`
+成功：`200 AuthStatusDTO`
 
-### `POST /api/app-update/check`
+### 4.3 Connected Clients
 
-Purpose:
+#### `GET /api/connected-clients`
 
-- force a fresh app-update check against the latest GitHub Release
+用途：列出当前后端进程生命周期内访问过 API 的客户端。
 
-Important notes:
+成功：`200 ConnectedClientsDTO`
 
-- bypasses the cached status used by `GET /api/app-update/status`
-- returns the same DTO shape as the status endpoint
-- used by the manual "Check for updates" action in Settings -> About
+```json
+{
+  "clients": [
+    {
+      "key": "client-key",
+      "ip": "192.168.1.50",
+      "port": 53122,
+      "hostname": "phone.local",
+      "userAgent": "CuratedAndroid/0.1",
+      "browser": "Curated Android",
+      "os": "Android",
+      "osVersion": "15",
+      "deviceType": "mobile",
+      "accessKind": "remote",
+      "isLocalMachine": false,
+      "firstSeen": "2026-06-07T12:00:00.000000000Z",
+      "lastSeen": "2026-06-07T12:01:00.000000000Z",
+      "requestCount": 12
+    }
+  ],
+  "total": 1,
+  "localCount": 0,
+  "remoteCount": 1,
+  "sampledAt": "2026-06-07T12:01:00Z"
+}
+```
 
-### `POST /api/app-update/download`
+说明：
 
-Purpose:
+- 数据只保存在内存中，重启后端会清空。
+- 当前最多保留 50 个最近客户端。
+- 不采集 MAC 地址。
 
-- download the latest Windows installer into Curated's controlled update cache and verify it with SHA256
+### 4.4 App Update
 
-Important notes:
+这些接口用于桌面打包应用的更新检查。Android 或其他衍生客户端通常只需要忽略或用于展示服务端桌面版本状态。
 
-- requires the cached update state to be `update-available`
-- requires `installerDownloadUrl` and `installerSha256`
-- downloads to the backend cache under an `updates/<version>/` directory
-- returns the same DTO shape as the status endpoint with `artifactStatus=verified` and `installReady=true` after verification
-- unsigned installers can still be downloaded and SHA256 verified, but signature status remains `not_checked`
+#### `GET /api/app-update/status`
 
-### `POST /api/app-update/install`
+用途：读取缓存的更新状态。
 
-Purpose:
+成功：`200 AppUpdateStatusDTO`
 
-- launch the verified downloaded installer after explicit user action
+#### `POST /api/app-update/check`
 
-Request body:
+用途：强制向 GitHub Releases 检查最新版本。
 
-- `mode`: optional `interactive`, `silent`, or `verysilent`; default is `interactive`
+成功：`200 AppUpdateStatusDTO`
 
-Important notes:
+#### `POST /api/app-update/download`
 
-- requires `installReady=true`
-- `silent` and `verysilent` only pass Inno Setup quiet flags; Windows UAC can still appear when the install target requires administrator privileges
-- returns the same DTO shape with `artifactStatus=install-launched` after the installer process is started
+用途：下载并校验最新 Windows 安装包。
 
-### `DELETE /api/app-update/downloaded-installer`
+成功：`200 AppUpdateStatusDTO`
 
-Purpose:
+错误：
 
-- remove the cached downloaded installer and clear artifact metadata from the app-update status row
+- `409 APP_UPDATE_DOWNLOAD_FAILED`
 
-## Homepage
+#### `POST /api/app-update/install`
 
-### `GET /api/homepage/recommendations`
+用途：启动已下载并验证的安装包。
 
-Purpose:
+Body：
 
-- return the persisted homepage daily recommendation snapshot used by the homepage hero and today's recommendation rail
+```json
+{
+  "mode": "interactive"
+}
+```
 
-Important notes:
+`mode` 可选：`interactive`、`silent`、`verysilent`。
 
-- the backend uses the current UTC date as the snapshot key
-- the first request for a UTC day generates and persists the snapshot in SQLite; later requests reuse the same result only when `generationVersion` matches the current algorithm
-- the snapshot contains `heroMovieIds` and `recommendationMovieIds`, plus `dateUtc`, `generatedAt`, and `generationVersion`
-- recommendation memory is persisted separately per movie in `homepage_recommendation_states`, tracking `last_recommended_at`, `recommend_count`, and `skip_until`
-- when enough inventory is available, the backend avoids reusing the combined hero/recommendation slate from the last 14 UTC days, then falls back through `14 -> 10 -> 7 -> 5 -> 3 -> 1 -> 0` day exclusion windows only as needed
-- generation uses weighted sampling without replacement: hard-cooling movies are skipped, recently recommended movies recover weight over a 14-day cooling window, long-unseen movies gain weight, and repeatedly recommended movies receive a logarithmic count penalty
-- the slate builder also applies actor and studio diversity penalties while picking the hero and recommendation set, so the same actors or studios are less likely to dominate one day's slate
-- after a new daily slate is persisted, the selected movies' recommendation states are updated so later days have persistent memory beyond the daily snapshot itself
+成功：`200 AppUpdateStatusDTO`
 
-### `POST /api/homepage/recommendations/refresh`
+错误：
 
-Purpose:
+- `400 COMMON_BAD_REQUEST`：body 不合法。
+- `409 APP_UPDATE_INSTALL_FAILED`
 
-- force-regenerate and overwrite the persisted homepage daily recommendation snapshot for the current UTC day
+#### `DELETE /api/app-update/downloaded-installer`
 
-Important notes:
+用途：删除已下载安装包并清理状态。
 
-- intended primarily for development and verification workflows
-- returns the same DTO shape as `GET /api/homepage/recommendations`
-- uses the same UTC day key and persistence table, but bypasses reuse of the existing snapshot for that day
-- accepts an optional JSON body `{ "preserveHeroMovieIds": ["..."], "excludeRecommendationMovieIds": ["..."] }`; when provided, the backend keeps those hero IDs as the persisted `heroMovieIds` and avoids returning the caller's currently visible recommendation IDs while regenerating `recommendationMovieIds`
-- the homepage "Today's Recommendations" refresh sends both `preserveHeroMovieIds` and `excludeRecommendationMovieIds` so clicking it refreshes only the recommendation rail, avoids the current rail where inventory allows, and does not change the current hero carousel
-- the frontend exposes this through a development-only button in Settings -> About when running in dev mode with `VITE_USE_WEB_API=true`
+成功：`200 AppUpdateStatusDTO`
 
-## Movies
+`AppUpdateStatusDTO` 关键字段：
 
-### `GET /api/library/movies`
+| 字段 | 说明 |
+| --- | --- |
+| `supported` | 当前运行时是否支持更新 |
+| `status` | `unsupported`、`up-to-date`、`update-available`、`error` |
+| `installedVersion` / `latestVersion` | 本地和远端版本 |
+| `hasUpdate` | 是否存在更新 |
+| `installerDownloadUrl` / `installerSha256` | 安装包下载和校验信息 |
+| `artifactStatus` | `downloading`、`downloaded`、`verified`、`failed`、`installing`、`install-launched` |
+| `downloadProgress` | 下载进度百分比 |
+| `installReady` | 是否可安装 |
+| `releaseNotesSnippet` | GitHub Release 文本摘要 |
 
-Purpose:
+### 4.5 Homepage Recommendations
 
-- list movies in the library
+#### `GET /api/homepage/recommendations`
 
-Common filters:
+用途：获取 UTC 当日首页推荐快照。
 
-- `q`
-- `tag`
-- `actor`
-- pagination fields
+成功：`200 HomepageDailyRecommendationsDTO`
 
-### `GET /api/library/movies/{id}`
+```json
+{
+  "dateUtc": "2026-06-07",
+  "generatedAt": "2026-06-07T00:00:00Z",
+  "generationVersion": "v1",
+  "heroMovieIds": ["movie-a", "movie-b"],
+  "recommendationMovieIds": ["movie-c", "movie-d"]
+}
+```
 
-Purpose:
+说明：
 
-- fetch a single movie detail payload
+- 后端按 UTC 日期生成并持久化。
+- 同一天重复请求会复用快照，除非算法版本变化或手动刷新。
+- 返回的是 ID 列表，客户端需再调用电影详情或利用已有列表缓存渲染。
 
-### `PATCH /api/library/movies/{id}`
+#### `POST /api/homepage/recommendations/refresh`
 
-Purpose:
+用途：强制刷新 UTC 当日推荐。
 
-- update user-facing movie state
+Body 可选：
 
-Common fields:
+```json
+{
+  "preserveHeroMovieIds": ["movie-a", "movie-b"],
+  "excludeRecommendationMovieIds": ["movie-c", "movie-d"]
+}
+```
 
-- favorite flag
-- user rating
-- `userTags`
-- `metadataTags`
+成功：`200 HomepageDailyRecommendationsDTO`
 
-### `DELETE /api/library/movies/{id}`
+### 4.6 Movies
 
-Purpose:
+#### `GET /api/library/movies`
 
-- remove a movie from the library
+用途：分页列出影片。
 
-### `GET /api/library/movies/{id}/stream`
+Query：
 
-Purpose:
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `mode` | string | 可用值：空 / `favorites` / `trash`。空表示普通库；`favorites` 只返回收藏；`trash` 返回回收站 |
+| `q` | string | 子串搜索标题、番号、片商、简介，不区分大小写 |
+| `actor` | string | 精确匹配演员名 |
+| `studio` | string | 精确匹配有效片商名 |
+| `limit` | number | 默认 50 |
+| `offset` | number | 默认 0 |
 
-- stream the primary video file
+成功：`200 MoviesPageDTO`
 
-Important notes:
+```json
+{
+  "items": [
+    {
+      "id": "movie-1",
+      "title": "Example Title",
+      "code": "ABC-001",
+      "studio": "Studio",
+      "actors": ["Actor A"],
+      "tags": ["metadata"],
+      "userTags": ["favorite"],
+      "runtimeMinutes": 120,
+      "rating": 4.5,
+      "isFavorite": true,
+      "addedAt": "2026-06-07T12:00:00Z",
+      "location": "D:\\Library\\ABC-001.mp4",
+      "resolution": "1080p",
+      "year": 2026,
+      "releaseDate": "2026-01-01",
+      "coverUrl": "/api/library/movies/movie-1/asset/cover?v=...",
+      "thumbUrl": "/api/library/movies/movie-1/asset/thumb?v=..."
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
 
-- supports Range requests
+说明：
 
-### `GET /api/library/movies/{id}/asset/{kind}`
+- 普通列表默认排除回收站；`mode=trash` 只返回回收站。
+- 普通列表按 `addedAt DESC, id ASC`；回收站按 `trashedAt DESC, id ASC`。
+- `rating` 是有效评分：用户评分优先，否则使用元数据评分。
+- `tags` 是元数据 / NFO 标签；`userTags` 是本地用户标签。
+- `coverUrl`、`thumbUrl`、`previewImages` 可能为相对 API URL。
 
-Purpose:
+#### `GET /api/library/movies/{movieId}`
 
-- fetch movie assets such as cover and thumb variants
+用途：获取影片详情。
 
-### `GET /api/library/movies/{id}/asset/preview/{index}`
+成功：`200 MovieDetailDTO`
 
-Purpose:
+`MovieDetailDTO` 在列表字段基础上增加：
 
-- fetch indexed preview stills when available
+| 字段 | 说明 |
+| --- | --- |
+| `summary` | 简介 |
+| `previewImages` | 预览图 URL 数组 |
+| `previewVideoUrl` | 预览视频 URL |
+| `metadataRating` | 元数据评分 |
+| `userRating` | 用户评分；无覆盖时省略或为 null |
+| `actorAvatarUrls` | 演员名到头像 URL 的映射 |
 
-### `POST /api/library/movies/{id}/scrape`
+错误：
 
-Purpose:
+- `404 COMMON_NOT_FOUND`
 
-- trigger metadata re-scrape for one movie
+#### `PATCH /api/library/movies/{movieId}`
 
-Important notes:
+用途：更新影片本地用户态和展示字段覆盖。
 
-- handled as an async task
+Body，所有字段可选，但至少要有一个字段：
 
-### `POST /api/library/movies/{id}/reveal`
+```json
+{
+  "isFavorite": true,
+  "rating": 4.25,
+  "userTags": ["tag-a", "tag-b"],
+  "metadataTags": ["nfo-a"],
+  "userTitle": "自定义标题",
+  "userStudio": "自定义片商",
+  "userSummary": "自定义简介",
+  "userReleaseDate": "2026-01-01",
+  "userRuntimeMinutes": 118
+}
+```
 
-Purpose:
+清除覆盖：
 
-- reveal the media file in the server machine's file manager
+```json
+{
+  "rating": null,
+  "userTitle": null,
+  "userStudio": "",
+  "userSummary": null,
+  "userReleaseDate": null,
+  "userRuntimeMinutes": null
+}
+```
 
-### `GET /api/library/movies/{id}/comment`
+约束：
 
-Purpose:
+- `rating` 范围 `0..5`；`null` 表示清除用户评分。
+- `userTags` 和 `metadataTags` 出现时是整表替换；空数组表示清空。
+- 用户标签最多 64 个，每个最多 64 个 Unicode 字符，后端会 trim 和去重。
+- `userReleaseDate` 必须是 `YYYY-MM-DD`。
+- `userRuntimeMinutes` 必须是 `0..99999` 的整数。
+- `userSummary` 最多约 120000 字符。
+- 回收站影片不能 patch，返回 `409 COMMON_CONFLICT`。
 
-- fetch the saved user comment for one movie
+成功：`200 MovieDetailDTO`
 
-### `PUT /api/library/movies/{id}/comment`
+#### `DELETE /api/library/movies/{movieId}`
 
-Purpose:
+用途：把影片移入回收站。
 
-- upsert the saved user comment for one movie
+成功：`204 No Content`
 
-## Library Paths
+错误：
 
-### `POST /api/library/paths`
+- `404 COMMON_NOT_FOUND`
 
-Purpose:
+#### `DELETE /api/library/movies/{movieId}?permanent=true`
 
-- add a configured library root
+用途：永久删除影片数据库记录和相关磁盘文件。
 
-### `PATCH /api/library/paths/{id}`
+前置条件：影片必须已经在回收站。
 
-Purpose:
+成功：`204 No Content`
 
-- update the display title for one configured library root
+错误：
 
-### `DELETE /api/library/paths/{id}`
+- `400 COMMON_BAD_REQUEST`：影片不在回收站。
+- `404 COMMON_NOT_FOUND`
 
-Purpose:
+#### `POST /api/library/movies/{movieId}/restore`
 
-- remove one configured library root from the database configuration
+用途：从回收站恢复影片。
 
-Important notes:
+成功：`204 No Content`
 
-- this unbinds or prunes database records that are no longer covered by any configured root
-- it does not delete the actual on-disk library directory
+错误：
 
-### `POST /api/library/paths/{id}/reveal`
+- `400 COMMON_BAD_REQUEST`：影片不在回收站。
+- `404 COMMON_NOT_FOUND`
 
-Purpose:
+#### `POST /api/library/movies/{movieId}/reveal`
 
-- open the configured library root directory in the server machine's file manager
+用途：在服务端机器文件管理器中定位影片文件。
 
-Important notes:
+成功：`204 No Content`
 
-- the backend validates that the stored path still exists on disk and is a directory
-- this opens the folder only; it does not modify library configuration or disk files
+说明：这是桌面 / 本机能力。Android 或远程客户端调用只会让服务端电脑打开文件管理器。
 
-### `GET /api/library/paths/storage-status`
+#### `GET /api/library/movies/{movieId}/comment`
 
-Purpose:
+用途：读取影片备注。
 
-- return the current storage availability snapshot for each configured library root
+成功：`200 MovieCommentDTO`
 
-Response:
+```json
+{
+  "body": "备注正文",
+  "updatedAt": "2026-06-07T12:00:00Z"
+}
+```
 
-- `items`: array of `LibraryPathStorageStatusDTO`
+无备注时返回：
 
-Status values:
+```json
+{
+  "body": "",
+  "updatedAt": ""
+}
+```
 
-- `online`: the configured directory is reachable, readable, and matches the stored backing-volume identity when one is known
-- `offline`: the backing storage root appears unavailable or disconnected
-- `volume_mismatch`: the path resolves to a different volume than the one previously bound to this library path
-- `path_missing`: the backing storage is present, but the configured library directory is missing or is not a directory
-- `permission_denied`: Curated can see the path, but cannot read it
-- `unknown`: Curated could not classify the storage state
+#### `PUT /api/library/movies/{movieId}/comment`
 
-Important notes:
+用途：新增或替换影片备注。
 
-- Windows is the primary supported platform for volume identity detection in this phase
-- macOS and Linux currently use the platform-neutral fallback and are future adaptation targets
-- responses include `canRescan` and `canImport`; the frontend uses these to block scans or imports that would target unavailable storage
-- responses can include `rootPath`, `driveType`, `volumeLabel`, `fileSystem`, `identityConfidence`, `expectedVolumeId`, and `currentVolumeId` for diagnostics
+Body：
 
-### `POST /api/library/paths/storage-status/check`
+```json
+{
+  "body": "备注正文"
+}
+```
 
-Purpose:
+约束：
 
-- perform a fresh storage availability probe for configured library roots
+- 后端会 trim。
+- 最多 10000 个 Unicode 字符。
+- 回收站影片不能写备注，返回 `409 COMMON_CONFLICT`。
 
-Request:
+成功：`200 MovieCommentDTO`
 
-- optional JSON body `{ "libraryPathIds": ["..."] }`
-- omit the body or pass an empty list to check all configured library roots
+#### `GET /api/library/movies/{movieId}/stream`
 
-Response:
+用途：直放主视频文件。
 
-- same shape as `GET /api/library/paths/storage-status`
+成功：`200 OK` 或 `206 Partial Content`
 
-Important notes:
+说明：
 
-- online checks persist the current backing-volume binding for the library path
-- the frontend calls this during app startup in Web API mode and before storage-sensitive actions such as full scans and movie imports
+- 支持 `GET` 和 `HEAD`。
+- 支持 Range，由 `http.ServeContent` 处理。
+- 客户端通常不应直接拼接该 URL，而是先调用 `/playback` 获取 descriptor。
 
-### `POST /api/library/paths/{id}/storage-binding/rebind`
+#### `GET /api/library/movies/{movieId}/asset/{kind}`
 
-Purpose:
+用途：获取影片封面或缩略图。
 
-- replace the stored backing-volume binding for one configured library root with the currently detected volume identity
+Path：
 
-Response:
+| 参数 | 可用值 |
+| --- | --- |
+| `kind` | `cover`、`thumb` |
 
-- one `LibraryPathStorageStatusDTO`
+成功：图片 bytes。
 
-Important notes:
+说明：
 
-- intended for deliberate recovery from `volume_mismatch`, for example after replacing a disk or moving a library root to a new volume
-- the new binding is persisted only when the current path is classified as `online`
+- 支持 `GET` 和 `HEAD`。
+- `Cache-Control: private, max-age=604800, immutable`
 
-## Movie Imports
+#### `GET /api/library/movies/{movieId}/asset/preview/{index}`
 
-### `POST /api/import/movies`
+用途：获取第 `index` 张预览图。
 
-Purpose:
+Path：
 
-- copy browser-uploaded movie files into the configured default library root
+| 参数 | 说明 |
+| --- | --- |
+| `index` | 从 1 开始 |
 
-Request:
+成功：图片 bytes。
 
-- `multipart/form-data`
-- repeated `files` parts contain uploaded movie files
-- repeated `relativePath` fields may be supplied before each file to preserve folder-relative names from browser folder selection
-- optional `totalBytes` is used for progress metadata
+说明：
 
-Important notes:
+- 本地缓存存在时使用本地缓存。
+- 本地不存在时，后端可能代理远端预览图源。
+- 代理远端时 `Cache-Control: private, no-cache`。
 
-- requires `defaultImportLibraryPathId` to be configured through `GET/PATCH /api/settings`
-- only video-like extensions are accepted by the import handler
-- imported files are copied into the target library root; source files are not moved or deleted
-- existing target files are treated as per-file conflicts and are not overwritten
-- the response is a `TaskDTO` with type `import.movies`
-- task metadata can include `targetLibraryPathId`, `targetPath`, `stage`, `totalFiles`, `completedFiles`, `failedFiles`, `copiedBytes`, `totalBytes`, `currentFileName`, `errorItems`, and optional `scanTaskId` / `scanError`
-- a successful or partially successful copy triggers the existing restricted library scan for the target root
+#### `POST /api/library/movies/{movieId}/scrape`
 
-### `POST /api/import/movies/uploads`
+用途：触发单片元数据刷新。
 
-Purpose:
+成功：`202 TaskDTO`
 
-- create a resumable movie import upload session for large browser uploads
+错误：
 
-Request:
+- `400 COMMON_BAD_REQUEST`：影片没有番号或没有视频路径。
+- `404 COMMON_NOT_FOUND`
+- `409 COMMON_CONFLICT`：影片在回收站。
 
-- JSON body with `files`
-- each file manifest includes `relativePath`, `size`, and optional `lastModified`
+#### `POST /api/library/metadata-scrape`
 
-Response:
+用途：按配置库路径批量刷新元数据。
 
-- `uploadId`
-- `chunkSize`
-- `targetPath`
-- per-file `fileId`, `relativePath`, `size`, `bytesReceived`, and `complete`
-- an `import.movies` task snapshot
+Body：
 
-Important notes:
+```json
+{
+  "paths": ["D:\\Library"]
+}
+```
 
-- requires `defaultImportLibraryPathId`
-- staging files are created under `<target-library-root>/.curated-import/<uploadId>/`
-- the first implementation keeps upload session state in backend memory; interrupted browser uploads can resume while the backend process is still running
-- final movie files are not visible in the library until commit succeeds
+成功：`202 MetadataRefreshQueuedDTO`
 
-### `GET /api/import/movies/uploads/{uploadId}`
+```json
+{
+  "queued": 10,
+  "skipped": 2,
+  "invalidPaths": []
+}
+```
 
-Purpose:
+约束：
 
-- return resumable upload status, including per-file received bytes and completion flags
+- `paths` 至少包含一个路径。
+- 路径应匹配已配置的库根。
 
-### `PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}`
+### 4.7 Played Movies
 
-Purpose:
+#### `GET /api/library/played-movies`
 
-- upload one raw binary chunk for a resumable movie import file
+用途：获取已播放影片 ID 列表。
 
-Request:
+成功：`200 PlayedMoviesListDTO`
 
-- raw `application/octet-stream` body
-- required header `X-Curated-Offset`
-- optional header `X-Curated-Chunk-Size`
+```json
+{
+  "movieIds": ["movie-1", "movie-2"]
+}
+```
 
-Important notes:
+#### `POST /api/library/played-movies/{movieId}`
 
-- chunk bytes are written by offset into the file's staging `.part` file
-- duplicate chunk indexes with the same range are treated as idempotent status reads
-- duplicate chunk indexes with a different range are rejected
+用途：记录影片已播放。
 
-### `POST /api/import/movies/uploads/{uploadId}/commit`
+成功：`204 No Content`
 
-Purpose:
+错误：
 
-- validate that all upload files are complete, flush staging files, commit them without overwriting existing target files, and start the restricted library scan
+- `404 COMMON_NOT_FOUND`
 
-Response:
+### 4.8 Actors
 
-- `TaskDTO` with type `import.movies`
+#### `GET /api/library/actors`
 
-### `DELETE /api/import/movies/uploads/{uploadId}`
+用途：分页列出演员。
 
-Purpose:
+Query：
 
-- abort a resumable upload session and remove its staging directory
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `q` | string | 演员名或演员用户标签子串，不区分大小写 |
+| `actorTag` | string | 精确匹配演员用户标签 |
+| `sort` | string | `name` 默认；`movieCount` 按参演数量降序 |
+| `limit` | number | 默认 50 |
+| `offset` | number | 默认 0 |
 
-## Playback
+成功：`200 ActorsListDTO`
 
-### `GET /api/library/movies/{id}/playback`
+```json
+{
+  "total": 1,
+  "actors": [
+    {
+      "name": "Actor A",
+      "avatarUrl": "/api/library/actors/Actor%20A/asset/avatar?v=...",
+      "avatarRemoteUrl": "https://...",
+      "avatarLocalUrl": "/api/library/actors/Actor%20A/asset/avatar?v=...",
+      "hasLocalAvatar": true,
+      "movieCount": 12,
+      "userTags": ["favorite"]
+    }
+  ]
+}
+```
 
-Purpose:
+说明：只列出至少有一部 active 影片的演员。
 
-- return the playback descriptor used by the frontend player pipeline
+#### `GET /api/library/actors/profile?name={name}`
 
-Important notes:
+用途：获取演员资料。
 
-- this is the primary playback planning seam
-- current responses are still direct-play oriented in many paths
-- playback descriptors may include diagnostics such as session kind and reason codes
+Query：
 
-### `POST /api/library/movies/{id}/playback-session`
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `name` | 是 | 演员展示名 |
 
-Purpose:
+成功：`200 ActorProfileDTO`
 
-- create an explicit playback session, for example for HLS push workflows
+```json
+{
+  "name": "Actor A",
+  "avatarUrl": "/api/library/actors/Actor%20A/asset/avatar?v=...",
+  "avatarRemoteUrl": "https://...",
+  "avatarLocalUrl": "/api/library/actors/Actor%20A/asset/avatar?v=...",
+  "hasLocalAvatar": true,
+  "summary": "Profile summary",
+  "homepage": "https://...",
+  "provider": "metatube",
+  "providerActorId": "123",
+  "height": 160,
+  "birthday": "2000-01-01",
+  "profileUpdatedAt": "2026-06-07T12:00:00Z",
+  "userTags": ["favorite"],
+  "externalLinks": ["https://example.com"]
+}
+```
 
-### `GET /api/playback/sessions/recent`
+#### `GET /api/library/actors/{name}/asset/avatar`
 
-Purpose:
+用途：获取本地缓存头像。
 
-- list active and recently archived playback sessions
+成功：图片 bytes。
 
-### `GET /api/playback/sessions/{id}`
+说明：
 
-Purpose:
+- 支持 `GET` 和 `HEAD`。
+- `Cache-Control: private, max-age=604800, immutable`
 
-- fetch a playback session status snapshot
+#### `POST /api/library/actors/scrape?name={name}`
 
-### `GET /api/playback/sessions/{id}/hls/{file}`
+用途：触发演员资料刮削。
 
-Purpose:
+成功：`202 TaskDTO`
 
-- serve HLS playlists and segments for pushed playback sessions
+错误：
 
-### `POST /api/library/movies/{id}/native-play`
+- `400 COMMON_BAD_REQUEST`：缺少 `name`。
+- `404 COMMON_NOT_FOUND`
 
-Purpose:
+#### `PATCH /api/library/actors/tags?name={name}`
 
-- legacy backend-side native-player launch hook
+用途：替换演员用户标签。
 
-Important notes:
+Body：
 
-- still present for legacy or native-shell integration
-- no longer the default path for the player page's local-player action
+```json
+{
+  "userTags": ["tag-a", "tag-b"]
+}
+```
 
-### `GET /api/playback/progress`
+成功：`200 ActorListItemDTO`
 
-Purpose:
+约束：同用户标签规则，最多 64 个，每个最多 64 字符；后端 trim、去重。
 
-- list playback progress records
+#### `PATCH /api/library/actors/external-links?name={name}`
 
-### `PUT /api/playback/progress/{movieId}`
+用途：替换演员外部链接列表。
 
-Purpose:
+Body：
 
-- update playback progress for one movie
+```json
+{
+  "externalLinks": ["https://example.com/profile"]
+}
+```
 
-### `DELETE /api/playback/progress/{movieId}`
+成功：`200 ActorProfileDTO`
 
-Purpose:
+约束：
 
-- clear playback progress for one movie
+- 最多 16 个链接。
+- 每个链接最多 2048 字符。
+- 必须是合法 `http` 或 `https` URL。
+- 后端 trim、去重。
 
-### `GET /api/playback/watch-time/daily`
+### 4.9 Playback
 
-Purpose:
+#### `GET /api/library/movies/{movieId}/playback`
 
-- list daily watch-time totals for Settings -> Overview statistics
+用途：获取播放描述，客户端应以此作为播放入口。
 
-Query:
+成功：`200 PlaybackDescriptorDTO`
 
-- `days` (optional): number of local calendar days to include; defaults to the 91-day statistics window and is capped at 91
+```json
+{
+  "movieId": "movie-1",
+  "mode": "direct",
+  "url": "/api/library/movies/movie-1/stream",
+  "mimeType": "video/mp4",
+  "fileName": "ABC-001.mp4",
+  "durationSec": 7200,
+  "resumePositionSec": 120.5,
+  "canDirectPlay": true,
+  "audioTracks": [],
+  "subtitleTracks": []
+}
+```
 
-### `POST /api/playback/watch-time/daily`
+字段说明：
 
-Purpose:
+| 字段 | 说明 |
+| --- | --- |
+| `mode` | `direct`、`hls`、`native` |
+| `sessionId` | HLS / 推流会话 ID |
+| `sessionKind` | 会话类型诊断字段 |
+| `url` | 播放 URL，可能是相对路径 |
+| `mimeType` | 媒体类型 |
+| `transcodeProfile` | 转码档位 |
+| `startPositionSec` | 请求创建会话时的起播点 |
+| `resumePositionSec` | 已保存续播点 |
+| `canDirectPlay` | 是否支持直放 |
+| `reasonCode` / `reasonMessage` | 模式选择诊断 |
+| `audioTracks` / `subtitleTracks` | 音轨 / 字幕轨信息 |
 
-- add one bounded watch-time delta for a movie and local day
+#### `POST /api/library/movies/{movieId}/playback-session`
 
-Body:
+用途：显式创建播放会话，例如 HLS 推流。
 
-- `movieId`: movie id
-- `dayKey`: local day key in `YYYY-MM-DD`
-- `watchedSec`: positive watch-time delta in seconds; backend rejects unusually large single deltas
+Body：
 
-### `GET /api/library/played-movies`
+```json
+{
+  "mode": "hls",
+  "startPositionSec": 120.5
+}
+```
 
-Purpose:
+`mode` 省略时默认为 `direct`。
 
-- list played-movie statistics or records
+成功：`201 PlaybackDescriptorDTO`
 
-### `POST /api/library/played-movies/{id}`
+错误：
 
-Purpose:
+- `400 COMMON_BAD_REQUEST`：请求模式或运行时前置条件不满足。
+- `404 COMMON_NOT_FOUND`
 
-- mark one movie as played
+#### `POST /api/library/movies/{movieId}/native-play`
 
-## Actors
+用途：让服务端机器启动外部本地播放器。
 
-### `GET /api/library/actors`
+Body 可选：
 
-Purpose:
+```json
+{
+  "startPositionSec": 120.5
+}
+```
 
-- list actors in the library
+成功：`200 NativePlaybackLaunchDTO`
 
-Common filters:
+说明：远程 / Android 客户端调用时，播放器会在服务端电脑上启动，不会在手机上播放。
 
-- `q`
-- `actorTag`
-- `sort`
-- pagination fields
+#### `GET /api/playback/sessions/recent`
 
-### `GET /api/library/actors/profile`
+用途：列出活跃和最近归档的播放会话。
 
-Purpose:
+Query：
 
-- fetch a single actor profile by actor name
+| 参数 | 说明 |
+| --- | --- |
+| `limit` | 默认 20 |
 
-### `PATCH /api/library/actors/tags`
+成功：`200 PlaybackSessionListDTO`
 
-Purpose:
+#### `GET /api/playback/sessions/{sessionId}`
 
-- replace user tags for a specific actor
+用途：读取播放会话状态。
 
-Important notes:
+成功：`200 PlaybackSessionStatusDTO`
 
-- actor identity is typically passed through the actor name query field
+```json
+{
+  "sessionId": "session-1",
+  "movieId": "movie-1",
+  "sessionKind": "hls",
+  "transcodeProfile": "default",
+  "startPositionSec": 120.5,
+  "startedAt": "2026-06-07T12:00:00Z",
+  "lastAccessedAt": "2026-06-07T12:01:00Z",
+  "expiresAt": "2026-06-07T13:00:00Z",
+  "state": "running"
+}
+```
 
-### `PATCH /api/library/actors/external-links`
+#### `GET /api/playback/sessions/{sessionId}/hls/{file}`
 
-Purpose:
+用途：读取 HLS playlist 或 segment。
 
-- replace the full user-managed external link list for a specific actor
+成功：
 
-Important notes:
+- `.m3u8`：`application/vnd.apple.mpegurl`
+- `.ts`：`video/mp2t`
+- 其他：`http.ServeFile` 自动推断
 
-- actor identity is passed through the actor name query field
-- request body shape is `{ "externalLinks": string[] }`
-- links are separate from the scraped `homepage` field and are returned by `GET /api/library/actors/profile`
+说明：
 
-### `POST /api/library/actors/scrape`
+- 支持 `GET` 和 `HEAD`。
+- 设置 `Cache-Control: no-store, no-cache, must-revalidate`。
 
-Purpose:
+#### `DELETE /api/playback/sessions/{sessionId}`
 
-- trigger actor metadata scraping
+用途：结束 / 删除播放会话。
 
-Important notes:
+成功：`204 No Content`
 
-- handled as an async task
+#### `GET /api/playback/progress`
 
-### `GET /api/library/actors/{name}/asset/avatar`
+用途：列出已保存播放进度。
 
-Purpose:
+成功：`200 PlaybackProgressListDTO`
 
-- serve a same-origin cached avatar image for an actor
+```json
+{
+  "items": [
+    {
+      "movieId": "movie-1",
+      "positionSec": 120.5,
+      "durationSec": 7200,
+      "updatedAt": "2026-06-07T12:00:00Z"
+    }
+  ]
+}
+```
 
-Important notes:
+#### `PUT /api/playback/progress/{movieId}`
 
-- backend-owned avatar caching reduces direct browser dependency on remote image hosts
+用途：保存单片续播进度。
 
-## Settings
+Body：
 
-### `GET /api/settings`
+```json
+{
+  "positionSec": 120.5,
+  "durationSec": 7200
+}
+```
 
-Purpose:
+成功：`204 No Content`
 
-- return the current effective settings DTO used by the frontend
+错误：
 
-### `PATCH /api/settings`
+- `404 COMMON_NOT_FOUND`
 
-Purpose:
+#### `DELETE /api/playback/progress/{movieId}`
 
-- partially update persisted settings
+用途：清除单片续播进度。
 
-Important notes:
+成功：`204 No Content`
 
-- updates are written back to `config/library-config.cfg` for library-level keys
-- `defaultImportLibraryPathId` stores the default target library path used by `POST /api/import/movies`
-- playback runtime preferences are also surfaced through this settings contract
-- `curatedFrameExportFormat` is a persisted library-level setting; accepted values are `jpg`, `webp`, and `png`, with `jpg` as the default
-- `autoActorProfileScrape` is an opt-in library-level setting; when enabled, successful movie metadata scrapes may enqueue missing actor-profile scrape tasks for actors that still lack both avatar and summary
-- `autoDownloadUpdates` is an opt-in library-level setting surfaced in Settings -> General; when enabled, the startup background update check may download and SHA256-verify a newer installer, while installation still requires explicit user confirmation
-- some backend logging changes require restart before file sinks fully reflect new values
+#### `GET /api/playback/watch-time/daily`
 
-## Curated Frames
+用途：读取每日观看时长统计。
 
-### `GET /api/curated-frames`
+Query：
 
-Purpose:
+| 参数 | 说明 |
+| --- | --- |
+| `days` | 默认 91，最大 91 |
 
-- query curated frames with filtering and pagination
+成功：`200 PlaybackWatchTimeDailyListDTO`
 
-Common filters:
+```json
+{
+  "items": [
+    {
+      "dayKey": "2026-06-07",
+      "watchedSec": 1800
+    }
+  ],
+  "totalWatchedSec": 1800,
+  "activeDays": 1,
+  "maxDayWatchedSec": 1800,
+  "longestStreakDays": 1
+}
+```
 
-- `q`
-- `actor`
+#### `POST /api/playback/watch-time/daily`
+
+用途：追加一段观看时长。
+
+Body：
+
+```json
+{
+  "movieId": "movie-1",
+  "dayKey": "2026-06-07",
+  "watchedSec": 30
+}
+```
+
+约束：
+
+- `dayKey` 必须是合法 `YYYY-MM-DD`。
+- `watchedSec` 必须 `> 0` 且 `<= 300`。
+- 同一天同影片会累加。
+
+成功：`204 No Content`
+
+### 4.10 Settings
+
+#### `GET /api/settings`
+
+用途：读取当前设置。
+
+成功：`200 SettingsDTO`
+
+关键字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `libraryPaths` | 已配置库根 |
+| `defaultImportLibraryPathId` | 默认导入目标库根 ID |
+| `player` | 播放器设置 |
+| `organizeLibrary` | 扫描后是否整理目录 |
+| `autoLibraryWatch` | 是否启用目录监听扫描 |
+| `autoActorProfileScrape` | 影片刮削后是否自动补演员资料 |
+| `autoDownloadUpdates` | 启动更新检查后是否自动下载 |
+| `launchAtLogin` | 桌面端是否登录自启 |
+| `launchAtLoginSupported` | 当前运行时是否支持登录自启 |
+| `curatedFrameExportFormat` | `jpg`、`webp`、`png` |
+| `metadataMovieProvider` | 单一影片元数据 provider |
+| `metadataMovieProviders` | 当前可用 provider 列表 |
+| `metadataMovieProviderChain` | 链式 provider 顺序 |
+| `metadataMovieScrapeMode` | `auto`、`specified`、`chain` |
+| `metadataMovieStrategy` | `auto-global`、`auto-cn-friendly`、`custom-chain`、`specified` |
+| `proxy` | 出站代理设置 |
+| `backendLog` | 后端日志设置 |
+
+#### `PATCH /api/settings`
+
+用途：部分更新设置。
+
+Body 示例：
+
+```json
+{
+  "defaultImportLibraryPathId": "library-path-id",
+  "curatedFrameExportFormat": "jpg",
+  "autoLibraryWatch": true,
+  "player": {
+    "hardwareDecode": true,
+    "hardwareEncoder": "auto",
+    "nativePlayerEnabled": false,
+    "streamPushEnabled": true,
+    "forceStreamPush": false,
+    "ffmpegCommand": "ffmpeg",
+    "preferNativePlayer": false,
+    "seekForwardStepSec": 10,
+    "seekBackwardStepSec": 10
+  },
+  "metadataMovieScrapeMode": "chain",
+  "metadataMovieProviderChain": ["provider-a", "provider-b"],
+  "proxy": {
+    "enabled": true,
+    "url": "http://127.0.0.1:7890",
+    "username": "",
+    "password": ""
+  },
+  "backendLog": {
+    "logDir": "D:\\CuratedLogs",
+    "logFilePrefix": "curated",
+    "logMaxAgeDays": 14,
+    "logLevel": "info"
+  }
+}
+```
+
+成功：`200 SettingsDTO`
+
+约束：
+
+- 至少发送一个支持字段，否则 `400 COMMON_BAD_REQUEST`。
+- `curatedFrameExportFormat` 必须是 `jpg`、`webp`、`png`。
+- `defaultImportLibraryPathId` 非空时必须存在。
+- `metadataMovieProvider` 和 `metadataMovieProviderChain` 中的 provider 必须在 `metadataMovieProviders` 中。
+- `metadataMovieScrapeMode` 必须是 `auto`、`specified`、`chain`。
+- `metadataMovieStrategy` 必须是 `auto-global`、`auto-cn-friendly`、`custom-chain`、`specified`。
+- `proxy.enabled=true` 时 `proxy.url` 不能为空。
+- 后端日志 sink 的部分变更需要重启后端才完全生效。
+
+### 4.11 Library Paths / Storage
+
+#### `POST /api/library/paths`
+
+用途：添加库根路径，并尽量启动首次扫描。
+
+Body：
+
+```json
+{
+  "path": "D:\\Library",
+  "title": "主库"
+}
+```
+
+成功：`201 AddLibraryPathResponse`
+
+```json
+{
+  "id": "library-path-id",
+  "path": "D:\\Library",
+  "title": "主库",
+  "firstLibraryScanPending": true,
+  "scanTask": {
+    "taskId": "task-1",
+    "type": "scan",
+    "status": "running",
+    "createdAt": "2026-06-07T12:00:00Z",
+    "progress": 0
+  }
+}
+```
+
+错误：
+
+- `400 COMMON_BAD_REQUEST`：路径为空或不是绝对路径。
+- `409 COMMON_CONFLICT`：库路径重复。
+
+#### `PATCH /api/library/paths/{id}`
+
+用途：更新库路径展示标题。
+
+Body：
+
+```json
+{
+  "title": "新标题"
+}
+```
+
+成功：`200 LibraryPathDTO`
+
+#### `DELETE /api/library/paths/{id}`
+
+用途：删除库根配置，并清理不再属于任何库根的影片记录。
+
+成功：`204 No Content`
+
+说明：不会删除磁盘上的库目录本身。
+
+#### `POST /api/library/paths/{id}/reveal`
+
+用途：在服务端机器文件管理器中打开库目录。
+
+成功：`204 No Content`
+
+#### `GET /api/library/paths/storage-status`
+
+用途：读取库根存储状态快照。
+
+成功：`200 LibraryPathStorageStatusListDTO`
+
+```json
+{
+  "items": [
+    {
+      "libraryPathId": "library-path-id",
+      "path": "D:\\Library",
+      "title": "主库",
+      "status": "online",
+      "message": "storage is online",
+      "checkedAt": "2026-06-07T12:00:00Z",
+      "rootPath": "D:\\",
+      "driveType": "fixed",
+      "volumeLabel": "Data",
+      "fileSystem": "NTFS",
+      "identityConfidence": "high",
+      "expectedVolumeId": "vol-a",
+      "currentVolumeId": "vol-a",
+      "canRescan": true,
+      "canImport": true
+    }
+  ]
+}
+```
+
+状态值：
+
+| 值 | 含义 |
+| --- | --- |
+| `online` | 目录可达且卷身份匹配 |
+| `offline` | 存储根不可用 |
+| `volume_mismatch` | 路径解析到不同卷 |
+| `path_missing` | 存储存在但库目录缺失 |
+| `permission_denied` | 权限不足 |
+| `unknown` | 无法分类 |
+
+#### `POST /api/library/paths/storage-status/check`
+
+用途：执行一次新的存储状态检测。
+
+Body 可选：
+
+```json
+{
+  "libraryPathIds": ["library-path-id"]
+}
+```
+
+省略或空数组表示检测全部。
+
+成功：`200 LibraryPathStorageStatusListDTO`
+
+#### `POST /api/library/paths/{id}/storage-binding/rebind`
+
+用途：把库根绑定到当前检测到的卷身份，用于恢复 `volume_mismatch`。
+
+成功：`200 LibraryPathStorageStatusDTO`
+
+说明：只有当前路径被识别为 `online` 时才会持久化新绑定。
+
+### 4.12 Movie Imports
+
+#### `POST /api/import/movies`
+
+用途：普通 multipart 导入影片文件。
+
+Content-Type：`multipart/form-data`
+
+Form fields：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `files` | file，重复 | 影片文件 |
+| `relativePath` | string，重复 | 可在每个文件前传入，用于保留目录相对路径 |
+| `totalBytes` | string / number | 可选，总字节数，用于进度 |
+
+成功：`202 TaskDTO`
+
+约束与行为：
+
+- 必须先配置 `defaultImportLibraryPathId`。
+- 只接受视频扩展名：`.mp4`, `.m4v`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.webm`, `.ts`, `.m2ts`, `.flv`, `.mpeg`, `.mpg`, `.ogv`, `.rmvb`, `.iso`。
+- 后端复制文件到默认库根，不移动或删除客户端源文件。
+- 目标文件已存在则该文件失败，不覆盖。
+- 至少成功复制一个文件时会尝试启动受限扫描。
+- 成功或部分失败都可能返回 `202 TaskDTO`，客户端要看 `status` 和 `metadata.errorItems`。
+
+导入任务 `metadata` 常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `targetLibraryPathId` | 目标库根 ID |
+| `targetPath` | 目标库根路径 |
+| `stage` | `copying`、`completed`、`partial_failed`、`failed` |
+| `totalFiles` / `completedFiles` / `failedFiles` | 文件计数 |
+| `copiedBytes` / `totalBytes` | 字节进度 |
+| `currentFileName` | 当前文件名 |
+| `errorItems` | 失败文件数组，含 `fileName`、`code`、`message` |
+| `scanTaskId` | 后续扫描任务 ID |
+| `scanError` | 扫描启动错误 |
+
+#### `POST /api/import/movies/uploads`
+
+用途：创建可续传 / 分片导入会话。
+
+Body：
+
+```json
+{
+  "files": [
+    {
+      "relativePath": "Folder/ABC-001.mp4",
+      "size": 1234567890,
+      "lastModified": 1710000000000
+    }
+  ]
+}
+```
+
+成功：`201 MovieImportUploadDTO`
+
+```json
+{
+  "uploadId": "upload_abcdef",
+  "targetPath": "D:\\Library",
+  "chunkSize": 33554432,
+  "bytesReceived": 0,
+  "totalBytes": 1234567890,
+  "state": "uploading",
+  "files": [
+    {
+      "fileId": "file_abcdef",
+      "relativePath": "Folder\\ABC-001.mp4",
+      "size": 1234567890,
+      "bytesReceived": 0,
+      "complete": false
+    }
+  ],
+  "task": {
+    "taskId": "task-1",
+    "type": "import.movies",
+    "status": "running",
+    "createdAt": "2026-06-07T12:00:00Z",
+    "progress": 0
+  }
+}
+```
+
+说明：
+
+- 默认 chunk size：32 MiB。
+- 上传会话存在后端内存中，后端进程重启后不可恢复。
+- staging 目录：`<target-library-root>/.curated-import/<uploadId>/`。
+
+#### `GET /api/import/movies/uploads/{uploadId}`
+
+用途：读取上传会话状态。
+
+成功：`200 MovieImportUploadDTO`
+
+#### `PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}`
+
+用途：上传一个文件分片。
+
+Content-Type：`application/octet-stream`
+
+Headers：
+
+| Header | 必填 | 说明 |
+| --- | --- | --- |
+| `X-Curated-Offset` | 是 | 本分片写入文件的起始字节 offset |
+| `X-Curated-Chunk-Size` | 否 | 本分片字节数；如果提供，body 实际大小必须一致 |
+
+成功：`200 MovieImportUploadDTO`
+
+行为：
+
+- `chunkIndex` 必须是非负整数。
+- 重复上传同一 `chunkIndex` 且 offset/size 一致时幂等返回当前状态。
+- 重复上传同一 `chunkIndex` 但范围不同，返回 `409 COMMON_CONFLICT`。
+- offset 越界或分片超过文件大小，返回 `400 COMMON_BAD_REQUEST`。
+
+#### `POST /api/import/movies/uploads/{uploadId}/commit`
+
+用途：验证所有文件完整，提交 staging 文件到库根，并启动扫描。
+
+成功：`202 TaskDTO`
+
+错误：
+
+- `400 COMMON_BAD_REQUEST`：上传不完整。
+- `409 COMMON_CONFLICT`：会话状态不允许提交或目标文件已存在。
+
+#### `DELETE /api/import/movies/uploads/{uploadId}`
+
+用途：取消分片上传并删除 staging 目录。
+
+成功：`204 No Content`
+
+### 4.13 Scans / Tasks
+
+#### `POST /api/scans`
+
+用途：启动库扫描。
+
+Body 可选：
+
+```json
+{
+  "paths": ["D:\\Library"]
+}
+```
+
+说明：
+
+- `paths` 省略或空数组通常表示扫描全部配置库根。
+- 如果已有扫描在运行，返回 `409 COMMON_CONFLICT`。
+
+成功：`202 TaskDTO`
+
+#### `GET /api/tasks/recent`
+
+用途：列出最近结束的任务。
+
+Query：
+
+| 参数 | 说明 |
+| --- | --- |
+| `limit` | 默认 30 |
+
+成功：`200 RecentTasksDTO`
+
+```json
+{
+  "tasks": [
+    {
+      "taskId": "task-1",
+      "type": "import.movies",
+      "status": "completed",
+      "createdAt": "2026-06-07T12:00:00Z",
+      "startedAt": "2026-06-07T12:00:01Z",
+      "finishedAt": "2026-06-07T12:01:00Z",
+      "progress": 100,
+      "message": "Movie import completed"
+    }
+  ]
+}
+```
+
+#### `GET /api/tasks/{taskId}`
+
+用途：读取单个任务状态。
+
+成功：`200 TaskDTO`
+
+错误：
+
+- `404 COMMON_NOT_FOUND`
+
+### 4.14 Curated Frames
+
+#### `GET /api/curated-frames`
+
+用途：分页查询精选帧元数据。
+
+Query：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `q` | string | 搜索标题、番号、movieId、演员 JSON、标签 JSON、捕获时间、秒数 |
+| `actor` | string | 精确匹配演员名 |
+| `movieId` | string | 精确匹配影片 ID |
+| `tag` | string | 精确匹配标签 |
+| `limit` | number | 默认 50，最大 200 |
+| `offset` | number | 默认 0 |
+
+成功：`200 CuratedFramesListDTO`
+
+```json
+{
+  "items": [
+    {
+      "id": "frame-1",
+      "movieId": "movie-1",
+      "title": "Example",
+      "code": "ABC-001",
+      "actors": ["Actor A"],
+      "positionSec": 42.5,
+      "capturedAt": "2026-06-07T12:00:00Z",
+      "tags": ["favorite"]
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+#### `GET /api/curated-frames/stats`
+
+用途：精选帧总数。
+
+成功：
+
+```json
+{
+  "total": 123
+}
+```
+
+#### `GET /api/curated-frames/tags`
+
+用途：精选帧标签 facet。
+
+成功：`200 CuratedFrameFacetListDTO`
+
+#### `GET /api/curated-frames/actors`
+
+用途：精选帧演员 facet。
+
+成功：`200 CuratedFrameFacetListDTO`
+
+facet 返回：
+
+```json
+{
+  "items": [
+    {
+      "name": "Actor A",
+      "count": 12
+    }
+  ]
+}
+```
+
+#### `POST /api/curated-frames`
+
+用途：保存精选帧。
+
+支持两种请求格式。
+
+JSON Body：
+
+```json
+{
+  "id": "frame-1",
+  "movieId": "movie-1",
+  "title": "Example",
+  "code": "ABC-001",
+  "actors": ["Actor A"],
+  "positionSec": 42.5,
+  "capturedAt": "2026-06-07T12:00:00Z",
+  "tags": ["favorite"],
+  "imageBase64": "iVBORw0KGgo..."
+}
+```
+
+Multipart：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `metadata` | string | 上述 JSON 去掉 `imageBase64` 后序列化 |
+| `image` | file | 图片 bytes |
+
+约束：
+
+- `id` 和 `movieId` 必填。
+- `image` 不能为空，最大 12 MiB。
+- `imageBase64` 是标准 base64，不带 `data:image/...;base64,` 前缀。
+- `movieId` 必须存在。
+- `id` 重复返回 `409 COMMON_CONFLICT`。
+
+成功：`204 No Content`
+
+#### `GET /api/curated-frames/{id}/image`
+
+用途：获取精选帧原图。
+
+成功：图片 bytes，`Cache-Control: private, max-age=3600`
+
+#### `GET /api/curated-frames/{id}/thumbnail`
+
+用途：获取精选帧缩略图。
+
+成功：图片 bytes，`Cache-Control: private, max-age=3600`
+
+#### `PATCH /api/curated-frames/{id}/tags`
+
+用途：替换精选帧标签。
+
+Body：
+
+```json
+{
+  "tags": ["tag-a", "tag-b"]
+}
+```
+
+`tags: null` 等价于空数组。
+
+成功：`204 No Content`
+
+#### `DELETE /api/curated-frames/{id}`
+
+用途：删除精选帧。
+
+成功：`204 No Content`
+
+#### `POST /api/curated-frames/export`
+
+用途：导出 1 到 20 张精选帧。
+
+Body：
+
+```json
+{
+  "ids": ["frame-1", "frame-2"],
+  "actorName": "Actor A",
+  "format": "jpg"
+}
+```
+
+字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `ids` | 必填；会 trim、去重；最多 20 |
+| `actorName` | 可选；用于导出文件名中的演员上下文，必须属于每一帧演员列表 |
+| `format` | `jpg` 默认；也支持 `jpeg` alias、`webp`、`png` |
+
+成功响应：
+
+| 数量 | Content-Type | 说明 |
+| --- | --- | --- |
+| 1 张 | `image/jpeg` / `image/png` / `image/webp` | 单图下载 |
+| 多张 | `application/zip` | ZIP 包 |
+
+响应会设置 `Content-Disposition`，客户端应从 header 解析文件名。
+
+错误：
+
+- `400 COMMON_BAD_REQUEST`：缺少 ids、超过 20、format 不支持。
+- `400 CURATED_EXPORT_ACTOR_MISMATCH`：`actorName` 不属于某一帧。
+- `404 COMMON_NOT_FOUND`：帧不存在或无图。
+
+导出图片会写入 Curated 元数据，包括：
+
+- `title`
+- `code`
+- `actors`
+- `positionSec`
+- `capturedAt`
+- `frameId`
 - `movieId`
-- `tag`
-- `limit`
-- `offset`
+- `tags`
+- `schemaVersion`
+- `exportedAt`
+- `appName`
+- `appVersion`
 
-Important notes:
+### 4.15 Providers / Proxy
 
-- responses include pagination metadata such as total count
+#### `POST /api/providers/ping`
 
-### `GET /api/curated-frames/stats`
+用途：检测单个元数据 provider 健康状态。
 
-Purpose:
+Body：
 
-- fetch curated frame aggregate counts
+```json
+{
+  "name": "provider-name"
+}
+```
 
-### `GET /api/curated-frames/tags`
+成功：`200 ProviderHealthDTO`
 
-Purpose:
+```json
+{
+  "name": "provider-name",
+  "status": "ok",
+  "latencyMs": 123,
+  "message": "",
+  "errorCategory": "",
+  "cooldownUntil": "",
+  "consecutiveFailures": 0,
+  "avgLatencyMs": 100
+}
+```
 
-- fetch curated frame tag facets
+错误：
 
-### `GET /api/curated-frames/actors`
+- `400 COMMON_BAD_REQUEST`：body 不合法或 name 为空。
+- `404 PROVIDER_NOT_FOUND`
 
-Purpose:
+`status` 可用值：`ok`、`degraded`、`fail`。
 
-- fetch curated frame actor facets
+`errorCategory` 常见值：
 
-### `POST /api/curated-frames`
+| 值 | 含义 |
+| --- | --- |
+| `dns_failure` | DNS 失败 |
+| `connect_timeout` | 连接超时 |
+| `tls_failure` | TLS 问题 |
+| `region_restricted` | 地区限制 |
+| `hotlink_denied` | 防盗链 / Referer 问题 |
+| `provider_empty_result` | provider 无结果 |
+| `provider_invalid_content` | 内容不符合预期 |
 
-Purpose:
+#### `POST /api/providers/ping-all`
 
-- create a curated frame record
+用途：检测所有 provider。
 
-Supported request styles:
+成功：`200 PingAllProvidersResponse`
 
-- legacy JSON with `imageBase64`
-- multipart form data with `metadata` and `image`
+```json
+{
+  "providers": [],
+  "total": 0,
+  "ok": 0,
+  "fail": 0
+}
+```
 
-Important notes:
+#### `POST /api/proxy/ping-javbus`
 
-- near-duplicate captures are allowed
-- review and cleanup are expected in the curated-frames library UI
+用途：用草稿代理配置或已保存代理配置请求 `https://www.javbus.com/`。
 
-### `GET /api/curated-frames/{id}/image`
+Body 可选：
 
-Purpose:
+```json
+{
+  "proxy": {
+    "enabled": true,
+    "url": "http://127.0.0.1:7890",
+    "username": "",
+    "password": ""
+  }
+}
+```
 
-- fetch the full curated frame image
+成功：`200 ProxyJavBusPingResponse`
 
-### `GET /api/curated-frames/{id}/thumbnail`
+```json
+{
+  "ok": true,
+  "latencyMs": 300,
+  "httpStatus": 200,
+  "message": ""
+}
+```
 
-Purpose:
+说明：
 
-- fetch the curated frame thumbnail
+- 如果省略 `proxy`，使用当前持久化代理设置。
+- 出站请求超时约 5 秒。
+- 远端连接失败通常仍返回 `200`，但 body 中 `ok=false`。
+- `proxy.enabled=true` 且 URL 为空时返回 `400 COMMON_BAD_REQUEST`。
 
-### `PATCH /api/curated-frames/{id}/tags`
+#### `POST /api/proxy/ping-google`
 
-Purpose:
+用途：同上，但目标为 `https://www.google.com/`。
 
-- update curated frame tags
+成功：`200 ProxyJavBusPingResponse`
 
-### `DELETE /api/curated-frames/{id}`
+## 5. DTO 速查
 
-Purpose:
+本节列出衍生客户端最常用 DTO。完整字段以 `backend/internal/contracts/contracts.go` 和 `src/api/types.ts` 为准。
 
-- delete a curated frame
+### 5.1 `AppError`
 
-### `POST /api/curated-frames/export`
+```ts
+interface AppError {
+  code: string
+  message: string
+  retryable: boolean
+  details?: Record<string, unknown>
+}
+```
 
-Purpose:
+### 5.2 `MovieListItemDTO`
 
-- export curated frames as WebP, PNG, or ZIP bundles
+```ts
+interface MovieListItemDTO {
+  id: string
+  title: string
+  code: string
+  studio: string
+  actors: string[]
+  tags: string[]
+  userTags?: string[]
+  runtimeMinutes: number
+  rating: number
+  isFavorite: boolean
+  addedAt: string
+  location: string
+  resolution: string
+  year: number
+  releaseDate?: string
+  coverUrl?: string
+  thumbUrl?: string
+  trashedAt?: string
+}
+```
 
-Important notes:
+### 5.3 `MovieDetailDTO`
 
-- current export range is 1 to 20 frames
-- exported metadata includes fields such as `tags`, `schemaVersion`, `exportedAt`, `appName`, and `appVersion`
+```ts
+interface MovieDetailDTO extends MovieListItemDTO {
+  summary: string
+  previewImages?: string[]
+  previewVideoUrl?: string
+  metadataRating: number
+  userRating?: number | null
+  actorAvatarUrls?: Record<string, string>
+}
+```
 
-## Scans And Tasks
+### 5.4 `SettingsDTO`
 
-### `POST /api/scans`
+```ts
+interface SettingsDTO {
+  libraryPaths: LibraryPathDTO[]
+  defaultImportLibraryPathId?: string
+  player: PlayerSettingsDTO
+  organizeLibrary: boolean
+  autoLibraryWatch: boolean
+  autoActorProfileScrape: boolean
+  autoDownloadUpdates: boolean
+  launchAtLogin: boolean
+  launchAtLoginSupported: boolean
+  curatedFrameExportFormat: "jpg" | "webp" | "png"
+  metadataMovieProvider: string
+  metadataMovieProviders: string[]
+  metadataMovieProviderChain: string[]
+  metadataMovieScrapeMode?: "auto" | "specified" | "chain"
+  metadataMovieStrategy?: "auto-global" | "auto-cn-friendly" | "custom-chain" | "specified"
+  proxy: ProxySettingsDTO
+  backendLog: BackendLogSettingsDTO
+}
+```
 
-Purpose:
+### 5.5 `PlaybackDescriptorDTO`
 
-- start a library scan
+```ts
+type PlaybackMode = "direct" | "hls" | "native"
 
-### `GET /api/tasks/recent`
+interface PlaybackDescriptorDTO {
+  movieId: string
+  mode: PlaybackMode
+  sessionId?: string
+  sessionKind?: string
+  url: string
+  mimeType?: string
+  fileName?: string
+  transcodeProfile?: string
+  durationSec?: number
+  startPositionSec?: number
+  resumePositionSec?: number
+  canDirectPlay: boolean
+  reason?: string
+  reasonCode?: string
+  reasonMessage?: string
+  sourceContainer?: string
+  sourceVideoCodec?: string
+  sourceAudioCodec?: string
+  audioTracks?: { id: string; label: string; default: boolean }[]
+  subtitleTracks?: { id: string; label: string; kind?: string; default: boolean }[]
+}
+```
 
-Purpose:
+### 5.6 `TaskDTO`
 
-- list recently finished tasks for UI tracking and notifications
+```ts
+interface TaskDTO {
+  taskId: string
+  type: string
+  status: "pending" | "running" | "completed" | "partial_failed" | "failed" | "cancelled"
+  createdAt: string
+  startedAt?: string
+  finishedAt?: string
+  progress: number
+  message?: string
+  errorCode?: string
+  errorCategory?: string
+  errorMessage?: string
+  provider?: string
+  metadata?: Record<string, unknown>
+}
+```
 
-### `GET /api/tasks/{taskId}`
+### 5.7 `MovieImportUploadDTO`
 
-Purpose:
+```ts
+interface MovieImportUploadDTO {
+  uploadId: string
+  targetPath: string
+  chunkSize: number
+  bytesReceived: number
+  totalBytes: number
+  state: "uploading" | "committed" | "aborted" | string
+  files: Array<{
+    fileId: string
+    relativePath: string
+    size: number
+    bytesReceived: number
+    complete: boolean
+  }>
+  task: TaskDTO
+}
+```
 
-- fetch task status and progress for an async operation
+### 5.8 `CuratedFrameItemDTO`
 
-## Type References
+```ts
+interface CuratedFrameItemDTO {
+  id: string
+  movieId: string
+  title: string
+  code: string
+  actors: string[]
+  positionSec: number
+  capturedAt: string
+  tags: string[]
+}
+```
 
-Primary type sources:
+### 5.9 `ActorProfileDTO`
 
-- backend contracts: `backend/internal/contracts/contracts.go`
-- frontend API types: `src/api/types.ts`
+```ts
+interface ActorProfileDTO {
+  name: string
+  avatarUrl?: string
+  avatarRemoteUrl?: string
+  avatarLocalUrl?: string
+  hasLocalAvatar?: boolean
+  summary?: string
+  homepage?: string
+  provider?: string
+  providerActorId?: string
+  height?: number
+  birthday?: string
+  profileUpdatedAt?: string
+  userTags?: string[]
+  externalLinks?: string[]
+}
+```
 
-For exact field-level payload structure, consult those source files together with the server route handlers in `backend/internal/server/server.go`.
-### `POST /api/curated-frames/export`
+## 6. 全路由清单
 
-Purpose:
+本清单与 `backend/internal/server/server.go` 的 `Routes()` 对齐。
 
-- export 1-20 curated frames in a single image format or a ZIP archive when multiple files are returned
+| Method | Path | 响应 |
+| --- | --- | --- |
+| `GET` | `/api/health` | `HealthDTO` |
+| `GET` | `/api/auth/status` | `AuthStatusDTO` |
+| `POST` | `/api/auth/setup-pin` | `AuthStatusDTO` |
+| `POST` | `/api/auth/unlock` | `AuthStatusDTO` |
+| `POST` | `/api/auth/change-pin` | `AuthStatusDTO` |
+| `POST` | `/api/auth/lock` | `AuthStatusDTO` |
+| `PATCH` | `/api/auth/settings` | `AuthStatusDTO` |
+| `GET` | `/api/connected-clients` | `ConnectedClientsDTO` |
+| `GET` | `/api/dev/performance` | `DevPerformanceSummaryDTO` |
+| `GET` | `/api/app-update/status` | `AppUpdateStatusDTO` |
+| `POST` | `/api/app-update/check` | `AppUpdateStatusDTO` |
+| `POST` | `/api/app-update/download` | `AppUpdateStatusDTO` |
+| `POST` | `/api/app-update/install` | `AppUpdateStatusDTO` |
+| `DELETE` | `/api/app-update/downloaded-installer` | `AppUpdateStatusDTO` |
+| `GET` | `/api/homepage/recommendations` | `HomepageDailyRecommendationsDTO` |
+| `POST` | `/api/homepage/recommendations/refresh` | `HomepageDailyRecommendationsDTO` |
+| `GET` | `/api/library/played-movies` | `PlayedMoviesListDTO` |
+| `POST` | `/api/library/played-movies/{movieId}` | `204` |
+| `GET` | `/api/library/movies` | `MoviesPageDTO` |
+| `GET` | `/api/library/actors` | `ActorsListDTO` |
+| `GET` | `/api/library/actors/profile` | `ActorProfileDTO` |
+| `GET` | `/api/library/actors/{name}/asset/avatar` | image |
+| `POST` | `/api/library/actors/scrape` | `TaskDTO` |
+| `PATCH` | `/api/library/actors/tags` | `ActorListItemDTO` |
+| `PATCH` | `/api/library/actors/external-links` | `ActorProfileDTO` |
+| `GET` | `/api/library/movies/{movieId}/asset/preview/{index}` | image |
+| `GET` | `/api/library/movies/{movieId}/asset/{kind}` | image |
+| `GET` | `/api/library/movies/{movieId}/playback` | `PlaybackDescriptorDTO` |
+| `POST` | `/api/library/movies/{movieId}/playback-session` | `PlaybackDescriptorDTO` |
+| `POST` | `/api/library/movies/{movieId}/native-play` | `NativePlaybackLaunchDTO` |
+| `GET` | `/api/library/movies/{movieId}/stream` | video |
+| `GET` | `/api/playback/sessions/recent` | `PlaybackSessionListDTO` |
+| `GET` | `/api/playback/sessions/{sessionId}` | `PlaybackSessionStatusDTO` |
+| `GET` | `/api/playback/sessions/{sessionId}/hls/{file}` | HLS file |
+| `DELETE` | `/api/playback/sessions/{sessionId}` | `204` |
+| `POST` | `/api/library/movies/{movieId}/reveal` | `204` |
+| `GET` | `/api/library/movies/{movieId}/comment` | `MovieCommentDTO` |
+| `PUT` | `/api/library/movies/{movieId}/comment` | `MovieCommentDTO` |
+| `GET` | `/api/library/movies/{movieId}` | `MovieDetailDTO` |
+| `PATCH` | `/api/library/movies/{movieId}` | `MovieDetailDTO` |
+| `POST` | `/api/library/movies/{movieId}/restore` | `204` |
+| `POST` | `/api/library/movies/{movieId}/scrape` | `TaskDTO` |
+| `POST` | `/api/library/metadata-scrape` | `MetadataRefreshQueuedDTO` |
+| `DELETE` | `/api/library/movies/{movieId}` | `204` |
+| `GET` | `/api/settings` | `SettingsDTO` |
+| `PATCH` | `/api/settings` | `SettingsDTO` |
+| `POST` | `/api/import/movies` | `TaskDTO` |
+| `POST` | `/api/import/movies/uploads` | `MovieImportUploadDTO` |
+| `GET` | `/api/import/movies/uploads/{uploadId}` | `MovieImportUploadDTO` |
+| `DELETE` | `/api/import/movies/uploads/{uploadId}` | `204` |
+| `PUT` | `/api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}` | `MovieImportUploadDTO` |
+| `POST` | `/api/import/movies/uploads/{uploadId}/commit` | `TaskDTO` |
+| `POST` | `/api/library/paths` | `AddLibraryPathResponse` |
+| `GET` | `/api/library/paths/storage-status` | `LibraryPathStorageStatusListDTO` |
+| `POST` | `/api/library/paths/storage-status/check` | `LibraryPathStorageStatusListDTO` |
+| `POST` | `/api/library/paths/{id}/reveal` | `204` |
+| `POST` | `/api/library/paths/{id}/storage-binding/rebind` | `LibraryPathStorageStatusDTO` |
+| `PATCH` | `/api/library/paths/{id}` | `LibraryPathDTO` |
+| `DELETE` | `/api/library/paths/{id}` | `204` |
+| `POST` | `/api/scans` | `TaskDTO` |
+| `GET` | `/api/tasks/recent` | `RecentTasksDTO` |
+| `GET` | `/api/tasks/{taskId}` | `TaskDTO` |
+| `GET` | `/api/playback/progress` | `PlaybackProgressListDTO` |
+| `PUT` | `/api/playback/progress/{movieId}` | `204` |
+| `DELETE` | `/api/playback/progress/{movieId}` | `204` |
+| `GET` | `/api/playback/watch-time/daily` | `PlaybackWatchTimeDailyListDTO` |
+| `POST` | `/api/playback/watch-time/daily` | `204` |
+| `GET` | `/api/curated-frames` | `CuratedFramesListDTO` |
+| `GET` | `/api/curated-frames/stats` | `CuratedFrameStatsDTO` |
+| `GET` | `/api/curated-frames/tags` | `CuratedFrameFacetListDTO` |
+| `GET` | `/api/curated-frames/actors` | `CuratedFrameFacetListDTO` |
+| `POST` | `/api/curated-frames` | `204` |
+| `GET` | `/api/curated-frames/{id}/thumbnail` | image |
+| `GET` | `/api/curated-frames/{id}/image` | image |
+| `PATCH` | `/api/curated-frames/{id}/tags` | `204` |
+| `DELETE` | `/api/curated-frames/{id}` | `204` |
+| `POST` | `/api/curated-frames/export` | image / zip |
+| `POST` | `/api/providers/ping` | `ProviderHealthDTO` |
+| `POST` | `/api/providers/ping-all` | `PingAllProvidersResponse` |
+| `POST` | `/api/proxy/ping-javbus` | `ProxyJavBusPingResponse` |
+| `POST` | `/api/proxy/ping-google` | `ProxyJavBusPingResponse` |
 
-Important notes:
+## 7. 维护规则
 
-- accepts `jpg`, `webp`, and `png`
-- JPG exports use `.jpg` filenames and `image/jpeg`
-- frontend single-export and batch-export actions now use the persisted `curatedFrameExportFormat` setting
+后续维护或新增 API 时请同步更新：
+
+1. `backend/internal/server/server.go` 或对应 handler 文件。
+2. `backend/internal/contracts/contracts.go` 中的 DTO、错误码和注释。
+3. `src/api/types.ts` 和 `src/api/endpoints.ts`。
+4. 本文件 `API.md`，包括 Endpoint Reference、DTO 速查、全路由清单。
+5. 如果新增端点或改变公开行为，还要按仓库规则同步 `.cursor/rules/project-facts.mdc`、`README.md`、`CLAUDE.md` 及相关 reference 文档。
+
+兼容性建议：
+
+- 新字段优先做可选字段，旧客户端可忽略。
+- 变更枚举值前先确认前端、Android、桌面壳和脚本是否都已支持。
+- 媒体端点不要改成 JSON envelope。
+- `204 No Content` 接口不要新增 JSON body，除非同步所有客户端。
+- 需要长耗时的操作优先返回 `202 TaskDTO`，避免客户端持有长连接。
+- 新增错误场景时优先复用现有错误码；需要稳定区分时再新增错误码。
+- 新增 query/body 字段时在 handler、Go DTO、TS types、本文档中同时落地。
