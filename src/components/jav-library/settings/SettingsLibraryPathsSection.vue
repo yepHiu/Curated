@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Database, RefreshCw } from "lucide-vue-next"
+import { Database, Download, RefreshCw } from "lucide-vue-next"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
 import {
   Card,
@@ -30,6 +30,8 @@ const props = defineProps<{
   storageStatusBusy: boolean
   storageStatusError: string
   storageBindingBusy: string | null
+  movieCsvExportBusy: boolean
+  movieCsvExportError: string
   defaultImportLibraryPathId: string
   defaultImportPathSaving: boolean
   defaultImportPathError: string
@@ -77,6 +79,7 @@ const emit = defineEmits<{
   reveal: [path: LibraryPathDTO]
   edit: [path: LibraryPathDTO]
   rescan: [path: LibraryPathDTO]
+  exportMoviesCsv: []
   checkStorage: []
   rebindStorage: [path: LibraryPathDTO]
   remove: [path: LibraryPathDTO]
@@ -226,6 +229,9 @@ function onDefaultImportPathChange(value: unknown) {
           <p v-if="storageStatusError" class="text-sm text-destructive" role="alert">
             {{ storageStatusError }}
           </p>
+          <p v-if="movieCsvExportError" class="text-sm text-destructive" role="alert">
+            {{ movieCsvExportError }}
+          </p>
 
           <SettingsLibraryPathRemoveDialog
             :open="removePathDialogOpen"
@@ -288,6 +294,21 @@ function onDefaultImportPathChange(value: unknown) {
               @browse="emit('browse')"
               @submit="emit('submit')"
             />
+            <Button
+              type="button"
+              variant="outline"
+              class="h-8 min-w-28 rounded-2xl px-3"
+              :disabled="movieCsvExportBusy"
+              data-export-movie-csv
+              @click="emit('exportMoviesCsv')"
+            >
+              <Download data-icon="inline-start" aria-hidden="true" />
+              {{
+                movieCsvExportBusy
+                  ? t("settings.movieCsvExporting")
+                  : t("settings.movieCsvExport")
+              }}
+            </Button>
             <Button
               type="button"
               variant="outline"

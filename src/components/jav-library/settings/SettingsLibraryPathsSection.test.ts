@@ -10,6 +10,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("lucide-vue-next", () => ({
   Database: { name: "Database", template: "<span />" },
+  Download: { name: "Download", template: "<span />" },
   RefreshCw: { name: "RefreshCw", template: "<span />" },
 }))
 
@@ -178,6 +179,8 @@ const baseProps = {
   addBusy: false,
   canSaveNewPath: false,
   dialogContentClass: "dialog-content",
+  movieCsvExportBusy: false,
+  movieCsvExportError: "",
 }
 
 describe("SettingsLibraryPathsSection", () => {
@@ -238,6 +241,7 @@ describe("SettingsLibraryPathsSection", () => {
     await wrapper.get("[data-select-all]").trigger("click")
     await wrapper.get("[data-clear]").trigger("click")
     await wrapper.get("[data-refresh]").trigger("click")
+    await wrapper.get("[data-export-movie-csv]").trigger("click")
     await wrapper.get("[data-check-storage-status]").trigger("click")
     await wrapper.get("[data-exit]").trigger("click")
     await wrapper.get("[data-remove-open]").trigger("click")
@@ -262,6 +266,7 @@ describe("SettingsLibraryPathsSection", () => {
     expect(wrapper.emitted("selectAll")).toHaveLength(1)
     expect(wrapper.emitted("clearSelection")).toHaveLength(1)
     expect(wrapper.emitted("refreshMetadata")).toHaveLength(1)
+    expect(wrapper.emitted("exportMoviesCsv")).toHaveLength(1)
     expect(wrapper.emitted("checkStorage")).toHaveLength(1)
     expect(wrapper.emitted("exitBatchMode")).toHaveLength(1)
     expect(wrapper.emitted("update:removePathDialogOpen")).toEqual([[false]])
@@ -294,6 +299,17 @@ describe("SettingsLibraryPathsSection", () => {
     expect(checkActionParent).toBe(addActionParent)
   })
 
+  it("places the movie CSV export action next to the storage actions", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: baseProps,
+    })
+
+    const addActionParent = wrapper.get("[data-add-dialog]").element.parentElement
+    const exportActionParent = wrapper.get("[data-export-movie-csv]").element.parentElement
+
+    expect(exportActionParent).toBe(addActionParent)
+  })
+
   it("uses the standard storage action button size for the storage check action", () => {
     const wrapper = mount(SettingsLibraryPathsSection, {
       props: baseProps,
@@ -304,5 +320,30 @@ describe("SettingsLibraryPathsSection", () => {
     expect(checkStorageClass).toContain("h-8")
     expect(checkStorageClass).toContain("min-w-28")
     expect(checkStorageClass).toContain("px-3")
+  })
+
+  it("disables the movie CSV export action while export is running", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: {
+        ...baseProps,
+        movieCsvExportBusy: true,
+      },
+    })
+
+    const button = wrapper.get("[data-export-movie-csv]")
+
+    expect(button.attributes("disabled")).toBeDefined()
+    expect(button.text()).toContain("settings.movieCsvExporting")
+  })
+
+  it("renders movie CSV export errors", () => {
+    const wrapper = mount(SettingsLibraryPathsSection, {
+      props: {
+        ...baseProps,
+        movieCsvExportError: "export failed",
+      },
+    })
+
+    expect(wrapper.text()).toContain("export failed")
   })
 })

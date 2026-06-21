@@ -50,6 +50,8 @@ export interface LibraryService {
   rebindLibraryPathStorage(id: string): Promise<void>
   /** Web：自 API 重新拉取全库列表（扫描/监听入库后更新计数与海报）；Mock：空操作 */
   reloadMoviesFromApi(): Promise<void>
+  /** Web/Mock: returns the full active movie list used by CSV export. */
+  listMoviesForExport(): Promise<readonly Movie[]>
   /** Web：仅在需要展示回收站时再拉取 trashed 列表；Mock：空操作 */
   ensureTrashLoaded(): Promise<void>
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */

@@ -532,6 +532,20 @@ function createWebLibraryService(): LibraryService {
       }, 450)
     },
 
+    async listMoviesForExport() {
+      try {
+        const movies = await fetchPagedMovies()
+        moviesState.value = movies
+        moviesLoadedState.value = true
+        loadErrorState.value = null
+        return movies
+      } catch (err) {
+        setLoadError(err, "library.loadFailed")
+        console.error("[web-library-service] failed to load movies for export", err)
+        throw err
+      }
+    },
+
     async ensureTrashLoaded() {
       try {
         trashedMoviesState.value = await loadTrashedMovies()

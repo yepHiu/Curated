@@ -40,6 +40,15 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.moviesLoaded.value).toBe(true)
   })
 
+  it("returns active movies for CSV export", async () => {
+    const activeIds = mockLibraryService.movies.value.map((movie) => movie.id)
+
+    const movies = await mockLibraryService.listMoviesForExport()
+
+    expect(movies.map((movie) => movie.id)).toEqual(activeIds)
+    expect(movies.every((movie) => !movie.trashedAt?.trim())).toBe(true)
+  })
+
   it("returns visible connected client examples in mock mode", async () => {
     const dto = await mockLibraryService.listConnectedClients()
 

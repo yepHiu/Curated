@@ -858,6 +858,10 @@ export const mockLibraryService: LibraryService = {
     // Mock: 列表为本地种子，无远端同步。
   },
 
+  async listMoviesForExport() {
+    return moviesState.value.filter((movie) => !movie.trashedAt?.trim())
+  },
+
   async ensureTrashLoaded() {
     // Mock: trash list is already derived from in-memory state.
   },

@@ -32,12 +32,14 @@ import {
 import { useTheme } from "@/composables/use-theme"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import { buildMovieCsvBlob, buildMovieCsvFilename } from "@/lib/movie-csv-export"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getStoredDirectoryHandle,
   setStoredDirectoryHandle,
   supportsFileSystemAccess,
 } from "@/lib/curated-frames/db"
+import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
 import {
   formatAboutBackendVersion,
 } from "@/lib/about-version"
@@ -221,6 +223,8 @@ const scanFeedbackError = ref("")
 const storageStatusBusy = ref(false)
 const storageStatusError = ref("")
 const storageBindingBusy = ref<string | null>(null)
+const movieCsvExportBusy = ref(false)
+const movieCsvExportError = ref("")
 /** 按目录批量元数据刷新：成功摘要 */
 const metadataRefreshSuccess = ref("")
 /** 按目录批量元数据刷新：错误文案 */
@@ -1495,6 +1499,29 @@ async function checkLibraryStorageStatus(ids?: string[]) {
   }
 }
 
+async function exportMovieLibraryCsv() {
+  if (movieCsvExportBusy.value) return
+  movieCsvExportError.value = ""
+  movieCsvExportBusy.value = true
+  try {
+    const movies = await libraryService.listMoviesForExport()
+    const blob = buildMovieCsvBlob(movies)
+    triggerDownloadBlob(blob, buildMovieCsvFilename())
+    pushAppToast(t("settings.movieCsvExportSuccess", { count: movies.length }), {
+      variant: "success",
+      durationMs: 3200,
+    })
+  } catch (err) {
+    console.error("[settings] export movie csv failed", err)
+    movieCsvExportError.value =
+      err instanceof HttpClientError && err.apiError?.message
+        ? err.apiError.message
+        : t("settings.movieCsvExportFailed")
+  } finally {
+    movieCsvExportBusy.value = false
+  }
+}
+
 async function rebindLibraryPathStorage(path: { id: string }) {
   storageStatusError.value = ""
   storageBindingBusy.value = path.id
@@ -2043,6 +2070,8 @@ async function runMetadataRefreshForSelected() {
         :storage-status-busy="storageStatusBusy"
         :storage-status-error="storageStatusError"
         :storage-binding-busy="storageBindingBusy"
+        :movie-csv-export-busy="movieCsvExportBusy"
+        :movie-csv-export-error="movieCsvExportError"
         :default-import-library-path-id="defaultImportLibraryPathId"
         :default-import-path-saving="defaultImportPathSaving"
         :default-import-path-error="defaultImportPathError"
@@ -2078,6 +2107,7 @@ async function runMetadataRefreshForSelected() {
         @edit="startEditLibraryTitle"
         @rescan="rescanPath($event.path)"
         @check-storage="checkLibraryStorageStatus()"
+        @export-movies-csv="exportMovieLibraryCsv"
         @rebind-storage="rebindLibraryPathStorage"
         @remove="openRemovePathConfirm"
         @change-default-import-library-path="onDefaultImportLibraryPathChange"
