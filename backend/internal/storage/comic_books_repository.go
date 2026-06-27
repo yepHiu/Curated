@@ -131,6 +131,22 @@ func (s *SQLiteStore) GetComicBookDetail(ctx context.Context, id string) (contra
 	return contracts.ComicBookDetailDTO{ComicBookListItemDTO: item, Pages: pages}, nil
 }
 
+func (s *SQLiteStore) GetComicBookByLocation(ctx context.Context, location string) (contracts.ComicBookDetailDTO, error) {
+	location = filepath.Clean(strings.TrimSpace(location))
+	if location == "" || location == "." {
+		return contracts.ComicBookDetailDTO{}, ErrComicBookNotFound
+	}
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM comic_books WHERE location = ?`, location).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return contracts.ComicBookDetailDTO{}, ErrComicBookNotFound
+		}
+		return contracts.ComicBookDetailDTO{}, err
+	}
+	return s.GetComicBookDetail(ctx, id)
+}
+
 func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComicBooksRequest) (contracts.ComicBooksPageDTO, error) {
 	limit := req.Limit
 	if limit <= 0 || limit > 500 {
