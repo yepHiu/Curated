@@ -250,6 +250,7 @@ PATCH  /api/settings                        # Partial update (persisted to confi
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
 POST   /api/scans                           # Start scan task
+GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
 GET    /api/playback/progress               # List all playback progress
@@ -370,7 +371,8 @@ All long-running operations (scan, scrape, asset download) are modeled as backgr
 
 - **Task lifecycle:** `pending` → `running` → `completed` | `partial_failed` | `failed` | `cancelled`
 - **Task types:** `scan.library`, `scrape.movie`, `scrape.actor`
-- **Polling:** Frontend polls `GET /api/tasks/{taskId}` for progress updates
+- **SSE events:** `GET /api/events` streams non-blocking `task.updated` snapshots; frontend task tracking and library-watch toasts consume it in Web API mode
+- **Polling fallback:** Frontend still polls `GET /api/tasks/{taskId}` for progress updates when SSE is unavailable
 - **Recent tasks:** `GET /api/tasks/recent` returns recently completed tasks for UI toast notifications
 - **Idempotency:** Tasks are designed to be safely retryable without duplicates
 
@@ -398,7 +400,7 @@ Player startup should consume `GET /api/library/movies/{id}/playback` instead of
 - Purpose: preserve current browser playback while creating the expansion seam for remux/transcode/native playback later
 - Browser playback may now move onto a backend-managed HLS session when stream push is enabled
 - HLS startup is remux-first when the source is already HLS-friendly, with fallback to hardware/software transcode profiles
-- The frontend keeps HLS playback inside the existing player page and loads `hls.js` on demand when the browser lacks native HLS support
+- The frontend keeps HLS playback inside the existing player page and loads npm-bundled `hls.js` on demand when the browser lacks native HLS support; packaged desktop builds no longer rely on a CDN HLS script
 - The backend now keeps a bounded in-memory archive for recent playback sessions so `GET /api/playback/sessions/recent` and `GET /api/playback/sessions/{id}` can diagnose recently stopped or expired HLS sessions
 - The current player page prefers browser-side local-player handoff for external playback. With the PotPlayer preset, the frontend uses a browser protocol template (default `potplayer:{url}`) instead of depending on backend process launch.
 - `POST /api/library/movies/{id}/native-play` still exists as a legacy/native-shell hook, but it is no longer the default path for the player page button

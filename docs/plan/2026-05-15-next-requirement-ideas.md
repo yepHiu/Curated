@@ -62,3 +62,53 @@
 - 导入 UI 增加速度 / ETA，不先做 SQLite 会话持久化。
 - Settings Overview 加 Connected Clients 的本机 in-memory MVP，不先做 token 鉴权。
 - 首页推荐卡片增加“为什么推荐”文案，先用现有算法信号解释，不改推荐算法。
+
+## 2026-06-28 状态复盘
+
+本节按当前代码、`project-facts.mdc`、`README.md`、`API.md` 与近期计划文档复核原清单。原始清单保留为历史候选池；以下状态用于后续筛选和拆 PRD。
+
+### 已落地或已被其它需求吸收
+
+| 原候选 | 当前判断 | 依据 / 备注 |
+|---|---|---|
+| Connected Clients 连接设备列表 | 已落地 | 已有 `GET /api/connected-clients`、Settings Overview 展示、Electron `X-Curated-Client: desktop-electron` 标记与桌面 OS 识别。 |
+| LAN 访问控制的一部分 | 已部分吸收 | PIN App Lock 已提供后端保护、`lanRequiresPin`、HTTP-only `curated_auth`、idle lock、trusted device、重启锁定策略。尚未做监听范围开关、显式访问 token、设备授权和会话管理 UI。 |
+| Electron 桌面壳基础 | 已落地 | 生产入口已是 Electron shell + Go 后端，支持托盘、隐藏到托盘、设置入口、浏览器入口和客户端标记。 |
+| 托盘“打开日志目录” | Go tray 已有，Electron tray 未补齐 | `backend/internal/desktop/tray_windows.go` 已有 `Open Logs`；`electron/desktop-shell.ts` 的托盘菜单仍只有打开 Curated、浏览器 Web、Settings、Quit。 |
+| HLS / 转码诊断底座 | 已部分落地 | 后端已有 playback session 创建、recent/list/detail 诊断接口；播放器已有 stats overlay。仍可做更清晰的用户可读诊断面板。 |
+| 大文件导入基础 | 已落地 | 已有 resumable upload endpoint、chunk 上传、commit、abort、task progress 和 `.curated-import/` staging。Phase 2 的持久恢复和清理仍未完成。 |
+| 完全离线桌面资源 | 已落地 | `index.html` 已移除 Google Fonts；Outfit 通过 `@fontsource/outfit` 打包；`hls.js` 改为 npm 动态 import；新增离线资源测试。 |
+| SSE 后端事件流 | MVP 已落地 | 新增 `GET /api/events` SSE；`tasks.Manager` 发布非阻塞 `task.updated`；前端 `backend-events`、任务 tracker 与 library watch toast 已接入，轮询保留 fallback。 |
+| 需求台账 | 已部分落地 | `docs/prd/requirements.csv` 已有真实产品需求 `REQ-0002`，但大多数候选需求还没有进入 PRD 台账。 |
+| SettingsPage 拆分 | 已推进 | `SettingsPage.vue` 已从约 3700 行降到约 2172 行，并拆出多个 settings 子组件；仍可继续收口父组件状态编排。 |
+
+### 仍然可以直接开做的候选需求
+
+| 建议优先级 | 需求 | 为什么现在适合做 | 第一切片建议 |
+|---|---|---|---|
+| P0 | LAN 访问范围与设备会话管理 | PIN 已解决“要不要解锁”，但还缺“服务监听在哪、哪些设备被信任、如何撤销设备”。这是 Android / LAN / Server Mode 的安全前置。 | 增加 Settings -> Security 的 trusted sessions 列表与撤销；后端提供会话列表/撤销接口；再评估监听范围或访问 token。 |
+| P1 | 大文件导入 Phase 2 | 当前 upload session 仍是内存态，刷新或重启后无法恢复；staging 残留也缺启动清理。真实多 GB 导入会直接受益。 | SQLite 持久化 upload session + 启动 janitor + UI 速度/ETA；暂停/继续可作为第二切片。 |
+| P1 | 资料库健康台 | 存储健康只覆盖库路径在线状态；重复番号、缺图、刮削失败、损坏资产仍没有统一工作台。 | 新增 Library Health 聚合页/Settings 卡片：重复番号、缺封面/预览、失联路径、最近失败刮削。 |
+| P1 | 元数据修复队列 | 当前有 provider health 和失败分类，但用户仍需要手动逐个重试。 | 后端聚合 missing/failed 状态；前端按错误类型过滤、批量重试、显示 provider 建议。 |
+| P2 | Electron 原生播放器桥 | 后端已有 native player 配置与 legacy native-play hook，但 Electron preload 仍只暴露目录选择。 | 保持可选关闭：preload 暴露窄 `launchNativePlayer` 或 shell handoff；设置页配置路径；播放描述符决策 native/direct/hls。 |
+| P2 | 智能集合 / Saved Views | 现有筛选、标签、演员、评分、历史已足够支撑保存视图。 | 先做 localStorage 版保存查询；侧边栏或首页展示；稳定后再迁 SQLite。 |
+| P2 | 推荐反馈与解释 | 每日推荐已有持久状态，但用户不能表达“不喜欢/少推荐”。 | 推荐卡片增加“为什么推荐”；保存 dislike/skip reason；生成时降低对应 actor/studio/tag 权重。 |
+| P2 | 演员别名 / 合并 / 纠错 | 演员资料、标签、外链已具备，下一步自然是解决同人不同名。 | 新增 actor aliases/canonical 表；Actor Profile 合并入口；电影 actor filter 走 canonical name。 |
+| P2 | 策展帧集合 / Storyboard | 策展帧已完成浏览、标签、导出；集合能把单张截图变成可整理素材。 | 新增 collection/board 模型；帧加入集合；导出 ZIP 或 HTML contact sheet。 |
+| P2 | 观看洞察页 | watch-time、history、rating 已有数据，但只在 Settings Overview 做了汇总。 | 新增 Insights：按演员/厂商/标签观看时长、完成率、近期中断、偏好变化。 |
+| P3 | 备份 / 迁移 / 恢复 | SQLite、配置、缓存、封面已成为长期资产；用户长期使用前需要可恢复路径。 | Settings Maintenance 增加备份包导出、恢复前预检、版本兼容说明。 |
+| P3 | 继续拆大文件 | 当前仍有 `PlayerPage.vue` 约 2515 行、`SettingsPage.vue` 约 2172 行、`server.go` 约 2917 行、`app.go` 约 2478 行。 | 按行为边界拆播放器 media/HLS/session 编排，后端按 auth/import/playback/library handler 继续拆。 |
+
+### 我建议下一轮优先选的 5 个
+
+1. **大文件导入 Phase 2**：入口链路最接近真实用户痛点，且当前后端已经有 chunk/staging/task 基础。
+2. **LAN 访问范围与设备会话管理**：承接 PIN、Connected Clients、Android App 规划，安全价值最高。
+3. **资料库健康台 + 元数据修复队列**：可以合并为一个“Library Health / Repair”方向，适合长期使用后的库维护。
+4. **智能集合 / Saved Views**：现有筛选、标签、演员、评分、历史已有足够信号，可以先做 localStorage 版保存查询。
+5. **推荐反馈与解释**：每日推荐已有持久状态，下一步可以让用户表达“不喜欢/少推荐”并展示简短解释。
+
+### 暂不建议立即做
+
+- Android 原生 App：已有 `docs/plan/2026-06-07-curated-android-app-foundation.md`，但在 LAN 安全、设备会话、离线/播放契约更稳前，建议先不要开新客户端工程。
+- 深度 WebHID / node-hid / DualSense LED 与自适应扳机：Web Gamepad MVP 已覆盖主流程，硬件深集成更适合等 Electron 原生桥更成熟后再做。
+- 完整多用户权限系统：当前产品仍是单用户本地媒体库，先做 App Lock、设备会话和访问范围控制即可。

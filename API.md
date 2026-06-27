@@ -250,6 +250,7 @@ X-Curated-OS-Version: 15
 | `GET /api/library/movies/{movieId}/asset/preview/{index}` | 预览图，可能从本地缓存或远端代理返回 |
 | `GET /api/library/actors/{name}/asset/avatar` | 演员头像 |
 | `GET /api/playback/sessions/{sessionId}/hls/{file}` | HLS playlist / segment |
+| `GET /api/events` | Server-Sent Events (`text/event-stream`) |
 | `GET /api/curated-frames/{id}/image` | 精选帧原图 |
 | `GET /api/curated-frames/{id}/thumbnail` | 精选帧缩略图 |
 | `POST /api/curated-frames/export` | 单图 `image/jpeg` / `image/png` / `image/webp`，多图 `application/zip` |
@@ -270,6 +271,8 @@ X-Curated-OS-Version: 15
 1. 调用触发接口，收到 `202 Accepted` 和 `TaskDTO`。
 2. 用 `taskId` 轮询 `GET /api/tasks/{taskId}`。
 3. 如果只关心最近完成任务，调用 `GET /api/tasks/recent?limit=30`。
+
+实时更新：Web API 客户端可以同时订阅 `GET /api/events`。当前 SSE 流会发送 `hello` 连接确认、`task.updated` 任务快照事件，以及 comment heartbeat；轮询端点仍保留为断线或不支持 SSE 时的 fallback。
 
 任务状态：
 
@@ -1781,6 +1784,37 @@ Query：
 
 - `404 COMMON_NOT_FOUND`
 
+#### `GET /api/events`
+
+用途：订阅后端事件流。当前事件流用于推送任务生命周期快照，前端用它驱动扫描、导入、刮削和目录监听 toast，同时保留 `/tasks/{taskId}` 与 `/tasks/recent` 轮询作为 fallback。
+
+认证：受 PIN App Lock 保护，未解锁时返回 `423 AUTH_LOCKED`。
+
+响应头：
+
+| Header | 值 |
+| --- | --- |
+| `Content-Type` | `text/event-stream` |
+| `Cache-Control` | `no-cache` |
+| `Connection` | `keep-alive` |
+| `X-Accel-Buffering` | `no` |
+
+连接成功后先发送：
+
+```text
+event: hello
+data: {"type":"hello"}
+```
+
+任务更新事件：
+
+```text
+event: task.updated
+data: {"type":"task.updated","task":{"taskId":"task-1","type":"scan.library","status":"running","createdAt":"2026-06-28T12:00:00Z","progress":0.4}}
+```
+
+服务端还会周期性发送 comment heartbeat。客户端断开后服务端会自动取消订阅；事件投递是非阻塞的，慢客户端可能丢失中间快照，因此客户端仍应保留轮询补偿。
+
 ### 4.14 Curated Frames
 
 #### `GET /api/curated-frames`
@@ -2212,7 +2246,16 @@ interface TaskDTO {
 }
 ```
 
-### 5.7 `MovieImportUploadDTO`
+### 5.7 `TaskEventDTO`
+
+```ts
+interface TaskEventDTO {
+  type: "task.updated"
+  task: TaskDTO
+}
+```
+
+### 5.8 `MovieImportUploadDTO`
 
 ```ts
 interface MovieImportUploadDTO {
@@ -2233,7 +2276,7 @@ interface MovieImportUploadDTO {
 }
 ```
 
-### 5.8 `CuratedFrameItemDTO`
+### 5.9 `CuratedFrameItemDTO`
 
 ```ts
 interface CuratedFrameItemDTO {
@@ -2248,7 +2291,7 @@ interface CuratedFrameItemDTO {
 }
 ```
 
-### 5.9 `ActorProfileDTO`
+### 5.10 `ActorProfileDTO`
 
 ```ts
 interface ActorProfileDTO {
@@ -2335,6 +2378,7 @@ interface ActorProfileDTO {
 | `PATCH` | `/api/library/paths/{id}` | `LibraryPathDTO` |
 | `DELETE` | `/api/library/paths/{id}` | `204` |
 | `POST` | `/api/scans` | `TaskDTO` |
+| `GET` | `/api/events` | SSE `TaskEventDTO` stream |
 | `GET` | `/api/tasks/recent` | `RecentTasksDTO` |
 | `GET` | `/api/tasks/{taskId}` | `TaskDTO` |
 | `GET` | `/api/playback/progress` | `PlaybackProgressListDTO` |

@@ -34,6 +34,8 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
+- **Offline desktop resources** — Packaged UI uses local Outfit font assets and npm-bundled `hls.js`; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
+- **Backend events** — `GET /api/events` streams task lifecycle updates over SSE so scan/import/scrape UI can react in real time while keeping polling as fallback.
 - **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
@@ -132,6 +134,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Resume playback with persisted progress (SQLite in Web API mode, localStorage in mock mode).
 - Playback descriptor seam for direct-play, remux, and transcode paths.
 - HLS session support with session diagnostics and recent-session listing.
+- Browser HLS fallback loads bundled `hls.js` on demand, without a runtime CDN dependency.
 - External player handoff via configurable browser protocol template (PotPlayer preset).
 - Daily watch-time statistics in Settings → Overview (91-day window).
 - Player stats overlay, preview timeline thumbnails, and curated-frame capture.
@@ -252,6 +255,8 @@ Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback
 See [API.md](API.md) for the full endpoint reference.
 
 Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
+
+Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
 
 Library storage presence uses endpoints under `/api/library/paths/storage-status` to detect offline or mismatched backing volumes. The current implementation is Windows-first; macOS and Linux use a fallback path probe and remain future adaptation targets.
 
