@@ -261,6 +261,22 @@ export interface ComicBookListItemDTO {
   completedAt?: string
 }
 
+export interface ComicBooksPageDTO {
+  items: ComicBookListItemDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ListComicBooksParams {
+  q?: string
+  tag?: string
+  favorite?: boolean
+  readStatus?: string
+  limit?: number
+  offset?: number
+}
+
 export interface ComicPageDTO {
   comicId: string
   index: number
@@ -291,6 +307,12 @@ export interface ComicCacheSettingsDTO {
   maxBytes: number
 }
 
+export interface ComicCacheStatusDTO {
+  maxBytes: number
+  usedBytes: number
+  entryCount: number
+}
+
 export interface ComicReadingProgressDTO {
   comicId: string
   pageIndex: number
@@ -304,6 +326,26 @@ export interface ComicReadingPreferencesDTO {
   fit: ComicFitMode
   direction: ComicReadingDirection
   updatedAt?: string
+}
+
+export interface PatchComicBookBody {
+  title?: string
+  tags?: string[]
+  favorite?: boolean
+  ratingSet?: boolean
+  ratingClear?: boolean
+  rating?: number
+}
+
+export interface PutComicProgressBody {
+  pageIndex: number
+  completed: boolean
+}
+
+export interface PutComicReadingPreferencesBody {
+  mode?: ComicReaderMode
+  fit?: ComicFitMode
+  direction?: ComicReadingDirection
 }
 
 export type HardwareEncoderPreference =
