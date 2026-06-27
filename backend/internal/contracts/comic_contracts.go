@@ -30,6 +30,22 @@ type ComicBookDetailDTO struct {
 	Pages []ComicPageDTO `json:"pages"`
 }
 
+type ListComicBooksRequest struct {
+	Query      string `json:"query,omitempty"`
+	Tag        string `json:"tag,omitempty"`
+	Favorite   *bool  `json:"favorite,omitempty"`
+	ReadStatus string `json:"readStatus,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+}
+
+type ComicBooksPageDTO struct {
+	Items  []ComicBookListItemDTO `json:"items"`
+	Total  int                    `json:"total"`
+	Limit  int                    `json:"limit"`
+	Offset int                    `json:"offset"`
+}
+
 type ComicPageDTO struct {
 	ComicID   string `json:"comicId"`
 	Index     int    `json:"index"`
@@ -72,8 +88,34 @@ type PutComicProgressRequest struct {
 	Completed bool `json:"completed"`
 }
 
+type ComicReadingProgressDTO struct {
+	ComicID   string `json:"comicId"`
+	PageIndex int    `json:"pageIndex"`
+	Completed bool   `json:"completed"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 type PutComicReadingPreferencesRequest struct {
 	Mode      *string `json:"mode,omitempty"`
 	Fit       *string `json:"fit,omitempty"`
 	Direction *string `json:"direction,omitempty"`
+}
+
+type ComicReadingPreferencesDTO struct {
+	ComicID   string `json:"comicId,omitempty"`
+	Mode      string `json:"mode"`
+	Fit       string `json:"fit"`
+	Direction string `json:"direction"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+type ComicCacheEntryDTO struct {
+	CacheKey       string `json:"cacheKey"`
+	ComicID        string `json:"comicId"`
+	Kind           string `json:"kind"`
+	PageIndex      int    `json:"pageIndex"`
+	Path           string `json:"path"`
+	SizeBytes      int64  `json:"sizeBytes"`
+	CreatedAt      string `json:"createdAt"`
+	LastAccessedAt string `json:"lastAccessedAt"`
 }
