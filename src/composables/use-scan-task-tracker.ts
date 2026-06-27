@@ -3,6 +3,10 @@ import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
 import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
 import { i18n } from "@/i18n"
+import {
+  subscribeBackendEvents,
+  type BackendEventSubscription,
+} from "@/lib/backend-events"
 import { useLibraryService } from "@/services/library-service"
 
 function isFsnotifyLibraryScan(task: TaskDTO): boolean {
@@ -39,6 +43,7 @@ let dismissTimer: ReturnType<typeof setTimeout> | null = null
 let trackedTaskId: string | null = null
 const trackedTaskOptions = ref<ScanTaskTrackerStartOptions>({})
 let consumerCount = 0
+let backendEventsSubscription: BackendEventSubscription | null = null
 
 const progressTask = computed(() =>
   trackedTaskOptions.value.hideProgressDock ? null : activeTask.value,
@@ -59,6 +64,11 @@ function stopPolling() {
     clearInterval(intervalId)
     intervalId = null
   }
+}
+
+function stopBackendEvents() {
+  backendEventsSubscription?.close()
+  backendEventsSubscription = null
 }
 
 function isTerminalStatus(status: TaskDTO["status"]): boolean {
@@ -108,6 +118,128 @@ function movieScrapeToastMessage(task: TaskDTO) {
     : tr("toasts.manualMovieScrapeFailed", { message })
 }
 
+function scheduleTerminalDismiss(taskId: string) {
+  clearDismissTimer()
+  dismissTimer = setTimeout(() => {
+    if (
+      trackedTaskId === taskId &&
+      activeTask.value?.taskId === taskId &&
+      isTerminalStatus(activeTask.value.status)
+    ) {
+      dismiss()
+    }
+  }, 5000)
+}
+
+function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
+  stopPolling()
+  stopBackendEvents()
+  if (t.type === "scan.library") {
+    if (!isFsnotifyLibraryScan(t)) {
+      const msg = t.message ?? ""
+      const tr = i18n.global.t
+      pushAppToast(
+        t.status === "completed"
+          ? tr("toasts.manualLibraryScanDone", { message: msg })
+          : tr("toasts.manualLibraryScanFailed", { message: msg }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          notification: {
+            type: "scan",
+            title:
+              t.status === "completed"
+                ? tr("notificationCenter.titles.scanDone")
+                : tr("notificationCenter.titles.scanFailed"),
+            source: libraryScanNotificationSource(t.taskId),
+          },
+        },
+      )
+    }
+    void libraryService.reloadMoviesFromApi()
+  } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
+    const tr = i18n.global.t
+    pushAppToast(movieScrapeToastMessage(t), {
+      variant: taskTerminalToastVariant(t.status),
+      notification: {
+        type: "scrape",
+        title:
+          t.status === "completed"
+            ? tr("notificationCenter.titles.scrapeDone")
+            : tr("notificationCenter.titles.scrapeFailed"),
+        source: movieScrapeNotificationSource(t),
+      },
+    })
+  } else if (t.type === "import.movies") {
+    const tr = i18n.global.t
+    if (t.status === "completed") {
+      pushAppToast(
+        tr("toasts.movieImportDone", {
+          completed: taskMetaNumber(t, "completedFiles"),
+        }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          notification: {
+            type: "system",
+            title: tr("notificationCenter.titles.importDone"),
+            source: importNotificationSource(t.taskId),
+          },
+        },
+      )
+    } else if (t.status === "partial_failed") {
+      pushAppToast(
+        tr("toasts.movieImportPartial", {
+          completed: taskMetaNumber(t, "completedFiles"),
+          failed: taskMetaNumber(t, "failedFiles"),
+        }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          durationMs: 6500,
+          notification: {
+            type: "system",
+            title: tr("notificationCenter.titles.importFailed"),
+            source: importNotificationSource(t.taskId),
+          },
+        },
+      )
+    } else if (t.status === "failed") {
+      pushAppToast(
+        tr("toasts.movieImportFailed", { message: t.errorMessage ?? t.message ?? "" }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          durationMs: 6500,
+          notification: {
+            type: "system",
+            title: tr("notificationCenter.titles.importFailed"),
+            source: importNotificationSource(t.taskId),
+          },
+        },
+      )
+    }
+    void libraryService.reloadMoviesFromApi()
+  }
+  scheduleTerminalDismiss(dismissTaskId)
+}
+
+function applyTaskUpdate(
+  t: TaskDTO,
+  options: { requireTrackedTaskId?: boolean; dismissTaskId?: string } = {},
+) {
+  if (!trackedTaskId) return
+  if (options.requireTrackedTaskId && t.taskId !== trackedTaskId) return
+  if (
+    activeTask.value?.taskId === t.taskId &&
+    isTerminalStatus(activeTask.value.status) &&
+    !isTerminalStatus(t.status)
+  ) {
+    return
+  }
+  pollError.value = null
+  activeTask.value = t
+  if (isTerminalStatus(t.status)) {
+    handleTerminalTask(t, options.dismissTaskId)
+  }
+}
+
 async function poll() {
   if (!trackedTaskId) return
   const taskId = trackedTaskId
@@ -115,105 +247,10 @@ async function poll() {
     pollError.value = null
     const t = await api.getTaskStatus(taskId)
     if (trackedTaskId !== taskId) return
-    activeTask.value = t
-    if (isTerminalStatus(t.status)) {
-      stopPolling()
-      if (t.type === "scan.library") {
-        if (!isFsnotifyLibraryScan(t)) {
-          const msg = t.message ?? ""
-          const tr = i18n.global.t
-          pushAppToast(
-            t.status === "completed"
-              ? tr("toasts.manualLibraryScanDone", { message: msg })
-              : tr("toasts.manualLibraryScanFailed", { message: msg }),
-            {
-              variant: taskTerminalToastVariant(t.status),
-              notification: {
-                type: "scan",
-                title:
-                  t.status === "completed"
-                    ? tr("notificationCenter.titles.scanDone")
-                    : tr("notificationCenter.titles.scanFailed"),
-                source: libraryScanNotificationSource(t.taskId),
-              },
-            },
-          )
-        }
-        void libraryService.reloadMoviesFromApi()
-      } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
-        const tr = i18n.global.t
-        pushAppToast(movieScrapeToastMessage(t), {
-          variant: taskTerminalToastVariant(t.status),
-          notification: {
-            type: "scrape",
-            title:
-              t.status === "completed"
-                ? tr("notificationCenter.titles.scrapeDone")
-                : tr("notificationCenter.titles.scrapeFailed"),
-            source: movieScrapeNotificationSource(t),
-          },
-        })
-      } else if (t.type === "import.movies") {
-        const tr = i18n.global.t
-        if (t.status === "completed") {
-          pushAppToast(
-            tr("toasts.movieImportDone", {
-              completed: taskMetaNumber(t, "completedFiles"),
-            }),
-            {
-              variant: taskTerminalToastVariant(t.status),
-              notification: {
-                type: "system",
-                title: tr("notificationCenter.titles.importDone"),
-                source: importNotificationSource(t.taskId),
-              },
-            },
-          )
-        } else if (t.status === "partial_failed") {
-          pushAppToast(
-            tr("toasts.movieImportPartial", {
-              completed: taskMetaNumber(t, "completedFiles"),
-              failed: taskMetaNumber(t, "failedFiles"),
-            }),
-            {
-              variant: taskTerminalToastVariant(t.status),
-              durationMs: 6500,
-              notification: {
-                type: "system",
-                title: tr("notificationCenter.titles.importFailed"),
-                source: importNotificationSource(t.taskId),
-              },
-            },
-          )
-        } else if (t.status === "failed") {
-          pushAppToast(
-            tr("toasts.movieImportFailed", { message: t.errorMessage ?? t.message ?? "" }),
-            {
-              variant: taskTerminalToastVariant(t.status),
-              durationMs: 6500,
-              notification: {
-                type: "system",
-                title: tr("notificationCenter.titles.importFailed"),
-                source: importNotificationSource(t.taskId),
-              },
-            },
-          )
-        }
-        void libraryService.reloadMoviesFromApi()
-      }
-      clearDismissTimer()
-      dismissTimer = setTimeout(() => {
-        if (
-          trackedTaskId === taskId &&
-          activeTask.value?.taskId === taskId &&
-          isTerminalStatus(activeTask.value.status)
-        ) {
-          dismiss()
-        }
-      }, 5000)
-    }
+    applyTaskUpdate(t, { dismissTaskId: taskId })
   } catch (e) {
     stopPolling()
+    stopBackendEvents()
     activeTask.value = null
     pollError.value = e instanceof Error ? e.message : i18n.global.t("scanTask.fetchFailed")
     trackedTaskId = null
@@ -224,6 +261,7 @@ async function poll() {
 function dismiss() {
   clearDismissTimer()
   stopPolling()
+  stopBackendEvents()
   trackedTaskId = null
   trackedTaskOptions.value = {}
   activeTask.value = null
@@ -240,6 +278,7 @@ export function useScanTaskTracker() {
     }
     clearDismissTimer()
     stopPolling()
+    stopBackendEvents()
     trackedTaskId = null
     trackedTaskOptions.value = {}
     activeTask.value = null
@@ -249,6 +288,7 @@ export function useScanTaskTracker() {
   function start(taskId: string, options: ScanTaskTrackerStartOptions = {}) {
     clearDismissTimer()
     stopPolling()
+    stopBackendEvents()
     trackedTaskId = taskId
     trackedTaskOptions.value = { ...options }
     activeTask.value = null
@@ -265,6 +305,11 @@ export function useScanTaskTracker() {
         },
       })
     }
+    backendEventsSubscription = subscribeBackendEvents({
+      onTaskUpdated(task) {
+        applyTaskUpdate(task, { requireTrackedTaskId: true })
+      },
+    })
     void poll()
     intervalId = setInterval(() => void poll(), POLL_MS)
   }

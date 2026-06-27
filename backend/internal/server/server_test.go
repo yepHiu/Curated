@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -1915,6 +1916,89 @@ func TestHandleGetRecentTasks(t *testing.T) {
 	}
 	if len(body.Tasks) != 1 || body.Tasks[0].TaskID != x.TaskID {
 		t.Fatalf("unexpected body: %+v", body.Tasks)
+	}
+}
+
+func TestHandleEventsStreamsTaskUpdates(t *testing.T) {
+	t.Parallel()
+
+	tm := tasks.NewManager()
+	h := NewHandler(Deps{
+		Cfg:    config.Config{},
+		Logger: zap.NewNop(),
+		Tasks:  tm,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/events", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 200; body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if contentType := resp.Header.Get("Content-Type"); !strings.Contains(contentType, "text/event-stream") {
+		t.Fatalf("Content-Type = %q, want text/event-stream", contentType)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	if eventName, _ := readSSEEvent(t, reader); eventName != "hello" {
+		t.Fatalf("first event = %q, want hello", eventName)
+	}
+
+	task := tm.Create("scan.library", map[string]any{"trigger": "manual"})
+	eventName, data := readSSEEvent(t, reader)
+	if eventName != tasks.TaskEventTypeTaskUpdated {
+		t.Fatalf("event = %q, want %q", eventName, tasks.TaskEventTypeTaskUpdated)
+	}
+
+	var event tasks.TaskEvent
+	if err := json.Unmarshal([]byte(data), &event); err != nil {
+		t.Fatalf("decode event data: %v; data=%q", err, data)
+	}
+	if event.Type != tasks.TaskEventTypeTaskUpdated || event.Task.TaskID != task.TaskID {
+		t.Fatalf("event data = %+v, want task %q", event, task.TaskID)
+	}
+}
+
+func readSSEEvent(t *testing.T, reader *bufio.Reader) (string, string) {
+	t.Helper()
+
+	var eventName string
+	var data strings.Builder
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("read SSE line: %v", err)
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			if eventName != "" {
+				return eventName, data.String()
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			if data.Len() > 0 {
+				data.WriteByte('\n')
+			}
+			data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
 	}
 }
 

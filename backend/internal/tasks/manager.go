@@ -5,21 +5,33 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"curated-backend/internal/contracts"
 )
 
+const TaskEventTypeTaskUpdated = "task.updated"
+
+// TaskEvent is emitted whenever a task snapshot changes.
+type TaskEvent struct {
+	Type string            `json:"type"`
+	Task contracts.TaskDTO `json:"task"`
+}
+
 // Manager is a thread-safe in-memory task registry with lifecycle tracking and automatic eviction.
 type Manager struct {
-	mu    sync.RWMutex
-	tasks map[string]contracts.TaskDTO
+	mu          sync.RWMutex
+	tasks       map[string]contracts.TaskDTO
+	subscribers map[string]chan TaskEvent
+	nextSubID   atomic.Uint64
 }
 
 // NewManager creates an empty task Manager.
 func NewManager() *Manager {
 	return &Manager{
-		tasks: make(map[string]contracts.TaskDTO),
+		tasks:       make(map[string]contracts.TaskDTO),
+		subscribers: make(map[string]chan TaskEvent),
 	}
 }
 
@@ -40,7 +52,36 @@ func (m *Manager) Create(taskType string, metadata map[string]any) contracts.Tas
 	_ = m.enforceCap()
 	m.mu.Unlock()
 
+	m.publishTaskUpdated(task)
 	return task
+}
+
+// Subscribe registers a listener for future task events. The returned
+// unsubscribe function is idempotent and closes the event channel.
+func (m *Manager) Subscribe(buffer int) (string, <-chan TaskEvent, func()) {
+	if buffer <= 0 {
+		buffer = 1
+	}
+	id := fmt.Sprintf("task-sub-%d", m.nextSubID.Add(1))
+	ch := make(chan TaskEvent, buffer)
+
+	m.mu.Lock()
+	m.subscribers[id] = ch
+	m.mu.Unlock()
+
+	var once sync.Once
+	unsubscribe := func() {
+		once.Do(func() {
+			m.mu.Lock()
+			if current, ok := m.subscribers[id]; ok {
+				delete(m.subscribers, id)
+				close(current)
+			}
+			m.mu.Unlock()
+		})
+	}
+
+	return id, ch, unsubscribe
 }
 
 // Start transitions a task to running and records the start timestamp.
@@ -240,12 +281,26 @@ func (m *Manager) enforceCap() int {
 
 func (m *Manager) update(taskID string, mutate func(contracts.TaskDTO) contracts.TaskDTO) contracts.TaskDTO {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	task := m.tasks[taskID]
 	task = mutate(task)
 	m.tasks[taskID] = task
+	m.mu.Unlock()
+
+	m.publishTaskUpdated(task)
 	return task
+}
+
+func (m *Manager) publishTaskUpdated(task contracts.TaskDTO) {
+	event := TaskEvent{Type: TaskEventTypeTaskUpdated, Task: task}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, ch := range m.subscribers {
+		select {
+		case ch <- event:
+		default:
+		}
+	}
 }
 
 func nowUTC() string {

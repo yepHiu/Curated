@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { defineComponent } from "vue"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { TaskDTO } from "@/api/types"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
   pushAppToast: vi.fn(),
   reloadMoviesFromApi: vi.fn(),
+  subscribeBackendEvents: vi.fn(),
 }))
 
 vi.mock("@/api/endpoints", () => ({
@@ -38,6 +39,10 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     reloadMoviesFromApi: mocks.reloadMoviesFromApi,
   }),
+}))
+
+vi.mock("@/lib/backend-events", () => ({
+  subscribeBackendEvents: mocks.subscribeBackendEvents,
 }))
 
 function makeTask(status: TaskDTO["status"]): TaskDTO {
@@ -77,6 +82,10 @@ function makeMovieScrapeTask(status: TaskDTO["status"]): TaskDTO {
   }
 }
 
+beforeEach(() => {
+  mocks.subscribeBackendEvents.mockReturnValue({ close: vi.fn() })
+})
+
 afterEach(() => {
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -84,6 +93,60 @@ afterEach(() => {
 })
 
 describe("useScanTaskTracker", () => {
+  it("updates a tracked task from backend events", async () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    mocks.subscribeBackendEvents.mockReturnValue({ close })
+    mocks.getTaskStatus.mockResolvedValueOnce(makeTask("running"))
+
+    const Harness = defineComponent({
+      setup() {
+        const { activeTask, start } = useScanTaskTracker()
+        start("task-1")
+        return { activeTask }
+      },
+      template: "<p>{{ activeTask?.status }}</p>",
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    const options = mocks.subscribeBackendEvents.mock.calls[0][0]
+    options.onTaskUpdated(makeTask("completed"))
+    await flushPromises()
+
+    expect(wrapper.text()).toBe("completed")
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualLibraryScanDone",
+      expect.objectContaining({ variant: "success" }),
+    )
+    expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+    expect(close).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("closes backend event subscriptions on unmount", async () => {
+    const close = vi.fn()
+    mocks.subscribeBackendEvents.mockReturnValue({ close })
+    mocks.getTaskStatus.mockResolvedValue(makeTask("running"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("task-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    wrapper.unmount()
+
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
   it("stops polling when the owning component unmounts", async () => {
     vi.useFakeTimers()
     mocks.getTaskStatus.mockResolvedValue(makeTask("running"))

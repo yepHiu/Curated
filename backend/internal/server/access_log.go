@@ -18,12 +18,21 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+func (s *statusRecorder) Flush() {
+	if flusher, ok := s.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 // accessLogQuiet returns true when the request should be logged at Debug (high-volume or noisy routes).
 func accessLogQuiet(r *http.Request) bool {
 	if r.Method == http.MethodGet && r.URL.Path == "/api/health" {
 		return true
 	}
 	if r.Method == http.MethodGet && r.URL.Path == "/api/tasks/recent" {
+		return true
+	}
+	if r.Method == http.MethodGet && r.URL.Path == "/api/events" {
 		return true
 	}
 	p := r.URL.Path

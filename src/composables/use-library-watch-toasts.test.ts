@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   pushAppToast: vi.fn(),
   reloadMoviesFromApi: vi.fn(),
   bumpMovieImageVersion: vi.fn(),
+  subscribeBackendEvents: vi.fn(),
 }))
 
 vi.mock("@/api/endpoints", () => ({
@@ -28,6 +29,10 @@ vi.mock("@/composables/use-app-toast", () => ({
 
 vi.mock("@/lib/image-version", () => ({
   bumpMovieImageVersion: mocks.bumpMovieImageVersion,
+}))
+
+vi.mock("@/lib/backend-events", () => ({
+  subscribeBackendEvents: mocks.subscribeBackendEvents,
 }))
 
 vi.mock("@/services/library-service", () => ({
@@ -107,6 +112,41 @@ afterEach(() => {
 })
 
 describe("useLibraryWatchToasts", () => {
+  it("handles fsnotify scan completion from backend events", async () => {
+    vi.useFakeTimers()
+    mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [] })
+    mocks.subscribeBackendEvents.mockReturnValue({ close: vi.fn() })
+
+    const wrapper = await mountLibraryWatchHarness()
+    await flushPromises()
+
+    const options = mocks.subscribeBackendEvents.mock.calls[0][0]
+    options.onTaskUpdated(makeFsnotifyScanTask())
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.libraryWatchScanDoneNoChanges",
+      expect.objectContaining({ variant: "success" }),
+    )
+    expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("closes backend event subscriptions on unmount", async () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [] })
+    mocks.subscribeBackendEvents.mockReturnValue({ close })
+
+    const wrapper = await mountLibraryWatchHarness()
+    await flushPromises()
+
+    wrapper.unmount()
+
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
   it("summarizes fsnotify scan completion without exposing the raw backend message", async () => {
     vi.useFakeTimers()
     mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [makeFsnotifyScanTask()] })

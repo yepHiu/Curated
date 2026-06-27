@@ -4,6 +4,10 @@ import { api } from "@/api/endpoints"
 import type { TaskDTO } from "@/api/types"
 import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
 import { bumpMovieImageVersion } from "@/lib/image-version"
+import {
+  subscribeBackendEvents,
+  type BackendEventSubscription,
+} from "@/lib/backend-events"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
@@ -134,6 +138,7 @@ export function useLibraryWatchToasts() {
   const fsnotifyScanParents = new Set<string>()
   const bumpedAssetDownloadTaskIds = new Set<string>()
   const changedScanFinishedAtByPaths = new Map<string, number>()
+  let backendEventsSubscription: BackendEventSubscription | null = null
 
   function markToastSeen(taskId: string) {
     seenToastIds.add(taskId)
@@ -189,102 +194,106 @@ export function useLibraryWatchToasts() {
     )
   }
 
+  function processTasks(tasks: TaskDTO[]) {
+    for (const task of tasks) {
+      if (isTerminalStatus(task.status) && isFsnotifyScan(task)) {
+        rememberChangedFsnotifyScan(task)
+      }
+    }
+
+    let needsMovieReload = false
+    for (const task of tasks) {
+      if (!isTerminalStatus(task.status) || !isFsnotifyScan(task)) {
+        continue
+      }
+      fsnotifyScanParents.add(task.taskId)
+      if (seenToastIds.has(task.taskId)) {
+        continue
+      }
+      if (shouldSuppressRedundantNoChangeScan(task)) {
+        markToastSeen(task.taskId)
+        continue
+      }
+      markToastSeen(task.taskId)
+      needsMovieReload = true
+      pushAppToast(libraryWatchScanToastMessage(task), {
+        variant: taskTerminalToastVariant(task.status),
+        notification: {
+          type: "scan",
+          title: t("notificationCenter.titles.scanDone"),
+          source: { taskId: task.taskId },
+        },
+      })
+    }
+
+    const isFsnotifyLinkedScrape = (task: TaskDTO) => {
+      const parent = parentScanId(task)
+      return (
+        taskMetaString(task, "parentScanTrigger") === "fsnotify" ||
+        taskMetaString(task, "trigger") === "fsnotify" ||
+        (!!parent && fsnotifyScanParents.has(parent))
+      )
+    }
+
+    for (const task of tasks) {
+      if (!isTerminalStatus(task.status) || task.type !== "scrape.movie") {
+        continue
+      }
+      if (seenToastIds.has(task.taskId)) {
+        continue
+      }
+      markToastSeen(task.taskId)
+      needsMovieReload = true
+      const mid = movieId(task)
+      if (mid && task.status === "completed") {
+        bumpMovieImageVersion(mid)
+      }
+      if (!isFsnotifyLinkedScrape(task)) {
+        continue
+      }
+      const msg = task.message ?? ""
+      pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
+        variant: taskTerminalToastVariant(task.status),
+        notification: {
+          type: "scrape",
+          title: t("notificationCenter.titles.scrapeDone"),
+          source: { taskId: task.taskId },
+        },
+      })
+    }
+
+    if (needsMovieReload) {
+      void libraryService.reloadMoviesFromApi()
+    }
+
+    for (const task of tasks) {
+      if (
+        !isTerminalStatus(task.status) ||
+        task.type !== "asset.download" ||
+        task.status !== "completed"
+      ) {
+        continue
+      }
+      if (bumpedAssetDownloadTaskIds.has(task.taskId)) continue
+      if (!taskFinishedAfterSessionStart(task)) continue
+      const mid = movieId(task)
+      if (!mid) continue
+      bumpedAssetDownloadTaskIds.add(task.taskId)
+      bumpMovieImageVersion(mid)
+    }
+
+    if (fsnotifyScanParents.size > 300) {
+      fsnotifyScanParents.clear()
+    }
+    if (changedScanFinishedAtByPaths.size > 300) {
+      changedScanFinishedAtByPaths.clear()
+    }
+  }
+
   async function poll() {
     try {
       const { tasks } = await api.getRecentTasks(40)
-      for (const task of tasks) {
-        if (isTerminalStatus(task.status) && isFsnotifyScan(task)) {
-          rememberChangedFsnotifyScan(task)
-        }
-      }
-
-      let needsMovieReload = false
-      for (const task of tasks) {
-        if (!isTerminalStatus(task.status) || !isFsnotifyScan(task)) {
-          continue
-        }
-        fsnotifyScanParents.add(task.taskId)
-        if (seenToastIds.has(task.taskId)) {
-          continue
-        }
-        if (shouldSuppressRedundantNoChangeScan(task)) {
-          markToastSeen(task.taskId)
-          continue
-        }
-        markToastSeen(task.taskId)
-        needsMovieReload = true
-        pushAppToast(libraryWatchScanToastMessage(task), {
-          variant: taskTerminalToastVariant(task.status),
-          notification: {
-            type: "scan",
-            title: t("notificationCenter.titles.scanDone"),
-            source: { taskId: task.taskId },
-          },
-        })
-      }
-
-      const isFsnotifyLinkedScrape = (task: TaskDTO) => {
-        const parent = parentScanId(task)
-        return (
-          taskMetaString(task, "parentScanTrigger") === "fsnotify" ||
-          taskMetaString(task, "trigger") === "fsnotify" ||
-          (!!parent && fsnotifyScanParents.has(parent))
-        )
-      }
-
-      for (const task of tasks) {
-        if (!isTerminalStatus(task.status) || task.type !== "scrape.movie") {
-          continue
-        }
-        if (seenToastIds.has(task.taskId)) {
-          continue
-        }
-        markToastSeen(task.taskId)
-        needsMovieReload = true
-        const mid = movieId(task)
-        if (mid && task.status === "completed") {
-          bumpMovieImageVersion(mid)
-        }
-        if (!isFsnotifyLinkedScrape(task)) {
-          continue
-        }
-        const msg = task.message ?? ""
-        pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
-          variant: taskTerminalToastVariant(task.status),
-          notification: {
-            type: "scrape",
-            title: t("notificationCenter.titles.scrapeDone"),
-            source: { taskId: task.taskId },
-          },
-        })
-      }
-
-      if (needsMovieReload) {
-        void libraryService.reloadMoviesFromApi()
-      }
-
-      for (const task of tasks) {
-        if (
-          !isTerminalStatus(task.status) ||
-          task.type !== "asset.download" ||
-          task.status !== "completed"
-        ) {
-          continue
-        }
-        if (bumpedAssetDownloadTaskIds.has(task.taskId)) continue
-        if (!taskFinishedAfterSessionStart(task)) continue
-        const mid = movieId(task)
-        if (!mid) continue
-        bumpedAssetDownloadTaskIds.add(task.taskId)
-        bumpMovieImageVersion(mid)
-      }
-
-      if (fsnotifyScanParents.size > 300) {
-        fsnotifyScanParents.clear()
-      }
-      if (changedScanFinishedAtByPaths.size > 300) {
-        changedScanFinishedAtByPaths.clear()
-      }
+      processTasks(tasks)
     } catch {
       // Offline / transient API errors: skip silently
     }
@@ -295,6 +304,13 @@ export function useLibraryWatchToasts() {
       return
     }
     libraryWatchAppMountedAtMs = Date.now() - 15_000
+    backendEventsSubscription = subscribeBackendEvents({
+      onTaskUpdated(task) {
+        if (isTerminalStatus(task.status)) {
+          processTasks([task])
+        }
+      },
+    })
     void poll()
     timer = setInterval(() => void poll(), POLL_MS)
   })
@@ -304,5 +320,7 @@ export function useLibraryWatchToasts() {
       clearInterval(timer)
       timer = null
     }
+    backendEventsSubscription?.close()
+    backendEventsSubscription = null
   })
 }

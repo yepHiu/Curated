@@ -7,6 +7,68 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+func TestSubscribeReceivesTaskUpdatedEvents(t *testing.T) {
+	t.Parallel()
+
+	m := NewManager()
+	subscriptionID, events, unsubscribe := m.Subscribe(8)
+	if subscriptionID == "" {
+		t.Fatal("subscriptionID is empty")
+	}
+	defer unsubscribe()
+
+	task := m.Create("scan.library", map[string]any{"trigger": "manual"})
+	if event := readTaskEvent(t, events); event.Type != TaskEventTypeTaskUpdated || event.Task.TaskID != task.TaskID {
+		t.Fatalf("create event = %+v, want task.updated for %q", event, task.TaskID)
+	}
+
+	started := m.Start(task.TaskID, "Scanning")
+	if event := readTaskEvent(t, events); event.Type != TaskEventTypeTaskUpdated || event.Task.Status != contracts.TaskRunning || event.Task.Message != started.Message {
+		t.Fatalf("start event = %+v, want running task", event)
+	}
+
+	completed := m.Complete(task.TaskID, "Scan complete")
+	if event := readTaskEvent(t, events); event.Type != TaskEventTypeTaskUpdated || event.Task.Status != contracts.TaskCompleted || event.Task.FinishedAt != completed.FinishedAt {
+		t.Fatalf("complete event = %+v, want completed task", event)
+	}
+
+	unsubscribe()
+	m.Fail(task.TaskID, "SCAN_FAILED", "ignored")
+	select {
+	case event, ok := <-events:
+		if ok {
+			t.Fatalf("received event after unsubscribe: %+v", event)
+		}
+	case <-time.After(20 * time.Millisecond):
+	}
+}
+
+func TestSubscribeDoesNotBlockOnSlowSubscriber(t *testing.T) {
+	t.Parallel()
+
+	m := NewManager()
+	_, events, unsubscribe := m.Subscribe(1)
+	defer unsubscribe()
+
+	task := m.Create("scan.library", nil)
+	// Fill the subscriber buffer and intentionally do not drain it before updates.
+	_ = readTaskEvent(t, events)
+	m.Progress(task.TaskID, 10, "ten")
+	m.Progress(task.TaskID, 20, "twenty")
+	m.Progress(task.TaskID, 30, "thirty")
+}
+
+func readTaskEvent(t *testing.T, events <-chan TaskEvent) TaskEvent {
+	t.Helper()
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for task event")
+		return TaskEvent{}
+	}
+}
+
 func TestProgressWithMetadata_MergesPatch(t *testing.T) {
 	t.Parallel()
 

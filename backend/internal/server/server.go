@@ -302,6 +302,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/lock", h.handleLockPIN)
 	mux.HandleFunc("PATCH /api/auth/settings", h.handlePatchAuthSettings)
 	mux.HandleFunc("GET /api/connected-clients", h.handleConnectedClients)
+	mux.HandleFunc("GET /api/events", h.handleEvents)
 	mux.HandleFunc("GET /api/dev/performance", h.handleDevPerformance)
 	mux.HandleFunc("GET /api/app-update/status", h.handleGetAppUpdateStatus)
 	mux.HandleFunc("POST /api/app-update/check", h.handleCheckAppUpdate)
