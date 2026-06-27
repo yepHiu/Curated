@@ -5,8 +5,23 @@ import {
   startHlsLoadingAtSessionOrigin,
 } from "@/lib/hls-player"
 
+const hlsMock = vi.hoisted(() => {
+  class FakeHls {
+    static isSupported() {
+      return true
+    }
+  }
+  return { FakeHls }
+})
+
+vi.mock("hls.js", () => ({ default: hlsMock.FakeHls }))
+
 afterEach(() => {
   vi.restoreAllMocks()
+  document.querySelectorAll('script[data-curated-hls="true"]').forEach((script) => {
+    script.remove()
+  })
+  delete window.Hls
 })
 
 describe("buildHlsPlaybackConfig", () => {
@@ -42,6 +57,21 @@ describe("startHlsLoadingAtSessionOrigin", () => {
     })
 
     expect(calls).toEqual([0])
+  })
+})
+
+describe("loadHlsLibrary", () => {
+  it("loads the bundled hls.js module without injecting a CDN script", async () => {
+    vi.resetModules()
+    const appendSpy = vi.spyOn(document.head, "appendChild")
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+
+    const Hls = await loadHlsLibrary()
+
+    expect(Hls).toBe(hlsMock.FakeHls)
+    expect(window.Hls).toBe(hlsMock.FakeHls)
+    expect(appendSpy).not.toHaveBeenCalled()
+    expect(document.querySelector('script[src*="cdn.jsdelivr.net"]')).toBeNull()
   })
 })
 

@@ -14,7 +14,7 @@
     "test": "vitest run --configLoader native --pool threads",
     "test:electron": "vitest run --config vitest.electron.config.ts --configLoader native --pool threads",
     "test:display": "playwright test tests/display-scaling/display-scaling.spec.ts",
-    "build": "pnpm typecheck && vite build",
+    "build": "pnpm typecheck && vite build --configLoader native",
     "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs",
     "build:electron": "pnpm build && pnpm backend:build:dev && pnpm build:electron:main",
     "dev:electron": "pnpm backend:build:dev && pnpm build:electron:main && electron .",
@@ -30,11 +30,13 @@
     "release:history:migrate": "python scripts/release/release_cli.py migrate-history"
   },
   "dependencies": {
+    "@fontsource/outfit": "^5.2.8",
     "@tailwindcss/vite": "^4.2.2",
     "@vueuse/core": "^14.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-vue": "^8.6.0",
+    "hls.js": "^1.6.16",
     "loglevel": "^1.9.2",
     "lucide-vue-next": "^0.577.0",
     "pinyin-pro": "^3.28.0",
