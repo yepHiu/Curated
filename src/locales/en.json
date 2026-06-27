@@ -463,7 +463,15 @@
     "previewCount": "{count} of {total}",
     "previewPage": "Page {page}",
     "previewPageAlt": "Comic page {page}",
-    "previewEmpty": "No page previews are available yet."
+    "previewEmpty": "No page previews are available yet.",
+    "readerPrevious": "Previous page",
+    "readerNext": "Next page",
+    "readerStitchPrevious": "Stitch with previous page",
+    "readerStitchNext": "Stitch with next page",
+    "readerClearStitch": "Clear stitched pages",
+    "readerMode": "Mode",
+    "readerFit": "Fit",
+    "readerDirection": "Direction"
   },
   "movie": {
     "expandSummary": "Expand summary",

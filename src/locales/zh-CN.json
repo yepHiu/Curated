@@ -463,7 +463,15 @@
     "previewCount": "{count} / {total}",
     "previewPage": "第 {page} 页",
     "previewPageAlt": "漫画第 {page} 页",
-    "previewEmpty": "暂无页面预览。"
+    "previewEmpty": "暂无页面预览。",
+    "readerPrevious": "上一页",
+    "readerNext": "下一页",
+    "readerStitchPrevious": "与上一页拼接",
+    "readerStitchNext": "与下一页拼接",
+    "readerClearStitch": "取消拼接",
+    "readerMode": "模式",
+    "readerFit": "适配",
+    "readerDirection": "方向"
   },
   "movie": {
     "expandSummary": "展开简介",

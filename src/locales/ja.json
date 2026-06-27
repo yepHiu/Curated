@@ -463,7 +463,15 @@
     "previewCount": "{count} / {total}",
     "previewPage": "{page} ページ",
     "previewPageAlt": "コミック {page} ページ",
-    "previewEmpty": "ページプレビューはまだありません。"
+    "previewEmpty": "ページプレビューはまだありません。",
+    "readerPrevious": "前のページ",
+    "readerNext": "次のページ",
+    "readerStitchPrevious": "前のページと結合",
+    "readerStitchNext": "次のページと結合",
+    "readerClearStitch": "結合を解除",
+    "readerMode": "モード",
+    "readerFit": "表示",
+    "readerDirection": "方向"
   },
   "movie": {
     "expandSummary": "概要を展開",
