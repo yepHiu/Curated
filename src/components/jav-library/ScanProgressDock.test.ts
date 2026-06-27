@@ -41,6 +41,24 @@ function importTask(status: TaskDTO["status"], metadata?: Record<string, unknown
   }
 }
 
+function comicImportTask(status: TaskDTO["status"], metadata?: Record<string, unknown>): TaskDTO {
+  return {
+    ...scanTask(status, metadata),
+    type: "import.comics",
+    progress: 62,
+    message: "Copying Book One.cbz",
+  }
+}
+
+function comicScanTask(status: TaskDTO["status"], metadata?: Record<string, unknown>): TaskDTO {
+  return {
+    ...scanTask(status, metadata),
+    type: "scan.comics",
+    progress: 42,
+    message: "Scanning comics",
+  }
+}
+
 async function mountDock() {
   const { default: ScanProgressDock } = await import("./ScanProgressDock.vue")
   return mount(ScanProgressDock, {
@@ -129,6 +147,46 @@ describe("ScanProgressDock", () => {
     expect(wrapper.text()).toContain("import.files")
     expect(wrapper.text()).toContain("import.copiedBytes")
     expect(wrapper.text()).not.toContain("scan.newItems")
+  })
+
+  it("renders comic import progress with comic-specific title", async () => {
+    const task = comicImportTask("running", {
+      currentFileName: "Book One.cbz",
+      completedFiles: 1,
+      totalFiles: 2,
+      failedFiles: 0,
+      copiedBytes: 1024,
+      totalBytes: 2048,
+    })
+    trackerState.activeTask.value = task
+    trackerState.progressTask.value = task
+
+    const wrapper = await mountDock()
+
+    expect(wrapper.text()).toContain("import.comicScanning")
+    expect(wrapper.text()).toContain("Book One.cbz")
+    expect(wrapper.text()).toContain("import.currentFile")
+    expect(wrapper.text()).not.toContain("scan.newItems")
+  })
+
+  it("renders comic scan metadata instead of movie scan counters", async () => {
+    const task = comicScanTask("running", {
+      filesDiscovered: 9,
+      imported: 2,
+      updated: 3,
+      skipped: 4,
+    })
+    trackerState.activeTask.value = task
+    trackerState.progressTask.value = task
+
+    const wrapper = await mountDock()
+
+    expect(wrapper.text()).toContain("scan.comicScanning")
+    expect(wrapper.text()).toContain("scan.discovered")
+    expect(wrapper.text()).toContain("scan.newItems")
+    expect(wrapper.text()).toContain("2")
+    expect(wrapper.text()).toContain("3")
+    expect(wrapper.text()).toContain("4")
   })
 
   it("does not render when the active task is hidden from progress UI", async () => {

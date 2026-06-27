@@ -17,7 +17,10 @@ const { progressTask, progressPollError, dismiss } = useScanTaskTracker()
 
 const emptyValue = "-"
 const visible = computed(() => progressTask.value != null || progressPollError.value != null)
-const isImportTask = computed(() => progressTask.value?.type === "import.movies")
+const isMovieImportTask = computed(() => progressTask.value?.type === "import.movies")
+const isComicImportTask = computed(() => progressTask.value?.type === "import.comics")
+const isImportTask = computed(() => isMovieImportTask.value || isComicImportTask.value)
+const isComicScanTask = computed(() => progressTask.value?.type === "scan.comics")
 
 function metaNum(m: Record<string, unknown> | undefined, key: string): string {
   const n = metaNumberValue(m, key)
@@ -58,10 +61,20 @@ const dockTitle = computed(() => {
   if (progressPollError.value && !progressTask.value) return t("scan.statusLabel")
   const task = progressTask.value
   if (!task) return ""
+  if (task.type === "import.comics") {
+    if (task.status === "completed") return t("import.comicCompleted")
+    if (task.status === "failed" || task.status === "partial_failed") return t("import.comicFinished")
+    return t("import.comicScanning")
+  }
   if (task.type === "import.movies") {
     if (task.status === "completed") return t("import.completed")
     if (task.status === "failed" || task.status === "partial_failed") return t("import.finished")
     return t("import.scanning")
+  }
+  if (task.type === "scan.comics") {
+    if (task.status === "completed") return t("scan.comicCompleted")
+    if (task.status === "failed" || task.status === "partial_failed") return t("scan.comicFinished")
+    return t("scan.comicScanning")
   }
   if (task.status === "completed") return t("scan.completed")
   if (task.status === "failed" || task.status === "partial_failed") return t("scan.finished")
@@ -86,6 +99,26 @@ const importCopiedBytes = computed(() => {
   }
   return formatBytes(copied)
 })
+
+const scanPrimaryLabel = computed(() =>
+  isComicScanTask.value ? t("scan.discovered") : t("scan.processed"),
+)
+const scanPrimaryValue = computed(() => {
+  const metadata = progressTask.value?.metadata
+  if (isComicScanTask.value) {
+    return metaNum(metadata, "filesDiscovered")
+  }
+  return `${metaNum(metadata, "scanProcessed")} / ${metaNum(metadata, "scanTotal")}`
+})
+const scanImportedValue = computed(() =>
+  metaNum(progressTask.value?.metadata, isComicScanTask.value ? "imported" : "scanImported"),
+)
+const scanUpdatedValue = computed(() =>
+  metaNum(progressTask.value?.metadata, isComicScanTask.value ? "updated" : "scanUpdated"),
+)
+const scanSkippedValue = computed(() =>
+  metaNum(progressTask.value?.metadata, isComicScanTask.value ? "skipped" : "scanSkipped"),
+)
 </script>
 
 <template>
@@ -137,23 +170,14 @@ const importCopiedBytes = computed(() => {
             </div>
 
             <div v-else class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span v-once>{{ t("scan.processed") }}</span>
-              <span class="text-right font-mono text-foreground">
-                {{ metaNum(progressTask.metadata, "scanProcessed") }} /
-                {{ metaNum(progressTask.metadata, "scanTotal") }}
-              </span>
+              <span>{{ scanPrimaryLabel }}</span>
+              <span class="text-right font-mono text-foreground">{{ scanPrimaryValue }}</span>
               <span v-once>{{ t("scan.newItems") }}</span>
-              <span class="text-right font-mono text-foreground">{{
-                metaNum(progressTask.metadata, "scanImported")
-              }}</span>
+              <span class="text-right font-mono text-foreground">{{ scanImportedValue }}</span>
               <span v-once>{{ t("scan.updated") }}</span>
-              <span class="text-right font-mono text-foreground">{{
-                metaNum(progressTask.metadata, "scanUpdated")
-              }}</span>
+              <span class="text-right font-mono text-foreground">{{ scanUpdatedValue }}</span>
               <span v-once>{{ t("scan.skipped") }}</span>
-              <span class="text-right font-mono text-foreground">{{
-                metaNum(progressTask.metadata, "scanSkipped")
-              }}</span>
+              <span class="text-right font-mono text-foreground">{{ scanSkippedValue }}</span>
             </div>
 
             <p

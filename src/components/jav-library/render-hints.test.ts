@@ -11,7 +11,9 @@ describe("jav-library render hints", () => {
   it("keeps scan progress stat labels, detail placeholders, and batch confirm titles static", () => {
     const normalizedDetailPageSource = normalizeLineEndings(detailPageSource)
 
-    for (const key of ["scan.processed", "scan.newItems", "scan.updated", "scan.skipped"]) {
+    expect(scanProgressDockSource).toContain("const scanPrimaryLabel = computed")
+
+    for (const key of ["scan.newItems", "scan.updated", "scan.skipped"]) {
       expect(scanProgressDockSource).toContain(`<span v-once>{{ t("${key}") }}</span>`)
     }
 

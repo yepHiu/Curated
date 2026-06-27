@@ -58,11 +58,16 @@
     "manualLibraryScanStarted": "ライブラリスキャンを開始しました。",
     "manualLibraryScanDone": "ライブラリスキャン完了 — {message}",
     "manualLibraryScanFailed": "ライブラリスキャン終了（未完了）— {message}",
+    "manualComicScanDone": "コミックスキャン完了 - {message}",
+    "manualComicScanFailed": "コミックスキャン終了（未完了）- {message}",
     "manualMovieScrapeDone": "メタデータ更新完了 — {message}",
     "manualMovieScrapeFailed": "メタデータ更新終了（未完了）— {message}",
     "movieImportDone": "動画のインポートが完了しました：{completed} 件をコピーしました。",
     "movieImportPartial": "動画のインポートが一部完了しました：成功 {completed} 件、失敗 {failed} 件。",
     "movieImportFailed": "動画のインポートに失敗しました：{message}",
+    "comicImportDone": "コミックのインポートが完了しました：{completed} 件のアーカイブをコピーしました。",
+    "comicImportPartial": "コミックのインポートが一部完了しました：成功 {completed} 件、失敗 {failed} 件。",
+    "comicImportFailed": "コミックのインポートに失敗しました：{message}",
     "storagePathOffline": "保存先「{title}」の確認が必要です：{message}",
     "storagePathsAbnormal": "{count} 件の保存先に確認が必要です。設定 > ライブラリで確認してください。"
   },
@@ -378,8 +383,12 @@
     "completed": "スキャン完了",
     "finished": "スキャン終了",
     "scanning": "ライブラリをスキャン中",
+    "comicCompleted": "コミックスキャン完了",
+    "comicFinished": "コミックスキャン終了",
+    "comicScanning": "コミックをスキャン中",
     "close": "閉じる",
     "processed": "処理済み",
+    "discovered": "検出",
     "newItems": "新規",
     "updated": "更新",
     "skipped": "スキップ"
@@ -424,7 +433,10 @@
     "currentFile": "現在のファイル",
     "files": "ファイル",
     "copiedBytes": "コピー済み",
-    "failedFiles": "失敗"
+    "failedFiles": "失敗",
+    "comicScanning": "コミックをインポート中",
+    "comicCompleted": "コミックインポート完了",
+    "comicFinished": "コミックインポート終了"
   },
   "scanTask": {
     "fetchFailed": "スキャンタスクの状態を取得できません"
@@ -1012,8 +1024,8 @@
     "playStartError": "再生を開始できませんでした（自動再生ブロックの可能性）。",
     "curatedCaptureErrorPrefix": "保存できませんでした",
     "curatedLabel": "Curated",
-    "feedbackPlay": "\u518d\u751f\u4e2d",
-    "feedbackPause": "\u4e00\u6642\u505c\u6b62",
+    "feedbackPlay": "再生中",
+    "feedbackPause": "一時停止",
     "ariaCurated": "現在フレームをキャプチャ（Curated）",
     "errFileMissing": "この動画を再生できません。ファイルの有無を確認してください。",
     "errGeneric": "再生エラー。後でもう一度。",
