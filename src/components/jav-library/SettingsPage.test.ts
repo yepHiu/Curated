@@ -144,6 +144,9 @@ vi.mock("@/components/jav-library/settings/SettingsAboutSection.vue", () => ({
 vi.mock("@/components/jav-library/settings/SettingsCuratedSection.vue", () => ({
   default: { name: "SettingsCuratedSection", template: "<section />" },
 }))
+vi.mock("@/components/jav-library/settings/SettingsComicLibrarySection.vue", () => ({
+  default: { name: "SettingsComicLibrarySection", template: "<section data-comic-settings />" },
+}))
 vi.mock("@/components/jav-library/settings/SettingsGeneralSection.vue", () => ({
   default: { name: "SettingsGeneralSection", template: "<section />" },
 }))
@@ -258,6 +261,12 @@ describe("SettingsPage movie CSV export", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.libraryService = createLibraryServiceMock()
+  })
+
+  it("shows the comic library settings navigation item", async () => {
+    const wrapper = await mountSettingsPage()
+
+    expect(wrapper.text()).toContain("settings.navComics")
   })
 
   it("downloads a CSV and shows a success toast when the storage section requests export", async () => {

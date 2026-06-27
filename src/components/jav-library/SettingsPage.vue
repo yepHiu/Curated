@@ -50,6 +50,7 @@ import {
 } from "@/lib/curated-frames/settings-storage"
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
+import SettingsComicLibrarySection from "@/components/jav-library/settings/SettingsComicLibrarySection.vue"
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
@@ -2122,6 +2123,21 @@ async function runMetadataRefreshForSelected() {
         :organize-library-error="organizeLibraryError"
         @change-organize-library="onOrganizeLibraryChange"
       />
+    </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('comics')"
+      value="comics"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
+    <section
+      id="settings-section-comics"
+      class="space-y-6"
+      :aria-label="t('settings.navComics')"
+    >
+    <h2 class="sr-only">{{ t("settings.navComics") }}</h2>
+      <SettingsComicLibrarySection />
     </section>
     </TabsContent>
 

@@ -4,6 +4,7 @@ export type SettingsSectionSlug =
   | "general"
   | "security"
   | "library"
+  | "comics"
   | "metadata"
   | "network"
   | "curated"
@@ -20,6 +21,7 @@ export const SETTINGS_NAV_ITEMS: { slug: SettingsSectionSlug; labelKey: string }
   { slug: "general", labelKey: "settings.navGeneral" },
   { slug: "security", labelKey: "settings.navSecurity" },
   { slug: "library", labelKey: "settings.navLibrary" },
+  { slug: "comics", labelKey: "settings.navComics" },
   { slug: "metadata", labelKey: "settings.navMetadata" },
   { slug: "network", labelKey: "settings.navNetwork" },
   { slug: "curated", labelKey: "settings.navCurated" },
