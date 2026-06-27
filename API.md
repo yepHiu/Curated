@@ -1,5 +1,9 @@
 # Curated 后端 API 使用指南
 
+> Comic library note: the optional comic module is intentionally separate from movies. It uses `/api/library/comics/*` and `/api/import/comics`, separate DTOs, separate tags/progress/preferences/cache, and it is hidden by the frontend until `comicLibraryEnabled=true`.
+
+Comic-specific error codes: `COMIC_LIBRARY_DISABLED`, `COMIC_PATH_NOT_CONFIGURED`, `COMIC_PATH_NOT_FOUND`, `COMIC_ARCHIVE_UNSUPPORTED`, `COMIC_ARCHIVE_EMPTY`, `COMIC_ARCHIVE_READ_FAILED`, `COMIC_BOOK_NOT_FOUND`, `COMIC_PAGE_NOT_FOUND`, `COMIC_IMPORT_TARGET_MISSING`, `COMIC_IMPORT_CONFLICT`, `COMIC_CACHE_CLEANUP_FAILED`.
+
 本文档是 Curated 仓库的公开 HTTP API 指南，用于当前 Web 前端、后续 Android App、局域网客户端以及其他衍生项目对接同一个 Go 后端。
 
 本文只描述当前 Go HTTP 后端已经实现的接口，不引入新 API 行为。
@@ -1411,6 +1415,16 @@ Body 示例：
 ```json
 {
   "defaultImportLibraryPathId": "library-path-id",
+  "comicLibraryEnabled": true,
+  "defaultComicImportLibraryPathId": "comic-library-path-id",
+  "comicReader": {
+    "mode": "page",
+    "fit": "contain",
+    "direction": "rtl"
+  },
+  "comicCache": {
+    "maxBytes": 2147483648
+  },
   "curatedFrameExportFormat": "jpg",
   "autoLibraryWatch": true,
   "player": {
@@ -1723,6 +1737,100 @@ Headers：
 用途：取消分片上传并删除 staging 目录。
 
 成功：`204 No Content`
+
+### 4.12A Comic Library
+
+The comic library is optional. Clients should first read `GET /api/settings`; if `comicLibraryEnabled` is false, hide comic navigation and do not call comic library endpoints.
+
+Comic task type constants are `scan.comics`, `import.comics`, and `comic.cache.cleanup`.
+
+#### Settings fields
+
+`SettingsDTO` includes:
+
+| Field | Meaning |
+| --- | --- |
+| `comicLibraryEnabled` | Enables the comic module and frontend entry points |
+| `comicLibraryPaths` | Independent comic archive roots |
+| `defaultComicImportLibraryPathId` | Target root used by `POST /api/import/comics` |
+| `comicReader` | Global defaults: `mode` (`page`/`scroll`), `fit` (`contain`/`width`), `direction` (`ltr`/`rtl`) |
+| `comicCache` | Comic cache settings; default `maxBytes` is 2147483648, negative values mean unlimited |
+
+#### `POST /api/import/comics`
+
+Imports `.zip` and `.cbz` archives with `multipart/form-data`.
+
+Form fields:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `files` | repeated file | Comic archive file |
+| `relativePath` | repeated string | Optional relative path paired with each file |
+| `totalBytes` | string / number | Optional progress total |
+
+Success: `202 TaskDTO` with task type `import.comics`. Successful copy starts a follow-up `scan.comics` task when possible.
+
+Behavior:
+
+- Requires `defaultComicImportLibraryPathId`.
+- Accepts only `.zip` and `.cbz`.
+- Copies archives into the default comic import root; it never deletes the source archive.
+- Does not overwrite an existing target file; conflicts are reported with `COMIC_IMPORT_CONFLICT`.
+- Import task metadata mirrors movie import progress fields and may include `scanTaskId` / `scanError`.
+
+#### Comic paths and scans
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/library/comics/paths` | `ComicLibraryPathDTO[]` |
+| `POST` | `/api/library/comics/paths` | `AddComicLibraryPathResponse` |
+| `PATCH` | `/api/library/comics/paths/{id}` | `ComicLibraryPathDTO` |
+| `DELETE` | `/api/library/comics/paths/{id}` | `204` |
+| `POST` | `/api/library/comics/scans` | `TaskDTO` (`scan.comics`) |
+
+#### Comic books
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/library/comics?q=&tag=&favorite=&readStatus=&limit=&offset=` | `ComicBooksPageDTO` |
+| `GET` | `/api/library/comics/{comicId}` | `ComicBookDetailDTO` |
+| `PATCH` | `/api/library/comics/{comicId}` | `ComicBookDetailDTO` |
+| `DELETE` | `/api/library/comics/{comicId}` | `204` |
+| `POST` | `/api/library/comics/books/{comicId}/reveal` | `204` |
+
+`PATCH /api/library/comics/{comicId}` accepts `title`, `tags`, `favorite`, and rating fields (`ratingSet`, `ratingClear`, `rating`). MVP detail metadata is title, tags, rating, and favorite; author or series can be represented as tags.
+
+#### Pages, reader progress, and preferences
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/library/comics/books/{comicId}/pages` | `ComicPageDTO[]` |
+| `GET` | `/api/library/comics/books/{comicId}/pages/{pageIndex}/image` | image |
+| `GET` | `/api/library/comics/books/{comicId}/pages/{pageIndex}/thumbnail` | image |
+| `GET` | `/api/library/comics/books/{comicId}/progress` | `ComicReadingProgressDTO` |
+| `PUT` | `/api/library/comics/books/{comicId}/progress` | `ComicReadingProgressDTO` |
+| `DELETE` | `/api/library/comics/books/{comicId}/progress` | `204` |
+| `GET` | `/api/library/comics/books/{comicId}/preferences` | `ComicReadingPreferencesDTO` |
+| `PUT` | `/api/library/comics/books/{comicId}/preferences` | `ComicReadingPreferencesDTO` |
+
+Reader preferences support page/scroll mode, contain/width fit, and LTR/RTL navigation. Temporary current+previous/current+next page stitching is reader-session state and is not persisted.
+
+#### Comic cache
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/library/comics/cache/status` | `ComicCacheStatusDTO` |
+| `POST` | `/api/library/comics/cache/cleanup` | `ComicCacheStatusDTO` |
+
+Comic cache cleanup deletes only files under the comic cache root plus cache index rows. It must not delete source `.zip` or `.cbz` archives.
+
+Archive page support:
+
+- Archive extensions: `.zip`, `.cbz`.
+- Page image extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`.
+- The first naturally sorted image is the cover.
+- Natural sort respects directory hierarchy and filename numeric order.
+- Metadata scraping, OCR, `.rar`, `.cbr`, and `.7z` are outside the MVP.
 
 ### 4.13 Scans / Tasks
 
@@ -2179,6 +2287,11 @@ interface MovieDetailDTO extends MovieListItemDTO {
 interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
   defaultImportLibraryPathId?: string
+  comicLibraryEnabled: boolean
+  comicLibraryPaths: ComicLibraryPathDTO[]
+  defaultComicImportLibraryPathId?: string
+  comicReader: ComicReaderSettingsDTO
+  comicCache: ComicCacheSettingsDTO
   player: PlayerSettingsDTO
   organizeLibrary: boolean
   autoLibraryWatch: boolean
@@ -2276,6 +2389,82 @@ interface MovieImportUploadDTO {
 }
 ```
 
+### 5.8A Comic DTOs
+
+```ts
+interface ComicLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+interface ComicBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  readStatus: "unread" | "reading" | "read" | string
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastReadAt?: string
+  completedAt?: string
+}
+
+interface ComicBookDetailDTO extends ComicBookListItemDTO {
+  pages: ComicPageDTO[]
+}
+
+interface ComicPageDTO {
+  comicId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+interface ComicReaderSettingsDTO {
+  mode: "page" | "scroll"
+  fit: "contain" | "width"
+  direction: "ltr" | "rtl"
+}
+
+interface ComicCacheSettingsDTO {
+  maxBytes: number
+}
+
+interface ComicCacheStatusDTO {
+  maxBytes: number
+  usedBytes: number
+  entryCount: number
+}
+
+interface ComicReadingProgressDTO {
+  comicId: string
+  pageIndex: number
+  completed: boolean
+  updatedAt: string
+}
+
+interface ComicReadingPreferencesDTO {
+  comicId?: string
+  mode: "page" | "scroll"
+  fit: "contain" | "width"
+  direction: "ltr" | "rtl"
+  updatedAt?: string
+}
+```
+
 ### 5.9 `CuratedFrameItemDTO`
 
 ```ts
@@ -2365,6 +2554,7 @@ interface ActorProfileDTO {
 | `GET` | `/api/settings` | `SettingsDTO` |
 | `PATCH` | `/api/settings` | `SettingsDTO` |
 | `POST` | `/api/import/movies` | `TaskDTO` |
+| `POST` | `/api/import/comics` | `TaskDTO` |
 | `POST` | `/api/import/movies/uploads` | `MovieImportUploadDTO` |
 | `GET` | `/api/import/movies/uploads/{uploadId}` | `MovieImportUploadDTO` |
 | `DELETE` | `/api/import/movies/uploads/{uploadId}` | `204` |
@@ -2377,6 +2567,26 @@ interface ActorProfileDTO {
 | `POST` | `/api/library/paths/{id}/storage-binding/rebind` | `LibraryPathStorageStatusDTO` |
 | `PATCH` | `/api/library/paths/{id}` | `LibraryPathDTO` |
 | `DELETE` | `/api/library/paths/{id}` | `204` |
+| `GET` | `/api/library/comics/paths` | `ComicLibraryPathDTO[]` |
+| `POST` | `/api/library/comics/paths` | `AddComicLibraryPathResponse` |
+| `PATCH` | `/api/library/comics/paths/{id}` | `ComicLibraryPathDTO` |
+| `DELETE` | `/api/library/comics/paths/{id}` | `204` |
+| `POST` | `/api/library/comics/scans` | `TaskDTO` |
+| `GET` | `/api/library/comics/cache/status` | `ComicCacheStatusDTO` |
+| `POST` | `/api/library/comics/cache/cleanup` | `ComicCacheStatusDTO` |
+| `GET` | `/api/library/comics` | `ComicBooksPageDTO` |
+| `GET` | `/api/library/comics/{comicId}` | `ComicBookDetailDTO` |
+| `PATCH` | `/api/library/comics/{comicId}` | `ComicBookDetailDTO` |
+| `DELETE` | `/api/library/comics/{comicId}` | `204` |
+| `POST` | `/api/library/comics/books/{comicId}/reveal` | `204` |
+| `GET` | `/api/library/comics/books/{comicId}/pages` | `ComicPageDTO[]` |
+| `GET` | `/api/library/comics/books/{comicId}/pages/{pageIndex}/image` | image |
+| `GET` | `/api/library/comics/books/{comicId}/pages/{pageIndex}/thumbnail` | image |
+| `GET` | `/api/library/comics/books/{comicId}/progress` | `ComicReadingProgressDTO` |
+| `PUT` | `/api/library/comics/books/{comicId}/progress` | `ComicReadingProgressDTO` |
+| `DELETE` | `/api/library/comics/books/{comicId}/progress` | `204` |
+| `GET` | `/api/library/comics/books/{comicId}/preferences` | `ComicReadingPreferencesDTO` |
+| `PUT` | `/api/library/comics/books/{comicId}/preferences` | `ComicReadingPreferencesDTO` |
 | `POST` | `/api/scans` | `TaskDTO` |
 | `GET` | `/api/events` | SSE `TaskEventDTO` stream |
 | `GET` | `/api/tasks/recent` | `RecentTasksDTO` |

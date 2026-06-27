@@ -27,6 +27,7 @@ The product name is **Curated**. The repository folder and npm package may still
 
 ## Highlights
 
+- **Optional comic library** - Independent `.zip` / `.cbz` comic library with separate storage, import, scanning, poster grid, detail page, reader preferences, progress, and cache.
 - **Local-first** — Vue 3 SPA frontend + Go HTTP API backend + SQLite persistence.
 - **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
@@ -128,6 +129,17 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Configurable default import library path.
 - Imports are blocked with a storage warning when the default target drive is offline or no longer matches the bound volume.
 
+### Comics
+
+- Optional comic module; the app entry is hidden until enabled in Settings -> Comics.
+- Supports `.zip` and `.cbz` archives containing JPG, PNG, WebP, or GIF pages.
+- Keeps comics independent from movies with separate SQLite tables, library paths, APIs, service adapters, tags, progress, preferences, and cache.
+- Uses natural page ordering across archive directories and treats the first sorted image as the cover.
+- Comic import copies archives into `defaultComicImportLibraryPathId`, never deletes source archives, never overwrites conflicts, and starts `scan.comics`.
+- Comic detail MVP includes title, tags, rating, favorite state, and page previews; author or series can be represented as tags.
+- Reader supports page or scroll mode, contain or width fit, LTR/RTL keyboard navigation, persisted progress/preferences, and session-only current+previous/current+next page stitching.
+- MVP exclusions: metadata scraping, OCR, `.rar` / `.cbr` / `.7z`, source archive deletion, and persistent double-page layout.
+
 ### Playback
 
 - HTML5 video playback with HTTP Range streaming.
@@ -179,7 +191,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 
 ### Settings & Configuration
 
-- Full settings UI: Overview, General, Security, Video storage, Metadata, Network, Curated frames, About, Maintenance.
+- Full settings UI: Overview, General, Security, Video storage, Comics, Metadata, Network, Curated frames, About, Maintenance.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.
@@ -236,6 +248,10 @@ Common library-level settings include:
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `defaultImportLibraryPathId`
+- `comicLibraryEnabled`
+- `defaultComicImportLibraryPathId`
+- `comicReader`
+- `comicCache`
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `autoDownloadUpdates`
@@ -250,11 +266,13 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 
 ## API
 
-Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
+Curated exposes a Go HTTP API for authentication/PIN App Lock, movie library, optional comic library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 
 Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
+
+Comic import uses browser upload via `POST /api/import/comics` for `.zip` / `.cbz` archives. Imports use `defaultComicImportLibraryPathId` as the target, copy archives without deleting source files, and report progress through `import.comics` plus follow-up `scan.comics` tasks.
 
 Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
 

@@ -1,5 +1,24 @@
 # 库目录整理与周期扫描
 
+## Comic library settings keys
+
+The optional comic module uses separate keys in `config/library-config.cfg`; they do not replace or overload movie library settings.
+
+| Field | Default | Meaning |
+|------|---------|---------|
+| `comicLibraryEnabled` | `false` | Enables comic routes and frontend comic navigation. When false, comic entry points stay hidden. |
+| `defaultComicImportLibraryPathId` | empty | Comic library path id used by `POST /api/import/comics`. |
+| `comicReader` | `{ "mode": "page", "fit": "contain", "direction": "ltr" }` | Global comic reader defaults. `mode` is `page` or `scroll`; `fit` is `contain` or `width`; `direction` is `ltr` or `rtl`. |
+| `comicCache` | `{ "maxBytes": 2147483648 }` | Separate comic cache limit. `0` normalizes to the default 2GB; negative values mean unlimited. |
+
+Comic archive behavior:
+
+- Supported archive extensions are `.zip` and `.cbz`.
+- Supported page image extensions are `.jpg`, `.jpeg`, `.png`, `.webp`, and `.gif`.
+- The first naturally sorted image is the cover.
+- Comic import copies archives into `defaultComicImportLibraryPathId`, never deletes the source archive, and never overwrites conflicts.
+- Comic cache cleanup deletes only comic cache files/index rows and must not delete source `.zip` / `.cbz` archives.
+
 ## 持久化：`config/library-config.cfg`
 
 与 `-config` 指向的服务端主配置（HTTP 地址、数据库路径等）**分开**存放。文件为 **JSON**，用于可持久化的「库行为」开关；后续可把更多设置项合并进同一文件（写入时保留未知键）。
