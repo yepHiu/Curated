@@ -106,8 +106,8 @@ vi.mock("@/components/jav-library/ScanProgressDock.vue", () => ({
   default: { name: "ScanProgressDock", template: "<div />" },
 }))
 
-vi.mock("@/components/jav-library/MovieImportDialog.vue", () => ({
-  default: { name: "MovieImportDialog", template: "<button data-movie-import>import.trigger</button>" },
+vi.mock("@/components/jav-library/ImportMenu.vue", () => ({
+  default: { name: "ImportMenu", template: "<div data-import-menu />" },
 }))
 
 vi.mock("@/components/ui/sonner", () => ({
@@ -179,10 +179,10 @@ describe("AppShell library search route sync", () => {
     expect(wrapper.find('[data-show-collapse-toggle="true"]').exists()).toBe(false)
   })
 
-  it("renders the movie import entry near the header actions", () => {
+  it("renders the import menu near the header actions", () => {
     const wrapper = shallowMount(AppShell)
 
-    expect(wrapper.findComponent({ name: "MovieImportDialog" }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: "ImportMenu" }).exists()).toBe(true)
   })
 
   it("shows a detail back link on primary browse drill-down routes", () => {

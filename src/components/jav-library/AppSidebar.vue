@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import {
+  BookOpen,
   Clapperboard,
   History,
   House,
@@ -28,6 +29,7 @@ import { useActivePlaybackSession } from "@/composables/use-active-playback-sess
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
+import { useComicLibraryService } from "@/services/comic-library-service"
 
 const props = withDefaults(
   defineProps<{
@@ -57,6 +59,7 @@ interface SidebarNavSection {
 
 const { t, locale } = useI18n()
 const route = useRoute()
+const comicService = useComicLibraryService()
 const {
   useWebApi: backendUseWebApi,
   status: backendStatus,
@@ -69,6 +72,14 @@ const {
   activePlaybackSession,
   dismissActivePlaybackSession,
 } = useActivePlaybackSession()
+
+onMounted(() => {
+  void Promise.resolve(comicService.refreshSettings()).catch((error) => {
+    console.warn("[sidebar] comic settings refresh failed", error)
+  })
+})
+
+const comicLibraryEnabled = computed(() => comicService.comicLibraryEnabled.value)
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -129,15 +140,23 @@ const backendCompactTitle = computed(() => {
 
 const sidebarNavGroups = computed((): SidebarNavGroups => {
   void locale.value
+  const browse: NavigationItem[] = [
+    { label: t("nav.home"), page: "home", icon: House },
+    { label: t("nav.library"), page: "library", icon: LibraryBig },
+  ]
+
+  if (comicLibraryEnabled.value) {
+    browse.push({ label: t("nav.comics"), page: "comics", icon: BookOpen })
+  }
+
+  browse.push(
+    { label: t("nav.actors"), page: "actors", icon: Users },
+    { label: t("nav.tags"), page: "tags", icon: Tags },
+    { label: t("nav.trash"), page: "trash", icon: Trash2 },
+  )
 
   return {
-    browse: [
-      { label: t("nav.home"), page: "home", icon: House },
-      { label: t("nav.library"), page: "library", icon: LibraryBig },
-      { label: t("nav.actors"), page: "actors", icon: Users },
-      { label: t("nav.tags"), page: "tags", icon: Tags },
-      { label: t("nav.trash"), page: "trash", icon: Trash2 },
-    ],
+    browse,
     yours: [
       { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
       { label: t("nav.history"), page: "history", icon: History },
@@ -158,7 +177,12 @@ const sidebarSections = computed((): SidebarNavSection[] => [
   },
 ])
 
-const isActive = (page: AppPage) => route.name === page
+const isActive = (page: AppPage) => {
+  if (page === "comics") {
+    return ["comics", "comic-detail", "comic-reader"].includes(String(route.name ?? ""))
+  }
+  return route.name === page
+}
 
 const brandHomeTarget = computed(() => ({ name: "home" as const }))
 
@@ -238,6 +262,9 @@ const getNavigationTarget = (page: AppPage) => {
   }
   if (page === "actors") {
     return { name: "actors" }
+  }
+  if (page === "comics") {
+    return { name: "comics" }
   }
   return buildBrowseRouteTarget(page as LibraryMode, route.query)
 }

@@ -5,7 +5,7 @@ import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vue
 import { LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
-import MovieImportDialog from "@/components/jav-library/MovieImportDialog.vue"
+import ImportMenu from "@/components/jav-library/ImportMenu.vue"
 import DevEnvironmentBadge from "@/components/dev/DevEnvironmentBadge.vue"
 import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
@@ -846,7 +846,7 @@ function clearActorsSearch() {
             <div
               class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
             >
-              <MovieImportDialog />
+              <ImportMenu />
               <NotificationCenter />
               <div
                 class="flex items-center gap-1.5"

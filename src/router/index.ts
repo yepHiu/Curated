@@ -1,5 +1,33 @@
 import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
+import { useComicLibraryService } from "@/services/comic-library-service"
+
+const comicRouteNames = new Set(["comics", "comic-detail", "comic-reader"])
+
+function isComicRoute(name: unknown): boolean {
+  return typeof name === "string" && comicRouteNames.has(name)
+}
+
+async function guardComicRouteIfNeeded(name: unknown) {
+  if (!isComicRoute(name)) {
+    return true
+  }
+  const comicService = useComicLibraryService()
+  try {
+    await comicService.refreshSettings()
+  } catch (error) {
+    console.warn("[router] comic settings refresh failed", error)
+  }
+  if (!comicService.comicLibraryEnabled.value) {
+    return {
+      name: "settings",
+      query: {
+        section: "comics",
+      },
+    }
+  }
+  return true
+}
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -55,6 +83,21 @@ const router = createRouter({
           component: () => import("@/views/ActorsView.vue"),
         },
         {
+          path: "comics",
+          name: "comics",
+          component: () => import("@/views/ComicsView.vue"),
+        },
+        {
+          path: "comics/:id",
+          name: "comic-detail",
+          component: () => import("@/views/ComicDetailView.vue"),
+        },
+        {
+          path: "comics/:id/read/:pageIndex?",
+          name: "comic-reader",
+          component: () => import("@/views/ComicReaderView.vue"),
+        },
+        {
           path: "history",
           name: "history",
           component: () => import("@/views/HistoryView.vue"),
@@ -91,7 +134,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (!isAuthLockEnabled() || to.name === "lock") {
-    return true
+    return await guardComicRouteIfNeeded(to.name)
   }
   try {
     const status = await authLockService.refreshStatus()
@@ -106,7 +149,7 @@ router.beforeEach(async (to) => {
   } catch (error) {
     console.warn("[router] auth status check failed", error)
   }
-  return true
+  return await guardComicRouteIfNeeded(to.name)
 })
 
 export default router

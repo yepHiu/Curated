@@ -27,6 +27,8 @@ const routeState = ref({
   query: {} as Record<string, unknown>,
 })
 const activePlaybackSessionState = ref<unknown>(null)
+const comicLibraryEnabled = ref(false)
+const refreshComicSettings = vi.fn()
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -48,6 +50,13 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     movies: computed(() => movies.value),
     trashedMovies: computed(() => trashedMovies.value),
+  }),
+}))
+
+vi.mock("@/services/comic-library-service", () => ({
+  useComicLibraryService: () => ({
+    comicLibraryEnabled: computed(() => comicLibraryEnabled.value),
+    refreshSettings: refreshComicSettings,
   }),
 }))
 
@@ -143,6 +152,8 @@ function setActivePlaybackSession() {
 
 beforeEach(() => {
   updateAvailable.value = false
+  comicLibraryEnabled.value = false
+  refreshComicSettings.mockReset()
   routeState.value = {
     name: "home",
     params: {},
@@ -199,6 +210,28 @@ describe("AppSidebar", () => {
 
     expect(expandedLinks.length).toBeGreaterThan(0)
     expect(expandedLinks).toHaveLength(compactLinks.length)
+  })
+
+  it("hides the comic entry when the comic library is disabled", async () => {
+    comicLibraryEnabled.value = false
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("nav.comics")
+  })
+
+  it("shows the comic entry when the comic library is enabled", async () => {
+    comicLibraryEnabled.value = true
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const comicLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.comics"))
+
+    expect(comicLink?.attributes("data-to")).toContain('"name":"comics"')
   })
 
   it("shows an expanded continue playback card above backend status", async () => {
