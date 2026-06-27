@@ -109,15 +109,20 @@ const shellGridClass = computed(() => {
   }`
 })
 
+const routeMovieId = computed(() =>
+  typeof route.params.id === "string" ? route.params.id : undefined,
+)
+const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))
+
 const currentMovie = computed(() => {
-  const routeMovieId = typeof route.params.id === "string" ? route.params.id : undefined
-  const selectedMovieId = getSelectedMovieQuery(route.query)
-  const candidateId = routeMovieId ?? selectedMovieId
+  const candidateId = routeMovieId.value ?? selectedMovieId.value
 
   return candidateId ? libraryService.getMovieById(candidateId) : undefined
 })
 
-const currentMovieId = computed(() => currentMovie.value?.id)
+const currentMovieId = computed(
+  () => currentMovie.value?.id ?? routeMovieId.value ?? selectedMovieId.value,
+)
 const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
 const isHomeRoute = computed(() => route.name === "home")
 /** 回收站不显示资料库顶栏搜索；首页也显示搜索框 */
@@ -132,6 +137,12 @@ const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(
   () => isHomeRoute.value || isLibraryRoute.value || isActorsRoute.value,
 )
+const hasDetailBackIntentOnPrimaryRoute = computed(
+  () =>
+    isPrimaryBrowseRoute.value &&
+    route.query.back === "detail" &&
+    Boolean(currentMovieId.value),
+)
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const useFlushWorkspaceFrame = computed(() =>
   ["home", "library", "favorites", "tags", "trash", "history", "curated-frames", "player"].includes(
@@ -139,7 +150,9 @@ const useFlushWorkspaceFrame = computed(() =>
   ),
 )
 
-const showHeaderBack = computed(() => !isPrimaryBrowseRoute.value)
+const showHeaderBack = computed(
+  () => !isPrimaryBrowseRoute.value || hasDetailBackIntentOnPrimaryRoute.value,
+)
 const routerViewFrameClass = computed(() =>
   useFlushWorkspaceFrame.value
     ? "flex h-full min-h-0 min-w-0 flex-col overflow-hidden"

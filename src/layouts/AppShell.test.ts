@@ -1,4 +1,4 @@
-import { shallowMount } from "@vue/test-utils"
+import { mount, shallowMount } from "@vue/test-utils"
 import { nextTick, reactive } from "vue"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import AppShell from "./AppShell.vue"
@@ -38,7 +38,8 @@ vi.mock("vue-i18n", () => ({
 vi.mock("vue-router", () => ({
   RouterLink: {
     name: "RouterLink",
-    template: "<a><slot /></a>",
+    props: ["to"],
+    template: "<a :data-to=\"JSON.stringify(to)\"><slot /></a>",
   },
   RouterView: {
     name: "RouterView",
@@ -182,6 +183,34 @@ describe("AppShell library search route sync", () => {
     const wrapper = shallowMount(AppShell)
 
     expect(wrapper.findComponent({ name: "MovieImportDialog" }).exists()).toBe(true)
+  })
+
+  it("shows a detail back link on primary browse drill-down routes", () => {
+    routerMocks.route.fullPath =
+      "/library?actor=Actor%20A&back=detail&browse=favorites&selected=movie-1"
+    routerMocks.route.name = "library"
+    routerMocks.route.path = "/library"
+    routerMocks.route.query = {
+      actor: "Actor A",
+      back: "detail",
+      browse: "favorites",
+      selected: "movie-1",
+    }
+
+    const wrapper = mount(AppShell)
+
+    expect(wrapper.text()).toContain("shell.backDetail")
+    expect(JSON.parse(wrapper.get("a[data-to]").attributes("data-to") ?? "{}")).toEqual(
+      {
+        name: "detail",
+        params: { id: "movie-1" },
+        query: {
+          actor: "Actor A",
+          browse: "favorites",
+          selected: "movie-1",
+        },
+      },
+    )
   })
 
   it("mounts global gamepad focus navigation in the app shell", () => {

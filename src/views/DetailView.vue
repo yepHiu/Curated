@@ -11,11 +11,11 @@ import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import {
   getBrowseSourceMode,
-  getDetailBrowseTargetMode,
   mergeLibraryQuery,
 } from "@/lib/library-query"
 import {
   buildDetailRouteFromBrowse,
+  buildFilteredBrowseRouteFromDetail,
   buildPlayerRouteFromBrowseIntent,
   resolveNavigationBackLink,
 } from "@/lib/navigation-intent"
@@ -225,62 +225,50 @@ const patchMovieDisplay = async (body: PatchMovieBody, done: (err?: unknown) => 
 
 const browseByTag = async (payload: { tag: string }) => {
   const tag = payload.tag.trim()
-  if (!tag) {
+  const id = movieId.value ?? detailMovie.value?.id
+  if (!tag || !id) {
     return
   }
   const sourceMode = getBrowseSourceMode(route.query)
-  await router.push({
-    name: getDetailBrowseTargetMode(sourceMode, "tag"),
-    query: mergeLibraryQuery(route.query, {
-      from: undefined,
-      tag,
-      q: undefined,
-      actor: undefined,
-      studio: undefined,
-      tab: "all",
-      selected: undefined,
-    }),
-  })
+  await router.push(buildFilteredBrowseRouteFromDetail({
+    movieId: id,
+    currentQuery: route.query,
+    sourceMode,
+    kind: "tag",
+    value: tag,
+  }))
 }
 
 const browseByActor = async (payload: { actor: string }) => {
   const actor = payload.actor.trim()
-  if (!actor) {
+  const id = movieId.value ?? detailMovie.value?.id
+  if (!actor || !id) {
     return
   }
   const sourceMode = getBrowseSourceMode(route.query)
-  await router.push({
-    name: getDetailBrowseTargetMode(sourceMode, "actor"),
-    query: mergeLibraryQuery(route.query, {
-      from: undefined,
-      actor,
-      q: undefined,
-      tag: undefined,
-      studio: undefined,
-      tab: "all",
-      selected: undefined,
-    }),
-  })
+  await router.push(buildFilteredBrowseRouteFromDetail({
+    movieId: id,
+    currentQuery: route.query,
+    sourceMode,
+    kind: "actor",
+    value: actor,
+  }))
 }
 
 const browseByStudio = async (payload: { studio: string }) => {
   const studio = payload.studio.trim()
-  if (!studio) {
+  const id = movieId.value ?? detailMovie.value?.id
+  if (!studio || !id) {
     return
   }
   const sourceMode = getBrowseSourceMode(route.query)
-  await router.push({
-    name: getDetailBrowseTargetMode(sourceMode, "studio"),
-    query: mergeLibraryQuery(route.query, {
-      from: undefined,
-      studio,
-      q: undefined,
-      tag: undefined,
-      actor: undefined,
-      tab: "all",
-      selected: undefined,
-    }),
-  })
+  await router.push(buildFilteredBrowseRouteFromDetail({
+    movieId: id,
+    currentQuery: route.query,
+    sourceMode,
+    kind: "studio",
+    value: studio,
+  }))
 }
 
 const handleDeleteMovie = async (id: string) => {

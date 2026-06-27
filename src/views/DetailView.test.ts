@@ -81,6 +81,7 @@ vi.mock("@/components/jav-library/DetailPage.vue", () => ({
     emits: [
       "toggleFavorite",
       "updateUserRating",
+      "browseByActor",
       "deleteMovie",
       "refreshMetadata",
     ],
@@ -98,6 +99,7 @@ vi.mock("@/components/jav-library/DetailPage.vue", () => ({
           data-update-rating
           @click="$emit('updateUserRating', { movieId: movie.id, value: 3.5 })"
         />
+        <button data-browse-actor @click="$emit('browseByActor', { actor: movie.actors[0] })" />
         <button data-delete-movie @click="$emit('deleteMovie', movie.id)" />
         <button data-refresh-metadata @click="$emit('refreshMetadata', movie.id)" />
       </section>
@@ -219,6 +221,24 @@ describe("DetailView", () => {
       query: {
         q: "star",
         tab: "top-rated",
+      },
+    })
+  })
+
+  it("opens actor filters with an explicit detail return intent", async () => {
+    const wrapper = mount(DetailView)
+    await flushPromises()
+
+    await wrapper.get("[data-browse-actor]").trigger("click")
+    await flushPromises()
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "favorites",
+      query: {
+        actor: "Actor A",
+        back: "detail",
+        browse: "favorites",
+        selected: "movie-1",
       },
     })
   })

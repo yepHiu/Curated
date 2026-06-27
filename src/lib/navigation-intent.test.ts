@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import * as navigationIntent from "@/lib/navigation-intent"
 import {
   buildDetailRouteFromBrowse,
   buildPlayerRouteFromBrowseIntent,
@@ -28,6 +29,46 @@ describe("navigation intent helpers", () => {
         q: "Mina",
         selected: "movie-1",
         tab: "new",
+      },
+    })
+  })
+
+  it("builds detail-origin filtered browse routes with a detail return intent", () => {
+    const build = (
+      navigationIntent as unknown as {
+        buildFilteredBrowseRouteFromDetail?: (input: {
+          movieId: string
+          currentQuery: Record<string, string>
+          sourceMode: "library" | "favorites" | "recent" | "tags" | "trash"
+          kind: "tag" | "actor" | "studio"
+          value: string
+        }) => unknown
+      }
+    ).buildFilteredBrowseRouteFromDetail
+
+    expect(build).toBeTypeOf("function")
+    if (!build) return
+
+    expect(
+      build({
+        movieId: "movie-1",
+        currentQuery: {
+          browse: "favorites",
+          q: "Mina",
+          selected: "movie-1",
+          tab: "top-rated",
+        },
+        sourceMode: "favorites",
+        kind: "actor",
+        value: "Actor A",
+      }),
+    ).toEqual({
+      name: "favorites",
+      query: {
+        actor: "Actor A",
+        back: "detail",
+        browse: "favorites",
+        selected: "movie-1",
       },
     })
   })

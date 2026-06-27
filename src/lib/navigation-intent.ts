@@ -1,6 +1,12 @@
 import type { LibraryMode } from "@/domain/library/types"
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteLocationRaw } from "vue-router"
-import { buildMovieRouteQuery, getBrowseSourceMode, mergeLibraryQuery } from "@/lib/library-query"
+import {
+  buildMovieRouteQuery,
+  getBrowseSourceMode,
+  getDetailBrowseTargetMode,
+  mergeLibraryQuery,
+  type DetailBrowseTargetKind,
+} from "@/lib/library-query"
 import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
 const navigationBackTargets = ["home", "browse", "detail", "history", "curated-frames"] as const
@@ -47,6 +53,10 @@ function buildBrowseBackLink(query: LocationQuery, movieId: string): RouteLocati
   }
 }
 
+function hasExplicitBackTarget(query: LocationQuery, target: NavigationBackTarget): boolean {
+  return query.back === target
+}
+
 export function getNavigationBackTarget(query: LocationQuery): NavigationBackTarget {
   if (isNavigationBackTarget(query.back)) {
     return query.back
@@ -66,6 +76,46 @@ export function buildDetailRouteFromBrowse(
     name: "detail",
     params: { id: movieId },
     query: buildMovieRouteQuery(currentQuery, sourceMode, movieId),
+  }
+}
+
+export interface FilteredBrowseRouteFromDetailInput {
+  movieId: string
+  currentQuery: LocationQuery
+  sourceMode: LibraryMode
+  kind: DetailBrowseTargetKind
+  value: string
+}
+
+export function buildFilteredBrowseRouteFromDetail({
+  movieId,
+  currentQuery,
+  sourceMode,
+  kind,
+  value,
+}: FilteredBrowseRouteFromDetailInput): RouteLocationRaw {
+  const trimmed = value.trim()
+  const filterPatch: Partial<
+    Record<"q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio", string | undefined>
+  > = {
+    q: undefined,
+    tag: undefined,
+    actor: undefined,
+    studio: undefined,
+    tab: "all",
+    selected: movieId,
+  }
+
+  filterPatch[kind] = trimmed || undefined
+
+  return {
+    name: getDetailBrowseTargetMode(sourceMode, kind),
+    query: {
+      ...mergeLibraryQuery(currentQuery, filterPatch),
+      back: "detail",
+      browse: sourceMode,
+      selected: movieId,
+    },
   }
 }
 
@@ -142,6 +192,21 @@ export function resolveNavigationBackLink(
         labelKey: "shell.backLibrary",
       }
     }
+    return {
+      to: buildDetailRouteFromBrowse(
+        currentMovieId,
+        route.query,
+        getBrowseSourceMode(route.query),
+      ),
+      labelKey: "shell.backDetail",
+    }
+  }
+
+  if (
+    route.name !== "detail" &&
+    currentMovieId &&
+    hasExplicitBackTarget(route.query, "detail")
+  ) {
     return {
       to: buildDetailRouteFromBrowse(
         currentMovieId,
