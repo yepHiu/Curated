@@ -5,6 +5,7 @@ import type {
   ComicBookDetailDTO,
   ComicBooksPageDTO,
   ComicCacheStatusDTO,
+  ComicImportUploadProgress,
   ComicLibraryPathDTO,
   ComicPageDTO,
   ComicReadingPreferencesDTO,
@@ -19,6 +20,10 @@ import type {
   UpdateComicLibraryPathBody,
 } from "./types"
 
+interface ComicImportApiOptions {
+  onUploadProgress?: (progress: ComicImportUploadProgress) => void
+}
+
 function comicListParamsToQuery(
   params?: ListComicBooksParams,
 ): Record<string, string | number | undefined> | undefined {
@@ -31,6 +36,11 @@ function comicListParamsToQuery(
     limit: params.limit,
     offset: params.offset,
   }
+}
+
+function relativePathForFile(file: File): string {
+  const candidate = (file as File & { webkitRelativePath?: string }).webkitRelativePath
+  return candidate?.trim() || file.name
 }
 
 export const comicApi = {
@@ -66,6 +76,22 @@ export const comicApi = {
 
   startComicScan(): Promise<TaskDTO> {
     return httpClient.post<TaskDTO>("/library/comics/scans", {})
+  },
+
+  importComics(files: File[], options?: ComicImportApiOptions): Promise<TaskDTO> {
+    const form = new FormData()
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    if (totalBytes > 0) {
+      form.set("totalBytes", String(totalBytes))
+    }
+    for (const file of files) {
+      const relativePath = relativePathForFile(file)
+      form.append("relativePath", relativePath)
+      form.append("files", file, relativePath)
+    }
+    return httpClient.postFormWithProgress<TaskDTO>("/import/comics", form, {
+      onUploadProgress: options?.onUploadProgress,
+    })
   },
 
   listComics(params?: ListComicBooksParams): Promise<ComicBooksPageDTO> {

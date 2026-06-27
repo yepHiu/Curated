@@ -1,6 +1,8 @@
 import type { ComputedRef } from "vue"
 import type {
   ComicCacheStatusDTO,
+  ComicImportUploadProgress,
+  LibraryPathStorageStatusDTO,
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
   PutComicReadingPreferencesBody,
@@ -21,10 +23,12 @@ export interface ComicLibraryService {
   loadError: ComputedRef<string | null>
   comicLibraryEnabled: ComputedRef<boolean>
   comicLibraryPaths: ComputedRef<readonly ComicLibrarySetting[]>
+  comicLibraryPathStorageStatuses: ComputedRef<readonly LibraryPathStorageStatusDTO[]>
   defaultComicImportLibraryPathId: ComputedRef<string>
   comicReader: ComputedRef<ComicReaderSettings>
   comicCache: ComputedRef<ComicCacheSettings>
   refreshSettings(): Promise<void>
+  checkComicLibraryPathStorageStatus(libraryPathIds?: string[]): Promise<void>
   setComicLibraryEnabled(value: boolean): Promise<void>
   addComicLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateComicLibraryPathTitle(id: string, title: string): Promise<void>
@@ -39,6 +43,10 @@ export interface ComicLibraryService {
   deleteComic(comicId: string): Promise<void>
   revealComicSource(comicId: string): Promise<void>
   scanComics(): Promise<TaskDTO | null>
+  importComics(
+    files: File[],
+    options?: { onUploadProgress?: (progress: ComicImportUploadProgress) => void },
+  ): Promise<TaskDTO | null>
   getComicProgress(comicId: string): Promise<ComicReadingProgressDTO>
   saveComicProgress(
     comicId: string,

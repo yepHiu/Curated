@@ -16,6 +16,7 @@ const comicApiMocks = vi.hoisted(() => ({
   updateComicLibraryPathTitle: vi.fn(),
   deleteComicLibraryPath: vi.fn(),
   startComicScan: vi.fn(),
+  importComics: vi.fn(),
   listComics: vi.fn(),
   getComic: vi.fn(),
   patchComic: vi.fn(),
@@ -256,5 +257,26 @@ describe("webComicLibraryService", () => {
     ])
     expect(webComicLibraryService.defaultComicImportLibraryPathId.value).toBe("comic-path-1")
     expect(webComicLibraryService.comicReader.value.direction).toBe("rtl")
+  })
+
+  it("imports comics through the comic import endpoint", async () => {
+    comicApiMocks.importComics.mockResolvedValueOnce({
+      taskId: "comic-import-1",
+      type: "import.comics",
+      status: "running",
+      createdAt: "2026-06-28T00:00:00Z",
+      progress: 0,
+    })
+    const onUploadProgress = vi.fn()
+    const file = new File(["cbz"], "Book One.cbz", { type: "application/vnd.comicbook+zip" })
+
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+    const task = await webComicLibraryService.importComics([file], { onUploadProgress })
+
+    expect(comicApiMocks.importComics).toHaveBeenCalledWith([file], { onUploadProgress })
+    expect(task?.taskId).toBe("comic-import-1")
+    expect(movieApiMocks.listMovies).not.toHaveBeenCalled()
+    expect(movieApiMocks.getMovie).not.toHaveBeenCalled()
+    expect(movieApiMocks.patchMovie).not.toHaveBeenCalled()
   })
 })

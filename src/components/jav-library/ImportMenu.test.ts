@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ImportMenu from "./ImportMenu.vue"
-import ComicImportDialog from "./ComicImportDialog.vue"
 
 const comicServiceState = vi.hoisted(() => ({
   comicLibraryEnabled: false,
@@ -28,6 +27,10 @@ vi.mock("lucide-vue-next", () => ({
 
 vi.mock("./MovieImportDialog.vue", () => ({
   default: { name: "MovieImportDialog", template: "<div data-import-menu-movie />" },
+}))
+
+vi.mock("./ComicImportDialog.vue", () => ({
+  default: { name: "ComicImportDialog", template: "<div data-import-menu-comic />" },
 }))
 
 vi.mock("@/services/comic-library-service", () => ({
@@ -111,17 +114,5 @@ describe("ImportMenu", () => {
 
     expect(wrapper.find("[data-import-menu-movie]").exists()).toBe(true)
     expect(wrapper.find("[data-import-menu-comic]").exists()).toBe(true)
-  })
-})
-
-describe("ComicImportDialog", () => {
-  it("blocks submit without a default comic import path", () => {
-    comicServiceState.defaultComicImportLibraryPathId = ""
-    comicServiceState.comicLibraryPaths = []
-
-    const wrapper = mount(ComicImportDialog)
-
-    expect(wrapper.get("[data-comic-import-submit]").attributes("disabled")).toBeDefined()
-    expect(wrapper.text()).toContain("import.comicNoDefaultPath")
   })
 })

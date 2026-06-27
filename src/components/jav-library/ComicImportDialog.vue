@@ -2,6 +2,10 @@
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { BookOpen, FileArchive, UploadCloud, X } from "lucide-vue-next"
+import { HttpClientError } from "@/api/http-client"
+import type { ComicImportUploadProgress, LibraryPathStorageStatusDTO } from "@/api/types"
+import { pushAppToast } from "@/composables/use-app-toast"
+import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,16 +16,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import { useComicLibraryService } from "@/services/comic-library-service"
 
 const { t } = useI18n()
 const comicService = useComicLibraryService()
+const taskTracker = useScanTaskTracker()
 
 const open = ref(false)
 const selectedFiles = ref<File[]>([])
 const skippedCount = ref(0)
 const importError = ref("")
 const dragActive = ref(false)
+const busy = ref(false)
+const uploadProgress = ref<ComicImportUploadProgress | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const archiveExtensions = new Set([".zip", ".cbz"])
@@ -32,16 +40,45 @@ const defaultImportPathId = computed(() =>
 const targetLibraryPath = computed(() =>
   comicService.comicLibraryPaths.value.find((path) => path.id === defaultImportPathId.value),
 )
+const targetStorageStatus = computed<LibraryPathStorageStatusDTO | undefined>(() =>
+  comicService.comicLibraryPathStorageStatuses.value.find(
+    (status) => status.libraryPathId === defaultImportPathId.value,
+  ),
+)
 const hasDefaultImportPath = computed(() => Boolean(targetLibraryPath.value))
+const targetStorageReady = computed(() => targetStorageStatus.value?.canImport !== false)
+const targetStorageUnavailableMessage = computed(() => {
+  const status = targetStorageStatus.value
+  if (!status || status.canImport !== false) return ""
+  return status.message?.trim() || t("import.storageUnavailable")
+})
 const selectedTotalBytes = computed(() =>
   selectedFiles.value.reduce((sum, file) => sum + file.size, 0),
 )
-const canSubmit = computed(() => selectedFiles.value.length > 0 && hasDefaultImportPath.value)
+const canSubmit = computed(() =>
+  selectedFiles.value.length > 0 &&
+  hasDefaultImportPath.value &&
+  targetStorageReady.value &&
+  !busy.value,
+)
+const progressValue = computed(() => {
+  if (!busy.value) return selectedFiles.value.length > 0 ? 100 : 0
+  return uploadProgress.value?.percent ?? 0
+})
+const triggerProgressDashOffset = computed(() => {
+  const clamped = Math.min(100, Math.max(0, progressValue.value))
+  return String(100 - clamped)
+})
 
 watch(open, (next) => {
   if (next) {
     importError.value = ""
-    void Promise.resolve(comicService.refreshSettings()).catch((error) => {
+    void Promise.resolve(comicService.refreshSettings()).then(() => {
+      const id = defaultImportPathId.value
+      if (id) {
+        void comicService.checkComicLibraryPathStorageStatus([id])
+      }
+    }).catch((error) => {
       console.warn("[comic-import] comic settings refresh failed", error)
     })
   }
@@ -81,6 +118,7 @@ function addFiles(files: File[]) {
 function clearSelection() {
   selectedFiles.value = []
   skippedCount.value = 0
+  uploadProgress.value = null
   importError.value = ""
   if (fileInputRef.value) fileInputRef.value.value = ""
 }
@@ -116,9 +154,49 @@ function formatBytes(value: number): string {
   return unit === 0 ? `${Math.trunc(n)} ${units[unit]}` : `${n.toFixed(1)} ${units[unit]}`
 }
 
-function submitImport() {
+function errorMessage(err: unknown): string {
+  if (err instanceof HttpClientError) {
+    return err.apiError?.message || err.message
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message
+  }
+  return t("import.failedMessage")
+}
+
+async function submitImport() {
   if (!canSubmit.value) return
-  importError.value = t("import.comicImportPending")
+  const id = defaultImportPathId.value
+  if (id) {
+    await comicService.checkComicLibraryPathStorageStatus([id])
+    if (!targetStorageReady.value) {
+      importError.value = targetStorageUnavailableMessage.value || t("import.storageUnavailable")
+      pushAppToast(importError.value, { variant: "warning", durationMs: 6500 })
+      return
+    }
+  }
+
+  importError.value = ""
+  busy.value = true
+  uploadProgress.value = { loaded: 0, total: selectedTotalBytes.value, percent: 0 }
+  try {
+    const task = await comicService.importComics(selectedFiles.value, {
+      onUploadProgress(progress) {
+        uploadProgress.value = progress
+      },
+    })
+    if (task?.taskId) {
+      taskTracker.start(task.taskId)
+    }
+    pushAppToast(t("import.queuedToast"), { variant: "success", durationMs: 2600 })
+    clearSelection()
+    open.value = false
+  } catch (err) {
+    importError.value = errorMessage(err)
+    pushAppToast(importError.value, { variant: "destructive", durationMs: 6500 })
+  } finally {
+    busy.value = false
+  }
 }
 </script>
 
@@ -132,7 +210,40 @@ function submitImport() {
         class="rounded-full"
         :aria-label="t('import.comicTrigger')"
       >
-        <BookOpen data-icon="inline-start" />
+        <svg
+          v-if="busy"
+          data-comic-import-trigger-progress
+          data-icon="inline-start"
+          class="size-4 -rotate-90 text-primary-foreground"
+          viewBox="0 0 36 36"
+          role="progressbar"
+          :aria-valuenow="progressValue"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-label="t('import.importing')"
+        >
+          <circle
+            class="text-primary-foreground/35"
+            cx="18"
+            cy="18"
+            r="15.9155"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+          />
+          <circle
+            cx="18"
+            cy="18"
+            r="15.9155"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-dasharray="100"
+            :stroke-dashoffset="triggerProgressDashOffset"
+          />
+        </svg>
+        <BookOpen v-else data-icon="inline-start" />
         {{ t("import.comicTrigger") }}
       </Button>
     </DialogTrigger>
@@ -160,6 +271,13 @@ function submitImport() {
             </span>
           </div>
         </div>
+
+        <p
+          v-if="targetStorageUnavailableMessage"
+          class="text-sm text-amber-700 dark:text-amber-300"
+        >
+          {{ t("import.storageUnavailable") }} {{ targetStorageUnavailableMessage }}
+        </p>
 
         <div
           class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors"
@@ -225,6 +343,17 @@ function submitImport() {
           {{ t("import.comicSkippedUnsupported", { count: skippedCount }) }}
         </p>
 
+        <div v-if="busy" class="flex flex-col gap-2">
+          <Progress :model-value="progressValue" />
+          <p class="text-xs text-muted-foreground">
+            {{ t("import.copyingProgress", {
+              percent: progressValue,
+              loaded: formatBytes(uploadProgress?.loaded ?? 0),
+              total: formatBytes(uploadProgress?.total ?? selectedTotalBytes),
+            }) }}
+          </p>
+        </div>
+
         <p v-if="importError" class="text-sm text-destructive" role="alert">
           {{ importError }}
         </p>
@@ -240,7 +369,7 @@ function submitImport() {
           :disabled="!canSubmit"
           @click="submitImport"
         >
-          {{ t("import.comicSubmit") }}
+          {{ busy ? t("import.importing") : t("import.comicSubmit") }}
         </Button>
       </DialogFooter>
     </DialogContent>

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -37,16 +38,35 @@ func (h *Handler) handleStartComicScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	task, err := h.startComicScan(r.Context(), paths)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("start comic scan failed", zap.Error(err))
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to start comic scan")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, task)
+}
+
+func (h *Handler) startComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO) (contracts.TaskDTO, error) {
+	if h.comicScanStarter != nil {
+		return h.comicScanStarter.StartComicScan(ctx, paths)
+	}
+	if h.tasks == nil {
+		return contracts.TaskDTO{}, errors.New("comic scan task manager is not available")
+	}
 	task := h.tasks.Create(contracts.TaskTypeScanComics, map[string]any{
 		"libraryPathCount": len(paths),
 	})
 	task = h.tasks.Start(task.TaskID, "Scanning comics")
-	h.saveTaskSnapshot(r.Context(), task)
+	h.saveTaskSnapshot(ctx, task)
 
 	scanPaths := append([]contracts.ComicLibraryPathDTO(nil), paths...)
 	go h.runComicScan(task.TaskID, scanPaths)
 
-	writeJSON(w, http.StatusAccepted, task)
+	return task, nil
 }
 
 func (h *Handler) comicLibraryEnabled() bool {

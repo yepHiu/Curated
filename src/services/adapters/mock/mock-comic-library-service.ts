@@ -2,6 +2,7 @@ import { computed, ref } from "vue"
 import { HttpClientError } from "@/api/http-client"
 import type {
   ComicCacheStatusDTO,
+  LibraryPathStorageStatusDTO,
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
   PutComicReadingPreferencesBody,
@@ -81,6 +82,7 @@ loadMockComicPrefs()
 
 const comicLibraryEnabledMock = ref(false)
 const comicLibraryPathsMock = ref<ComicLibrarySetting[]>([])
+const comicLibraryPathStorageStatusesMock = ref<LibraryPathStorageStatusDTO[]>([])
 const defaultComicImportLibraryPathIdMock = ref("")
 const comicReaderMock = ref<ComicReaderSettings>({
   mode: "page",
@@ -203,12 +205,44 @@ export const mockComicLibraryService: ComicLibraryService = {
   loadError: computed(() => null),
   comicLibraryEnabled: computed(() => comicLibraryEnabledMock.value),
   comicLibraryPaths: computed(() => comicLibraryPathsMock.value),
+  comicLibraryPathStorageStatuses: computed(() => comicLibraryPathStorageStatusesMock.value),
   defaultComicImportLibraryPathId: computed(() => defaultComicImportLibraryPathIdMock.value),
   comicReader: computed(() => comicReaderMock.value),
   comicCache: computed(() => comicCacheMock.value),
 
   async refreshSettings() {
     // Mock settings are local state only.
+  },
+
+  async checkComicLibraryPathStorageStatus(libraryPathIds?: string[]) {
+    const selected = new Set(libraryPathIds?.map((id) => id.trim()).filter(Boolean) ?? [])
+    const paths = selected.size > 0
+      ? comicLibraryPathsMock.value.filter((path) => selected.has(path.id))
+      : comicLibraryPathsMock.value
+    const checked = paths.map((path) => {
+      const existing = comicLibraryPathStorageStatusesMock.value.find(
+        (status) => status.libraryPathId === path.id,
+      )
+      return existing ?? {
+        libraryPathId: path.id,
+        path: path.path,
+        title: path.title,
+        status: "online" as const,
+        message: "online",
+        checkedAt: nowISO(),
+        canRescan: true,
+        canImport: true,
+      }
+    })
+    if (selected.size === 0) {
+      comicLibraryPathStorageStatusesMock.value = checked
+      return
+    }
+    const next = new Map(comicLibraryPathStorageStatusesMock.value.map((item) => [item.libraryPathId, item]))
+    for (const item of checked) {
+      next.set(item.libraryPathId, item)
+    }
+    comicLibraryPathStorageStatusesMock.value = [...next.values()]
   },
 
   async setComicLibraryEnabled(value: boolean) {
@@ -307,6 +341,10 @@ export const mockComicLibraryService: ComicLibraryService = {
 
   async scanComics(): Promise<TaskDTO | null> {
     throw mockHttpError(501, "MOCK_COMIC_SCAN_NOT_SUPPORTED")
+  },
+
+  async importComics(): Promise<TaskDTO | null> {
+    throw mockHttpError(501, "MOCK_COMIC_IMPORT_NOT_SUPPORTED")
   },
 
   async getComicProgress(comicId: string): Promise<ComicReadingProgressDTO> {

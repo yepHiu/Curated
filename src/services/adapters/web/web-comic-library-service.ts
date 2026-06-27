@@ -4,6 +4,7 @@ import type {
   ComicBookDetailDTO,
   ComicBookListItemDTO,
   ComicCacheStatusDTO,
+  LibraryPathStorageStatusDTO,
   ComicLibraryPathDTO,
   ComicPageDTO,
   ComicReadingPreferencesDTO,
@@ -30,6 +31,7 @@ const comicsLoadedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const comicLibraryEnabledState = ref(false)
 const comicLibraryPathsState = ref<ComicLibrarySetting[]>([])
+const comicLibraryPathStorageStatusesState: Ref<LibraryPathStorageStatusDTO[]> = ref([])
 const defaultComicImportLibraryPathIdState = ref("")
 const comicReaderState = ref<ComicReaderSettings>({
   mode: "page",
@@ -198,6 +200,7 @@ function createWebComicLibraryService(): ComicLibraryService {
     loadError: computed(() => loadErrorState.value),
     comicLibraryEnabled: computed(() => comicLibraryEnabledState.value),
     comicLibraryPaths: computed(() => comicLibraryPathsState.value),
+    comicLibraryPathStorageStatuses: computed(() => comicLibraryPathStorageStatusesState.value),
     defaultComicImportLibraryPathId: computed(() => defaultComicImportLibraryPathIdState.value),
     comicReader: computed(() => comicReaderState.value),
     comicCache: computed(() => comicCacheState.value),
@@ -205,6 +208,18 @@ function createWebComicLibraryService(): ComicLibraryService {
     async refreshSettings() {
       const settings = await comicApi.getSettings()
       applySettingsFromDTO(settings)
+    },
+
+    async checkComicLibraryPathStorageStatus(libraryPathIds?: string[]) {
+      const ids = libraryPathIds?.map((id) => id.trim()).filter(Boolean) ?? []
+      if (ids.length === 0) {
+        comicLibraryPathStorageStatusesState.value = []
+        return
+      }
+      comicLibraryPathStorageStatusesState.value =
+        comicLibraryPathStorageStatusesState.value.filter((status) =>
+          ids.includes(status.libraryPathId),
+        )
     },
 
     async setComicLibraryEnabled(value: boolean) {
@@ -324,6 +339,14 @@ function createWebComicLibraryService(): ComicLibraryService {
 
     async scanComics(): Promise<TaskDTO | null> {
       return await comicApi.startComicScan()
+    },
+
+    async importComics(files, options): Promise<TaskDTO | null> {
+      const selected = files.filter((file) => file.size >= 0)
+      if (selected.length === 0) {
+        return null
+      }
+      return await comicApi.importComics(selected, options)
     },
 
     async getComicProgress(comicId: string) {

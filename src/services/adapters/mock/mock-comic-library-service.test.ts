@@ -79,5 +79,10 @@ describe("mockComicLibraryService", () => {
     await expect(mockComicLibraryService.revealComicSource("comic-1")).rejects.toMatchObject({
       status: 501,
     })
+    await expect(mockComicLibraryService.importComics([
+      new File(["cbz"], "Book One.cbz", { type: "application/vnd.comicbook+zip" }),
+    ])).rejects.toMatchObject({
+      status: 501,
+    })
   })
 })

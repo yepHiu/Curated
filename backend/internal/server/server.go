@@ -51,6 +51,11 @@ type ScanStarter interface {
 	StartScan(ctx context.Context, paths []string) (contracts.TaskDTO, error)
 }
 
+// ComicScanStarter starts an async comic library scan task and returns its task descriptor.
+type ComicScanStarter interface {
+	StartComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO) (contracts.TaskDTO, error)
+}
+
 // MovieMetadataRefresher starts an async single-movie metadata rescrape and returns the scrape task.
 type MovieMetadataRefresher interface {
 	StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error)
@@ -208,6 +213,7 @@ type Handler struct {
 	store                       *storage.SQLiteStore
 	tasks                       *tasks.Manager
 	scanStarter                 ScanStarter
+	comicScanStarter            ComicScanStarter
 	organizeLibraryCtl          OrganizeLibraryController
 	autoLibraryWatchCtl         AutoLibraryWatchController
 	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
@@ -241,6 +247,7 @@ type Deps struct {
 	Store                            *storage.SQLiteStore
 	Tasks                            *tasks.Manager
 	ScanStarter                      ScanStarter
+	ComicScanStarter                 ComicScanStarter
 	OrganizeLibraryCtl               OrganizeLibraryController
 	AutoLibraryWatchCtl              AutoLibraryWatchController
 	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
@@ -278,6 +285,7 @@ func NewHandler(deps Deps) *Handler {
 		store:                       deps.Store,
 		tasks:                       deps.Tasks,
 		scanStarter:                 deps.ScanStarter,
+		comicScanStarter:            deps.ComicScanStarter,
 		organizeLibraryCtl:          deps.OrganizeLibraryCtl,
 		autoLibraryWatchCtl:         deps.AutoLibraryWatchCtl,
 		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
@@ -362,6 +370,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/import/movies/uploads/{uploadId}", h.handleAbortMovieImportUpload)
 	mux.HandleFunc("PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}", h.handlePutMovieImportUploadChunk)
 	mux.HandleFunc("POST /api/import/movies/uploads/{uploadId}/commit", h.handleCommitMovieImportUpload)
+	mux.HandleFunc("POST /api/import/comics", h.handleImportComics)
 	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
 	mux.HandleFunc("GET /api/library/paths/storage-status", h.handleGetLibraryPathStorageStatus)
 	mux.HandleFunc("POST /api/library/paths/storage-status/check", h.handleCheckLibraryPathStorageStatus)
