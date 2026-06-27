@@ -91,6 +91,30 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.DefaultImportLibraryPathID = s
 	}
+	if v, ok := m["comicLibraryEnabled"]; ok {
+		b, err := parseJSONBool(v, "comicLibraryEnabled")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.ComicLibraryEnabled = b
+	}
+	if v, ok := m["defaultComicImportLibraryPathId"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: defaultComicImportLibraryPathId: %w", path, err)
+		}
+		cfg.DefaultComicImportLibraryPathID = s
+	}
+	if v, ok := m["comicReader"]; ok {
+		if err := parseComicReaderConfig(v, &cfg.ComicReader); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
+	if v, ok := m["comicCache"]; ok {
+		if err := parseComicCacheConfig(v, &cfg.ComicCache); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

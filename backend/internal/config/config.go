@@ -41,6 +41,14 @@ type Config struct {
 	CuratedFrameExportFormat string `json:"curatedFrameExportFormat,omitempty"`
 	// DefaultImportLibraryPathID is the library_paths row id used by top-bar movie import. Empty means not configured.
 	DefaultImportLibraryPathID string `json:"defaultImportLibraryPathId,omitempty"`
+	// ComicLibraryEnabled gates the optional, independent comic library domain.
+	ComicLibraryEnabled bool `json:"comicLibraryEnabled,omitempty"`
+	// DefaultComicImportLibraryPathID is the comic_library_paths row id used by comic import. Empty means not configured.
+	DefaultComicImportLibraryPathID string `json:"defaultComicImportLibraryPathId,omitempty"`
+	// ComicReader stores global default comic reader preferences.
+	ComicReader ComicReaderConfig `json:"comicReader,omitempty"`
+	// ComicCache stores comic thumbnail/page cache limits.
+	ComicCache ComicCacheConfig `json:"comicCache,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.
@@ -178,6 +186,9 @@ func Default() Config {
 		AutoDownloadUpdates:      false,
 		LaunchAtLogin:            false,
 		CuratedFrameExportFormat: "jpg",
+		ComicLibraryEnabled:      false,
+		ComicReader:              DefaultComicReaderConfig(),
+		ComicCache:               DefaultComicCacheConfig(),
 	}
 }
 
@@ -226,6 +237,8 @@ func Load(path string) (Config, error) {
 		cfg.HttpAddr = defaultHTTPAddr()
 	}
 	cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat)
+	cfg.ComicReader = NormalizeComicReaderConfig(cfg.ComicReader)
+	cfg.ComicCache = NormalizeComicCacheConfig(cfg.ComicCache)
 	if cfg.Tasks.ScanTimeoutSeconds <= 0 {
 		cfg.Tasks.ScanTimeoutSeconds = 600
 	}

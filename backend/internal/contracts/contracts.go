@@ -511,10 +511,15 @@ type UpdateLibraryPathRequest struct {
 
 // SettingsDTO carries all application settings exposed to the frontend.
 type SettingsDTO struct {
-	LibraryPaths               []LibraryPathDTO  `json:"libraryPaths"`
-	DefaultImportLibraryPathID string            `json:"defaultImportLibraryPathId,omitempty"`
-	Player                     PlayerSettingsDTO `json:"player"`
-	OrganizeLibrary            bool              `json:"organizeLibrary"`
+	LibraryPaths                    []LibraryPathDTO       `json:"libraryPaths"`
+	DefaultImportLibraryPathID      string                 `json:"defaultImportLibraryPathId,omitempty"`
+	ComicLibraryEnabled             bool                   `json:"comicLibraryEnabled"`
+	ComicLibraryPaths               []ComicLibraryPathDTO  `json:"comicLibraryPaths,omitempty"`
+	DefaultComicImportLibraryPathID string                 `json:"defaultComicImportLibraryPathId,omitempty"`
+	ComicReader                     ComicReaderSettingsDTO `json:"comicReader"`
+	ComicCache                      ComicCacheSettingsDTO  `json:"comicCache"`
+	Player                          PlayerSettingsDTO      `json:"player"`
+	OrganizeLibrary                 bool                   `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
 	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
@@ -581,15 +586,19 @@ type ProxyJavBusPingResponse struct {
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
-	OrganizeLibrary            *bool                   `json:"organizeLibrary,omitempty"`
-	AutoLibraryWatch           *bool                   `json:"autoLibraryWatch,omitempty"`
-	AutoActorProfileScrape     *bool                   `json:"autoActorProfileScrape,omitempty"`
-	AutoDownloadUpdates        *bool                   `json:"autoDownloadUpdates,omitempty"`
-	LaunchAtLogin              *bool                   `json:"launchAtLogin,omitempty"`
-	CuratedFrameExportFormat   *string                 `json:"curatedFrameExportFormat,omitempty"`
-	DefaultImportLibraryPathID *string                 `json:"defaultImportLibraryPathId,omitempty"`
-	Player                     *PatchPlayerSettingsDTO `json:"player,omitempty"`
-	MetadataMovieProvider      *string                 `json:"metadataMovieProvider,omitempty"`
+	OrganizeLibrary                 *bool                   `json:"organizeLibrary,omitempty"`
+	AutoLibraryWatch                *bool                   `json:"autoLibraryWatch,omitempty"`
+	AutoActorProfileScrape          *bool                   `json:"autoActorProfileScrape,omitempty"`
+	AutoDownloadUpdates             *bool                   `json:"autoDownloadUpdates,omitempty"`
+	LaunchAtLogin                   *bool                   `json:"launchAtLogin,omitempty"`
+	CuratedFrameExportFormat        *string                 `json:"curatedFrameExportFormat,omitempty"`
+	DefaultImportLibraryPathID      *string                 `json:"defaultImportLibraryPathId,omitempty"`
+	ComicLibraryEnabled             *bool                   `json:"comicLibraryEnabled,omitempty"`
+	DefaultComicImportLibraryPathID *string                 `json:"defaultComicImportLibraryPathId,omitempty"`
+	ComicReader                     *ComicReaderSettingsDTO `json:"comicReader,omitempty"`
+	ComicCache                      *ComicCacheSettingsDTO  `json:"comicCache,omitempty"`
+	Player                          *PatchPlayerSettingsDTO `json:"player,omitempty"`
+	MetadataMovieProvider           *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
 	MetadataMovieProviderChain *[]string `json:"metadataMovieProviderChain,omitempty"`
 	// MetadataMovieScrapeMode: auto | specified | chain; switches active scrape strategy without necessarily clearing saved lists.
@@ -942,7 +951,10 @@ const (
 	TaskFailed        = "failed"
 	TaskCancelled     = "cancelled"
 
-	TaskTypeImportMovies = "import.movies"
+	TaskTypeImportMovies      = "import.movies"
+	TaskTypeScanComics        = "scan.comics"
+	TaskTypeImportComics      = "import.comics"
+	TaskTypeComicCacheCleanup = "comic.cache.cleanup"
 
 	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
 	ErrorCodeNotFound      = "COMMON_NOT_FOUND"
@@ -968,6 +980,18 @@ const (
 	ErrorCodeImportCopyFailed          = "IMPORT_COPY_FAILED"
 	ErrorCodeImportCancelled           = "IMPORT_CANCELLED"
 	ErrorCodeImportScanFailed          = "IMPORT_SCAN_FAILED"
+
+	ErrorCodeComicLibraryDisabled     = "COMIC_LIBRARY_DISABLED"
+	ErrorCodeComicPathNotConfigured   = "COMIC_PATH_NOT_CONFIGURED"
+	ErrorCodeComicPathNotFound        = "COMIC_PATH_NOT_FOUND"
+	ErrorCodeComicArchiveUnsupported  = "COMIC_ARCHIVE_UNSUPPORTED"
+	ErrorCodeComicArchiveEmpty        = "COMIC_ARCHIVE_EMPTY"
+	ErrorCodeComicArchiveReadFailed   = "COMIC_ARCHIVE_READ_FAILED"
+	ErrorCodeComicBookNotFound        = "COMIC_BOOK_NOT_FOUND"
+	ErrorCodeComicPageNotFound        = "COMIC_PAGE_NOT_FOUND"
+	ErrorCodeComicImportTargetMissing = "COMIC_IMPORT_TARGET_MISSING"
+	ErrorCodeComicImportConflict      = "COMIC_IMPORT_CONFLICT"
+	ErrorCodeComicCacheCleanupFailed  = "COMIC_CACHE_CLEANUP_FAILED"
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"
