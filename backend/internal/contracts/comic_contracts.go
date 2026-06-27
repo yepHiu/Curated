@@ -7,6 +7,19 @@ type ComicLibraryPathDTO struct {
 	FirstLibraryScanPending bool   `json:"firstLibraryScanPending"`
 }
 
+type AddComicLibraryPathRequest struct {
+	Path  string `json:"path"`
+	Title string `json:"title,omitempty"`
+}
+
+type AddComicLibraryPathResponse struct {
+	ComicLibraryPathDTO
+}
+
+type UpdateComicLibraryPathRequest struct {
+	Title string `json:"title"`
+}
+
 type ComicBookListItemDTO struct {
 	ID               string   `json:"id"`
 	Title            string   `json:"title"`

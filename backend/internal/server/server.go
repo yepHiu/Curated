@@ -142,6 +142,18 @@ type DefaultImportLibraryPathController interface {
 	SetDefaultImportLibraryPathID(id string) error
 }
 
+// ComicSettingsController exposes and updates optional comic library settings.
+type ComicSettingsController interface {
+	ComicLibraryEnabled() bool
+	SetComicLibraryEnabled(v bool) error
+	DefaultComicImportLibraryPathID() string
+	SetDefaultComicImportLibraryPathID(id string) error
+	ComicReaderSettings() contracts.ComicReaderSettingsDTO
+	SetComicReaderSettings(v contracts.ComicReaderSettingsDTO) error
+	ComicCacheSettings() contracts.ComicCacheSettingsDTO
+	SetComicCacheSettings(v contracts.ComicCacheSettingsDTO) error
+}
+
 // LibraryPathStorageStatusProvider checks whether configured library paths' backing storage is available.
 type LibraryPathStorageStatusProvider interface {
 	ListLibraryPathStorageStatus(ctx context.Context) (contracts.LibraryPathStorageStatusListDTO, error)
@@ -203,6 +215,7 @@ type Handler struct {
 	launchAtLoginCtl            LaunchAtLoginController
 	curatedFrameExportFormatCtl CuratedFrameExportFormatController
 	defaultImportLibraryPathCtl DefaultImportLibraryPathController
+	comicSettingsCtl            ComicSettingsController
 	libraryPathStorageStatus    LibraryPathStorageStatusProvider
 	metadataScrapeCtl           MetadataScrapeSettings
 	providerHealthChecker       ProviderHealthChecker
@@ -235,6 +248,7 @@ type Deps struct {
 	LaunchAtLoginCtl                 LaunchAtLoginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
+	ComicSettingsCtl                 ComicSettingsController
 	LibraryPathStorageStatusProvider LibraryPathStorageStatusProvider
 	MetadataScrapeCtl                MetadataScrapeSettings
 	ProviderHealthChecker            ProviderHealthChecker
@@ -271,6 +285,7 @@ func NewHandler(deps Deps) *Handler {
 		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
 		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
+		comicSettingsCtl:            deps.ComicSettingsCtl,
 		libraryPathStorageStatus:    deps.LibraryPathStorageStatusProvider,
 		metadataScrapeCtl:           deps.MetadataScrapeCtl,
 		providerHealthChecker:       deps.ProviderHealthChecker,
@@ -355,6 +370,11 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
+	mux.HandleFunc("GET /api/library/comics/paths", h.handleListComicLibraryPaths)
+	mux.HandleFunc("POST /api/library/comics/paths", h.handleAddComicLibraryPath)
+	mux.HandleFunc("PATCH /api/library/comics/paths/{id}", h.handlePatchComicLibraryPath)
+	mux.HandleFunc("DELETE /api/library/comics/paths/{id}", h.handleDeleteComicLibraryPath)
+	mux.HandleFunc("POST /api/library/comics/scans", h.handleStartComicScan)
 	mux.HandleFunc("GET /api/tasks/recent", h.handleGetRecentTasks)
 	mux.HandleFunc("GET /api/tasks/{taskId}", h.handleGetTaskStatus)
 
@@ -1536,6 +1556,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if err != nil {
 		return contracts.SettingsDTO{}, err
 	}
+	comicLibraryPaths, err := h.store.ListComicLibraryPaths(ctx)
+	if err != nil {
+		return contracts.SettingsDTO{}, err
+	}
 	org := h.cfg.OrganizeLibrary
 	if h.organizeLibraryCtl != nil {
 		org = h.organizeLibraryCtl.OrganizeLibrary()
@@ -1566,9 +1590,24 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.defaultImportLibraryPathCtl != nil {
 		defaultImportLibraryPathID = strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
 	}
+	comicLibraryEnabled := h.cfg.ComicLibraryEnabled
+	defaultComicImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultComicImportLibraryPathID)
+	comicReader := comicReaderSettingsDTOFromConfig(h.cfg.ComicReader)
+	comicCache := comicCacheSettingsDTOFromConfig(h.cfg.ComicCache)
+	if h.comicSettingsCtl != nil {
+		comicLibraryEnabled = h.comicSettingsCtl.ComicLibraryEnabled()
+		defaultComicImportLibraryPathID = strings.TrimSpace(h.comicSettingsCtl.DefaultComicImportLibraryPathID())
+		comicReader = normalizeComicReaderSettingsDTO(h.comicSettingsCtl.ComicReaderSettings())
+		comicCache = normalizeComicCacheSettingsDTO(h.comicSettingsCtl.ComicCacheSettings())
+	}
 	dto := contracts.SettingsDTO{
-		LibraryPaths:               libraryPaths,
-		DefaultImportLibraryPathID: defaultImportLibraryPathID,
+		LibraryPaths:                    libraryPaths,
+		DefaultImportLibraryPathID:      defaultImportLibraryPathID,
+		ComicLibraryEnabled:             comicLibraryEnabled,
+		ComicLibraryPaths:               comicLibraryPaths,
+		DefaultComicImportLibraryPathID: defaultComicImportLibraryPathID,
+		ComicReader:                     comicReader,
+		ComicCache:                      comicCache,
 		Player: contracts.PlayerSettingsDTO{
 			HardwareDecode:      h.cfg.Player.HardwareDecode,
 			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
@@ -1716,6 +1755,32 @@ func playerSettingsPatchFromDTO(dto contracts.PlayerSettingsDTO) contracts.Patch
 	}
 }
 
+func comicReaderSettingsDTOFromConfig(v config.ComicReaderConfig) contracts.ComicReaderSettingsDTO {
+	n := config.NormalizeComicReaderConfig(v)
+	return contracts.ComicReaderSettingsDTO{
+		Mode:      n.Mode,
+		Fit:       n.Fit,
+		Direction: n.Direction,
+	}
+}
+
+func comicCacheSettingsDTOFromConfig(v config.ComicCacheConfig) contracts.ComicCacheSettingsDTO {
+	n := config.NormalizeComicCacheConfig(v)
+	return contracts.ComicCacheSettingsDTO{MaxBytes: n.MaxBytes}
+}
+
+func normalizeComicReaderSettingsDTO(v contracts.ComicReaderSettingsDTO) contracts.ComicReaderSettingsDTO {
+	return comicReaderSettingsDTOFromConfig(config.ComicReaderConfig{
+		Mode:      v.Mode,
+		Fit:       v.Fit,
+		Direction: v.Direction,
+	})
+}
+
+func normalizeComicCacheSettingsDTO(v contracts.ComicCacheSettingsDTO) contracts.ComicCacheSettingsDTO {
+	return comicCacheSettingsDTOFromConfig(config.ComicCacheConfig{MaxBytes: v.MaxBytes})
+}
+
 func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
@@ -1733,7 +1798,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.comicSettingsCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1747,12 +1812,12 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.ComicLibraryEnabled == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
 
-	ops := make([]settingsPatchOperation, 0, 13)
+	ops := make([]settingsPatchOperation, 0, 17)
 
 	if body.OrganizeLibrary != nil {
 		if h.organizeLibraryCtl == nil {
@@ -1904,6 +1969,109 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,
 				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.ComicLibraryEnabled != nil {
+		if h.comicSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
+			return
+		}
+		target := *body.ComicLibraryEnabled
+		if target {
+			paths, err := h.store.ListComicLibraryPaths(r.Context())
+			if err != nil {
+				if h.logger != nil {
+					h.logger.Warn("validate comic library paths failed", zap.Error(err))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to validate comic library paths")
+				return
+			}
+			if len(paths) == 0 {
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeComicPathNotConfigured, "comic library requires at least one comic path")
+				return
+			}
+		}
+		prev := h.comicSettingsCtl.ComicLibraryEnabled()
+		ops = append(ops, settingsPatchOperation{
+			name:     "comicLibraryEnabled",
+			apply:    func() error { return h.comicSettingsCtl.SetComicLibraryEnabled(target) },
+			rollback: func() error { return h.comicSettingsCtl.SetComicLibraryEnabled(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save comic library settings"),
+			},
+		})
+	}
+
+	if body.DefaultComicImportLibraryPathID != nil {
+		if h.comicSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
+			return
+		}
+		target := strings.TrimSpace(*body.DefaultComicImportLibraryPathID)
+		if target != "" {
+			if _, err := h.store.GetComicLibraryPath(r.Context(), target); err != nil {
+				if errors.Is(err, storage.ErrComicLibraryPathNotFound) {
+					writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeComicPathNotFound, "unknown defaultComicImportLibraryPathId")
+					return
+				}
+				if h.logger != nil {
+					h.logger.Warn("validate default comic import library path failed", zap.Error(err))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to validate default comic import library path")
+				return
+			}
+		}
+		prev := h.comicSettingsCtl.DefaultComicImportLibraryPathID()
+		ops = append(ops, settingsPatchOperation{
+			name:     "defaultComicImportLibraryPathId",
+			apply:    func() error { return h.comicSettingsCtl.SetDefaultComicImportLibraryPathID(target) },
+			rollback: func() error { return h.comicSettingsCtl.SetDefaultComicImportLibraryPathID(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save comic library settings"),
+			},
+		})
+	}
+
+	if body.ComicReader != nil {
+		if h.comicSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
+			return
+		}
+		prev := normalizeComicReaderSettingsDTO(h.comicSettingsCtl.ComicReaderSettings())
+		target := normalizeComicReaderSettingsDTO(*body.ComicReader)
+		ops = append(ops, settingsPatchOperation{
+			name:     "comicReader",
+			apply:    func() error { return h.comicSettingsCtl.SetComicReaderSettings(target) },
+			rollback: func() error { return h.comicSettingsCtl.SetComicReaderSettings(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	if body.ComicCache != nil {
+		if h.comicSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
+			return
+		}
+		prev := normalizeComicCacheSettingsDTO(h.comicSettingsCtl.ComicCacheSettings())
+		target := normalizeComicCacheSettingsDTO(*body.ComicCache)
+		ops = append(ops, settingsPatchOperation{
+			name:     "comicCache",
+			apply:    func() error { return h.comicSettingsCtl.SetComicCacheSettings(target) },
+			rollback: func() error { return h.comicSettingsCtl.SetComicCacheSettings(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
 			},
 		})
 	}

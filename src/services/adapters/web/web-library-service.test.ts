@@ -48,6 +48,16 @@ function movieDetailDto(id: string, overrides: Partial<MovieDetailDTO> = {}): Mo
 function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
   return {
     libraryPaths: [],
+    comicLibraryEnabled: false,
+    comicLibraryPaths: [],
+    comicReader: {
+      mode: "page",
+      fit: "contain",
+      direction: "ltr",
+    },
+    comicCache: {
+      maxBytes: 2 * 1024 * 1024 * 1024,
+    },
     player: {
       hardwareDecode: true,
       hardwareEncoder: "auto",

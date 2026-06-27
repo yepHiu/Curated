@@ -87,6 +87,14 @@ type App struct {
 	// defaultImportLibraryPathID controls where top-bar movie imports are copied.
 	defaultImportLibraryPathID   string
 	defaultImportLibraryPathIDMu sync.RWMutex
+	// comicLibraryEnabled gates the optional, independent comic library domain.
+	comicLibraryEnabled   bool
+	comicLibraryEnabledMu sync.RWMutex
+	// defaultComicImportLibraryPathID controls where top-bar comic imports are copied.
+	defaultComicImportLibraryPathID   string
+	defaultComicImportLibraryPathIDMu sync.RWMutex
+	// comicSettingsMu protects cfg.ComicReader and cfg.ComicCache.
+	comicSettingsMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapePendingMu sync.Mutex
@@ -166,22 +174,24 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			FFmpegCommand:   cfg.Player.FFmpegCommand,
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
-		devCPUSampler:                 devmetrics.NewCPUSampler(),
-		appUpdate:                     appupdate.NewService(store, logger),
-		storageHealth:                 storagehealth.NewChecker(storagehealth.NewDefaultProbe(), store),
-		organizeLibrary:               cfg.OrganizeLibrary,
-		autoLibraryWatch:              cfg.AutoLibraryWatch,
-		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
-		autoDownloadUpdates:           cfg.AutoDownloadUpdates,
-		launchAtLogin:                 cfg.LaunchAtLogin,
-		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
-		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
-		autoActorProfileScrapePending: make(map[string]struct{}),
-		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
-		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
-		appCtx:                        ctx,
-		scrapeSem:                     make(chan struct{}, scrapeConc),
-		watchScanPending:              make(map[string]struct{}),
+		devCPUSampler:                   devmetrics.NewCPUSampler(),
+		appUpdate:                       appupdate.NewService(store, logger),
+		storageHealth:                   storagehealth.NewChecker(storagehealth.NewDefaultProbe(), store),
+		organizeLibrary:                 cfg.OrganizeLibrary,
+		autoLibraryWatch:                cfg.AutoLibraryWatch,
+		autoActorProfileScrape:          cfg.AutoActorProfileScrape,
+		autoDownloadUpdates:             cfg.AutoDownloadUpdates,
+		launchAtLogin:                   cfg.LaunchAtLogin,
+		curatedFrameExportFormat:        config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
+		defaultImportLibraryPathID:      strings.TrimSpace(cfg.DefaultImportLibraryPathID),
+		comicLibraryEnabled:             cfg.ComicLibraryEnabled,
+		defaultComicImportLibraryPathID: strings.TrimSpace(cfg.DefaultComicImportLibraryPathID),
+		autoActorProfileScrapePending:   make(map[string]struct{}),
+		metadataMovieProviderChain:      cfg.MetadataMovieProviderChain,
+		librarySettingsPath:             strings.TrimSpace(librarySettingsPath),
+		appCtx:                          ctx,
+		scrapeSem:                       make(chan struct{}, scrapeConc),
+		watchScanPending:                make(map[string]struct{}),
 	}
 	app.appUpdate.SetCacheDir(cfg.CacheDir)
 	app.appUpdate.SetTaskManager(app.tasks)
@@ -362,6 +372,34 @@ func (a *App) DefaultImportLibraryPathID() string {
 	return strings.TrimSpace(a.defaultImportLibraryPathID)
 }
 
+// ComicLibraryEnabled reports whether the optional comic library domain is enabled.
+func (a *App) ComicLibraryEnabled() bool {
+	a.comicLibraryEnabledMu.RLock()
+	defer a.comicLibraryEnabledMu.RUnlock()
+	return a.comicLibraryEnabled
+}
+
+// DefaultComicImportLibraryPathID returns the configured comic_library_paths row id used by comic import.
+func (a *App) DefaultComicImportLibraryPathID() string {
+	a.defaultComicImportLibraryPathIDMu.RLock()
+	defer a.defaultComicImportLibraryPathIDMu.RUnlock()
+	return strings.TrimSpace(a.defaultComicImportLibraryPathID)
+}
+
+// ComicReaderSettings returns global default comic reader preferences exposed to Settings UI.
+func (a *App) ComicReaderSettings() contracts.ComicReaderSettingsDTO {
+	a.comicSettingsMu.RLock()
+	defer a.comicSettingsMu.RUnlock()
+	return comicReaderSettingsDTOFromConfig(a.cfg.ComicReader)
+}
+
+// ComicCacheSettings returns comic cache governance settings exposed to Settings UI.
+func (a *App) ComicCacheSettings() contracts.ComicCacheSettingsDTO {
+	a.comicSettingsMu.RLock()
+	defer a.comicSettingsMu.RUnlock()
+	return comicCacheSettingsDTOFromConfig(a.cfg.ComicCache)
+}
+
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
 func (a *App) SetAutoLibraryWatch(v bool) error {
 	path := a.librarySettingsPath
@@ -500,6 +538,107 @@ func (a *App) SetDefaultImportLibraryPathID(id string) error {
 	a.cfg.DefaultImportLibraryPathID = id
 	a.defaultImportLibraryPathIDMu.Unlock()
 	return nil
+}
+
+// SetComicLibraryEnabled persists the optional comic library gate.
+func (a *App) SetComicLibraryEnabled(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicLibraryEnabled"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicLibraryEnabledMu.Lock()
+	a.comicLibraryEnabled = v
+	a.cfg.ComicLibraryEnabled = v
+	a.comicLibraryEnabledMu.Unlock()
+	return nil
+}
+
+// SetDefaultComicImportLibraryPathID persists the default comic import destination path id.
+func (a *App) SetDefaultComicImportLibraryPathID(id string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	id = strings.TrimSpace(id)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["defaultComicImportLibraryPathId"] = id
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.defaultComicImportLibraryPathIDMu.Lock()
+	a.defaultComicImportLibraryPathID = id
+	a.cfg.DefaultComicImportLibraryPathID = id
+	a.defaultComicImportLibraryPathIDMu.Unlock()
+	return nil
+}
+
+// SetComicReaderSettings persists global default comic reader preferences.
+func (a *App) SetComicReaderSettings(v contracts.ComicReaderSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeComicReaderConfig(config.ComicReaderConfig{
+		Mode:      v.Mode,
+		Fit:       v.Fit,
+		Direction: v.Direction,
+	})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicReader"] = map[string]any{
+			"mode":      next.Mode,
+			"fit":       next.Fit,
+			"direction": next.Direction,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicSettingsMu.Lock()
+	a.cfg.ComicReader = next
+	a.comicSettingsMu.Unlock()
+	return nil
+}
+
+// SetComicCacheSettings persists comic cache governance settings.
+func (a *App) SetComicCacheSettings(v contracts.ComicCacheSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeComicCacheConfig(config.ComicCacheConfig{MaxBytes: v.MaxBytes})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicCache"] = map[string]any{
+			"maxBytes": next.MaxBytes,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicSettingsMu.Lock()
+	a.cfg.ComicCache = next
+	a.comicSettingsMu.Unlock()
+	return nil
+}
+
+func comicReaderSettingsDTOFromConfig(v config.ComicReaderConfig) contracts.ComicReaderSettingsDTO {
+	n := config.NormalizeComicReaderConfig(v)
+	return contracts.ComicReaderSettingsDTO{
+		Mode:      n.Mode,
+		Fit:       n.Fit,
+		Direction: n.Direction,
+	}
+}
+
+func comicCacheSettingsDTOFromConfig(v config.ComicCacheConfig) contracts.ComicCacheSettingsDTO {
+	n := config.NormalizeComicCacheConfig(v)
+	return contracts.ComicCacheSettingsDTO{MaxBytes: n.MaxBytes}
 }
 
 // ListLibraryPathStorageStatus checks every configured library path's backing storage.
@@ -2587,6 +2726,7 @@ func (a *App) HTTPHandler() http.Handler {
 		LaunchAtLoginCtl:                 a,
 		CuratedFrameExportFormatCtl:      a,
 		DefaultImportLibraryPathCtl:      a,
+		ComicSettingsCtl:                 a,
 		MetadataScrapeCtl:                a,
 		ProviderHealthChecker:            a.scraper,
 		ProxyCtl:                         a,

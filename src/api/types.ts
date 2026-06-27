@@ -223,6 +223,89 @@ export interface CheckLibraryPathStorageStatusBody {
   libraryPathIds?: string[]
 }
 
+export interface ComicLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+export interface AddComicLibraryPathBody {
+  path: string
+  title?: string
+}
+
+export interface AddComicLibraryPathResultDTO extends ComicLibraryPathDTO {}
+
+export interface UpdateComicLibraryPathBody {
+  title: string
+}
+
+export type ComicReadStatus = "unread" | "reading" | "read"
+
+export interface ComicBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  readStatus: ComicReadStatus | string
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastReadAt?: string
+  completedAt?: string
+}
+
+export interface ComicPageDTO {
+  comicId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+export interface ComicBookDetailDTO extends ComicBookListItemDTO {
+  pages: ComicPageDTO[]
+}
+
+export type ComicReaderMode = "page" | "scroll"
+export type ComicFitMode = "contain" | "width"
+export type ComicReadingDirection = "ltr" | "rtl"
+
+export interface ComicReaderSettingsDTO {
+  mode: ComicReaderMode
+  fit: ComicFitMode
+  direction: ComicReadingDirection
+}
+
+export interface ComicCacheSettingsDTO {
+  maxBytes: number
+}
+
+export interface ComicReadingProgressDTO {
+  comicId: string
+  pageIndex: number
+  completed: boolean
+  updatedAt: string
+}
+
+export interface ComicReadingPreferencesDTO {
+  comicId?: string
+  mode: ComicReaderMode
+  fit: ComicFitMode
+  direction: ComicReadingDirection
+  updatedAt?: string
+}
+
 export type HardwareEncoderPreference =
   | "auto"
   | "amf"
@@ -274,6 +357,11 @@ export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
   /** Library path id used as the target for top-bar movie imports. Empty or missing means not configured. */
   defaultImportLibraryPathId?: string
+  comicLibraryEnabled: boolean
+  comicLibraryPaths: ComicLibraryPathDTO[]
+  defaultComicImportLibraryPathId?: string
+  comicReader: ComicReaderSettingsDTO
+  comicCache: ComicCacheSettingsDTO
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
@@ -337,7 +425,14 @@ export interface ProxyJavBusPingResponse {
   message?: string
 }
 
-export interface PatchSettingsBody {
+export interface PatchComicSettingsBody {
+  comicLibraryEnabled?: boolean
+  defaultComicImportLibraryPathId?: string
+  comicReader?: ComicReaderSettingsDTO
+  comicCache?: ComicCacheSettingsDTO
+}
+
+export interface PatchSettingsBody extends PatchComicSettingsBody {
   organizeLibrary?: boolean
   autoLibraryWatch?: boolean
   autoActorProfileScrape?: boolean

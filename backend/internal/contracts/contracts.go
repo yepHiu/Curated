@@ -514,7 +514,7 @@ type SettingsDTO struct {
 	LibraryPaths                    []LibraryPathDTO       `json:"libraryPaths"`
 	DefaultImportLibraryPathID      string                 `json:"defaultImportLibraryPathId,omitempty"`
 	ComicLibraryEnabled             bool                   `json:"comicLibraryEnabled"`
-	ComicLibraryPaths               []ComicLibraryPathDTO  `json:"comicLibraryPaths,omitempty"`
+	ComicLibraryPaths               []ComicLibraryPathDTO  `json:"comicLibraryPaths"`
 	DefaultComicImportLibraryPathID string                 `json:"defaultComicImportLibraryPathId,omitempty"`
 	ComicReader                     ComicReaderSettingsDTO `json:"comicReader"`
 	ComicCache                      ComicCacheSettingsDTO  `json:"comicCache"`
