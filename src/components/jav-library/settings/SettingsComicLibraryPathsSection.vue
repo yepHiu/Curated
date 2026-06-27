@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const props = defineProps<{
+defineProps<{
   paths: readonly ComicLibrarySetting[]
   defaultImportLibraryPathId: string
   addBusy: boolean

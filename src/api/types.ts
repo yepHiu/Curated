@@ -235,7 +235,7 @@ export interface AddComicLibraryPathBody {
   title?: string
 }
 
-export interface AddComicLibraryPathResultDTO extends ComicLibraryPathDTO {}
+export type AddComicLibraryPathResultDTO = ComicLibraryPathDTO
 
 export interface UpdateComicLibraryPathBody {
   title: string
