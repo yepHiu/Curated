@@ -69,6 +69,22 @@ func (s *SQLiteStore) GetComicProgress(ctx context.Context, comicID string) (con
 }
 
 func (s *SQLiteStore) DeleteComicProgress(ctx context.Context, comicID string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM comic_reading_progress WHERE comic_id = ?`, comicID)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM comic_reading_progress WHERE comic_id = ?`, comicID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE comic_books
+		    SET read_status = 'unread', last_read_at = '', completed_at = '', updated_at = ?
+		  WHERE id = ?`,
+		nowUTC(),
+		comicID,
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

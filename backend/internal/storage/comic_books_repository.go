@@ -334,6 +334,41 @@ func (s *SQLiteStore) PatchComicBook(ctx context.Context, comicID string, patch 
 	return s.GetComicBookDetail(ctx, comicID)
 }
 
+func (s *SQLiteStore) DeleteComicBookIndex(ctx context.Context, comicID string) error {
+	comicID = strings.TrimSpace(comicID)
+	if comicID == "" {
+		return ErrComicBookNotFound
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, stmt := range []string{
+		`DELETE FROM comic_pages WHERE comic_id = ?`,
+		`DELETE FROM comic_book_tags WHERE comic_id = ?`,
+		`DELETE FROM comic_reading_progress WHERE comic_id = ?`,
+		`DELETE FROM comic_reading_preferences WHERE comic_id = ?`,
+		`DELETE FROM comic_cache_entries WHERE comic_id = ?`,
+	} {
+		if _, err := tx.ExecContext(ctx, stmt, comicID); err != nil {
+			return err
+		}
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM comic_books WHERE id = ?`, comicID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrComicBookNotFound
+	}
+	return tx.Commit()
+}
+
 func nullEmptyString(v string) any {
 	if strings.TrimSpace(v) == "" {
 		return nil
