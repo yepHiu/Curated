@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { FolderOpen, FolderPlus } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 
-defineProps<{
+const props = defineProps<{
   open: boolean
   newPath: string
   newPathTitle: string
@@ -25,6 +26,16 @@ defineProps<{
   addBusy: boolean
   canSaveNewPath: boolean
   contentClass: string
+  triggerLabel?: string
+  dialogTitle?: string
+  dialogDescription?: string
+  pathLabel?: string
+  pathPlaceholder?: string
+  pathInputId?: string
+  titleLabel?: string
+  titlePlaceholder?: string
+  titleInputId?: string
+  examplePaths?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +48,12 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const pathInputId = computed(() => props.pathInputId ?? "new-lib-path")
+const titleInputId = computed(() => props.titleInputId ?? "new-lib-title")
+const displayedExamplePaths = computed(() =>
+  props.examplePaths?.length ? props.examplePaths : ["D:\\Media\\JAV", "/home/user/Videos"],
+)
 
 function updateNewPath(value: unknown) {
   emit("update:newPath", typeof value === "string" ? value : String(value ?? ""))
@@ -55,29 +72,36 @@ function updateNewPathTitle(value: unknown) {
     <DialogTrigger as-child>
       <Button type="button" class="h-8 min-w-28 rounded-2xl px-3">
         <FolderPlus data-icon="inline-start" />
-        {{ t("settings.addPath") }}
+        {{ triggerLabel ?? t("settings.addPath") }}
       </Button>
     </DialogTrigger>
 
     <DialogContent :class="contentClass">
       <DialogHeader>
-        <DialogTitle>{{ t("settings.addPathDialogTitle") }}</DialogTitle>
+        <DialogTitle>{{ dialogTitle ?? t("settings.addPathDialogTitle") }}</DialogTitle>
         <DialogDescription>
-          {{ t("settings.addPathDialogDesc") }}
-          <span class="font-mono text-xs">D:\Media\JAV</span> 或
-          <span class="font-mono text-xs">/home/user/Videos</span>。
+          {{ dialogDescription ?? t("settings.addPathDialogDesc") }}
+          <template
+            v-for="(example, index) in displayedExamplePaths"
+            :key="example"
+          >
+            <span class="font-mono text-xs">{{ example }}</span>
+            <span v-if="index < displayedExamplePaths.length - 1"> / </span>
+          </template>
         </DialogDescription>
       </DialogHeader>
 
       <div class="flex flex-col gap-3">
         <div class="flex flex-col gap-3">
-          <label class="text-sm font-medium" for="new-lib-path">{{ t("settings.absolutePath") }}</label>
+          <label class="text-sm font-medium" :for="pathInputId">
+            {{ pathLabel ?? t("settings.absolutePath") }}
+          </label>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <Input
-              id="new-lib-path"
+              :id="pathInputId"
               :model-value="newPath"
               class="rounded-xl sm:min-w-0 sm:flex-1"
-              placeholder="D:\Media\JAV\Library"
+              :placeholder="pathPlaceholder ?? 'D:\\Media\\JAV\\Library'"
               autocomplete="off"
               @update:model-value="updateNewPath"
               @input="emit('clearError')"
@@ -111,14 +135,14 @@ function updateNewPathTitle(value: unknown) {
           </p>
         </div>
         <div class="flex flex-col gap-3">
-          <label class="text-sm font-medium" for="new-lib-title">{{
-            t("settings.optionalPathTitle")
-          }}</label>
+          <label class="text-sm font-medium" :for="titleInputId">
+            {{ titleLabel ?? t("settings.optionalPathTitle") }}
+          </label>
           <Input
-            id="new-lib-title"
+            :id="titleInputId"
             :model-value="newPathTitle"
             class="rounded-xl"
-            :placeholder="t('settings.displayName')"
+            :placeholder="titlePlaceholder ?? t('settings.displayName')"
             autocomplete="off"
             @update:model-value="updateNewPathTitle"
           />

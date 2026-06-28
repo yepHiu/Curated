@@ -943,6 +943,8 @@
     "comicLibraryPathTitleLabel": "漫画路径显示名",
     "comicLibraryPathTitlePlaceholder": "显示名",
     "comicLibraryPathAdd": "添加路径",
+    "comicLibraryPathDialogTitle": "添加漫画存储目录",
+    "comicLibraryPathDialogDesc": "填写绝对路径作为漫画来源；可点击「选择文件夹」打开系统目录界面。示例：",
     "comicLibraryPathAdding": "添加中…",
     "comicLibraryPathRemove": "移除",
     "comicLibraryPathEmpty": "还没有漫画存储路径。",

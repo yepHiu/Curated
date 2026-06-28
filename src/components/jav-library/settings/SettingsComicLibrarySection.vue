@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { BookOpen } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { ComicCacheStatusDTO } from "@/api/types"
 import type { ComicCacheSettings, ComicReaderSettings } from "@/domain/comic/types"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { useComicLibraryService } from "@/services/comic-library-service"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,6 +42,25 @@ const pathError = ref("")
 const readerError = ref("")
 const cacheError = ref("")
 const comicCacheStatus = ref<ComicCacheStatusDTO | null>(null)
+const addPathDialogOpen = ref(false)
+const newPath = ref("")
+const newPathTitle = ref("")
+const directoryHint = ref("")
+const pickDirectoryBusy = ref(false)
+
+const canSaveNewPath = computed(() => {
+  const trimmed = newPath.value.trim()
+  return trimmed.length > 0 && isAbsoluteLibraryPath(trimmed)
+})
+
+const directoryHintDisplay = computed(() => {
+  const hint = directoryHint.value.trim()
+  if (!hint) return ""
+  if (!canSaveNewPath.value) {
+    return `${hint}\n\n${t("settings.pickFolderHintSaveSuffix")}`
+  }
+  return hint
+})
 
 function errorMessage(err: unknown, fallbackKey = "settings.errSaveTitle"): string {
   if (err instanceof HttpClientError && err.apiError?.message) {
@@ -56,6 +76,15 @@ onMounted(() => {
   void comicService.refreshSettings().catch((err) => {
     enableError.value = errorMessage(err)
   })
+})
+
+watch(addPathDialogOpen, (open) => {
+  if (!open) {
+    newPath.value = ""
+    newPathTitle.value = ""
+    pathError.value = ""
+    directoryHint.value = ""
+  }
 })
 
 async function enableComicLibrary() {
@@ -86,9 +115,36 @@ async function disableComicLibrary() {
   }
 }
 
-async function addComicPath(path: string, title: string) {
+function clearPathAddError() {
   pathError.value = ""
-  const trimmed = path.trim()
+}
+
+async function browseForDirectory() {
+  directoryHint.value = ""
+  pickDirectoryBusy.value = true
+  try {
+    const outcome = await pickLibraryDirectory()
+    if (outcome.status === "ok") {
+      newPath.value = outcome.path
+      clearPathAddError()
+      return
+    }
+    if (outcome.status === "hint") {
+      directoryHint.value = outcome.message
+      if (outcome.suggestedTitle && !newPathTitle.value.trim()) {
+        newPathTitle.value = outcome.suggestedTitle
+      }
+      await nextTick()
+      document.getElementById("new-comic-lib-path")?.focus()
+    }
+  } finally {
+    pickDirectoryBusy.value = false
+  }
+}
+
+async function submitAddPath() {
+  pathError.value = ""
+  const trimmed = newPath.value.trim()
   if (!trimmed) {
     pathError.value = t("settings.comicLibraryPathRequired")
     return
@@ -99,8 +155,11 @@ async function addComicPath(path: string, title: string) {
   }
   try {
     pathBusy.value = true
-    await comicService.addComicLibraryPath(trimmed, title.trim() || undefined)
+    await comicService.addComicLibraryPath(trimmed, newPathTitle.value.trim() || undefined)
     await comicService.refreshSettings()
+    newPath.value = ""
+    newPathTitle.value = ""
+    addPathDialogOpen.value = false
   } catch (err) {
     pathError.value = errorMessage(err)
   } finally {
@@ -248,10 +307,19 @@ async function cleanupCache() {
         <SettingsComicLibraryPathsSection
           :paths="comicLibraryPaths"
           :default-import-library-path-id="defaultComicImportLibraryPathId"
+          v-model:add-path-dialog-open="addPathDialogOpen"
+          v-model:new-path="newPath"
+          v-model:new-path-title="newPathTitle"
+          :pick-directory-busy="pickDirectoryBusy"
+          :directory-hint-display="directoryHintDisplay"
           :add-busy="pathBusy"
+          :can-save-new-path="canSaveNewPath"
           :default-saving="defaultPathBusy"
-          :error="pathError"
-          @add-path="addComicPath"
+          :path-add-error="pathError"
+          dialog-content-class="rounded-3xl border-border/50 sm:max-w-md"
+          @clear-error="clearPathAddError"
+          @browse="browseForDirectory"
+          @submit="submitAddPath"
           @remove-path="removeComicPath"
           @change-default-import-path="changeDefaultPath"
         />

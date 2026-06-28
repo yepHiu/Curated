@@ -28,6 +28,8 @@ vi.mock("vue-i18n", () => ({
 vi.mock("lucide-vue-next", () => ({
   BookOpen: { name: "BookOpen", template: "<span />" },
   Database: { name: "Database", template: "<span />" },
+  FolderOpen: { name: "FolderOpen", template: "<span />" },
+  FolderPlus: { name: "FolderPlus", template: "<span />" },
   FolderArchive: { name: "FolderArchive", template: "<span />" },
   PanelsTopLeft: { name: "PanelsTopLeft", template: "<span />" },
   Trash2: { name: "Trash2", template: "<span />" },
@@ -35,6 +37,10 @@ vi.mock("lucide-vue-next", () => ({
 
 vi.mock("@/services/comic-library-service", () => ({
   useComicLibraryService: () => mockState.comicService,
+}))
+
+vi.mock("@/lib/pick-directory", () => ({
+  pickLibraryDirectory: vi.fn(),
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -52,6 +58,22 @@ vi.mock("@/components/ui/button", () => ({
     emits: ["click"],
     template: "<button :disabled='disabled' @click=\"$emit('click', $event)\"><slot /></button>",
   },
+}))
+
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: {
+    name: "Dialog",
+    props: ["open"],
+    emits: ["update:open"],
+    template: "<div><slot /></div>",
+  },
+  DialogClose: { name: "DialogClose", template: "<div><slot /></div>" },
+  DialogContent: { name: "DialogContent", template: "<div><slot /></div>" },
+  DialogDescription: { name: "DialogDescription", template: "<p><slot /></p>" },
+  DialogFooter: { name: "DialogFooter", template: "<footer><slot /></footer>" },
+  DialogHeader: { name: "DialogHeader", template: "<header><slot /></header>" },
+  DialogTitle: { name: "DialogTitle", template: "<h3><slot /></h3>" },
+  DialogTrigger: { name: "DialogTrigger", template: "<div><slot /></div>" },
 }))
 
 vi.mock("@/components/ui/input", () => ({

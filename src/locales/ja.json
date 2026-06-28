@@ -943,6 +943,8 @@
     "comicLibraryPathTitleLabel": "コミック保存パスの表示名",
     "comicLibraryPathTitlePlaceholder": "表示名",
     "comicLibraryPathAdd": "パスを追加",
+    "comicLibraryPathDialogTitle": "コミック保存フォルダを追加",
+    "comicLibraryPathDialogDesc": "コミックのルート絶対パスを入力します。システムのフォルダ選択も使えます。例：",
     "comicLibraryPathAdding": "追加中…",
     "comicLibraryPathRemove": "削除",
     "comicLibraryPathEmpty": "コミック保存パスはまだありません。",

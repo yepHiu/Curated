@@ -946,6 +946,8 @@
     "comicLibraryPathTitleLabel": "Comic storage path title",
     "comicLibraryPathTitlePlaceholder": "Display name",
     "comicLibraryPathAdd": "Add path",
+    "comicLibraryPathDialogTitle": "Add comic storage directory",
+    "comicLibraryPathDialogDesc": "Enter an absolute comic root; you can pick a folder from the system directory picker. Examples:",
     "comicLibraryPathAdding": "Adding...",
     "comicLibraryPathRemove": "Remove",
     "comicLibraryPathEmpty": "No comic storage paths yet.",

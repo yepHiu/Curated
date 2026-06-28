@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { FolderArchive, Trash2 } from "lucide-vue-next"
 import type { ComicLibrarySetting } from "@/domain/comic/types"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -12,33 +11,59 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 
-defineProps<{
+const props = defineProps<{
   paths: readonly ComicLibrarySetting[]
   defaultImportLibraryPathId: string
+  addPathDialogOpen: boolean
+  newPath: string
+  newPathTitle: string
+  pickDirectoryBusy: boolean
+  directoryHintDisplay: string
+  pathAddError: string
   addBusy: boolean
+  canSaveNewPath: boolean
   defaultSaving: boolean
-  error: string
+  dialogContentClass: string
 }>()
 
 const emit = defineEmits<{
-  addPath: [path: string, title: string]
+  "update:addPathDialogOpen": [open: boolean]
+  "update:newPath": [path: string]
+  "update:newPathTitle": [title: string]
+  clearError: []
+  browse: []
+  submit: []
   removePath: [id: string]
   changeDefaultImportPath: [id: string]
 }>()
 
 const { t } = useI18n()
-const newPath = ref("")
-const newTitle = ref("")
 
-function submitPath() {
-  emit("addPath", newPath.value, newTitle.value)
+const defaultImportPathSelectValue = computed(() =>
+  props.paths.some((path) => path.id === props.defaultImportLibraryPathId)
+    ? props.defaultImportLibraryPathId
+    : undefined,
+)
+
+const selectedDefaultImportPath = computed(() => {
+  const id = defaultImportPathSelectValue.value
+  if (!id) return undefined
+  return props.paths.find((path) => path.id === id)
+})
+
+function defaultImportPathTriggerLabel(path: ComicLibrarySetting): string {
+  const title = path.title.trim()
+  if (!title || title === path.path) {
+    return path.path
+  }
+  return `${title} 路 ${path.path}`
 }
 
 function onDefaultChange(value: unknown) {
-  if (typeof value === "string") {
-    emit("changeDefaultImportPath", value)
-  }
+  if (typeof value !== "string" || value === props.defaultImportLibraryPathId) return
+  emit("changeDefaultImportPath", value)
 }
 </script>
 
@@ -59,32 +84,9 @@ function onDefaultChange(value: unknown) {
       </p>
     </div>
 
-    <div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(10rem,16rem)_auto]">
-      <Input
-        v-model="newPath"
-        :placeholder="t('settings.comicLibraryPathPlaceholder')"
-        :aria-label="t('settings.comicLibraryPathLabel')"
-      />
-      <Input
-        v-model="newTitle"
-        :placeholder="t('settings.comicLibraryPathTitlePlaceholder')"
-        :aria-label="t('settings.comicLibraryPathTitleLabel')"
-      />
-      <Button
-        type="button"
-        size="sm"
-        class="h-9"
-        :disabled="addBusy"
-        @click="submitPath"
-      >
-        {{ addBusy ? t("settings.comicLibraryPathAdding") : t("settings.comicLibraryPathAdd") }}
-      </Button>
-    </div>
-
-    <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
-
     <div
       class="flex flex-col gap-3 rounded-lg border border-border/50 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+      :aria-busy="props.defaultSaving"
     >
       <div class="flex min-w-0 flex-col gap-1">
         <p class="text-sm font-medium text-foreground">
@@ -95,48 +97,62 @@ function onDefaultChange(value: unknown) {
         </p>
       </div>
       <Select
-        :model-value="defaultImportLibraryPathId"
-        :disabled="paths.length === 0 || defaultSaving"
+        :model-value="defaultImportPathSelectValue"
+        :disabled="props.paths.length === 0 || props.defaultSaving"
         @update:model-value="onDefaultChange"
       >
         <SelectTrigger
           size="sm"
-          class="h-9 w-full min-w-[12rem] rounded-xl border-border/50 sm:w-56"
+          class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-72 sm:shrink-0"
           :aria-label="t('settings.comicDefaultImportPath')"
         >
-          <SelectValue :placeholder="t('settings.comicDefaultImportPathNone')" />
+          <SelectValue :placeholder="t('settings.comicDefaultImportPathNone')">
+            <span
+              v-if="selectedDefaultImportPath"
+              class="block min-w-0 flex-1 truncate text-left"
+            >
+              {{ defaultImportPathTriggerLabel(selectedDefaultImportPath) }}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent align="end" class="rounded-xl border-border/50">
           <SelectItem
-            v-for="path in paths"
+            v-for="path in props.paths"
             :key="path.id"
+            class="rounded-lg"
             :value="path.id"
           >
-            {{ path.title || path.path }}
+            <span class="flex min-w-0 flex-col gap-0.5">
+              <span class="truncate text-sm">{{ path.title || path.path }}</span>
+              <span class="truncate font-mono text-xs text-muted-foreground">
+                {{ path.path }}
+              </span>
+            </span>
           </SelectItem>
         </SelectContent>
       </Select>
     </div>
 
-    <div v-if="paths.length > 0" class="flex flex-col gap-2">
+    <div v-if="props.paths.length > 0" class="flex flex-col gap-3">
       <div
-        v-for="path in paths"
+        v-for="path in props.paths"
         :key="path.id"
-        class="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+        class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div class="min-w-0">
           <p class="truncate text-sm font-medium text-foreground">{{ path.title || path.path }}</p>
-          <p class="truncate text-xs text-muted-foreground">{{ path.path }}</p>
+          <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
         </div>
         <Button
           type="button"
           size="sm"
           variant="ghost"
-          class="h-8 shrink-0"
+          class="h-8 shrink-0 rounded-lg px-2"
           :aria-label="t('settings.comicLibraryPathRemove')"
+          :data-remove-comic-path="path.id"
           @click="emit('removePath', path.id)"
         >
-          <Trash2 class="size-4" aria-hidden="true" />
+          <Trash2 data-icon="inline-start" aria-hidden="true" />
           {{ t("settings.comicLibraryPathRemove") }}
         </Button>
       </div>
@@ -144,5 +160,35 @@ function onDefaultChange(value: unknown) {
     <p v-else class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
       {{ t("settings.comicLibraryPathEmpty") }}
     </p>
+
+    <div class="flex flex-wrap justify-start gap-2 pt-1">
+      <SettingsLibraryPathAddDialog
+        :open="props.addPathDialogOpen"
+        :new-path="props.newPath"
+        :new-path-title="props.newPathTitle"
+        :pick-directory-busy="props.pickDirectoryBusy"
+        :directory-hint-display="props.directoryHintDisplay"
+        :path-add-error="props.pathAddError"
+        :add-busy="props.addBusy"
+        :can-save-new-path="props.canSaveNewPath"
+        :content-class="props.dialogContentClass"
+        :trigger-label="t('settings.comicLibraryPathAdd')"
+        :dialog-title="t('settings.comicLibraryPathDialogTitle')"
+        :dialog-description="t('settings.comicLibraryPathDialogDesc')"
+        :path-label="t('settings.comicLibraryPathLabel')"
+        :path-placeholder="t('settings.comicLibraryPathPlaceholder')"
+        path-input-id="new-comic-lib-path"
+        :title-label="t('settings.comicLibraryPathTitleLabel')"
+        :title-placeholder="t('settings.comicLibraryPathTitlePlaceholder')"
+        title-input-id="new-comic-lib-title"
+        :example-paths="['D:\\Comics', '/home/user/Comics']"
+        @update:open="emit('update:addPathDialogOpen', $event)"
+        @update:new-path="emit('update:newPath', $event)"
+        @update:new-path-title="emit('update:newPathTitle', $event)"
+        @clear-error="emit('clearError')"
+        @browse="emit('browse')"
+        @submit="emit('submit')"
+      />
+    </div>
   </div>
 </template>
