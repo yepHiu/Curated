@@ -36,6 +36,19 @@ function makeComic(id: string, title: string): ComicBook {
 }
 
 describe("ComicLibraryPage", () => {
+  it("omits the page title and description from the comic wall header", () => {
+    const wrapper = mount(ComicLibraryPage, {
+      props: {
+        comics: [makeComic("comic-1", "Glass City Notebook")],
+        activeFilter: "all",
+      },
+    })
+
+    expect(wrapper.text()).not.toContain("comics.title")
+    expect(wrapper.text()).not.toContain("comics.subtitle")
+    expect(wrapper.find("h1").exists()).toBe(false)
+  })
+
   it("renders sample comics in the comic wall", () => {
     const wrapper = mount(ComicLibraryPage, {
       props: {

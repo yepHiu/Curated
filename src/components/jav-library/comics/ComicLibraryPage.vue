@@ -39,11 +39,7 @@ function onFilterChange(value: string | number) {
 <template>
   <div class="flex h-full min-h-0 min-w-0 flex-col gap-5">
     <header class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold tracking-normal">{{ t("comics.title") }}</h1>
-          <p class="mt-1 text-sm text-muted-foreground">{{ t("comics.subtitle") }}</p>
-        </div>
+      <div class="flex flex-wrap items-end justify-end gap-3">
         <Input
           class="h-10 w-full max-w-sm rounded-2xl"
           :model-value="props.searchQuery"
