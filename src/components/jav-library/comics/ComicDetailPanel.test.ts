@@ -152,6 +152,18 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.find("[data-comic-save]").exists()).toBe(false)
   })
 
+  it("omits source metadata from the visible detail body", () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic(),
+      },
+    })
+
+    expect(wrapper.text()).not.toContain("comics.sourceFile")
+    expect(wrapper.text()).not.toContain("comics.sourceLocation")
+    expect(wrapper.text()).not.toContain("D:/Comics/original.cbz")
+  })
+
   it("opens the edit dialog from the more menu and forwards edited fields", async () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {

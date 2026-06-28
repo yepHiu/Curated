@@ -226,19 +226,6 @@ function confirmDeleteComic() {
           </div>
         </div>
 
-        <div class="grid min-w-0 gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 text-sm">
-          <div class="min-w-0">
-            <p class="text-xs text-muted-foreground">{{ t("comics.sourceFile") }}</p>
-            <p class="mt-1 break-all font-medium">{{ comic.sourceFileName }}</p>
-          </div>
-          <div class="min-w-0">
-            <p class="text-xs text-muted-foreground">{{ t("comics.sourceLocation") }}</p>
-            <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
-              {{ comic.location || "—" }}
-            </p>
-          </div>
-        </div>
-
         <div class="flex flex-wrap items-center gap-3">
           <Button
             type="button"
