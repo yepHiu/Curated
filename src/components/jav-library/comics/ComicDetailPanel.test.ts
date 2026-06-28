@@ -11,11 +11,21 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: { name: "Badge", template: "<span><slot /></span>" },
+  Badge: {
+    name: "Badge",
+    props: ["as", "variant"],
+    template: '<component :is="as || \'span\'" v-bind="$attrs"><slot /></component>',
+  },
 }))
 
 vi.mock("@/components/ui/button", () => ({
-  Button: { name: "Button", props: ["disabled"], template: "<button><slot /></button>" },
+  Button: {
+    name: "Button",
+    props: ["disabled"],
+    emits: ["click"],
+    template:
+      '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
+  },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -41,12 +51,59 @@ vi.mock("@/components/ui/card", () => ({
   },
 }))
 
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: {
+    name: "Dialog",
+    props: ["open"],
+    emits: ["update:open"],
+    template: '<div v-if="open" data-dialog-open><slot /></div>',
+  },
+  DialogClose: {
+    name: "DialogClose",
+    template: "<span><slot /></span>",
+  },
+  DialogContent: {
+    name: "DialogContent",
+    template: "<section><slot /></section>",
+  },
+  DialogDescription: {
+    name: "DialogDescription",
+    template: "<p><slot /></p>",
+  },
+  DialogFooter: {
+    name: "DialogFooter",
+    template: "<footer><slot /></footer>",
+  },
+  DialogHeader: {
+    name: "DialogHeader",
+    template: "<header><slot /></header>",
+  },
+  DialogTitle: {
+    name: "DialogTitle",
+    template: "<h2><slot /></h2>",
+  },
+}))
+
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: { name: "DropdownMenu", template: "<div><slot /></div>" },
+  DropdownMenuContent: { name: "DropdownMenuContent", template: "<div><slot /></div>" },
+  DropdownMenuGroup: { name: "DropdownMenuGroup", template: "<div><slot /></div>" },
+  DropdownMenuItem: {
+    name: "DropdownMenuItem",
+    emits: ["click"],
+    template:
+      '<button v-bind="$attrs" type="button" @click="$emit(\'click\', $event)"><slot /></button>',
+  },
+  DropdownMenuTrigger: { name: "DropdownMenuTrigger", template: "<div><slot /></div>" },
+}))
+
 vi.mock("@/components/ui/input", () => ({
   Input: {
     name: "Input",
     props: ["modelValue"],
     emits: ["update:modelValue"],
-    template: "<input :value='modelValue' @input=\"$emit('update:modelValue', $event.target.value)\" />",
+    template:
+      '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
   },
 }))
 
@@ -54,7 +111,7 @@ function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
   return {
     id: "comic-detail-1",
     title: "Original Title",
-    tags: ["作者:青井"],
+    tags: ["author:alpha", "series:rain"],
     rating: 3,
     isFavorite: false,
     readStatus: "unread",
@@ -69,44 +126,78 @@ function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
 }
 
 describe("ComicDetailPanel", () => {
-  it("emits title, tags, rating, and favorite edits", async () => {
+  it("renders the detail page in read-only mode with actions in the more menu", () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic({ coverUrl: "https://example.com/detail-cover.jpg" }),
+      },
+    })
+
+    expect(wrapper.text()).toContain("Original Title")
+    expect(wrapper.text()).toContain("author:alpha")
+    expect(wrapper.text()).toContain("series:rain")
+    expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
+      "https://example.com/detail-cover.jpg",
+    )
+    expect(wrapper.get("[data-comic-detail-rating-card]").text()).toContain("3")
+    expect(wrapper.find("[data-comic-more-actions]").exists()).toBe(true)
+    expect(wrapper.find("[data-comic-edit-action]").exists()).toBe(true)
+    expect(wrapper.find("[data-comic-reveal-source]").exists()).toBe(true)
+    expect(wrapper.find("[data-comic-delete-action]").exists()).toBe(true)
+
+    expect(wrapper.find("[data-comic-title-input]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-tags-input]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-rating-input]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-favorite-toggle]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-save]").exists()).toBe(false)
+  })
+
+  it("opens the edit dialog from the more menu and forwards edited fields", async () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic(),
       },
     })
 
+    await wrapper.get("[data-comic-edit-action]").trigger("click")
     await wrapper.get("[data-comic-title-input]").setValue("Edited Title")
-    await wrapper.get("[data-comic-tags-input]").setValue("作者:青井, 系列:雨庭")
+    await wrapper.get("[data-comic-tags-input]").setValue("author:alpha, series:rain, volume:1")
     await wrapper.get("[data-comic-rating-input]").setValue("4.5")
     await wrapper.get("[data-comic-favorite-toggle]").trigger("click")
     await wrapper.get("[data-comic-save]").trigger("click")
 
-    expect(wrapper.emitted("patch")?.[0]?.[0]).toEqual({
+    const patchCall = wrapper.emitted("patch")?.[0]
+    expect(patchCall?.[0]).toEqual({
       title: "Edited Title",
-      tags: ["作者:青井", "系列:雨庭"],
+      tags: ["author:alpha", "series:rain", "volume:1"],
       rating: 4.5,
       favorite: true,
     })
+    expect(typeof patchCall?.[1]).toBe("function")
   })
 
-  it("suggests author, series, volume, and circle tag prefixes", () => {
+  it("emits reader, reveal, and confirmed delete actions", async () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic(),
       },
     })
 
-    expect(wrapper.text()).toContain("作者:")
-    expect(wrapper.text()).toContain("系列:")
-    expect(wrapper.text()).toContain("卷:")
-    expect(wrapper.text()).toContain("社团:")
+    await wrapper.get("[data-comic-start-reading]").trigger("click")
+    expect(wrapper.emitted("startReading")?.[0]).toEqual([0])
+
+    await wrapper.get("[data-comic-reveal-source]").trigger("click")
+    expect(wrapper.emitted("revealSource")?.[0]).toEqual(["comic-detail-1"])
+
+    await wrapper.get("[data-comic-delete-action]").trigger("click")
+    await wrapper.get("[data-comic-delete-confirm]").trigger("click")
+    expect(wrapper.emitted("deleteComic")?.[0]).toEqual(["comic-detail-1"])
   })
 
-  it("uses the movie detail page shell with cover, rating card, and reader action", async () => {
+  it("uses the shared detail shell with the narrower media column", () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
-        comic: makeComic({ coverUrl: "https://example.com/detail-cover.jpg" }),
+        comic: makeComic(),
       },
     })
 
@@ -115,17 +206,15 @@ describe("ComicDetailPanel", () => {
     )
     expect(wrapper.get("[data-comic-detail-content]").classes()).toEqual(
       expect.arrayContaining([
-        "lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]",
-        "xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]",
+        "lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]",
       ]),
     )
-    expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
-      "https://example.com/detail-cover.jpg",
+    expect(wrapper.get("[data-comic-detail-media-column]").classes()).toEqual(
+      expect.arrayContaining([
+        "lg:max-w-[min(100%,24rem)]",
+        "xl:max-w-[min(100%,28rem)]",
+      ]),
     )
-    expect(wrapper.get("[data-comic-detail-rating-card]").text()).toContain("3")
-
-    await wrapper.get("[data-comic-start-reading]").trigger("click")
-
-    expect(wrapper.emitted("startReading")?.[0]).toEqual([0])
   })
 })

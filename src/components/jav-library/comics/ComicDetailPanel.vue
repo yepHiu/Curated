@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { BookOpen, Heart, Save, Star } from "lucide-vue-next"
+import {
+  BookOpen,
+  FolderOpen,
+  Heart,
+  MoreVertical,
+  Pencil,
+  Star,
+  Trash2,
+} from "lucide-vue-next"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,7 +19,15 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import ComicDeleteConfirmDialog from "./ComicDeleteConfirmDialog.vue"
+import ComicEditDialog from "./ComicEditDialog.vue"
 
 const props = defineProps<{
   comic: ComicBook
@@ -19,18 +35,16 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  patch: [patch: ComicPatch]
+  patch: [patch: ComicPatch, done: (err?: unknown) => void]
   startReading: [pageIndex: number]
+  deleteComic: [comicId: string]
+  revealSource: [comicId: string]
 }>()
 
 const { t } = useI18n()
 
-const titleDraft = ref(props.comic.title)
-const tagsDraft = ref(props.comic.tags.join(", "))
-const ratingDraft = ref(props.comic.rating == null ? "" : String(props.comic.rating))
-const favoriteDraft = ref(props.comic.isFavorite)
-
-const tagSuggestions = ["作者:", "系列:", "卷:", "社团:"]
+const editOpen = ref(false)
+const deleteConfirmOpen = ref(false)
 
 const coverSrc = computed(() => props.comic.coverUrl ?? props.comic.pages?.[0]?.thumbUrl ?? "")
 const ratingLabel = computed(() =>
@@ -41,44 +55,27 @@ const progressLabel = computed(() => {
   const page = Math.min(props.comic.pageCount, Math.max(1, props.comic.currentPageIndex + 1))
   return `${page} / ${props.comic.pageCount}`
 })
+const canRevealSource = computed(() => Boolean(props.comic.location.trim()))
 
 watch(
-  () => props.comic,
-  (comic) => {
-    titleDraft.value = comic.title
-    tagsDraft.value = comic.tags.join(", ")
-    ratingDraft.value = comic.rating == null ? "" : String(comic.rating)
-    favoriteDraft.value = comic.isFavorite
+  () => props.comic.id,
+  () => {
+    editOpen.value = false
+    deleteConfirmOpen.value = false
   },
 )
 
-const parsedTags = computed(() =>
-  tagsDraft.value
-    .split(/[,，\n]/)
-    .map((tag) => tag.trim())
-    .filter(Boolean),
-)
-
-function parsedRating(): number | null {
-  const raw = String(ratingDraft.value ?? "").trim()
-  if (!raw) return null
-  const n = Number(raw)
-  if (!Number.isFinite(n)) return props.comic.rating ?? null
-  return Math.min(5, Math.max(0, n))
+function patchComicFromEdit(patch: ComicPatch, done: (err?: unknown) => void) {
+  emit("patch", patch, done)
 }
 
-function applySuggestion(prefix: string) {
-  const current = tagsDraft.value.trim()
-  tagsDraft.value = current ? `${current}, ${prefix}` : prefix
+function revealSource() {
+  if (!canRevealSource.value) return
+  emit("revealSource", props.comic.id)
 }
 
-function emitPatch() {
-  emit("patch", {
-    title: titleDraft.value.trim() || props.comic.title,
-    tags: parsedTags.value,
-    rating: parsedRating(),
-    favorite: favoriteDraft.value,
-  })
+function confirmDeleteComic() {
+  emit("deleteComic", props.comic.id)
 }
 </script>
 
@@ -89,9 +86,12 @@ function emitPatch() {
   >
     <CardContent
       data-comic-detail-content
-      class="grid w-full min-w-0 gap-6 overflow-x-hidden p-5 sm:p-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]"
+      class="grid w-full min-w-0 gap-6 overflow-x-hidden p-5 sm:p-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]"
     >
-      <div class="w-full min-w-0 max-w-full overflow-hidden lg:mx-auto lg:max-w-[min(100%,30rem)] xl:max-w-[min(100%,34rem)]">
+      <div
+        data-comic-detail-media-column
+        class="w-full min-w-0 max-w-full overflow-hidden lg:mx-auto lg:max-w-[min(100%,24rem)] xl:max-w-[min(100%,28rem)]"
+      >
         <div class="relative isolate w-full overflow-hidden rounded-[1.5rem] border border-border/60 bg-muted/40 aspect-[358/537]">
           <img
             v-if="coverSrc"
@@ -135,106 +135,120 @@ function emitPatch() {
               {{ t("comics.pageCount", { count: comic.pageCount }) }} · {{ progressLabel }}
             </span>
           </p>
+          <p class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+            <Heart
+              class="size-4 shrink-0"
+              :class="comic.isFavorite ? 'fill-primary text-primary' : 'text-muted-foreground'"
+              aria-hidden="true"
+            />
+            <span>{{ comic.isFavorite ? t("comics.favoriteOn") : t("comics.favoriteOff") }}</span>
+          </p>
         </div>
       </div>
 
       <div class="flex min-w-0 max-w-full flex-col gap-5">
-        <div class="flex min-w-0 max-w-full flex-col gap-2">
-          <CardTitle class="break-words text-2xl sm:text-3xl">
-            {{ comic.title }}
-          </CardTitle>
-          <CardDescription class="break-words text-sm text-muted-foreground sm:text-base">
-            {{ comic.sourceFileName }}
-          </CardDescription>
+        <div class="flex min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div class="min-w-0 max-w-full flex-1">
+            <CardTitle class="break-words text-2xl sm:text-3xl">
+              {{ comic.title }}
+            </CardTitle>
+            <CardDescription class="break-words text-sm text-muted-foreground sm:text-base">
+              {{ comic.sourceFileName }}
+            </CardDescription>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                class="shrink-0 rounded-xl"
+                data-comic-more-actions
+                :aria-label="t('comics.moreActions')"
+              >
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="min-w-[11rem]">
+              <DropdownMenuGroup>
+                <DropdownMenuItem data-comic-edit-action @click="editOpen = true">
+                  <Pencil class="size-4 shrink-0" aria-hidden="true" />
+                  {{ t("comics.editComic") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-comic-reveal-source
+                  :disabled="!canRevealSource"
+                  :title="!canRevealSource ? t('comics.revealComicNoPath') : undefined"
+                  @click="revealSource"
+                >
+                  <FolderOpen class="size-4 shrink-0" aria-hidden="true" />
+                  {{ t("comics.revealComicSource") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-comic-delete-action
+                  variant="destructive"
+                  @click="deleteConfirmOpen = true"
+                >
+                  <Trash2 class="size-4 shrink-0" aria-hidden="true" />
+                  {{ t("comics.deleteComic") }}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ComicEditDialog
+            v-model:open="editOpen"
+            :comic="comic"
+            :patch-comic="patchComicFromEdit"
+          />
+
+          <ComicDeleteConfirmDialog
+            v-model:open="deleteConfirmOpen"
+            @confirm="confirmDeleteComic"
+          />
         </div>
 
-        <div class="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
-          <div class="flex min-w-0 flex-col gap-3">
-            <label class="flex flex-col gap-1.5 text-sm font-medium">
-              {{ t("comics.detailTitleLabel") }}
-              <Input
-                v-model="titleDraft"
-                data-comic-title-input
-                class="h-10 rounded-xl"
-              />
-            </label>
-
-            <label class="flex flex-col gap-1.5 text-sm font-medium">
-              {{ t("comics.detailTagsLabel") }}
-              <Input
-                v-model="tagsDraft"
-                data-comic-tags-input
-                class="h-10 rounded-xl"
-              />
-            </label>
-
-            <div class="flex flex-wrap gap-2">
-              <Badge
-                v-for="prefix in tagSuggestions"
-                :key="prefix"
-                as-child
-                variant="secondary"
-                class="rounded-full px-2.5 py-1 text-xs font-normal"
-              >
-                <button type="button" @click="applySuggestion(prefix)">
-                  {{ prefix }}
-                </button>
-              </Badge>
-            </div>
-          </div>
-
-          <div class="flex min-w-0 flex-col gap-3">
-            <label class="flex flex-col gap-1.5 text-sm font-medium">
-              {{ t("comics.detailRatingLabel") }}
-              <Input
-                v-model="ratingDraft"
-                data-comic-rating-input
-                class="h-10 rounded-xl"
-                inputmode="decimal"
-                type="number"
-                min="0"
-                max="5"
-                step="0.5"
-              />
-            </label>
-
-            <Button
-              type="button"
-              variant="outline"
-              class="justify-start rounded-xl"
-              data-comic-favorite-toggle
-              :aria-pressed="favoriteDraft"
-              @click="favoriteDraft = !favoriteDraft"
-            >
-              <Heart
-                data-icon="inline-start"
-                :class="favoriteDraft ? 'fill-primary text-primary' : 'text-muted-foreground'"
-              />
-              {{ favoriteDraft ? t("comics.favoriteOn") : t("comics.favoriteOff") }}
-            </Button>
-
-            <Button
-              type="button"
-              class="rounded-xl"
-              data-comic-save
-              :disabled="props.busy"
-              @click="emitPatch"
-            >
-              <Save data-icon="inline-start" />
-              {{ t("comics.saveDetail") }}
-            </Button>
-
-            <Button
-              type="button"
+        <div data-comic-detail-tags class="flex flex-col gap-3">
+          <p class="text-sm font-medium">{{ t("comics.detailTagsLabel") }}</p>
+          <p v-if="comic.tags.length === 0" class="text-sm text-muted-foreground">
+            {{ t("comics.noTags") }}
+          </p>
+          <div v-else class="flex flex-wrap gap-2">
+            <Badge
+              v-for="tag in comic.tags"
+              :key="tag"
               variant="secondary"
-              class="rounded-xl"
-              data-comic-start-reading
-              @click="emit('startReading', comic.currentPageIndex)"
+              class="rounded-full border border-border/60 bg-secondary/70 px-3 py-1 text-xs font-medium"
             >
-              <BookOpen data-icon="inline-start" />
-              {{ t("comics.startReading") }}
-            </Button>
+              {{ tag }}
+            </Badge>
           </div>
+        </div>
+
+        <div class="grid min-w-0 gap-3 rounded-2xl border border-border/70 bg-background/50 p-4 text-sm">
+          <div class="min-w-0">
+            <p class="text-xs text-muted-foreground">{{ t("comics.sourceFile") }}</p>
+            <p class="mt-1 break-all font-medium">{{ comic.sourceFileName }}</p>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-muted-foreground">{{ t("comics.sourceLocation") }}</p>
+            <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+              {{ comic.location || "—" }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            class="rounded-full px-8"
+            data-comic-start-reading
+            @click="emit('startReading', comic.currentPageIndex)"
+          >
+            <BookOpen data-icon="inline-start" />
+            {{ t("comics.startReading") }}
+          </Button>
         </div>
       </div>
     </CardContent>

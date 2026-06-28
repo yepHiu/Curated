@@ -311,7 +311,7 @@ function pickUserTagSuggestion(tag: string) {
       :class="
         props.compact
           ? 'lg:grid-cols-[minmax(0,12.5rem)_minmax(0,1fr)]'
-          : 'lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]'
+          : 'lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]'
       "
     >
       <div
@@ -319,7 +319,7 @@ function pickUserTagSuggestion(tag: string) {
         :class="
           props.compact
             ? 'mx-auto max-w-[12.5rem]'
-            : 'lg:mx-auto lg:max-w-[min(100%,30rem)] xl:max-w-[min(100%,34rem)]'
+            : 'lg:mx-auto lg:max-w-[min(100%,24rem)] xl:max-w-[min(100%,28rem)]'
         "
       >
         <!-- 不锁死竖版比例：横版整碟封套 / 竖版封面都由图片 intrinsic 高度决定，避免上下黑边 -->

@@ -41,7 +41,7 @@ watch(
   { immediate: true },
 )
 
-async function patchComic(patch: ComicPatch) {
+async function patchComic(patch: ComicPatch, done?: (err?: unknown) => void) {
   const id = detailComic.value?.id
   if (!id) return
   patchBusy.value = true
@@ -51,10 +51,38 @@ async function patchComic(patch: ComicPatch) {
     if (updated) {
       detailComic.value = updated
     }
+    done?.()
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : t("comics.detailSaveError")
+    done?.(error)
   } finally {
     patchBusy.value = false
+  }
+}
+
+async function deleteComic(comicId: string) {
+  const id = comicId.trim() || detailComic.value?.id
+  if (!id) return
+  patchBusy.value = true
+  errorText.value = ""
+  try {
+    await comicService.deleteComic(id)
+    await router.replace({ name: "comics" })
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("comics.deleteComicError")
+  } finally {
+    patchBusy.value = false
+  }
+}
+
+async function revealSource(comicId: string) {
+  const id = comicId.trim() || detailComic.value?.id
+  if (!id) return
+  errorText.value = ""
+  try {
+    await comicService.revealComicSource(id)
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("comics.revealComicError")
   }
 }
 
@@ -92,6 +120,8 @@ function openReader(pageIndex: number) {
           :busy="patchBusy"
           @patch="patchComic"
           @start-reading="openReader"
+          @delete-comic="deleteComic"
+          @reveal-source="revealSource"
         />
 
         <ComicPagePreviewGrid

@@ -71,7 +71,11 @@ vi.mock("@/components/ui/button", () => ({
 
 vi.mock("@/components/ui/card", () => ({
   Card: { name: "Card", template: "<div><slot /></div>" },
-  CardContent: { name: "CardContent", template: "<div><slot /></div>" },
+  CardContent: {
+    name: "CardContent",
+    props: ["class"],
+    template: '<div data-card-content :class="$props.class"><slot /></div>',
+  },
   CardDescription: { name: "CardDescription", template: "<div><slot /></div>" },
   CardTitle: { name: "CardTitle", template: "<div><slot /></div>" },
 }))
@@ -215,6 +219,21 @@ describe("DetailPanel", () => {
     await restoreButton!.trigger("click")
 
     expect(wrapper.emitted("restoreMovie")).toEqual([["movie-1"]])
+  })
+
+  it("uses the narrower media column on movie detail pages", () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    expect(wrapper.get("[data-card-content]").classes()).toEqual(
+      expect.arrayContaining([
+        "lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]",
+      ]),
+    )
   })
 
   it("adds a suggested user tag immediately when clicked", async () => {
