@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ComicBook } from "@/domain/comic/types"
 import ComicCard from "@/components/jav-library/comics/ComicCard.vue"
+import { buildAutoFillMovieGridTemplate } from "@/lib/movie-grid-template"
 
 const props = defineProps<{
   comics: readonly ComicBook[]
@@ -12,12 +13,19 @@ const emit = defineEmits<{
   openReader: [comicId: string, pageIndex: number]
   toggleFavorite: [payload: { comicId: string; nextValue: boolean }]
 }>()
+
+const comicGridStyle = {
+  gridTemplateColumns: buildAutoFillMovieGridTemplate("var(--movie-grid-min-track)"),
+  columnGap: "var(--movie-grid-gap)",
+  rowGap: "var(--movie-grid-gap)",
+}
 </script>
 
 <template>
   <div
     data-virtual-comic-grid
-    class="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]"
+    class="grid w-full overflow-x-hidden"
+    :style="comicGridStyle"
   >
     <ComicCard
       v-for="comic in props.comics"

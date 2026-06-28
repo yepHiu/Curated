@@ -18,6 +18,29 @@ vi.mock("@/components/ui/button", () => ({
   Button: { name: "Button", props: ["disabled"], template: "<button><slot /></button>" },
 }))
 
+vi.mock("@/components/ui/card", () => ({
+  Card: {
+    name: "Card",
+    props: ["class"],
+    template: "<section data-card :class='$props.class'><slot /></section>",
+  },
+  CardContent: {
+    name: "CardContent",
+    props: ["class"],
+    template: "<div data-card-content :class='$props.class'><slot /></div>",
+  },
+  CardDescription: {
+    name: "CardDescription",
+    props: ["class"],
+    template: "<p :class='$props.class'><slot /></p>",
+  },
+  CardTitle: {
+    name: "CardTitle",
+    props: ["class"],
+    template: "<h2 :class='$props.class'><slot /></h2>",
+  },
+}))
+
 vi.mock("@/components/ui/input", () => ({
   Input: {
     name: "Input",
@@ -78,5 +101,31 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).toContain("系列:")
     expect(wrapper.text()).toContain("卷:")
     expect(wrapper.text()).toContain("社团:")
+  })
+
+  it("uses the movie detail page shell with cover, rating card, and reader action", async () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic({ coverUrl: "https://example.com/detail-cover.jpg" }),
+      },
+    })
+
+    expect(wrapper.get("[data-comic-detail-panel]").classes()).toEqual(
+      expect.arrayContaining(["rounded-3xl", "bg-card/85"]),
+    )
+    expect(wrapper.get("[data-comic-detail-content]").classes()).toEqual(
+      expect.arrayContaining([
+        "lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]",
+      ]),
+    )
+    expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
+      "https://example.com/detail-cover.jpg",
+    )
+    expect(wrapper.get("[data-comic-detail-rating-card]").text()).toContain("3")
+
+    await wrapper.get("[data-comic-start-reading]").trigger("click")
+
+    expect(wrapper.emitted("startReading")?.[0]).toEqual([0])
   })
 })

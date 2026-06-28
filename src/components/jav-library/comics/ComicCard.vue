@@ -4,7 +4,13 @@ import { useI18n } from "vue-i18n"
 import { BookOpen, Heart, Star } from "lucide-vue-next"
 import type { ComicBook } from "@/domain/comic/types"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+} from "@/components/ui/card"
+import { Toggle } from "@/components/ui/toggle"
 
 const props = defineProps<{
   comic: ComicBook
@@ -46,100 +52,105 @@ function toggleFavorite() {
 </script>
 
 <template>
-  <article
+  <Card
     data-comic-card
     :data-comic-card-id="comic.id"
-    class="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm shadow-black/5 transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md motion-reduce:transition-none"
-    :class="props.selected ? 'border-primary/55 ring-2 ring-primary/20' : ''"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
+    :class="props.selected ? 'border-primary/55 shadow-lg shadow-primary/10 ring-2 ring-primary/25' : ''"
   >
     <button
       type="button"
-      class="flex min-w-0 flex-1 flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      class="flex w-full flex-col text-left focus-visible:outline-none"
       @click="emit('openDetails', comic.id)"
     >
-      <div class="relative aspect-[2/3] overflow-hidden bg-muted/40">
-        <img
-          v-if="coverSrc"
-          :src="coverSrc"
-          :alt="comic.title"
-          class="h-full w-full object-cover"
-          loading="lazy"
-        >
+      <div class="p-[var(--movie-card-padding)] pb-0">
         <div
-          v-else
-          class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground"
-          aria-hidden="true"
+          data-comic-poster
+          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/40 aspect-[358/537]"
         >
-          <BookOpen class="size-10" />
-        </div>
-        <div class="absolute inset-x-0 bottom-0 h-1 bg-black/35" aria-hidden="true">
-          <div class="h-full bg-primary" :style="{ width: `${progressPercent}%` }" />
+          <img
+            v-if="coverSrc"
+            :src="coverSrc"
+            :alt="comic.title"
+            class="absolute inset-0 z-[1] h-full w-full object-cover"
+            loading="lazy"
+          >
+          <div
+            v-else
+            class="absolute inset-0 z-[1] flex items-center justify-center bg-muted text-muted-foreground"
+            aria-hidden="true"
+          >
+            <BookOpen class="size-10" />
+          </div>
+
+          <div
+            v-if="coverSrc"
+            class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/50 via-transparent to-black/25"
+            aria-hidden="true"
+          />
+
+          <Badge
+            class="relative z-[2] m-[var(--movie-card-padding)] h-5 max-w-[calc(100%-1.25rem)] truncate rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
+          >
+            {{ comic.sourceFileName }}
+          </Badge>
+
+          <Toggle
+            :pressed="props.comic.isFavorite"
+            variant="outline"
+            size="sm"
+            class="absolute right-2.5 bottom-2.5 z-[2] rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            :data-comic-favorite="String(comic.isFavorite)"
+            :aria-label="t('comics.favorite')"
+            @update:pressed="toggleFavorite"
+            @click.stop
+          >
+            <Heart />
+          </Toggle>
+
+          <div class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50" aria-hidden="true">
+            <div class="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progressPercent}%` }" />
+          </div>
         </div>
       </div>
 
-      <div class="flex min-h-[8.5rem] min-w-0 flex-col gap-2 p-3">
-        <div class="flex min-w-0 items-start justify-between gap-2">
-          <h3 class="line-clamp-2 min-w-0 text-sm font-medium leading-snug">
-            {{ comic.title }}
-          </h3>
-          <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
-            <Star class="size-3 fill-current" aria-hidden="true" />
-            {{ ratingLabel }}
-          </span>
+      <CardContent
+        data-comic-card-body
+        class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
+      >
+        <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
+          <CardTitle class="truncate text-[13px]">{{ comic.title }}</CardTitle>
+          <CardDescription class="truncate text-[11px]">
+            {{ t("comics.pageCount", { count: comic.pageCount }) }} · {{ progressLabel }}
+          </CardDescription>
         </div>
 
-        <div class="flex flex-wrap gap-1.5">
+        <div class="flex min-h-6 items-center gap-1 overflow-hidden">
+          <Badge
+            v-if="comic.rating != null"
+            variant="outline"
+            class="shrink-0 rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary"
+          >
+            <Star class="size-3 fill-current" aria-hidden="true" />
+            {{ ratingLabel }}
+          </Badge>
           <Badge
             v-for="tag in visibleTags"
             :key="tag"
             variant="secondary"
-            class="max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-normal"
+            class="max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight"
           >
             {{ tag }}
           </Badge>
           <Badge
             v-if="hiddenTagCount > 0"
             variant="outline"
-            class="rounded-full px-2 py-0.5 text-[11px] font-normal text-muted-foreground"
+            class="shrink-0 rounded-full border-muted-foreground/35 px-1.5 text-[10px] leading-tight text-muted-foreground"
           >
             +{{ hiddenTagCount }}
           </Badge>
         </div>
-
-        <div class="mt-auto flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{{ t("comics.pageCount", { count: comic.pageCount }) }}</span>
-          <span class="tabular-nums">{{ progressLabel }}</span>
-        </div>
-      </div>
+      </CardContent>
     </button>
-
-    <div class="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        class="h-8 rounded-lg px-2 text-xs"
-        @click="emit('openReader', comic.id, comic.currentPageIndex)"
-      >
-        <BookOpen data-icon="inline-start" />
-        {{ t("comics.startReading") }}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        class="size-8 rounded-lg"
-        :data-comic-favorite="String(comic.isFavorite)"
-        :aria-pressed="comic.isFavorite"
-        :aria-label="t('comics.favorite')"
-        @click="toggleFavorite"
-      >
-        <Heart
-          class="size-4"
-          :class="comic.isFavorite ? 'fill-primary text-primary' : 'text-muted-foreground'"
-          aria-hidden="true"
-        />
-      </Button>
-    </div>
-  </article>
+  </Card>
 </template>

@@ -2,8 +2,6 @@
 import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { BookOpen } from "lucide-vue-next"
-import { Button } from "@/components/ui/button"
 import ComicDetailPanel from "@/components/jav-library/comics/ComicDetailPanel.vue"
 import ComicPagePreviewGrid from "@/components/jav-library/comics/ComicPagePreviewGrid.vue"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
@@ -81,17 +79,6 @@ function openReader(pageIndex: number) {
 
     <template v-else-if="detailComic">
       <div class="flex min-w-0 flex-col gap-6">
-        <header class="flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-sm text-muted-foreground">{{ detailComic.sourceFileName }}</p>
-            <h1 class="mt-1 text-2xl font-semibold tracking-normal">{{ detailComic.title }}</h1>
-          </div>
-          <Button type="button" class="rounded-xl" @click="openReader(detailComic.currentPageIndex)">
-            <BookOpen data-icon="inline-start" />
-            {{ t("comics.startReading") }}
-          </Button>
-        </header>
-
         <p
           v-if="errorText"
           role="alert"
@@ -104,6 +91,7 @@ function openReader(pageIndex: number) {
           :comic="detailComic"
           :busy="patchBusy"
           @patch="patchComic"
+          @start-reading="openReader"
         />
 
         <ComicPagePreviewGrid

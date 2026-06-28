@@ -22,6 +22,16 @@ vi.mock("@/components/ui/button", () => ({
   },
 }))
 
+vi.mock("@/components/ui/toggle", () => ({
+  Toggle: {
+    name: "Toggle",
+    props: ["pressed"],
+    emits: ["update:pressed"],
+    template:
+      "<button :aria-pressed='pressed' @click=\"$emit('update:pressed', !pressed)\"><slot /></button>",
+  },
+}))
+
 function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
   return {
     id: "comic-card-1",
@@ -54,5 +64,28 @@ describe("ComicCard", () => {
     expect(wrapper.text()).toContain("4.5")
     expect(wrapper.text()).toContain("6 / 24")
     expect(wrapper.get("[data-comic-favorite]").attributes("data-comic-favorite")).toBe("true")
+  })
+
+  it("uses the same compact poster-first layout tokens as movie cards", () => {
+    const wrapper = mount(ComicCard, {
+      props: {
+        comic: makeComic(),
+      },
+    })
+
+    expect(wrapper.get("[data-comic-card]").classes()).toEqual(
+      expect.arrayContaining(["rounded-[1.2rem]", "bg-card/80", "shadow-md"]),
+    )
+    expect(wrapper.get("[data-comic-poster]").classes()).toEqual(
+      expect.arrayContaining(["aspect-[358/537]"]),
+    )
+    expect(wrapper.get("[data-comic-card-body]").classes()).toEqual(
+      expect.arrayContaining([
+        "min-h-[var(--movie-card-body-min-height)]",
+        "gap-[var(--movie-card-body-gap)]",
+        "p-[var(--movie-card-padding)]",
+      ]),
+    )
+    expect(wrapper.text()).not.toContain("comics.startReading")
   })
 })
