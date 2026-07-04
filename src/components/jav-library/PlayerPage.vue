@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
@@ -264,6 +264,22 @@ function onDocumentPictureInPictureChange() {
   syncPipActiveFromDocument()
 }
 
+function requestExitPictureInPictureFor(video: HTMLVideoElement) {
+  if (document.pictureInPictureElement !== video) return
+  void document.exitPictureInPicture().catch(() => {
+    // ignore browser PiP teardown races
+  })
+}
+
+function stopCurrentVideoPlaybackPipeline(): boolean {
+  const v = videoRef.value
+  if (!v) return false
+  resetVideoElementPlaybackPipeline(v)
+  requestExitPictureInPictureFor(v)
+  isPipActive.value = false
+  return true
+}
+
 function syncSurfaceFullscreenFromDocument() {
   const el = surfaceRef.value
   isSurfaceFullscreen.value = Boolean(el && document.fullscreenElement === el)
@@ -461,19 +477,19 @@ async function destroyHlsInstance() {
 }
 
 async function syncVideoSource() {
-  await nextTick()
-  const v = videoRef.value
   const src = playbackSrc.value?.trim() ?? ""
   const mode = playbackDescriptor.value?.mode ?? "direct"
   const previousMode = lastAppliedPlaybackMode
-  await destroyHlsInstance()
-  if (!v) return
   if (!src) {
-    v.removeAttribute("src")
-    v.load()
+    stopCurrentVideoPlaybackPipeline()
+    await destroyHlsInstance()
     lastAppliedPlaybackMode = undefined
     return
   }
+  await destroyHlsInstance()
+  await nextTick()
+  const v = videoRef.value
+  if (!v) return
   if (mode === "direct" && playbackDescriptor.value?.canDirectPlay === false) {
     playbackError.value = t("player.decodeError")
   }
@@ -808,6 +824,11 @@ onMounted(() => {
   window.addEventListener("beforeunload", onWindowBeforeUnload)
 })
 
+onBeforeUnmount(() => {
+  flushPlaybackProgress()
+  stopCurrentVideoPlaybackPipeline()
+})
+
 onUnmounted(() => {
   flushPlaybackProgress()
   flushScheduledPlaybackSessionCleanup()
@@ -823,11 +844,6 @@ onUnmounted(() => {
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()
   immersiveChrome.dispose()
-  if (document.pictureInPictureElement) {
-    void document.exitPictureInPicture().catch(() => {
-      // ignore
-    })
-  }
   if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
   if (progressSliderFocusRestoreTimer) clearTimeout(progressSliderFocusRestoreTimer)

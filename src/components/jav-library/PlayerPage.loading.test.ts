@@ -152,6 +152,7 @@ beforeEach(() => {
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "false")
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {})
   routeState.query = {}
   routeState.hash = ""
   routerMocks.replace.mockReset()
@@ -305,5 +306,33 @@ describe("PlayerPage loading states", () => {
     } finally {
       wrapper.unmount()
     }
+  })
+
+  it("tears down the video media pipeline when the player unmounts", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "direct",
+      url: "/api/library/movies/movie-1/stream",
+      durationSec: 120,
+      canDirectPlay: true,
+    })
+    const pauseSpy = vi.mocked(HTMLMediaElement.prototype.pause)
+    const removeAttributeSpy = vi.spyOn(HTMLMediaElement.prototype, "removeAttribute")
+    const loadSpy = vi.mocked(HTMLMediaElement.prototype.load)
+    const wrapper = await mountPlayerPage()
+
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find("video").exists()).toBe(true)
+
+    pauseSpy.mockClear()
+    removeAttributeSpy.mockClear()
+    loadSpy.mockClear()
+
+    wrapper.unmount()
+
+    expect(pauseSpy).toHaveBeenCalledTimes(1)
+    expect(removeAttributeSpy).toHaveBeenCalledWith("src")
+    expect(loadSpy).toHaveBeenCalledTimes(1)
   })
 })
