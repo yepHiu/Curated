@@ -71,6 +71,22 @@ export function buildActorDetailRoute(
   }
 }
 
+export function buildActorDetailRouteFromDetail(
+  actorName: string,
+  movieId: string,
+  currentQuery: LocationQuery,
+  sourceMode: LibraryMode,
+): RouteLocationRaw {
+  return {
+    name: "actor-detail",
+    params: { actorName },
+    query: {
+      ...buildMovieRouteQuery(currentQuery, sourceMode, movieId),
+      back: "detail",
+    },
+  }
+}
+
 function buildActorBackLink(query: LocationQuery, movieId: string): RouteLocationRaw {
   const actorName = getActorNameQuery(query)
   if (!actorName) {
@@ -228,6 +244,17 @@ export function resolveNavigationBackLink(
   currentMovieId?: string,
 ): { to: RouteLocationRaw; labelKey: string } {
   if (route.name === "actor-detail") {
+    if (currentMovieId && hasExplicitBackTarget(route.query, "detail")) {
+      return {
+        to: buildDetailRouteFromBrowse(
+          currentMovieId,
+          route.query,
+          getBrowseSourceMode(route.query),
+        ),
+        labelKey: "shell.backDetail",
+      }
+    }
+
     return {
       to: { name: "actors" },
       labelKey: "shell.backActors",

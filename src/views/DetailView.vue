@@ -14,7 +14,7 @@ import {
   mergeLibraryQuery,
 } from "@/lib/library-query"
 import {
-  buildActorDetailRoute,
+  buildActorDetailRouteFromDetail,
   buildDetailRouteFromBrowse,
   buildFilteredBrowseRouteFromDetail,
   buildPlayerRouteFromBrowseIntent,
@@ -246,7 +246,14 @@ const browseByActor = async (payload: { actor: string }) => {
   if (!actor || !id) {
     return
   }
-  await router.push(buildActorDetailRoute(actor, id))
+  await router.push(
+    buildActorDetailRouteFromDetail(
+      actor,
+      id,
+      route.query,
+      getBrowseSourceMode(route.query),
+    ),
+  )
 }
 
 const browseByStudio = async (payload: { studio: string }) => {

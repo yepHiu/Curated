@@ -249,6 +249,36 @@ describe("navigation intent helpers", () => {
     })
   })
 
+  it("resolves detail-origin actor pages back to the originating detail page", () => {
+    expect(
+      resolveNavigationBackLink(
+        {
+          name: "actor-detail",
+          query: {
+            back: "detail",
+            browse: "favorites",
+            q: "star",
+            selected: "movie-1",
+            tab: "top-rated",
+          },
+        },
+        "movie-1",
+      ),
+    ).toEqual({
+      labelKey: "shell.backDetail",
+      to: {
+        name: "detail",
+        params: { id: "movie-1" },
+        query: {
+          browse: "favorites",
+          q: "star",
+          selected: "movie-1",
+          tab: "top-rated",
+        },
+      },
+    })
+  })
+
   it("resolves special player sources and detail routes via the same helper", () => {
     expect(
       resolveNavigationBackLink(

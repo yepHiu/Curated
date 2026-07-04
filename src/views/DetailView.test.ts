@@ -236,7 +236,11 @@ describe("DetailView", () => {
       name: "actor-detail",
       params: { actorName: "Actor A" },
       query: {
+        back: "detail",
+        browse: "favorites",
+        q: "star",
         selected: "movie-1",
+        tab: "top-rated",
       },
     })
   })
