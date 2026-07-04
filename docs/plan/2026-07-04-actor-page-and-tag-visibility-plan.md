@@ -68,7 +68,7 @@ The preferred first pass is the recommended portrait-led compact card, then vali
 
 ### Phase 2: Add Dedicated Actor Detail Page
 
-This should be a separate implementation slice after Phase 1.
+This is the current implementation slice. The product decision is to stop treating actor filmography as a thin `library?actor=...` filter wrapper. The new route should make the actor the page subject, with that actor's movies presented as page content below the actor profile.
 
 - Add a route such as `/actors/:name` or `/actor/:name` with a stable encoded actor name.
 - Make actor cards navigate to this actor detail page instead of pushing to `library?actor=...`.
@@ -79,6 +79,44 @@ This should be a separate implementation slice after Phase 1.
 
 Trade-off: reusing the existing movie grid is efficient, but the route, page layout, and navigation state should be actor-page specific so it does not feel like a thin Library filter wrapper.
 
+#### Phase 2 Implementation Plan
+
+**Goal:** build an actor-owned detail route now, while keeping backend changes out of scope.
+
+**Architecture:** add a child route under the existing actor namespace, `actors/:actorName`, backed by a new `ActorDetailView` and `ActorDetailPage`. The actor page can reuse `ActorProfileCard` for the profile area and `VirtualMovieMasonry` for the movie grid, but it should own its own route state, title, empty state, and navigation rather than mounting `LibraryView`.
+
+**Files:**
+
+- Modify `src/router/index.ts` to add `name: "actor-detail"` at `path: "actors/:actorName"`.
+- Modify `src/components/jav-library/ActorLibraryCard.vue` so the card click pushes `actor-detail` with `actorName`.
+- Create `src/views/ActorDetailView.vue` as the route wrapper that reads and decodes the route param.
+- Create `src/components/jav-library/ActorDetailPage.vue` to render profile, movie section, empty state, and movie interactions.
+- Add focused tests for `ActorLibraryCard`, router registration, and `ActorDetailPage`.
+- Update this plan document as the durable reminder that backend actor-movie endpoints remain a later option.
+
+**TDD checkpoints:**
+
+1. Add a failing `ActorLibraryCard` test that expects actor card clicks to navigate to `actor-detail`.
+2. Add a failing router test that resolves `/actors/Mina%20Kaze` to `actor-detail`.
+3. Add a failing `ActorDetailPage` test that filters movies by exact actor and passes them to `VirtualMovieMasonry`.
+4. Implement the route, card navigation, view wrapper, and page component minimally.
+5. Verify focused tests, then run `pnpm typecheck`, `pnpm lint`, and browser QA on desktop and mobile.
+
+**First-version behavior:**
+
+- Actor cards open `/actors/<encoded actor name>`.
+- Actor detail pages show actor profile first.
+- The filmography section below shows only movies whose `actors` include that exact actor name.
+- The first version reuses the already-loaded service movie cache, matching current frontend data boundaries and avoiding backend churn.
+- Movie detail/player buttons from this page may initially use existing detail/player routes; actor-specific return routing can be refined as a follow-up if the current navigation intent helpers require broader changes.
+
+**Not in this slice:**
+
+- No backend route changes.
+- No actor tag cleanup.
+- No new filter drawer or reuse of the entire Library page.
+- No batch management on the actor filmography page in the first pass.
+
 ### Phase 3: Optional Backend/API Cleanup
 
 This is explicitly not part of the initial change.
@@ -86,6 +124,16 @@ This is explicitly not part of the initial change.
 - If actor tags stay unused for a while, decide whether to deprecate UI-only, API-only, or database-level support.
 - Remove actor tag query support only after confirming there is no need to recover existing actor tag data.
 - Update `project-facts.mdc`, `API.md`, `CLAUDE.md`, and public docs only if backend/API behavior changes.
+
+### Phase 3: Optional Dedicated Actor-Movie Backend API
+
+This is recorded as a future reminder, not current scope.
+
+- Add an explicit backend endpoint such as `GET /api/library/actors/{name}/movies` or `GET /api/library/actors/movies?name=...`.
+- Return a paged movie response with actor-specific totals, limit, offset, and sort options.
+- Let the frontend actor detail page load filmography independently from the global movie cache.
+- Keep the existing `GET /api/library/movies?actor=...` behavior for compatibility until callers migrate.
+- Revisit docs (`project-facts.mdc`, `API.md`, `CLAUDE.md`, README API summaries) only when this backend contract is actually introduced.
 
 ## Open Decision
 
