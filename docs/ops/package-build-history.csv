@@ -296,3 +296,20 @@ aedd5abc chore(release): prepare 1.4.7 package",versionSource=auto-patch; BuildS
 ef4a8d7b docs(api): expand backend api and android foundation
 592be22b chore(release): prepare 1.4.9 package",versionSource=auto-patch; BuildStamp=20260619.053619; error=go build -tags release -ldflags -H=windowsgui -X curated-backend/internal/version.BuildStamp=20260619.053619 -X curated-backend/internal/version.InstallerVersion=1.4.10 -o C:\Users\wujiahui\code\jav-lib\jav-shadcn\release\backend\curated.exe ./cmd/curated failed with exit code 1
 2026-06-19,1.4.10,d7b4492e,master,release:publish,release/portable/Curated-1.4.10-windows-x64.zip; release/installer/Curated-Setup-1.4.10.exe; release/manifest/release.json,成功,wujiahui,无代码差异（同一提交重复打包）,versionSource=explicit; BuildStamp=20260619.053836; portable=versionSource=explicit; installer=versionSource=explicit
+2026-07-05,1.4.11,96548b72,master,release:publish,release/manifest/release.json,失败,wujiahui,"96548b72 fix(frontend): preserve detail return from actor page
+5deb611a feat(frontend): add dedicated actor detail page
+99af4698 docs: plan dedicated actor detail page
+2a0fe57e style(frontend): tighten actor card grid
+865caccb feat(frontend): hide actor tags in actor UI
+10248ad3 docs(plan): outline actor page tag visibility
+58d9229a fix(frontend): stop player media on teardown
+3853f962 docs: document offline resources and SSE events
+efe3c505 feat: stream task updates over SSE
+96cb7ac2 feat(frontend): bundle offline desktop resources
+3c9866af docs(plan): add comic library MVP implementation plan
+45ad4216 docs(plan): add comic library MVP design
+955a9a8a fix(frontend): preserve detail return from filters
+519d5dfe docs(plan): add Curated Android UI color style guide
+6609ad44 feat(frontend): export active movie library to CSV
+293e9fe7 chore(release): prepare 1.4.10 package",versionSource=auto-patch; BuildStamp=20260704.201339; error=Electron runtime not found: C:\Users\wujiahui\code\jav-lib\jav-shadcn\node_modules\.pnpm\electron@42.0.1\node_modules\electron\dist\electron.exe
+2026-07-05,1.4.11,96548b72,master,release:publish,release/portable/Curated-1.4.11-windows-x64.zip; release/installer/Curated-Setup-1.4.11.exe; release/manifest/release.json,成功,wujiahui,无代码差异（同一提交重复打包）,versionSource=explicit; BuildStamp=20260704.201819; portable=versionSource=explicit; installer=versionSource=explicit
