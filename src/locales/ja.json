@@ -30,6 +30,11 @@
     "dismissContinuePlayback": "再生再開の表示を隠す"
   },
   "actors": {
+    "detailEyebrow": "出演者",
+    "detailSubtitle": "プロフィールとライブラリ内の作品。",
+    "detailMovieSection": "作品",
+    "detailEmptyTitle": "この出演者の作品はまだありません",
+    "detailEmptyDesc": "この出演者に紐づく作品がここに表示されます。",
     "title": "出演者ライブラリ",
     "subtitle": "出演者別に作品を探せます。",
     "searchLabel": "名前検索",
@@ -66,6 +71,8 @@
     "storagePathsAbnormal": "{count} 件の保存先に確認が必要です。設定 > ライブラリで確認してください。"
   },
   "shell": {
+    "backActor": "出演者に戻る",
+    "backActors": "出演者一覧に戻る",
     "openMenu": "ナビメニューを開く",
     "clearSearch": "検索をクリア",
     "clearCuratedSearch": "キュレート検索をクリア",

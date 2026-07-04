@@ -9,7 +9,7 @@ import {
 } from "@/lib/library-query"
 import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
-const navigationBackTargets = ["home", "browse", "detail", "history", "curated-frames"] as const
+const navigationBackTargets = ["home", "browse", "detail", "actor", "history", "curated-frames"] as const
 
 export type NavigationBackTarget = (typeof navigationBackTargets)[number]
 
@@ -51,6 +51,32 @@ function buildBrowseBackLink(query: LocationQuery, movieId: string): RouteLocati
       selected: movieId,
     }),
   }
+}
+
+function getActorNameQuery(query: LocationQuery): string {
+  const raw = query.actor
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return typeof value === "string" ? value.trim() : ""
+}
+
+export function buildActorDetailRoute(
+  actorName: string,
+  selectedMovieId?: string,
+): RouteLocationRaw {
+  const selected = selectedMovieId?.trim()
+  return {
+    name: "actor-detail",
+    params: { actorName },
+    query: selected ? { selected } : {},
+  }
+}
+
+function buildActorBackLink(query: LocationQuery, movieId: string): RouteLocationRaw {
+  const actorName = getActorNameQuery(query)
+  if (!actorName) {
+    return buildBrowseBackLink(query, movieId)
+  }
+  return buildActorDetailRoute(actorName, movieId)
 }
 
 function hasExplicitBackTarget(query: LocationQuery, target: NavigationBackTarget): boolean {
@@ -132,6 +158,41 @@ export function buildPlayerRouteFromBrowseIntent(
   }
 }
 
+export function buildDetailRouteFromActor(movieId: string, actorName: string): RouteLocationRaw {
+  return {
+    name: "detail",
+    params: { id: movieId },
+    query: {
+      actor: actorName,
+      back: "actor",
+      selected: movieId,
+    },
+  }
+}
+
+export function buildPlayerRouteFromActorIntent(
+  movieId: string,
+  actorName: string,
+): RouteLocationRaw {
+  const query: LocationQuery = {
+    actor: actorName,
+    autoplay: "1",
+    back: "actor",
+    selected: movieId,
+  }
+
+  const resumeSec = getResumeSecondsForOpenPlayer(movieId)
+  if (resumeSec !== undefined) {
+    query.t = String(resumeSec)
+  }
+
+  return {
+    name: "player",
+    params: { id: movieId },
+    query,
+  }
+}
+
 export function buildPlayerRouteFromHistoryIntent(
   movieId: string,
   resumeSec: number,
@@ -166,6 +227,13 @@ export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,
 ): { to: RouteLocationRaw; labelKey: string } {
+  if (route.name === "actor-detail") {
+    return {
+      to: { name: "actors" },
+      labelKey: "shell.backActors",
+    }
+  }
+
   if (route.name === "player" && currentMovieId) {
     const backTarget = getNavigationBackTarget(route.query)
     if (backTarget === "history") {
@@ -184,6 +252,12 @@ export function resolveNavigationBackLink(
       return {
         to: { name: "curated-frames" },
         labelKey: "shell.backCurated",
+      }
+    }
+    if (backTarget === "actor") {
+      return {
+        to: buildActorBackLink(route.query, currentMovieId),
+        labelKey: "shell.backActor",
       }
     }
     if (backTarget === "browse") {
@@ -218,10 +292,17 @@ export function resolveNavigationBackLink(
   }
 
   if (route.name === "detail" && currentMovieId) {
-    if (getNavigationBackTarget(route.query) === "home") {
+    const backTarget = getNavigationBackTarget(route.query)
+    if (backTarget === "home") {
       return {
         to: { name: "home" },
         labelKey: "shell.backHome",
+      }
+    }
+    if (backTarget === "actor") {
+      return {
+        to: buildActorBackLink(route.query, currentMovieId),
+        labelKey: "shell.backActor",
       }
     }
     return {

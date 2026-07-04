@@ -48,4 +48,22 @@ describe("router auth lock guard", () => {
 
     expect(router.currentRoute.value.name).toBe("library")
   })
+
+  it("resolves dedicated actor detail pages when auth status is already unlocked", async () => {
+    const refreshStatus = vi.fn().mockResolvedValue({
+      ...lockedStatus,
+      unlocked: true,
+    })
+    vi.doMock("@/services/auth-lock-service", () => ({
+      authLockService: { refreshStatus },
+      isAuthLockEnabled: () => true,
+    }))
+
+    const { default: router } = await import("@/router")
+    await router.push("/actors/Mina%20Kaze")
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe("actor-detail")
+    expect(router.currentRoute.value.params.actorName).toBe("Mina Kaze")
+  })
 })

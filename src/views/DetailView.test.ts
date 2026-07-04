@@ -225,7 +225,7 @@ describe("DetailView", () => {
     })
   })
 
-  it("opens actor filters with an explicit detail return intent", async () => {
+  it("opens actor links on the dedicated actor detail page", async () => {
     const wrapper = mount(DetailView)
     await flushPromises()
 
@@ -233,11 +233,9 @@ describe("DetailView", () => {
     await flushPromises()
 
     expect(routerPushMock).toHaveBeenCalledWith({
-      name: "favorites",
+      name: "actor-detail",
+      params: { actorName: "Actor A" },
       query: {
-        actor: "Actor A",
-        back: "detail",
-        browse: "favorites",
         selected: "movie-1",
       },
     })

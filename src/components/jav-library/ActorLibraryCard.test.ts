@@ -17,10 +17,6 @@ vi.mock("vue-router", () => ({
   }),
 }))
 
-vi.mock("@/lib/library-query", () => ({
-  mergeLibraryQuery: vi.fn((_query, patch) => patch),
-}))
-
 vi.mock("@/components/ui/avatar", () => ({
   Avatar: {
     props: ["class"],
@@ -99,5 +95,22 @@ describe("ActorLibraryCard", () => {
     expect(avatar.classes()).toContain("size-24")
     expect(avatar.classes()).toContain("rounded-2xl")
     expect(wrapper.get("[data-avatar-image]").attributes("alt")).toBe("Alpha Star")
+  })
+
+  it("opens the dedicated actor detail route", async () => {
+    const { default: ActorLibraryCard } = await import("./ActorLibraryCard.vue")
+
+    const wrapper = mount(ActorLibraryCard, {
+      props: {
+        actor: actor({ name: "Mina Kaze" }),
+      },
+    })
+
+    await wrapper.get("button").trigger("click")
+
+    expect(routerPush).toHaveBeenCalledWith({
+      name: "actor-detail",
+      params: { actorName: "Mina Kaze" },
+    })
   })
 })

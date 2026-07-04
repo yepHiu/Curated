@@ -237,4 +237,21 @@ describe("AppSidebar", () => {
     expect(wrapper.find("[data-active-playback-card]").exists()).toBe(false)
     expect(wrapper.find("[data-active-playback-compact]").exists()).toBe(false)
   })
+
+  it("keeps the actors nav item active on actor detail pages", async () => {
+    routeState.value = {
+      name: "actor-detail",
+      params: { actorName: "Actor A" },
+      query: {},
+    }
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const actorsLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.actors"))
+
+    expect(actorsLink?.classes()).toContain("bg-sidebar-accent")
+  })
 })

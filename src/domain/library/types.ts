@@ -6,6 +6,7 @@ export type AppPage =
   | "tags"
   | "trash"
   | "actors"
+  | "actor-detail"
   | "history"
   | "curated-frames"
   | "detail"

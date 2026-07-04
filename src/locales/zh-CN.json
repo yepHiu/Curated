@@ -30,6 +30,11 @@
     "dismissContinuePlayback": "隐藏继续播放入口"
   },
   "actors": {
+    "detailEyebrow": "演员",
+    "detailSubtitle": "演员资料与已入库影片。",
+    "detailMovieSection": "影片",
+    "detailEmptyTitle": "这个演员暂无影片",
+    "detailEmptyDesc": "与这个演员关联的影片会显示在这里。",
     "title": "演员库",
     "subtitle": "按演员浏览片单，快速找到相关影片。",
     "searchLabel": "搜索演员名",
@@ -66,6 +71,8 @@
     "storagePathsAbnormal": "{count} 个存储目录需要处理。请到设置 > 资料库中检查。"
   },
   "shell": {
+    "backActor": "返回演员",
+    "backActors": "返回演员库",
     "openMenu": "打开导航菜单",
     "clearSearch": "清除搜索",
     "clearCuratedSearch": "清除萃取帧搜索",

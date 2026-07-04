@@ -158,7 +158,12 @@ const sidebarSections = computed((): SidebarNavSection[] => [
   },
 ])
 
-const isActive = (page: AppPage) => route.name === page
+const isActive = (page: AppPage) => {
+  if (page === "actors") {
+    return route.name === "actors" || route.name === "actor-detail"
+  }
+  return route.name === page
+}
 
 const brandHomeTarget = computed(() => ({ name: "home" as const }))
 

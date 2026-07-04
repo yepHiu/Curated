@@ -81,6 +81,12 @@ alwaysApply: true
 - The reveal handler validates that the stored library path still exists on disk and is a directory before opening it.
 - Removing a library path still only updates Curated database bindings; it does not delete the actual local directory on disk.
 
+## 2026-07 Actor Detail Route
+
+- Frontend route `actor-detail` lives at `/actors/:actorName` and renders `ActorDetailView.vue` / `ActorDetailPage.vue`.
+- Actor library cards and actor links from movie details navigate to the dedicated actor detail page instead of using the generic `library?actor=...` flow.
+- The first actor detail implementation reuses the existing `libraryService.movies` cache and filters movies by exact actor name; a dedicated backend actor-movie endpoint remains a future option rather than current behavior.
+
 ## 2026-05 Library Storage Presence
 
 - Backend storage presence checks live in `backend/internal/storagehealth` and persist expected backing-volume identities through `library_path_storage_bindings` in SQLite.

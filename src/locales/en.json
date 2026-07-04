@@ -30,6 +30,11 @@
     "dismissContinuePlayback": "Hide continue playing"
   },
   "actors": {
+    "detailEyebrow": "Actor",
+    "detailSubtitle": "Profile and titles from your library.",
+    "detailMovieSection": "Movies",
+    "detailEmptyTitle": "No movies for this actor",
+    "detailEmptyDesc": "Titles linked to this actor will appear here.",
     "title": "Actors",
     "subtitle": "Browse by actor and quickly find related titles.",
     "searchLabel": "Search name",
@@ -66,6 +71,8 @@
     "storagePathsAbnormal": "{count} storage paths need attention. Open Settings > Library to review them."
   },
   "shell": {
+    "backActor": "Back to actor",
+    "backActors": "Back to actors",
     "openMenu": "Open navigation menu",
     "clearSearch": "Clear search",
     "clearCuratedSearch": "Clear curated search",

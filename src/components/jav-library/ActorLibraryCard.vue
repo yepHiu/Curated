@@ -10,7 +10,6 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card"
-import { mergeLibraryQuery } from "@/lib/library-query"
 
 const props = defineProps<{
   actor: ActorListItemDTO
@@ -31,18 +30,8 @@ const initials = computed(() => {
 
 function goFilmography() {
   void router.push({
-    name: "library",
-    query: mergeLibraryQuery(
-      {},
-      {
-        actor: props.actor.name,
-        q: undefined,
-        tag: undefined,
-        studio: undefined,
-        tab: "all",
-        selected: undefined,
-      },
-    ),
+    name: "actor-detail",
+    params: { actorName: props.actor.name },
   })
 }
 </script>

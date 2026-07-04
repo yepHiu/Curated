@@ -145,9 +145,17 @@ const hasDetailBackIntentOnPrimaryRoute = computed(
 )
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const useFlushWorkspaceFrame = computed(() =>
-  ["home", "library", "favorites", "tags", "trash", "history", "curated-frames", "player"].includes(
-    String(route.name ?? ""),
-  ),
+  [
+    "home",
+    "library",
+    "favorites",
+    "tags",
+    "trash",
+    "actor-detail",
+    "history",
+    "curated-frames",
+    "player",
+  ].includes(String(route.name ?? "")),
 )
 
 const showHeaderBack = computed(

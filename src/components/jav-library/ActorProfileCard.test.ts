@@ -136,6 +136,24 @@ async function mountComponent() {
   })
 }
 
+async function mountComponentWithProps(props: Record<string, unknown>) {
+  vi.resetModules()
+  vi.stubEnv("VITE_USE_WEB_API", "true")
+  const mod = await import("./ActorProfileCard.vue")
+  return mount(mod.default, {
+    props: {
+      actorName: "Alpha Star",
+      userTagSuggestions: [],
+      ...props,
+    },
+    global: {
+      stubs: {
+        Teleport: false,
+      },
+    },
+  })
+}
+
 describe("ActorProfileCard", () => {
   beforeEach(() => {
     getActorProfile.mockReset()
@@ -329,6 +347,21 @@ describe("ActorProfileCard", () => {
     expect(wrapper.text()).not.toContain("Hidden Actor Tag")
     expect(wrapper.text()).not.toContain("common.add")
     expect(patchActorUserTags).not.toHaveBeenCalled()
+  })
+
+  it("can hide the legacy clear-filter action on actor-owned pages", async () => {
+    getActorProfile.mockResolvedValue({
+      name: "Alpha Star",
+      externalLinks: [],
+      userTags: [],
+      summary: "Bio",
+      avatarUrl: "https://example.com/avatar.jpg",
+    })
+
+    const wrapper = await mountComponentWithProps({ showClearFilter: false })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("library.clearActorFilter")
   })
 
   it("persists a notification when automatic actor scraping completes", async () => {

@@ -34,9 +34,11 @@ const props = withDefaults(
     actorName: string
     /** Kept for parent compatibility while actor tag UI is hidden. */
     userTagSuggestions?: readonly string[]
+    showClearFilter?: boolean
   }>(),
   {
     userTagSuggestions: () => [],
+    showClearFilter: true,
   },
 )
 
@@ -357,6 +359,7 @@ onUnmounted(() => {
             {{ scraping ? t("library.actorRefreshing") : t("library.actorRefreshProfile") }}
           </Button>
           <Button
+            v-if="showClearFilter"
             type="button"
             variant="outline"
             size="sm"

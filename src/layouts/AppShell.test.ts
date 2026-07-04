@@ -249,4 +249,22 @@ describe("AppShell library search route sync", () => {
     expect(contentFrame.classes().join(" ")).not.toContain("px-4")
     expect(contentFrame.classes().join(" ")).not.toContain("py-4")
   })
+
+  it("treats actor detail as an owned page with actor-library back navigation", () => {
+    routerMocks.route.fullPath = "/actors/Mina%20Kaze"
+    routerMocks.route.name = "actor-detail"
+    routerMocks.route.path = "/actors/Mina%20Kaze"
+    routerMocks.route.params = { actorName: "Mina Kaze" }
+    routerMocks.route.query = {}
+
+    const wrapper = mount(AppShell)
+    const contentFrame = wrapper.get("[data-router-view-frame]")
+
+    expect(wrapper.text()).toContain("shell.backActors")
+    expect(JSON.parse(wrapper.get("a[data-to]").attributes("data-to") ?? "{}")).toEqual({
+      name: "actors",
+    })
+    expect(contentFrame.classes().join(" ")).not.toContain("px-4")
+    expect(contentFrame.classes().join(" ")).not.toContain("py-4")
+  })
 })

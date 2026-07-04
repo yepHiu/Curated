@@ -127,6 +127,7 @@ describe("navigation intent helpers", () => {
   it("parses explicit and legacy back-target query semantics", () => {
     expect(getNavigationBackTarget({ back: "home" })).toBe("home")
     expect(getNavigationBackTarget({ back: "browse" })).toBe("browse")
+    expect(getNavigationBackTarget({ back: "actor" })).toBe("actor")
     expect(getNavigationBackTarget({ from: "history" })).toBe("history")
     expect(getNavigationBackTarget({ from: "curated-frames" })).toBe("curated-frames")
     expect(getNavigationBackTarget({ from: "favorites" })).toBe("detail")
@@ -185,6 +186,66 @@ describe("navigation intent helpers", () => {
           selected: "movie-1",
         },
       },
+    })
+  })
+
+  it("resolves actor filmography back links to the actor detail page", () => {
+    expect(
+      resolveNavigationBackLink(
+        {
+          name: "detail",
+          query: {
+            actor: "Mina Kaze",
+            back: "actor",
+            selected: "movie-1",
+          },
+        },
+        "movie-1",
+      ),
+    ).toEqual({
+      labelKey: "shell.backActor",
+      to: {
+        name: "actor-detail",
+        params: { actorName: "Mina Kaze" },
+        query: {
+          selected: "movie-1",
+        },
+      },
+    })
+
+    expect(
+      resolveNavigationBackLink(
+        {
+          name: "player",
+          query: {
+            actor: "Mina Kaze",
+            back: "actor",
+            selected: "movie-1",
+          },
+        },
+        "movie-1",
+      ),
+    ).toEqual({
+      labelKey: "shell.backActor",
+      to: {
+        name: "actor-detail",
+        params: { actorName: "Mina Kaze" },
+        query: {
+          selected: "movie-1",
+        },
+      },
+    })
+  })
+
+  it("resolves actor detail pages back to the actor library", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "actor-detail",
+        query: {},
+      }),
+    ).toEqual({
+      labelKey: "shell.backActors",
+      to: { name: "actors" },
     })
   })
 
