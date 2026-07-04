@@ -49,6 +49,30 @@ vi.mock("@/components/jav-library/ActorLibraryCard.vue", () => ({
 }))
 
 describe("ActorsPage", () => {
+  it("keeps actor cards in a compact centered grid", async () => {
+    listActors.mockResolvedValueOnce({
+      total: 2,
+      actors: [
+        {
+          name: "Alpha Star",
+          movieCount: 12,
+        },
+        {
+          name: "Beta Star",
+          movieCount: 8,
+        },
+      ],
+    })
+    const { default: ActorsPage } = await import("./ActorsPage.vue")
+
+    const wrapper = mount(ActorsPage)
+    await flushPromises()
+
+    const grid = wrapper.get("[data-actor-grid]")
+    expect(grid.classes()).toContain("grid-cols-[repeat(auto-fill,minmax(9.25rem,9.5rem))]")
+    expect(grid.classes()).toContain("justify-center")
+  })
+
   it("does not expose actor-tag filtering UI or pass actorTag to the list query", async () => {
     listActors.mockResolvedValueOnce({
       total: 1,

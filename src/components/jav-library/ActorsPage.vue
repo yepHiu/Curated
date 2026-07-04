@@ -175,7 +175,8 @@ onBeforeUnmount(() => {
       </div>
       <template v-else>
         <div
-          class="grid w-full min-w-0 grid-cols-2 gap-4 pb-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 [&>*]:min-w-0"
+          data-actor-grid
+          class="grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(9.25rem,9.5rem))] justify-center gap-4 pb-4 [&>*]:min-w-0"
         >
           <ActorLibraryCard
             v-for="a in actors"
