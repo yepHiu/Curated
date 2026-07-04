@@ -313,6 +313,24 @@ describe("ActorProfileCard", () => {
     expect(text).toContain("https://example.com/a")
   })
 
+  it("does not render actor user tags or tag editing controls", async () => {
+    getActorProfile.mockResolvedValue({
+      name: "Alpha Star",
+      externalLinks: [],
+      userTags: ["Hidden Actor Tag"],
+      summary: "Bio",
+      avatarUrl: "https://example.com/avatar.jpg",
+    })
+
+    const wrapper = await mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Alpha Star")
+    expect(wrapper.text()).not.toContain("Hidden Actor Tag")
+    expect(wrapper.text()).not.toContain("common.add")
+    expect(patchActorUserTags).not.toHaveBeenCalled()
+  })
+
   it("persists a notification when automatic actor scraping completes", async () => {
     getActorProfile
       .mockResolvedValueOnce({

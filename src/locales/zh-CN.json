@@ -31,9 +31,9 @@
   },
   "actors": {
     "title": "演员库",
-    "subtitle": "按演员浏览片单；标签为演员专属用户标签，与影片标签无关。",
+    "subtitle": "按演员浏览片单，快速找到相关影片。",
     "searchLabel": "搜索演员名",
-    "searchPlaceholder": "名字或演员标签包含…",
+    "searchPlaceholder": "演员名字包含…",
     "actorTagLabel": "按演员标签筛选",
     "actorTagPlaceholder": "精确匹配某个演员标签",
     "sortName": "按姓名",

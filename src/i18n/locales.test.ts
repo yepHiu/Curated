@@ -118,4 +118,16 @@ describe("locale key parity", () => {
 
     expect(missing).toEqual([])
   })
+
+  it.each(Object.entries(locales))(
+    "%s actor library visible copy does not advertise actor tags",
+    (_locale, messages) => {
+      const visibleActorCopy = [
+        readLocaleKey(messages, "actors.searchPlaceholder"),
+        readLocaleKey(messages, "actors.subtitle"),
+      ].join(" ")
+
+      expect(visibleActorCopy).not.toMatch(/\bactor tags?\b|\btags?\b|标签|タグ/i)
+    },
+  )
 })

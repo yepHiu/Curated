@@ -31,9 +31,9 @@
   },
   "actors": {
     "title": "出演者ライブラリ",
-    "subtitle": "出演者別に閲覧。ここでのタグは出演者用ユーザータグで、作品タグとは別です。",
+    "subtitle": "出演者別に作品を探せます。",
     "searchLabel": "名前検索",
-    "searchPlaceholder": "名前または出演者タグに含む…",
+    "searchPlaceholder": "名前に含む…",
     "actorTagLabel": "出演者タグで絞り込み",
     "actorTagPlaceholder": "タグの完全一致",
     "sortName": "名前順",

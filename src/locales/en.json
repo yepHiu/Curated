@@ -31,9 +31,9 @@
   },
   "actors": {
     "title": "Actors",
-    "subtitle": "Browse by actor. Tags here are actor-only user tags, not movie tags.",
+    "subtitle": "Browse by actor and quickly find related titles.",
     "searchLabel": "Search name",
-    "searchPlaceholder": "Name or actor tag contains…",
+    "searchPlaceholder": "Actor name contains…",
     "actorTagLabel": "Filter by actor tag",
     "actorTagPlaceholder": "Exact actor tag",
     "sortName": "By name",
