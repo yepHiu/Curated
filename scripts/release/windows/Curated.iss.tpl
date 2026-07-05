@@ -23,7 +23,7 @@ SetupIconFile={#MyAppSourceDir}\curated.ico
 UninstallDisplayIcon={app}\curated.ico
 CloseApplications=yes
 RestartApplications=no
-CloseApplicationsFilter=Curated.exe
+CloseApplicationsFilter=Curated.exe,curated.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

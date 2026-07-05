@@ -97,8 +97,11 @@ export function buildTrayMenuModel(options: {
   ]
 }
 
-export function shouldHideWindowOnClose(options: { isQuitting: boolean }): boolean {
-  return !options.isQuitting
+export function shouldHideWindowOnClose(options: {
+  isQuitting: boolean
+  isSystemSessionEnding?: boolean
+}): boolean {
+  return !options.isQuitting && !options.isSystemSessionEnding
 }
 
 export function shouldStopBackendOnQuit(options: { attachedToExistingBackend: boolean }): boolean {

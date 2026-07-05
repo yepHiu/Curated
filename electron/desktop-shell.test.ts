@@ -142,6 +142,12 @@ describe("Electron desktop shell integration", () => {
   it("hides the window on close unless the app is intentionally quitting", () => {
     expect(shouldHideWindowOnClose({ isQuitting: false })).toBe(true)
     expect(shouldHideWindowOnClose({ isQuitting: true })).toBe(false)
+    expect(
+      shouldHideWindowOnClose({
+        isQuitting: false,
+        isSystemSessionEnding: true,
+      }),
+    ).toBe(false)
   })
 
   it("only stops the backend on quit when Electron owns the backend process", () => {

@@ -43,6 +43,7 @@ let rendererBaseUrl: string | undefined
 let appIconPath: string | undefined
 let appTray: Tray | undefined
 let isQuitting = false
+let isSystemSessionEnding = false
 
 const singleInstanceLock = app.requestSingleInstanceLock()
 if (!singleInstanceLock) {
@@ -149,8 +150,16 @@ function createMainWindow(
   window.once("ready-to-show", () => {
     window.show()
   })
+  window.on("query-session-end", () => {
+    isSystemSessionEnding = true
+    isQuitting = true
+  })
+  window.on("session-end", () => {
+    isSystemSessionEnding = true
+    isQuitting = true
+  })
   window.on("close", (event) => {
-    if (!shouldHideWindowOnClose({ isQuitting })) {
+    if (!shouldHideWindowOnClose({ isQuitting, isSystemSessionEnding })) {
       return
     }
     event.preventDefault()
