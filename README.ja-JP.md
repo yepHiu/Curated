@@ -212,6 +212,9 @@ pnpm dev:electron
 
 - `config/library-config.cfg`
 
+`config/library-config.example.cfg` は、リリースパッケージで使用するバージョン管理済みの
+サニタイズ済みサンプルです。端末固有の `library-config.cfg` は配布物にコピーされません。
+
 主なライブラリ設定項目:
 
 - `organizeLibrary`

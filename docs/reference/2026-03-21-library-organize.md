@@ -2,6 +2,10 @@
 
 ## 持久化：`config/library-config.cfg`
 
+本机运行配置继续写入 `config/library-config.cfg`，该文件不纳入版本控制，也不得进入正式发布包。
+仓库中的 `config/library-config.example.cfg` 是唯一受 Git 管理的脱敏发布示例；release 组装会校验其
+内容必须匹配安全基线，再复制为 `resources/app/runtime/config/library-config.example.cfg`。
+
 与 `-config` 指向的服务端主配置（HTTP 地址、数据库路径等）**分开**存放。文件为 **JSON**，用于可持久化的「库行为」开关；后续可把更多设置项合并进同一文件（写入时保留未知键）。
 
 | 字段 | 说明 |

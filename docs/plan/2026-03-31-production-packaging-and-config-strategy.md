@@ -165,7 +165,7 @@ go build -tags release -ldflags "-H=windowsgui -X curated-backend/internal/versi
 2. 确认本次 `-Version`，不要直接使用 `package.json` 中 `release:*` 脚本默认的 `0.0.0-local`。
 3. 确认当前 commit / branch，并记录将用于台账的 short SHA。
 4. 确认 Inno Setup 是否可用：`ISCC.exe` 需存在于 PATH，或位于 `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` / `C:\Program Files\Inno Setup 6\ISCC.exe`。
-5. 确认 `config/library-config.cfg` 中示例配置可作为 `runtime/config/library-config.example.cfg` 随包分发；不要把本机私密代理、私有路径或临时调试配置带入示例配置。
+5. 仅将受 Git 管理、经过脱敏校验的 `config/library-config.example.cfg` 复制为 `runtime/config/library-config.example.cfg`；禁止把本机 `config/library-config.cfg`、私密代理、私有路径、资料库 ID、播放器命令或临时调试配置带入正式包。
 6. 确认 FFmpeg 可随包分发：优先使用 `backend/third_party/ffmpeg/bin/` 中的真实运行时；如果仓库内只有 README，发布脚本会尝试从 Scoop 或 PATH 发现真实 `ffmpeg.exe` / `ffprobe.exe` 并复制到 `third_party/ffmpeg/bin/`，且不会复制 `scoop/shims` 下的 shim；如果没有找到可用运行时，打包应失败而不是产出缺少 FFmpeg 的安装包。
 
 推荐执行命令：

@@ -230,6 +230,9 @@ The backend reads its main runtime config from JSON and merges library-level set
 
 - `config/library-config.cfg`
 
+`config/library-config.example.cfg` is the tracked, sanitized sample used by release packaging. The
+machine-specific `library-config.cfg` is never copied into distributable packages.
+
 Common library-level settings include:
 
 - `organizeLibrary`

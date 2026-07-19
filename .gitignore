@@ -80,8 +80,10 @@ videos_test/
 # logfile
 log/
 
-# config file (repo root only; do not ignore backend/internal/config)
-/config/
+# Local config files (repo root only; do not ignore backend/internal/config).
+# Keep the sanitized release example tracked while ignoring machine-specific runtime state.
+/config/*
+!/config/library-config.example.cfg
 
 # Preferred repo-local scratch namespace for future local-only workspace state
 /.workspace/

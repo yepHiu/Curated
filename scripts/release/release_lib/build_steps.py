@@ -25,6 +25,17 @@ from .versioning import allocate_next_patch_in_file, format_version, read_versio
 DEFAULT_VERSION_FILE = "scripts/release/version.json"
 DEFAULT_HISTORY_CSV = "docs/ops/package-build-history.csv"
 LEGACY_HISTORY_MD = "docs/ops/2026-04-02-package-build-history.md"
+RELEASE_LIBRARY_CONFIG_EXAMPLE = "config/library-config.example.cfg"
+
+_SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE: dict[str, object] = {
+    "organizeLibrary": False,
+    "autoLibraryWatch": True,
+    "autoActorProfileScrape": False,
+    "autoDownloadUpdates": False,
+    "launchAtLogin": False,
+    "curatedFrameExportFormat": "jpg",
+    "proxy": {"enabled": False},
+}
 
 
 @dataclass(frozen=True)
@@ -152,6 +163,24 @@ def build_electron_main(output_dir: str = "electron-dist") -> Path:
     return resolved_output_dir
 
 
+def _validated_release_library_config_example(repo_root: Path) -> Path:
+    example_path = repo_root / RELEASE_LIBRARY_CONFIG_EXAMPLE
+    if not example_path.is_file():
+        raise FileNotFoundError(f"Sanitized release library config example not found: {example_path}")
+
+    try:
+        parsed = json.loads(example_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid release library config example JSON: {example_path}: {exc}") from exc
+
+    if parsed != _SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE:
+        raise ValueError(
+            "Release library config example must match the sanitized baseline and must not contain "
+            "machine paths, proxy details, provider selections, library ids, or player commands"
+        )
+    return example_path
+
+
 def assemble_release(
     version: str,
     build_stamp: str,
@@ -167,6 +196,7 @@ def assemble_release(
     resolved_electron_main_dir = resolve_release_path(electron_main_dir, repo_root)
     resolved_electron_runtime_dir = resolve_release_path(electron_runtime_dir, repo_root)
     resolved_output_dir = resolve_release_path(output_dir, repo_root)
+    library_config_example_path = _validated_release_library_config_example(repo_root)
     app_dir = resolved_output_dir / "resources" / "app"
     runtime_dir = app_dir / "runtime"
     docs_dir = resolved_output_dir / "docs"
@@ -216,7 +246,7 @@ def assemble_release(
     ffmpeg_bundle_source = _bundle_ffmpeg_runtime(repo_root, app_dir)
 
     shutil.copy2(
-        repo_root / "config" / "library-config.cfg",
+        library_config_example_path,
         runtime_dir / "config" / "library-config.example.cfg",
     )
     shutil.copy2(

@@ -212,6 +212,9 @@ pnpm dev:electron
 
 - `config/library-config.cfg`
 
+`config/library-config.example.cfg` 是受版本控制、经过脱敏的正式包示例；本机专用的
+`library-config.cfg` 不会复制进可分发产物。
+
 常见资料库级配置包括：
 
 - `organizeLibrary`

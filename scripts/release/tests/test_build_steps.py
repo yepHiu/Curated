@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -195,7 +196,23 @@ class BuildStepsTests(unittest.TestCase):
 
         config_dir = self.temp_root / "config"
         config_dir.mkdir()
-        (config_dir / "library-config.cfg").write_text("{}", encoding="utf-8")
+        (config_dir / "library-config.cfg").write_text(
+            json.dumps(
+                {
+                    "proxy": {"enabled": True, "url": "http://local-user:secret@127.0.0.1:7890"},
+                    "defaultImportLibraryPathId": "private-library-id",
+                    "logDir": "C:/Users/private/Curated/logs",
+                    "metadataMovieProviderChain": ["PrivateProvider"],
+                    "player": {"nativePlayerCommand": "C:/Private/Player/player.exe"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        safe_example = dict(build_steps._SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE)
+        (config_dir / "library-config.example.cfg").write_text(
+            json.dumps(safe_example, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
         plan_dir = self.temp_root / "docs" / "plan"
         plan_dir.mkdir(parents=True)
@@ -228,10 +245,32 @@ class BuildStepsTests(unittest.TestCase):
         self.assertTrue((app_dir / "electron-dist" / "main.js").is_file())
         self.assertTrue((app_dir / "electron-dist" / "preload.cjs").is_file())
         self.assertTrue((app_dir / "third_party" / "ffmpeg" / "bin" / "ffmpeg.exe").is_file())
+        staged_example = json.loads(
+            (app_dir / "runtime" / "config" / "library-config.example.cfg").read_text(encoding="utf-8")
+        )
+        self.assertEqual(staged_example, safe_example)
+        self.assertNotIn("private-library-id", json.dumps(staged_example))
+        self.assertNotIn("local-user", json.dumps(staged_example))
         self.assertEqual((app_dir / "package.json").read_text(encoding="utf-8"), '{\n  "name": "curated-desktop",\n  "version": "1.4.7",\n  "type": "module",\n  "main": "electron-dist/main.js"\n}\n')
         release_notes = (output / "README-release.txt").read_text(encoding="utf-8")
         self.assertIn("Curated.exe is the Electron desktop shell", release_notes)
         self.assertIn("resources\\app\\curated.exe is the release Go backend", release_notes)
+
+    def test_release_library_config_example_rejects_sensitive_content(self) -> None:
+        config_dir = self.temp_root / "config"
+        config_dir.mkdir()
+        (config_dir / "library-config.example.cfg").write_text(
+            json.dumps(
+                {
+                    **build_steps._SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE,
+                    "logDir": "C:/Users/private/Curated/logs",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ValueError, "sanitized baseline"):
+            build_steps._validated_release_library_config_example(self.temp_root)
 
     def test_installer_template_launches_electron_desktop_exe(self) -> None:
         template = (REPO_ROOT / "scripts" / "release" / "windows" / "Curated.iss.tpl").read_text(encoding="utf-8")
