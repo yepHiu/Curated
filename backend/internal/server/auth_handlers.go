@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/storage"
 )
@@ -198,6 +199,10 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 	var body contracts.PatchAuthSettingsRequest
 	if err := decodeAuthJSONBody(r, &body); err != nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		return
+	}
+	if body.PINEnabled != nil && !*body.PINEnabled && h.cfg.LANEnabled && !config.HTTPAddrIsLoopback(h.cfg.HttpAddr) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "PIN cannot be disabled while LAN mode is enabled")
 		return
 	}
 	settings, err := h.store.PatchAppSecuritySettings(r.Context(), storage.AppSecuritySettingsPatch{

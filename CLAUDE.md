@@ -292,7 +292,7 @@ POST   /api/providers/ping-all              # Ping all providers
 - Go HTTP backend with SQLite database
 - File scanning, metadata scraping, task system
 - REST API at `/api`
-- Frontend connects via HTTP when `VITE_USE_WEB_API=true`
+- Frontend connects via HTTP when `VITE_USE_WEB_API=true`; backend defaults are loopback-only (`127.0.0.1:8080` dev, `127.0.0.1:8081` release). A non-loopback main-config `httpAddr` also requires `lanEnabled: true` and an initialized application PIN.
 - Electron shell MVP under `electron/`: starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, loads the Web UI in BrowserWindow with the Curated app icon, keeps the app running in the tray when the window is closed, and exposes only `window.javLibrary.pickDirectory()` through preload for native directory selection. Packaged releases install `Curated.exe` as the Electron shell, package Electron app files under `resources/app/electron-dist`, place the Go backend at `resources/app/curated.exe`, and load the backend-hosted static UI on `http://127.0.0.1:8081`.
 - Library storage presence checks for configured roots are implemented Windows-first, with macOS/Linux kept as fallback/future adaptation targets
 - Playback uses HTML5 `<video>` with HTTP Range streaming

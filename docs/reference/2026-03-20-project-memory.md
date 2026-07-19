@@ -4,7 +4,7 @@
 
 - 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
 - `docs/product/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
-- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`:8080`**，Vite 代理 **`/api` → `:8080`** 仍作为 fallback / 非 loopback 路径保留；release **`:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。关闭该开关时仍可使用内存 **Mock** 适配器。
+- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`127.0.0.1:8080`**，Vite 代理 **`/api` → `127.0.0.1:8080`** 仍作为 fallback；release **`127.0.0.1:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。非 loopback 监听需要主配置显式设置 **`lanEnabled: true`** 且已初始化 PIN。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先 + 最小桌面壳层` 策略：核心业务仍是 `Vue Web App -> HTTP API -> Go Backend`，`electron/` 负责启动或复用 Go HTTP 后端、开发态启动或复用 Vite 前端、用带 Curated 图标的 BrowserWindow 加载 Web UI、关闭窗口时退到托盘，并仅通过 preload 暴露 `window.javLibrary.pickDirectory()` 这一类窄原生能力；深度 IPC 桥接仍是后续目标。
 
 ## 2. 当前代码事实

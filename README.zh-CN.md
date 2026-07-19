@@ -59,7 +59,7 @@ go run ./cmd/curated
 
 开发默认值：
 
-- HTTP 地址：`:8080`
+- HTTP 地址：`127.0.0.1:8080`（仅本机 loopback）
 - 健康名：`curated-dev`
 
 Windows 开发辅助命令：
@@ -181,7 +181,7 @@ pnpm dev:electron
 
 - Windows 发布流程：`pnpm release:publish`（Python CLI 编排）。
 - 安装后的生产入口：`Curated.exe` 是 Electron 桌面壳；release Go 后端打包为 `resources/app/curated.exe`，由 Electron 拥有生命周期时以 `-mode http` 启动。
-- 托盘常驻运行，本地前端托管于 `:8081`。
+- 托盘常驻运行，本地前端托管于 loopback `127.0.0.1:8081`。
 - Inno Setup 安装器与便携 zip 分发。
 - FFmpeg 集成与发布清单生成。
 - 打包历史台账（`docs/ops/package-build-history.csv`）。
@@ -231,7 +231,7 @@ pnpm dev:electron
   空 `logDir` 表示”使用默认日志目录”，而不是关闭文件日志：
   正式包写入 `LOCALAPPDATA\\Curated\\logs`，开发态写入 `backend/runtime/logs`。
 
-发布构建默认使用端口 `:8081`，除非被配置覆盖。
+开发与发布构建分别默认监听仅本机可达的 `127.0.0.1:8080` 与 `127.0.0.1:8081`。若要把独立服务端显式开放到局域网，应先在 loopback 模式下完成应用 PIN 初始化，再通过主运行时 JSON 配置同时设置非 loopback `httpAddr` 与 `"lanEnabled": true`，例如 `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`。未显式开启 LAN 或尚未配置 PIN 时，Curated 会拒绝启动非 loopback 监听；内置前端仍使用同源 `/api`。
 
 ## API
 

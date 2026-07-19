@@ -59,7 +59,7 @@ go run ./cmd/curated
 
 開発時のデフォルト:
 
-- HTTP アドレス: `:8080`
+- HTTP アドレス: `127.0.0.1:8080`（ローカル loopback のみ）
 - ヘルス名: `curated-dev`
 
 Windows 向け開発補助コマンド:
@@ -181,7 +181,7 @@ pnpm dev:electron
 
 - Windows リリースフロー：`pnpm release:publish`（Python CLI による統合）。
 - インストール後の本番入口：`Curated.exe` は Electron デスクトップシェルです。release Go バックエンドは `resources/app/curated.exe` として同梱され、Electron が所有する場合は `-mode http` で起動します。
-- トレイ常駐起動、`:8081` でのローカルフロントエンド配信。
+- トレイ常駐起動、loopback `127.0.0.1:8081` でのローカルフロントエンド配信。
 - Inno Setup インストーラーとポータブル zip 配布。
 - FFmpeg バンドルとリリースマニフェスト生成。
 - パッケージ履歴台帳（`docs/ops/package-build-history.csv`）。
@@ -231,7 +231,7 @@ pnpm dev:electron
   空の `logDir` は「ファイルログを無効化」ではなく「既定のログ保存先を使う」意味です:
   release ビルドは `LOCALAPPDATA\\Curated\\logs`、開発時は `backend/runtime/logs` を使います。
 
-リリースビルドでは、設定で上書きしない限りデフォルトで `:8081` を使用します。
+開発ビルドとリリースビルドは、それぞれローカル専用の `127.0.0.1:8080` と `127.0.0.1:8081` を既定で使用します。スタンドアロンサーバーを LAN に公開する場合は、まず loopback モードでアプリ PIN を設定し、メインランタイム JSON 設定で非 loopback の `httpAddr` と `"lanEnabled": true` の両方を明示してください（例: `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`）。LAN の明示的な有効化または PIN 初期化がない場合、Curated は非 loopback リスナーの起動を拒否します。組み込みフロントエンドは引き続き同一オリジンの `/api` を使用します。
 
 ## API
 

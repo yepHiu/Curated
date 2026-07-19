@@ -20,11 +20,14 @@ type Config struct {
 	// LogFilePrefix is the base name for files like {prefix}-20060102.log; default is channel-specific when LogDir is set.
 	LogFilePrefix string `json:"logFilePrefix,omitempty"`
 	// LogMaxAgeDays removes rotated files older than this many days; 0 means default 7 when file logging is enabled.
-	LogMaxAgeDays int      `json:"logMaxAgeDays,omitempty"`
-	HttpAddr      string   `json:"httpAddr"`
-	DatabasePath  string   `json:"databasePath"`
-	CacheDir      string   `json:"cacheDir"`
-	LibraryPaths  []string `json:"libraryPaths"`
+	LogMaxAgeDays int    `json:"logMaxAgeDays,omitempty"`
+	HttpAddr      string `json:"httpAddr"`
+	// LANEnabled must be explicitly enabled before a non-loopback HTTP address is accepted.
+	// LAN startup additionally requires an initialized application PIN.
+	LANEnabled   bool     `json:"lanEnabled,omitempty"`
+	DatabasePath string   `json:"databasePath"`
+	CacheDir     string   `json:"cacheDir"`
+	LibraryPaths []string `json:"libraryPaths"`
 	// ScanIntervalSeconds is deprecated: kept in JSON for backward compatibility with older config files; ignored (no scheduled scan).
 	ScanIntervalSeconds int `json:"scanIntervalSeconds,omitempty"`
 	// OrganizeLibrary moves/renames video files into {parent}/{番号}/{番号}.ext and stores NFO/assets beside the video when enabled.
@@ -130,8 +133,8 @@ type ProxyConfig struct {
 	Password string `json:"password,omitempty"`
 }
 
-// DefaultHTTPAddr returns the compiled default HTTP listen address: :8080 for normal builds,
-// :8081 for release builds (go build -tags release).
+// DefaultHTTPAddr returns the compiled loopback-only HTTP listen address:
+// 127.0.0.1:8080 for normal builds and 127.0.0.1:8081 for release builds.
 func DefaultHTTPAddr() string {
 	return defaultHTTPAddr()
 }

@@ -62,7 +62,7 @@ go run ./cmd/curated
 
 Development defaults:
 
-- HTTP address: `:8080`
+- HTTP address: `127.0.0.1:8080` (loopback only)
 - health name: `curated-dev`
 
 Windows development helper:
@@ -197,7 +197,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 
 - Windows release workflow: `pnpm release:publish` via Python CLI.
 - Installed release entrypoint: `Curated.exe` is the Electron desktop shell; the release Go backend is bundled as `resources/app/curated.exe` and started with `-mode http` when Electron owns it.
-- Tray-mode runtime with local frontend hosting on `:8081`.
+- Tray-mode runtime with local frontend hosting on loopback `127.0.0.1:8081`.
 - Inno Setup installer and portable zip distribution.
 - FFmpeg bundling and release manifest generation.
 - Package build history ledger (`docs/ops/package-build-history.csv`).
@@ -249,7 +249,7 @@ Common library-level settings include:
   Empty `logDir` means "use the default log directory" rather than disabling file logging:
   release builds use `LOCALAPPDATA\\Curated\\logs`, while dev builds use `backend/runtime/logs`.
 
-Release builds default to port `:8081` unless overridden by config. The bundled frontend also uses same-origin `/api` by default, so LAN clients opening `http://<host-ip>:8081` call the backend on that same host and port.
+Development and release builds default to loopback-only `127.0.0.1:8080` and `127.0.0.1:8081`. To expose a standalone server on the LAN, first configure an application PIN while Curated is running on loopback, then pass a main runtime JSON config with both an explicit non-loopback `httpAddr` and `"lanEnabled": true`, for example `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`. Curated refuses to start a non-loopback listener when LAN opt-in is absent or the PIN has not been initialized. The bundled frontend continues to use same-origin `/api`.
 
 ## API
 

@@ -312,6 +312,69 @@ func TestAuthMiddlewareLocksSensitiveAPIUntilUnlocked(t *testing.T) {
 	}
 }
 
+func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
+	t.Parallel()
+
+	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "lan-auth.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(Deps{
+		Cfg: config.Config{
+			HttpAddr:   "0.0.0.0:8081",
+			LANEnabled: true,
+		},
+		Logger: zap.NewNop(),
+		Store:  store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	setupResp := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/setup-pin", map[string]any{
+		"pin":        "123456",
+		"confirmPin": "123456",
+	})
+	if setupResp.StatusCode != http.StatusOK {
+		t.Fatalf("setup status = %d, want 200", setupResp.StatusCode)
+	}
+	_ = setupResp.Body.Close()
+	cookie := findAuthCookie(setupResp.Cookies())
+	if cookie == nil {
+		t.Fatal("expected auth cookie after setup")
+	}
+
+	payload := bytes.NewBufferString(`{"pinEnabled":false}`)
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/auth/settings", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("disable PIN status = %d, want 400", resp.StatusCode)
+	}
+	appErr := decodeAuthJSON[contracts.AppError](t, resp)
+	if appErr.Code != contracts.ErrorCodeBadRequest {
+		t.Fatalf("disable PIN error code = %q, want %q", appErr.Code, contracts.ErrorCodeBadRequest)
+	}
+
+	settings, err := store.GetAppSecuritySettings(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !settings.PINEnabled {
+		t.Fatal("PIN was disabled while LAN mode remained enabled")
+	}
+}
+
 func findAuthCookie(cookies []*http.Cookie) *http.Cookie {
 	for _, cookie := range cookies {
 		if cookie != nil && cookie.Name == "curated_auth" && strings.TrimSpace(cookie.Value) != "" {

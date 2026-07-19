@@ -194,6 +194,13 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 }
 
 func runHTTP(ctx context.Context, boot *bootstrap) error {
+	securitySettings, err := boot.store.GetAppSecuritySettings(ctx)
+	if err != nil {
+		return fmt.Errorf("read HTTP exposure security settings: %w", err)
+	}
+	if err := boot.cfg.ValidateHTTPExposure(securitySettings.PINEnabled); err != nil {
+		return err
+	}
 	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, serverListeningReporter())
 }
 
