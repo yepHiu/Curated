@@ -1,0 +1,330 @@
+<script setup lang="ts">
+import { computed, ref } from "vue"
+import { useI18n } from "vue-i18n"
+import {
+  ArchiveRestore,
+  DatabaseBackup,
+  FileCheck2,
+  FolderOpen,
+  RotateCw,
+  ShieldCheck,
+} from "lucide-vue-next"
+import { HttpClientError } from "@/api/http-client"
+import type {
+  BackupManifestDTO,
+  BackupRestorePreflightDTO,
+  BackupVerificationDTO,
+} from "@/api/types"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { pushAppToast } from "@/composables/use-app-toast"
+import {
+  buildBackupFilename,
+  ensureBackupExtension,
+  joinBackupDestination,
+} from "@/lib/backup-path"
+import { isAbsoluteLibraryPath } from "@/lib/path-validation"
+import { pickLibraryDirectory } from "@/lib/pick-directory"
+import { useLibraryService } from "@/services/library-service"
+
+const props = defineProps<{
+  supported: boolean
+}>()
+
+const { t, locale } = useI18n()
+const libraryService = useLibraryService()
+const backupPathDraft = ref("")
+const pathError = ref("")
+const pickerHint = ref("")
+const actionError = ref("")
+const busyAction = ref<"pick" | "create" | "verify" | "preflight" | null>(null)
+const createdManifest = ref<BackupManifestDTO | null>(null)
+const verification = ref<BackupVerificationDTO | null>(null)
+const preflight = ref<BackupRestorePreflightDTO | null>(null)
+
+const busy = computed(() => busyAction.value !== null)
+
+function formatError(error: unknown): string {
+  if (error instanceof HttpClientError && error.apiError?.message) {
+    return error.apiError.message
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return t("settings.backupUnknownError")
+}
+
+function validatedBackupPath(): string | null {
+  pathError.value = ""
+  const candidate = ensureBackupExtension(backupPathDraft.value)
+  if (!candidate || !isAbsoluteLibraryPath(candidate)) {
+    pathError.value = t("settings.backupPathAbsolute")
+    return null
+  }
+  backupPathDraft.value = candidate
+  return candidate
+}
+
+async function pickBackupDirectory() {
+  if (!props.supported || busy.value) return
+  pathError.value = ""
+  pickerHint.value = ""
+  busyAction.value = "pick"
+  try {
+    const outcome = await pickLibraryDirectory()
+    if (outcome.status === "ok") {
+      backupPathDraft.value = joinBackupDestination(outcome.path, buildBackupFilename())
+    } else if (outcome.status === "hint") {
+      pickerHint.value = outcome.message
+    } else if (outcome.status === "unsupported") {
+      pickerHint.value = t("settings.backupPickerUnsupported")
+    }
+  } finally {
+    busyAction.value = null
+  }
+}
+
+async function createAndVerifyBackup() {
+  if (!props.supported || busy.value) return
+  const backupPath = validatedBackupPath()
+  if (!backupPath) return
+  actionError.value = ""
+  pickerHint.value = ""
+  preflight.value = null
+  busyAction.value = "create"
+  try {
+    createdManifest.value = await libraryService.createBackup(backupPath)
+    verification.value = await libraryService.verifyBackup(backupPath)
+    if (!verification.value.valid) {
+      actionError.value = t("settings.backupCreatedVerificationFailed")
+      return
+    }
+    pushAppToast(t("settings.backupCreatedToast"), {
+      variant: "success",
+      durationMs: 3600,
+    })
+  } catch (error) {
+    actionError.value = formatError(error)
+  } finally {
+    busyAction.value = null
+  }
+}
+
+async function verifyExistingBackup() {
+  if (!props.supported || busy.value) return
+  const backupPath = validatedBackupPath()
+  if (!backupPath) return
+  actionError.value = ""
+  createdManifest.value = null
+  preflight.value = null
+  busyAction.value = "verify"
+  try {
+    verification.value = await libraryService.verifyBackup(backupPath)
+  } catch (error) {
+    actionError.value = formatError(error)
+  } finally {
+    busyAction.value = null
+  }
+}
+
+async function preflightExistingBackup() {
+  if (!props.supported || busy.value) return
+  const backupPath = validatedBackupPath()
+  if (!backupPath) return
+  actionError.value = ""
+  createdManifest.value = null
+  busyAction.value = "preflight"
+  try {
+    preflight.value = await libraryService.preflightBackupRestore(backupPath)
+    verification.value = preflight.value.verification
+  } catch (error) {
+    actionError.value = formatError(error)
+  } finally {
+    busyAction.value = null
+  }
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B"
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1)
+  return `${new Intl.NumberFormat(locale.value, { maximumFractionDigits: index === 0 ? 0 : 1 }).format(value / 1024 ** index)} ${units[index]}`
+}
+</script>
+
+<template>
+  <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+    <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+      <span
+        class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+        aria-hidden="true"
+      >
+        <DatabaseBackup class="size-[1.15rem]" />
+      </span>
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <CardTitle class="min-w-0 text-lg tracking-tight">
+          {{ t("settings.backupCardTitle") }}
+        </CardTitle>
+        <Badge :variant="supported ? 'success' : 'secondary'">
+          {{ supported ? t("settings.backupAvailable") : t("settings.backupWebRequired") }}
+        </Badge>
+      </div>
+      <CardDescription
+        class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
+      >
+        {{ t("settings.backupCardDesc") }}
+      </CardDescription>
+    </CardHeader>
+
+    <CardContent class="flex flex-col gap-4 pt-0">
+      <div class="flex flex-col gap-2">
+        <label for="settings-backup-path" class="text-sm font-medium text-foreground">
+          {{ t("settings.backupPathLabel") }}
+        </label>
+        <Input
+          id="settings-backup-path"
+          v-model="backupPathDraft"
+          :disabled="!supported || busy"
+          :aria-invalid="Boolean(pathError)"
+          aria-describedby="settings-backup-path-help"
+          :placeholder="t('settings.backupPathPlaceholder')"
+          autocomplete="off"
+          data-settings-backup-path
+        />
+        <p v-if="pathError" id="settings-backup-path-help" class="text-xs text-destructive" role="alert">
+          {{ pathError }}
+        </p>
+        <p v-else-if="pickerHint" id="settings-backup-path-help" class="text-xs text-muted-foreground">
+          {{ pickerHint }}
+        </p>
+        <p v-else id="settings-backup-path-help" class="text-xs leading-relaxed text-muted-foreground">
+          {{ t("settings.backupPathHint") }}
+        </p>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          class="h-auto min-h-11 transition-colors"
+          :disabled="!supported || busy"
+          data-settings-comfortable-control
+          data-settings-backup-pick
+          @click="pickBackupDirectory"
+        >
+          <FolderOpen data-icon="inline-start" />
+          {{ t("settings.backupPickDirectory") }}
+        </Button>
+        <Button
+          type="button"
+          class="h-auto min-h-11 transition-colors"
+          :disabled="!supported || busy"
+          data-settings-comfortable-control
+          data-settings-backup-create
+          @click="createAndVerifyBackup"
+        >
+          <RotateCw v-if="busyAction === 'create'" data-icon="inline-start" class="animate-spin" />
+          <DatabaseBackup v-else data-icon="inline-start" />
+          {{ t("settings.backupCreate") }}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          class="h-auto min-h-11 transition-colors"
+          :disabled="!supported || busy"
+          data-settings-comfortable-control
+          data-settings-backup-verify
+          @click="verifyExistingBackup"
+        >
+          <FileCheck2 data-icon="inline-start" />
+          {{ t("settings.backupVerify") }}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          class="h-auto min-h-11 transition-colors"
+          :disabled="!supported || busy"
+          data-settings-comfortable-control
+          data-settings-backup-preflight
+          @click="preflightExistingBackup"
+        >
+          <ShieldCheck data-icon="inline-start" />
+          {{ t("settings.backupPreflight") }}
+        </Button>
+      </div>
+
+      <p v-if="actionError" class="text-sm text-destructive" role="alert">
+        {{ actionError }}
+      </p>
+
+      <template v-if="createdManifest || verification || preflight">
+        <Separator />
+        <div class="flex flex-col gap-3" aria-live="polite">
+          <div v-if="createdManifest" class="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="success">{{ t("settings.backupCreated") }}</Badge>
+            <span class="text-muted-foreground">
+              {{ t("settings.backupManifestSummary", {
+                files: createdManifest.files.length,
+                migrations: createdManifest.schemaMigrations.length,
+              }) }}
+            </span>
+          </div>
+
+          <div v-if="verification" class="flex flex-col gap-2 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge :variant="verification.valid ? 'success' : 'danger'">
+                {{ verification.valid ? t("settings.backupValid") : t("settings.backupInvalid") }}
+              </Badge>
+              <span class="text-muted-foreground">
+                {{ t("settings.backupIntegritySummary", {
+                  quick: verification.databaseIntegrity.quickCheck || '—',
+                  foreignKeys: verification.databaseIntegrity.foreignKeyViolations,
+                }) }}
+              </span>
+            </div>
+            <ul v-if="verification.errors.length" class="list-disc ps-5 text-destructive">
+              <li v-for="error in verification.errors" :key="error">{{ error }}</li>
+            </ul>
+            <ul v-if="verification.warnings.length" class="list-disc ps-5 text-muted-foreground">
+              <li v-for="warning in verification.warnings" :key="warning">{{ warning }}</li>
+            </ul>
+          </div>
+
+          <div v-if="preflight" class="flex flex-col gap-2 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge :variant="preflight.canRestore ? 'success' : 'danger'">
+                {{ preflight.canRestore ? t("settings.backupPreflightReady") : t("settings.backupPreflightBlocked") }}
+              </Badge>
+              <span class="text-muted-foreground">
+                {{ t("settings.backupCapacitySummary", {
+                  required: formatBytes(preflight.requiredBytes),
+                  available: preflight.availableBytesKnown ? formatBytes(preflight.availableBytes) : '—',
+                }) }}
+              </span>
+            </div>
+            <ul v-if="preflight.errors.length" class="list-disc ps-5 text-destructive">
+              <li v-for="error in preflight.errors" :key="error">{{ error }}</li>
+            </ul>
+            <ul v-if="preflight.warnings.length" class="list-disc ps-5 text-muted-foreground">
+              <li v-for="warning in preflight.warnings" :key="warning">{{ warning }}</li>
+            </ul>
+          </div>
+        </div>
+      </template>
+
+      <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+        <ArchiveRestore class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
+      </div>
+    </CardContent>
+  </Card>
+</template>

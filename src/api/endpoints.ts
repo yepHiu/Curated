@@ -2,6 +2,9 @@ import { HttpClientError, httpClient } from "./http-client"
 import {
   assertApiResponse,
   isConnectedClientsDTO,
+  isBackupManifestDTO,
+  isBackupRestorePreflightDTO,
+  isBackupVerificationDTO,
   isHealthDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
@@ -34,6 +37,11 @@ import type {
   AddPlaybackWatchTimeBody,
   AppUpdateStatusDTO,
   AppUpdateInstallBody,
+  BackupCreateBody,
+  BackupManifestDTO,
+  BackupPathBody,
+  BackupRestorePreflightDTO,
+  BackupVerificationDTO,
   AuthStatusDTO,
   AuthSessionsDTO,
   ChangePinBody,
@@ -299,6 +307,24 @@ export const api = {
 
   clearDownloadedAppUpdateInstaller(): Promise<AppUpdateStatusDTO> {
     return httpClient.delete<AppUpdateStatusDTO>("/app-update/downloaded-installer")
+  },
+
+  createBackup(body: BackupCreateBody): Promise<BackupManifestDTO> {
+    return httpClient
+      .post<unknown>("/maintenance/backups", body)
+      .then((value) => assertApiResponse("POST /maintenance/backups", value, isBackupManifestDTO))
+  },
+
+  verifyBackup(body: BackupPathBody): Promise<BackupVerificationDTO> {
+    return httpClient
+      .post<unknown>("/maintenance/backups/verify", body)
+      .then((value) => assertApiResponse("POST /maintenance/backups/verify", value, isBackupVerificationDTO))
+  },
+
+  preflightBackupRestore(body: BackupPathBody): Promise<BackupRestorePreflightDTO> {
+    return httpClient
+      .post<unknown>("/maintenance/backups/preflight", body)
+      .then((value) => assertApiResponse("POST /maintenance/backups/preflight", value, isBackupRestorePreflightDTO))
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

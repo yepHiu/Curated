@@ -3,6 +3,9 @@ import type {
   ConnectedClientDeviceType,
   ConnectedClientDTO,
   ConnectedClientsDTO,
+  BackupManifestDTO,
+  BackupRestorePreflightDTO,
+  BackupVerificationDTO,
   HealthDTO,
   MovieDetailDTO,
   MovieListItemDTO,
@@ -137,6 +140,64 @@ export function isConnectedClientsDTO(value: unknown): value is ConnectedClients
     isFiniteNumber(value.localCount) &&
     isFiniteNumber(value.remoteCount) &&
     isString(value.sampledAt)
+  )
+}
+
+export function isBackupManifestDTO(value: unknown): value is BackupManifestDTO {
+  return (
+    isRecord(value) &&
+    isString(value.format) &&
+    isFiniteNumber(value.formatVersion) &&
+    isString(value.createdAt) &&
+    isString(value.appVersion) &&
+    isString(value.appChannel) &&
+    isRecord(value.scope) &&
+    isBoolean(value.scope.databaseIncluded) &&
+    isBoolean(value.scope.libraryConfigIncluded) &&
+    isBoolean(value.scope.userAssetsIncluded) &&
+    isBoolean(value.scope.mediaFilesIncluded) &&
+    isStringArray(value.schemaMigrations) &&
+    Array.isArray(value.files) &&
+    value.files.every((file) =>
+      isRecord(file) &&
+      isString(file.kind) &&
+      isString(file.path) &&
+      isFiniteNumber(file.sizeBytes) &&
+      isString(file.sha256),
+    )
+  )
+}
+
+export function isBackupVerificationDTO(value: unknown): value is BackupVerificationDTO {
+  return (
+    isRecord(value) &&
+    isBoolean(value.valid) &&
+    isString(value.checkedAt) &&
+    (value.manifest === undefined || isBackupManifestDTO(value.manifest)) &&
+    isRecord(value.databaseIntegrity) &&
+    isString(value.databaseIntegrity.quickCheck) &&
+    isFiniteNumber(value.databaseIntegrity.foreignKeyViolations) &&
+    isStringArray(value.errors) &&
+    isStringArray(value.warnings)
+  )
+}
+
+export function isBackupRestorePreflightDTO(value: unknown): value is BackupRestorePreflightDTO {
+  return (
+    isRecord(value) &&
+    isBoolean(value.canRestore) &&
+    isString(value.checkedAt) &&
+    isBackupVerificationDTO(value.verification) &&
+    isString(value.targetDatabase) &&
+    isBoolean(value.targetDatabaseExists) &&
+    isOptionalString(value.targetConfig) &&
+    isBoolean(value.targetConfigExists) &&
+    isFiniteNumber(value.requiredBytes) &&
+    isFiniteNumber(value.availableBytes) &&
+    isBoolean(value.availableBytesKnown) &&
+    isStringArray(value.unsupportedMigrations) &&
+    isStringArray(value.errors) &&
+    isStringArray(value.warnings)
   )
 }
 

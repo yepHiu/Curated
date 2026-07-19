@@ -1,6 +1,9 @@
 import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
+  BackupManifestDTO,
+  BackupRestorePreflightDTO,
+  BackupVerificationDTO,
   CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
@@ -498,6 +501,18 @@ function createWebLibraryService(): LibraryService {
         refreshLibraryPathStorageStatusesFromApi(),
         refreshCuratedFramesCountFromApi(),
       ])
+    },
+
+    async createBackup(destinationPath: string): Promise<BackupManifestDTO> {
+      return api.createBackup({ destinationPath: destinationPath.trim() })
+    },
+
+    async verifyBackup(backupPath: string): Promise<BackupVerificationDTO> {
+      return api.verifyBackup({ backupPath: backupPath.trim() })
+    },
+
+    async preflightBackupRestore(backupPath: string): Promise<BackupRestorePreflightDTO> {
+      return api.preflightBackupRestore({ backupPath: backupPath.trim() })
     },
 
     async checkLibraryPathStorageStatus(libraryPathIds?: string[]) {

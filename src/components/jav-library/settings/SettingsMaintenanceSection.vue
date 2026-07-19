@@ -9,9 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import SettingsBackupSection from "./SettingsBackupSection.vue"
 
 defineProps<{
   fullScanBusy: boolean
+  backupSupported: boolean
 }>()
 
 const emit = defineEmits<{
@@ -23,6 +25,10 @@ const { t } = useI18n()
 
 <template>
   <div class="flex w-full flex-col gap-6">
+    <div class="break-inside-avoid">
+      <SettingsBackupSection :supported="backupSupported" />
+    </div>
+
     <div class="break-inside-avoid">
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">

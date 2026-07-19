@@ -22,6 +22,9 @@ var ErrScrapeMovieNoLocation = errors.New("movie has no video path")
 // ErrActorNotFound is returned when no actors row exists for the given display name.
 var ErrActorNotFound = errors.New("actor not found")
 
+// ErrBackupDestinationExists prevents accidental replacement of a backup package.
+var ErrBackupDestinationExists = errors.New("backup destination already exists")
+
 // Command represents a request message in the stdio JSONL transport.
 type Command struct {
 	ID      string          `json:"id"`
@@ -133,6 +136,71 @@ type AppUpdateStatusDTO struct {
 // AppUpdateInstallRequest is the body for POST /api/app-update/install.
 type AppUpdateInstallRequest struct {
 	Mode string `json:"mode,omitempty"`
+}
+
+// BackupCreateRequest creates a new package at a server-side path.
+type BackupCreateRequest struct {
+	DestinationPath string `json:"destinationPath"`
+}
+
+// BackupPathRequest identifies an existing backup package.
+type BackupPathRequest struct {
+	BackupPath string `json:"backupPath"`
+}
+
+type BackupScopeDTO struct {
+	DatabaseIncluded      bool `json:"databaseIncluded"`
+	LibraryConfigIncluded bool `json:"libraryConfigIncluded"`
+	UserAssetsIncluded    bool `json:"userAssetsIncluded"`
+	MediaFilesIncluded    bool `json:"mediaFilesIncluded"`
+}
+
+type BackupFileDTO struct {
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"sizeBytes"`
+	SHA256    string `json:"sha256"`
+}
+
+type BackupManifestDTO struct {
+	Format           string          `json:"format"`
+	FormatVersion    int             `json:"formatVersion"`
+	CreatedAt        string          `json:"createdAt"`
+	AppVersion       string          `json:"appVersion"`
+	AppChannel       string          `json:"appChannel"`
+	Scope            BackupScopeDTO  `json:"scope"`
+	SchemaMigrations []string        `json:"schemaMigrations"`
+	Files            []BackupFileDTO `json:"files"`
+}
+
+type BackupIntegrityDTO struct {
+	QuickCheck           string `json:"quickCheck"`
+	ForeignKeyViolations int    `json:"foreignKeyViolations"`
+}
+
+type BackupVerificationDTO struct {
+	Valid             bool               `json:"valid"`
+	CheckedAt         string             `json:"checkedAt"`
+	Manifest          *BackupManifestDTO `json:"manifest,omitempty"`
+	DatabaseIntegrity BackupIntegrityDTO `json:"databaseIntegrity"`
+	Errors            []string           `json:"errors"`
+	Warnings          []string           `json:"warnings"`
+}
+
+type BackupRestorePreflightDTO struct {
+	CanRestore            bool                  `json:"canRestore"`
+	CheckedAt             string                `json:"checkedAt"`
+	Verification          BackupVerificationDTO `json:"verification"`
+	TargetDatabase        string                `json:"targetDatabase"`
+	TargetDatabaseExists  bool                  `json:"targetDatabaseExists"`
+	TargetConfig          string                `json:"targetConfig,omitempty"`
+	TargetConfigExists    bool                  `json:"targetConfigExists"`
+	RequiredBytes         int64                 `json:"requiredBytes"`
+	AvailableBytes        uint64                `json:"availableBytes"`
+	AvailableBytesKnown   bool                  `json:"availableBytesKnown"`
+	UnsupportedMigrations []string              `json:"unsupportedMigrations"`
+	Errors                []string              `json:"errors"`
+	Warnings              []string              `json:"warnings"`
 }
 
 // ListMoviesRequest filters the library movie listing by mode, query, actor, group, or studio.
@@ -988,6 +1056,12 @@ const (
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"
+
+	ErrorCodeBackupInvalidRequest  = "BACKUP_INVALID_REQUEST"
+	ErrorCodeBackupConflict        = "BACKUP_CONFLICT"
+	ErrorCodeBackupCreateFailed    = "BACKUP_CREATE_FAILED"
+	ErrorCodeBackupVerifyFailed    = "BACKUP_VERIFY_FAILED"
+	ErrorCodeBackupPreflightFailed = "BACKUP_PREFLIGHT_FAILED"
 
 	// Curated frames export
 	ErrorCodeCuratedExportActorMismatch = "CURATED_EXPORT_ACTOR_MISMATCH"

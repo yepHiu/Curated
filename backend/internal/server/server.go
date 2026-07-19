@@ -189,6 +189,12 @@ type AppUpdateProvider interface {
 	ClearDownloadedAppUpdateInstaller(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
 }
 
+type BackupProvider interface {
+	CreateBackup(ctx context.Context, destinationPath string) (contracts.BackupManifestDTO, error)
+	VerifyBackup(ctx context.Context, backupPath string) (contracts.BackupVerificationDTO, error)
+	PreflightBackupRestore(ctx context.Context, backupPath string) (contracts.BackupRestorePreflightDTO, error)
+}
+
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
 	cfg                         config.Config
@@ -217,6 +223,7 @@ type Handler struct {
 	nativePlaybackLauncher      NativePlaybackLauncher
 	homepageRecommendations     HomepageRecommendationsProvider
 	appUpdateProvider           AppUpdateProvider
+	backupProvider              BackupProvider
 	importUploads               *movieImportUploadSessionStore
 	clientTracker               *clienttracker.Tracker
 	authAttempts                *authAttemptLimiter
@@ -250,6 +257,7 @@ type Deps struct {
 	NativePlaybackLauncher           NativePlaybackLauncher
 	HomepageRecommendations          HomepageRecommendationsProvider
 	AppUpdateProvider                AppUpdateProvider
+	BackupProvider                   BackupProvider
 	ClientTracker                    *clienttracker.Tracker
 }
 
@@ -286,6 +294,7 @@ func NewHandler(deps Deps) *Handler {
 		nativePlaybackLauncher:      deps.NativePlaybackLauncher,
 		homepageRecommendations:     deps.HomepageRecommendations,
 		appUpdateProvider:           deps.AppUpdateProvider,
+		backupProvider:              deps.BackupProvider,
 		importUploads:               newMovieImportUploadSessionStore(),
 		clientTracker:               tracker,
 		authAttempts:                newAuthAttemptLimiter(),
@@ -314,6 +323,9 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/app-update/download", h.handleDownloadAppUpdateInstaller)
 	mux.HandleFunc("POST /api/app-update/install", h.handleInstallAppUpdate)
 	mux.HandleFunc("DELETE /api/app-update/downloaded-installer", h.handleClearDownloadedAppUpdateInstaller)
+	mux.HandleFunc("POST /api/maintenance/backups", h.handleCreateBackup)
+	mux.HandleFunc("POST /api/maintenance/backups/verify", h.handleVerifyBackup)
+	mux.HandleFunc("POST /api/maintenance/backups/preflight", h.handlePreflightBackupRestore)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

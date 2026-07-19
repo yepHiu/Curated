@@ -8,11 +8,24 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
+vi.mock("@/lib/pick-directory", () => ({
+  pickLibraryDirectory: vi.fn(),
+}))
+
+vi.mock("@/services/library-service", () => ({
+  useLibraryService: () => ({
+    createBackup: vi.fn(),
+    verifyBackup: vi.fn(),
+    preflightBackupRestore: vi.fn(),
+  }),
+}))
+
 describe("SettingsMaintenanceSection", () => {
   it("renders maintenance actions and emits full scan requests", async () => {
     const wrapper = mount(SettingsMaintenanceSection, {
       props: {
         fullScanBusy: false,
+        backupSupported: false,
       },
     })
 
@@ -28,6 +41,7 @@ describe("SettingsMaintenanceSection", () => {
     const wrapper = mount(SettingsMaintenanceSection, {
       props: {
         fullScanBusy: true,
+        backupSupported: false,
       },
     })
 

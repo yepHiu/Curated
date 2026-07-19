@@ -3,10 +3,14 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"curated-backend/internal/storage"
 )
+
+// ErrDestinationExists prevents backup creation from overwriting a package.
+var ErrDestinationExists = errors.New("backup destination already exists")
 
 const (
 	FormatName               = "curated-backup"

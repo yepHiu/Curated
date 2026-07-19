@@ -329,6 +329,69 @@ export interface BackendLogSettingsDTO {
   logLevel?: string
 }
 
+export interface BackupScopeDTO {
+  databaseIncluded: boolean
+  libraryConfigIncluded: boolean
+  userAssetsIncluded: boolean
+  mediaFilesIncluded: boolean
+}
+
+export interface BackupFileDTO {
+  kind: string
+  path: string
+  sizeBytes: number
+  sha256: string
+}
+
+export interface BackupManifestDTO {
+  format: string
+  formatVersion: number
+  createdAt: string
+  appVersion: string
+  appChannel: string
+  scope: BackupScopeDTO
+  schemaMigrations: string[]
+  files: BackupFileDTO[]
+}
+
+export interface BackupIntegrityDTO {
+  quickCheck: string
+  foreignKeyViolations: number
+}
+
+export interface BackupVerificationDTO {
+  valid: boolean
+  checkedAt: string
+  manifest?: BackupManifestDTO
+  databaseIntegrity: BackupIntegrityDTO
+  errors: string[]
+  warnings: string[]
+}
+
+export interface BackupRestorePreflightDTO {
+  canRestore: boolean
+  checkedAt: string
+  verification: BackupVerificationDTO
+  targetDatabase: string
+  targetDatabaseExists: boolean
+  targetConfig?: string
+  targetConfigExists: boolean
+  requiredBytes: number
+  availableBytes: number
+  availableBytesKnown: boolean
+  unsupportedMigrations: string[]
+  errors: string[]
+  warnings: string[]
+}
+
+export interface BackupCreateBody {
+  destinationPath: string
+}
+
+export interface BackupPathBody {
+  backupPath: string
+}
+
 /** PATCH backendLog 的字段；省略表示不修改 */
 export interface PatchBackendLogBody {
   logDir?: string

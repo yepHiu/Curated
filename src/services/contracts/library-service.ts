@@ -4,6 +4,9 @@ import type {
   ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
+  BackupManifestDTO,
+  BackupRestorePreflightDTO,
+  BackupVerificationDTO,
   ConnectedClientsDTO,
   CuratedFrameExportFormat,
   HealthDTO,
@@ -92,6 +95,9 @@ export interface LibraryService {
   patchBackendLog(patch: PatchBackendLogBody): Promise<void>
   listConnectedClients(): Promise<ConnectedClientsDTO>
   health(): Promise<HealthDTO>
+  createBackup(destinationPath: string): Promise<BackupManifestDTO>
+  verifyBackup(backupPath: string): Promise<BackupVerificationDTO>
+  preflightBackupRestore(backupPath: string): Promise<BackupRestorePreflightDTO>
   pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProvider(name: string): Promise<ProviderHealthDTO>

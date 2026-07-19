@@ -237,6 +237,55 @@ func TestCreateRejectsInvalidLibraryConfigWithoutCreatingPackage(t *testing.T) {
 	}
 }
 
+func TestCreateNeverOverwritesExistingPackage(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	store := openMigratedStore(t, filepath.Join(root, "source.db"))
+	defer func() { _ = store.Close() }()
+	backupPath := filepath.Join(root, "existing.curated-backup")
+	original := []byte("keep this package\n")
+	if err := os.WriteFile(backupPath, original, 0o600); err != nil {
+		t.Fatalf("write existing package: %v", err)
+	}
+
+	if _, err := Create(ctx, CreateOptions{Store: store, DestinationPath: backupPath}); !errors.Is(err, ErrDestinationExists) {
+		t.Fatalf("Create error = %v, want ErrDestinationExists", err)
+	}
+	contents, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("read existing package: %v", err)
+	}
+	if !bytes.Equal(contents, original) {
+		t.Fatalf("existing package was replaced: %q", contents)
+	}
+}
+
+func TestCommitPackageFallsBackWhenHardLinksAreUnavailable(t *testing.T) {
+	root := t.TempDir()
+	tempPath := filepath.Join(root, ".completed.tmp")
+	destination := filepath.Join(root, "portable-drive.curated-backup")
+	contents := []byte("complete backup package\n")
+	if err := os.WriteFile(tempPath, contents, 0o600); err != nil {
+		t.Fatalf("write completed package: %v", err)
+	}
+	linkUnavailable := func(string, string) error { return errors.New("hard links unavailable") }
+
+	if err := commitPackageWithoutOverwrite(tempPath, destination, linkUnavailable); err != nil {
+		t.Fatalf("commitPackageWithoutOverwrite: %v", err)
+	}
+	committed, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("read committed package: %v", err)
+	}
+	if !bytes.Equal(committed, contents) {
+		t.Fatalf("committed package = %q, want %q", committed, contents)
+	}
+
+	if err := commitPackageWithoutOverwrite(tempPath, destination, linkUnavailable); !errors.Is(err, ErrDestinationExists) {
+		t.Fatalf("second commit error = %v, want ErrDestinationExists", err)
+	}
+}
+
 func openMigratedStore(t *testing.T, databasePath string) *storage.SQLiteStore {
 	t.Helper()
 	store, err := storage.NewSQLiteStore(databasePath)

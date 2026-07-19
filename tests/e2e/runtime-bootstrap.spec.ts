@@ -247,3 +247,257 @@ test("locked startup defers protected hydration until a successful unlock", asyn
   expect(unknownApiRequests).toEqual([])
   expect(consoleErrors).toEqual([])
 })
+
+test("maintenance backup flow creates verifies and preflights without online restore", async ({ page }) => {
+  const consoleErrors: string[] = []
+  const pageErrors: string[] = []
+  const unknownApiRequests: string[] = []
+  const backupPaths: string[] = []
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text())
+  })
+  page.on("pageerror", (error) => pageErrors.push(error.message))
+  await hideDevPerformanceBar(page)
+  await stubEventSource(page)
+
+  const manifest = {
+    format: "curated-backup",
+    formatVersion: 1,
+    createdAt: "2026-07-20T02:00:00Z",
+    appVersion: "1.4.11",
+    appChannel: "test",
+    scope: {
+      databaseIncluded: true,
+      libraryConfigIncluded: true,
+      userAssetsIncluded: false,
+      mediaFilesIncluded: false,
+    },
+    schemaMigrations: ["0001_init.sql", "0027_auth_session_public_ids.sql"],
+    files: [
+      {
+        kind: "database",
+        path: "database/curated.db",
+        sizeBytes: 1_048_576,
+        sha256: "a".repeat(64),
+      },
+    ],
+  }
+  const verification = {
+    valid: true,
+    checkedAt: "2026-07-20T02:01:00Z",
+    manifest,
+    databaseIntegrity: { quickCheck: "ok", foreignKeyViolations: 0 },
+    errors: [],
+    warnings: [],
+  }
+
+  await page.route(/^https?:\/\/[^/]+\/api\//, async (route: Route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (path === "/api/auth/status") {
+      await route.fulfill({
+        json: {
+          pinEnabled: true,
+          unlocked: true,
+          setupRequired: false,
+          pinLength: 4,
+          trustedForever: false,
+          sessionTtlMinutes: 60,
+          lanRequiresPin: true,
+          lockOnRestart: true,
+        },
+      })
+      return
+    }
+    if (path === "/api/library/movies") {
+      await route.fulfill({ json: { items: [], limit: 500, offset: 0, total: 0 } })
+      return
+    }
+    if (path === "/api/playback/progress") {
+      await route.fulfill({ json: { items: [] } })
+      return
+    }
+    if (path === "/api/library/played-movies") {
+      await route.fulfill({ json: { movieIds: [] } })
+      return
+    }
+    if (path === "/api/settings") {
+      await route.fulfill({
+        json: {
+          libraryPaths: [],
+          defaultImportLibraryPathId: "",
+          player: {
+            hardwareDecode: false,
+            hardwareEncoder: "auto",
+            nativePlayerPreset: "custom",
+            nativePlayerEnabled: false,
+            streamPushEnabled: false,
+            forceStreamPush: false,
+            preferNativePlayer: false,
+            seekForwardStepSec: 10,
+            seekBackwardStepSec: 10,
+          },
+          organizeLibrary: false,
+          autoLibraryWatch: false,
+          autoActorProfileScrape: false,
+          autoDownloadUpdates: false,
+          launchAtLogin: false,
+          launchAtLoginSupported: false,
+          curatedFrameExportFormat: "jpg",
+          metadataMovieProvider: "",
+          metadataMovieProviders: [],
+          metadataMovieProviderChain: [],
+          metadataMovieScrapeMode: "auto",
+          metadataMovieStrategy: "auto-global",
+          proxy: { enabled: false },
+          backendLog: { logDir: "", logLevel: "info" },
+        },
+      })
+      return
+    }
+    if (path === "/api/library/paths/storage-status" || path === "/api/library/paths/storage-status/check") {
+      await route.fulfill({ json: { items: [] } })
+      return
+    }
+    if (path === "/api/curated-frames/stats") {
+      await route.fulfill({ json: { total: 0 } })
+      return
+    }
+    if (path === "/api/tasks/recent") {
+      await route.fulfill({ json: { tasks: [] } })
+      return
+    }
+    if (path === "/api/app-update/status") {
+      await route.fulfill({ json: { supported: false, status: "unsupported" } })
+      return
+    }
+    if (path === "/api/health") {
+      await route.fulfill({
+        json: {
+          name: "curated-e2e",
+          version: "e2e",
+          channel: "test",
+          transport: "http",
+          databasePath: "D:\\Curated\\curated.db",
+        },
+      })
+      return
+    }
+    if (path === "/api/connected-clients") {
+      await route.fulfill({
+        json: {
+          clients: [],
+          total: 0,
+          localCount: 0,
+          remoteCount: 0,
+          sampledAt: "2026-07-20T02:00:00Z",
+        },
+      })
+      return
+    }
+    if (path === "/api/playback/watch-time/daily") {
+      await route.fulfill({
+        json: {
+          items: [],
+          totalWatchedSec: 0,
+          activeDays: 0,
+          maxDayWatchedSec: 0,
+          longestStreakDays: 0,
+        },
+      })
+      return
+    }
+    if (path === "/api/dev/performance") {
+      await route.fulfill({
+        json: {
+          supported: true,
+          sampledAt: "2026-07-20T02:00:00Z",
+          systemCpuPercent: 0,
+          backendCpuPercent: 0,
+        },
+      })
+      return
+    }
+    if (path === "/api/maintenance/backups" && request.method() === "POST") {
+      const body = request.postDataJSON() as { destinationPath: string }
+      backupPaths.push(body.destinationPath)
+      await route.fulfill({ status: 201, json: manifest })
+      return
+    }
+    if (path === "/api/maintenance/backups/verify") {
+      await route.fulfill({ json: verification })
+      return
+    }
+    if (path === "/api/maintenance/backups/preflight") {
+      await route.fulfill({
+        json: {
+          canRestore: true,
+          checkedAt: "2026-07-20T02:02:00Z",
+          verification,
+          targetDatabase: "D:\\Curated\\curated.db",
+          targetDatabaseExists: true,
+          targetConfig: "D:\\Curated\\library-config.cfg",
+          targetConfigExists: true,
+          requiredBytes: 2_097_152,
+          availableBytes: 10_737_418_240,
+          availableBytesKnown: true,
+          unsupportedMigrations: [],
+          errors: [],
+          warnings: ["backup does not include media source files"],
+        },
+      })
+      return
+    }
+
+    unknownApiRequests.push(`${request.method()} ${apiPath(request.url())}`)
+    await route.fulfill({
+      status: 404,
+      json: { code: "E2E_UNSTUBBED", message: "Unstubbed e2e request", retryable: false },
+    })
+  })
+
+  await page.goto(`${WEB_BASE_URL}/#/settings?section=maintenance`, {
+    waitUntil: "domcontentloaded",
+  })
+  const pathInput = page.locator("[data-settings-backup-path]")
+  await expect(pathInput).toBeVisible()
+  await pathInput.fill("D:\\Backups\\curated-e2e")
+  await page.locator("[data-settings-backup-create]").click()
+  await expect(page.getByText(/验证通过|Verified|検証済み/)).toBeVisible()
+  expect(backupPaths).toEqual(["D:\\Backups\\curated-e2e.curated-backup"])
+
+  await page.locator("[data-settings-backup-preflight]").click()
+  await expect(page.getByText(/可以离线恢复|Ready for offline restore|オフライン復元可能/)).toBeVisible()
+  await expect(page.locator("[data-settings-backup-restore]")).toHaveCount(0)
+
+  const desktopHasHorizontalOverflow = await page.evaluate(() => {
+    const root = document.documentElement
+    return root.scrollWidth > root.clientWidth + 1
+  })
+  expect(desktopHasHorizontalOverflow).toBe(false)
+
+  await page.setViewportSize({ width: 375, height: 812 })
+  await expect(pathInput).toBeVisible()
+  const mobileHasHorizontalOverflow = await page.evaluate(() => {
+    const root = document.documentElement
+    return root.scrollWidth > root.clientWidth + 1
+  })
+  expect(mobileHasHorizontalOverflow).toBe(false)
+  for (const selector of [
+    "[data-settings-backup-pick]",
+    "[data-settings-backup-create]",
+    "[data-settings-backup-verify]",
+    "[data-settings-backup-preflight]",
+  ]) {
+    const bounds = await page.locator(selector).boundingBox()
+    expect(bounds?.height, selector).toBeGreaterThanOrEqual(44)
+  }
+  expect(unknownApiRequests).toEqual([])
+  expect(consoleErrors).toEqual([])
+  expect(pageErrors).toEqual([])
+
+  const screenshotPath = process.env.CURATED_BACKUP_E2E_SCREENSHOT
+  if (screenshotPath) {
+    await page.screenshot({ path: screenshotPath, fullPage: false })
+  }
+})

@@ -2600,6 +2600,7 @@ func (a *App) HTTPHandler() http.Handler {
 		NativePlaybackLauncher:           a,
 		HomepageRecommendations:          a,
 		AppUpdateProvider:                a,
+		BackupProvider:                   a,
 		LibraryPathStorageStatusProvider: a,
 	}).Routes()
 	return webui.WrapHandler(apiHandler)

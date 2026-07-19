@@ -32,7 +32,7 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 		return manifest, fmt.Errorf("resolve backup destination: %w", err)
 	}
 	if _, err := os.Stat(absDestination); err == nil {
-		return manifest, fmt.Errorf("backup destination already exists: %s", absDestination)
+		return manifest, fmt.Errorf("%w: %s", ErrDestinationExists, absDestination)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return manifest, fmt.Errorf("inspect backup destination: %w", err)
 	}
@@ -146,12 +146,9 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("create temporary backup package: %w", err)
 	}
 	tempPath := tempFile.Name()
-	committed := false
 	defer func() {
 		_ = tempFile.Close()
-		if !committed {
-			_ = os.Remove(tempPath)
-		}
+		_ = os.Remove(tempPath)
 	}()
 	if err := tempFile.Chmod(0o600); err != nil {
 		return Manifest{}, fmt.Errorf("restrict backup package permissions: %w", err)
@@ -177,11 +174,53 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 	if err := tempFile.Close(); err != nil {
 		return Manifest{}, fmt.Errorf("close backup package: %w", err)
 	}
-	if err := os.Rename(tempPath, absDestination); err != nil {
-		return Manifest{}, fmt.Errorf("commit backup package: %w", err)
+	if err := commitPackageWithoutOverwrite(tempPath, absDestination, os.Link); err != nil {
+		return Manifest{}, err
+	}
+	return manifest, nil
+}
+
+func commitPackageWithoutOverwrite(tempPath, destination string, linkFile func(string, string) error) error {
+	// The temporary package lives beside the destination. A hard link is the
+	// atomic fast path and, unlike os.Rename on Unix, never replaces a racing
+	// destination. Filesystems without hard-link support (for example exFAT)
+	// fall back to an O_EXCL copy that keeps the same no-overwrite guarantee.
+	if err := linkFile(tempPath, destination); err == nil {
+		return nil
+	} else if errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("%w: %s", ErrDestinationExists, destination)
+	}
+
+	source, err := os.Open(tempPath)
+	if err != nil {
+		return fmt.Errorf("open completed backup package: %w", err)
+	}
+	defer func() { _ = source.Close() }()
+	target, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("%w: %s", ErrDestinationExists, destination)
+	}
+	if err != nil {
+		return fmt.Errorf("create backup destination: %w", err)
+	}
+	committed := false
+	defer func() {
+		_ = target.Close()
+		if !committed {
+			_ = os.Remove(destination)
+		}
+	}()
+	if _, err := io.Copy(target, source); err != nil {
+		return fmt.Errorf("copy backup package to destination: %w", err)
+	}
+	if err := target.Sync(); err != nil {
+		return fmt.Errorf("sync backup destination: %w", err)
+	}
+	if err := target.Close(); err != nil {
+		return fmt.Errorf("close backup destination: %w", err)
 	}
 	committed = true
-	return manifest, nil
+	return nil
 }
 
 func writePrivateFile(filePath string, contents []byte) error {

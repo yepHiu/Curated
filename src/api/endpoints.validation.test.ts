@@ -222,6 +222,86 @@ describe("api endpoint response validation", () => {
     expect(post).toHaveBeenCalledWith("/auth/sessions/revoke-others", {})
   })
 
+  it("validates backup create verify and preflight responses", async () => {
+    const manifest = {
+      format: "curated-backup",
+      formatVersion: 1,
+      createdAt: "2026-07-20T02:00:00Z",
+      appVersion: "1.4.11",
+      appChannel: "dev",
+      scope: {
+        databaseIncluded: true,
+        libraryConfigIncluded: true,
+        userAssetsIncluded: false,
+        mediaFilesIncluded: false,
+      },
+      schemaMigrations: ["0001_init.sql"],
+      files: [
+        {
+          kind: "database",
+          path: "database/curated.db",
+          sizeBytes: 1024,
+          sha256: "a".repeat(64),
+        },
+      ],
+    }
+    const verification = {
+      valid: true,
+      checkedAt: "2026-07-20T02:01:00Z",
+      manifest,
+      databaseIntegrity: { quickCheck: "ok", foreignKeyViolations: 0 },
+      errors: [],
+      warnings: [],
+    }
+    const preflight = {
+      canRestore: true,
+      checkedAt: "2026-07-20T02:02:00Z",
+      verification,
+      targetDatabase: "D:\\Curated\\curated.db",
+      targetDatabaseExists: true,
+      targetConfig: "D:\\Curated\\library-config.cfg",
+      targetConfigExists: true,
+      requiredBytes: 2048,
+      availableBytes: 4096,
+      availableBytesKnown: true,
+      unsupportedMigrations: [],
+      errors: [],
+      warnings: [],
+    }
+    const post = vi.spyOn(httpClient, "post")
+    post.mockResolvedValueOnce(manifest)
+    post.mockResolvedValueOnce(verification)
+    post.mockResolvedValueOnce(preflight)
+
+    await expect(api.createBackup({ destinationPath: "D:\\Backups\\curated.curated-backup" })).resolves.toEqual(manifest)
+    await expect(api.verifyBackup({ backupPath: "D:\\Backups\\curated.curated-backup" })).resolves.toEqual(verification)
+    await expect(api.preflightBackupRestore({ backupPath: "D:\\Backups\\curated.curated-backup" })).resolves.toEqual(preflight)
+
+    expect(post).toHaveBeenNthCalledWith(1, "/maintenance/backups", {
+      destinationPath: "D:\\Backups\\curated.curated-backup",
+    })
+    expect(post).toHaveBeenNthCalledWith(2, "/maintenance/backups/verify", {
+      backupPath: "D:\\Backups\\curated.curated-backup",
+    })
+    expect(post).toHaveBeenNthCalledWith(3, "/maintenance/backups/preflight", {
+      backupPath: "D:\\Backups\\curated.curated-backup",
+    })
+  })
+
+  it("rejects malformed backup verification responses", async () => {
+    vi.spyOn(httpClient, "post").mockResolvedValueOnce({
+      valid: true,
+      checkedAt: "2026-07-20T02:01:00Z",
+      databaseIntegrity: { quickCheck: "ok" },
+      errors: [],
+      warnings: [],
+    })
+
+    await expect(api.verifyBackup({ backupPath: "D:\\bad.curated-backup" })).rejects.toThrow(
+      "Invalid API response for POST /maintenance/backups/verify",
+    )
+  })
+
   it("keeps small movie imports on the multipart endpoint", async () => {
     const task = {
       taskId: "import.movies-1",

@@ -704,6 +704,18 @@ export const mockLibraryService: LibraryService = {
     }
   },
 
+  async createBackup(): Promise<never> {
+    throw new Error("Backup maintenance requires Web API mode")
+  },
+
+  async verifyBackup(): Promise<never> {
+    throw new Error("Backup maintenance requires Web API mode")
+  },
+
+  async preflightBackupRestore(): Promise<never> {
+    throw new Error("Backup maintenance requires Web API mode")
+  },
+
   async listConnectedClients(): Promise<ConnectedClientsDTO> {
     return buildMockConnectedClients()
   },
