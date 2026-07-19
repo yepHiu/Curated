@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run --configLoader native --pool threads",
     "test:electron": "vitest run --config vitest.electron.config.ts --configLoader native --pool threads",
+    "test:e2e": "playwright test --config playwright.e2e.config.ts",
     "test:display": "playwright test tests/display-scaling/display-scaling.spec.ts",
     "build": "pnpm typecheck && vite build --configLoader native",
     "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs",

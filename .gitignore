@@ -38,6 +38,8 @@ test-results/
 .env
 .env.*
 !.env.example
+!.env.e2e-mock
+!.env.e2e-web
 backend/runtime/
 backend/frontend-dist/
 .gocache/
