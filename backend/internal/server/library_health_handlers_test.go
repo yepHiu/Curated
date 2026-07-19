@@ -140,6 +140,66 @@ func TestLibraryHealthScanDoesNotCallOfflineMovieMissing(t *testing.T) {
 	}
 }
 
+func TestLibraryHealthScanReturnsEmptyFindingsAsJSONArray(t *testing.T) {
+	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "health-empty.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	h := NewHandler(Deps{
+		Cfg:                              config.Default(),
+		Logger:                           zap.NewNop(),
+		Store:                            store,
+		LibraryPathStorageStatusProvider: &libraryHealthStorageProvider{items: []contracts.LibraryPathStorageStatusDTO{}},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	report := requestLibraryHealthReport(t, srv.URL+"/api/library/health/scan")
+	if report.Findings == nil {
+		t.Fatal("findings decoded as nil; API must return [] rather than null for an empty healthy report")
+	}
+	if len(report.Findings) != 0 || report.Summary.TotalFindings != 0 || report.Status != "healthy" {
+		t.Fatalf("empty report = %#v", report)
+	}
+}
+
+func TestIsMovieMetadataMissingDoesNotRequeueSuccessfulScrapeWithoutSummary(t *testing.T) {
+	tests := []struct {
+		name  string
+		movie storage.LibraryHealthMovieRecord
+		want  bool
+	}{
+		{
+			name:  "unresolved scan placeholder",
+			movie: storage.LibraryHealthMovieRecord{Summary: "Metadata pending scrape."},
+			want:  true,
+		},
+		{
+			name:  "successful provider with empty scraped summary",
+			movie: storage.LibraryHealthMovieRecord{Provider: "javbus", Summary: "Metadata pending scrape."},
+			want:  false,
+		},
+		{
+			name:  "locally completed summary",
+			movie: storage.LibraryHealthMovieRecord{Summary: "Curated metadata"},
+			want:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isMovieMetadataMissing(tt.movie); got != tt.want {
+				t.Fatalf("isMovieMetadataMissing(%#v) = %v, want %v", tt.movie, got, tt.want)
+			}
+		})
+	}
+}
+
 func requestLibraryHealthReport(t *testing.T, url string) contracts.LibraryHealthReportDTO {
 	t.Helper()
 	resp, err := http.Post(url, "application/json", http.NoBody)

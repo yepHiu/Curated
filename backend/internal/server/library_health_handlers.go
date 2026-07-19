@@ -37,7 +37,8 @@ type libraryHealthCollector struct {
 
 func newLibraryHealthCollector(limit int) *libraryHealthCollector {
 	return &libraryHealthCollector{
-		limit: limit,
+		limit:    limit,
+		findings: make([]contracts.LibraryHealthFindingDTO, 0),
 		summary: contracts.LibraryHealthSummaryDTO{
 			CategoryCounts: make(map[string]int),
 		},
@@ -456,7 +457,8 @@ func normalizeLibraryHealthPath(path string) string {
 }
 
 func isMovieMetadataMissing(movie storage.LibraryHealthMovieRecord) bool {
-	return strings.EqualFold(strings.TrimSpace(movie.Summary), "Metadata pending scrape.")
+	return strings.TrimSpace(movie.Provider) == "" &&
+		strings.EqualFold(strings.TrimSpace(movie.Summary), "Metadata pending scrape.")
 }
 
 func hasMoviePosterAsset(types map[string]bool) bool {
