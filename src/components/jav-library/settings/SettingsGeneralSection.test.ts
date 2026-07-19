@@ -115,6 +115,19 @@ describe("SettingsGeneralSection", () => {
     expect(wrapper.text()).toContain("settings.autoDownloadUpdatesTitle")
     expect(wrapper.text()).toContain("settings.launchAtLoginTitle")
     expect(wrapper.get("[data-logging]").attributes("data-auto-save-ready")).toBe("true")
+    const selectedValues = wrapper.findAllComponents({ name: "SelectValue" })
+    expect(selectedValues[0]?.text()).toBe("settings.langZh")
+    expect(selectedValues[1]?.text()).toBe("settings.themeSystem")
+  })
+
+  it("updates translated selected-value labels when locale and theme props change", async () => {
+    const wrapper = mount(SettingsGeneralSection, { props: baseProps })
+
+    await wrapper.setProps({ locale: "en", themePreference: "dark" })
+
+    const selectedValues = wrapper.findAllComponents({ name: "SelectValue" })
+    expect(selectedValues[0]?.text()).toBe("settings.langEn")
+    expect(selectedValues[1]?.text()).toBe("settings.themeDark")
   })
 
   it("emits setting changes from controls", async () => {

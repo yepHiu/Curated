@@ -84,6 +84,12 @@ const backendLogMaxAgeSelectItems = computed(() => {
   return items
 })
 
+const selectedBackendLogMaxAgeLabel = computed(() => (
+  backendLogMaxAgeSelectItems.value.find(
+    (item) => item.value === backendLogMaxAgeDaysChoice.value,
+  )?.label ?? backendLogMaxAgeDaysChoice.value
+))
+
 function syncBackendLogDraftFromService() {
   const b = libraryService.backendLog.value
   backendLogDirDraft.value = (b.logDir ?? "").trim()
@@ -326,7 +332,7 @@ onBeforeUnmount(() => {
                 class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
                 :aria-label="t('settings.backendLogMaxAge')"
               >
-                <SelectValue />
+                <SelectValue>{{ selectedBackendLogMaxAgeLabel }}</SelectValue>
               </SelectTrigger>
               <SelectContent align="end" class="rounded-xl border-border/50">
                 <SelectItem
@@ -353,7 +359,7 @@ onBeforeUnmount(() => {
                 class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
                 :aria-label="t('settings.backendLogLevel')"
               >
-                <SelectValue />
+                <SelectValue>{{ backendLogLevelDraft }}</SelectValue>
               </SelectTrigger>
               <SelectContent align="end" class="rounded-xl border-border/50">
                 <SelectItem
@@ -426,7 +432,7 @@ onBeforeUnmount(() => {
                 class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
                 :aria-label="t('settings.clientLogLevel')"
               >
-                <SelectValue />
+                <SelectValue>{{ clientLogLevelUi }}</SelectValue>
               </SelectTrigger>
               <SelectContent class="rounded-xl border-border/50">
                 <SelectItem

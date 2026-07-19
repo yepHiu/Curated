@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import { Languages, Power, RefreshCw } from "lucide-vue-next"
 import {
@@ -20,7 +21,7 @@ import SettingsLoggingSection from "./SettingsLoggingSection.vue"
 
 type ThemePreference = "light" | "dark" | "system"
 
-defineProps<{
+const props = defineProps<{
   locale: string
   themePreference: ThemePreference
   autoDownloadUpdates: boolean
@@ -42,6 +43,18 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const selectedLocaleLabel = computed(() => {
+  if (props.locale === "en") return t("settings.langEn")
+  if (props.locale === "ja") return t("settings.langJa")
+  return t("settings.langZh")
+})
+
+const selectedThemeLabel = computed(() => {
+  if (props.themePreference === "light") return t("settings.themeLight")
+  if (props.themePreference === "dark") return t("settings.themeDark")
+  return t("settings.themeSystem")
+})
 
 function updateLocale(value: unknown) {
   if (typeof value === "string") {
@@ -85,7 +98,7 @@ function updateLocale(value: unknown) {
                   class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
                   :aria-label="t('settings.language')"
                 >
-                  <SelectValue />
+                  <SelectValue>{{ selectedLocaleLabel }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end" class="rounded-xl border-border/50">
                   <SelectItem value="zh-CN">{{ t("settings.langZh") }}</SelectItem>
@@ -112,7 +125,7 @@ function updateLocale(value: unknown) {
                   class="h-9 w-full min-w-[11rem] shrink-0 rounded-xl border-border/50 sm:w-44"
                   :aria-label="t('settings.appearance')"
                 >
-                  <SelectValue />
+                  <SelectValue>{{ selectedThemeLabel }}</SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end" class="rounded-xl border-border/50">
                   <SelectItem value="light">{{ t("settings.themeLight") }}</SelectItem>
