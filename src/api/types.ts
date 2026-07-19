@@ -82,7 +82,6 @@ export interface SetupPinBody {
   pin: string
   confirmPin: string
   sessionTtlMinutes?: number
-  lanRequiresPin?: boolean
   lockOnRestart?: boolean
   trustedForever?: boolean
 }
@@ -101,8 +100,21 @@ export interface ChangePinBody {
 export interface PatchAuthSettingsBody {
   pinEnabled?: boolean
   sessionTtlMinutes?: number
-  lanRequiresPin?: boolean
   lockOnRestart?: boolean
+}
+
+export interface AuthSessionDTO {
+  publicId: string
+  userAgent?: string
+  ip?: string
+  createdAt: string
+  lastSeenAt: string
+  trustedForever: boolean
+  current: boolean
+}
+
+export interface AuthSessionsDTO {
+  items: AuthSessionDTO[]
 }
 
 export interface AppUpdateStatusDTO {

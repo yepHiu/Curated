@@ -198,6 +198,30 @@ describe("api endpoint response validation", () => {
     })
   })
 
+  it("lists and revokes trusted sessions through safe public ids", async () => {
+    const sessions = {
+      items: [{
+        publicId: "public-session-id",
+        userAgent: "Test Browser",
+        createdAt: "2026-07-19T10:00:00Z",
+        lastSeenAt: "2026-07-19T11:00:00Z",
+        trustedForever: true,
+        current: false,
+      }],
+    }
+    const get = vi.spyOn(httpClient, "get").mockResolvedValueOnce(sessions)
+    const remove = vi.spyOn(httpClient, "delete").mockResolvedValueOnce({ items: [] })
+    const post = vi.spyOn(httpClient, "post").mockResolvedValueOnce({ items: [] })
+
+    await expect(api.listTrustedAuthSessions()).resolves.toEqual(sessions)
+    await expect(api.revokeTrustedAuthSession("public/session")).resolves.toEqual({ items: [] })
+    await expect(api.revokeOtherTrustedAuthSessions()).resolves.toEqual({ items: [] })
+
+    expect(get).toHaveBeenCalledWith("/auth/sessions")
+    expect(remove).toHaveBeenCalledWith("/auth/sessions/public%2Fsession")
+    expect(post).toHaveBeenCalledWith("/auth/sessions/revoke-others", {})
+  })
+
   it("keeps small movie imports on the multipart endpoint", async () => {
     const task = {
       taskId: "import.movies-1",

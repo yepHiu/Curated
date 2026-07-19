@@ -231,7 +231,7 @@ pnpm dev:electron
   空の `logDir` は「ファイルログを無効化」ではなく「既定のログ保存先を使う」意味です:
   release ビルドは `LOCALAPPDATA\\Curated\\logs`、開発時は `backend/runtime/logs` を使います。
 
-開発ビルドとリリースビルドは、それぞれローカル専用の `127.0.0.1:8080` と `127.0.0.1:8081` を既定で使用します。スタンドアロンサーバーを LAN に公開する場合は、まず loopback モードでアプリ PIN を設定し、メインランタイム JSON 設定で非 loopback の `httpAddr` と `"lanEnabled": true` の両方を明示してください（例: `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`）。LAN の明示的な有効化または PIN 初期化がない場合、Curated は非 loopback リスナーの起動を拒否します。ブラウザー CORS は同一オリジン、loopback 開発 Origin、およびメイン設定の `corsAllowedOrigins` に正確に列挙した追加 Origin のみに制限され、任意の credentialed Origin は反映しません。無効な PIN 設定/解除が 5 回連続すると、`Retry-After` 付きの指数バックオフが適用されます。組み込みフロントエンドは引き続き同一オリジンの `/api` を使用します。
+開発ビルドとリリースビルドは、それぞれローカル専用の `127.0.0.1:8080` と `127.0.0.1:8081` を既定で使用します。スタンドアロンサーバーを LAN に公開する場合は、まず loopback モードでアプリ PIN を設定し、メインランタイム JSON 設定で非 loopback の `httpAddr` と `"lanEnabled": true` の両方を明示してください（例: `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`）。LAN の明示的な有効化または PIN 初期化がない場合、Curated は非 loopback リスナーの起動を拒否します。ブラウザー CORS は同一オリジン、loopback 開発 Origin、およびメイン設定の `corsAllowedOrigins` に正確に列挙した追加 Origin のみに制限され、任意の credentialed Origin は反映しません。無効な PIN 設定/解除が 5 回連続すると、`Retry-After` 付きの指数バックオフが適用されます。Curated はローカルと LAN で共通のグローバル PIN ロックを使用し、設定画面では現在のデバイス、IP、ブラウザー、最終利用時刻を確認して、個別または他のすべての永久信頼デバイスを確認付きで取り消せます。組み込みフロントエンドは引き続き同一オリジンの `/api` を使用します。
 
 ## API
 

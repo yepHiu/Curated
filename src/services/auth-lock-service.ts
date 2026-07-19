@@ -2,6 +2,8 @@ import { computed, ref } from "vue"
 import { api } from "@/api/endpoints"
 import type {
   AuthStatusDTO,
+  AuthSessionDTO,
+  AuthSessionsDTO,
   ChangePinBody,
   PatchAuthSettingsBody,
   SetupPinBody,
@@ -20,6 +22,7 @@ const defaultStatus: AuthStatusDTO = {
 }
 
 const statusState = ref<AuthStatusDTO>({ ...defaultStatus })
+const trustedSessionsState = ref<AuthSessionDTO[]>([])
 let refreshInFlight: Promise<AuthStatusDTO> | null = null
 
 function setStatus(next: AuthStatusDTO): AuthStatusDTO {
@@ -31,12 +34,18 @@ function setStatus(next: AuthStatusDTO): AuthStatusDTO {
   return statusState.value
 }
 
+function setTrustedSessions(next: AuthSessionsDTO): AuthSessionDTO[] {
+  trustedSessionsState.value = Array.isArray(next.items) ? [...next.items] : []
+  return trustedSessionsState.value
+}
+
 export function isAuthLockEnabled(): boolean {
   return import.meta.env.VITE_USE_WEB_API === "true"
 }
 
 export const authLockService = {
   status: computed(() => statusState.value),
+  trustedSessions: computed(() => trustedSessionsState.value),
 
   async refreshStatus(): Promise<AuthStatusDTO> {
     if (refreshInFlight) return refreshInFlight
@@ -61,10 +70,24 @@ export const authLockService = {
   },
 
   async lock(): Promise<AuthStatusDTO> {
-    return setStatus(await api.lockApp())
+    const status = setStatus(await api.lockApp())
+    trustedSessionsState.value = []
+    return status
   },
 
   async patchSettings(body: PatchAuthSettingsBody): Promise<AuthStatusDTO> {
     return setStatus(await api.patchAuthSettings(body))
+  },
+
+  async listTrustedSessions(): Promise<AuthSessionDTO[]> {
+    return setTrustedSessions(await api.listTrustedAuthSessions())
+  },
+
+  async revokeTrustedSession(publicId: string): Promise<AuthSessionDTO[]> {
+    return setTrustedSessions(await api.revokeTrustedAuthSession(publicId))
+  },
+
+  async revokeOtherTrustedSessions(): Promise<AuthSessionDTO[]> {
+    return setTrustedSessions(await api.revokeOtherTrustedAuthSessions())
   },
 }

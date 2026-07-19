@@ -10,6 +10,9 @@ vi.mock("@/api/endpoints", () => ({
     changePin: vi.fn(),
     lockApp: vi.fn(),
     patchAuthSettings: vi.fn(),
+    listTrustedAuthSessions: vi.fn(),
+    revokeTrustedAuthSession: vi.fn(),
+    revokeOtherTrustedAuthSessions: vi.fn(),
   },
 }))
 
@@ -73,5 +76,26 @@ describe("authLockService", () => {
       confirmPin: "98765",
     })
     expect(authLockService.status.value.pinLength).toBe(5)
+  })
+
+  it("lists and revokes trusted sessions by safe public id", async () => {
+    const session = {
+      publicId: "public-session-id",
+      userAgent: "Test Browser",
+      ip: "127.0.0.1",
+      createdAt: "2026-07-19T10:00:00Z",
+      lastSeenAt: "2026-07-19T11:00:00Z",
+      trustedForever: true,
+      current: false,
+    }
+    vi.mocked(api.listTrustedAuthSessions).mockResolvedValueOnce({ items: [session] })
+    vi.mocked(api.revokeTrustedAuthSession).mockResolvedValueOnce({ items: [] })
+
+    await expect(authLockService.listTrustedSessions()).resolves.toEqual([session])
+    expect(authLockService.trustedSessions.value).toEqual([session])
+
+    await expect(authLockService.revokeTrustedSession(session.publicId)).resolves.toEqual([])
+    expect(api.revokeTrustedAuthSession).toHaveBeenCalledWith("public-session-id")
+    expect(authLockService.trustedSessions.value).toEqual([])
   })
 })

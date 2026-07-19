@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { LockKeyhole, ShieldCheck } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
+import type { AuthSessionDTO } from "@/api/types"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -20,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -29,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Skeleton } from "@/components/ui/skeleton"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
 
 const { t } = useI18n()
@@ -44,10 +48,16 @@ const setupDialogOpen = ref(false)
 const changeDialogOpen = ref(false)
 const settingsBusy = ref(false)
 const lockBusy = ref(false)
+const trustedSessionsLoading = ref(false)
+const trustedSessionActionBusy = ref(false)
+const trustedSessionDialogOpen = ref(false)
+const trustedSessionAction = ref<{ kind: "one", session: AuthSessionDTO } | { kind: "others" } | null>(null)
 const errorText = ref("")
 const successText = ref("")
 
 const status = computed(() => authLockService.status.value)
+const trustedSessions = computed(() => authLockService.trustedSessions.value)
+const otherTrustedSessionCount = computed(() => trustedSessions.value.filter((session) => !session.current).length)
 const authEnabled = computed(() => isAuthLockEnabled())
 const sessionTTLValue = computed(() => String(status.value.sessionTtlMinutes || 60))
 const canSetupPIN = computed(() =>
@@ -62,9 +72,12 @@ const canChangePIN = computed(() =>
   !changeBusy.value,
 )
 
-onMounted(() => {
+onMounted(async () => {
   if (authEnabled.value) {
-    void refreshAuthStatus()
+    await refreshAuthStatus()
+    if (status.value.pinEnabled) {
+      await refreshTrustedSessions()
+    }
   }
 })
 
@@ -129,10 +142,6 @@ function closeChangeDialog() {
   changeDialogOpen.value = false
 }
 
-function onLanRequiresPINChange(value: boolean) {
-  void patchAuthSettings({ lanRequiresPin: value })
-}
-
 function onLockOnRestartChange(value: boolean) {
   void patchAuthSettings({ lockOnRestart: value })
 }
@@ -160,9 +169,9 @@ async function setupPIN() {
       pin,
       confirmPin,
       sessionTtlMinutes: status.value.sessionTtlMinutes,
-      lanRequiresPin: status.value.lanRequiresPin,
       lockOnRestart: status.value.lockOnRestart,
     })
+    await refreshTrustedSessions()
     setupDialogOpen.value = false
     resetSetupDrafts()
     successText.value = t("settings.securitySetupSaved")
@@ -233,6 +242,65 @@ async function lockNow() {
     errorText.value = formatAuthError(error)
   } finally {
     lockBusy.value = false
+  }
+}
+
+async function refreshTrustedSessions() {
+  if (!authEnabled.value || !status.value.pinEnabled) {
+    return
+  }
+  try {
+    trustedSessionsLoading.value = true
+    await authLockService.listTrustedSessions()
+  } catch (error) {
+    errorText.value = formatAuthError(error)
+  } finally {
+    trustedSessionsLoading.value = false
+  }
+}
+
+function formatSessionTime(value: string): string {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed)
+}
+
+function requestTrustedSessionRevoke(session: AuthSessionDTO) {
+  trustedSessionAction.value = { kind: "one", session }
+  trustedSessionDialogOpen.value = true
+}
+
+function requestOtherTrustedSessionsRevoke() {
+  trustedSessionAction.value = { kind: "others" }
+  trustedSessionDialogOpen.value = true
+}
+
+async function confirmTrustedSessionRevoke() {
+  const action = trustedSessionAction.value
+  if (!action) {
+    return
+  }
+  errorText.value = ""
+  successText.value = ""
+  try {
+    trustedSessionActionBusy.value = true
+    if (action.kind === "one") {
+      await authLockService.revokeTrustedSession(action.session.publicId)
+    } else {
+      await authLockService.revokeOtherTrustedSessions()
+    }
+    trustedSessionDialogOpen.value = false
+    trustedSessionAction.value = null
+    successText.value = t("settings.securityTrustedSessionsRevoked")
+  } catch (error) {
+    errorText.value = formatAuthError(error)
+  } finally {
+    trustedSessionActionBusy.value = false
   }
 }
 </script>
@@ -434,7 +502,7 @@ async function lockNow() {
               :disabled="!status.pinEnabled || lockBusy"
               @click="lockNow"
             >
-              <LockKeyhole class="size-4" />
+              <LockKeyhole data-icon="inline-start" />
               {{ t("settings.securityLockNow") }}
             </Button>
           </div>
@@ -480,26 +548,6 @@ async function lockNow() {
         >
           <div class="flex min-w-0 flex-col gap-1">
             <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securityLanRequiresPin") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securityLanRequiresPinHint") }}
-            </p>
-          </div>
-          <Switch
-            :model-value="status.lanRequiresPin"
-            :disabled="settingsBusy"
-            :aria-label="t('settings.securityLanRequiresPin')"
-            @update:model-value="onLanRequiresPINChange"
-          />
-        </div>
-
-        <div
-          data-security-block
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
               {{ t("settings.securityLockOnRestart") }}
             </p>
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -516,26 +564,137 @@ async function lockNow() {
 
         <div
           data-security-block
-          role="note"
-          class="flex flex-col gap-4 rounded-2xl border border-border/40 border-l-[3px] border-l-muted-foreground/40 bg-surface-muted px-4 py-3"
+          data-trusted-sessions
+          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
         >
-          <div class="flex flex-col gap-2">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securityTrustDeviceTitle") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securityTrustDeviceHint") }}
-            </p>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex min-w-0 flex-col gap-1">
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.securityTrustedSessionsTitle") }}
+              </p>
+              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {{ t("settings.securityTrustedSessionsHint") }}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="shrink-0 rounded-xl"
+              :disabled="!status.pinEnabled || trustedSessionsLoading"
+              @click="refreshTrustedSessions"
+            >
+              {{ t("settings.securityTrustedSessionsRefresh") }}
+            </Button>
           </div>
 
-          <div class="flex flex-col gap-2 border-t border-border/35 pt-4">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securityLanPolicyTitle") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.securityLanPolicyHint") }}
-            </p>
+          <div v-if="trustedSessionsLoading" class="flex flex-col gap-2" aria-busy="true">
+            <Skeleton class="h-16 w-full rounded-xl" />
+            <Skeleton class="h-16 w-full rounded-xl" />
           </div>
+
+          <p
+            v-else-if="trustedSessions.length === 0"
+            class="rounded-xl border border-dashed border-border/60 px-3 py-4 text-sm text-muted-foreground"
+          >
+            {{ t("settings.securityTrustedSessionsEmpty") }}
+          </p>
+
+          <div v-else class="flex flex-col">
+            <template v-for="(session, index) in trustedSessions" :key="session.publicId">
+              <div class="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex min-w-0 flex-col gap-1.5">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <Badge v-if="session.current" variant="default">
+                      {{ t("settings.securityTrustedSessionsCurrent") }}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {{ t("settings.securityTrustedSessionsTrusted") }}
+                    </Badge>
+                  </div>
+                  <p class="truncate text-sm font-medium text-foreground" :title="session.userAgent">
+                    {{ session.userAgent || t("settings.securityTrustedSessionsUnknownClient") }}
+                  </p>
+                  <p class="text-xs leading-relaxed text-muted-foreground">
+                    {{ session.ip || t("settings.securityTrustedSessionsUnknownIp") }} ·
+                    {{ t("settings.securityTrustedSessionsLastSeen", { time: formatSessionTime(session.lastSeenAt) }) }}
+                  </p>
+                </div>
+                <Button
+                  v-if="!session.current"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="shrink-0 rounded-xl"
+                  :disabled="trustedSessionActionBusy"
+                  @click="requestTrustedSessionRevoke(session)"
+                >
+                  {{ t("settings.securityTrustedSessionsRevoke") }}
+                </Button>
+              </div>
+              <Separator v-if="index < trustedSessions.length - 1" />
+            </template>
+          </div>
+
+          <div v-if="otherTrustedSessionCount > 0" class="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="rounded-xl"
+              :disabled="trustedSessionActionBusy"
+              @click="requestOtherTrustedSessionsRevoke"
+            >
+              {{ t("settings.securityTrustedSessionsRevokeOthers") }}
+            </Button>
+          </div>
+        </div>
+
+        <Dialog v-model:open="trustedSessionDialogOpen">
+          <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{{ t("settings.securityTrustedSessionsConfirmTitle") }}</DialogTitle>
+              <DialogDescription class="text-pretty">
+                {{ trustedSessionAction?.kind === "others"
+                  ? t("settings.securityTrustedSessionsConfirmOthers")
+                  : t("settings.securityTrustedSessionsConfirmOne") }}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter class="gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                class="rounded-xl"
+                :disabled="trustedSessionActionBusy"
+                @click="trustedSessionDialogOpen = false"
+              >
+                {{ t("common.cancel") }}
+              </Button>
+              <Button
+                data-confirm-session-revoke
+                type="button"
+                variant="destructive"
+                class="rounded-xl"
+                :disabled="trustedSessionActionBusy"
+                @click="confirmTrustedSessionRevoke"
+              >
+                {{ t("settings.securityTrustedSessionsRevoke") }}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <div
+          data-security-block
+          role="note"
+          class="flex flex-col gap-2 rounded-2xl border border-border/40 border-l-[3px] border-l-muted-foreground/40 bg-surface-muted px-4 py-3"
+        >
+          <p class="text-sm font-semibold text-foreground">
+            {{ t("settings.securityLanPolicyTitle") }}
+          </p>
+          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            {{ t("settings.securityLanPolicyHint") }}
+          </p>
         </div>
 
         <p

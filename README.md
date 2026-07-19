@@ -39,7 +39,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
 - **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
-- **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, exponential backoff after repeated failed attempts, and an opt-in trusted-device mode that can stay unlocked until explicitly locked.
+- **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, exponential backoff after repeated failed attempts, and a Settings UI for reviewing and revoking trusted-forever devices without exposing session bearer tokens.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
 - **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, marks backend requests as `Curated Desktop` for connected-client visibility, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
@@ -176,6 +176,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Settings -> Security opens PIN setup and PIN change in shadcn-vue dialogs from entry buttons; changing the configured PIN requires the current PIN plus the new PIN confirmation.
 - The lock screen uses a compact shadcn-vue card with PIN cells based on the configured PIN length and keyboard input only; it does not show library artwork or other sensitive media context.
 - In Web API mode, locked requests to protected `/api/*` endpoints return `423 AUTH_LOCKED`; mock mode keeps PIN disabled for fast UI iteration.
+- Settings -> Security lists active trusted-forever devices with current-device, IP, browser, and last-activity context; users can revoke one other device or all other trusted devices after confirmation. Curated uses one global PIN policy for local and LAN clients.
 
 ### Settings & Configuration
 

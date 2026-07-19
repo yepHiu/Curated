@@ -15,11 +15,15 @@ const authMock = vi.hoisted(() => ({
       lockOnRestart: true,
     },
   },
+  trustedSessions: { value: [] as Array<Record<string, unknown>> },
   refreshStatus: vi.fn(),
   setupPin: vi.fn(),
   changePin: vi.fn(),
   lock: vi.fn(),
   patchSettings: vi.fn(),
+  listTrustedSessions: vi.fn(),
+  revokeTrustedSession: vi.fn(),
+  revokeOtherTrustedSessions: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -52,6 +56,10 @@ vi.mock("@/components/ui/button", () => ({
     props: ["type", "disabled", "variant", "size"],
     template: "<button v-bind=\"$attrs\" :type=\"type\" :disabled=\"disabled\"><slot /></button>",
   },
+}))
+
+vi.mock("@/components/ui/badge", () => ({
+  Badge: { name: "Badge", template: "<span data-badge><slot /></span>" },
 }))
 
 vi.mock("@/components/ui/dialog", () => ({
@@ -102,6 +110,14 @@ vi.mock("@/components/ui/switch", () => ({
   },
 }))
 
+vi.mock("@/components/ui/separator", () => ({
+  Separator: { name: "Separator", template: "<div data-separator />" },
+}))
+
+vi.mock("@/components/ui/skeleton", () => ({
+  Skeleton: { name: "Skeleton", template: "<div data-skeleton />" },
+}))
+
 vi.mock("@/components/ui/select", () => {
   const Select = {
     name: "Select",
@@ -131,11 +147,18 @@ describe("SettingsSecuritySection", () => {
       lanRequiresPin: true,
       lockOnRestart: true,
     }
+    authMock.trustedSessions.value = []
     authMock.refreshStatus.mockReset()
     authMock.setupPin.mockReset()
     authMock.changePin.mockReset()
     authMock.lock.mockReset()
     authMock.patchSettings.mockReset()
+    authMock.listTrustedSessions.mockReset()
+    authMock.listTrustedSessions.mockResolvedValue([])
+    authMock.revokeTrustedSession.mockReset()
+    authMock.revokeTrustedSession.mockResolvedValue([])
+    authMock.revokeOtherTrustedSessions.mockReset()
+    authMock.revokeOtherTrustedSessions.mockResolvedValue([])
   })
 
   it("uses the settings card and nested block layout contract", () => {
@@ -154,17 +177,17 @@ describe("SettingsSecuritySection", () => {
     expect(wrapper.findAll("[data-security-block]")).toHaveLength(5)
   })
 
-  it("renders PIN setup entry, session TTL, LAN PIN, and lock-now controls", () => {
+  it("renders PIN setup, session TTL, trusted-session, and lock-now controls", () => {
     const wrapper = mount(SettingsSecuritySection)
 
     expect(wrapper.text()).toContain("settings.securityTitle")
     expect(wrapper.text()).toContain("settings.securitySetupTitle")
     expect(wrapper.text()).toContain("settings.securityEnablePin")
     expect(wrapper.text()).toContain("settings.securitySessionTitle")
-    expect(wrapper.text()).toContain("settings.securityLanRequiresPin")
+    expect(wrapper.text()).toContain("settings.securityTrustedSessionsTitle")
     expect(wrapper.text()).toContain("settings.securityLockNow")
-    expect(wrapper.text()).toContain("settings.securityTrustDeviceTitle")
     expect(wrapper.text()).toContain("settings.securityLanPolicyTitle")
+    expect(wrapper.text()).not.toContain("settings.securityLanRequiresPin")
     expect(wrapper.find("[data-setup-pin-trigger]").exists()).toBe(true)
     expect(wrapper.findAll("input[type='password']")).toHaveLength(0)
   })
@@ -192,7 +215,6 @@ describe("SettingsSecuritySection", () => {
       pin: "1234",
       confirmPin: "1234",
       sessionTtlMinutes: 60,
-      lanRequiresPin: true,
       lockOnRestart: true,
     })
     expect(wrapper.text()).toContain("settings.securitySetupSaved")
@@ -228,5 +250,50 @@ describe("SettingsSecuritySection", () => {
       confirmPin: "98765",
     })
     expect(wrapper.text()).toContain("settings.securityPinChanged")
+  })
+
+  it("lists trusted sessions and confirms revoking another device", async () => {
+    authMock.status.value = {
+      ...authMock.status.value,
+      pinEnabled: true,
+      setupRequired: false,
+      pinLength: 4,
+    }
+    authMock.trustedSessions.value = [
+      {
+        publicId: "current-public",
+        userAgent: "Current Browser",
+        ip: "127.0.0.1",
+        createdAt: "2026-07-19T10:00:00Z",
+        lastSeenAt: "2026-07-19T11:00:00Z",
+        trustedForever: true,
+        current: true,
+      },
+      {
+        publicId: "other-public",
+        userAgent: "Other Browser",
+        ip: "192.168.1.20",
+        createdAt: "2026-07-18T10:00:00Z",
+        lastSeenAt: "2026-07-19T09:00:00Z",
+        trustedForever: true,
+        current: false,
+      },
+    ]
+    const wrapper = mount(SettingsSecuritySection)
+
+    expect(wrapper.text()).toContain("Current Browser")
+    expect(wrapper.text()).toContain("Other Browser")
+    expect(wrapper.text()).toContain("settings.securityTrustedSessionsCurrent")
+
+    const revokeButtons = wrapper.findAll("button").filter((button) =>
+      button.text().includes("settings.securityTrustedSessionsRevoke"),
+    )
+    await revokeButtons[0].trigger("click")
+    expect(wrapper.find("[data-confirm-session-revoke]").exists()).toBe(true)
+
+    await wrapper.get("[data-confirm-session-revoke]").trigger("click")
+
+    expect(authMock.revokeTrustedSession).toHaveBeenCalledWith("other-public")
+    expect(wrapper.text()).toContain("settings.securityTrustedSessionsRevoked")
   })
 })

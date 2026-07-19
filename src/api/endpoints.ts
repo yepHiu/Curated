@@ -35,6 +35,7 @@ import type {
   AppUpdateStatusDTO,
   AppUpdateInstallBody,
   AuthStatusDTO,
+  AuthSessionsDTO,
   ChangePinBody,
   ConnectedClientsDTO,
   CreateCuratedFrameBody,
@@ -266,6 +267,18 @@ export const api = {
 
   patchAuthSettings(body: PatchAuthSettingsBody): Promise<AuthStatusDTO> {
     return httpClient.patch<AuthStatusDTO>("/auth/settings", body)
+  },
+
+  listTrustedAuthSessions(): Promise<AuthSessionsDTO> {
+    return httpClient.get<AuthSessionsDTO>("/auth/sessions")
+  },
+
+  revokeTrustedAuthSession(publicId: string): Promise<AuthSessionsDTO> {
+    return httpClient.delete<AuthSessionsDTO>(`/auth/sessions/${encodeURIComponent(publicId)}`)
+  },
+
+  revokeOtherTrustedAuthSessions(): Promise<AuthSessionsDTO> {
+    return httpClient.post<AuthSessionsDTO>("/auth/sessions/revoke-others", {})
   },
 
   getAppUpdateStatus(): Promise<AppUpdateStatusDTO> {
