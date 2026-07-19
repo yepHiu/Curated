@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库已经具备以 Web 为先的架构、面向 Windows 的发布打包流程、托盘模式运行、Electron 桌面壳层 MVP、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
+Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库以 Electron 桌面壳承载共享 Web UI 和 HTTP 服务边界，并具备面向 Windows 的发布打包、托盘生命周期、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
 
 完整功能清单请参见 [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)。
 
@@ -32,6 +32,7 @@ Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 G
 - **完善的资料库管理** — 虚拟化海报网格、收藏、评分、标签、演员资料、回收站/恢复、影片笔记，以及支持 fsnotify 自动扫描的多目录资料库。
 - **影片导入** — 支持拖拽、文件选择或文件夹选择导入，带进度跟踪与大文件断点续传。
 - **存储在线检测** — 优先支持 Windows 外置硬盘场景，针对已配置库路径检测硬盘离线或卷身份变化，并通过启动提醒、通知中心、扫描/导入阻断与手动重绑降低误操作风险。
+- **可验证备份包** — 使用 `VACUUM INTO` 创建一致 SQLite 快照，可选包含资料库配置，支持 SHA-256 manifest、SQLite 完整性验证、恢复预检、离线原子恢复与保留回滚副本。
 - **元数据刮削** — 多数据源支持，可配置策略（自动全局 / 国内友好 / 自定义链路 / 指定源），数据源健康检查，机器可读的故障分类。
 - **播放能力** — HTML5 视频播放（Range 流）、续播进度、每日观看统计、HLS 会话（remux/转码管线）、外部播放器接力、播放会话诊断。
 - **首页每日推荐** — 基于 UTC 日的 hero 轮播与推荐栏，通过 SQLite 持久化保证跨设备一致，含加权采样、冷却窗口与演员/厂牌均衡。
@@ -69,6 +70,24 @@ pnpm backend:build:dev
 ```
 
 该命令会生成 `backend/runtime/curated-dev.exe`。
+
+### 备份、验证与恢复
+
+维护命令统一从 `backend/` 运行；若数据库路径来自自定义主配置，请额外传入 `-config path/to/config.json`：
+
+```powershell
+go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
+```
+
+创建和验证不会替换当前数据。真正恢复必须离线执行：先完全退出 Curated，确认 preflight 成功并阅读警告，再显式确认：
+
+```powershell
+go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
+```
+
+第一版备份包含一致 SQLite 快照，以及存在时的 `library-config.cfg`；不包含媒体源文件和用户资产文件。manifest 记录文件大小、SHA-256、应用标识、范围和已应用迁移；验证会逐文件校验，并实际执行 SQLite `quick_check` 与 `foreign_key_check`。恢复会拒绝未来迁移和磁盘空间不足，在同目录原子替换文件，并把旧数据库/配置保留为 `.pre-restore-*` 回滚证据。
 
 ### 启动前端
 

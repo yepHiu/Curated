@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Curated** (product name; repo folder `jav-shadcn`) is a desktop-oriented media library application for managing, browsing, scraping, and playing video collections. It consists of a Vue 3 frontend with a Go backend, using SQLite for persistence and metatube-sdk-go for metadata scraping.
 
-**Current Architecture Phase:** Web-first phase (Vue SPA + Go HTTP API) with an in-repo Electron desktop-shell MVP. Electron currently starts or reuses the Go backend, starts or reuses Vite in development, uses the Curated app icon, hides to tray on window close, marks backend requests as Curated Desktop with `X-Curated-Client: desktop-electron` plus desktop OS headers, and exposes only a narrow `window.javLibrary.pickDirectory()` preload bridge for native directory selection. Production release packaging installs `Curated.exe` as the Electron desktop shell and bundles the Go backend under `resources/app/curated.exe`; deeper Electron IPC bridges and mpv player integration remain target-direction work.
+**Current Architecture Phase:** Local-first Electron delivery around a shared Vue SPA + Go HTTP API boundary. Electron currently starts or reuses the Go backend, starts or reuses Vite in development, uses the Curated app icon, hides to tray on window close, marks backend requests as Curated Desktop with `X-Curated-Client: desktop-electron` plus desktop OS headers, and exposes only a narrow `window.javLibrary.pickDirectory()` preload bridge for native directory selection. Production release packaging installs `Curated.exe` as the Electron desktop shell and bundles the Go backend under `resources/app/curated.exe`; deeper Electron IPC bridges and mpv player integration remain target-direction work.
 
 **Public docs rule:** Root `README.md` is the English primary README, `README.zh-CN.md` and `README.ja-JP.md` are full translations, and root `API.md` is the single public API reference. Do not rebuild the full API table inside the README.
 
@@ -78,7 +78,17 @@ go test ./internal/storage/...
 
 # Run with verbose output
 go test -v ./internal/storage/...
+
+# Create / verify / preflight a backup package
+go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
+
+# Restore only after Curated is fully stopped and preflight succeeds
+go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
 ```
+
+Backup format v1 includes the SQLite snapshot and optional `library-config.cfg`, but not media or user asset files. Normal runtime holds `<databasePath>.runtime.lock`; offline restore must acquire the same cross-process lock and retains `.pre-restore-*` rollback files.
 
 Windows binary naming rule:
 - Development backend builds must use `curated-dev.exe`.

@@ -128,6 +128,17 @@ pnpm test -- path/to/file.test.ts
 | 静态检查 | `go vet ./...` |
 | 单包测试 | `go test ./internal/storage/...`（示例） |
 
+备份维护命令同样必须从 `backend/` 运行。`backup-create` / `backup-verify` 可在不替换运行数据的情况下执行；`backup-restore` 必须先完全退出 Curated，并在成功 preflight 后显式传 `-confirm-restore`：
+
+```powershell
+go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
+```
+
+自定义主配置需同时传 `-config <path>`。恢复会获取 `<databasePath>.runtime.lock`；仍有 Curated 进程持锁时必须失败，不能通过删除锁文件绕过。
+
 从仓库根目录也可：
 
 ```bash

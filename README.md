@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships a web-first architecture with Windows-friendly release packaging, tray-mode runtime support, an Electron desktop-shell MVP, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
+Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships an Electron desktop shell around a shared Web UI and HTTP service boundary, with Windows-friendly release packaging, tray lifecycle, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
 
 See [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) for the full catalog of implemented features.
 
@@ -32,6 +32,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
 - **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
+- **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, restore preflight, offline atomic restore, and retained rollback copies.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
 - **Offline desktop resources** — Packaged UI uses local Outfit font assets and npm-bundled `hls.js`; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
@@ -72,6 +73,24 @@ pnpm backend:build:dev
 ```
 
 This produces `backend/runtime/curated-dev.exe`.
+
+### Back Up, Verify, and Restore
+
+Run maintenance commands from `backend/`; add `-config path/to/config.json` when the database path comes from a custom main config:
+
+```powershell
+go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
+```
+
+Creating and verifying a backup do not replace live data. A restore is deliberately offline: fully quit Curated first, review a successful preflight, then provide explicit confirmation:
+
+```powershell
+go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
+```
+
+The package contains a consistent SQLite snapshot and, when present, `library-config.cfg`. It does not include media source files or user asset files in the first format version. The manifest records file sizes, SHA-256 hashes, application identity, scope, and applied migrations. Verification checks every declared file plus SQLite `quick_check` and `foreign_key_check`; restore rejects future migrations and insufficient disk space, replaces files atomically, and retains the previous database/config as `.pre-restore-*` rollback evidence.
 
 ### Start The Frontend
 

@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated は、Vue 3 フロントエンドと Go + SQLite バックエンドで構成されたローカルファーストのメディアライブラリアプリケーションです。現在のリポジトリには、Web ファースト構成、Windows 向けの配布パッケージ、トレイモード起動、Electron デスクトップシェル MVP、メタデータスクレイピング、再生ワークフロー、キュレートフレーム管理、ゲームパッド操作、そして包括的な設定システムが実装されています。
+Curated は、Vue 3 フロントエンドと Go + SQLite バックエンドで構成されたローカルファーストのメディアライブラリアプリケーションです。現在のリポジトリでは、共有 Web UI と HTTP サービス境界を Electron デスクトップシェルで提供し、Windows 向け配布、トレイライフサイクル、メタデータスクレイピング、再生、キュレートフレーム、ゲームパッド操作、包括的な設定を実装しています。
 
 全実装機能の一覧は [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) を参照してください。
 
@@ -32,6 +32,7 @@ Curated は、Vue 3 フロントエンドと Go + SQLite バックエンドで�
 - **包括的なライブラリ管理** — 仮想化ポスターグリッド、お気に入り、評価、タグ、俳優プロフィール、ゴミ箱/復元、ムービーノート、fsnotify ベースの自動スキャンとマルチルートライブラリパス。
 - **ムービーインポート** — ドラッグ＆ドロップ、ファイル選択、フォルダ選択に対応し、進捗追跡と大容量ファイル向けレジューム可能チャンクアップロードを完備。
 - **ストレージ存在確認** — Windows の外付けドライブ利用を優先し、設定済みライブラリルートのオフライン状態やボリューム変更を検出して、起動時アラート、通知センター、スキャン/インポートのブロック、手動再バインドを提供。
+- **検証可能なバックアップ** — `VACUUM INTO` による一貫した SQLite スナップショット、任意のライブラリ設定、SHA-256 マニフェスト、SQLite 整合性検証、復元プリフライト、オフライン原子的復元、ロールバックコピー保持。
 - **メタデータスクレイピング** — マルチプロバイダー対応、戦略設定（自動グローバル / 中国向け / カスタムチェーン / 指定）、プロバイダーヘルスチェック、ネットワーク診断向けの機械可読な障害カテゴリ。
 - **再生** — HTML5 動画再生（Range ストリーミング）、レジューム再生、日次視聴統計、HLS セッション（remux/トランスコードパイプライン）、外部プレーヤー引き渡し、再生セッション診断。
 - **ホームページ日次レコメンデーション** — UTC ベースの hero カルーセルとレコメンデーション行を SQLite に永続化し、クロスデバイスで一貫性を確保。重み付きサンプリング、クールダウン期間、出演者/スタジオ多様性バランシングを適用。
@@ -69,6 +70,24 @@ pnpm backend:build:dev
 ```
 
 このコマンドは `backend/runtime/curated-dev.exe` を生成します。
+
+### バックアップ、検証、復元
+
+メンテナンスコマンドは `backend/` から実行します。データベースパスをカスタム main config で指定している場合は `-config path/to/config.json` も渡してください。
+
+```powershell
+go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
+go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
+```
+
+作成と検証は現在のデータを置き換えません。復元はオフライン専用です。Curated を完全終了し、成功した preflight と警告を確認してから明示的に承認します。
+
+```powershell
+go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
+```
+
+初期フォーマットには一貫した SQLite スナップショットと、存在する場合の `library-config.cfg` が含まれます。メディアソースとユーザーアセットは含まれません。manifest はサイズ、SHA-256、アプリ識別、スコープ、適用済み migration を記録します。検証は全ファイルと SQLite `quick_check` / `foreign_key_check` を確認し、復元は未知の将来 migration や容量不足を拒否して原子的に置換し、旧データベース/設定を `.pre-restore-*` として保持します。
 
 ### フロントエンドを起動する
 
