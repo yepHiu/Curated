@@ -22,6 +22,13 @@ func TestListCuratedFramesForExport_orderAndMissing(t *testing.T) {
 	id1 := "11111111-1111-1111-1111-111111111111"
 	id2 := "22222222-2222-2222-2222-222222222222"
 	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a} // minimal invalid but insert only needs bytes
+	if _, err := store.db.Exec(`
+		INSERT INTO movies (
+			id, title, code, studio, summary, added_at, location, resolution, year
+		) VALUES ('m', 'T', 'C-1', '', '', '2020-01-01T00:00:00Z', 'test://m', '', 0)
+	`); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.InsertCuratedFrame(ctx, CuratedFrameMeta{
 		ID: id1, MovieID: "m", Title: "T", Code: "C-1", Actors: []string{"A"},
 		PositionSec: 1, CapturedAt: "2020-01-01T00:00:00Z", Tags: nil,

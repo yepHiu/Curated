@@ -30,6 +30,11 @@ func TestLibraryPathStorageBindingUpsertAndGet(t *testing.T) {
 		DriveType:          "removable",
 		IdentityConfidence: "high",
 	}
+	if _, err := store.db.ExecContext(ctx, `
+		INSERT INTO library_paths (id, path, title) VALUES (?, ?, ?)
+	`, original.LibraryPathID, original.RootPath, "Test library"); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.UpsertLibraryPathStorageBinding(ctx, original); err != nil {
 		t.Fatalf("UpsertLibraryPathStorageBinding original: %v", err)
 	}

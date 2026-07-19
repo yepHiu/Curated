@@ -78,6 +78,27 @@ func TestDeleteMovie_RemovesRowsAndFiles(t *testing.T) {
 	if err := store.UpdateMediaAssetLocalPath(ctx, outcome.MovieID, "cover", "http://x", coverPath); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := store.db.Exec(`
+		INSERT INTO actors (name) VALUES ('Delete Test Actor');
+		INSERT INTO tags (name, type) VALUES ('delete-test-tag', 'user');
+		INSERT INTO movie_actors (movie_id, actor_id)
+		SELECT ?, id FROM actors WHERE name = 'Delete Test Actor';
+		INSERT INTO movie_tags (movie_id, tag_id)
+		SELECT ?, id FROM tags WHERE name = 'delete-test-tag' AND type = 'user';
+		INSERT INTO playback_progress (movie_id, position_sec, duration_sec, updated_at)
+		VALUES (?, 12, 100, '2026-07-19T00:00:00Z');
+		INSERT INTO curated_frames (
+			id, movie_id, title, code, position_sec, captured_at, image_blob
+		) VALUES ('delete-frame', ?, 'Frame', 'DEL-001', 12, '2026-07-19T00:00:00Z', X'89504E47');
+		INSERT INTO library_played_movies (movie_id, first_played_at)
+		VALUES (?, '2026-07-19T00:00:00Z');
+		INSERT INTO library_movie_comments (movie_id, body, updated_at)
+		VALUES (?, 'delete me', '2026-07-19T00:00:00Z');
+		INSERT INTO playback_daily_watch_time (day_key, movie_id, watched_sec, updated_at)
+		VALUES ('2026-07-19', ?, 20, '2026-07-19T00:00:00Z');
+	`, outcome.MovieID, outcome.MovieID, outcome.MovieID, outcome.MovieID, outcome.MovieID, outcome.MovieID, outcome.MovieID); err != nil {
+		t.Fatal(err)
+	}
 
 	cacheRoot := filepath.Join(root, "asset-cache")
 	if err := store.DeleteMovie(ctx, outcome.MovieID, cacheRoot); err != nil {
@@ -96,6 +117,26 @@ func TestDeleteMovie_RemovesRowsAndFiles(t *testing.T) {
 	_, err = store.GetMovieDetail(ctx, outcome.MovieID)
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("expected sql.ErrNoRows after delete, got %v", err)
+	}
+	for _, table := range []string{
+		"media_assets",
+		"movie_actors",
+		"movie_tags",
+		"scan_items",
+		"playback_progress",
+		"curated_frames",
+		"library_played_movies",
+		"library_movie_comments",
+		"playback_daily_watch_time",
+	} {
+		var count int
+		query := `SELECT COUNT(*) FROM ` + table + ` WHERE movie_id = ?`
+		if err := store.db.QueryRowContext(ctx, query, outcome.MovieID).Scan(&count); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("%s still has %d row(s) for deleted movie", table, count)
+		}
 	}
 }
 

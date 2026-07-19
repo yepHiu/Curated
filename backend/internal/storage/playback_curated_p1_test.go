@@ -31,6 +31,13 @@ func insertCuratedFrameForP1Test(t *testing.T, store *SQLiteStore, meta CuratedF
 	if meta.CapturedAt == "" {
 		meta.CapturedAt = "2026-04-11T00:00:00Z"
 	}
+	if _, err := store.db.Exec(`
+		INSERT OR IGNORE INTO movies (
+			id, title, code, studio, summary, added_at, location, resolution, year
+		) VALUES (?, ?, ?, '', '', '2026-04-11T00:00:00Z', ?, '', 0)
+	`, meta.MovieID, meta.Title, "TEST-"+meta.MovieID, "test://"+meta.MovieID); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.InsertCuratedFrame(context.Background(), meta, []byte("png-"+meta.ID)); err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -38,6 +39,19 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("enable sqlite foreign keys: %w", err)
+	}
+	var foreignKeysEnabled int
+	if err := db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeysEnabled); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("verify sqlite foreign keys: %w", err)
+	}
+	if foreignKeysEnabled != 1 {
+		_ = db.Close()
+		return nil, fmt.Errorf("verify sqlite foreign keys: pragma remained %d", foreignKeysEnabled)
 	}
 
 	return &SQLiteStore{db: db}, nil
@@ -101,5 +115,34 @@ func (s *SQLiteStore) Migrate(ctx context.Context) error {
 		}
 	}
 
+	return s.verifyForeignKeyIntegrity(ctx)
+}
+
+func (s *SQLiteStore) verifyForeignKeyIntegrity(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA foreign_key_check`)
+	if err != nil {
+		return fmt.Errorf("check sqlite foreign keys: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	if rows.Next() {
+		var tableName string
+		var rowID any
+		var parentTable string
+		var foreignKeyID int
+		if err := rows.Scan(&tableName, &rowID, &parentTable, &foreignKeyID); err != nil {
+			return fmt.Errorf("read sqlite foreign key violation: %w", err)
+		}
+		return fmt.Errorf(
+			"sqlite foreign key violation: table=%s rowid=%v parent=%s foreign_key_id=%d",
+			tableName,
+			rowID,
+			parentTable,
+			foreignKeyID,
+		)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("check sqlite foreign keys: %w", err)
+	}
 	return nil
 }
