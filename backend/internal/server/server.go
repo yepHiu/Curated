@@ -353,6 +353,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/health/scan", h.handleScanLibraryHealth)
 	mux.HandleFunc("POST /api/library/health/repairs", h.handleStartLibraryHealthRepair)
 	mux.HandleFunc("GET /api/library/health/repairs/{repairId}", h.handleGetLibraryHealthRepair)
+	mux.HandleFunc("POST /api/library/health/actions", h.handleStartLibraryHealthAction)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

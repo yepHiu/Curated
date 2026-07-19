@@ -564,6 +564,13 @@ type StartLibraryHealthRepairRequest struct {
 	Confirm    bool     `json:"confirm"`
 }
 
+// StartLibraryHealthActionRequest starts a confirmed cleanup for exact current finding IDs.
+type StartLibraryHealthActionRequest struct {
+	Action     string   `json:"action"`
+	FindingIDs []string `json:"findingIds"`
+	Confirm    bool     `json:"confirm"`
+}
+
 // LibraryHealthRepairItemDTO is one persisted per-finding repair outcome.
 type LibraryHealthRepairItemDTO struct {
 	Ordinal      int    `json:"ordinal"`
@@ -1114,8 +1121,9 @@ const (
 	TaskFailed        = "failed"
 	TaskCancelled     = "cancelled"
 
-	TaskTypeImportMovies        = "import.movies"
-	TaskTypeLibraryHealthRepair = "library.health.repair"
+	TaskTypeImportMovies         = "import.movies"
+	TaskTypeLibraryHealthRepair  = "library.health.repair"
+	TaskTypeLibraryHealthCleanup = "library.health.cleanup"
 
 	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
 	ErrorCodeForbidden     = "COMMON_FORBIDDEN"
@@ -1151,6 +1159,7 @@ const (
 	ErrorCodeHealthRepairNoFindings           = "HEALTH_REPAIR_NO_FINDINGS"
 	ErrorCodeHealthRepairPersistFailed        = "HEALTH_REPAIR_PERSIST_FAILED"
 	ErrorCodeHealthRepairInterrupted          = "HEALTH_REPAIR_INTERRUPTED"
+	ErrorCodeHealthCleanupFailed              = "HEALTH_CLEANUP_FAILED"
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"
