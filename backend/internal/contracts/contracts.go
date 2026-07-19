@@ -555,6 +555,47 @@ type LibraryHealthReportDTO struct {
 	Truncated       bool                          `json:"truncated"`
 }
 
+// StartLibraryHealthRepairRequest starts an explicitly confirmed bounded repair.
+type StartLibraryHealthRepairRequest struct {
+	Action     string   `json:"action"`
+	Categories []string `json:"categories,omitempty"`
+	FindingIDs []string `json:"findingIds,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+	Confirm    bool     `json:"confirm"`
+}
+
+// LibraryHealthRepairItemDTO is one persisted per-finding repair outcome.
+type LibraryHealthRepairItemDTO struct {
+	Ordinal      int    `json:"ordinal"`
+	FindingID    string `json:"findingId"`
+	Category     string `json:"category"`
+	MovieID      string `json:"movieId"`
+	Label        string `json:"label"`
+	Status       string `json:"status"`
+	ChildTaskID  string `json:"childTaskId,omitempty"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	StartedAt    string `json:"startedAt,omitempty"`
+	FinishedAt   string `json:"finishedAt,omitempty"`
+}
+
+// LibraryHealthRepairDTO exposes a persisted repair run and all per-item results.
+type LibraryHealthRepairDTO struct {
+	RepairID       string                       `json:"repairId"`
+	TaskID         string                       `json:"taskId"`
+	Action         string                       `json:"action"`
+	Categories     []string                     `json:"categories"`
+	Status         string                       `json:"status"`
+	TotalItems     int                          `json:"totalItems"`
+	CompletedItems int                          `json:"completedItems"`
+	SucceededItems int                          `json:"succeededItems"`
+	FailedItems    int                          `json:"failedItems"`
+	CreatedAt      string                       `json:"createdAt"`
+	StartedAt      string                       `json:"startedAt,omitempty"`
+	FinishedAt     string                       `json:"finishedAt,omitempty"`
+	Items          []LibraryHealthRepairItemDTO `json:"items"`
+}
+
 // CheckLibraryPathStorageStatusRequest optionally narrows a fresh storage check to specific library paths.
 type CheckLibraryPathStorageStatusRequest struct {
 	LibraryPathIDs []string `json:"libraryPathIds,omitempty"`
@@ -1073,7 +1114,8 @@ const (
 	TaskFailed        = "failed"
 	TaskCancelled     = "cancelled"
 
-	TaskTypeImportMovies = "import.movies"
+	TaskTypeImportMovies        = "import.movies"
+	TaskTypeLibraryHealthRepair = "library.health.repair"
 
 	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
 	ErrorCodeForbidden     = "COMMON_FORBIDDEN"
@@ -1104,6 +1146,11 @@ const (
 	ErrorCodeImportUploadPersistFailed = "IMPORT_UPLOAD_PERSIST_FAILED"
 	ErrorCodeImportUploadUnrecoverable = "IMPORT_UPLOAD_UNRECOVERABLE"
 	ErrorCodeImportUploadExpired       = "IMPORT_UPLOAD_EXPIRED"
+
+	ErrorCodeHealthRepairConfirmationRequired = "HEALTH_REPAIR_CONFIRMATION_REQUIRED"
+	ErrorCodeHealthRepairNoFindings           = "HEALTH_REPAIR_NO_FINDINGS"
+	ErrorCodeHealthRepairPersistFailed        = "HEALTH_REPAIR_PERSIST_FAILED"
+	ErrorCodeHealthRepairInterrupted          = "HEALTH_REPAIR_INTERRUPTED"
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"

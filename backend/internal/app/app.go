@@ -1530,10 +1530,37 @@ func (a *App) beginMovieScrapeTask(ctx context.Context, output io.Writer, result
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist scraper task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
+	if err := a.store.StartMovieMetadataScrapeAttempt(ctx, result.MovieID, task.TaskID, time.Now()); err != nil {
+		a.logger.Error("failed to persist metadata scrape attempt", zap.Error(err), zap.String("taskId", task.TaskID), zap.String("movieId", result.MovieID))
+	}
 	if err := a.emitEvent(output, contracts.EventTaskStarted, contracts.TaskEventDTO{Task: task}); err != nil {
 		a.logger.Error("failed to emit scraper task start", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
 	return task
+}
+
+func (a *App) finishMovieMetadataScrapeAttempt(parentCtx context.Context, result contracts.ScanFileResultDTO, task contracts.TaskDTO) {
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 5*time.Second)
+	defer cancel()
+	status := "completed"
+	if task.Status != contracts.TaskCompleted {
+		status = "failed"
+	}
+	err := a.store.FinishMovieMetadataScrapeAttempt(ctx, storage.MovieMetadataScrapeAttempt{
+		MovieID:       result.MovieID,
+		TaskID:        task.TaskID,
+		Status:        status,
+		ErrorCode:     task.ErrorCode,
+		ErrorCategory: task.ErrorCategory,
+		ErrorMessage:  task.ErrorMessage,
+		Provider:      task.Provider,
+	}, time.Now())
+	if err != nil {
+		a.logger.Error("failed to finish metadata scrape attempt", zap.Error(err), zap.String("taskId", task.TaskID), zap.String("movieId", result.MovieID))
+	}
 }
 
 // runMovieScrapeBody runs scraper, persists metadata, NFO/assets hooks; ctx must be the scrape timeout context.
@@ -1551,6 +1578,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed scraper task", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
+		a.finishMovieMetadataScrapeAttempt(parentCtx, result, task)
 		_ = a.emitEvent(output, contracts.EventTaskFailed, contracts.TaskEventDTO{Task: task})
 		_ = a.emitEvent(output, contracts.EventScraperFailed, struct {
 			Task    contracts.TaskDTO `json:"task"`
@@ -1581,6 +1609,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist scraper failure", zap.Error(saveErr), zap.String("taskId", task.TaskID))
 		}
+		a.finishMovieMetadataScrapeAttempt(parentCtx, result, task)
 		_ = a.emitEvent(output, contracts.EventTaskFailed, contracts.TaskEventDTO{Task: task})
 		_ = a.emitEvent(output, contracts.EventScraperFailed, struct {
 			Task    contracts.TaskDTO `json:"task"`
@@ -1604,6 +1633,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	if err := a.store.SaveTask(ctx, task); err != nil {
 		a.logger.Error("failed to persist completed scraper task", zap.Error(err), zap.String("taskId", task.TaskID))
 	}
+	a.finishMovieMetadataScrapeAttempt(parentCtx, result, task)
 	a.logger.Info("scrape.movie completed",
 		zap.String("taskId", task.TaskID),
 		zap.String("movieId", result.MovieID),

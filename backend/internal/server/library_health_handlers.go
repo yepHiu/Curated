@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -84,7 +85,7 @@ func (h *Handler) handleScanLibraryHealth(w http.ResponseWriter, r *http.Request
 		limit = parsed
 	}
 
-	report, err := h.scanLibraryHealth(r, limit)
+	report, err := h.scanLibraryHealth(r.Context(), limit)
 	if err != nil {
 		if h.logger != nil {
 			h.logger.Error("scan library health failed", zap.Error(err))
@@ -95,8 +96,7 @@ func (h *Handler) handleScanLibraryHealth(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, report)
 }
 
-func (h *Handler) scanLibraryHealth(r *http.Request, limit int) (contracts.LibraryHealthReportDTO, error) {
-	ctx := r.Context()
+func (h *Handler) scanLibraryHealth(ctx context.Context, limit int) (contracts.LibraryHealthReportDTO, error) {
 	snapshot, err := h.store.InspectLibraryHealth(ctx)
 	if err != nil {
 		return contracts.LibraryHealthReportDTO{}, fmt.Errorf("inspect database: %w", err)
@@ -176,6 +176,29 @@ func (h *Handler) scanLibraryHealth(r *http.Request, limit int) (contracts.Libra
 	assetTypesByMovie := make(map[string]map[string]bool)
 	for _, movie := range snapshot.Movies {
 		movieByID[movie.ID] = movie
+	}
+	for _, attempt := range snapshot.MetadataAttempts {
+		movie, exists := movieByID[attempt.MovieID]
+		if !exists {
+			continue
+		}
+		collector.add(contracts.LibraryHealthFindingDTO{
+			Category:   "metadata_failed",
+			Severity:   "warning",
+			EntityType: "movie",
+			EntityID:   movie.ID,
+			Label:      firstNonEmpty(movie.Code, movie.Title),
+			Path:       movie.Location,
+			Message:    firstNonEmpty(attempt.ErrorMessage, "metadata scrape failed"),
+			Details: map[string]any{
+				"taskId":        attempt.TaskID,
+				"errorCode":     attempt.ErrorCode,
+				"errorCategory": attempt.ErrorCategory,
+				"provider":      attempt.Provider,
+				"finishedAt":    attempt.FinishedAt,
+			},
+			RepairActions: []string{"rescrape_metadata", "export_diagnostics"},
+		})
 	}
 	for _, asset := range snapshot.Assets {
 		if assetTypesByMovie[asset.MovieID] == nil {

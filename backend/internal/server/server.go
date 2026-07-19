@@ -197,6 +197,7 @@ type BackupProvider interface {
 
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
+	runtimeContext              context.Context
 	cfg                         config.Config
 	logger                      *zap.Logger
 	store                       *storage.SQLiteStore
@@ -284,7 +285,13 @@ func NewHandler(deps Deps) *Handler {
 			importUploads.startJanitor(deps.RuntimeContext)
 		}
 	}
+	if deps.Store != nil && deps.RuntimeContext != nil {
+		if err := deps.Store.InterruptLibraryHealthRepairRuns(deps.RuntimeContext, time.Now()); err != nil && deps.Logger != nil {
+			deps.Logger.Error("mark interrupted library health repairs failed", zap.Error(err))
+		}
+	}
 	return &Handler{
+		runtimeContext:              deps.RuntimeContext,
 		cfg:                         deps.Cfg,
 		logger:                      deps.Logger,
 		store:                       deps.Store,
@@ -344,6 +351,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/maintenance/backups/verify", h.handleVerifyBackup)
 	mux.HandleFunc("POST /api/maintenance/backups/preflight", h.handlePreflightBackupRestore)
 	mux.HandleFunc("POST /api/library/health/scan", h.handleScanLibraryHealth)
+	mux.HandleFunc("POST /api/library/health/repairs", h.handleStartLibraryHealthRepair)
+	mux.HandleFunc("GET /api/library/health/repairs/{repairId}", h.handleGetLibraryHealthRepair)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

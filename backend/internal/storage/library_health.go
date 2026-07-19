@@ -55,6 +55,7 @@ type LibraryHealthSnapshot struct {
 	Movies               []LibraryHealthMovieRecord
 	Assets               []LibraryHealthAssetRecord
 	Actors               []LibraryHealthActorRecord
+	MetadataAttempts     []MovieMetadataScrapeAttempt
 	Orphans              []LibraryHealthOrphanRecord
 	QuickCheckMessages   []string
 	ForeignKeyViolations []LibraryHealthForeignKeyViolation
@@ -129,6 +130,32 @@ func (s *SQLiteStore) InspectLibraryHealth(ctx context.Context) (LibraryHealthSn
 			return out, err
 		}
 		out.Actors = append(out.Actors, row)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return out, err
+	}
+	if err := rows.Close(); err != nil {
+		return out, err
+	}
+
+	rows, err = s.db.QueryContext(ctx, `
+		SELECT movie_id, task_id, status, error_code, error_category, error_message,
+			provider, started_at, finished_at, updated_at
+		FROM movie_metadata_scrape_attempts
+		WHERE status = 'failed'
+		ORDER BY updated_at DESC, movie_id`)
+	if err != nil {
+		return out, err
+	}
+	for rows.Next() {
+		var row MovieMetadataScrapeAttempt
+		if err := rows.Scan(&row.MovieID, &row.TaskID, &row.Status, &row.ErrorCode, &row.ErrorCategory,
+			&row.ErrorMessage, &row.Provider, &row.StartedAt, &row.FinishedAt, &row.UpdatedAt); err != nil {
+			_ = rows.Close()
+			return out, err
+		}
+		out.MetadataAttempts = append(out.MetadataAttempts, row)
 	}
 	if err := rows.Err(); err != nil {
 		_ = rows.Close()
