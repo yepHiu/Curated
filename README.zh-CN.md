@@ -33,6 +33,7 @@ Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 G
 - **影片导入** — 支持拖拽、文件选择或文件夹选择导入，带进度跟踪与大文件断点续传。
 - **存储在线检测** — 优先支持 Windows 外置硬盘场景，针对已配置库路径检测硬盘离线或卷身份变化，并通过启动提醒、通知中心、扫描/导入阻断与手动重绑降低误操作风险。
 - **可验证备份包** — 使用 `VACUUM INTO` 创建一致 SQLite 快照，可选包含资料库配置，支持 SHA-256 manifest、SQLite 完整性验证、设置页创建/验证/恢复预检、离线原子恢复与保留回滚副本。
+- **可审计路径迁移** — 提供离线 dry-run/apply CLI，用于盘符、挂载点及 Windows→Unix 前缀迁移，包含路径段匹配、目标/冲突检查、自动验证备份、单事务更新、存储绑定重置与持久化审计记录。
 - **元数据刮削** — 多数据源支持，可配置策略（自动全局 / 国内友好 / 自定义链路 / 指定源），数据源健康检查，机器可读的故障分类。
 - **播放能力** — HTML5 视频播放（Range 流）、续播进度、每日观看统计、HLS 会话（remux/转码管线）、外部播放器接力、播放会话诊断。
 - **首页每日推荐** — 基于 UTC 日的 hero 轮播与推荐栏，通过 SQLite 持久化保证跨设备一致，含加权采样、冷却窗口与演员/厂牌均衡。
@@ -90,6 +91,22 @@ go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated
 ```
 
 第一版备份包含一致 SQLite 快照，以及存在时的 `library-config.cfg`；不包含媒体源文件和用户资产文件。manifest 记录文件大小、SHA-256、应用标识、范围和已应用迁移；验证会逐文件校验，并实际执行 SQLite `quick_check` 与 `foreign_key_check`。恢复会拒绝未来迁移和磁盘空间不足，在同目录原子替换文件，并把旧数据库/配置保留为 `.pre-restore-*` 回滚证据。
+
+### 迁移已保存路径
+
+盘符、挂载点或资料库根目录变化时，先完全退出 Curated，再执行只读 plan。源与目标必须是绝对 Windows、UNC 或 Unix 路径；匹配按路径段进行，因此 `D:\Media` 不会误匹配 `D:\Media2`。
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
+```
+
+apply 必须提供一个尚不存在的备份包路径并显式确认。Curated 会先创建并验证迁移前备份，再开启单事务更新：
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
+```
+
+白名单仅包含 `library_paths.path`、`movies.location`、`scan_items.path`、`media_assets.local_path`、`actors.avatar_local_path`、`library_path_storage_bindings.root_path` 与 `app_update_status.downloaded_file_path`；不会改写自由文本或 URL。目标冲突、目标类型错误和目标缺失默认阻止 apply。若执行当前操作系统无法检查目标的跨平台迁移，可显式使用 `-allow-missing-paths` 承担风险。旧前缀下的存储 binding 会被删除，使 Curated 下次启动时重新探测并绑定新卷；成功 apply 会执行 SQLite 完整性检查，并让 `path_migration_audits` 与路径变更在同一事务提交。
 
 ### 启动前端
 

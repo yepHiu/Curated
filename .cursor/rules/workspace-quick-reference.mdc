@@ -54,6 +54,7 @@ alwaysApply: true
 - **重启前后端**：先释放 `5173` 与后端端口（开发 `8080` / release `8081` 或配置里的 `httpAddr`），再分别启动。
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；二次启动会复用现有实例并重新打开浏览器。
 - **修改 API 行为**：优先改 `backend/internal/server` 与 `backend/internal/app`，前端路径集中在 `src/api/endpoints.ts`。
+- **离线路径迁移**：完全退出 Curated 后在 `backend/` 先运行 `go run ./cmd/curated -maintenance path-migrate-plan -path-from <absolute> -path-to <absolute>`；apply 额外要求新 `-backup-path` 与 `-confirm-path-migration`。自定义数据库路径同时传 `-config <path>`；不要删除 `.runtime.lock` 绕过运行时互斥。
 - **修改 README / 对外说明**：如果用户可见行为、命令入口、目录政策或公开说明变了，检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 是否需要同步。
 - **打包历史**：`pnpm release:portable`、`pnpm release:installer`、`pnpm release:publish` 会向 `docs/ops/package-build-history.csv` 追加记录。
 

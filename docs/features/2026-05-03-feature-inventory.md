@@ -201,7 +201,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Network settings | Shipped | Proxy configuration with ping tests |
 | Curated frames settings | Shipped | Export format preference |
 | About page | Shipped | Version info, update checks, dev tools |
-| Maintenance | Shipped | Backup create-and-verify, package verification, restore preflight, full scan, and maintenance guidance |
+| Maintenance | Shipped | Backup create-and-verify, package verification, restore preflight, audited offline path migration, full scan, and maintenance guidance |
 | Security | Shipped | PIN setup/change, idle-lock policy, lock-now, and trusted-session review/revocation |
 
 ### 7.2 Configuration System
@@ -213,7 +213,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Frontend env vars | Shipped | `VITE_USE_WEB_API`, `VITE_API_BASE_URL`, `VITE_LOG_LEVEL` |
 | Backend JSON config | Shipped | Main runtime config with library config merge |
 
-### 7.3 Backup & Recovery
+### 7.3 Backup, Recovery & Path Migration
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -222,6 +222,9 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Settings maintenance controls | Shipped | PIN-protected create-and-verify, verify, and restore preflight in Web API mode |
 | Offline restore | Shipped | Explicit CLI confirmation, runtime lock, compatibility/capacity preflight, `.pre-restore-*` rollback files |
 | No-overwrite destination | Shipped | Atomic hard-link commit or `O_EXCL` fallback for filesystems without hard links |
+| Read-only path migration plan | Shipped | Whitelisted columns; segment-aware Windows/UNC/Unix mapping; affected counts, samples, target status, conflicts, errors/warnings, and `canApply` |
+| Audited path migration apply | Shipped | Runtime lock, explicit confirmation, automatic verified backup, single-transaction path updates plus audit, pre-commit SQLite checks, and storage-binding reset |
+| Cross-platform path mapping | Shipped | Windows case/separator semantics and Windows→Unix mapping; missing/unchecked targets require explicit override while wrong type/errors/conflicts always block |
 
 ### 7.4 App Updates
 

@@ -2323,6 +2323,39 @@ Body 与 verify 相同。
 
 真正恢复必须完全退出 Curated 后，通过 `curated -maintenance backup-restore ... -confirm-restore` 离线执行；成功恢复会保留 `.pre-restore-*` 数据库和配置回滚副本。
 
+### 4.17 Offline Path Migration CLI
+
+路径迁移不是 HTTP API，也不会在运行中的 Settings 页面直接执行。盘符、挂载点或库根变化时，必须完全退出 Curated，并从 `backend/` 运行维护 CLI；自定义数据库配置需同时传 `-config <path>`。plan 获取与正常运行时相同的 `<databasePath>.runtime.lock`，读取数据库但不执行 schema migration 或数据写入：
+
+```powershell
+go run ./cmd/curated `
+  -maintenance path-migrate-plan `
+  -path-from D:\Media `
+  -path-to E:\Media
+```
+
+apply 要求 plan 可应用、一个尚不存在的 `.curated-backup` 目标和显式确认：
+
+```powershell
+go run ./cmd/curated `
+  -maintenance path-migrate-apply `
+  -path-from D:\Media `
+  -path-to E:\Media `
+  -backup-path D:\Backups\before-path-migration.curated-backup `
+  -confirm-path-migration
+```
+
+行为与安全边界：
+
+- 源/目标必须是绝对 Windows drive、UNC 或 Unix 路径；拒绝相对路径、`..`、等价前缀以及嵌套在源前缀下的目标。
+- Windows 比较忽略盘符/路径段大小写并统一 `/`、`\`；Unix 保持大小写敏感；匹配按路径段边界进行，`D:\Media` 不匹配 `D:\Media2`。
+- 支持 Windows→Unix 等跨平台映射。当前操作系统无法检查目标时默认为 `unchecked` 并阻止 apply；只有显式 `-allow-missing-paths` 才放行 `missing` / `unchecked`。`wrong-type`、I/O error 和唯一性冲突始终阻止 apply。
+- 只处理白名单 `library_paths.path`、`movies.location`、`scan_items.path`、`media_assets.local_path`、`actors.avatar_local_path`、`library_path_storage_bindings.root_path`、`app_update_status.downloaded_file_path`；不扫描或替换自由文本、URL 与既有审计 JSON。
+- `library_path_storage_bindings` 命中时删除旧 binding，不把旧卷身份迁到新路径；Curated 下次启动时重新探测并绑定。
+- apply 先通过 `VACUUM INTO` 创建且验证迁移前备份，再在一个 SQLite 事务中重新 plan、更新白名单字段、执行 `quick_check` / `foreign_key_check` 并写入 `path_migration_audits`。任何更新、完整性检查或审计写入失败都会回滚整个事务。
+
+plan 只要成功读取数据库，就会在 stdout 写出结构化 JSON；`plan.columns` 按白名单列返回 `affectedRows`、`emptyRows`、`outsidePrefixRows`、`invalidStoredPaths`、`missingTargets`、`uncheckedTargets`、`targetErrors`、`conflicts` 和最多 5 个样例，顶层还返回汇总、`errors`、`warnings` 与 `canApply`。`canApply=false` 时 CLI 写出 plan 后以非零状态退出。apply 的事务内重新 plan 若被阻止，也会输出该结构化结果和已创建的备份路径；参数无效、未确认、锁冲突或 I/O 失败等无法形成有效 plan 的错误写到 stderr。apply 成功额外返回经过验证的备份 manifest/verification、`appliedRows`、`auditId`、`appliedAt` 和完整 apply plan。
+
 ## 5. DTO 速查
 
 本节列出衍生客户端最常用 DTO。完整字段以 `backend/internal/contracts/contracts.go` 和 `src/api/types.ts` 为准。

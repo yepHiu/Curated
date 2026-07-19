@@ -139,6 +139,15 @@ go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated
 
 自定义主配置需同时传 `-config <path>`。恢复会获取 `<databasePath>.runtime.lock`；仍有 Curated 进程持锁时必须失败，不能通过删除锁文件绕过。
 
+路径迁移同样是离线维护操作。必须先完全退出 Curated，先运行只读 plan，确认 `canApply=true`、影响数、样例、目标状态和冲突，再为 apply 提供一个尚不存在的备份包路径与显式确认：
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
+go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
+```
+
+Windows→Unix 等当前操作系统无法检查目标的场景，只有在人工确认目标布局后才可显式增加 `-allow-missing-paths`；该参数只放行 missing/unchecked，不放行目标类型错误、I/O error 或冲突。apply 会自动创建并验证迁移前备份，随后在同一事务内更新白名单路径、清除旧存储 binding、执行完整性检查并写审计。禁止删除 `.runtime.lock`、跳过 plan、复用已有备份目标或直接用 SQL 字符串替换代替维护命令。
+
 从仓库根目录也可：
 
 ```bash

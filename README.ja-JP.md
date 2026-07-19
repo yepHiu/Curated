@@ -33,6 +33,7 @@ Curated は、Vue 3 フロントエンドと Go + SQLite バックエンドで�
 - **ムービーインポート** — ドラッグ＆ドロップ、ファイル選択、フォルダ選択に対応し、進捗追跡と大容量ファイル向けレジューム可能チャンクアップロードを完備。
 - **ストレージ存在確認** — Windows の外付けドライブ利用を優先し、設定済みライブラリルートのオフライン状態やボリューム変更を検出して、起動時アラート、通知センター、スキャン/インポートのブロック、手動再バインドを提供。
 - **検証可能なバックアップ** — `VACUUM INTO` による一貫した SQLite スナップショット、任意のライブラリ設定、SHA-256 マニフェスト、SQLite 整合性検証、設定画面からの作成・検証・復元プリフライト、オフライン原子的復元、ロールバックコピー保持。
+- **監査可能なパス移行** — ドライブ文字、マウントポイント、Windows→Unix プレフィックス変更向けのオフライン dry-run/apply CLI。パスセグメント一致、移行先/競合検査、自動検証バックアップ、単一トランザクション更新、ストレージ binding リセット、永続監査記録を提供します。
 - **メタデータスクレイピング** — マルチプロバイダー対応、戦略設定（自動グローバル / 中国向け / カスタムチェーン / 指定）、プロバイダーヘルスチェック、ネットワーク診断向けの機械可読な障害カテゴリ。
 - **再生** — HTML5 動画再生（Range ストリーミング）、レジューム再生、日次視聴統計、HLS セッション（remux/トランスコードパイプライン）、外部プレーヤー引き渡し、再生セッション診断。
 - **ホームページ日次レコメンデーション** — UTC ベースの hero カルーセルとレコメンデーション行を SQLite に永続化し、クロスデバイスで一貫性を確保。重み付きサンプリング、クールダウン期間、出演者/スタジオ多様性バランシングを適用。
@@ -90,6 +91,22 @@ go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated
 ```
 
 初期フォーマットには一貫した SQLite スナップショットと、存在する場合の `library-config.cfg` が含まれます。メディアソースとユーザーアセットは含まれません。manifest はサイズ、SHA-256、アプリ識別、スコープ、適用済み migration を記録します。検証は全ファイルと SQLite `quick_check` / `foreign_key_check` を確認し、復元は未知の将来 migration や容量不足を拒否して原子的に置換し、旧データベース/設定を `.pre-restore-*` として保持します。
+
+### 保存済みパスを移行する
+
+ドライブ文字、マウントポイント、ライブラリルートが変わった場合は、Curated を完全終了してから読み取り専用 plan を実行します。移行元と移行先は絶対 Windows、UNC、Unix パスである必要があります。照合はパスセグメント単位なので、`D:\Media` が `D:\Media2` に誤一致することはありません。
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
+```
+
+apply には未使用のバックアップ先と明示的な確認が必要です。Curated は単一トランザクション更新を開始する前に、移行前パッケージを作成して検証します。
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
+```
+
+ホワイトリストは `library_paths.path`、`movies.location`、`scan_items.path`、`media_assets.local_path`、`actors.avatar_local_path`、`library_path_storage_bindings.root_path`、`app_update_status.downloaded_file_path` のみに限定され、自由文や URL は書き換えません。移行先競合、型不一致、欠落は apply をブロックします。現在の OS で移行先を検査できない意図的なクロスプラットフォーム移行では、`-allow-missing-paths` が明示的なリスク承認になります。旧プレフィックスのストレージ binding は削除され、次回起動時に新しいボリュームを再検出・再 binding します。成功時は SQLite 整合性検査を行い、`path_migration_audits` をパス変更と同じトランザクションで保存します。
 
 ### フロントエンドを起動する
 

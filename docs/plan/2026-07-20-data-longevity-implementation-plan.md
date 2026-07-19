@@ -11,7 +11,7 @@
 |---|---|---|
 | C1 备份核心与离线 CLI | verified | `bd2e9b59`、`4d0fd1f0`；storage / backup / maintenance / cmd 测试与全量 Go test/vet 通过 |
 | C2 Settings Maintenance | verified | `e7958490`；受 PIN 保护的 create / verify / preflight API、Web/Mock service contract、三语 Settings UI、目标 Vitest、全量 167/684 Vitest、4/28 Electron、4 项 Chromium e2e、typecheck/lint/build 与全量 Go test/vet 均通过 |
-| C3 路径迁移 CLI | not-started | REQ-0015 |
+| C3 路径迁移 CLI | verified | `1d9b2070`；只读 plan、7 列白名单、Windows/UNC/Unix 与跨平台映射、目标/冲突检查、迁移前已验证备份、单事务 apply + audit、binding reset、目标/全量 Go test/vet 与真实临时 SQLite CLI 演练通过 |
 | C4 上传 session 持久化 | not-started | REQ-0016 |
 | C5 Library Health / 修复队列 | not-started | REQ-0017、REQ-0018 |
 
@@ -72,6 +72,16 @@ config/library-config.cfg   # 原文件存在时
 - `dry-run` 输出每个表的影响数量、样例、冲突、越界与不存在目标。
 - `apply` 在单事务中执行，并把操作摘要写入迁移审计记录或外部结果文件。
 - Windows 路径比较处理盘符大小写和分隔符；禁止部分目录名误匹配。
+
+完成结果（2026-07-20）：
+
+- 已实现 `path-migrate-plan` / `path-migrate-apply`，两者均要求 Curated 完全退出并取得运行时数据库锁；plan 不运行 schema migration，也不写数据库。
+- 白名单覆盖 `library_paths.path`、`movies.location`、`scan_items.path`、`media_assets.local_path`、`actors.avatar_local_path`、`library_path_storage_bindings.root_path`、`app_update_status.downloaded_file_path`；自由文本、URL 与历史审计不参与替换。
+- Windows drive / UNC 比较大小写不敏感并统一分隔符，Unix 保持大小写；按路径段匹配，支持 Windows→Unix，拒绝相对路径、`..`、等价前缀和目标嵌套在源下的危险映射。
+- plan 结构化返回各列影响数、空值/越界/非法值、目标 missing/unchecked/error、唯一性冲突、最多 5 个样例、errors/warnings 与 `canApply`；输出顺序稳定。
+- apply 要求新备份目标与 `-confirm-path-migration`，先创建并验证迁移前 `.curated-backup`，再于单事务内重新 plan、更新路径、清除旧存储 binding、运行 `quick_check` / `foreign_key_check`、创建并写入 `path_migration_audits`；审计写入失败测试证明全部路径更新回滚。
+- missing/unchecked 默认阻止；人工确认跨平台布局后可显式 `-allow-missing-paths`，但 wrong-type、I/O error 和冲突始终不可覆盖。
+- 真实临时 SQLite 演练证明 plan 后原路径与 audit count 保持不变；apply 后 3 行更新、binding 清零、审计落库，独立 `backup-verify`、`quick_check` 和 `foreign_key_check` 通过。
 
 ### C4：上传 session 持久化
 

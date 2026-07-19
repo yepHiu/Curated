@@ -86,9 +86,13 @@ go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curat
 
 # Restore only after Curated is fully stopped and preflight succeeds
 go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
+
+# Plan first; apply only while Curated is fully stopped and with a verified pre-migration backup
+go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
+go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
 ```
 
-Backup format v1 includes the SQLite snapshot and optional `library-config.cfg`, but not media or user asset files. Normal runtime holds `<databasePath>.runtime.lock`; offline restore must acquire the same cross-process lock and retains `.pre-restore-*` rollback files. In Web API mode, Settings -> Maintenance calls the PIN-protected create, verify, and preflight endpoints with absolute paths on the backend machine; it intentionally exposes no online restore action.
+Backup format v1 includes the SQLite snapshot and optional `library-config.cfg`, but not media or user asset files. Normal runtime holds `<databasePath>.runtime.lock`; offline restore and path migration must acquire the same cross-process lock. Restore retains `.pre-restore-*` rollback files. Path migration uses a read-only plan, a strict path-column whitelist, segment-aware Windows/Unix mapping, target/conflict checks, an automatically created and verified backup, one transaction for updates plus `path_migration_audits`, and storage-binding reset. Cross-platform missing/unchecked targets require explicit `-allow-missing-paths`; target type errors and conflicts cannot be overridden. In Web API mode, Settings -> Maintenance calls the PIN-protected create, verify, and preflight endpoints with absolute paths on the backend machine; it intentionally exposes no online restore or path-migration action.
 
 Windows binary naming rule:
 - Development backend builds must use `curated-dev.exe`.
@@ -303,6 +307,8 @@ POST   /api/providers/ping-all              # Ping all providers
 **App update checks/download/install:** `GET /api/app-update/status` returns the packaged-app update state used by Settings -> About and the sidebar brand badge, while `POST /api/app-update/check` forces a refresh. The backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`, returns `installerDownloadUrl` and `installerSha256` when the release includes a Windows `.exe` installer asset with a digest, caches the result in SQLite, reuses the process proxy settings for outbound requests, and uses `0.0.0` as the dev-runtime fallback when no packaged installer version was injected. Settings -> General exposes persisted `autoDownloadUpdates`; when enabled, the startup background check may automatically download and SHA256-verify a newer installer, but it never auto-installs one. `POST /api/app-update/download` downloads to the backend update cache and verifies SHA256; `POST /api/app-update/install` launches the verified installer only after explicit user action. Current local packages are unsigned, so this flow relies on SHA256 integrity and keeps silent auto-install disabled by default.
 
 **Backup maintenance controls:** `POST /api/maintenance/backups`, `/verify`, and `/preflight` are protected by the existing PIN middleware, accept strict JSON with backend-machine absolute paths, and cap request bodies at 64 KiB. Creation never overwrites an existing destination; it uses an atomic hard-link commit where supported and an `O_EXCL` copy fallback for filesystems such as exFAT. Settings -> Maintenance exposes create-and-verify, verify, and preflight in Web API mode, disables them in Mock mode, and keeps the actual restore exclusively in the offline maintenance CLI.
+
+**Offline path migration:** `path-migrate-plan` and `path-migrate-apply` are CLI-only maintenance actions. They map absolute Windows/UNC/Unix prefixes without arbitrary text replacement and only touch `library_paths.path`, `movies.location`, `scan_items.path`, `media_assets.local_path`, `actors.avatar_local_path`, `library_path_storage_bindings.root_path`, and `app_update_status.downloaded_file_path`. Plan is database-read-only and returns structured affected counts, samples, target status, conflicts, errors, warnings, and `canApply`. Apply requires `-confirm-path-migration` plus a new `-backup-path`, creates and verifies that backup first, then re-plans and commits path changes, binding deletion, integrity checks, and `path_migration_audits` atomically.
 
 ## Architecture Boundaries
 

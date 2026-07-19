@@ -33,6 +33,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
 - **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, Settings-based create/verify/preflight controls, offline atomic restore, and retained rollback copies.
+- **Audited path migration** — Offline dry-run/apply CLI for drive-letter, mount-point, and Windows-to-Unix prefix changes, with segment-aware matching, target/conflict checks, automatic verified backup, one-transaction updates, binding reset, and a persisted audit record.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
 - **Offline desktop resources** — Packaged UI uses local Outfit font assets and npm-bundled `hls.js`; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
@@ -93,6 +94,22 @@ go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated
 ```
 
 The package contains a consistent SQLite snapshot and, when present, `library-config.cfg`. It does not include media source files or user asset files in the first format version. The manifest records file sizes, SHA-256 hashes, application identity, scope, and applied migrations. Verification checks every declared file plus SQLite `quick_check` and `foreign_key_check`; restore rejects future migrations and insufficient disk space, replaces files atomically, and retains the previous database/config as `.pre-restore-*` rollback evidence.
+
+### Migrate Stored Paths
+
+When a drive letter, mount point, or library root changes, fully quit Curated and run a read-only plan first. Source and target roots must be absolute Windows, UNC, or Unix paths. Matching is path-segment aware, so `D:\Media` never matches `D:\Media2`.
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
+```
+
+Apply requires an unused backup destination and explicit confirmation. Curated creates and verifies that pre-migration package before opening the one-transaction update:
+
+```powershell
+go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
+```
+
+The whitelist is limited to `library_paths.path`, `movies.location`, `scan_items.path`, `media_assets.local_path`, `actors.avatar_local_path`, `library_path_storage_bindings.root_path`, and `app_update_status.downloaded_file_path`; free text and URLs are never rewritten. Existing destination conflicts, wrong target types, and missing targets block apply. For a deliberate cross-platform migration whose targets cannot be inspected on the current OS, `-allow-missing-paths` is an explicit risk override. Storage bindings under the old prefix are removed so Curated can detect and bind the new volume on next startup. Successful apply runs SQLite integrity checks and writes `path_migration_audits` in the same transaction as the path changes.
 
 ### Start The Frontend
 
