@@ -23,6 +23,7 @@ import (
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
 	"curated-backend/internal/logging"
+	"curated-backend/internal/maintenance"
 	"curated-backend/internal/processlock"
 	"curated-backend/internal/server"
 	"curated-backend/internal/shellopen"
@@ -60,10 +61,31 @@ func main() {
 	configPath := flag.String("config", "", "Path to backend config file")
 	mode := flag.String("mode", defaultMode, "Run mode: http, stdio, both, or tray")
 	autostart := flag.Bool("autostart", false, "Internal flag for silent login autostart")
+	maintenanceAction := flag.String("maintenance", "", "Maintenance action: backup-create, backup-verify, backup-preflight, or backup-restore")
+	backupPath := flag.String("backup-path", "", "Path to a .curated-backup package for maintenance actions")
+	confirmRestore := flag.Bool("confirm-restore", false, "Required confirmation for the destructive backup-restore action")
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if strings.TrimSpace(*maintenanceAction) != "" {
+		cfg, err := config.Load(*configPath)
+		if err != nil {
+			exitWithInitError("failed to load maintenance config", err)
+		}
+		if err := maintenance.Run(ctx, maintenance.Options{
+			Action:            *maintenanceAction,
+			BackupPath:        *backupPath,
+			DatabasePath:      cfg.DatabasePath,
+			LibraryConfigPath: config.DefaultLibrarySettingsPath(),
+			AppVersion:        version.PackageVersion(),
+			AppChannel:        version.Channel,
+			ConfirmRestore:    *confirmRestore,
+		}, os.Stdout); err != nil {
+			exitWithInitError("maintenance action failed", err)
+		}
+		return
+	}
 
 	boot, err := initialize(ctx, *configPath)
 	if err != nil {
