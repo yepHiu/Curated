@@ -728,6 +728,10 @@ export const mockLibraryService: LibraryService = {
     throw new Error("Library health repair requires Web API mode")
   },
 
+  async startLibraryHealthAction(): Promise<never> {
+    throw new Error("Library health cleanup requires Web API mode")
+  },
+
   async listConnectedClients(): Promise<ConnectedClientsDTO> {
     return buildMockConnectedClients()
   },

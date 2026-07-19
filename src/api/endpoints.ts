@@ -83,6 +83,7 @@ import type {
   PostCuratedFramesExportBody,
   PatchMovieBody,
   StartLibraryHealthRepairBody,
+  StartLibraryHealthActionBody,
   PatchSettingsBody,
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
@@ -349,6 +350,10 @@ export const api = {
     return httpClient
       .get<unknown>(`/library/health/repairs/${encodeURIComponent(repairId)}`)
       .then((value) => assertApiResponse("GET /library/health/repairs/{id}", value, isLibraryHealthRepairDTO))
+  },
+
+  startLibraryHealthAction(body: StartLibraryHealthActionBody): Promise<TaskDTO> {
+    return httpClient.post<TaskDTO>("/library/health/actions", body)
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

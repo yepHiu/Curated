@@ -17,6 +17,7 @@ import type {
   LibraryHealthFindingDTO,
   LibraryHealthRepairDTO,
   LibraryHealthReportDTO,
+  TaskDTO,
 } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ import { statusPanelClass } from "@/lib/ui/status-tone"
 import { useLibraryService } from "@/services/library-service"
 
 type RepairCategory = "metadata_missing" | "metadata_failed"
+type CleanupAction = "cleanup_orphan_state" | "cleanup_import_staging"
 
 const props = defineProps<{
   supported: boolean
@@ -56,6 +58,10 @@ const repair = ref<LibraryHealthRepairDTO | null>(null)
 const repairDialogOpen = ref(false)
 const pendingRepairCategory = ref<RepairCategory>("metadata_missing")
 const repairSubmitting = ref(false)
+const cleanupDialogOpen = ref(false)
+const pendingCleanupAction = ref<CleanupAction>("cleanup_orphan_state")
+const cleanupSubmitting = ref(false)
+const cleanupTask = ref<TaskDTO | null>(null)
 let componentAlive = true
 
 const visibleFindings = computed(() => report.value?.findings.slice(0, 100) ?? [])
@@ -77,6 +83,18 @@ const repairActive = computed(() => {
   const status = repair.value?.status
   return status === "pending" || status === "running"
 })
+const cleanupActive = computed(() => {
+  const status = cleanupTask.value?.status
+  return status === "pending" || status === "running"
+})
+const maintenanceActive = computed(() => repairActive.value || cleanupActive.value)
+const orphanCleanupFindings = computed(() => actionableFindings("cleanup_orphan_state"))
+const stagingCleanupFindings = computed(() => actionableFindings("cleanup_import_staging"))
+const pendingCleanupFindings = computed(() => (
+  pendingCleanupAction.value === "cleanup_orphan_state"
+    ? orphanCleanupFindings.value
+    : stagingCleanupFindings.value
+))
 
 onBeforeUnmount(() => {
   componentAlive = false
@@ -144,7 +162,7 @@ function categoryLabel(category: string): string {
 }
 
 async function runHealthScan() {
-  if (!props.supported || reportBusy.value || repairActive.value) return
+  if (!props.supported || reportBusy.value || maintenanceActive.value) return
   actionError.value = ""
   reportBusy.value = true
   try {
@@ -154,6 +172,10 @@ async function runHealthScan() {
   } finally {
     reportBusy.value = false
   }
+}
+
+function actionableFindings(action: CleanupAction): LibraryHealthFindingDTO[] {
+  return (report.value?.findings ?? []).filter((finding) => finding.repairActions?.includes(action))
 }
 
 function openRepairDialog(category: RepairCategory) {
@@ -197,6 +219,50 @@ async function pollRepair(repairId: string) {
       return
     }
     await new Promise((resolve) => window.setTimeout(resolve, 750))
+  }
+}
+
+function openCleanupDialog(action: CleanupAction) {
+  if (!props.supported || maintenanceActive.value) return
+  pendingCleanupAction.value = action
+  cleanupDialogOpen.value = true
+}
+
+async function confirmCleanup() {
+  const findings = pendingCleanupFindings.value.slice(0, 25)
+  if (!props.supported || cleanupSubmitting.value || findings.length === 0) return
+  actionError.value = ""
+  cleanupSubmitting.value = true
+  try {
+    cleanupTask.value = await libraryService.startLibraryHealthAction({
+      action: pendingCleanupAction.value,
+      findingIds: findings.map((finding) => finding.id),
+      confirm: true,
+    })
+    cleanupDialogOpen.value = false
+    await pollCleanupTask(cleanupTask.value.taskId)
+  } catch (error) {
+    actionError.value = formatError(error)
+  } finally {
+    cleanupSubmitting.value = false
+  }
+}
+
+async function pollCleanupTask(taskId: string) {
+  while (componentAlive) {
+    const current = await libraryService.getTaskStatus(taskId)
+    cleanupTask.value = current
+    if (!["pending", "running"].includes(current.status)) {
+      pushAppToast(
+        current.status === "completed"
+          ? t("settings.libraryHealthCleanupCompletedToast")
+          : t("settings.libraryHealthCleanupFinishedWithErrorsToast"),
+        { variant: current.status === "completed" ? "success" : "warning" },
+      )
+      await runHealthScan()
+      return
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 500))
   }
 }
 
@@ -260,7 +326,7 @@ function downloadDiagnostics() {
               class="h-auto min-h-11 rounded-2xl px-5 font-medium"
               data-settings-comfortable-control
               data-library-health-scan
-              :disabled="!supported || reportBusy || repairActive"
+              :disabled="!supported || reportBusy || maintenanceActive"
               @click="runHealthScan"
             >
               <LoaderCircle v-if="reportBusy" data-icon="inline-start" class="animate-spin" />
@@ -359,6 +425,17 @@ function downloadDiagnostics() {
             </ul>
           </div>
 
+          <div v-if="cleanupTask" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/10 p-4" aria-live="polite">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupProgressTitle") }}</p>
+              <Badge :variant="cleanupTask.status === 'completed' ? 'success' : cleanupActive ? 'info' : 'warning'">
+                {{ t(`settings.libraryHealthRepairStatus_${cleanupTask.status}`) }}
+              </Badge>
+            </div>
+            <Progress :model-value="cleanupTask.progress" :aria-label="t('settings.libraryHealthCleanupProgressTitle')" />
+            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ cleanupTask.message }}</p>
+          </div>
+
           <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthMetadataRepairTitle") }}</p>
@@ -390,6 +467,41 @@ function downloadDiagnostics() {
               >
                 <RefreshCw data-icon="inline-start" />
                 {{ t("settings.libraryHealthRepairFailed", { count: report.summary.categoryCounts.metadata_failed }) }}
+              </Button>
+            </div>
+          </div>
+
+          <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex min-w-0 flex-col gap-2">
+              <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupTitle") }}</p>
+              <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthCleanupHint") }}</p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <Button
+                v-if="orphanCleanupFindings.length"
+                type="button"
+                variant="outline"
+                class="h-auto min-h-11 rounded-2xl px-4"
+                data-settings-comfortable-control
+                data-library-health-cleanup-orphans
+                :disabled="maintenanceActive"
+                @click="openCleanupDialog('cleanup_orphan_state')"
+              >
+                <Wrench data-icon="inline-start" />
+                {{ t("settings.libraryHealthCleanupOrphans", { count: orphanCleanupFindings.length }) }}
+              </Button>
+              <Button
+                v-if="stagingCleanupFindings.length"
+                type="button"
+                variant="outline"
+                class="h-auto min-h-11 rounded-2xl px-4"
+                data-settings-comfortable-control
+                data-library-health-cleanup-staging
+                :disabled="maintenanceActive"
+                @click="openCleanupDialog('cleanup_import_staging')"
+              >
+                <FileWarning data-icon="inline-start" />
+                {{ t("settings.libraryHealthCleanupStaging", { count: stagingCleanupFindings.length }) }}
               </Button>
             </div>
           </div>
@@ -456,6 +568,43 @@ function downloadDiagnostics() {
             <LoaderCircle v-if="repairSubmitting" data-icon="inline-start" class="animate-spin" />
             <Wrench v-else data-icon="inline-start" />
             {{ repairSubmitting ? t("settings.libraryHealthRepairStarting") : t("settings.libraryHealthRepairConfirmAction") }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="cleanupDialogOpen">
+      <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{{ t("settings.libraryHealthCleanupConfirmTitle") }}</DialogTitle>
+          <DialogDescription class="text-pretty">
+            {{ t("settings.libraryHealthCleanupConfirmDescription", {
+              count: Math.min(25, pendingCleanupFindings.length),
+              action: pendingCleanupAction === 'cleanup_orphan_state'
+                ? t('settings.libraryHealthCleanupOrphanLabel')
+                : t('settings.libraryHealthCleanupStagingLabel'),
+            }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <div class="flex items-start gap-3 rounded-lg border border-danger/25 bg-danger/[0.07] p-3 text-sm text-foreground">
+          <AlertTriangle class="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
+          <p class="text-xs leading-relaxed sm:text-sm">{{ t("settings.libraryHealthCleanupConfirmWarning") }}</p>
+        </div>
+        <DialogFooter class="gap-3">
+          <Button type="button" variant="outline" class="min-h-11 rounded-2xl" :disabled="cleanupSubmitting" @click="cleanupDialogOpen = false">
+            {{ t("common.cancel") }}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            class="min-h-11 rounded-2xl"
+            data-library-health-cleanup-confirm
+            :disabled="cleanupSubmitting"
+            @click="confirmCleanup"
+          >
+            <LoaderCircle v-if="cleanupSubmitting" data-icon="inline-start" class="animate-spin" />
+            <Wrench v-else data-icon="inline-start" />
+            {{ cleanupSubmitting ? t("settings.libraryHealthCleanupStarting") : t("settings.libraryHealthCleanupConfirmAction") }}
           </Button>
         </DialogFooter>
       </DialogContent>

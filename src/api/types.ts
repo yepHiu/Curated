@@ -442,6 +442,12 @@ export interface StartLibraryHealthRepairBody {
   confirm: boolean
 }
 
+export interface StartLibraryHealthActionBody {
+  action: "cleanup_orphan_state" | "cleanup_import_staging"
+  findingIds: string[]
+  confirm: boolean
+}
+
 export interface LibraryHealthRepairItemDTO {
   ordinal: number
   findingId: string

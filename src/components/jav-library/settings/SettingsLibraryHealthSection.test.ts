@@ -6,6 +6,8 @@ const serviceMock = vi.hoisted(() => ({
   scanLibraryHealth: vi.fn(),
   startLibraryHealthRepair: vi.fn(),
   getLibraryHealthRepair: vi.fn(),
+  startLibraryHealthAction: vi.fn(),
+  getTaskStatus: vi.fn(),
 }))
 
 const toastMock = vi.hoisted(() => vi.fn())
@@ -106,6 +108,25 @@ describe("SettingsLibraryHealthSection", () => {
       finishedAt: undefined,
     })
     serviceMock.getLibraryHealthRepair.mockResolvedValue(completedRepair)
+    serviceMock.startLibraryHealthAction.mockResolvedValue({
+      taskId: "cleanup-1",
+      type: "library.health.cleanup",
+      status: "running",
+      createdAt: "2026-07-20T10:02:00Z",
+      startedAt: "2026-07-20T10:02:00Z",
+      progress: 0,
+      message: "cleaning",
+    })
+    serviceMock.getTaskStatus.mockResolvedValue({
+      taskId: "cleanup-1",
+      type: "library.health.cleanup",
+      status: "completed",
+      createdAt: "2026-07-20T10:02:00Z",
+      startedAt: "2026-07-20T10:02:00Z",
+      finishedAt: "2026-07-20T10:02:01Z",
+      progress: 100,
+      message: "cleanup completed",
+    })
   })
 
   it("runs a read-only scan and renders categorized findings", async () => {
@@ -155,5 +176,50 @@ describe("SettingsLibraryHealthSection", () => {
     const wrapper = mount(SettingsLibraryHealthSection, { props: { supported: false } })
     expect(wrapper.get("[data-library-health-scan]").attributes("disabled")).toBeDefined()
     expect(wrapper.text()).toContain("settings.libraryHealthWebRequired")
+  })
+
+  it("requires confirmation and exact finding ids for destructive cleanup", async () => {
+    serviceMock.scanLibraryHealth.mockResolvedValue({
+      ...report,
+      summary: {
+        ...report.summary,
+        totalFindings: 1,
+        warningFindings: 1,
+        infoFindings: 0,
+        categoryCounts: { orphan_user_state: 1 },
+      },
+      findings: [{
+        id: "health-orphan",
+        category: "orphan_user_state",
+        severity: "warning" as const,
+        entityType: "playback_progress",
+        entityId: "missing-movie",
+        label: "playback_progress",
+        message: "user state references a missing movie",
+        repairActions: ["cleanup_orphan_state"],
+      }],
+    })
+    const wrapper = mount(SettingsLibraryHealthSection, {
+      props: { supported: true },
+      attachTo: document.body,
+    })
+    await wrapper.get("[data-library-health-scan]").trigger("click")
+    await flushPromises()
+    await wrapper.get("[data-library-health-cleanup-orphans]").trigger("click")
+    await flushPromises()
+
+    expect(serviceMock.startLibraryHealthAction).not.toHaveBeenCalled()
+    const confirm = document.querySelector<HTMLButtonElement>("[data-library-health-cleanup-confirm]")
+    expect(confirm).not.toBeNull()
+    confirm?.click()
+    await flushPromises()
+
+    expect(serviceMock.startLibraryHealthAction).toHaveBeenCalledWith({
+      action: "cleanup_orphan_state",
+      findingIds: ["health-orphan"],
+      confirm: true,
+    })
+    expect(serviceMock.getTaskStatus).toHaveBeenCalledWith("cleanup-1")
+    wrapper.unmount()
   })
 })

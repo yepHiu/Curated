@@ -24,6 +24,7 @@ import type {
   SettingsDTO,
   TaskDTO,
   StartLibraryHealthRepairBody,
+  StartLibraryHealthActionBody,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
@@ -528,6 +529,10 @@ function createWebLibraryService(): LibraryService {
 
     async getLibraryHealthRepair(repairId: string): Promise<LibraryHealthRepairDTO> {
       return api.getLibraryHealthRepair(repairId.trim())
+    },
+
+    async startLibraryHealthAction(body: StartLibraryHealthActionBody): Promise<TaskDTO> {
+      return api.startLibraryHealthAction(body)
     },
 
     async checkLibraryPathStorageStatus(libraryPathIds?: string[]) {

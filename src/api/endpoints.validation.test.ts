@@ -372,6 +372,28 @@ describe("api endpoint response validation", () => {
     expect(get).toHaveBeenCalledWith("/library/health/repairs/repair-1")
   })
 
+  it("posts exact confirmed library health cleanup findings", async () => {
+    const task = {
+      taskId: "cleanup-1",
+      type: "library.health.cleanup",
+      status: "running",
+      createdAt: "2026-07-20T10:02:00Z",
+      progress: 0,
+    }
+    const post = vi.spyOn(httpClient, "post").mockResolvedValueOnce(task)
+
+    await expect(api.startLibraryHealthAction({
+      action: "cleanup_orphan_state",
+      findingIds: ["health-orphan"],
+      confirm: true,
+    })).resolves.toEqual(task)
+    expect(post).toHaveBeenCalledWith("/library/health/actions", {
+      action: "cleanup_orphan_state",
+      findingIds: ["health-orphan"],
+      confirm: true,
+    })
+  })
+
   it("rejects malformed library health category counts", async () => {
     vi.spyOn(httpClient, "post").mockResolvedValueOnce({
       scannedAt: "2026-07-20T10:00:00Z",

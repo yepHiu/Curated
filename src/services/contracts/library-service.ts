@@ -35,6 +35,7 @@ import type {
   PutMovieCommentBody,
   TaskDTO,
   StartLibraryHealthRepairBody,
+  StartLibraryHealthActionBody,
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
@@ -104,6 +105,7 @@ export interface LibraryService {
   scanLibraryHealth(): Promise<LibraryHealthReportDTO>
   startLibraryHealthRepair(body: StartLibraryHealthRepairBody): Promise<LibraryHealthRepairDTO>
   getLibraryHealthRepair(repairId: string): Promise<LibraryHealthRepairDTO>
+  startLibraryHealthAction(body: StartLibraryHealthActionBody): Promise<TaskDTO>
   pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProvider(name: string): Promise<ProviderHealthDTO>
