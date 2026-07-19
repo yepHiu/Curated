@@ -4,6 +4,7 @@ package tasks
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,6 +55,20 @@ func (m *Manager) Create(taskType string, metadata map[string]any) contracts.Tas
 
 	m.publishTaskUpdated(task)
 	return task
+}
+
+// Restore registers a persisted task snapshot without changing its identity or
+// timestamps. Restart-recoverable operations use it to rebuild runtime state.
+// Restore intentionally does not publish a synthetic task.updated event.
+func (m *Manager) Restore(task contracts.TaskDTO) bool {
+	if strings.TrimSpace(task.TaskID) == "" || strings.TrimSpace(task.Type) == "" {
+		return false
+	}
+	m.mu.Lock()
+	m.tasks[task.TaskID] = task
+	_ = m.enforceCap()
+	m.mu.Unlock()
+	return true
 }
 
 // Subscribe registers a listener for future task events. The returned

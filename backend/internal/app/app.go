@@ -97,9 +97,11 @@ type App struct {
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
 	librarySettingsPath        string   // JSON file under config/ (organizeLibrary, future keys)
 
-	appCtx   context.Context
-	writeMu  sync.Mutex
-	scanning atomic.Bool
+	appCtx          context.Context
+	writeMu         sync.Mutex
+	scanning        atomic.Bool
+	httpHandlerOnce sync.Once
+	httpHandler     http.Handler
 
 	// scrapeSem limits concurrent scrape.movie pipelines (network + DB).
 	scrapeSem chan struct{}
@@ -2574,36 +2576,40 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 
 // HTTPHandler builds the HTTP request multiplexer for the web API server.
 func (a *App) HTTPHandler() http.Handler {
-	apiHandler := server.NewHandler(server.Deps{
-		Cfg:                              a.cfg,
-		Logger:                           a.logger,
-		Store:                            a.store,
-		Tasks:                            a.tasks,
-		ScanStarter:                      a,
-		OrganizeLibraryCtl:               a,
-		AutoLibraryWatchCtl:              a,
-		AutoActorProfileScrapeCtl:        a,
-		AutoDownloadUpdatesCtl:           a,
-		LaunchAtLoginCtl:                 a,
-		CuratedFrameExportFormatCtl:      a,
-		DefaultImportLibraryPathCtl:      a,
-		MetadataScrapeCtl:                a,
-		ProviderHealthChecker:            a.scraper,
-		ProxyCtl:                         a,
-		BackendLogCtl:                    a,
-		PlayerSettingsCtl:                a,
-		MovieMetadataRefresher:           a,
-		ActorProfileRefresher:            a,
-		LibraryWatchReloader:             a,
-		DevPerformanceProvider:           a,
-		PlaybackResolver:                 a,
-		NativePlaybackLauncher:           a,
-		HomepageRecommendations:          a,
-		AppUpdateProvider:                a,
-		BackupProvider:                   a,
-		LibraryPathStorageStatusProvider: a,
-	}).Routes()
-	return webui.WrapHandler(apiHandler)
+	a.httpHandlerOnce.Do(func() {
+		apiHandler := server.NewHandler(server.Deps{
+			RuntimeContext:                   a.appCtx,
+			Cfg:                              a.cfg,
+			Logger:                           a.logger,
+			Store:                            a.store,
+			Tasks:                            a.tasks,
+			ScanStarter:                      a,
+			OrganizeLibraryCtl:               a,
+			AutoLibraryWatchCtl:              a,
+			AutoActorProfileScrapeCtl:        a,
+			AutoDownloadUpdatesCtl:           a,
+			LaunchAtLoginCtl:                 a,
+			CuratedFrameExportFormatCtl:      a,
+			DefaultImportLibraryPathCtl:      a,
+			MetadataScrapeCtl:                a,
+			ProviderHealthChecker:            a.scraper,
+			ProxyCtl:                         a,
+			BackendLogCtl:                    a,
+			PlayerSettingsCtl:                a,
+			MovieMetadataRefresher:           a,
+			ActorProfileRefresher:            a,
+			LibraryWatchReloader:             a,
+			DevPerformanceProvider:           a,
+			PlaybackResolver:                 a,
+			NativePlaybackLauncher:           a,
+			HomepageRecommendations:          a,
+			AppUpdateProvider:                a,
+			BackupProvider:                   a,
+			LibraryPathStorageStatusProvider: a,
+		}).Routes()
+		a.httpHandler = webui.WrapHandler(apiHandler)
+	})
+	return a.httpHandler
 }
 
 // GetAppUpdateStatus returns the cached packaged-app update check result.

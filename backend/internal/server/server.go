@@ -231,6 +231,7 @@ type Handler struct {
 
 // Deps bundles all dependencies needed to construct a Handler.
 type Deps struct {
+	RuntimeContext                   context.Context
 	Cfg                              config.Config
 	Logger                           *zap.Logger
 	Store                            *storage.SQLiteStore
@@ -267,6 +268,22 @@ func NewHandler(deps Deps) *Handler {
 	if tracker == nil {
 		tracker = clienttracker.New()
 	}
+	importUploads := newMovieImportUploadSessionStore(deps.Store, deps.Tasks, deps.Logger)
+	if deps.Store != nil && deps.Tasks != nil {
+		recoveryContext := deps.RuntimeContext
+		if recoveryContext == nil {
+			recoveryContext = context.Background()
+		}
+		if err := importUploads.recover(recoveryContext); err != nil {
+			importUploads.initErr = err
+			if deps.Logger != nil {
+				deps.Logger.Error("recover movie import upload sessions failed", zap.Error(err))
+			}
+		}
+		if deps.RuntimeContext != nil {
+			importUploads.startJanitor(deps.RuntimeContext)
+		}
+	}
 	return &Handler{
 		cfg:                         deps.Cfg,
 		logger:                      deps.Logger,
@@ -295,7 +312,7 @@ func NewHandler(deps Deps) *Handler {
 		homepageRecommendations:     deps.HomepageRecommendations,
 		appUpdateProvider:           deps.AppUpdateProvider,
 		backupProvider:              deps.BackupProvider,
-		importUploads:               newMovieImportUploadSessionStore(),
+		importUploads:               importUploads,
 		clientTracker:               tracker,
 		authAttempts:                newAuthAttemptLimiter(),
 	}
@@ -2582,7 +2599,7 @@ func importProgressPercent(copiedBytes int64, declaredTotalBytes int64) int {
 	if declaredTotalBytes <= 0 {
 		return 0
 	}
-	p := int((copiedBytes * 100) / declaredTotalBytes)
+	p := int((float64(copiedBytes) / float64(declaredTotalBytes)) * 100)
 	if p < 0 {
 		return 0
 	}

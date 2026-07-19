@@ -98,8 +98,12 @@ func decodeBackupPathRequest(w http.ResponseWriter, r *http.Request) (contracts.
 }
 
 func decodeStrictJSONBody(w http.ResponseWriter, r *http.Request, destination any) error {
+	return decodeStrictJSONBodyLimit(w, r, destination, 64<<10)
+}
+
+func decodeStrictJSONBodyLimit(w http.ResponseWriter, r *http.Request, destination any, limit int64) error {
 	defer r.Body.Close()
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {

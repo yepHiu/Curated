@@ -704,18 +704,22 @@ type MovieImportUploadFileDTO struct {
 	Size          int64  `json:"size"`
 	BytesReceived int64  `json:"bytesReceived"`
 	Complete      bool   `json:"complete"`
+	State         string `json:"state,omitempty"`
 }
 
 // MovieImportUploadDTO reports resumable import upload session state.
 type MovieImportUploadDTO struct {
-	UploadID      string                     `json:"uploadId"`
-	TargetPath    string                     `json:"targetPath"`
-	ChunkSize     int64                      `json:"chunkSize"`
-	BytesReceived int64                      `json:"bytesReceived"`
-	TotalBytes    int64                      `json:"totalBytes"`
-	State         string                     `json:"state"`
-	Files         []MovieImportUploadFileDTO `json:"files"`
-	Task          TaskDTO                    `json:"task"`
+	UploadID       string                     `json:"uploadId"`
+	TargetPath     string                     `json:"targetPath"`
+	ChunkSize      int64                      `json:"chunkSize"`
+	BytesReceived  int64                      `json:"bytesReceived"`
+	TotalBytes     int64                      `json:"totalBytes"`
+	State          string                     `json:"state"`
+	ExpiresAt      string                     `json:"expiresAt,omitempty"`
+	RecoveryStatus string                     `json:"recoveryStatus,omitempty"`
+	RecoveryError  string                     `json:"recoveryError,omitempty"`
+	Files          []MovieImportUploadFileDTO `json:"files"`
+	Task           TaskDTO                    `json:"task"`
 }
 
 // CreateMovieImportUploadResponse is returned after creating a resumable movie import upload.
@@ -1053,6 +1057,9 @@ const (
 	ErrorCodeImportCopyFailed          = "IMPORT_COPY_FAILED"
 	ErrorCodeImportCancelled           = "IMPORT_CANCELLED"
 	ErrorCodeImportScanFailed          = "IMPORT_SCAN_FAILED"
+	ErrorCodeImportUploadPersistFailed = "IMPORT_UPLOAD_PERSIST_FAILED"
+	ErrorCodeImportUploadUnrecoverable = "IMPORT_UPLOAD_UNRECOVERABLE"
+	ErrorCodeImportUploadExpired       = "IMPORT_UPLOAD_EXPIRED"
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"

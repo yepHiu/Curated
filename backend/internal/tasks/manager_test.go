@@ -174,3 +174,35 @@ func TestListRecentFinished_SkipsRunning(t *testing.T) {
 		t.Fatalf("status %q", got[0].Status)
 	}
 }
+
+func TestRestorePreservesPersistedSnapshotWithoutPublishing(t *testing.T) {
+	t.Parallel()
+	m := NewManager()
+	_, events, unsubscribe := m.Subscribe(1)
+	defer unsubscribe()
+	snapshot := contracts.TaskDTO{
+		TaskID:    "import.movies-restored",
+		Type:      contracts.TaskTypeImportMovies,
+		Status:    contracts.TaskRunning,
+		Progress:  42,
+		Message:   "Uploading movies",
+		CreatedAt: "2026-07-20T00:00:00Z",
+		StartedAt: "2026-07-20T00:00:01Z",
+		Metadata:  map[string]any{"uploadId": "upload_restored"},
+	}
+	if !m.Restore(snapshot) {
+		t.Fatal("Restore returned false")
+	}
+	got, ok := m.Get(snapshot.TaskID)
+	if !ok || got.Progress != snapshot.Progress || got.CreatedAt != snapshot.CreatedAt || got.Metadata["uploadId"] != "upload_restored" {
+		t.Fatalf("restored snapshot=%+v ok=%v", got, ok)
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("Restore published event %+v", event)
+	default:
+	}
+	if m.Restore(contracts.TaskDTO{}) {
+		t.Fatal("Restore accepted empty snapshot")
+	}
+}

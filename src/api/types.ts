@@ -476,6 +476,7 @@ export interface MovieImportUploadFileDTO {
   size: number
   bytesReceived: number
   complete: boolean
+  state?: string
 }
 
 export interface MovieImportUploadDTO {
@@ -485,6 +486,9 @@ export interface MovieImportUploadDTO {
   bytesReceived: number
   totalBytes: number
   state: string
+  expiresAt?: string
+  recoveryStatus?: string
+  recoveryError?: string
   files: MovieImportUploadFileDTO[]
   task: TaskDTO
 }
