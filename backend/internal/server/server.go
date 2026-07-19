@@ -343,6 +343,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/maintenance/backups", h.handleCreateBackup)
 	mux.HandleFunc("POST /api/maintenance/backups/verify", h.handleVerifyBackup)
 	mux.HandleFunc("POST /api/maintenance/backups/preflight", h.handlePreflightBackupRestore)
+	mux.HandleFunc("POST /api/library/health/scan", h.handleScanLibraryHealth)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)

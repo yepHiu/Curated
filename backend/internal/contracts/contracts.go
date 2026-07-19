@@ -511,6 +511,50 @@ type LibraryPathStorageStatusListDTO struct {
 	Items []LibraryPathStorageStatusDTO `json:"items"`
 }
 
+// LibraryHealthDatabaseDTO summarizes read-only SQLite integrity checks.
+type LibraryHealthDatabaseDTO struct {
+	QuickCheckOK       bool     `json:"quickCheckOk"`
+	QuickCheckMessages []string `json:"quickCheckMessages"`
+	ForeignKeyOK       bool     `json:"foreignKeyOk"`
+	ForeignKeyCount    int      `json:"foreignKeyCount"`
+}
+
+// LibraryHealthFindingDTO is one stable, actionable health finding.
+// RepairActions is advisory; the read-only scan never executes an action.
+type LibraryHealthFindingDTO struct {
+	ID            string         `json:"id"`
+	Category      string         `json:"category"`
+	Severity      string         `json:"severity"`
+	EntityType    string         `json:"entityType"`
+	EntityID      string         `json:"entityId,omitempty"`
+	Label         string         `json:"label"`
+	Path          string         `json:"path,omitempty"`
+	Message       string         `json:"message"`
+	Details       map[string]any `json:"details,omitempty"`
+	RepairActions []string       `json:"repairActions,omitempty"`
+}
+
+// LibraryHealthSummaryDTO contains complete counts even when Findings is truncated.
+type LibraryHealthSummaryDTO struct {
+	TotalFindings       int            `json:"totalFindings"`
+	CriticalFindings    int            `json:"criticalFindings"`
+	WarningFindings     int            `json:"warningFindings"`
+	InfoFindings        int            `json:"infoFindings"`
+	SkippedOfflineFiles int            `json:"skippedOfflineFiles"`
+	CategoryCounts      map[string]int `json:"categoryCounts"`
+}
+
+// LibraryHealthReportDTO is a fresh, read-only library health snapshot.
+type LibraryHealthReportDTO struct {
+	ScannedAt       string                        `json:"scannedAt"`
+	Status          string                        `json:"status"`
+	Database        LibraryHealthDatabaseDTO      `json:"database"`
+	StorageStatuses []LibraryPathStorageStatusDTO `json:"storageStatuses"`
+	Summary         LibraryHealthSummaryDTO       `json:"summary"`
+	Findings        []LibraryHealthFindingDTO     `json:"findings"`
+	Truncated       bool                          `json:"truncated"`
+}
+
 // CheckLibraryPathStorageStatusRequest optionally narrows a fresh storage check to specific library paths.
 type CheckLibraryPathStorageStatusRequest struct {
 	LibraryPathIDs []string `json:"libraryPathIds,omitempty"`
