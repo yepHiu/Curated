@@ -61,9 +61,13 @@ func main() {
 	configPath := flag.String("config", "", "Path to backend config file")
 	mode := flag.String("mode", defaultMode, "Run mode: http, stdio, both, or tray")
 	autostart := flag.Bool("autostart", false, "Internal flag for silent login autostart")
-	maintenanceAction := flag.String("maintenance", "", "Maintenance action: backup-create, backup-verify, backup-preflight, or backup-restore")
+	maintenanceAction := flag.String("maintenance", "", "Maintenance action: backup-create, backup-verify, backup-preflight, backup-restore, path-migrate-plan, or path-migrate-apply")
 	backupPath := flag.String("backup-path", "", "Path to a .curated-backup package for maintenance actions")
 	confirmRestore := flag.Bool("confirm-restore", false, "Required confirmation for the destructive backup-restore action")
+	pathFrom := flag.String("path-from", "", "Absolute source path prefix for path migration")
+	pathTo := flag.String("path-to", "", "Absolute target path prefix for path migration")
+	allowMissingPaths := flag.Bool("allow-missing-paths", false, "Allow path migration when mapped targets are missing or cannot be checked on this OS")
+	confirmPathMigration := flag.Bool("confirm-path-migration", false, "Required confirmation for path-migrate-apply")
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -74,13 +78,17 @@ func main() {
 			exitWithInitError("failed to load maintenance config", err)
 		}
 		if err := maintenance.Run(ctx, maintenance.Options{
-			Action:            *maintenanceAction,
-			BackupPath:        *backupPath,
-			DatabasePath:      cfg.DatabasePath,
-			LibraryConfigPath: config.DefaultLibrarySettingsPath(),
-			AppVersion:        version.PackageVersion(),
-			AppChannel:        version.Channel,
-			ConfirmRestore:    *confirmRestore,
+			Action:               *maintenanceAction,
+			BackupPath:           *backupPath,
+			DatabasePath:         cfg.DatabasePath,
+			LibraryConfigPath:    config.DefaultLibrarySettingsPath(),
+			AppVersion:           version.PackageVersion(),
+			AppChannel:           version.Channel,
+			ConfirmRestore:       *confirmRestore,
+			PathFrom:             *pathFrom,
+			PathTo:               *pathTo,
+			AllowMissingPaths:    *allowMissingPaths,
+			ConfirmPathMigration: *confirmPathMigration,
 		}, os.Stdout); err != nil {
 			exitWithInitError("maintenance action failed", err)
 		}

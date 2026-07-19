@@ -18,43 +18,46 @@ import (
 )
 
 const (
-	ActionBackupCreate    = "backup-create"
-	ActionBackupVerify    = "backup-verify"
-	ActionBackupPreflight = "backup-preflight"
-	ActionBackupRestore   = "backup-restore"
+	ActionBackupCreate     = "backup-create"
+	ActionBackupVerify     = "backup-verify"
+	ActionBackupPreflight  = "backup-preflight"
+	ActionBackupRestore    = "backup-restore"
+	ActionPathMigratePlan  = "path-migrate-plan"
+	ActionPathMigrateApply = "path-migrate-apply"
 )
 
 var (
-	ErrVerificationFailed = errors.New("backup verification failed")
-	ErrPreflightFailed    = errors.New("backup restore preflight failed")
+	ErrVerificationFailed   = errors.New("backup verification failed")
+	ErrPreflightFailed      = errors.New("backup restore preflight failed")
+	ErrPathMigrationBlocked = errors.New("path migration plan is blocked")
 )
 
 // Options configures one non-interactive maintenance action.
 type Options struct {
-	Action            string
-	BackupPath        string
-	DatabasePath      string
-	LibraryConfigPath string
-	AppVersion        string
-	AppChannel        string
-	ConfirmRestore    bool
-	Now               func() time.Time
+	Action               string
+	BackupPath           string
+	DatabasePath         string
+	LibraryConfigPath    string
+	AppVersion           string
+	AppChannel           string
+	ConfirmRestore       bool
+	PathFrom             string
+	PathTo               string
+	AllowMissingPaths    bool
+	ConfirmPathMigration bool
+	Now                  func() time.Time
 }
 
 // Run performs one action and writes a machine-readable JSON result.
 func Run(ctx context.Context, options Options, output io.Writer) error {
 	action := strings.TrimSpace(options.Action)
-	backupPath := strings.TrimSpace(options.BackupPath)
-	if backupPath == "" {
-		return errors.New("-backup-path is required for maintenance actions")
-	}
-	absBackupPath, err := filepath.Abs(backupPath)
-	if err != nil {
-		return fmt.Errorf("resolve backup path: %w", err)
-	}
 
 	switch action {
 	case ActionBackupCreate:
+		absBackupPath, err := requiredAbsolutePath("-backup-path", options.BackupPath)
+		if err != nil {
+			return err
+		}
 		if _, err := os.Stat(options.DatabasePath); err != nil {
 			return fmt.Errorf("inspect source database: %w", err)
 		}
@@ -83,6 +86,10 @@ func Run(ctx context.Context, options Options, output io.Writer) error {
 			"manifest":   manifest,
 		})
 	case ActionBackupVerify:
+		absBackupPath, err := requiredAbsolutePath("-backup-path", options.BackupPath)
+		if err != nil {
+			return err
+		}
 		verification, err := backup.Verify(ctx, absBackupPath)
 		if err != nil {
 			return err
@@ -99,6 +106,10 @@ func Run(ctx context.Context, options Options, output io.Writer) error {
 		}
 		return nil
 	case ActionBackupPreflight:
+		absBackupPath, err := requiredAbsolutePath("-backup-path", options.BackupPath)
+		if err != nil {
+			return err
+		}
 		preflight, err := backup.PreflightRestore(ctx, backup.PreflightOptions{
 			BackupPath:     absBackupPath,
 			TargetDatabase: options.DatabasePath,
@@ -120,6 +131,10 @@ func Run(ctx context.Context, options Options, output io.Writer) error {
 		}
 		return nil
 	case ActionBackupRestore:
+		absBackupPath, err := requiredAbsolutePath("-backup-path", options.BackupPath)
+		if err != nil {
+			return err
+		}
 		lock, err := processlock.Acquire(options.DatabasePath + ".runtime.lock")
 		if err != nil {
 			if errors.Is(err, processlock.ErrAlreadyLocked) {
@@ -145,9 +160,25 @@ func Run(ctx context.Context, options Options, output io.Writer) error {
 			"backupPath": absBackupPath,
 			"restore":    restored,
 		})
+	case ActionPathMigratePlan:
+		return runPathMigration(ctx, options, output, false)
+	case ActionPathMigrateApply:
+		return runPathMigration(ctx, options, output, true)
 	default:
 		return fmt.Errorf("unknown maintenance action %q", action)
 	}
+}
+
+func requiredAbsolutePath(flagName, value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("%s is required for this maintenance action", flagName)
+	}
+	absPath, err := filepath.Abs(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s: %w", flagName, err)
+	}
+	return absPath, nil
 }
 
 func writeJSON(output io.Writer, value any) error {
