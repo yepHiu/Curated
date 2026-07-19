@@ -114,4 +114,24 @@ describe("LibraryPage", () => {
 
     expect(wrapper.find("[data-actor-profile-card]").exists()).toBe(false)
   })
+
+  it("uses a three-column mobile tab grid with 44px touch targets", () => {
+    const wrapper = mount(LibraryPage, {
+      props: {
+        mode: "library",
+        allMovies: [],
+        visibleMovies: [],
+        activeTab: "all",
+      },
+    })
+
+    expect(wrapper.get("h1").classes()).toContain("sr-only")
+    expect(wrapper.get("[data-library-filter-tabs]").classes()).toEqual(
+      expect.arrayContaining(["grid", "grid-cols-3", "w-full"]),
+    )
+    for (const trigger of wrapper.findAll("[data-library-tab-trigger]")) {
+      expect(trigger.classes()).toContain("min-h-11")
+    }
+    expect(wrapper.get("[data-library-batch-toggle]").classes()).toContain("min-h-11")
+  })
 })

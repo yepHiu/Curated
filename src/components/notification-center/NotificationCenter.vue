@@ -125,7 +125,8 @@ function dotClass(type: AppNotification["type"]) {
         type="button"
         variant="ghost"
         size="icon"
-        class="relative rounded-2xl text-muted-foreground hover:text-foreground"
+        data-notification-trigger
+        class="relative size-11 rounded-2xl text-muted-foreground hover:text-foreground lg:size-9"
         :class="{ 'bg-muted text-foreground': popoverOpen }"
         :aria-label="t('notificationCenter.bellAria')"
       >

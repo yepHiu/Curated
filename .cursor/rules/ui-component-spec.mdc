@@ -91,6 +91,9 @@ alwaysApply: false
 
 - 可点击海报/卡片主区域用 **`button type="button"`** 或明确 `role` + 键盘可操作；保留 **`focus-visible`** 样式（勿 `outline-none` 且无替代）。
 -  meaningful 图片提供 **`alt`**（如番号）；装饰性渐变层 **`aria-hidden="true"`**。
+- 手机宽度下主要触控目标（壳层菜单、导入、通知、主题切换、资料库 Tabs、批量入口与影片勾选）须至少 **44×44 CSS px**；桌面紧凑密度可在 `lg` 断点恢复既有尺寸。
+- `LibraryPage` 的三项筛选 Tabs 在手机端使用等宽三列，不依赖不可控的 flex 换行；每个路由页面保留唯一语义 `h1`（可在视觉上 `sr-only`）。
+- `MovieCard` 标签可收缩并省略，但末尾 `+N` overflow badge 必须 `shrink-0` 且保持在卡片边界内。
 
 ## 变更同步
 

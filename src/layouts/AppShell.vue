@@ -693,7 +693,8 @@ function clearActorsSearch() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                class="shrink-0 rounded-2xl text-muted-foreground hover:text-foreground lg:hidden"
+                data-mobile-menu-trigger
+                class="size-11 shrink-0 rounded-2xl text-muted-foreground hover:text-foreground lg:hidden"
                 :aria-label="t('shell.openMenu')"
                 @click="mobileSidebarOpen = true"
               >
@@ -716,8 +717,8 @@ function clearActorsSearch() {
                 <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
                 <Input
                   v-model="searchDraft"
-                  class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
-                  :class="searchDraft.trim() ? 'pr-10' : ''"
+                  class="h-11 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30 lg:h-10"
+                  :class="searchDraft.trim() ? 'pr-12' : ''"
                   :placeholder="t('shell.searchLibraryPlaceholder')"
                   autocomplete="off"
                   role="combobox"
@@ -738,7 +739,7 @@ function clearActorsSearch() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  class="absolute top-1/2 right-1.5 z-[1] size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="absolute top-1/2 right-0 z-[1] size-11 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground lg:right-1.5 lg:size-8"
                   :aria-label="t('shell.clearSearch')"
                   @click="clearLibrarySearch"
                 >
@@ -809,8 +810,8 @@ function clearActorsSearch() {
                 <Search class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   v-model="searchDraftFrames"
-                  class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
-                  :class="searchDraftFrames.trim() ? 'pr-10' : ''"
+                  class="h-11 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30 lg:h-10"
+                  :class="searchDraftFrames.trim() ? 'pr-12' : ''"
                   :placeholder="t('shell.searchCuratedPlaceholder')"
                 />
                 <Button
@@ -818,7 +819,7 @@ function clearActorsSearch() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  class="absolute top-1/2 right-1.5 size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="absolute top-1/2 right-0 size-11 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground lg:right-1.5 lg:size-8"
                   :aria-label="t('shell.clearCuratedSearch')"
                   @click="clearCuratedFramesSearch"
                 >
@@ -832,8 +833,8 @@ function clearActorsSearch() {
                 <Search class="pointer-events-none absolute top-1/2 left-3 z-[1] -translate-y-1/2 text-muted-foreground" />
                 <Input
                   v-model="searchDraftActors"
-                  class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
-                  :class="searchDraftActors.trim() ? 'pr-10' : ''"
+                  class="h-11 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30 lg:h-10"
+                  :class="searchDraftActors.trim() ? 'pr-12' : ''"
                   :placeholder="t('actors.searchPlaceholder')"
                   autocomplete="off"
                 />
@@ -842,7 +843,7 @@ function clearActorsSearch() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  class="absolute top-1/2 right-1.5 z-[1] size-8 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  class="absolute top-1/2 right-0 z-[1] size-11 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground lg:right-1.5 lg:size-8"
                   :aria-label="t('shell.clearSearch')"
                   @click="clearActorsSearch"
                 >
@@ -856,7 +857,22 @@ function clearActorsSearch() {
             >
               <MovieImportDialog />
               <NotificationCenter />
+              <Button
+                v-if="!isLgUp"
+                type="button"
+                variant="ghost"
+                size="icon"
+                data-mobile-theme-toggle
+                class="size-11 rounded-2xl text-muted-foreground hover:text-foreground"
+                :aria-label="t('shell.themeToggleAria')"
+                :title="t('shell.themeToggleHint')"
+                @click="onShellAppearanceSwitch(resolvedMode !== 'dark')"
+              >
+                <Moon v-if="resolvedMode === 'dark'" aria-hidden="true" />
+                <Sun v-else aria-hidden="true" />
+              </Button>
               <div
+                v-else
                 class="flex items-center gap-1.5"
                 :title="t('shell.themeToggleHint')"
               >

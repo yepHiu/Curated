@@ -56,4 +56,27 @@ describe("MovieCard", () => {
 
     expect(second.find(".bg-gradient-to-t").exists()).toBe(true)
   })
+
+  it("reserves visible space for the tag overflow badge on narrow cards", () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie({
+          userTags: ["favorite", "performer"],
+          tags: ["subtitle", "collection"],
+        }),
+        showFavorite: true,
+      },
+    })
+
+    expect(wrapper.get("[data-movie-tag-row]").classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "overflow-hidden"]),
+    )
+    for (const tag of wrapper.findAll("[data-movie-card-tag]")) {
+      expect(tag.classes()).toEqual(expect.arrayContaining(["min-w-0", "shrink"]))
+    }
+    const overflow = wrapper.get("[data-movie-tag-overflow]")
+    expect(overflow.text()).toBe("+1")
+    expect(overflow.classes()).toContain("shrink-0")
+    expect(wrapper.get("[data-movie-favorite-toggle]").classes()).toContain("size-11")
+  })
 })

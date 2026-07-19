@@ -68,6 +68,58 @@ test("Mock navigation stays entirely behind the Mock adapter", async ({ page }) 
   expect(backendRequests).toEqual([])
 })
 
+test("375px library controls remain touchable without clipping or horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await hideDevPerformanceBar(page)
+  await page.goto(`${MOCK_BASE_URL}/#/library`, { waitUntil: "domcontentloaded" })
+
+  await expect(page.locator("h1")).toHaveCount(1)
+  await expect(page.locator("h1")).not.toHaveText("")
+  await expect(page.locator("[data-library-filter-tabs]")).toBeVisible()
+
+  const hasHorizontalOverflow = await page.evaluate(() => {
+    const root = document.documentElement
+    return root.scrollWidth > root.clientWidth + 1
+  })
+  expect(hasHorizontalOverflow).toBe(false)
+
+  for (const trigger of await page.locator("[data-library-tab-trigger]").all()) {
+    const box = await trigger.boundingBox()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  }
+
+  const batchToggleBox = await page.locator("[data-library-batch-toggle]").boundingBox()
+  expect(batchToggleBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+
+  const overflowBadge = page.locator("[data-movie-tag-overflow]").first()
+  await expect(overflowBadge).toBeVisible()
+  const tagRow = overflowBadge.locator("xpath=ancestor::*[@data-movie-tag-row]")
+  const [overflowBox, tagRowBox] = await Promise.all([
+    overflowBadge.boundingBox(),
+    tagRow.boundingBox(),
+  ])
+  expect((overflowBox?.x ?? 0) + (overflowBox?.width ?? 0)).toBeLessThanOrEqual(
+    (tagRowBox?.x ?? 0) + (tagRowBox?.width ?? 0) + 1,
+  )
+
+  await page.locator("[data-library-batch-toggle]").click()
+  const movieBatchToggle = page.locator("[data-movie-batch-toggle]").first()
+  await expect(movieBatchToggle).toBeVisible()
+  const movieBatchToggleBox = await movieBatchToggle.boundingBox()
+  expect(movieBatchToggleBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+  expect(movieBatchToggleBox?.width ?? 0).toBeGreaterThanOrEqual(44)
+
+  for (const selector of [
+    "[data-mobile-menu-trigger]",
+    "[data-import-trigger]",
+    "[data-notification-trigger]",
+    "[data-mobile-theme-toggle]",
+  ]) {
+    const box = await page.locator(selector).boundingBox()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  }
+})
+
 test("locked startup defers protected hydration until a successful unlock", async ({ page }) => {
   let unlocked = false
   const protectedRequests: Array<{ path: string; unlocked: boolean }> = []

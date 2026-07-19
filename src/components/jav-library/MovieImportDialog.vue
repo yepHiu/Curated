@@ -233,7 +233,7 @@ async function submitImport() {
         data-import-trigger
         type="button"
         variant="default"
-        class="rounded-full"
+        class="min-h-11 rounded-full lg:min-h-9"
         :aria-label="t('import.trigger')"
       >
         <svg

@@ -121,7 +121,7 @@ const progressPercent = computed(() => {
 const fullStarBadgePositionClass = computed(() => {
   const hasFav = props.showFavorite !== false
   const hasProg = progressPercent.value != null
-  const h = hasFav ? "right-[3.25rem]" : "right-2.5"
+  const h = hasFav ? "right-[3.75rem]" : "right-2.5"
   const v = hasProg ? "bottom-3" : "bottom-2.5"
   return `${h} ${v}`
 })
@@ -165,7 +165,8 @@ const handleFavoriteChange = (nextValue: boolean) => {
         >
           <label
             v-if="props.batchMode"
-            class="absolute top-2 right-2 z-[4] flex cursor-pointer items-center justify-center rounded-md border border-border/45 bg-background/25 p-1.5 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
+            data-movie-batch-toggle
+            class="absolute top-2 right-2 z-[4] flex size-11 cursor-pointer items-center justify-center rounded-xl border border-border/45 bg-background/25 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
             @click.stop
           >
             <input
@@ -218,7 +219,8 @@ const handleFavoriteChange = (nextValue: boolean) => {
             :pressed="props.movie.isFavorite"
             variant="outline"
             size="sm"
-            class="absolute right-2.5 bottom-2.5 z-[2] rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            data-movie-favorite-toggle
+            class="absolute right-2.5 bottom-2.5 z-[2] size-11 rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             @update:pressed="handleFavoriteChange(Boolean($event))"
             @click.stop
           >
@@ -247,15 +249,16 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
 
         <!-- Badge 默认含 py-0.5 + 边框，高度常 > h-5；勿用固定矮行 + overflow-hidden 以免裁切 -->
-        <div class="flex min-h-6 items-center gap-1">
+        <div data-movie-tag-row class="flex min-h-6 min-w-0 items-center gap-1 overflow-hidden">
           <Badge
             v-for="(item, i) in cardTagsDisplay.tags"
             :key="`${i}-${item.text}`"
             :variant="item.source === 'user' ? 'outline' : 'secondary'"
+            data-movie-card-tag
             :class="
               item.source === 'user'
-                ? 'max-w-[4.75rem] truncate rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
-                : 'max-w-[4.75rem] truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
+                ? 'min-w-0 max-w-[4.75rem] shrink truncate rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
+                : 'min-w-0 max-w-[4.75rem] shrink truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
             "
           >
             {{ item.text }}
@@ -263,6 +266,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
           <Badge
             v-if="cardTagsDisplay.overflow > 0"
             variant="outline"
+            data-movie-tag-overflow
             class="shrink-0 rounded-full border-muted-foreground/35 px-1.5 text-[10px] leading-tight text-muted-foreground"
           >
             +{{ cardTagsDisplay.overflow }}

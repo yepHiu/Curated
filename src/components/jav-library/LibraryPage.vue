@@ -104,6 +104,18 @@ const activeActorTrimmed = computed(() => props.activeActorFilter?.trim() ?? "")
 const activeStudioTrimmed = computed(() => props.activeStudioFilter?.trim() ?? "")
 
 const batchModeOn = computed(() => props.batchMode === true)
+const pageTitleKey = computed(() => {
+  switch (props.mode) {
+    case "favorites":
+      return "nav.favorites"
+    case "tags":
+      return "nav.tags"
+    case "trash":
+      return "nav.trash"
+    default:
+      return "nav.library"
+  }
+})
 
 const handleTabChange = (value: string | number) => {
   emit("update:activeTab", String(value) as LibraryTab)
@@ -122,6 +134,7 @@ function isChipActive(tag: string): boolean {
 
 <template>
   <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-5 lg:gap-6">
+    <h1 class="sr-only">{{ t(pageTitleKey) }}</h1>
     <div
       v-if="activeStudioTrimmed"
       class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/85 px-4 py-3 shadow-sm shadow-black/5"
@@ -133,7 +146,7 @@ function isChipActive(tag: string): boolean {
         type="button"
         variant="outline"
         size="sm"
-        class="shrink-0 rounded-xl"
+        class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
         @click="emit('clearExactStudioFilter')"
       >
         {{ t("library.clearFilter") }}
@@ -153,7 +166,7 @@ function isChipActive(tag: string): boolean {
             type="button"
             variant="outline"
             size="sm"
-            class="shrink-0 rounded-xl"
+            class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
             @click="emit('clearExactTagFilter')"
           >
             {{ t("library.clearFilter") }}
@@ -177,7 +190,7 @@ function isChipActive(tag: string): boolean {
               type="button"
               variant="ghost"
               size="sm"
-              class="h-8 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+              class="h-auto min-h-11 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground sm:h-8 sm:min-h-8"
               :aria-expanded="metaTagsExpanded"
               @click="metaTagsExpanded = !metaTagsExpanded"
             >
@@ -206,7 +219,7 @@ function isChipActive(tag: string): boolean {
               as-child
               :variant="isChipActive(row.tag) ? 'default' : 'secondary'"
               :class="[
-                'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
+                'min-h-11 rounded-full border px-3 py-1 text-sm font-normal transition-colors',
                 isChipActive(row.tag)
                   ? 'border-primary/40'
                   : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
@@ -241,7 +254,7 @@ function isChipActive(tag: string): boolean {
               type="button"
               variant="ghost"
               size="sm"
-              class="h-8 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+              class="h-auto min-h-11 shrink-0 gap-1 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground sm:h-8 sm:min-h-8"
               :aria-expanded="userTagsExpanded"
               @click="userTagsExpanded = !userTagsExpanded"
             >
@@ -270,7 +283,7 @@ function isChipActive(tag: string): boolean {
               as-child
               :variant="isChipActive(row.tag) ? 'default' : 'secondary'"
               :class="[
-                'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
+                'min-h-11 rounded-full border px-3 py-1 text-sm font-normal transition-colors',
                 isChipActive(row.tag)
                   ? 'border-primary/40'
                   : 'cursor-pointer border-primary/25 bg-primary/10 hover:bg-primary/20',
@@ -306,7 +319,7 @@ function isChipActive(tag: string): boolean {
           type="button"
           variant="outline"
           size="sm"
-          class="shrink-0 gap-1.5 rounded-xl"
+          class="min-h-11 shrink-0 gap-1.5 rounded-xl sm:min-h-8"
           @click="emit('enterBatchMode')"
         >
           <ListChecks class="size-4 opacity-80" aria-hidden="true" />
@@ -318,7 +331,7 @@ function isChipActive(tag: string): boolean {
           type="button"
           variant="outline"
           size="sm"
-          class="shrink-0 gap-1.5 rounded-xl"
+          class="min-h-11 shrink-0 gap-1.5 rounded-xl sm:min-h-8"
           @click="emit('selectAllVisibleInBatch')"
         >
           <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
@@ -328,7 +341,7 @@ function isChipActive(tag: string): boolean {
           type="button"
           variant="ghost"
           size="sm"
-          class="shrink-0 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+          class="min-h-11 shrink-0 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:min-h-8"
           @click="emit('exitBatchMode')"
         >
           <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
@@ -343,28 +356,32 @@ function isChipActive(tag: string): boolean {
     >
       <Tabs
         :model-value="props.activeTab"
-        class="min-w-0 flex-1 gap-4"
+        class="w-full min-w-0 flex-1 gap-4 sm:w-auto"
         @update:model-value="handleTabChange"
       >
-        <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
-          <TabsTrigger value="all" class="rounded-xl px-4 py-2">
+        <TabsList
+          data-library-filter-tabs
+          class="grid h-auto w-full max-w-full grid-cols-3 rounded-2xl bg-muted/60 p-1 sm:inline-flex sm:w-fit"
+        >
+          <TabsTrigger value="all" data-library-tab-trigger class="min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs sm:min-h-9 sm:px-4 sm:text-sm">
             {{ t("library.tabAll") }}
           </TabsTrigger>
-          <TabsTrigger value="new" class="rounded-xl px-4 py-2">
+          <TabsTrigger value="new" data-library-tab-trigger class="min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs sm:min-h-9 sm:px-4 sm:text-sm">
             {{ t("library.tabNew") }}
           </TabsTrigger>
-          <TabsTrigger value="top-rated" class="rounded-xl px-4 py-2">
+          <TabsTrigger value="top-rated" data-library-tab-trigger class="min-h-11 min-w-0 rounded-xl px-2 py-2 text-xs sm:min-h-9 sm:px-4 sm:text-sm">
             {{ t("library.tabTop") }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <div class="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
         <template v-if="!batchModeOn">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            class="gap-1.5 rounded-xl"
+            data-library-batch-toggle
+            class="min-h-11 gap-1.5 rounded-xl sm:min-h-8"
             @click="emit('enterBatchMode')"
           >
             <ListChecks class="size-4 opacity-80" aria-hidden="true" />
@@ -376,7 +393,7 @@ function isChipActive(tag: string): boolean {
             type="button"
             variant="outline"
             size="sm"
-            class="gap-1.5 rounded-xl"
+            class="min-h-11 gap-1.5 rounded-xl sm:min-h-8"
             @click="emit('selectAllVisibleInBatch')"
           >
             <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
@@ -386,7 +403,7 @@ function isChipActive(tag: string): boolean {
             type="button"
             variant="ghost"
             size="sm"
-            class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            class="min-h-11 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:min-h-8"
             @click="emit('exitBatchMode')"
           >
             <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
