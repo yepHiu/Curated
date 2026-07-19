@@ -88,7 +88,7 @@ go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curat
 go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
 ```
 
-Backup format v1 includes the SQLite snapshot and optional `library-config.cfg`, but not media or user asset files. Normal runtime holds `<databasePath>.runtime.lock`; offline restore must acquire the same cross-process lock and retains `.pre-restore-*` rollback files.
+Backup format v1 includes the SQLite snapshot and optional `library-config.cfg`, but not media or user asset files. Normal runtime holds `<databasePath>.runtime.lock`; offline restore must acquire the same cross-process lock and retains `.pre-restore-*` rollback files. In Web API mode, Settings -> Maintenance calls the PIN-protected create, verify, and preflight endpoints with absolute paths on the backend machine; it intentionally exposes no online restore action.
 
 Windows binary naming rule:
 - Development backend builds must use `curated-dev.exe`.
@@ -217,6 +217,9 @@ POST   /api/app-update/check                # Force a fresh packaged-app update 
 POST   /api/app-update/download             # Download and SHA256-verify the latest installer
 POST   /api/app-update/install              # Launch a verified downloaded installer after explicit user action
 DELETE /api/app-update/downloaded-installer # Clear cached downloaded installer metadata/file
+POST   /api/maintenance/backups             # Create a consistent package without overwriting an existing destination
+POST   /api/maintenance/backups/verify      # Verify manifest, hashes, files, SQLite integrity, and migrations
+POST   /api/maintenance/backups/preflight   # Assess compatibility, targets, and capacity without writing live data
 GET    /api/homepage/recommendations        # Persisted UTC-day homepage hero + recommendation snapshot
 POST   /api/homepage/recommendations/refresh # Force-regenerate the current UTC-day homepage recommendation snapshot; optional body preserveHeroMovieIds keeps the hero slate and excludeRecommendationMovieIds avoids the current rail
 GET    /api/library/movies                  # List movies (query: mode, q, limit, offset, actor, tag)
@@ -298,6 +301,8 @@ POST   /api/providers/ping-all              # Ping all providers
 **Curated Desktop client marker:** Electron injects `X-Curated-Client: desktop-electron`, `X-Curated-Client-Version`, `X-Curated-OS`, and `X-Curated-OS-Version` on requests to the backend origin. `backend/internal/clienttracker` uses that marker before User-Agent parsing, reports the browser name as `Curated Desktop`, includes the marker in its in-memory client key so the desktop shell is not merged with a normal Chrome tab on the same machine, and trusts the desktop OS headers to show Windows 11 instead of Chromium's legacy `Windows NT 10.0` token. For regular browsers, the backend also uses `Sec-CH-UA-Platform` and `Sec-CH-UA-Platform-Version` when present.
 
 **App update checks/download/install:** `GET /api/app-update/status` returns the packaged-app update state used by Settings -> About and the sidebar brand badge, while `POST /api/app-update/check` forces a refresh. The backend compares the current runtime `installerVersion` with the latest GitHub Release for `yepHiu/Curated`, returns `installerDownloadUrl` and `installerSha256` when the release includes a Windows `.exe` installer asset with a digest, caches the result in SQLite, reuses the process proxy settings for outbound requests, and uses `0.0.0` as the dev-runtime fallback when no packaged installer version was injected. Settings -> General exposes persisted `autoDownloadUpdates`; when enabled, the startup background check may automatically download and SHA256-verify a newer installer, but it never auto-installs one. `POST /api/app-update/download` downloads to the backend update cache and verifies SHA256; `POST /api/app-update/install` launches the verified installer only after explicit user action. Current local packages are unsigned, so this flow relies on SHA256 integrity and keeps silent auto-install disabled by default.
+
+**Backup maintenance controls:** `POST /api/maintenance/backups`, `/verify`, and `/preflight` are protected by the existing PIN middleware, accept strict JSON with backend-machine absolute paths, and cap request bodies at 64 KiB. Creation never overwrites an existing destination; it uses an atomic hard-link commit where supported and an `O_EXCL` copy fallback for filesystems such as exFAT. Settings -> Maintenance exposes create-and-verify, verify, and preflight in Web API mode, disables them in Mock mode, and keeps the actual restore exclusively in the offline maintenance CLI.
 
 ## Architecture Boundaries
 

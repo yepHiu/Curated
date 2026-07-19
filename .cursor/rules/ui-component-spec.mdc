@@ -72,6 +72,7 @@ alwaysApply: false
 - **互斥策略**：使用 **`fieldset`** + **`legend.sr-only`**；每项为 **`label` > `input[type=radio]` + 文案**；行布局 **`items-center`**，使圆点与多行主副文案垂直居中（**`SettingsMetadataModeSection`**）。
 - **选项主文案**：`text-sm font-medium`；**选项下说明**：与上节「块说明」同款 token（`text-xs … sm:text-sm`）。
 - **文案列 + 主行动**：**`flex justify-between gap-3`**；在 **`sm:flex-row`** 下对整块使用 **`items-center`**，避免按钮相对双行说明「贴顶」（**`SettingsMetadataTriggerScrapeSection`**）。
+- **设置页密度例外**：`SettingsPage` 默认把常规按钮/选择器收紧到 32px；需要手机端舒适触控的主要维护动作可加 `data-settings-comfortable-control` 退出该全局约束，并在自身使用 `h-auto min-h-11`，保证实际按钮框至少 44px。不要把该 opt-out 机械扩散到所有设置控件。
 
 ### 参考实现
 

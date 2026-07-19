@@ -10,7 +10,7 @@
 | 切片 | 状态 | 证据 |
 |---|---|---|
 | C1 备份核心与离线 CLI | verified | `bd2e9b59`、`4d0fd1f0`；storage / backup / maintenance / cmd 测试与全量 Go test/vet 通过 |
-| C2 Settings Maintenance | in-progress | 待增加受 PIN 保护的 create / verify / preflight API 与前端维护入口 |
+| C2 Settings Maintenance | verified | `e7958490`；受 PIN 保护的 create / verify / preflight API、Web/Mock service contract、三语 Settings UI、目标 Vitest、全量 167/684 Vitest、4/28 Electron、4 项 Chromium e2e、typecheck/lint/build 与全量 Go test/vet 均通过 |
 | C3 路径迁移 CLI | not-started | REQ-0015 |
 | C4 上传 session 持久化 | not-started | REQ-0016 |
 | C5 Library Health / 修复队列 | not-started | REQ-0017、REQ-0018 |

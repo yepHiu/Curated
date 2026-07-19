@@ -32,7 +32,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
 - **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
-- **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, restore preflight, offline atomic restore, and retained rollback copies.
+- **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, Settings-based create/verify/preflight controls, offline atomic restore, and retained rollback copies.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
 - **Offline desktop resources** — Packaged UI uses local Outfit font assets and npm-bundled `hls.js`; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
@@ -75,6 +75,8 @@ pnpm backend:build:dev
 This produces `backend/runtime/curated-dev.exe`.
 
 ### Back Up, Verify, and Restore
+
+In Web API mode, Settings -> Maintenance can create and immediately verify a package, verify an existing package, and run restore preflight. Paths are absolute paths on the backend machine. Curated deliberately exposes no online restore button; restore remains an offline maintenance operation.
 
 Run maintenance commands from `backend/`; add `-config path/to/config.json` when the database path comes from a custom main config:
 
@@ -200,6 +202,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 ### Settings & Configuration
 
 - Full settings UI: Overview, General, Security, Video storage, Metadata, Network, Curated frames, About, Maintenance.
+- Maintenance provides PIN-protected backup creation, package verification, and offline-restore preflight in Web API mode; Mock mode disables filesystem maintenance actions.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.

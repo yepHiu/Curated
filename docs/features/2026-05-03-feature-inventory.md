@@ -201,7 +201,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Network settings | Shipped | Proxy configuration with ping tests |
 | Curated frames settings | Shipped | Export format preference |
 | About page | Shipped | Version info, update checks, dev tools |
-| Maintenance | Shipped | Database path, log settings |
+| Maintenance | Shipped | Backup create-and-verify, package verification, restore preflight, full scan, and maintenance guidance |
 | Security | Shipped | PIN setup/change, idle-lock policy, lock-now, and trusted-session review/revocation |
 
 ### 7.2 Configuration System
@@ -213,7 +213,17 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Frontend env vars | Shipped | `VITE_USE_WEB_API`, `VITE_API_BASE_URL`, `VITE_LOG_LEVEL` |
 | Backend JSON config | Shipped | Main runtime config with library config merge |
 
-### 7.3 App Updates
+### 7.3 Backup & Recovery
+
+| Feature | Status | Notes |
+|---|---|---|
+| Consistent SQLite package | Shipped | `VACUUM INTO`; optional `library-config.cfg`; no media or user assets in v1 |
+| Manifest and integrity verification | Shipped | Size, SHA-256, declared entries, `quick_check`, `foreign_key_check`, migrations |
+| Settings maintenance controls | Shipped | PIN-protected create-and-verify, verify, and restore preflight in Web API mode |
+| Offline restore | Shipped | Explicit CLI confirmation, runtime lock, compatibility/capacity preflight, `.pre-restore-*` rollback files |
+| No-overwrite destination | Shipped | Atomic hard-link commit or `O_EXCL` fallback for filesystems without hard links |
+
+### 7.4 App Updates
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -227,7 +237,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Opt-in background download | Shipped | `autoDownloadUpdates`; startup may download and verify, but does not auto-install |
 | Release page fallback | Shipped | Falls back to release page URL when no `.exe` asset |
 
-### 7.4 Proxy
+### 7.5 Proxy
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -236,7 +246,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Proxy ping test (JavBus) | Shipped | `POST /api/proxy/ping-javbus` |
 | Proxy ping test (Google) | Shipped | `POST /api/proxy/ping-google` |
 
-### 7.5 Logging
+### 7.6 Logging
 
 | Feature | Status | Notes |
 |---|---|---|

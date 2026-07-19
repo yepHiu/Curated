@@ -62,6 +62,7 @@
 - 互斥策略：**`fieldset`** + **`legend.sr-only`**；**`label` + `radio`** 行用 **`items-center`**。
 - 选项主文：`text-sm font-medium`；选项下说明：与「块说明」同款 token。
 - 文案 + 按钮/开关：**`justify-between`**；**`sm:flex-row`** 时整块 **`items-center`**，避免操作控件相对多行文案贴顶。
+- `SettingsPage` 默认将常规按钮、选择器触发器和侧栏 Tab 收紧为 32px。对于手机端需要舒适触控的主要维护动作，可在按钮上增加 **`data-settings-comfortable-control`** 显式退出该密度规则，并使用 **`h-auto min-h-11`** 保证实际交互框至少 44px；这是一项局部可访问性例外，不应机械扩散到全部设置控件。
 
 **索引**：`.cursor/rules/ui-component-spec.mdc`「设置页 Tab 大卡片与内嵌区块」；实现目录 **`src/components/jav-library/settings/SettingsMetadata*.vue`**。
 

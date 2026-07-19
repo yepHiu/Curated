@@ -2166,6 +2166,163 @@ Body 可选：
 
 成功：`200 ProxyJavBusPingResponse`
 
+### 4.16 Maintenance Backups
+
+以下三个端点都需要已解锁的 PIN 会话，只接受运行 Curated 后端那台机器上的绝对路径。请求 body 上限为 64 KiB，未知字段、尾随 JSON、相对路径和空路径都会以 `400 BACKUP_INVALID_REQUEST` 拒绝。它们不会替换正在使用的数据库，也没有在线 restore 端点。
+
+#### `POST /api/maintenance/backups`
+
+用途：从运行中的 SQLite 创建一致 `.curated-backup` 包。目标文件已存在时绝不覆盖。
+
+Body：
+
+```json
+{
+  "destinationPath": "D:\\Backups\\curated-20260720.curated-backup"
+}
+```
+
+成功：`201 BackupManifestDTO`
+
+```json
+{
+  "format": "curated-backup",
+  "formatVersion": 1,
+  "createdAt": "2026-07-20T03:00:00Z",
+  "appVersion": "1.4.11",
+  "appChannel": "release",
+  "scope": {
+    "databaseIncluded": true,
+    "libraryConfigIncluded": true,
+    "userAssetsIncluded": false,
+    "mediaFilesIncluded": false
+  },
+  "schemaMigrations": ["0001_init.sql"],
+  "files": [
+    {
+      "kind": "database",
+      "path": "database/curated.db",
+      "sizeBytes": 1048576,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
+```
+
+错误：
+
+- `409 BACKUP_CONFLICT`：目标包已经存在。
+- `500 BACKUP_CREATE_FAILED`：快照、完整性检查、打包或落盘失败。
+- `503 BACKUP_CREATE_FAILED`：备份服务未装配。
+
+#### `POST /api/maintenance/backups/verify`
+
+用途：验证已有包的 manifest、声明文件、大小、SHA-256、SQLite `quick_check`、`foreign_key_check` 与 migration 一致性。
+
+Body：
+
+```json
+{
+  "backupPath": "D:\\Backups\\curated-20260720.curated-backup"
+}
+```
+
+成功：`200 BackupVerificationDTO`。包内容无效但仍可读取时返回 `200` 和 `valid=false`，并在 `errors` 中列出完整诊断；文件无法打开或执行验证时返回 `400 BACKUP_VERIFY_FAILED`。
+
+```json
+{
+  "valid": true,
+  "checkedAt": "2026-07-20T03:01:00Z",
+  "manifest": {
+    "format": "curated-backup",
+    "formatVersion": 1,
+    "createdAt": "2026-07-20T03:00:00Z",
+    "appVersion": "1.4.11",
+    "appChannel": "release",
+    "scope": {
+      "databaseIncluded": true,
+      "libraryConfigIncluded": true,
+      "userAssetsIncluded": false,
+      "mediaFilesIncluded": false
+    },
+    "schemaMigrations": ["0001_init.sql"],
+    "files": [
+      {
+        "kind": "database",
+        "path": "database/curated.db",
+        "sizeBytes": 1048576,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "databaseIntegrity": {
+    "quickCheck": "ok",
+    "foreignKeyViolations": 0
+  },
+  "errors": [],
+  "warnings": []
+}
+```
+
+#### `POST /api/maintenance/backups/preflight`
+
+用途：在不写目标数据库的前提下，验证备份并检查当前目标数据库/配置、未来未知 migration、所需空间和可用空间。
+
+Body 与 verify 相同。
+
+成功：`200 BackupRestorePreflightDTO`。不满足恢复条件时仍返回结构化 `canRestore=false`、`errors` 和 `warnings`；无法读取或执行预检时返回 `400 BACKUP_PREFLIGHT_FAILED`。
+
+```json
+{
+  "canRestore": true,
+  "checkedAt": "2026-07-20T03:02:00Z",
+  "verification": {
+    "valid": true,
+    "checkedAt": "2026-07-20T03:02:00Z",
+    "manifest": {
+      "format": "curated-backup",
+      "formatVersion": 1,
+      "createdAt": "2026-07-20T03:00:00Z",
+      "appVersion": "1.4.11",
+      "appChannel": "release",
+      "scope": {
+        "databaseIncluded": true,
+        "libraryConfigIncluded": true,
+        "userAssetsIncluded": false,
+        "mediaFilesIncluded": false
+      },
+      "schemaMigrations": ["0001_init.sql"],
+      "files": [
+        {
+          "kind": "database",
+          "path": "database/curated.db",
+          "sizeBytes": 1048576,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    "databaseIntegrity": {
+      "quickCheck": "ok",
+      "foreignKeyViolations": 0
+    },
+    "errors": [],
+    "warnings": []
+  },
+  "targetDatabase": "D:\\Curated\\curated.db",
+  "targetDatabaseExists": true,
+  "targetConfig": "D:\\Curated\\library-config.cfg",
+  "targetConfigExists": true,
+  "requiredBytes": 2097152,
+  "availableBytes": 10737418240,
+  "availableBytesKnown": true,
+  "unsupportedMigrations": [],
+  "errors": [],
+  "warnings": ["backup does not include media source files"]
+}
+```
+
+真正恢复必须完全退出 Curated 后，通过 `curated -maintenance backup-restore ... -confirm-restore` 离线执行；成功恢复会保留 `.pre-restore-*` 数据库和配置回滚副本。
+
 ## 5. DTO 速查
 
 本节列出衍生客户端最常用 DTO。完整字段以 `backend/internal/contracts/contracts.go` 和 `src/api/types.ts` 为准。
@@ -2378,6 +2535,9 @@ interface ActorProfileDTO {
 | `POST` | `/api/app-update/download` | `AppUpdateStatusDTO` |
 | `POST` | `/api/app-update/install` | `AppUpdateStatusDTO` |
 | `DELETE` | `/api/app-update/downloaded-installer` | `AppUpdateStatusDTO` |
+| `POST` | `/api/maintenance/backups` | `BackupManifestDTO` |
+| `POST` | `/api/maintenance/backups/verify` | `BackupVerificationDTO` |
+| `POST` | `/api/maintenance/backups/preflight` | `BackupRestorePreflightDTO` |
 | `GET` | `/api/homepage/recommendations` | `HomepageDailyRecommendationsDTO` |
 | `POST` | `/api/homepage/recommendations/refresh` | `HomepageDailyRecommendationsDTO` |
 | `GET` | `/api/library/played-movies` | `PlayedMoviesListDTO` |
