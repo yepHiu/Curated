@@ -124,6 +124,7 @@ HTTP API 成功时直接返回 DTO 本体，不包 `{ "ok": true, "data": ... }`
 | 错误码 | 常见含义 |
 | --- | --- |
 | `COMMON_BAD_REQUEST` | 请求参数、JSON、文件或字段值不合法 |
+| `COMMON_FORBIDDEN` | 请求的浏览器 Origin 或 Host 不在服务端允许范围内 |
 | `COMMON_NOT_FOUND` | 资源不存在 |
 | `COMMON_INTERNAL` | 后端内部错误 |
 | `COMMON_CONFLICT` | 当前状态不允许该操作 |
@@ -175,9 +176,10 @@ Cookie：
 
 后端 CORS 行为：
 
-- 有 `Origin` 时，`Access-Control-Allow-Origin` 回显该 Origin。
-- `Access-Control-Allow-Credentials: true`
-- 无 `Origin` 时允许 `*`，主要用于非浏览器客户端或工具。
+- 浏览器 Origin 只有三类会被允许：请求同源、`localhost` / loopback 开发 Origin、主运行时 JSON 中 `corsAllowedOrigins` 配置的精确 Origin。
+- 允许的 Origin 返回同值 `Access-Control-Allow-Origin` 与 `Access-Control-Allow-Credentials: true`；不会再对任意 Origin 回显，也不会返回通配符 `*`。
+- 未列入允许范围的 Origin 返回 `403 COMMON_FORBIDDEN`，不能读取 API response。
+- 非浏览器客户端可以不发送 `Origin`；Host 仍必须符合当前 loopback / LAN 监听策略，避免 DNS rebinding。
 - 允许方法：`GET, POST, PUT, PATCH, DELETE, OPTIONS`
 
 允许的请求头：

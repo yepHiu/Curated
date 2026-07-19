@@ -24,10 +24,13 @@ type Config struct {
 	HttpAddr      string `json:"httpAddr"`
 	// LANEnabled must be explicitly enabled before a non-loopback HTTP address is accepted.
 	// LAN startup additionally requires an initialized application PIN.
-	LANEnabled   bool     `json:"lanEnabled,omitempty"`
-	DatabasePath string   `json:"databasePath"`
-	CacheDir     string   `json:"cacheDir"`
-	LibraryPaths []string `json:"libraryPaths"`
+	LANEnabled bool `json:"lanEnabled,omitempty"`
+	// CORSAllowedOrigins contains exact additional browser origins allowed to read credentialed API responses.
+	// Same-origin and loopback development origins are allowed automatically.
+	CORSAllowedOrigins []string `json:"corsAllowedOrigins,omitempty"`
+	DatabasePath       string   `json:"databasePath"`
+	CacheDir           string   `json:"cacheDir"`
+	LibraryPaths       []string `json:"libraryPaths"`
 	// ScanIntervalSeconds is deprecated: kept in JSON for backward compatibility with older config files; ignored (no scheduled scan).
 	ScanIntervalSeconds int `json:"scanIntervalSeconds,omitempty"`
 	// OrganizeLibrary moves/renames video files into {parent}/{番号}/{番号}.ext and stores NFO/assets beside the video when enabled.

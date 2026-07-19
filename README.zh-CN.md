@@ -231,7 +231,7 @@ pnpm dev:electron
   空 `logDir` 表示”使用默认日志目录”，而不是关闭文件日志：
   正式包写入 `LOCALAPPDATA\\Curated\\logs`，开发态写入 `backend/runtime/logs`。
 
-开发与发布构建分别默认监听仅本机可达的 `127.0.0.1:8080` 与 `127.0.0.1:8081`。若要把独立服务端显式开放到局域网，应先在 loopback 模式下完成应用 PIN 初始化，再通过主运行时 JSON 配置同时设置非 loopback `httpAddr` 与 `"lanEnabled": true`，例如 `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`。未显式开启 LAN 或尚未配置 PIN 时，Curated 会拒绝启动非 loopback 监听；内置前端仍使用同源 `/api`。
+开发与发布构建分别默认监听仅本机可达的 `127.0.0.1:8080` 与 `127.0.0.1:8081`。若要把独立服务端显式开放到局域网，应先在 loopback 模式下完成应用 PIN 初始化，再通过主运行时 JSON 配置同时设置非 loopback `httpAddr` 与 `"lanEnabled": true`，例如 `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`。未显式开启 LAN 或尚未配置 PIN 时，Curated 会拒绝启动非 loopback 监听。浏览器 CORS 只允许同源、loopback 开发 Origin，以及主配置 `corsAllowedOrigins` 中精确列出的额外 Origin，不再回显任意携带凭据的 Origin；内置前端仍使用同源 `/api`。
 
 ## API
 

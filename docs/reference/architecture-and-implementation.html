@@ -415,7 +415,7 @@
     <li><code>/api/import/movies/uploads</code> — 大文件导入的分块续传端点：<code>POST</code> 创建 session，<code>PUT .../chunks/{chunkIndex}</code> 按 offset 写入 <code>.curated-import</code> 暂存文件，前端对 retryable 的 chunk 网络/超时失败会重试同一块，<code>GET</code> 查询状态，<code>POST .../commit</code> flush 后以不覆盖已有文件的方式提交并触发扫描，<code>DELETE</code> 取消并清理暂存。</li>
     <li><code>POST /api/scans</code>、<code>GET /api/tasks/recent</code>、<code>GET /api/tasks/{taskId}</code>、<code>GET /api/events</code> — 扫描、任务状态与 SSE 任务事件流。</li>
   </ul>
-  <p>中间层对响应做 CORS 包装，便于浏览器开发联调。</p>
+  <p>HTTP 中间层对 Host 与浏览器 Origin 做安全校验：默认允许同源与 loopback 开发 Origin，额外跨域入口必须精确写入主运行时配置 <code>corsAllowedOrigins</code>；任意 Origin 回显与通配符 credentialed CORS 已禁用，非法 Host / Origin 返回 <code>403 COMMON_FORBIDDEN</code>。</p>
 
   <h3>3.4 SQLite 与内存回退（重要）</h3>
   <p>列表与详情在 HTTP 层采用<strong>「数据库优先 + 空则回退内存库」</strong>策略（便于 DB 尚无数据时 UI 仍有演示数据）：</p>

@@ -249,7 +249,7 @@ Common library-level settings include:
   Empty `logDir` means "use the default log directory" rather than disabling file logging:
   release builds use `LOCALAPPDATA\\Curated\\logs`, while dev builds use `backend/runtime/logs`.
 
-Development and release builds default to loopback-only `127.0.0.1:8080` and `127.0.0.1:8081`. To expose a standalone server on the LAN, first configure an application PIN while Curated is running on loopback, then pass a main runtime JSON config with both an explicit non-loopback `httpAddr` and `"lanEnabled": true`, for example `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`. Curated refuses to start a non-loopback listener when LAN opt-in is absent or the PIN has not been initialized. The bundled frontend continues to use same-origin `/api`.
+Development and release builds default to loopback-only `127.0.0.1:8080` and `127.0.0.1:8081`. To expose a standalone server on the LAN, first configure an application PIN while Curated is running on loopback, then pass a main runtime JSON config with both an explicit non-loopback `httpAddr` and `"lanEnabled": true`, for example `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`. Curated refuses to start a non-loopback listener when LAN opt-in is absent or the PIN has not been initialized. Browser CORS access is limited to same-origin, loopback development origins, and exact additional origins listed in main config `corsAllowedOrigins`; arbitrary credentialed Origin reflection is not supported. The bundled frontend continues to use same-origin `/api`.
 
 ## API
 

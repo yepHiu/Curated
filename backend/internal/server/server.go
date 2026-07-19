@@ -381,7 +381,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
 	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
 
-	return WithAccessLog(h.logger, withClientTracking(withCORS(h.withAuthLock(mux)), h.clientTracker))
+	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -3122,27 +3122,5 @@ func (h *Handler) handleProxyPingURL(w http.ResponseWriter, r *http.Request, tar
 		LatencyMs:  latencyMs,
 		HTTPStatus: resp.StatusCode,
 		Message:    msg,
-	})
-}
-
-func withCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		} else {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Curated-Offset, X-Curated-Chunk-Size, X-Curated-Chunk-SHA256, X-Curated-Client, X-Curated-Client-Version, X-Curated-OS, X-Curated-OS-Version, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version")
-		w.Header().Set("Accept-CH", "Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
 	})
 }

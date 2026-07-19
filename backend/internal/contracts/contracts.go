@@ -945,6 +945,7 @@ const (
 	TaskTypeImportMovies = "import.movies"
 
 	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
+	ErrorCodeForbidden     = "COMMON_FORBIDDEN"
 	ErrorCodeNotFound      = "COMMON_NOT_FOUND"
 	ErrorCodeInternal      = "COMMON_INTERNAL"
 	ErrorCodeUnsupported   = "COMMON_UNSUPPORTED_COMMAND"

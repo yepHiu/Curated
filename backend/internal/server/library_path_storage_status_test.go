@@ -79,6 +79,7 @@ func TestHandleGetLibraryPathStorageStatus(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/library/paths/storage-status", http.NoBody)
+	req.Host = "127.0.0.1:8080"
 	rr := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rr, req)
 
@@ -106,6 +107,7 @@ func TestHandleCheckLibraryPathStorageStatus(t *testing.T) {
 
 	body := []byte(`{"libraryPathIds":["library-2"]}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/library/paths/storage-status/check", bytes.NewReader(body))
+	req.Host = "127.0.0.1:8080"
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rr, req)
@@ -128,6 +130,7 @@ func TestHandleRebindLibraryPathStorage(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/library/paths/library-2/storage-binding/rebind", http.NoBody)
+	req.Host = "127.0.0.1:8080"
 	rr := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rr, req)
 
