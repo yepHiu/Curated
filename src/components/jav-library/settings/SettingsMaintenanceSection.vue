@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from "vue"
 import { useI18n } from "vue-i18n"
 import { BookOpen, ScanSearch, Wrench } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import SettingsBackupSection from "./SettingsBackupSection.vue"
-import SettingsLibraryHealthSection from "./SettingsLibraryHealthSection.vue"
+
+const SettingsLibraryHealthSection = defineAsyncComponent(
+  () => import("./SettingsLibraryHealthSection.vue"),
+)
 
 defineProps<{
   fullScanBusy: boolean

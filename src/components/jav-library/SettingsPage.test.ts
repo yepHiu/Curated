@@ -31,6 +31,10 @@ vi.mock("vue-i18n", async () => {
   }
 })
 
+vi.mock("@/i18n", () => ({
+  ensureLocaleMessages: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: { section: "library" } }),
   useRouter: () => ({ replace: vi.fn().mockResolvedValue(undefined) }),

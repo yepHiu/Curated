@@ -6,7 +6,7 @@ import "@fontsource/outfit/700.css"
 import "vue-sonner/style.css"
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css"
 import App from "./App.vue"
-import { i18n } from "@/i18n"
+import { ensureLocaleMessages, i18n, initialLocale } from "@/i18n"
 import { initClientLogger } from "@/lib/app-logger"
 import { startAuthIdleLockMonitor } from "@/services/auth-idle-lock-service"
 import { startProtectedWebStateBootstrap } from "@/services/protected-web-state-bootstrap"
@@ -15,7 +15,8 @@ import "./style.css"
 
 initClientLogger()
 
-function boot() {
+async function boot() {
+  await ensureLocaleMessages(initialLocale)
   const app = createApp(App)
   app.config.errorHandler = (err, _instance, info) => {
     console.error("[global error handler]", err, info)

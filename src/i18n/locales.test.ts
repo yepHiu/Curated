@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import en from "@/locales/en.json"
 import ja from "@/locales/ja.json"
 import zhCN from "@/locales/zh-CN.json"
+import { ensureLocaleMessages, i18n } from "@/i18n"
 
 const locales = {
   en,
@@ -121,6 +122,13 @@ function readLocaleKey(messages: Record<string, unknown>, key: string): unknown 
 }
 
 describe("locale key parity", () => {
+  it.each(["en", "ja"] as const)("loads %s messages on demand", async (locale) => {
+    await ensureLocaleMessages(locale)
+    const messages = i18n.global.getLocaleMessage(locale) as Record<string, unknown>
+    expect(Object.keys(messages).length).toBeGreaterThan(0)
+    expect(messages.common).toBeTypeOf("object")
+  })
+
   it.each(Object.entries(locales))("%s has curated tag filter and saving keys", (_locale, messages) => {
     const missing = requiredLocaleKeys.filter((key) => {
       const value = readLocaleKey(messages, key)

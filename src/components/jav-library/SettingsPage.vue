@@ -12,6 +12,8 @@ import {
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
+import { ensureLocaleMessages } from "@/i18n"
+import type { SupportedLocale } from "@/lib/locale-storage"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { HttpClientError } from "@/api/http-client"
 import type {
@@ -1502,6 +1504,12 @@ async function checkLibraryStorageStatus(ids?: string[]) {
   }
 }
 
+async function setLocaleFromSelect(value: string) {
+  if (value !== "zh-CN" && value !== "en" && value !== "ja") return
+  await ensureLocaleMessages(value as SupportedLocale)
+  locale.value = value
+}
+
 async function exportMovieLibraryCsv() {
   if (movieCsvExportBusy.value) return
   movieCsvExportError.value = ""
@@ -2017,7 +2025,7 @@ async function runMetadataRefreshForSelected() {
     >
     <h2 class="sr-only">{{ t("settings.navGeneral") }}</h2>
     <SettingsGeneralSection
-      v-model:locale="locale"
+      :locale="locale"
       :theme-preference="themePreference"
       :auto-download-updates="autoDownloadUpdates"
       :auto-download-updates-saving="autoDownloadUpdatesSaving"
@@ -2028,6 +2036,7 @@ async function runMetadataRefreshForSelected() {
       :launch-at-login-unavailable-hint="launchAtLoginUnavailableHint"
       :launch-at-login-error="launchAtLoginError"
       :auto-save-ready="settingsAutoSaveReady"
+      @update:locale="void setLocaleFromSelect($event)"
       @change-theme="setThemeFromSelect"
       @change-auto-download-updates="onAutoDownloadUpdatesChange"
       @change-launch-at-login="onLaunchAtLoginChange"
