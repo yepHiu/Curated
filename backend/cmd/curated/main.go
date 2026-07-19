@@ -23,6 +23,7 @@ import (
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
 	"curated-backend/internal/logging"
+	"curated-backend/internal/processlock"
 	"curated-backend/internal/server"
 	"curated-backend/internal/shellopen"
 	"curated-backend/internal/storage"
@@ -45,6 +46,7 @@ type bootstrap struct {
 	cfg        config.Config
 	logger     *zap.Logger
 	store      *storage.SQLiteStore
+	dataLock   *processlock.Lock
 	backendApp *app.App
 	cleanup    func()
 }
@@ -116,6 +118,11 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize logger: %w", err)
 	}
+	dataLock, err := processlock.Acquire(cfg.DatabasePath + ".runtime.lock")
+	if err != nil {
+		_ = logger.Sync()
+		return nil, fmt.Errorf("acquire database runtime lock: %w", err)
+	}
 
 	startupFields := []zap.Field{
 		zap.String("buildStamp", version.Stamp()),
@@ -142,21 +149,25 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 
 	store, err := storage.NewSQLiteStore(cfg.DatabasePath)
 	if err != nil {
+		_ = dataLock.Release()
 		_ = logger.Sync()
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
 	if err := store.Migrate(ctx); err != nil {
 		_ = store.Close()
+		_ = dataLock.Release()
 		_ = logger.Sync()
 		return nil, fmt.Errorf("run sqlite migrations: %w", err)
 	}
 	if err := store.ApplyAuthStartupPolicy(ctx); err != nil {
 		_ = store.Close()
+		_ = dataLock.Release()
 		_ = logger.Sync()
 		return nil, fmt.Errorf("apply auth startup policy: %w", err)
 	}
 	if err := store.SeedLibraryPathsIfEmpty(ctx, cfg.LibraryPaths); err != nil {
 		_ = store.Close()
+		_ = dataLock.Release()
 		_ = logger.Sync()
 		return nil, fmt.Errorf("seed library paths: %w", err)
 	}
@@ -164,6 +175,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	backendApp, err := app.New(ctx, cfg, logger, store, librarySettingsPath)
 	if err != nil {
 		_ = store.Close()
+		_ = dataLock.Release()
 		_ = logger.Sync()
 		return nil, fmt.Errorf("initialize backend app: %w", err)
 	}
@@ -173,6 +185,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	if cfg.LibraryWatchOn() {
 		if err := backendApp.EnsureLibraryWatchRunning(); err != nil {
 			_ = store.Close()
+			_ = dataLock.Release()
 			_ = logger.Sync()
 			return nil, fmt.Errorf("init library fsnotify watcher: %w", err)
 		}
@@ -182,12 +195,14 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 		cfg:        cfg,
 		logger:     logger,
 		store:      store,
+		dataLock:   dataLock,
 		backendApp: backendApp,
 		cleanup: func() {
 			if backendApp != nil {
 				backendApp.Close()
 			}
 			_ = store.Close()
+			_ = dataLock.Release()
 			_ = logger.Sync()
 		},
 	}, nil
