@@ -104,6 +104,10 @@ pnpm dev
 | 轻量运行时 e2e（Chromium） | `pnpm test:e2e` |
 | 生产构建 | `pnpm build`（内部含 `typecheck` + `vite build`） |
 
+`pnpm build` 同时执行 Bundle hard budget；超出任一预算会直接构建失败，并在成功构建时生成 `dist/bundle-analysis.json`。当前预算为：首屏静态 JS 闭包不超过 **500 kB raw / 165 kB gzip**，全部 JS 不超过 **2250 kB raw / 750 kB gzip**；`hls-player`、`pinyin-search`、入口 `index` 与 `SettingsView` 另有具名 chunk 预算。`hls-player` 允许作为独立动态大 chunk（上限 **525 kB raw / 165 kB gzip**），但不得进入 HTML modulepreload 或首屏静态依赖闭包。
+
+调整分块时不得通过重新增加 catch-all `vendor`、单纯调高 `chunkSizeWarningLimit` 或放宽 hard budget 来绕过回归。`chunkSizeWarningLimit: 525` 与 HLS 的显式 hard budget 对齐，仅避免对已知动态媒体播放器重复告警。
+
 **单测文件**（示例）：
 
 ```bash

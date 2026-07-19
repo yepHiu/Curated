@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from "vue"
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
-import PreviewImageViewerInner from "@/components/jav-library/PreviewImageViewerInner.vue"
 import { cn } from "@/lib/utils"
+
+const PreviewImageViewerInner = defineAsyncComponent(
+  () => import("@/components/jav-library/PreviewImageViewerInner.vue"),
+)
 
 defineProps<{
   open: boolean
