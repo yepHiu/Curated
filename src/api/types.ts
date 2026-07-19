@@ -392,6 +392,86 @@ export interface BackupPathBody {
   backupPath: string
 }
 
+export type LibraryHealthStatus = "healthy" | "attention" | "critical"
+export type LibraryHealthSeverity = "critical" | "warning" | "info"
+
+export interface LibraryHealthDatabaseDTO {
+  quickCheckOk: boolean
+  quickCheckMessages: string[]
+  foreignKeyOk: boolean
+  foreignKeyCount: number
+}
+
+export interface LibraryHealthFindingDTO {
+  id: string
+  category: string
+  severity: LibraryHealthSeverity
+  entityType: string
+  entityId?: string
+  label: string
+  path?: string
+  message: string
+  details?: Record<string, unknown>
+  repairActions?: string[]
+}
+
+export interface LibraryHealthSummaryDTO {
+  totalFindings: number
+  criticalFindings: number
+  warningFindings: number
+  infoFindings: number
+  skippedOfflineFiles: number
+  categoryCounts: Record<string, number>
+}
+
+export interface LibraryHealthReportDTO {
+  scannedAt: string
+  status: LibraryHealthStatus
+  database: LibraryHealthDatabaseDTO
+  storageStatuses: LibraryPathStorageStatusDTO[]
+  summary: LibraryHealthSummaryDTO
+  findings: LibraryHealthFindingDTO[]
+  truncated: boolean
+}
+
+export interface StartLibraryHealthRepairBody {
+  action: "rescrape_metadata"
+  categories?: Array<"metadata_missing" | "metadata_failed">
+  findingIds?: string[]
+  limit?: number
+  confirm: boolean
+}
+
+export interface LibraryHealthRepairItemDTO {
+  ordinal: number
+  findingId: string
+  category: string
+  movieId: string
+  label: string
+  status: "pending" | "queued" | "succeeded" | "failed" | "cancelled"
+  childTaskId?: string
+  errorCode?: string
+  errorMessage?: string
+  startedAt?: string
+  finishedAt?: string
+}
+
+export interface LibraryHealthRepairDTO {
+  repairId: string
+  taskId: string
+  action: "rescrape_metadata"
+  categories: string[]
+  status: "pending" | "running" | "completed" | "partial_failed" | "failed" | "cancelled"
+  totalItems: number
+  completedItems: number
+  succeededItems: number
+  failedItems: number
+  createdAt: string
+  startedAt?: string
+  finishedAt?: string
+  items: LibraryHealthRepairItemDTO[]
+}
+
 /** PATCH backendLog 的字段；省略表示不修改 */
 export interface PatchBackendLogBody {
   logDir?: string

@@ -6,6 +6,8 @@ import {
   isBackupRestorePreflightDTO,
   isBackupVerificationDTO,
   isHealthDTO,
+  isLibraryHealthRepairDTO,
+  isLibraryHealthReportDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
 } from "./guards"
@@ -59,6 +61,8 @@ import type {
   CheckLibraryPathStorageStatusBody,
   LibraryPathStorageStatusDTO,
   LibraryPathStorageStatusListDTO,
+  LibraryHealthRepairDTO,
+  LibraryHealthReportDTO,
   LibraryPathDTO,
   UpdateLibraryPathBody,
   ListActorsParams,
@@ -78,6 +82,7 @@ import type {
   PatchCuratedFrameTagsBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
+  StartLibraryHealthRepairBody,
   PatchSettingsBody,
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
@@ -325,6 +330,25 @@ export const api = {
     return httpClient
       .post<unknown>("/maintenance/backups/preflight", body)
       .then((value) => assertApiResponse("POST /maintenance/backups/preflight", value, isBackupRestorePreflightDTO))
+  },
+
+  scanLibraryHealth(findingLimit = 500): Promise<LibraryHealthReportDTO> {
+    const q = new URLSearchParams({ findingLimit: String(findingLimit) })
+    return httpClient
+      .post<unknown>(`/library/health/scan?${q.toString()}`)
+      .then((value) => assertApiResponse("POST /library/health/scan", value, isLibraryHealthReportDTO))
+  },
+
+  startLibraryHealthRepair(body: StartLibraryHealthRepairBody): Promise<LibraryHealthRepairDTO> {
+    return httpClient
+      .post<unknown>("/library/health/repairs", body)
+      .then((value) => assertApiResponse("POST /library/health/repairs", value, isLibraryHealthRepairDTO))
+  },
+
+  getLibraryHealthRepair(repairId: string): Promise<LibraryHealthRepairDTO> {
+    return httpClient
+      .get<unknown>(`/library/health/repairs/${encodeURIComponent(repairId)}`)
+      .then((value) => assertApiResponse("GET /library/health/repairs/{id}", value, isLibraryHealthRepairDTO))
   },
 
   listPlayedMovies(): Promise<PlayedMoviesListDTO> {

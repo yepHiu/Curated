@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import { BookOpen, RefreshCw, ScanSearch, Wrench } from "lucide-vue-next"
+import { BookOpen, ScanSearch, Wrench } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -10,10 +10,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import SettingsBackupSection from "./SettingsBackupSection.vue"
+import SettingsLibraryHealthSection from "./SettingsLibraryHealthSection.vue"
 
 defineProps<{
   fullScanBusy: boolean
   backupSupported: boolean
+  healthSupported: boolean
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +27,8 @@ const { t } = useI18n()
 
 <template>
   <div class="flex w-full flex-col gap-6">
+    <SettingsLibraryHealthSection :supported="healthSupported" />
+
     <div class="break-inside-avoid">
       <SettingsBackupSection :supported="backupSupported" />
     </div>
@@ -71,23 +75,6 @@ const { t } = useI18n()
                 class="size-4"
                 :class="fullScanBusy ? 'animate-pulse' : ''"
               />
-              {{ t("common.run") }}
-            </Button>
-          </div>
-
-          <div
-            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div class="min-w-0 flex flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.rebuildCache") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.rebuildCacheHint") }}
-              </p>
-            </div>
-            <Button variant="secondary" class="h-11 shrink-0 rounded-2xl px-5 font-medium">
-              <RefreshCw data-icon="inline-start" class="size-4" />
               {{ t("common.run") }}
             </Button>
           </div>

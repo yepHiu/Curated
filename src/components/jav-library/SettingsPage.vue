@@ -2278,6 +2278,7 @@ async function runMetadataRefreshForSelected() {
       <SettingsMaintenanceSection
         :full-scan-busy="fullScanBusy"
         :backup-supported="useWebApi"
+        :health-supported="useWebApi"
         @run-full-scan="runFullScan"
       />
     </section>

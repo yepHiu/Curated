@@ -302,6 +302,104 @@ describe("api endpoint response validation", () => {
     )
   })
 
+  it("validates library health reports and persisted repair results", async () => {
+    const report = {
+      scannedAt: "2026-07-20T10:00:00Z",
+      status: "attention",
+      database: {
+        quickCheckOk: true,
+        quickCheckMessages: ["ok"],
+        foreignKeyOk: true,
+        foreignKeyCount: 0,
+      },
+      storageStatuses: [],
+      summary: {
+        totalFindings: 1,
+        criticalFindings: 0,
+        warningFindings: 1,
+        infoFindings: 0,
+        skippedOfflineFiles: 0,
+        categoryCounts: { metadata_missing: 1 },
+      },
+      findings: [{
+        id: "health-1",
+        category: "metadata_missing",
+        severity: "warning",
+        entityType: "movie",
+        entityId: "movie-1",
+        label: "TEST-001",
+        message: "metadata missing",
+        repairActions: ["rescrape_metadata"],
+      }],
+      truncated: false,
+    }
+    const repair = {
+      repairId: "repair-1",
+      taskId: "task-1",
+      action: "rescrape_metadata",
+      categories: ["metadata_missing"],
+      status: "completed",
+      totalItems: 1,
+      completedItems: 1,
+      succeededItems: 1,
+      failedItems: 0,
+      createdAt: "2026-07-20T10:01:00Z",
+      finishedAt: "2026-07-20T10:01:02Z",
+      items: [{
+        ordinal: 0,
+        findingId: "health-1",
+        category: "metadata_missing",
+        movieId: "movie-1",
+        label: "TEST-001",
+        status: "succeeded",
+        childTaskId: "scrape-1",
+      }],
+    }
+    const post = vi.spyOn(httpClient, "post")
+    post.mockResolvedValueOnce(report)
+    post.mockResolvedValueOnce(repair)
+    const get = vi.spyOn(httpClient, "get").mockResolvedValueOnce(repair)
+
+    await expect(api.scanLibraryHealth(250)).resolves.toEqual(report)
+    await expect(api.startLibraryHealthRepair({
+      action: "rescrape_metadata",
+      categories: ["metadata_missing"],
+      confirm: true,
+    })).resolves.toEqual(repair)
+    await expect(api.getLibraryHealthRepair("repair-1")).resolves.toEqual(repair)
+
+    expect(post).toHaveBeenNthCalledWith(1, "/library/health/scan?findingLimit=250")
+    expect(get).toHaveBeenCalledWith("/library/health/repairs/repair-1")
+  })
+
+  it("rejects malformed library health category counts", async () => {
+    vi.spyOn(httpClient, "post").mockResolvedValueOnce({
+      scannedAt: "2026-07-20T10:00:00Z",
+      status: "healthy",
+      database: {
+        quickCheckOk: true,
+        quickCheckMessages: ["ok"],
+        foreignKeyOk: true,
+        foreignKeyCount: 0,
+      },
+      storageStatuses: [],
+      summary: {
+        totalFindings: 0,
+        criticalFindings: 0,
+        warningFindings: 0,
+        infoFindings: 0,
+        skippedOfflineFiles: 0,
+        categoryCounts: { metadata_missing: "zero" },
+      },
+      findings: [],
+      truncated: false,
+    })
+
+    await expect(api.scanLibraryHealth()).rejects.toThrow(
+      "Invalid API response for POST /library/health/scan",
+    )
+  })
+
   it("keeps small movie imports on the multipart endpoint", async () => {
     const task = {
       taskId: "import.movies-1",

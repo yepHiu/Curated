@@ -13,6 +13,8 @@ import type {
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
   LibraryPathStorageStatusDTO,
+  LibraryHealthRepairDTO,
+  LibraryHealthReportDTO,
   ListActorsParams,
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
@@ -32,6 +34,7 @@ import type {
   ProxyJavBusPingResponse,
   PutMovieCommentBody,
   TaskDTO,
+  StartLibraryHealthRepairBody,
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
@@ -98,6 +101,9 @@ export interface LibraryService {
   createBackup(destinationPath: string): Promise<BackupManifestDTO>
   verifyBackup(backupPath: string): Promise<BackupVerificationDTO>
   preflightBackupRestore(backupPath: string): Promise<BackupRestorePreflightDTO>
+  scanLibraryHealth(): Promise<LibraryHealthReportDTO>
+  startLibraryHealthRepair(body: StartLibraryHealthRepairBody): Promise<LibraryHealthRepairDTO>
+  getLibraryHealthRepair(repairId: string): Promise<LibraryHealthRepairDTO>
   pingProxyJavbus(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse>
   pingProvider(name: string): Promise<ProviderHealthDTO>

@@ -26,6 +26,7 @@ describe("SettingsMaintenanceSection", () => {
       props: {
         fullScanBusy: false,
         backupSupported: false,
+        healthSupported: false,
       },
     })
 
@@ -42,6 +43,7 @@ describe("SettingsMaintenanceSection", () => {
       props: {
         fullScanBusy: true,
         backupSupported: false,
+        healthSupported: false,
       },
     })
 

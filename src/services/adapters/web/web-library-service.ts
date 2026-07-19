@@ -8,6 +8,8 @@ import type {
   HomepageDailyRecommendationsDTO,
   RefreshHomepageDailyRecommendationsBody,
   LibraryPathStorageStatusDTO,
+  LibraryHealthRepairDTO,
+  LibraryHealthReportDTO,
   NativePlayerPreset,
   ListActorsParams,
   MetadataMovieScrapeMode,
@@ -21,6 +23,7 @@ import type {
   ProxySettingsDTO,
   SettingsDTO,
   TaskDTO,
+  StartLibraryHealthRepairBody,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
@@ -513,6 +516,18 @@ function createWebLibraryService(): LibraryService {
 
     async preflightBackupRestore(backupPath: string): Promise<BackupRestorePreflightDTO> {
       return api.preflightBackupRestore({ backupPath: backupPath.trim() })
+    },
+
+    async scanLibraryHealth(): Promise<LibraryHealthReportDTO> {
+      return api.scanLibraryHealth()
+    },
+
+    async startLibraryHealthRepair(body: StartLibraryHealthRepairBody): Promise<LibraryHealthRepairDTO> {
+      return api.startLibraryHealthRepair(body)
+    },
+
+    async getLibraryHealthRepair(repairId: string): Promise<LibraryHealthRepairDTO> {
+      return api.getLibraryHealthRepair(repairId.trim())
     },
 
     async checkLibraryPathStorageStatus(libraryPathIds?: string[]) {
