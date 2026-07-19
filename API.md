@@ -136,6 +136,9 @@ HTTP API 成功时直接返回 DTO 本体，不包 `{ "ok": true, "data": ... }`
 | `IMPORT_NOT_ENOUGH_SPACE` | 磁盘空间不足 |
 | `IMPORT_COPY_FAILED` | 导入复制失败 |
 | `IMPORT_SCAN_FAILED` | 文件已导入但后续扫描启动失败 |
+| `IMPORT_UPLOAD_PERSIST_FAILED` | 分片已经写盘，但上传范围或会话状态未能持久化；调用方可安全重传同一范围 |
+| `IMPORT_UPLOAD_UNRECOVERABLE` | 上传暂存文件或提交结果无法与 SQLite 会话记录安全协调 |
+| `IMPORT_UPLOAD_EXPIRED` | 上传会话超过滑动有效期，已进入过期清理流程 |
 | `APP_UPDATE_DOWNLOAD_FAILED` | 更新安装包下载失败 |
 | `APP_UPDATE_INSTALL_FAILED` | 更新安装启动失败 |
 | `CURATED_EXPORT_ACTOR_MISMATCH` | 精选帧导出时 `actorName` 不属于某一帧 |
@@ -1694,19 +1697,22 @@ Body：
 
 ```json
 {
-  "uploadId": "upload_abcdef",
+  "uploadId": "upload_0123456789abcdef",
   "targetPath": "D:\\Library",
   "chunkSize": 33554432,
   "bytesReceived": 0,
   "totalBytes": 1234567890,
   "state": "uploading",
+  "expiresAt": "2026-07-21T12:00:00Z",
+  "recoveryStatus": "ready",
   "files": [
     {
-      "fileId": "file_abcdef",
+      "fileId": "file_0123456789abcdef",
       "relativePath": "Folder\\ABC-001.mp4",
       "size": 1234567890,
       "bytesReceived": 0,
-      "complete": false
+      "complete": false,
+      "state": "pending"
     }
   ],
   "task": {
@@ -1722,8 +1728,12 @@ Body：
 说明：
 
 - 默认 chunk size：32 MiB。
-- 上传会话存在后端内存中，后端进程重启后不可恢复。
+- manifest 请求体上限为 2 MiB，最多 10,000 个文件；未知字段、尾随 JSON、重复目标路径、空文件和总大小溢出都会返回 `400 COMMON_BAD_REQUEST`。
+- migration `0029_movie_import_upload_sessions.sql` 把 session、文件、已接收 chunk 范围和清理审计持久化到 SQLite。活跃会话使用 24 小时滑动有效期，每个成功分片会续期。
 - staging 目录：`<target-library-root>/.curated-import/<uploadId>/`。
+- 后端启动时会从 SQLite 恢复 `uploading` / `committing` 会话及原 task ID，并以 chunk 范围账本重新推导字节计数；不会把预分配文件长度当成已上传字节。
+- `recoveryStatus` 为 `ready`、`unavailable` 或 `unrecoverable`。目标盘暂时离线时返回 `unavailable` 并保留会话；盘符恢复后，后续 GET、PUT 或 commit 会重新协调。`recoveryError` 仅在需要诊断时出现。
+- janitor 每 15 分钟检查终态、确实过期的活跃会话，以及超过 24 小时且严格匹配 `.curated-import/upload_<16 lowercase hex>` 的孤立目录。每次清理都先写 `movie_import_upload_cleanup_audits`；它不会删除最终目标文件，也不会扫描或删除任意隐藏目录。
 
 #### `GET /api/import/movies/uploads/{uploadId}`
 
@@ -1751,11 +1761,15 @@ Headers：
 - `chunkIndex` 必须是非负整数。
 - 重复上传同一 `chunkIndex` 且 offset/size 一致时幂等返回当前状态。
 - 重复上传同一 `chunkIndex` 但范围不同，返回 `409 COMMON_CONFLICT`。
+- 不同 chunk index 的范围不得重叠。
 - offset 越界或分片超过文件大小，返回 `400 COMMON_BAD_REQUEST`。
+- 非空分片先写入指定范围并完成 `Sync` / `Close`，之后才在 SQLite 事务中记录 chunk 并更新文件与会话计数；如果进程在写盘后、记录前退出，客户端可重传同一范围。
 
 #### `POST /api/import/movies/uploads/{uploadId}/commit`
 
 用途：验证所有文件完整，提交 staging 文件到库根，并启动扫描。
+
+提交前会对全部目标做不覆盖预检，并先把会话持久化为 `committing`。每个成功移动的文件都有 SQLite committed marker；后端重启后可继续未完成提交，也可识别“文件已移动但 marker 尚未写入”的中断窗口。无法安全协调的会话会标记为 `unrecoverable`，不会覆盖冲突文件。
 
 成功：`202 TaskDTO`
 

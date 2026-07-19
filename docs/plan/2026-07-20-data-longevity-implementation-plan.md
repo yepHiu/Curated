@@ -12,7 +12,7 @@
 | C1 备份核心与离线 CLI | verified | `bd2e9b59`、`4d0fd1f0`；storage / backup / maintenance / cmd 测试与全量 Go test/vet 通过 |
 | C2 Settings Maintenance | verified | `e7958490`；受 PIN 保护的 create / verify / preflight API、Web/Mock service contract、三语 Settings UI、目标 Vitest、全量 167/684 Vitest、4/28 Electron、4 项 Chromium e2e、typecheck/lint/build 与全量 Go test/vet 均通过 |
 | C3 路径迁移 CLI | verified | `1d9b2070`；只读 plan、7 列白名单、Windows/UNC/Unix 与跨平台映射、目标/冲突检查、迁移前已验证备份、单事务 apply + audit、binding reset、目标/全量 Go test/vet 与真实临时 SQLite CLI 演练通过 |
-| C4 上传 session 持久化 | not-started | REQ-0016 |
+| C4 上传 session 持久化 | verified | `3e77766e`；SQLite session/file/chunk ledger、重启恢复、提交中断协调、24h sliding TTL、审计 janitor、离线目标延迟与全量 Go/前端/Electron/e2e/build 门禁通过 |
 | C5 Library Health / 修复队列 | not-started | REQ-0017、REQ-0018 |
 
 ## 1. 目标与边界
@@ -89,6 +89,16 @@ config/library-config.cfg   # 原文件存在时
 - 每次创建、chunk 落盘、commit/abort 状态转换都以可恢复顺序持久化。
 - 启动时重建 session；校验 staging 文件实际大小，不信任仅数据库记录。
 - janitor 只清理明确过期、已 abort/commit 或无法恢复且已记录诊断的目录，不扫描和删除任意隐藏目录。
+
+完成结果（2026-07-20）：
+
+- migration `0029_movie_import_upload_sessions.sql` 新增 `movie_import_upload_sessions`、`movie_import_upload_files`、`movie_import_upload_chunks` 与 `movie_import_upload_cleanup_audits`；repository 以事务维护 chunk 去重/重叠约束、文件与会话计数、条件过期、状态转换和 cleanup audit。
+- chunk 写入顺序为目标范围写盘、边界校验、`Sync`、`Close`，再写 SQLite chunk row 并更新计数；启动恢复从 chunk 行重新推导 received bytes，不把预分配文件长度当成完成证据。写盘后、记账前退出时，客户端可安全覆盖式重传同一范围。
+- 启动恢复 `uploading` / `committing` session、原 task ID、进度和 metadata；提交逐文件记录 committed marker，可继续 staging 尚存的移动，也可识别 final 已移动但 marker 尚未写入的中断窗口。冲突文件不覆盖，无法安全协调的状态标为 `unrecoverable`。
+- 目标盘离线时 session 保留并暴露 `recoveryStatus=unavailable`；目标恢复后 GET/PUT/commit 可重新协调。janitor 不在离线时谎报 staging 已移除，恢复在线后才审计清理。
+- 默认 active TTL 24h、janitor interval 15m、orphan grace 24h、terminal cleanup delay 1m。janitor 只清理 SQLite 登记的终态/确实过期 session，或严格位于配置库根下且命名为 `.curated-import/upload_<16 lowercase hex>` 的旧孤立目录；symlink、无效命名、新鲜 orphan、任意隐藏目录和最终目标文件均不删除。
+- manifest 限制为 2 MiB、最多 10,000 文件，拒绝未知字段、尾随 JSON、重复目标路径、空文件和总量溢出；DTO 同步 `expiresAt`、`recoveryStatus`、`recoveryError` 与 file `state`，并增加 `IMPORT_UPLOAD_PERSIST_FAILED`、`IMPORT_UPLOAD_UNRECOVERABLE`、`IMPORT_UPLOAD_EXPIRED`。
+- 验证证据：`go test ./...`、`go vet ./...`、`npx -y pnpm@11.0.0 typecheck`、`lint`、`test`（167 files / 684 tests）、`test:electron`（4 files / 28 tests）、`test:e2e`（4 Chromium tests）、`build`、`build:electron:main` 全部通过。`go test -race` 因本机未启用 CGO 未运行成功，因此不列为通过证据。
 
 ### C5：Library Health 与修复队列
 

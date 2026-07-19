@@ -30,7 +30,7 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Local-first** — Vue 3 SPA frontend + Go HTTP API backend + SQLite persistence.
 - **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
-- **Movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and resumable chunked upload for large files.
+- **Restart-safe movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and SQLite-backed resumable uploads that recover across backend restarts.
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
 - **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, Settings-based create/verify/preflight controls, offline atomic restore, and retained rollback copies.
 - **Audited path migration** — Offline dry-run/apply CLI for drive-letter, mount-point, and Windows-to-Unix prefix changes, with segment-aware matching, target/conflict checks, automatic verified backup, one-transaction updates, binding reset, and a persisted audit record.
@@ -162,6 +162,8 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Top-bar movie import via drag-and-drop, file selection, or folder selection.
 - Progress tracking with per-file status and failure notifications.
 - Resumable chunked upload for large files with commit/abort lifecycle.
+- SQLite-backed session, file, and chunk-range recovery across backend restarts, including interrupted commit reconciliation.
+- Audited janitor cleanup for expired and narrowly scoped orphan staging directories; offline target storage defers cleanup, and final destination files are never deleted.
 - Conflict detection (existing target files are not overwritten).
 - Configurable default import library path.
 - Imports are blocked with a storage warning when the default target drive is offline or no longer matches the bound volume.
@@ -297,7 +299,7 @@ Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback
 
 See [API.md](API.md) for the full endpoint reference.
 
-Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
+Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Session, file, and synchronized chunk-range state is persisted in SQLite, restored with the original task after backend restart, and reconciled if a commit was interrupted. A scoped janitor records cleanup audits for expired/terminal sessions and old `.curated-import/upload_<id>` orphans; it defers while target storage is offline, never overwrites conflicts, and never deletes final destination files. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
 
 Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
 

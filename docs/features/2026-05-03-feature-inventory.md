@@ -158,9 +158,15 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Folder selection import | Shipped | Preserves relative paths via `relativePath` fields |
 | Progress tracking | Shipped | `import.movies` task with file-level progress |
 | Resumable upload | Shipped | Chunked upload for large files; `POST /api/import/movies/uploads` |
+| Restart persistence | Shipped | SQLite-backed session/file/chunk ledger restores the original task after backend restart |
+| Chunk range ledger | Shipped | Synced non-overlapping chunk ranges are the source of truth for received-byte counters |
 | Upload commit | Shipped | `POST /api/import/movies/uploads/{id}/commit` |
+| Interrupted commit recovery | Shipped | Reconciles staging/final files and per-file commit markers without overwriting conflicts |
 | Upload abort | Shipped | `DELETE /api/import/movies/uploads/{id}` |
 | Upload status query | Shipped | `GET /api/import/movies/uploads/{id}` |
+| Offline storage deferral | Shipped | `recoveryStatus=unavailable` retains the session until its target storage returns |
+| Upload janitor | Shipped | Sliding TTL plus narrowly scoped terminal/expired/orphan staging cleanup |
+| Cleanup audits | Shipped | Cleanup attempts and outcomes persist in `movie_import_upload_cleanup_audits` |
 | Conflict detection | Shipped | Existing target files are not overwritten |
 | Default import path | Shipped | `defaultImportLibraryPathId` setting |
 | Staging isolation | Shipped | Files hidden until commit; `.curated-import/` staging dir |

@@ -389,12 +389,16 @@ Backend uses stable error codes (see `backend/internal/contracts/contracts.go`):
 
 Migrations are in `backend/internal/storage/migrations/` and run automatically on startup.
 
+Migration `0029_movie_import_upload_sessions.sql` persists resumable movie-import sessions, ordered files, synchronized chunk-range ledgers, per-file commit markers, expiry/diagnostics, and cleanup audits. `movie_import_upload_repository.go` owns transactional counters and state transitions; `movie_import_upload_runtime.go` restores `uploading` / `committing` sessions and original task IDs on startup, reconciles interrupted commits, and runs the scoped upload janitor. Chunk bytes are `Sync`/`Close`d before SQLite records the range, and startup derives counters from chunk rows rather than preallocated file size.
+
+Upload DTOs expose optional `expiresAt`, `recoveryStatus`, `recoveryError`, and per-file `state`. `recoveryStatus` is `ready`, `unavailable`, or `unrecoverable`; offline target storage is retained for later reconciliation. The 24-hour sliding TTL and 15-minute janitor are safety bounded: cleanup is audited, only strict old `.curated-import/upload_<16 lowercase hex>` or registered terminal/expired staging is eligible, symlinks/out-of-scope paths are skipped, and final destination files are never deleted. Stable errors include `IMPORT_UPLOAD_PERSIST_FAILED`, `IMPORT_UPLOAD_UNRECOVERABLE`, and `IMPORT_UPLOAD_EXPIRED`.
+
 ### Backend Task System
 
-All long-running operations (scan, scrape, asset download) are modeled as background tasks:
+All long-running operations (scan, scrape, asset download, movie import) are modeled as background tasks:
 
 - **Task lifecycle:** `pending` → `running` → `completed` | `partial_failed` | `failed` | `cancelled`
-- **Task types:** `scan.library`, `scrape.movie`, `scrape.actor`
+- **Task types:** `scan.library`, `scrape.movie`, `scrape.actor`, `import.movies`
 - **SSE events:** `GET /api/events` streams non-blocking `task.updated` snapshots; frontend task tracking and library-watch toasts consume it in Web API mode
 - **Polling fallback:** Frontend still polls `GET /api/tasks/{taskId}` for progress updates when SSE is unavailable
 - **Recent tasks:** `GET /api/tasks/recent` returns recently completed tasks for UI toast notifications
