@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -372,6 +373,117 @@ func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
 	}
 	if !settings.PINEnabled {
 		t.Fatal("PIN was disabled while LAN mode remained enabled")
+	}
+}
+
+func TestAuthUnlockRateLimitReturnsRetryAfterAndResetsAfterSuccess(t *testing.T) {
+	t.Parallel()
+
+	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "auth-rate-limit.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetAppPIN(context.Background(), "123456"); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store})
+	h.authAttempts.now = func() time.Time { return now }
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	for attempt := 1; attempt <= authFailuresBeforeBackoff; attempt++ {
+		resp := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/unlock", map[string]any{"pin": "000000"})
+		if attempt < authFailuresBeforeBackoff {
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("attempt %d status = %d, want 401", attempt, resp.StatusCode)
+			}
+			_ = resp.Body.Close()
+			continue
+		}
+		if resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("attempt %d status = %d, want 429", attempt, resp.StatusCode)
+		}
+		if got := resp.Header.Get("Retry-After"); got != "1" {
+			t.Fatalf("Retry-After = %q, want 1", got)
+		}
+		appErr := decodeAuthJSON[contracts.AppError](t, resp)
+		if appErr.Code != contracts.ErrorCodeAuthRateLimited || !appErr.Retryable {
+			t.Fatalf("rate limit error = %+v", appErr)
+		}
+		if got := appErr.Details["retryAfterSeconds"]; got != float64(1) {
+			t.Fatalf("retryAfterSeconds = %#v, want 1", got)
+		}
+	}
+
+	blocked := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/unlock", map[string]any{"pin": "123456"})
+	if blocked.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("correct PIN during backoff status = %d, want 429", blocked.StatusCode)
+	}
+	_ = blocked.Body.Close()
+
+	now = now.Add(time.Second)
+	unlocked := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/unlock", map[string]any{"pin": "123456"})
+	if unlocked.StatusCode != http.StatusOK {
+		t.Fatalf("correct PIN after backoff status = %d, want 200", unlocked.StatusCode)
+	}
+	_ = unlocked.Body.Close()
+
+	wrongAfterReset := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/unlock", map[string]any{"pin": "000000"})
+	if wrongAfterReset.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("first failure after reset status = %d, want 401", wrongAfterReset.StatusCode)
+	}
+	_ = wrongAfterReset.Body.Close()
+}
+
+func TestAuthSetupPINRateLimitsInvalidAttempts(t *testing.T) {
+	t.Parallel()
+
+	srv, _ := newAuthTestServer(t)
+	for attempt := 1; attempt <= authFailuresBeforeBackoff; attempt++ {
+		resp := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/setup-pin", map[string]any{
+			"pin":        "123456",
+			"confirmPin": "654321",
+		})
+		if attempt < authFailuresBeforeBackoff {
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("attempt %d status = %d, want 400", attempt, resp.StatusCode)
+			}
+			_ = resp.Body.Close()
+			continue
+		}
+		if resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("attempt %d status = %d, want 429", attempt, resp.StatusCode)
+		}
+		if got := resp.Header.Get("Retry-After"); got != "1" {
+			t.Fatalf("Retry-After = %q, want 1", got)
+		}
+		appErr := decodeAuthJSON[contracts.AppError](t, resp)
+		if appErr.Code != contracts.ErrorCodeAuthRateLimited {
+			t.Fatalf("rate limit code = %q, want %q", appErr.Code, contracts.ErrorCodeAuthRateLimited)
+		}
+	}
+}
+
+func TestAuthBackoffGrowsExponentiallyAndCaps(t *testing.T) {
+	t.Parallel()
+
+	if got := authBackoffForFailures(4); got != 0 {
+		t.Fatalf("backoff before threshold = %s, want 0", got)
+	}
+	if got := authBackoffForFailures(5); got != time.Second {
+		t.Fatalf("backoff at threshold = %s, want 1s", got)
+	}
+	if got := authBackoffForFailures(6); got != 2*time.Second {
+		t.Fatalf("second backoff = %s, want 2s", got)
+	}
+	if got := authBackoffForFailures(100); got != authBackoffMaximum {
+		t.Fatalf("capped backoff = %s, want %s", got, authBackoffMaximum)
 	}
 }
 

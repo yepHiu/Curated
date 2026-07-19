@@ -488,6 +488,7 @@ Body：
 常见错误：
 
 - `400 COMMON_BAD_REQUEST`：PIN 格式不合法或确认不一致。
+- `429 AUTH_RATE_LIMITED`：同一来源连续提交无效设置请求；响应含 `Retry-After` header 与 `details.retryAfterSeconds`。
 - `423 AUTH_LOCKED`：已经设置 PIN 且当前请求未解锁。
 
 #### `POST /api/auth/unlock`
@@ -510,6 +511,7 @@ Body：
 错误：
 
 - `401 AUTH_INVALID_PIN`
+- `429 AUTH_RATE_LIMITED`：连续 PIN 失败触发指数退避；响应含 `Retry-After` header，body 的 `retryable=true` 且 `details.retryAfterSeconds` 给出建议等待秒数。成功解锁后清除当前 IP 与客户端指纹的失败计数。
 
 #### `POST /api/auth/change-pin`
 

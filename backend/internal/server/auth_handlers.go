@@ -35,20 +35,23 @@ func (h *Handler) handleSetupPIN(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "security storage is not available")
 		return
 	}
+	if h.enforceAuthAttemptLimit(w, r, "setup_pin") {
+		return
+	}
 
 	var body contracts.SetupPINRequest
 	if err := decodeAuthJSONBody(r, &body); err != nil {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		h.writeAuthAttemptFailure(w, r, "setup_pin", http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
 		return
 	}
 	body.PIN = strings.TrimSpace(body.PIN)
 	body.ConfirmPIN = strings.TrimSpace(body.ConfirmPIN)
 	if err := validatePIN(body.PIN); err != nil {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		h.writeAuthAttemptFailure(w, r, "setup_pin", http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 		return
 	}
 	if body.PIN != body.ConfirmPIN {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "pin confirmation does not match")
+		h.writeAuthAttemptFailure(w, r, "setup_pin", http.StatusBadRequest, contracts.ErrorCodeBadRequest, "pin confirmation does not match")
 		return
 	}
 
@@ -88,6 +91,7 @@ func (h *Handler) handleSetupPIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAuthCookie(w, session)
+	h.resetAuthAttempts(r)
 	writeJSON(w, http.StatusOK, authStatusFromSettings(settings, &session))
 }
 
@@ -96,10 +100,13 @@ func (h *Handler) handleUnlockPIN(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "security storage is not available")
 		return
 	}
+	if h.enforceAuthAttemptLimit(w, r, "unlock_pin") {
+		return
+	}
 
 	var body contracts.UnlockPINRequest
 	if err := decodeAuthJSONBody(r, &body); err != nil {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+		h.writeAuthAttemptFailure(w, r, "unlock_pin", http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
 		return
 	}
 	ok, err := h.store.VerifyAppPIN(r.Context(), body.PIN)
@@ -108,7 +115,7 @@ func (h *Handler) handleUnlockPIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		writeAppError(w, http.StatusUnauthorized, contracts.ErrorCodeAuthInvalidPIN, "PIN is incorrect")
+		h.writeAuthAttemptFailure(w, r, "unlock_pin", http.StatusUnauthorized, contracts.ErrorCodeAuthInvalidPIN, "PIN is incorrect")
 		return
 	}
 	settings, err := h.store.GetAppSecuritySettings(r.Context())
@@ -122,6 +129,7 @@ func (h *Handler) handleUnlockPIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAuthCookie(w, session)
+	h.resetAuthAttempts(r)
 	writeJSON(w, http.StatusOK, authStatusFromSettings(settings, &session))
 }
 

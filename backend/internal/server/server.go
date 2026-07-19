@@ -219,6 +219,7 @@ type Handler struct {
 	appUpdateProvider           AppUpdateProvider
 	importUploads               *movieImportUploadSessionStore
 	clientTracker               *clienttracker.Tracker
+	authAttempts                *authAttemptLimiter
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -287,6 +288,7 @@ func NewHandler(deps Deps) *Handler {
 		appUpdateProvider:           deps.AppUpdateProvider,
 		importUploads:               newMovieImportUploadSessionStore(),
 		clientTracker:               tracker,
+		authAttempts:                newAuthAttemptLimiter(),
 	}
 }
 

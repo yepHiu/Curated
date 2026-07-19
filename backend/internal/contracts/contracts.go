@@ -958,8 +958,9 @@ const (
 	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
 	ErrorCodeConflict      = "COMMON_CONFLICT"
 
-	ErrorCodeAuthLocked     = "AUTH_LOCKED"
-	ErrorCodeAuthInvalidPIN = "AUTH_INVALID_PIN"
+	ErrorCodeAuthLocked      = "AUTH_LOCKED"
+	ErrorCodeAuthInvalidPIN  = "AUTH_INVALID_PIN"
+	ErrorCodeAuthRateLimited = "AUTH_RATE_LIMITED"
 
 	ErrorCodeImportSourceUnavailable   = "IMPORT_SOURCE_UNAVAILABLE"
 	ErrorCodeImportTargetNotConfigured = "IMPORT_TARGET_NOT_CONFIGURED"
