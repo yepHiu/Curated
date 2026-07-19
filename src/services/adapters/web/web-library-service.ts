@@ -371,8 +371,6 @@ async function refreshLibraryPathStorageStatusesFromApi() {
 }
 
 function createWebLibraryService(): LibraryService {
-  void ensureLoaded({ includeTrash: isTrashHashRoute() })
-
   const impl: LibraryService = {
     movies: computed(() => moviesState.value),
     moviesLoaded: computed(() => moviesLoadedState.value),
@@ -1091,6 +1089,15 @@ export async function loadMovieDetail(movieId: string): Promise<Movie | undefine
   })()
   pendingMovieDetailLoads.set(id, promise)
   return promise
+}
+
+/**
+ * Explicitly starts the selected Web adapter. Importing this module must stay
+ * network-side-effect free so the Mock adapter can be bundled without probing
+ * a backend that is not part of the active runtime.
+ */
+export function startWebLibraryService(): Promise<void> {
+  return ensureLoaded({ includeTrash: isTrashHashRoute() })
 }
 
 export const webLibraryService = createWebLibraryService()

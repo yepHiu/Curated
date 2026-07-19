@@ -94,6 +94,12 @@ vi.mock("@/i18n", () => ({
   },
 }))
 
+async function loadStartedWebLibraryService() {
+  const serviceModule = await import("./web-library-service")
+  void serviceModule.startWebLibraryService()
+  return serviceModule
+}
+
 beforeEach(() => {
   vi.resetModules()
   window.location.hash = ""
@@ -109,11 +115,32 @@ beforeEach(() => {
   vi.useRealTimers()
 })
 
+describe("webLibraryService bootstrap", () => {
+  it("does not call the API merely because the adapter module is imported", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+
+    await import("./web-library-service")
+    await flushPromises()
+
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+  })
+
+  it("loads movies only after the selected adapter is explicitly started", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+
+    expect(apiMocks.listMovies).toHaveBeenCalledTimes(1)
+    expect(webLibraryService.moviesLoaded.value).toBe(true)
+  })
+})
+
 describe("webLibraryService loadError", () => {
   it("stores a visible load error when the initial movie list request fails", async () => {
     apiMocks.listMovies.mockRejectedValueOnce(new Error("list failed"))
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     expect(webLibraryService.loadError.value).toBe("list failed")
@@ -123,7 +150,7 @@ describe("webLibraryService loadError", () => {
     apiMocks.listMovies.mockResolvedValue({ items: [], total: 0 })
     apiMocks.getMovie.mockRejectedValueOnce(new Error("detail failed"))
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await expect(webLibraryService.loadMovieDetail("movie-1")).resolves.toBeUndefined()
 
@@ -140,7 +167,7 @@ describe("webLibraryService loadError", () => {
       }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await expect(webLibraryService.loadMovieDetail("movie-1")).resolves.toBeUndefined()
 
@@ -159,7 +186,7 @@ describe("webLibraryService mutations", () => {
       sampledAt: "2026-05-15T10:00:00Z",
     })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     await expect(webLibraryService.listConnectedClients()).resolves.toMatchObject({
@@ -186,7 +213,7 @@ describe("webLibraryService mutations", () => {
       }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await expect(webLibraryService.setOrganizeLibrary(false)).rejects.toThrow("save failed")
 
@@ -213,7 +240,7 @@ describe("webLibraryService mutations", () => {
       .mockReturnValueOnce(firstPatch)
       .mockResolvedValueOnce(settingsDto({ organizeLibrary: true }))
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     const firstSave = webLibraryService.setOrganizeLibrary(false)
@@ -234,7 +261,7 @@ describe("webLibraryService mutations", () => {
       settingsDto({ autoDownloadUpdates: true }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await webLibraryService.setAutoDownloadUpdates(true)
 
@@ -251,7 +278,7 @@ describe("webLibraryService mutations", () => {
       }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await expect(
       webLibraryService.setProxy({
@@ -276,7 +303,7 @@ describe("webLibraryService mutations", () => {
       settingsDto({ defaultImportLibraryPathId: "library-b" }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await webLibraryService.setDefaultImportLibraryPathId(" library-b ")
 
@@ -296,7 +323,7 @@ describe("webLibraryService mutations", () => {
       progress: 100,
     })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     const file = new File(["movie"], "IMP-001.mp4", { type: "video/mp4" })
     const onUploadProgress = vi.fn()
@@ -323,7 +350,7 @@ describe("webLibraryService mutations", () => {
     })
     apiMocks.listMovies.mockReturnValueOnce(pendingList)
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     let resolved = false
     const ensurePromise = webLibraryService.ensureMovieCached("   ").then(() => {
       resolved = true
@@ -347,7 +374,7 @@ describe("webLibraryService mutations", () => {
       offset: 0,
     })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     apiMocks.listMovies.mockClear()
     await webLibraryService.ensureMovieCached(" movie-1 ")
@@ -376,7 +403,7 @@ describe("webLibraryService mutations", () => {
         offset: 0,
       })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     apiMocks.listMovies.mockClear()
     await webLibraryService.ensureMovieCached(" movie-1 ")
@@ -405,7 +432,7 @@ describe("webLibraryService mutations", () => {
       })
     apiMocks.deleteMovie.mockResolvedValueOnce(undefined)
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await webLibraryService.deleteMovie(" movie-1 ")
 
@@ -452,7 +479,7 @@ describe("webLibraryService mutations", () => {
       })
     apiMocks.restoreMovie.mockResolvedValueOnce(undefined)
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await webLibraryService.restoreMovie(" movie-1 ")
 
@@ -485,7 +512,7 @@ describe("webLibraryService mutations", () => {
       })
     apiMocks.deleteMovie.mockResolvedValueOnce(undefined)
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     apiMocks.listMovies.mockClear()
     await webLibraryService.deleteMoviePermanently(" movie-1 ")
@@ -508,7 +535,7 @@ describe("webLibraryService mutations", () => {
       movieDetailDto("movie-1", { title: "Updated title", summary: "Updated summary" }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     const updated = await webLibraryService.patchMovie("movie-1", {
       userTitle: "Updated title",
@@ -536,7 +563,7 @@ describe("webLibraryService mutations", () => {
       movieDetailDto("movie-1", { title: "Patched after load" }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     const updated = await webLibraryService.patchMovie("movie-1", {
       userTitle: "Patched after load",
@@ -561,7 +588,7 @@ describe("webLibraryService mutations", () => {
       movieDetailDto("movie-1", { isFavorite: true }),
     )
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     const updated = await webLibraryService.toggleFavorite("movie-1", true)
 
@@ -579,7 +606,7 @@ describe("webLibraryService mutations", () => {
     })
     apiMocks.patchMovie.mockRejectedValueOnce(new Error("patch failed"))
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     await expect(webLibraryService.toggleFavorite("movie-1", true)).rejects.toThrow(
       "patch failed",
@@ -599,7 +626,7 @@ describe("webLibraryService reloadMoviesFromApi", () => {
       offset: 0,
     })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     apiMocks.listMovies.mockClear()
     apiMocks.listMovies.mockResolvedValue({
@@ -631,7 +658,7 @@ describe("webLibraryService loading", () => {
       offset: 0,
     })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     apiMocks.listMovies.mockClear()
@@ -696,7 +723,7 @@ describe("webLibraryService loading", () => {
       })
       .mockReturnValueOnce(secondPage)
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     expect(apiMocks.listMovies).toHaveBeenNthCalledWith(
@@ -740,7 +767,7 @@ describe("webLibraryService loading", () => {
         offset: 1,
       })
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     expect(apiMocks.listMovies).toHaveBeenNthCalledWith(
@@ -774,7 +801,7 @@ describe("webLibraryService loading", () => {
       })
     }
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
 
     expect(apiMocks.listMovies).toHaveBeenLastCalledWith(
@@ -789,7 +816,7 @@ describe("webLibraryService loading", () => {
     apiMocks.listMovies.mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.getMovie.mockResolvedValueOnce(movieDetailDto("movie-1"))
 
-    const { webLibraryService } = await import("./web-library-service")
+    const { webLibraryService } = await loadStartedWebLibraryService()
     await flushPromises()
     const [first, second] = await Promise.all([
       webLibraryService.loadMovieDetail("movie-1"),
