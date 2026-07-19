@@ -100,6 +100,8 @@ pnpm dev
 | 类型检查 | `pnpm typecheck` |
 | ESLint | `pnpm lint` |
 | 单元测试（Vitest） | `pnpm test` |
+| Electron 单元测试 | `pnpm test:electron` |
+| 轻量运行时 e2e（Chromium） | `pnpm test:e2e` |
 | 生产构建 | `pnpm build`（内部含 `typecheck` + `vite build`） |
 
 **单测文件**（示例）：
@@ -107,6 +109,8 @@ pnpm dev
 ```bash
 pnpm test -- path/to/file.test.ts
 ```
+
+`pnpm test:e2e` 会自动在独立的 4173（Mock）与 4174（Web API stub）端口启动 Vite，覆盖 Mock 导航不访问后端、锁定启动不请求受保护资源、解锁后只 hydrate 一次等日常运行时流程。它不依赖本机 5173/8080 开发服务。`pnpm test:display` 是独立的跨浏览器/多 viewport 长耗时套件，仍需按 UI 规范获得明确同意后才能运行，不纳入日常 CI。
 
 ---
 
@@ -117,6 +121,7 @@ pnpm test -- path/to/file.test.ts
 | 目的 | 命令 |
 |------|------|
 | 全量测试 | `go test ./...` |
+| 静态检查 | `go vet ./...` |
 | 单包测试 | `go test ./internal/storage/...`（示例） |
 
 从仓库根目录也可：
@@ -149,9 +154,14 @@ cd backend && go test ./...
 1. `pnpm typecheck`
 2. `pnpm lint`
 3. `pnpm test`
-4. `cd backend && go test ./...`
+4. `pnpm test:electron`
+5. `pnpm test:e2e`
+6. `cd backend && go test ./...`
+7. `cd backend && go vet ./...`
 
 全绿后再进行 `pnpm build`（若本次改动涉及前端发布构建）。
+
+GitHub Actions 的 `.github/workflows/ci.yml` 在 pull request 与 `master` push 上执行以上质量门禁，并额外运行生产依赖 high 漏洞审计、前端/Electron 构建和发布脚本测试。display-scaling 套件保持人工选择，不在该工作流中运行。
 
 ---
 
