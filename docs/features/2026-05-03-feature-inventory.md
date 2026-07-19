@@ -1,8 +1,8 @@
 # Curated Feature Inventory
 
-2026-05-03 · Current as of v1.4.2
+Updated 2026-07-20 · Current repository state
 
-This document catalogs all features implemented in the current **web-first** phase. Features marked `[Target]` are documented future direction, not shipped.
+This document catalogs features implemented in the current **Electron desktop shell + Web UI + Go API** architecture. Features marked `[Target]` are documented future direction, not shipped. Source code and `.cursor/rules/project-facts.mdc` take precedence if this inventory becomes stale.
 
 ---
 
@@ -44,6 +44,7 @@ This document catalogs all features implemented in the current **web-first** pha
 | Library path management | Shipped | Add, edit title, delete, reveal in OS file manager |
 | Multi-root library support | Shipped | Multiple library paths under one database |
 | Directory watch (fsnotify) | Shipped | `autoLibraryWatch` setting; debounced scan on new files |
+| Storage presence and binding health | Shipped | Detects offline, missing, permission-denied, and volume-mismatch roots; blocks unsafe scan/import and supports deliberate rebind |
 | Soft-delete (trash) | Shipped | Sets `trashedAt`; restore or permanent-delete |
 | Reveal in file manager | Shipped | Server-side file manager open for movie files and library roots |
 
@@ -201,6 +202,7 @@ This document catalogs all features implemented in the current **web-first** pha
 | Curated frames settings | Shipped | Export format preference |
 | About page | Shipped | Version info, update checks, dev tools |
 | Maintenance | Shipped | Database path, log settings |
+| Security | Shipped | PIN setup/change, idle-lock policy, lock-now, and trusted-session review/revocation |
 
 ### 7.2 Configuration System
 
@@ -220,6 +222,9 @@ This document catalogs all features implemented in the current **web-first** pha
 | Update caching | Shipped | Results cached in SQLite |
 | Sidebar update badge | Shipped | Lightweight badge (expanded) or dot (compact) in sidebar |
 | Direct installer download | Shipped | `installerDownloadUrl` from release assets; Settings → About download button |
+| Verified installer staging | Shipped | Downloads installer into the update cache and verifies SHA256 before it becomes installable |
+| Explicit installer launch | Shipped | `POST /api/app-update/install`; never silently installs without a user action |
+| Opt-in background download | Shipped | `autoDownloadUpdates`; startup may download and verify, but does not auto-install |
 | Release page fallback | Shipped | Falls back to release page URL when no `.exe` asset |
 
 ### 7.4 Proxy
@@ -269,6 +274,8 @@ This document catalogs all features implemented in the current **web-first** pha
 | Windows release workflow | Shipped | `pnpm release:publish` via Python CLI |
 | Version management | Shipped | `scripts/release/version.json` |
 | Tray-mode runtime | Shipped | `-mode tray` startup; system tray icon |
+| Electron installed entrypoint | Shipped | Top-level `Curated.exe` is the Electron shell; Go backend is `resources/app/curated.exe` |
+| Narrow native directory bridge | Shipped | Preload exposes only `window.javLibrary.pickDirectory()`; business APIs remain HTTP REST |
 | Local frontend hosting | Shipped | Release binary serves `frontend-dist/` on `:8081` |
 | Inno Setup installer | Shipped | `.iss` template rendered by Python |
 | Portable zip | Shipped | Standalone zip distribution |
@@ -293,11 +300,14 @@ This document catalogs all features implemented in the current **web-first** pha
 | i18n (3 languages) | Shipped | `en`, `ja`, `zh-CN` via `vue-i18n` |
 | Virtual scrolling | Shipped | `vue-virtual-scroller` for poster grids |
 | Toast notifications | Shipped | `vue-sonner` via `pushAppToast()` |
-| Router-based navigation | Shipped | 8 routes: library, favorites, recent, tags, actors, history, detail, player, settings |
+| Router-based navigation | Shipped | 15 named records including home, lock, trash, actor detail, Curated Frames, redirect, and 404 routes |
 | Error boundary | Shipped | Root-level error boundary |
 | Dev performance monitor | Shipped | Fixed bottom overlay bar; dev-only |
 | Loading state management | Shipped | Shallow refs for large state |
 | Library first-load caching | Shipped | Performance optimization |
+| Active-adapter bootstrap | Shipped | Only the selected Web adapter starts; Mock navigation performs no backend requests |
+| Protected-state bootstrap | Shipped | Web mode waits for authoritative auth status and hydrates progress/played state only after unlock |
+| Bundle hard budgets | Shipped | `pnpm build` enforces initial/total/named chunk limits and emits `dist/bundle-analysis.json` |
 
 ---
 
@@ -310,8 +320,10 @@ This document catalogs all features implemented in the current **web-first** pha
 | Clean architecture | Shipped | Repository pattern; contracts layer |
 | Async task system | Shipped | `pending → running → completed/partial_failed/failed/cancelled` |
 | Task types | Shipped | `scan.library`, `scrape.movie`, `scrape.actor`, `import.movies` |
+| SSE task event stream | Shipped | `GET /api/events` sends `task.updated` snapshots and heartbeat; polling remains fallback |
 | Task polling API | Shipped | `GET /api/tasks/{taskId}` + `GET /api/tasks/recent` |
 | Database migrations | Shipped | Auto-run on startup |
+| SQLite referential integrity | Shipped | Every SQLite connection verifies foreign keys; historical orphan rows are quarantined before cleanup |
 | Structured error codes | Shipped | `COMMON_*`, `LIBRARY_*`, `SCAN_*`, `SCRAPER_*`, `PLAYER_*`, `SETTINGS_*`, `CURATED_*`, `PROVIDER_*` |
 | HTTP client timeout | Shipped | Request-level timeout |
 | Graceful shutdown | Shipped | Barrier for in-flight scrape goroutines |
@@ -325,6 +337,13 @@ This document catalogs all features implemented in the current **web-first** pha
 
 | Feature | Status | Notes |
 |---|---|---|
+| Loopback-safe defaults | Shipped | Development and release listeners default to `127.0.0.1`; non-loopback requires explicit `lanEnabled` and an initialized PIN |
+| Origin and Host validation | Shipped | Credentialed browser access is restricted to same-origin, loopback development origins, and exact configured origins |
+| PIN App Lock | Shipped | Argon2id PIN hash, HTTP-only `curated_auth` cookie, router lock screen, and protected `/api/*` middleware |
+| PIN attempt throttling | Shipped | Repeated setup/unlock failures trigger exponential backoff and `429 AUTH_RATE_LIMITED` with `Retry-After` |
+| Sliding regular sessions | Shipped | Protected activity refreshes idle expiry; restart-lock behavior is configurable |
+| Trusted-forever sessions | Shipped | Safe public IDs support list, single revoke, and revoke-others without exposing bearer tokens |
+| Sanitized release configuration | Shipped | Packaging stages tracked `library-config.example.cfg` and rejects sensitive machine-local values |
 | Unsafe protocol rejection | Shipped | Player launch URL validation |
 | Path traversal prevention | Shipped | Reveal endpoint validates paths |
 | Filesystem path sanitization | Shipped | Error messages don't leak server paths |
@@ -334,27 +353,33 @@ This document catalogs all features implemented in the current **web-first** pha
 
 ## 13. Current Architecture Phase
 
-**Web-first** — Vue SPA + Go HTTP API + SQLite.
+**Local-first desktop delivery with shared Web UI** — Electron shell + Vue SPA + Go HTTP API + SQLite. Browser access and Mock mode remain supported, while business APIs deliberately stay on the HTTP service boundary.
 
 ### Shipped
+- Electron shell, tray lifecycle, installed Electron entrypoint, and narrow directory-picker preload bridge
 - Go HTTP backend with SQLite
 - File scanning, metadata scraping, task system
 - REST API at `/api`
 - Frontend connects via HTTP (`VITE_USE_WEB_API=true`)
+- Mock mode with no inactive Web adapter startup requests
+- PIN lock, throttling, trusted-session management, loopback/LAN guard, and strict browser origin policy
+- SSE `task.updated` events with polling fallback
 - HTML5 `<video>` with HTTP Range streaming
 - Web Gamepad API controls
 - Trash/restore workflow
 - HLS playback sessions
 - Curated frames with export
 - Windows release packaging with tray mode
+- SQLite-backed playback progress in Web API mode; localStorage fallback in Mock mode
+- Storage presence health, connected-client visibility, and verified installer update workflow
 
 ### Target (not yet implemented)
-- Electron shell, preload script, main process IPC
+- Deep Electron business IPC or a broad native desktop bridge
 - mpv player integration with named pipes
-- Desktop file system bridge
+- Broader desktop file-system and permission bridge beyond directory picking
 - WebHID / node-hid controller depth (touchpad gestures, adaptive triggers, LED)
-- Multi-device playback progress sync
-- Real-time event push (WebSocket/SSE)
+- Account-based multi-user synchronization beyond the current shared local SQLite library
+- Native mobile clients and remote-server pairing
 
 ---
 
@@ -362,12 +387,30 @@ This document catalogs all features implemented in the current **web-first** pha
 
 | Route | Page | Notes |
 |---|---|---|
+| `/lock` | App Lock | PIN unlock and redirect recovery |
+| `/` | Home | Daily recommendation hero and rail |
 | `/library` | Library | Default landing; query: `q`, `tag`, `actor`, `tab` |
 | `/favorites` | Favorites | Filtered library view |
-| `/recent` | Recent | Recently added |
+| `/recent` | Recent redirect | Redirects into the library query model |
 | `/tags` | Tags | Tag browse |
+| `/trash` | Trash | Restore or permanently delete trashed movies |
 | `/actors` | Actors | Actor list; query: `q`, `actorTag`, `sort` |
+| `/actors/:actorName` | Actor Detail | Actor profile and exact-name movie results |
 | `/history` | History | Watch history by date |
+| `/curated-frames` | Curated Frames | Search, filter, edit, delete, and export captured frames |
 | `/detail/:id` | Movie Detail | Full metadata, comments, previews |
-| `/player/:id` | Player | Query: `?t=`, `?from=history` |
+| `/player/:id?` | Player | Query: `?t=`, `?from=history` |
 | `/settings` | Settings | Overview, General, Library, Metadata, Network, Curated, About, Maintenance |
+| `/:pathMatch(.*)*` | Not Found | In-shell 404 state |
+
+---
+
+## 15. Delivery Quality
+
+| Capability | Status | Notes |
+|---|---|---|
+| Pull-request CI workflow | Shipped | Frontend quality, Go quality, production audit, builds, Python release tests, and runtime e2e jobs |
+| Runtime Chromium e2e | Shipped | Covers Mock isolation, locked startup hydration ordering, and 375px mobile controls |
+| Mobile touch baseline | Shipped | Primary phone controls use at least 44×44 CSS px targets and the library route has one semantic `h1` |
+| Production dependency audit | Shipped | CI blocks high-severity production advisories |
+| Display-scaling suite | Manual | Long-running cross-browser/display test remains explicit and is not part of normal CI |

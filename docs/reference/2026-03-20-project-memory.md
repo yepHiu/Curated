@@ -2,8 +2,8 @@
 
 ## 1. 产品定位
 
-- 当前仓库是 **Curated** 的前端高保真原型，用来验证信息架构、页面关系和交互骨架。
-- `docs/product/2026-03-20-jav-libary.md` 描述的是目标桌面产品蓝图，不等于当前代码已经具备完整桌面能力。
+- 当前仓库是可运行、可打包的 **Curated** 本地优先媒体资料库，不再只是前端高保真原型。
+- `docs/product/2026-03-20-jav-libary.md` 同时描述当前实现与目标桌面蓝图；其中 mpv、深度业务 IPC 和广泛原生桥接仍是目标，不应与已落地 Electron 壳混淆。
 - 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`127.0.0.1:8080`**，Vite 代理 **`/api` → `127.0.0.1:8080`** 仍作为 fallback；release **`127.0.0.1:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。非 loopback 监听需要主配置显式设置 **`lanEnabled: true`** 且已初始化 PIN。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先 + 最小桌面壳层` 策略：核心业务仍是 `Vue Web App -> HTTP API -> Go Backend`，`electron/` 负责启动或复用 Go HTTP 后端、开发态启动或复用 Vite 前端、用带 Curated 图标的 BrowserWindow 加载 Web UI、关闭窗口时退到托盘，并仅通过 preload 暴露 `window.javLibrary.pickDirectory()` 这一类窄原生能力；深度 IPC 桥接仍是后续目标。
 
@@ -32,8 +32,8 @@
 - 公开文档：`README.md` 为英文主版，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；根目录 `API.md` 为唯一公开 API 参考文档
 - **UI 设计规范（代码级）**：[`2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
-- 播放进度（仅浏览器，非服务端）：`src/lib/playback-progress-storage.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
-- 已播计数（localStorage）：`src/lib/played-movies-storage.ts`
+- 播放进度（Web API 为 SQLite、Mock 为 localStorage）：`src/lib/playback-progress-storage.ts`、`src/services/protected-web-state-bootstrap.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
+- 已播计数（Web API 为 SQLite、Mock 为 localStorage）：`src/lib/played-movies-storage.ts`
 
 ### 当前交付状态
 
@@ -41,15 +41,15 @@
 - `App.vue` 仅承载 `RouterView`，页面切换统一由 `vue-router` 管理。
 - `AppShell` 已实现侧边栏、顶部搜索区和主内容区的稳定壳层。
 - **数据源**：环境变量 **`VITE_USE_WEB_API`** 为 `true` 时，页面通过 **`src/services/adapters/web`** 与 **`src/api/*`** 消费后端 HTTP API；否则使用 **`mock`** 适配器与 `jav-library` 假数据。
-- 已具备：图库浏览（含虚拟滚动）、详情、**HTML5 视频播放**（接后端 stream 时）、**观看历史**（`history` 路由）、设置与扫描/刮削任务轮询等；部分能力在 Mock 模式下为降级表现。
+- 已具备：首页推荐、虚拟化资料库、详情、演员详情、HTML5/HLS 播放、观看历史、萃取帧、导入与分片上传、设置、PIN 锁、可信会话、存储在线检测、应用更新，以及扫描/刮削任务的 SSE + 轮询补偿；部分能力在 Mock 模式下为本地降级表现。
 
 ### 当前前后端互联事实
 
 - 已落地 **library-service 契约**（`src/services/contracts/library-service.ts`）与 **Web / Mock 双适配器**。
-- **Go Backend** 提供 `/api` 下健康检查、影片列表/详情/PATCH/删除、**视频流 Range**、库路径、设置（含 **`organizeLibrary`** / **`autoLibraryWatch`** / 元数据源等）、扫描、**`tasks/recent`** 与按 id 任务查询等（摘要见 `README.md`）。
+- **Go Backend** 提供 `/api` 下健康检查、认证与可信会话、影片/演员/萃取帧、导入、播放与 HLS session、库路径与存储健康、设置、扫描/刮削任务、SSE `events`、connected clients 与应用更新等（公开摘要见 `API.md` 与 `README.md`）。
 - **库行为 JSON**：`config/library-config.cfg` 与 **`PATCH /api/settings`** 同步；**`autoLibraryWatch`**（默认开）控制是否在主配置允许时启用 **fsnotify** 监听并在新文件事件后排队防抖扫描，**不**关闭手动或周期全库扫描。
 - 已有 **Electron MVP**：`electron/main.ts` / `electron/backend-process.ts` / `electron/frontend-process.ts` 启动或复用 Go HTTP 后端，等待 `/api/health` 后在开发态启动或复用 `http://127.0.0.1:5173` 的 Vite 前端并加载 Web UI；打包态仍加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。窗口使用 Curated 图标，关闭窗口会隐藏到托盘，托盘菜单可恢复窗口、在浏览器打开 Web 端、打开 Settings 或真正退出；`preload` 仅暴露 `window.javLibrary.pickDirectory()` 供现有目录选择入口调用原生目录对话框，不承载业务 API。仍无 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
-- **观看进度与历史列表**仅存 **`localStorage`**，**未**写入 SQLite；与产品文档 §6.5 中服务端 `play_history` 表仍为「待决策/未落地」关系。
+- **观看进度与已播放状态**在 Web API 模式写入 SQLite，在 Mock 模式写入 `localStorage`。Web 模式启动会先读取权威认证状态，只有解锁后才 hydrate，两类状态都只执行一次。
 
 ## 3. 当前产品信息架构
 
@@ -57,17 +57,21 @@
 
 - `library`
 - `favorites`
-- `recent`
+- `recent`（redirect）
 - `tags`
+- `trash`
 - `actors`（演员库：[`ActorsView.vue`](../../src/views/ActorsView.vue)；API **`GET/PATCH /api/library/actors…`**；路由 query **`actorsQ`** / **`actorTag`**）
+- `actors/:actorName`
 - `history`（观看历史：按本地日期分组，数据见下）
+- `curated-frames`
 - `detail/:id`
 - `player/:id?`
 - `settings`
+- `lock`、home 与应用内 404
 
 ### 观看进度与历史（前端事实）
 
-- **续播进度**（当前时间、时长、`updatedAt`）保存在 **`localStorage`** 键 **`jav-library-playback-progress-v1`**；**不与后端同步**。清除站点数据、换浏览器或隐私模式会丢失。
+- **续播进度**（当前时间、时长、`updatedAt`）在 Web API 模式经 `GET/PUT/DELETE /api/playback/progress` 与 SQLite 同步；Mock 模式保存在 **`localStorage`** 键 **`jav-library-playback-progress-v1`**，清除该浏览器站点数据会丢失 Mock 进度。
 - **路由**：`history` → [`src/views/HistoryView.vue`](../../src/views/HistoryView.vue)；按本地日历日分组（今天/昨天/日期）；卡片 [`PlaybackHistoryCard.vue`](../../src/components/jav-library/PlaybackHistoryCard.vue)（左文案、右海报 **`coverUrl` 优先**、`object-cover` 裁切、底栏进度条）。
 - **续播**：`PlayerPage` 在 `loadedmetadata` 后根据 **`?t=`**（优先）或本地存储 seek；`timeupdate` 节流写入；pause/ended/隐藏页签/unmount 补写。
 - 从资料库/详情进入播放器：[`buildPlayerRouteFromBrowse`](../../src/lib/player-route.ts) 可在有效进度下附带 **`?t=`**；从历史进入附带 **`?from=history`**，`AppShell` 顶栏返回历史而非详情。
@@ -85,14 +89,14 @@
 - 搜索词 `q`、标签页 `tab`、当前选中影片 `selected` 已作为 URL 状态存在。
 - 影片浏览体验已经偏向“媒体库 / 海报墙”而不是“后台表格管理”。
 - 库页已引入虚拟滚动能力，说明大规模海报浏览是明确方向。
-- 设置页目前是前端原型，但字段组织已经映射到未来扫描、搜刮、播放配置模型。
+- 设置页已经联通后端持久化，并覆盖通用、影片存储、元数据、网络、播放、萃取帧、安全、关于与维护等领域。
 
 ## 5. 当前尚未实现的能力
 
 - 尚未接入深度 `Electron` preload / IPC 桌面桥接；当前 Electron 仍是最小浏览器壳层，只补了托盘生命周期和原生目录选择这一类窄 preload 能力。
 - 尚未实现 **mpv** 与命名管道 / IPC 的桌面播放闭环（Web 阶段为 `<video>` + HTTP Range）。
-- **服务端**观看进度表 / `play_history` API、多设备同步进度：**未实现**（当前仅前端 localStorage）。
-- 测试覆盖与运维观测仍偏薄；部分边界错误与任务事件仍待产品化收敛。
+- 尚未实现账号级多用户、跨资料库远程同步与冲突解决；这与当前同一 SQLite 资料库内共享播放进度是不同范围。
+- 尚未完成备份/恢复预检、路径迁移 CLI、上传 session 重启恢复、Library Health 和元数据修复队列。
 
 ## 6. 产品与架构边界
 
@@ -103,27 +107,27 @@
 
 ### 前端互联要求
 
-- 前端后续必须补齐 `services` 层，UI 组件和 `views` 不应直接依赖 HTTP 细节、Electron API 或数据库实现。
-- 前端服务接口应至少覆盖 `library`、`scan`、`scraper`、`player`、`settings` 五类领域能力。
-- 互联契约需优先定义 `DTO`、事件类型、错误码、任务状态枚举，再接真实 UI 调用链。
-- 第一阶段应先支持 `mock adapter` 与 `web adapter` 切换，后续再补 `desktop adapter`。
+- 前端已具备 service contract 与 Web/Mock adapter；UI 组件和 `views` 继续不得直接依赖具体 adapter、Electron IPC 或数据库实现。
+- 新能力应先扩展现有 typed DTO、错误码、事件和 service contract，再接 UI 调用链。
+- 只有 active adapter 可以启动；Mock 模式不得因为模块导入而请求后端，Web 模式不得在锁定状态 hydrate 受保护数据。
+- 若未来新增 desktop adapter，必须证明 HTTP service seam 无法满足该窄原生能力，不得复制整套业务接口。
 - 前端不应同时感知 `HTTP`、`IPC`、命名管道等多套底层协议，只消费统一的前端服务抽象。
 
 ## 7. 当前主要风险
 
 - 最大风险仍然是把“产品蓝图”和“当前实现”混为一谈。
 - **Mock 与 Web API 双模式**并存：未读 `.env` / 文档时易误判“是否已接后端”。
-- **观看进度仅存本机**：用户可能误以为换电脑或清缓存后仍能续播。
-- 扫描、搜刮、缓存、播放、本地配置本质上都属于后台任务或桌面能力，目前还缺少统一协议。
+- **数据恢复能力不足**：SQLite 已成为长期用户状态来源，但备份验证、恢复预检和路径迁移尚未形成产品闭环。
+- 上传 session 仍需跨后端重启持久化；资料库异常也缺少统一健康入口。
 - 文案层面当前界面偏英文，设计文档偏中文，后续需要决定正式的产品语言策略。
 
 ## 8. 推荐的下一步产品优先级
 
-1. 沉淀前端服务契约：影片库、扫描、搜刮、播放器、设置。
-2. 先补 `Go Backend` 的 HTTP API，让 Web 前端可直接联通真实后端。
-3. 定义任务状态与事件模型，支撑扫描和搜刮等异步流程。
-4. 将 mock 数据层逐步抽象成可替换的 `web adapter`。
-5. 在 Electron MVP 稳定后，再评估 tray、原生文件桥、真实播放器与桌面桥接。
+1. 完成可验证的备份、恢复预检与路径迁移。
+2. 将上传 session 持久化到 SQLite，并在启动时清理过期 session 与孤立 staging 文件。
+3. 建立 Library Health 与元数据修复队列的统一入口。
+4. 在数据可靠性基线后增加 Saved Views、推荐解释/负反馈、演员别名归并与 Insights。
+5. 战略扩展只选择一个主分支，避免同时铺开 Linux/fnOS、WebDAV、漫画库和 Android。
 
 ## 9. 表单与文本输入（项目要求）
 

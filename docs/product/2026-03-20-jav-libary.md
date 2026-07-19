@@ -32,10 +32,10 @@
 
 ### 当前边界
 
-- 当前仓库是 `Vue 3 + TypeScript + Vite + shadcn-vue` 的前端工程，并包含 **`Go + SQLite` 后端**；开发时可通过 **`VITE_USE_WEB_API`** + Vite 代理使用真实 **HTTP API**，亦可选 **Mock** 适配器（无后端）。
-- **已接通时**：页面经 `services` 契约与 `src/api` 消费后端；**未接通时**：列表/详情等仍可由 mock 数据驱动，但 **观看进度与历史** 始终依赖浏览器 **`localStorage`**（与后端无关）。
-- 当前仓库尚未在根工程中落地 `Electron`、`preload`、`mpv` 和完整桌面运行时。
-- 因此，本文中涉及桌面桥接、**mpv** 控制链和最终桌面编排的内容，均默认属于 `目标设计`，除非明确标注为 `当前状态`。
+- 当前仓库包含 `Vue 3 + TypeScript + Vite + shadcn-vue` 前端、**`Go + SQLite` 后端**和 **Electron 桌面壳**。开发时通过 **`VITE_USE_WEB_API`** 使用真实 HTTP API，亦可选择完全不启动 Web adapter 的 Mock 模式。
+- **Web API 模式**：页面经 `services` 契约与 `src/api` 消费后端，观看进度、已播放状态等写入 SQLite；锁定启动时先获取 `/api/auth/status`，解锁后才 hydrate 受保护状态。**Mock 模式**：列表、详情与用户状态由本地 adapter 驱动，观看进度等保存在浏览器 `localStorage`。
+- Electron 已落地最小桌面运行时：启动或复用 Go 后端和开发态 Vite、加载现有 Web UI、关闭退到托盘，并通过 preload 仅暴露 `window.javLibrary.pickDirectory()`。生产安装包的顶层 `Curated.exe` 已是 Electron 壳，Go 后端位于 `resources/app/curated.exe`。
+- 本文中的 **mpv** 控制链、深度业务 IPC 和更广泛桌面文件系统桥接仍属于 `目标设计`；现有 Electron 壳、目录选择、托盘与 HTTP 业务链属于 `当前状态`。
 
 ### 文档维护原则
 
@@ -53,29 +53,35 @@
 - `src/App.vue` 只承载 `RouterView`。
 - `src/layouts/AppShell.vue` 已实现稳定的应用壳层。
 - 已落地页面包括：
+  - `home`
   - `library`
   - `favorites`
-  - `recent`
+  - `recent`（重定向到资料库查询模型）
   - `tags`
-  - **`history`（观看历史，按本地日期分组；进度存 `localStorage`）**
+  - `trash`
+  - `actors`
+  - `actors/:actorName`
+  - **`history`（观看历史，按本地日期分组）**
+  - `curated-frames`
   - `detail/:id`
   - `player/:id?`
   - `settings`
+  - `lock` 与应用内 404
 - 当前产品组件集中在 `src/components/jav-library`。
 - **双数据源**：开启 Web API 时经 **`src/services/adapters/web`** 与后端交互；Mock 模式下类型与假数据仍可参考 `src/lib/jav-library.ts`。
 - 当前库页已具备搜索、标签页切换、选中影片状态、海报墙浏览和虚拟滚动能力。
 - **Web 模式下**：播放器可通过 **`GET .../stream`** 用 `<video>` 播放；详情 PATCH、扫描/刮削任务等与后端联动。**Mock 模式**下播放流等能力降级。
-- **观看进度**：前端已实现续播与历史列表，**未**对应服务端 `play_history` 表（见 §6.5）。
+- **观看进度**：Web API 模式通过 `GET/PUT/DELETE /api/playback/progress` 持久化到 SQLite，Mock 模式使用 `localStorage`；历史列表与播放器续播共享这层模式感知存储。
 
 ### 1.2 当前问题
 
-- Mock 与真实 API 并存，若未读环境配置易误判“是否已接后端”。
-- 部分能力（如续播）仅在前端持久化，与长期「账号/多设备」愿景需后续对齐。
+- Mock 与真实 API 并存，若未读环境配置易误判当前数据源；启动代码必须保持只有 active adapter 产生副作用。
+- 当前 SQLite 是单资料库共享状态，不等同于带账号、冲突解决和远程同步的多用户系统。
 - 文档需持续区分「仅前端」「仅后端」「全链路已通」三类状态。
 
 ### 1.3 现阶段定位
 
-- 当前阶段的核心目标不是实现桌面 runtime，而是先把产品信息架构、交互模型和前端契约稳定下来。
+- 当前阶段已经具备可交付桌面壳和完整 HTTP 主链，核心目标转为发布安全、长期数据可靠性、恢复能力与可解释个性化，而不是继续把现有产品当作早期原型。
 
 ---
 
@@ -148,8 +154,9 @@
 
 ### 3.2 当前状态
 
-- 当前仅存在 `Vue Renderer` 侧的原型。
-- 当前没有 `preload bridge`、`Electron Main`、`Go Backend` 和命令总线。
+- `Vue Renderer`、Go HTTP Backend、SQLite、Electron Main 和窄 preload bridge 均已落地。
+- Electron Main 负责窗口、托盘、Go/Vite 进程生命周期与后端请求的桌面客户端标记；preload 当前只提供受控目录选择。
+- 业务命令仍通过 HTTP REST 与 typed service adapter 传递，不存在广泛的 Electron IPC 命令总线；mpv 进程控制仍未实现。
 
 ### 3.3 模块职责
 
@@ -174,10 +181,11 @@
 
 ### 4.1 当前状态
 
-- 当前页面直接从 `src/lib/jav-library.ts` 获取类型和 mock 数据。
-- 当前尚未抽象 `services` 层，也没有 adapter 切换机制。
+- 已建立 `src/services/contracts/library-service.ts` 与 Web/Mock adapter，views/components 通过 `useLibraryService()` 消费统一契约。
+- `VITE_USE_WEB_API=true` 时只启动 Web adapter；否则只使用 Mock adapter，导入 inactive adapter 不会触发后端请求。
+- HTTP DTO 与端点集中在 `src/api`，页面不直接依赖 SQLite、Electron IPC 或具体 adapter 实现。
 
-### 4.2 目标设计
+### 4.2 延续设计
 
 前端应新增统一的服务层，例如：
 
@@ -236,7 +244,7 @@ interface SettingsService {
 
 - 前端长期状态层当前以 **Composables + 服务层** 为默认；后续优化或新增功能中可从小服务、小范围模块开始试点 `pinia` 等状态库，不在一开始做全局大迁移。
 - 服务接口返回值是否统一包装为 `Result<T, AppError>` 结构。
-- 事件订阅采用主动轮询、事件总线，还是基于 Electron 的推送桥接。
+- 当前任务事件采用后端 SSE + 轮询补偿；待决策的是是否扩充更多领域事件，而不是重新选择基础传输。
 
 ---
 
@@ -246,8 +254,8 @@ interface SettingsService {
 
 #### 当前状态
 
-- 当前已在前端原型中实现库页、收藏页、最近页、标签页和详情页的基本结构。
-- 当前库页的上下文依赖 route name、query 参数和 mock 数据计算。
+- 已实现首页、资料库、收藏、标签、回收站、演员、历史、详情与萃取帧等完整浏览结构，并通过虚拟滚动支撑大资料库。
+- 库页上下文依赖 route name 与 query 参数；数据统一经过 service contract，可来自 Web API 或 Mock adapter。
 
 #### 目标设计
 
@@ -365,7 +373,7 @@ ABC123.mp4
 
 #### 当前状态
 
-- 当前仅在产品文档和设置页原型中体现搜刮能力，尚无真实实现。
+- 已实现影片与演员元数据刮削、批量刷新、多 provider 策略、provider 健康检查、资源下载缓存、自动演员资料排队，以及任务/SSE 进度反馈。
 
 #### 目标设计
 
@@ -459,7 +467,7 @@ stop()
 
 ### 6.1 当前状态
 
-- 当前前端已有 `Movie`、统计卡片、设置项和若干展示字段，但这只是原型层模型。
+- `Movie`、`Actor`、`LibraryPath`、任务、播放 session、设置、认证 session、导入 session 等已形成前后端 typed DTO 与 SQLite 模型；下文接口示例属于设计参考，不应覆盖现有 contracts。
 
 ### 6.2 目标领域对象
 
@@ -583,7 +591,7 @@ updated_at        DATETIME
 ### 6.5 待决策
 
 - 是否需要单独的 `assets` 表记录 poster、thumb、preview 的派生资源。
-- 是否需要 **`play_history`（或服务端等价模型）** 支撑断点续播与最近播放的**跨设备/可备份**同步。**`当前状态`（前端）**：续播与观看历史已由 **`localStorage`** 实现（见 `docs/reference/2026-03-20-project-memory.md`），**不写入**当前 SQLite 库。
+- 当前已用 SQLite `playback_progress` 等价模型支撑 Web API 模式下的断点续播和同一资料库客户端共享；Mock 模式仍使用 `localStorage`。待决策的是未来是否需要账号级历史、冲突解决和远程同步，而不是是否需要服务端进度表。
 - 是否要为电影文件和逻辑影片分离建模，以支持多文件版本。
 
 ---
@@ -716,8 +724,9 @@ UI 操作
 
 - 当前 `PlayerPage` 为 video-first 布局；在 **Web 阶段（`VITE_USE_WEB_API`）** 下，主视频通过 **`GET /api/library/movies/{movieId}/stream`** 输出字节流（支持 `Range`），前端使用 **`<video>`** 播放；解码由 **浏览器**完成，不兼容格式需在 UI 提示或依赖后续桌面 `mpv`。
 - 流路径会校验影片 `location` 是否落在已配置的 **library path** 之下，避免任意文件读取。
-- **断点续播（前端）**：进度写入浏览器 **`localStorage`**；支持路由 **`?t=秒`** 与从 **观看历史** 进入；详情见 `project-memory` 与 `README`。**非**服务端会话状态。
-- **目标设计**中的 `mpv + Electron` 控制链（§8.2–8.3）仍为桌面阶段方案，与上述 Web 播放可并存（后期可双模式）。
+- **断点续播**：Web API 模式通过 SQLite-backed `/api/playback/progress` 读写，Mock 模式写入浏览器 `localStorage`；支持路由 **`?t=秒`** 与从观看历史进入。锁屏时不会提前 hydrate 这些受保护数据。
+- **HLS 会话**：播放描述符可启动后端托管的 remux/transcode HLS session；浏览器缺少原生 HLS 时按需加载 npm-bundled `hls.js`。
+- **目标设计**中的 `mpv + Electron` 控制链（§8.2–8.3）仍未实现，与现有 HTML5/HLS 播放路径可以并存。
 
 ---
 
@@ -785,17 +794,17 @@ UI 操作
 
 - 侧栏 **History** 进入；[`HistoryView`](src/views/HistoryView.vue) 按 **本地日历日**分组（如今天、昨天、中文日期）。
 - 卡片 [`PlaybackHistoryCard`](src/components/jav-library/PlaybackHistoryCard.vue)：左侧标题/演员/番号，右侧海报（**`coverUrl` 优先**于 `thumbUrl`，宽比例容器 + `object-cover`），底部细进度条。
-- 数据与 **SQLite 无关**；条目与当前库中影片合并展示（已删库条目不显示）。
+- Web API 模式的进度数据来自 SQLite，Mock 模式来自 `localStorage`；两者都会与当前库中影片合并展示（已删库条目不显示）。
 
 #### 目标设计
 
-- 可选与服务端 **`play_history`** 或分析事件合并，支持跨设备与备份恢复。
+- 后续可在现有 SQLite progress 基础上增加更完整的播放事件、统计与账号级同步；备份恢复应覆盖这些现有用户状态。
 
 ### 9.5 设置页
 
 #### 当前状态
 
-- 已有目录管理、扫描间隔、硬件解码、手动任务入口等原型结构。
+- 已联通真实设置读写，覆盖通用、影片存储、元数据、网络、播放、萃取帧、安全、关于和维护；包含库路径/存储检测、代理测试、自动监听、更新、PIN/可信会话与日志治理。
 
 #### 目标设计
 
@@ -806,11 +815,11 @@ UI 操作
 
 #### 当前状态
 
-- 设计文档以中文为主，当前前端原型文案偏英文。
+- 产品当前维护 `zh-CN`、`en`、`ja` 三套 `vue-i18n` locale，并有 locale 完整性测试。
 
 #### 待决策
 
-- 最终产品是中文优先、英文优先，还是双语。
+- 最终产品是否继续同等维护中英日三语，或明确主语言与翻译发布节奏。
 - 内部字段命名和对外显示文案是否分离维护。
 
 ---
@@ -871,8 +880,9 @@ type AppEvent =
 
 ### 10.5 当前状态
 
-- 当前还没有真实任务系统、事件流和错误码体系。
-- 但设置页和播放器页已经足以反向约束这套模型的设计。
+- Go 后端已有真实异步任务系统、稳定错误码和 `/api/tasks/{taskId}` / `/api/tasks/recent` 查询。
+- `GET /api/events` 已提供受 PIN 保护的 SSE：发送 `hello`、非阻塞 `task.updated` 快照和 heartbeat；前端扫描跟踪与目录监听提示优先消费事件，同时保留轮询 fallback。
+- 扫描、刮削、导入、播放和 provider 诊断均已有结构化错误或任务状态；后续重点是统一 Library Health 与元数据修复入口。
 
 ---
 
@@ -936,34 +946,34 @@ logs/
 
 ### 12.1 建议阶段路线图
 
-#### 阶段 1：稳定前端原型
+#### 阶段 1：稳定前端原型（已完成）
 
 - 收敛页面结构和交互路径。
 - 统一文案策略。
 - 从 `src/lib/jav-library.ts` 提炼服务契约和 DTO。
 
-#### 阶段 2：建立前端服务层
+#### 阶段 2：建立前端服务层（已完成）
 
 - 增加 `services` 与 adapter 结构。
 - 让 `views` 不再直接依赖 mock 数据模块。
 - 定义任务模型、事件模型和错误码。
 
-#### 阶段 3：Web 后端联通
+#### 阶段 3：Web 后端联通（已完成）
 
 - 为 `Go Backend` 提供 Web 可调用的 HTTP API。
 - 建立 `web adapter`，让前端页面可切到真实后端。
 - 跑通影片库、详情、设置和扫描的 Web 链路。
 
-#### 阶段 4：任务与写操作增强
+#### 阶段 4：任务与写操作增强（已完成基础闭环）
 
 - 补齐设置更新、影片更新等写操作。
 - 完善扫描任务状态流和前端任务反馈。
-- 视需要引入 SSE / WebSocket，或继续使用轮询方案。
+- 已引入 SSE `task.updated`，并保留轮询作为断线补偿。
 
-#### 阶段 5：桌面桥接与播放器闭环
+#### 阶段 5：桌面桥接与播放器闭环（Electron 壳已完成；深度原生播放待定）
 
-- 接入 `Electron`。
-- 设计 `preload` 白名单 API。
+- 已接入 Electron 壳、托盘与进程生命周期。
+- 已以白名单方式仅暴露目录选择 preload API。
 - 复用既有服务契约切换到桌面桥接。
 - 接入 `mpv`。
 - 建立播放器会话模型。
@@ -973,15 +983,15 @@ logs/
 
 1. 前端长期状态层当前默认继续使用 Composables + 服务层；可在后续优化或新增功能中从小服务、小范围模块渐进试点 `pinia` 等状态库，避免一开始做全局大迁移。
 2. 前端服务层接口的命名、返回值和错误包装标准。
-3. Web 阶段任务反馈采用轮询、SSE 还是 WebSocket。
-4. 配置持久化长期归属 `Go Backend` 还是未来的 `Electron` 宿主层。
-5. 搜刮任务、缓存任务和扫描任务的编排关系。
-6. 产品最终显示语言是否统一为中文，还是保留英文界面。
+3. 是否继续扩充 SSE 事件类型，或维持任务快照 + 轮询补偿的当前边界。
+4. 深度原生播放应采用 mpv、受控外部播放器桥还是继续强化浏览器 HLS。
+5. 账号级多用户、远程同步与冲突解决是否属于 Curated 的产品边界。
+6. 产品最终显示语言是否统一为中文，还是继续维护中英日三语。
 
 ### 12.3 文档结论
 
-这份文档的核心作用不是描述“仓库现在已经做完了什么”，而是把当前前端原型与未来桌面产品之间的桥梁设计清楚：
+这份文档同时保留当前事实与目标设计，并用明确状态避免把历史路线误当成现状：
 
-- 当前已经有较完整的产品原型。
-- 当前还没有真实桌面能力。
-- 接下来的关键不是盲目接技术，而是先把契约、边界和任务模型定义好。
+- 当前已经具备 Electron 桌面交付、Web/Mock 双 adapter、Go/SQLite 主链、任务/SSE、PIN 与播放器基础。
+- 当前仍没有 mpv 命名管道、深度业务 IPC、广泛原生文件桥和多用户同步。
+- 接下来的关键是长期数据治理、备份恢复、上传恢复、Library Health 和可解释个性化，同时继续保持现有契约边界。
