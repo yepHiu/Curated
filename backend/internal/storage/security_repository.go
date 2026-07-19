@@ -42,13 +42,13 @@ type AppSecuritySettings struct {
 type AppSecuritySettingsPatch struct {
 	PINEnabled        *bool
 	SessionTTLMinutes *int
-	LANRequiresPIN    *bool
 	LockOnRestart     *bool
 }
 
 // AuthSession is one browser/device unlock session.
 type AuthSession struct {
 	ID             string
+	PublicID       string
 	ClientKey      string
 	UserAgent      string
 	IP             string
@@ -194,10 +194,6 @@ func (s *SQLiteStore) PatchAppSecuritySettings(ctx context.Context, patch AppSec
 	if patch.SessionTTLMinutes != nil {
 		ttl = normalizeSessionTTLMinutes(*patch.SessionTTLMinutes)
 	}
-	lanRequiresPIN := current.LANRequiresPIN
-	if patch.LANRequiresPIN != nil {
-		lanRequiresPIN = *patch.LANRequiresPIN
-	}
 	lockOnRestart := current.LockOnRestart
 	if patch.LockOnRestart != nil {
 		lockOnRestart = *patch.LockOnRestart
@@ -215,7 +211,7 @@ func (s *SQLiteStore) PatchAppSecuritySettings(ctx context.Context, patch AppSec
 	`,
 		boolToInt(pinEnabled),
 		ttl,
-		boolToInt(lanRequiresPIN),
+		1,
 		boolToInt(lockOnRestart),
 		nowRFC3339(time.Now()),
 	)
@@ -235,6 +231,10 @@ func (s *SQLiteStore) CreateAuthSession(ctx context.Context, input CreateAuthSes
 			return AuthSession{}, err
 		}
 	}
+	publicID, err := randomURLBase64(16)
+	if err != nil {
+		return AuthSession{}, err
+	}
 	clientKey := strings.TrimSpace(input.ClientKey)
 	if clientKey == "" {
 		return AuthSession{}, errors.New("client key is required")
@@ -251,6 +251,7 @@ func (s *SQLiteStore) CreateAuthSession(ctx context.Context, input CreateAuthSes
 	}
 	session := AuthSession{
 		ID:             id,
+		PublicID:       publicID,
 		ClientKey:      clientKey,
 		UserAgent:      strings.TrimSpace(input.UserAgent),
 		IP:             strings.TrimSpace(input.IP),
@@ -259,9 +260,10 @@ func (s *SQLiteStore) CreateAuthSession(ctx context.Context, input CreateAuthSes
 		ExpiresAt:      expiresAt,
 		TrustedForever: input.TrustedForever,
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO auth_sessions (
 			id,
+			public_id,
 			client_key,
 			user_agent,
 			ip,
@@ -270,9 +272,10 @@ func (s *SQLiteStore) CreateAuthSession(ctx context.Context, input CreateAuthSes
 			expires_at,
 			trusted_forever,
 			revoked_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
 	`,
 		session.ID,
+		session.PublicID,
 		session.ClientKey,
 		session.UserAgent,
 		session.IP,
@@ -292,11 +295,12 @@ func (s *SQLiteStore) GetAuthSession(ctx context.Context, id string) (AuthSessio
 	var session AuthSession
 	var trustedForever int
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, client_key, user_agent, ip, created_at, last_seen_at, expires_at, trusted_forever, revoked_at
+		SELECT id, public_id, client_key, user_agent, ip, created_at, last_seen_at, expires_at, trusted_forever, revoked_at
 		FROM auth_sessions
 		WHERE id = ?
 	`, strings.TrimSpace(id)).Scan(
 		&session.ID,
+		&session.PublicID,
 		&session.ClientKey,
 		&session.UserAgent,
 		&session.IP,
@@ -367,6 +371,78 @@ func (s *SQLiteStore) RevokeAuthSession(ctx context.Context, id string) error {
 		WHERE id = ?
 	`, nowRFC333Nanos(time.Now().UTC()), strings.TrimSpace(id))
 	return err
+}
+
+// ListTrustedAuthSessions returns active trusted-forever sessions without exposing their bearer-token IDs.
+func (s *SQLiteStore) ListTrustedAuthSessions(ctx context.Context) ([]AuthSession, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, public_id, client_key, user_agent, ip, created_at, last_seen_at, expires_at, trusted_forever, revoked_at
+		FROM auth_sessions
+		WHERE trusted_forever = 1
+			AND revoked_at = ''
+		ORDER BY last_seen_at DESC, created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	sessions := make([]AuthSession, 0)
+	for rows.Next() {
+		var session AuthSession
+		var trustedForever int
+		if err := rows.Scan(
+			&session.ID,
+			&session.PublicID,
+			&session.ClientKey,
+			&session.UserAgent,
+			&session.IP,
+			&session.CreatedAt,
+			&session.LastSeenAt,
+			&session.ExpiresAt,
+			&trustedForever,
+			&session.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		session.TrustedForever = trustedForever != 0
+		sessions = append(sessions, session)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
+
+// RevokeTrustedAuthSessionByPublicID revokes one active trusted session by its non-secret public ID.
+func (s *SQLiteStore) RevokeTrustedAuthSessionByPublicID(ctx context.Context, publicID string) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE auth_sessions
+		SET revoked_at = ?
+		WHERE public_id = ?
+			AND trusted_forever = 1
+			AND revoked_at = ''
+	`, nowRFC333Nanos(time.Now().UTC()), strings.TrimSpace(publicID))
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	return count > 0, err
+}
+
+// RevokeOtherTrustedAuthSessions revokes every active trusted session except currentSessionID.
+func (s *SQLiteStore) RevokeOtherTrustedAuthSessions(ctx context.Context, currentSessionID string) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE auth_sessions
+		SET revoked_at = ?
+		WHERE trusted_forever = 1
+			AND revoked_at = ''
+			AND id != ?
+	`, nowRFC333Nanos(time.Now().UTC()), strings.TrimSpace(currentSessionID))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // ApplyAuthStartupPolicy revokes regular sessions when restart locking is enabled.

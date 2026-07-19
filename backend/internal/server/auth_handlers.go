@@ -76,7 +76,6 @@ func (h *Handler) handleSetupPIN(w http.ResponseWriter, r *http.Request) {
 	}
 	patch := storage.AppSecuritySettingsPatch{
 		SessionTTLMinutes: body.SessionTTLMinutes,
-		LANRequiresPIN:    body.LANRequiresPIN,
 		LockOnRestart:     body.LockOnRestart,
 	}
 	settings, err = h.store.PatchAppSecuritySettings(r.Context(), patch)
@@ -216,7 +215,6 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 	settings, err := h.store.PatchAppSecuritySettings(r.Context(), storage.AppSecuritySettingsPatch{
 		PINEnabled:        body.PINEnabled,
 		SessionTTLMinutes: body.SessionTTLMinutes,
-		LANRequiresPIN:    body.LANRequiresPIN,
 		LockOnRestart:     body.LockOnRestart,
 	})
 	if err != nil {
@@ -288,7 +286,7 @@ func authStatusFromSettings(settings storage.AppSecuritySettings, session *stora
 		SetupRequired:     !settings.PINEnabled,
 		PINLength:         authStatusPINLength(settings),
 		SessionTTLMinutes: settings.SessionTTLMinutes,
-		LANRequiresPIN:    settings.LANRequiresPIN,
+		LANRequiresPIN:    true,
 		LockOnRestart:     settings.LockOnRestart,
 	}
 	if session != nil {

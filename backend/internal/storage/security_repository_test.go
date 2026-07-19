@@ -138,6 +138,9 @@ func TestSecurityTrustedForeverSessionHasNoExpiry(t *testing.T) {
 	if session.ID == "" {
 		t.Fatal("expected generated session ID")
 	}
+	if session.PublicID == "" || session.PublicID == session.ID {
+		t.Fatalf("PublicID = %q, want a separate non-secret identifier", session.PublicID)
+	}
 	if !session.TrustedForever {
 		t.Fatal("TrustedForever = false, want true")
 	}
@@ -154,6 +157,95 @@ func TestSecurityTrustedForeverSessionHasNoExpiry(t *testing.T) {
 	}
 	if valid.ID != session.ID || !valid.TrustedForever {
 		t.Fatalf("valid session = %+v, want trusted session %q", valid, session.ID)
+	}
+}
+
+func TestSecurityListsAndRevokesTrustedSessionsByPublicID(t *testing.T) {
+	t.Parallel()
+
+	store := newSecurityTestStore(t)
+	now := time.Now().UTC()
+	current, err := store.CreateAuthSession(context.Background(), CreateAuthSessionInput{
+		ID:             "current-secret-token",
+		ClientKey:      "current-client",
+		TrustedForever: true,
+		Now:            now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := store.CreateAuthSession(context.Background(), CreateAuthSessionInput{
+		ID:             "other-secret-token",
+		ClientKey:      "other-client",
+		TrustedForever: true,
+		Now:            now.Add(-time.Minute),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	regular, err := store.CreateAuthSession(context.Background(), CreateAuthSessionInput{
+		ID:        "regular-secret-token",
+		ClientKey: "regular-client",
+		Now:       now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err := store.ListTrustedAuthSessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("trusted sessions = %+v, want 2", sessions)
+	}
+	if sessions[0].ID != current.ID || sessions[1].ID != other.ID {
+		t.Fatalf("trusted session order = %+v", sessions)
+	}
+
+	revoked, err := store.RevokeTrustedAuthSessionByPublicID(context.Background(), other.PublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !revoked {
+		t.Fatal("expected other trusted session to be revoked")
+	}
+	if _, ok, err := store.GetValidAuthSession(context.Background(), other.ID, now); err != nil {
+		t.Fatal(err)
+	} else if ok {
+		t.Fatal("revoked trusted session is still valid")
+	}
+
+	third, err := store.CreateAuthSession(context.Background(), CreateAuthSessionInput{
+		ID:             "third-secret-token",
+		ClientKey:      "third-client",
+		TrustedForever: true,
+		Now:            now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, err := store.RevokeOtherTrustedAuthSessions(context.Background(), current.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("revoked other trusted sessions = %d, want 1", count)
+	}
+	if _, ok, err := store.GetValidAuthSession(context.Background(), current.ID, now); err != nil {
+		t.Fatal(err)
+	} else if !ok {
+		t.Fatal("current trusted session should remain valid")
+	}
+	if _, ok, err := store.GetValidAuthSession(context.Background(), third.ID, now); err != nil {
+		t.Fatal(err)
+	} else if ok {
+		t.Fatal("other trusted session should be revoked")
+	}
+	if _, ok, err := store.GetValidAuthSession(context.Background(), regular.ID, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	} else if !ok {
+		t.Fatal("regular session should not be affected by trusted-session revocation")
 	}
 }
 

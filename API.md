@@ -458,6 +458,8 @@ curl -X POST \
 }
 ```
 
+`lanRequiresPin` 是旧客户端兼容字段，当前固定为 `true`；Curated 已统一采用全局 PIN 锁，不再提供“本机与 LAN 分叉”的可写策略。
+
 #### `POST /api/auth/setup-pin`
 
 用途：设置初始 PIN，或在已解锁状态下重设 PIN，并创建当前客户端会话。
@@ -471,7 +473,6 @@ Body：
   "pin": "1234",
   "confirmPin": "1234",
   "sessionTtlMinutes": 60,
-  "lanRequiresPin": true,
   "lockOnRestart": true,
   "trustedForever": false
 }
@@ -554,7 +555,6 @@ Body：
 {
   "pinEnabled": true,
   "sessionTtlMinutes": 60,
-  "lanRequiresPin": true,
   "lockOnRestart": true
 }
 ```
@@ -562,6 +562,48 @@ Body：
 所有字段可选；只发送要修改的字段。
 
 成功：`200 AuthStatusDTO`
+
+#### `GET /api/auth/sessions`
+
+用途：列出仍有效的 trusted-forever 会话。返回安全的 `publicId`、IP、User-Agent、创建/最近活动时间和 `current` 标识；不会返回可用作 cookie 的真实 session token。
+
+认证：需要已解锁会话。
+
+成功：`200 AuthSessionsDTO`
+
+```json
+{
+  "items": [
+    {
+      "publicId": "safe-public-reference",
+      "userAgent": "Mozilla/5.0 ...",
+      "ip": "192.168.1.20",
+      "createdAt": "2026-07-19T12:00:00Z",
+      "lastSeenAt": "2026-07-19T12:30:00Z",
+      "trustedForever": true,
+      "current": false
+    }
+  ]
+}
+```
+
+#### `DELETE /api/auth/sessions/{publicId}`
+
+用途：按非秘密 `publicId` 撤销一个 trusted-forever 会话。撤销当前会话时同时清除 `curated_auth` cookie。
+
+认证：需要已解锁会话。
+
+成功：`200 AuthSessionsDTO`（撤销后的列表）。
+
+错误：`404 COMMON_NOT_FOUND` 表示会话已不存在或已撤销。
+
+#### `POST /api/auth/sessions/revoke-others`
+
+用途：撤销除当前会话之外的所有 trusted-forever 会话；当前是普通短会话时会撤销全部 trusted-forever 会话。
+
+认证：需要已解锁会话。
+
+成功：`200 AuthSessionsDTO`（撤销后的列表）。
 
 ### 4.3 Connected Clients
 

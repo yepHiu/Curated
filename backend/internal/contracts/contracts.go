@@ -469,8 +469,9 @@ type AuthStatusDTO struct {
 	SessionExpiresAt  string `json:"sessionExpiresAt,omitempty"`
 	TrustedForever    bool   `json:"trustedForever"`
 	SessionTTLMinutes int    `json:"sessionTtlMinutes"`
-	LANRequiresPIN    bool   `json:"lanRequiresPin"`
-	LockOnRestart     bool   `json:"lockOnRestart"`
+	// LANRequiresPIN is a deprecated compatibility field. Curated now uses one global PIN lock.
+	LANRequiresPIN bool `json:"lanRequiresPin"`
+	LockOnRestart  bool `json:"lockOnRestart"`
 }
 
 // SetupPINRequest is the body for POST /api/auth/setup-pin.
@@ -478,7 +479,6 @@ type SetupPINRequest struct {
 	PIN               string `json:"pin"`
 	ConfirmPIN        string `json:"confirmPin"`
 	SessionTTLMinutes *int   `json:"sessionTtlMinutes,omitempty"`
-	LANRequiresPIN    *bool  `json:"lanRequiresPin,omitempty"`
 	LockOnRestart     *bool  `json:"lockOnRestart,omitempty"`
 	TrustedForever    bool   `json:"trustedForever,omitempty"`
 }
@@ -500,8 +500,23 @@ type ChangePINRequest struct {
 type PatchAuthSettingsRequest struct {
 	PINEnabled        *bool `json:"pinEnabled,omitempty"`
 	SessionTTLMinutes *int  `json:"sessionTtlMinutes,omitempty"`
-	LANRequiresPIN    *bool `json:"lanRequiresPin,omitempty"`
 	LockOnRestart     *bool `json:"lockOnRestart,omitempty"`
+}
+
+// AuthSessionDTO is a safe, non-secret trusted-session summary.
+type AuthSessionDTO struct {
+	PublicID       string `json:"publicId"`
+	UserAgent      string `json:"userAgent,omitempty"`
+	IP             string `json:"ip,omitempty"`
+	CreatedAt      string `json:"createdAt"`
+	LastSeenAt     string `json:"lastSeenAt"`
+	TrustedForever bool   `json:"trustedForever"`
+	Current        bool   `json:"current"`
+}
+
+// AuthSessionsDTO lists active trusted-forever sessions.
+type AuthSessionsDTO struct {
+	Items []AuthSessionDTO `json:"items"`
 }
 
 // UpdateLibraryPathRequest is the body for PATCH /api/library/paths/{id}.
