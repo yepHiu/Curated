@@ -16,6 +16,7 @@ import type { LibraryMode, LibraryTab } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import {
   buildClearLibraryActorFilterQuery,
+  buildSavedViewFiltersV1,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
@@ -31,6 +32,9 @@ import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
 import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
+import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
+import { getProgress, playbackProgressRevision } from "@/lib/playback-progress-storage"
+import { hasPlayedMovie, playedMovieCount } from "@/lib/played-movies-storage"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
 import { useGamepad } from "@/composables/use-gamepad"
 import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
@@ -547,7 +551,36 @@ const libraryMovies = computed(() =>
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
 const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
 const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
+const canonicalActorExactQuery = ref("")
+let actorResolveSequence = 0
+
+watch(
+  actorExactQuery,
+  async (rawName) => {
+    const sequence = ++actorResolveSequence
+    canonicalActorExactQuery.value = rawName
+    if (!rawName) return
+    try {
+      const profile = await libraryService.getActorProfile(rawName)
+      if (sequence !== actorResolveSequence) return
+      canonicalActorExactQuery.value = profile.name
+      if (profile.name !== rawName) {
+        await router.replace({
+          name: libraryMode.value,
+          query: mergeLibraryQuery(route.query, { actor: profile.name }),
+        })
+      }
+    } catch {
+      // Keep the original query so ordinary not-found handling and empty states remain stable.
+    }
+  },
+  { immediate: true },
+)
+const effectiveActorExactQuery = computed(
+  () => canonicalActorExactQuery.value || actorExactQuery.value,
+)
 const studioExactQuery = computed(() => getLibraryStudioExactQuery(route.query).trim())
+const savedViewFilters = computed(() => buildSavedViewFiltersV1(libraryMode.value, route.query))
 /**
  * 小写 -> 库内规范演员名（用于 q 与演员名匹配）。
  * 仅在「无 actor= 且顶栏 q 非空」时需要解析；有 `actor=` 或 q 为空时跳过全库扫描，避免大库下卡主线程。
@@ -588,7 +621,7 @@ const actorResolvedFromSearch = computed(() => {
 
 /** 演员资料卡标题：URL `actor` 优先，否则为 `q` 解析出的演员名 */
 const actorProfileDisplayName = computed(
-  () => actorExactQuery.value || actorResolvedFromSearch.value,
+  () => effectiveActorExactQuery.value || actorResolvedFromSearch.value,
 )
 
 const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
@@ -630,7 +663,7 @@ const queryFilteredMovies = computed(() => {
     )
   }
 
-  const actorFromParam = actorExactQuery.value
+  const actorFromParam = effectiveActorExactQuery.value
   if (actorFromParam) {
     list = list.filter((movie) => movie.actors.includes(actorFromParam))
   } else if (actorViaQ) {
@@ -642,7 +675,13 @@ const queryFilteredMovies = computed(() => {
     list = list.filter((movie) => movie.studio.trim() === studioExact)
   }
 
-  return list
+  // These revisions make the Saved View result reactive after playback writes or hydrate.
+  void playbackProgressRevision.value
+  void playedMovieCount.value
+  return filterMoviesBySavedView(list, savedViewFilters.value, {
+    hasPlayedMovie,
+    getProgress,
+  })
 })
 
 /** 回收站不使用 tab 子筛选（顶栏无「入库时间 / 发售日期 / 评分」） */
@@ -688,8 +727,13 @@ const replaceQuery = async (
 watch(
   [selectedMovie, () => route.query.selected],
   ([movie]) => {
-    const nextSelected = movie?.id
     const normalizedSelected = getSelectedMovieQuery(route.query)
+    // A clean library/Saved View route may intentionally omit `selected`.
+    // Keep the first card as an internal fallback without polluting the canonical URL.
+    if (!normalizedSelected) {
+      return
+    }
+    const nextSelected = movie?.id
 
     if (nextSelected === normalizedSelected) {
       return

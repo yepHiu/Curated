@@ -8,13 +8,20 @@ const routerMocks = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
 }))
+const routeState = vi.hoisted(() => ({
+  name: "library",
+  path: "/library",
+  query: {} as Record<string, unknown>,
+}))
 const serviceState = vi.hoisted(() => ({
   loadError: null as string | null,
+  movies: [] as import("@/domain/movie/types").Movie[],
 }))
 const serviceMocks = vi.hoisted(() => ({
   toggleFavorite: vi.fn(),
   ensureTrashLoaded: vi.fn(),
   refreshMovieMetadata: vi.fn(),
+  getActorProfile: vi.fn(),
 }))
 const scanTrackerStartMock = vi.hoisted(() => vi.fn())
 
@@ -26,11 +33,7 @@ vi.mock("vue-i18n", () => ({
 }))
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    name: "library",
-    path: "/library",
-    query: {},
-  }),
+  useRoute: () => routeState,
   useRouter: () => routerMocks,
 }))
 
@@ -47,21 +50,23 @@ vi.mock("@/composables/use-scan-task-tracker", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
-    movies: computed(() => []),
+    movies: computed(() => serviceState.movies),
     trashedMovies: computed(() => []),
     loadError: computed(() => serviceState.loadError),
     ensureTrashLoaded: serviceMocks.ensureTrashLoaded,
     toggleFavorite: serviceMocks.toggleFavorite,
     refreshMovieMetadata: serviceMocks.refreshMovieMetadata,
+    getActorProfile: serviceMocks.getActorProfile,
   }),
 }))
 
 vi.mock("@/components/jav-library/LibraryPage.vue", () => ({
   default: {
     name: "LibraryPage",
+    props: ["visibleMovies", "activeActorFilter"],
     emits: ["toggleFavorite", "contextMenu"],
     template: `
-      <div>
+      <div data-library-page :data-visible-ids="visibleMovies.map((movie) => movie.id).join(',')" :data-active-actor="activeActorFilter">
         <button type="button" data-toggle-favorite @click="$emit('toggleFavorite', { movieId: 'movie-1', nextValue: true })">Favorite</button>
         <button
           type="button"
@@ -97,10 +102,15 @@ vi.mock("@/components/jav-library/MovieLibraryContextMenu.vue", () => ({
 }))
 
 afterEach(() => {
+  routeState.name = "library"
+  routeState.path = "/library"
+  routeState.query = {}
   serviceState.loadError = null
+  serviceState.movies = []
   serviceMocks.toggleFavorite.mockReset()
   serviceMocks.ensureTrashLoaded.mockReset()
   serviceMocks.refreshMovieMetadata.mockReset()
+  serviceMocks.getActorProfile.mockReset()
   scanTrackerStartMock.mockReset()
   pushAppToastMock.mockReset()
   routerMocks.push.mockReset()
@@ -146,5 +156,44 @@ describe("LibraryView feedback", () => {
 
     expect(serviceMocks.refreshMovieMetadata).toHaveBeenCalledWith("movie-1")
     expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", { notifyMovieScrape: true })
+  })
+
+  it("resolves an actor alias to the canonical route and local movie filter", async () => {
+    routeState.query = { actor: "Old Actor" }
+    serviceState.movies = [
+      {
+        id: "movie-1",
+        title: "Movie 1",
+        code: "M-1",
+        studio: "Studio",
+        actors: ["Canonical Actor"],
+        tags: [],
+        userTags: [],
+        runtimeMinutes: 100,
+        rating: 4,
+        isFavorite: false,
+        addedAt: "2026-07-21",
+        location: "D:/movie-1.mp4",
+        resolution: "1080p",
+        year: 2026,
+        summary: "",
+        tone: "",
+        coverClass: "",
+      },
+    ]
+    serviceMocks.getActorProfile.mockResolvedValueOnce({ name: "Canonical Actor" })
+
+    const wrapper = mount(LibraryView)
+    await flushPromises()
+
+    expect(serviceMocks.getActorProfile).toHaveBeenCalledWith("Old Actor")
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      name: "library",
+      query: { actor: "Canonical Actor" },
+    })
+    expect(wrapper.get("[data-library-page]").attributes("data-active-actor")).toBe(
+      "Canonical Actor",
+    )
+    expect(wrapper.get("[data-library-page]").attributes("data-visible-ids")).toBe("movie-1")
   })
 })

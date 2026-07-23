@@ -63,6 +63,10 @@ vi.mock("@/components/jav-library/ActorProfileCard.vue", () => ({
   },
 }))
 
+vi.mock("@/components/jav-library/LibrarySavedViewsControls.vue", () => ({
+  default: { template: "<div data-saved-view-controls />" },
+}))
+
 vi.mock("@/components/jav-library/VirtualMovieMasonry.vue", () => ({
   default: {
     template: `

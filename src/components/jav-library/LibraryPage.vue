@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ActorProfileCard from "@/components/jav-library/ActorProfileCard.vue"
+import LibrarySavedViewsControls from "@/components/jav-library/LibrarySavedViewsControls.vue"
 import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vue"
 import {
   aggregateMetadataTagCounts,
@@ -376,6 +377,7 @@ function isChipActive(tag: string): boolean {
       </Tabs>
       <div class="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
         <template v-if="!batchModeOn">
+          <LibrarySavedViewsControls />
           <Button
             type="button"
             variant="outline"
