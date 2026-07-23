@@ -82,7 +82,9 @@ export async function loadHlsLibrary(): Promise<HlsCtor> {
     return hlsLoaderPromise
   }
 
-  hlsLoaderPromise = import("hls.js")
+  // Curated's backend emits a single local playback rendition and does not use
+  // subtitle, EME/DRM, alternate-audio, or CMCD controllers from the full build.
+  hlsLoaderPromise = import("hls.js/light")
     .then((mod) => {
       const Hls = (mod.default ?? mod) as HlsCtor
       window.Hls = Hls

@@ -14,7 +14,7 @@ const hlsMock = vi.hoisted(() => {
   return { FakeHls }
 })
 
-vi.mock("hls.js", () => ({ default: hlsMock.FakeHls }))
+vi.mock("hls.js/light", () => ({ default: hlsMock.FakeHls }))
 
 afterEach(() => {
   vi.restoreAllMocks()
