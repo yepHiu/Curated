@@ -239,6 +239,8 @@ X-Curated-OS-Version: 15
 | --- | --- | --- |
 | `GET /library/movies` | 50 | 当前 HTTP handler 不强制上限 |
 | `GET /library/actors` | 50 | 当前 handler 不强制上限 |
+| `GET /library/actors/merge-audits` | 50 | 100 |
+| `GET /insights/breakdown` | 10 | 25 |
 | `GET /curated-frames` | 50 | 200 |
 | `GET /tasks/recent` | 30 | 当前 handler 不强制上限 |
 | `GET /playback/sessions/recent` | 20 | 当前 handler 不强制上限 |
@@ -728,9 +730,28 @@ Body：
 {
   "dateUtc": "2026-06-07",
   "generatedAt": "2026-06-07T00:00:00Z",
-  "generationVersion": "v1",
+  "generationVersion": "v8",
   "heroMovieIds": ["movie-a", "movie-b"],
-  "recommendationMovieIds": ["movie-c", "movie-d"]
+  "recommendationMovieIds": ["movie-c", "movie-d"],
+  "recommendations": [
+    {
+      "movieId": "movie-c",
+      "reasons": [{ "code": "recently_added" }, { "code": "well_rated" }],
+      "feedbackEffects": []
+    },
+    {
+      "movieId": "movie-d",
+      "reasons": [{ "code": "rediscovery" }],
+      "feedbackEffects": [
+        {
+          "feedbackId": "feedback_0123",
+          "targetType": "actor",
+          "targetValue": "Actor A",
+          "effect": "weight_reduced"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -738,7 +759,9 @@ Body：
 
 - 后端按 UTC 日期生成并持久化。
 - 同一天重复请求会复用快照，除非算法版本变化或手动刷新。
-- 返回的是 ID 列表，客户端需再调用电影详情或利用已有列表缓存渲染。
+- `recommendationMovieIds` 保留为兼容、有序 ID 列表；`recommendations` 与其逐项同序且长度相同，提供真实生成理由和命中的降权反馈。
+- 每项至少一个 `reasons`。当前 code：`high_user_rating`、`favorite`、`recently_added`、`well_rated`、`rediscovery`、`catalog_discovery`；Mock 的本地偏好算法还可返回 `shared_actor`、`shared_studio`、`shared_tag` 并携带 `entityType/entityValue`。前端只翻译 code，不自行伪造原因。
+- `feedbackEffects` 只记录仍保留探索资格的 `less` 降权；影片级 `not_interested` / 活跃 `snooze` 会直接排除候选，因此不会出现在已选条目里。
 
 #### `POST /api/homepage/recommendations/refresh`
 
@@ -755,6 +778,62 @@ Body 可选：
 
 成功：`200 HomepageDailyRecommendationsDTO`
 
+刷新只重新生成快照，不会隐式创建任何反馈。
+
+#### `GET /api/homepage/recommendations/feedback`
+
+用途：列出当前有效的显式推荐反馈，按创建时间倒序。过期 `snooze` 不返回。
+
+成功：`200 RecommendationFeedbackListDTO`
+
+```json
+{
+  "items": [
+    {
+      "id": "feedback_0123",
+      "action": "less",
+      "targetType": "actor",
+      "targetValue": "Actor A",
+      "sourceMovieId": "movie-c",
+      "createdAt": "2026-07-21T01:00:00Z",
+      "updatedAt": "2026-07-21T01:00:00Z"
+    }
+  ]
+}
+```
+
+#### `POST /api/homepage/recommendations/feedback`
+
+用途：创建显式反馈。同 `action + targetType + 规范化 target` 重复提交幂等并返回原记录；最多保留 500 条有效反馈。
+
+请求组合：
+
+| action | targetType | 额外字段 | 语义 |
+|---|---|---|---|
+| `not_interested` | `movie` | 无 | 永久排除，直到删除反馈 |
+| `snooze` | `movie` | `durationDays` 1～365 | 到期前排除 |
+| `less` | `actor` / `studio` / `tag` | 无 | 降低权重但保留至少 10% 探索因子 |
+
+所有请求必须带 `sourceMovieId`；影片必须仍在活动库，演员/片商/标签必须真实属于该影片。任意字符串、回收站影片和错误 action/target 组合都会被拒绝。
+
+```json
+{
+  "action": "snooze",
+  "targetType": "movie",
+  "targetValue": "movie-c",
+  "sourceMovieId": "movie-c",
+  "durationDays": 7
+}
+```
+
+成功：`201 RecommendationFeedbackDTO`。
+
+错误码：`RECOMMENDATION_FEEDBACK_INVALID`、`RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND`、`RECOMMENDATION_FEEDBACK_LIMIT_REACHED`。
+
+#### `DELETE /api/homepage/recommendations/feedback/{feedbackId}`
+
+用途：撤销一条反馈。成功 `204`；不存在返回 `404 RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND`。删除只影响推荐生成，不删除影片、演员、标签、评分或观看记录。
+
 ### 4.6 Movies
 
 #### `GET /api/library/movies`
@@ -765,10 +844,15 @@ Query：
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `mode` | string | 可用值：空 / `favorites` / `trash`。空表示普通库；`favorites` 只返回收藏；`trash` 返回回收站 |
+| `mode` | string | 可用值：空 / `library` / `favorites` / `recent` / `tags` / `trash`。空与 `library` 返回活动库；`favorites` 只返回收藏；`recent` 只返回最近 30 天入库；`tags` 返回与活动库相同的影片集合，标签聚合与排序由前端布局完成；`trash` 返回回收站。其他值返回 `400 COMMON_BAD_REQUEST` |
 | `q` | string | 子串搜索标题、番号、片商、简介，不区分大小写 |
+| `tag` | string | 精确匹配元数据或用户标签 |
 | `actor` | string | 精确匹配演员名 |
 | `studio` | string | 精确匹配有效片商名 |
+| `playState` | string | `all` / `unwatched` / `in-progress` / `completed`；播放进度达到 95% 视为完成 |
+| `userRating` | number | 精确匹配用户本地评分 0～5；不使用刮削评分替代 |
+| `resolution` | string | 精确分辨率；`4k` 同时匹配 `4K` / `2160p` / `UHD` / `3840x2160` |
+| `addedAfter` | string | RFC3339 或 `YYYY-MM-DD` 入库时间下界 |
 | `limit` | number | 默认 50 |
 | `offset` | number | 默认 0 |
 
@@ -787,6 +871,7 @@ Query：
       "userTags": ["favorite"],
       "runtimeMinutes": 120,
       "rating": 4.5,
+      "userRating": 5,
       "isFavorite": true,
       "addedAt": "2026-06-07T12:00:00Z",
       "location": "D:\\Library\\ABC-001.mp4",
@@ -808,6 +893,7 @@ Query：
 - 普通列表默认排除回收站；`mode=trash` 只返回回收站。
 - 普通列表按 `addedAt DESC, id ASC`；回收站按 `trashedAt DESC, id ASC`。
 - `rating` 是有效评分：用户评分优先，否则使用元数据评分。
+- `userRating` 仅在存在用户本地评分时返回，供 Saved Views 等功能区分用户信号与刮削评分。
 - `tags` 是元数据 / NFO 标签；`userTags` 是本地用户标签。
 - `coverUrl`、`thumbUrl`、`previewImages` 可能为相对 API URL。
 
@@ -1081,7 +1167,7 @@ Query：
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `q` | string | 演员名或演员用户标签子串，不区分大小写 |
+| `q` | string | canonical 演员名、历史 alias 或演员用户标签子串，不区分大小写 |
 | `actorTag` | string | 精确匹配演员用户标签 |
 | `sort` | string | `name` 默认；`movieCount` 按参演数量降序 |
 | `limit` | number | 默认 50 |
@@ -1106,7 +1192,7 @@ Query：
 }
 ```
 
-说明：只列出至少有一部 active 影片的演员。
+说明：只列出至少有一部 active 影片的 canonical 演员；alias 搜索命中时仍返回 canonical 演员行。
 
 #### `GET /api/library/actors/profile?name={name}`
 
@@ -1116,7 +1202,7 @@ Query：
 
 | 参数 | 必填 | 说明 |
 | --- | --- | --- |
-| `name` | 是 | 演员展示名 |
+| `name` | 是 | canonical 演员名或已归并 alias |
 
 成功：`200 ActorProfileDTO`
 
@@ -1135,9 +1221,12 @@ Query：
   "birthday": "2000-01-01",
   "profileUpdatedAt": "2026-06-07T12:00:00Z",
   "userTags": ["favorite"],
-  "externalLinks": ["https://example.com"]
+  "externalLinks": ["https://example.com"],
+  "aliases": ["Old Actor Name"]
 }
 ```
+
+alias 请求会解析到 canonical profile；响应中的 `name` 始终是 canonical 展示名。旧演员详情 URL、资料库 `actor=` 筛选、头像、标签、外链与刮削入口使用相同解析规则。
 
 #### `GET /api/library/actors/{name}/asset/avatar`
 
@@ -1197,6 +1286,164 @@ Body：
 - 每个链接最多 2048 字符。
 - 必须是合法 `http` 或 `https` URL。
 - 后端 trim、去重。
+
+#### `POST /api/library/actors/merge-preview`
+
+用途：只读预览把一个仍存在的 canonical source 演员归并到现有 target 演员。target 可以使用 canonical 名或已存在 alias；已经归并的 alias 不能再次作为 source。
+
+Body：
+
+```json
+{
+  "sourceName": "Old Actor Name",
+  "targetName": "Canonical Actor Name"
+}
+```
+
+成功：`200 ActorMergePreviewDTO`
+
+```json
+{
+  "previewToken": "8d62...",
+  "source": {
+    "id": 10,
+    "name": "Old Actor Name",
+    "aliases": ["Older Name"]
+  },
+  "target": {
+    "id": 20,
+    "name": "Canonical Actor Name",
+    "aliases": []
+  },
+  "movies": {
+    "sourceCount": 8,
+    "targetCount": 12,
+    "duplicateCount": 2,
+    "resultCount": 18
+  },
+  "userTags": {
+    "source": ["source-tag"],
+    "target": ["target-tag"],
+    "result": ["target-tag", "source-tag"]
+  },
+  "externalLinks": {
+    "source": ["https://source.example"],
+    "target": ["https://target.example"],
+    "result": ["https://target.example", "https://source.example"]
+  },
+  "recommendationFeedback": {
+    "sourceCount": 1,
+    "targetCount": 1,
+    "duplicateCount": 1,
+    "resultCount": 1
+  },
+  "curatedFramesAffected": 3,
+  "aliasesToMove": ["Old Actor Name", "Older Name"],
+  "profileFields": [
+    {
+      "field": "summary",
+      "sourceValue": "Source summary",
+      "targetValue": "Target summary",
+      "defaultSelection": "target",
+      "conflict": true
+    }
+  ],
+  "canApply": true,
+  "blockingReasons": [],
+  "requiredDecisions": ["summary"]
+}
+```
+
+预览完全只读。`previewToken` 是覆盖完整预览状态的 opaque SHA-256 token，包括 source/target profile 内部状态、影片 ID、用户标签、外链、alias、演员推荐反馈与会受影响的萃取帧演员 JSON；客户端不得自行生成或解释它。外链合并后超过 16 项、alias/name 冲突等情况返回 `canApply:false` 和 `blockingReasons`，而不是写入任何数据。
+
+#### `POST /api/library/actors/merge`
+
+用途：明确确认并事务化应用一次刚刚预览过的演员归并。
+
+Body：
+
+```json
+{
+  "sourceName": "Old Actor Name",
+  "targetName": "Canonical Actor Name",
+  "previewToken": "8d62...",
+  "confirm": true,
+  "profileDecisions": {
+    "summary": "target",
+    "providerActorId": "source"
+  }
+}
+```
+
+约束与行为：
+
+- `confirm` 必须为 `true`，并且必须携带最近 preview 返回的 token。
+- apply 在同一个 SQLite 事务内重新生成完整 preview；任一相关内容变化都会以 stale preview 拒绝。
+- `profileDecisions` 只接受 preview 中列出的字段，值只能是 `source` 或 `target`；两个不同非空值的字段必须显式选择。
+- `movie_actors`、演员用户标签、外链、profile、头像本地状态、aliases、演员推荐反馈与萃取帧演员列表按 preview 规则迁移并去重，然后才删除 source actor。
+- 任何步骤失败都会回滚，零部分写入；成功后写入持久化 merge audit。
+- 已经作为 target 的 canonical actor 后续仍可继续归并到另一个 canonical actor；历史 audit 保存当时的数字 ID、名称和摘要快照，不钉死活跃演员行。
+
+成功：`200 ActorMergeAuditDTO`
+
+```json
+{
+  "id": "amrg_0123456789abcdef",
+  "sourceActorId": 10,
+  "targetActorId": 20,
+  "sourceName": "Old Actor Name",
+  "targetName": "Canonical Actor Name",
+  "previewToken": "8d62...",
+  "summary": {
+    "movies": {
+      "sourceCount": 8,
+      "targetCount": 12,
+      "duplicateCount": 2,
+      "resultCount": 18
+    },
+    "userTags": ["target-tag", "source-tag"],
+    "externalLinks": ["https://target.example", "https://source.example"],
+    "aliases": ["Old Actor Name", "Older Name"],
+    "recommendationFeedback": {
+      "sourceCount": 1,
+      "targetCount": 1,
+      "duplicateCount": 1,
+      "resultCount": 1
+    },
+    "curatedFramesAffected": 3,
+    "profileDecisions": {
+      "summary": "target",
+      "providerActorId": "source"
+    }
+  },
+  "appliedAt": "2026-07-21T04:00:00Z"
+}
+```
+
+#### `GET /api/library/actors/merge-audits`
+
+用途：分页读取不可变的演员归并审计。
+
+Query：
+
+| 参数 | 说明 |
+| --- | --- |
+| `limit` | 默认 50，最大 100 |
+| `offset` | 默认 0；负数归零 |
+
+成功：`200 ActorMergeAuditListDTO`，结构为 `{ items, total, limit, offset }`。
+
+演员归并错误码：
+
+| HTTP | Code | 含义 |
+| --- | --- | --- |
+| `400` | `ACTOR_MERGE_INVALID` | body、确认、字段或 profile decision 非法 |
+| `404` | `ACTOR_MERGE_NOT_FOUND` | source 或 target 不存在 |
+| `409` | `ACTOR_MERGE_SELF` | source 与 target 解析为同一演员 |
+| `409` | `ACTOR_MERGE_SOURCE_IS_ALIAS` | 已归并 alias 被再次作为 source |
+| `409` | `ACTOR_MERGE_CONFLICT` | alias/name 或 profile decision 冲突 |
+| `409` | `ACTOR_MERGE_STALE_PREVIEW` | preview 后完整相关状态已变化 |
+| `409` | `ACTOR_MERGE_LINK_LIMIT` | 合并后外链超过 16 项 |
 
 ### 4.9 Playback
 
@@ -2337,7 +2584,272 @@ Body 与 verify 相同。
 
 真正恢复必须完全退出 Curated 后，通过 `curated -maintenance backup-restore ... -confirm-restore` 离线执行；成功恢复会保留 `.pre-restore-*` 数据库和配置回滚副本。
 
-### 4.17 Offline Path Migration CLI
+### 4.17 Library Health and Repair
+
+以下端点都受现有 PIN 中间件保护。健康扫描默认只读；扫描与修复严格分离，不会在诊断阶段删除、覆盖、重新刮削或重扫。Settings → Maintenance 在 Web API 模式下提供扫描、JSON 导出、元数据修复确认和限定清理确认；Mock 模式明确禁用这些后端能力。
+
+#### `POST /api/library/health/scan`
+
+用途：生成当前时点的资料库健康快照。可选 query `findingLimit=1..5000` 控制返回的明细条数；完整分类计数不会因明细截断而丢失。
+
+成功：`200 LibraryHealthReportDTO`
+
+```json
+{
+  "scannedAt": "2026-07-20T05:45:00Z",
+  "status": "attention",
+  "database": {
+    "quickCheckOk": true,
+    "quickCheckMessages": ["ok"],
+    "foreignKeyOk": true,
+    "foreignKeyCount": 0
+  },
+  "storageStatuses": [],
+  "summary": {
+    "totalFindings": 1,
+    "criticalFindings": 0,
+    "warningFindings": 1,
+    "infoFindings": 0,
+    "skippedOfflineFiles": 0,
+    "categoryCounts": { "metadata_failed": 1 }
+  },
+  "findings": [
+    {
+      "id": "health_0123456789abcdef01234567",
+      "category": "metadata_failed",
+      "severity": "warning",
+      "entityType": "movie",
+      "entityId": "abc-001",
+      "label": "ABC-001",
+      "path": "D:\\Media\\ABC-001.mp4",
+      "message": "metadata provider timed out",
+      "repairActions": ["rescrape_metadata", "export_diagnostics"]
+    }
+  ],
+  "truncated": false
+}
+```
+
+稳定类别包括 `database_integrity`、`foreign_key_violation`、`storage_unavailable`、`source_missing`、`source_unreadable`、`source_empty`、`asset_missing`、`asset_download_failed`、`duplicate_code`、`duplicate_source`、`orphan_user_state`、`metadata_missing`、`metadata_failed`、`movie_poster_missing`、`actor_avatar_missing` 与 `import_staging_residue`。finding ID 由类别、实体和路径稳定生成。
+
+离线、卷不匹配、路径缺失或权限异常的库根只报告根级问题，并跳过其下影片、资源和演员头像的逐文件检查；`skippedOfflineFiles` 记录跳过量，避免把断开的外置盘误报为文件已删除。`.curated-import` 只检查第一层；只有未登记、非 symlink 且严格命名为 `upload_<16 lowercase hex>` 的目录才会得到 `cleanup_import_staging` 建议。
+
+#### `POST /api/library/health/repairs`
+
+用途：对当前仍存在的 `metadata_missing` / `metadata_failed` finding 启动显式确认、持久化且有界的元数据修复队列。后端每次最多 100 项，Settings 每批最多 25 项。
+
+Body：
+
+```json
+{
+  "action": "rescrape_metadata",
+  "categories": ["metadata_failed"],
+  "findingIds": ["health_0123456789abcdef01234567"],
+  "limit": 25,
+  "confirm": true
+}
+```
+
+成功：`202 LibraryHealthRepairDTO`。父任务类型为 `library.health.repair`；每个影片使用独立 `scrape.movie` 子任务，`GET /api/library/health/repairs/{repairId}` 可持续读取持久化的逐项状态、child task ID、错误和时间戳。
+
+```json
+{
+  "repairId": "repair-1",
+  "taskId": "library.health.repair-1",
+  "action": "rescrape_metadata",
+  "categories": ["metadata_failed"],
+  "status": "running",
+  "totalItems": 1,
+  "completedItems": 0,
+  "succeededItems": 0,
+  "failedItems": 0,
+  "createdAt": "2026-07-20T05:46:00Z",
+  "items": [
+    {
+      "ordinal": 0,
+      "findingId": "health_0123456789abcdef01234567",
+      "category": "metadata_failed",
+      "movieId": "abc-001",
+      "label": "ABC-001",
+      "status": "pending"
+    }
+  ]
+}
+```
+
+后端在入队前重新扫描并只接受仍可执行的精确 finding；健康影片不能通过任意 movie ID 加入队列。后端重启时，未完成项会被明确持久化为 `cancelled` / `HEALTH_REPAIR_INTERRUPTED`，不会永久停在 `running`。最新 scrape attempt 以影片为键，旧任务的晚到结果不能覆盖更新任务的结果。
+
+#### `GET /api/library/health/repairs/{repairId}`
+
+用途：读取一个持久化修复队列及其全部逐项结果。
+
+成功：`200 LibraryHealthRepairDTO`。不存在时返回 `404 COMMON_NOT_FOUND`。
+
+#### `POST /api/library/health/actions`
+
+用途：对当前健康报告中的精确 finding 执行确认式清理。目前只支持 `cleanup_orphan_state` 和 `cleanup_import_staging`。
+
+Body：
+
+```json
+{
+  "action": "cleanup_import_staging",
+  "findingIds": ["health_abcdef0123456789abcdef01"],
+  "confirm": true
+}
+```
+
+成功：`202 TaskDTO`，任务类型为 `library.health.cleanup`，逐项结果写入 task metadata。执行前会重新扫描；任一 finding 已过期、类别不匹配或不再可执行时，整个请求以 `409 HEALTH_REPAIR_NO_FINDINGS` 拒绝。
+
+孤儿状态清理只允许 `playback_progress`、`library_movie_comments`、`library_played_movies`、`playback_daily_watch_time` 白名单，并在父影片仍不存在时于同一 SQLite 事务写入 `library_health_cleanup_audits`。暂存清理要求候选绝对路径精确位于在线配置根的 `.curated-import/upload_<16 lowercase hex>`，根与候选都不得是 symlink，且 SQLite 中仍无 upload session；删除前写入 `movie_import_upload_cleanup_audits`。最终影片文件永远不会成为候选。
+
+确认式端点的通用错误：
+
+- `409 HEALTH_REPAIR_CONFIRMATION_REQUIRED`：`confirm` 不是 `true`。
+- `409 HEALTH_REPAIR_NO_FINDINGS`：没有仍然匹配的当前 finding，或 cleanup finding 已过期/不可执行。
+- `500 HEALTH_REPAIR_PERSIST_FAILED`：修复队列、任务或审计状态无法持久化。
+- `HEALTH_CLEANUP_FAILED`：清理 task 的终态错误码（`failed` / `partial_failed`）；逐项结果保留在 task metadata，而不是丢失审计上下文。
+
+### 4.18 Saved Views
+
+Saved Views 使用版本化白名单筛选快照。Web API 模式写入当前 SQLite 的 `library_saved_views`；Mock 模式写入独立的 `localStorage` 键 `curated-library-saved-views-v1`。任何端点都不会保存或接受 `selected`、`from`、`browse`、`back`、`autoplay`、`t` 等瞬态导航字段。
+
+#### `GET /api/library/saved-views`
+
+用途：按 `sortOrder ASC` 返回全部保存视图。空列表稳定返回 `{"items":[]}`。
+
+#### `POST /api/library/saved-views`
+
+Body：
+
+```json
+{
+  "name": "未看 4K",
+  "filters": {
+    "schemaVersion": 1,
+    "mode": "library",
+    "tab": "all",
+    "playState": "unwatched",
+    "userRating": 5,
+    "resolution": "4k",
+    "addedWithinDays": 365
+  }
+}
+```
+
+成功：`201 SavedViewDTO`。名称 trim 后为 1～40 个 Unicode 字符，忽略大小写及首尾空白后必须唯一；每个库最多 50 个视图。筛选文本最长 200 字符，`addedWithinDays` 为 1～3650。服务端重新规范化所有字段，`2160p` / `UHD` 等保存为 `4k`。
+
+#### `PATCH /api/library/saved-views/{savedViewId}`
+
+可部分更新 `name` 和/或完整 `filters`；成功返回 `200 SavedViewDTO`。空 patch、未知字段、未知 schema、无效枚举或越界值返回 `400 SAVED_VIEW_INVALID`。
+
+#### `DELETE /api/library/saved-views/{savedViewId}`
+
+成功返回 `204` 并压紧剩余 `sortOrder`。只删除视图定义，不删除或修改影片、播放记录、评分、收藏或标签。
+
+#### `PUT /api/library/saved-views/order`
+
+Body：`{"ids":["view_b","view_a"]}`。必须把当前全部 ID 各提交一次；缺失、重复或未知 ID 返回 `400 SAVED_VIEW_INVALID`。成功返回重排后的 `200 SavedViewsDTO`，更新在一个 SQLite 事务内完成。
+
+通用错误：
+
+- `409 SAVED_VIEW_NAME_CONFLICT`：规范化名称重复。
+- `409 SAVED_VIEW_LIMIT_REACHED`：已达到 50 个视图。
+- `404 COMMON_NOT_FOUND`：目标视图不存在。
+
+应用视图时前端从空 query 重建 canonical route；相对时间窗口在每次应用/计算时重新解释，不把一次性的绝对“当前时间”写入定义。
+
+### 4.19 Personal Insights
+
+Personal Insights 只返回有界聚合，不返回逐日或逐次完整播放历史。Web API 模式由 SQLite 在后端聚合；Mock 模式使用相同指标口径在服务适配器内部读取版本化本地观看时长和播放进度，原始行不会通过 `LibraryService` 暴露给页面。
+
+时间范围固定为 `30d`、`90d`、`365d`、`all`。客户端应传 IANA `timezone`（例如 `Asia/Shanghai`）；省略时后端使用 `UTC`。响应总是回显实际包含首尾日的 `from`、`to`、`timezone`、生成时间 `generatedAt`，并在存在历史数据时返回 `dataSince`。后端二进制内嵌 IANA tzdata，避免 Windows 打包态依赖系统时区数据库。
+
+#### `GET /api/insights/overview`
+
+Query：
+
+| 参数 | 说明 |
+| --- | --- |
+| `range` | 必填：`30d`、`90d`、`365d` 或 `all` |
+| `timezone` | IANA 时区；省略使用 `UTC`，最长 128 字符 |
+
+成功：`200 PersonalInsightsOverviewDTO`
+
+```json
+{
+  "range": "30d",
+  "from": "2026-06-23",
+  "to": "2026-07-22",
+  "timezone": "Asia/Shanghai",
+  "generatedAt": "2026-07-21T16:30:00Z",
+  "dataSince": "2026-04-01",
+  "watchedSeconds": 18240,
+  "startedMovies": 12,
+  "completedMovies": 7,
+  "completionRate": 0.5833333333,
+  "completionThreshold": 0.9,
+  "ratedMovies": 5,
+  "averageUserRating": 4.2
+}
+```
+
+指标口径：
+
+- `watchedSeconds`：范围内 `playback_daily_watch_time.watched_sec` 按影片和日期累加后的总和。
+- `startedMovies`：范围内具有正观看时长、且当前仍有影片行的不同 `movieId` 数。
+- `completedMovies`：上述 started 影片中，**当前保存进度**满足 `durationSec > 0` 且 `positionSec >= durationSec × 0.9` 的数量。当前 schema 没有历史 completion event，因此该字段不声称“完成动作发生在所选范围内”。
+- `completionRate`：`completedMovies / startedMovies`；分母为 0 时必须为 JSON `null`，不能返回误导性的 `0`。
+- `ratedMovies` / `averageUserRating`：只统计范围内 started 影片当前存在的本地用户评分；不声称评分动作发生在该范围内。无评分分母时平均分为 `null`。
+
+#### `GET /api/insights/breakdown`
+
+Query：
+
+| 参数 | 说明 |
+| --- | --- |
+| `range` | 与 overview 相同 |
+| `timezone` | 与 overview 相同 |
+| `dimension` | 必填：`actor`、`studio` 或 `tag` |
+| `limit` | 可选，默认 10，范围 1～25 |
+
+成功：`200 PersonalInsightsBreakdownDTO`
+
+```json
+{
+  "range": "30d",
+  "dimension": "actor",
+  "from": "2026-06-23",
+  "to": "2026-07-22",
+  "timezone": "Asia/Shanghai",
+  "generatedAt": "2026-07-21T16:30:00Z",
+  "dataSince": "2026-04-01",
+  "totalWatchedSeconds": 18240,
+  "attribution": "full-per-entity",
+  "items": [
+    {
+      "name": "Actor A",
+      "watchedSeconds": 7200,
+      "movieCount": 4,
+      "shareOfTotal": 0.3947368421
+    }
+  ],
+  "limit": 10
+}
+```
+
+归因固定为 `full-per-entity`：多演员、多标签影片会把该影片完整观看时长分别计入每个关联实体；同一影片的同名 metadata/user tag 先去重。单项 `shareOfTotal = item.watchedSeconds / totalWatchedSeconds`，跨实体合计可能超过 100%，不能解释为互斥饼图。排序固定为观看时长降序、影片数降序、名称忽略大小写升序、名称升序；actor 使用 canonical actor，旧 alias 不产生独立排行。
+
+稳定参数错误均返回 `400`：
+
+| Code | 含义 |
+| --- | --- |
+| `INSIGHTS_INVALID_RANGE` | 未知或缺失的范围 |
+| `INSIGHTS_INVALID_TIMEZONE` | 时区为空白规则之外、过长或无法加载 |
+| `INSIGHTS_INVALID_DIMENSION` | 未知或缺失的维度 |
+| `INSIGHTS_INVALID_LIMIT` | `limit` 不是整数或不在 1～25 |
+
+### 4.20 Offline Path Migration CLI
 
 路径迁移不是 HTTP API，也不会在运行中的 Settings 页面直接执行。盘符、挂载点或库根变化时，必须完全退出 Curated，并从 `backend/` 运行维护 CLI；自定义数据库配置需同时传 `-config <path>`。plan 获取与正常运行时相同的 `<databasePath>.runtime.lock`，读取数据库但不执行 schema migration 或数据写入：
 
@@ -2559,6 +3071,46 @@ interface ActorProfileDTO {
   profileUpdatedAt?: string
   userTags?: string[]
   externalLinks?: string[]
+  aliases?: string[]
+}
+```
+
+### 5.11 Actor merge DTOs
+
+```ts
+interface ActorMergePreviewDTO {
+  previewToken: string
+  source: { id: number; name: string; aliases: string[] }
+  target: { id: number; name: string; aliases: string[] }
+  movies: ActorMergeAssociationSummaryDTO
+  userTags: ActorMergeValuesSummaryDTO
+  externalLinks: ActorMergeValuesSummaryDTO
+  recommendationFeedback: ActorMergeAssociationSummaryDTO
+  curatedFramesAffected: number
+  aliasesToMove: string[]
+  profileFields: Array<{
+    field: string
+    sourceValue: string
+    targetValue: string
+    defaultSelection: "source" | "target"
+    conflict: boolean
+  }>
+  canApply: boolean
+  blockingReasons: Array<{ code: string; message: string }>
+  requiredDecisions: string[]
+}
+
+interface ActorMergeAssociationSummaryDTO {
+  sourceCount: number
+  targetCount: number
+  duplicateCount: number
+  resultCount: number
+}
+
+interface ActorMergeValuesSummaryDTO {
+  source: string[]
+  target: string[]
+  result: string[]
 }
 ```
 
@@ -2585,10 +3137,22 @@ interface ActorProfileDTO {
 | `POST` | `/api/maintenance/backups` | `BackupManifestDTO` |
 | `POST` | `/api/maintenance/backups/verify` | `BackupVerificationDTO` |
 | `POST` | `/api/maintenance/backups/preflight` | `BackupRestorePreflightDTO` |
+| `POST` | `/api/library/health/scan` | `LibraryHealthReportDTO` |
+| `POST` | `/api/library/health/repairs` | `LibraryHealthRepairDTO` |
+| `GET` | `/api/library/health/repairs/{repairId}` | `LibraryHealthRepairDTO` |
+| `POST` | `/api/library/health/actions` | `TaskDTO` |
 | `GET` | `/api/homepage/recommendations` | `HomepageDailyRecommendationsDTO` |
 | `POST` | `/api/homepage/recommendations/refresh` | `HomepageDailyRecommendationsDTO` |
+| `GET` | `/api/homepage/recommendations/feedback` | `RecommendationFeedbackListDTO` |
+| `POST` | `/api/homepage/recommendations/feedback` | `RecommendationFeedbackDTO` |
+| `DELETE` | `/api/homepage/recommendations/feedback/{feedbackId}` | `204` |
 | `GET` | `/api/library/played-movies` | `PlayedMoviesListDTO` |
 | `POST` | `/api/library/played-movies/{movieId}` | `204` |
+| `GET` | `/api/library/saved-views` | `SavedViewsDTO` |
+| `POST` | `/api/library/saved-views` | `SavedViewDTO` |
+| `PUT` | `/api/library/saved-views/order` | `SavedViewsDTO` |
+| `PATCH` | `/api/library/saved-views/{savedViewId}` | `SavedViewDTO` |
+| `DELETE` | `/api/library/saved-views/{savedViewId}` | `204` |
 | `GET` | `/api/library/movies` | `MoviesPageDTO` |
 | `GET` | `/api/library/actors` | `ActorsListDTO` |
 | `GET` | `/api/library/actors/profile` | `ActorProfileDTO` |
@@ -2596,6 +3160,11 @@ interface ActorProfileDTO {
 | `POST` | `/api/library/actors/scrape` | `TaskDTO` |
 | `PATCH` | `/api/library/actors/tags` | `ActorListItemDTO` |
 | `PATCH` | `/api/library/actors/external-links` | `ActorProfileDTO` |
+| `POST` | `/api/library/actors/merge-preview` | `ActorMergePreviewDTO` |
+| `POST` | `/api/library/actors/merge` | `ActorMergeAuditDTO` |
+| `GET` | `/api/library/actors/merge-audits` | `ActorMergeAuditListDTO` |
+| `GET` | `/api/insights/overview` | `PersonalInsightsOverviewDTO` |
+| `GET` | `/api/insights/breakdown` | `PersonalInsightsBreakdownDTO` |
 | `GET` | `/api/library/movies/{movieId}/asset/preview/{index}` | image |
 | `GET` | `/api/library/movies/{movieId}/asset/{kind}` | image |
 | `GET` | `/api/library/movies/{movieId}/playback` | `PlaybackDescriptorDTO` |
