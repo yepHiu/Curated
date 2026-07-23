@@ -34,13 +34,16 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, notification-center entries, scan/import blocking, and manual rebind when a volume changes.
 - **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, Settings-based create/verify/preflight controls, offline atomic restore, and retained rollback copies.
 - **Audited path migration** — Offline dry-run/apply CLI for drive-letter, mount-point, and Windows-to-Unix prefix changes, with segment-aware matching, target/conflict checks, automatic verified backup, one-transaction updates, binding reset, and a persisted audit record.
+- **Library Health & bounded repairs** — Settings → Maintenance runs read-only SQLite, storage, source-file, asset, metadata, orphan-state, and import-staging diagnostics with stable finding IDs and offline-safe checks. Missing/failed metadata retries are explicitly confirmed, task-tracked, restart-aware, and bounded; orphan state or strictly scoped staging cleanup requires a fresh finding and writes audit evidence without deleting final movie files.
+- **Saved Views** — Save, apply, rename, reorder, update, and delete reusable library filters for unwatched/in-progress/completed state, exact local rating, actor/tag/studio, resolution, search, sorting, and relative import windows. Web API mode persists versioned definitions in SQLite; Mock mode uses an isolated localStorage key, and transient movie/playback navigation never enters a saved definition.
 - **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
 - **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
-- **Offline desktop resources** — Packaged UI uses local Outfit font assets and npm-bundled `hls.js`; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
+- **Offline desktop resources** — Packaged UI uses local Outfit font assets and the npm-bundled official `hls.js/light` build for Curated's single-rendition local streams; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
 - **Backend events** — `GET /api/events` streams task lifecycle updates over SSE so scan/import/scrape UI can react in real time while keeping polling as fallback.
-- **Homepage daily recommendations** — UTC-based hero carousel and recommendation rail persisted in SQLite for cross-device consistency, with weighted sampling, cooling windows, and actor/studio diversity balancing.
+- **Explainable homepage recommendations** — UTC-based hero and recommendation snapshots persist in SQLite with truthful reason codes. Explicit local-only feedback supports not-interested, bounded snooze, actor/studio/tag down-ranking, immediate undo, and centralized removal; refresh alone never creates feedback.
+- **Personal Insights** — A lazy local-only dashboard summarizes 30/90/365-day or all-time watch duration, started/currently-complete movies, completion rate, local ratings, and bounded canonical actor/studio/tag rankings. Web API mode aggregates in SQLite without returning raw history; Mock mode computes behind the same service boundary, and empty denominators never become a misleading `0%`.
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
-- **Actor management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, and async metadata scraping.
+- **Actor identity management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, async metadata scraping, Unicode-normalized aliases, and a read-only-preview/confirmed transactional merge workflow that preserves associations and audit history.
 - **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, exponential backoff after repeated failed attempts, and a Settings UI for reviewing and revoking trusted-forever devices without exposing session bearer tokens.
 - **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
@@ -174,7 +177,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Resume playback with persisted progress (SQLite in Web API mode, localStorage in mock mode).
 - Playback descriptor seam for direct-play, remux, and transcode paths.
 - HLS session support with session diagnostics and recent-session listing.
-- Browser HLS fallback loads bundled `hls.js` on demand, without a runtime CDN dependency.
+- Browser HLS fallback loads the official bundled `hls.js/light` build on demand, without a runtime CDN dependency.
 - External player handoff via configurable browser protocol template (PotPlayer preset).
 - Daily watch-time statistics in Settings → Overview (91-day window).
 - Player stats overlay, preview timeline thumbnails, and curated-frame capture.
@@ -188,6 +191,8 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - User tag editing and external links management.
 - Same-origin actor avatar delivery through backend-managed caching.
 - Actor metadata scraping as async task.
+- Canonical actor identities with NFKC/case/whitespace normalization; old names resolve through persisted aliases across profile, search, library filters, scraping, and metadata ingestion.
+- Actor detail merge workbench with read-only impact preview, explicit profile-conflict decisions, stale-preview protection, one-transaction apply, and queryable audits. Web API uses SQLite migrations `0035`/`0036`; Mock uses `curated-actor-merges-v1`.
 
 ### Curated Frames
 
@@ -205,6 +210,15 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Weighted sampling without replacement with cooling windows and count decay.
 - Actor and studio diversity balancing.
 - Force-refresh with hero preservation and recommendation exclusion.
+- Persisted reason codes for every recommendation; the renderer only localizes backend explanations.
+- Explicit not-interested, 1–365 day snooze, and bounded actor/studio/tag down-ranking with undo and local feedback management.
+
+### Personal Insights
+
+- Lazy `/insights` workspace with 30-day, 90-day, 365-day, and all-time local-calendar ranges.
+- Watch duration, distinct started movies, current 90%-progress completion count/rate, current local rating count, and average rating with explicit denominator semantics.
+- Canonical actor, studio, and deduplicated tag rankings use bounded `full-per-entity` attribution; totals across entities may exceed 100% by design.
+- Web API mode returns only server-side aggregates; Mock mode uses local watch-time/progress storage behind `LibraryService`. Empty denominators render as unavailable rather than a false `0%`.
 
 ### Security
 
@@ -295,7 +309,7 @@ Development and release builds default to loopback-only `127.0.0.1:8080` and `12
 
 ## API
 
-Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
+Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback, actor identity/merge, settings, connected-client visibility, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 
