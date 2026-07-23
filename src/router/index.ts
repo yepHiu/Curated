@@ -65,6 +65,11 @@ const router = createRouter({
           component: () => import("@/views/HistoryView.vue"),
         },
         {
+          path: "insights",
+          name: "insights",
+          component: () => import("@/views/InsightsView.vue"),
+        },
+        {
           path: "curated-frames",
           name: "curated-frames",
           component: () => import("@/views/CuratedFramesView.vue"),

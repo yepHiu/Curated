@@ -4,6 +4,7 @@ import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   Clapperboard,
+  ChartNoAxesColumnIncreasing,
   History,
   House,
   LibraryBig,
@@ -139,6 +140,7 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
       { label: t("nav.trash"), page: "trash", icon: Trash2 },
     ],
     yours: [
+      { label: t("nav.insights"), page: "insights", icon: ChartNoAxesColumnIncreasing },
       { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
       { label: t("nav.history"), page: "history", icon: History },
     ],
@@ -237,6 +239,9 @@ const getNavigationTarget = (page: AppPage) => {
   }
   if (page === "history") {
     return { name: "history" }
+  }
+  if (page === "insights") {
+    return { name: "insights" }
   }
   if (page === "curated-frames") {
     return { name: "curated-frames" }

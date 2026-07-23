@@ -254,4 +254,15 @@ describe("AppSidebar", () => {
 
     expect(actorsLink?.classes()).toContain("bg-sidebar-accent")
   })
+
+  it("exposes personal insights in the Yours group with a direct route target", async () => {
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const insightsLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.insights"))
+
+    expect(insightsLink?.attributes("data-to")).toBe('{"name":"insights"}')
+  })
 })

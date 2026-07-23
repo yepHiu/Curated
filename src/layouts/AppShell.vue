@@ -153,6 +153,7 @@ const useFlushWorkspaceFrame = computed(() =>
     "trash",
     "actor-detail",
     "history",
+    "insights",
     "curated-frames",
     "player",
   ].includes(String(route.name ?? "")),
