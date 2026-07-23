@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import * as navigationIntent from "@/lib/navigation-intent"
 import {
+  buildDetailRouteFromActor,
   buildDetailRouteFromBrowse,
   buildPlayerRouteFromBrowseIntent,
   getNavigationBackTarget,
@@ -120,6 +121,54 @@ describe("navigation intent helpers", () => {
         browse: "favorites",
         q: "Mina",
         selected: "movie-1",
+      },
+    })
+  })
+
+  it("preserves the new actor page across detail and player round trips", () => {
+    const actorDetailRoute = buildDetailRouteFromActor("movie-1", "Mina Kaze") as {
+      query: Record<string, string>
+    }
+    const playerRoute = buildPlayerRouteFromBrowseIntent(
+      "movie-1",
+      actorDetailRoute.query,
+      "library",
+      "detail",
+    ) as { query: Record<string, string> }
+
+    expect(playerRoute.query).toEqual({
+      actor: "Mina Kaze",
+      autoplay: "1",
+      back: "detail",
+      browse: "library",
+      detailBack: "actor",
+      selected: "movie-1",
+    })
+
+    const returnedDetail = resolveNavigationBackLink(
+      { name: "player", query: playerRoute.query },
+      "movie-1",
+    ).to as { query: Record<string, string> }
+
+    expect(returnedDetail).toEqual({
+      name: "detail",
+      params: { id: "movie-1" },
+      query: {
+        actor: "Mina Kaze",
+        back: "actor",
+        browse: "library",
+        selected: "movie-1",
+      },
+    })
+    expect(resolveNavigationBackLink(
+      { name: "detail", query: returnedDetail.query },
+      "movie-1",
+    )).toEqual({
+      labelKey: "shell.backActor",
+      to: {
+        name: "actor-detail",
+        params: { actorName: "Mina Kaze" },
+        query: { selected: "movie-1" },
       },
     })
   })

@@ -10,13 +10,23 @@ import {
 import { getResumeSecondsForOpenPlayer } from "@/lib/playback-progress-storage"
 
 const navigationBackTargets = ["home", "browse", "detail", "actor", "history", "curated-frames"] as const
+const detailBackTargets = ["home", "browse", "actor"] as const
 
 export type NavigationBackTarget = (typeof navigationBackTargets)[number]
+type DetailBackTarget = (typeof detailBackTargets)[number]
 
 type RouteLike = Pick<RouteLocationNormalizedLoaded, "name" | "query">
 
 function isNavigationBackTarget(value: unknown): value is NavigationBackTarget {
   return typeof value === "string" && navigationBackTargets.includes(value as NavigationBackTarget)
+}
+
+function isDetailBackTarget(value: unknown): value is DetailBackTarget {
+  return typeof value === "string" && detailBackTargets.includes(value as DetailBackTarget)
+}
+
+function getDetailBackTarget(query: LocationQuery): DetailBackTarget | undefined {
+  return isDetailBackTarget(query.detailBack) ? query.detailBack : undefined
 }
 
 function formatResumeSecondsForRoute(resumeSec: number): string {
@@ -34,6 +44,13 @@ function buildPlayerQuery(
     ...buildMovieRouteQuery(currentQuery, sourceMode, movieId),
     autoplay: "1",
     back,
+  }
+
+  // `back` belongs to the player itself. Preserve the detail page's parent
+  // separately so player -> detail -> parent keeps the full navigation chain.
+  delete query.detailBack
+  if (back === "detail" && isDetailBackTarget(currentQuery.back)) {
+    query.detailBack = currentQuery.back
   }
 
   const resumeSec = getResumeSecondsForOpenPlayer(movieId)
@@ -118,6 +135,26 @@ export function buildDetailRouteFromBrowse(
     name: "detail",
     params: { id: movieId },
     query: buildMovieRouteQuery(currentQuery, sourceMode, movieId),
+  }
+}
+
+function buildDetailRouteFromPlayer(
+  movieId: string,
+  currentQuery: LocationQuery,
+  sourceMode: LibraryMode,
+): RouteLocationRaw {
+  const query: LocationQuery = buildMovieRouteQuery(currentQuery, sourceMode, movieId)
+  const detailBack = getDetailBackTarget(currentQuery)
+
+  delete query.detailBack
+  if (detailBack) {
+    query.back = detailBack
+  }
+
+  return {
+    name: "detail",
+    params: { id: movieId },
+    query,
   }
 }
 
@@ -294,7 +331,7 @@ export function resolveNavigationBackLink(
       }
     }
     return {
-      to: buildDetailRouteFromBrowse(
+      to: buildDetailRouteFromPlayer(
         currentMovieId,
         route.query,
         getBrowseSourceMode(route.query),
