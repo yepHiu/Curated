@@ -198,6 +198,102 @@ describe("api endpoint response validation", () => {
     })
   })
 
+  it("keeps valid versioned Saved Views and rejects malformed filter schemas", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({
+            items: [
+              {
+                id: "view-1",
+                name: "Unwatched 4K",
+                filters: {
+                  schemaVersion: 1,
+                  mode: "library",
+                  playState: "unwatched",
+                  resolution: "4k",
+                },
+                sortOrder: 0,
+                createdAt: "2026-07-20T00:00:00Z",
+                updatedAt: "2026-07-20T00:00:00Z",
+              },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            items: [
+              {
+                id: "view-2",
+                name: "Future schema",
+                filters: { schemaVersion: 2 },
+                sortOrder: 0,
+                createdAt: "2026-07-20T00:00:00Z",
+                updatedAt: "2026-07-20T00:00:00Z",
+              },
+            ],
+          }),
+        ),
+    )
+
+    await expect(api.listSavedViews()).resolves.toMatchObject({
+      items: [expect.objectContaining({ id: "view-1" })],
+    })
+    await expect(api.listSavedViews()).rejects.toThrow(
+      "Invalid API response for GET /library/saved-views",
+    )
+  })
+
+  it("validates explained recommendations and feedback responses", async () => {
+    const snapshot = {
+      dateUtc: "2026-07-21",
+      generatedAt: "2026-07-21T00:00:00Z",
+      generationVersion: "v7",
+      heroMovieIds: ["m01"],
+      recommendationMovieIds: ["m02"],
+      recommendations: [{
+        movieId: "m02",
+        reasons: [{ code: "well_rated" }],
+        feedbackEffects: [],
+      }],
+    }
+    const feedback = {
+      id: "feedback_1",
+      action: "less",
+      targetType: "actor",
+      targetValue: "Actor A",
+      sourceMovieId: "m02",
+      createdAt: "2026-07-21T00:00:00Z",
+      updatedAt: "2026-07-21T00:00:00Z",
+    }
+    vi.spyOn(httpClient, "get")
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce({ ...snapshot, recommendationMovieIds: ["m03"] })
+      .mockResolvedValueOnce({ items: [feedback] })
+    const post = vi.spyOn(httpClient, "post")
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce(feedback)
+    const remove = vi.spyOn(httpClient, "delete").mockResolvedValueOnce(undefined)
+
+    await expect(api.getHomepageDailyRecommendations()).resolves.toEqual(snapshot)
+    await expect(api.getHomepageDailyRecommendations()).rejects.toThrow(
+      "Invalid API response for GET /homepage/recommendations",
+    )
+    await expect(api.refreshHomepageDailyRecommendations()).resolves.toEqual(snapshot)
+    await expect(api.listHomepageRecommendationFeedback()).resolves.toEqual({ items: [feedback] })
+    await expect(api.createHomepageRecommendationFeedback({
+      action: "less",
+      targetType: "actor",
+      targetValue: "Actor A",
+      sourceMovieId: "m02",
+    })).resolves.toEqual(feedback)
+    await expect(api.deleteHomepageRecommendationFeedback("feedback/1")).resolves.toBeUndefined()
+    expect(remove).toHaveBeenCalledWith("/homepage/recommendations/feedback/feedback%2F1")
+    expect(post).toHaveBeenNthCalledWith(1, "/homepage/recommendations/refresh", undefined)
+  })
+
   it("lists and revokes trusted sessions through safe public ids", async () => {
     const sessions = {
       items: [{
@@ -632,6 +728,190 @@ describe("api endpoint response validation", () => {
       "/import/movies/uploads/upload_retry/files/file_retry/chunks/1",
     ])
     expect(post).toHaveBeenNthCalledWith(2, "/import/movies/uploads/upload_retry/commit")
+  })
+
+  it("validates actor merge preview, apply audit, and audit list responses", async () => {
+    const association = {
+      sourceCount: 1,
+      targetCount: 2,
+      duplicateCount: 0,
+      resultCount: 3,
+    }
+    const preview = {
+      previewToken: "token",
+      source: { id: 1, name: "Source", aliases: [] },
+      target: { id: 2, name: "Target", aliases: ["Target Alias"] },
+      movies: association,
+      userTags: { source: [], target: [], result: [] },
+      externalLinks: { source: [], target: [], result: [] },
+      recommendationFeedback: { ...association, targetCount: 0, resultCount: 1 },
+      curatedFramesAffected: 0,
+      aliasesToMove: ["Source"],
+      profileFields: [
+        {
+          field: "summary",
+          sourceValue: "source",
+          targetValue: "target",
+          defaultSelection: "target",
+          conflict: true,
+        },
+      ],
+      canApply: true,
+      blockingReasons: [],
+      requiredDecisions: ["summary"],
+    }
+    const audit = {
+      id: "amrg_1",
+      sourceActorId: 1,
+      targetActorId: 2,
+      sourceName: "Source",
+      targetName: "Target",
+      previewToken: "token",
+      appliedAt: "2026-07-21T00:00:00Z",
+      summary: {
+        movies: association,
+        userTags: [],
+        externalLinks: [],
+        aliases: ["Source"],
+        recommendationFeedback: { ...association, targetCount: 0, resultCount: 1 },
+        curatedFramesAffected: 0,
+        profileDecisions: { summary: "target" },
+      },
+    }
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(preview))
+        .mockResolvedValueOnce(jsonResponse(audit))
+        .mockResolvedValueOnce(
+          jsonResponse({ items: [audit], total: 1, limit: 50, offset: 0 }),
+        ),
+    )
+
+    await expect(
+      api.previewActorMerge({ sourceName: "Source", targetName: "Target" }),
+    ).resolves.toMatchObject({ previewToken: "token" })
+    await expect(
+      api.applyActorMerge({
+        sourceName: "Source",
+        targetName: "Target",
+        previewToken: "token",
+        confirm: true,
+        profileDecisions: { summary: "target" },
+      }),
+    ).resolves.toMatchObject({ id: "amrg_1" })
+    await expect(api.listActorMergeAudits()).resolves.toMatchObject({ total: 1 })
+  })
+
+  it("rejects malformed actor merge responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse({
+          previewToken: "token",
+          source: { id: 1, name: "Source", aliases: [] },
+          target: { id: 2, name: "Target", aliases: [] },
+          movies: { sourceCount: 1 },
+        }),
+      ),
+    )
+
+    await expect(
+      api.previewActorMerge({ sourceName: "Source", targetName: "Target" }),
+    ).rejects.toThrow("Invalid API response for POST /library/actors/merge-preview")
+  })
+
+  it("validates personal insights responses and encodes IANA timezone queries", async () => {
+    const overview = {
+      range: "30d",
+      from: "2026-06-23",
+      to: "2026-07-22",
+      timezone: "Asia/Shanghai",
+      generatedAt: "2026-07-21T16:30:00Z",
+      dataSince: null,
+      watchedSeconds: 0,
+      startedMovies: 0,
+      completedMovies: 0,
+      completionRate: null,
+      completionThreshold: 0.9,
+      ratedMovies: 0,
+      averageUserRating: null,
+    }
+    const breakdown = {
+      range: "30d",
+      dimension: "actor",
+      from: "2026-06-23",
+      to: "2026-07-22",
+      timezone: "Asia/Shanghai",
+      generatedAt: "2026-07-21T16:30:00Z",
+      dataSince: "2026-07-01",
+      totalWatchedSeconds: 120,
+      attribution: "full-per-entity",
+      items: [{ name: "Actor", watchedSeconds: 120, movieCount: 1, shareOfTotal: 1 }],
+      limit: 10,
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(overview))
+      .mockResolvedValueOnce(jsonResponse(breakdown))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await expect(api.getPersonalInsightsOverview({ range: "30d", timezone: "Asia/Shanghai" }))
+      .resolves.toEqual(overview)
+    await expect(api.getPersonalInsightsBreakdown({
+      range: "30d",
+      timezone: "Asia/Shanghai",
+      dimension: "actor",
+      limit: 10,
+    })).resolves.toEqual(breakdown)
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("range=30d&timezone=Asia%2FShanghai")
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("dimension=actor&limit=10")
+  })
+
+  it("rejects misleading or malformed personal insights responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({
+          range: "30d",
+          from: "2026-06-23",
+          to: "2026-07-22",
+          timezone: "UTC",
+          generatedAt: "2026-07-21T16:30:00Z",
+          dataSince: null,
+          watchedSeconds: 0,
+          startedMovies: 0,
+          completedMovies: 0,
+          completionRate: 0,
+          completionThreshold: 0.9,
+          ratedMovies: 0,
+          averageUserRating: null,
+        }))
+        .mockResolvedValueOnce(jsonResponse({
+          range: "30d",
+          dimension: "tag",
+          from: "2026-06-23",
+          to: "2026-07-22",
+          timezone: "UTC",
+          generatedAt: "2026-07-21T16:30:00Z",
+          dataSince: null,
+          totalWatchedSeconds: 0,
+          attribution: "exclusive",
+          items: [],
+          limit: 10,
+        })),
+    )
+
+    await expect(api.getPersonalInsightsOverview({ range: "30d", timezone: "UTC" }))
+      .rejects.toThrow("Invalid API response for GET /insights/overview")
+    await expect(api.getPersonalInsightsBreakdown({
+      range: "30d",
+      timezone: "UTC",
+      dimension: "tag",
+    })).rejects.toThrow("Invalid API response for GET /insights/breakdown")
   })
 
 })

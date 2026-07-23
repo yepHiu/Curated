@@ -22,6 +22,23 @@ var ErrScrapeMovieNoLocation = errors.New("movie has no video path")
 // ErrActorNotFound is returned when no actors row exists for the given display name.
 var ErrActorNotFound = errors.New("actor not found")
 
+var (
+	ErrRecommendationFeedbackInvalid        = errors.New("recommendation feedback invalid")
+	ErrRecommendationFeedbackTargetNotFound = errors.New("recommendation feedback target not found")
+	ErrRecommendationFeedbackLimitReached   = errors.New("recommendation feedback limit reached")
+	ErrActorMergeInvalid                    = errors.New("actor merge invalid")
+	ErrActorMergeNotFound                   = errors.New("actor merge actor not found")
+	ErrActorMergeSelf                       = errors.New("actor merge source and target are identical")
+	ErrActorMergeSourceAlias                = errors.New("actor merge source is an alias")
+	ErrActorMergeConflict                   = errors.New("actor merge conflict")
+	ErrActorMergeStalePreview               = errors.New("actor merge preview is stale")
+	ErrActorMergeLinkLimit                  = errors.New("actor merge external link limit exceeded")
+	ErrPersonalInsightsInvalidRange         = errors.New("personal insights range is invalid")
+	ErrPersonalInsightsInvalidTimezone      = errors.New("personal insights timezone is invalid")
+	ErrPersonalInsightsInvalidDimension     = errors.New("personal insights dimension is invalid")
+	ErrPersonalInsightsInvalidLimit         = errors.New("personal insights limit is invalid")
+)
+
 // ErrBackupDestinationExists prevents accidental replacement of a backup package.
 var ErrBackupDestinationExists = errors.New("backup destination already exists")
 
@@ -203,14 +220,66 @@ type BackupRestorePreflightDTO struct {
 	Warnings              []string              `json:"warnings"`
 }
 
-// ListMoviesRequest filters the library movie listing by mode, query, actor, group, or studio.
+// ListMoviesRequest filters the library movie listing using the same canonical
+// semantics that Saved Views expose to the renderer.
 type ListMoviesRequest struct {
-	Mode   string `json:"mode,omitempty"`
-	Query  string `json:"query,omitempty"`
-	Actor  string `json:"actor,omitempty"`
-	Studio string `json:"studio,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
-	Offset int    `json:"offset,omitempty"`
+	Mode       string   `json:"mode,omitempty"`
+	Query      string   `json:"query,omitempty"`
+	Tag        string   `json:"tag,omitempty"`
+	Actor      string   `json:"actor,omitempty"`
+	Studio     string   `json:"studio,omitempty"`
+	PlayState  string   `json:"playState,omitempty"`
+	UserRating *float64 `json:"userRating,omitempty"`
+	Resolution string   `json:"resolution,omitempty"`
+	AddedAfter string   `json:"addedAfter,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+	Offset     int      `json:"offset,omitempty"`
+}
+
+const SavedViewSchemaVersion = 1
+
+// SavedViewFiltersV1 is the durable, versioned filter snapshot stored for a
+// user-created library view. Navigation-only query state is deliberately absent.
+type SavedViewFiltersV1 struct {
+	SchemaVersion   int      `json:"schemaVersion"`
+	Mode            string   `json:"mode,omitempty"`
+	Query           string   `json:"q,omitempty"`
+	Tag             string   `json:"tag,omitempty"`
+	Actor           string   `json:"actor,omitempty"`
+	Studio          string   `json:"studio,omitempty"`
+	Tab             string   `json:"tab,omitempty"`
+	PlayState       string   `json:"playState,omitempty"`
+	UserRating      *float64 `json:"userRating,omitempty"`
+	Resolution      string   `json:"resolution,omitempty"`
+	AddedWithinDays int      `json:"addedWithinDays,omitempty"`
+}
+
+// SavedViewDTO is one ordered user-defined library view.
+type SavedViewDTO struct {
+	ID        string             `json:"id"`
+	Name      string             `json:"name"`
+	Filters   SavedViewFiltersV1 `json:"filters"`
+	SortOrder int                `json:"sortOrder"`
+	CreatedAt string             `json:"createdAt"`
+	UpdatedAt string             `json:"updatedAt"`
+}
+
+type SavedViewsDTO struct {
+	Items []SavedViewDTO `json:"items"`
+}
+
+type CreateSavedViewBody struct {
+	Name    string             `json:"name"`
+	Filters SavedViewFiltersV1 `json:"filters"`
+}
+
+type PatchSavedViewBody struct {
+	Name    *string             `json:"name,omitempty"`
+	Filters *SavedViewFiltersV1 `json:"filters,omitempty"`
+}
+
+type ReorderSavedViewsBody struct {
+	IDs []string `json:"ids"`
 }
 
 // ActorProfileDTO is returned by GET /api/library/actors/profile.
@@ -229,6 +298,7 @@ type ActorProfileDTO struct {
 	ProfileUpdatedAt string   `json:"profileUpdatedAt,omitempty"`
 	UserTags         []string `json:"userTags,omitempty"`
 	ExternalLinks    []string `json:"externalLinks,omitempty"`
+	Aliases          []string `json:"aliases,omitempty"`
 }
 
 // ActorListItemDTO is one row in GET /api/library/actors (library display name + stats + actor-only user tags).
@@ -265,6 +335,95 @@ type PatchActorUserTagsBody struct {
 // PatchActorExternalLinksBody is the JSON body for PATCH /api/library/actors/external-links?name=.
 type PatchActorExternalLinksBody struct {
 	ExternalLinks []string `json:"externalLinks"`
+}
+
+type ActorMergeActorRefDTO struct {
+	ID      int64    `json:"id"`
+	Name    string   `json:"name"`
+	Aliases []string `json:"aliases"`
+}
+
+type ActorMergeAssociationSummaryDTO struct {
+	SourceCount    int `json:"sourceCount"`
+	TargetCount    int `json:"targetCount"`
+	DuplicateCount int `json:"duplicateCount"`
+	ResultCount    int `json:"resultCount"`
+}
+
+type ActorMergeValuesSummaryDTO struct {
+	Source []string `json:"source"`
+	Target []string `json:"target"`
+	Result []string `json:"result"`
+}
+
+type ActorMergeProfileFieldDTO struct {
+	Field            string `json:"field"`
+	SourceValue      string `json:"sourceValue"`
+	TargetValue      string `json:"targetValue"`
+	DefaultSelection string `json:"defaultSelection"`
+	Conflict         bool   `json:"conflict"`
+}
+
+type ActorMergeBlockingReasonDTO struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type ActorMergePreviewRequest struct {
+	SourceName string `json:"sourceName"`
+	TargetName string `json:"targetName"`
+}
+
+type ActorMergePreviewDTO struct {
+	PreviewToken           string                          `json:"previewToken"`
+	Source                 ActorMergeActorRefDTO           `json:"source"`
+	Target                 ActorMergeActorRefDTO           `json:"target"`
+	Movies                 ActorMergeAssociationSummaryDTO `json:"movies"`
+	UserTags               ActorMergeValuesSummaryDTO      `json:"userTags"`
+	ExternalLinks          ActorMergeValuesSummaryDTO      `json:"externalLinks"`
+	RecommendationFeedback ActorMergeAssociationSummaryDTO `json:"recommendationFeedback"`
+	CuratedFramesAffected  int                             `json:"curatedFramesAffected"`
+	AliasesToMove          []string                        `json:"aliasesToMove"`
+	ProfileFields          []ActorMergeProfileFieldDTO     `json:"profileFields"`
+	CanApply               bool                            `json:"canApply"`
+	BlockingReasons        []ActorMergeBlockingReasonDTO   `json:"blockingReasons"`
+	RequiredDecisions      []string                        `json:"requiredDecisions"`
+}
+
+type ApplyActorMergeRequest struct {
+	SourceName       string            `json:"sourceName"`
+	TargetName       string            `json:"targetName"`
+	PreviewToken     string            `json:"previewToken"`
+	Confirm          bool              `json:"confirm"`
+	ProfileDecisions map[string]string `json:"profileDecisions,omitempty"`
+}
+
+type ActorMergeAuditSummaryDTO struct {
+	Movies                 ActorMergeAssociationSummaryDTO `json:"movies"`
+	UserTags               []string                        `json:"userTags"`
+	ExternalLinks          []string                        `json:"externalLinks"`
+	Aliases                []string                        `json:"aliases"`
+	RecommendationFeedback ActorMergeAssociationSummaryDTO `json:"recommendationFeedback"`
+	CuratedFramesAffected  int                             `json:"curatedFramesAffected"`
+	ProfileDecisions       map[string]string               `json:"profileDecisions"`
+}
+
+type ActorMergeAuditDTO struct {
+	ID            string                    `json:"id"`
+	SourceActorID int64                     `json:"sourceActorId"`
+	TargetActorID int64                     `json:"targetActorId"`
+	SourceName    string                    `json:"sourceName"`
+	TargetName    string                    `json:"targetName"`
+	PreviewToken  string                    `json:"previewToken"`
+	Summary       ActorMergeAuditSummaryDTO `json:"summary"`
+	AppliedAt     string                    `json:"appliedAt"`
+}
+
+type ActorMergeAuditListDTO struct {
+	Items  []ActorMergeAuditDTO `json:"items"`
+	Total  int                  `json:"total"`
+	Limit  int                  `json:"limit"`
+	Offset int                  `json:"offset"`
 }
 
 // MaxMovieCommentRunes is the maximum length (Unicode scalars) for PUT /library/movies/{id}/comment body.
@@ -344,6 +503,7 @@ type MovieListItemDTO struct {
 	UserTags       []string `json:"userTags,omitempty"`
 	RuntimeMinutes int      `json:"runtimeMinutes"`
 	Rating         float64  `json:"rating"`
+	UserRating     *float64 `json:"userRating,omitempty"`
 	IsFavorite     bool     `json:"isFavorite"`
 	AddedAt        string   `json:"addedAt"`
 	Location       string   `json:"location"`
@@ -888,6 +1048,60 @@ type AddPlaybackWatchTimeBody struct {
 	WatchedSec float64 `json:"watchedSec"`
 }
 
+type PersonalInsightsRange string
+
+const (
+	PersonalInsightsRange30Days  PersonalInsightsRange = "30d"
+	PersonalInsightsRange90Days  PersonalInsightsRange = "90d"
+	PersonalInsightsRange365Days PersonalInsightsRange = "365d"
+	PersonalInsightsRangeAll     PersonalInsightsRange = "all"
+)
+
+type PersonalInsightsDimension string
+
+const (
+	PersonalInsightsDimensionActor  PersonalInsightsDimension = "actor"
+	PersonalInsightsDimensionStudio PersonalInsightsDimension = "studio"
+	PersonalInsightsDimensionTag    PersonalInsightsDimension = "tag"
+)
+
+type PersonalInsightsOverviewDTO struct {
+	Range               PersonalInsightsRange `json:"range"`
+	From                string                `json:"from"`
+	To                  string                `json:"to"`
+	Timezone            string                `json:"timezone"`
+	GeneratedAt         string                `json:"generatedAt"`
+	DataSince           *string               `json:"dataSince"`
+	WatchedSeconds      float64               `json:"watchedSeconds"`
+	StartedMovies       int                   `json:"startedMovies"`
+	CompletedMovies     int                   `json:"completedMovies"`
+	CompletionRate      *float64              `json:"completionRate"`
+	CompletionThreshold float64               `json:"completionThreshold"`
+	RatedMovies         int                   `json:"ratedMovies"`
+	AverageUserRating   *float64              `json:"averageUserRating"`
+}
+
+type PersonalInsightsBreakdownItemDTO struct {
+	Name           string  `json:"name"`
+	WatchedSeconds float64 `json:"watchedSeconds"`
+	MovieCount     int     `json:"movieCount"`
+	ShareOfTotal   float64 `json:"shareOfTotal"`
+}
+
+type PersonalInsightsBreakdownDTO struct {
+	Range               PersonalInsightsRange              `json:"range"`
+	Dimension           PersonalInsightsDimension          `json:"dimension"`
+	From                string                             `json:"from"`
+	To                  string                             `json:"to"`
+	Timezone            string                             `json:"timezone"`
+	GeneratedAt         string                             `json:"generatedAt"`
+	DataSince           *string                            `json:"dataSince"`
+	TotalWatchedSeconds float64                            `json:"totalWatchedSeconds"`
+	Attribution         string                             `json:"attribution"`
+	Items               []PersonalInsightsBreakdownItemDTO `json:"items"`
+	Limit               int                                `json:"limit"`
+}
+
 // PlaybackMode describes how a media file is delivered to the player.
 type PlaybackMode string
 
@@ -1048,11 +1262,31 @@ type PlayedMoviesListDTO struct {
 
 // HomepageDailyRecommendationsDTO carries the hero and recommendation movie IDs for a UTC day.
 type HomepageDailyRecommendationsDTO struct {
-	DateUTC                string   `json:"dateUtc"`
-	GeneratedAt            string   `json:"generatedAt"`
-	GenerationVersion      string   `json:"generationVersion,omitempty"`
-	HeroMovieIDs           []string `json:"heroMovieIds"`
-	RecommendationMovieIDs []string `json:"recommendationMovieIds"`
+	DateUTC                string                          `json:"dateUtc"`
+	GeneratedAt            string                          `json:"generatedAt"`
+	GenerationVersion      string                          `json:"generationVersion,omitempty"`
+	HeroMovieIDs           []string                        `json:"heroMovieIds"`
+	RecommendationMovieIDs []string                        `json:"recommendationMovieIds"`
+	Recommendations        []HomepageRecommendationItemDTO `json:"recommendations"`
+}
+
+type HomepageRecommendationReasonDTO struct {
+	Code        string `json:"code"`
+	EntityType  string `json:"entityType,omitempty"`
+	EntityValue string `json:"entityValue,omitempty"`
+}
+
+type HomepageRecommendationFeedbackEffectDTO struct {
+	FeedbackID  string `json:"feedbackId"`
+	TargetType  string `json:"targetType"`
+	TargetValue string `json:"targetValue"`
+	Effect      string `json:"effect"`
+}
+
+type HomepageRecommendationItemDTO struct {
+	MovieID         string                                    `json:"movieId"`
+	Reasons         []HomepageRecommendationReasonDTO         `json:"reasons"`
+	FeedbackEffects []HomepageRecommendationFeedbackEffectDTO `json:"feedbackEffects"`
 }
 
 // HomepageDailyRecommendationsRefreshOptions customizes a forced homepage snapshot refresh.
@@ -1061,6 +1295,29 @@ type HomepageDailyRecommendationsRefreshOptions struct {
 	PreserveHeroMovieIDs []string `json:"preserveHeroMovieIds,omitempty"`
 	// ExcludeRecommendationMovieIDs avoids returning the recommendation rail currently visible to the caller.
 	ExcludeRecommendationMovieIDs []string `json:"excludeRecommendationMovieIds,omitempty"`
+}
+
+type RecommendationFeedbackDTO struct {
+	ID            string `json:"id"`
+	Action        string `json:"action"`
+	TargetType    string `json:"targetType"`
+	TargetValue   string `json:"targetValue"`
+	SourceMovieID string `json:"sourceMovieId"`
+	ExpiresAt     string `json:"expiresAt,omitempty"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type RecommendationFeedbackListDTO struct {
+	Items []RecommendationFeedbackDTO `json:"items"`
+}
+
+type CreateRecommendationFeedbackBody struct {
+	Action        string `json:"action"`
+	TargetType    string `json:"targetType"`
+	TargetValue   string `json:"targetValue"`
+	SourceMovieID string `json:"sourceMovieId"`
+	DurationDays  int    `json:"durationDays,omitempty"`
 }
 
 // TaskDTO represents an async background task (scan, scrape, download).
@@ -1125,19 +1382,36 @@ const (
 	TaskTypeLibraryHealthRepair  = "library.health.repair"
 	TaskTypeLibraryHealthCleanup = "library.health.cleanup"
 
-	ErrorCodeBadRequest    = "COMMON_BAD_REQUEST"
-	ErrorCodeForbidden     = "COMMON_FORBIDDEN"
-	ErrorCodeNotFound      = "COMMON_NOT_FOUND"
-	ErrorCodeInternal      = "COMMON_INTERNAL"
-	ErrorCodeUnsupported   = "COMMON_UNSUPPORTED_COMMAND"
-	ErrorCodeLibraryFetch  = "LIBRARY_FETCH_FAILED"
-	ErrorCodeScanStart     = "SCAN_START_FAILED"
-	ErrorCodeScanWalk      = "SCAN_WALK_FAILED"
-	ErrorCodeScanCancelled = "SCAN_CANCELLED"
-	ErrorCodeScraperInit   = "SCRAPER_INIT_FAILED"
-	ErrorCodeScraperRun    = "SCRAPER_RUN_FAILED"
-	ErrorCodeAssetDownload = "ASSET_DOWNLOAD_FAILED"
-	ErrorCodeConflict      = "COMMON_CONFLICT"
+	ErrorCodeBadRequest                           = "COMMON_BAD_REQUEST"
+	ErrorCodeForbidden                            = "COMMON_FORBIDDEN"
+	ErrorCodeNotFound                             = "COMMON_NOT_FOUND"
+	ErrorCodeInternal                             = "COMMON_INTERNAL"
+	ErrorCodeUnsupported                          = "COMMON_UNSUPPORTED_COMMAND"
+	ErrorCodeLibraryFetch                         = "LIBRARY_FETCH_FAILED"
+	ErrorCodeScanStart                            = "SCAN_START_FAILED"
+	ErrorCodeScanWalk                             = "SCAN_WALK_FAILED"
+	ErrorCodeScanCancelled                        = "SCAN_CANCELLED"
+	ErrorCodeScraperInit                          = "SCRAPER_INIT_FAILED"
+	ErrorCodeScraperRun                           = "SCRAPER_RUN_FAILED"
+	ErrorCodeAssetDownload                        = "ASSET_DOWNLOAD_FAILED"
+	ErrorCodeConflict                             = "COMMON_CONFLICT"
+	ErrorCodeSavedViewInvalid                     = "SAVED_VIEW_INVALID"
+	ErrorCodeSavedViewNameConflict                = "SAVED_VIEW_NAME_CONFLICT"
+	ErrorCodeSavedViewLimit                       = "SAVED_VIEW_LIMIT_REACHED"
+	ErrorCodeRecommendationFeedbackInvalid        = "RECOMMENDATION_FEEDBACK_INVALID"
+	ErrorCodeRecommendationFeedbackTargetNotFound = "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND"
+	ErrorCodeRecommendationFeedbackLimit          = "RECOMMENDATION_FEEDBACK_LIMIT_REACHED"
+	ErrorCodeActorMergeInvalid                    = "ACTOR_MERGE_INVALID"
+	ErrorCodeActorMergeNotFound                   = "ACTOR_MERGE_NOT_FOUND"
+	ErrorCodeActorMergeSelf                       = "ACTOR_MERGE_SELF"
+	ErrorCodeActorMergeSourceAlias                = "ACTOR_MERGE_SOURCE_IS_ALIAS"
+	ErrorCodeActorMergeConflict                   = "ACTOR_MERGE_CONFLICT"
+	ErrorCodeActorMergeStalePreview               = "ACTOR_MERGE_STALE_PREVIEW"
+	ErrorCodeActorMergeLinkLimit                  = "ACTOR_MERGE_LINK_LIMIT"
+	ErrorCodePersonalInsightsInvalidRange         = "INSIGHTS_INVALID_RANGE"
+	ErrorCodePersonalInsightsInvalidTimezone      = "INSIGHTS_INVALID_TIMEZONE"
+	ErrorCodePersonalInsightsInvalidDimension     = "INSIGHTS_INVALID_DIMENSION"
+	ErrorCodePersonalInsightsInvalidLimit         = "INSIGHTS_INVALID_LIMIT"
 
 	ErrorCodeAuthLocked      = "AUTH_LOCKED"
 	ErrorCodeAuthInvalidPIN  = "AUTH_INVALID_PIN"

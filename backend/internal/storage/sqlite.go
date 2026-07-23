@@ -114,6 +114,12 @@ func (s *SQLiteStore) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := s.backfillActorNormalizedNames(ctx); err != nil {
+		return fmt.Errorf("backfill normalized actor names: %w", err)
+	}
+	if err := s.backfillActorFeedbackNormalizedTargets(ctx); err != nil {
+		return fmt.Errorf("backfill normalized actor feedback targets: %w", err)
+	}
 
 	return s.verifyForeignKeyIntegrity(ctx)
 }

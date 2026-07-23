@@ -15,6 +15,11 @@ function makeSnapshot(
     generationVersion: "v1",
     heroMovieIds,
     recommendationMovieIds,
+    recommendations: recommendationMovieIds.map((movieId) => ({
+      movieId,
+      reasons: [{ code: "catalog_discovery" }],
+      feedbackEffects: [],
+    })),
   }
 }
 

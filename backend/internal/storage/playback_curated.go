@@ -128,13 +128,14 @@ func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta 
 	return err
 }
 
-// isSQLiteConstraint returns true if err is a SQLite constraint violation (code 19).
+// isSQLiteConstraint returns true for both SQLite's base constraint code (19)
+// and extended codes such as SQLITE_CONSTRAINT_UNIQUE (2067).
 func isSQLiteConstraint(err error) bool {
 	if err == nil {
 		return false
 	}
 	var e interface{ Code() int }
-	return errors.As(err, &e) && e.Code() == 19
+	return errors.As(err, &e) && e.Code()&0xff == 19
 }
 
 func scanCuratedMeta(actorsJSON, tagsJSON string, dest *CuratedFrameMeta) error {

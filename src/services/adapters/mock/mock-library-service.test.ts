@@ -49,6 +49,92 @@ describe("mockLibraryService", () => {
     expect(movies.every((movie) => !movie.trashedAt?.trim())).toBe(true)
   })
 
+  it("persists ordered Saved Views and enforces normalized names", async () => {
+    for (const item of [...mockLibraryService.savedViews.value]) {
+      await mockLibraryService.deleteSavedView(item.id)
+    }
+    const first = await mockLibraryService.createSavedView("Unwatched", {
+      schemaVersion: 1,
+      mode: "library",
+      playState: "unwatched",
+      tab: "all",
+    })
+    const second = await mockLibraryService.createSavedView("4K", {
+      schemaVersion: 1,
+      mode: "library",
+      resolution: "2160p",
+      tab: "all",
+      playState: "all",
+    })
+    expect(mockLibraryService.savedViews.value.map((item) => item.id)).toEqual([
+      first.id,
+      second.id,
+    ])
+    expect(mockLibraryService.savedViews.value[1]?.filters.resolution).toBe("4k")
+
+    await expectHttpClientError(
+      mockLibraryService.createSavedView("  uNwAtChEd ", {
+        schemaVersion: 1,
+      }),
+      {
+        status: 409,
+        code: "SAVED_VIEW_NAME_CONFLICT",
+        message: "saved view name already exists",
+      },
+    )
+
+    await mockLibraryService.reorderSavedViews([second.id, first.id])
+    await mockLibraryService.updateSavedView(first.id, { name: "Not watched" })
+    await mockLibraryService.refreshSavedViews()
+    expect(mockLibraryService.savedViews.value.map((item) => item.name)).toEqual([
+      "4K",
+      "Not watched",
+    ])
+
+    await mockLibraryService.deleteSavedView(second.id)
+    await mockLibraryService.deleteSavedView(first.id)
+    expect(mockLibraryService.savedViews.value).toEqual([])
+  })
+
+  it("persists explicit recommendation feedback and applies it to mock generation", async () => {
+    const existing = await mockLibraryService.listHomepageRecommendationFeedback()
+    for (const item of existing.items) {
+      await mockLibraryService.deleteHomepageRecommendationFeedback(item.id)
+    }
+
+    const movie = mockLibraryService.movies.value.find((item) => item.actors.length > 0)
+    expect(movie).toBeTruthy()
+    const actor = movie!.actors[0]!
+    const less = await mockLibraryService.createHomepageRecommendationFeedback({
+      action: "less",
+      targetType: "actor",
+      targetValue: actor,
+      sourceMovieId: movie!.id,
+    })
+    const duplicate = await mockLibraryService.createHomepageRecommendationFeedback({
+      action: "less",
+      targetType: "actor",
+      targetValue: actor.toLocaleLowerCase(),
+      sourceMovieId: movie!.id,
+    })
+    expect(duplicate.id).toBe(less.id)
+
+    const blocked = await mockLibraryService.createHomepageRecommendationFeedback({
+      action: "not_interested",
+      targetType: "movie",
+      targetValue: movie!.id,
+      sourceMovieId: movie!.id,
+    })
+    const snapshot = await mockLibraryService.getHomepageDailyRecommendations()
+    expect(snapshot.heroMovieIds).not.toContain(movie!.id)
+    expect(snapshot.recommendationMovieIds).not.toContain(movie!.id)
+    expect(snapshot.recommendations.every((item) => item.reasons.length > 0)).toBe(true)
+
+    await mockLibraryService.deleteHomepageRecommendationFeedback(blocked.id)
+    await mockLibraryService.deleteHomepageRecommendationFeedback(less.id)
+    expect((await mockLibraryService.listHomepageRecommendationFeedback()).items).toEqual([])
+  })
+
   it("returns visible connected client examples in mock mode", async () => {
     const dto = await mockLibraryService.listConnectedClients()
 

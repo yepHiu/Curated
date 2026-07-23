@@ -1,6 +1,12 @@
 import { computed, ref, watch } from "vue"
 import type {
   ActorListItemDTO,
+  ActorMergeAuditDTO,
+  ActorMergeAuditListDTO,
+  ActorMergePreviewDTO,
+  ActorMergePreviewRequest,
+  ActorMergeProfileFieldDTO,
+  ApplyActorMergeRequest,
   ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
@@ -8,6 +14,11 @@ import type {
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  HomepageRecommendationFeedbackEffectDTO,
+  HomepageRecommendationItemDTO,
+  CreateRecommendationFeedbackBody,
+  RecommendationFeedbackDTO,
+  RecommendationFeedbackListDTO,
   RefreshHomepageDailyRecommendationsBody,
   LibraryPathStorageStatusDTO,
   NativePlayerPreset,
@@ -15,6 +26,10 @@ import type {
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   MovieCommentDTO,
+  PersonalInsightsBreakdownDTO,
+  PersonalInsightsDimension,
+  PersonalInsightsOverviewDTO,
+  PersonalInsightsRange,
   PatchPlayerSettingsBody,
   PlayerSettingsDTO,
   PatchBackendLogBody,
@@ -23,6 +38,8 @@ import type {
   ProviderHealthDTO,
   ProxyJavBusPingResponse,
   PutMovieCommentBody,
+  SavedViewDTO,
+  SavedViewFiltersV1,
   TaskDTO,
 } from "@/api/types"
 import type { LibrarySetting } from "@/domain/library/types"
@@ -30,13 +47,32 @@ import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { countCuratedFrames } from "@/lib/curated-frames/db"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
+import { normalizeActorIdentity } from "@/lib/actor-identity"
 import { getCurrentUtcDayKey } from "@/lib/current-utc-day-key"
 import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import { sampleRandomMovies } from "@/lib/random-sample"
+import { buildPersonalInsightsBreakdown, buildPersonalInsightsOverview } from "@/lib/personal-insights"
+import { listSortedByUpdatedDesc } from "@/lib/playback-progress-storage"
+import { listPlaybackWatchTimeMovieEntries } from "@/lib/playback-watch-time-storage"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
 import { HttpClientError } from "@/api/http-client"
+import {
+  normalizeSavedViewFiltersV1,
+  normalizeSavedViewName,
+  normalizedSavedViewNameKey,
+} from "@/lib/saved-view-model"
+import { loadLocalSavedViews, saveLocalSavedViews } from "@/lib/saved-views-local-storage"
+import {
+  loadLocalRecommendationFeedback,
+  saveLocalRecommendationFeedback,
+} from "@/lib/recommendation-feedback-local-storage"
+import {
+  loadLocalActorMergeState,
+  saveLocalActorMergeState,
+  type LocalActorMergeState,
+} from "@/lib/actor-merge-local-storage"
 
 function normalizeMockLibraryPath(p: string): string {
   return p.trim().replace(/\\/g, "/")
@@ -88,6 +124,15 @@ const playerSettingsMock = ref<PlayerSettingsDTO>({
 })
 const backendLogMock = ref<BackendLogSettingsDTO>({ logDir: "", logLevel: "info" })
 const defaultImportLibraryPathIdMock = ref("library-a")
+const savedViewsMock = ref<SavedViewDTO[]>(
+  loadLocalSavedViews(typeof localStorage === "undefined" ? undefined : localStorage),
+)
+const recommendationFeedbackMock = ref<RecommendationFeedbackDTO[]>(
+  loadLocalRecommendationFeedback(typeof localStorage === "undefined" ? undefined : localStorage),
+)
+const actorMergeStateMock = ref<LocalActorMergeState>(
+  loadLocalActorMergeState(typeof localStorage === "undefined" ? undefined : localStorage),
+)
 const libraryPathStorageStatusesMock = ref<LibraryPathStorageStatusDTO[]>([
   {
     libraryPathId: "library-a",
@@ -199,6 +244,123 @@ function mockHttpError(status: number, code: string, message = code): HttpClient
   })
 }
 
+function persistMockSavedViews(items: SavedViewDTO[]) {
+  savedViewsMock.value = items.map((item, sortOrder) => ({ ...item, sortOrder }))
+  saveLocalSavedViews(
+    savedViewsMock.value,
+    typeof localStorage === "undefined" ? undefined : localStorage,
+  )
+}
+
+function newMockSavedViewID(): string {
+  const uuid = globalThis.crypto?.randomUUID?.()
+  return `view_${uuid ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`}`
+}
+
+function persistMockRecommendationFeedback(items: RecommendationFeedbackDTO[]) {
+  recommendationFeedbackMock.value = [...items].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id),
+  )
+  saveLocalRecommendationFeedback(
+    recommendationFeedbackMock.value,
+    typeof localStorage === "undefined" ? undefined : localStorage,
+  )
+}
+
+function refreshActiveMockRecommendationFeedback() {
+  const now = Date.now()
+  const active = recommendationFeedbackMock.value.filter(
+    (item) => !item.expiresAt || Date.parse(item.expiresAt) > now,
+  )
+  if (active.length !== recommendationFeedbackMock.value.length) {
+    persistMockRecommendationFeedback(active)
+  }
+}
+
+function mockRecommendationFeedbackID(): string {
+  const uuid = globalThis.crypto?.randomUUID?.()
+  return `feedback_${uuid ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`}`
+}
+
+function mockRecommendationFeedbackTargetKey(
+  targetType: RecommendationFeedbackDTO["targetType"],
+  targetValue: string,
+): string {
+  return targetType === "actor"
+    ? normalizeActorIdentity(targetValue)
+    : targetValue.trim().toLocaleLowerCase()
+}
+
+function canonicalMockFeedbackTarget(
+  movie: Movie,
+  targetType: CreateRecommendationFeedbackBody["targetType"],
+  targetValue: string,
+): string | undefined {
+  const wanted = targetValue.trim()
+  if (targetType === "movie") return movie.id.toLocaleLowerCase() === wanted.toLocaleLowerCase() ? movie.id : undefined
+  if (targetType === "studio") return movie.studio.trim().toLocaleLowerCase() === wanted.toLocaleLowerCase() ? movie.studio.trim() : undefined
+  const values = targetType === "actor" ? movie.actors : [...movie.tags, ...movie.userTags]
+  const wantedKey = targetType === "actor"
+    ? normalizeActorIdentity(wanted)
+    : wanted.toLocaleLowerCase()
+  return values.find((value) => {
+    const valueKey = targetType === "actor"
+      ? normalizeActorIdentity(value)
+      : value.trim().toLocaleLowerCase()
+    return valueKey === wantedKey
+  })?.trim()
+}
+
+function isValidMockFeedbackShape(body: CreateRecommendationFeedbackBody): boolean {
+  if (body.action === "not_interested") return body.targetType === "movie" && body.durationDays === undefined
+  if (body.action === "snooze") {
+    return body.targetType === "movie" && Number.isInteger(body.durationDays) && (body.durationDays ?? 0) >= 1 && (body.durationDays ?? 0) <= 365
+  }
+  return body.action === "less" && ["actor", "studio", "tag"].includes(body.targetType) && body.durationDays === undefined
+}
+
+function mockFeedbackEffects(movie: Movie): HomepageRecommendationFeedbackEffectDTO[] {
+  const values = {
+    actor: new Set(movie.actors.map(normalizeActorIdentity)),
+    studio: new Set([movie.studio.trim().toLocaleLowerCase()]),
+    tag: new Set([...movie.tags, ...movie.userTags].map((value) => value.trim().toLocaleLowerCase())),
+  }
+  return recommendationFeedbackMock.value
+    .filter((item) => {
+      if (item.action !== "less" || item.targetType === "movie") return false
+      const normalized = item.targetType === "actor"
+        ? normalizeActorIdentity(item.targetValue)
+        : item.targetValue.trim().toLocaleLowerCase()
+      return values[item.targetType].has(normalized)
+    })
+    .map((item) => ({
+      feedbackId: item.id,
+      targetType: item.targetType as "actor" | "studio" | "tag",
+      targetValue: item.targetValue,
+      effect: "weight_reduced" as const,
+    }))
+    .sort((left, right) => left.targetType.localeCompare(right.targetType) || left.targetValue.localeCompare(right.targetValue))
+}
+
+function isMockRecommendationMovieBlocked(movieId: string): boolean {
+  return recommendationFeedbackMock.value.some(
+    (item) =>
+      item.targetType === "movie" &&
+      (item.action === "not_interested" || item.action === "snooze") &&
+      item.targetValue.toLocaleLowerCase() === movieId.toLocaleLowerCase(),
+  )
+}
+
+function mockRecommendationItem(
+  entry: ReturnType<typeof buildHomepagePortalModel>["recommendations"][number],
+): HomepageRecommendationItemDTO {
+  return {
+    movieId: entry.movie.id,
+    reasons: entry.reasons.length > 0 ? entry.reasons.map((reason) => ({ ...reason })) : [{ code: "catalog_discovery" }],
+    feedbackEffects: mockFeedbackEffects(entry.movie),
+  }
+}
+
 function normalizeNativePlayerPreset(
   preset: PlayerSettingsDTO["nativePlayerPreset"],
   command?: string,
@@ -242,6 +404,47 @@ void refreshCuratedFramesCountMock()
 const mockActorUserTags = ref<Map<string, string[]>>(new Map())
 const mockActorExternalLinks = ref<Map<string, string[]>>(new Map())
 
+function normalizeMockActorIdentity(value: string): string {
+  return normalizeActorIdentity(value)
+}
+
+function resolveMockCanonicalActorName(value: string): string {
+  let current = value.trim()
+  const visited = new Set<string>()
+  for (let index = 0; index < 32; index += 1) {
+    const normalized = normalizeMockActorIdentity(current)
+    if (!normalized || visited.has(normalized)) return current
+    visited.add(normalized)
+    const next = actorMergeStateMock.value.aliases[normalized]?.canonicalName.trim()
+    if (!next) return current
+    current = next
+  }
+  return current
+}
+
+function mockActorAliasesFor(canonicalName: string): string[] {
+  const canonical = normalizeMockActorIdentity(canonicalName)
+  return Object.values(actorMergeStateMock.value.aliases)
+    .filter(
+      (entry) =>
+        normalizeMockActorIdentity(resolveMockCanonicalActorName(entry.canonicalName)) === canonical,
+    )
+    .map((entry) => entry.alias)
+    .sort((left, right) => left.localeCompare(right))
+}
+
+function applyPersistedMockActorAliases(movie: Movie): Movie {
+  const actors = [
+    ...new Map(
+      movie.actors.map((actor) => {
+        const canonical = resolveMockCanonicalActorName(actor)
+        return [normalizeMockActorIdentity(canonical), canonical] as const
+      }),
+    ).values(),
+  ]
+  return { ...movie, actors }
+}
+
 function mockActorsFromMovies(): ActorListItemDTO[] {
   const counts = new Map<string, number>()
   for (const m of moviesState.value) {
@@ -276,7 +479,7 @@ function buildMockCompletedTask(taskId: string, type: string, message = ""): Tas
 }
 
 function findMockActor(name: string): ActorListItemDTO | undefined {
-  const normalized = name.trim()
+	const normalized = resolveMockCanonicalActorName(name)
   if (!normalized) {
     return undefined
   }
@@ -293,6 +496,7 @@ function buildMockActorProfile(name: string): ActorProfileDTO {
     avatarUrl: actor.avatarUrl,
     userTags: actor.userTags ?? [],
     externalLinks: [...(mockActorExternalLinks.value.get(actor.name) ?? [])],
+    aliases: mockActorAliasesFor(actor.name),
     summary: "",
   }
 }
@@ -458,8 +662,315 @@ const buildMovie = (index: number): Movie => {
 loadMockMoviePrefs()
 
 const moviesState = ref<Movie[]>(
-  Array.from({ length: 180 }, (_, index) => mergeMockPrefsIntoMovie(buildMovie(index))),
+  Array.from({ length: 180 }, (_, index) =>
+    applyPersistedMockActorAliases(mergeMockPrefsIntoMovie(buildMovie(index))),
+  ),
 )
+
+const mockActorMergeProfileFieldNames = [
+  "avatarRemoteUrl",
+  "avatarLocalPath",
+  "summary",
+  "homepage",
+  "provider",
+  "providerActorId",
+  "height",
+  "birthday",
+] as const
+
+function mockActorMergeProfileFields(): ActorMergeProfileFieldDTO[] {
+  return mockActorMergeProfileFieldNames.map((field) => ({
+    field,
+    sourceValue: "",
+    targetValue: "",
+    defaultSelection: "target",
+    conflict: false,
+  }))
+}
+
+function mockActorMergeError(code: string, message = code): HttpClientError {
+  const status = code === "ACTOR_MERGE_NOT_FOUND" ? 404 : code === "ACTOR_MERGE_INVALID" ? 400 : 409
+  return mockHttpError(status, code, message)
+}
+
+function mockActorMergeStableUnique(values: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of values) {
+    const value = raw.trim()
+    const key = value
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(value)
+  }
+  return result
+}
+
+function mockActorMergeStableUniqueActors(values: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of values) {
+    const value = raw.trim()
+    const key = normalizeMockActorIdentity(value)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(value)
+  }
+  return result
+}
+
+function mockActorMergeSummary(source: string[], target: string[]) {
+  const targetSet = new Set(target)
+  const duplicateCount = source.filter((value) => targetSet.has(value)).length
+  return {
+    sourceCount: source.length,
+    targetCount: target.length,
+    duplicateCount,
+    resultCount: source.length + target.length - duplicateCount,
+  }
+}
+
+function mockActorMergeFeedbackSummary(sourceNames: Set<string>, targetNames: Set<string>) {
+  let sourceCount = 0
+  let targetCount = 0
+  for (const item of recommendationFeedbackMock.value) {
+    if (item.action !== "less" || item.targetType !== "actor") continue
+    const normalized = normalizeMockActorIdentity(item.targetValue)
+    if (sourceNames.has(normalized)) sourceCount += 1
+    else if (targetNames.has(normalized)) targetCount += 1
+  }
+  const total = sourceCount + targetCount
+  return {
+    sourceCount,
+    targetCount,
+    duplicateCount: total > 0 ? total - 1 : 0,
+    resultCount: total > 0 ? 1 : 0,
+  }
+}
+
+function mockActorMergeHash(value: unknown): string {
+  const text = JSON.stringify(value)
+  let hash = 0xcbf29ce484222325n
+  const prime = 0x100000001b3n
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= BigInt(text.charCodeAt(index))
+    hash = BigInt.asUintN(64, hash * prime)
+  }
+  return hash.toString(16).padStart(16, "0")
+}
+
+function previewMockActorMerge(body: ActorMergePreviewRequest): ActorMergePreviewDTO {
+  const sourceInput = body.sourceName.trim()
+  const targetInput = body.targetName.trim()
+  if (!sourceInput || !targetInput) {
+    throw mockActorMergeError("ACTOR_MERGE_INVALID", "sourceName and targetName are required")
+  }
+  const actors = mockActorsFromMovies()
+  const source = actors.find((actor) => actor.name === sourceInput)
+  if (!source) {
+    const resolved = resolveMockCanonicalActorName(sourceInput)
+    if (normalizeMockActorIdentity(resolved) !== normalizeMockActorIdentity(sourceInput) && findMockActor(resolved)) {
+      throw mockActorMergeError("ACTOR_MERGE_SOURCE_IS_ALIAS")
+    }
+    throw mockActorMergeError("ACTOR_MERGE_NOT_FOUND")
+  }
+  const targetName = resolveMockCanonicalActorName(targetInput)
+  const target = actors.find(
+    (actor) => normalizeMockActorIdentity(actor.name) === normalizeMockActorIdentity(targetName),
+  )
+  if (!target) throw mockActorMergeError("ACTOR_MERGE_NOT_FOUND")
+  if (source.name === target.name) throw mockActorMergeError("ACTOR_MERGE_SELF")
+
+  const sourceAliases = mockActorAliasesFor(source.name)
+  const targetAliases = mockActorAliasesFor(target.name)
+  const sourceNames = new Set(
+    [source.name, ...sourceAliases].map(normalizeMockActorIdentity),
+  )
+  const targetNames = new Set(
+    [target.name, ...targetAliases].map(normalizeMockActorIdentity),
+  )
+  const sourceMovieIds = moviesState.value
+    .filter((movie) => movie.actors.some((actor) => sourceNames.has(normalizeMockActorIdentity(actor))))
+    .map((movie) => movie.id)
+    .sort()
+  const targetMovieIds = moviesState.value
+    .filter((movie) => movie.actors.some((actor) => targetNames.has(normalizeMockActorIdentity(actor))))
+    .map((movie) => movie.id)
+    .sort()
+  const sourceTags = [...(mockActorUserTags.value.get(source.name) ?? [])].sort()
+  const targetTags = [...(mockActorUserTags.value.get(target.name) ?? [])].sort()
+  const sourceLinks = [...(mockActorExternalLinks.value.get(source.name) ?? [])]
+  const targetLinks = [...(mockActorExternalLinks.value.get(target.name) ?? [])]
+  const aliasesToMove = mockActorMergeStableUniqueActors([source.name, ...sourceAliases])
+  const blockingReasons: { code: string; message: string }[] = []
+  const externalLinks = {
+    source: sourceLinks,
+    target: targetLinks,
+    result: mockActorMergeStableUnique([...targetLinks, ...sourceLinks]),
+  }
+  if (externalLinks.result.length > 16) {
+    blockingReasons.push({
+      code: "ACTOR_MERGE_LINK_LIMIT",
+      message: `merged external links would contain ${externalLinks.result.length} entries; maximum is 16`,
+    })
+  }
+  for (const alias of aliasesToMove) {
+    const normalized = normalizeMockActorIdentity(alias)
+    const collision = actors.find(
+      (actor) =>
+        actor.name !== source.name &&
+        actor.name !== target.name &&
+        normalizeMockActorIdentity(actor.name) === normalized,
+    )
+    const aliasOwner = actorMergeStateMock.value.aliases[normalized]?.canonicalName
+    if (collision || (aliasOwner && normalizeMockActorIdentity(resolveMockCanonicalActorName(aliasOwner)) !== normalizeMockActorIdentity(target.name))) {
+      blockingReasons.push({
+        code: "ACTOR_MERGE_CONFLICT",
+        message: `alias ${alias} conflicts with another actor identity`,
+      })
+    }
+  }
+  const preview: ActorMergePreviewDTO = {
+    previewToken: "",
+    source: {
+      id: actors.findIndex((actor) => actor.name === source.name) + 1,
+      name: source.name,
+      aliases: sourceAliases,
+    },
+    target: {
+      id: actors.findIndex((actor) => actor.name === target.name) + 1,
+      name: target.name,
+      aliases: targetAliases,
+    },
+    movies: mockActorMergeSummary(sourceMovieIds, targetMovieIds),
+    userTags: {
+      source: sourceTags,
+      target: targetTags,
+      result: mockActorMergeStableUnique([...targetTags, ...sourceTags]),
+    },
+    externalLinks,
+    recommendationFeedback: mockActorMergeFeedbackSummary(sourceNames, targetNames),
+    curatedFramesAffected: 0,
+    aliasesToMove,
+    profileFields: mockActorMergeProfileFields(),
+    canApply: blockingReasons.length === 0,
+    blockingReasons,
+    requiredDecisions: [],
+  }
+  preview.previewToken = mockActorMergeHash({
+    preview,
+    sourceMovieIds,
+    targetMovieIds,
+    feedback: recommendationFeedbackMock.value,
+    aliases: actorMergeStateMock.value.aliases,
+  })
+  return preview
+}
+
+function applyMockActorMerge(body: ApplyActorMergeRequest): ActorMergeAuditDTO {
+  if (!body.confirm || !body.previewToken.trim()) {
+    throw mockActorMergeError("ACTOR_MERGE_INVALID", "confirm and previewToken are required")
+  }
+  const preview = previewMockActorMerge(body)
+  if (preview.previewToken !== body.previewToken.trim()) {
+    throw mockActorMergeError("ACTOR_MERGE_STALE_PREVIEW")
+  }
+  if (!preview.canApply) {
+    const blocker = preview.blockingReasons[0]
+    throw mockActorMergeError(blocker?.code ?? "ACTOR_MERGE_CONFLICT", blocker?.message)
+  }
+  const knownFields = new Set(mockActorMergeProfileFieldNames)
+  for (const [field, selection] of Object.entries(body.profileDecisions ?? {})) {
+    if (!knownFields.has(field as (typeof mockActorMergeProfileFieldNames)[number]) || !["source", "target"].includes(selection)) {
+      throw mockActorMergeError("ACTOR_MERGE_INVALID", `invalid profile decision for ${field}`)
+    }
+  }
+
+  const sourceNames = new Set(
+    [preview.source.name, ...preview.source.aliases].map(normalizeMockActorIdentity),
+  )
+  moviesState.value = moviesState.value.map((movie) => ({
+    ...movie,
+    actors: mockActorMergeStableUniqueActors(
+      movie.actors.map((actor) =>
+        sourceNames.has(normalizeMockActorIdentity(actor)) ? preview.target.name : actor,
+      ),
+    ),
+  }))
+
+  const nextTags = new Map(mockActorUserTags.value)
+  nextTags.set(preview.target.name, [...preview.userTags.result])
+  nextTags.delete(preview.source.name)
+  mockActorUserTags.value = nextTags
+  const nextLinks = new Map(mockActorExternalLinks.value)
+  nextLinks.set(preview.target.name, [...preview.externalLinks.result])
+  nextLinks.delete(preview.source.name)
+  mockActorExternalLinks.value = nextLinks
+
+  const feedbackByKey = new Map<string, RecommendationFeedbackDTO>()
+  for (const item of recommendationFeedbackMock.value) {
+    const next =
+      item.action === "less" &&
+      item.targetType === "actor" &&
+      sourceNames.has(normalizeMockActorIdentity(item.targetValue))
+        ? { ...item, targetValue: preview.target.name, updatedAt: new Date().toISOString() }
+        : item
+    const key = `${next.action}\u0000${next.targetType}\u0000${mockRecommendationFeedbackTargetKey(next.targetType, next.targetValue)}`
+    if (!feedbackByKey.has(key)) feedbackByKey.set(key, next)
+  }
+  persistMockRecommendationFeedback([...feedbackByKey.values()])
+
+  const aliases = { ...actorMergeStateMock.value.aliases }
+  for (const [normalizedAlias, entry] of Object.entries(aliases)) {
+    if (
+      sourceNames.has(
+        normalizeMockActorIdentity(resolveMockCanonicalActorName(entry.canonicalName)),
+      )
+    ) {
+      aliases[normalizedAlias] = { ...entry, canonicalName: preview.target.name }
+    }
+  }
+  for (const alias of preview.aliasesToMove) {
+    aliases[normalizeMockActorIdentity(alias)] = {
+      alias,
+      canonicalName: preview.target.name,
+    }
+  }
+  const appliedAt = new Date().toISOString()
+  const profileDecisions = Object.fromEntries(
+    preview.profileFields.map((field) => [
+      field.field,
+      body.profileDecisions?.[field.field] ?? field.defaultSelection,
+    ]),
+  ) as Record<string, "source" | "target">
+  const audit: ActorMergeAuditDTO = {
+    id: `amrg_${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`}`,
+    sourceActorId: preview.source.id,
+    targetActorId: preview.target.id,
+    sourceName: preview.source.name,
+    targetName: preview.target.name,
+    previewToken: preview.previewToken,
+    appliedAt,
+    summary: {
+      movies: preview.movies,
+      userTags: [...preview.userTags.result],
+      externalLinks: [...preview.externalLinks.result],
+      aliases: mockActorMergeStableUniqueActors([...preview.target.aliases, ...preview.aliasesToMove]),
+      recommendationFeedback: preview.recommendationFeedback,
+      curatedFramesAffected: preview.curatedFramesAffected,
+      profileDecisions,
+    },
+  }
+  actorMergeStateMock.value = {
+    aliases,
+    audits: [audit, ...actorMergeStateMock.value.audits].slice(0, 500),
+  }
+  saveLocalActorMergeState(
+    actorMergeStateMock.value,
+    typeof localStorage === "undefined" ? undefined : localStorage,
+  )
+  return audit
+}
 
 function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | undefined {
   const id = movieId.trim()
@@ -601,6 +1112,7 @@ export const mockLibraryService: LibraryService = {
   ),
   libraryPaths: computed(() => libraryPathsState.value),
   libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesMock.value),
+  savedViews: computed(() => savedViewsMock.value),
   defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdMock.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
@@ -763,17 +1275,23 @@ export const mockLibraryService: LibraryService = {
   },
 
   async getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
+    refreshActiveMockRecommendationFeedback()
     const dateUtc = getCurrentUtcDayKey()
     const model = buildHomepagePortalModel({
-      movies: moviesState.value,
+      movies: moviesState.value.filter((movie) => !isMockRecommendationMovieBlocked(movie.id)),
       daySeed: dateUtc,
     })
+    const recommendations = model.recommendations
+      .map((entry, index) => ({ entry, index, effects: mockFeedbackEffects(entry.movie) }))
+      .sort((left, right) => left.effects.length - right.effects.length || left.index - right.index)
+      .map(({ entry }) => mockRecommendationItem(entry))
     return {
       dateUtc,
       generatedAt: `${dateUtc}T00:00:00Z`,
-      generationVersion: "mock-v1",
+      generationVersion: "mock-v2",
       heroMovieIds: model.heroMovies.map((movie) => movie.id),
-      recommendationMovieIds: model.recommendations.map((entry) => entry.movie.id),
+      recommendationMovieIds: recommendations.map((item) => item.movieId),
+      recommendations,
     }
   },
 
@@ -799,14 +1317,73 @@ export const mockLibraryService: LibraryService = {
       ...snapshot.recommendationMovieIds.filter((movieId) => !blockedMovieIds.has(movieId)),
       ...moviesState.value
         .map((movie) => movie.id)
-        .filter((movieId) => !blockedMovieIds.has(movieId)),
+        .filter((movieId) => !blockedMovieIds.has(movieId) && !isMockRecommendationMovieBlocked(movieId)),
     ].slice(0, Math.max(snapshot.recommendationMovieIds.length, 6))
+
+    const recommendationByMovieID = new Map(snapshot.recommendations.map((item) => [item.movieId, item]))
+    const recommendations = recommendationMovieIds.map((movieId) => recommendationByMovieID.get(movieId) ?? {
+      movieId,
+      reasons: [{ code: "catalog_discovery" as const }],
+      feedbackEffects: mockFeedbackEffects(moviesState.value.find((movie) => movie.id === movieId)!),
+    })
 
     return {
       ...snapshot,
       heroMovieIds: preservedHeroMovieIds,
       recommendationMovieIds,
+      recommendations,
     }
+  },
+
+  async listHomepageRecommendationFeedback(): Promise<RecommendationFeedbackListDTO> {
+    refreshActiveMockRecommendationFeedback()
+    return { items: recommendationFeedbackMock.value.map((item) => ({ ...item })) }
+  },
+
+  async createHomepageRecommendationFeedback(
+    body: CreateRecommendationFeedbackBody,
+  ): Promise<RecommendationFeedbackDTO> {
+    refreshActiveMockRecommendationFeedback()
+    if (!isValidMockFeedbackShape(body)) {
+      throw mockHttpError(400, "RECOMMENDATION_FEEDBACK_INVALID")
+    }
+    const movie = moviesState.value.find(
+      (candidate) => candidate.id === body.sourceMovieId.trim() && !candidate.trashedAt,
+    )
+    if (!movie) throw mockHttpError(404, "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND")
+    const targetValue = canonicalMockFeedbackTarget(movie, body.targetType, body.targetValue)
+    if (!targetValue) throw mockHttpError(404, "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND")
+    const key = `${body.action}\u0000${body.targetType}\u0000${mockRecommendationFeedbackTargetKey(body.targetType, targetValue)}`
+    const existing = recommendationFeedbackMock.value.find(
+      (item) => `${item.action}\u0000${item.targetType}\u0000${mockRecommendationFeedbackTargetKey(item.targetType, item.targetValue)}` === key,
+    )
+    if (existing) return { ...existing }
+    if (recommendationFeedbackMock.value.length >= 500) {
+      throw mockHttpError(409, "RECOMMENDATION_FEEDBACK_LIMIT_REACHED")
+    }
+    const now = new Date()
+    const item: RecommendationFeedbackDTO = {
+      id: mockRecommendationFeedbackID(),
+      action: body.action,
+      targetType: body.targetType,
+      targetValue,
+      sourceMovieId: movie.id,
+      ...(body.action === "snooze"
+        ? { expiresAt: new Date(now.getTime() + body.durationDays! * 86_400_000).toISOString() }
+        : {}),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }
+    persistMockRecommendationFeedback([item, ...recommendationFeedbackMock.value])
+    return { ...item }
+  },
+
+  async deleteHomepageRecommendationFeedback(id: string): Promise<void> {
+    const next = recommendationFeedbackMock.value.filter((item) => item.id !== id.trim())
+    if (next.length === recommendationFeedbackMock.value.length) {
+      throw mockHttpError(404, "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND")
+    }
+    persistMockRecommendationFeedback(next)
   },
 
   async refreshSettings() {
@@ -892,6 +1469,100 @@ export const mockLibraryService: LibraryService = {
 
   async ensureTrashLoaded() {
     // Mock: trash list is already derived from in-memory state.
+  },
+
+  async refreshSavedViews() {
+    savedViewsMock.value = loadLocalSavedViews(
+      typeof localStorage === "undefined" ? undefined : localStorage,
+    )
+  },
+
+  async createSavedView(name: string, filters: SavedViewFiltersV1): Promise<SavedViewDTO> {
+    if (savedViewsMock.value.length >= 50) {
+      throw mockHttpError(409, "SAVED_VIEW_LIMIT_REACHED", "saved view limit reached")
+    }
+    let normalizedName: string
+    let normalizedFilters: SavedViewFiltersV1
+    try {
+      normalizedName = normalizeSavedViewName(name)
+      normalizedFilters = normalizeSavedViewFiltersV1(filters)
+    } catch (error) {
+      throw mockHttpError(400, "SAVED_VIEW_INVALID", error instanceof Error ? error.message : "invalid saved view")
+    }
+    const nameKey = normalizedSavedViewNameKey(normalizedName)
+    if (savedViewsMock.value.some((item) => normalizedSavedViewNameKey(item.name) === nameKey)) {
+      throw mockHttpError(409, "SAVED_VIEW_NAME_CONFLICT", "saved view name already exists")
+    }
+    const now = new Date().toISOString()
+    const created: SavedViewDTO = {
+      id: newMockSavedViewID(),
+      name: normalizedName,
+      filters: normalizedFilters,
+      sortOrder: savedViewsMock.value.length,
+      createdAt: now,
+      updatedAt: now,
+    }
+    persistMockSavedViews([...savedViewsMock.value, created])
+    return created
+  },
+
+  async updateSavedView(
+    id: string,
+    patch: { name?: string; filters?: SavedViewFiltersV1 },
+  ): Promise<SavedViewDTO> {
+    const index = savedViewsMock.value.findIndex((item) => item.id === id.trim())
+    if (index < 0) {
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "saved view not found")
+    }
+    const current = savedViewsMock.value[index]!
+    let name = current.name
+    let filters = current.filters
+    try {
+      if (patch.name !== undefined) name = normalizeSavedViewName(patch.name)
+      if (patch.filters !== undefined) filters = normalizeSavedViewFiltersV1(patch.filters)
+    } catch (error) {
+      throw mockHttpError(400, "SAVED_VIEW_INVALID", error instanceof Error ? error.message : "invalid saved view")
+    }
+    const nameKey = normalizedSavedViewNameKey(name)
+    if (
+      savedViewsMock.value.some(
+        (item, itemIndex) => itemIndex !== index && normalizedSavedViewNameKey(item.name) === nameKey,
+      )
+    ) {
+      throw mockHttpError(409, "SAVED_VIEW_NAME_CONFLICT", "saved view name already exists")
+    }
+    const updated: SavedViewDTO = {
+      ...current,
+      name,
+      filters,
+      updatedAt: new Date().toISOString(),
+    }
+    persistMockSavedViews(
+      savedViewsMock.value.map((item, itemIndex) => (itemIndex === index ? updated : item)),
+    )
+    return updated
+  },
+
+  async deleteSavedView(id: string) {
+    const trimmed = id.trim()
+    if (!savedViewsMock.value.some((item) => item.id === trimmed)) {
+      throw mockHttpError(404, "COMMON_NOT_FOUND", "saved view not found")
+    }
+    persistMockSavedViews(savedViewsMock.value.filter((item) => item.id !== trimmed))
+  },
+
+  async reorderSavedViews(ids: string[]) {
+    const currentIDs = new Set(savedViewsMock.value.map((item) => item.id))
+    const requested = new Set(ids)
+    if (
+      ids.length !== savedViewsMock.value.length ||
+      requested.size !== ids.length ||
+      ids.some((id) => !currentIDs.has(id))
+    ) {
+      throw mockHttpError(400, "SAVED_VIEW_INVALID", "saved view order must contain every view exactly once")
+    }
+    const byID = new Map(savedViewsMock.value.map((item) => [item.id, item]))
+    persistMockSavedViews(ids.map((id) => byID.get(id)!))
   },
 
   async setOrganizeLibrary(value: boolean) {
@@ -1168,6 +1839,9 @@ export const mockLibraryService: LibraryService = {
         if (r.name.toLowerCase().includes(q)) {
           return true
         }
+        if (mockActorAliasesFor(r.name).some((alias) => alias.toLowerCase().includes(q))) {
+          return true
+        }
         return (r.userTags ?? []).some((t) => t.toLowerCase().includes(q))
       })
     }
@@ -1188,7 +1862,7 @@ export const mockLibraryService: LibraryService = {
   },
 
   async patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO> {
-    const n = name.trim()
+		const n = resolveMockCanonicalActorName(name)
     if (!n) {
       throw mockHttpError(400, "COMMON_BAD_REQUEST", "actor name is required")
     }
@@ -1230,6 +1904,55 @@ export const mockLibraryService: LibraryService = {
       ...profile,
       externalLinks: normalized,
     }
+  },
+
+  async previewActorMerge(body: ActorMergePreviewRequest): Promise<ActorMergePreviewDTO> {
+    return previewMockActorMerge(body)
+  },
+
+  async applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO> {
+    return applyMockActorMerge(body)
+  },
+
+  async listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO> {
+    const limit = params?.limit && params.limit > 0 ? Math.min(params.limit, 100) : 50
+    const offset = params?.offset && params.offset > 0 ? params.offset : 0
+    return {
+      items: actorMergeStateMock.value.audits.slice(offset, offset + limit),
+      total: actorMergeStateMock.value.audits.length,
+      limit,
+      offset,
+    }
+  },
+
+  async getPersonalInsightsOverview(params: {
+    range: PersonalInsightsRange
+    timezone: string
+  }): Promise<PersonalInsightsOverviewDTO> {
+    return buildPersonalInsightsOverview({
+      movies: moviesState.value,
+      progressEntries: listSortedByUpdatedDesc(),
+      watchTimeEntries: listPlaybackWatchTimeMovieEntries(),
+      range: params.range,
+      timezone: params.timezone,
+    })
+  },
+
+  async getPersonalInsightsBreakdown(params: {
+    range: PersonalInsightsRange
+    timezone: string
+    dimension: PersonalInsightsDimension
+    limit?: number
+  }): Promise<PersonalInsightsBreakdownDTO> {
+    return buildPersonalInsightsBreakdown({
+      movies: moviesState.value,
+      progressEntries: listSortedByUpdatedDesc(),
+      watchTimeEntries: listPlaybackWatchTimeMovieEntries(),
+      range: params.range,
+      timezone: params.timezone,
+      dimension: params.dimension,
+      limit: params.limit,
+    })
   },
 
   async getMovieComment(movieId: string): Promise<MovieCommentDTO> {

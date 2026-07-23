@@ -1,8 +1,10 @@
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
+import type { SavedViewFiltersV1, SavedViewPlayState } from "@/api/types"
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteRecordName } from "vue-router"
 
 const libraryModes = ["library", "favorites", "recent", "tags", "trash"] as const
 const libraryTabs = ["all", "new", "top-rated"] as const
+const libraryPlayStates = ["all", "unwatched", "in-progress", "completed"] as const
 const libraryNavigationTransientKeys = ["from", "browse", "back", "autoplay", "t"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
@@ -131,6 +133,89 @@ export const getLibraryTabQuery = (query: LocationQuery): LibraryTab => {
   return libraryTabs.includes(value as LibraryTab) ? (value as LibraryTab) : "all"
 }
 
+export const getLibraryPlayStateQuery = (query: LocationQuery): SavedViewPlayState => {
+  const value = typeof query.playState === "string" ? query.playState : "all"
+  return libraryPlayStates.includes(value as SavedViewPlayState)
+    ? (value as SavedViewPlayState)
+    : "all"
+}
+
+export const getLibraryUserRatingQuery = (query: LocationQuery): number | undefined => {
+  if (typeof query.userRating !== "string" || query.userRating.trim() === "") {
+    return undefined
+  }
+  const value = Number(query.userRating)
+  return Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined
+}
+
+export const normalizeLibraryResolutionFilter = (value: string): string => {
+  switch (value.trim().toLowerCase()) {
+    case "":
+      return ""
+    case "4k":
+    case "2160p":
+    case "uhd":
+    case "3840x2160":
+      return "4k"
+    case "1080p":
+    case "full hd":
+    case "fhd":
+      return "1080p"
+    case "720p":
+    case "hd":
+      return "720p"
+    case "480p":
+    case "sd":
+      return "480p"
+    default:
+      return value.trim().toLowerCase()
+  }
+}
+
+export const getLibraryResolutionQuery = (query: LocationQuery): string =>
+  normalizeLibraryResolutionFilter(typeof query.resolution === "string" ? query.resolution : "")
+
+export const getLibraryAddedWithinDaysQuery = (query: LocationQuery): number | undefined => {
+  if (typeof query.addedWithinDays !== "string") {
+    return undefined
+  }
+  const value = Number(query.addedWithinDays)
+  return Number.isInteger(value) && value >= 1 && value <= 3650 ? value : undefined
+}
+
+export const buildSavedViewFiltersV1 = (
+  mode: LibraryMode,
+  query: LocationQuery,
+): SavedViewFiltersV1 => ({
+  schemaVersion: 1,
+  mode,
+  q: getLibrarySearchQuery(query).trim() || undefined,
+  tag: getLibraryTagExactQuery(query).trim() || undefined,
+  actor: getLibraryActorExactQuery(query).trim() || undefined,
+  studio: getLibraryStudioExactQuery(query).trim() || undefined,
+  tab: getLibraryTabQuery(query),
+  playState: getLibraryPlayStateQuery(query),
+  userRating: getLibraryUserRatingQuery(query),
+  resolution: getLibraryResolutionQuery(query) || undefined,
+  addedWithinDays: getLibraryAddedWithinDaysQuery(query),
+})
+
+export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => ({
+  name: filters.mode ?? "library",
+  query: mergeLibraryQuery({}, {
+    q: filters.q,
+    tag: filters.tag,
+    actor: filters.actor,
+    studio: filters.studio,
+    tab: filters.tab,
+    playState: filters.playState,
+    userRating: filters.userRating === undefined ? undefined : String(filters.userRating),
+    resolution: normalizeLibraryResolutionFilter(filters.resolution ?? "") || undefined,
+    addedWithinDays:
+      filters.addedWithinDays === undefined ? undefined : String(filters.addedWithinDays),
+  }),
+})
+
 export const getSelectedMovieQuery = (query: LocationQuery) => {
   const raw = query.selected
   if (typeof raw === "string") {
@@ -150,19 +235,43 @@ export const getBrowseContextQuery = (query: LocationQuery) => ({
   actor: getLibraryActorExactQuery(query).trim() || undefined,
   studio: getLibraryStudioExactQuery(query).trim() || undefined,
   tab: getLibraryTabQuery(query) === "all" ? undefined : getLibraryTabQuery(query),
+  playState:
+    getLibraryPlayStateQuery(query) === "all" ? undefined : getLibraryPlayStateQuery(query),
+  userRating:
+    getLibraryUserRatingQuery(query) === undefined
+      ? undefined
+      : String(getLibraryUserRatingQuery(query)),
+  resolution: getLibraryResolutionQuery(query) || undefined,
+  addedWithinDays:
+    getLibraryAddedWithinDaysQuery(query) === undefined
+      ? undefined
+      : String(getLibraryAddedWithinDaysQuery(query)),
   selected: getSelectedMovieQuery(query),
 })
+
+type LibraryQueryPatchKey =
+  | "q"
+  | "tab"
+  | "selected"
+  | "from"
+  | "tag"
+  | "actor"
+  | "studio"
+  | "playState"
+  | "userRating"
+  | "resolution"
+  | "addedWithinDays"
 
 export const mergeLibraryQuery = (
   sourceQuery: LocationQuery,
   patch: Partial<
-    Record<"q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio", string | undefined>
+    Record<LibraryQueryPatchKey, string | undefined>
   >,
 ) => {
   const nextQuery: LocationQuery = omitLibraryNavigationTransientKeys(sourceQuery)
 
   const applyValue = (
-    key: "q" | "tab" | "selected" | "from" | "tag" | "actor" | "studio",
+    key: LibraryQueryPatchKey,
     value: string | undefined,
   ) => {
     if (value) {
@@ -201,6 +310,22 @@ export const mergeLibraryQuery = (
     applyValue("studio", patch.studio?.trim() || undefined)
   }
 
+  if (hasOwnKey(patch, "playState")) {
+    applyValue("playState", patch.playState && patch.playState !== "all" ? patch.playState : undefined)
+  }
+
+  if (hasOwnKey(patch, "userRating")) {
+    applyValue("userRating", patch.userRating)
+  }
+
+  if (hasOwnKey(patch, "resolution")) {
+    applyValue("resolution", normalizeLibraryResolutionFilter(patch.resolution ?? "") || undefined)
+  }
+
+  if (hasOwnKey(patch, "addedWithinDays")) {
+    applyValue("addedWithinDays", patch.addedWithinDays)
+  }
+
   return nextQuery
 }
 
@@ -212,6 +337,16 @@ export const buildBrowseRouteTarget = (page: LibraryMode, currentQuery: Location
     actor: getLibraryActorExactQuery(currentQuery).trim() || undefined,
     studio: getLibraryStudioExactQuery(currentQuery).trim() || undefined,
     tab: getLibraryTabQuery(currentQuery),
+    playState: getLibraryPlayStateQuery(currentQuery),
+    userRating:
+      getLibraryUserRatingQuery(currentQuery) === undefined
+        ? undefined
+        : String(getLibraryUserRatingQuery(currentQuery)),
+    resolution: getLibraryResolutionQuery(currentQuery) || undefined,
+    addedWithinDays:
+      getLibraryAddedWithinDaysQuery(currentQuery) === undefined
+        ? undefined
+        : String(getLibraryAddedWithinDaysQuery(currentQuery)),
     selected: getSelectedMovieQuery(currentQuery),
   }),
 })

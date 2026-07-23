@@ -42,6 +42,12 @@ const playedIds: Set<string> = USE_WEB ? new Set() : loadIdsFromStorage()
 /** 曾进入过播放页的去重影片数（供设置页统计与 computed 依赖） */
 export const playedMovieCount = ref(playedIds.size)
 
+/** Whether this movie has ever entered a valid playback flow in the active adapter. */
+export function hasPlayedMovie(movieId: string): boolean {
+  const id = movieId.trim()
+  return id !== "" && playedIds.has(id)
+}
+
 /**
  * Web API：启动时从后端拉取已播放 id 集合。
  */

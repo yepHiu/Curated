@@ -167,7 +167,7 @@ describe("buildHomepagePortalModel", () => {
     })
 
     expect(model.recommendations[0]?.movie.id).toBe("matched")
-    expect(model.recommendations[0]?.reasons.some((reason) => reason.kind === "actor")).toBe(true)
+    expect(model.recommendations[0]?.reasons.some((reason) => reason.code === "shared_actor")).toBe(true)
   })
 
   it("prefers backend daily snapshot ids for hero and recommendation order", () => {

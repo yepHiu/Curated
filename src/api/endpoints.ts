@@ -6,10 +6,20 @@ import {
   isBackupRestorePreflightDTO,
   isBackupVerificationDTO,
   isHealthDTO,
+  isHomepageDailyRecommendationsDTO,
   isLibraryHealthRepairDTO,
   isLibraryHealthReportDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
+  isSavedViewDTO,
+  isSavedViewsDTO,
+  isRecommendationFeedbackDTO,
+  isRecommendationFeedbackListDTO,
+  isActorMergeAuditDTO,
+  isActorMergeAuditListDTO,
+  isActorMergePreviewDTO,
+  isPersonalInsightsBreakdownDTO,
+  isPersonalInsightsOverviewDTO,
 } from "./guards"
 
 function filenameFromContentDisposition(h: string | null): string {
@@ -32,6 +42,11 @@ function filenameFromContentDisposition(h: string | null): string {
 }
 import type {
   ActorListItemDTO,
+  ActorMergeAuditDTO,
+  ActorMergeAuditListDTO,
+  ActorMergePreviewDTO,
+  ActorMergePreviewRequest,
+  ApplyActorMergeRequest,
   ActorProfileDTO,
   ActorsListDTO,
   AddLibraryPathBody,
@@ -53,10 +68,14 @@ import type {
   CuratedFrameFacetListDTO,
   CuratedFrameStatsDTO,
   CreatePlaybackSessionBody,
+  CreateSavedViewBody,
   CuratedFramesListDTO,
   DevPerformanceSummaryDTO,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  CreateRecommendationFeedbackBody,
+  RecommendationFeedbackDTO,
+  RecommendationFeedbackListDTO,
   RefreshHomepageDailyRecommendationsBody,
   CheckLibraryPathStorageStatusBody,
   LibraryPathStorageStatusDTO,
@@ -88,10 +107,18 @@ import type {
   PlayedMoviesListDTO,
   PlaybackProgressListDTO,
   PlaybackWatchTimeDailyListDTO,
+  PersonalInsightsBreakdownDTO,
+  PersonalInsightsDimension,
+  PersonalInsightsOverviewDTO,
+  PersonalInsightsRange,
   ProxyJavBusPingRequestBody,
   ProxyJavBusPingResponse,
   PutMovieCommentBody,
   PutPlaybackProgressBody,
+  PatchSavedViewBody,
+  ReorderSavedViewsBody,
+  SavedViewDTO,
+  SavedViewsDTO,
   SettingsDTO,
   SetupPinBody,
   StartScanBody,
@@ -361,13 +388,33 @@ export const api = {
   },
 
   getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO> {
-    return httpClient.get<HomepageDailyRecommendationsDTO>("/homepage/recommendations")
+    return httpClient
+      .get<unknown>("/homepage/recommendations")
+      .then((value) => assertApiResponse("GET /homepage/recommendations", value, isHomepageDailyRecommendationsDTO))
   },
 
   refreshHomepageDailyRecommendations(
     body?: RefreshHomepageDailyRecommendationsBody,
   ): Promise<HomepageDailyRecommendationsDTO> {
-    return httpClient.post<HomepageDailyRecommendationsDTO>("/homepage/recommendations/refresh", body)
+    return httpClient
+      .post<unknown>("/homepage/recommendations/refresh", body)
+      .then((value) => assertApiResponse("POST /homepage/recommendations/refresh", value, isHomepageDailyRecommendationsDTO))
+  },
+
+  listHomepageRecommendationFeedback(): Promise<RecommendationFeedbackListDTO> {
+    return httpClient
+      .get<unknown>("/homepage/recommendations/feedback")
+      .then((value) => assertApiResponse("GET /homepage/recommendations/feedback", value, isRecommendationFeedbackListDTO))
+  },
+
+  createHomepageRecommendationFeedback(body: CreateRecommendationFeedbackBody): Promise<RecommendationFeedbackDTO> {
+    return httpClient
+      .post<unknown>("/homepage/recommendations/feedback", body)
+      .then((value) => assertApiResponse("POST /homepage/recommendations/feedback", value, isRecommendationFeedbackDTO))
+  },
+
+  deleteHomepageRecommendationFeedback(id: string): Promise<void> {
+    return httpClient.delete(`/homepage/recommendations/feedback/${encodeURIComponent(id)}`)
   },
 
   recordPlayedMovie(movieId: string): Promise<void> {
@@ -378,6 +425,34 @@ export const api = {
     return httpClient
       .get<unknown>("/library/movies", params as Record<string, string | number | undefined>)
       .then((value) => assertApiResponse("GET /library/movies", value, isMoviesPageDTO))
+  },
+
+  listSavedViews(): Promise<SavedViewsDTO> {
+    return httpClient
+      .get<unknown>("/library/saved-views")
+      .then((value) => assertApiResponse("GET /library/saved-views", value, isSavedViewsDTO))
+  },
+
+  createSavedView(body: CreateSavedViewBody): Promise<SavedViewDTO> {
+    return httpClient
+      .post<unknown>("/library/saved-views", body)
+      .then((value) => assertApiResponse("POST /library/saved-views", value, isSavedViewDTO))
+  },
+
+  patchSavedView(id: string, body: PatchSavedViewBody): Promise<SavedViewDTO> {
+    return httpClient
+      .patch<unknown>(`/library/saved-views/${encodeURIComponent(id)}`, body)
+      .then((value) => assertApiResponse("PATCH /library/saved-views/:id", value, isSavedViewDTO))
+  },
+
+  deleteSavedView(id: string): Promise<void> {
+    return httpClient.delete(`/library/saved-views/${encodeURIComponent(id)}`)
+  },
+
+  reorderSavedViews(body: ReorderSavedViewsBody): Promise<SavedViewsDTO> {
+    return httpClient
+      .put<unknown>("/library/saved-views/order", body)
+      .then((value) => assertApiResponse("PUT /library/saved-views/order", value, isSavedViewsDTO))
   },
 
   getActorProfile(name: string): Promise<ActorProfileDTO> {
@@ -402,6 +477,44 @@ export const api = {
   scrapeActorProfile(name: string): Promise<TaskDTO> {
     const q = new URLSearchParams({ name })
     return httpClient.post<TaskDTO>(`/library/actors/scrape?${q.toString()}`)
+  },
+
+  previewActorMerge(body: ActorMergePreviewRequest): Promise<ActorMergePreviewDTO> {
+    return httpClient
+      .post<unknown>("/library/actors/merge-preview", body)
+      .then((value) => assertApiResponse("POST /library/actors/merge-preview", value, isActorMergePreviewDTO))
+  },
+
+  applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO> {
+    return httpClient
+      .post<unknown>("/library/actors/merge", body)
+      .then((value) => assertApiResponse("POST /library/actors/merge", value, isActorMergeAuditDTO))
+  },
+
+  listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO> {
+    return httpClient
+      .get<unknown>("/library/actors/merge-audits", params)
+      .then((value) => assertApiResponse("GET /library/actors/merge-audits", value, isActorMergeAuditListDTO))
+  },
+
+  getPersonalInsightsOverview(params: {
+    range: PersonalInsightsRange
+    timezone: string
+  }): Promise<PersonalInsightsOverviewDTO> {
+    return httpClient
+      .get<unknown>("/insights/overview", params)
+      .then((value) => assertApiResponse("GET /insights/overview", value, isPersonalInsightsOverviewDTO))
+  },
+
+  getPersonalInsightsBreakdown(params: {
+    range: PersonalInsightsRange
+    timezone: string
+    dimension: PersonalInsightsDimension
+    limit?: number
+  }): Promise<PersonalInsightsBreakdownDTO> {
+    return httpClient
+      .get<unknown>("/insights/breakdown", params)
+      .then((value) => assertApiResponse("GET /insights/breakdown", value, isPersonalInsightsBreakdownDTO))
   },
 
   getMovie(movieId: string): Promise<MovieDetailDTO> {

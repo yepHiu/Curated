@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest"
 import {
   buildBrowseRouteTarget,
+  buildSavedViewFiltersV1,
+  buildSavedViewRouteTarget,
   buildClearLibraryActorFilterQuery,
   getDetailBrowseTargetMode,
   buildMovieRouteQuery,
   getBrowseSourceMode,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
+  getLibraryAddedWithinDaysQuery,
+  getLibraryPlayStateQuery,
+  getLibraryResolutionQuery,
+  getLibraryUserRatingQuery,
   getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
@@ -243,6 +249,75 @@ describe("library query helpers", () => {
       studio: "ACME",
       selected: "id-1",
       tab: "new",
+    })
+  })
+
+  it("normalizes advanced filters and preserves them through browse navigation", () => {
+    const query = {
+      playState: "unwatched",
+      userRating: "5",
+      resolution: "2160P",
+      addedWithinDays: "30",
+      selected: "movie-1",
+      autoplay: "1",
+      t: "42",
+    }
+    expect(getLibraryPlayStateQuery(query)).toBe("unwatched")
+    expect(getLibraryUserRatingQuery(query)).toBe(5)
+    expect(getLibraryResolutionQuery(query)).toBe("4k")
+    expect(getLibraryAddedWithinDaysQuery(query)).toBe(30)
+    expect(buildBrowseRouteTarget("favorites", query)).toEqual({
+      name: "favorites",
+      query: {
+        playState: "unwatched",
+        userRating: "5",
+        resolution: "4k",
+        addedWithinDays: "30",
+        selected: "movie-1",
+      },
+    })
+  })
+
+  it("builds a versioned Saved View without transient navigation state", () => {
+    const filters = buildSavedViewFiltersV1("library", {
+      q: "Mina",
+      actor: "Mina",
+      tab: "top-rated",
+      playState: "unwatched",
+      userRating: "5",
+      resolution: "2160p",
+      addedWithinDays: "90",
+      selected: "movie-1",
+      from: "detail",
+      browse: "favorites",
+      back: "library",
+      autoplay: "1",
+      t: "12",
+    })
+    expect(filters).toEqual({
+      schemaVersion: 1,
+      mode: "library",
+      q: "Mina",
+      tag: undefined,
+      actor: "Mina",
+      studio: undefined,
+      tab: "top-rated",
+      playState: "unwatched",
+      userRating: 5,
+      resolution: "4k",
+      addedWithinDays: 90,
+    })
+    expect(buildSavedViewRouteTarget(filters)).toEqual({
+      name: "library",
+      query: {
+        q: "Mina",
+        actor: "Mina",
+        tab: "top-rated",
+        playState: "unwatched",
+        userRating: "5",
+        resolution: "4k",
+        addedWithinDays: "90",
+      },
     })
   })
 

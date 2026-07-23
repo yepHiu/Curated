@@ -1863,19 +1863,20 @@ func (a *App) enqueueAutoActorProfileScrapes(ctx context.Context, actorNames []s
 	}
 }
 
-// StartActorProfileScrape enqueues Metatube actor lookup for an existing library actor row (exact name).
+// StartActorProfileScrape resolves aliases and enqueues Metatube lookup for the canonical actor.
 func (a *App) StartActorProfileScrape(ctx context.Context, actorName string) (contracts.TaskDTO, error) {
 	actorName = strings.TrimSpace(actorName)
 	if actorName == "" {
 		return contracts.TaskDTO{}, fmt.Errorf("actor name is required")
 	}
-	exists, err := a.store.ActorNameExists(ctx, actorName)
+	canonicalName, err := a.store.ResolveActorCanonicalName(ctx, actorName)
 	if err != nil {
+		if errors.Is(err, contracts.ErrActorNotFound) {
+			return contracts.TaskDTO{}, contracts.ErrActorNotFound
+		}
 		return contracts.TaskDTO{}, err
 	}
-	if !exists {
-		return contracts.TaskDTO{}, contracts.ErrActorNotFound
-	}
+	actorName = canonicalName
 
 	task, err := a.createActorProfileScrapeTask(ctx, actorName, map[string]any{"actorName": actorName})
 	if err != nil {
@@ -2633,6 +2634,9 @@ func (a *App) HTTPHandler() http.Handler {
 			PlaybackResolver:                 a,
 			NativePlaybackLauncher:           a,
 			HomepageRecommendations:          a,
+			HomepageRecommendationFeedback:   a,
+			ActorMergeProvider:               a,
+			PersonalInsightsProvider:         a,
 			AppUpdateProvider:                a,
 			BackupProvider:                   a,
 			LibraryPathStorageStatusProvider: a,

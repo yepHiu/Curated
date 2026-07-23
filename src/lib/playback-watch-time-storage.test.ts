@@ -50,6 +50,7 @@ describe("playback watch time storage", () => {
     const {
       addWatchTimeDelta,
       listDailyWatchTime,
+      listPlaybackWatchTimeMovieEntries,
       watchTimeRevision,
     } = await importStorage()
     const initialRevision = watchTimeRevision.value
@@ -80,6 +81,15 @@ describe("playback watch time storage", () => {
         "movie-1": 70,
       },
     })
+    const rows = listPlaybackWatchTimeMovieEntries()
+    expect(rows).toEqual([
+      { dayKey: outsideDefaultWindow, movieId: "movie-3", watchedSec: 300 },
+      { dayKey: yesterday, movieId: "movie-1", watchedSec: 70 },
+      { dayKey: today, movieId: "movie-1", watchedSec: 150 },
+      { dayKey: today, movieId: "movie-2", watchedSec: 50 },
+    ].sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.movieId.localeCompare(b.movieId)))
+    rows[0]!.watchedSec = 1
+    expect(listPlaybackWatchTimeMovieEntries()[0]!.watchedSec).toBe(300)
   })
 
   it("ignores invalid mock increments without bumping revision", async () => {

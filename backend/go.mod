@@ -10,6 +10,7 @@ require (
 	github.com/metatube-community/metatube-sdk-go v1.3.2
 	go.uber.org/zap v1.27.1
 	golang.org/x/sys v0.42.0
+	golang.org/x/text v0.28.0
 	gorm.io/datatypes v1.2.6
 )
 
@@ -86,7 +87,6 @@ require (
 	golang.org/x/image v0.30.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect

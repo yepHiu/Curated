@@ -14,6 +14,19 @@ const apiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   patchSettings: vi.fn(),
   importMovies: vi.fn(),
+  listSavedViews: vi.fn(),
+  createSavedView: vi.fn(),
+  patchSavedView: vi.fn(),
+  deleteSavedView: vi.fn(),
+  reorderSavedViews: vi.fn(),
+  listHomepageRecommendationFeedback: vi.fn(),
+  createHomepageRecommendationFeedback: vi.fn(),
+  deleteHomepageRecommendationFeedback: vi.fn(),
+  previewActorMerge: vi.fn(),
+  applyActorMerge: vi.fn(),
+  listActorMergeAudits: vi.fn(),
+  getPersonalInsightsOverview: vi.fn(),
+  getPersonalInsightsBreakdown: vi.fn(),
 }))
 
 function movieListDto(id: string, overrides: Partial<MovieListItemDTO> = {}): MovieListItemDTO {
@@ -112,6 +125,19 @@ beforeEach(() => {
   apiMocks.getSettings.mockReset()
   apiMocks.patchSettings.mockReset()
   apiMocks.importMovies.mockReset()
+  apiMocks.listSavedViews.mockReset()
+  apiMocks.createSavedView.mockReset()
+  apiMocks.patchSavedView.mockReset()
+  apiMocks.deleteSavedView.mockReset()
+  apiMocks.reorderSavedViews.mockReset()
+  apiMocks.listHomepageRecommendationFeedback.mockReset()
+  apiMocks.createHomepageRecommendationFeedback.mockReset()
+  apiMocks.deleteHomepageRecommendationFeedback.mockReset()
+  apiMocks.previewActorMerge.mockReset()
+  apiMocks.applyActorMerge.mockReset()
+  apiMocks.listActorMergeAudits.mockReset()
+  apiMocks.getPersonalInsightsOverview.mockReset()
+  apiMocks.getPersonalInsightsBreakdown.mockReset()
   vi.useRealTimers()
 })
 
@@ -176,6 +202,68 @@ describe("webLibraryService loadError", () => {
 })
 
 describe("webLibraryService mutations", () => {
+  it("delegates recommendation feedback lifecycle to the Web API", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    const item = {
+      id: "feedback-1",
+      action: "less" as const,
+      targetType: "actor" as const,
+      targetValue: "Actor A",
+      sourceMovieId: "movie-1",
+      createdAt: "2026-07-21T00:00:00Z",
+      updatedAt: "2026-07-21T00:00:00Z",
+    }
+    apiMocks.listHomepageRecommendationFeedback.mockResolvedValueOnce({ items: [item] })
+    apiMocks.createHomepageRecommendationFeedback.mockResolvedValueOnce(item)
+    apiMocks.deleteHomepageRecommendationFeedback.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    await expect(webLibraryService.listHomepageRecommendationFeedback()).resolves.toEqual({ items: [item] })
+    await expect(webLibraryService.createHomepageRecommendationFeedback({
+      action: "less",
+      targetType: "actor",
+      targetValue: "Actor A",
+      sourceMovieId: "movie-1",
+    })).resolves.toEqual(item)
+    await expect(webLibraryService.deleteHomepageRecommendationFeedback(item.id)).resolves.toBeUndefined()
+    expect(apiMocks.deleteHomepageRecommendationFeedback).toHaveBeenCalledWith(item.id)
+  })
+
+  it("keeps the ordered Saved Views cache in sync with API mutations", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    const first = {
+      id: "view-1",
+      name: "Unwatched",
+      filters: { schemaVersion: 1 as const, mode: "library" as const, playState: "unwatched" as const },
+      sortOrder: 0,
+      createdAt: "2026-07-20T00:00:00Z",
+      updatedAt: "2026-07-20T00:00:00Z",
+    }
+    const second = {
+      ...first,
+      id: "view-2",
+      name: "4K",
+      filters: { schemaVersion: 1 as const, mode: "library" as const, resolution: "4k" },
+      sortOrder: 1,
+    }
+    apiMocks.listSavedViews.mockResolvedValueOnce({ items: [first] })
+    apiMocks.createSavedView.mockResolvedValueOnce(second)
+    apiMocks.patchSavedView.mockResolvedValueOnce({ ...first, name: "Not watched" })
+    apiMocks.reorderSavedViews.mockResolvedValueOnce({ items: [second, { ...first, name: "Not watched", sortOrder: 1 }] })
+    apiMocks.deleteSavedView.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    await webLibraryService.refreshSavedViews()
+    await webLibraryService.createSavedView("4K", second.filters)
+    await webLibraryService.updateSavedView(first.id, { name: "Not watched" })
+    await webLibraryService.reorderSavedViews([second.id, first.id])
+    expect(webLibraryService.savedViews.value.map((item) => item.id)).toEqual([second.id, first.id])
+    await webLibraryService.deleteSavedView(second.id)
+    expect(webLibraryService.savedViews.value).toHaveLength(1)
+  })
+
   it("forwards connected clients requests to the API", async () => {
     apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.listConnectedClients.mockResolvedValueOnce({
@@ -828,5 +916,84 @@ describe("webLibraryService loading", () => {
     expect(second?.summary).toBe("Summary movie-1")
     expect(webLibraryService.getMovieById("movie-1")?.summary).toBe("Summary movie-1")
     expect(webLibraryService.loadError.value).toBeNull()
+  })
+
+  it("passes actor merge operations through and refreshes canonical movie actors after apply", async () => {
+    apiMocks.listMovies.mockResolvedValue({
+      items: [movieListDto("movie-1", { actors: ["Target"] })],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+    apiMocks.previewActorMerge.mockResolvedValue({ previewToken: "token" })
+    apiMocks.applyActorMerge.mockResolvedValue({
+      id: "amrg_1",
+      sourceName: "Source",
+      targetName: "Target",
+    })
+    apiMocks.listActorMergeAudits.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+    })
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    await expect(
+      webLibraryService.previewActorMerge({ sourceName: "Source", targetName: "Target" }),
+    ).resolves.toEqual({ previewToken: "token" })
+    await expect(
+      webLibraryService.applyActorMerge({
+        sourceName: "Source",
+        targetName: "Target",
+        previewToken: "token",
+        confirm: true,
+      }),
+    ).resolves.toMatchObject({ id: "amrg_1" })
+    await expect(webLibraryService.listActorMergeAudits()).resolves.toMatchObject({ total: 0 })
+
+    expect(apiMocks.applyActorMerge).toHaveBeenCalledWith(
+      expect.objectContaining({ confirm: true, previewToken: "token" }),
+    )
+    expect(apiMocks.listMovies).toHaveBeenCalledTimes(2)
+    expect(webLibraryService.movies.value[0]?.actors).toEqual(["Target"])
+  })
+
+  it("delegates bounded personal insights queries to the Web API", async () => {
+    apiMocks.listMovies.mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.getPersonalInsightsOverview.mockResolvedValue({
+      range: "30d",
+      watchedSeconds: 120,
+    })
+    apiMocks.getPersonalInsightsBreakdown.mockResolvedValue({
+      range: "30d",
+      dimension: "tag",
+      items: [],
+    })
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+
+    await expect(webLibraryService.getPersonalInsightsOverview({
+      range: "30d",
+      timezone: "Asia/Shanghai",
+    })).resolves.toMatchObject({ watchedSeconds: 120 })
+    await expect(webLibraryService.getPersonalInsightsBreakdown({
+      range: "30d",
+      timezone: "Asia/Shanghai",
+      dimension: "tag",
+      limit: 10,
+    })).resolves.toMatchObject({ dimension: "tag" })
+
+    expect(apiMocks.getPersonalInsightsOverview).toHaveBeenCalledWith({
+      range: "30d",
+      timezone: "Asia/Shanghai",
+    })
+    expect(apiMocks.getPersonalInsightsBreakdown).toHaveBeenCalledWith({
+      range: "30d",
+      timezone: "Asia/Shanghai",
+      dimension: "tag",
+      limit: 10,
+    })
   })
 })

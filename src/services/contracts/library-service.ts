@@ -1,6 +1,11 @@
 import type { ComputedRef } from "vue"
 import type {
   ActorListItemDTO,
+  ActorMergeAuditDTO,
+  ActorMergeAuditListDTO,
+  ActorMergePreviewDTO,
+  ActorMergePreviewRequest,
+  ApplyActorMergeRequest,
   ActorProfileDTO,
   ActorsListDTO,
   BackendLogSettingsDTO,
@@ -11,6 +16,9 @@ import type {
   CuratedFrameExportFormat,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
+  CreateRecommendationFeedbackBody,
+  RecommendationFeedbackDTO,
+  RecommendationFeedbackListDTO,
   RefreshHomepageDailyRecommendationsBody,
   LibraryPathStorageStatusDTO,
   LibraryHealthRepairDTO,
@@ -21,6 +29,10 @@ import type {
   MovieImportUploadProgress,
   NativePlaybackLaunchDTO,
   MovieCommentDTO,
+  PersonalInsightsBreakdownDTO,
+  PersonalInsightsDimension,
+  PersonalInsightsOverviewDTO,
+  PersonalInsightsRange,
   PlaybackDescriptorDTO,
   PatchBackendLogBody,
   PostCuratedFramesExportBody,
@@ -36,6 +48,8 @@ import type {
   TaskDTO,
   StartLibraryHealthRepairBody,
   StartLibraryHealthActionBody,
+  SavedViewDTO,
+  SavedViewFiltersV1,
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
@@ -51,6 +65,8 @@ export interface LibraryService {
   libraryStats: ComputedRef<readonly LibraryStat[]>
   libraryPaths: ComputedRef<readonly LibrarySetting[]>
   libraryPathStorageStatuses: ComputedRef<readonly LibraryPathStorageStatusDTO[]>
+  /** Ordered user-defined library filters (SQLite in Web API; localStorage in Mock). */
+  savedViews: ComputedRef<readonly SavedViewDTO[]>
   defaultImportLibraryPathId: ComputedRef<string>
   refreshSettings(): Promise<void>
   checkLibraryPathStorageStatus(libraryPathIds?: string[]): Promise<void>
@@ -61,6 +77,11 @@ export interface LibraryService {
   listMoviesForExport(): Promise<readonly Movie[]>
   /** Web：仅在需要展示回收站时再拉取 trashed 列表；Mock：空操作 */
   ensureTrashLoaded(): Promise<void>
+  refreshSavedViews(): Promise<void>
+  createSavedView(name: string, filters: SavedViewFiltersV1): Promise<SavedViewDTO>
+  updateSavedView(id: string, patch: { name?: string; filters?: SavedViewFiltersV1 }): Promise<SavedViewDTO>
+  deleteSavedView(id: string): Promise<void>
+  reorderSavedViews(ids: string[]): Promise<void>
   /** 与后端 GET/PATCH /api/settings 同步；mock 为本地状态 */
   organizeLibrary: ComputedRef<boolean>
   setOrganizeLibrary(value: boolean): Promise<void>
@@ -112,6 +133,9 @@ export interface LibraryService {
   pingAllProviders(): Promise<PingAllProvidersResponse>
   getHomepageDailyRecommendations(): Promise<HomepageDailyRecommendationsDTO>
   refreshHomepageDailyRecommendations(body?: RefreshHomepageDailyRecommendationsBody): Promise<HomepageDailyRecommendationsDTO>
+  listHomepageRecommendationFeedback(): Promise<RecommendationFeedbackListDTO>
+  createHomepageRecommendationFeedback(body: CreateRecommendationFeedbackBody): Promise<RecommendationFeedbackDTO>
+  deleteHomepageRecommendationFeedback(id: string): Promise<void>
   /** Web：后端会尝试对该路径启动初次扫描，返回任务供上层轮询；Mock 恒为 null */
   addLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
   updateLibraryPathTitle(id: string, title: string): Promise<void>
@@ -186,6 +210,24 @@ export interface LibraryService {
   patchActorUserTags(name: string, userTags: string[]): Promise<ActorListItemDTO>
   /** Web：PATCH /library/actors/external-links；Mock：内存 Map */
   patchActorExternalLinks(name: string, externalLinks: string[]): Promise<ActorProfileDTO>
+  /** Read-only merge preview with stale-preview token and every affected association. */
+  previewActorMerge(body: ActorMergePreviewRequest): Promise<ActorMergePreviewDTO>
+  /** Confirm and transactionally apply a previously previewed canonical merge. */
+  applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO>
+  /** Query persisted canonical merge audit history. */
+  listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO>
+  /** Return bounded, server-side personal viewing metrics for one local calendar range. */
+  getPersonalInsightsOverview(params: {
+    range: PersonalInsightsRange
+    timezone: string
+  }): Promise<PersonalInsightsOverviewDTO>
+  /** Return one bounded actor, studio, or tag attribution ranking for the same range. */
+  getPersonalInsightsBreakdown(params: {
+    range: PersonalInsightsRange
+    timezone: string
+    dimension: PersonalInsightsDimension
+    limit?: number
+  }): Promise<PersonalInsightsBreakdownDTO>
   /** Web：GET /library/movies/{id}/comment；Mock：localStorage */
   getMovieComment(movieId: string): Promise<MovieCommentDTO>
   /** Web：PUT /library/movies/{id}/comment；Mock：localStorage */

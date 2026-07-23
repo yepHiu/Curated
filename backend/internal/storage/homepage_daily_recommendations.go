@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
+	"curated-backend/internal/contracts"
 )
 
 // HomepageDailyRecommendationSnapshot is a UTC-day homepage recommendation display snapshot persisted in SQLite.
@@ -13,6 +15,7 @@ type HomepageDailyRecommendationSnapshot struct {
 	RecommendationMovieIDs []string
 	GeneratedAt            string
 	GenerationVersion      string
+	Recommendations        []contracts.HomepageRecommendationItemDTO
 }
 
 // HomepageRecommendationState tracks long-lived per-movie recommendation state (last recommended, count, skip window).
@@ -28,10 +31,12 @@ type HomepageRecommendationState struct {
 func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context, dateUTC string) (HomepageDailyRecommendationSnapshot, bool, error) {
 	var heroJSON string
 	var recommendationJSON string
+	var recommendationItemsJSON string
 	var snapshot HomepageDailyRecommendationSnapshot
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT date_utc, hero_movie_ids_json, recommendation_movie_ids_json, generated_at, generation_version
+		SELECT date_utc, hero_movie_ids_json, recommendation_movie_ids_json, generated_at, generation_version,
+		       recommendation_items_json
 		FROM homepage_daily_recommendations
 		WHERE date_utc = ?
 	`, dateUTC).Scan(
@@ -40,6 +45,7 @@ func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context
 		&recommendationJSON,
 		&snapshot.GeneratedAt,
 		&snapshot.GenerationVersion,
+		&recommendationItemsJSON,
 	)
 	if err == sql.ErrNoRows {
 		return HomepageDailyRecommendationSnapshot{}, false, nil
@@ -51,6 +57,9 @@ func (s *SQLiteStore) GetHomepageDailyRecommendationSnapshot(ctx context.Context
 		return HomepageDailyRecommendationSnapshot{}, false, err
 	}
 	if err := json.Unmarshal([]byte(recommendationJSON), &snapshot.RecommendationMovieIDs); err != nil {
+		return HomepageDailyRecommendationSnapshot{}, false, err
+	}
+	if err := json.Unmarshal([]byte(recommendationItemsJSON), &snapshot.Recommendations); err != nil {
 		return HomepageDailyRecommendationSnapshot{}, false, err
 	}
 
@@ -67,6 +76,10 @@ func (s *SQLiteStore) UpsertHomepageDailyRecommendationSnapshot(ctx context.Cont
 	if err != nil {
 		return err
 	}
+	recommendationItemsJSON, err := json.Marshal(snapshot.Recommendations)
+	if err != nil {
+		return err
+	}
 
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO homepage_daily_recommendations (
@@ -74,19 +87,22 @@ func (s *SQLiteStore) UpsertHomepageDailyRecommendationSnapshot(ctx context.Cont
 			hero_movie_ids_json,
 			recommendation_movie_ids_json,
 			generated_at,
-			generation_version
-		) VALUES (?, ?, ?, ?, ?)
+			generation_version,
+			recommendation_items_json
+		) VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(date_utc) DO UPDATE SET
 			hero_movie_ids_json = excluded.hero_movie_ids_json,
 			recommendation_movie_ids_json = excluded.recommendation_movie_ids_json,
 			generated_at = excluded.generated_at,
-			generation_version = excluded.generation_version
+			generation_version = excluded.generation_version,
+			recommendation_items_json = excluded.recommendation_items_json
 	`,
 		snapshot.DateUTC,
 		string(heroJSON),
 		string(recommendationJSON),
 		snapshot.GeneratedAt,
 		snapshot.GenerationVersion,
+		string(recommendationItemsJSON),
 	)
 	return err
 }
@@ -98,7 +114,8 @@ func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 	endDateUTC string,
 ) ([]HomepageDailyRecommendationSnapshot, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT date_utc, hero_movie_ids_json, recommendation_movie_ids_json, generated_at, generation_version
+		SELECT date_utc, hero_movie_ids_json, recommendation_movie_ids_json, generated_at, generation_version,
+		       recommendation_items_json
 		FROM homepage_daily_recommendations
 		WHERE date_utc >= ? AND date_utc <= ?
 		ORDER BY date_utc DESC
@@ -113,12 +130,14 @@ func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 		var snapshot HomepageDailyRecommendationSnapshot
 		var heroJSON string
 		var recommendationJSON string
+		var recommendationItemsJSON string
 		if err := rows.Scan(
 			&snapshot.DateUTC,
 			&heroJSON,
 			&recommendationJSON,
 			&snapshot.GeneratedAt,
 			&snapshot.GenerationVersion,
+			&recommendationItemsJSON,
 		); err != nil {
 			return nil, err
 		}
@@ -126,6 +145,9 @@ func (s *SQLiteStore) ListHomepageDailyRecommendationSnapshotsInRange(
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(recommendationJSON), &snapshot.RecommendationMovieIDs); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(recommendationItemsJSON), &snapshot.Recommendations); err != nil {
 			return nil, err
 		}
 		snapshots = append(snapshots, snapshot)

@@ -1,11 +1,19 @@
 import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import type {
   BackendLogSettingsDTO,
+  ActorMergeAuditDTO,
+  ActorMergeAuditListDTO,
+  ActorMergePreviewDTO,
+  ActorMergePreviewRequest,
+  ApplyActorMergeRequest,
   BackupManifestDTO,
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   CuratedFrameExportFormat,
   HomepageDailyRecommendationsDTO,
+  CreateRecommendationFeedbackBody,
+  RecommendationFeedbackDTO,
+  RecommendationFeedbackListDTO,
   RefreshHomepageDailyRecommendationsBody,
   LibraryPathStorageStatusDTO,
   LibraryHealthRepairDTO,
@@ -15,6 +23,10 @@ import type {
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   NativePlaybackLaunchDTO,
+  PersonalInsightsBreakdownDTO,
+  PersonalInsightsDimension,
+  PersonalInsightsOverviewDTO,
+  PersonalInsightsRange,
   PlaybackDescriptorDTO,
   PatchBackendLogBody,
   PatchMovieBody,
@@ -25,6 +37,8 @@ import type {
   TaskDTO,
   StartLibraryHealthRepairBody,
   StartLibraryHealthActionBody,
+  SavedViewDTO,
+  SavedViewFiltersV1,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
 import { api } from "@/api/endpoints"
@@ -45,6 +59,7 @@ const loadErrorState = ref<string | null>(null)
 const trashedMoviesState: Ref<Movie[]> = shallowRef([])
 const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 const libraryPathStorageStatusesState: Ref<LibraryPathStorageStatusDTO[]> = ref([])
+const savedViewsState: Ref<SavedViewDTO[]> = ref([])
 const defaultImportLibraryPathIdState = ref("")
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
@@ -389,6 +404,7 @@ function createWebLibraryService(): LibraryService {
     }),
     libraryPaths: computed(() => libraryPathsState.value),
     libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesState.value),
+    savedViews: computed(() => savedViewsState.value),
     defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
@@ -649,6 +665,39 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
+    async refreshSavedViews() {
+      const dto = await api.listSavedViews()
+      savedViewsState.value = [...dto.items]
+    },
+
+    async createSavedView(name: string, filters: SavedViewFiltersV1) {
+      const created = await api.createSavedView({ name, filters })
+      savedViewsState.value = [...savedViewsState.value, created].sort(
+        (left, right) => left.sortOrder - right.sortOrder,
+      )
+      return created
+    },
+
+    async updateSavedView(id: string, patch: { name?: string; filters?: SavedViewFiltersV1 }) {
+      const updated = await api.patchSavedView(id, patch)
+      savedViewsState.value = savedViewsState.value.map((item) =>
+        item.id === updated.id ? updated : item,
+      )
+      return updated
+    },
+
+    async deleteSavedView(id: string) {
+      await api.deleteSavedView(id)
+      savedViewsState.value = savedViewsState.value
+        .filter((item) => item.id !== id)
+        .map((item, sortOrder) => ({ ...item, sortOrder }))
+    },
+
+    async reorderSavedViews(ids: string[]) {
+      const dto = await api.reorderSavedViews({ ids })
+      savedViewsState.value = [...dto.items]
+    },
+
     async setAutoDownloadUpdates(value: boolean) {
       const seq = ++autoDownloadUpdatesSaveSeq
       autoDownloadUpdatesState.value = value
@@ -840,6 +889,20 @@ function createWebLibraryService(): LibraryService {
       body?: RefreshHomepageDailyRecommendationsBody,
     ): Promise<HomepageDailyRecommendationsDTO> {
       return await api.refreshHomepageDailyRecommendations(body)
+    },
+
+    async listHomepageRecommendationFeedback(): Promise<RecommendationFeedbackListDTO> {
+      return await api.listHomepageRecommendationFeedback()
+    },
+
+    async createHomepageRecommendationFeedback(
+      body: CreateRecommendationFeedbackBody,
+    ): Promise<RecommendationFeedbackDTO> {
+      return await api.createHomepageRecommendationFeedback(body)
+    },
+
+    async deleteHomepageRecommendationFeedback(id: string): Promise<void> {
+      await api.deleteHomepageRecommendationFeedback(id)
     },
 
     async addLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
@@ -1081,6 +1144,36 @@ function createWebLibraryService(): LibraryService {
 
     async patchActorExternalLinks(name: string, externalLinks: string[]) {
       return await api.patchActorExternalLinks(name.trim(), externalLinks)
+    },
+
+    async previewActorMerge(body: ActorMergePreviewRequest): Promise<ActorMergePreviewDTO> {
+      return await api.previewActorMerge(body)
+    },
+
+    async applyActorMerge(body: ApplyActorMergeRequest): Promise<ActorMergeAuditDTO> {
+      const audit = await api.applyActorMerge(body)
+      await reloadMoviesFromApiImmediate()
+      return audit
+    },
+
+    async listActorMergeAudits(params?: { limit?: number; offset?: number }): Promise<ActorMergeAuditListDTO> {
+      return await api.listActorMergeAudits(params)
+    },
+
+    async getPersonalInsightsOverview(params: {
+      range: PersonalInsightsRange
+      timezone: string
+    }): Promise<PersonalInsightsOverviewDTO> {
+      return await api.getPersonalInsightsOverview(params)
+    },
+
+    async getPersonalInsightsBreakdown(params: {
+      range: PersonalInsightsRange
+      timezone: string
+      dimension: PersonalInsightsDimension
+      limit?: number
+    }): Promise<PersonalInsightsBreakdownDTO> {
+      return await api.getPersonalInsightsBreakdown(params)
     },
 
     async getMovieComment(movieId: string) {

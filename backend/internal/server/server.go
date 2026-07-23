@@ -180,6 +180,23 @@ type HomepageRecommendationsProvider interface {
 	RegenerateHomepageDailyRecommendations(ctx context.Context, dateUTC string, options ...contracts.HomepageDailyRecommendationsRefreshOptions) (contracts.HomepageDailyRecommendationsDTO, error)
 }
 
+type HomepageRecommendationFeedbackProvider interface {
+	ListHomepageRecommendationFeedback(ctx context.Context) (contracts.RecommendationFeedbackListDTO, error)
+	CreateHomepageRecommendationFeedback(ctx context.Context, body contracts.CreateRecommendationFeedbackBody) (contracts.RecommendationFeedbackDTO, error)
+	DeleteHomepageRecommendationFeedback(ctx context.Context, id string) error
+}
+
+type ActorMergeProvider interface {
+	PreviewActorMerge(ctx context.Context, req contracts.ActorMergePreviewRequest) (contracts.ActorMergePreviewDTO, error)
+	ApplyActorMerge(ctx context.Context, req contracts.ApplyActorMergeRequest) (contracts.ActorMergeAuditDTO, error)
+	ListActorMergeAudits(ctx context.Context, limit, offset int) (contracts.ActorMergeAuditListDTO, error)
+}
+
+type PersonalInsightsProvider interface {
+	GetPersonalInsightsOverview(ctx context.Context, rangeValue string, timezone string) (contracts.PersonalInsightsOverviewDTO, error)
+	GetPersonalInsightsBreakdown(ctx context.Context, rangeValue string, timezone string, dimension string, limit int) (contracts.PersonalInsightsBreakdownDTO, error)
+}
+
 // AppUpdateProvider checks and returns packaged-app update status from GitHub Releases.
 type AppUpdateProvider interface {
 	GetAppUpdateStatus(ctx context.Context) (contracts.AppUpdateStatusDTO, error)
@@ -197,37 +214,40 @@ type BackupProvider interface {
 
 // Handler holds all HTTP handler dependencies and implements the API route handlers.
 type Handler struct {
-	runtimeContext              context.Context
-	cfg                         config.Config
-	logger                      *zap.Logger
-	store                       *storage.SQLiteStore
-	tasks                       *tasks.Manager
-	scanStarter                 ScanStarter
-	organizeLibraryCtl          OrganizeLibraryController
-	autoLibraryWatchCtl         AutoLibraryWatchController
-	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
-	autoDownloadUpdatesCtl      AutoDownloadUpdatesController
-	launchAtLoginCtl            LaunchAtLoginController
-	curatedFrameExportFormatCtl CuratedFrameExportFormatController
-	defaultImportLibraryPathCtl DefaultImportLibraryPathController
-	libraryPathStorageStatus    LibraryPathStorageStatusProvider
-	metadataScrapeCtl           MetadataScrapeSettings
-	providerHealthChecker       ProviderHealthChecker
-	proxyCtl                    ProxyController
-	backendLogCtl               BackendLogSettingsController
-	playerSettingsCtl           PlayerSettingsController
-	movieMetadataRefresher      MovieMetadataRefresher
-	actorProfileRefresher       ActorProfileRefresher
-	libraryWatchReloader        LibraryWatchReloader
-	devPerformanceProvider      DevPerformanceProvider
-	playbackResolver            PlaybackResolver
-	nativePlaybackLauncher      NativePlaybackLauncher
-	homepageRecommendations     HomepageRecommendationsProvider
-	appUpdateProvider           AppUpdateProvider
-	backupProvider              BackupProvider
-	importUploads               *movieImportUploadSessionStore
-	clientTracker               *clienttracker.Tracker
-	authAttempts                *authAttemptLimiter
+	runtimeContext                 context.Context
+	cfg                            config.Config
+	logger                         *zap.Logger
+	store                          *storage.SQLiteStore
+	tasks                          *tasks.Manager
+	scanStarter                    ScanStarter
+	organizeLibraryCtl             OrganizeLibraryController
+	autoLibraryWatchCtl            AutoLibraryWatchController
+	autoActorProfileScrapeCtl      AutoActorProfileScrapeController
+	autoDownloadUpdatesCtl         AutoDownloadUpdatesController
+	launchAtLoginCtl               LaunchAtLoginController
+	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
+	defaultImportLibraryPathCtl    DefaultImportLibraryPathController
+	libraryPathStorageStatus       LibraryPathStorageStatusProvider
+	metadataScrapeCtl              MetadataScrapeSettings
+	providerHealthChecker          ProviderHealthChecker
+	proxyCtl                       ProxyController
+	backendLogCtl                  BackendLogSettingsController
+	playerSettingsCtl              PlayerSettingsController
+	movieMetadataRefresher         MovieMetadataRefresher
+	actorProfileRefresher          ActorProfileRefresher
+	libraryWatchReloader           LibraryWatchReloader
+	devPerformanceProvider         DevPerformanceProvider
+	playbackResolver               PlaybackResolver
+	nativePlaybackLauncher         NativePlaybackLauncher
+	homepageRecommendations        HomepageRecommendationsProvider
+	homepageRecommendationFeedback HomepageRecommendationFeedbackProvider
+	actorMergeProvider             ActorMergeProvider
+	personalInsightsProvider       PersonalInsightsProvider
+	appUpdateProvider              AppUpdateProvider
+	backupProvider                 BackupProvider
+	importUploads                  *movieImportUploadSessionStore
+	clientTracker                  *clienttracker.Tracker
+	authAttempts                   *authAttemptLimiter
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -258,6 +278,9 @@ type Deps struct {
 	PlaybackResolver                 PlaybackResolver
 	NativePlaybackLauncher           NativePlaybackLauncher
 	HomepageRecommendations          HomepageRecommendationsProvider
+	HomepageRecommendationFeedback   HomepageRecommendationFeedbackProvider
+	ActorMergeProvider               ActorMergeProvider
+	PersonalInsightsProvider         PersonalInsightsProvider
 	AppUpdateProvider                AppUpdateProvider
 	BackupProvider                   BackupProvider
 	ClientTracker                    *clienttracker.Tracker
@@ -291,37 +314,40 @@ func NewHandler(deps Deps) *Handler {
 		}
 	}
 	return &Handler{
-		runtimeContext:              deps.RuntimeContext,
-		cfg:                         deps.Cfg,
-		logger:                      deps.Logger,
-		store:                       deps.Store,
-		tasks:                       deps.Tasks,
-		scanStarter:                 deps.ScanStarter,
-		organizeLibraryCtl:          deps.OrganizeLibraryCtl,
-		autoLibraryWatchCtl:         deps.AutoLibraryWatchCtl,
-		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
-		autoDownloadUpdatesCtl:      deps.AutoDownloadUpdatesCtl,
-		launchAtLoginCtl:            deps.LaunchAtLoginCtl,
-		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
-		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
-		libraryPathStorageStatus:    deps.LibraryPathStorageStatusProvider,
-		metadataScrapeCtl:           deps.MetadataScrapeCtl,
-		providerHealthChecker:       deps.ProviderHealthChecker,
-		proxyCtl:                    deps.ProxyCtl,
-		backendLogCtl:               deps.BackendLogCtl,
-		playerSettingsCtl:           deps.PlayerSettingsCtl,
-		movieMetadataRefresher:      deps.MovieMetadataRefresher,
-		actorProfileRefresher:       deps.ActorProfileRefresher,
-		libraryWatchReloader:        deps.LibraryWatchReloader,
-		devPerformanceProvider:      deps.DevPerformanceProvider,
-		playbackResolver:            deps.PlaybackResolver,
-		nativePlaybackLauncher:      deps.NativePlaybackLauncher,
-		homepageRecommendations:     deps.HomepageRecommendations,
-		appUpdateProvider:           deps.AppUpdateProvider,
-		backupProvider:              deps.BackupProvider,
-		importUploads:               importUploads,
-		clientTracker:               tracker,
-		authAttempts:                newAuthAttemptLimiter(),
+		runtimeContext:                 deps.RuntimeContext,
+		cfg:                            deps.Cfg,
+		logger:                         deps.Logger,
+		store:                          deps.Store,
+		tasks:                          deps.Tasks,
+		scanStarter:                    deps.ScanStarter,
+		organizeLibraryCtl:             deps.OrganizeLibraryCtl,
+		autoLibraryWatchCtl:            deps.AutoLibraryWatchCtl,
+		autoActorProfileScrapeCtl:      deps.AutoActorProfileScrapeCtl,
+		autoDownloadUpdatesCtl:         deps.AutoDownloadUpdatesCtl,
+		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
+		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
+		defaultImportLibraryPathCtl:    deps.DefaultImportLibraryPathCtl,
+		libraryPathStorageStatus:       deps.LibraryPathStorageStatusProvider,
+		metadataScrapeCtl:              deps.MetadataScrapeCtl,
+		providerHealthChecker:          deps.ProviderHealthChecker,
+		proxyCtl:                       deps.ProxyCtl,
+		backendLogCtl:                  deps.BackendLogCtl,
+		playerSettingsCtl:              deps.PlayerSettingsCtl,
+		movieMetadataRefresher:         deps.MovieMetadataRefresher,
+		actorProfileRefresher:          deps.ActorProfileRefresher,
+		libraryWatchReloader:           deps.LibraryWatchReloader,
+		devPerformanceProvider:         deps.DevPerformanceProvider,
+		playbackResolver:               deps.PlaybackResolver,
+		nativePlaybackLauncher:         deps.NativePlaybackLauncher,
+		homepageRecommendations:        deps.HomepageRecommendations,
+		homepageRecommendationFeedback: deps.HomepageRecommendationFeedback,
+		actorMergeProvider:             deps.ActorMergeProvider,
+		personalInsightsProvider:       deps.PersonalInsightsProvider,
+		appUpdateProvider:              deps.AppUpdateProvider,
+		backupProvider:                 deps.BackupProvider,
+		importUploads:                  importUploads,
+		clientTracker:                  tracker,
+		authAttempts:                   newAuthAttemptLimiter(),
 	}
 }
 
@@ -356,8 +382,16 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/health/actions", h.handleStartLibraryHealthAction)
 	mux.HandleFunc("GET /api/homepage/recommendations", h.handleGetHomepageRecommendations)
 	mux.HandleFunc("POST /api/homepage/recommendations/refresh", h.handleRefreshHomepageRecommendations)
+	mux.HandleFunc("GET /api/homepage/recommendations/feedback", h.handleListHomepageRecommendationFeedback)
+	mux.HandleFunc("POST /api/homepage/recommendations/feedback", h.handleCreateHomepageRecommendationFeedback)
+	mux.HandleFunc("DELETE /api/homepage/recommendations/feedback/{feedbackId}", h.handleDeleteHomepageRecommendationFeedback)
 	mux.HandleFunc("GET /api/library/played-movies", h.handleListPlayedMovies)
 	mux.HandleFunc("POST /api/library/played-movies/{movieId}", h.handleRecordPlayedMovie)
+	mux.HandleFunc("GET /api/library/saved-views", h.handleListSavedViews)
+	mux.HandleFunc("POST /api/library/saved-views", h.handleCreateSavedView)
+	mux.HandleFunc("PUT /api/library/saved-views/order", h.handleReorderSavedViews)
+	mux.HandleFunc("PATCH /api/library/saved-views/{savedViewId}", h.handlePatchSavedView)
+	mux.HandleFunc("DELETE /api/library/saved-views/{savedViewId}", h.handleDeleteSavedView)
 	mux.HandleFunc("GET /api/library/movies", h.handleListMovies)
 	mux.HandleFunc("GET /api/library/actors", h.handleListActors)
 	mux.HandleFunc("GET /api/library/actors/profile", h.handleGetActorProfile)
@@ -365,6 +399,11 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/actors/scrape", h.handleScrapeActorProfile)
 	mux.HandleFunc("PATCH /api/library/actors/tags", h.handlePatchActorUserTags)
 	mux.HandleFunc("PATCH /api/library/actors/external-links", h.handlePatchActorExternalLinks)
+	mux.HandleFunc("POST /api/library/actors/merge-preview", h.handlePreviewActorMerge)
+	mux.HandleFunc("POST /api/library/actors/merge", h.handleApplyActorMerge)
+	mux.HandleFunc("GET /api/library/actors/merge-audits", h.handleListActorMergeAudits)
+	mux.HandleFunc("GET /api/insights/overview", h.handleGetPersonalInsightsOverview)
+	mux.HandleFunc("GET /api/insights/breakdown", h.handleGetPersonalInsightsBreakdown)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/preview/{index}", h.handleGetMoviePreviewAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/asset/{kind}", h.handleGetMovieAsset)
 	mux.HandleFunc("GET /api/library/movies/{movieId}/playback", h.handleGetMoviePlayback)
@@ -461,13 +500,51 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		limit = 50
 	}
 
+	mode := strings.ToLower(strings.TrimSpace(query.Get("mode")))
+	if !oneOf(mode, "", "library", "favorites", "recent", "tags", "trash") {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid mode")
+		return
+	}
+
+	playState := strings.ToLower(strings.TrimSpace(query.Get("playState")))
+	if playState != "" && !oneOf(playState, "all", "unwatched", "in-progress", "completed") {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid playState")
+		return
+	}
+	var userRating *float64
+	if raw := strings.TrimSpace(query.Get("userRating")); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 5 {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "userRating must be between 0 and 5")
+			return
+		}
+		userRating = &value
+	}
+	addedAfter := strings.TrimSpace(query.Get("addedAfter"))
+	if addedAfter != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, addedAfter)
+		if err != nil {
+			parsed, err = time.Parse("2006-01-02", addedAfter)
+		}
+		if err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "addedAfter must be RFC3339 or YYYY-MM-DD")
+			return
+		}
+		addedAfter = parsed.UTC().Format(time.RFC3339Nano)
+	}
+
 	request := contracts.ListMoviesRequest{
-		Mode:   query.Get("mode"),
-		Query:  query.Get("q"),
-		Actor:  query.Get("actor"),
-		Studio: query.Get("studio"),
-		Limit:  limit,
-		Offset: offset,
+		Mode:       mode,
+		Query:      query.Get("q"),
+		Tag:        query.Get("tag"),
+		Actor:      query.Get("actor"),
+		Studio:     query.Get("studio"),
+		PlayState:  playState,
+		UserRating: userRating,
+		Resolution: normalizeSavedViewResolution(query.Get("resolution")),
+		AddedAfter: addedAfter,
+		Limit:      limit,
+		Offset:     offset,
 	}
 
 	result, err := h.store.ListMovies(r.Context(), request)

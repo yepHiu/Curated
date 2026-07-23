@@ -8,6 +8,7 @@ export type AppPage =
   | "actors"
   | "actor-detail"
   | "history"
+  | "insights"
   | "curated-frames"
   | "detail"
   | "player"

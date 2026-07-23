@@ -125,6 +125,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 			UserTags:       userTagsByMovie[row.ID],
 			RuntimeMinutes: row.RuntimeMinutes,
 			Rating:         effectiveRating(row.MetadataRating, row.UserRating),
+			UserRating:     userRatingPtr(row.UserRating),
 			IsFavorite:     row.IsFavorite,
 			AddedAt:        row.AddedAt,
 			Location:       row.Location,
@@ -209,6 +210,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		UserTags:       userTagsByMovie[row.ID],
 		RuntimeMinutes: row.RuntimeMinutes,
 		Rating:         effectiveRating(row.MetadataRating, row.UserRating),
+		UserRating:     userRatingPtr(row.UserRating),
 		IsFavorite:     row.IsFavorite,
 		AddedAt:        row.AddedAt,
 		Location:       row.Location,
@@ -262,7 +264,7 @@ func (s *SQLiteStore) lookupActorAvatarURLsByMovieID(ctx context.Context, movieI
 // movieSelectEffectiveColumns 是复用的 SELECT 片段：查询 movies 时表别名必须为 m。
 // 列表/详情里对用户可见的文本类字段优先用 user_*（非空且 trim 后非空则覆盖元数据列）；
 // year：若 user_release_date 前 4 位可解析为 1800–3000 的年份则用其作为年，否则用 m.year；
-// release_date 同样 user 优先；trashed_at 用 IFNULL 归一为 ''，便于 Scan 与下游判断。
+// release_date 同样 user 优先；trashed_at 用 IFNULL 归一为 ”，便于 Scan 与下游判断。
 const movieSelectEffectiveColumns = `
 SELECT m.id,
 	COALESCE(NULLIF(TRIM(m.user_title), ''), m.title) AS title,
@@ -284,12 +286,14 @@ SELECT m.id,
 
 // buildMovieFilters 根据列表请求拼 WHERE 子句与参数，供 ListMovies 等 COUNT/LIMIT 查询复用。
 // - mode=trash：仅回收站；否则仅非回收站（见 sqlMovie*Clause）。
-// - request.Mode==favorites：额外要求 is_favorite。
+// - request.Mode==favorites：额外要求 is_favorite；recent：仅最近 30 天入库。
+// - tags 是前端标签聚合布局模式，后端返回与 library 相同的活动影片集合。
 // - Query：在「生效」标题、番号、片商、简介上做不区分大小写的子串匹配（LIKE）。
-// - Actor：EXISTS 精确匹配演员名；Studio：与「生效」片商 TRIM 后全等。
+// - Tag / Actor：通过关联表精确匹配；Studio：与「生效」片商 TRIM 后全等。
+// - PlayState / UserRating / Resolution / AddedAfter：Saved Views 所需的稳定筛选语义。
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
-	clauses := make([]string, 0, 4)
-	args := make([]any, 0, 8)
+	clauses := make([]string, 0, 10)
+	args := make([]any, 0, 16)
 
 	mode := strings.TrimSpace(strings.ToLower(request.Mode))
 	if mode == "trash" {
@@ -298,8 +302,11 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		clauses = append(clauses, sqlMovieActiveClause)
 	}
 
-	if request.Mode == "favorites" {
+	if mode == "favorites" {
 		clauses = append(clauses, "m.is_favorite = 1")
+	}
+	if mode == "recent" {
+		clauses = append(clauses, "julianday(m.added_at) >= julianday('now', '-30 days')")
 	}
 
 	query := strings.TrimSpace(strings.ToLower(request.Query))
@@ -309,18 +316,76 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		args = append(args, like, like, like, like)
 	}
 
+	if tag := strings.TrimSpace(request.Tag); tag != "" {
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM movie_tags mt
+			INNER JOIN tags tag_filter ON tag_filter.id = mt.tag_id
+			WHERE mt.movie_id = m.id AND tag_filter.name = ?
+		)`)
+		args = append(args, tag)
+	}
+
 	if actor := strings.TrimSpace(request.Actor); actor != "" {
+		normalizedActor := NormalizeActorIdentity(actor)
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM movie_actors ma
 			INNER JOIN actors act ON act.id = ma.actor_id
-			WHERE ma.movie_id = m.id AND act.name = ?
+			WHERE ma.movie_id = m.id AND (
+				act.name = ? OR act.normalized_name = ? OR EXISTS (
+					SELECT 1 FROM actor_aliases aa
+					WHERE aa.canonical_actor_id = act.id AND aa.normalized_alias = ?
+				)
+			)
 		)`)
-		args = append(args, actor)
+		args = append(args, actor, normalizedActor, normalizedActor)
 	}
 
 	if studio := strings.TrimSpace(request.Studio); studio != "" {
 		clauses = append(clauses, `TRIM(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) = ?`)
 		args = append(args, studio)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(request.PlayState)) {
+	case "unwatched":
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM library_played_movies played WHERE played.movie_id = m.id
+		) AND NOT EXISTS (
+			SELECT 1 FROM playback_progress progress
+			WHERE progress.movie_id = m.id AND progress.position_sec >= 5
+		)`)
+	case "in-progress":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM playback_progress progress
+			WHERE progress.movie_id = m.id
+			  AND progress.position_sec >= 5
+			  AND (progress.duration_sec <= 0 OR progress.position_sec < progress.duration_sec * 0.95)
+		)`)
+	case "completed":
+		clauses = append(clauses, `EXISTS (
+			SELECT 1 FROM playback_progress progress
+			WHERE progress.movie_id = m.id
+			  AND progress.duration_sec > 0
+			  AND progress.position_sec >= progress.duration_sec * 0.95
+		)`)
+	}
+
+	if request.UserRating != nil {
+		clauses = append(clauses, "m.user_rating = ?")
+		args = append(args, *request.UserRating)
+	}
+
+	if resolution := strings.ToLower(strings.TrimSpace(request.Resolution)); resolution != "" {
+		if resolution == "4k" {
+			clauses = append(clauses, `LOWER(TRIM(m.resolution)) IN ('4k', '2160p', 'uhd', '3840x2160')`)
+		} else {
+			clauses = append(clauses, "LOWER(TRIM(m.resolution)) = ?")
+			args = append(args, resolution)
+		}
+	}
+
+	if addedAfter := strings.TrimSpace(request.AddedAfter); addedAfter != "" {
+		clauses = append(clauses, "julianday(m.added_at) >= julianday(?)")
+		args = append(args, addedAfter)
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args

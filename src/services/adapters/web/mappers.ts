@@ -39,6 +39,7 @@ export function mapMovieListItem(dto: MovieListItemDTO): Movie {
     userTags: dto.userTags ?? [],
     runtimeMinutes: dto.runtimeMinutes,
     rating: dto.rating,
+    userRating: dto.userRating === undefined ? undefined : dto.userRating,
     isFavorite: dto.isFavorite,
     addedAt: dto.addedAt,
     location: dto.location,

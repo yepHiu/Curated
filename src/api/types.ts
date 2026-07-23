@@ -161,6 +161,8 @@ export interface MovieListItemDTO {
   userTags?: string[]
   runtimeMinutes: number
   rating: number
+  /** 用户本地评分；列表筛选必须与站点/刮削评分区分 */
+  userRating?: number | null
   isFavorite: boolean
   addedAt: string
   location: string
@@ -595,6 +597,7 @@ export interface ActorProfileDTO {
   /** 演员维度用户标签，与 ActorListItemDTO.userTags 同源 */
   userTags?: string[]
   externalLinks?: string[]
+  aliases?: string[]
 }
 
 export interface PatchActorExternalLinksBody {
@@ -630,12 +633,156 @@ export interface ListActorsParams {
 export interface ListMoviesParams {
   mode?: string
   q?: string
+  /** 精确匹配元数据或用户标签 */
+  tag?: string
   /** 精确演员名，与路由 `actor` 一致 */
   actor?: string
   /** 精确厂商名，与路由 `studio` 一致 */
   studio?: string
+  playState?: "all" | "unwatched" | "in-progress" | "completed"
+  userRating?: number
+  /** `4k` 同时匹配 4K / 2160p / UHD */
+  resolution?: string
+  /** RFC3339 或 YYYY-MM-DD；后端转换为 UTC 后做 added_at 下界筛选 */
+  addedAfter?: string
   limit?: number
   offset?: number
+}
+
+export interface ActorMergeActorRefDTO {
+  id: number
+  name: string
+  aliases: string[]
+}
+
+export interface ActorMergeAssociationSummaryDTO {
+  sourceCount: number
+  targetCount: number
+  duplicateCount: number
+  resultCount: number
+}
+
+export interface ActorMergeValuesSummaryDTO {
+  source: string[]
+  target: string[]
+  result: string[]
+}
+
+export interface ActorMergeProfileFieldDTO {
+  field: string
+  sourceValue: string
+  targetValue: string
+  defaultSelection: "source" | "target"
+  conflict: boolean
+}
+
+export interface ActorMergeBlockingReasonDTO {
+  code: string
+  message: string
+}
+
+export interface ActorMergePreviewRequest {
+  sourceName: string
+  targetName: string
+}
+
+export interface ActorMergePreviewDTO {
+  previewToken: string
+  source: ActorMergeActorRefDTO
+  target: ActorMergeActorRefDTO
+  movies: ActorMergeAssociationSummaryDTO
+  userTags: ActorMergeValuesSummaryDTO
+  externalLinks: ActorMergeValuesSummaryDTO
+  recommendationFeedback: ActorMergeAssociationSummaryDTO
+  curatedFramesAffected: number
+  aliasesToMove: string[]
+  profileFields: ActorMergeProfileFieldDTO[]
+  canApply: boolean
+  blockingReasons: ActorMergeBlockingReasonDTO[]
+  requiredDecisions: string[]
+}
+
+export type ActorMergeProfileSelection = "source" | "target"
+
+export interface ApplyActorMergeRequest {
+  sourceName: string
+  targetName: string
+  previewToken: string
+  confirm: boolean
+  profileDecisions?: Record<string, ActorMergeProfileSelection>
+}
+
+export interface ActorMergeAuditSummaryDTO {
+  movies: ActorMergeAssociationSummaryDTO
+  userTags: string[]
+  externalLinks: string[]
+  aliases: string[]
+  recommendationFeedback: ActorMergeAssociationSummaryDTO
+  curatedFramesAffected: number
+  profileDecisions: Record<string, ActorMergeProfileSelection>
+}
+
+export interface ActorMergeAuditDTO {
+  id: string
+  sourceActorId: number
+  targetActorId: number
+  sourceName: string
+  targetName: string
+  previewToken: string
+  summary: ActorMergeAuditSummaryDTO
+  appliedAt: string
+}
+
+export interface ActorMergeAuditListDTO {
+  items: ActorMergeAuditDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type SavedViewMode = "library" | "favorites" | "recent" | "tags" | "trash"
+export type SavedViewTab = "all" | "new" | "top-rated"
+export type SavedViewPlayState = "all" | "unwatched" | "in-progress" | "completed"
+
+export interface SavedViewFiltersV1 {
+  schemaVersion: 1
+  mode?: SavedViewMode
+  q?: string
+  tag?: string
+  actor?: string
+  studio?: string
+  tab?: SavedViewTab
+  playState?: SavedViewPlayState
+  userRating?: number
+  resolution?: string
+  addedWithinDays?: number
+}
+
+export interface SavedViewDTO {
+  id: string
+  name: string
+  filters: SavedViewFiltersV1
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SavedViewsDTO {
+  items: SavedViewDTO[]
+}
+
+export interface CreateSavedViewBody {
+  name: string
+  filters: SavedViewFiltersV1
+}
+
+export interface PatchSavedViewBody {
+  name?: string
+  filters?: SavedViewFiltersV1
+}
+
+export interface ReorderSavedViewsBody {
+  ids: string[]
 }
 
 export interface StartScanBody {
@@ -896,6 +1043,103 @@ export interface HomepageDailyRecommendationsDTO {
   generationVersion?: string
   heroMovieIds: string[]
   recommendationMovieIds: string[]
+  recommendations: HomepageRecommendationItemDTO[]
+}
+
+export type HomepageRecommendationReasonCode =
+  | "high_user_rating"
+  | "favorite"
+  | "recently_added"
+  | "well_rated"
+  | "rediscovery"
+  | "catalog_discovery"
+  | "shared_actor"
+  | "shared_studio"
+  | "shared_tag"
+
+export interface HomepageRecommendationReasonDTO {
+  code: HomepageRecommendationReasonCode
+  entityType?: "actor" | "studio" | "tag"
+  entityValue?: string
+}
+
+export interface HomepageRecommendationFeedbackEffectDTO {
+  feedbackId: string
+  targetType: "actor" | "studio" | "tag"
+  targetValue: string
+  effect: "weight_reduced"
+}
+
+export interface HomepageRecommendationItemDTO {
+  movieId: string
+  reasons: HomepageRecommendationReasonDTO[]
+  feedbackEffects: HomepageRecommendationFeedbackEffectDTO[]
+}
+
+export type RecommendationFeedbackAction = "not_interested" | "snooze" | "less"
+export type RecommendationFeedbackTargetType = "movie" | "actor" | "studio" | "tag"
+
+export interface RecommendationFeedbackDTO {
+  id: string
+  action: RecommendationFeedbackAction
+  targetType: RecommendationFeedbackTargetType
+  targetValue: string
+  sourceMovieId: string
+  expiresAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RecommendationFeedbackListDTO {
+  items: RecommendationFeedbackDTO[]
+}
+
+export interface CreateRecommendationFeedbackBody {
+  action: RecommendationFeedbackAction
+  targetType: RecommendationFeedbackTargetType
+  targetValue: string
+  sourceMovieId: string
+  durationDays?: number
+}
+
+export type PersonalInsightsRange = "30d" | "90d" | "365d" | "all"
+export type PersonalInsightsDimension = "actor" | "studio" | "tag"
+
+export interface PersonalInsightsOverviewDTO {
+  range: PersonalInsightsRange
+  from: string
+  to: string
+  timezone: string
+  generatedAt: string
+  dataSince: string | null
+  watchedSeconds: number
+  startedMovies: number
+  completedMovies: number
+  completionRate: number | null
+  completionThreshold: number
+  ratedMovies: number
+  averageUserRating: number | null
+}
+
+export interface PersonalInsightsBreakdownItemDTO {
+  name: string
+  watchedSeconds: number
+  movieCount: number
+  shareOfTotal: number
+}
+
+export interface PersonalInsightsBreakdownDTO {
+  range: PersonalInsightsRange
+  dimension: PersonalInsightsDimension
+  from: string
+  to: string
+  timezone: string
+  generatedAt: string
+  dataSince: string | null
+  totalWatchedSeconds: number
+  attribution: "full-per-entity"
+  items: PersonalInsightsBreakdownItemDTO[]
+  limit: number
 }
 
 export interface RefreshHomepageDailyRecommendationsBody {

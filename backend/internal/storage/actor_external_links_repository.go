@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -105,22 +104,19 @@ func (s *SQLiteStore) ReplaceActorExternalLinksByName(ctx context.Context, name 
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var actorID int64
-	switch err := tx.QueryRowContext(ctx, `SELECT id FROM actors WHERE name = ?`, name).Scan(&actorID); {
-	case errors.Is(err, sql.ErrNoRows):
-		return contracts.ErrActorNotFound
-	case err != nil:
+	identity, err := resolveActorIdentity(ctx, tx, name)
+	if err != nil {
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM actor_external_links WHERE actor_id = ?`, actorID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM actor_external_links WHERE actor_id = ?`, identity.ID); err != nil {
 		return err
 	}
 	for i, item := range links {
 		now := nowUTC()
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO actor_external_links (actor_id, url, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-			actorID, item, i, now, now,
+			identity.ID, item, i, now, now,
 		); err != nil {
 			return err
 		}

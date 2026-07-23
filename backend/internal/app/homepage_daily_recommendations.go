@@ -15,7 +15,7 @@ import (
 	"curated-backend/internal/storage"
 )
 
-const homepageDailyRecommendationGenerationVersion = "v6"
+const homepageDailyRecommendationGenerationVersion = "v8"
 
 const (
 	homepageDailyHeroLimit              = 8
@@ -41,6 +41,15 @@ type homepageDailyCandidate struct {
 	uniqueActors     []string
 	normalizedStudio string
 	recencyFactor    float64 // pre-computed from homepageRecommendationWeight static parts
+	freshnessBoost   float64
+	feedbackEffects  []contracts.HomepageRecommendationFeedbackEffectDTO
+}
+
+type homepageRecommendationFeedbackPolicy struct {
+	excludedMovieIDs map[string]struct{}
+	lessActors       map[string][]storage.HomepageRecommendationFeedbackRecord
+	lessStudios      map[string][]storage.HomepageRecommendationFeedbackRecord
+	lessTags         map[string][]storage.HomepageRecommendationFeedbackRecord
 }
 
 type homepageDailySelectionState struct {
@@ -68,6 +77,7 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 			GenerationVersion:      snapshot.GenerationVersion,
 			HeroMovieIDs:           snapshot.HeroMovieIDs,
 			RecommendationMovieIDs: snapshot.RecommendationMovieIDs,
+			Recommendations:        snapshot.Recommendations,
 		}), nil
 	}
 
@@ -83,6 +93,7 @@ func (a *App) GetOrCreateHomepageDailyRecommendations(ctx context.Context, dateU
 		RecommendationMovieIDs: dto.RecommendationMovieIDs,
 		GeneratedAt:            dto.GeneratedAt,
 		GenerationVersion:      dto.GenerationVersion,
+		Recommendations:        dto.Recommendations,
 	}); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
@@ -106,7 +117,7 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 	}
 	dto = applyHomepageDailyRefreshOptions(dto, options...)
 	if hasRefreshOptions && len(normalizeHomepageMovieIDs(refreshOptions.PreserveHeroMovieIDs, homepageDailyHeroLimit)) > 0 {
-		recommendationMovieIDs, err := a.generateHomepageDailyRecommendationIDsForPreservedHero(
+		recommendationMovieIDs, recommendations, err := a.generateHomepageDailyRecommendationIDsForPreservedHero(
 			ctx,
 			dateUTC,
 			dto.HeroMovieIDs,
@@ -116,6 +127,7 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 			return contracts.HomepageDailyRecommendationsDTO{}, err
 		}
 		dto.RecommendationMovieIDs = recommendationMovieIDs
+		dto.Recommendations = recommendations
 	}
 	dto = normalizeHomepageDailyRecommendationsDTOArrays(dto)
 
@@ -125,6 +137,7 @@ func (a *App) RegenerateHomepageDailyRecommendations(ctx context.Context, dateUT
 		RecommendationMovieIDs: dto.RecommendationMovieIDs,
 		GeneratedAt:            dto.GeneratedAt,
 		GenerationVersion:      dto.GenerationVersion,
+		Recommendations:        dto.Recommendations,
 	}); err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
@@ -151,7 +164,40 @@ func firstHomepageDailyRefreshOptions(
 func normalizeHomepageDailyRecommendationsDTOArrays(dto contracts.HomepageDailyRecommendationsDTO) contracts.HomepageDailyRecommendationsDTO {
 	dto.HeroMovieIDs = cloneHomepageMovieIDs(dto.HeroMovieIDs)
 	dto.RecommendationMovieIDs = cloneHomepageMovieIDs(dto.RecommendationMovieIDs)
+	dto.Recommendations = normalizeHomepageRecommendationItems(dto.RecommendationMovieIDs, dto.Recommendations)
 	return dto
+}
+
+func normalizeHomepageRecommendationItems(
+	movieIDs []string,
+	items []contracts.HomepageRecommendationItemDTO,
+) []contracts.HomepageRecommendationItemDTO {
+	byMovieID := make(map[string]contracts.HomepageRecommendationItemDTO, len(items))
+	for _, item := range items {
+		if movieID := strings.TrimSpace(item.MovieID); movieID != "" {
+			byMovieID[movieID] = item
+		}
+	}
+	out := make([]contracts.HomepageRecommendationItemDTO, 0, len(movieIDs))
+	for _, movieID := range movieIDs {
+		item, ok := byMovieID[movieID]
+		if !ok {
+			item = contracts.HomepageRecommendationItemDTO{
+				MovieID: movieID,
+				Reasons: []contracts.HomepageRecommendationReasonDTO{{Code: "catalog_discovery"}},
+			}
+		}
+		item.Reasons = append([]contracts.HomepageRecommendationReasonDTO(nil), item.Reasons...)
+		if len(item.Reasons) == 0 {
+			item.Reasons = []contracts.HomepageRecommendationReasonDTO{{Code: "catalog_discovery"}}
+		}
+		item.FeedbackEffects = append([]contracts.HomepageRecommendationFeedbackEffectDTO(nil), item.FeedbackEffects...)
+		if item.FeedbackEffects == nil {
+			item.FeedbackEffects = []contracts.HomepageRecommendationFeedbackEffectDTO{}
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func cloneHomepageMovieIDs(movieIDs []string) []string {
@@ -207,6 +253,7 @@ func applyHomepageDailyRefreshOptions(
 		GenerationVersion:      dto.GenerationVersion,
 		HeroMovieIDs:           preservedHeroMovieIDs,
 		RecommendationMovieIDs: normalizeHomepageMovieIDsExcluding(recommendationCandidates, recommendationLimit, heroSeen),
+		Recommendations:        dto.Recommendations,
 	}
 }
 
@@ -284,8 +331,12 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 	if err != nil {
 		return contracts.HomepageDailyRecommendationsDTO{}, err
 	}
+	feedbackPolicy, err := a.loadHomepageRecommendationFeedbackPolicy(ctx, dateUTC)
+	if err != nil {
+		return contracts.HomepageDailyRecommendationsDTO{}, err
+	}
 
-	allCandidates := rankHomepageDailyCandidates(page.Items, dateUTC, exposurePenaltyByMovieID, recommendationStates)
+	allCandidates := rankHomepageDailyCandidates(page.Items, dateUTC, exposurePenaltyByMovieID, recommendationStates, feedbackPolicy)
 	selected := make(map[string]struct{})
 	selectionState := homepageDailySelectionState{
 		actorCounts:  make(map[string]int),
@@ -311,6 +362,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		exclusionLadder,
 		random,
 	)
+	recommendations := buildHomepageRecommendationItems(recommendationIDs, allCandidates, dateUTC)
 
 	dto := contracts.HomepageDailyRecommendationsDTO{
 		DateUTC:                dateUTC,
@@ -318,6 +370,7 @@ func (a *App) generateHomepageDailyRecommendations(ctx context.Context, dateUTC 
 		GenerationVersion:      homepageDailyRecommendationGenerationVersion,
 		HeroMovieIDs:           heroIDs,
 		RecommendationMovieIDs: recommendationIDs,
+		Recommendations:        recommendations,
 	}
 
 	if a.logger != nil {
@@ -342,32 +395,36 @@ func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
 	dateUTC string,
 	preservedHeroMovieIDs []string,
 	excludedRecommendationMovieIDs []string,
-) ([]string, error) {
+) ([]string, []contracts.HomepageRecommendationItemDTO, error) {
 	page, err := a.store.ListMovies(ctx, contracts.ListMoviesRequest{
 		Limit:  10000,
 		Offset: 0,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	exposurePenaltyByMovieID, err := a.buildHomepageExposurePenaltyMap(ctx, dateUTC)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	recentSnapshots, err := a.listHomepageRecentSnapshots(ctx, dateUTC, homepageDailyExposureLookbackDays)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	exclusionLadder, err := buildHomepageDailyExclusionLadder(dateUTC, recentSnapshots, homepageDailyRecentExclusionWindows)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	recommendationStates, err := a.listHomepageRecommendationStateMap(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	feedbackPolicy, err := a.loadHomepageRecommendationFeedbackPolicy(ctx, dateUTC)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	allCandidates := rankHomepageDailyCandidates(
@@ -375,6 +432,7 @@ func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
 		dateUTC,
 		exposurePenaltyByMovieID,
 		relaxHomepageDailyRecommendationCooling(recommendationStates),
+		feedbackPolicy,
 	)
 	candidateByMovieID := make(map[string]homepageDailyCandidate, len(allCandidates))
 	for _, candidate := range allCandidates {
@@ -415,7 +473,7 @@ func (a *App) generateHomepageDailyRecommendationIDsForPreservedHero(
 		exclusionLadder,
 		random,
 	)
-	return recommendationIDs, nil
+	return recommendationIDs, buildHomepageRecommendationItems(recommendationIDs, allCandidates, dateUTC), nil
 }
 
 func relaxHomepageDailyRecommendationCooling(
@@ -617,11 +675,172 @@ func buildHomepageRecentExclusionSet(
 	return excluded
 }
 
+func (a *App) loadHomepageRecommendationFeedbackPolicy(
+	ctx context.Context,
+	dateUTC string,
+) (homepageRecommendationFeedbackPolicy, error) {
+	evaluationTime := time.Now().UTC()
+	if evaluationTime.Format("2006-01-02") != dateUTC {
+		if parsed, err := time.Parse("2006-01-02", dateUTC); err == nil {
+			evaluationTime = parsed
+		}
+	}
+	rows, err := a.store.ListActiveHomepageRecommendationFeedback(ctx, evaluationTime)
+	if err != nil {
+		return homepageRecommendationFeedbackPolicy{}, err
+	}
+	policy := homepageRecommendationFeedbackPolicy{
+		excludedMovieIDs: make(map[string]struct{}),
+		lessActors:       make(map[string][]storage.HomepageRecommendationFeedbackRecord),
+		lessStudios:      make(map[string][]storage.HomepageRecommendationFeedbackRecord),
+		lessTags:         make(map[string][]storage.HomepageRecommendationFeedbackRecord),
+	}
+	for _, row := range rows {
+		target := strings.ToLower(strings.TrimSpace(row.NormalizedTarget))
+		if target == "" {
+			continue
+		}
+		if (row.Action == "not_interested" || row.Action == "snooze") && row.TargetType == "movie" {
+			policy.excludedMovieIDs[target] = struct{}{}
+			continue
+		}
+		if row.Action != "less" {
+			continue
+		}
+		switch row.TargetType {
+		case "actor":
+			target = storage.NormalizeActorIdentity(row.TargetValue)
+			policy.lessActors[target] = append(policy.lessActors[target], row)
+		case "studio":
+			policy.lessStudios[target] = append(policy.lessStudios[target], row)
+		case "tag":
+			policy.lessTags[target] = append(policy.lessTags[target], row)
+		}
+	}
+	return policy, nil
+}
+
+func (p homepageRecommendationFeedbackPolicy) factorForMovie(
+	movie contracts.MovieListItemDTO,
+) (float64, []contracts.HomepageRecommendationFeedbackEffectDTO) {
+	if _, excluded := p.excludedMovieIDs[strings.ToLower(strings.TrimSpace(movie.ID))]; excluded {
+		return 0, nil
+	}
+
+	matched := make(map[string]storage.HomepageRecommendationFeedbackRecord)
+	add := func(rows []storage.HomepageRecommendationFeedbackRecord) {
+		for _, row := range rows {
+			matched[row.ID] = row
+		}
+	}
+	for _, actor := range movie.Actors {
+		add(p.lessActors[storage.NormalizeActorIdentity(actor)])
+	}
+	add(p.lessStudios[strings.ToLower(strings.TrimSpace(movie.Studio))])
+	for _, tag := range append(append([]string{}, movie.Tags...), movie.UserTags...) {
+		add(p.lessTags[strings.ToLower(strings.TrimSpace(tag))])
+	}
+
+	effects := make([]contracts.HomepageRecommendationFeedbackEffectDTO, 0, len(matched))
+	for _, row := range matched {
+		effects = append(effects, contracts.HomepageRecommendationFeedbackEffectDTO{
+			FeedbackID:  row.ID,
+			TargetType:  row.TargetType,
+			TargetValue: row.TargetValue,
+			Effect:      "weight_reduced",
+		})
+	}
+	sort.Slice(effects, func(i, j int) bool {
+		if effects[i].TargetType != effects[j].TargetType {
+			return effects[i].TargetType < effects[j].TargetType
+		}
+		if effects[i].TargetValue != effects[j].TargetValue {
+			return effects[i].TargetValue < effects[j].TargetValue
+		}
+		return effects[i].FeedbackID < effects[j].FeedbackID
+	})
+	if len(effects) == 0 {
+		return 1, effects
+	}
+	return math.Max(0.1, math.Pow(0.35, float64(len(effects)))), effects
+}
+
+func buildHomepageRecommendationItems(
+	movieIDs []string,
+	candidates []homepageDailyCandidate,
+	dateUTC string,
+) []contracts.HomepageRecommendationItemDTO {
+	byMovieID := make(map[string]homepageDailyCandidate, len(candidates))
+	for _, candidate := range candidates {
+		byMovieID[candidate.movie.ID] = candidate
+	}
+	items := make([]contracts.HomepageRecommendationItemDTO, 0, len(movieIDs))
+	for _, movieID := range movieIDs {
+		candidate, ok := byMovieID[movieID]
+		if !ok {
+			items = append(items, contracts.HomepageRecommendationItemDTO{
+				MovieID:         movieID,
+				Reasons:         []contracts.HomepageRecommendationReasonDTO{{Code: "catalog_discovery"}},
+				FeedbackEffects: []contracts.HomepageRecommendationFeedbackEffectDTO{},
+			})
+			continue
+		}
+		items = append(items, contracts.HomepageRecommendationItemDTO{
+			MovieID:         movieID,
+			Reasons:         homepageRecommendationReasons(candidate, dateUTC),
+			FeedbackEffects: append([]contracts.HomepageRecommendationFeedbackEffectDTO(nil), candidate.feedbackEffects...),
+		})
+	}
+	return items
+}
+
+func homepageRecommendationReasons(
+	candidate homepageDailyCandidate,
+	dateUTC string,
+) []contracts.HomepageRecommendationReasonDTO {
+	reasons := make([]contracts.HomepageRecommendationReasonDTO, 0, 3)
+	appendReason := func(code string) {
+		if len(reasons) < 3 {
+			reasons = append(reasons, contracts.HomepageRecommendationReasonDTO{Code: code})
+		}
+	}
+	if candidate.movie.UserRating != nil && *candidate.movie.UserRating >= 4 {
+		appendReason("high_user_rating")
+	}
+	if candidate.movie.IsFavorite {
+		appendReason("favorite")
+	}
+	if candidate.freshnessBoost > 0 {
+		appendReason("recently_added")
+	}
+	if candidate.movie.Rating >= 4 {
+		appendReason("well_rated")
+	}
+	if homepageRecommendationIsRediscovery(candidate.state, dateUTC) {
+		appendReason("rediscovery")
+	}
+	if len(reasons) == 0 {
+		appendReason("catalog_discovery")
+	}
+	return reasons
+}
+
+func homepageRecommendationIsRediscovery(state storage.HomepageRecommendationState, dateUTC string) bool {
+	lastRecommendedAt := strings.TrimSpace(state.LastRecommendedAt)
+	if lastRecommendedAt == "" {
+		return true
+	}
+	currentDate, currentErr := time.Parse("2006-01-02", dateUTC)
+	lastTime, lastErr := time.Parse(time.RFC3339, lastRecommendedAt)
+	return currentErr == nil && lastErr == nil && currentDate.Sub(lastTime) >= 30*24*time.Hour
+}
+
 func rankHomepageDailyCandidates(
 	items []contracts.MovieListItemDTO,
 	dateUTC string,
 	extraPenalty map[string]float64,
 	states map[string]storage.HomepageRecommendationState,
+	feedbackPolicy homepageRecommendationFeedbackPolicy,
 ) []homepageDailyCandidate {
 	candidates := make([]homepageDailyCandidate, 0, len(items))
 	for _, movie := range items {
@@ -639,13 +858,16 @@ func rankHomepageDailyCandidates(
 		if strings.TrimSpace(movie.CoverURL) != "" || strings.TrimSpace(movie.ThumbURL) != "" {
 			score += 6
 		}
+		freshnessBoost := 0.0
 		if addedAt := strings.TrimSpace(movie.AddedAt); addedAt != "" {
-			score += homepageFreshnessBoost(addedAt, dateUTC)
+			freshnessBoost = homepageFreshnessBoost(addedAt, dateUTC)
+			score += freshnessBoost
 		}
 		if extraPenalty != nil {
 			score -= extraPenalty[movie.ID]
 		}
 
+		feedbackFactor, feedbackEffects := feedbackPolicy.factorForMovie(movie)
 		hashScore := homepageDailyHash(dateUTC + "|" + movie.ID)
 		candidates = append(candidates, homepageDailyCandidate{
 			movie:            movie,
@@ -654,7 +876,9 @@ func rankHomepageDailyCandidates(
 			state:            states[movie.ID],
 			uniqueActors:     normalizeUniqueActors(movie.Actors),
 			normalizedStudio: strings.TrimSpace(movie.Studio),
-			recencyFactor:    homepageRecencyFactor(states[movie.ID], dateUTC),
+			recencyFactor:    homepageRecencyFactor(states[movie.ID], dateUTC) * feedbackFactor,
+			freshnessBoost:   freshnessBoost,
+			feedbackEffects:  feedbackEffects,
 		})
 	}
 
@@ -895,7 +1119,7 @@ func homepageDiversityPenalty(
 
 	seenActors := make(map[string]struct{})
 	for _, actor := range movie.Actors {
-		normalizedActor := strings.TrimSpace(actor)
+		normalizedActor := storage.NormalizeActorIdentity(actor)
 		if normalizedActor == "" {
 			continue
 		}
@@ -917,7 +1141,7 @@ func homepageDiversityPenalty(
 func accumulateHomepageDiversity(selectionState homepageDailySelectionState, movie contracts.MovieListItemDTO) {
 	seenActors := make(map[string]struct{})
 	for _, actor := range movie.Actors {
-		normalizedActor := strings.TrimSpace(actor)
+		normalizedActor := storage.NormalizeActorIdentity(actor)
 		if normalizedActor == "" {
 			continue
 		}
@@ -941,7 +1165,7 @@ func normalizeUniqueActors(actors []string) []string {
 	seen := make(map[string]struct{}, len(actors))
 	out := make([]string, 0, len(actors))
 	for _, a := range actors {
-		na := strings.TrimSpace(a)
+		na := storage.NormalizeActorIdentity(a)
 		if na == "" {
 			continue
 		}

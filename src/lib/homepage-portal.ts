@@ -1,12 +1,10 @@
 import type { Movie } from "@/domain/movie/types"
+import type { HomepageRecommendationReasonDTO } from "@/api/types"
 import { compareByAddedAtDesc } from "@/lib/movie-sort"
 import type { PlaybackProgressEntry } from "@/lib/playback-progress-storage"
 import { hashStringToUint32, mulberry32 } from "@/lib/random-sample"
 
-export interface HomepageReason {
-  kind: "actor" | "tag" | "studio" | "favorite" | "rating"
-  label: string
-}
+export type HomepageReason = HomepageRecommendationReasonDTO
 
 export interface HomepageRecommendationEntry {
   movie: Movie
@@ -50,6 +48,10 @@ export interface BuildHomepagePortalInput {
 export interface HomepageDailyRecommendationsSelection {
   heroMovieIds?: readonly string[] | null
   recommendationMovieIds?: readonly string[] | null
+  recommendations?: readonly {
+    movieId: string
+    reasons: readonly HomepageRecommendationReasonDTO[]
+  }[] | null
 }
 
 function stableDateSeed(daySeed?: string): string {
@@ -248,11 +250,18 @@ function withHomepageDailyRecommendations(
   const fallbackRecommendations = new Map(
     model.recommendations.map((entry) => [entry.movie.id, entry] as const),
   )
+  const backendRecommendationByMovieID = new Map(
+    (Array.isArray(selection.recommendations) ? selection.recommendations : []).map(
+      (item) => [item.movieId, item] as const,
+    ),
+  )
   const recommendations: HomepageRecommendationEntry[] = recommendationMovies.map((movie) => (
-    fallbackRecommendations.get(movie.id) ?? {
-      movie,
-      reasons: [],
-      score: movie.rating * 10,
+    {
+      ...(fallbackRecommendations.get(movie.id) ?? {
+        movie,
+        score: movie.rating * 10,
+      }),
+      reasons: backendRecommendationByMovieID.get(movie.id)?.reasons ?? [{ code: "catalog_discovery" }],
     }
   ))
 
@@ -348,20 +357,21 @@ export function buildHomepagePortalModel({
 
       const reasons: HomepageReason[] = []
       if (actorMatches[0] && actorMatches[0].weight > 0) {
-        reasons.push({ kind: "actor", label: actorMatches[0].actor })
+        reasons.push({ code: "shared_actor", entityType: "actor", entityValue: actorMatches[0].actor })
       }
       if (tagMatches[0] && tagMatches[0].weight > 0) {
-        reasons.push({ kind: "tag", label: tagMatches[0].tag })
+        reasons.push({ code: "shared_tag", entityType: "tag", entityValue: tagMatches[0].tag })
       }
       if (studioWeight > 0) {
-        reasons.push({ kind: "studio", label: movie.studio })
+        reasons.push({ code: "shared_studio", entityType: "studio", entityValue: movie.studio })
       }
       if (movie.isFavorite) {
-        reasons.push({ kind: "favorite", label: "favorite" })
+        reasons.push({ code: "favorite" })
       }
       if (movie.rating >= 4.7) {
-        reasons.push({ kind: "rating", label: String(movie.rating) })
+        reasons.push({ code: "well_rated" })
       }
+      if (reasons.length === 0) reasons.push({ code: "catalog_discovery" })
 
       return {
         movie,

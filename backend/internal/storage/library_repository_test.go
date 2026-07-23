@@ -7,10 +7,57 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/scraper"
 )
+
+func TestListMovies_RecentModeUsesThirtyDayWindow(t *testing.T) {
+	t.Parallel()
+
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "recent-mode.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	insertMovie := func(id string, addedAt time.Time) {
+		t.Helper()
+		if _, err := store.db.ExecContext(ctx, `
+			INSERT INTO movies (
+				id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+				added_at, location, resolution, year, created_at, updated_at
+			) VALUES (?, ?, ?, '', '', 0, 0, 0, ?, ?, '1080p', 0, ?, ?)`,
+			id,
+			id,
+			id,
+			addedAt.Format(time.RFC3339Nano),
+			filepath.Join(t.TempDir(), id+".mp4"),
+			addedAt.Format(time.RFC3339Nano),
+			addedAt.Format(time.RFC3339Nano),
+		); err != nil {
+			t.Fatalf("insert %s: %v", id, err)
+		}
+	}
+
+	now := time.Now().UTC()
+	insertMovie("recent-movie", now.Add(-24*time.Hour))
+	insertMovie("old-movie", now.Add(-31*24*time.Hour))
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Mode: "recent", Limit: 10})
+	if err != nil {
+		t.Fatalf("list recent movies: %v", err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != "recent-movie" {
+		t.Fatalf("recent page = %#v, want only recent-movie", page)
+	}
+}
 
 func TestListMovies_EmptyRelationsEncodeAsArrays(t *testing.T) {
 	t.Parallel()

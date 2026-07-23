@@ -1,4 +1,8 @@
 import type {
+  ActorMergeAssociationSummaryDTO,
+  ActorMergeAuditDTO,
+  ActorMergeAuditListDTO,
+  ActorMergePreviewDTO,
   ConnectedClientAccessKind,
   ConnectedClientDeviceType,
   ConnectedClientDTO,
@@ -7,6 +11,10 @@ import type {
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   HealthDTO,
+  HomepageDailyRecommendationsDTO,
+  HomepageRecommendationFeedbackEffectDTO,
+  HomepageRecommendationItemDTO,
+  HomepageRecommendationReasonDTO,
   LibraryHealthFindingDTO,
   LibraryHealthRepairDTO,
   LibraryHealthReportDTO,
@@ -14,6 +22,14 @@ import type {
   MovieDetailDTO,
   MovieListItemDTO,
   MoviesPageDTO,
+  PersonalInsightsBreakdownDTO,
+  PersonalInsightsBreakdownItemDTO,
+  PersonalInsightsOverviewDTO,
+  SavedViewDTO,
+  SavedViewFiltersV1,
+  SavedViewsDTO,
+  RecommendationFeedbackDTO,
+  RecommendationFeedbackListDTO,
 } from "./types"
 
 export class InvalidApiResponseError extends Error {
@@ -61,6 +77,10 @@ function isNonNegativeInteger(value: unknown): value is number {
   return isFiniteNumber(value) && Number.isInteger(value) && value >= 0
 }
 
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
 }
@@ -100,6 +120,104 @@ export function isHealthDTO(value: unknown): value is HealthDTO {
     isString(value.databasePath) &&
     isOptionalString(value.channel) &&
     isOptionalString(value.installerVersion)
+  )
+}
+
+function isActorMergeAssociationSummaryDTO(
+  value: unknown,
+): value is ActorMergeAssociationSummaryDTO {
+  return (
+    isRecord(value) &&
+    isNonNegativeInteger(value.sourceCount) &&
+    isNonNegativeInteger(value.targetCount) &&
+    isNonNegativeInteger(value.duplicateCount) &&
+    isNonNegativeInteger(value.resultCount)
+  )
+}
+
+function isActorMergeValuesSummaryDTO(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isStringArray(value.source) &&
+    isStringArray(value.target) &&
+    isStringArray(value.result)
+  )
+}
+
+function isActorMergeProfileSelection(value: unknown): value is "source" | "target" {
+  return value === "source" || value === "target"
+}
+
+function isActorMergeProfileSelectionRecord(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).every(isActorMergeProfileSelection)
+}
+
+export function isActorMergePreviewDTO(value: unknown): value is ActorMergePreviewDTO {
+  return (
+    isRecord(value) &&
+    isString(value.previewToken) &&
+    isRecord(value.source) &&
+    isNonNegativeInteger(value.source.id) &&
+    isString(value.source.name) &&
+    isStringArray(value.source.aliases) &&
+    isRecord(value.target) &&
+    isNonNegativeInteger(value.target.id) &&
+    isString(value.target.name) &&
+    isStringArray(value.target.aliases) &&
+    isActorMergeAssociationSummaryDTO(value.movies) &&
+    isActorMergeValuesSummaryDTO(value.userTags) &&
+    isActorMergeValuesSummaryDTO(value.externalLinks) &&
+    isActorMergeAssociationSummaryDTO(value.recommendationFeedback) &&
+    isNonNegativeInteger(value.curatedFramesAffected) &&
+    isStringArray(value.aliasesToMove) &&
+    Array.isArray(value.profileFields) &&
+    value.profileFields.every(
+      (field) =>
+        isRecord(field) &&
+        isString(field.field) &&
+        isString(field.sourceValue) &&
+        isString(field.targetValue) &&
+        isActorMergeProfileSelection(field.defaultSelection) &&
+        isBoolean(field.conflict),
+    ) &&
+    isBoolean(value.canApply) &&
+    Array.isArray(value.blockingReasons) &&
+    value.blockingReasons.every(
+      (reason) => isRecord(reason) && isString(reason.code) && isString(reason.message),
+    ) &&
+    isStringArray(value.requiredDecisions)
+  )
+}
+
+export function isActorMergeAuditDTO(value: unknown): value is ActorMergeAuditDTO {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isNonNegativeInteger(value.sourceActorId) &&
+    isNonNegativeInteger(value.targetActorId) &&
+    isString(value.sourceName) &&
+    isString(value.targetName) &&
+    isString(value.previewToken) &&
+    isString(value.appliedAt) &&
+    isRecord(value.summary) &&
+    isActorMergeAssociationSummaryDTO(value.summary.movies) &&
+    isStringArray(value.summary.userTags) &&
+    isStringArray(value.summary.externalLinks) &&
+    isStringArray(value.summary.aliases) &&
+    isActorMergeAssociationSummaryDTO(value.summary.recommendationFeedback) &&
+    isNonNegativeInteger(value.summary.curatedFramesAffected) &&
+    isActorMergeProfileSelectionRecord(value.summary.profileDecisions)
+  )
+}
+
+export function isActorMergeAuditListDTO(value: unknown): value is ActorMergeAuditListDTO {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.every(isActorMergeAuditDTO) &&
+    isNonNegativeInteger(value.total) &&
+    isNonNegativeInteger(value.limit) &&
+    isNonNegativeInteger(value.offset)
   )
 }
 
@@ -313,6 +431,7 @@ export function isMovieListItemDTO(value: unknown): value is MovieListItemDTO {
     isOptionalStringArray(value.userTags) &&
     isFiniteNumber(value.runtimeMinutes) &&
     isFiniteNumber(value.rating) &&
+    isOptionalNullableNumber(value.userRating) &&
     isBoolean(value.isFavorite) &&
     isString(value.addedAt) &&
     isString(value.location) &&
@@ -347,5 +466,198 @@ export function isMoviesPageDTO(value: unknown): value is MoviesPageDTO {
     isFiniteNumber(value.total) &&
     isFiniteNumber(value.limit) &&
     isFiniteNumber(value.offset)
+  )
+}
+
+function isSavedViewFiltersV1(value: unknown): value is SavedViewFiltersV1 {
+  if (!isRecord(value) || value.schemaVersion !== 1) {
+    return false
+  }
+  const mode = value.mode
+  const tab = value.tab
+  const playState = value.playState
+  return (
+    (mode === undefined || ["library", "favorites", "recent", "tags", "trash"].includes(String(mode))) &&
+    (tab === undefined || ["all", "new", "top-rated"].includes(String(tab))) &&
+    (playState === undefined || ["all", "unwatched", "in-progress", "completed"].includes(String(playState))) &&
+    isOptionalString(value.q) &&
+    isOptionalString(value.tag) &&
+    isOptionalString(value.actor) &&
+    isOptionalString(value.studio) &&
+    isOptionalFiniteNumber(value.userRating) &&
+    isOptionalString(value.resolution) &&
+    (value.addedWithinDays === undefined || isNonNegativeInteger(value.addedWithinDays))
+  )
+}
+
+export function isSavedViewDTO(value: unknown): value is SavedViewDTO {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isSavedViewFiltersV1(value.filters) &&
+    isNonNegativeInteger(value.sortOrder) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
+export function isSavedViewsDTO(value: unknown): value is SavedViewsDTO {
+  return isRecord(value) && Array.isArray(value.items) && value.items.every(isSavedViewDTO)
+}
+
+const recommendationReasonCodes = new Set([
+  "high_user_rating",
+  "favorite",
+  "recently_added",
+  "well_rated",
+  "rediscovery",
+  "catalog_discovery",
+  "shared_actor",
+  "shared_studio",
+  "shared_tag",
+])
+
+function isHomepageRecommendationReasonDTO(value: unknown): value is HomepageRecommendationReasonDTO {
+  return (
+    isRecord(value) &&
+    isString(value.code) &&
+    recommendationReasonCodes.has(value.code) &&
+    (value.entityType === undefined || ["actor", "studio", "tag"].includes(String(value.entityType))) &&
+    isOptionalString(value.entityValue)
+  )
+}
+
+function isHomepageRecommendationFeedbackEffectDTO(value: unknown): value is HomepageRecommendationFeedbackEffectDTO {
+  return (
+    isRecord(value) &&
+    isString(value.feedbackId) &&
+    ["actor", "studio", "tag"].includes(String(value.targetType)) &&
+    isString(value.targetValue) &&
+    value.effect === "weight_reduced"
+  )
+}
+
+function isHomepageRecommendationItemDTO(value: unknown): value is HomepageRecommendationItemDTO {
+  return (
+    isRecord(value) &&
+    isString(value.movieId) &&
+    Array.isArray(value.reasons) &&
+    value.reasons.length > 0 &&
+    value.reasons.every(isHomepageRecommendationReasonDTO) &&
+    Array.isArray(value.feedbackEffects) &&
+    value.feedbackEffects.every(isHomepageRecommendationFeedbackEffectDTO)
+  )
+}
+
+export function isHomepageDailyRecommendationsDTO(value: unknown): value is HomepageDailyRecommendationsDTO {
+  if (!isRecord(value)) return false
+  const recommendationMovieIds = value.recommendationMovieIds
+  const recommendations = value.recommendations
+  return (
+    isString(value.dateUtc) &&
+    isString(value.generatedAt) &&
+    isOptionalString(value.generationVersion) &&
+    isStringArray(value.heroMovieIds) &&
+    isStringArray(recommendationMovieIds) &&
+    Array.isArray(recommendations) &&
+    recommendations.every(isHomepageRecommendationItemDTO) &&
+    recommendations.length === recommendationMovieIds.length &&
+    recommendations.every((item, index) => item.movieId === recommendationMovieIds[index])
+  )
+}
+
+export function isRecommendationFeedbackDTO(value: unknown): value is RecommendationFeedbackDTO {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    ["not_interested", "snooze", "less"].includes(String(value.action)) &&
+    ["movie", "actor", "studio", "tag"].includes(String(value.targetType)) &&
+    isString(value.targetValue) &&
+    isString(value.sourceMovieId) &&
+    isOptionalString(value.expiresAt) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
+export function isRecommendationFeedbackListDTO(value: unknown): value is RecommendationFeedbackListDTO {
+  return isRecord(value) && Array.isArray(value.items) && value.items.every(isRecommendationFeedbackDTO)
+}
+
+function isPersonalInsightsRange(value: unknown): boolean {
+  return ["30d", "90d", "365d", "all"].includes(String(value))
+}
+
+function isPersonalInsightsDimension(value: unknown): boolean {
+  return ["actor", "studio", "tag"].includes(String(value))
+}
+
+function isNullableString(value: unknown): boolean {
+  return value === null || isString(value)
+}
+
+function isPersonalInsightsBreakdownItemDTO(value: unknown): value is PersonalInsightsBreakdownItemDTO {
+  return (
+    isRecord(value) &&
+    isString(value.name) &&
+    value.name.trim().length > 0 &&
+    isNonNegativeFiniteNumber(value.watchedSeconds) &&
+    isNonNegativeInteger(value.movieCount) &&
+    isFiniteNumber(value.shareOfTotal) &&
+    value.shareOfTotal >= 0 &&
+    value.shareOfTotal <= 1
+  )
+}
+
+export function isPersonalInsightsOverviewDTO(value: unknown): value is PersonalInsightsOverviewDTO {
+  if (!isRecord(value)) return false
+  const completionRateValid = value.startedMovies === 0
+    ? value.completionRate === null
+    : isFiniteNumber(value.completionRate) &&
+      value.completionRate >= 0 &&
+      value.completionRate <= 1 &&
+      Math.abs(value.completionRate - Number(value.completedMovies) / Number(value.startedMovies)) < 1e-9
+  const averageRatingValid = value.ratedMovies === 0
+    ? value.averageUserRating === null
+    : isFiniteNumber(value.averageUserRating)
+  return (
+    isPersonalInsightsRange(value.range) &&
+    isString(value.from) &&
+    isString(value.to) &&
+    isString(value.timezone) &&
+    isString(value.generatedAt) &&
+    isNullableString(value.dataSince) &&
+    isNonNegativeFiniteNumber(value.watchedSeconds) &&
+    isNonNegativeInteger(value.startedMovies) &&
+    isNonNegativeInteger(value.completedMovies) &&
+    value.completedMovies <= value.startedMovies &&
+    completionRateValid &&
+    isFiniteNumber(value.completionThreshold) &&
+    value.completionThreshold > 0 &&
+    value.completionThreshold <= 1 &&
+    isNonNegativeInteger(value.ratedMovies) &&
+    value.ratedMovies <= value.startedMovies &&
+    averageRatingValid
+  )
+}
+
+export function isPersonalInsightsBreakdownDTO(value: unknown): value is PersonalInsightsBreakdownDTO {
+  return (
+    isRecord(value) &&
+    isPersonalInsightsRange(value.range) &&
+    isPersonalInsightsDimension(value.dimension) &&
+    isString(value.from) &&
+    isString(value.to) &&
+    isString(value.timezone) &&
+    isString(value.generatedAt) &&
+    isNullableString(value.dataSince) &&
+    isNonNegativeFiniteNumber(value.totalWatchedSeconds) &&
+    value.attribution === "full-per-entity" &&
+    isNonNegativeInteger(value.limit) &&
+    value.limit >= 1 &&
+    Array.isArray(value.items) &&
+    value.items.length <= value.limit &&
+    value.items.every(isPersonalInsightsBreakdownItemDTO)
   )
 }

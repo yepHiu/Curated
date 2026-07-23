@@ -12,15 +12,14 @@ import (
 	"curated-backend/internal/scraper"
 )
 
-// GetActorProfile loads one row from actors by exact name (library display name).
+// GetActorProfile resolves canonical names and aliases, then loads the canonical row.
 func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contracts.ActorProfileDTO, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return contracts.ActorProfileDTO{}, contracts.ErrActorNotFound
+	identity, err := resolveActorIdentity(ctx, s.db, name)
+	if err != nil {
+		return contracts.ActorProfileDTO{}, err
 	}
 	var (
 		dto              contracts.ActorProfileDTO
-		actorID          int64
 		avatar           sql.NullString
 		avatarLocalPath  sql.NullString
 		summary          sql.NullString
@@ -31,11 +30,11 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 		birthday         sql.NullString
 		profileUpdatedAt sql.NullString
 	)
-	err := s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowContext(ctx, `
 		SELECT id, name, avatar, avatar_local_path, summary, homepage, provider, provider_actor_id, height, birthday, profile_updated_at
-		FROM actors WHERE name = ?`, name,
+		FROM actors WHERE id = ?`, identity.ID,
 	).Scan(
-		&actorID,
+		&identity.ID,
 		&dto.Name,
 		&avatar,
 		&avatarLocalPath,
@@ -65,29 +64,29 @@ func (s *SQLiteStore) GetActorProfile(ctx context.Context, name string) (contrac
 	dto.Height = height
 	dto.Birthday = birthday.String
 	dto.ProfileUpdatedAt = profileUpdatedAt.String
-	tagsByID, err := s.loadActorUserTagsForIDs(ctx, []int64{actorID})
+	tagsByID, err := s.loadActorUserTagsForIDs(ctx, []int64{identity.ID})
 	if err != nil {
 		return contracts.ActorProfileDTO{}, err
 	}
-	dto.UserTags = tagsByID[actorID]
-	linksByID, err := s.loadActorExternalLinksForIDs(ctx, []int64{actorID})
+	dto.UserTags = tagsByID[identity.ID]
+	linksByID, err := s.loadActorExternalLinksForIDs(ctx, []int64{identity.ID})
 	if err != nil {
 		return contracts.ActorProfileDTO{}, err
 	}
-	dto.ExternalLinks = linksByID[actorID]
+	dto.ExternalLinks = linksByID[identity.ID]
+	dto.Aliases, err = queryActorMergeStrings(ctx, s.db,
+		`SELECT alias FROM actor_aliases WHERE canonical_actor_id = ? ORDER BY id`, identity.ID)
+	if err != nil {
+		return contracts.ActorProfileDTO{}, err
+	}
 	return dto, nil
 }
 
-// ActorNameExists reports whether an actors row exists for the exact display name.
+// ActorNameExists reports whether a canonical name or alias resolves to an actor.
 func (s *SQLiteStore) ActorNameExists(ctx context.Context, name string) (bool, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return false, nil
-	}
-	var one int
-	err := s.db.QueryRowContext(ctx, `SELECT 1 FROM actors WHERE name = ? LIMIT 1`, name).Scan(&one)
+	_, err := resolveActorIdentity(ctx, s.db, name)
 	switch {
-	case errors.Is(err, sql.ErrNoRows):
+	case errors.Is(err, contracts.ErrActorNotFound):
 		return false, nil
 	case err != nil:
 		return false, err
@@ -99,13 +98,16 @@ func (s *SQLiteStore) ActorNameExists(ctx context.Context, name string) (bool, e
 // ActorProfileNeedsScrape reports whether the exact actors row exists and still lacks both
 // a remote avatar URL and a summary. This matches the current frontend lazy auto-scrape rule.
 func (s *SQLiteStore) ActorProfileNeedsScrape(ctx context.Context, name string) (bool, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
+	identity, err := resolveActorIdentity(ctx, s.db, name)
+	if errors.Is(err, contracts.ErrActorNotFound) {
 		return false, nil
+	}
+	if err != nil {
+		return false, err
 	}
 	var avatar string
 	var summary string
-	err := s.db.QueryRowContext(ctx, `SELECT avatar, summary FROM actors WHERE name = ?`, name).Scan(&avatar, &summary)
+	err = s.db.QueryRowContext(ctx, `SELECT avatar, summary FROM actors WHERE id = ?`, identity.ID).Scan(&avatar, &summary)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return false, nil
@@ -122,6 +124,10 @@ func (s *SQLiteStore) UpdateActorProfile(ctx context.Context, p scraper.ActorPro
 	if name == "" {
 		return errors.New("empty actor display name")
 	}
+	identity, err := resolveActorIdentity(ctx, s.db, name)
+	if err != nil {
+		return err
+	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE actors SET
 			avatar = ?,
@@ -132,7 +138,7 @@ func (s *SQLiteStore) UpdateActorProfile(ctx context.Context, p scraper.ActorPro
 			height = ?,
 			birthday = ?,
 			profile_updated_at = ?
-		WHERE name = ?`,
+		WHERE id = ?`,
 		strings.TrimSpace(p.AvatarURL),
 		strings.TrimSpace(p.Summary),
 		strings.TrimSpace(p.Homepage),
@@ -141,7 +147,7 @@ func (s *SQLiteStore) UpdateActorProfile(ctx context.Context, p scraper.ActorPro
 		p.Height,
 		strings.TrimSpace(p.Birthday),
 		nowUTC(),
-		name,
+		identity.ID,
 	)
 	if err != nil {
 		return err
@@ -178,15 +184,19 @@ func (s *SQLiteStore) ListActors(ctx context.Context, req contracts.ListActorsRe
 	whereParts := []string{"1=1"}
 	args := make([]any, 0, 6)
 	if q != "" {
-		// 顶栏搜索：演员名子串 或 演员用户标签（actor_user_tags）子串，均不区分大小写
+		// 顶栏搜索：canonical name、alias 或演员用户标签子串，均不区分大小写。
 		whereParts = append(whereParts, `(
 			INSTR(LOWER(a.name), LOWER(?)) > 0
+			OR EXISTS (
+				SELECT 1 FROM actor_aliases aa
+				WHERE aa.canonical_actor_id = a.id AND INSTR(LOWER(aa.alias), LOWER(?)) > 0
+			)
 			OR EXISTS (
 				SELECT 1 FROM actor_user_tags aut
 				WHERE aut.actor_id = a.id AND INSTR(LOWER(aut.tag), LOWER(?)) > 0
 			)
 		)`)
-		args = append(args, q, q)
+		args = append(args, q, q, q)
 	}
 	if tagFilter != "" {
 		whereParts = append(whereParts, `EXISTS (SELECT 1 FROM actor_user_tags aut WHERE aut.actor_id = a.id AND aut.tag = ?)`)
@@ -327,68 +337,64 @@ func (s *SQLiteStore) ReplaceActorUserTagsByName(ctx context.Context, name strin
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var actorID int64
-	switch err := tx.QueryRowContext(ctx, `SELECT id FROM actors WHERE name = ?`, name).Scan(&actorID); {
-	case errors.Is(err, sql.ErrNoRows):
-		return contracts.ErrActorNotFound
-	case err != nil:
+	identity, err := resolveActorIdentity(ctx, tx, name)
+	if err != nil {
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM actor_user_tags WHERE actor_id = ?`, actorID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM actor_user_tags WHERE actor_id = ?`, identity.ID); err != nil {
 		return err
 	}
 	for _, t := range tags {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO actor_user_tags (actor_id, tag) VALUES (?, ?)`, actorID, t); err != nil {
+			`INSERT INTO actor_user_tags (actor_id, tag) VALUES (?, ?)`, identity.ID, t); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-// ActorListItemByName returns one list row by exact actors.name (for PATCH response).
+// ActorListItemByName resolves aliases and returns the canonical list row.
 func (s *SQLiteStore) ActorListItemByName(ctx context.Context, name string) (contracts.ActorListItemDTO, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return contracts.ActorListItemDTO{}, contracts.ErrActorNotFound
+	identity, err := resolveActorIdentity(ctx, s.db, name)
+	if err != nil {
+		return contracts.ActorListItemDTO{}, err
 	}
-	var id int64
 	var avatar string
 	var avatarLocalPath string
 	var movieCount int
-	err := s.db.QueryRowContext(ctx, `
-		SELECT a.id, a.avatar, COUNT(ma.movie_id), a.avatar_local_path
+	err = s.db.QueryRowContext(ctx, `
+		SELECT a.name, a.avatar, COUNT(ma.movie_id), a.avatar_local_path
 		FROM actors a
 		LEFT JOIN movie_actors ma ON ma.actor_id = a.id
-		WHERE a.name = ?
-		GROUP BY a.id, a.name, a.avatar, a.avatar_local_path`, name,
-	).Scan(&id, &avatar, &movieCount, &avatarLocalPath)
+		WHERE a.id = ?
+		GROUP BY a.id, a.name, a.avatar, a.avatar_local_path`, identity.ID,
+	).Scan(&identity.Name, &avatar, &movieCount, &avatarLocalPath)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return contracts.ActorListItemDTO{}, contracts.ErrActorNotFound
 	case err != nil:
 		return contracts.ActorListItemDTO{}, err
 	}
-	tagsByActor, err := s.loadActorUserTagsForIDs(ctx, []int64{id})
+	tagsByActor, err := s.loadActorUserTagsForIDs(ctx, []int64{identity.ID})
 	if err != nil {
 		return contracts.ActorListItemDTO{}, err
 	}
 	return contracts.ActorListItemDTO{
-		Name:            name,
+		Name:            identity.Name,
 		AvatarURL:       strings.TrimSpace(avatar),
 		AvatarRemoteURL: strings.TrimSpace(avatar),
 		HasLocalAvatar:  strings.TrimSpace(avatarLocalPath) != "",
 		MovieCount:      movieCount,
-		UserTags:        tagsByActor[id],
+		UserTags:        tagsByActor[identity.ID],
 	}, nil
 }
 
 // UpdateActorAvatarCache records the fetch outcome for a cached actor avatar (local path, HTTP status, last error).
 func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, localPath string, httpStatus int, lastErr string) error {
-	actorName = strings.TrimSpace(actorName)
-	if actorName == "" {
-		return contracts.ErrActorNotFound
+	identity, err := resolveActorIdentity(ctx, s.db, actorName)
+	if err != nil {
+		return err
 	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE actors SET
@@ -396,12 +402,12 @@ func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, loc
 			avatar_last_http_status = ?,
 			avatar_last_error = ?,
 			avatar_last_fetched_at = ?
-		WHERE name = ?`,
+		WHERE id = ?`,
 		strings.TrimSpace(localPath),
 		httpStatus,
 		strings.TrimSpace(lastErr),
 		nowUTC(),
-		actorName,
+		identity.ID,
 	)
 	if err != nil {
 		return err
@@ -418,12 +424,12 @@ func (s *SQLiteStore) UpdateActorAvatarCache(ctx context.Context, actorName, loc
 
 // GetActorAvatarSource returns the remote avatar URL for an actor, or empty string if none set.
 func (s *SQLiteStore) GetActorAvatarSource(ctx context.Context, actorName string) (string, error) {
-	actorName = strings.TrimSpace(actorName)
-	if actorName == "" {
-		return "", contracts.ErrActorNotFound
+	identity, err := resolveActorIdentity(ctx, s.db, actorName)
+	if err != nil {
+		return "", err
 	}
 	var avatar string
-	err := s.db.QueryRowContext(ctx, `SELECT avatar FROM actors WHERE name = ?`, actorName).Scan(&avatar)
+	err = s.db.QueryRowContext(ctx, `SELECT avatar FROM actors WHERE id = ?`, identity.ID).Scan(&avatar)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return "", contracts.ErrActorNotFound
@@ -503,12 +509,12 @@ func (s *SQLiteStore) BatchActorAvatarLocalReady(ctx context.Context, actorNames
 
 // OpenActorAvatarFile opens the local cached avatar file for an actor after path-policy validation.
 func (s *SQLiteStore) OpenActorAvatarFile(ctx context.Context, actorName, cacheDir string) (*os.File, error) {
-	actorName = strings.TrimSpace(actorName)
-	if actorName == "" {
+	identity, err := resolveActorIdentity(ctx, s.db, actorName)
+	if err != nil {
 		return nil, ErrMovieAssetNotFound
 	}
 	var localPath string
-	err := s.db.QueryRowContext(ctx, `SELECT avatar_local_path FROM actors WHERE name = ? AND TRIM(avatar_local_path) != ''`, actorName).Scan(&localPath)
+	err = s.db.QueryRowContext(ctx, `SELECT avatar_local_path FROM actors WHERE id = ? AND TRIM(avatar_local_path) != ''`, identity.ID).Scan(&localPath)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrMovieAssetNotFound

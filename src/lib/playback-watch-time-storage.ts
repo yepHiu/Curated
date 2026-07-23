@@ -14,6 +14,12 @@ const MAX_DELTA_SEC = 300
 
 type StoreShape = Record<string, Record<string, number>>
 
+export interface PlaybackWatchTimeMovieEntry {
+  dayKey: string
+  movieId: string
+  watchedSec: number
+}
+
 export const watchTimeRevision = ref(0)
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -116,4 +122,23 @@ export async function listDailyWatchTime(
   }
   cache = normalizeStore(cache)
   return buildWatchTimeSummary(aggregateStore(cache), { days: windowDays })
+}
+
+/**
+ * Return a normalized snapshot for bounded Mock-side aggregates. The returned
+ * rows are detached from the mutable cache and are never exposed by the
+ * LibraryService contract to rendered pages.
+ */
+export function listPlaybackWatchTimeMovieEntries(): PlaybackWatchTimeMovieEntry[] {
+  if (USE_WEB) return []
+  cache = normalizeStore(cache)
+  return Object.entries(cache)
+    .flatMap(([dayKey, movies]) =>
+      Object.entries(movies).map(([movieId, watchedSec]) => ({
+        dayKey,
+        movieId,
+        watchedSec,
+      })),
+    )
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.movieId.localeCompare(b.movieId))
 }

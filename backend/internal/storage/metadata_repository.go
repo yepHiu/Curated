@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"curated-backend/internal/contracts"
 	"curated-backend/internal/scraper"
 )
 
@@ -198,11 +199,29 @@ func upsertMediaAsset(ctx context.Context, tx *sql.Tx, id, movieID, assetType, s
 }
 
 func ensureActor(ctx context.Context, tx *sql.Tx, name string) (int64, error) {
-	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO actors (name, avatar) VALUES (?, '')`, name)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, errors.New("empty actor name")
+	}
+	resolved, err := resolveActorIdentity(ctx, tx, name)
+	if err == nil {
+		return resolved.ID, nil
+	}
+	if !errors.Is(err, contracts.ErrActorNotFound) {
+		return 0, err
+	}
+	_, err = tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO actors (name, normalized_name, avatar) VALUES (?, ?, '')`,
+		name, NormalizeActorIdentity(name),
+	)
 	if err != nil {
 		return 0, err
 	}
-	return lookupEntityID(ctx, tx, `SELECT id FROM actors WHERE name = ?`, name)
+	resolved, err = resolveActorIdentity(ctx, tx, name)
+	if err != nil {
+		return 0, err
+	}
+	return resolved.ID, nil
 }
 
 func ensureTag(ctx context.Context, tx *sql.Tx, name string) (int64, error) {
