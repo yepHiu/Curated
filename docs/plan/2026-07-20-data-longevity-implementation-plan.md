@@ -1,7 +1,7 @@
 # Curated Data Longevity 实施计划
 
 日期：2026-07-20
-状态：in-progress
+状态：verified
 关联需求：REQ-0014～REQ-0018
 上位计划：`docs/plan/2026-07-19-project-feature-quality-audit.md`
 
@@ -13,7 +13,7 @@
 | C2 Settings Maintenance | verified | `e7958490`；受 PIN 保护的 create / verify / preflight API、Web/Mock service contract、三语 Settings UI、目标 Vitest、全量 167/684 Vitest、4/28 Electron、4 项 Chromium e2e、typecheck/lint/build 与全量 Go test/vet 均通过 |
 | C3 路径迁移 CLI | verified | `1d9b2070`；只读 plan、7 列白名单、Windows/UNC/Unix 与跨平台映射、目标/冲突检查、迁移前已验证备份、单事务 apply + audit、binding reset、目标/全量 Go test/vet 与真实临时 SQLite CLI 演练通过 |
 | C4 上传 session 持久化 | verified | `3e77766e`；SQLite session/file/chunk ledger、重启恢复、提交中断协调、24h sliding TTL、审计 janitor、离线目标延迟与全量 Go/前端/Electron/e2e/build 门禁通过 |
-| C5 Library Health / 修复队列 | not-started | REQ-0017、REQ-0018 |
+| C5 Library Health / 修复队列 | verified | `19056f99`、`24b9fceb`、`2348c566`、`01f1ffd6`、`dd6b4bea`、`f34073b2`、`dd42c0f2`、`827b851d`；只读离线安全扫描、稳定 finding、持久化有界修复、确认式审计清理、三语 UI、浏览器 QA、全量门禁与 Bundle hard budget 通过 |
 
 ## 1. 目标与边界
 
@@ -106,6 +106,17 @@ config/library-config.cfg   # 原文件存在时
 - 检测与修复分离；默认只读，不在扫描阶段自动删除或覆盖。
 - 修复使用现有 task lifecycle，支持重新扫描、重新刮削、清理已确认孤儿和导出诊断。
 
+完成结果（2026-07-20）：
+
+- `POST /api/library/health/scan` 返回 `healthy | attention | critical`、SQLite quick/fk 状态、存储状态、完整分类计数、稳定 finding ID、实体/路径和允许 action。明细可截断但计数完整；空结果稳定编码为 `[]` 而不是 `null`。
+- 离线、卷不匹配、路径缺失或权限异常的根只报告根级 finding 并累计 `skippedOfflineFiles`，不把断开的外置盘误报为源文件删除。扫描不修改 staging、元数据或最终影片文件；`.curated-import` 只检查第一层，只有未登记、非 symlink、严格命名的 `upload_<16 lowercase hex>` 才允许自动清理。
+- migration `0030_library_health_repairs.sql` 持久化最新 metadata attempt、repair run 和 repair item；`POST /api/library/health/repairs` 只接受重新扫描后仍存在的 `metadata_missing` / `metadata_failed` finding，必须 `confirm:true`，后端最多 100 项、Settings 最多 25 项。每个 `scrape.movie` 子任务与逐项成功/失败持久化；重启把未完成项明确标为 `cancelled / HEALTH_REPAIR_INTERRUPTED`；旧 task 的晚到结果不能覆盖更新 attempt。成功 provider 即使没有简介也不会被 placeholder 误判为缺失。
+- migration `0031_library_health_cleanup_audits.sql` 与 `POST /api/library/health/actions` 实现确认式清理。孤儿状态仅限 `playback_progress`、`library_movie_comments`、`library_played_movies`、`playback_daily_watch_time` 白名单并与 audit 同事务；暂存清理重新验证在线配置根、精确 descendant、严格 upload ID、无 session、非 symlink，删除前写 cleanup audit。旧/stale finding 整体拒绝，最终影片文件永不进入候选。
+- Settings -> Maintenance 提供只读扫描、语义状态、完整计数、finding/path 明细、JSON 导出、missing/failed 修复确认、孤儿/暂存清理确认、进度和逐项结果；Mock 明确禁用。Playwright Chromium 真实隔离后端 QA 覆盖健康空状态、三类 finding、metadata 确认 Dialog、cleanup 确认/执行/审计、375px 与桌面视口、44px 主按钮、无横向溢出和 0 console error/warning；应用内 Browser runtime 列表为空，按技能故障排查后记录原因并回退 Playwright。
+- 运行态 QA 发现并修复两个契约问题：零 finding 不再序列化为 `null`；成功刮削但 provider 无简介时不再误入 `metadata_missing`。确认式暂存清理的实测任务只移除临时目录，最终影片保持存在，task metadata 记录 `status=removed`。
+- Library Health 工作台通过异步组件从 Settings chunk 拆出；英文/日文 locale 按需加载并在切换前完成消息注册，翻译型 Select 当前值可即时刷新。最终 `bundle-analysis.json`：首屏 `333469 raw / 120624 gzip`，`index` `80193 / 29668`，`SettingsView` `202497 / 42252`，Library Health chunk `21160 / 4987`，均低于硬预算。
+- 最终门禁：`go test ./...`、`go vet ./...`、typecheck、lint、全量 Vitest（168 files / 694 tests）、Electron Vitest（4 files / 28 tests）、Chromium e2e（4/4）、生产 build、`build:electron:main`、PRD lint、PRD 单测与 `git diff --check` 全部通过；未运行未获授权的 `test:display`，也不声称本机未启用 CGO 的 race detector 通过。
+
 ## 4. 验证与提交策略
 
 每个切片必须：
@@ -115,4 +126,14 @@ config/library-config.cfg   # 原文件存在时
 - 更新 `API.md`、README 三语版、`CLAUDE.md`、`project-facts.mdc` 和架构 HTML 中受影响的端点与事实；
 - 精确暂存并按最小行为单元提交；未经用户明确要求不 push。
 
-Milestone C 最终审计需要逐条对应 REQ-0014～REQ-0018 的 acceptance criteria 和权威测试证据，不能用“相关测试大多通过”替代逐项证明。
+Milestone C 最终审计（2026-07-20）：
+
+| 需求 | 结论 | 权威证据 |
+|---|---|---|
+| REQ-0014 | verified | 一致备份、manifest、校验、preflight、离线原子 restore 与回滚副本；C1/C2 提交和全量门禁 |
+| REQ-0015 | verified | 只读 plan、7 列白名单、目标/冲突阻断、已验证备份、单事务 apply/audit、真实临时 SQLite 演练 |
+| REQ-0016 | verified | SQLite upload/file/chunk ledger、重启/提交中断恢复、离线延迟、审计 janitor、严格不覆盖/不删最终文件 |
+| REQ-0017 | verified | 稳定类别/计数与实体/路径、SQLite/存储/文件/资源/孤儿/staging 只读诊断、离线安全、显式确认与 cleanup audit |
+| REQ-0018 | verified | missing/failed 过滤、100/25 上限、parent/child task、逐项持久化、重启中断、成功 metadata 不误入队列、显式确认 |
+
+结论：REQ-0014～REQ-0018 的 acceptance criteria 均有代码、专项测试、运行态 QA 与全量门禁证据，Milestone C / Data Longevity 标记为 `verified`。

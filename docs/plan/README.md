@@ -19,7 +19,7 @@
 
 ## 当前主计划
 
-当前执行中的主计划是 [`2026-07-19-project-feature-quality-audit.md`](2026-07-19-project-feature-quality-audit.md)，对应 PRD 中 Milestone A～C 的条目。容器、WebDAV、合规解耦、漫画库和 Android 等文档在未进入 PRD 且未被选为 Milestone E 主分支前，均不与主计划并行实施。
+当前执行中的主计划是 [`2026-07-19-project-feature-quality-audit.md`](2026-07-19-project-feature-quality-audit.md)。Milestone A～C 已验证；当前 Milestone D 的独立执行入口是 [`2026-07-20-personalization-implementation-plan.md`](2026-07-20-personalization-implementation-plan.md)，对应 REQ-0019～REQ-0022。容器、WebDAV、合规解耦、漫画库和 Android 等文档在未进入 PRD 且未被选为 Milestone E 主分支前，均不与主计划并行实施。
 
 ## 状态流转
 
