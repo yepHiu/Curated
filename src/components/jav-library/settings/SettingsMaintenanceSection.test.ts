@@ -32,10 +32,33 @@ describe("SettingsMaintenanceSection", () => {
 
     expect(wrapper.text()).toContain("settings.manualCardTitle")
     expect(wrapper.text()).toContain("settings.configCardTitle")
+    expect(wrapper.findAll('[data-slot="card"]')).toHaveLength(1)
+
+    const maintenanceBlocks = wrapper.findAll("[data-settings-maintenance-block]")
+    // The health block stays asynchronously loaded; the three synchronous
+    // blocks lock the parent card composition while health has its own suite.
+    expect(maintenanceBlocks).toHaveLength(3)
+    expect(maintenanceBlocks.every((block) => block.classes().includes("p-4"))).toBe(true)
 
     await wrapper.get("[data-settings-full-scan]").trigger("click")
 
     expect(wrapper.emitted("runFullScan")).toHaveLength(1)
+  })
+
+  it("keeps primary maintenance actions comfortable on narrow screens", () => {
+    const wrapper = mount(SettingsMaintenanceSection, {
+      props: {
+        fullScanBusy: false,
+        backupSupported: false,
+        healthSupported: false,
+      },
+    })
+
+    const fullScan = wrapper.get("[data-settings-full-scan]")
+    expect(fullScan.attributes("data-settings-comfortable-control")).toBeDefined()
+    expect(fullScan.classes()).toContain("min-h-11")
+    expect(fullScan.classes()).toContain("w-full")
+    expect(fullScan.classes()).toContain("sm:w-auto")
   })
 
   it("disables full scan while a scan is busy", () => {

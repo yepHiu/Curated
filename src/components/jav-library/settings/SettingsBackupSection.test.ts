@@ -79,6 +79,9 @@ describe("SettingsBackupSection", () => {
 
   it("creates a package and immediately verifies it", async () => {
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    const block = wrapper.get('[data-settings-maintenance-block="backup"]')
+    expect(block.classes()).toContain("p-4")
+
     await wrapper.get("[data-settings-backup-path]").setValue("D:\\Backups\\curated")
     await wrapper.get("[data-settings-backup-create]").trigger("click")
     await flushPromises()

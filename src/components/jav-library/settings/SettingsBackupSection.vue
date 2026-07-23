@@ -17,13 +17,6 @@ import type {
 } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { pushAppToast } from "@/composables/use-app-toast"
@@ -34,6 +27,7 @@ import {
 } from "@/lib/backup-path"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
+import { statusPanelClass } from "@/lib/ui/status-tone"
 import { useLibraryService } from "@/services/library-service"
 
 const props = defineProps<{
@@ -162,30 +156,27 @@ function formatBytes(value: number): string {
 </script>
 
 <template>
-  <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-    <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
-      <span
-        class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-        aria-hidden="true"
-      >
-        <DatabaseBackup class="size-[1.15rem]" />
-      </span>
+  <section
+    aria-labelledby="settings-backup-title"
+    class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+    data-settings-maintenance-block="backup"
+  >
+    <div class="flex flex-col gap-2">
       <div class="flex min-w-0 flex-wrap items-center gap-2">
-        <CardTitle class="min-w-0 text-lg tracking-tight">
+        <DatabaseBackup class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <h3 id="settings-backup-title" class="min-w-0 text-sm font-semibold text-foreground">
           {{ t("settings.backupCardTitle") }}
-        </CardTitle>
+        </h3>
         <Badge :variant="supported ? 'success' : 'secondary'">
           {{ supported ? t("settings.backupAvailable") : t("settings.backupWebRequired") }}
         </Badge>
       </div>
-      <CardDescription
-        class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-      >
+      <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
         {{ t("settings.backupCardDesc") }}
-      </CardDescription>
-    </CardHeader>
+      </p>
+    </div>
 
-    <CardContent class="flex flex-col gap-4 pt-0">
+    <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
       <div class="flex flex-col gap-2">
         <label for="settings-backup-path" class="text-sm font-medium text-foreground">
           {{ t("settings.backupPathLabel") }}
@@ -211,11 +202,11 @@ function formatBytes(value: number): string {
         </p>
       </div>
 
-      <div class="flex flex-wrap gap-2">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Button
           type="button"
           variant="outline"
-          class="h-auto min-h-11 transition-colors"
+          class="h-auto min-h-11 w-full transition-colors"
           :disabled="!supported || busy"
           data-settings-comfortable-control
           data-settings-backup-pick
@@ -226,7 +217,7 @@ function formatBytes(value: number): string {
         </Button>
         <Button
           type="button"
-          class="h-auto min-h-11 transition-colors"
+          class="h-auto min-h-11 w-full transition-colors"
           :disabled="!supported || busy"
           data-settings-comfortable-control
           data-settings-backup-create
@@ -239,7 +230,7 @@ function formatBytes(value: number): string {
         <Button
           type="button"
           variant="secondary"
-          class="h-auto min-h-11 transition-colors"
+          class="h-auto min-h-11 w-full transition-colors"
           :disabled="!supported || busy"
           data-settings-comfortable-control
           data-settings-backup-verify
@@ -251,7 +242,7 @@ function formatBytes(value: number): string {
         <Button
           type="button"
           variant="secondary"
-          class="h-auto min-h-11 transition-colors"
+          class="h-auto min-h-11 w-full transition-colors"
           :disabled="!supported || busy"
           data-settings-comfortable-control
           data-settings-backup-preflight
@@ -261,6 +252,7 @@ function formatBytes(value: number): string {
           {{ t("settings.backupPreflight") }}
         </Button>
       </div>
+    </div>
 
       <p v-if="actionError" class="text-sm text-destructive" role="alert">
         {{ actionError }}
@@ -321,10 +313,11 @@ function formatBytes(value: number): string {
         </div>
       </template>
 
-      <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-        <ArchiveRestore class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
+      <div :class="statusPanelClass('info')">
+        <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <ArchiveRestore class="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
+          <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
+        </div>
       </div>
-    </CardContent>
-  </Card>
+  </section>
 </template>

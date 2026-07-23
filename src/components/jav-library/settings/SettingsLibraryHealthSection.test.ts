@@ -134,6 +134,9 @@ describe("SettingsLibraryHealthSection", () => {
       props: { supported: true },
       global: { stubs: { teleport: true } },
     })
+    const block = wrapper.get('[data-settings-maintenance-block="health"]')
+    expect(block.classes()).toContain("p-4")
+
     await wrapper.get("[data-library-health-scan]").trigger("click")
     await flushPromises()
 

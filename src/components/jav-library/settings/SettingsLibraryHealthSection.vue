@@ -22,13 +22,6 @@ import type {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -280,25 +273,26 @@ function downloadDiagnostics() {
 </script>
 
 <template>
-  <div class="break-inside-avoid">
-    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
-        <span
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-          aria-hidden="true"
-        >
-          <Activity class="size-[1.15rem]" />
-        </span>
-        <CardTitle class="min-w-0 text-lg tracking-tight">
-          {{ t("settings.libraryHealthTitle") }}
-        </CardTitle>
-        <CardDescription class="col-start-2 text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
+  <div class="contents">
+    <section
+      aria-labelledby="settings-library-health-title"
+      class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+      data-settings-maintenance-block="health"
+    >
+      <div class="flex min-w-0 flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <Activity class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <h3 id="settings-library-health-title" class="text-sm font-semibold text-foreground">
+            {{ t("settings.libraryHealthTitle") }}
+          </h3>
+        </div>
+        <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
           {{ t("settings.libraryHealthDescription") }}
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent class="flex flex-col gap-3 pt-0">
-        <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex min-w-0 flex-col gap-2">
             <p class="text-sm font-semibold text-foreground">
               {{ t("settings.libraryHealthScanTitle") }}
@@ -307,12 +301,12 @@ function downloadDiagnostics() {
               {{ t("settings.libraryHealthScanHint") }}
             </p>
           </div>
-          <div class="flex shrink-0 flex-wrap gap-2">
+          <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
               v-if="report"
               type="button"
               variant="outline"
-              class="h-auto min-h-11 rounded-2xl px-4"
+              class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
               data-settings-comfortable-control
               data-library-health-export
               :disabled="reportBusy"
@@ -323,7 +317,7 @@ function downloadDiagnostics() {
             </Button>
             <Button
               type="button"
-              class="h-auto min-h-11 rounded-2xl px-5 font-medium"
+              class="h-auto min-h-11 w-full rounded-2xl px-5 font-medium sm:w-auto"
               data-settings-comfortable-control
               data-library-health-scan
               :disabled="!supported || reportBusy || maintenanceActive"
@@ -336,34 +330,42 @@ function downloadDiagnostics() {
           </div>
         </div>
 
-        <p v-if="!supported" class="text-xs leading-relaxed text-info sm:text-sm" role="status">
+        <p
+          v-if="!supported"
+          :class="[statusPanelClass('info'), 'text-xs leading-relaxed text-info sm:text-sm']"
+          role="status"
+        >
           {{ t("settings.libraryHealthWebRequired") }}
         </p>
-        <p v-if="actionError" class="text-xs leading-relaxed text-danger sm:text-sm" role="alert">
+        <p
+          v-if="actionError"
+          :class="[statusPanelClass('danger'), 'text-xs leading-relaxed text-danger sm:text-sm']"
+          role="alert"
+        >
           {{ actionError }}
         </p>
 
         <template v-if="report">
           <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/10 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthTotal") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.totalFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/10 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthCritical") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.criticalFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/10 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthWarnings") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.warningFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/10 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthOfflineSkipped") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.skippedOfflineFiles }}</strong>
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-2">
                 <ShieldCheck class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -401,7 +403,7 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="repair" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/10 p-4" aria-live="polite">
+          <div v-if="repair" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthRepairProgressTitle") }}</p>
               <Badge :variant="repairStatusVariant(repair.status)">
@@ -425,7 +427,7 @@ function downloadDiagnostics() {
             </ul>
           </div>
 
-          <div v-if="cleanupTask" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/10 p-4" aria-live="polite">
+          <div v-if="cleanupTask" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupProgressTitle") }}</p>
               <Badge :variant="cleanupTask.status === 'completed' ? 'success' : cleanupActive ? 'info' : 'warning'">
@@ -436,17 +438,17 @@ function downloadDiagnostics() {
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ cleanupTask.message }}</p>
           </div>
 
-          <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthMetadataRepairTitle") }}</p>
               <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthMetadataRepairHint") }}</p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
+            <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
               <Button
                 v-if="report.summary.categoryCounts.metadata_missing"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 rounded-2xl px-4"
+                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
                 data-settings-comfortable-control
                 data-library-health-repair-missing
                 :disabled="repairActive"
@@ -459,7 +461,7 @@ function downloadDiagnostics() {
                 v-if="report.summary.categoryCounts.metadata_failed"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 rounded-2xl px-4"
+                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
                 data-settings-comfortable-control
                 data-library-health-repair-failed
                 :disabled="repairActive"
@@ -471,17 +473,17 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupTitle") }}</p>
               <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthCleanupHint") }}</p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
+            <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
               <Button
                 v-if="orphanCleanupFindings.length"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 rounded-2xl px-4"
+                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
                 data-settings-comfortable-control
                 data-library-health-cleanup-orphans
                 :disabled="maintenanceActive"
@@ -494,7 +496,7 @@ function downloadDiagnostics() {
                 v-if="stagingCleanupFindings.length"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 rounded-2xl px-4"
+                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
                 data-settings-comfortable-control
                 data-library-health-cleanup-staging
                 :disabled="maintenanceActive"
@@ -506,7 +508,7 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="visibleFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+          <div v-if="visibleFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
             <div class="flex flex-wrap items-end justify-between gap-2">
               <div class="flex min-w-0 flex-col gap-1">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthFindingsTitle") }}</p>
@@ -531,13 +533,13 @@ function downloadDiagnostics() {
           </div>
         </template>
 
-        <div v-else-if="!reportBusy" class="flex flex-col items-start gap-2 rounded-lg border border-dashed border-border/60 bg-muted/5 p-4">
+        <div v-else-if="!reportBusy" class="flex flex-col items-start gap-2 rounded-lg border border-dashed border-border/60 bg-background/30 p-3">
           <FileWarning class="size-5 text-muted-foreground" aria-hidden="true" />
           <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthIdleTitle") }}</p>
           <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthIdleHint") }}</p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
 
     <Dialog v-model:open="repairDialogOpen">
       <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
