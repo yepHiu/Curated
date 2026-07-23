@@ -313,3 +313,57 @@ efe3c505 feat: stream task updates over SSE
 6609ad44 feat(frontend): export active movie library to CSV
 293e9fe7 chore(release): prepare 1.4.10 package",versionSource=auto-patch; BuildStamp=20260704.201339; error=Electron runtime not found: C:\Users\wujiahui\code\jav-lib\jav-shadcn\node_modules\.pnpm\electron@42.0.1\node_modules\electron\dist\electron.exe
 2026-07-05,1.4.11,96548b72,master,release:publish,release/portable/Curated-1.4.11-windows-x64.zip; release/installer/Curated-Setup-1.4.11.exe; release/manifest/release.json,成功,wujiahui,无代码差异（同一提交重复打包）,versionSource=explicit; BuildStamp=20260704.201819; portable=versionSource=explicit; installer=versionSource=explicit
+2026-07-24,1.4.12,a3de3335,master,release:publish,release/portable/Curated-1.4.12-windows-x64.zip; release/installer/Curated-Setup-1.4.12.exe; release/manifest/release.json,成功,wujiahui,"a3de3335 test(e2e): stabilize personalization release gate
+f01d9e6a docs(product): record personalization delivery status
+6c583b59 docs(readme): describe personalization features
+ee0779e4 docs(api): document personalization endpoints
+4067ddb7 feat(i18n): translate personalization workflows
+8928fe61 feat(insights): add personal viewing dashboard
+9262ecf2 feat(actors): add canonical merge workflow
+c612f7bb feat(home): add explainable recommendation feedback
+b8fbef96 feat(library): add saved views and canonical actor filters
+1e5911e8 feat(personalization): add durable library intelligence services
+b2fc6d0e docs(plan): track personalization milestone delivery
+1927de45 docs(plan): assess WebDAV library storage
+770e808b docs(plan): define metadata source decoupling
+3e788f43 docs(plan): assess container deployment feasibility
+4092cbd6 docs(network): map scraping request paths
+ef1e7ce1 fix(settings): align maintenance workspace UI
+00f4c74a perf(player): load the light HLS runtime
+35eae86b fix(navigation): preserve actor return through playback
+d1b950e6 fix(history): restore page title spacing
+827b851d fix(settings): refresh translated select values
+dd42c0f2 perf(frontend): lazy-load locale and health chunks
+f34073b2 fix(health): keep reports contract-safe and repairable
+dd6b4bea feat(health): expose confirmed cleanup controls
+01f1ffd6 feat(health): add audited confirmed cleanup actions
+2348c566 feat(health): add maintenance diagnostics workspace
+24b9fceb feat(health): persist bounded metadata repair queue
+19056f99 feat(health): add read-only library diagnostics
+13b38442 docs: document restart-safe upload sessions
+3e77766e feat(import): persist resumable upload sessions
+047f0111 docs: document audited path migration
+1d9b2070 feat(storage): add audited path migration CLI
+44eff48f docs: document backup maintenance API
+e7958490 feat(backup): add maintenance backup controls
+aa2946b0 docs: document backup recovery workflow
+4d0fd1f0 feat(backup): create verify and restore library packages
+bd2e9b59 fix(storage): lock the active database across processes
+cb6ecccc docs: track audit requirements and plan status
+3804e639 docs: refresh current feature inventory
+dba73822 perf(frontend): enforce bundle budgets and lazy media chunks
+f792870e fix(ui): improve mobile library touch targets
+fc264956 ci: add frontend backend build and audit gates
+b054cb1e test(e2e): cover mock navigation and locked startup
+68f83960 fix(frontend): hydrate protected state after unlock
+a60a630b fix(frontend): start only the active library adapter
+08f95f1c chore(deps): patch frontend security advisories
+b1483fa4 feat(security): add trusted session controls
+eebe3f68 feat(security): manage trusted auth sessions
+68ae71f5 feat(security): rate limit PIN attempts
+0741b54b fix(security): restrict browser origins and hosts
+30b54b94 fix(security): default HTTP listeners to loopback
+49fbf1c6 fix(storage): enforce sqlite foreign keys
+8b00e69c fix(release): stage sanitized config example
+6fb3752b fix(installer): close running desktop app during install
+586bc1f6 chore(release): prepare 1.4.11 package",versionSource=auto-patch; BuildStamp=20260723.171425; portable=versionSource=explicit; installer=versionSource=explicit
