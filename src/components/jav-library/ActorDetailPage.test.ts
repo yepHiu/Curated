@@ -46,8 +46,21 @@ vi.mock("@/components/jav-library/ActorProfileCard.vue", () => ({
   default: {
     name: "ActorProfileCard",
     props: ["actorName", "showClearFilter"],
-    template:
-      '<section data-actor-profile :data-actor-name="actorName" :data-show-clear-filter="String(showClearFilter)" />',
+    emits: ["resolvedName"],
+    template: `<section data-actor-profile :data-actor-name="actorName" :data-show-clear-filter="String(showClearFilter)">
+      <button data-resolve-name @click="$emit('resolvedName', 'Canonical Actor')" />
+    </section>`,
+  },
+}))
+
+vi.mock("@/components/jav-library/ActorMergeDialog.vue", () => ({
+  default: {
+    name: "ActorMergeDialog",
+    props: ["open", "sourceName"],
+    emits: ["update:open", "merged"],
+    template: `<section data-actor-merge-dialog :data-open="String(open)" :data-source-name="sourceName">
+      <button data-complete-merge @click="$emit('merged', 'Merged Target')" />
+    </section>`,
   },
 }))
 
@@ -196,6 +209,25 @@ describe("ActorDetailPage", () => {
       name: "actor-detail",
       params: { actorName: "Mina Kaze" },
       query: { selected: "movie-1" },
+    })
+  })
+
+  it("canonicalizes alias routes and navigates to the merge target", async () => {
+    const wrapper = await mountPage()
+    await wrapper.get("[data-resolve-name]").trigger("click")
+    await flushPromises()
+    expect(routerReplace).toHaveBeenCalledWith({
+      name: "actor-detail",
+      params: { actorName: "Canonical Actor" },
+      query: {},
+    })
+
+    await wrapper.get("[data-complete-merge]").trigger("click")
+    await flushPromises()
+    expect(routerReplace).toHaveBeenLastCalledWith({
+      name: "actor-detail",
+      params: { actorName: "Merged Target" },
+      query: {},
     })
   })
 })

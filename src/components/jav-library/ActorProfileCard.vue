@@ -44,6 +44,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   clearFilter: []
+  resolvedName: [name: string]
 }>()
 
 const { t } = useI18n()
@@ -93,6 +94,7 @@ async function fetchProfileForSeq(seq: number, name: string): Promise<void> {
     return
   }
   profile.value = data
+  emit("resolvedName", data.name)
 }
 
 function needsAutoScrape(p: ActorProfileDTO): boolean {
