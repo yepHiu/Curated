@@ -145,6 +145,7 @@ test("locked startup defers protected hydration until a successful unlock", asyn
 
     if (
       path === "/api/library/movies" ||
+      path === "/api/library/saved-views" ||
       path === "/api/playback/progress" ||
       path === "/api/library/played-movies"
     ) {
@@ -186,6 +187,10 @@ test("locked startup defers protected hydration until a successful unlock", asyn
 
     if (path === "/api/library/movies") {
       await route.fulfill({ json: { items: [], limit: 500, offset: 0, total: 0 } })
+      return
+    }
+    if (path === "/api/library/saved-views") {
+      await route.fulfill({ json: { items: [] } })
       return
     }
     if (path === "/api/playback/progress") {
@@ -241,6 +246,7 @@ test("locked startup defers protected hydration until a successful unlock", asyn
     .toEqual([
       "/api/library/played-movies",
       "/api/library/movies?limit=500&offset=0",
+      "/api/library/saved-views",
       "/api/playback/progress",
     ].sort())
   expect(protectedRequests.every((request) => request.unlocked)).toBe(true)

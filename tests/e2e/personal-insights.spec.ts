@@ -54,7 +54,7 @@ test("personal insights renders bounded local aggregates at desktop and 375px", 
 
   const ranges = page.locator("[data-insights-range-selector] label")
   await expect(ranges).toHaveCount(4)
-  await page.locator('input[value="90d"]').check()
+  await ranges.nth(1).click()
   await expect(page.locator('input[value="90d"]')).toBeChecked()
   await expect(page.locator("[data-insights-metric]")).toHaveCount(6)
 

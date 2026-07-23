@@ -8,7 +8,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Keep local cold-start transforms bounded; five parallel first loads can
+  // otherwise consume the full per-test timeout before the app is interactive.
+  workers: process.env.CI ? 1 : 2,
   reporter: "list",
   timeout: 30_000,
   expect: {
