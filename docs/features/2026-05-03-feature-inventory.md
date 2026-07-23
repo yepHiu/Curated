@@ -1,6 +1,6 @@
 # Curated Feature Inventory
 
-Updated 2026-07-20 · Current repository state
+Updated 2026-07-21 · Current repository state
 
 This document catalogs features implemented in the current **Electron desktop shell + Web UI + Go API** architecture. Features marked `[Target]` are documented future direction, not shipped. Source code and `.cursor/rules/project-facts.mdc` take precedence if this inventory becomes stale.
 
@@ -20,6 +20,8 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Favorites view | Shipped | `favorites` route, toggle via `PATCH` |
 | Recent additions view | Shipped | `recent` route |
 | Tags browse view | Shipped | `tags` route |
+| Advanced library filters | Shipped | Play state, exact local user rating, normalized resolution, and relative import window; canonical URL query |
+| Saved Views | Implemented; browser QA pending | Ordered create/apply/update/rename/reorder/delete; SQLite in Web API, isolated versioned localStorage in Mock; transient navigation fields excluded |
 | Trash view | Shipped | `mode=trash` query, restore or permanent-delete |
 | History view | Shipped | Watch history grouped by local calendar date |
 
@@ -63,6 +65,9 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Provider strategies | Shipped | `auto-global`, `auto-cn-friendly`, `custom-chain`, `specified` |
 | Provider health checks | Shipped | `POST /api/providers/ping` + `/ping-all` |
 | Failure categories | Shipped | Machine-readable error categories for network troubleshooting |
+| Unified Library Health | Shipped | Read-only `POST /api/library/health/scan`; stable category counts/findings for SQLite, storage, source files, assets, duplicates, metadata attempts, orphan state, and strict import staging; offline roots skip per-file checks |
+| Bounded metadata repair | Shipped | Confirmed `POST /api/library/health/repairs`, persisted `library.health.repair` parent plus per-movie `scrape.movie` child results, 100-item backend / 25-item Settings limits, explicit restart interruption |
+| Audited targeted cleanup | Shipped | Confirmed `POST /api/library/health/actions`; freshly revalidated findings, whitelisted orphan-state deletion or strict non-symlink upload staging removal, persistent audit evidence, never final movie files |
 
 ---
 
@@ -121,6 +126,12 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Avatar caching & delivery | Shipped | `GET /api/library/actors/{name}/asset/avatar` (same-origin) |
 | Actor scraping | Shipped | Async task via `POST /api/library/actors/scrape` |
 | Actor profile card on library | Shipped | Shown when browsing library with `actor=` filter |
+| Canonical actor identities | Implemented; browser QA pending | `actors.normalized_name` plus globally unique aliases; NFKC, Unicode case fold, and whitespace fold shared by lookup, recommendations, Web, and Mock comparison |
+| Alias-aware actor lookup | Implemented; browser QA pending | Profile, list search, exact library filter, avatar, tags, links, scraping, metadata ingestion, and old actor routes resolve to the canonical actor |
+| Read-only merge preview | Implemented; browser QA pending | Reports movie/tag/link/profile/feedback/frame impact, conflicts, blockers, and a complete-state opaque token without writes |
+| Confirmed transactional merge | Implemented; browser QA pending | `confirm:true`, stale-token rejection, explicit profile decisions, one SQLite transaction, zero partial writes, and association dedupe |
+| Actor merge audits | Shipped | Queryable immutable snapshots; migrations `0035`/`0036` preserve audit history while allowing later chained canonical merges |
+| Mock actor merge persistence | Shipped | Isolated `curated-actor-merges-v1` localStorage stores aliases and audits; generated movie actors canonicalize after reload |
 
 ---
 
@@ -173,15 +184,15 @@ This document catalogs features implemented in the current **Electron desktop sh
 
 ---
 
-## 6. Homepage & Recommendations
+## 6. Homepage, Recommendations & Personal Insights
 
 | Feature | Status | Notes |
 |---|---|---|
 | Daily recommendation snapshot | Shipped | UTC day key; persisted in SQLite |
 | Hero carousel | Shipped | `heroMovieIds` in snapshot |
-| Recommendation rail | Shipped | `recommendationMovieIds` in snapshot |
+| Recommendation rail | Shipped | Compatibility `recommendationMovieIds` plus same-order explanation items in snapshot |
 | Cross-device consistency | Shipped | Same snapshot for all browsers/devices |
-| Generation versioning | Shipped | Reuses snapshot only when algorithm version matches |
+| Generation versioning | Shipped | Current `v8`; reuses snapshot only when algorithm version matches and shares canonical actor identity normalization |
 | Weighted sampling | Shipped | Without replacement; weight based on recency and count |
 | Hard cooling | Shipped | Recently scraped movies are temporarily excluded |
 | Recovery cooling window | Shipped | 14-day exclusion window with staged fallback (14→10→7→5→3→1→0) |
@@ -191,6 +202,20 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Force-refresh | Shipped | `POST /api/homepage/recommendations/refresh` |
 | Hero preservation on refresh | Shipped | `preserveHeroMovieIds` body parameter |
 | Recommendation exclusion on refresh | Shipped | `excludeRecommendationMovieIds` body parameter |
+| Explainable recommendation items | Implemented; browser QA pending | Persisted truthful reason codes; renderer only localizes them |
+| Movie not-interested feedback | Implemented; browser QA pending | Explicit permanent exclusion until feedback removal |
+| Bounded snooze | Implemented; browser QA pending | 1-365 days; expired entries are ignored and cleaned |
+| Actor/studio/tag down-ranking | Implemented; browser QA pending | Multiplies matching candidate weight while retaining bounded exploration |
+| Feedback undo and management | Implemented; browser QA pending | Current-card undo plus dialog for active feedback removal |
+| Web feedback persistence | Shipped | SQLite `homepage_recommendation_feedback`, migrations `0033`/`0034` |
+| Mock feedback persistence | Shipped | Isolated `curated-homepage-recommendation-feedback-v1` localStorage |
+| Refresh isolation | Shipped | Refresh regenerates recommendations but never creates feedback |
+| Lazy Personal Insights route | Implemented; browser QA pending | `/insights` loads separately and is linked from the Yours sidebar group |
+| Explicit insight ranges | Shipped | Inclusive local-calendar `30d`, `90d`, `365d`, and `all`, with IANA timezone and returned boundaries |
+| Viewing overview aggregate | Shipped | Watch time, distinct started movies, current 90%-progress completed count/rate, current local rating count/average; empty denominators are null |
+| Bounded preference breakdowns | Shipped | Stable top 1-25 canonical actor/studio/deduplicated-tag rows with `full-per-entity` attribution |
+| Raw-history privacy boundary | Shipped | Web returns only SQLite aggregates; Mock aggregation stays inside the service adapter and does not expose source rows to the page |
+| Responsive and localized insights UI | Implemented; browser QA pending | One semantic h1, keyboard radio range selection, loading/error/retry/empty states, stale-response guard, zh-CN/en/ja, 375px-safe grid |
 
 ---
 
@@ -207,7 +232,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Network settings | Shipped | Proxy configuration with ping tests |
 | Curated frames settings | Shipped | Export format preference |
 | About page | Shipped | Version info, update checks, dev tools |
-| Maintenance | Shipped | Backup create-and-verify, package verification, restore preflight, audited offline path migration, full scan, and maintenance guidance |
+| Maintenance | Shipped | Library Health scan/export, bounded metadata repair, confirmed audited cleanup, backup create-and-verify, package verification, restore preflight, audited offline path migration, full scan, and maintenance guidance |
 | Security | Shipped | PIN setup/change, idle-lock policy, lock-now, and trusted-session review/revocation |
 
 ### 7.2 Configuration System
@@ -226,6 +251,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Consistent SQLite package | Shipped | `VACUUM INTO`; optional `library-config.cfg`; no media or user assets in v1 |
 | Manifest and integrity verification | Shipped | Size, SHA-256, declared entries, `quick_check`, `foreign_key_check`, migrations |
 | Settings maintenance controls | Shipped | PIN-protected create-and-verify, verify, and restore preflight in Web API mode |
+| Library Health workspace | Shipped | Web API-only diagnostics, semantic status/counts, stable finding/path detail, confirmation dialogs, task progress, per-item results; Mock disabled; 44px mobile maintenance actions |
 | Offline restore | Shipped | Explicit CLI confirmation, runtime lock, compatibility/capacity preflight, `.pre-restore-*` rollback files |
 | No-overwrite destination | Shipped | Atomic hard-link commit or `O_EXCL` fallback for filesystems without hard links |
 | Read-only path migration plan | Shipped | Whitelisted columns; segment-aware Windows/UNC/Unix mapping; affected counts, samples, target status, conflicts, errors/warnings, and `canApply` |
@@ -343,7 +369,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | Task polling API | Shipped | `GET /api/tasks/{taskId}` + `GET /api/tasks/recent` |
 | Database migrations | Shipped | Auto-run on startup |
 | SQLite referential integrity | Shipped | Every SQLite connection verifies foreign keys; historical orphan rows are quarantined before cleanup |
-| Structured error codes | Shipped | `COMMON_*`, `LIBRARY_*`, `SCAN_*`, `SCRAPER_*`, `PLAYER_*`, `SETTINGS_*`, `CURATED_*`, `PROVIDER_*` |
+| Structured error codes | Shipped | `COMMON_*`, `LIBRARY_*`, `ACTOR_MERGE_*`, `SCAN_*`, `SCRAPER_*`, `PLAYER_*`, `SETTINGS_*`, `CURATED_*`, `PROVIDER_*` |
 | HTTP client timeout | Shipped | Request-level timeout |
 | Graceful shutdown | Shipped | Barrier for in-flight scrape goroutines |
 | Scanner cancellation | Shipped | `filepath.Walk` respects context cancellation |
@@ -414,7 +440,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | `/tags` | Tags | Tag browse |
 | `/trash` | Trash | Restore or permanently delete trashed movies |
 | `/actors` | Actors | Actor list; query: `q`, `actorTag`, `sort` |
-| `/actors/:actorName` | Actor Detail | Actor profile and exact-name movie results |
+| `/actors/:actorName` | Actor Detail | Canonical profile and movie results; old alias routes normalize to canonical and expose the merge workbench |
 | `/history` | History | Watch history by date |
 | `/curated-frames` | Curated Frames | Search, filter, edit, delete, and export captured frames |
 | `/detail/:id` | Movie Detail | Full metadata, comments, previews |
