@@ -107,6 +107,14 @@ describe("HistoryView", () => {
     pushAppToastMock.mockReset()
   })
 
+  it("keeps the page title separated from the shell divider", () => {
+    const wrapper = mount(HistoryView)
+    const content = wrapper.get("[data-history-content]")
+
+    expect(content.classes()).toContain("pt-[var(--app-page-py)]")
+    expect(content.classes()).toContain("lg:pt-[var(--app-page-py-lg)]")
+  })
+
   it("renders the empty state when no playback rows are available", () => {
     playbackRows.splice(0, playbackRows.length)
 

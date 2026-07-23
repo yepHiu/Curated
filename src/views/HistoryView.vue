@@ -185,7 +185,8 @@ watch(
   <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
       <div
-        class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-3 pb-6 sm:px-6 lg:px-8"
+        data-history-content
+        class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-3 pt-[var(--app-page-py)] pb-6 sm:px-6 lg:px-8 lg:pt-[var(--app-page-py-lg)]"
       >
         <header class="flex flex-col gap-3">
           <div class="flex flex-wrap items-start justify-between gap-3">
