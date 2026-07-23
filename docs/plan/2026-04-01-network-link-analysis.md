@@ -1256,3 +1256,426 @@ FANZA 这类 provider 的代码里已经显式处理过 region error，这说明
 - 不让脏结果轻易污染本地缓存
 
 这三件事补上后，系统在大陆环境下的可用性会明显上一个台阶。
+
+## 16. 2026-07-18 MetaTube 当前实现性能复审
+
+> 本节基于 2026-07-18 当前代码重新审计，关注 `backend/internal/scraper/metatube/service.go`、`backend/internal/app/app.go`、`backend/internal/assets/service.go` 与 `metatube-sdk-go v1.3.2` 的实际行为。前文部分建议已经落地，但仍存在“状态已记录、调度未消费”和“局部并发受限、全局并发失控”等新旧差距。
+
+### 16.1 结论
+
+MetaTube 链路仍有明显优化空间，而且最高收益点不在字符串清洗或 DTO 映射，而在以下四层：
+
+1. **任务编排**：批量刷新与资源下载缺少真正的全局有界队列。
+2. **Provider 调度**：已经计算健康、延迟与冷却状态，但实际抓取没有使用这些状态。
+3. **SDK 调用边界**：SDK 搜索/详情 API 不接收 `context.Context`，外层取消和 task deadline 无法及时中断在途请求。
+4. **缓存与重复请求**：跨重启缓存、同番号 singleflight、负缓存、资源 URL 去重和条件请求都还缺失。
+
+如果只做一轮短期优化，建议先修“有界队列 + 详情失败继续 chain + 冷却真正参与调度 + 动态代理正确生效”。这几项同时改善吞吐、尾延迟、成功率和电脑资源占用。
+
+### 16.2 当前已经做得较好的部分
+
+- 第三方 SDK 已集中在 `internal/scraper/metatube` 适配层，没有散落到 HTTP 和存储层。
+- 影片任务有 `scraper.maxConcurrent`，扫描触发的路径默认最多 4 条 scrape pipeline。
+- 单次影片抓取有 120 秒 task timeout，单 provider 请求默认 45 秒。
+- 资源下载按单任务默认限制 3 路并发，并限制单响应最大 50 MiB。
+- 资源下载使用临时文件和原子替换，失败不会截断已有好文件。
+- 预览图存在非空本地文件时会跳过重复下载。
+- Provider 已记录连续失败次数、平均延迟、错误分类与 10 分钟冷却时间。
+- 影片、人物、资源任务已经输出总耗时和机器可读错误分类。
+- 图片已检查 HTTP 状态与 `Content-Type`；演员头像还检查最小字节数。
+
+这些基础使后续优化可以集中在调度器与边界层，不需要重写全部业务流水线。
+
+### 16.3 P0：批量刷新存在乘法式并发
+
+扫描触发路径：
+
+```text
+enqueueScrape
+  -> goroutine
+  -> scrapeSem
+  -> runScrape
+```
+
+这一条有默认 4 路限制。
+
+但手动单片刷新和资料库批量刷新走：
+
+```text
+StartMetadataRefreshForLibraryPaths
+  -> for every movie
+  -> startAsyncMovieMetadataScrape
+  -> goroutine
+  -> runMovieScrapeBody
+```
+
+`startAsyncMovieMetadataScrape` 当前没有获取 `scrapeSem`。如果一次刷新 N 部影片，会立即创建 N 个 goroutine。每条 pipeline 如果进入 SDK `SearchMovieAll`，SDK 又会对所有已注册 movie provider 各创建一个 goroutine。
+
+当前 SDK 静态注册约 35 个 provider，因此理论并发形态接近：
+
+```text
+批量影片数 N × 约 35 个 provider 搜索
+```
+
+即使很多请求很快失败，也可能瞬间放大 DNS、连接、TLS、代理和 goroutine 压力。扫描路径默认 4 路时，单是 `auto-global` 也可能同时产生约 `4 × 35 = 140` 个 provider 搜索 goroutine，尚未计算单 provider 内部重试和后续图片请求。
+
+建议：
+
+- 所有入口统一进入一个 `ScrapeCoordinator` 有界队列，不允许入口自行 `go`。
+- 队列 worker 数统一读取 `scraper.maxConcurrent`。
+- 入队时以 `movieId` 和规范化编号去重；同片已有 pending/running 任务时返回现有 task，或明确返回 `skippedExistingTask`。
+- 获取并发令牌必须 `select` 监听 context，取消时不能永久卡在 semaphore send。
+- 批量 API 只创建一个父任务，再按 worker 消费子项；避免一次写入成千上万个 running task。
+- 影片和人物任务使用分离的队列或带权优先级，避免自动人物补全占满全部影片 scrape worker。
+
+### 16.4 P0：资源下载只有“每任务限流”，没有“全局限流”
+
+`assets.DownloadAllTo` 每次调用都会新建一个容量为 `maxConcurrentDownloads` 的局部 semaphore。影片刮削成功后，`runMovieScrapeBody` 又直接：
+
+```go
+go a.runAssetDownload(...)
+```
+
+所以默认“3 路”是每部影片 3 路，而不是整个应用 3 路。批量刷新 N 部影片时，理论图片并发可接近 `N × 3`。同时这些 asset goroutine 没有纳入 `scrapeWg` 或独立 wait group，应用关闭时也缺少完整 drain 语义。
+
+建议：
+
+- 新增应用级 `AssetCoordinator` 或共享 semaphore，配置解释改成“全局最大资源请求数”。
+- provider/host 再加每主机 token bucket，避免某一个站点被多影片同时打满。
+- 资源任务加入独立 wait group；关闭应用时停止接单、取消在途、在有限时间内 drain。
+- 批量抓取时允许元数据完成后低优先级下载图片，不让图片占用影片搜索 worker。
+- 对封面、缩略图、预览图设不同队列优先级：封面优先，预览图可延后或按需下载。
+
+### 16.5 P0：Provider 健康状态尚未真正参与调度
+
+当前 `recordProviderFailure` 会在连续失败 3 次后设置：
+
+```text
+CooldownUntil = now + 10 minutes
+```
+
+也会维护 `AvgLatencyMs` 和 `ErrorCategory`。但是：
+
+- `PreferredMovieProviderChain` 仍返回固定静态顺序；
+- `scrapeWithChain` 不检查 `CooldownUntil`；
+- `scrapeSingleOrAuto` 不跳过处于冷却期的 provider；
+- `SearchMovieAll` 仍会调用所有 SDK 已注册 provider；
+- 平均延迟不参与排序；
+- 健康状态只在内存中，重启后全部丢失。
+
+因此当前“熔断/冷却”主要是展示数据，不是实际熔断。
+
+建议引入独立 `ProviderScheduler`：
+
+```text
+configured chain
+  -> normalize provider id
+  -> remove disabled providers
+  -> skip active cooldown providers
+  -> score by exact-match history + success rate + EWMA latency
+  -> keep configured order as primary preference
+  -> produce effective attempt plan
+```
+
+规则建议：
+
+- 用户明确指定单 provider 时仍尊重选择，但 UI 提示其处于冷却期；手动操作可选择“仍然尝试一次”。
+- 自动/chain 模式默认跳过冷却源；如果全部冷却，可选择最早恢复的一个做半开探测，而不是全部重试。
+- 成功后关闭该 provider 熔断；半开状态同一时刻只允许一个探测请求。
+- health key 使用统一的小写 canonical ID，避免大小写不同形成多份统计。
+- 将轻量健康摘要持久化到 Curated SQLite，设置合理 TTL；不保存媒体关键词和响应正文。
+
+### 16.6 P0：Chain 只在“搜索失败”时回退，详情失败不会继续
+
+当前 `scrapeWithChain` 的流程是：
+
+```text
+provider A search
+  -> 找到第一个有效 SearchResult
+  -> fetchMovieInfo
+  -> 直接 return
+```
+
+如果 A 的搜索页可用，但详情页返回验证页、解析失败、区域限制、空内容或超时，整个影片任务直接失败，不会继续尝试 provider B。
+
+同时当前在“搜索成功”后立即 `recordProviderSuccess`，详情失败不会回写 A 的失败状态，所以健康数据会高估实际可用性。
+
+建议把“一次 provider attempt”定义成完整事务：
+
+```text
+search -> exact result validation -> details -> minimum quality validation
+```
+
+只有四步全部成功才记录 provider success。任何一步失败都记录 phase、latency、category，并继续下一个 provider。任务元数据增加：
+
+```text
+providerAttempts[] = {
+  provider,
+  searchMs,
+  detailMs,
+  phase,
+  result,
+  errorCategory
+}
+```
+
+这样能明显提升 chain 成功率，也让“搜索可达但详情失效”不再伪装成健康。
+
+### 16.7 P0：动态代理修改可能没有真正作用于既有 HTTP Transport
+
+当前 `SetProxy` 通过 `proxyenv.Sync` 修改 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`，代码注释认为 `http.ProxyFromEnvironment` 会“每次请求重新读取”。但当前 Go `net/http` 实现通过 `envProxyOnce sync.Once` 缓存环境代理解析函数；进程第一次使用 `ProxyFromEnvironment` 后再修改环境变量，既有 transport 不应被假设为会自动切换代理。
+
+这会造成一种典型现象：
+
+- 设置页用 `NewHTTPClientForProxy` 测试新代理成功；
+- 已经初始化并发过请求的 MetaTube transport 仍沿用旧代理或直连；
+- 用户感觉“测试可用，实际刮削仍超时”。
+
+建议：
+
+- 不把可变业务设置依赖在进程环境变量上。
+- 为每个 scraper/extension 显式注入带 `http.ProxyURL` 的 transport。
+- 设置变化时创建新 transport / 新 provider client，并在原子 swap 后关闭旧 idle connections。
+- 如果上游 SDK 无法注入统一 transport，短期方案是重建整个 MetaTube service；重建过程要与 scrape queue 协调，不能在在途任务中替换 engine。
+- 长期 sidecar 扩展协议直接传递规范化代理配置，扩展进程启动时固定 transport。
+
+### 16.8 P1：SDK context 取消不能进入在途请求
+
+Curated 的 `Scrape(ctx, ...)` 会在步骤前检查 `ctx.Done()`，App 也创建了 120 秒任务 deadline。但是 SDK 的：
+
+```go
+SearchMovie
+SearchMovieAll
+GetMovieInfoByProviderID
+SearchActorAll
+GetActorInfoByProviderID
+```
+
+都不接收 `context.Context`。一旦进入 SDK 调用，取消只会在 SDK 返回后才被 Curated 观察到。`SearchMovieAll` 还会等待全部 provider goroutine 完成，不能在一个高质量精确结果出现后取消其余请求。
+
+建议优先级：
+
+1. 最佳：给上游 SDK 提交 context-aware API，所有 HTTP request 使用 `NewRequestWithContext`。
+2. 可控：维护最小 fork，只修改 engine/provider HTTP 边界，不改数据模型。
+3. 合规拆分后：由 sidecar host 设置请求 deadline；超时后先发送 cancel，宽限期后终止扩展进程。
+4. 不推荐：仅在 Curated 外层 `select` 后提前返回，因为 SDK goroutine 仍会留在后台占用连接和资源。
+
+验收标准应是“用户取消或 task deadline 到达后，并发令牌在短时间内真实释放”，而不只是 UI 把任务标成失败。
+
+### 16.9 P1：`SearchMovieAll` 的全源扇出应改为自适应有限竞速
+
+SDK `SearchMovieAll` 会同时启动所有 movie provider，收齐全部结果后再排序。它有两个问题：
+
+- 请求数量固定偏大；
+- 尾延迟由最慢 provider 决定，即使早已得到精确结果也要等待。
+
+推荐默认不再调用 SDK `SearchMovieAll`，改由 Curated 调度器调用单 provider 搜索：
+
+1. 先尝试健康、历史命中率高的首选 provider。
+2. 如果在短 hedge delay 内没有结果，再启动第二个 provider。
+3. 同时在途 provider 默认不超过 2～3 个。
+4. 得到编号精确匹配并成功抓取详情后取消其余请求。
+5. 只有用户明确选择“全源深度搜索”时才扩大范围。
+
+这种有限竞速比纯串行 chain 尾延迟低，又比全 35 源扇出温和。具体 hedge delay 和并发数应根据本地统计调节，不应写死为所有网络环境相同。
+
+### 16.10 P1：搜索结果选择需要先做精确性和质量校验
+
+普通 chain 当前取 provider 返回的第一个 `IsValid()` 结果；只有 FC2 合并结果调用了 `rankMovieSearchResults`。如果站点搜索排序变化，第一个“结构有效”的结果不一定是编号最匹配的结果，会额外抓取错误详情并污染本地库。
+
+建议：
+
+- 所有 provider 统一按规范化编号相似度排序，而不是只取第一项。
+- 精确编号匹配优先；模糊结果低于阈值时不要自动写库。
+- 详情返回后再次校验 `info.Number` 与请求编号。
+- 对已有高质量数据设置降级保护：新结果缺标题、演员、日期或封面时，不应用空字段覆盖旧值。
+- 记录 `matchScore` 和 `qualityScore`，但默认不把第三方原始 HTML 写日志或数据库。
+
+### 16.11 P1：演员抓取的请求放大明显
+
+`ScrapeActor` 最多生成三种关键词变体，每个变体调用一次 `SearchActorAll`；SDK 每次 `SearchActorAll` 又并发全部 actor provider。命中后 `GetActorInfoByProviderID(..., false)` 强制实时抓取，SDK 对日语演员还可能再向 Gfriends 获取图片。
+
+最坏路径接近：
+
+```text
+3 个关键词 × 全部 actor provider + 详情请求 + Gfriends 图片注入
+```
+
+建议：
+
+- 先规范化名字并查询 Curated 本地 actor alias / provider ID 缓存。
+- 已有 `provider + providerActorId` 时直接详情刷新，不再全源搜索。
+- 自动补全使用 TTL：头像和简介都存在且未过期时跳过；失败也加负缓存，避免每部关联影片重复触发。
+- 自动任务只尝试优先 actor provider；手动“深度搜索”才全源。
+- 人物任务使用独立低优先级队列，避免抢占影片抓取。
+- Gfriends 图片注入视为独立可选能力，有单独 timeout、熔断和错误分类。
+
+### 16.12 P1：MetaTube 内存数据库没有跨重启收益
+
+当前 `NewService` 使用空 DSN，SDK 会打开：
+
+```text
+file::memory:?cache=shared
+```
+
+影片详情以 `lazy=true` 获取时能在当前进程复用 SDK DB，但应用重启后缓存消失；演员详情又显式使用 `lazy=false`，保存后不会在下次读取时命中。
+
+不建议直接把 SDK 内存库改成永久文件后就宣布完成，因为还需要 TTL、schema 兼容、损坏恢复和隐私边界。更稳妥的是在 Curated 层建立小型、可控的缓存：
+
+- `normalizedCode + provider` 的搜索命中缓存；
+- `provider + providerItemId` 的详情缓存时间；
+- 空结果和稳定失败的短 TTL 负缓存；
+- 同一编号并发请求使用 `singleflight` 合并；
+- 手动“强制刷新”绕过正缓存，但仍受并发与熔断保护。
+
+缓存只保存结构化 DTO 和必要诊断，不保存第三方页面正文。扩展化后，缓存所有权建议放在 Core，以便不同扩展都遵守同一容量和隐私规则。
+
+### 16.13 P1：健康检查本身可能很慢并放大重试
+
+`handlePingAllProviders` 当前顺序检查每个 provider。单 provider `CheckProviderHealth` 最多尝试 3 次，每次底层 provider 又可能自带 HTTP retry；默认 provider timeout 为 45 秒。理论上某些故障环境下，“检查全部”可能持续很久。
+
+另外当前健康检查在“无搜索结果但无 error”时仍记录 `ok`，它只能说明请求返回，不足以证明搜索解析和详情链路都正常。
+
+建议：
+
+- `GET` 默认立即返回带 TTL 的最近健康快照，不现场探测所有 provider。
+- 显式刷新改成后台 task + SSE，使用 3～4 路全局有界并发。
+- 健康探测使用独立的短 timeout 和统一 retry budget，不继承影片详情的 45 秒策略。
+- 区分 `networkReachable`、`searchValid`、`detailValid`、`assetReachable`，不要只有一个 ok/fail。
+- 避免“外层 3 次 × 底层 4 次”式重试乘法；每次用户动作设总 retry budget。
+- 尊重 HTTP 429 / `Retry-After`，加入 jitter，避免所有 worker 同时重试。
+
+### 16.14 P1：资源下载可减少重复流量并改进局部成功
+
+当前还有几项直接可优化：
+
+- 当 `CoverURL == ThumbURL` 时仍会下载两次同一 URL。
+- cover / thumb 每次重刮都重新下载，未使用 ETag、Last-Modified、source URL 未变化判断或内容 hash。
+- `DownloadAllTo` 任意一张图片失败就返回整体 error，已成功的文件不会返回给上层写入 `local_path`，下次容易重复下载。
+- 初次 movie asset 下载不带 referer；后端预览兜底才会使用保存的 referer。
+- `downloadOne` 只检查 Content-Type，没有像演员头像一样检查最小字节数，也没有解码图片头验证尺寸。
+- 预览图只按“文件非空”判断命中，历史错误图或损坏文件也可能被当作缓存。
+
+建议：
+
+- 先按规范化 URL 去重；同 URL 的 cover/thumb 只抓一次，再复用文件或创建引用。
+- 资源下载返回 `{ successes, failures }`，成功项立即落库，任务用 `partial_failed` 表达局部失败。
+- 保存并使用 ETag / Last-Modified；源 URL 未变且本地校验通过时跳过下载。
+- 每种资源携带 provider、referer 和声明 host，上下文化请求头。
+- 解析图片 header，校验最小尺寸、格式和已知占位图 hash。
+- 预览图采用按需或后台低优先级下载；用户没有打开详情时不必阻塞全部预览缓存。
+
+### 16.15 P1：批量刷新存在数据库 N+1
+
+`StartMetadataRefreshForLibraryPaths` 先调用 `ListMovieIDsUnderLibraryRoots`，然后对每个 ID 调用完整的 `GetMovieDetail`。后者除主影片查询外，还会加载演员、标签、预览图和演员头像；而启动 scrape 实际只需要：
+
+```text
+movieId, code, location
+```
+
+因此批量刷新一部影片可能额外执行多次无用查询，大库中会形成明显 N+1。
+
+建议新增专用存储方法：
+
+```text
+ListMovieScrapeCandidatesUnderLibraryRoots
+  -> []{ movieId, code, location }
+```
+
+一次流式/分页查询直接返回最小字段，边读边向有界队列入队。不要为了复用详情 DTO 而加载展示页需要的关联数据。
+
+### 16.16 P2：日志、指标与可测试性
+
+当前 MetaTube 适配层约 800 行，但测试主要覆盖 poster URL fallback，chain、冷却、health、actor 选择、详情失败回退等核心调度没有直接单测。SDK `engine` 又是具体类型，难以注入故障和延迟。
+
+建议先抽出内部小接口：
+
+```go
+type EngineAdapter interface {
+    SearchMovie(...)
+    GetMovieInfo(...)
+    SearchActor(...)
+    GetActorInfo(...)
+}
+```
+
+用 fake engine 覆盖：
+
+- 冷却 provider 被跳过；
+- 半开只发一个请求；
+- search 成功、detail 失败后继续 chain；
+- 编号相似度不足不写库；
+- context 取消释放 worker；
+- 同番号 singleflight；
+- 部分资源失败仍保存成功项；
+- 批量刷新不会超过全局并发上限。
+
+运行指标至少记录本地聚合值：
+
+- `scrape_total_ms`、`queue_wait_ms`；
+- `search_ms`、`detail_ms`、`asset_ms`；
+- `providers_attempted`、`providers_skipped_cooldown`；
+- `cache_hit`、`negative_cache_hit`、`singleflight_shared`；
+- 每 provider 成功率、p50/p95 延迟、错误分类；
+- 当前队列深度、活跃 worker、全局 HTTP 在途数。
+
+详细 URL 查询参数、代理凭据、媒体路径和第三方页面内容不得进入指标或 Info 日志。SDK 当前会向 stdout 输出全 provider 搜索耗时/错误长行；若无法注入 logger，建议在最小 fork 或 sidecar 中把它接入 Curated 的结构化、可分级日志。
+
+### 16.17 建议实施顺序
+
+#### 第一批：高收益、低架构风险
+
+1. 所有影片入口统一使用全局有界 scrape queue。
+2. 增加 movieId / normalized code 在途去重。
+3. 资源下载增加全局队列和 wait group。
+4. chain 在 detail 失败后继续，并在完整 attempt 后再记录健康。
+5. 冷却状态实际参与 chain 调度。
+6. 新增批量最小字段查询，消除 `GetMovieDetail` N+1。
+7. cover/thumb URL 去重，资源改为局部成功。
+
+#### 第二批：网络边界与尾延迟
+
+1. 修复动态代理：显式 transport 或安全重建 service。
+2. 用有限竞速替代默认 `SearchMovieAll`。
+3. 引入 per-provider / per-host timeout、rate limit 和 retry budget。
+4. 健康全检改为缓存快照 + 后台有界任务。
+5. 演员抓取优先使用已有 provider ID 和 TTL。
+
+#### 第三批：缓存、可观测性与扩展化
+
+1. 搜索/详情正缓存、负缓存和 singleflight。
+2. provider 健康摘要持久化。
+3. 拆分 search/detail/asset 指标和质量分。
+4. 增加 fake engine 单测与故障注入集成测试。
+5. 将上述调度器保留在 Curated Core，MetaTube 迁移为 sidecar 扩展；Core 负责全局队列、缓存、deadline 和权限，扩展只实现 provider 协议。
+
+### 16.18 性能验收建议
+
+先用可控 fake provider 建立基线，再在用户授权的测试环境进行真实网络基准。不要用公开站点做高并发压测。
+
+建议验收：
+
+- 批量刷新 1、100、1000 部影片时，goroutine 和 HTTP 在途数均受配置上限约束，不随影片数线性瞬时爆发。
+- 同一编号同时触发多次只产生一组出站请求，其余任务共享结果或明确去重。
+- chain 的 search 或 detail 失败都能继续下一 provider，并正确记录 attempt phase。
+- 冷却 provider 在自动模式中零请求；半开时最多一个探测请求。
+- 取消任务后 worker 和 HTTP 连接在规定宽限期内真实释放。
+- `ping-all` HTTP 请求快速返回快照；刷新过程通过 task/SSE 展示，不阻塞设置页请求。
+- 单张资源失败不丢弃其他成功资源；重复刷新不重复下载未变化资源。
+- 动态修改代理后，新请求确定使用新 transport；测试请求与实际抓取路径一致。
+- 所有优化不改变已有元数据 DTO、SQLite 用户数据和前端服务契约，除非通过版本化字段显式扩展。
+
+### 16.19 与合规扩展方案的关系
+
+这些优化不应全部写死在 MetaTube 适配器里。合规拆分后的推荐职责是：
+
+| Curated Core | MetaTube 扩展 |
+|---|---|
+| 全局任务队列、去重、优先级 | 具体 provider 搜索与解析 |
+| deadline、取消、进程生命周期 | 按协议响应取消或被 host 终止 |
+| provider 健康、熔断、缓存 | 返回结构化 phase/error |
+| 代理与 host 权限 | 仅访问 manifest 声明主机 |
+| 结构化指标与脱敏日志 | 不直接向 stdout 输出页面或敏感 URL |
+| 资源缓存与局部成功 | 返回资源 URL、referer 与来源标识 |
+
+这样即使未来替换 MetaTube 或加入其他合法元数据扩展，性能治理也不会重新实现一遍。
