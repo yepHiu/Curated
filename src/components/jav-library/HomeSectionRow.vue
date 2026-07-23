@@ -15,9 +15,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="flex flex-col gap-4">
     <div class="flex items-end justify-between gap-3">
-      <div class="space-y-1">
+      <div class="flex flex-col gap-1">
         <h2 class="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
           {{ title }}
         </h2>
@@ -32,16 +32,18 @@ const emit = defineEmits<{
     </div>
 
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-      <MovieCard
-        v-for="movie in movies"
-        :key="movie.id"
-        :movie="movie"
-        :show-favorite="false"
-        poster-loading="lazy"
-        poster-fetch-priority="low"
-        @open-details="emit('openDetails', $event)"
-        @open-player="emit('openPlayer', $event)"
-      />
+      <template v-for="movie in movies" :key="movie.id">
+        <slot name="item" :movie="movie">
+          <MovieCard
+            :movie="movie"
+            :show-favorite="false"
+            poster-loading="lazy"
+            poster-fetch-priority="low"
+            @open-details="emit('openDetails', $event)"
+            @open-player="emit('openPlayer', $event)"
+          />
+        </slot>
+      </template>
     </div>
   </section>
 </template>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
+import type { CreateRecommendationFeedbackBody, RecommendationFeedbackDTO } from "@/api/types"
 import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
 import { armHomeDetailReturnRestore } from "@/composables/use-home-scroll-preserve"
 import { useRouter } from "vue-router"
@@ -13,9 +15,11 @@ import {
   playbackProgressRevision,
 } from "@/lib/playback-progress-storage"
 import { useLibraryService } from "@/services/library-service"
+import { pushAppToast } from "@/composables/use-app-toast"
 
 const libraryService = useLibraryService()
 const router = useRouter()
+const { t } = useI18n()
 const homepageDailyRecommendations = useHomepageDailyRecommendations()
 const showHomepageSkeleton = computed(() => !libraryService.moviesLoaded.value)
 const showHomepageEmptyState = computed(
@@ -25,6 +29,24 @@ const showHomepageEmptyState = computed(
 const PORTAL_PLAYBACK_PROGRESS_DEBOUNCE_MS = 5_000
 const portalPlaybackProgressRevision = ref(playbackProgressRevision.value)
 let portalPlaybackProgressTimer: ReturnType<typeof setTimeout> | null = null
+const recommendationFeedback = ref<RecommendationFeedbackDTO[]>([])
+const recommendationFeedbackBusy = ref(false)
+
+async function refreshRecommendationFeedback() {
+  try {
+    recommendationFeedback.value = (
+      await libraryService.listHomepageRecommendationFeedback()
+    ).items
+  } catch (error) {
+    pushAppToast(error instanceof Error ? error.message : t("home.recommendationFeedbackFailed"), {
+      variant: "destructive",
+    })
+  }
+}
+
+onMounted(() => {
+  void refreshRecommendationFeedback()
+})
 
 watch(playbackProgressRevision, (revision) => {
   if (portalPlaybackProgressTimer) {
@@ -98,6 +120,38 @@ function refreshRecommendations() {
     excludeRecommendationMovieIds: portalModel.value.recommendations.map((entry) => entry.movie.id),
   })
 }
+
+async function submitRecommendationFeedback(body: CreateRecommendationFeedbackBody) {
+  if (recommendationFeedbackBusy.value) return
+  recommendationFeedbackBusy.value = true
+  try {
+    await libraryService.createHomepageRecommendationFeedback(body)
+    await refreshRecommendationFeedback()
+    pushAppToast(t("home.recommendationFeedbackSaved"), { variant: "success" })
+  } catch (error) {
+    pushAppToast(error instanceof Error ? error.message : t("home.recommendationFeedbackFailed"), {
+      variant: "destructive",
+    })
+  } finally {
+    recommendationFeedbackBusy.value = false
+  }
+}
+
+async function deleteRecommendationFeedback(feedbackId: string) {
+  if (recommendationFeedbackBusy.value) return
+  recommendationFeedbackBusy.value = true
+  try {
+    await libraryService.deleteHomepageRecommendationFeedback(feedbackId)
+    await refreshRecommendationFeedback()
+    pushAppToast(t("home.recommendationFeedbackRemoved"), { variant: "success" })
+  } catch (error) {
+    pushAppToast(error instanceof Error ? error.message : t("home.recommendationFeedbackFailed"), {
+      variant: "destructive",
+    })
+  } finally {
+    recommendationFeedbackBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -107,9 +161,13 @@ function refreshRecommendations() {
     v-else
     :model="portalModel"
     :recommendations-refreshing="homepageDailyRecommendations.loading.value"
+    :recommendation-feedback="recommendationFeedback"
+    :recommendation-feedback-busy="recommendationFeedbackBusy"
     @open-details="openDetails"
     @open-player="openPlayer"
     @browse-taste="browseTaste"
     @refresh-recommendations="refreshRecommendations"
+    @submit-recommendation-feedback="submitRecommendationFeedback"
+    @delete-recommendation-feedback="deleteRecommendationFeedback"
   />
 </template>
