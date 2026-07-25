@@ -80,7 +80,7 @@ This produces `backend/runtime/curated-dev.exe`.
 
 ### Back Up, Verify, and Restore
 
-In Web API mode, Settings -> Maintenance can create and immediately verify a package, verify an existing package, and run restore preflight. Paths are absolute paths on the backend machine. Curated deliberately exposes no online restore button; restore remains an offline maintenance operation.
+In Web API mode, Settings -> Maintenance can create and immediately verify a package, verify an existing package, and run restore preflight. Enter an absolute directory on the backend machine; Curated generates a fresh UTC-timestamped package filename. After a package is created successfully, the directory (not the generated filename) is persisted as `backupDirectory` in `library-config.cfg` and prefilled after refresh or restart. Curated deliberately exposes no online restore button; restore remains an offline maintenance operation.
 
 Run maintenance commands from `backend/`; add `-config path/to/config.json` when the database path comes from a custom main config:
 
@@ -235,7 +235,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 ### Settings & Configuration
 
 - Full settings UI: Overview, General, Security, Video storage, Metadata, Network, Curated frames, About, Maintenance.
-- Maintenance provides PIN-protected backup creation, package verification, and offline-restore preflight in Web API mode; Mock mode disables filesystem maintenance actions.
+- Maintenance provides PIN-protected backup creation, package verification, and offline-restore preflight in Web API mode; the last successfully used backup directory is remembered across refreshes and restarts. Mock mode disables filesystem maintenance actions.
 - Library-level config persisted to `config/library-config.cfg` with atomic writes.
 - Proxy configuration with JavBus and Google ping tests.
 - Backend logging: configurable directory, retention, and level.
@@ -295,6 +295,7 @@ Common library-level settings include:
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `defaultImportLibraryPathId`
+- `backupDirectory` (directory only; empty means no remembered backup destination)
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `autoDownloadUpdates`

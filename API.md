@@ -1682,6 +1682,7 @@ Body：
 | --- | --- |
 | `libraryPaths` | 已配置库根 |
 | `defaultImportLibraryPathId` | 默认导入目标库根 ID |
+| `backupDirectory` | 最近一次成功创建备份所用的绝对目录；只保存目录，空字符串表示未记住 |
 | `player` | 播放器设置 |
 | `organizeLibrary` | 扫描后是否整理目录 |
 | `autoLibraryWatch` | 是否启用目录监听扫描 |
@@ -1707,6 +1708,7 @@ Body 示例：
 ```json
 {
   "defaultImportLibraryPathId": "library-path-id",
+  "backupDirectory": "D:\\CuratedBackups",
   "curatedFrameExportFormat": "jpg",
   "autoLibraryWatch": true,
   "player": {
@@ -1744,6 +1746,7 @@ Body 示例：
 - 至少发送一个支持字段，否则 `400 COMMON_BAD_REQUEST`。
 - `curatedFrameExportFormat` 必须是 `jpg`、`webp`、`png`。
 - `defaultImportLibraryPathId` 非空时必须存在。
+- `backupDirectory` 非空时必须是后端机器上的绝对路径；发送空字符串可清除记忆目录。
 - `metadataMovieProvider` 和 `metadataMovieProviderChain` 中的 provider 必须在 `metadataMovieProviders` 中。
 - `metadataMovieScrapeMode` 必须是 `auto`、`specified`、`chain`。
 - `metadataMovieStrategy` 必须是 `auto-global`、`auto-cn-friendly`、`custom-chain`、`specified`。

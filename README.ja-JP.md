@@ -77,7 +77,7 @@ pnpm backend:build:dev
 
 ### バックアップ、検証、復元
 
-Web API モードでは、Settings -> Maintenance からパッケージの作成と即時検証、既存パッケージの検証、復元プリフライトを実行できます。パスはバックエンド実行マシン上の絶対パスです。オンライン復元ボタンは意図的に提供せず、実際の復元はオフラインメンテナンス操作のままです。
+Web API モードでは、Settings -> Maintenance からパッケージの作成と即時検証、既存パッケージの検証、復元プリフライトを実行できます。バックエンド実行マシン上の絶対フォルダーを入力すると、Curated が UTC タイムスタンプ付きのパッケージ名を生成します。作成成功後はフォルダーだけ（生成ファイル名は含めない）を `backupDirectory` として `library-config.cfg` に保存し、更新後や再起動後に再入力します。オンライン復元ボタンは意図的に提供せず、実際の復元はオフラインメンテナンス操作のままです。
 
 メンテナンスコマンドは `backend/` から実行します。データベースパスをカスタム main config で指定している場合は `-config path/to/config.json` も渡してください。
 
@@ -219,7 +219,7 @@ pnpm dev:electron
 ### 設定
 
 - 包括的な設定 UI：概要、一般、動画の保存先、メタデータ、ネットワーク、キュレートフレーム、バージョン情報、メンテナンス。
-- Web API モードのメンテナンス画面は、PIN で保護されたバックアップ作成、パッケージ検証、オフライン復元プリフライトを提供します。Mock モードでは実ファイルシステム操作を無効化します。
+- Web API モードのメンテナンス画面は、PIN で保護されたバックアップ作成、パッケージ検証、オフライン復元プリフライトを提供し、最後に作成成功したバックアップ先フォルダーを更新や再起動をまたいで記憶します。Mock モードでは実ファイルシステム操作を無効化します。
 - `config/library-config.cfg` へのライブラリレベル設定永続化（アトミック書き込み）。
 - プロキシ設定（JavBus および Google 接続テスト付き）。
 - バックエンドログ：ディレクトリ、保持日数、レベルの設定。
@@ -277,6 +277,7 @@ pnpm dev:electron
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `defaultImportLibraryPathId`
+- `backupDirectory`（フォルダーのみ。空値は保存先未設定）
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `launchAtLogin`

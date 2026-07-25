@@ -42,6 +42,7 @@ alwaysApply: true
   - `autoActorProfileScrape`
   - `autoDownloadUpdates`
   - `launchAtLogin`
+  - `backupDirectory`
   - `proxy`
   - `logDir` / `logFilePrefix` / `logMaxAgeDays` / `logLevel`
 - `PATCH /api/settings` 会部分更新这些资料库级设置。

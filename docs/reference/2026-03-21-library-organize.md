@@ -13,6 +13,7 @@
 | `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
 | `metadataMovieProvider` | 影片 Metatube 源；空字符串表示自动。由设置页或 `PATCH /api/settings` 更新。 |
 | `defaultImportLibraryPathId` | 默认导入目标库路径 id。由设置页「影片存储」或 `PATCH /api/settings` 更新；`POST /api/import/movies` 会把浏览器选择的影片复制到该库根目录下，不移动或删除源文件。 |
+| `backupDirectory` | 最近一次通过设置页成功创建备份时使用的绝对目录。只保存目录，不保存自动生成的包文件名；每次创建仍生成新的 UTC 时间戳文件名。空字符串表示未记住目录。由 `PATCH /api/settings` 原子更新，刷新页面或重启后端后通过 `GET /api/settings` 回填。 |
 | `autoLibraryWatch` | 默认 **`true`**。为 **`true`** 且主配置允许目录监听时，库根下新文件经 **fsnotify** 防抖后会触发与 **`POST /api/scans`** 同类的扫描链（任务元数据常带 `trigger: fsnotify`），并可能对新增条目排队刮削。为 **`false`** 时**不**因监听排队扫描；**手动扫描、周期 `autoScanIntervalSeconds` 全库扫描**不受影响。由设置页「自动刮削元数据」或 `PATCH /api/settings` 的 `autoLibraryWatch` 更新。 |
 | `launchAtLogin` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；在支持的 Windows 运行时中会同步当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 项，命令行为 `curated(.exe) -mode tray -autostart`。Windows 登录触发的这次启动会**静默进入托盘**，只拉起本地服务与托盘图标，**不会自动打开浏览器页面**。 |
 | `autoDownloadUpdates` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；开启后，启动阶段的后台更新检查若发现较新的 installer，会自动下载并完成 SHA256 校验；安装仍须用户在 Settings -> About 显式确认，不会自动静默安装。 |

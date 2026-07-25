@@ -77,7 +77,7 @@ pnpm backend:build:dev
 
 ### 备份、验证与恢复
 
-Web API 模式下，Settings -> Maintenance 可以创建并立即验证备份包、验证已有备份以及执行恢复预检。这里填写的是后端所在机器的绝对路径。Curated 刻意不提供在线恢复按钮；真正恢复仍是离线维护操作。
+Web API 模式下，Settings -> Maintenance 可以创建并立即验证备份包、验证已有备份以及执行恢复预检。这里填写的是后端所在机器的绝对目录，Curated 会自动生成带 UTC 时间戳的包文件名。备份创建成功后，只把目录（不含生成的文件名）作为 `backupDirectory` 写入 `library-config.cfg`，刷新页面或重启后端后会自动回填。Curated 刻意不提供在线恢复按钮；真正恢复仍是离线维护操作。
 
 维护命令统一从 `backend/` 运行；若数据库路径来自自定义主配置，请额外传入 `-config path/to/config.json`：
 
@@ -218,7 +218,7 @@ pnpm dev:electron
 ### 设置与配置
 
 - 完整设置界面：概览、常规、影片存储、元数据、网络、萃取帧、关于、维护。
-- Web API 模式的维护页提供受 PIN 保护的备份创建、包验证与离线恢复预检；Mock 模式会禁用真实文件系统维护操作。
+- Web API 模式的维护页提供受 PIN 保护的备份创建、包验证与离线恢复预检，并跨刷新/重启记住最近一次成功创建所用的备份目录；Mock 模式会禁用真实文件系统维护操作。
 - 资料库级配置持久化到 `config/library-config.cfg`，原子写入。
 - 代理配置，含 JavBus 与 Google 连通性测试。
 - 后端日志：可配置目录、保留天数与级别。
@@ -276,6 +276,7 @@ pnpm dev:electron
 - `metadataMovieProvider`
 - `metadataMovieStrategy`
 - `defaultImportLibraryPathId`
+- `backupDirectory`（只保存目录；空值表示未记住备份目标）
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `launchAtLogin`
