@@ -91,6 +91,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.DefaultImportLibraryPathID = s
 	}
+	if v, ok := m["backupDirectory"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: backupDirectory: %w", path, err)
+		}
+		cfg.BackupDirectory = s
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

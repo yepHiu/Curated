@@ -95,6 +95,7 @@ import {
 import type { LibraryService } from "@/services/contracts/library-service"
 
 const organizeLibraryMock = ref(false)
+const backupDirectoryMock = ref("")
 const autoLibraryWatchMock = ref(true)
 const autoActorProfileScrapeMock = ref(false)
 const autoDownloadUpdatesMock = ref(false)
@@ -1114,6 +1115,7 @@ export const mockLibraryService: LibraryService = {
   libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesMock.value),
   savedViews: computed(() => savedViewsMock.value),
   defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdMock.value),
+  backupDirectory: computed(() => backupDirectoryMock.value),
   organizeLibrary: computed(() => organizeLibraryMock.value),
   autoLibraryWatch: computed(() => autoLibraryWatchMock.value),
   autoActorProfileScrape: computed(() => autoActorProfileScrapeMock.value),
@@ -1567,6 +1569,10 @@ export const mockLibraryService: LibraryService = {
 
   async setOrganizeLibrary(value: boolean) {
     organizeLibraryMock.value = value
+  },
+
+  async setBackupDirectory(directory: string) {
+    backupDirectoryMock.value = directory.trim()
   },
 
   async setAutoLibraryWatch(value: boolean) {

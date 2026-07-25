@@ -2128,6 +2128,20 @@ type statefulOrganizeCtl struct {
 	err error
 }
 
+type statefulBackupDirectoryCtl struct {
+	v   string
+	err error
+}
+
+func (s *statefulBackupDirectoryCtl) BackupDirectory() string { return s.v }
+func (s *statefulBackupDirectoryCtl) SetBackupDirectory(v string) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.v = v
+	return nil
+}
+
 func (s *statefulOrganizeCtl) OrganizeLibrary() bool { return s.v }
 func (s *statefulOrganizeCtl) SetOrganizeLibrary(v bool) error {
 	if s.err != nil {
@@ -2969,5 +2983,106 @@ func TestHandlePatchSettings_RollsBackEarlierChangesWhenLaterPatchFails(t *testi
 	}
 	if dto.OrganizeLibrary {
 		t.Fatal("GET /api/settings should still report organizeLibrary=false after rollback")
+	}
+}
+
+func TestHandlePatchSettings_BackupDirectoryPersistsInSettingsDTO(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctl := &statefulBackupDirectoryCtl{}
+	h := NewHandler(Deps{
+		Cfg:                config.Config{},
+		Logger:             zap.NewNop(),
+		Store:              store,
+		BackupDirectoryCtl: ctl,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	directory := filepath.Join(root, "backups")
+	body, err := json.Marshal(map[string]string{"backupDirectory": "  " + directory + "  "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		responseBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(responseBody))
+	}
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if got := dto.BackupDirectory; got != directory {
+		t.Fatalf("BackupDirectory = %q, want %q", got, directory)
+	}
+	if got := ctl.BackupDirectory(); got != directory {
+		t.Fatalf("controller BackupDirectory = %q, want %q", got, directory)
+	}
+
+	getResp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer getResp.Body.Close()
+	if err := json.NewDecoder(getResp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if got := dto.BackupDirectory; got != directory {
+		t.Fatalf("GET BackupDirectory = %q, want %q", got, directory)
+	}
+}
+
+func TestHandlePatchSettings_BackupDirectoryRejectsRelativePath(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	ctl := &statefulBackupDirectoryCtl{v: filepath.Join(root, "original")}
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), Store: store, BackupDirectoryCtl: ctl})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"backupDirectory":"relative/backups"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		responseBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(responseBody))
+	}
+	if got, want := ctl.BackupDirectory(), filepath.Join(root, "original"); got != want {
+		t.Fatalf("BackupDirectory changed to %q, want %q", got, want)
 	}
 }

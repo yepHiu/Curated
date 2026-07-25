@@ -14,7 +14,9 @@ vi.mock("@/lib/pick-directory", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
+    backupDirectory: { value: "" },
     createBackup: vi.fn(),
+    setBackupDirectory: vi.fn(),
     verifyBackup: vi.fn(),
     preflightBackupRestore: vi.fn(),
   }),

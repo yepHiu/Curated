@@ -834,6 +834,7 @@
     "backupDirectoryPlaceholder": "D:\\Backups",
     "backupDirectoryHint": "Curated バックエンドが動作するマシン上の絶対フォルダーパスを入力してください。作成時に UTC タイムスタンプ付きの .curated-backup ファイル名を自動生成し、既存ファイルは上書きしません。",
     "backupDirectoryAbsolute": "Windows、UNC、または Unix の絶対フォルダーパスを入力してください。",
+    "backupDirectorySaveFailed": "バックアップは作成されましたが、保存先フォルダーの設定を保存できませんでした：{error}",
     "backupPathLabel": "既存のバックアップパッケージのパス",
     "backupPathPlaceholder": "D:\\Backups\\curated.curated-backup",
     "backupPathHint": "検証または復元プリフライトには、対象の .curated-backup ファイルの絶対パスを入力してください。新しく作成したパスはここに自動入力されます。",

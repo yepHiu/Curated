@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsBackupSection from "./SettingsBackupSection.vue"
 
 const serviceMock = vi.hoisted(() => ({
+  backupDirectory: { value: "" },
   createBackup: vi.fn(),
+  setBackupDirectory: vi.fn(),
   verifyBackup: vi.fn(),
   preflightBackupRestore: vi.fn(),
 }))
@@ -58,7 +60,11 @@ const verification = {
 describe("SettingsBackupSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    serviceMock.backupDirectory.value = ""
     serviceMock.createBackup.mockResolvedValue(manifest)
+    serviceMock.setBackupDirectory.mockImplementation(async (directory: string) => {
+      serviceMock.backupDirectory.value = directory
+    })
     serviceMock.verifyBackup.mockResolvedValue(verification)
     serviceMock.preflightBackupRestore.mockResolvedValue({
       canRestore: true,
@@ -90,12 +96,48 @@ describe("SettingsBackupSection", () => {
       expect.stringMatching(/^D:\\Backups\\curated-\d{8}-\d{6}Z\.curated-backup$/),
     )
     const createdPath = serviceMock.createBackup.mock.calls[0]?.[0]
+    expect(serviceMock.setBackupDirectory).toHaveBeenCalledWith("D:\\Backups")
     expect(serviceMock.verifyBackup).toHaveBeenCalledWith(createdPath)
     expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe(
       createdPath,
     )
     expect(wrapper.text()).toContain("settings.backupValid")
     expect(toastMock).toHaveBeenCalled()
+  })
+
+  it("prefills the remembered backup directory", () => {
+    serviceMock.backupDirectory.value = "D:\\Remembered"
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+
+    expect(
+      (wrapper.get("[data-settings-backup-directory]").element as HTMLInputElement).value,
+    ).toBe("D:\\Remembered")
+  })
+
+  it("does not persist the directory when backup creation fails", async () => {
+    serviceMock.createBackup.mockRejectedValueOnce(new Error("create failed"))
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-directory]").setValue("D:\\Backups")
+    await wrapper.get("[data-settings-backup-create]").trigger("click")
+    await flushPromises()
+
+    expect(serviceMock.setBackupDirectory).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain("create failed")
+  })
+
+  it("keeps verifying a created backup when saving the directory preference fails", async () => {
+    serviceMock.setBackupDirectory.mockRejectedValueOnce(new Error("settings unavailable"))
+    const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
+    await wrapper.get("[data-settings-backup-directory]").setValue("D:\\Backups")
+    await wrapper.get("[data-settings-backup-create]").trigger("click")
+    await flushPromises()
+
+    expect(serviceMock.verifyBackup).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain("settings.backupDirectorySaveFailed")
+    expect(wrapper.text()).toContain("settings.backupValid")
+    expect(
+      (wrapper.get("[data-settings-backup-directory]").element as HTMLInputElement).value,
+    ).toBe("D:\\Backups")
   })
 
   it("keeps the native directory outcome as the backup destination", async () => {

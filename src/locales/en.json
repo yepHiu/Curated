@@ -843,6 +843,7 @@
     "backupDirectoryPlaceholder": "D:\\Backups",
     "backupDirectoryHint": "Enter an absolute directory on the machine running the Curated backend. Creation generates a UTC-timestamped .curated-backup filename and never overwrites an existing file.",
     "backupDirectoryAbsolute": "Enter an absolute Windows, UNC, or Unix directory path.",
+    "backupDirectorySaveFailed": "The backup was created, but its directory preference could not be saved: {error}",
     "backupPathLabel": "Existing backup package path",
     "backupPathPlaceholder": "D:\\Backups\\curated.curated-backup",
     "backupPathHint": "Enter the absolute path to a specific .curated-backup file for verification or restore preflight. A newly created path appears here automatically.",

@@ -834,6 +834,7 @@
     "backupDirectoryPlaceholder": "D:\\Backups",
     "backupDirectoryHint": "请输入运行 Curated 后端那台机器上的绝对目录。创建时会自动生成带 UTC 时间戳的 .curated-backup 文件名，且不会覆盖已有文件。",
     "backupDirectoryAbsolute": "请输入 Windows、UNC 或 Unix 绝对目录路径。",
+    "backupDirectorySaveFailed": "备份已创建，但备份目录偏好保存失败：{error}",
     "backupPathLabel": "现有备份包路径",
     "backupPathPlaceholder": "D:\\Backups\\curated.curated-backup",
     "backupPathHint": "用于验证或恢复预检，请输入具体 .curated-backup 文件的绝对路径。创建成功后，此处会自动填入新备份路径。",

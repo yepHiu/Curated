@@ -61,6 +61,7 @@ const libraryPathsState: Ref<LibrarySetting[]> = ref([])
 const libraryPathStorageStatusesState: Ref<LibraryPathStorageStatusDTO[]> = ref([])
 const savedViewsState: Ref<SavedViewDTO[]> = ref([])
 const defaultImportLibraryPathIdState = ref("")
+const backupDirectoryState = ref("")
 /** 与后端 config.Default() / library-config.cfg 默认一致，避免首屏在 GET 完成前误显示为关 */
 const organizeLibraryState = ref(true)
 /** 与后端默认一致：关，避免误触新库「首次扫描」扩展逻辑 */
@@ -102,6 +103,7 @@ let autoDownloadUpdatesSaveSeq = 0
 let launchAtLoginSaveSeq = 0
 let curatedFrameExportFormatSaveSeq = 0
 let defaultImportLibraryPathSaveSeq = 0
+let backupDirectorySaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
 let metadataMovieProviderChainSaveSeq = 0
 let metadataMovieScrapeModeSaveSeq = 0
@@ -364,6 +366,7 @@ async function refreshLibraryPathsFromApi() {
     const settings = await api.getSettings()
     libraryPathsState.value = mapLibraryPathsFromSettings(settings.libraryPaths)
     defaultImportLibraryPathIdState.value = settings.defaultImportLibraryPathId?.trim() ?? ""
+    backupDirectoryState.value = settings.backupDirectory?.trim() ?? ""
     organizeLibraryState.value = Boolean(settings.organizeLibrary)
     autoLibraryWatchState.value = settings.autoLibraryWatch !== false
     autoActorProfileScrapeState.value = Boolean(settings.autoActorProfileScrape)
@@ -406,6 +409,7 @@ function createWebLibraryService(): LibraryService {
     libraryPathStorageStatuses: computed(() => libraryPathStorageStatusesState.value),
     savedViews: computed(() => savedViewsState.value),
     defaultImportLibraryPathId: computed(() => defaultImportLibraryPathIdState.value),
+    backupDirectory: computed(() => backupDirectoryState.value),
     organizeLibrary: computed(() => organizeLibraryState.value),
     autoLibraryWatch: computed(() => autoLibraryWatchState.value),
     autoActorProfileScrape: computed(() => autoActorProfileScrapeState.value),
@@ -525,6 +529,15 @@ function createWebLibraryService(): LibraryService {
 
     async createBackup(destinationPath: string): Promise<BackupManifestDTO> {
       return api.createBackup({ destinationPath: destinationPath.trim() })
+    },
+
+    async setBackupDirectory(directory: string): Promise<void> {
+      const target = directory.trim()
+      const seq = ++backupDirectorySaveSeq
+      const next = await api.patchSettings({ backupDirectory: target })
+      if (seq === backupDirectorySaveSeq) {
+        backupDirectoryState.value = next.backupDirectory?.trim() ?? ""
+      }
     },
 
     async verifyBackup(backupPath: string): Promise<BackupVerificationDTO> {

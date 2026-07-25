@@ -61,6 +61,7 @@ function movieDetailDto(id: string, overrides: Partial<MovieDetailDTO> = {}): Mo
 function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
   return {
     libraryPaths: [],
+    backupDirectory: "",
     player: {
       hardwareDecode: true,
       hardwareEncoder: "auto",
@@ -784,6 +785,26 @@ describe("webLibraryService loading", () => {
     ])
     expect(webLibraryService.moviesLoaded.value).toBe(true)
     expect(webLibraryService.loadError.value).toBeNull()
+  })
+
+  it("loads and persists the remembered backup directory through settings", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.getSettings.mockResolvedValueOnce(
+      settingsDto({ backupDirectory: "D:\\Remembered" }),
+    )
+    apiMocks.patchSettings.mockResolvedValueOnce(
+      settingsDto({ backupDirectory: "D:\\Backups" }),
+    )
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    await webLibraryService.refreshSettings()
+    expect(webLibraryService.backupDirectory.value).toBe("D:\\Remembered")
+
+    await webLibraryService.setBackupDirectory("  D:\\Backups  ")
+
+    expect(apiMocks.patchSettings).toHaveBeenCalledWith({ backupDirectory: "D:\\Backups" })
+    expect(webLibraryService.backupDirectory.value).toBe("D:\\Backups")
   })
 
   it("marks the movie list loaded after the first page while remaining pages continue in the background", async () => {

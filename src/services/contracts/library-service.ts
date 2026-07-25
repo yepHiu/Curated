@@ -68,6 +68,7 @@ export interface LibraryService {
   /** Ordered user-defined library filters (SQLite in Web API; localStorage in Mock). */
   savedViews: ComputedRef<readonly SavedViewDTO[]>
   defaultImportLibraryPathId: ComputedRef<string>
+  backupDirectory: ComputedRef<string>
   refreshSettings(): Promise<void>
   checkLibraryPathStorageStatus(libraryPathIds?: string[]): Promise<void>
   rebindLibraryPathStorage(id: string): Promise<void>
@@ -121,6 +122,7 @@ export interface LibraryService {
   listConnectedClients(): Promise<ConnectedClientsDTO>
   health(): Promise<HealthDTO>
   createBackup(destinationPath: string): Promise<BackupManifestDTO>
+  setBackupDirectory(directory: string): Promise<void>
   verifyBackup(backupPath: string): Promise<BackupVerificationDTO>
   preflightBackupRestore(backupPath: string): Promise<BackupRestorePreflightDTO>
   scanLibraryHealth(): Promise<LibraryHealthReportDTO>

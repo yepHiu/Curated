@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   ArchiveRestore,
@@ -39,6 +39,7 @@ const libraryService = useLibraryService()
 const backupDirectoryDraft = ref("")
 const backupPathDraft = ref("")
 const directoryError = ref("")
+const directoryPersistenceError = ref("")
 const pathError = ref("")
 const pickerHint = ref("")
 const actionError = ref("")
@@ -48,6 +49,20 @@ const verification = ref<BackupVerificationDTO | null>(null)
 const preflight = ref<BackupRestorePreflightDTO | null>(null)
 
 const busy = computed(() => busyAction.value !== null)
+
+let lastSyncedDirectory = ""
+watch(
+  () => libraryService.backupDirectory.value,
+  (value) => {
+    const next = value.trim()
+    const current = backupDirectoryDraft.value.trim()
+    if (current === "" || current === lastSyncedDirectory) {
+      backupDirectoryDraft.value = next
+    }
+    lastSyncedDirectory = next
+  },
+  { immediate: true },
+)
 
 function formatError(error: unknown): string {
   if (error instanceof HttpClientError && error.apiError?.message) {
@@ -106,12 +121,20 @@ async function createAndVerifyBackup() {
   if (!backupDirectory) return
   const backupPath = joinBackupDestination(backupDirectory, buildBackupFilename())
   actionError.value = ""
+  directoryPersistenceError.value = ""
   pickerHint.value = ""
   preflight.value = null
   busyAction.value = "create"
   try {
     createdManifest.value = await libraryService.createBackup(backupPath)
     backupPathDraft.value = backupPath
+    try {
+      await libraryService.setBackupDirectory(backupDirectory)
+    } catch (error) {
+      directoryPersistenceError.value = t("settings.backupDirectorySaveFailed", {
+        error: formatError(error),
+      })
+    }
     verification.value = await libraryService.verifyBackup(backupPath)
     if (!verification.value.valid) {
       actionError.value = t("settings.backupCreatedVerificationFailed")
@@ -298,6 +321,9 @@ function formatBytes(value: number): string {
 
       <p v-if="actionError" class="text-sm text-destructive" role="alert">
         {{ actionError }}
+      </p>
+      <p v-if="directoryPersistenceError" class="text-sm text-warning" role="alert">
+        {{ directoryPersistenceError }}
       </p>
 
       <template v-if="createdManifest || verification || preflight">

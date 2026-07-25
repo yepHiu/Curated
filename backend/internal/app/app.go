@@ -87,6 +87,9 @@ type App struct {
 	// defaultImportLibraryPathID controls where top-bar movie imports are copied.
 	defaultImportLibraryPathID   string
 	defaultImportLibraryPathIDMu sync.RWMutex
+	// backupDirectory is the remembered destination for timestamped backup packages.
+	backupDirectory   string
+	backupDirectoryMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapePendingMu sync.Mutex
@@ -178,6 +181,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		launchAtLogin:                 cfg.LaunchAtLogin,
 		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
+		backupDirectory:               strings.TrimSpace(cfg.BackupDirectory),
 		autoActorProfileScrapePending: make(map[string]struct{}),
 		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
 		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
@@ -364,6 +368,13 @@ func (a *App) DefaultImportLibraryPathID() string {
 	return strings.TrimSpace(a.defaultImportLibraryPathID)
 }
 
+// BackupDirectory returns the remembered destination directory for backup packages.
+func (a *App) BackupDirectory() string {
+	a.backupDirectoryMu.RLock()
+	defer a.backupDirectoryMu.RUnlock()
+	return strings.TrimSpace(a.backupDirectory)
+}
+
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
 func (a *App) SetAutoLibraryWatch(v bool) error {
 	path := a.librarySettingsPath
@@ -501,6 +512,27 @@ func (a *App) SetDefaultImportLibraryPathID(id string) error {
 	a.defaultImportLibraryPathID = id
 	a.cfg.DefaultImportLibraryPathID = id
 	a.defaultImportLibraryPathIDMu.Unlock()
+	return nil
+}
+
+// SetBackupDirectory persists the remembered backup destination directory.
+// An empty value clears the preference; path validation is performed by the HTTP boundary.
+func (a *App) SetBackupDirectory(directory string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	directory = strings.TrimSpace(directory)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["backupDirectory"] = directory
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.backupDirectoryMu.Lock()
+	a.backupDirectory = directory
+	a.cfg.BackupDirectory = directory
+	a.backupDirectoryMu.Unlock()
 	return nil
 }
 
@@ -2622,6 +2654,7 @@ func (a *App) HTTPHandler() http.Handler {
 			LaunchAtLoginCtl:                 a,
 			CuratedFrameExportFormatCtl:      a,
 			DefaultImportLibraryPathCtl:      a,
+			BackupDirectoryCtl:               a,
 			MetadataScrapeCtl:                a,
 			ProviderHealthChecker:            a.scraper,
 			ProxyCtl:                         a,

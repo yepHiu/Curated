@@ -288,6 +288,8 @@ export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
   /** Library path id used as the target for top-bar movie imports. Empty or missing means not configured. */
   defaultImportLibraryPathId?: string
+  /** Remembered directory for newly generated backup package filenames. Empty means not configured. */
+  backupDirectory: string
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
@@ -508,6 +510,8 @@ export interface PatchSettingsBody {
   launchAtLogin?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
   defaultImportLibraryPathId?: string
+  /** Absolute backup destination directory; an empty string clears the remembered value. */
+  backupDirectory?: string
   player?: PatchPlayerSettingsBody
   /** 未发送则不改；发送 "" 恢复自动；非空须为服务端认可的 provider 名 */
   metadataMovieProvider?: string

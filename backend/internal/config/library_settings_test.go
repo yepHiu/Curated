@@ -143,6 +143,22 @@ func TestMergeLibrarySettingsFile_DefaultImportLibraryPathID(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_BackupDirectory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"backupDirectory":"  D:\\Backups  "}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.BackupDirectory, `D:\Backups`; got != want {
+		t.Fatalf("BackupDirectory = %q, want %q", got, want)
+	}
+}
+
 func TestMergeLibrarySettingsFile_LaunchAtLoginTrue(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

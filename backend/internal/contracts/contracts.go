@@ -848,6 +848,7 @@ type UpdateLibraryPathRequest struct {
 type SettingsDTO struct {
 	LibraryPaths               []LibraryPathDTO  `json:"libraryPaths"`
 	DefaultImportLibraryPathID string            `json:"defaultImportLibraryPathId,omitempty"`
+	BackupDirectory            string            `json:"backupDirectory"`
 	Player                     PlayerSettingsDTO `json:"player"`
 	OrganizeLibrary            bool              `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
@@ -923,6 +924,7 @@ type PatchSettingsRequest struct {
 	LaunchAtLogin              *bool                   `json:"launchAtLogin,omitempty"`
 	CuratedFrameExportFormat   *string                 `json:"curatedFrameExportFormat,omitempty"`
 	DefaultImportLibraryPathID *string                 `json:"defaultImportLibraryPathId,omitempty"`
+	BackupDirectory            *string                 `json:"backupDirectory,omitempty"`
 	Player                     *PatchPlayerSettingsDTO `json:"player,omitempty"`
 	MetadataMovieProvider      *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).

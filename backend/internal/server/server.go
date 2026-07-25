@@ -142,6 +142,12 @@ type DefaultImportLibraryPathController interface {
 	SetDefaultImportLibraryPathID(id string) error
 }
 
+// BackupDirectoryController exposes the remembered backup package destination directory.
+type BackupDirectoryController interface {
+	BackupDirectory() string
+	SetBackupDirectory(directory string) error
+}
+
 // LibraryPathStorageStatusProvider checks whether configured library paths' backing storage is available.
 type LibraryPathStorageStatusProvider interface {
 	ListLibraryPathStorageStatus(ctx context.Context) (contracts.LibraryPathStorageStatusListDTO, error)
@@ -227,6 +233,7 @@ type Handler struct {
 	launchAtLoginCtl               LaunchAtLoginController
 	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
 	defaultImportLibraryPathCtl    DefaultImportLibraryPathController
+	backupDirectoryCtl             BackupDirectoryController
 	libraryPathStorageStatus       LibraryPathStorageStatusProvider
 	metadataScrapeCtl              MetadataScrapeSettings
 	providerHealthChecker          ProviderHealthChecker
@@ -265,6 +272,7 @@ type Deps struct {
 	LaunchAtLoginCtl                 LaunchAtLoginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
+	BackupDirectoryCtl               BackupDirectoryController
 	LibraryPathStorageStatusProvider LibraryPathStorageStatusProvider
 	MetadataScrapeCtl                MetadataScrapeSettings
 	ProviderHealthChecker            ProviderHealthChecker
@@ -327,6 +335,7 @@ func NewHandler(deps Deps) *Handler {
 		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
 		defaultImportLibraryPathCtl:    deps.DefaultImportLibraryPathCtl,
+		backupDirectoryCtl:             deps.BackupDirectoryCtl,
 		libraryPathStorageStatus:       deps.LibraryPathStorageStatusProvider,
 		metadataScrapeCtl:              deps.MetadataScrapeCtl,
 		providerHealthChecker:          deps.ProviderHealthChecker,
@@ -1688,9 +1697,14 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.defaultImportLibraryPathCtl != nil {
 		defaultImportLibraryPathID = strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
 	}
+	backupDirectory := strings.TrimSpace(h.cfg.BackupDirectory)
+	if h.backupDirectoryCtl != nil {
+		backupDirectory = strings.TrimSpace(h.backupDirectoryCtl.BackupDirectory())
+	}
 	dto := contracts.SettingsDTO{
 		LibraryPaths:               libraryPaths,
 		DefaultImportLibraryPathID: defaultImportLibraryPathID,
+		BackupDirectory:            backupDirectory,
 		Player: contracts.PlayerSettingsDTO{
 			HardwareDecode:      h.cfg.Player.HardwareDecode,
 			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
@@ -1855,7 +1869,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1869,12 +1883,12 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
 
-	ops := make([]settingsPatchOperation, 0, 13)
+	ops := make([]settingsPatchOperation, 0, 14)
 
 	if body.OrganizeLibrary != nil {
 		if h.organizeLibraryCtl == nil {
@@ -2022,6 +2036,29 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "defaultImportLibraryPathId",
 			apply:    func() error { return h.defaultImportLibraryPathCtl.SetDefaultImportLibraryPathID(target) },
 			rollback: func() error { return h.defaultImportLibraryPathCtl.SetDefaultImportLibraryPathID(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.BackupDirectory != nil {
+		if h.backupDirectoryCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "backup directory settings not available")
+			return
+		}
+		target := strings.TrimSpace(*body.BackupDirectory)
+		if target != "" && !isAbsoluteBackupPath(target) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "backupDirectory must be an absolute path or empty")
+			return
+		}
+		prev := h.backupDirectoryCtl.BackupDirectory()
+		ops = append(ops, settingsPatchOperation{
+			name:     "backupDirectory",
+			apply:    func() error { return h.backupDirectoryCtl.SetBackupDirectory(target) },
+			rollback: func() error { return h.backupDirectoryCtl.SetBackupDirectory(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,
