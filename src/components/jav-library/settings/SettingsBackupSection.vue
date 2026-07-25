@@ -36,7 +36,9 @@ const props = defineProps<{
 
 const { t, locale } = useI18n()
 const libraryService = useLibraryService()
+const backupDirectoryDraft = ref("")
 const backupPathDraft = ref("")
+const directoryError = ref("")
 const pathError = ref("")
 const pickerHint = ref("")
 const actionError = ref("")
@@ -68,15 +70,26 @@ function validatedBackupPath(): string | null {
   return candidate
 }
 
+function validatedBackupDirectory(): string | null {
+  directoryError.value = ""
+  const candidate = backupDirectoryDraft.value.trim()
+  if (!candidate || !isAbsoluteLibraryPath(candidate)) {
+    directoryError.value = t("settings.backupDirectoryAbsolute")
+    return null
+  }
+  backupDirectoryDraft.value = candidate
+  return candidate
+}
+
 async function pickBackupDirectory() {
   if (!props.supported || busy.value) return
-  pathError.value = ""
+  directoryError.value = ""
   pickerHint.value = ""
   busyAction.value = "pick"
   try {
     const outcome = await pickLibraryDirectory()
     if (outcome.status === "ok") {
-      backupPathDraft.value = joinBackupDestination(outcome.path, buildBackupFilename())
+      backupDirectoryDraft.value = outcome.path
     } else if (outcome.status === "hint") {
       pickerHint.value = outcome.message
     } else if (outcome.status === "unsupported") {
@@ -89,14 +102,16 @@ async function pickBackupDirectory() {
 
 async function createAndVerifyBackup() {
   if (!props.supported || busy.value) return
-  const backupPath = validatedBackupPath()
-  if (!backupPath) return
+  const backupDirectory = validatedBackupDirectory()
+  if (!backupDirectory) return
+  const backupPath = joinBackupDestination(backupDirectory, buildBackupFilename())
   actionError.value = ""
   pickerHint.value = ""
   preflight.value = null
   busyAction.value = "create"
   try {
     createdManifest.value = await libraryService.createBackup(backupPath)
+    backupPathDraft.value = backupPath
     verification.value = await libraryService.verifyBackup(backupPath)
     if (!verification.value.valid) {
       actionError.value = t("settings.backupCreatedVerificationFailed")
@@ -178,31 +193,31 @@ function formatBytes(value: number): string {
 
     <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
       <div class="flex flex-col gap-2">
-        <label for="settings-backup-path" class="text-sm font-medium text-foreground">
-          {{ t("settings.backupPathLabel") }}
+        <label for="settings-backup-directory" class="text-sm font-medium text-foreground">
+          {{ t("settings.backupDirectoryLabel") }}
         </label>
         <Input
-          id="settings-backup-path"
-          v-model="backupPathDraft"
+          id="settings-backup-directory"
+          v-model="backupDirectoryDraft"
           :disabled="!supported || busy"
-          :aria-invalid="Boolean(pathError)"
-          aria-describedby="settings-backup-path-help"
-          :placeholder="t('settings.backupPathPlaceholder')"
+          :aria-invalid="Boolean(directoryError)"
+          aria-describedby="settings-backup-directory-help"
+          :placeholder="t('settings.backupDirectoryPlaceholder')"
           autocomplete="off"
-          data-settings-backup-path
+          data-settings-backup-directory
         />
-        <p v-if="pathError" id="settings-backup-path-help" class="text-xs text-destructive" role="alert">
-          {{ pathError }}
+        <p v-if="directoryError" id="settings-backup-directory-help" class="text-xs text-destructive" role="alert">
+          {{ directoryError }}
         </p>
-        <p v-else-if="pickerHint" id="settings-backup-path-help" class="text-xs text-muted-foreground">
+        <p v-else-if="pickerHint" id="settings-backup-directory-help" class="text-xs text-muted-foreground">
           {{ pickerHint }}
         </p>
-        <p v-else id="settings-backup-path-help" class="text-xs leading-relaxed text-muted-foreground">
-          {{ t("settings.backupPathHint") }}
+        <p v-else id="settings-backup-directory-help" class="text-xs leading-relaxed text-muted-foreground">
+          {{ t("settings.backupDirectoryHint") }}
         </p>
       </div>
 
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button
           type="button"
           variant="outline"
@@ -227,6 +242,33 @@ function formatBytes(value: number): string {
           <DatabaseBackup v-else data-icon="inline-start" />
           {{ t("settings.backupCreate") }}
         </Button>
+      </div>
+
+      <Separator />
+
+      <div class="flex flex-col gap-2">
+        <label for="settings-backup-path" class="text-sm font-medium text-foreground">
+          {{ t("settings.backupPathLabel") }}
+        </label>
+        <Input
+          id="settings-backup-path"
+          v-model="backupPathDraft"
+          :disabled="!supported || busy"
+          :aria-invalid="Boolean(pathError)"
+          aria-describedby="settings-backup-path-help"
+          :placeholder="t('settings.backupPathPlaceholder')"
+          autocomplete="off"
+          data-settings-backup-path
+        />
+        <p v-if="pathError" id="settings-backup-path-help" class="text-xs text-destructive" role="alert">
+          {{ pathError }}
+        </p>
+        <p v-else id="settings-backup-path-help" class="text-xs leading-relaxed text-muted-foreground">
+          {{ t("settings.backupPathHint") }}
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button
           type="button"
           variant="secondary"

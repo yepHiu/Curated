@@ -82,28 +82,30 @@ describe("SettingsBackupSection", () => {
     const block = wrapper.get('[data-settings-maintenance-block="backup"]')
     expect(block.classes()).toContain("p-4")
 
-    await wrapper.get("[data-settings-backup-path]").setValue("D:\\Backups\\curated")
+    await wrapper.get("[data-settings-backup-directory]").setValue("D:\\Backups")
     await wrapper.get("[data-settings-backup-create]").trigger("click")
     await flushPromises()
 
     expect(serviceMock.createBackup).toHaveBeenCalledWith(
-      "D:\\Backups\\curated.curated-backup",
+      expect.stringMatching(/^D:\\Backups\\curated-\d{8}-\d{6}Z\.curated-backup$/),
     )
-    expect(serviceMock.verifyBackup).toHaveBeenCalledWith(
-      "D:\\Backups\\curated.curated-backup",
+    const createdPath = serviceMock.createBackup.mock.calls[0]?.[0]
+    expect(serviceMock.verifyBackup).toHaveBeenCalledWith(createdPath)
+    expect((wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value).toBe(
+      createdPath,
     )
     expect(wrapper.text()).toContain("settings.backupValid")
     expect(toastMock).toHaveBeenCalled()
   })
 
-  it("uses the native directory outcome to build a timestamped package path", async () => {
+  it("keeps the native directory outcome as the backup destination", async () => {
     pickerMock.mockResolvedValueOnce({ status: "ok", path: "D:\\Backups" })
     const wrapper = mount(SettingsBackupSection, { props: { supported: true } })
     await wrapper.get("[data-settings-backup-pick]").trigger("click")
     await flushPromises()
 
-    const value = (wrapper.get("[data-settings-backup-path]").element as HTMLInputElement).value
-    expect(value).toMatch(/^D:\\Backups\\curated-\d{8}-\d{6}Z\.curated-backup$/)
+    const value = (wrapper.get("[data-settings-backup-directory]").element as HTMLInputElement).value
+    expect(value).toBe("D:\\Backups")
   })
 
   it("runs restore preflight without exposing an online restore action", async () => {
