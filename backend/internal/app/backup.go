@@ -69,7 +69,7 @@ func backupManifestDTO(manifest backup.Manifest) contracts.BackupManifestDTO {
 			UserAssetsIncluded:    manifest.Scope.UserAssetsIncluded,
 			MediaFilesIncluded:    manifest.Scope.MediaFilesIncluded,
 		},
-		SchemaMigrations: append([]string(nil), manifest.SchemaMigrations...),
+		SchemaMigrations: append([]string{}, manifest.SchemaMigrations...),
 		Files:            files,
 	}
 }
@@ -88,8 +88,8 @@ func backupVerificationDTO(verification backup.Verification) contracts.BackupVer
 			QuickCheck:           verification.DatabaseIntegrity.QuickCheck,
 			ForeignKeyViolations: verification.DatabaseIntegrity.ForeignKeyViolations,
 		},
-		Errors:   append([]string(nil), verification.Errors...),
-		Warnings: append([]string(nil), verification.Warnings...),
+		Errors:   append([]string{}, verification.Errors...),
+		Warnings: append([]string{}, verification.Warnings...),
 	}
 }
 
@@ -105,8 +105,8 @@ func backupPreflightDTO(preflight backup.RestorePreflight) contracts.BackupResto
 		RequiredBytes:         preflight.RequiredBytes,
 		AvailableBytes:        preflight.AvailableBytes,
 		AvailableBytesKnown:   preflight.AvailableBytesKnown,
-		UnsupportedMigrations: append([]string(nil), preflight.UnsupportedMigrations...),
-		Errors:                append([]string(nil), preflight.Errors...),
-		Warnings:              append([]string(nil), preflight.Warnings...),
+		UnsupportedMigrations: append([]string{}, preflight.UnsupportedMigrations...),
+		Errors:                append([]string{}, preflight.Errors...),
+		Warnings:              append([]string{}, preflight.Warnings...),
 	}
 }
