@@ -22,7 +22,6 @@ export interface WatermarkedBandLayout {
   iconSize: number
   brandFontSize: number
   mainFontSize: number
-  actorFontSize: number
 }
 
 const DEFAULT_THEME: WatermarkedExportTheme = {
@@ -75,7 +74,6 @@ export function buildWatermarkedBandLayout(sourceHeight: number): WatermarkedBan
     iconSize: Math.max(20, Math.round(bandHeight * 0.24)),
     brandFontSize: Math.max(13, Math.round(bandHeight * 0.21)),
     mainFontSize: Math.max(13, Math.round(bandHeight * 0.19)),
-    actorFontSize: Math.max(10, Math.round(bandHeight * 0.11)),
   }
 }
 
@@ -146,38 +144,35 @@ function drawWatermarkedFrame(
   const rightX = width - layout.padding
   const code = safeText(row.code)
   const title = safeText(row.title) || "Untitled"
-  const actors = row.actors.map(safeText).filter(Boolean).join(" · ")
-  const gap = Math.max(6, Math.round(layout.mainFontSize * 0.4))
-
-  ctx.font = `700 ${layout.mainFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
-  const codeWidth = code ? ctx.measureText(code).width : 0
-  const titleMaxWidth = Math.max(0, rightX - leftX - (code ? codeWidth + gap : 0))
-  const fittedTitle = fitText(ctx, title, titleMaxWidth)
-  const mainY = height + layout.padding + layout.mainFontSize
-  ctx.textBaseline = "alphabetic"
-  ctx.textAlign = "left"
-  ctx.fillStyle = theme.foreground
-  ctx.fillText(fittedTitle, leftX, mainY)
-  if (code) {
-    ctx.fillStyle = theme.primary
-    ctx.textAlign = "right"
-    ctx.fillText(code, rightX, mainY)
-  }
-
-  const detailsY = height + layout.bandHeight - layout.padding
   const logoHeight = Math.min(
-    Math.max(layout.brandFontSize * 1.35, layout.iconSize),
-    layout.bandHeight - layout.padding * 1.15,
+    Math.round(layout.bandHeight * 0.68),
+    layout.bandHeight - Math.round(layout.padding * 0.65),
   )
   const logoWidth = Math.round(logoHeight * (1085 / 322))
-  ctx.drawImage(logo, leftX, detailsY - logoHeight, logoWidth, logoHeight)
+  const metadataLeft = Math.max(
+    Math.round(width * 0.46),
+    leftX + logoWidth + layout.padding * 2,
+  )
+  const metadataWidth = Math.max(0, rightX - metadataLeft)
+  const titleFontSize = layout.mainFontSize
+  const codeFontSize = Math.max(12, Math.round(layout.mainFontSize * 0.86))
+  const fittedTitle = fitText(ctx, title, metadataWidth)
+  const titleY = height + layout.padding + titleFontSize
+  const codeY = height + layout.bandHeight - layout.padding
 
-  if (actors) {
-    ctx.font = `500 ${layout.actorFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
-    ctx.fillStyle = theme.mutedForeground
-    ctx.textAlign = "right"
-    ctx.fillText(fitText(ctx, actors, Math.max(0, Math.round(width * 0.48))), rightX, detailsY)
+  ctx.font = `700 ${titleFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+  ctx.textBaseline = "alphabetic"
+  ctx.textAlign = "right"
+  ctx.fillStyle = theme.foreground
+  ctx.fillText(fittedTitle, rightX, titleY)
+  if (code) {
+    ctx.font = `700 ${codeFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+    ctx.fillStyle = theme.primary
+    ctx.fillText(code, rightX, codeY)
   }
+
+  const logoTop = height + Math.round((layout.bandHeight - logoHeight) / 2)
+  ctx.drawImage(logo, leftX, logoTop, logoWidth, logoHeight)
 
   return canvas
 }
