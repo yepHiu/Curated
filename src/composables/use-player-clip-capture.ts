@@ -67,9 +67,9 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
     thresholdTimer = window.setTimeout(() => {
       thresholdTimer = null
       if (!pointerActive || phase.value !== "armed") return
-      startSec.value = Number.isFinite(options.currentTime.value)
-        ? Math.max(0, options.currentTime.value)
-        : now
+      // Keep the timestamp captured on press. Re-reading the media clock here
+      // can pick up a stale seek/timeupdate value and make consecutive clips
+      // start from the previous recording's position.
       phase.value = "recording"
       recordingStartedAt = performance.now()
       ticker = window.setInterval(() => {

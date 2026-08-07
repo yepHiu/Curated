@@ -349,6 +349,7 @@ let pendingCuratedFrameCapture: Promise<
 > | null = null
 
 function beginCuratedPress() {
+  if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
   pendingCuratedFrameCapture = video
     ? captureCuratedFrameCandidate(video, {

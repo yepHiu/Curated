@@ -78,6 +78,38 @@ describe("usePlayerClipCapture", () => {
     expect(result.endSec).toBeGreaterThanOrEqual(14.4)
   })
 
+  it("keeps each clip anchored to the time captured when the press began", () => {
+    const currentTime = ref(100)
+    const onClipReady = vi.fn().mockResolvedValue(undefined)
+    const capture = usePlayerClipCapture({
+      currentTime,
+      duration: ref(1000),
+      longPressMs: 400,
+      onClipReady,
+    })
+
+    capture.startPress()
+    currentTime.value = 100.5
+    vi.advanceTimersByTime(400)
+    currentTime.value = 105.5
+    vi.advanceTimersByTime(100)
+    const first = capture.finishPress()
+
+    expect(first).toMatchObject({ wasLongPress: true, startSec: 100, endSec: 105.5 })
+    capture.reset()
+
+    currentTime.value = 200
+    capture.startPress()
+    currentTime.value = 200.5
+    vi.advanceTimersByTime(400)
+    currentTime.value = 205.5
+    vi.advanceTimersByTime(100)
+    const second = capture.finishPress()
+
+    expect(second).toMatchObject({ wasLongPress: true, startSec: 200, endSec: 205.5 })
+    expect(second.startSec).not.toBe(first.startSec)
+  })
+
   it("automatically ends at the configured maximum duration", () => {
     const currentTime = ref(10)
     const onClipReady = vi.fn().mockResolvedValue(undefined)
