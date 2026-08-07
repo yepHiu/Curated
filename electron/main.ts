@@ -20,6 +20,7 @@ import {
   resolveAppIconPath,
   selectedDirectoryFromOpenDialogResult,
   shouldHideWindowOnClose,
+  withCuratedDesktopVersion,
   withCuratedDesktopRequestHeaders,
   shouldStopBackendOnQuit,
   shouldUseApplicationMenu,
@@ -184,7 +185,7 @@ function createMainWindow(
   })
 
   installDesktopClientMarker(window, backendBaseUrl)
-  void window.loadURL(initialUrl)
+  void window.loadURL(withCuratedDesktopVersion(initialUrl, app.getVersion()))
   return window
 }
 
@@ -268,7 +269,7 @@ function showMainWindow(initialUrl?: string): void {
     return
   }
   if (initialUrl) {
-    void mainWindow.loadURL(initialUrl)
+    void mainWindow.loadURL(withCuratedDesktopVersion(initialUrl, app.getVersion()))
   }
   if (mainWindow.isMinimized()) {
     mainWindow.restore()

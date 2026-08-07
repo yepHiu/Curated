@@ -8,6 +8,7 @@ export const curatedDesktopClientHeaderValue = "desktop-electron"
 export const curatedDesktopClientVersionHeaderName = "X-Curated-Client-Version"
 export const curatedDesktopClientOSHeaderName = "X-Curated-OS"
 export const curatedDesktopClientOSVersionHeaderName = "X-Curated-OS-Version"
+export const curatedDesktopVersionQueryName = "curatedDesktopVersion"
 
 export interface NativeDirectoryPickResult {
   path: string
@@ -117,6 +118,20 @@ export function shouldMarkCuratedDesktopRequest(candidateUrl: string, backendBas
     return new URL(candidateUrl).origin === new URL(backendBaseUrl).origin
   } catch {
     return false
+  }
+}
+
+export function withCuratedDesktopVersion(candidateUrl: string, appVersion: string): string {
+  const version = appVersion.trim()
+  if (!version) {
+    return candidateUrl
+  }
+  try {
+    const url = new URL(candidateUrl)
+    url.searchParams.set(curatedDesktopVersionQueryName, version)
+    return url.toString()
+  } catch {
+    return candidateUrl
   }
 }
 

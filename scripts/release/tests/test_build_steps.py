@@ -278,6 +278,8 @@ class BuildStepsTests(unittest.TestCase):
         self.assertIn('#define MyAppExeName "Curated.exe"', template)
         self.assertIn('Filename: "{app}\\{#MyAppExeName}"', template)
         self.assertIn("CloseApplicationsFilter=Curated.exe,curated.exe", template)
+        self.assertIn('Type: filesandordirs; Name: "{app}\\frontend-dist"', template)
+        self.assertIn('Type: filesandordirs; Name: "{app}\\resources\\app\\frontend-dist"', template)
 
     def test_publish_release_builds_electron_main_before_assembly(self) -> None:
         calls: list[str] = []

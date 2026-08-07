@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+const (
+	entryCacheControl  = "no-store, no-cache, must-revalidate"
+	assetCacheControl  = "public, max-age=31536000, immutable"
+	staticCacheControl = "no-cache"
+)
+
 // WrapHandler serves the frontend dist when it can be located locally.
 // All /api requests are delegated to apiHandler unchanged.
 // Non-API GET/HEAD requests use SPA fallback to index.html.
@@ -24,6 +30,11 @@ func WrapHandler(apiHandler http.Handler) http.Handler {
 		return apiHandler
 	}
 
+	return wrapHandlerWithDist(apiHandler, distDir)
+}
+
+func wrapHandlerWithDist(apiHandler http.Handler, distDir string) http.Handler {
+	indexPath := filepath.Join(distDir, "index.html")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
 			apiHandler.ServeHTTP(w, r)
@@ -35,12 +46,28 @@ func WrapHandler(apiHandler http.Handler) http.Handler {
 		}
 
 		if filePath, ok := resolveRequestFile(distDir, r.URL.Path); ok {
+			setFrontendCacheHeaders(w, r.URL.Path, filepath.Clean(filePath) == filepath.Clean(indexPath))
 			http.ServeFile(w, r, filePath)
 			return
 		}
 
+		setFrontendCacheHeaders(w, r.URL.Path, true)
 		http.ServeFile(w, r, indexPath)
 	})
+}
+
+func setFrontendCacheHeaders(w http.ResponseWriter, requestPath string, isEntry bool) {
+	if isEntry {
+		w.Header().Set("Cache-Control", entryCacheControl)
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		return
+	}
+	if strings.HasPrefix(requestPath, "/assets/") {
+		w.Header().Set("Cache-Control", assetCacheControl)
+		return
+	}
+	w.Header().Set("Cache-Control", staticCacheControl)
 }
 
 // FindDistDir resolves the best local frontend dist directory.

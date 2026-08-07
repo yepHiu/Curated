@@ -9,9 +9,11 @@ import {
   curatedDesktopClientOSHeaderName,
   curatedDesktopClientOSVersionHeaderName,
   curatedDesktopClientVersionHeaderName,
+  curatedDesktopVersionQueryName,
   desktopOSInfo,
   shouldMarkCuratedDesktopRequest,
   withCuratedDesktopRequestHeaders,
+  withCuratedDesktopVersion,
   pickDirectoryChannel,
   resolveAppIconPath,
   selectedDirectoryFromOpenDialogResult,
@@ -148,6 +150,20 @@ describe("Electron desktop shell integration", () => {
         isSystemSessionEnding: true,
       }),
     ).toBe(false)
+  })
+
+  it("versions renderer entry URLs while preserving routes and existing queries", () => {
+    expect(withCuratedDesktopVersion("http://127.0.0.1:8081", "1.4.13")).toBe(
+      `http://127.0.0.1:8081/?${curatedDesktopVersionQueryName}=1.4.13`,
+    )
+    expect(withCuratedDesktopVersion("http://127.0.0.1:8081/?section=about#/settings", " 1.4.13 ")).toBe(
+      `http://127.0.0.1:8081/?section=about&${curatedDesktopVersionQueryName}=1.4.13#/settings`,
+    )
+  })
+
+  it("leaves renderer URLs unchanged when versioning cannot be applied", () => {
+    expect(withCuratedDesktopVersion("not a URL", "1.4.13")).toBe("not a URL")
+    expect(withCuratedDesktopVersion("http://127.0.0.1:8081", "   ")).toBe("http://127.0.0.1:8081")
   })
 
   it("only stops the backend on quit when Electron owns the backend process", () => {
