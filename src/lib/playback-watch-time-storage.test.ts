@@ -112,9 +112,10 @@ describe("playback watch time storage", () => {
   })
 
   it("uses the Web API for listing and adding daily watch time", async () => {
+    const recentDay = daysAgo(1)
     const api = makeApiMock()
     api.listPlaybackWatchTimeDaily.mockResolvedValueOnce({
-      items: [{ dayKey: "2026-05-01", watchedSec: 600 }],
+      items: [{ dayKey: recentDay, watchedSec: 600 }],
       totalWatchedSec: 600,
       activeDays: 1,
       maxDayWatchedSec: 600,
@@ -128,12 +129,12 @@ describe("playback watch time storage", () => {
     } = await importStorage({ useWebApi: true, api })
     const initialRevision = watchTimeRevision.value
 
-    await addWatchTimeDelta(" movie-1 ", "2026-05-01", 480)
+    await addWatchTimeDelta(" movie-1 ", recentDay, 480)
     const summary = await listDailyWatchTime()
 
     expect(api.addPlaybackWatchTimeDaily).toHaveBeenCalledWith({
       movieId: "movie-1",
-      dayKey: "2026-05-01",
+      dayKey: recentDay,
       watchedSec: 300,
     })
     expect(api.listPlaybackWatchTimeDaily).toHaveBeenCalledWith(91)

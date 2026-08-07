@@ -349,6 +349,7 @@ test("maintenance backup flow creates verifies and preflights without online res
           autoDownloadUpdates: false,
           launchAtLogin: false,
           launchAtLoginSupported: false,
+          backupDirectory: "",
           curatedFrameExportFormat: "jpg",
           metadataMovieProvider: "",
           metadataMovieProviders: [],
@@ -467,10 +468,14 @@ test("maintenance backup flow creates verifies and preflights without online res
   })
   const pathInput = page.locator("[data-settings-backup-path]")
   await expect(pathInput).toBeVisible()
+  const directoryInput = page.locator("[data-settings-backup-directory]")
+  await expect(directoryInput).toBeVisible()
+  await directoryInput.fill("D:\\Backups")
   await pathInput.fill("D:\\Backups\\curated-e2e")
   await page.locator("[data-settings-backup-create]").click()
   await expect(page.getByText(/验证通过|Verified|検証済み/)).toBeVisible()
-  expect(backupPaths).toEqual(["D:\\Backups\\curated-e2e.curated-backup"])
+  expect(backupPaths).toHaveLength(1)
+  expect(backupPaths[0]).toMatch(/^D:\\Backups\\curated-\d{8}-\d{6}Z\.curated-backup$/)
 
   await page.locator("[data-settings-backup-preflight]").click()
   await expect(page.getByText(/可以离线恢复|Ready for offline restore|オフライン復元可能/)).toBeVisible()
