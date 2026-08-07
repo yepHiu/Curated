@@ -156,9 +156,12 @@ function drawWatermarkedFrame(
   const metadataWidth = Math.max(0, rightX - metadataLeft)
   const titleFontSize = layout.mainFontSize
   const codeFontSize = Math.max(12, Math.round(layout.mainFontSize * 0.86))
+  const metadataGap = Math.max(4, Math.round(layout.padding * 0.3))
+  const metadataBlockHeight = titleFontSize + metadataGap + (code ? codeFontSize : 0)
   const fittedTitle = fitText(ctx, title, metadataWidth)
-  const titleY = height + layout.padding + titleFontSize
-  const codeY = height + layout.bandHeight - layout.padding
+  const metadataTop = height + Math.max(0, Math.round((layout.bandHeight - metadataBlockHeight) / 2))
+  const titleY = metadataTop + titleFontSize
+  const codeY = titleY + metadataGap + codeFontSize
 
   ctx.font = `600 ${titleFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
   ctx.textBaseline = "alphabetic"
