@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -262,6 +263,7 @@ type Handler struct {
 	importUploads                  *movieImportUploadSessionStore
 	clientTracker                  *clienttracker.Tracker
 	authAttempts                   *authAttemptLimiter
+	movieClipArtifacts             *sync.Map
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -329,7 +331,7 @@ func NewHandler(deps Deps) *Handler {
 			deps.Logger.Error("mark interrupted library health repairs failed", zap.Error(err))
 		}
 	}
-	return &Handler{
+	h := &Handler{
 		runtimeContext:                 deps.RuntimeContext,
 		cfg:                            deps.Cfg,
 		logger:                         deps.Logger,
@@ -366,7 +368,12 @@ func NewHandler(deps Deps) *Handler {
 		importUploads:                  importUploads,
 		clientTracker:                  tracker,
 		authAttempts:                   newAuthAttemptLimiter(),
+		movieClipArtifacts:             &sync.Map{},
 	}
+	if deps.RuntimeContext != nil {
+		h.startMovieClipArtifactJanitor(deps.RuntimeContext)
+	}
+	return h
 }
 
 // Routes builds the HTTP mux with all registered API routes, access logging, and CORS.
@@ -439,6 +446,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/library/movies/{movieId}", h.handlePatchMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/restore", h.handleRestoreMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/clips", h.handleCreateMovieClip)
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
@@ -458,6 +466,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
 	mux.HandleFunc("GET /api/tasks/recent", h.handleGetRecentTasks)
+	mux.HandleFunc("GET /api/tasks/{taskId}/artifact", h.handleGetMovieClipArtifact)
 	mux.HandleFunc("GET /api/tasks/{taskId}", h.handleGetTaskStatus)
 
 	mux.HandleFunc("GET /api/playback/progress", h.handleListPlaybackProgress)

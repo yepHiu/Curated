@@ -291,6 +291,8 @@ POST   /api/scans                           # Start scan task
 GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
+POST   /api/library/movies/{movieId}/clips # Queue bounded GIF clip generation (0.4–6 seconds)
+GET    /api/tasks/{taskId}/artifact         # Download completed GIF clip artifact
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress

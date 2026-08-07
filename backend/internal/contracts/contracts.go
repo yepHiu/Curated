@@ -1259,6 +1259,15 @@ type PostCuratedFramesExportBody struct {
 	Format string `json:"format,omitempty"`
 }
 
+// CreateMovieClipBody is the JSON body for POST /api/library/movies/{movieId}/clips.
+type CreateMovieClipBody struct {
+	StartSec float64 `json:"startSec"`
+	EndSec   float64 `json:"endSec"`
+	Format   string  `json:"format,omitempty"`
+	FPS      int     `json:"fps,omitempty"`
+	Width    int     `json:"width,omitempty"`
+}
+
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.
 type PlayedMoviesListDTO struct {
 	MovieIDs []string `json:"movieIds"`

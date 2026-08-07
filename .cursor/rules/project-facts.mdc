@@ -3,6 +3,11 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-08 GIF Clip Capture
+
+- Web API GIF clips use `POST /api/library/movies/{movieId}/clips` with bounded `startSec/endSec` (0.4–6 seconds), `format: "gif"`, optional `fps` (1–20) and `width` (160–960). The endpoint creates a `movie_clip_gif` task; completed output is downloaded from `GET /api/tasks/{taskId}/artifact`.
+- Source paths are validated against configured library roots before FFmpeg reads them. GIF artifacts are confined to the cache directory and removed after 24 hours; Mock mode does not fake GIF generation.
+
 # Project Facts（当前实现）
 
 - **产品正式名称：Curated**（仓库目录 / npm `name` 等可能仍为 `jav-shadcn`）。

@@ -24,6 +24,12 @@ func resolveFFmpegCommand(configured string) string {
 	return cmd
 }
 
+// ResolveFFmpegCommand exposes the configured/bundled command resolver to other
+// backend features that execute bounded FFmpeg jobs (for example GIF clips).
+func ResolveFFmpegCommand(configured string) string {
+	return resolveFFmpegCommand(configured)
+}
+
 func findBundledFFmpegCommand() (string, bool) {
 	for _, candidate := range bundledFFmpegCandidates() {
 		if candidate == "" {
