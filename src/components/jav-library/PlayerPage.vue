@@ -1666,7 +1666,12 @@ function onPlaybackKeyup(e: KeyboardEvent) {
   if (shouldIgnoreGlobalPlaybackHotkeysForTarget(e.target)) return
   e.preventDefault()
   const result = clipCapture.finishPress()
-  if (!result.wasLongPress) void runCuratedCapture()
+  if (result.wasLongPress) return
+  // When the recorder reaches its six-second cap it finishes automatically
+  // before the keyup event arrives. Consume the click suppression marker so
+  // releasing the key does not create an extra static frame.
+  if (clipCapture.consumeClick()) return
+  void runCuratedCapture()
 }
 
 async function runCuratedCapture() {

@@ -95,4 +95,26 @@ describe("usePlayerClipCapture", () => {
 
     expect(onClipReady).toHaveBeenCalledWith({ startSec: 10, endSec: 16 })
   })
+
+  it("suppresses the keyup click after automatic maximum-duration completion", () => {
+    const currentTime = ref(10)
+    const onClipReady = vi.fn().mockResolvedValue(undefined)
+    const capture = usePlayerClipCapture({
+      currentTime,
+      duration: ref(100),
+      maxDurationSec: 6,
+      onClipReady,
+    })
+
+    capture.startPress()
+    vi.advanceTimersByTime(400)
+    currentTime.value = 16
+    vi.advanceTimersByTime(100)
+
+    expect(onClipReady).toHaveBeenCalledTimes(1)
+    expect(capture.phase.value).toBe("processing")
+    expect(capture.finishPress().wasLongPress).toBe(false)
+    expect(capture.consumeClick()).toBe(true)
+    expect(capture.consumeClick()).toBe(false)
+  })
 })
