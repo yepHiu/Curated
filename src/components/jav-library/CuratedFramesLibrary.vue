@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Film,
   PlayCircle,
   Plus,
   Sparkles,
@@ -368,6 +369,36 @@ async function exportSingleFromDialog() {
 
 async function exportSingleFromDialogWatermarked() {
   await exportSingleFromDialogWithMode("watermarked")
+}
+
+function curatedFrameGifFilename(frame: CuratedFrameRecord): string {
+  const source = frame.code.trim() || frame.id.trim() || "curated-frame"
+  const safeName = source.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+  return `curated-${safeName}.gif`
+}
+
+async function exportSingleGifFromDialog() {
+  const motion = selected.value?.motion
+  const artifactUrl = motion?.status === "ready" ? motion.artifactUrl : undefined
+  if (!selected.value || !artifactUrl) {
+    dialogExportError.value = t("curated.exportGifUnavailable")
+    return
+  }
+  exportBusy.value = true
+  dialogExportError.value = ""
+  try {
+    const response = await fetch(artifactUrl)
+    if (!response.ok) {
+      throw new Error(`GIF export request failed: ${response.status}`)
+    }
+    const blob = await response.blob()
+    triggerDownloadBlob(blob, curatedFrameGifFilename(selected.value))
+  } catch (err) {
+    console.error("[curated-frames] GIF export failed", err)
+    dialogExportError.value = t("curated.exportGifFailed")
+  } finally {
+    exportBusy.value = false
+  }
 }
 
 async function exportSingleFromDialogWithMode(mode: CuratedExportMode) {
@@ -1752,29 +1783,47 @@ defineExpose({
             <p v-if="dialogExportError" class="text-sm text-destructive" role="alert">{{ dialogExportError }}</p>
 
             <div class="mt-auto flex shrink-0 flex-col gap-2 border-t border-border/60 pt-5">
-              <Button
-                v-if="useWebApi"
-                type="button"
-                variant="secondary"
-                size="sm"
-                class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
-                @click="exportSingleFromDialog"
+              <div
+                class="grid grid-cols-3 gap-2"
+                role="group"
+                :aria-label="t('curated.exportActionsAria')"
               >
-                <Download class="size-4 shrink-0" aria-hidden="true" />
-                <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}</span>
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
-                :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
-                @click="exportSingleFromDialogWatermarked"
-              >
-                <Sparkles class="size-4 shrink-0" aria-hidden="true" />
-                <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportWatermarked") }}</span>
-              </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-10 min-w-0 justify-center gap-1 rounded-xl px-2 text-xs"
+                  :disabled="!useWebApi || exportBusy || dialogTagSaveStatus === 'saving'"
+                  :title="!useWebApi ? t('curated.exportRequiresApi') : undefined"
+                  @click="exportSingleFromDialog"
+                >
+                  <Download class="size-4 shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-10 min-w-0 justify-center gap-1 rounded-xl px-2 text-xs"
+                  :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
+                  @click="exportSingleFromDialogWatermarked"
+                >
+                  <Sparkles class="size-4 shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportWatermarked") }}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  class="h-10 min-w-0 justify-center gap-1 rounded-xl px-2 text-xs"
+                  :disabled="!selected?.motion || selected.motion.status !== 'ready' || !selected.motion.artifactUrl || exportBusy || dialogTagSaveStatus === 'saving'"
+                  :title="!selected?.motion || selected.motion.status !== 'ready' || !selected.motion.artifactUrl ? t('curated.exportGifUnavailable') : undefined"
+                  @click="exportSingleGifFromDialog"
+                >
+                  <Film class="size-4 shrink-0" aria-hidden="true" />
+                  <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportGif") }}</span>
+                </Button>
+              </div>
               <Button
                 type="button"
                 size="sm"
