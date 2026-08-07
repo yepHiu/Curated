@@ -22,7 +22,7 @@ const (
 	maxMovieClipDurationSec = 6.0
 	minMovieClipDurationSec = 0.4
 	defaultMovieClipFPS     = 10
-	defaultMovieClipWidth   = 480
+	defaultMovieClipWidth   = 640
 	movieClipArtifactMaxAge = 24 * time.Hour
 )
 

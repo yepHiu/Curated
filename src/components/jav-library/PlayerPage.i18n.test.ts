@@ -14,4 +14,8 @@ describe("PlayerPage i18n", () => {
     expect(source).toMatch(/t\(["']player\.feedbackPlay["']\)/)
     expect(source).toMatch(/t\(["']player\.feedbackPause["']\)/)
   })
+
+  it("requests the balanced 640px GIF export width", () => {
+    expect(source).toMatch(/fps:\s*10,\s*\n\s*width:\s*640,/)
+  })
 })

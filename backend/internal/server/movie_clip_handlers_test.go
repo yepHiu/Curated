@@ -14,6 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestMovieClipDefaultWidth(t *testing.T) {
+	if defaultMovieClipWidth != 640 {
+		t.Fatalf("default movie clip width = %d, want 640", defaultMovieClipWidth)
+	}
+}
+
 func TestHandleCreateMovieClipRejectsInvalidRangesBeforeStorageLookup(t *testing.T) {
 	h := &Handler{tasks: tasks.NewManager(), logger: zap.NewNop()}
 	for _, tc := range []struct {

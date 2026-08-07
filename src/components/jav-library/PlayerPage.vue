@@ -349,7 +349,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
       startSec: input.startSec,
       endSec: input.endSec,
       fps: 10,
-      width: 480,
+      width: 640,
     })
     clipExportTask.value = task
     clipCapture.taskId.value = task.taskId
