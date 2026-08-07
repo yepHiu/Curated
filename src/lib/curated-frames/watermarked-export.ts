@@ -1,4 +1,5 @@
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
+import curatedTitleLogoUrl from "@/icon/curated-title-nobg.png"
 
 export type WatermarkedCuratedExportFormat = "jpg" | "webp" | "png"
 
@@ -120,55 +121,13 @@ function fitText(
   return low > 0 ? `${value.slice(0, low)}${ellipsis}` : ellipsis
 }
 
-function drawSparkles(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  color: string,
-) {
-  const center = size / 2
-  const arm = size * 0.4
-  const drawStar = (cx: number, cy: number, radius: number) => {
-    ctx.beginPath()
-    ctx.moveTo(cx, cy - radius)
-    ctx.lineTo(cx - radius * 0.24, cy - radius * 0.24)
-    ctx.lineTo(cx - radius, cy)
-    ctx.lineTo(cx - radius * 0.24, cy + radius * 0.24)
-    ctx.lineTo(cx, cy + radius)
-    ctx.lineTo(cx + radius * 0.24, cy + radius * 0.24)
-    ctx.lineTo(cx + radius, cy)
-    ctx.lineTo(cx + radius * 0.24, cy - radius * 0.24)
-    ctx.closePath()
-    ctx.stroke()
-  }
-
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.strokeStyle = color
-  ctx.lineWidth = Math.max(1.5, size * 0.07)
-  ctx.lineCap = "round"
-  ctx.lineJoin = "round"
-  drawStar(center, center, arm)
-  ctx.beginPath()
-  ctx.moveTo(size * 0.2, size * 0.1)
-  ctx.lineTo(size * 0.2, size * 0.28)
-  ctx.moveTo(size * 0.1, size * 0.19)
-  ctx.lineTo(size * 0.3, size * 0.19)
-  ctx.moveTo(size * 0.8, size * 0.72)
-  ctx.lineTo(size * 0.8, size * 0.9)
-  ctx.moveTo(size * 0.7, size * 0.81)
-  ctx.lineTo(size * 0.9, size * 0.81)
-  ctx.stroke()
-  ctx.restore()
-}
-
 function drawWatermarkedFrame(
   image: CanvasImageSource,
   width: number,
   height: number,
   row: CuratedFrameDbRow,
   theme: WatermarkedExportTheme,
+  logo: CanvasImageSource,
 ): HTMLCanvasElement {
   const layout = buildWatermarkedBandLayout(height)
   const canvas = document.createElement("canvas")
@@ -206,11 +165,12 @@ function drawWatermarkedFrame(
   }
 
   const detailsY = height + layout.bandHeight - layout.padding
-  drawSparkles(ctx, leftX, detailsY - layout.iconSize * 0.8, layout.iconSize, theme.primary)
-  ctx.fillStyle = theme.foreground
-  ctx.font = `600 ${layout.brandFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
-  ctx.textAlign = "left"
-  ctx.fillText("Curated", leftX + layout.iconSize + Math.max(8, layout.padding * 0.55), detailsY)
+  const logoHeight = Math.min(
+    Math.max(layout.brandFontSize * 1.35, layout.iconSize),
+    layout.bandHeight - layout.padding * 1.15,
+  )
+  const logoWidth = Math.round(logoHeight * (1085 / 322))
+  ctx.drawImage(logo, leftX, detailsY - logoHeight, logoWidth, logoHeight)
 
   if (actors) {
     ctx.font = `500 ${layout.actorFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
@@ -234,6 +194,15 @@ function loadImage(blob: Blob): Promise<HTMLImageElement> {
       URL.revokeObjectURL(url)
       reject(new Error("failed to decode curated frame image"))
     }
+    image.src = url
+  })
+}
+
+function loadImageUrl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error("failed to load Curated logo"))
     image.src = url
   })
 }
@@ -277,12 +246,14 @@ export async function renderWatermarkedCuratedFrame(
   if (!image.naturalWidth || !image.naturalHeight) {
     throw new Error("curated frame image has no dimensions")
   }
+  const logo = await loadImageUrl(curatedTitleLogoUrl)
   const canvas = drawWatermarkedFrame(
     image,
     image.naturalWidth,
     image.naturalHeight,
     source.row,
     theme,
+    logo,
   )
   return canvasToBlob(canvas, format)
 }
