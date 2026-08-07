@@ -166,16 +166,21 @@ const handleFavoriteChange = (nextValue: boolean) => {
           <label
             v-if="props.batchMode"
             data-movie-batch-toggle
-            class="absolute top-2 right-2 z-[4] flex size-11 cursor-pointer items-center justify-center rounded-xl border border-border/45 bg-background/25 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
+            class="absolute top-2 right-2 z-[4] flex size-11 cursor-pointer items-center justify-center"
             @click.stop
           >
-            <input
-              type="checkbox"
-              class="size-4 cursor-pointer rounded accent-primary"
-              :checked="props.batchChecked"
-              :aria-label="t('library.batchCardToggleAria')"
-              @change="onBatchCheckboxChange"
-            />
+            <span
+              data-movie-batch-toggle-visual
+              class="flex size-7 items-center justify-center rounded-md border border-border/45 bg-background/25 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
+            >
+              <input
+                type="checkbox"
+                class="size-4 cursor-pointer rounded accent-primary"
+                :checked="props.batchChecked"
+                :aria-label="t('library.batchCardToggleAria')"
+                @change="onBatchCheckboxChange"
+              />
+            </span>
           </label>
           <MediaStill
             v-if="posterSrc"

@@ -383,19 +383,45 @@ func (s *Service) scrapeSingleOrAuto(ctx context.Context, movieID, number, prefe
 	return s.fetchMovieInfo(ctx, movieID, number, first)
 }
 
-// effectivePosterURLs merges Metatube's thumb/cover vs big_* fields (some providers only fill the latter).
-func effectivePosterURLs(info *model.MovieInfo) (coverURL, thumbURL string) {
+// effectivePosterURLs merges Metatube's detail and search-result poster fields.
+// Some providers replace a missing detail thumb with the wide cover even though
+// the search result still contains the distinct portrait card poster.
+func effectivePosterURLs(info *model.MovieInfo, result *model.MovieSearchResult) (coverURL, thumbURL string) {
 	if info == nil {
 		return "", ""
 	}
-	cover := strings.TrimSpace(info.CoverURL)
-	if cover == "" {
-		cover = strings.TrimSpace(info.BigCoverURL)
+	firstNonEmpty := func(values ...string) string {
+		for _, value := range values {
+			if value = strings.TrimSpace(value); value != "" {
+				return value
+			}
+		}
+		return ""
 	}
-	thumb := strings.TrimSpace(info.ThumbURL)
-	if thumb == "" {
-		thumb = strings.TrimSpace(info.BigThumbURL)
+
+	searchCover, searchThumb := "", ""
+	if result != nil {
+		searchCover = result.CoverURL
+		searchThumb = result.ThumbURL
 	}
+	cover := firstNonEmpty(info.CoverURL, info.BigCoverURL, searchCover)
+
+	thumbCandidates := []string{info.ThumbURL, info.BigThumbURL, searchThumb}
+	thumb := ""
+	for _, candidate := range thumbCandidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if thumb == "" {
+			thumb = candidate
+		}
+		if cover == "" || candidate != cover {
+			thumb = candidate
+			break
+		}
+	}
+
 	switch {
 	case thumb == "" && cover != "":
 		thumb = cover
@@ -423,7 +449,7 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, result.Provider, err)
 	}
 
-	coverURL, thumbURL := effectivePosterURLs(info)
+	coverURL, thumbURL := effectivePosterURLs(info, result)
 	s.logger.Info("metadata fetched",
 		zap.String("number", number),
 		zap.String("title", info.Title),

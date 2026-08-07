@@ -36,6 +36,19 @@ function makeMovie(overrides: Partial<Movie> = {}): Movie {
 }
 
 describe("MovieCard", () => {
+  it("prefers the card thumbnail over the detail cover", () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie({
+          coverUrl: "/api/library/movies/movie-card-1/asset/cover?v=cover",
+          thumbUrl: "/api/library/movies/movie-card-1/asset/thumb?v=thumb",
+        }),
+      },
+    })
+
+    expect(wrapper.get("img").attributes("src")).toContain("/asset/thumb")
+  })
+
   it("keeps the poster overlay visible when a loaded poster card is remounted", async () => {
     const movie = makeMovie()
     const first = mount(MovieCard, {
@@ -78,5 +91,17 @@ describe("MovieCard", () => {
     expect(overflow.text()).toBe("+1")
     expect(overflow.classes()).toContain("shrink-0")
     expect(wrapper.get("[data-movie-favorite-toggle]").classes()).toContain("size-11")
+  })
+
+  it("keeps the batch selection visual compact inside its touch target", () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie(),
+        batchMode: true,
+      },
+    })
+
+    expect(wrapper.get("[data-movie-batch-toggle]").classes()).toContain("size-11")
+    expect(wrapper.get("[data-movie-batch-toggle-visual]").classes()).toContain("size-7")
   })
 })
