@@ -45,7 +45,12 @@ import {
   type HlsLevel,
 } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
-import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
+import {
+  captureCuratedFrameCandidate,
+  saveCuratedCaptureFromVideo,
+  saveCuratedFrameCandidate,
+  type CuratedFrameCaptureCandidate,
+} from "@/lib/curated-frames/save-capture"
 import {
   getCuratedCaptureFeedbackSoundEnabled,
   getCuratedCaptureKeyCode,
@@ -339,6 +344,34 @@ const clipCapturePhase = clipCapture.phase
 const clipCaptureIsRecording = clipCapture.isRecording
 const clipCaptureElapsedSec = clipCapture.elapsedSec
 const clipCaptureProgress = clipCapture.progress
+let pendingCuratedFrameCapture: Promise<
+  { ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }
+> | null = null
+
+function beginCuratedPress() {
+  const video = videoRef.value
+  pendingCuratedFrameCapture = video
+    ? captureCuratedFrameCandidate(video, {
+      positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
+    })
+    : null
+  clipCapture.startPress()
+}
+
+async function savePendingCuratedFrame() {
+  const pending = pendingCuratedFrameCapture
+  pendingCuratedFrameCapture = null
+  if (pending) {
+    const candidate = await pending
+    if (!candidate.ok) return candidate
+    return saveCuratedFrameCandidate(candidate.candidate, props.movie)
+  }
+  const video = videoRef.value
+  if (!video) return { ok: false as const, reason: t("player.captureNoVideo") }
+  return saveCuratedCaptureFromVideo(video, props.movie, {
+    positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
+  })
+}
 
 async function submitClipExport(input: { startSec: number; endSec: number }) {
   clipExportError.value = ""
@@ -349,9 +382,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (!video) {
       throw new Error(t("player.captureNoVideo"))
     }
-    const frameResult = await saveCuratedCaptureFromVideo(video, props.movie, {
-      positionSecOverride: input.startSec,
-    })
+    const frameResult = await savePendingCuratedFrame()
     if (!frameResult.ok) {
       throw new Error(frameResult.reason)
     }
@@ -410,7 +441,7 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
 }
 
 function onCuratedButtonPointerDown() {
-  clipCapture.startPress()
+  beginCuratedPress()
 }
 
 function onCuratedButtonPointerUp() {
@@ -418,6 +449,7 @@ function onCuratedButtonPointerUp() {
 }
 
 function onCuratedButtonPointerCancel() {
+  pendingCuratedFrameCapture = null
   clipCapture.cancelPress()
 }
 
@@ -1622,7 +1654,7 @@ function onPlaybackKeydown(e: KeyboardEvent) {
     default:
       if (e.code === getCuratedCaptureKeyCode()) {
         e.preventDefault()
-        if (!e.repeat) clipCapture.startPress()
+        if (!e.repeat) beginCuratedPress()
       }
       break
   }
@@ -1659,9 +1691,7 @@ async function runCuratedCapture() {
     curatedShutterTimer = null
   }, 600)
 
-  const result = await saveCuratedCaptureFromVideo(v, props.movie, {
-    positionSecOverride: getAbsolutePlaybackTime(v.currentTime),
-  })
+  const result = await savePendingCuratedFrame()
   if (!result.ok) {
     curatedCaptureError.value = result.reason
     curatedShutterActive.value = false

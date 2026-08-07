@@ -10,8 +10,15 @@ import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
 export type SaveCuratedCaptureResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; positionSec: number }
   | { ok: false; reason: string }
+
+export type CuratedFrameCaptureCandidate = {
+  id: string
+  blob: Blob
+  positionSec: number
+  capturedAt: string
+}
 
 export type SaveCuratedCaptureOptions = {
   positionSecOverride?: number
@@ -28,36 +35,39 @@ export function resolveCuratedCapturePositionSec(
   return Number.isFinite(videoCurrentTime) && videoCurrentTime >= 0 ? videoCurrentTime : 0
 }
 
-/**
- * 从 video 截帧：Web API 时 POST 后端 SQLite；否则写入 IndexedDB。按设置可额外下载或写入用户目录。
- */
-export async function saveCuratedCaptureFromVideo(
+export async function captureCuratedFrameCandidate(
   video: HTMLVideoElement,
-  movie: Movie,
   options: SaveCuratedCaptureOptions = {},
-): Promise<SaveCuratedCaptureResult> {
+): Promise<{ ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }> {
   const cap = await captureVideoFrameToPng(video)
   if (!cap.ok) {
     return { ok: false, reason: cap.reason }
   }
+  return {
+    ok: true,
+    candidate: {
+      id: crypto.randomUUID(),
+      blob: cap.blob,
+      positionSec: resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride),
+      capturedAt: new Date().toISOString(),
+    },
+  }
+}
 
-  const positionSec = resolveCuratedCapturePositionSec(
-    video.currentTime,
-    options.positionSecOverride,
-  )
-  const capturedAt = new Date().toISOString()
-  const id = crypto.randomUUID()
-
+export async function saveCuratedFrameCandidate(
+  candidate: CuratedFrameCaptureCandidate,
+  movie: Movie,
+): Promise<SaveCuratedCaptureResult> {
   const row = {
-    id,
+    id: candidate.id,
     movieId: movie.id,
     title: movie.title,
     code: movie.code,
     actors: [...movie.actors],
-    positionSec,
-    capturedAt,
+    positionSec: candidate.positionSec,
+    capturedAt: candidate.capturedAt,
     tags: [] as string[],
-    imageBlob: cap.blob,
+    imageBlob: candidate.blob,
   }
 
   try {
@@ -71,7 +81,7 @@ export async function saveCuratedCaptureFromVideo(
         positionSec: row.positionSec,
         capturedAt: row.capturedAt,
         tags: row.tags,
-      }, cap.blob)
+      }, candidate.blob)
       bumpCuratedFramesRevision()
     } else {
       await putCuratedFrame(row)
@@ -86,27 +96,35 @@ export async function saveCuratedCaptureFromVideo(
     }
   }
 
-  const filename = formatFrameFilename(movie.code, positionSec, capturedAt)
+  const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt)
   const mode = getCuratedFrameSaveMode()
-
   if (mode === "download") {
     try {
-      triggerDownloadBlob(cap.blob, filename)
+      triggerDownloadBlob(candidate.blob, filename)
     } catch {
-      // 仍保留 IDB
+      // 仍保留应用内记录
     }
   }
-
   if (mode === "directory") {
     try {
       const dir = await getStoredDirectoryHandle()
-      if (dir) {
-        await writeBlobToDirectory(dir, cap.blob, filename)
-      }
+      if (dir) await writeBlobToDirectory(dir, candidate.blob, filename)
     } catch {
-      // 权限或 API 失败时忽略，IDB 已保存
+      // 权限或 API 失败时忽略，应用内记录已保存
     }
   }
+  return { ok: true, id: row.id, positionSec: row.positionSec }
+}
 
-  return { ok: true, id: row.id }
+/**
+ * 从 video 截帧：Web API 时 POST 后端 SQLite；否则写入 IndexedDB。按设置可额外下载或写入用户目录。
+ */
+export async function saveCuratedCaptureFromVideo(
+  video: HTMLVideoElement,
+  movie: Movie,
+  options: SaveCuratedCaptureOptions = {},
+): Promise<SaveCuratedCaptureResult> {
+  const candidate = await captureCuratedFrameCandidate(video, options)
+  if (!candidate.ok) return candidate
+  return saveCuratedFrameCandidate(candidate.candidate, movie)
 }
