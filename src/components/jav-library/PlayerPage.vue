@@ -333,7 +333,10 @@ let lastAuthoritativePlaybackTimeSec: number | null = null
 let progressSliderFocusRestoreTimer: number | null = null
 
 const clipCapture = usePlayerClipCapture({
-  currentTime: computed(() => getAbsolutePlaybackTime(videoRef.value?.currentTime ?? currentTime.value)),
+  // HTMLVideoElement.currentTime is not reactive. Feed the state machine the
+  // reactive playback clock instead, refreshing it from the live video element
+  // when a press starts so consecutive clips never reuse a cached timestamp.
+  currentTime,
   duration: computed(() => totalDurationSec.value),
   minDurationSec: 0.4,
   maxDurationSec: 6,
@@ -351,6 +354,9 @@ let pendingCuratedFrameCapture: Promise<
 function beginCuratedPress() {
   if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
+  if (video) {
+    currentTime.value = getAbsolutePlaybackTime(video.currentTime)
+  }
   pendingCuratedFrameCapture = video
     ? captureCuratedFrameCandidate(video, {
       positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
