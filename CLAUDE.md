@@ -291,7 +291,7 @@ POST   /api/scans                           # Start scan task
 GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
-POST   /api/library/movies/{movieId}/clips # Queue bounded GIF clip generation (0.4–6 seconds)
+POST   /api/library/movies/{movieId}/clips # Queue bounded GIF clip generation; curatedFrameId persists it with a curated frame (0.4–6 seconds)
 GET    /api/tasks/{taskId}/artifact         # Download completed GIF clip artifact
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
@@ -306,6 +306,7 @@ POST   /api/curated-frames                  # Create curated frame (legacy JSON 
 POST   /api/curated-frames/export           # Export 1–20 frames as JPG/WebP/PNG with embedded tags/schemaVersion/exportedAt/appName/appVersion or ZIP
 GET    /api/curated-frames/{id}/image       # Get curated frame image
 GET    /api/curated-frames/{id}/thumbnail   # Get curated frame thumbnail
+GET    /api/curated-frames/{id}/motion      # Stream persisted GIF motion artifact when ready
 PATCH  /api/curated-frames/{id}/tags        # Update frame tags
 DELETE /api/curated-frames/{id}             # Delete curated frame
 POST   /api/providers/ping                  # Ping a single provider

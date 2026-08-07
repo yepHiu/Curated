@@ -9,6 +9,21 @@ export interface CuratedFrameRecord {
   capturedAt: string
   /** 仅萃取帧库使用，与影片 userTags / 元数据 tags 无关联 */
   tags: string[]
+  motion?: CuratedFrameMotion
+}
+
+export interface CuratedFrameMotion {
+  status: "processing" | "ready" | "error"
+  contentType: string
+  durationSec: number
+  width: number
+  height: number
+  fps: number
+  fileSize: number
+  artifactUrl?: string
+  errorMessage?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 /** 列表展示用：含可展示的 object URL（由组件创建/回收） */

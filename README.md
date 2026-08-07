@@ -319,7 +319,7 @@ Movie import uses browser upload via `POST /api/import/movies` for drag/drop, fi
 
 Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
 
-GIF clip capture uses `POST /api/library/movies/{movieId}/clips` with a bounded `startSec/endSec` range (0.4–6 seconds) and returns an async task. Poll `GET /api/tasks/{taskId}`; completed GIFs are downloaded from `GET /api/tasks/{taskId}/artifact`. The backend validates the source movie path against configured library roots and removes clip artifacts after 24 hours.
+GIF clip capture uses `POST /api/library/movies/{movieId}/clips` with a bounded `startSec/endSec` range (0.4–6 seconds) and returns an async task. Pass `curatedFrameId` to persist the GIF beside a curated frame in the app-owned `curated-frame-motions` directory; the library exposes it through `GET /api/curated-frames/{id}/motion`. Without an associated frame, poll `GET /api/tasks/{taskId}` and use the temporary artifact route; those unassociated artifacts are removed after 24 hours. The backend validates the source movie path against configured library roots.
 
 Library storage presence uses endpoints under `/api/library/paths/storage-status` to detect offline or mismatched backing volumes. The current implementation is Windows-first; macOS and Linux use a fallback path probe and remain future adaptation targets.
 

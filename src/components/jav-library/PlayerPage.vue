@@ -345,11 +345,22 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
   clipExportUrl.value = ""
   clipExportTask.value = null
   try {
+    const video = videoRef.value
+    if (!video) {
+      throw new Error(t("player.captureNoVideo"))
+    }
+    const frameResult = await saveCuratedCaptureFromVideo(video, props.movie, {
+      positionSecOverride: input.startSec,
+    })
+    if (!frameResult.ok) {
+      throw new Error(frameResult.reason)
+    }
     const task = await libraryService.createMovieClip(props.movie.id, {
       startSec: input.startSec,
       endSec: input.endSec,
       fps: 10,
       width: 640,
+      curatedFrameId: frameResult.id,
     })
     clipExportTask.value = task
     clipCapture.taskId.value = task.taskId
@@ -371,7 +382,6 @@ async function pollClipExportTask(taskId: string) {
     clipExportUrl.value = artifactUrl
     clipCapture.phase.value = artifactUrl ? "success" : "error"
     if (artifactUrl) {
-      downloadClipArtifact(artifactUrl)
       scheduleClipFeedbackDismiss(1600)
     } else {
       clipExportError.value = t("player.clipExportMissingArtifact")
@@ -386,17 +396,6 @@ async function pollClipExportTask(taskId: string) {
     return
   }
   clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId), 500)
-}
-
-function downloadClipArtifact(url = clipExportUrl.value) {
-  if (!url || typeof document === "undefined") return
-  const link = document.createElement("a")
-  link.href = url
-  link.download = ""
-  link.style.display = "none"
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
 }
 
 function scheduleClipFeedbackDismiss(delayMs: number) {
@@ -2638,7 +2637,7 @@ const videoPreloadMode = computed(() =>
               <span v-if="clipCapturePhase === 'armed'">{{ t('player.clipArmed') }}</span>
               <span v-else-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
               <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
-              <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipDownloading') }}</span>
+              <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
             </div>

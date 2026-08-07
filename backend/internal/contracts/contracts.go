@@ -1199,14 +1199,30 @@ type NativePlaybackLaunchDTO struct {
 
 // CuratedFrameItemDTO is list metadata (no image); use GET /api/curated-frames/{id}/image for bytes.
 type CuratedFrameItemDTO struct {
-	ID          string   `json:"id"`
-	MovieID     string   `json:"movieId"`
-	Title       string   `json:"title"`
-	Code        string   `json:"code"`
-	Actors      []string `json:"actors"`
-	PositionSec float64  `json:"positionSec"`
-	CapturedAt  string   `json:"capturedAt"`
-	Tags        []string `json:"tags"`
+	ID          string                 `json:"id"`
+	MovieID     string                 `json:"movieId"`
+	Title       string                 `json:"title"`
+	Code        string                 `json:"code"`
+	Actors      []string               `json:"actors"`
+	PositionSec float64                `json:"positionSec"`
+	CapturedAt  string                 `json:"capturedAt"`
+	Tags        []string               `json:"tags"`
+	Motion      *CuratedFrameMotionDTO `json:"motion,omitempty"`
+}
+
+// CuratedFrameMotionDTO describes an app-owned motion artifact associated with a frame.
+type CuratedFrameMotionDTO struct {
+	Status       string  `json:"status"`
+	ContentType  string  `json:"contentType"`
+	DurationSec  float64 `json:"durationSec"`
+	Width        int     `json:"width"`
+	Height       int     `json:"height"`
+	FPS          int     `json:"fps"`
+	FileSize     int64   `json:"fileSize"`
+	ArtifactURL  string  `json:"artifactUrl,omitempty"`
+	ErrorMessage string  `json:"errorMessage,omitempty"`
+	CreatedAt    string  `json:"createdAt,omitempty"`
+	UpdatedAt    string  `json:"updatedAt,omitempty"`
 }
 
 // CuratedFramesListDTO is a paginated curated frame listing.
@@ -1261,11 +1277,12 @@ type PostCuratedFramesExportBody struct {
 
 // CreateMovieClipBody is the JSON body for POST /api/library/movies/{movieId}/clips.
 type CreateMovieClipBody struct {
-	StartSec float64 `json:"startSec"`
-	EndSec   float64 `json:"endSec"`
-	Format   string  `json:"format,omitempty"`
-	FPS      int     `json:"fps,omitempty"`
-	Width    int     `json:"width,omitempty"`
+	StartSec       float64 `json:"startSec"`
+	EndSec         float64 `json:"endSec"`
+	Format         string  `json:"format,omitempty"`
+	FPS            int     `json:"fps,omitempty"`
+	Width          int     `json:"width,omitempty"`
+	CuratedFrameID string  `json:"curatedFrameId,omitempty"`
 }
 
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.

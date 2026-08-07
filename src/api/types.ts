@@ -613,6 +613,7 @@ export interface CreateMovieClipBody {
   format: "gif"
   fps?: number
   width?: number
+  curatedFrameId?: string
 }
 
 export interface PatchActorExternalLinksBody {
@@ -989,6 +990,21 @@ export interface CuratedFrameItemDTO {
   positionSec: number
   capturedAt: string
   tags: string[]
+  motion?: CuratedFrameMotionDTO
+}
+
+export interface CuratedFrameMotionDTO {
+  status: "processing" | "ready" | "error"
+  contentType: string
+  durationSec: number
+  width: number
+  height: number
+  fps: number
+  fileSize: number
+  artifactUrl?: string
+  errorMessage?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ListCuratedFramesParams {

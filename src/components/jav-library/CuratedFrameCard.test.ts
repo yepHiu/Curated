@@ -78,4 +78,36 @@ describe("CuratedFrameCard", () => {
 
     expect(wrapper.find("input[type='checkbox']").exists()).toBe(false)
   })
+
+  it("plays a ready motion artifact only after the card is hovered", async () => {
+    const motionRow = {
+      ...row,
+      motion: {
+        status: "ready" as const,
+        contentType: "image/gif",
+        durationSec: 2,
+        width: 640,
+        height: 360,
+        fps: 10,
+        fileSize: 1200,
+        artifactUrl: "/api/curated-frames/frame-a/motion",
+      },
+    }
+    const wrapper = mount(CuratedFrameCard, {
+      props: {
+        row: motionRow,
+        imageUrl: "blob:frame-a",
+        positionLabel: "01:05",
+        batchMode: false,
+        selected: false,
+        nearDuplicate: false,
+      },
+    })
+
+    expect(wrapper.find("video").exists()).toBe(false)
+    await wrapper.trigger("mouseenter")
+    expect(wrapper.find("video").attributes("src")).toBe("/api/curated-frames/frame-a/motion")
+    await wrapper.trigger("mouseleave")
+    expect(wrapper.find("video").exists()).toBe(false)
+  })
 })

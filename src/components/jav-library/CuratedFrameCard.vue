@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import { Film } from "lucide-vue-next"
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
 
-defineProps<{
+const props = defineProps<{
   row: CuratedFrameDbRow
   imageUrl: string
   positionLabel: string
@@ -19,12 +21,20 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const motionActive = ref(false)
+const hasMotion = computed(() => props.row.motion?.status === "ready" && Boolean(props.row.motion.artifactUrl))
+
+function setMotionActive(active: boolean) {
+  if (hasMotion.value) motionActive.value = active
+}
 </script>
 
 <template>
   <div
     class="group relative min-w-0 overflow-hidden rounded-2xl border bg-card/90 shadow-md transition hover:border-primary/40 hover:shadow-lg"
     :class="nearDuplicate ? 'border-amber-400/70' : 'border-border/70'"
+    @mouseenter="setMotionActive(true)"
+    @mouseleave="setMotionActive(false)"
   >
     <label
       v-if="batchMode"
@@ -46,14 +56,37 @@ const { t } = useI18n()
     >
       {{ t("curated.duplicateReviewBadge") }}
     </span>
+    <span
+      v-if="row.motion"
+      class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white shadow-sm"
+      :title="row.motion.status === 'ready' ? t('curated.motionAvailable') : t('curated.motionProcessing')"
+    >
+      <Film class="size-3" aria-hidden="true" />
+      <span class="sr-only">{{ row.motion.status === "ready" ? t("curated.motionAvailable") : t("curated.motionProcessing") }}</span>
+    </span>
     <button
       type="button"
       class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       @contextmenu.prevent="emit('contextmenu', $event, row, sectionActor || undefined)"
       @click="emit('open', row, sectionActor || undefined)"
+      @focusin="setMotionActive(true)"
+      @focusout="setMotionActive(false)"
     >
       <div class="relative aspect-video w-full bg-black/80">
+        <video
+          v-if="motionActive && hasMotion"
+          :src="row.motion?.artifactUrl"
+          :poster="imageUrl"
+          class="h-full w-full object-contain"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="metadata"
+          :aria-label="t('curated.motionAvailable')"
+        />
         <img
+          v-else
           :src="imageUrl"
           :alt="row.code"
           class="h-full w-full object-contain"

@@ -10,6 +10,9 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -24,7 +27,7 @@ const maxCuratedImageBytes = 12 << 20 // 12 MiB raw PNG/JPEG
 func mapCuratedFrameItems(rows []storage.CuratedFrameMeta) []contracts.CuratedFrameItemDTO {
 	items := make([]contracts.CuratedFrameItemDTO, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, contracts.CuratedFrameItemDTO{
+		item := contracts.CuratedFrameItemDTO{
 			ID:          row.ID,
 			MovieID:     row.MovieID,
 			Title:       row.Title,
@@ -33,7 +36,23 @@ func mapCuratedFrameItems(rows []storage.CuratedFrameMeta) []contracts.CuratedFr
 			PositionSec: row.PositionSec,
 			CapturedAt:  row.CapturedAt,
 			Tags:        row.Tags,
-		})
+		}
+		if motion := row.Motion; motion != nil {
+			item.Motion = &contracts.CuratedFrameMotionDTO{
+				Status:       motion.Status,
+				ContentType:  motion.ContentType,
+				DurationSec:  motion.DurationSec,
+				Width:        motion.Width,
+				Height:       motion.Height,
+				FPS:          motion.FPS,
+				FileSize:     motion.FileSize,
+				ArtifactURL:  "/api/curated-frames/" + url.PathEscape(row.ID) + "/motion",
+				ErrorMessage: motion.ErrorMessage,
+				CreatedAt:    motion.CreatedAt,
+				UpdatedAt:    motion.UpdatedAt,
+			}
+		}
+		items = append(items, item)
 	}
 	return items
 }
@@ -421,6 +440,10 @@ func (h *Handler) handleDeleteCuratedFrame(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ctx := r.Context()
+	var motionArtifact string
+	if motion, motionErr := h.store.GetCuratedFrameMotion(ctx, id); motionErr == nil && motion != nil {
+		motionArtifact = motion.ArtifactName
+	}
 	if err := h.store.DeleteCuratedFrame(ctx, id); err != nil {
 		if err == sql.ErrNoRows {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "curated frame not found")
@@ -429,6 +452,9 @@ func (h *Handler) handleDeleteCuratedFrame(w http.ResponseWriter, r *http.Reques
 		h.logger.Error("delete curated frame", zap.Error(err))
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete curated frame")
 		return
+	}
+	if motionArtifact != "" {
+		_ = os.Remove(filepath.Join(curatedFrameMotionRoot(h), filepath.Base(motionArtifact)))
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -67,7 +67,7 @@ describe("saveCuratedCaptureFromVideo", () => {
       { id: "movie-1", title: "Title", code: "CODE", actors: ["Mina"] } as never,
     )
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toMatchObject({ ok: true, id: expect.any(String) })
     expect(findNearbyCuratedFrame).not.toHaveBeenCalled()
     expect(putCuratedFrame).toHaveBeenCalled()
   })

@@ -93,6 +93,53 @@ func makeTestJPEG(t *testing.T, width, height int) []byte {
 	return buf.Bytes()
 }
 
+func TestHandleGetCuratedFrameMotionServesPersistedArtifact(t *testing.T) {
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "curated-motion.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	movieID := addMovieForCuratedFramesP1Test(t, store, "CF-MOTION")
+	if err := store.InsertCuratedFrame(context.Background(), storage.CuratedFrameMeta{
+		ID: "motion-frame", MovieID: movieID, Title: "Motion", Code: "CF-MOTION", CapturedAt: "2026-08-08T00:00:00Z",
+	}, []byte("poster")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{
+		FrameID: "motion-frame", Status: "ready", ArtifactName: "motion-frame.gif", ContentType: "image/gif",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	motionRoot := filepath.Join(root, "curated-frame-motions")
+	if err := os.MkdirAll(motionRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(motionRoot, "motion-frame.gif"), []byte("GIF89a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(NewHandler(Deps{Cfg: config.Config{CacheDir: root}, Logger: zap.NewNop(), Store: store}).Routes())
+	t.Cleanup(srv.Close)
+	resp, err := http.Get(srv.URL + "/api/curated-frames/motion-frame/motion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "GIF89a" || resp.Header.Get("Content-Type") != "image/gif" {
+		t.Fatalf("body/content-type = %q/%q", string(body), resp.Header.Get("Content-Type"))
+	}
+}
+
 func TestHandleCuratedFramesQueryStatsAndFacets(t *testing.T) {
 	t.Parallel()
 	store, srv := newCuratedFramesP1Server(t)

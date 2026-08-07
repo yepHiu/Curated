@@ -481,6 +481,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/curated-frames/actors", h.handleListCuratedFrameActors)
 	mux.HandleFunc("POST /api/curated-frames", h.handlePostCuratedFrame)
 	mux.HandleFunc("GET /api/curated-frames/{id}/thumbnail", h.handleGetCuratedFrameThumbnail)
+	mux.HandleFunc("GET /api/curated-frames/{id}/motion", h.handleGetCuratedFrameMotion)
 	mux.HandleFunc("GET /api/curated-frames/{id}/image", h.handleGetCuratedFrameImage)
 	mux.HandleFunc("PATCH /api/curated-frames/{id}/tags", h.handlePatchCuratedFrameTags)
 	mux.HandleFunc("DELETE /api/curated-frames/{id}", h.handleDeleteCuratedFrame)

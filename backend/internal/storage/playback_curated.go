@@ -101,6 +101,23 @@ type CuratedFrameMeta struct {
 	PositionSec float64
 	CapturedAt  string
 	Tags        []string
+	Motion      *CuratedFrameMotionMeta
+}
+
+// CuratedFrameMotionMeta describes a persisted motion artifact associated with a curated frame.
+type CuratedFrameMotionMeta struct {
+	FrameID      string
+	Status       string
+	ArtifactName string
+	ContentType  string
+	DurationSec  float64
+	Width        int
+	Height       int
+	FPS          int
+	FileSize     int64
+	ErrorMessage string
+	CreatedAt    string
+	UpdatedAt    string
 }
 
 // InsertCuratedFrame inserts a curated frame with image bytes (no thumbnail).
@@ -146,6 +163,68 @@ func scanCuratedMeta(actorsJSON, tagsJSON string, dest *CuratedFrameMeta) error 
 		dest.Tags = nil
 	}
 	return nil
+}
+
+func (s *SQLiteStore) loadCuratedFrameMotion(ctx context.Context, frameID string) (*CuratedFrameMotionMeta, error) {
+	var motion CuratedFrameMotionMeta
+	err := s.db.QueryRowContext(ctx, `
+		SELECT frame_id, status, artifact_name, content_type, duration_sec, width, height, fps, file_size, error_message, created_at, updated_at
+		FROM curated_frame_motions WHERE frame_id = ?
+	`, frameID).Scan(
+		&motion.FrameID, &motion.Status, &motion.ArtifactName, &motion.ContentType,
+		&motion.DurationSec, &motion.Width, &motion.Height, &motion.FPS, &motion.FileSize,
+		&motion.ErrorMessage, &motion.CreatedAt, &motion.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &motion, nil
+}
+
+// CuratedFrameExists reports whether a curated frame exists.
+func (s *SQLiteStore) CuratedFrameExists(ctx context.Context, frameID string) (bool, error) {
+	var one int
+	err := s.db.QueryRowContext(ctx, `SELECT 1 FROM curated_frames WHERE id = ? LIMIT 1`, frameID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// UpsertCuratedFrameMotion marks a motion artifact as processing or failed.
+func (s *SQLiteStore) UpsertCuratedFrameMotion(ctx context.Context, motion CuratedFrameMotionMeta) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if motion.CreatedAt == "" {
+		motion.CreatedAt = now
+	}
+	motion.UpdatedAt = now
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO curated_frame_motions (frame_id, status, artifact_name, content_type, duration_sec, width, height, fps, file_size, error_message, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(frame_id) DO UPDATE SET
+			status = excluded.status,
+			artifact_name = excluded.artifact_name,
+			content_type = excluded.content_type,
+			duration_sec = excluded.duration_sec,
+			width = excluded.width,
+			height = excluded.height,
+			fps = excluded.fps,
+			file_size = excluded.file_size,
+			error_message = excluded.error_message,
+			updated_at = excluded.updated_at
+	`, motion.FrameID, motion.Status, motion.ArtifactName, motion.ContentType, motion.DurationSec, motion.Width, motion.Height, motion.FPS, motion.FileSize, motion.ErrorMessage, motion.CreatedAt, motion.UpdatedAt)
+	return err
+}
+
+// GetCuratedFrameMotion returns the persisted motion metadata, if present.
+func (s *SQLiteStore) GetCuratedFrameMotion(ctx context.Context, frameID string) (*CuratedFrameMotionMeta, error) {
+	return s.loadCuratedFrameMotion(ctx, frameID)
 }
 
 // CuratedFrameQuery holds filter and pagination parameters for curated frame search.
@@ -255,6 +334,15 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	if err := rows.Err(); err != nil {
 		return CuratedFramePage{}, err
 	}
+	if err := rows.Close(); err != nil {
+		return CuratedFramePage{}, err
+	}
+	for i := range out {
+		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
+		if err != nil {
+			return CuratedFramePage{}, err
+		}
+	}
 	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
 
@@ -280,7 +368,19 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 		_ = scanCuratedMeta(actorsJSON, tagsJSON, &m)
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func listCuratedFrameJSONFacet(ctx context.Context, db *sql.DB, column string) ([]CuratedFrameFacet, error) {

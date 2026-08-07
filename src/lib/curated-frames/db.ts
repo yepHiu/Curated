@@ -44,6 +44,7 @@ function mapCuratedFrameItem(it: CuratedFrameRecord): CuratedFrameDbRow {
     positionSec: it.positionSec,
     capturedAt: it.capturedAt,
     tags: [...it.tags],
+    motion: it.motion ? { ...it.motion } : undefined,
   }
 }
 

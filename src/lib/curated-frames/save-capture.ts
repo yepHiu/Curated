@@ -10,7 +10,7 @@ import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
 export type SaveCuratedCaptureResult =
-  | { ok: true }
+  | { ok: true; id: string }
   | { ok: false; reason: string }
 
 export type SaveCuratedCaptureOptions = {
@@ -108,5 +108,5 @@ export async function saveCuratedCaptureFromVideo(
     }
   }
 
-  return { ok: true }
+  return { ok: true, id: row.id }
 }

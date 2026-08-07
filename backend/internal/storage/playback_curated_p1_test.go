@@ -133,3 +133,32 @@ func TestCuratedFrameThumbnailFallsBackToImage(t *testing.T) {
 		t.Fatalf("thumbnail fallback = %q", string(got))
 	}
 }
+
+func TestCuratedFrameMotionPersistsAndLoadsWithFrame(t *testing.T) {
+	t.Parallel()
+	store := newMigratedTestStore(t)
+	ctx := context.Background()
+	insertCuratedFrameForP1Test(t, store, CuratedFrameMeta{ID: "motion-frame"})
+
+	err := store.UpsertCuratedFrameMotion(ctx, CuratedFrameMotionMeta{
+		FrameID: "motion-frame", Status: "ready", ArtifactName: "motion-frame.gif",
+		ContentType: "image/gif", DurationSec: 2.5, Width: 640, Height: 360, FPS: 10, FileSize: 1234,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	motion, err := store.GetCuratedFrameMotion(ctx, "motion-frame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if motion == nil || motion.Status != "ready" || motion.ArtifactName != "motion-frame.gif" {
+		t.Fatalf("motion = %+v", motion)
+	}
+	page, err := store.QueryCuratedFrames(ctx, CuratedFrameQuery{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Motion == nil || page.Items[0].Motion.Width != 640 {
+		t.Fatalf("frame motion = %+v", page.Items)
+	}
+}

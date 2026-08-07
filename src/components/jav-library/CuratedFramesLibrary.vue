@@ -686,6 +686,7 @@ const movieGroups = computed((): MovieGroupSection[] => {
 
 const dialogOpen = ref(false)
 const selected = ref<CuratedFrameRecord | null>(null)
+const dialogMotionPlaying = ref(false)
 const dialogCarouselApi = ref<CarouselApi | null>(null)
 const dialogCarouselUserSelecting = ref(false)
 type CuratedFrameContextMenuState = {
@@ -825,6 +826,7 @@ function resetDialogTagSaveState(savedTags: string[] = []) {
 
 function resetDialogState() {
   selected.value = null
+  dialogMotionPlaying.value = false
   resetDialogCarouselUserSelecting()
   resetTagInputState()
   resetDialogTagSaveState()
@@ -943,6 +945,7 @@ function openDialog(item: RowWithUrl, fromActorSection: string | null = null) {
   dialogOpenedFromActor.value = fromActorSection
   dialogExportError.value = ""
   selected.value = meta
+  dialogMotionPlaying.value = false
   dialogTags.value = [...item.row.tags]
   resetTagInputState()
   resetDialogTagSaveState(item.row.tags)
@@ -1516,11 +1519,30 @@ defineExpose({
                 >
                   <div class="flex h-full w-full min-w-0 items-center justify-center bg-black">
                     <img
+                      v-if="!isDialogEntryCurrent(entry) || !dialogMotionPlaying || entry.item.row.motion?.status !== 'ready' || !entry.item.row.motion.artifactUrl"
                       :src="dialogEntryImageUrl(entry)"
                       alt=""
                       class="box-border h-full w-full object-contain p-2 sm:p-4"
                       decoding="async"
                       draggable="false"
+                    />
+                    <img
+                      v-else-if="entry.item.row.motion.contentType === 'image/gif'"
+                      :src="entry.item.row.motion.artifactUrl"
+                      :alt="t('curated.motionAvailable')"
+                      class="box-border h-full w-full object-contain p-2 sm:p-4"
+                      draggable="false"
+                    />
+                    <video
+                      v-else
+                      :src="entry.item.row.motion.artifactUrl"
+                      :poster="dialogEntryImageUrl(entry)"
+                      class="box-border h-full w-full object-contain p-2 sm:p-4"
+                      autoplay
+                      muted
+                      loop
+                      playsinline
+                      controls
                     />
                   </div>
                 </CarouselItem>
@@ -1547,6 +1569,18 @@ defineExpose({
               @click="navigateDialogFrame('next')"
             >
               <ChevronRight class="size-5 sm:size-6" aria-hidden="true" />
+            </Button>
+            <Button
+              v-if="selected?.motion?.status === 'ready' && selected.motion.artifactUrl"
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/65 text-white shadow-lg ring-1 ring-white/15 hover:bg-black/80 hover:text-white"
+              :aria-pressed="dialogMotionPlaying"
+              @click.stop="dialogMotionPlaying = !dialogMotionPlaying"
+            >
+              <PlayCircle class="size-4" aria-hidden="true" />
+              {{ dialogMotionPlaying ? t("curated.stopMotion") : t("curated.playMotion") }}
             </Button>
           </div>
           <div
