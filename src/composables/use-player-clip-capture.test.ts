@@ -43,6 +43,22 @@ describe("usePlayerClipCapture", () => {
     await vi.waitFor(() => expect(onClipReady).toHaveBeenCalledWith({ startSec: 12, endSec: 13.2 }))
   })
 
+  it("keeps the visible recording duration moving between media timeupdate events", () => {
+    const currentTime = ref(12)
+    const capture = usePlayerClipCapture({
+      currentTime,
+      duration: ref(100),
+      onClipReady: vi.fn(),
+    })
+
+    capture.startPress()
+    vi.advanceTimersByTime(400)
+    vi.advanceTimersByTime(650)
+
+    expect(capture.isRecording.value).toBe(true)
+    expect(capture.elapsedSec.value).toBeGreaterThanOrEqual(0.6)
+  })
+
   it("automatically ends at the configured maximum duration", () => {
     const currentTime = ref(10)
     const onClipReady = vi.fn().mockResolvedValue(undefined)

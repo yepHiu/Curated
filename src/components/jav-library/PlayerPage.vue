@@ -320,6 +320,7 @@ const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
 const clipExportUrl = ref("")
 const clipExportError = ref("")
 let clipPollTimer: number | null = null
+let clipFeedbackDismissTimer: number | null = null
 let curatedPlusOneTimer: number | null = null
 let curatedShutterTimer: number | null = null
 let curatedCaptureFeedbackTimer: number | null = null
@@ -358,6 +359,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
   } catch (err) {
     clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
     clipCapture.phase.value = "error"
+    scheduleClipFeedbackDismiss(3600)
     throw err
   }
 }
@@ -370,15 +372,44 @@ async function pollClipExportTask(taskId: string) {
     const artifactUrl = typeof task.metadata?.artifactUrl === "string" ? task.metadata.artifactUrl : ""
     clipExportUrl.value = artifactUrl
     clipCapture.phase.value = artifactUrl ? "success" : "error"
-    if (!artifactUrl) clipExportError.value = t("player.clipExportMissingArtifact")
+    if (artifactUrl) {
+      downloadClipArtifact(artifactUrl)
+      scheduleClipFeedbackDismiss(1600)
+    } else {
+      clipExportError.value = t("player.clipExportMissingArtifact")
+      scheduleClipFeedbackDismiss(3600)
+    }
     return
   }
   if (["failed", "partial_failed", "cancelled"].includes(task.status)) {
     clipExportError.value = task.errorMessage || task.message || t("player.clipExportFailed")
     clipCapture.phase.value = "error"
+    scheduleClipFeedbackDismiss(3600)
     return
   }
   clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId), 500)
+}
+
+function downloadClipArtifact(url = clipExportUrl.value) {
+  if (!url || typeof document === "undefined") return
+  const link = document.createElement("a")
+  link.href = url
+  link.download = ""
+  link.style.display = "none"
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+function scheduleClipFeedbackDismiss(delayMs: number) {
+  if (clipFeedbackDismissTimer !== null) window.clearTimeout(clipFeedbackDismissTimer)
+  clipFeedbackDismissTimer = window.setTimeout(() => {
+    clipCapture.reset()
+    clipExportTask.value = null
+    clipExportUrl.value = ""
+    clipExportError.value = ""
+    clipFeedbackDismissTimer = null
+  }, delayMs)
 }
 
 function onCuratedButtonPointerDown() {
@@ -960,6 +991,7 @@ onUnmounted(() => {
   stopPlaybackClockSyncLoop()
   if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
   if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+  if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
   disposeCuratedCaptureFeedbackAudio()
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()

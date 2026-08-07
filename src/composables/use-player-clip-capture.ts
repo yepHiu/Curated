@@ -30,6 +30,7 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
   const longPressMs = options.longPressMs ?? 400
   let thresholdTimer: number | null = null
   let ticker: number | null = null
+  let recordingStartedAt: number | null = null
   let pointerActive = false
 
   const isRecording = computed(() => phase.value === "recording")
@@ -51,6 +52,7 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
     error.value = ""
     taskId.value = null
     pointerActive = false
+    recordingStartedAt = null
   }
 
   function startPress() {
@@ -65,13 +67,17 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
     thresholdTimer = window.setTimeout(() => {
       thresholdTimer = null
       if (!pointerActive || phase.value !== "armed") return
+      startSec.value = Number.isFinite(options.currentTime.value)
+        ? Math.max(0, options.currentTime.value)
+        : now
       phase.value = "recording"
-      const startedAt = performance.now()
+      recordingStartedAt = performance.now()
       ticker = window.setInterval(() => {
         const mediaNow = Number.isFinite(options.currentTime.value) ? Math.max(0, options.currentTime.value) : now
-        elapsedSec.value = Math.max(0, mediaNow - (startSec.value ?? now))
+        const mediaElapsed = Math.max(0, mediaNow - (startSec.value ?? now))
+        const wallElapsed = recordingStartedAt === null ? 0 : Math.max(0, (performance.now() - recordingStartedAt) / 1000)
+        elapsedSec.value = Math.max(mediaElapsed, wallElapsed)
         if (elapsedSec.value >= maxDurationSec) finishPress()
-        else if (performance.now() - startedAt > maxDurationSec * 1000) finishPress()
       }, 50)
     }, longPressMs)
   }

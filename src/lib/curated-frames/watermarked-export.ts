@@ -184,26 +184,7 @@ function drawWatermarkedFrame(
   ctx.fillRect(0, height, width, layout.bandHeight)
 
   const leftX = layout.padding
-  const brandCenterY = height + layout.bandHeight / 2
-  drawSparkles(
-    ctx,
-    leftX,
-    brandCenterY - layout.iconSize / 2,
-    layout.iconSize,
-    theme.primary,
-  )
-  ctx.fillStyle = theme.foreground
-  ctx.font = `600 ${layout.brandFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
-  ctx.textBaseline = "middle"
-  ctx.textAlign = "left"
-  ctx.fillText("Curated", leftX + layout.iconSize + Math.max(8, layout.padding * 0.55), brandCenterY)
-
   const rightX = width - layout.padding
-  const rightStart = Math.max(
-    leftX + layout.iconSize + layout.padding * 3,
-    Math.round(width * 0.36),
-  )
-  const rightMaxWidth = Math.max(0, rightX - rightStart)
   const code = safeText(row.code)
   const title = safeText(row.title) || "Untitled"
   const actors = row.actors.map(safeText).filter(Boolean).join(" · ")
@@ -211,27 +192,31 @@ function drawWatermarkedFrame(
 
   ctx.font = `700 ${layout.mainFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
   const codeWidth = code ? ctx.measureText(code).width : 0
-  const titleMaxWidth = Math.max(0, rightMaxWidth - (code ? codeWidth + gap : 0))
+  const titleMaxWidth = Math.max(0, rightX - leftX - (code ? codeWidth + gap : 0))
   const fittedTitle = fitText(ctx, title, titleMaxWidth)
-  const titleWidth = ctx.measureText(fittedTitle).width
-  const codeX = rightX - titleWidth - (code ? gap : 0) - codeWidth
-  const titleX = rightX - titleWidth
   const mainY = height + layout.padding + layout.mainFontSize
   ctx.textBaseline = "alphabetic"
-  ctx.textAlign = "right"
+  ctx.textAlign = "left"
   ctx.fillStyle = theme.foreground
-  ctx.fillText(fittedTitle, titleX, mainY)
+  ctx.fillText(fittedTitle, leftX, mainY)
   if (code) {
     ctx.fillStyle = theme.primary
-    ctx.textAlign = "left"
-    ctx.fillText(code, codeX, mainY)
+    ctx.textAlign = "right"
+    ctx.fillText(code, rightX, mainY)
   }
+
+  const detailsY = height + layout.bandHeight - layout.padding
+  drawSparkles(ctx, leftX, detailsY - layout.iconSize * 0.8, layout.iconSize, theme.primary)
+  ctx.fillStyle = theme.foreground
+  ctx.font = `600 ${layout.brandFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+  ctx.textAlign = "left"
+  ctx.fillText("Curated", leftX + layout.iconSize + Math.max(8, layout.padding * 0.55), detailsY)
 
   if (actors) {
     ctx.font = `500 ${layout.actorFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
     ctx.fillStyle = theme.mutedForeground
     ctx.textAlign = "right"
-    ctx.fillText(fitText(ctx, actors, rightMaxWidth), rightX, mainY + layout.actorFontSize + Math.max(3, layout.padding * 0.2))
+    ctx.fillText(fitText(ctx, actors, Math.max(0, Math.round(width * 0.48))), rightX, detailsY)
   }
 
   return canvas
