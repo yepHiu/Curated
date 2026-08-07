@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n"
-import { Download, Trash2, X } from "lucide-vue-next"
+import { Download, Sparkles, Trash2, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 
 const props = defineProps<{
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   selectAllVisible: []
   deleteSelected: []
   export: []
+  exportWatermarked: []
 }>()
 
 const { t } = useI18n()
@@ -76,6 +77,17 @@ const { t } = useI18n()
         >
           <Download class="size-4" />
           {{ exportBusy ? t("curated.exportWorking") : t("curated.export") }}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          class="gap-1.5 rounded-xl"
+          :disabled="selectedCount === 0 || exportBusy || deleteBusy"
+          @click="emit('exportWatermarked')"
+        >
+          <Sparkles class="size-4" />
+          {{ exportBusy ? t("curated.exportWorking") : t("curated.exportWatermarked") }}
         </Button>
         <Button
           type="button"

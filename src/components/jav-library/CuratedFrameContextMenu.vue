@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onClickOutside, useEventListener } from "@vueuse/core"
-import { Download, Trash2 } from "lucide-vue-next"
+import { Download, Sparkles, Trash2 } from "lucide-vue-next"
 import { computed, nextTick, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   export: []
+  exportWatermarked: []
   delete: []
 }>()
 
@@ -52,6 +53,11 @@ function onExport() {
 
 function onDelete() {
   emit("delete")
+  close()
+}
+
+function onExportWatermarked() {
+  emit("exportWatermarked")
   close()
 }
 
@@ -102,6 +108,16 @@ watch(
       >
         <Download class="size-4 shrink-0" aria-hidden="true" />
         {{ t("curated.export") }}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        :class="itemClass"
+        data-curated-frame-context-action="export-watermarked"
+        @click="onExportWatermarked"
+      >
+        <Sparkles class="size-4 shrink-0" aria-hidden="true" />
+        {{ t("curated.exportWatermarked") }}
       </button>
       <button
         type="button"

@@ -19,6 +19,7 @@ type CuratedFramesLibraryExpose = {
   selectAllVisibleUpTo20: () => void
   deleteSelectedFrames: () => void
   exportSelected: () => void | Promise<void>
+  exportSelectedWatermarked: () => void | Promise<void>
 }
 
 const curatedLibRef = ref<CuratedFramesLibraryExpose | null>(null)
@@ -54,6 +55,10 @@ function onCuratedBatchExport() {
   void curatedLibRef.value?.exportSelected()
 }
 
+function onCuratedBatchExportWatermarked() {
+  void curatedLibRef.value?.exportSelectedWatermarked()
+}
+
 function onCuratedBatchDeleteSelected() {
   curatedLibRef.value?.deleteSelectedFrames()
 }
@@ -78,6 +83,7 @@ function onCuratedBatchDeleteSelected() {
       @select-all-visible="onCuratedBatchSelectAllVisible"
       @delete-selected="onCuratedBatchDeleteSelected"
       @export="onCuratedBatchExport"
+      @export-watermarked="onCuratedBatchExportWatermarked"
     />
   </div>
 </template>

@@ -15,6 +15,33 @@ func TestDefault_CuratedFrameExportFormatIsJPG(t *testing.T) {
 	}
 }
 
+func TestDefault_CuratedFrameExportModeIsRaw(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	if got, want := cfg.CuratedFrameExportMode, "raw"; got != want {
+		t.Fatalf("CuratedFrameExportMode = %q, want %q", got, want)
+	}
+}
+
+func TestMergeLibrarySettingsFile_CuratedFrameExportMode(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"curatedFrameExportMode":"watermarked"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.CuratedFrameExportMode, "watermarked"; got != want {
+		t.Fatalf("CuratedFrameExportMode = %q, want %q", got, want)
+	}
+}
+
 func TestMergeLibrarySettingsFile_CuratedFrameExportFormat(t *testing.T) {
 	t.Parallel()
 

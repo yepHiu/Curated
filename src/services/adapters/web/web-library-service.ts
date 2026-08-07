@@ -10,6 +10,7 @@ import type {
   BackupRestorePreflightDTO,
   BackupVerificationDTO,
   CuratedFrameExportFormat,
+  CuratedFrameExportMode,
   HomepageDailyRecommendationsDTO,
   CreateRecommendationFeedbackBody,
   RecommendationFeedbackDTO,
@@ -71,6 +72,7 @@ const autoDownloadUpdatesState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
 const curatedFrameExportFormatState = ref<CuratedFrameExportFormat>("jpg")
+const curatedFrameExportModeState = ref<CuratedFrameExportMode>("raw")
 const metadataMovieProviderState = ref("")
 const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
@@ -102,6 +104,7 @@ let autoActorProfileScrapeSaveSeq = 0
 let autoDownloadUpdatesSaveSeq = 0
 let launchAtLoginSaveSeq = 0
 let curatedFrameExportFormatSaveSeq = 0
+let curatedFrameExportModeSaveSeq = 0
 let defaultImportLibraryPathSaveSeq = 0
 let backupDirectorySaveSeq = 0
 let metadataMovieProviderSaveSeq = 0
@@ -374,6 +377,7 @@ async function refreshLibraryPathsFromApi() {
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
     curatedFrameExportFormatState.value = settings.curatedFrameExportFormat ?? "jpg"
+    curatedFrameExportModeState.value = settings.curatedFrameExportMode ?? "raw"
     applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
@@ -417,6 +421,7 @@ function createWebLibraryService(): LibraryService {
     launchAtLogin: computed(() => launchAtLoginState.value),
     launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
     curatedFrameExportFormat: computed(() => curatedFrameExportFormatState.value),
+    curatedFrameExportMode: computed(() => curatedFrameExportModeState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
     metadataMovieProviders: computed(() => metadataMovieProvidersState.value),
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
@@ -769,6 +774,25 @@ function createWebLibraryService(): LibraryService {
           }
         }
         throw err
+      }
+    },
+    async setCuratedFrameExportMode(mode: CuratedFrameExportMode) {
+      const seq = ++curatedFrameExportModeSaveSeq
+      curatedFrameExportModeState.value = mode
+      try {
+        const next = await api.patchSettings({ curatedFrameExportMode: mode })
+        if (seq === curatedFrameExportModeSaveSeq) {
+          curatedFrameExportModeState.value = next.curatedFrameExportMode ?? "raw"
+        }
+      } catch (err) {
+        if (seq === curatedFrameExportModeSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+          throw err
+        }
       }
     },
 

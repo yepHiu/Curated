@@ -6,6 +6,9 @@ import {
 
 const MODE_KEY = "jav-curated-frames-save-mode"
 const CAPTURE_KEY_CODE_KEY = "jav-curated-capture-key-code"
+const EXPORT_MODE_KEY = "jav-curated-frame-export-mode"
+
+export type CuratedFrameExportModePreference = "raw" | "watermarked"
 
 export function getCuratedFrameSaveMode(): CuratedFrameSaveMode {
   if (typeof localStorage === "undefined") return "app"
@@ -37,4 +40,18 @@ export function setCuratedCaptureKeyCode(code: string) {
 export function resetCuratedCaptureKeyCode() {
   if (typeof localStorage === "undefined") return
   localStorage.removeItem(CAPTURE_KEY_CODE_KEY)
+}
+
+export function getCuratedFrameExportMode(): CuratedFrameExportModePreference {
+  if (typeof localStorage === "undefined") return "raw"
+  return localStorage.getItem(EXPORT_MODE_KEY) === "watermarked" ? "watermarked" : "raw"
+}
+
+export function setCuratedFrameExportMode(mode: CuratedFrameExportModePreference) {
+  if (typeof localStorage === "undefined") return
+  if (mode === "raw") {
+    localStorage.removeItem(EXPORT_MODE_KEY)
+    return
+  }
+  localStorage.setItem(EXPORT_MODE_KEY, mode)
 }

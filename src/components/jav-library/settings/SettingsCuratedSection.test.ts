@@ -68,6 +68,7 @@ const baseProps = {
   curatedSaveMode: "app" as const,
   directorySupported: true,
   curatedFrameExportFormat: "jpg" as const,
+  curatedFrameExportMode: "raw" as const,
   curatedExportFormatOptions: [
     { value: "jpg" as const, label: "JPG" },
     { value: "png" as const, label: "PNG" },
@@ -89,7 +90,8 @@ describe("SettingsCuratedSection", () => {
     expect(wrapper.text()).toContain("C")
     expect(wrapper.text()).toContain("settings.savePolicy")
     expect(wrapper.find("[data-shortcut-section]").exists()).toBe(true)
-    expect(wrapper.get(".select-stub").attributes("data-model-value")).toBe("jpg")
+    expect(wrapper.findAll(".select-stub")[0]?.attributes("data-model-value")).toBe("raw")
+    expect(wrapper.findAll(".select-stub")[1]?.attributes("data-model-value")).toBe("jpg")
   })
 
   it("emits save mode and export format changes", async () => {
@@ -98,10 +100,12 @@ describe("SettingsCuratedSection", () => {
     })
 
     await wrapper.get('input[value="download"]').setValue(true)
-    wrapper.getComponent({ name: "Select" }).vm.$emit("update:modelValue", "png")
+    wrapper.findAllComponents({ name: "Select" })[0]!.vm.$emit("update:modelValue", "watermarked")
+    wrapper.findAllComponents({ name: "Select" })[1]!.vm.$emit("update:modelValue", "png")
 
     expect(wrapper.emitted("update:curatedSaveMode")).toEqual([["download"]])
     expect(wrapper.emitted("changeExportFormat")).toEqual([["png"]])
+    expect(wrapper.emitted("changeExportMode")).toEqual([["watermarked"]])
   })
 
   it("renders export directory controls and emits actions", async () => {

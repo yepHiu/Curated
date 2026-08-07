@@ -136,6 +136,12 @@ type CuratedFrameExportFormatController interface {
 	SetCuratedFrameExportFormat(v string) error
 }
 
+// CuratedFrameExportModeController exposes and updates the default export mode preference for curated frames.
+type CuratedFrameExportModeController interface {
+	CuratedFrameExportMode() string
+	SetCuratedFrameExportMode(v string) error
+}
+
 // DefaultImportLibraryPathController exposes the library root used by top-bar movie import.
 type DefaultImportLibraryPathController interface {
 	DefaultImportLibraryPathID() string
@@ -232,6 +238,7 @@ type Handler struct {
 	autoDownloadUpdatesCtl         AutoDownloadUpdatesController
 	launchAtLoginCtl               LaunchAtLoginController
 	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
+	curatedFrameExportModeCtl      CuratedFrameExportModeController
 	defaultImportLibraryPathCtl    DefaultImportLibraryPathController
 	backupDirectoryCtl             BackupDirectoryController
 	libraryPathStorageStatus       LibraryPathStorageStatusProvider
@@ -271,6 +278,7 @@ type Deps struct {
 	AutoDownloadUpdatesCtl           AutoDownloadUpdatesController
 	LaunchAtLoginCtl                 LaunchAtLoginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
+	CuratedFrameExportModeCtl        CuratedFrameExportModeController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
 	BackupDirectoryCtl               BackupDirectoryController
 	LibraryPathStorageStatusProvider LibraryPathStorageStatusProvider
@@ -334,6 +342,7 @@ func NewHandler(deps Deps) *Handler {
 		autoDownloadUpdatesCtl:         deps.AutoDownloadUpdatesCtl,
 		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
 		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
+		curatedFrameExportModeCtl:      deps.CuratedFrameExportModeCtl,
 		defaultImportLibraryPathCtl:    deps.DefaultImportLibraryPathCtl,
 		backupDirectoryCtl:             deps.BackupDirectoryCtl,
 		libraryPathStorageStatus:       deps.LibraryPathStorageStatusProvider,
@@ -1693,6 +1702,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if h.curatedFrameExportFormatCtl != nil {
 		curatedFrameExportFormat = config.NormalizeCuratedFrameExportFormat(h.curatedFrameExportFormatCtl.CuratedFrameExportFormat())
 	}
+	curatedFrameExportMode := config.NormalizeCuratedFrameExportMode(h.cfg.CuratedFrameExportMode)
+	if h.curatedFrameExportModeCtl != nil {
+		curatedFrameExportMode = config.NormalizeCuratedFrameExportMode(h.curatedFrameExportModeCtl.CuratedFrameExportMode())
+	}
 	defaultImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultImportLibraryPathID)
 	if h.defaultImportLibraryPathCtl != nil {
 		defaultImportLibraryPathID = strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
@@ -1723,6 +1736,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		LaunchAtLogin:            launchAtLogin,
 		LaunchAtLoginSupported:   launchAtLoginSupported,
 		CuratedFrameExportFormat: curatedFrameExportFormat,
+		CuratedFrameExportMode:   curatedFrameExportMode,
 		MetadataMovieProviders:   []string{},
 	}
 	if strings.TrimSpace(dto.Player.NativePlayerCommand) == "" {
@@ -1869,7 +1883,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1883,7 +1897,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2004,6 +2018,29 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "curatedFrameExportFormat",
 			apply:    func() error { return h.curatedFrameExportFormatCtl.SetCuratedFrameExportFormat(target) },
 			rollback: func() error { return h.curatedFrameExportFormatCtl.SetCuratedFrameExportFormat(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	if body.CuratedFrameExportMode != nil {
+		if h.curatedFrameExportModeCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "curated frame export mode settings not available")
+			return
+		}
+		target := strings.ToLower(strings.TrimSpace(*body.CuratedFrameExportMode))
+		if target != "raw" && target != "watermarked" {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `curatedFrameExportMode must be one of "raw" or "watermarked"`)
+			return
+		}
+		prev := h.curatedFrameExportModeCtl.CuratedFrameExportMode()
+		ops = append(ops, settingsPatchOperation{
+			name:     "curatedFrameExportMode",
+			apply:    func() error { return h.curatedFrameExportModeCtl.SetCuratedFrameExportMode(target) },
+			rollback: func() error { return h.curatedFrameExportModeCtl.SetCuratedFrameExportMode(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusBadRequest,
 				code:    contracts.ErrorCodeBadRequest,

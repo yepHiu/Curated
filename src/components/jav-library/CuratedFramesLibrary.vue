@@ -10,6 +10,7 @@ import {
   Download,
   PlayCircle,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-vue-next"
@@ -55,6 +56,11 @@ import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-ke
 import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
 import { curatedFrameImageUrl, curatedFrameThumbnailUrl } from "@/lib/curated-frame-image-url"
 import { triggerDownloadBlob } from "@/lib/curated-frames/export-file"
+import {
+  buildWatermarkedCuratedFramesExport,
+  type WatermarkedCuratedExportFormat,
+  type WatermarkedCuratedFrameSource,
+} from "@/lib/curated-frames/watermarked-export"
 import { deleteCuratedFramesBatch } from "@/lib/curated-frames/batch-delete"
 import {
   buildCuratedFrameNearDuplicateIndex,
@@ -268,6 +274,7 @@ function actorNameForExportRequest(): string | undefined {
 }
 
 type CuratedExportFormat = NonNullable<PostCuratedFramesExportBody["format"]>
+type CuratedExportMode = "raw" | "watermarked"
 
 function preferredCuratedExportFormat(): CuratedExportFormat {
   return libraryService.curatedFrameExportFormat.value ?? "jpg"
@@ -278,6 +285,7 @@ async function runExport(
   actorName: string | undefined,
   format: CuratedExportFormat,
   errorTarget: "toolbar" | "dialog" | "toast",
+  mode: CuratedExportMode = "raw",
 ) {
   exportBusy.value = true
   if (errorTarget === "toolbar") {
@@ -290,11 +298,37 @@ async function runExport(
     body.actorName = actorName
   }
   try {
-    const { blob, filename } = await libraryService.exportCuratedFrames(body)
+    let blob: Blob
+    let filename: string
+    if (mode === "watermarked") {
+      const sources: WatermarkedCuratedFrameSource[] = []
+      for (const id of ids) {
+        const item = listWithUrls.value.find((candidate) => candidate.row.id === id)
+        if (!item) {
+          throw new Error(`curated frame ${id} is not loaded`)
+        }
+        sources.push({
+          row: item.row,
+          imageUrl: item.row.imageBlob ? item.url : curatedFrameImageUrl(item.row.id),
+        })
+      }
+      const result = await buildWatermarkedCuratedFramesExport(
+        sources,
+        format as WatermarkedCuratedExportFormat,
+      )
+      blob = result.blob
+      filename = result.filename
+    } else {
+      const result = await libraryService.exportCuratedFrames(body)
+      blob = result.blob
+      filename = result.filename
+    }
     triggerDownloadBlob(blob, filename)
   } catch (err) {
     console.error("[curated-frames] export failed", err)
-    const msg = t("curated.exportFailed")
+    const msg = mode === "watermarked"
+      ? t("curated.exportWatermarkedFailed")
+      : t("curated.exportFailed")
     if (errorTarget === "toolbar") {
       exportToolbarError.value = msg
     } else if (errorTarget === "dialog") {
@@ -308,6 +342,14 @@ async function runExport(
 }
 
 async function exportSelected() {
+  await exportSelectedWithMode(libraryService.curatedFrameExportMode.value)
+}
+
+async function exportSelectedWatermarked() {
+  await exportSelectedWithMode("watermarked")
+}
+
+async function exportSelectedWithMode(mode: CuratedExportMode) {
   if (selectedFrameIds.value.length === 0) {
     return
   }
@@ -316,25 +358,42 @@ async function exportSelected() {
     actorNameForExportRequest(),
     preferredCuratedExportFormat(),
     "toolbar",
+    mode,
   )
 }
 
 async function exportSingleFromDialog() {
+  await exportSingleFromDialogWithMode(libraryService.curatedFrameExportMode.value)
+}
+
+async function exportSingleFromDialogWatermarked() {
+  await exportSingleFromDialogWithMode("watermarked")
+}
+
+async function exportSingleFromDialogWithMode(mode: CuratedExportMode) {
   if (!selected.value) {
     return
   }
   const actorName = resolveSingleFrameActorNameForExport(selected.value, dialogOpenedFromActor.value)
-  await runExport([selected.value.id], actorName, preferredCuratedExportFormat(), "dialog")
+  await runExport([selected.value.id], actorName, preferredCuratedExportFormat(), "dialog", mode)
 }
 
 async function exportSingleFromContextMenu() {
+  await exportSingleFromContextMenuWithMode(libraryService.curatedFrameExportMode.value)
+}
+
+async function exportSingleFromContextMenuWatermarked() {
+  await exportSingleFromContextMenuWithMode("watermarked")
+}
+
+async function exportSingleFromContextMenuWithMode(mode: CuratedExportMode) {
   const menu = frameContextMenu.value
   if (!menu) {
     return
   }
   closeFrameContextMenu()
   const actorName = resolveSingleFrameActorNameForExport(menu.frame, menu.fromActorSection)
-  await runExport([menu.frame.id], actorName, preferredCuratedExportFormat(), "toast")
+  await runExport([menu.frame.id], actorName, preferredCuratedExportFormat(), "toast", mode)
 }
 
 const maxFrameTags = 64
@@ -1327,6 +1386,7 @@ defineExpose({
     openDeleteConfirmForSelectedFrames()
   },
   exportSelected,
+  exportSelectedWatermarked,
 })
 </script>
 
@@ -1672,6 +1732,17 @@ defineExpose({
               </Button>
               <Button
                 type="button"
+                variant="secondary"
+                size="sm"
+                class="h-10 w-full justify-center gap-1.5 rounded-xl px-2"
+                :disabled="exportBusy || dialogTagSaveStatus === 'saving'"
+                @click="exportSingleFromDialogWatermarked"
+              >
+                <Sparkles class="size-4 shrink-0" aria-hidden="true" />
+                <span class="truncate">{{ exportBusy ? t("curated.exportWorking") : t("curated.exportWatermarked") }}</span>
+              </Button>
+              <Button
+                type="button"
                 size="sm"
                 class="h-10 w-full justify-center gap-1.5 rounded-xl"
                 :disabled="dialogTagSaveStatus === 'saving'"
@@ -1704,6 +1775,7 @@ defineExpose({
       :use-web-api="useWebApi"
       @close="closeFrameContextMenu"
       @export="exportSingleFromContextMenu"
+      @export-watermarked="exportSingleFromContextMenuWatermarked"
       @delete="openDeleteConfirmFromContextMenu"
     />
 

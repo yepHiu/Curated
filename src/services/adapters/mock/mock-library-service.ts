@@ -12,6 +12,7 @@ import type {
   BackendLogSettingsDTO,
   ConnectedClientsDTO,
   CuratedFrameExportFormat,
+  CuratedFrameExportMode,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
   HomepageRecommendationFeedbackEffectDTO,
@@ -93,6 +94,10 @@ import {
   upsertMockMoviePrefs,
 } from "@/lib/mock-movie-prefs-storage"
 import type { LibraryService } from "@/services/contracts/library-service"
+import {
+  getCuratedFrameExportMode,
+  setCuratedFrameExportMode as persistCuratedFrameExportMode,
+} from "@/lib/curated-frames/settings-storage"
 
 const organizeLibraryMock = ref(false)
 const backupDirectoryMock = ref("")
@@ -102,6 +107,7 @@ const autoDownloadUpdatesMock = ref(false)
 const launchAtLoginMock = ref(false)
 const launchAtLoginSupportedMock = ref(false)
 const curatedFrameExportFormatMock = ref<CuratedFrameExportFormat>("jpg")
+const curatedFrameExportModeMock = ref<CuratedFrameExportMode>(getCuratedFrameExportMode())
 const metadataMovieProviderMock = ref("")
 /** Mock 无引擎枚举，列表为空＝仅自动模式 */
 const metadataMovieProvidersMock = ref<string[]>([])
@@ -1123,6 +1129,7 @@ export const mockLibraryService: LibraryService = {
   launchAtLogin: computed(() => launchAtLoginMock.value),
   launchAtLoginSupported: computed(() => launchAtLoginSupportedMock.value),
   curatedFrameExportFormat: computed(() => curatedFrameExportFormatMock.value),
+  curatedFrameExportMode: computed(() => curatedFrameExportModeMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
   metadataMovieProviders: computed(() => metadataMovieProvidersMock.value),
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
@@ -1593,6 +1600,10 @@ export const mockLibraryService: LibraryService = {
 
   async setCuratedFrameExportFormat(format: CuratedFrameExportFormat) {
     curatedFrameExportFormatMock.value = format
+  },
+  async setCuratedFrameExportMode(mode: CuratedFrameExportMode) {
+    curatedFrameExportModeMock.value = mode
+    persistCuratedFrameExportMode(mode)
   },
 
   async setMetadataMovieProvider(name: string) {

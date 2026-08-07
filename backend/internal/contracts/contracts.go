@@ -862,6 +862,7 @@ type SettingsDTO struct {
 	// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
 	LaunchAtLoginSupported   bool     `json:"launchAtLoginSupported"`
 	CuratedFrameExportFormat string   `json:"curatedFrameExportFormat"`
+	CuratedFrameExportMode   string   `json:"curatedFrameExportMode"`
 	MetadataMovieProvider    string   `json:"metadataMovieProvider"`
 	MetadataMovieProviders   []string `json:"metadataMovieProviders"`
 	// MetadataMovieProviderChain: ordered provider priority list (may be non-empty while UI mode is auto/specified).
@@ -923,6 +924,7 @@ type PatchSettingsRequest struct {
 	AutoDownloadUpdates        *bool                   `json:"autoDownloadUpdates,omitempty"`
 	LaunchAtLogin              *bool                   `json:"launchAtLogin,omitempty"`
 	CuratedFrameExportFormat   *string                 `json:"curatedFrameExportFormat,omitempty"`
+	CuratedFrameExportMode     *string                 `json:"curatedFrameExportMode,omitempty"`
 	DefaultImportLibraryPathID *string                 `json:"defaultImportLibraryPathId,omitempty"`
 	BackupDirectory            *string                 `json:"backupDirectory,omitempty"`
 	Player                     *PatchPlayerSettingsDTO `json:"player,omitempty"`

@@ -283,6 +283,7 @@ export type MetadataMovieStrategy =
   | "custom-chain"
   | "specified"
 export type CuratedFrameExportFormat = "jpg" | "webp" | "png"
+export type CuratedFrameExportMode = "raw" | "watermarked"
 
 export interface SettingsDTO {
   libraryPaths: LibraryPathDTO[]
@@ -303,6 +304,7 @@ export interface SettingsDTO {
   launchAtLogin: boolean
   launchAtLoginSupported: boolean
   curatedFrameExportFormat: CuratedFrameExportFormat
+  curatedFrameExportMode: CuratedFrameExportMode
   /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
   metadataMovieProvider: string
   /** 当前引擎可用的影片源名（排序），供指定模式选择 */
@@ -509,6 +511,7 @@ export interface PatchSettingsBody {
   autoDownloadUpdates?: boolean
   launchAtLogin?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
+  curatedFrameExportMode?: CuratedFrameExportMode
   defaultImportLibraryPathId?: string
   /** Absolute backup destination directory; an empty string clears the remembered value. */
   backupDirectory?: string

@@ -201,7 +201,7 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Tag editing and frame deletion.
 - Stats overview, tag facets, and actor facets.
 - Export in JPG (EXIF), WebP (EXIF), PNG (iTXt), or ZIP with embedded metadata (tags, schemaVersion, exportedAt, appName, appVersion).
-- Configurable export format preference (`curatedFrameExportFormat`).
+- Configurable export format and default export style preferences (`curatedFrameExportFormat`, `curatedFrameExportMode`).
 
 ### Homepage & Recommendations
 
@@ -301,6 +301,7 @@ Common library-level settings include:
 - `autoDownloadUpdates`
 - `launchAtLogin`
 - `curatedFrameExportFormat` (default `jpg`; accepted values: `jpg`, `webp`, `png`)
+- `curatedFrameExportMode` (default `raw`; accepted values: `raw`, `watermarked`; controls the general curated-frame export action while explicit raw/watermarked actions remain available)
 - `proxy`
 - backend log directory and retention settings
   Empty `logDir` means "use the default log directory" rather than disabling file logging:

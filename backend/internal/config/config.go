@@ -45,6 +45,8 @@ type Config struct {
 	LaunchAtLogin bool `json:"launchAtLogin,omitempty"`
 	// CuratedFrameExportFormat controls curated frame export output format. Persisted in library-config.cfg.
 	CuratedFrameExportFormat string `json:"curatedFrameExportFormat,omitempty"`
+	// CuratedFrameExportMode controls whether the general curated-frame export action uses the original or watermarked image.
+	CuratedFrameExportMode string `json:"curatedFrameExportMode,omitempty"`
 	// DefaultImportLibraryPathID is the library_paths row id used by top-bar movie import. Empty means not configured.
 	DefaultImportLibraryPathID string `json:"defaultImportLibraryPathId,omitempty"`
 	// BackupDirectory is the remembered destination directory for timestamped backup packages. Persisted in library-config.cfg.
@@ -186,6 +188,7 @@ func Default() Config {
 		AutoDownloadUpdates:      false,
 		LaunchAtLogin:            false,
 		CuratedFrameExportFormat: "jpg",
+		CuratedFrameExportMode:   "raw",
 	}
 }
 
@@ -234,6 +237,7 @@ func Load(path string) (Config, error) {
 		cfg.HttpAddr = defaultHTTPAddr()
 	}
 	cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat)
+	cfg.CuratedFrameExportMode = NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode)
 	if cfg.Tasks.ScanTimeoutSeconds <= 0 {
 		cfg.Tasks.ScanTimeoutSeconds = 600
 	}
@@ -356,6 +360,18 @@ func NormalizeCuratedFrameExportFormat(value string) string {
 		return "jpg"
 	default:
 		return "jpg"
+	}
+}
+
+// NormalizeCuratedFrameExportMode validates the default curated-frame export mode, defaulting to "raw".
+func NormalizeCuratedFrameExportMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "watermarked":
+		return "watermarked"
+	case "raw":
+		return "raw"
+	default:
+		return "raw"
 	}
 }
 

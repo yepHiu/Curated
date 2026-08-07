@@ -165,6 +165,16 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.curatedFrameExportFormat.value).toBe("jpg")
   })
 
+  it("defaults curated-frame export mode to raw and allows switching to watermarked", async () => {
+    expect(mockLibraryService.curatedFrameExportMode.value).toBe("raw")
+
+    await mockLibraryService.setCuratedFrameExportMode("watermarked")
+    expect(mockLibraryService.curatedFrameExportMode.value).toBe("watermarked")
+
+    await mockLibraryService.setCuratedFrameExportMode("raw")
+    expect(mockLibraryService.curatedFrameExportMode.value).toBe("raw")
+  })
+
   it("tracks default import library path and returns a mock import task", async () => {
     expect(mockLibraryService.defaultImportLibraryPathId.value).toBe("library-a")
 

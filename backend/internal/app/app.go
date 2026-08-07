@@ -84,6 +84,9 @@ type App struct {
 	// curatedFrameExportFormat controls curated-frame export output format via Settings.
 	curatedFrameExportFormat   string
 	curatedFrameExportFormatMu sync.RWMutex
+	// curatedFrameExportMode controls the default curated-frame export action.
+	curatedFrameExportMode   string
+	curatedFrameExportModeMu sync.RWMutex
 	// defaultImportLibraryPathID controls where top-bar movie imports are copied.
 	defaultImportLibraryPathID   string
 	defaultImportLibraryPathIDMu sync.RWMutex
@@ -180,6 +183,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoDownloadUpdates:           cfg.AutoDownloadUpdates,
 		launchAtLogin:                 cfg.LaunchAtLogin,
 		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
+		curatedFrameExportMode:        config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
 		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
 		backupDirectory:               strings.TrimSpace(cfg.BackupDirectory),
 		autoActorProfileScrapePending: make(map[string]struct{}),
@@ -361,6 +365,13 @@ func (a *App) CuratedFrameExportFormat() string {
 	return config.NormalizeCuratedFrameExportFormat(a.curatedFrameExportFormat)
 }
 
+// CuratedFrameExportMode returns the default curated-frame export mode.
+func (a *App) CuratedFrameExportMode() string {
+	a.curatedFrameExportModeMu.RLock()
+	defer a.curatedFrameExportModeMu.RUnlock()
+	return config.NormalizeCuratedFrameExportMode(a.curatedFrameExportMode)
+}
+
 // DefaultImportLibraryPathID returns the configured library_paths row id used by movie import.
 func (a *App) DefaultImportLibraryPathID() string {
 	a.defaultImportLibraryPathIDMu.RLock()
@@ -492,6 +503,29 @@ func (a *App) SetCuratedFrameExportFormat(v string) error {
 	a.curatedFrameExportFormat = next
 	a.cfg.CuratedFrameExportFormat = next
 	a.curatedFrameExportFormatMu.Unlock()
+	return nil
+}
+
+// SetCuratedFrameExportMode persists the default curated-frame export mode and updates memory.
+func (a *App) SetCuratedFrameExportMode(v string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeCuratedFrameExportMode(v)
+	if strings.TrimSpace(strings.ToLower(v)) != next {
+		return fmt.Errorf(`curatedFrameExportMode must be one of "raw" or "watermarked"`)
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["curatedFrameExportMode"] = next
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.curatedFrameExportModeMu.Lock()
+	a.curatedFrameExportMode = next
+	a.cfg.CuratedFrameExportMode = next
+	a.curatedFrameExportModeMu.Unlock()
 	return nil
 }
 
@@ -2653,6 +2687,7 @@ func (a *App) HTTPHandler() http.Handler {
 			AutoDownloadUpdatesCtl:           a,
 			LaunchAtLoginCtl:                 a,
 			CuratedFrameExportFormatCtl:      a,
+			CuratedFrameExportModeCtl:        a,
 			DefaultImportLibraryPathCtl:      a,
 			BackupDirectoryCtl:               a,
 			MetadataScrapeCtl:                a,

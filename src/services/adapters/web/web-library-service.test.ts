@@ -82,6 +82,7 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
     launchAtLogin: false,
     launchAtLoginSupported: false,
     curatedFrameExportFormat: "jpg",
+    curatedFrameExportMode: "raw",
     metadataMovieProvider: "",
     metadataMovieProviders: [],
     metadataMovieProviderChain: [],

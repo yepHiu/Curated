@@ -84,6 +84,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(s)
 	}
+	if v, ok := m["curatedFrameExportMode"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.CuratedFrameExportMode = NormalizeCuratedFrameExportMode(s)
+	}
 	if v, ok := m["defaultImportLibraryPathId"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

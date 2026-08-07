@@ -21,7 +21,7 @@ describe("CuratedFrameContextMenu", () => {
     tags: ["closeup"],
   }
 
-  it("emits export and delete actions from the right-click menu", async () => {
+  it("emits raw, watermarked, and delete actions from the right-click menu", async () => {
     const wrapper = mount(CuratedFrameContextMenu, {
       attachTo: document.body,
       props: {
@@ -35,15 +35,19 @@ describe("CuratedFrameContextMenu", () => {
     await nextTick()
 
     const exportButton = document.body.querySelector('[data-curated-frame-context-action="export"]') as HTMLButtonElement | null
+    const watermarkedButton = document.body.querySelector('[data-curated-frame-context-action="export-watermarked"]') as HTMLButtonElement | null
     const deleteButton = document.body.querySelector('[data-curated-frame-context-action="delete"]') as HTMLButtonElement | null
 
     expect(exportButton).not.toBeNull()
+    expect(watermarkedButton).not.toBeNull()
     expect(deleteButton).not.toBeNull()
 
     exportButton?.click()
+    watermarkedButton?.click()
     deleteButton?.click()
 
     expect(wrapper.emitted("export")).toHaveLength(1)
+    expect(wrapper.emitted("exportWatermarked")).toHaveLength(1)
     expect(wrapper.emitted("delete")).toHaveLength(1)
 
     wrapper.unmount()
@@ -63,9 +67,11 @@ describe("CuratedFrameContextMenu", () => {
     await nextTick()
 
     const exportButton = document.body.querySelector('[data-curated-frame-context-action="export"]') as HTMLButtonElement | null
+    const watermarkedButton = document.body.querySelector('[data-curated-frame-context-action="export-watermarked"]') as HTMLButtonElement | null
     const deleteButton = document.body.querySelector('[data-curated-frame-context-action="delete"]') as HTMLButtonElement | null
 
     expect(exportButton?.disabled).toBe(true)
+    expect(watermarkedButton?.disabled).toBe(false)
     expect(deleteButton?.disabled).toBe(false)
 
     wrapper.unmount()

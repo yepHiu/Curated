@@ -2,7 +2,7 @@
 import { useI18n } from "vue-i18n"
 import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
-import type { CuratedFrameExportFormat } from "@/api/types"
+import type { CuratedFrameExportFormat, CuratedFrameExportMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -36,6 +36,7 @@ defineProps<{
   curatedSaveMode: CuratedFrameSaveMode
   directorySupported: boolean
   curatedFrameExportFormat: CuratedFrameExportFormat
+  curatedFrameExportMode: CuratedFrameExportMode
   curatedExportFormatOptions: readonly {
     value: CuratedFrameExportFormat
     label: string
@@ -50,6 +51,7 @@ defineProps<{
 const emit = defineEmits<{
   "update:curatedSaveMode": [value: CuratedFrameSaveMode]
   changeExportFormat: [value: unknown]
+  changeExportMode: [value: unknown]
   pickExportDirectory: []
   clearExportDirectory: []
 }>()
@@ -188,6 +190,44 @@ const { t } = useI18n()
                 </span>
               </span>
             </label>
+          </fieldset>
+
+          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+            <legend class="sr-only">{{ t("settings.curatedExportModeTitle") }}</legend>
+            <div
+              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+            >
+              <div class="min-w-0 flex-1 space-y-1">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.curatedExportModeTitle") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.curatedExportModeHint") }}
+                </p>
+              </div>
+              <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2">
+                <Select
+                  :model-value="curatedFrameExportMode"
+                  :disabled="curatedExportFormatSaving"
+                  @update:model-value="emit('changeExportMode', $event)"
+                >
+                  <SelectTrigger
+                    class="h-9 w-full min-w-0 rounded-xl border-border/50 sm:w-40 sm:min-w-0 sm:shrink-0"
+                    :aria-label="t('settings.curatedExportModeLabel')"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent class="rounded-xl border-border/50">
+                    <SelectItem value="raw" class="rounded-lg">
+                      {{ t("settings.curatedExportModeRaw") }}
+                    </SelectItem>
+                    <SelectItem value="watermarked" class="rounded-lg">
+                      {{ t("settings.curatedExportModeWatermarked") }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </fieldset>
 
           <SettingsCuratedShortcutSection />

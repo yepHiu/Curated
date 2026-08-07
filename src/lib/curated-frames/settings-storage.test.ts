@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest"
 import {
   getCuratedCaptureKeyCode,
   getCuratedFrameSaveMode,
+  getCuratedFrameExportMode,
   resetCuratedCaptureKeyCode,
   setCuratedCaptureKeyCode,
   setCuratedFrameSaveMode,
+  setCuratedFrameExportMode,
 } from "@/lib/curated-frames/settings-storage"
 
 describe("curated frame settings storage", () => {
@@ -16,6 +18,14 @@ describe("curated frame settings storage", () => {
     expect(getCuratedFrameSaveMode()).toBe("app")
     setCuratedFrameSaveMode("directory")
     expect(getCuratedFrameSaveMode()).toBe("directory")
+  })
+
+  it("defaults and persists the curated frame export mode", () => {
+    expect(getCuratedFrameExportMode()).toBe("raw")
+    setCuratedFrameExportMode("watermarked")
+    expect(getCuratedFrameExportMode()).toBe("watermarked")
+    setCuratedFrameExportMode("raw")
+    expect(getCuratedFrameExportMode()).toBe("raw")
   })
 
   it("uses C as the default curated capture shortcut", () => {

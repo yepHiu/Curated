@@ -18,6 +18,7 @@ import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import { HttpClientError } from "@/api/http-client"
 import type {
   CuratedFrameExportFormat,
+  CuratedFrameExportMode,
   HealthDTO,
   LibraryPathStorageStatusDTO,
   ProviderHealthDTO,
@@ -781,6 +782,7 @@ const autoDownloadUpdates = computed(() => libraryService.autoDownloadUpdates.va
 const launchAtLogin = computed(() => libraryService.launchAtLogin.value)
 const launchAtLoginSupported = computed(() => libraryService.launchAtLoginSupported.value)
 const curatedFrameExportFormat = computed(() => libraryService.curatedFrameExportFormat.value)
+const curatedFrameExportMode = computed(() => libraryService.curatedFrameExportMode.value)
 const curatedExportFormatOptions = computed(
   (): { value: CuratedFrameExportFormat; label: string }[] => [
     { value: "jpg", label: "JPG" },
@@ -1774,6 +1776,33 @@ function onCuratedExportFormatSelect(next: unknown) {
   void onCuratedExportFormatChange(next)
 }
 
+async function onCuratedExportModeChange(next: CuratedFrameExportMode) {
+  if (next === curatedFrameExportMode.value) return
+  curatedExportFormatError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      curatedExportFormatSaving.value = true
+      try {
+        await libraryService.setCuratedFrameExportMode(next)
+      } finally {
+        curatedExportFormatSaving.value = false
+      }
+    })
+  } catch (err) {
+    console.error("[settings] curated export mode change failed", err)
+    if (err instanceof HttpClientError && err.apiError?.message) {
+      curatedExportFormatError.value = err.apiError.message
+    } else {
+      curatedExportFormatError.value = t("settings.errSaveTitle")
+    }
+  }
+}
+
+function onCuratedExportModeSelect(next: unknown) {
+  if (next !== "raw" && next !== "watermarked") return
+  void onCuratedExportModeChange(next)
+}
+
 async function onMetadataMovieModeAuto() {
   if (metadataMovieModeUi.value === "auto") return
   metadataMovieError.value = ""
@@ -2245,6 +2274,7 @@ async function runMetadataRefreshForSelected() {
         :capture-shortcut-label="curatedCaptureShortcutLabel"
         :directory-supported="curatedDirectorySupported"
         :curated-frame-export-format="curatedFrameExportFormat"
+        :curated-frame-export-mode="curatedFrameExportMode"
         :curated-export-format-options="curatedExportFormatOptions"
         :curated-export-format-saving="curatedExportFormatSaving"
         :curated-export-dir-label="curatedExportDirLabel"
@@ -2252,6 +2282,7 @@ async function runMetadataRefreshForSelected() {
         :curated-export-error="curatedExportError"
         :curated-export-format-error="curatedExportFormatError"
         @change-export-format="onCuratedExportFormatSelect"
+        @change-export-mode="onCuratedExportModeSelect"
         @pick-export-directory="pickCuratedExportDirectory"
         @clear-export-directory="clearCuratedExportDirectory"
       />

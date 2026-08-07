@@ -22,6 +22,21 @@ type stubCuratedExportFormatCtl struct {
 	err error
 }
 
+type stubCuratedExportModeCtl struct {
+	v   string
+	err error
+}
+
+func (s *stubCuratedExportModeCtl) CuratedFrameExportMode() string { return s.v }
+
+func (s *stubCuratedExportModeCtl) SetCuratedFrameExportMode(v string) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.v = v
+	return nil
+}
+
 func (s *stubCuratedExportFormatCtl) CuratedFrameExportFormat() string {
 	return s.v
 }
@@ -159,5 +174,67 @@ func TestHandlePatchSettings_CuratedFrameExportFormatRejectsInvalidValue(t *test
 	}
 	if got, want := exportCtl.v, "jpg"; got != want {
 		t.Fatalf("controller value = %q, want %q after invalid patch", got, want)
+	}
+}
+
+func TestHandleGetSettings_CuratedFrameExportModeFromController(t *testing.T) {
+	t.Parallel()
+
+	modeCtl := &stubCuratedExportModeCtl{v: "watermarked"}
+	srv := newSettingsCuratedExportFormatTestServer(t, Deps{
+		Cfg:                       config.Default(),
+		OrganizeLibraryCtl:       stubOrganizeCtl{},
+		AutoLibraryWatchCtl:      stubAutoWatchCtl{},
+		MetadataScrapeCtl:        stubMetadataCtl{},
+		CuratedFrameExportModeCtl: modeCtl,
+	})
+
+	resp, err := http.Get(srv.URL + "/api/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var dto contracts.SettingsDTO
+	if err := json.NewDecoder(resp.Body).Decode(&dto); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dto.CuratedFrameExportMode, "watermarked"; got != want {
+		t.Fatalf("CuratedFrameExportMode = %q, want %q", got, want)
+	}
+}
+
+func TestHandlePatchSettings_CuratedFrameExportMode(t *testing.T) {
+	t.Parallel()
+
+	modeCtl := &stubCuratedExportModeCtl{v: "raw"}
+	srv := newSettingsCuratedExportFormatTestServer(t, Deps{
+		Cfg:                       config.Default(),
+		OrganizeLibraryCtl:       stubOrganizeCtl{},
+		AutoLibraryWatchCtl:      stubAutoWatchCtl{},
+		MetadataScrapeCtl:        stubMetadataCtl{},
+		CuratedFrameExportModeCtl: modeCtl,
+	})
+
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", strings.NewReader(`{"curatedFrameExportMode":"watermarked"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(body))
+	}
+	if got, want := modeCtl.v, "watermarked"; got != want {
+		t.Fatalf("controller value = %q, want %q", got, want)
 	}
 }

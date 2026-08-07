@@ -14,6 +14,7 @@ import type {
   BackupVerificationDTO,
   ConnectedClientsDTO,
   CuratedFrameExportFormat,
+  CuratedFrameExportMode,
   HealthDTO,
   HomepageDailyRecommendationsDTO,
   CreateRecommendationFeedbackBody,
@@ -98,6 +99,8 @@ export interface LibraryService {
   setLaunchAtLogin(value: boolean): Promise<void>
   curatedFrameExportFormat: ComputedRef<CuratedFrameExportFormat>
   setCuratedFrameExportFormat(format: CuratedFrameExportFormat): Promise<void>
+  curatedFrameExportMode: ComputedRef<CuratedFrameExportMode>
+  setCuratedFrameExportMode(mode: CuratedFrameExportMode): Promise<void>
   /** 影片刮削源：空为自动；mock 下列表常为空，仅支持自动 */
   metadataMovieProvider: ComputedRef<string>
   metadataMovieProviders: ComputedRef<readonly string[]>
