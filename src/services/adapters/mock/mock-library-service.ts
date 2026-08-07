@@ -1229,6 +1229,10 @@ export const mockLibraryService: LibraryService = {
     throw new Error("Backup maintenance requires Web API mode")
   },
 
+  async createMovieClip(): Promise<never> {
+    throw new Error("GIF clip export requires Web API mode")
+  },
+
   async verifyBackup(): Promise<never> {
     throw new Error("Backup maintenance requires Web API mode")
   },

@@ -607,6 +607,14 @@ export interface ActorProfileDTO {
   aliases?: string[]
 }
 
+export interface CreateMovieClipBody {
+  startSec: number
+  endSec: number
+  format: "gif"
+  fps?: number
+  width?: number
+}
+
 export interface PatchActorExternalLinksBody {
   externalLinks: string[]
 }

@@ -47,6 +47,7 @@ import type {
   ProxyJavBusPingResponse,
   PutMovieCommentBody,
   TaskDTO,
+  CreateMovieClipBody,
   StartLibraryHealthRepairBody,
   StartLibraryHealthActionBody,
   SavedViewDTO,
@@ -154,6 +155,7 @@ export interface LibraryService {
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>
+  createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
   /** Web：请求后端在系统文件管理器中显示该片主视频；Mock 会拒绝。 */

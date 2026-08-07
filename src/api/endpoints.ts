@@ -69,6 +69,7 @@ import type {
   CuratedFrameStatsDTO,
   CreatePlaybackSessionBody,
   CreateSavedViewBody,
+  CreateMovieClipBody,
   CuratedFramesListDTO,
   DevPerformanceSummaryDTO,
   HealthDTO,
@@ -664,6 +665,10 @@ export const api = {
 
   getTaskStatus(taskId: string): Promise<TaskDTO> {
     return httpClient.get<TaskDTO>(`/tasks/${encodeURIComponent(taskId)}`)
+  },
+
+  createMovieClip(movieId: string, body: CreateMovieClipBody): Promise<TaskDTO> {
+    return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/clips`, body)
   },
 
   getRecentTasks(limit?: number): Promise<RecentTasksDTO> {

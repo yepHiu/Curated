@@ -6,7 +6,10 @@ import {
   AlertTriangle,
   Camera,
   Check,
+  Circle,
+  Download,
   ExternalLink,
+  Film,
   Info,
   Loader2,
   Maximize2,
@@ -16,6 +19,7 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  Share2,
   Volume2,
   VolumeX,
 } from "lucide-vue-next"
@@ -121,6 +125,7 @@ import {
   type PlaybackStatsSnapshot,
 } from "@/lib/player-playback-stats"
 import { usePlayerGamepadControls } from "@/composables/use-player-gamepad-controls"
+import { usePlayerClipCapture } from "@/composables/use-player-clip-capture"
 import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { resolveNavigationBackLink } from "@/lib/navigation-intent"
@@ -311,6 +316,10 @@ type CuratedCaptureFeedback =
 const curatedCaptureFeedback = ref<CuratedCaptureFeedback>({ phase: "idle" })
 const curatedCaptureAnnouncement = ref("")
 const curatedCaptureFeedbackSoundEnabled = ref(getCuratedCaptureFeedbackSoundEnabled())
+const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
+const clipExportUrl = ref("")
+const clipExportError = ref("")
+let clipPollTimer: number | null = null
 let curatedPlusOneTimer: number | null = null
 let curatedShutterTimer: number | null = null
 let curatedCaptureFeedbackTimer: number | null = null
@@ -318,6 +327,90 @@ const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
 let playbackClockSyncIntervalId: number | null = null
 let lastAuthoritativePlaybackTimeSec: number | null = null
 let progressSliderFocusRestoreTimer: number | null = null
+
+const clipCapture = usePlayerClipCapture({
+  currentTime: computed(() => getAbsolutePlaybackTime(videoRef.value?.currentTime ?? currentTime.value)),
+  duration: computed(() => totalDurationSec.value),
+  minDurationSec: 0.4,
+  maxDurationSec: 6,
+  longPressMs: 400,
+  onClipReady: submitClipExport,
+})
+const clipCapturePhase = clipCapture.phase
+const clipCaptureIsRecording = clipCapture.isRecording
+const clipCaptureElapsedSec = clipCapture.elapsedSec
+const clipCaptureProgress = clipCapture.progress
+
+async function submitClipExport(input: { startSec: number; endSec: number }) {
+  clipExportError.value = ""
+  clipExportUrl.value = ""
+  clipExportTask.value = null
+  try {
+    const task = await libraryService.createMovieClip(props.movie.id, {
+      startSec: input.startSec,
+      endSec: input.endSec,
+      fps: 10,
+      width: 480,
+    })
+    clipExportTask.value = task
+    clipCapture.taskId.value = task.taskId
+    await pollClipExportTask(task.taskId)
+  } catch (err) {
+    clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
+    clipCapture.phase.value = "error"
+    throw err
+  }
+}
+
+async function pollClipExportTask(taskId: string) {
+  if (clipPollTimer !== null) window.clearTimeout(clipPollTimer)
+  const task = await libraryService.getTaskStatus(taskId)
+  clipExportTask.value = task
+  if (task.status === "completed") {
+    const artifactUrl = typeof task.metadata?.artifactUrl === "string" ? task.metadata.artifactUrl : ""
+    clipExportUrl.value = artifactUrl
+    clipCapture.phase.value = artifactUrl ? "success" : "error"
+    if (!artifactUrl) clipExportError.value = t("player.clipExportMissingArtifact")
+    return
+  }
+  if (["failed", "partial_failed", "cancelled"].includes(task.status)) {
+    clipExportError.value = task.errorMessage || task.message || t("player.clipExportFailed")
+    clipCapture.phase.value = "error"
+    return
+  }
+  clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId), 500)
+}
+
+function onCuratedButtonPointerDown() {
+  clipCapture.startPress()
+}
+
+function onCuratedButtonPointerUp() {
+  clipCapture.finishPress()
+}
+
+function onCuratedButtonPointerCancel() {
+  clipCapture.cancelPress()
+}
+
+function onCuratedButtonClick() {
+  if (clipCapture.consumeClick()) return
+  void runCuratedCapture()
+}
+
+async function shareClip() {
+  if (!clipExportUrl.value) return
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: props.movie.title || props.movie.code, url: clipExportUrl.value })
+    } else {
+      await navigator.clipboard?.writeText(clipExportUrl.value)
+      pushAppToast(t("player.clipShareCopied"))
+    }
+  } catch {
+    // Sharing can be cancelled by the user; keep the completed artifact visible.
+  }
+}
 
 /** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
 const IDLE_HIDE_MS = 5000
@@ -807,6 +900,7 @@ function stripTFromRoute() {
 watch(
   () => props.movie.id,
   async () => {
+    clipCapture.cancelPress()
     const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
     void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
@@ -821,6 +915,7 @@ watch(
 )
 
 function onVisibilityChange() {
+  if (document.visibilityState === "hidden") clipCapture.cancelPress()
   if (document.visibilityState === "hidden") {
     flushPlaybackProgress()
   }
@@ -839,6 +934,7 @@ onMounted(() => {
   document.addEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   document.addEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.addEventListener("keydown", onPlaybackKeydown)
+  window.addEventListener("keyup", onPlaybackKeyup)
   window.addEventListener("mousemove", immersiveChrome.onPageMouseMove, { passive: true })
   document.addEventListener("visibilitychange", onVisibilityChange)
   window.addEventListener("beforeunload", onWindowBeforeUnload)
@@ -857,11 +953,13 @@ onUnmounted(() => {
   document.removeEventListener("pictureinpicturechange", onDocumentPictureInPictureChange)
   document.removeEventListener("fullscreenchange", onDocumentFullscreenChange)
   window.removeEventListener("keydown", onPlaybackKeydown)
+  window.removeEventListener("keyup", onPlaybackKeyup)
   window.removeEventListener("mousemove", immersiveChrome.onPageMouseMove)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
   stopPlaybackClockSyncLoop()
   if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
+  if (clipPollTimer !== null) clearTimeout(clipPollTimer)
   disposeCuratedCaptureFeedbackAudio()
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()
@@ -1509,10 +1607,19 @@ function onPlaybackKeydown(e: KeyboardEvent) {
     default:
       if (e.code === getCuratedCaptureKeyCode()) {
         e.preventDefault()
-        void runCuratedCapture()
+        if (!e.repeat) clipCapture.startPress()
       }
       break
   }
+}
+
+function onPlaybackKeyup(e: KeyboardEvent) {
+  if (e.code !== getCuratedCaptureKeyCode()) return
+  if (!playbackSrc.value || e.ctrlKey || e.metaKey || e.altKey) return
+  if (shouldIgnoreGlobalPlaybackHotkeysForTarget(e.target)) return
+  e.preventDefault()
+  const result = clipCapture.finishPress()
+  if (!result.wasLongPress) void runCuratedCapture()
 }
 
 async function runCuratedCapture() {
@@ -2495,6 +2602,43 @@ const videoPreloadMode = computed(() =>
         <div class="sr-only" aria-live="polite" aria-atomic="true">
           {{ curatedCaptureAnnouncement }}
         </div>
+        <Transition
+          enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+          enter-from-class="opacity-0 translate-y-2"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-150 ease-in motion-reduce:transition-none"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 translate-y-2"
+        >
+          <div
+            v-if="clipCapturePhase !== 'idle'"
+            class="pointer-events-none absolute bottom-20 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="flex items-center gap-2 text-sm font-semibold">
+              <Circle v-if="clipCaptureIsRecording" class="size-3 fill-rose-400 text-rose-400" aria-hidden="true" />
+              <Film v-else class="size-4 text-primary" aria-hidden="true" />
+              <span v-if="clipCapturePhase === 'armed'">{{ t('player.clipArmed') }}</span>
+              <span v-else-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
+              <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
+              <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipReady') }}</span>
+              <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
+              <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
+            </div>
+            <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
+              <div class="h-full rounded-full bg-rose-400 transition-[width] duration-75" :style="{ width: `${clipCaptureProgress * 100}%` }" />
+            </div>
+            <div v-if="clipCapturePhase === 'success' && clipExportUrl" class="pointer-events-auto mt-3 flex justify-end gap-2">
+              <a :href="clipExportUrl" download class="inline-flex items-center gap-1 rounded-md bg-white/12 px-2.5 py-1.5 text-xs font-medium hover:bg-white/20">
+                <Download class="size-3.5" aria-hidden="true" />{{ t('player.clipDownload') }}
+              </a>
+              <button type="button" class="inline-flex items-center gap-1 rounded-md bg-primary/80 px-2.5 py-1.5 text-xs font-medium hover:bg-primary" @click.stop="shareClip">
+                <Share2 class="size-3.5" aria-hidden="true" />{{ t('player.clipShare') }}
+              </button>
+            </div>
+          </div>
+        </Transition>
         <div
           class="pointer-events-none absolute inset-0 z-[5]"
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
@@ -2669,7 +2813,10 @@ const videoPreloadMode = computed(() =>
                   :disabled="!playbackSrc"
                   :aria-label="t('player.ariaCurated')"
                   :aria-keyshortcuts="getCuratedCaptureKeyCode()"
-                  @click="runCuratedCapture"
+                  @pointerdown="onCuratedButtonPointerDown"
+                  @pointerup="onCuratedButtonPointerUp"
+                  @pointercancel="onCuratedButtonPointerCancel"
+                  @click="onCuratedButtonClick"
                 >
                   {{ t("player.curatedLabel") }}
                 </Button>
