@@ -34,6 +34,7 @@ _SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE: dict[str, object] = {
     "autoDownloadUpdates": False,
     "launchAtLogin": False,
     "curatedFrameExportFormat": "jpg",
+    "backupDirectory": "",
     "proxy": {"enabled": False},
 }
 
