@@ -367,3 +367,13 @@ eebe3f68 feat(security): manage trusted auth sessions
 8b00e69c fix(release): stage sanitized config example
 6fb3752b fix(installer): close running desktop app during install
 586bc1f6 chore(release): prepare 1.4.11 package",versionSource=auto-patch; BuildStamp=20260723.171425; portable=versionSource=explicit; installer=versionSource=explicit
+2026-08-07,1.4.13,896f16b0,master,release:publish,release/manifest/release.json,失败,wujiahui,"896f16b0 docs: document release cache safeguards
+30410c6f test: keep release fixtures date independent
+4c3afcdd fix(release): refresh packaged frontend assets
+a67b592a fix(metadata): preserve distinct poster thumbnails
+b56d35ae docs(settings): document persisted backup directory
+be6ca0c4 feat(settings): persist backup directory
+e53787e6 fix(api): encode empty backup arrays
+5a0a0a54 feat(settings): generate backup filename from directory
+64f291fa chore(release): prepare 1.4.12 package","versionSource=auto-patch; BuildStamp=20260807.154548; error=Release library config example must match the sanitized baseline and must not contain machine paths, proxy details, provider selections, library ids, or player commands"
+2026-08-07,1.4.13,0b314359,master,release:publish,release/portable/Curated-1.4.13-windows-x64.zip; release/installer/Curated-Setup-1.4.13.exe; release/manifest/release.json,成功,wujiahui,0b314359 fix(release): include persisted backup setting,versionSource=explicit; BuildStamp=20260807.154802; portable=versionSource=explicit; installer=versionSource=explicit
