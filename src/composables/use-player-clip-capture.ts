@@ -95,8 +95,11 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
       return { wasLongPress: false, ...(wasArmed ? {} : {}) }
     }
     const start = startSec.value ?? options.currentTime.value
-    const mediaNow = Number.isFinite(options.currentTime.value) ? Math.max(0, options.currentTime.value) : start
-    const end = Math.min(Math.max(start + minDurationSec, mediaNow), start + maxDurationSec)
+    // The media clock can lag behind the final keyup by several `timeupdate`
+    // intervals. Use the live elapsed recorder duration as the source of truth
+    // so a five-second hold does not collapse into the minimum 0.4s clip.
+    const recordedDuration = Math.max(minDurationSec, elapsedSec.value)
+    const end = Math.min(start + recordedDuration, start + maxDurationSec)
     startSec.value = start
     endSec.value = end
     elapsedSec.value = Math.max(0, end - start)

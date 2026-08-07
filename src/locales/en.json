@@ -1241,6 +1241,7 @@
     "clipRecording": "Recording GIF",
     "clipProcessing": "Generating GIF…",
     "clipReady": "GIF ready",
+    "clipDownloading": "Recording complete, downloading",
     "clipExportFailed": "GIF generation failed",
     "clipExportUnavailable": "GIF clips require Web API mode",
     "clipExportMissingArtifact": "The GIF task finished without a downloadable file",

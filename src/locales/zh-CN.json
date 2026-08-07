@@ -1241,6 +1241,7 @@
     "clipRecording": "正在录制 GIF",
     "clipProcessing": "正在生成 GIF…",
     "clipReady": "GIF 已准备好",
+    "clipDownloading": "录制完成，正在下载中",
     "clipExportFailed": "GIF 生成失败",
     "clipExportUnavailable": "GIF 截取需要 Web API 模式",
     "clipExportMissingArtifact": "GIF 任务完成，但没有可下载文件",

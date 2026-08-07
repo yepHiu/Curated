@@ -1241,6 +1241,7 @@
     "clipRecording": "GIFを録画中",
     "clipProcessing": "GIFを生成中…",
     "clipReady": "GIFの準備ができました",
+    "clipDownloading": "録画完了、ダウンロード中",
     "clipExportFailed": "GIFの生成に失敗しました",
     "clipExportUnavailable": "GIFクリップにはWeb APIモードが必要です",
     "clipExportMissingArtifact": "GIFタスクは完了しましたが、ダウンロード可能なファイルがありません",

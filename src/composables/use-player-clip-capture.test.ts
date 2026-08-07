@@ -59,6 +59,25 @@ describe("usePlayerClipCapture", () => {
     expect(capture.elapsedSec.value).toBeGreaterThanOrEqual(0.6)
   })
 
+  it("uses the held duration when the media clock is stale at keyup", () => {
+    const currentTime = ref(12)
+    const onClipReady = vi.fn().mockResolvedValue(undefined)
+    const capture = usePlayerClipCapture({
+      currentTime,
+      duration: ref(100),
+      onClipReady,
+    })
+
+    capture.startPress()
+    vi.advanceTimersByTime(400)
+    vi.advanceTimersByTime(2500)
+    const result = capture.finishPress()
+
+    expect(result.wasLongPress).toBe(true)
+    expect(result.startSec).toBe(12)
+    expect(result.endSec).toBeGreaterThanOrEqual(14.4)
+  })
+
   it("automatically ends at the configured maximum duration", () => {
     const currentTime = ref(10)
     const onClipReady = vi.fn().mockResolvedValue(undefined)

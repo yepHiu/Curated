@@ -7,7 +7,6 @@ import {
   Camera,
   Check,
   Circle,
-  Download,
   ExternalLink,
   Film,
   Info,
@@ -19,7 +18,6 @@ import {
   Play,
   SkipBack,
   SkipForward,
-  Share2,
   Volume2,
   VolumeX,
 } from "lucide-vue-next"
@@ -427,20 +425,6 @@ function onCuratedButtonPointerCancel() {
 function onCuratedButtonClick() {
   if (clipCapture.consumeClick()) return
   void runCuratedCapture()
-}
-
-async function shareClip() {
-  if (!clipExportUrl.value) return
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: props.movie.title || props.movie.code, url: clipExportUrl.value })
-    } else {
-      await navigator.clipboard?.writeText(clipExportUrl.value)
-      pushAppToast(t("player.clipShareCopied"))
-    }
-  } catch {
-    // Sharing can be cancelled by the user; keep the completed artifact visible.
-  }
 }
 
 /** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
@@ -2654,20 +2638,12 @@ const videoPreloadMode = computed(() =>
               <span v-if="clipCapturePhase === 'armed'">{{ t('player.clipArmed') }}</span>
               <span v-else-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
               <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
-              <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipReady') }}</span>
+              <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipDownloading') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
             </div>
             <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
               <div class="h-full rounded-full bg-rose-400 transition-[width] duration-75" :style="{ width: `${clipCaptureProgress * 100}%` }" />
-            </div>
-            <div v-if="clipCapturePhase === 'success' && clipExportUrl" class="pointer-events-auto mt-3 flex justify-end gap-2">
-              <a :href="clipExportUrl" download class="inline-flex items-center gap-1 rounded-md bg-white/12 px-2.5 py-1.5 text-xs font-medium hover:bg-white/20">
-                <Download class="size-3.5" aria-hidden="true" />{{ t('player.clipDownload') }}
-              </a>
-              <button type="button" class="inline-flex items-center gap-1 rounded-md bg-primary/80 px-2.5 py-1.5 text-xs font-medium hover:bg-primary" @click.stop="shareClip">
-                <Share2 class="size-3.5" aria-hidden="true" />{{ t('player.clipShare') }}
-              </button>
             </div>
           </div>
         </Transition>
