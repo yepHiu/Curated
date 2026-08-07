@@ -3,10 +3,12 @@ import {
   getCuratedCaptureKeyCode,
   getCuratedFrameSaveMode,
   getCuratedFrameExportMode,
+  getCuratedCaptureFeedbackSoundEnabled,
   resetCuratedCaptureKeyCode,
   setCuratedCaptureKeyCode,
   setCuratedFrameSaveMode,
   setCuratedFrameExportMode,
+  setCuratedCaptureFeedbackSoundEnabled,
 } from "@/lib/curated-frames/settings-storage"
 
 describe("curated frame settings storage", () => {
@@ -30,6 +32,14 @@ describe("curated frame settings storage", () => {
 
   it("uses C as the default curated capture shortcut", () => {
     expect(getCuratedCaptureKeyCode()).toBe("KeyC")
+  })
+
+  it("defaults the capture feedback sound on and persists the off preference", () => {
+    expect(getCuratedCaptureFeedbackSoundEnabled()).toBe(true)
+    setCuratedCaptureFeedbackSoundEnabled(false)
+    expect(getCuratedCaptureFeedbackSoundEnabled()).toBe(false)
+    setCuratedCaptureFeedbackSoundEnabled(true)
+    expect(getCuratedCaptureFeedbackSoundEnabled()).toBe(true)
   })
 
   it("persists a supported curated capture shortcut", () => {

@@ -31,6 +31,15 @@ vi.mock("@/components/ui/button", () => ({
   },
 }))
 
+vi.mock("@/components/ui/switch", () => ({
+  Switch: {
+    name: "Switch",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<button data-switch :aria-checked=\"String(modelValue)\" @click=\"$emit('update:modelValue', !modelValue)\" />",
+  },
+}))
+
 vi.mock("@/components/ui/card", () => ({
   Card: { name: "Card", template: "<div><slot /></div>" },
   CardContent: { name: "CardContent", template: "<div><slot /></div>" },
@@ -65,6 +74,7 @@ vi.mock("./SettingsCuratedShortcutSection.vue", () => ({
 
 const baseProps = {
   captureShortcutLabel: "C",
+  captureFeedbackSoundEnabled: true,
   curatedSaveMode: "app" as const,
   directorySupported: true,
   curatedFrameExportFormat: "jpg" as const,

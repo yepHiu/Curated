@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
+  AlertTriangle,
+  Camera,
+  Check,
   ExternalLink,
   Info,
   Loader2,
@@ -41,7 +44,14 @@ import {
 } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { saveCuratedCaptureFromVideo } from "@/lib/curated-frames/save-capture"
-import { getCuratedCaptureKeyCode } from "@/lib/curated-frames/settings-storage"
+import {
+  getCuratedCaptureFeedbackSoundEnabled,
+  getCuratedCaptureKeyCode,
+} from "@/lib/curated-frames/settings-storage"
+import {
+  disposeCuratedCaptureFeedbackAudio,
+  playCuratedCaptureTriggerCue,
+} from "@/lib/curated-frames/capture-feedback-sound"
 import {
   getProgress,
   parseResumeSecondsFromQuery,
@@ -292,8 +302,18 @@ function onDocumentFullscreenChange() {
 const curatedShutterActive = ref(false)
 const curatedPlusOne = ref(false)
 const curatedCaptureError = ref("")
+type CuratedCaptureFeedback =
+  | { phase: "idle" }
+  | { phase: "capturing"; positionSec: number }
+  | { phase: "success"; positionSec: number }
+  | { phase: "error"; message: string }
+
+const curatedCaptureFeedback = ref<CuratedCaptureFeedback>({ phase: "idle" })
+const curatedCaptureAnnouncement = ref("")
+const curatedCaptureFeedbackSoundEnabled = ref(getCuratedCaptureFeedbackSoundEnabled())
 let curatedPlusOneTimer: number | null = null
 let curatedShutterTimer: number | null = null
+let curatedCaptureFeedbackTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
 let playbackClockSyncIntervalId: number | null = null
 let lastAuthoritativePlaybackTimeSec: number | null = null
@@ -841,6 +861,8 @@ onUnmounted(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
   stopPlaybackClockSyncLoop()
+  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
+  disposeCuratedCaptureFeedbackAudio()
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()
   immersiveChrome.dispose()
@@ -1502,6 +1524,12 @@ async function runCuratedCapture() {
   }
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
   if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
+  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
+
+  const positionSec = getAbsolutePlaybackTime(v.currentTime)
+  curatedCaptureFeedback.value = { phase: "capturing", positionSec }
+  curatedCaptureAnnouncement.value = t("player.captureFeedbackCapturing")
+  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
 
   curatedShutterActive.value = true
   curatedShutterTimer = window.setTimeout(() => {
@@ -1515,8 +1543,23 @@ async function runCuratedCapture() {
   if (!result.ok) {
     curatedCaptureError.value = result.reason
     curatedShutterActive.value = false
+    curatedCaptureFeedback.value = { phase: "error", message: result.reason }
+    curatedCaptureAnnouncement.value = t("player.captureFeedbackError", { reason: result.reason })
+    curatedCaptureFeedbackTimer = window.setTimeout(() => {
+      curatedCaptureFeedback.value = { phase: "idle" }
+      curatedCaptureFeedbackTimer = null
+    }, 3200)
     return
   }
+
+  curatedCaptureFeedback.value = { phase: "success", positionSec }
+  curatedCaptureAnnouncement.value = t("player.captureFeedbackSuccess", {
+    time: formatClock(positionSec),
+  })
+  curatedCaptureFeedbackTimer = window.setTimeout(() => {
+    curatedCaptureFeedback.value = { phase: "idle" }
+    curatedCaptureFeedbackTimer = null
+  }, 900)
 
   curatedPlusOne.value = true
   curatedPlusOneTimer = window.setTimeout(() => {
@@ -2407,6 +2450,51 @@ const videoPreloadMode = computed(() =>
         :class="videoAreaCursorClass"
         @click="onVideoSurfaceClick"
       >
+        <Transition
+          enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+          enter-from-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition duration-150 ease-in motion-reduce:transition-none"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
+        >
+          <div
+            v-if="curatedCaptureFeedback.phase !== 'idle'"
+            class="pointer-events-none absolute left-1/2 top-[8%] z-[20] inline-flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-2 rounded-full border bg-black/75 px-3 py-1.5 text-sm font-medium shadow-[0_12px_28px_rgba(0,0,0,0.3)] backdrop-blur-md"
+            :class="
+              curatedCaptureFeedback.phase === 'success'
+                ? 'border-emerald-300/35 text-emerald-200'
+                : curatedCaptureFeedback.phase === 'error'
+                  ? 'border-rose-300/40 text-rose-200'
+                  : 'border-primary/35 text-pink-200'
+            "
+            :role="curatedCaptureFeedback.phase === 'error' ? 'alert' : 'status'"
+            :aria-label="
+              curatedCaptureFeedback.phase === 'capturing'
+                ? t('player.captureFeedbackCapturing')
+                : curatedCaptureFeedback.phase === 'success'
+                  ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
+                  : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
+            "
+          >
+            <Camera v-if="curatedCaptureFeedback.phase === 'capturing'" class="size-4 shrink-0" aria-hidden="true" />
+            <Check v-else-if="curatedCaptureFeedback.phase === 'success'" class="size-4 shrink-0" aria-hidden="true" />
+            <AlertTriangle v-else class="size-4 shrink-0" aria-hidden="true" />
+            <span class="truncate">
+              {{
+                curatedCaptureFeedback.phase === 'capturing'
+                  ? t('player.captureFeedbackCapturing')
+                  : curatedCaptureFeedback.phase === 'success'
+                    ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
+                    : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
+              }}
+            </span>
+          </div>
+        </Transition>
+
+        <div class="sr-only" aria-live="polite" aria-atomic="true">
+          {{ curatedCaptureAnnouncement }}
+        </div>
         <div
           class="pointer-events-none absolute inset-0 z-[5]"
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
@@ -2580,6 +2668,7 @@ const videoPreloadMode = computed(() =>
                   class="rounded-full border-0 bg-primary px-5 py-2 text-sm font-semibold tracking-wide text-primary-foreground hover:bg-primary/88 sm:px-6"
                   :disabled="!playbackSrc"
                   :aria-label="t('player.ariaCurated')"
+                  :aria-keyshortcuts="getCuratedCaptureKeyCode()"
                   @click="runCuratedCapture"
                 >
                   {{ t("player.curatedLabel") }}
@@ -2718,12 +2807,12 @@ const videoPreloadMode = computed(() =>
 
 .curated-shutter-ring {
   animation: curated-shutter-inset 0.55s ease-out forwards;
-  box-shadow: inset 0 0 0 10px hsl(var(--primary) / 0.5);
+  box-shadow: inset 0 0 0 8px hsl(var(--primary) / 0.42);
 }
 
 @keyframes curated-shutter-inset {
   from {
-    box-shadow: inset 0 0 0 14px hsl(var(--primary) / 0.55);
+    box-shadow: inset 0 0 0 8px hsl(var(--primary) / 0.46);
     opacity: 1;
   }
   to {

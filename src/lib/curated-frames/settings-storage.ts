@@ -7,6 +7,7 @@ import {
 const MODE_KEY = "jav-curated-frames-save-mode"
 const CAPTURE_KEY_CODE_KEY = "jav-curated-capture-key-code"
 const EXPORT_MODE_KEY = "jav-curated-frame-export-mode"
+const CAPTURE_FEEDBACK_SOUND_KEY = "jav-curated-capture-feedback-sound-v1"
 
 export type CuratedFrameExportModePreference = "raw" | "watermarked"
 
@@ -54,4 +55,18 @@ export function setCuratedFrameExportMode(mode: CuratedFrameExportModePreference
     return
   }
   localStorage.setItem(EXPORT_MODE_KEY, mode)
+}
+
+export function getCuratedCaptureFeedbackSoundEnabled(): boolean {
+  if (typeof localStorage === "undefined") return true
+  return localStorage.getItem(CAPTURE_FEEDBACK_SOUND_KEY) !== "off"
+}
+
+export function setCuratedCaptureFeedbackSoundEnabled(enabled: boolean) {
+  if (typeof localStorage === "undefined") return
+  if (enabled) {
+    localStorage.removeItem(CAPTURE_FEEDBACK_SOUND_KEY)
+    return
+  }
+  localStorage.setItem(CAPTURE_FEEDBACK_SOUND_KEY, "off")
 }

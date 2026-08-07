@@ -4,6 +4,7 @@ import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import type { CuratedFrameExportFormat, CuratedFrameExportMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import {
   Card,
   CardContent,
@@ -33,6 +34,7 @@ import SettingsCuratedShortcutSection from "./SettingsCuratedShortcutSection.vue
 
 defineProps<{
   captureShortcutLabel: string
+  captureFeedbackSoundEnabled: boolean
   curatedSaveMode: CuratedFrameSaveMode
   directorySupported: boolean
   curatedFrameExportFormat: CuratedFrameExportFormat
@@ -50,6 +52,7 @@ defineProps<{
 
 const emit = defineEmits<{
   "update:curatedSaveMode": [value: CuratedFrameSaveMode]
+  "update:captureFeedbackSoundEnabled": [value: boolean]
   changeExportFormat: [value: unknown]
   changeExportMode: [value: unknown]
   pickExportDirectory: []
@@ -231,6 +234,25 @@ const { t } = useI18n()
           </fieldset>
 
           <SettingsCuratedShortcutSection />
+
+          <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+            <legend class="sr-only">{{ t("settings.captureFeedbackSoundTitle") }}</legend>
+            <div class="flex min-w-0 items-start justify-between gap-4">
+              <div class="min-w-0 flex-1 space-y-1">
+                <p class="text-sm font-semibold text-foreground">
+                  {{ t("settings.captureFeedbackSoundTitle") }}
+                </p>
+                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                  {{ t("settings.captureFeedbackSoundHint") }}
+                </p>
+              </div>
+              <Switch
+                :model-value="captureFeedbackSoundEnabled"
+                :aria-label="t('settings.captureFeedbackSoundTitle')"
+                @update:model-value="emit('update:captureFeedbackSoundEnabled', Boolean($event))"
+              />
+            </div>
+          </fieldset>
 
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>

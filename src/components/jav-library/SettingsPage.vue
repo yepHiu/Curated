@@ -48,7 +48,9 @@ import {
 } from "@/lib/about-version"
 import {
   getCuratedCaptureKeyCode,
+  getCuratedCaptureFeedbackSoundEnabled,
   getCuratedFrameSaveMode,
+  setCuratedCaptureFeedbackSoundEnabled,
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
@@ -1186,6 +1188,7 @@ watch(watchTimeRevision, () => {
 
 /** 萃取帧：保存策略 */
 const curatedSaveMode = ref<CuratedFrameSaveMode>("app")
+const curatedCaptureFeedbackSoundEnabled = ref(true)
 const curatedExportDirLabel = ref("")
 const curatedExportPickBusy = ref(false)
 const curatedExportError = ref("")
@@ -1305,6 +1308,7 @@ onMounted(async () => {
     setCuratedFrameSaveMode(mode)
   }
   curatedSaveMode.value = mode
+  curatedCaptureFeedbackSoundEnabled.value = getCuratedCaptureFeedbackSoundEnabled()
   void refreshCuratedExportDirLabel()
   await nextTick()
   settingsAutoSaveReady.value = true
@@ -1312,6 +1316,10 @@ onMounted(async () => {
 
 watch(curatedSaveMode, (mode) => {
   setCuratedFrameSaveMode(mode)
+})
+
+watch(curatedCaptureFeedbackSoundEnabled, (enabled) => {
+  setCuratedCaptureFeedbackSoundEnabled(enabled)
 })
 
 watch(addPathDialogOpen, (open) => {
@@ -2272,6 +2280,7 @@ async function runMetadataRefreshForSelected() {
       <SettingsCuratedSection
         v-model:curated-save-mode="curatedSaveMode"
         :capture-shortcut-label="curatedCaptureShortcutLabel"
+        :capture-feedback-sound-enabled="curatedCaptureFeedbackSoundEnabled"
         :directory-supported="curatedDirectorySupported"
         :curated-frame-export-format="curatedFrameExportFormat"
         :curated-frame-export-mode="curatedFrameExportMode"
@@ -2283,6 +2292,7 @@ async function runMetadataRefreshForSelected() {
         :curated-export-format-error="curatedExportFormatError"
         @change-export-format="onCuratedExportFormatSelect"
         @change-export-mode="onCuratedExportModeSelect"
+        @update:capture-feedback-sound-enabled="curatedCaptureFeedbackSoundEnabled = $event"
         @pick-export-directory="pickCuratedExportDirectory"
         @clear-export-directory="clearCuratedExportDirectory"
       />
