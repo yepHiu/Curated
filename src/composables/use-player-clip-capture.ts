@@ -77,6 +77,9 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
   }
 
   function finishPress(): { wasLongPress: boolean; startSec?: number; endSec?: number } {
+    if (phase.value !== "armed" && phase.value !== "recording") {
+      return { wasLongPress: false }
+    }
     const wasLongPress = phase.value === "recording"
     pointerActive = false
     clearTimers()
