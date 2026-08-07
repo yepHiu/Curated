@@ -160,13 +160,13 @@ function drawWatermarkedFrame(
   const titleY = height + layout.padding + titleFontSize
   const codeY = height + layout.bandHeight - layout.padding
 
-  ctx.font = `700 ${titleFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+  ctx.font = `600 ${titleFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
   ctx.textBaseline = "alphabetic"
   ctx.textAlign = "right"
   ctx.fillStyle = theme.foreground
   ctx.fillText(fittedTitle, rightX, titleY)
   if (code) {
-    ctx.font = `700 ${codeFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+    ctx.font = `600 ${codeFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
     ctx.fillStyle = theme.primary
     ctx.fillText(code, rightX, codeY)
   }
