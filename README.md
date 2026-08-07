@@ -358,6 +358,7 @@ Key notes:
 - `pnpm release:publish` builds the Vue frontend, the release Go backend, and the Electron main process before assembling artifacts.
 - Release packaging assembles a Windows-oriented Electron staging directory, portable zip, installer executable, and release manifest.
 - The assembled app copies the Electron runtime to `release/Curated`, renames `electron.exe` to `Curated.exe`, writes `resources/app/package.json`, places `electron-dist/` and `frontend-dist/` under `resources/app/`, and bundles the Go backend as `resources/app/curated.exe`.
+- Packaged Web UI entry documents and SPA fallbacks are served with `no-store`; hashed `/assets/*` remain immutable. Electron also versions its renderer entry URL, and installer upgrades remove only the managed legacy/current `frontend-dist` directories before copying the new build, preventing an older cached desktop UI from surviving an application update.
 - Release packaging bundles FFmpeg into `resources/app/third_party/ffmpeg/bin/`: it first uses `backend/third_party/ffmpeg/bin/`, then falls back to a real local FFmpeg installation discovered from Scoop or PATH, and fails fast if no runtime is available.
 - The package build ledger now lives in `docs/ops/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
 - The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source and launches `{app}\Curated.exe`.

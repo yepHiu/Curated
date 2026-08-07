@@ -328,6 +328,7 @@ pnpm release:publish
 - `pnpm release:publish` は Vue フロントエンド、release Go バックエンド、Electron main process をビルドしてから成果物を組み立てます。
 - リリースフローでは、Windows 用 Electron ステージングディレクトリ、ポータブル zip、インストーラー実行ファイル、リリースマニフェストを生成します。
 - 組み立てられたアプリは Electron runtime を `release/Curated` にコピーし、`electron.exe` を `Curated.exe` にリネームし、`resources/app/package.json` を書き込み、`electron-dist/`、`frontend-dist/`、Go バックエンド `curated.exe` を `resources/app/` 配下に配置します。
+- パッケージ版 Web UI の入口文書と SPA fallback は `no-store` で配信し、ハッシュ付き `/assets/*` は immutable 長期キャッシュを維持します。Electron は renderer 入口 URL にアプリ版を付加し、installer 更新時は管理対象の旧・現行 `frontend-dist` だけを新しいビルドのコピー前に削除するため、更新後に古いデスクトップ UI が残りません。
 - パッケージ履歴台帳は `docs/ops/package-build-history.csv` に移行済みで、Excel / WPS 互換のため UTF-8 with BOM で保存されます。
 - インストーラー自体は引き続き Inno Setup を使いますが、`.iss` テンプレートの描画と `ISCC.exe` 呼び出しは Python 側で行います。ショートカットとインストール完了後の起動入口は `{app}\Curated.exe` を指します。
 - 設定画面から現在のユーザー向け Windows ログイン時起動を永続化できます。この自動起動はサイレントでトレイに入り、ブラウザは自動で開きません。

@@ -15,7 +15,7 @@ alwaysApply: true
 - **release 构建默认地址**：`-tags release` 时默认 `127.0.0.1:8081`（仅 loopback），健康名 `curated`；非 loopback `httpAddr` 必须同时显式设置主配置 `lanEnabled: true` 且数据库已初始化 PIN，否则拒绝启动 HTTP 服务。
 - **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
 - **Vite 代理 / 直连后端**：`vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`（长上传关闭 proxy 超时）；仅本地 loopback Web API 开发态下，`src/api/http-client.ts` 和播放器媒体流会直连开发后端 `:8080`，避免大文件上传/大视频流经过 Vite proxy；release `:8081` 静态托管继续走同源 `/api`。
-- **本地静态托管**：存在 `frontend-dist/` 或 `dist/` 时，后端会直接托管前端静态文件并对非 `/api` 路由做 SPA fallback。
+- **本地静态托管**：存在 `frontend-dist/` 或 `dist/` 时，后端会直接托管前端静态文件并对非 `/api` 路由做 SPA fallback；`index.html` 与 SPA fallback 强制 `no-store`，`/assets/*` 内容哈希资源使用 immutable 长缓存，其余静态文件要求重新验证，避免 Electron 升级后继续命中旧入口。
 
 ## 根目录政策（阶段 1）
 
@@ -28,7 +28,7 @@ alwaysApply: true
 - **新的本地临时目录优先放到**：`.workspace/`
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
-- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
+- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## 配置与持久化

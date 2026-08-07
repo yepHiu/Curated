@@ -335,6 +335,7 @@ pnpm release:publish
 - `pnpm release:publish` 会先构建 Vue 前端、release Go 后端和 Electron main process，再组装产物。
 - 发布流程会生成 Windows Electron 发布目录、便携包、安装器可执行文件和发布清单。
 - 组装目录会复制 Electron runtime 到 `release/Curated`，把 `electron.exe` 重命名为 `Curated.exe`，写入 `resources/app/package.json`，并把 `electron-dist/`、`frontend-dist/` 和 Go 后端 `curated.exe` 放入 `resources/app/`。
+- 打包态 Web UI 的入口文档与 SPA fallback 使用 `no-store`，带哈希的 `/assets/*` 保持 immutable 长缓存；Electron 还会给 renderer 入口附加应用版本，installer 覆盖升级前只清理受管理的新旧 `frontend-dist` 目录，防止升级后继续显示旧桌面页面。
 - 打包历史台账已经迁移到 `docs/ops/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
 - 安装包仍然继续使用 Inno Setup，只是由 Python 负责渲染 `.iss` 模板并调用 `ISCC.exe`；安装后快捷方式和安装完成后的启动入口都指向 `{app}\Curated.exe`。
 - 设置页可以为当前用户持久化 Windows 开机自启动；这类登录触发的启动会静默进入托盘，不会自动打开浏览器页面。
