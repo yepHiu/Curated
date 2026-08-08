@@ -52,7 +52,6 @@ import { normalizeActorIdentity } from "@/lib/actor-identity"
 import { getCurrentUtcDayKey } from "@/lib/current-utc-day-key"
 import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
-import { sampleRandomMovies } from "@/lib/random-sample"
 import { buildPersonalInsightsBreakdown, buildPersonalInsightsOverview } from "@/lib/personal-insights"
 import { listSortedByUpdatedDesc } from "@/lib/playback-progress-storage"
 import { listPlaybackWatchTimeMovieEntries } from "@/lib/playback-watch-time-storage"
@@ -1806,10 +1805,20 @@ export const mockLibraryService: LibraryService = {
   },
   getRelatedMovies(movieId, limit = 6) {
     const id = movieId.trim()
-    const pool = moviesState.value.filter(
-      (movie) => movie.id !== id && !movie.trashedAt?.trim(),
+    const source = moviesState.value.find((movie) => movie.id === id)
+    if (!source) return []
+    const actors = new Set(
+      source.actors.map((actor) => actor.trim().toLocaleLowerCase()).filter(Boolean),
     )
-    return sampleRandomMovies(pool, limit, id || "_")
+    if (actors.size === 0) return []
+    return moviesState.value
+      .filter(
+        (movie) =>
+          movie.id !== id &&
+          !movie.trashedAt?.trim() &&
+          movie.actors.some((actor) => actors.has(actor.trim().toLocaleLowerCase())),
+      )
+      .slice(0, Math.max(0, limit))
   },
 
   async patchMovie(movieId, body) {

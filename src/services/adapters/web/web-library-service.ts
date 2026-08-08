@@ -49,7 +49,6 @@ import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
-import { sampleRandomMovies } from "@/lib/random-sample"
 import type { LibraryService } from "@/services/contracts/library-service"
 import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
@@ -1102,8 +1101,19 @@ function createWebLibraryService(): LibraryService {
 
     getRelatedMovies(movieId, limit = 6) {
       const id = movieId.trim()
-      const pool = moviesState.value.filter((m) => m.id !== id)
-      return sampleRandomMovies(pool, limit, id || "_")
+      const source = moviesState.value.find((movie) => movie.id === id)
+      if (!source) return []
+      const actors = new Set(
+        source.actors.map((actor) => actor.trim().toLocaleLowerCase()).filter(Boolean),
+      )
+      if (actors.size === 0) return []
+      return moviesState.value
+        .filter(
+          (movie) =>
+            movie.id !== id &&
+            movie.actors.some((actor) => actors.has(actor.trim().toLocaleLowerCase())),
+        )
+        .slice(0, Math.max(0, limit))
     },
 
     async patchMovie(movieId: string, body: PatchMovieBody) {

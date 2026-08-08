@@ -1265,7 +1265,7 @@
     "previewSrOpen": "在查看器中打开第 {n} 张预览图",
     "previewEmpty": "当前条目没有样本图 URL（例如仅刮削到文本、或提供商未返回预览图）。",
     "previewGalleryTitle": "预览图",
-    "relatedTitle": "随机推荐",
+    "relatedTitle": "演员还出演过",
     "commentTitle": "我的评论",
     "commentReadonlyTrashHint": "该片在回收站中，仅可阅读；恢复后可再次编辑保存。",
     "commentPlaceholder": "写点什么…",

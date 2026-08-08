@@ -1265,7 +1265,7 @@
     "previewSrOpen": "Open preview {n} in viewer",
     "previewEmpty": "No preview image URLs (text-only scrape or provider omitted art).",
     "previewGalleryTitle": "Preview gallery",
-    "relatedTitle": "Random picks",
+    "relatedTitle": "Also starring",
     "commentTitle": "My notes",
     "commentReadonlyTrashHint": "This title is in trash: read-only. Restore it to edit and save notes again.",
     "commentPlaceholder": "Write something…",
