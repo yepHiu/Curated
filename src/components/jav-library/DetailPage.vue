@@ -40,7 +40,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
@@ -259,8 +258,6 @@ function openPosterInViewer() {
 
       <MovieGrid
         :movies="relatedMoviesForGrid"
-        :selected-movie-id="movie.id"
-        @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
         @toggle-favorite="emit('toggleFavorite', $event)"

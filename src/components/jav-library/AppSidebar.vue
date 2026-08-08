@@ -347,16 +347,16 @@ const getNavigationTarget = (page: AppPage) => {
         <RouterLink
           data-active-playback-card
           :to="activePlaybackSession.resumeRouteTarget"
-          class="group flex min-w-0 flex-col gap-2 rounded-lg px-3 py-2.5 pr-10 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
+          class="group flex min-w-0 flex-col gap-2 rounded-lg px-3 py-2.5 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/60"
           :aria-label="activePlaybackAriaLabel"
         >
-          <span class="flex min-w-0 items-center justify-between gap-2">
+          <span class="flex min-w-0 items-center justify-between gap-2 pr-10">
             <span class="inline-flex min-w-0 items-center gap-2 text-xs font-medium text-primary">
               <span class="size-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_4px_hsl(var(--primary)/0.16)]" aria-hidden="true" />
               <span class="truncate">{{ t("nav.continuePlayback") }}</span>
             </span>
-            <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Play class="size-3.5 fill-current" aria-hidden="true" />
+            <span class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Play class="size-4 fill-current" aria-hidden="true" />
             </span>
           </span>
           <span class="line-clamp-2 min-w-0 text-sm font-medium leading-snug">
@@ -379,11 +379,11 @@ const getNavigationTarget = (page: AppPage) => {
           variant="ghost"
           size="icon"
           data-active-playback-dismiss
-          class="absolute right-1.5 top-1.5 size-7 rounded-lg text-muted-foreground hover:text-foreground"
+          class="absolute right-3 top-2.5 size-8 rounded-lg text-muted-foreground hover:text-foreground"
           :aria-label="t('nav.dismissContinuePlayback')"
           @click="dismissActivePlaybackSession(activePlaybackSession.movieId)"
         >
-          <X class="size-3.5" aria-hidden="true" />
+          <X class="size-4" aria-hidden="true" />
         </Button>
       </div>
 

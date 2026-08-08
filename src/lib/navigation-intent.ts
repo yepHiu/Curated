@@ -64,9 +64,7 @@ function buildPlayerQuery(
 function buildBrowseBackLink(query: LocationQuery, movieId: string): RouteLocationRaw {
   return {
     name: getBrowseSourceMode(query),
-    query: mergeLibraryQuery(query, {
-      selected: movieId,
-    }),
+    query: mergeLibraryQuery(query, { selected: movieId }),
   }
 }
 

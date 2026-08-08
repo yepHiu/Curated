@@ -123,12 +123,6 @@ const userTagSuggestionPool = computed(() =>
   buildUserTagSuggestionPool(libraryService.movies.value, detailMovie.value?.tags ?? []),
 )
 
-const selectMovie = async (nextMovieId: string) => {
-  await router.replace(
-    buildDetailRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
-  )
-}
-
 const openDetails = async (nextMovieId: string) => {
   await router.push(
     buildDetailRouteFromBrowse(nextMovieId, route.query, getBrowseSourceMode(route.query)),
@@ -476,7 +470,6 @@ useEventListener("keydown", (event: KeyboardEvent) => {
         :related-movies="relatedMovies"
         :user-tag-suggestions="userTagSuggestionPool"
         :metadata-refresh-busy="metadataRefreshBusy"
-        @select="selectMovie"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"

@@ -110,6 +110,7 @@ vi.mock("@/lib/curated-frames/db", () => ({
 
 vi.mock("@/lib/curated-frames/settings-storage", () => ({
   getCuratedCaptureKeyCode: () => "KeyC",
+  getCuratedCaptureFeedbackSoundEnabled: () => true,
   getCuratedFrameSaveMode: () => "app",
   setCuratedFrameSaveMode: vi.fn(),
 }))

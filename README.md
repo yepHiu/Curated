@@ -19,7 +19,7 @@
 
 # Curated
 
-Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships an Electron desktop shell around a shared Web UI and HTTP service boundary, with Windows-friendly release packaging, tray lifecycle, metadata scraping, playback workflows, curated-frame management, gamepad controls, and a comprehensive settings system.
+Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships an Electron desktop shell around a shared Web UI and HTTP service boundary, with Windows-friendly release packaging, tray lifecycle, metadata scraping, playback workflows, curated-frame management, and a comprehensive settings system.
 
 See [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) for the full catalog of implemented features.
 
@@ -45,7 +45,6 @@ The product name is **Curated**. The repository folder and npm package may still
 - **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
 - **Actor identity management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, async metadata scraping, Unicode-normalized aliases, and a read-only-preview/confirmed transactional merge workflow that preserves associations and audit history.
 - **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, exponential backoff after repeated failed attempts, and a Settings UI for reviewing and revoking trusted-forever devices without exposing session bearer tokens.
-- **Gamepad controls** — Web Gamepad API support for standard controllers including DualSense: global focus navigation, library-grid selection, and player playback controls.
 - **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
 - **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, marks backend requests as `Curated Desktop` for connected-client visibility, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
 - **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, connected-client visibility, and logging controls.
@@ -142,7 +141,6 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 ### Library
 
 - Virtualized poster-grid browsing for large libraries with URL-backed selection.
-- Standard gamepad navigation for the virtualized poster grid.
 - Favorites, ratings (0-5), user tags, and metadata tags.
 - Multi-root library paths: add, edit, delete, and reveal in OS file manager.
 - Library organization with structured folder naming (`organizeLibrary` setting).
@@ -242,13 +240,6 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - App update checks against GitHub Releases with sidebar badge, in-app installer download, SHA256 verification, an opt-in General-settings auto-download toggle, and explicit user-confirmed installer launch.
 - Windows login autostart (`launchAtLogin`).
 
-### Gamepad Controls
-
-- Web Gamepad API support for standard controllers including DualSense.
-- Global focus navigation, library-grid selection, and player playback controls.
-- Large seek jumps, curated-frame capture, and stats/chrome toggle.
-- Browser-local settings toggle persisted in localStorage.
-
 ### Packaging & Release
 
 - Windows release workflow: `pnpm release:publish` via Python CLI.
@@ -277,8 +268,6 @@ Runtime configuration is split between frontend environment variables and backen
 - `VITE_USE_WEB_API=true`: use the real backend
 - `VITE_API_BASE_URL`: override the API base URL; when unset, local loopback Web API development connects directly to dev backend `:8080` to avoid proxying large uploads through Vite, while release hosting on `:8081` and other modes use same-origin `/api`
 - `VITE_LOG_LEVEL`: optional browser log level default
-
-Gamepad controls are a browser-local preference saved in `localStorage` under `curated-gamepad-controls-v1`. They use the Web Gamepad API only; WebHID, node-hid, adaptive triggers, LED control, and Electron main-process controller integration remain future target-direction items.
 
 ### Backend
 
@@ -356,7 +345,7 @@ pnpm release:publish
 Key notes:
 
 - Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.4.7`.
+- The current base line is `1.5.1`.
 - `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
 - `pnpm release:publish` builds the Vue frontend, the release Go backend, and the Electron main process before assembling artifacts.
 - Release packaging assembles a Windows-oriented Electron staging directory, portable zip, installer executable, and release manifest.

@@ -126,11 +126,8 @@ import {
   toFiniteNumber,
   type PlaybackStatsSnapshot,
 } from "@/lib/player-playback-stats"
-import { usePlayerGamepadControls } from "@/composables/use-player-gamepad-controls"
 import { usePlayerClipCapture } from "@/composables/use-player-clip-capture"
-import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
-import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -146,7 +143,6 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
-const { gamepadControlsEnabled } = useGamepadControlsPreference()
 const watchTimeTracker = createPlaybackWatchTimeTracker({ movieId: props.movie.id })
 const playbackSeekBackwardStep = computed(() =>
   Math.max(1, Number(libraryService.playerSettings.value.seekBackwardStepSec ?? 10)),
@@ -1723,29 +1719,6 @@ async function toggleFullscreen() {
   }
 }
 
-async function exitPlayerFullscreen() {
-  const el = surfaceRef.value
-  if (!el || document.fullscreenElement !== el) return
-  try {
-    await document.exitFullscreen()
-  } catch {
-    // ignore
-  } finally {
-    syncSurfaceFullscreenFromDocument()
-  }
-}
-
-async function exitPlayerRoute() {
-  await router.push(resolveNavigationBackLink(route, props.movie.id).to)
-}
-
-function toggleChromeVisibility() {
-  chromeVisible.value = !chromeVisible.value
-  if (chromeVisible.value && isPlaying.value) {
-    scheduleChromeIdleHide()
-  }
-}
-
 async function togglePictureInPicture() {
   const v = videoRef.value
   if (!v || !playbackSrc.value || !pipSupported.value) return
@@ -1759,24 +1732,6 @@ async function togglePictureInPicture() {
     // 需用户手势或编解码器不支持时可能失败，静默处理
   }
 }
-
-usePlayerGamepadControls({
-  enabled: gamepadControlsEnabled,
-  isFullscreen: isSurfaceFullscreen,
-  seekBackwardStepSec: playbackSeekBackwardStep,
-  seekForwardStepSec: playbackSeekForwardStep,
-  actions: {
-    togglePlayPause,
-    seekDelta,
-    adjustVolume,
-    toggleMute,
-    toggleChrome: toggleChromeVisibility,
-    toggleDetailedStats,
-    runCuratedCapture,
-    exitFullscreen: exitPlayerFullscreen,
-    exitPlayer: exitPlayerRoute,
-  },
-})
 
 const fileBasename = computed(() => {
   const loc = props.movie.location?.trim() ?? ""
@@ -2642,7 +2597,7 @@ const videoPreloadMode = computed(() =>
         >
           <div
             v-if="clipCapturePhase !== 'idle'"
-            class="pointer-events-none absolute bottom-20 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
+            class="pointer-events-none absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
             role="status"
             aria-live="polite"
           >
@@ -2657,7 +2612,10 @@ const videoPreloadMode = computed(() =>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
             </div>
             <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
-              <div class="h-full rounded-full bg-rose-400 transition-[width] duration-100 ease-linear" :style="{ width: `${clipCaptureProgress * 100}%` }" />
+              <div
+                class="h-full origin-left rounded-full bg-rose-400 transition-transform duration-200 ease-linear motion-reduce:transition-none"
+                :style="{ transform: `scaleX(${clipCaptureProgress})` }"
+              />
             </div>
           </div>
         </Transition>

@@ -27,7 +27,6 @@ const props = defineProps<{
   mode: LibraryMode
   allMovies: readonly Movie[]
   visibleMovies: readonly Movie[]
-  selectedMovie?: Movie
   activeTab: LibraryTab
   batchMode?: boolean
   /** 多选 id 列表（来自父级 Set 快照，用于卡片勾选态） */
@@ -43,7 +42,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:activeTab": [value: LibraryTab]
-  select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId?: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
@@ -57,7 +55,6 @@ const emit = defineEmits<{
   exitBatchMode: []
   selectAllVisibleInBatch: []
   toggleBatchSelect: [movieId: string]
-  columnsChange: [count: number]
 }>()
 
 const { t, locale } = useI18n()
@@ -418,19 +415,16 @@ function isChipActive(tag: string): boolean {
     <div class="min-h-0 flex-1">
       <VirtualMovieMasonry
         :movies="props.visibleMovies"
-        :selected-movie-id="props.selectedMovie?.id"
         :batch-mode="batchModeOn"
         :batch-selected-ids="props.batchSelectedIds ?? []"
         :scroll-preserve-key="props.scrollPreserveKey"
         :empty-title="props.mode === 'trash' ? t('library.trashEmptyTitle') : undefined"
         :empty-description="props.mode === 'trash' ? t('library.trashEmptyDesc') : undefined"
-        @select="emit('select', $event)"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
         @toggle-favorite="emit('toggleFavorite', $event)"
         @context-menu="emit('contextMenu', $event)"
         @toggle-batch-select="emit('toggleBatchSelect', $event)"
-        @columns-change="emit('columnsChange', $event)"
       >
         <template v-if="props.mode !== 'tags' && activeActorTrimmed" #header>
           <ActorProfileCard

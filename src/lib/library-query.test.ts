@@ -17,7 +17,6 @@ import {
   getLibraryTabQuery,
   getLibraryTagExactQuery,
   getCuratedFrameTagQuery,
-  getSelectedMovieQuery,
   mergeLibraryQuery,
   isLibraryBrowseRoute,
   mergeCuratedFramesQuery,
@@ -91,7 +90,6 @@ describe("library query helpers", () => {
     expect(getBrowseSourceMode({ browse: "recent" })).toBe("recent")
     expect(getBrowseSourceMode(query)).toBe("favorites")
     expect(getLibrarySearchQuery(query)).toBe("MKB")
-    expect(getSelectedMovieQuery(query)).toBe("mkb-100")
     expect(getLibraryTabQuery(query)).toBe("top-rated")
   })
 
@@ -100,10 +98,6 @@ describe("library query helpers", () => {
     expect(getDetailBrowseTargetMode("tags", "actor")).toBe("library")
     expect(getDetailBrowseTargetMode("tags", "studio")).toBe("library")
     expect(getDetailBrowseTargetMode("favorites", "actor")).toBe("favorites")
-  })
-
-  it("reads selected movie id from first string when query repeats key", () => {
-    expect(getSelectedMovieQuery({ selected: ["a", "b"] })).toBe("a")
   })
 
   it("merges browse query patches and clears empty values", () => {

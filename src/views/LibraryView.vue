@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, shallowRef, watch } from "vue"
+import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { HttpClientError } from "@/api/http-client"
@@ -23,7 +23,6 @@ import {
   getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
-  getSelectedMovieQuery,
   mergeLibraryQuery,
   resolveLibraryMode,
 } from "@/lib/library-query"
@@ -36,14 +35,6 @@ import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
 import { getProgress, playbackProgressRevision } from "@/lib/playback-progress-storage"
 import { hasPlayedMovie, playedMovieCount } from "@/lib/played-movies-storage"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
-import { useGamepad } from "@/composables/use-gamepad"
-import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
-import {
-  resolveLibraryGridAction,
-  resolveLibraryGridPageSelection,
-  resolveLibraryGridSelection,
-} from "@/lib/gamepad/library-grid-navigation"
-import type { GamepadDirection, StandardGamepadButtonName } from "@/lib/gamepad/standard-gamepad"
 import {
   compareByAddedAtDesc,
   compareByRatingDesc,
@@ -58,7 +49,6 @@ const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
-const { gamepadControlsEnabled } = useGamepadControlsPreference()
 
 const metadataRefreshBusy = ref(false)
 
@@ -625,7 +615,6 @@ const actorProfileDisplayName = computed(
 )
 
 const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
-const selectedMovieId = computed(() => getSelectedMovieQuery(route.query))
 
 const queryFilteredMovies = computed(() => {
   const qRaw = searchQuery.value.trim()
@@ -700,71 +689,8 @@ const visibleMovies = computed(() => {
   }
 })
 
-const selectedMovie = computed(() => {
-  if (selectedMovieId.value) {
-    const routeMovie = visibleMovies.value.find((movie) => movie.id === selectedMovieId.value)
-    if (routeMovie) {
-      return routeMovie
-    }
-  }
-
-  return visibleMovies.value[0] ?? undefined
-})
-const libraryGridColumnCount = ref(1)
-const libraryGamepadEnabled = computed(
-  () => gamepadControlsEnabled.value && ["library", "favorites", "tags", "trash"].includes(libraryMode.value),
-)
-
-const replaceQuery = async (
-  nextQuery: Partial<Record<"q" | "tab" | "selected" | "from", string | undefined>>,
-) => {
-  await router.replace({
-    name: libraryMode.value,
-    query: mergeLibraryQuery(route.query, nextQuery),
-  })
-}
-
-watch(
-  [selectedMovie, () => route.query.selected],
-  ([movie]) => {
-    const normalizedSelected = getSelectedMovieQuery(route.query)
-    // A clean library/Saved View route may intentionally omit `selected`.
-    // Keep the first card as an internal fallback without polluting the canonical URL.
-    if (!normalizedSelected) {
-      return
-    }
-    const nextSelected = movie?.id
-
-    if (nextSelected === normalizedSelected) {
-      return
-    }
-
-    void replaceQuery({
-      selected: nextSelected,
-    })
-  },
-  { immediate: true, flush: "post" },
-)
-
-const updateActiveTab = async (value: LibraryTab) => {
-  await replaceQuery({
-    tab: value,
-    selected: selectedMovie.value?.id ?? visibleMovies.value[0]?.id,
-  })
-}
-
-const selectMovie = async (movieId: string) => {
-  await replaceQuery({
-    selected: movieId,
-  })
-}
-
-const openDetails = async (movieId: string) => {
-  await router.push(buildDetailRouteFromBrowse(movieId, route.query, libraryMode.value))
-}
-
 const openPlayer = async (movieId?: string) => {
-  const nextMovieId = movieId ?? selectedMovie.value?.id
+  const nextMovieId = movieId?.trim()
 
   if (!nextMovieId) {
     return
@@ -775,67 +701,23 @@ const openPlayer = async (movieId?: string) => {
   )
 }
 
-function setLibraryGridColumnCount(count: number) {
-  libraryGridColumnCount.value = Math.max(1, Math.floor(count))
-}
-
-function navigateLibraryGrid(direction: GamepadDirection) {
-  const nextMovie = resolveLibraryGridSelection({
-    movies: visibleMovies.value,
-    currentMovieId: selectedMovie.value?.id,
-    direction,
-    columnCount: libraryGridColumnCount.value,
+const replaceQuery = async (nextQuery: Partial<Record<"q" | "tab" | "from", string | undefined>>) => {
+  await router.replace({
+    name: libraryMode.value,
+    query: mergeLibraryQuery(route.query, nextQuery),
   })
-  if (!nextMovie || nextMovie.id === selectedMovie.value?.id) return
-  void selectMovie(nextMovie.id)
 }
 
-function navigateLibraryGridPage(direction: "up" | "down") {
-  const nextMovie = resolveLibraryGridPageSelection({
-    movies: visibleMovies.value,
-    currentMovieId: selectedMovie.value?.id,
-    direction,
-    columnCount: libraryGridColumnCount.value,
+const updateActiveTab = async (value: LibraryTab) => {
+  await replaceQuery({
+    tab: value,
   })
-  if (!nextMovie || nextMovie.id === selectedMovie.value?.id) return
-  void selectMovie(nextMovie.id)
 }
 
-function runLibraryGridButtonAction(button: StandardGamepadButtonName) {
-  const movieId = selectedMovie.value?.id
-  if (!movieId) return
-  const action = resolveLibraryGridAction({ button, batchMode: batchMode.value })
-  if (action === "open-details") {
-    void openDetails(movieId)
-    return
-  }
-  if (action === "enter-batch-select") {
-    enterBatchMode()
-    toggleBatchSelect(movieId)
-    return
-  }
-  if (action === "toggle-batch-select") {
-    toggleBatchSelect(movieId)
-  }
+const openDetails = async (movieId: string) => {
+  await router.push(buildDetailRouteFromBrowse(movieId, route.query, libraryMode.value))
 }
 
-const libraryGamepad = useGamepad({ enabled: libraryGamepadEnabled })
-const libraryGamepadCleanups = [
-  libraryGamepad.onDirectionPress("left", () => navigateLibraryGrid("left")),
-  libraryGamepad.onDirectionPress("right", () => navigateLibraryGrid("right")),
-  libraryGamepad.onDirectionPress("up", () => navigateLibraryGrid("up")),
-  libraryGamepad.onDirectionPress("down", () => navigateLibraryGrid("down")),
-  libraryGamepad.onButtonPress("cross", () => runLibraryGridButtonAction("cross")),
-  libraryGamepad.onButtonPress("square", () => runLibraryGridButtonAction("square")),
-  libraryGamepad.onButtonPress("l2", () => navigateLibraryGridPage("up")),
-  libraryGamepad.onButtonPress("r2", () => navigateLibraryGridPage("down")),
-]
-
-onUnmounted(() => {
-  for (const cleanup of libraryGamepadCleanups) {
-    cleanup()
-  }
-})
 
 const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) => {
   try {
@@ -860,7 +742,6 @@ const browseByExactTag = async (tag: string) => {
       actor: undefined,
       studio: undefined,
       tab: "all",
-      selected: undefined,
     }),
   })
 }
@@ -910,7 +791,6 @@ const activeStudioForPage = computed(() =>
         :mode="libraryMode"
         :all-movies="libraryMovies"
         :visible-movies="visibleMovies"
-        :selected-movie="selectedMovie"
         :active-tab="effectiveTab"
         :batch-mode="batchMode"
         :batch-selected-ids="batchSelectedIdsList"
@@ -919,7 +799,6 @@ const activeStudioForPage = computed(() =>
         :actor-user-tag-suggestions="actorUserTagSuggestionPool"
         :scroll-preserve-key="libraryScrollKey"
         @update:active-tab="updateActiveTab"
-        @select="selectMovie"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"
@@ -932,7 +811,6 @@ const activeStudioForPage = computed(() =>
         @exit-batch-mode="exitBatchMode"
         @select-all-visible-in-batch="selectAllVisibleInBatch"
         @toggle-batch-select="toggleBatchSelect"
-        @columns-change="setLibraryGridColumnCount"
       />
     </div>
 

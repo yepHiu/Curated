@@ -349,7 +349,6 @@ POST   /api/providers/ping-all              # Ping all providers
 - Electron shell MVP under `electron/`: starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, loads the Web UI in BrowserWindow with the Curated app icon and a versioned renderer query, keeps the app running in the tray when the window is closed, and exposes only `window.javLibrary.pickDirectory()` through preload for native directory selection. Packaged releases install `Curated.exe` as the Electron shell, package Electron app files under `resources/app/electron-dist`, place the Go backend at `resources/app/curated.exe`, load the backend-hosted static UI on `http://127.0.0.1:8081`, serve entry HTML with `no-store`, and remove managed old `frontend-dist` trees before installer upgrades.
 - Library storage presence checks for configured roots are implemented Windows-first, with macOS/Linux kept as fallback/future adaptation targets
 - Playback uses HTML5 `<video>` with HTTP Range streaming
-- Web Gamepad API MVP for standard controllers, including DualSense standard mapping: player controls, global focus navigation, library-grid navigation, and a browser-local Settings toggle
 - Trash/restore functionality (soft delete with `trashedAt` timestamp)
 
 **Not Yet Implemented (Documented as Targets):**

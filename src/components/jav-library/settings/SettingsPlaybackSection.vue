@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useSettingsScrollPreserve } from "@/composables/use-settings-scroll-preserve"
-import { useGamepadControlsPreference } from "@/lib/gamepad/gamepad-settings"
 import {
   defaultNativePlayerBackendCommand,
   defaultNativePlayerBrowserTemplate,
@@ -46,7 +45,6 @@ const props = defineProps<{
 const { t } = useI18n()
 const libraryService = useLibraryService()
 const { withPreservedScroll } = useSettingsScrollPreserve()
-const { gamepadControlsEnabled, setGamepadControlsEnabled } = useGamepadControlsPreference()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const isPlaybackTestingEnv = import.meta.env.DEV || import.meta.env.MODE === "test"
@@ -162,10 +160,6 @@ function playbackHardwareEncoderLabel(value: HardwareEncoderPreference): string 
     default:
       return t("settings.playbackHardwareEncoderAuto")
   }
-}
-
-function onGamepadControlsEnabledChange(value: boolean) {
-  setGamepadControlsEnabled(Boolean(value))
 }
 
 function buildPlaybackPatchFromDraft(): PatchPlayerSettingsBody | null {
@@ -385,25 +379,6 @@ onBeforeUnmount(() => {
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
-          <div
-            class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-          >
-            <div class="flex min-w-0 flex-1 flex-col gap-3">
-              <p class="text-sm font-semibold text-foreground">
-                {{ t("settings.gamepadControlsTitle") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.gamepadControlsHint") }}
-              </p>
-            </div>
-            <Switch
-              data-gamepad-controls-toggle
-              :model-value="gamepadControlsEnabled"
-              :aria-label="t('settings.gamepadControlsTitle')"
-              @update:model-value="onGamepadControlsEnabledChange"
-            />
-          </div>
-
           <div
             class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
           >

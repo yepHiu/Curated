@@ -218,12 +218,9 @@ export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => ({
 
 export const getSelectedMovieQuery = (query: LocationQuery) => {
   const raw = query.selected
-  if (typeof raw === "string") {
-    return raw
-  }
+  if (typeof raw === "string") return raw
   if (Array.isArray(raw)) {
-    const first = raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
-    return first
+    return raw.find((x): x is string => typeof x === "string" && x.trim() !== "")
   }
   return undefined
 }

@@ -9,7 +9,6 @@ import VirtualMovieMasonry from "@/components/jav-library/VirtualMovieMasonry.vu
 import { Button } from "@/components/ui/button"
 import { pushAppToast } from "@/composables/use-app-toast"
 import type { Movie } from "@/domain/movie/types"
-import { getSelectedMovieQuery } from "@/lib/library-query"
 import {
   buildDetailRouteFromActor,
   buildPlayerRouteFromActorIntent,
@@ -67,33 +66,9 @@ const actorMovies = computed(() => {
   return libraryService.movies.value.filter((movie) => movie.actors.includes(actor))
 })
 
-const selectedMovieId = computed(() => {
-  const selected = getSelectedMovieQuery(route.query)
-  if (!selected) {
-    return undefined
-  }
-  return actorMovies.value.some((movie) => movie.id === selected) ? selected : undefined
-})
-
 const scrollPreserveKey = computed(() =>
   actorDisplayName.value ? `actor-detail:${actorDisplayName.value}` : "actor-detail",
 )
-
-async function selectMovie(movieId?: string) {
-  const id = movieId?.trim()
-  const actor = actorDisplayName.value
-  if (!id || !actor) {
-    return
-  }
-  await router.replace({
-    name: "actor-detail",
-    params: { actorName: actor },
-    query: {
-      ...route.query,
-      selected: id,
-    },
-  })
-}
 
 async function openDetails(movieId?: string) {
   const id = movieId?.trim()
@@ -174,11 +149,9 @@ async function toggleFavorite(payload: { movieId: string; nextValue: boolean }) 
         <div class="min-h-0 flex-1 overflow-hidden">
           <VirtualMovieMasonry
             :movies="actorMovies"
-            :selected-movie-id="selectedMovieId"
             :empty-title="t('actors.detailEmptyTitle')"
             :empty-description="t('actors.detailEmptyDesc')"
             :scroll-preserve-key="scrollPreserveKey"
-            @select="selectMovie"
             @open-details="openDetails"
             @open-player="openPlayer"
             @toggle-favorite="toggleFavorite"

@@ -69,22 +69,19 @@ vi.mock("@/components/jav-library/VirtualMovieMasonry.vue", () => ({
     name: "VirtualMovieMasonry",
     props: [
       "movies",
-      "selectedMovieId",
       "emptyTitle",
       "emptyDescription",
       "scrollPreserveKey",
     ],
-    emits: ["select", "openDetails", "openPlayer", "toggleFavorite"],
+    emits: ["openDetails", "openPlayer", "toggleFavorite"],
     template: `
       <section
         data-virtual-masonry
         :data-movie-ids="movies.map((movie) => movie.id).join(',')"
-        :data-selected-movie-id="selectedMovieId || ''"
         :data-empty-title="emptyTitle"
         :data-empty-description="emptyDescription"
         :data-scroll-preserve-key="scrollPreserveKey"
       >
-        <button data-select-movie @click="$emit('select', movies[0]?.id)" />
         <button data-open-details @click="$emit('openDetails', movies[0]?.id)" />
         <button data-open-player @click="$emit('openPlayer', movies[0]?.id)" />
         <button
@@ -158,16 +155,6 @@ describe("ActorDetailPage", () => {
     expect(wrapper.text()).toContain("actors.movieCount:2")
   })
 
-  it("uses the selected route query without borrowing LibraryView state", async () => {
-    routeState.query = { selected: "movie-3" }
-
-    const wrapper = await mountPage()
-
-    expect(wrapper.get("[data-virtual-masonry]").attributes("data-selected-movie-id")).toBe(
-      "movie-3",
-    )
-  })
-
   it("keeps actor-page context when opening detail and player routes", async () => {
     const wrapper = await mountPage()
 
@@ -196,19 +183,6 @@ describe("ActorDetailPage", () => {
         back: "actor",
         selected: "movie-1",
       },
-    })
-  })
-
-  it("persists local selected movie state in the actor route query", async () => {
-    const wrapper = await mountPage()
-
-    await wrapper.get("[data-select-movie]").trigger("click")
-    await flushPromises()
-
-    expect(routerReplace).toHaveBeenCalledWith({
-      name: "actor-detail",
-      params: { actorName: "Mina Kaze" },
-      query: { selected: "movie-1" },
     })
   })
 

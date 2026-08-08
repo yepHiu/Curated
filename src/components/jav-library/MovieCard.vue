@@ -22,7 +22,6 @@ import { buildVersionedImageUrl, getMovieImageVersion } from "@/lib/image-versio
 const props = withDefaults(
   defineProps<{
     movie: Movie
-    selected?: boolean
     showFavorite?: boolean
     batchMode?: boolean
     batchChecked?: boolean
@@ -38,7 +37,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
@@ -131,7 +129,6 @@ const handleOpenDetails = () => {
     emit("toggleBatchSelect", props.movie.id)
     return
   }
-  emit("select", props.movie.id)
   emit("openDetails", props.movie.id)
 }
 
@@ -147,14 +144,11 @@ const handleFavoriteChange = (nextValue: boolean) => {
 <template>
   <Card
     class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
-    :class="props.selected ? 'border-primary/55 shadow-lg shadow-primary/10 ring-2 ring-primary/25' : ''"
     :data-movie-card-id="movie.id"
   >
     <button
       type="button"
       class="flex w-full flex-col text-left focus-visible:outline-none"
-      data-gamepad-focusable
-      :data-gamepad-focus-id="movie.id"
       @click="handleOpenDetails"
       @contextmenu.prevent="emit('contextMenu', $event)"
     >

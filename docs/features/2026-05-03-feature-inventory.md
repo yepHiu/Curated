@@ -294,21 +294,21 @@ This document catalogs features implemented in the current **Electron desktop sh
 
 ---
 
-## 8. Gamepad Controls
+## 8. Gamepad Controls (removed)
 
 | Feature | Status | Notes |
 |---|---|---|
-| Web Gamepad API support | Shipped | Standard gamepad API; no WebHID/node-hid |
-| DualSense standard mapping | Shipped | Recognizes DualSense in standard mode |
-| Global focus navigation | Shipped | Navigate between sidebar, content, player |
-| Library grid navigation | Shipped | D-pad + stick navigation in virtualized poster grid |
-| Player playback controls | Shipped | Play/pause, seek, volume, mute, fullscreen exit |
-| Large seek jumps | Shipped | Shoulder-button large jumps |
-| Curated frame capture (gamepad) | Shipped | Capture button during playback |
-| Stats/chrome toggle | Shipped | Show/hide player overlays |
+| Web Gamepad API support | Removed | Removed from the current product per user feedback; no runtime gamepad handlers remain. |
+| DualSense standard mapping | Removed | — |
+| Global focus navigation | Removed | — |
+| Library grid navigation | Removed | — |
+| Player playback controls | Removed | — |
+| Large seek jumps | Removed | — |
+| Curated frame capture (gamepad) | Removed | — |
+| Stats/chrome toggle | Removed | — |
 | Route-back behavior | Shipped | Return from player to previous page |
-| Browser-local toggle | Shipped | `localStorage` key `curated-gamepad-controls-v1` |
-| Rumble support typing | Shipped | Type-level support for future rumble |
+| Browser-local toggle | Removed | — |
+| Rumble support typing | Removed | — |
 
 ---
 
@@ -410,7 +410,6 @@ This document catalogs features implemented in the current **Electron desktop sh
 - PIN lock, throttling, trusted-session management, loopback/LAN guard, and strict browser origin policy
 - SSE `task.updated` events with polling fallback
 - HTML5 `<video>` with HTTP Range streaming
-- Web Gamepad API controls
 - Trash/restore workflow
 - HLS playback sessions
 - Curated frames with export

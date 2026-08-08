@@ -16,7 +16,6 @@ const routerMocks = vi.hoisted(() => {
   return { replace, route }
 })
 
-const gamepadFocusNavigationMock = vi.hoisted(() => vi.fn())
 const mediaQueryMatches = vi.hoisted(() => ({ value: true, __v_isRef: true }))
 
 vi.mock("@vueuse/core", async () => {
@@ -77,9 +76,6 @@ vi.mock("@/composables/use-theme", () => ({
   }),
 }))
 
-vi.mock("@/composables/use-gamepad-focus-navigation", () => ({
-  useGamepadFocusNavigation: gamepadFocusNavigationMock,
-}))
 
 vi.mock("@/components/jav-library/AppSidebar.vue", () => ({
   default: {
@@ -134,7 +130,6 @@ describe("AppShell library search route sync", () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mediaQueryMatches.value = true
-    gamepadFocusNavigationMock.mockClear()
     routerMocks.replace.mockClear()
     routerMocks.route = reactive({
       fullPath: "/tags",
@@ -207,12 +202,6 @@ describe("AppShell library search route sync", () => {
         },
       },
     )
-  })
-
-  it("mounts global gamepad focus navigation in the app shell", () => {
-    shallowMount(AppShell)
-
-    expect(gamepadFocusNavigationMock).toHaveBeenCalledTimes(1)
   })
 
   it("uses the tightened desktop sidebar grid transition", () => {

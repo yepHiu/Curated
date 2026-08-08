@@ -13,7 +13,6 @@ import MovieCard from "@/components/jav-library/MovieCard.vue"
 const props = withDefaults(
   defineProps<{
     movies: Movie[]
-    selectedMovieId: string
     /** 最多展示张数；详情推荐区由父组件切片时可仍用默认 */
     maxVisible?: number
   }>(),
@@ -21,7 +20,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  select: [movieId: string]
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
@@ -36,8 +34,6 @@ const visibleMovies = computed(() => props.movies.slice(0, props.maxVisible))
       <div v-for="movie in visibleMovies" :key="movie.id" class="w-[var(--movie-related-card-width)]">
         <MovieCard
           :movie="movie"
-          :selected="movie.id === props.selectedMovieId"
-          @select="emit('select', $event)"
           @open-details="emit('openDetails', $event)"
           @open-player="emit('openPlayer', $event)"
           @toggle-favorite="emit('toggleFavorite', $event)"
