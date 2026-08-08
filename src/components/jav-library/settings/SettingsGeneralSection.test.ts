@@ -62,7 +62,6 @@ const baseProps = {
   launchAtLogin: false,
   launchAtLoginSaving: false,
   launchAtLoginDisabled: false,
-  launchAtLoginUnavailableHint: "",
   launchAtLoginError: "",
   autoDownloadUpdates: false,
   autoDownloadUpdatesSaving: false,
@@ -79,7 +78,6 @@ describe("SettingsGeneralSection", () => {
     const firstCard = wrapper.get("[data-card]")
     const firstHeader = wrapper.get("[data-card-header]")
     const firstTitle = wrapper.get("[data-card-title]")
-    const firstDescription = wrapper.get("[data-card-description]")
     const firstContent = wrapper.get("[data-card-content]")
 
     expect(firstCard.classes()).toContain("gap-2")
@@ -88,16 +86,6 @@ describe("SettingsGeneralSection", () => {
     expect(firstHeader.classes()).toContain("grid-cols-[auto_minmax(0,1fr)]")
     expect(firstTitle.classes()).toEqual(
       expect.arrayContaining(["min-w-0", "text-lg", "tracking-tight"]),
-    )
-    expect(firstDescription.classes()).toEqual(
-      expect.arrayContaining([
-        "col-start-2",
-        "text-xs",
-        "leading-relaxed",
-        "text-pretty",
-        "text-muted-foreground",
-        "sm:text-sm",
-      ]),
     )
     expect(firstContent.classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-3", "pt-0"]),
@@ -114,6 +102,12 @@ describe("SettingsGeneralSection", () => {
     expect(wrapper.text()).toContain("settings.appearance")
     expect(wrapper.text()).toContain("settings.autoDownloadUpdatesTitle")
     expect(wrapper.text()).toContain("settings.launchAtLoginTitle")
+    expect(wrapper.text()).not.toContain("settings.languageHint")
+    expect(wrapper.text()).not.toContain("settings.appearanceHint")
+    expect(wrapper.text()).not.toContain("settings.autoDownloadUpdatesDesc")
+    expect(wrapper.text()).not.toContain("settings.autoDownloadUpdatesHint")
+    expect(wrapper.text()).not.toContain("settings.launchAtLoginDesc")
+    expect(wrapper.text()).not.toContain("settings.launchAtLoginHint")
     expect(wrapper.get("[data-logging]").attributes("data-auto-save-ready")).toBe("true")
     const selectedValues = wrapper.findAllComponents({ name: "SelectValue" })
     expect(selectedValues[0]?.text()).toBe("settings.langZh")
@@ -154,13 +148,11 @@ describe("SettingsGeneralSection", () => {
         ...baseProps,
         launchAtLoginSaving: true,
         launchAtLoginDisabled: true,
-        launchAtLoginUnavailableHint: "unsupported",
         launchAtLoginError: "save failed",
       },
     })
 
     expect(wrapper.text()).toContain("settings.launchAtLoginSyncing")
-    expect(wrapper.text()).not.toContain("unsupported")
     expect(wrapper.text()).toContain("save failed")
     expect(wrapper.findAll(".switch-stub")[1]?.attributes("disabled")).toBeDefined()
   })

@@ -5,7 +5,6 @@ import { Languages, Power, RefreshCw } from "lucide-vue-next"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -30,7 +29,6 @@ const props = defineProps<{
   launchAtLogin: boolean
   launchAtLoginSaving: boolean
   launchAtLoginDisabled: boolean
-  launchAtLoginUnavailableHint: string
   launchAtLoginError: string
   autoSaveReady: boolean
 }>()
@@ -78,11 +76,6 @@ function updateLocale(value: unknown) {
             <CardTitle class="min-w-0 text-lg tracking-tight">
               {{ t("settings.generalSubsectionLocaleAppearance") }}
             </CardTitle>
-            <CardDescription
-              class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-            >
-              {{ t("settings.languageHint") }}
-            </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-0">
             <div
@@ -112,9 +105,6 @@ function updateLocale(value: unknown) {
             >
               <div class="min-w-0 space-y-1">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.appearance") }}</p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.appearanceHint") }}
-                </p>
               </div>
               <Select
                 :model-value="themePreference"
@@ -149,11 +139,6 @@ function updateLocale(value: unknown) {
             <CardTitle class="min-w-0 text-lg tracking-tight">
               {{ t("settings.autoDownloadUpdatesTitle") }}
             </CardTitle>
-            <CardDescription
-              class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-            >
-              {{ t("settings.autoDownloadUpdatesDesc") }}
-            </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-0">
             <div
@@ -163,9 +148,6 @@ function updateLocale(value: unknown) {
               <div class="min-w-0 space-y-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.autoDownloadUpdatesSwitch") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.autoDownloadUpdatesHint") }}
                 </p>
                 <p
                   v-if="autoDownloadUpdatesSaving"
@@ -199,11 +181,6 @@ function updateLocale(value: unknown) {
             <CardTitle class="min-w-0 text-lg tracking-tight">
               {{ t("settings.launchAtLoginTitle") }}
             </CardTitle>
-            <CardDescription
-              class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-            >
-              {{ t("settings.launchAtLoginDesc") }}
-            </CardDescription>
           </CardHeader>
           <CardContent class="flex flex-col gap-3 pt-0">
             <div
@@ -214,20 +191,11 @@ function updateLocale(value: unknown) {
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.launchAtLoginSwitch") }}
                 </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.launchAtLoginHint") }}
-                </p>
                 <p
                   v-if="launchAtLoginSaving"
                   class="text-xs text-muted-foreground motion-safe:animate-pulse"
                 >
                   {{ t("settings.launchAtLoginSyncing") }}
-                </p>
-                <p
-                  v-else-if="launchAtLoginUnavailableHint"
-                  class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
-                >
-                  {{ launchAtLoginUnavailableHint }}
                 </p>
               </div>
               <Switch

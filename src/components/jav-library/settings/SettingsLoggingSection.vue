@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -263,11 +262,6 @@ onBeforeUnmount(() => {
           <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.backendLogTitle") }}
           </CardTitle>
-          <CardDescription
-            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.backendLogDesc") }}
-          </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <p
@@ -413,11 +407,6 @@ onBeforeUnmount(() => {
           <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.clientLogTitle") }}
           </CardTitle>
-          <CardDescription
-            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.clientLogDesc") }}
-          </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <div

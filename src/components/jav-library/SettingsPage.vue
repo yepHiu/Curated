@@ -845,11 +845,6 @@ const isViteDev = import.meta.env.DEV
 const launchAtLoginDisabled = computed(
   () => !useWebApi || (!launchAtLoginSupported.value && !launchAtLogin.value),
 )
-const launchAtLoginUnavailableHint = computed(() => {
-  if (!useWebApi) return t("settings.launchAtLoginMockHint")
-  if (!launchAtLoginSupported.value) return t("settings.launchAtLoginUnsupportedHint")
-  return ""
-})
 const aboutHealth = ref<HealthDTO | null>(null)
 const aboutHealthLoading = ref(false)
 const aboutHealthError = ref("")
@@ -2070,7 +2065,6 @@ async function runMetadataRefreshForSelected() {
       :launch-at-login="launchAtLogin"
       :launch-at-login-saving="launchAtLoginSaving"
       :launch-at-login-disabled="launchAtLoginDisabled"
-      :launch-at-login-unavailable-hint="launchAtLoginUnavailableHint"
       :launch-at-login-error="launchAtLoginError"
       :auto-save-ready="settingsAutoSaveReady"
       @update:locale="void setLocaleFromSelect($event)"
