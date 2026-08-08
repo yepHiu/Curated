@@ -199,9 +199,6 @@ onBeforeUnmount(() => { requestSequence += 1 })
     <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 pb-8 sm:px-6 lg:px-8">
       <header class="flex flex-col gap-5">
         <div class="flex max-w-3xl flex-col gap-2">
-          <p class="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
-            {{ t("insights.eyebrow") }}
-          </p>
           <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">
             {{ t("insights.title") }}
           </h1>

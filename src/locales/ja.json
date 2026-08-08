@@ -31,7 +31,6 @@
     "dismissContinuePlayback": "再生再開の表示を隠す"
   },
   "insights": {
-    "eyebrow": "この端末内だけで処理",
     "title": "パーソナル分析",
     "subtitle": "視聴ペース、完了状況、好みの分布を確認できます。完全な再生履歴を外部へ送らず、すべて端末内で集計します。",
     "rangeLegend": "分析する期間",

@@ -31,7 +31,6 @@
     "dismissContinuePlayback": "Hide continue playing"
   },
   "insights": {
-    "eyebrow": "Local to this device",
     "title": "Personal insights",
     "subtitle": "Understand your viewing rhythm, completion, and preference mix. Metrics are aggregated locally without sending your full playback history anywhere.",
     "rangeLegend": "Insights date range",

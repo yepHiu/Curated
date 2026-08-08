@@ -31,7 +31,6 @@
     "dismissContinuePlayback": "隐藏继续播放入口"
   },
   "insights": {
-    "eyebrow": "仅保存在本机",
     "title": "个人洞察",
     "subtitle": "了解你的观看节奏、完成情况和偏好分布。所有指标都在本机聚合，不会上传完整播放历史。",
     "rangeLegend": "洞察时间范围",
