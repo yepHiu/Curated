@@ -254,7 +254,7 @@ function openPosterInViewer() {
 
     <MovieCommentSection :movie-id="movie.id" :readonly="commentReadonly" />
 
-    <div class="flex flex-col gap-4">
+    <div v-if="relatedMoviesForGrid.length" class="flex flex-col gap-4">
       <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>
 
       <MovieGrid

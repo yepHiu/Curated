@@ -139,4 +139,16 @@ describe("DetailPage", () => {
     expect(stills[5]!.props("loading")).toBe("lazy")
     expect(stills[5]!.props("fetchPriority")).toBe("low")
   })
+
+  it("hides the related section when there are no shared-actor movies", () => {
+    const wrapper = mount(DetailPage, {
+      props: {
+        movie: makeMovie(),
+        relatedMovies: [],
+      },
+    })
+
+    expect(wrapper.text()).not.toContain("detailPage.relatedTitle")
+    expect(wrapper.findComponent({ name: "MovieGrid" }).exists()).toBe(false)
+  })
 })
