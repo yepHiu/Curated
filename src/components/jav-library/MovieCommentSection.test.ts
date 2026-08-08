@@ -20,14 +20,6 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => serviceMocks,
 }))
 
-vi.mock("@/components/ui/button", () => ({
-  Button: {
-    name: "Button",
-    emits: ["click"],
-    template: "<button v-bind=\"$attrs\" @click=\"$emit('click', $event)\"><slot /></button>",
-  },
-}))
-
 vi.mock("@/components/ui/card", () => ({
   Card: { name: "Card", template: "<section><slot /></section>" },
   CardContent: { name: "CardContent", template: "<div><slot /></div>" },
@@ -179,18 +171,4 @@ describe("MovieCommentSection", () => {
     expect(wrapper.get("textarea").attributes("readonly")).toBeDefined()
   })
 
-  it("saves immediately from the manual save button and shows saved feedback", async () => {
-    const wrapper = await mountComment()
-
-    await wrapper.get("textarea").setValue("manual edit")
-    expect(wrapper.text()).toContain("detailPage.commentUnsaved")
-
-    await wrapper.get("[data-comment-save]").trigger("click")
-    await flushPromises()
-
-    expect(serviceMocks.putMovieComment).toHaveBeenCalledWith("movie-1", {
-      body: "manual edit",
-    })
-    expect(wrapper.text()).toContain("detailPage.commentAutoSaved")
-  })
 })

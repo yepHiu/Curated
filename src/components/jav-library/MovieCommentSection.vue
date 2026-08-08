@@ -2,10 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
-import { Loader2, MessageSquare } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import { MAX_MOVIE_COMMENT_RUNES, type MovieCommentDTO } from "@/api/types"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -256,28 +254,6 @@ onBeforeUnmount(() => {
         >
           {{ saveError }}
         </p>
-        <div v-if="!props.readonly" class="flex justify-end">
-          <Button
-            type="button"
-            class="rounded-full"
-            :disabled="saving || !hasUnsavedChanges || isTooLong"
-            data-comment-save
-            @click="saveCommentNow()"
-          >
-            <Loader2
-              v-if="saving"
-              class="size-4 shrink-0 animate-spin"
-              aria-hidden="true"
-            />
-            <MessageSquare
-              v-else
-              class="size-4 shrink-0"
-              data-icon="inline-start"
-              aria-hidden="true"
-            />
-            {{ saving ? t("detailPage.commentSaving") : t("detailPage.commentSave") }}
-          </Button>
-        </div>
       </template>
     </CardContent>
   </Card>

@@ -118,10 +118,6 @@ vi.mock("@/components/ui/button", () => ({
   Button: { name: "Button", template: "<button><slot /></button>" },
 }))
 
-vi.mock("@/components/ui/switch", () => ({
-  Switch: { name: "Switch", template: "<button />" },
-}))
-
 vi.mock("@/components/ui/input", () => ({
   Input: { name: "Input", template: "<input />" },
 }))

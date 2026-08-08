@@ -11,7 +11,6 @@ import DevPerformanceBar from "@/components/dev/DevPerformanceBar.vue"
 import { Toaster } from "@/components/ui/sonner"
 import ScanProgressDock from "@/components/jav-library/ScanProgressDock.vue"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -859,39 +858,18 @@ function clearActorsSearch() {
               <MovieImportDialog />
               <NotificationCenter />
               <Button
-                v-if="!isLgUp"
                 type="button"
                 variant="ghost"
                 size="icon"
-                data-mobile-theme-toggle
-                class="size-11 rounded-2xl text-muted-foreground hover:text-foreground"
+                data-theme-toggle
+                class="size-10 rounded-xl text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 :aria-label="t('shell.themeToggleAria')"
                 :title="t('shell.themeToggleHint')"
                 @click="onShellAppearanceSwitch(resolvedMode !== 'dark')"
               >
-                <Moon v-if="resolvedMode === 'dark'" aria-hidden="true" />
-                <Sun v-else aria-hidden="true" />
+                <Moon v-if="resolvedMode === 'dark'" class="size-4" aria-hidden="true" />
+                <Sun v-else class="size-4" aria-hidden="true" />
               </Button>
-              <div
-                v-else
-                class="flex items-center gap-1.5"
-                :title="t('shell.themeToggleHint')"
-              >
-                <Sun
-                  class="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Switch
-                  :model-value="resolvedMode === 'dark'"
-                  class="motion-safe:transition-colors motion-safe:duration-200"
-                  :aria-label="t('shell.themeToggleAria')"
-                  @update:model-value="onShellAppearanceSwitch"
-                />
-                <Moon
-                  class="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </div>
             </div>
           </div>
 
