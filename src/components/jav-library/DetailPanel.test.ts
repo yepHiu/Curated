@@ -80,7 +80,11 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: { name: "DropdownMenu", template: "<div><slot /></div>" },
   DropdownMenuContent: { name: "DropdownMenuContent", template: "<div><slot /></div>" },
   DropdownMenuGroup: { name: "DropdownMenuGroup", template: "<div><slot /></div>" },
-  DropdownMenuItem: { name: "DropdownMenuItem", template: "<button><slot /></button>" },
+  DropdownMenuItem: {
+    name: "DropdownMenuItem",
+    emits: ["click"],
+    template: '<button @click="$emit(\'click\', $event)"><slot /></button>',
+  },
   DropdownMenuTrigger: { name: "DropdownMenuTrigger", template: "<div><slot /></div>" },
 }))
 
@@ -103,6 +107,16 @@ vi.mock("@/components/jav-library/MovieDeleteConfirmDialog.vue", () => ({
 
 vi.mock("@/components/jav-library/MovieEditDialog.vue", () => ({
   default: { name: "MovieEditDialog", template: "<div />" },
+}))
+
+vi.mock("@/components/jav-library/MovieMetadataRefreshConfirmDialog.vue", () => ({
+  default: {
+    name: "MovieMetadataRefreshConfirmDialog",
+    props: ["open", "movieTitle"],
+    emits: ["update:open", "confirm"],
+    template:
+      '<div v-if="open" data-refresh-confirm><button type="button" @click="$emit(\'confirm\')">Confirm</button></div>',
+  },
 }))
 
 vi.mock("@/components/jav-library/MovieRatingStars.vue", () => ({
@@ -215,6 +229,26 @@ describe("DetailPanel", () => {
     await restoreButton!.trigger("click")
 
     expect(wrapper.emitted("restoreMovie")).toEqual([["movie-1"]])
+  })
+
+  it("confirms single-movie metadata refresh before emitting the action", async () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    const refreshItem = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("detailPanel.refreshMetadata"))
+    expect(refreshItem).toBeDefined()
+
+    await refreshItem!.trigger("click")
+    expect(wrapper.find("[data-refresh-confirm]").exists()).toBe(true)
+    expect(wrapper.emitted("refreshMetadata")).toBeUndefined()
+
+    await wrapper.get("[data-refresh-confirm] button").trigger("click")
+    expect(wrapper.emitted("refreshMetadata")).toEqual([["movie-1"]])
   })
 
   it("adds a suggested user tag immediately when clicked", async () => {

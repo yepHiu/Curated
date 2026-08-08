@@ -36,6 +36,7 @@ import { Separator } from "@/components/ui/separator"
 import MediaStill from "@/components/jav-library/MediaStill.vue"
 import MovieDeleteConfirmDialog from "@/components/jav-library/MovieDeleteConfirmDialog.vue"
 import MovieEditDialog from "@/components/jav-library/MovieEditDialog.vue"
+import MovieMetadataRefreshConfirmDialog from "@/components/jav-library/MovieMetadataRefreshConfirmDialog.vue"
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
 import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
@@ -64,6 +65,7 @@ const props = withDefaults(
 
 const deleteConfirmOpen = ref(false)
 const permanentDeleteConfirmOpen = ref(false)
+const metadataRefreshConfirmOpen = ref(false)
 
 const isTrashed = computed(() => Boolean(props.movie.trashedAt?.trim()))
 
@@ -476,7 +478,7 @@ function pickUserTagSuggestion(tag: string) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   :disabled="props.metadataRefreshBusy"
-                  @click="emit('refreshMetadata', movie.id)"
+                  @click="metadataRefreshConfirmOpen = true"
                 >
                   <RefreshCw
                     class="size-4 shrink-0"
@@ -563,6 +565,12 @@ function pickUserTagSuggestion(tag: string) {
             v-model:open="permanentDeleteConfirmOpen"
             variant="permanent"
             @confirm="emit('deleteMoviePermanently', movie.id)"
+          />
+
+          <MovieMetadataRefreshConfirmDialog
+            v-model:open="metadataRefreshConfirmOpen"
+            :movie-title="movie.title"
+            @confirm="emit('refreshMetadata', movie.id)"
           />
         </div>
 
