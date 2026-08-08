@@ -32,6 +32,7 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
   let ticker: number | null = null
   let recordingStartedAt: number | null = null
   let pointerActive = false
+  const recordingTickMs = 16
 
   const isRecording = computed(() => phase.value === "recording")
   const progress = computed(() => Math.min(1, elapsedSec.value / maxDurationSec))
@@ -78,7 +79,7 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
         const wallElapsed = recordingStartedAt === null ? 0 : Math.max(0, (performance.now() - recordingStartedAt) / 1000)
         elapsedSec.value = Math.max(mediaElapsed, wallElapsed)
         if (elapsedSec.value >= maxDurationSec) finishPress()
-      }, 50)
+      }, recordingTickMs)
     }, longPressMs)
   }
 

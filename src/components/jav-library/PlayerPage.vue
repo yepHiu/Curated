@@ -2657,7 +2657,7 @@ const videoPreloadMode = computed(() =>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
             </div>
             <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
-              <div class="h-full rounded-full bg-rose-400 transition-[width] duration-75" :style="{ width: `${clipCaptureProgress * 100}%` }" />
+              <div class="h-full rounded-full bg-rose-400 transition-[width] duration-100 ease-linear" :style="{ width: `${clipCaptureProgress * 100}%` }" />
             </div>
           </div>
         </Transition>
