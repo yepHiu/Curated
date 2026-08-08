@@ -77,8 +77,14 @@ function reasonLabel(index: number) {
       @open-player="emit('openPlayer', $event)"
     />
 
-    <div class="flex min-w-0 flex-col gap-2 px-0.5">
-      <div class="flex min-h-6 min-w-0 flex-wrap gap-1.5">
+    <div
+      data-home-recommendation-meta
+      class="flex min-w-0 items-center gap-1.5 px-0.5"
+    >
+      <div
+        data-home-recommendation-tags
+        class="flex min-h-6 min-w-0 flex-1 flex-wrap gap-1.5"
+      >
         <Badge
           v-for="(_, index) in entry.reasons.slice(0, 2)"
           :key="`${movie.id}-${index}`"
@@ -89,7 +95,7 @@ function reasonLabel(index: number) {
         </Badge>
       </div>
 
-      <div class="flex items-center justify-end gap-1">
+      <div data-home-recommendation-actions class="flex shrink-0 items-center gap-1">
         <Button
           v-if="activeFeedback"
           type="button"

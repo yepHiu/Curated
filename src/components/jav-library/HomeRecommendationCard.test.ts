@@ -92,6 +92,15 @@ function buttonContaining(wrapper: ReturnType<typeof mountCard>, text: string) {
 }
 
 describe("HomeRecommendationCard", () => {
+  it("keeps recommendation tags and the overflow action on one row", () => {
+    const wrapper = mountCard()
+    const tags = wrapper.get("[data-home-recommendation-tags]")
+    const actions = wrapper.get("[data-home-recommendation-actions]")
+
+    expect(tags.element.parentElement).toBe(actions.element.parentElement)
+    expect(wrapper.get("[data-home-recommendation-meta]").classes()).toContain("items-center")
+  })
+
   it("renders translated reason codes and emits explicit feedback targets", async () => {
     const wrapper = mountCard()
     expect(wrapper.text()).toContain("home.recommendationReason.shared_actor")
