@@ -19,12 +19,10 @@ import {
 } from "lucide-vue-next"
 import { RouterLink, useRoute } from "vue-router"
 import type { AppPage, LibraryMode } from "@/domain/library/types"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { useAppUpdate } from "@/composables/use-app-update"
 import { useActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
@@ -65,7 +63,6 @@ const {
   versionDisplay: backendVersionDisplay,
   checkNow: checkBackendHealth,
 } = useBackendHealth()
-const { hasUpdateBadge, summary: appUpdateSummary } = useAppUpdate()
 const {
   activePlaybackSession,
   dismissActivePlaybackSession,
@@ -169,21 +166,6 @@ const isActive = (page: AppPage) => {
 
 const brandHomeTarget = computed(() => ({ name: "home" as const }))
 
-const brandAboutUpdateTarget = computed(() => ({
-  name: "settings" as const,
-  query: { ...route.query, section: "about" },
-}))
-
-const brandUpdateTitle = computed(() => {
-  if (!hasUpdateBadge.value) {
-    return "Curated"
-  }
-  const latest = appUpdateSummary.value?.latestVersion?.trim()
-  return latest
-    ? `Curated\nNew version ${latest}`
-    : "Curated\nNew version available"
-})
-
 function formatSidebarPlaybackClock(seconds: number): string {
   const total = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0))
   const hours = Math.floor(total / 3600)
@@ -279,12 +261,6 @@ const getNavigationTarget = (page: AppPage) => {
         >
           <span class="relative inline-flex items-center">
             <Sparkles class="size-5 shrink-0 text-primary sm:size-[1.35rem]" aria-hidden="true" />
-            <span
-              v-if="props.compact && hasUpdateBadge"
-              data-update-dot
-              class="absolute -right-1 -top-1 size-2.5 rounded-full border border-sidebar bg-primary shadow-[0_0_0_3px_rgba(254,98,142,0.16)]"
-              aria-hidden="true"
-            />
           </span>
           <span
             class="truncate transition-[opacity,max-width] duration-200 motion-reduce:transition-none"
@@ -293,22 +269,6 @@ const getNavigationTarget = (page: AppPage) => {
           >
             Curated
           </span>
-        </RouterLink>
-        <RouterLink
-          v-if="!props.compact && hasUpdateBadge"
-          :to="brandAboutUpdateTarget"
-          data-update-badge-link
-          :title="brandUpdateTitle"
-          :aria-label="brandUpdateTitle"
-          class="inline-flex shrink-0"
-        >
-          <Badge
-            data-update-badge
-            variant="secondary"
-            class="pointer-events-none rounded-full border border-primary/25 bg-primary/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-primary"
-          >
-            New
-          </Badge>
         </RouterLink>
       </div>
     </div>
