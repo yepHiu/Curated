@@ -377,3 +377,38 @@ e53787e6 fix(api): encode empty backup arrays
 5a0a0a54 feat(settings): generate backup filename from directory
 64f291fa chore(release): prepare 1.4.12 package","versionSource=auto-patch; BuildStamp=20260807.154548; error=Release library config example must match the sanitized baseline and must not contain machine paths, proxy details, provider selections, library ids, or player commands"
 2026-08-07,1.4.13,0b314359,master,release:publish,release/portable/Curated-1.4.13-windows-x64.zip; release/installer/Curated-Setup-1.4.13.exe; release/manifest/release.json,成功,wujiahui,0b314359 fix(release): include persisted backup setting,versionSource=explicit; BuildStamp=20260807.154802; portable=versionSource=explicit; installer=versionSource=explicit
+2026-08-09,1.5.1,1b162bd1,master,release:publish,release/portable/Curated-1.5.1-windows-x64.zip; release/installer/Curated-Setup-1.5.1.exe; release/manifest/release.json,成功,wujiahui,"1b162bd1 fix: smooth GIF capture progress
+8b23acf8 fix: remove player curated toolbar button
+0d5bdfda fix: simplify home section headers
+d21f4762 fix: align recommendation actions with tags
+a20104bf fix: center collapsed sidebar brand icon
+7f562d19 fix: hide empty related movies section
+b3240ca2 feat: show shared-actor movies on detail page
+d4ac1605 fix: simplify theme control and comment saving
+40cc07e2 fix: simplify player media heading
+fa11011c fix: remove sidebar update badge
+e65a832f fix: center capture feedback toggle
+67cc9360 fix: streamline curated settings hints
+8688025d fix: simplify settings descriptions
+cd503325 feat: confirm single movie metadata refresh
+a04b8135 fix: hide insights local-only eyebrow
+7bbe1212 fix: preserve actor library scroll position
+7c1f68cb fix: use live reactive playback time for GIF clips
+888334f6 fix: keep consecutive GIF captures independent
+f174d88f feat: add GIF export to curated frame details
+9f4c7e9a fix: avoid extra frame after max GIF duration
+74cbb11f fix: anchor motion frames at press time
+faf8749f feat: persist GIFs with curated frames
+e72c74fe feat: raise default GIF export width to 640px
+24f132fd style: tighten watermark metadata spacing
+08817335 style: lighten watermark metadata weight
+dd26ede5 fix: align watermark metadata and enlarge logo
+5843f5bd fix: preserve held GIF duration and simplify completion
+2936c3d3 fix: use official Curated logo in watermarked exports
+a206aef3 fix: refine GIF download feedback and watermark layout
+996c4bde feat: generate GIF clips with ffmpeg tasks
+b099c92a fix: preserve completed GIF clip state
+1824d06d feat: add long press GIF clip capture
+6943a999 feat: improve curated frame capture feedback
+cf93e6d3 feat: add watermarked curated frame export
+f6b3a9f9 chore(release): prepare 1.4.13 package",versionSource=auto-patch; BuildStamp=20260808.190310; portable=versionSource=explicit; installer=versionSource=explicit
