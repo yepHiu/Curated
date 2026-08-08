@@ -307,7 +307,6 @@ function onDocumentFullscreenChange() {
 }
 
 const curatedShutterActive = ref(false)
-const curatedPlusOne = ref(false)
 const curatedCaptureError = ref("")
 type CuratedCaptureFeedback =
   | { phase: "idle" }
@@ -323,7 +322,6 @@ const clipExportUrl = ref("")
 const clipExportError = ref("")
 let clipPollTimer: number | null = null
 let clipFeedbackDismissTimer: number | null = null
-let curatedPlusOneTimer: number | null = null
 let curatedShutterTimer: number | null = null
 let curatedCaptureFeedbackTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
@@ -444,24 +442,6 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
     clipExportError.value = ""
     clipFeedbackDismissTimer = null
   }, delayMs)
-}
-
-function onCuratedButtonPointerDown() {
-  beginCuratedPress()
-}
-
-function onCuratedButtonPointerUp() {
-  clipCapture.finishPress()
-}
-
-function onCuratedButtonPointerCancel() {
-  pendingCuratedFrameCapture = null
-  clipCapture.cancelPress()
-}
-
-function onCuratedButtonClick() {
-  if (clipCapture.consumeClick()) return
-  void runCuratedCapture()
 }
 
 /** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
@@ -1017,7 +997,6 @@ onUnmounted(() => {
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()
   immersiveChrome.dispose()
-  if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
   if (progressSliderFocusRestoreTimer) clearTimeout(progressSliderFocusRestoreTimer)
   stopFpsTracking()
@@ -1688,7 +1667,6 @@ async function runCuratedCapture() {
     return
   }
   if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
-  if (curatedPlusOneTimer) clearTimeout(curatedPlusOneTimer)
   if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
 
   const positionSec = getAbsolutePlaybackTime(v.currentTime)
@@ -1724,11 +1702,6 @@ async function runCuratedCapture() {
     curatedCaptureFeedbackTimer = null
   }, 900)
 
-  curatedPlusOne.value = true
-  curatedPlusOneTimer = window.setTimeout(() => {
-    curatedPlusOne.value = false
-    curatedPlusOneTimer = null
-  }, 800)
   if (!chromeVisible.value) {
     immersiveChrome.showCuratedFeedback(`${t("player.curatedLabel")} +1`)
   }
@@ -2805,9 +2778,9 @@ const videoPreloadMode = computed(() =>
             {{ curatedCaptureError }}
           </p>
 
-          <!-- 底栏：播放控制 | Curated（与音量同一行）| 音量 + 全屏 -->
+          <!-- 底栏：播放控制 | 音量 + 全屏 -->
           <div
-            class="grid w-full items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-x-4"
+            class="grid w-full items-center gap-x-3 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-x-4"
           >
             <div class="flex items-center justify-center gap-2 sm:justify-start">
               <Button
@@ -2839,41 +2812,8 @@ const videoPreloadMode = computed(() =>
               </Button>
             </div>
 
-            <div class="relative flex justify-center justify-self-center">
-              <div class="relative inline-flex items-center">
-                <Transition
-                  enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
-                  enter-from-class="opacity-0 scale-95 motion-reduce:scale-100"
-                  enter-to-class="opacity-100 scale-100"
-                  leave-active-class="transition duration-400 ease-in motion-reduce:transition-none"
-                  leave-from-class="opacity-100 scale-100"
-                  leave-to-class="opacity-0 scale-95 motion-reduce:scale-100"
-                >
-                  <span
-                    v-if="curatedPlusOne"
-                    class="pointer-events-none absolute left-full ml-2 inline-block text-sm font-bold text-primary drop-shadow-md"
-                  >
-                    +1
-                  </span>
-                </Transition>
-                <Button
-                  type="button"
-                  class="rounded-full border-0 bg-primary px-5 py-2 text-sm font-semibold tracking-wide text-primary-foreground hover:bg-primary/88 sm:px-6"
-                  :disabled="!playbackSrc"
-                  :aria-label="t('player.ariaCurated')"
-                  :aria-keyshortcuts="getCuratedCaptureKeyCode()"
-                  @pointerdown="onCuratedButtonPointerDown"
-                  @pointerup="onCuratedButtonPointerUp"
-                  @pointercancel="onCuratedButtonPointerCancel"
-                  @click="onCuratedButtonClick"
-                >
-                  {{ t("player.curatedLabel") }}
-                </Button>
-              </div>
-            </div>
-
             <div
-              class="flex flex-wrap items-center justify-center gap-3 sm:col-start-3 sm:justify-end"
+              class="flex flex-wrap items-center justify-center gap-3 sm:col-start-2 sm:justify-end"
             >
               <div
                 class="flex h-9 min-w-[min(100%,14rem)] max-w-full flex-1 items-center gap-2 rounded-full bg-white/8 px-3 text-white/80 backdrop-blur sm:min-w-[14rem] sm:flex-initial sm:gap-3 sm:px-4"
