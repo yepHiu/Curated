@@ -25,7 +25,6 @@ import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -2481,16 +2480,17 @@ const videoPreloadMode = computed(() =>
         class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5"
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
       >
-        <div class="flex min-w-0 flex-col items-start gap-2 text-left">
-          <Badge variant="secondary" class="rounded-full border border-white/20 bg-white/10 text-white">
-            {{ movie.code }}
-          </Badge>
-          <div class="flex min-w-0 flex-col gap-1">
-            <p class="text-lg font-semibold text-white sm:text-xl">{{ movie.title }}</p>
-            <p v-if="fileBasename" class="truncate text-sm text-white/65" :title="movie.location">
-              {{ fileBasename }}
-            </p>
-          </div>
+        <div class="min-w-0 text-left">
+          <p class="truncate text-lg font-semibold leading-tight text-white sm:text-xl">
+            <span
+              v-if="movie.code"
+              data-player-heading-code
+              class="mr-2 font-medium text-white/70"
+            >
+              {{ movie.code }}
+            </span>
+            <span data-player-heading-title>{{ movie.title }}</span>
+          </p>
         </div>
       </div>
 
