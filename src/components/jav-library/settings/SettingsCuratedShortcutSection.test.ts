@@ -18,6 +18,10 @@ describe("SettingsCuratedShortcutSection", () => {
     const wrapper = mount(SettingsCuratedShortcutSection)
 
     expect(wrapper.get("[data-curated-shortcut-current]").text()).toContain("C")
+    expect(wrapper.get("[data-curated-shortcut-help]").attributes("aria-label")).toBe(
+      "settings.curatedShortcutHelpAria",
+    )
+    expect(wrapper.find("[data-curated-shortcut-help] + p").exists()).toBe(false)
 
     await wrapper.get("[data-curated-shortcut-record]").trigger("click")
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }))

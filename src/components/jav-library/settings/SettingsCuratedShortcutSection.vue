@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { RotateCcw } from "lucide-vue-next"
+import { CircleHelp, RotateCcw } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
+import {
+  TooltipContent,
+  TooltipPortal,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "reka-ui"
 import {
   getCuratedCaptureKeyCode,
   resetCuratedCaptureKeyCode,
@@ -85,12 +92,32 @@ onBeforeUnmount(() => {
         class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4"
       >
         <div class="min-w-0 flex-1 space-y-1">
-          <div class="text-sm font-semibold text-foreground">
-            {{ t("settings.curatedShortcutTitle") }}
+          <div class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span>{{ t("settings.curatedShortcutTitle") }}</span>
+            <TooltipProvider :delay-duration="280">
+              <TooltipRoot>
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    data-curated-shortcut-help
+                    class="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    :aria-label="t('settings.curatedShortcutHelpAria')"
+                  >
+                    <CircleHelp class="size-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent
+                    side="top"
+                    :side-offset="6"
+                    class="z-50 max-w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border/50 bg-popover px-3 py-2 text-xs leading-relaxed text-pretty text-popover-foreground shadow-lg"
+                  >
+                    {{ t("settings.curatedShortcutBody", { keys: reservedLabels.join(" · ") }) }}
+                  </TooltipContent>
+                </TooltipPortal>
+              </TooltipRoot>
+            </TooltipProvider>
           </div>
-          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            {{ t("settings.curatedShortcutBody", { keys: reservedLabels.join(" · ") }) }}
-          </p>
         </div>
 
         <div

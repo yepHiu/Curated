@@ -204,9 +204,6 @@ const { t } = useI18n()
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportModeTitle") }}
                 </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.curatedExportModeHint") }}
-                </p>
               </div>
               <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2">
                 <Select
@@ -242,9 +239,6 @@ const { t } = useI18n()
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.captureFeedbackSoundTitle") }}
                 </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.captureFeedbackSoundHint") }}
-                </p>
               </div>
               <Switch
                 :model-value="captureFeedbackSoundEnabled"
@@ -262,9 +256,6 @@ const { t } = useI18n()
               <div class="min-w-0 flex-1 space-y-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportFormatTitle") }}
-                </p>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {{ t("settings.curatedExportFormatHint") }}
                 </p>
               </div>
               <div
