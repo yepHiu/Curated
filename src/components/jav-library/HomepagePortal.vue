@@ -104,7 +104,6 @@ function onHomeScroll() {
     >
       <HomeSectionRow
         :title="t('home.sectionRecentTitle')"
-        :subtitle="t('home.sectionRecentBody')"
         :movies="model.recentMovies"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
@@ -112,7 +111,6 @@ function onHomeScroll() {
 
       <HomeSectionRow
         :title="t('home.sectionRecommendTitle')"
-        :subtitle="t('home.sectionRecommendBody')"
         :movies="recommendationMovies"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"

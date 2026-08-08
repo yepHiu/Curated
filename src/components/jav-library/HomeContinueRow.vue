@@ -51,13 +51,10 @@ const cards = computed<ContinueCardRow[]>(() =>
 
 <template>
   <section class="space-y-4">
-    <div class="space-y-1">
+    <div>
       <h2 class="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
         {{ t("home.sectionContinueTitle") }}
       </h2>
-      <p class="text-sm text-muted-foreground">
-        {{ t("home.sectionContinueBody") }}
-      </p>
     </div>
 
     <div class="grid gap-3 lg:grid-cols-2">

@@ -4,7 +4,6 @@ import MovieCard from "@/components/jav-library/MovieCard.vue"
 
 defineProps<{
   title: string
-  subtitle?: string
   movies: Movie[]
 }>()
 
@@ -17,13 +16,10 @@ const emit = defineEmits<{
 <template>
   <section class="flex flex-col gap-4">
     <div class="flex items-end justify-between gap-3">
-      <div class="flex flex-col gap-1">
+      <div>
         <h2 class="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
           {{ title }}
         </h2>
-        <p v-if="subtitle" class="text-sm text-muted-foreground">
-          {{ subtitle }}
-        </p>
       </div>
 
       <div v-if="$slots.action" class="shrink-0">
