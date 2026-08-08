@@ -251,11 +251,11 @@ const getNavigationTarget = (page: AppPage) => {
         <RouterLink
           :to="brandHomeTarget"
           data-sidebar-brand-link
-          class="font-curated inline-flex items-center gap-2 px-1 py-1 font-semibold tracking-wide text-primary"
+          class="font-curated inline-flex items-center px-1 py-1 font-semibold tracking-wide text-primary"
           :class="
             props.compact
-              ? 'w-full max-w-full justify-center text-base'
-              : 'min-w-0 w-fit min-w-0 max-w-full flex-1 text-lg sm:text-xl'
+              ? 'w-full max-w-full justify-center gap-0 text-base'
+              : 'min-w-0 w-fit min-w-0 max-w-full flex-1 gap-2 text-lg sm:text-xl'
           "
           :title="t('nav.home')"
         >

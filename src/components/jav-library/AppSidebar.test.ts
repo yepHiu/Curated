@@ -145,6 +145,15 @@ describe("AppSidebar", () => {
     expect(expandedLinks).toHaveLength(compactLinks.length)
   })
 
+  it("centers the brand icon without the collapsed label gap", async () => {
+    const wrapper = mount(AppSidebar, { props: { compact: true } })
+    await flushPromises()
+
+    const brandLink = wrapper.get("[data-sidebar-brand-link]")
+    expect(brandLink.classes()).toContain("justify-center")
+    expect(brandLink.classes()).toContain("gap-0")
+  })
+
   it("shows an expanded continue playback card above backend status", async () => {
     setActivePlaybackSession()
 
