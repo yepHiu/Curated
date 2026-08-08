@@ -234,12 +234,13 @@ const { t } = useI18n()
 
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.captureFeedbackSoundTitle") }}</legend>
-            <div class="flex min-w-0 items-start justify-between gap-4">
-              <div class="min-w-0 flex-1 space-y-1">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.captureFeedbackSoundTitle") }}
-                </p>
-              </div>
+            <div
+              data-capture-feedback-row
+              class="flex min-w-0 items-center justify-center gap-4"
+            >
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.captureFeedbackSoundTitle") }}
+              </p>
               <Switch
                 :model-value="captureFeedbackSoundEnabled"
                 :aria-label="t('settings.captureFeedbackSoundTitle')"

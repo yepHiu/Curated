@@ -100,6 +100,9 @@ describe("SettingsCuratedSection", () => {
     expect(wrapper.text()).toContain("C")
     expect(wrapper.text()).toContain("settings.savePolicy")
     expect(wrapper.find("[data-shortcut-section]").exists()).toBe(true)
+    expect(wrapper.get("[data-capture-feedback-row]").classes()).toEqual(
+      expect.arrayContaining(["items-center", "justify-center"]),
+    )
     expect(wrapper.text()).not.toContain("settings.curatedExportModeHint")
     expect(wrapper.text()).not.toContain("settings.captureFeedbackSoundHint")
     expect(wrapper.text()).not.toContain("settings.curatedExportFormatHint")
