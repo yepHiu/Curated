@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import type { ActorListItemDTO } from "@/api/types"
 import ActorLibraryCard from "@/components/jav-library/ActorLibraryCard.vue"
+import { useLibraryScrollPreserve } from "@/composables/use-library-scroll-preserve"
 import { getActorsSearchQuery } from "@/lib/actors-route-query"
 import { useLibraryService } from "@/services/library-service"
 
@@ -27,6 +28,16 @@ const listBase = computed(() => ({
   sort: "movieCount" as const,
   limit: PAGE_SIZE,
 }))
+
+const scrollPreserveKey = computed(() => {
+  const query = getActorsSearchQuery(route.query).trim()
+  return query ? `actors:${query}` : "actors"
+})
+
+useLibraryScrollPreserve({
+  scrollElRef: scrollRoot,
+  preserveKey: scrollPreserveKey,
+})
 
 async function fetchFirstPage() {
   loading.value = true
