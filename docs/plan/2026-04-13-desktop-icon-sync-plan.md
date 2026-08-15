@@ -4,7 +4,7 @@
 
 **Goal:** Promote the new pink-on-dark Curated icon to the canonical desktop/tray icon source and sync every derived desktop/web asset to it.
 
-**Architecture:** Treat `icon/curated-icon-rg-dark-pink.png` as the single source image for desktop-facing icon assets. Regenerate the public PNG copies and the embedded Windows `.ico`, then update project memory/docs so future icon updates continue from the same source file.
+**Architecture:** Treat `icon/curated-appicon.png` as the single source image for desktop-facing icon assets. Regenerate the public PNG copies and the embedded Windows `.ico`, then update project memory/docs so future icon updates continue from the same source file.
 
 **Tech Stack:** PowerShell, Python Pillow, Go embed asset, Vite static assets, Markdown docs
 
@@ -22,8 +22,8 @@
 - [ ] **Step 1: Update the repo memory files to point to the new source image**
 
 State explicitly that:
-- README wordmark still uses `icon/curated-title-nobg.png`
-- Desktop/tray/app icon source is now `icon/curated-icon-rg-dark-pink.png`
+- README wordmark still uses `icon/curated-wordmark.png`
+- Desktop/tray/app icon source is now `icon/curated-appicon.png`
 - Derived files remain `public/Curated-icon.png`, `backend/frontend-dist/Curated-icon.png`, and `backend/internal/assets/curated.ico`
 
 - [ ] **Step 2: Save the implementation note**
@@ -36,15 +36,15 @@ Keep this plan in `docs/plan/` so the icon swap has a discoverable record alongs
 - Modify: `public/Curated-icon.png`
 - Modify: `backend/frontend-dist/Curated-icon.png`
 - Modify: `backend/internal/assets/curated.ico`
-- Add: `icon/curated-icon-rg-dark-pink.png`
+- Add: `icon/curated-appicon.png`
 
 - [ ] **Step 1: Copy the canonical PNG into the two shipped PNG targets**
 
 Run:
 
 ```powershell
-Copy-Item icon\curated-icon-rg-dark-pink.png public\Curated-icon.png -Force
-Copy-Item icon\curated-icon-rg-dark-pink.png backend\frontend-dist\Curated-icon.png -Force
+Copy-Item icon\curated-appicon.png public\Curated-icon.png -Force
+Copy-Item icon\curated-appicon.png backend\frontend-dist\Curated-icon.png -Force
 ```
 
 Expected: both PNG targets have the same bytes as the canonical source.
@@ -54,7 +54,7 @@ Expected: both PNG targets have the same bytes as the canonical source.
 Run:
 
 ```powershell
-python -c "from PIL import Image; img = Image.open(r'icon/curated-icon-rg-dark-pink.png').convert('RGBA'); img.save(r'backend/internal/assets/curated.ico', sizes=[(16,16),(20,20),(24,24),(32,32),(40,40),(48,48),(64,64),(128,128),(256,256)])"
+python -c "from PIL import Image; img = Image.open(r'icon/curated-appicon.png').convert('RGBA'); img.save(r'backend/internal/assets/curated.ico', sizes=[(16,16),(20,20),(24,24),(32,32),(40,40),(48,48),(64,64),(128,128),(256,256)])"
 ```
 
 Expected: `backend/internal/assets/curated.ico` is rewritten as a multi-size icon suitable for the embedded tray asset and packaged desktop shortcuts.

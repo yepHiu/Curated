@@ -50,7 +50,7 @@ export function resolveAppIconPath(
     path.join(appPath, "curated.ico"),
     path.join(appPath, "backend", "internal", "assets", "curated.ico"),
     path.join(appPath, "public", "Curated-icon.png"),
-    path.join(appPath, "icon", "curated-icon-rg-dark-pink.png"),
+    path.join(appPath, "icon", "curated-appicon.png"),
   ]
 
   return candidates.find((candidate) => pathExists(candidate))

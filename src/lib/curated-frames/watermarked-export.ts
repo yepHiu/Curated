@@ -1,5 +1,5 @@
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
-import curatedTitleLogoUrl from "@/icon/curated-title-nobg.png"
+import curatedTitleLogoUrl from "@/icon/curated-wordmark.png"
 
 export type WatermarkedCuratedExportFormat = "jpg" | "webp" | "png"
 

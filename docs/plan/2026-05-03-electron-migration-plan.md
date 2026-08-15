@@ -359,7 +359,7 @@ Electron 桌面程序和远程 Web 访问**共享同一个后端实例**：
 
 本轮补齐了桌面壳层中最早应该使用 Electron 原生能力的两个点：
 
-- **应用图标**：Electron 主窗口优先使用 `backend/internal/assets/curated.ico`，回退到 `public/Curated-icon.png` / `icon/curated-icon-rg-dark-pink.png`；Windows 下设置 `app.setAppUserModelId("com.curated.desktop")`，避免任务栏标识继续表现为默认 Electron。
+- **应用图标**：Electron 主窗口优先使用 `backend/internal/assets/curated.ico`，回退到 `public/Curated-icon.png` / `icon/curated-appicon.png`；Windows 下设置 `app.setAppUserModelId("com.curated.desktop")`，避免任务栏标识继续表现为默认 Electron。
 - **原生目录选择**：新增 `electron/preload.cjs`，只暴露 `window.javLibrary.pickDirectory()`；主进程通过 `dialog.showOpenDialog({ properties: ["openDirectory"] })` 处理 `curated:pick-directory` IPC，并返回 `{ path } | null`。
 - **前端接入方式**：不改设置页组件。现有 `src/lib/pick-directory.ts` 已经优先调用 `window.javLibrary.pickDirectory()`，因此「影片存储」添加路径与日志目录选择会在 Electron 中自动走原生目录对话框；普通浏览器仍按 `showDirectoryPicker()` / `webkitdirectory` 降级。
 - **边界仍保持不变**：业务 API 继续走同源 REST，不引入 Electron 专用业务 adapter；preload 不暴露任意文件系统、数据库或后端业务能力。
