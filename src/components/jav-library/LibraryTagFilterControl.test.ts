@@ -63,7 +63,7 @@ describe("LibraryTagFilterControl", () => {
 
     expect(wrapper.find('[data-library-tag-filter-option="Featured"]').exists()).toBe(true)
     expect(wrapper.find('[data-library-tag-filter-option="mine"]').exists()).toBe(false)
-    expect(wrapper.get('[data-library-tag-filter-chip="mine"]').exists()).toBe(true)
+    expect(wrapper.find('[data-library-tag-filter-chip="mine"]').exists()).toBe(true)
   })
 
   it("shows the empty library copy when there are no tag facets", () => {

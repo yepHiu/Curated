@@ -74,10 +74,6 @@ const hasVisibleOptions = computed(() => visibleGroups.value.length > 0)
 function isSelected(name: string): boolean {
   return selectedSet.value.has(name.trim().toLocaleLowerCase())
 }
-
-function attr(suffix: string): string {
-  return `${props.testId}-${suffix}`
-}
 </script>
 
 <template>

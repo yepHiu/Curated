@@ -116,7 +116,7 @@ describe("CuratedFrameTagFilterBar", () => {
       selectedTags: [],
     })
 
-    expect(wrapper.get("[data-curated-tag-filter-toggle]").exists()).toBe(true)
+    expect(wrapper.find("[data-curated-tag-filter-toggle]").exists()).toBe(true)
     expect(wrapper.text()).toContain("curated.tagFilterEmpty")
     expect(wrapper.find("[data-curated-tag-filter-option]").exists()).toBe(false)
   })

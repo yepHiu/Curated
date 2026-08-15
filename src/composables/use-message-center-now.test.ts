@@ -1,7 +1,15 @@
-import { computed, defineComponent } from "vue"
+import { defineComponent } from "vue"
 import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import type { TaskDTO } from "@/api/types"
+
+function taskFixture(partial: Partial<TaskDTO> & Pick<TaskDTO, "taskId" | "type" | "status">): TaskDTO {
+  return {
+    createdAt: "2026-08-16T00:00:00Z",
+    progress: 0,
+    ...partial,
+  }
+}
 
 const trackerState = vi.hoisted(() => ({
   activeTask: { value: null as TaskDTO | null },
@@ -33,13 +41,13 @@ async function mountNow() {
 
 describe("useMessageCenterNow", () => {
   it("summarizes an in-progress import without using the scan dock copy", async () => {
-    trackerState.activeTask.value = {
+    trackerState.activeTask.value = taskFixture({
       taskId: "import-1",
       type: "import.movies",
       status: "running",
       message: "Copying",
       metadata: { completedFiles: 2, totalFiles: 5 },
-    } as TaskDTO
+    })
     trackerState.progressTask.value = trackerState.activeTask.value
 
     const wrapper = await mountNow()
@@ -47,12 +55,12 @@ describe("useMessageCenterNow", () => {
   })
 
   it("hides terminal tasks from the Now section", async () => {
-    trackerState.activeTask.value = {
+    trackerState.activeTask.value = taskFixture({
       taskId: "scan-1",
       type: "scan.library",
       status: "completed",
       message: "done",
-    } as TaskDTO
+    })
     trackerState.progressTask.value = trackerState.activeTask.value
 
     const wrapper = await mountNow()
