@@ -700,7 +700,21 @@ export const api = {
   },
 
   listCuratedFrames(params?: ListCuratedFramesParams): Promise<CuratedFramesListDTO> {
-    return httpClient.get<CuratedFramesListDTO>("/curated-frames", params as Record<string, string | number | undefined>)
+    const tags = [
+      ...(params?.tags ?? []),
+      ...(params?.tag ? [params.tag] : []),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const uniqueTags = [...new Set(tags)]
+    return httpClient.get<CuratedFramesListDTO>("/curated-frames", {
+      q: params?.q,
+      actor: params?.actor,
+      movieId: params?.movieId,
+      tag: uniqueTags.length > 0 ? uniqueTags.join(",") : undefined,
+      limit: params?.limit,
+      offset: params?.offset,
+    })
   },
 
   getCuratedFrameStats(): Promise<CuratedFrameStatsDTO> {

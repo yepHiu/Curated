@@ -34,6 +34,7 @@ const { t } = useI18n()
       </p>
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <slot name="actions-start" />
       <template v-if="!batchMode">
         <Button
           type="button"

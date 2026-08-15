@@ -233,6 +233,7 @@ type CuratedFrameQuery struct {
 	Actor   string
 	MovieID string
 	Tag     string
+	Tags    []string
 	Limit   int
 	Offset  int
 }
@@ -285,9 +286,24 @@ func buildCuratedFrameWhere(q CuratedFrameQuery) (string, []any) {
 		clauses = append(clauses, `movie_id = ?`)
 		args = append(args, s)
 	}
+	tags := make([]string, 0, len(q.Tags)+1)
 	if s := strings.TrimSpace(q.Tag); s != "" {
+		tags = append(tags, s)
+	}
+	for _, raw := range q.Tags {
+		if s := strings.TrimSpace(raw); s != "" {
+			tags = append(tags, s)
+		}
+	}
+	seenTag := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		key := strings.ToLower(tag)
+		if _, ok := seenTag[key]; ok {
+			continue
+		}
+		seenTag[key] = struct{}{}
 		clauses = append(clauses, `tags_json LIKE ?`)
-		args = append(args, curatedJSONContainsArg(s))
+		args = append(args, curatedJSONContainsArg(tag))
 	}
 	if len(clauses) == 0 {
 		return "", args

@@ -23,6 +23,7 @@ export interface CuratedFrameListQuery {
   actor?: string
   movieId?: string
   tag?: string
+  tags?: string[]
   limit?: number
   offset?: number
 }
@@ -129,9 +130,16 @@ export async function listCuratedFramesPage(
       const movieId = query.movieId.trim()
       filtered = filtered.filter((row) => row.movieId.trim() === movieId)
     }
-    if (query.tag?.trim()) {
-      const tag = query.tag.trim()
-      filtered = filtered.filter((row) => row.tags.some((name) => name.trim() === tag))
+    const tags = [
+      ...(query.tags ?? []),
+      ...(query.tag ? [query.tag] : []),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean)
+    if (tags.length > 0) {
+      filtered = filtered.filter((row) =>
+        tags.every((tag) => row.tags.some((name) => name.trim() === tag)),
+      )
     }
     const total = filtered.length
     const limit = query.limit && query.limit > 0 ? query.limit : total

@@ -1,112 +1,146 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
+import { Check, Tags } from "lucide-vue-next"
 import type { CuratedFrameFacetItemDTO } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const props = defineProps<{
   facets: readonly CuratedFrameFacetItemDTO[]
-  visibleFacets: readonly CuratedFrameFacetItemDTO[]
-  activeTag: string
-  hiddenCount: number
-  expanded: boolean
+  selectedTags: readonly string[]
 }>()
 
 const emit = defineEmits<{
   clear: []
   toggleTag: [tag: string]
-  updateExpanded: [expanded: boolean]
 }>()
 
 const { t } = useI18n()
 
-function isActive(tag: string): boolean {
-  return props.activeTag === tag.trim()
+const selectedSet = computed(() => {
+  const set = new Set<string>()
+  for (const tag of props.selectedTags) {
+    const trimmed = tag.trim()
+    if (trimmed) set.add(trimmed.toLocaleLowerCase())
+  }
+  return set
+})
+
+const selectedCount = computed(() => props.selectedTags.length)
+const filterActive = computed(() => selectedCount.value > 0)
+
+const buttonLabel = computed(() => {
+  if (selectedCount.value === 0) {
+    return t("curated.tagFilterTitle")
+  }
+  if (selectedCount.value === 1) {
+    return props.selectedTags[0]!
+  }
+  return t("curated.tagFilterSelectedCount", { count: selectedCount.value })
+})
+
+const menuFacets = computed(() => {
+  const selectedNames = new Set(selectedSet.value)
+  const fromFacets = [...props.facets]
+  for (const tag of props.selectedTags) {
+    const trimmed = tag.trim()
+    if (!trimmed) continue
+    if (fromFacets.some((facet) => facet.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) {
+      continue
+    }
+    fromFacets.unshift({ name: trimmed, count: 0 })
+  }
+  return fromFacets.sort((left, right) => {
+    const leftSelected = selectedNames.has(left.name.toLocaleLowerCase())
+    const rightSelected = selectedNames.has(right.name.toLocaleLowerCase())
+    if (leftSelected !== rightSelected) {
+      return leftSelected ? -1 : 1
+    }
+    return right.count - left.count || left.name.localeCompare(right.name)
+  })
+})
+
+function isSelected(tag: string): boolean {
+  return selectedSet.value.has(tag.trim().toLocaleLowerCase())
 }
 </script>
 
 <template>
-  <section
-    class="shrink-0 rounded-3xl border border-border/70 bg-card/85 px-4 py-3 shadow-lg shadow-black/5"
-    :aria-label="t('curated.tagFilterTitle')"
-  >
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="min-w-0 space-y-2">
-        <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {{ t("curated.tagFilterTitle") }}
-        </p>
-        <div v-if="facets.length > 0" class="flex flex-wrap gap-2">
-          <Badge
-            as-child
-            :variant="!activeTag ? 'default' : 'secondary'"
-            :class="[
-              'rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-              !activeTag
-                ? 'border-primary/40'
-                : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-            ]"
-          >
-            <button
-              type="button"
-              class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-              :aria-pressed="!activeTag"
-              :aria-label="t('curated.ariaClearFrameTagFilter')"
-              @click="emit('clear')"
-            >
-              {{ t("curated.tagFilterAll") }}
-            </button>
-          </Badge>
-          <Badge
-            v-for="tag in visibleFacets"
-            :key="tag.name"
-            as-child
-            :variant="isActive(tag.name) ? 'default' : 'secondary'"
-            :class="[
-              'max-w-[14rem] rounded-full border px-3 py-1 text-sm font-normal transition-colors',
-              isActive(tag.name)
-                ? 'border-primary/40'
-                : 'cursor-pointer border-border/60 bg-secondary/70 hover:bg-secondary hover:text-secondary-foreground',
-            ]"
-          >
-            <button
-              type="button"
-              class="inline-flex max-w-full min-w-0 items-center gap-1.5"
-              :aria-pressed="isActive(tag.name)"
-              :aria-label="t('curated.ariaFilterFrameTag', { tag: tag.name, count: tag.count })"
-              @click="emit('toggleTag', tag.name)"
-            >
-              <span class="truncate">{{ tag.name }}</span>
-              <span
-                class="tabular-nums text-xs opacity-80"
-                :class="
-                  isActive(tag.name)
-                    ? 'text-primary-foreground/90'
-                    : 'text-muted-foreground'
-                "
-              >
-                · {{ tag.count }}
-              </span>
-            </button>
-          </Badge>
-        </div>
-        <p v-else class="text-sm text-muted-foreground">
-          {{ t("curated.tagFilterEmpty") }}
-        </p>
-      </div>
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
       <Button
-        v-if="hiddenCount > 0"
         type="button"
-        variant="ghost"
         size="sm"
-        class="h-8 shrink-0 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-        @click="emit('updateExpanded', !expanded)"
+        data-curated-tag-filter-toggle
+        class="min-h-11 max-w-[14rem] gap-1.5 rounded-xl sm:min-h-8"
+        :variant="filterActive ? 'secondary' : 'outline'"
+        :aria-label="t('curated.tagFilterTitle')"
+        :aria-pressed="filterActive"
       >
-        {{
-          expanded
-            ? t("curated.tagFilterShowLess")
-            : t("curated.tagFilterShowMore", { count: hiddenCount })
-        }}
+        <Tags class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+        <span class="min-w-0 truncate">{{ buttonLabel }}</span>
+        <Badge v-if="selectedCount > 1" variant="outline" class="shrink-0 tabular-nums">
+          {{ selectedCount }}
+        </Badge>
       </Button>
-    </div>
-  </section>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent
+      align="start"
+      class="w-64 rounded-xl"
+      data-curated-tag-filter-menu
+    >
+      <DropdownMenuLabel class="font-normal text-muted-foreground">
+        {{ t("curated.tagFilterTitle") }}
+      </DropdownMenuLabel>
+      <p
+        v-if="selectedCount > 0"
+        class="px-2 pb-1 text-xs leading-relaxed text-muted-foreground"
+        data-curated-tag-filter-selected
+      >
+        {{ t("curated.tagFilterSelectedList", { tags: selectedTags.join(" · ") }) }}
+      </p>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          data-curated-tag-filter-clear
+          :disabled="selectedCount === 0"
+          @click="emit('clear')"
+        >
+          <Check v-if="selectedCount === 0" aria-hidden="true" />
+          <Tags v-else aria-hidden="true" />
+          {{ t("curated.tagFilterAll") }}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup v-if="menuFacets.length > 0" class="max-h-64 overflow-y-auto">
+        <DropdownMenuCheckboxItem
+          v-for="tag in menuFacets"
+          :key="tag.name"
+          :checked="isSelected(tag.name)"
+          :data-curated-tag-filter-option="tag.name"
+          @select.prevent
+          @click="emit('toggleTag', tag.name)"
+        >
+          <span class="min-w-0 flex-1 truncate">{{ tag.name }}</span>
+          <span class="shrink-0 tabular-nums text-xs text-muted-foreground">
+            · {{ tag.count }}
+          </span>
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuGroup>
+      <p v-else class="px-2 py-1.5 text-sm text-muted-foreground">
+        {{ t("curated.tagFilterEmpty") }}
+      </p>
+    </DropdownMenuContent>
+  </DropdownMenu>
 </template>

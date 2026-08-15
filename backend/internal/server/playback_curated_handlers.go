@@ -162,11 +162,19 @@ func (h *Handler) handleListCuratedFrames(w http.ResponseWriter, r *http.Request
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
+	rawTags := make([]string, 0, 8)
+	for _, value := range q["tag"] {
+		for _, part := range strings.Split(value, ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				rawTags = append(rawTags, trimmed)
+			}
+		}
+	}
 	page, err := h.store.QueryCuratedFrames(ctx, storage.CuratedFrameQuery{
 		Query:   strings.TrimSpace(q.Get("q")),
 		Actor:   strings.TrimSpace(q.Get("actor")),
 		MovieID: strings.TrimSpace(q.Get("movieId")),
-		Tag:     strings.TrimSpace(q.Get("tag")),
+		Tags:    rawTags,
 		Limit:   limit,
 		Offset:  offset,
 	})

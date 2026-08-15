@@ -41,8 +41,9 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import type { CuratedFrameRecord } from "@/domain/curated-frame/types"
 import {
   getCuratedFrameSearchQuery,
-  getCuratedFrameTagQuery,
+  getCuratedFrameTagFilters,
   mergeCuratedFramesQuery,
+  serializeCuratedFrameTagFilters,
 } from "@/lib/library-query"
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
 import {
@@ -73,7 +74,6 @@ import {
   shouldShowCuratedFrameTagRetry,
   type CuratedFrameTagSaveStatus,
 } from "@/lib/curated-frames/p2-state"
-import { visibleCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 import {
   clearCuratedFrameExportSelection,
   reconcileCuratedFrameActorExportSelection,
@@ -97,7 +97,6 @@ const libraryService = useLibraryService()
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const curatedPageLimit = 60
-const curatedTagFilterPreviewLimit = 16
 
 /** 与资料库「批量管理」一致：勾选卡片并配合底部工具栏导出 */
 const batchMode = ref(false)
@@ -443,7 +442,6 @@ const rowsLoadingMore = ref(false)
 const rowsScrollRoot = ref<HTMLElement | null>(null)
 const rowsLoadMoreSentinel = ref<HTMLElement | null>(null)
 const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
-const tagFiltersExpanded = ref(false)
 let rowsLoadMoreObserver: IntersectionObserver | null = null
 
 function revokeAllUrls() {
@@ -459,8 +457,8 @@ function currentCuratedQuery() {
   return getCuratedFrameSearchQuery(route.query).trim()
 }
 
-function currentCuratedTagFilter() {
-  return getCuratedFrameTagQuery(route.query).trim()
+function currentCuratedTagFilters() {
+  return getCuratedFrameTagFilters(route.query)
 }
 
 async function reloadFromDb() {
@@ -468,7 +466,7 @@ async function reloadFromDb() {
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
-      tag: currentCuratedTagFilter(),
+      tags: currentCuratedTagFilters(),
       limit: curatedPageLimit,
       offset: 0,
     })
@@ -489,7 +487,7 @@ async function loadMoreRows() {
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
-      tag: currentCuratedTagFilter(),
+      tags: currentCuratedTagFilters(),
       limit: curatedPageLimit,
       offset: rawRows.value.length,
     })
@@ -506,7 +504,7 @@ watch(
   [
     () => curatedFramesRevision.value,
     () => getCuratedFrameSearchQuery(route.query),
-    () => getCuratedFrameTagQuery(route.query),
+    () => serializeCuratedFrameTagFilters(getCuratedFrameTagFilters(route.query)) ?? "",
   ],
   () => {
     void reloadFromDb()
@@ -542,9 +540,9 @@ onUnmounted(() => {
 })
 
 const isEmpty = computed(() => !rowsLoading.value && listWithUrls.value.length === 0)
-const activeTagFilter = computed(() => getCuratedFrameTagQuery(route.query).trim())
+const activeTagFilters = computed(() => getCuratedFrameTagFilters(route.query))
 const hasActiveFrameFilters = computed(
-  () => currentCuratedQuery() !== "" || activeTagFilter.value !== "",
+  () => currentCuratedQuery() !== "" || activeTagFilters.value.length > 0,
 )
 const isLibraryEmpty = computed(
   () =>
@@ -609,24 +607,6 @@ function observeRowsLoadMoreSentinel() {
 
 watch([rowsScrollRoot, rowsLoadMoreSentinel], observeRowsLoadMoreSentinel, { flush: "post" })
 
-const visibleCuratedTagFacets = computed(() => {
-  const facets = visibleCuratedFrameTagFacets(
-    curatedTagFacets.value,
-    curatedTagFilterPreviewLimit,
-    tagFiltersExpanded.value,
-  )
-  const active = activeTagFilter.value
-  if (!active || tagFiltersExpanded.value || facets.some((item) => item.name === active)) {
-    return facets
-  }
-  const activeFacet = curatedTagFacets.value.find((item) => item.name === active)
-  return activeFacet
-    ? [activeFacet, ...facets.slice(0, Math.max(curatedTagFilterPreviewLimit - 1, 0))]
-    : facets
-})
-const hiddenCuratedTagFacetCount = computed(() =>
-  Math.max(curatedTagFacets.value.length - curatedTagFilterPreviewLimit, 0),
-)
 const curatedFrameNearDuplicateThresholdSec = 3
 const nearDuplicateGroups = computed(() =>
   findCuratedFrameNearDuplicateGroups(rawRows.value, curatedFrameNearDuplicateThresholdSec),
@@ -1225,16 +1205,17 @@ function pickUserTagSuggestion(tag: string) {
   void nextTick(() => newUserTagInputRef.value?.focus())
 }
 
-function isCuratedTagFilterActive(tag: string) {
-  return activeTagFilter.value === tag.trim()
-}
-
-function setCuratedFrameTagFilter(tag: string | undefined) {
-  const normalized = tag?.trim()
+function setCuratedFrameTagFilters(tags: readonly string[]) {
   void router.replace({
     name: "curated-frames",
-    query: mergeCuratedFramesQuery(route.query, { cft: normalized || undefined }),
+    query: mergeCuratedFramesQuery(route.query, {
+      cft: serializeCuratedFrameTagFilters(tags),
+    }),
   })
+}
+
+function clearCuratedFrameTagFilters() {
+  setCuratedFrameTagFilters([])
 }
 
 function toggleCuratedFrameTagFilter(tag: string) {
@@ -1242,7 +1223,12 @@ function toggleCuratedFrameTagFilter(tag: string) {
   if (!normalized) {
     return
   }
-  setCuratedFrameTagFilter(isCuratedTagFilterActive(normalized) ? undefined : normalized)
+  const key = normalized.toLocaleLowerCase()
+  const next = activeTagFilters.value.filter((item) => item.toLocaleLowerCase() !== key)
+  if (next.length === activeTagFilters.value.length) {
+    next.push(normalized)
+  }
+  setCuratedFrameTagFilters(next)
 }
 
 /** 在本页用独立 cft 参数筛选萃取帧，不进入影片库 tag */
@@ -1257,7 +1243,9 @@ async function browseCuratedFramesByTag(tag: string) {
   resetDialogState()
   await router.push({
     name: "curated-frames",
-    query: mergeCuratedFramesQuery(route.query, { cft: t }),
+    query: mergeCuratedFramesQuery(route.query, {
+      cft: serializeCuratedFrameTagFilters([t]),
+    }),
   })
 }
 
@@ -1448,18 +1436,16 @@ defineExpose({
         @enter-batch-mode="batchMode = true"
         @select-visible="selectAllVisibleUpTo20"
         @exit-batch-mode="exitBatchMode"
-      />
-
-      <CuratedFrameTagFilterBar
-        :facets="curatedTagFacets"
-        :visible-facets="visibleCuratedTagFacets"
-        :active-tag="activeTagFilter"
-        :hidden-count="hiddenCuratedTagFacetCount"
-        :expanded="tagFiltersExpanded"
-        @clear="setCuratedFrameTagFilter(undefined)"
-        @toggle-tag="toggleCuratedFrameTagFilter"
-        @update-expanded="tagFiltersExpanded = $event"
-      />
+      >
+        <template #actions-start>
+          <CuratedFrameTagFilterBar
+            :facets="curatedTagFacets"
+            :selected-tags="activeTagFilters"
+            @clear="clearCuratedFrameTagFilters"
+            @toggle-tag="toggleCuratedFrameTagFilter"
+          />
+        </template>
+      </CuratedFrameLibraryToolbar>
 
       <div
         ref="rowsScrollRoot"
@@ -1469,8 +1455,8 @@ defineExpose({
       <CuratedFrameEmptyState
         v-if="isFilteredEmpty"
         variant="filtered"
-        :show-clear-filter="Boolean(activeTagFilter)"
-        @clear-filter="setCuratedFrameTagFilter(undefined)"
+        :show-clear-filter="activeTagFilters.length > 0"
+        @clear-filter="clearCuratedFrameTagFilters"
       />
       <TabsContent value="timeline" class="mt-0 outline-none">
         <CuratedFrameTimelineTab
