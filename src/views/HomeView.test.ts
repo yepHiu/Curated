@@ -140,14 +140,6 @@ vi.mock("@/components/jav-library/MediaStill.vue", () => ({
   },
 }))
 
-vi.mock("@/components/jav-library/PlaybackHistoryCard.vue", () => ({
-  default: {
-    name: "PlaybackHistoryCard",
-    props: ["movie", "entry"],
-    template: "<article class='playback-history-card-stub'>{{ movie.title }} {{ entry.movieId }}</article>",
-  },
-}))
-
 describe("HomeView", () => {
   beforeEach(() => {
     routerPushMock.mockReset()
@@ -196,7 +188,7 @@ describe("HomeView", () => {
     expect(wrapper.text()).toContain("home.sectionRecentTitle")
     expect(wrapper.text()).toContain("home.sectionRecommendTitle")
     expect(wrapper.text()).toContain("home.sectionContinueTitle")
-    expect(wrapper.findAll(".playback-history-card-stub")).toHaveLength(2)
+    expect(wrapper.getComponent({ name: "HomeContinueRow" }).findAll(".movie-card-stub")).toHaveLength(2)
   })
 
   it("renders dedicated empty state after movies finish loading with no results", () => {
@@ -323,7 +315,7 @@ describe("HomeView", () => {
 
     await wrapper.get('[data-home-taste-chip-kind="tag"]').trigger("click")
     expect(routerPushMock).toHaveBeenLastCalledWith({
-      name: "tags",
+      name: "library",
       query: {
         tag: "tag-a",
       },

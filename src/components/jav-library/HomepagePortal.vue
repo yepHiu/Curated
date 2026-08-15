@@ -182,6 +182,7 @@ function onHomeScroll() {
       </HomeSectionRow>
 
       <HomeContinueRow
+        v-if="model.continueWatching.length > 0"
         :entries="model.continueWatching"
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"

@@ -291,7 +291,7 @@ export function buildHomepagePortalModel({
   heroLimit = 8,
   recentLimit = 6,
   recommendationLimit = 6,
-  continueLimit = 4,
+  continueLimit = 6,
   tasteLimitPerKind = 3,
 }: BuildHomepagePortalInput): HomepagePortalModel {
   const activeMovies = movies.filter((movie) => !movie.trashedAt?.trim())

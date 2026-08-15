@@ -2,7 +2,6 @@
 import { Skeleton } from "@/components/ui/skeleton"
 
 const posterSkeletons = Array.from({ length: 6 }, (_, index) => `poster-${index}`)
-const continueSkeletons = Array.from({ length: 4 }, (_, index) => `continue-${index}`)
 const tasteSkeletons = Array.from({ length: 3 }, (_, index) => `taste-${index}`)
 </script>
 
@@ -46,7 +45,7 @@ const tasteSkeletons = Array.from({ length: 3 }, (_, index) => `taste-${index}`)
       class="mx-auto flex w-full max-w-[1680px] flex-col gap-8 px-4 py-6 sm:px-5 lg:gap-10 lg:px-6 lg:py-8 xl:px-8"
     >
       <section
-        v-for="sectionId in ['recent', 'recommend']"
+        v-for="sectionId in ['recent', 'recommend', 'continue']"
         :key="sectionId"
         :data-homepage-skeleton-section="sectionId"
         class="space-y-4"
@@ -66,31 +65,6 @@ const tasteSkeletons = Array.from({ length: 3 }, (_, index) => `taste-${index}`)
             <div class="space-y-2">
               <Skeleton class="h-4 w-2/3" />
               <Skeleton class="h-3 w-1/2" />
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section
-        data-homepage-skeleton-section="continue"
-        class="space-y-4"
-      >
-        <div class="space-y-2">
-          <Skeleton class="h-6 w-48" />
-          <Skeleton class="h-4 w-full max-w-xl" />
-        </div>
-
-        <div class="grid gap-3 lg:grid-cols-2">
-          <article
-            v-for="itemId in continueSkeletons"
-            :key="itemId"
-            class="grid min-h-32 grid-cols-[5rem_1fr] gap-4 rounded-[1.25rem] border border-border/50 bg-card/60 p-4"
-          >
-            <Skeleton class="h-full w-full rounded-lg" />
-            <div class="space-y-3">
-              <Skeleton class="h-5 w-2/3" />
-              <Skeleton class="h-4 w-1/2" />
-              <Skeleton class="h-2.5 w-full rounded-full" />
             </div>
           </article>
         </div>

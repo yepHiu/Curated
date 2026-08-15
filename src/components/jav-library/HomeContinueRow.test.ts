@@ -37,16 +37,16 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-vi.mock("@/components/jav-library/PlaybackHistoryCard.vue", () => ({
+vi.mock("@/components/jav-library/MovieCard.vue", () => ({
   default: {
-    name: "PlaybackHistoryCard",
-    props: ["movie", "entry"],
-    template: "<article class='playback-history-card-stub'>{{ movie.title }} {{ entry.movieId }}</article>",
+    name: "MovieCard",
+    props: ["movie"],
+    template: "<article class='movie-card-stub'>{{ movie.title }}</article>",
   },
 }))
 
 describe("HomeContinueRow", () => {
-  it("renders only playback history cards without remaining time or details action", () => {
+  it("renders continue watching as poster movie cards", () => {
     const wrapper = mount(HomeContinueRow, {
       props: {
         entries: [
@@ -60,7 +60,9 @@ describe("HomeContinueRow", () => {
       },
     })
 
-    expect(wrapper.findAll(".playback-history-card-stub")).toHaveLength(1)
+    expect(wrapper.findAll(".movie-card-stub")).toHaveLength(1)
+    expect(wrapper.findAll(".playback-history-card-stub")).toHaveLength(0)
+    expect(wrapper.text()).toContain("home.sectionContinueTitle")
     expect(wrapper.text()).not.toContain("home.continueRemaining")
     expect(wrapper.text()).not.toContain("home.heroDetailsAction")
   })
