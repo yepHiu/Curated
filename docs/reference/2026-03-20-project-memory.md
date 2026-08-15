@@ -4,7 +4,7 @@
 
 - 当前仓库是可运行、可打包的 **Curated** 本地优先媒体资料库，不再只是前端高保真原型。
 - `docs/product/2026-03-20-jav-libary.md` 同时描述当前实现与目标桌面蓝图；其中 mpv、深度业务 IPC 和广泛原生桥接仍是目标，不应与已落地 Electron 壳混淆。
-- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`127.0.0.1:8080`**，Vite 代理 **`/api` → `127.0.0.1:8080`** 仍作为 fallback；release **`127.0.0.1:8081`** 静态托管继续使用同源 **`/api`**（详见 `README.md`）。非 loopback 监听需要主配置显式设置 **`lanEnabled: true`** 且已初始化 PIN。关闭该开关时仍可使用内存 **Mock** 适配器。
+- 当前仓库包含 **Vue 前端** 与 **`Go + SQLite` 后端**；开发模式下可通过 **`VITE_USE_WEB_API=true`** 联通真实 HTTP API，本地 loopback 默认直连开发后端 **`127.0.0.1:8080`**，Vite 代理 **`/api` → `127.0.0.1:8080`** 仍作为 fallback；release **`127.0.0.1:8081`** 静态托管继续使用同源 **`/api`**（详见 `docs/guide.md`）。非 loopback 监听需要主配置显式设置 **`lanEnabled: true`** 且已初始化 PIN。关闭该开关时仍可使用内存 **Mock** 适配器。
 - 当前阶段采用 `Web 优先 + 最小桌面壳层` 策略：核心业务仍是 `Vue Web App -> HTTP API -> Go Backend`，`electron/` 负责启动或复用 Go HTTP 后端、开发态启动或复用 Vite 前端、用带 Curated 图标的 BrowserWindow 加载 Web UI、关闭窗口时退到托盘，并仅通过 preload 暴露 `window.javLibrary.pickDirectory()` 这一类窄原生能力；深度 IPC 桥接仍是后续目标。
 
 ## 2. 当前代码事实
@@ -28,8 +28,8 @@
 - 产品组件：`src/components/jav-library`
 - UI 原子组件：`src/components/ui`
 - 主题样式：`src/style.css`
-- 品牌资源：`icon/curated-title-nobg.png` 为 README 顶部带字标志；`icon/curated-icon-rg-dark-pink.png` 为应用无字图标源图，已同步到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`
-- 公开文档：`README.md` 为英文主版，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；根目录 `API.md` 为唯一公开 API 参考文档
+- 品牌资源：`icon/curated-wordmark.png` 为 README 顶部带字标志；`icon/curated-appicon.png` 为圆角深色底应用图标源图；`icon/curated-mark.png` 为透明底核心标志。应用图标已同步到 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`
+- 公开文档：`README.md` 为英文短入口，`README.zh-CN.md` 与 `README.ja-JP.md` 为完整翻译版；详细手册与文档索引为 [`docs/guide.md`](../guide.md)；根目录 `API.md` 为唯一公开 API 参考文档
 - **UI 设计规范（代码级）**：[`2026-03-24-frontend-ui-spec.md`](2026-03-24-frontend-ui-spec.md)；Cursor 速查 [`.cursor/rules/ui-component-spec.mdc`](../../.cursor/rules/ui-component-spec.mdc)
 - 原型数据与类型（Mock 模式）：`src/lib/jav-library.ts`
 - 播放进度（Web API 为 SQLite、Mock 为 localStorage）：`src/lib/playback-progress-storage.ts`、`src/services/protected-web-state-bootstrap.ts`、`src/lib/player-route.ts`、`src/lib/playback-history-groups.ts`
@@ -46,7 +46,7 @@
 ### 当前前后端互联事实
 
 - 已落地 **library-service 契约**（`src/services/contracts/library-service.ts`）与 **Web / Mock 双适配器**。
-- **Go Backend** 提供 `/api` 下健康检查、认证与可信会话、影片/演员/萃取帧、导入、播放与 HLS session、库路径与存储健康、设置、扫描/刮削任务、SSE `events`、connected clients 与应用更新等（公开摘要见 `API.md` 与 `README.md`）。
+- **Go Backend** 提供 `/api` 下健康检查、认证与可信会话、影片/演员/萃取帧、导入、播放与 HLS session、库路径与存储健康、设置、扫描/刮削任务、SSE `events`、connected clients 与应用更新等（公开摘要见 `API.md` 与 `docs/guide.md`）。
 - **库行为 JSON**：`config/library-config.cfg` 与 **`PATCH /api/settings`** 同步；**`autoLibraryWatch`**（默认开）控制是否在主配置允许时启用 **fsnotify** 监听并在新文件事件后排队防抖扫描，**不**关闭手动或周期全库扫描。
 - 已有 **Electron MVP**：`electron/main.ts` / `electron/backend-process.ts` / `electron/frontend-process.ts` 启动或复用 Go HTTP 后端，等待 `/api/health` 后在开发态启动或复用 `http://127.0.0.1:5173` 的 Vite 前端并加载 Web UI；打包态仍加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。窗口使用 Curated 图标，关闭窗口会隐藏到托盘，托盘菜单可恢复窗口、在浏览器打开 Web 端、打开 Settings 或真正退出；`preload` 仅暴露 `window.javLibrary.pickDirectory()` 供现有目录选择入口调用原生目录对话框，不承载业务 API。仍无 **mpv** 命名管道；Web 阶段播放由浏览器 `<video>` 解码。
 - **观看进度与已播放状态**在 Web API 模式写入 SQLite，在 Mock 模式写入 `localStorage`。Web 模式启动会先读取权威认证状态，只有解锁后才 hydrate，两类状态都只执行一次。
@@ -164,6 +164,6 @@
 - 若 `docs/product/2026-03-20-jav-libary.md` 继续扩展，需同步标注哪些是愿景，哪些已经在当前仓库落地。
 - 打整机安装包或执行正式发布时，版本号必须跟随 `docs/ops/package-build-history.csv` 的发布历史延续；先查最近一条有效记录，再确定本次发布版本，并让安装包、发布清单与历史台账保持同一版本号。
 - 调整全局 `Input` 默认样式或主题变量时，同步检查 **§9 表单与文本输入** 与 **`vue-frontend-standards.mdc`** 是否仍一致。
-- 调整品牌资源时，优先以 `icon/` 为设计源：README 使用 `icon/curated-title-nobg.png`，应用图标统一由 `icon/curated-icon-rg-dark-pink.png` 派生；至少同步检查 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。
+- 调整品牌资源时，优先以 `icon/` 为设计源：README 使用 `icon/curated-wordmark.png`，应用图标统一由 `icon/curated-appicon.png` 派生，透明核心标志为 `icon/curated-mark.png`；至少同步检查 `public/Curated-icon.png`、`backend/frontend-dist/Curated-icon.png` 与 `backend/internal/assets/curated.ico`。对照表见 `icon/README.md`。
 - 调整公开接口时，根目录 `API.md` 是唯一对外 API 参考文档；README 三语版只保留 API 概要和链接，不再维护完整接口表。
 - 调整用户可见说明、命令入口或公开功能描述时，默认同步检查 `README.md`、`README.zh-CN.md`、`README.ja-JP.md` 三份文档，避免多语言 README 长期漂移。

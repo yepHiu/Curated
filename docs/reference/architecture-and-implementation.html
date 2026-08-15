@@ -322,7 +322,7 @@
     <li><span class="path">src/App.vue</span>：根组件，通常承载 <code>router-view</code>。</li>
     <li><span class="path">src/router/index.ts</span>：使用 <strong>Hash 路由</strong>（<code>createWebHashHistory</code>），子路由挂在 <span class="path">layouts/AppShell.vue</span> 下：
       <ul>
-        <li><code>/library</code>、<code>/favorites</code>、<code>/recent</code>、<code>/tags</code> → 同一 <span class="path">views/LibraryView.vue</span>（通过路由名区分模式）。</li>
+        <li><code>/library</code>、<code>/favorites</code> → 同一 <span class="path">views/LibraryView.vue</span>（通过路由名区分模式）。<code>/recent</code> 与退役的 <code>/tags</code> 重定向到 <code>/library</code>；后者保留 <code>tag</code> 及其他 query。</li>
         <li><code>/history</code> → <span class="path">views/HistoryView.vue</span>（观看历史：按本地日期分组；数据见 2.5）。</li>
         <li><code>/detail/:id</code> → <span class="path">views/DetailView.vue</span></li>
         <li><code>/player/:id?</code> → <span class="path">views/PlayerView.vue</span></li>
@@ -382,7 +382,7 @@
     <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code> / <code>tray</code>）与可选 <code>-maintenance</code> 备份/恢复或路径迁移动作；离线动作复用正常运行时数据库锁。</li>
     <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>metadataMovieStrategy</code>、<code>defaultImportLibraryPathId</code>、<code>backupDirectory</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code> 等）。</li>
     <li>先取得 <code>&lt;databasePath&gt;.runtime.lock</code> 跨进程独占锁，再打开 SQLite：<code>storage.NewSQLiteStore(cfg.DatabasePath)</code>，执行 <code>Migrate</code>，必要时 <code>SeedLibraryPathsIfEmpty</code>。</li>
-    <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存与 <code>internal/storagehealth</code> 存储在线检测器等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。若 <code>autoActorProfileScrape</code> 为真，则影片元数据刮削成功后会继续为仍缺头像与简介的演员自动排队 <code>scrape.actor</code>。</li>
+    <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存与 <code>internal/storagehealth</code> 存储在线检测器等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。若 <code>autoActorProfileScrape</code> 为真，则影片元数据刮削成功后会继续为仍缺头像与简介的演员自动排队 <code>scrape.actor</code>，并启动有界后台补刮循环 <code>StartAutoActorProfileScrapeLoop</code>。</li>
     <li><code>http</code> 模式下 <code>server.ListenAndServe</code> 挂载 <code>backendApp.HTTPHandler()</code>。</li>
   </ol>
 
@@ -491,7 +491,7 @@
       <tr><td>导入影片</td><td><code>MovieImportDialog</code>、设置页默认导入路径选择器、<code>ScanProgressDock</code></td><td><code>POST /api/import/movies</code>、<code>/api/import/movies/uploads</code> 分块续传、<code>0029_movie_import_upload_sessions.sql</code>、<code>movie_import_upload_repository.go</code>、<code>movie_import_upload_runtime.go</code>；SQLite session/chunk ledger、重启与提交中断恢复、离线延迟、审计 janitor、不覆盖与不删除最终文件；<code>defaultImportLibraryPathId</code>、<code>import.movies</code> 任务、默认路径 <code>canImport</code> 检查</td></tr>
       <tr><td>整理库开关</td><td>设置 UI</td><td><code>OrganizeLibraryController</code> 写回 <code>library-config.cfg</code></td></tr>
       <tr><td>监听触发的自动扫描</td><td>设置 UI（自动刮削）</td><td><code>AutoLibraryWatchController</code> + <code>librarywatch.Watcher</code>；<code>autoLibraryWatch</code> 写入 <code>library-config.cfg</code></td></tr>
-      <tr><td>影片刮削后自动补演员资料</td><td>设置 UI（自动刮削）</td><td><code>AutoActorProfileScrapeController</code> + <code>scrape.actor</code> 自动排队；<code>autoActorProfileScrape</code> 写入 <code>library-config.cfg</code></td></tr>
+      <tr><td>缺少资料的演员自动补刮</td><td>设置 UI（自动刮削）</td><td><code>AutoActorProfileScrapeController</code> + 影片刮削后排队 + 启动/定时有界 sweep；<code>autoActorProfileScrape</code> 写入 <code>library-config.cfg</code></td></tr>
       <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；支持 <code>/api/playback/sessions/recent</code> 与 <code>/api/playback/sessions/{id}</code> 观测会话状态；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
       <tr><td>任务事件流</td><td><code>src/lib/backend-events.ts</code>、<code>use-scan-task-tracker.ts</code>、<code>use-library-watch-toasts.ts</code></td><td><code>GET /api/events</code> SSE；<code>tasks.Manager</code> 发布 <code>task.updated</code>，轮询端点保留为 fallback</td></tr>
       <tr><td>每日观看时间统计</td><td><code>SettingsWatchTimeHeatmap.vue</code>、<code>watch-time-heatmap.ts</code>、<code>playback-watch-time-tracker.ts</code></td><td><code>GET/POST /api/playback/watch-time/daily</code>；按 <code>day_key + movie_id</code> 聚合，设置概览固定展示 91 天摘要指标</td></tr>

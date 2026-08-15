@@ -59,7 +59,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | fsnotify-triggered scan | Shipped | New file detection with debounce |
 | Movie metadata scraping | Shipped | Via metatube-sdk-go; `POST /api/library/movies/{id}/scrape` |
 | Actor metadata scraping | Shipped | `POST /api/library/actors/scrape` |
-| Auto actor profile scrape | Shipped | `autoActorProfileScrape` setting; enqueues on movie scrape success |
+| Auto actor profile scrape | Shipped | `autoActorProfileScrape` setting; enqueues on movie scrape success and via a bounded missing-profile library sweep |
 | Batch metadata refresh | Shipped | `POST /api/library/metadata-scrape` by library paths |
 | Multi-provider support | Shipped | `metadataMovieProvider` + `metadataMovieStrategy` |
 | Provider strategies | Shipped | `auto-global`, `auto-cn-friendly`, `custom-chain`, `specified` |
@@ -436,7 +436,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 | `/library` | Library | Default landing; query: `q`, `tag`, `actor`, `tab` |
 | `/favorites` | Favorites | Filtered library view |
 | `/recent` | Recent redirect | Redirects into the library query model |
-| `/tags` | Tags | Tag browse |
+| `/tags` | Library redirect | Redirects to `/library`, preserving `tag` and other query |
 | `/trash` | Trash | Restore or permanently delete trashed movies |
 | `/actors` | Actors | Actor list; query: `q`, `actorTag`, `sort` |
 | `/actors/:actorName` | Actor Detail | Canonical profile and movie results; old alias routes normalize to canonical and expose the merge workbench |
