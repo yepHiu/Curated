@@ -225,6 +225,37 @@
     background-color: var(--scrollbar-thumb-hover);
   }
 
+  /*
+   * Reka SelectViewport injects CSS that hides its scrollbar and only relies on
+   * chevron scroll buttons. Restore the project thin scrollbar so long option
+   * lists (tags / actors / studios / years) show scroll position.
+   */
+  [data-reka-select-viewport] {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    -ms-overflow-style: auto !important;
+  }
+
+  [data-reka-select-viewport]::-webkit-scrollbar {
+    display: block !important;
+    width: 8px;
+    height: 8px;
+  }
+
+  [data-reka-select-viewport]::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: var(--radius);
+  }
+
+  [data-reka-select-viewport]::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: var(--scrollbar-thumb);
+  }
+
+  [data-reka-select-viewport]::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
   /* 锁定视口高度，避免壳层内溢出把文档撑高导致「整页滚动 + 底部空白」 */
   html {
     color-scheme: light;

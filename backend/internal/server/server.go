@@ -582,12 +582,24 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rawTags := make([]string, 0, 8)
+	for _, value := range query["tag"] {
+		rawTags = append(rawTags, value)
+	}
+	rawActors := make([]string, 0, 8)
+	for _, value := range query["actor"] {
+		rawActors = append(rawActors, value)
+	}
+	rawStudios := make([]string, 0, 8)
+	for _, value := range query["studio"] {
+		rawStudios = append(rawStudios, value)
+	}
 	request := contracts.ListMoviesRequest{
 		Mode:       mode,
 		Query:      query.Get("q"),
-		Tag:        query.Get("tag"),
-		Actor:      query.Get("actor"),
-		Studio:     query.Get("studio"),
+		Tags:       storage.ParseMovieTagFilters(rawTags...),
+		Actor:      strings.Join(storage.ParseMovieTagFilters(rawActors...), ","),
+		Studio:     strings.Join(storage.ParseMovieTagFilters(rawStudios...), ","),
 		PlayState:  playState,
 		UserRating: userRating,
 		Unrated:    unrated,

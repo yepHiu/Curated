@@ -846,9 +846,9 @@ Query：
 | --- | --- | --- |
 | `mode` | string | 可用值：空 / `library` / `favorites` / `recent` / `tags` / `trash`。空与 `library` 返回活动库；`favorites` 只返回收藏；`recent` 只返回最近 30 天入库；`tags` 返回与活动库相同的影片集合，标签聚合与排序由前端布局完成；`trash` 返回回收站。其他值返回 `400 COMMON_BAD_REQUEST` |
 | `q` | string | 子串搜索标题、番号、片商、简介，不区分大小写 |
-| `tag` | string | 精确匹配元数据或用户标签 |
-| `actor` | string | 精确匹配演员名 |
-| `studio` | string | 精确匹配有效片商名 |
+| `tag` | string | 精确匹配元数据（INFO/nfo）或用户标签；逗号分隔或多个 `tag` 参数表示全部命中（AND） |
+| `actor` | string | 精确匹配演员名；逗号分隔或多个 `actor` 参数表示全部命中（AND，须同时出演；含 alias） |
+| `studio` | string | 精确匹配有效片商名；逗号分隔或多个 `studio` 参数表示命中任一（OR） |
 | `playState` | string | `all` / `unwatched` / `in-progress` / `completed`；播放进度达到 95% 视为完成 |
 | `userRating` | number | 用户本地评分**最低分** 0～5；不使用刮削评分替代。与 `unrated` 同时出现时以未评分为准 |
 | `unrated` | boolean | `1` / `true` / `yes` 只返回没有本地用户评分的影片 |
@@ -1691,7 +1691,7 @@ Body：
 | `player` | 播放器设置 |
 | `organizeLibrary` | 扫描后是否整理目录 |
 | `autoLibraryWatch` | 是否启用目录监听扫描 |
-| `autoActorProfileScrape` | 影片刮削后是否自动补演员资料 |
+| `autoActorProfileScrape` | 是否自动补刮缺少头像和简介的演员资料（影片刮削后立即补刮，并后台分批补齐已有空资料演员） |
 | `autoDownloadUpdates` | 启动更新检查后是否自动下载 |
 | `launchAtLogin` | 桌面端是否登录自启 |
 | `launchAtLoginSupported` | 当前运行时是否支持登录自启 |
@@ -2748,7 +2748,7 @@ Body：
 }
 ```
 
-成功：`201 SavedViewDTO`。名称 trim 后为 1～40 个 Unicode 字符，忽略大小写及首尾空白后必须唯一；每个库最多 50 个视图。筛选文本最长 200 字符，`addedWithinDays` 为 1～3650。`userRating` 表示本地评分最低分；`unrated` 为 true 时忽略 `userRating`。可选 `year`（`YYYY` 或 `unknown`）、`runtime`（`short` / `standard` / `long`）、`catalog`（`unscraped` / `no-cover`）。服务端重新规范化所有字段，`2160p` / `UHD` 等保存为 `4k`。
+成功：`201 SavedViewDTO`。名称 trim 后为 1～40 个 Unicode 字符，忽略大小写及首尾空白后必须唯一；每个库最多 50 个视图。筛选文本最长 200 字符，`addedWithinDays` 为 1～3650。`userRating` 表示本地评分最低分；`unrated` 为 true 时忽略 `userRating`。可选 `year`（`YYYY` 或 `unknown`）、`runtime`（`short` / `standard` / `long`）、`catalog`（`unscraped` / `no-cover`）、`sort`（`added` / `release` / `rating` / `code` / `actor` / `studio` / `year`；省略或 `added` 表示按入库时间）。`tag` 可为逗号分隔的多个标签，影片必须同时具备全部所选标签（用户标签或 INFO/nfo 标签均可）。服务端重新规范化所有字段，`2160p` / `UHD` 等保存为 `4k`。
 
 #### `PATCH /api/library/saved-views/{savedViewId}`
 

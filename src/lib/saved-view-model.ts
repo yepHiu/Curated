@@ -1,14 +1,33 @@
-import type { SavedViewFiltersV1, SavedViewMode, SavedViewPlayState, SavedViewTab } from "@/api/types"
+import type {
+  SavedViewFiltersV1,
+  SavedViewMode,
+  SavedViewPlayState,
+  SavedViewSort,
+  SavedViewTab,
+} from "@/api/types"
 import {
   normalizeLibraryCatalogFilter,
   normalizeLibraryResolutionFilter,
   normalizeLibraryRuntimeFilter,
+  normalizeLibrarySortFilter,
   normalizeLibraryYearFilter,
+  serializeLibraryTagFilters,
+  parseLibraryTagFilterText,
 } from "@/lib/library-query"
+import { librarySortKeyFromTab } from "@/lib/movie-sort"
 
 const modes = new Set<SavedViewMode>(["library", "favorites", "recent", "tags", "trash"])
 const tabs = new Set<SavedViewTab>(["all", "new", "top-rated"])
 const playStates = new Set<SavedViewPlayState>(["all", "unwatched", "in-progress", "completed"])
+const sorts = new Set<SavedViewSort>([
+  "added",
+  "release",
+  "rating",
+  "code",
+  "actor",
+  "studio",
+  "year",
+])
 
 export function normalizeSavedViewName(value: string): string {
   const name = value.trim()
@@ -60,18 +79,28 @@ export function normalizeSavedViewFiltersV1(input: SavedViewFiltersV1): SavedVie
   if (input.catalog?.trim() && !catalog) {
     throw new Error("invalid saved view catalog")
   }
+  const sortRaw = input.sort?.trim() ?? ""
+  const sort = sortRaw ? normalizeLibrarySortFilter(sortRaw) : ""
+  if (sortRaw && !sort) {
+    throw new Error("invalid saved view sort")
+  }
   if (mode === "trash") {
     return { schemaVersion: 1, mode: "trash", tab: "all", playState: "all" }
   }
   const unrated = input.unrated === true
+  const resolvedSort = (sort || librarySortKeyFromTab(tab)) as SavedViewSort
+  if (!sorts.has(resolvedSort)) {
+    throw new Error("invalid saved view sort")
+  }
   return {
     schemaVersion: 1,
     mode,
     q: normalizeText(input.q),
-    tag: normalizeText(input.tag),
-    actor: normalizeText(input.actor),
-    studio: normalizeText(input.studio),
+    tag: normalizeText(serializeLibraryTagFilters(parseLibraryTagFilterText(input.tag))),
+    actor: normalizeText(serializeLibraryTagFilters(parseLibraryTagFilterText(input.actor))),
+    studio: normalizeText(serializeLibraryTagFilters(parseLibraryTagFilterText(input.studio))),
     tab,
+    sort: resolvedSort === "added" ? undefined : resolvedSort,
     playState,
     userRating: unrated ? undefined : input.userRating,
     unrated: unrated || undefined,

@@ -128,6 +128,9 @@ describe("AppSidebar", () => {
       .find((link) => link.text().includes("nav.library"))
 
     expect(libraryLink?.text()).toBe("nav.library")
+    expect(
+      wrapper.findAll("[data-sidebar-nav-link]").some((link) => link.text().includes("nav.tags")),
+    ).toBe(false)
   })
 
   it("keeps the same core nav link count when toggling compact mode", async () => {

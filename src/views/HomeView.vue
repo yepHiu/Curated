@@ -102,7 +102,7 @@ function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string 
 
   if (payload.kind === "tag") {
     void router.push({
-      name: "tags",
+      name: "library",
       query: { tag: label },
     })
     return

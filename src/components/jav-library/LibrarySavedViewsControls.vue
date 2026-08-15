@@ -3,7 +3,9 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
+  ArrowUpDown,
   Bookmark,
+  Building2,
   Check,
   ChevronDown,
   ChevronUp,
@@ -12,7 +14,9 @@ import {
   Pencil,
   RefreshCw,
   Save,
+  Tags,
   Trash2,
+  User,
   X,
 } from "lucide-vue-next"
 import type { SavedViewDTO, SavedViewFiltersV1 } from "@/api/types"
@@ -49,27 +53,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import LibraryFacetPickerPanel from "@/components/jav-library/LibraryFacetPickerPanel.vue"
+import LibraryTagFilterControl from "@/components/jav-library/LibraryTagFilterControl.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
+import {
+  aggregateMetadataTagCounts,
+  aggregateNamedCounts,
+  aggregateUserTagCounts,
+  withCurrentNamedCounts,
+} from "@/lib/library-stats"
 import {
   buildSavedViewFiltersV1,
   buildSavedViewRouteTarget,
-  getLibraryActorExactQuery,
+  getLibraryActorExactFilters,
   getLibraryAddedWithinDaysQuery,
   getLibraryCatalogQuery,
   getLibraryPlayStateQuery,
   getLibraryResolutionQuery,
   getLibraryRuntimeQuery,
-  getLibraryStudioExactQuery,
-  getLibraryTagExactQuery,
+  getLibrarySortQuery,
+  getLibraryStudioExactFilters,
+  getLibraryTagExactFilters,
   getLibraryUnratedQuery,
   getLibraryUserRatingQuery,
   getLibraryYearQuery,
   mergeLibraryQuery,
+  normalizeLibrarySortFilter,
+  parseLibraryTagFilterText,
   resolveLibraryMode,
+  serializeLibraryTagFilters,
 } from "@/lib/library-query"
+import { librarySortKeys, libraryTabFromSortKey } from "@/lib/movie-sort"
 import { useLibraryService } from "@/services/library-service"
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
@@ -85,6 +102,7 @@ const nameDraft = ref("")
 const mode = computed(() => resolveLibraryMode(route))
 const savedViews = computed(() => libraryService.savedViews.value)
 const currentFilters = computed(() => buildSavedViewFiltersV1(mode.value, route.query))
+const sort = computed(() => getLibrarySortQuery(route.query))
 const playState = computed(() => getLibraryPlayStateQuery(route.query))
 const userRating = computed(() => getLibraryUserRatingQuery(route.query))
 const unrated = computed(() => getLibraryUnratedQuery(route.query))
@@ -93,9 +111,15 @@ const addedWithinDays = computed(() => getLibraryAddedWithinDaysQuery(route.quer
 const year = computed(() => getLibraryYearQuery(route.query))
 const runtime = computed(() => getLibraryRuntimeQuery(route.query))
 const catalog = computed(() => getLibraryCatalogQuery(route.query))
-const tagFilter = computed(() => getLibraryTagExactQuery(route.query).trim())
-const actorFilter = computed(() => getLibraryActorExactQuery(route.query).trim())
-const studioFilter = computed(() => getLibraryStudioExactQuery(route.query).trim())
+const tagFilters = computed(() => getLibraryTagExactFilters(route.query))
+const actorFilters = computed(() => getLibraryActorExactFilters(route.query))
+const studioFilters = computed(() => getLibraryStudioExactFilters(route.query))
+const filterOpen = ref(false)
+type LibraryFacetKind = "tag" | "actor" | "studio"
+const activeFacet = ref<LibraryFacetKind | null>(null)
+watch(filterOpen, (open) => {
+  if (!open) activeFacet.value = null
+})
 const ratingSelectValue = computed(() => {
   if (unrated.value) return "unrated"
   return userRating.value === undefined ? "any" : String(userRating.value)
@@ -110,9 +134,15 @@ const advancedFilterCount = computed(
     Number(year.value !== "") +
     Number(runtime.value !== "") +
     Number(catalog.value !== "") +
-    Number(tagFilter.value !== "") +
-    Number(actorFilter.value !== "") +
-    Number(studioFilter.value !== ""),
+    Number(tagFilters.value.length > 0) +
+    Number(actorFilters.value.length > 0) +
+    Number(studioFilters.value.length > 0),
+)
+const sortActive = computed(() => sort.value !== "added")
+const sortButtonLabel = computed(() =>
+  sortActive.value
+    ? t(`library.savedViewSortValue.${sort.value}`)
+    : t("library.savedViewSort"),
 )
 const yearOptions = computed(() => {
   const years = new Set<number>()
@@ -123,35 +153,56 @@ const yearOptions = computed(() => {
   }
   return [...years].sort((left, right) => right - left)
 })
-const tagSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.flatMap((movie) => [...movie.tags, ...movie.userTags])))
-const actorSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.flatMap((movie) => movie.actors)))
-const studioSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.map((movie) => movie.studio)))
-const tagDraft = ref("")
-const actorDraft = ref("")
-const studioDraft = ref("")
+const userTagSuggestions = computed(() =>
+  aggregateUserTagCounts(libraryService.movies.value, locale.value),
+)
+const metadataTagSuggestions = computed(() =>
+  aggregateMetadataTagCounts(libraryService.movies.value, locale.value),
+)
+const actorSuggestions = computed(() =>
+  withCurrentNamedCounts(
+    aggregateNamedCounts(
+      libraryService.movies.value.flatMap((movie) => movie.actors),
+      locale.value,
+    ),
+    actorFilters.value,
+    locale.value,
+  ),
+)
+const studioSuggestions = computed(() =>
+  withCurrentNamedCounts(
+    aggregateNamedCounts(
+      libraryService.movies.value.map((movie) => movie.studio),
+      locale.value,
+    ),
+    studioFilters.value,
+    locale.value,
+  ),
+)
+const actorPickerGroups = computed(() => [
+  {
+    id: "actors",
+    ariaKey: "library.ariaFilterActor",
+    rows: actorSuggestions.value,
+  },
+])
+const studioPickerGroups = computed(() => [
+  {
+    id: "studios",
+    ariaKey: "library.ariaFilterStudio",
+    rows: studioSuggestions.value,
+  },
+])
 
-watch(tagFilter, (value) => {
-  tagDraft.value = value
-}, { immediate: true })
-watch(actorFilter, (value) => {
-  actorDraft.value = value
-}, { immediate: true })
-watch(studioFilter, (value) => {
-  studioDraft.value = value
-}, { immediate: true })
-
-function uniqueFacetValues(values: readonly string[]): string[] {
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (const value of values) {
-    const trimmed = value.trim()
-    if (!trimmed) continue
-    const key = trimmed.toLocaleLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.push(trimmed)
+function facetTriggerLabel(count: number, selectedKey: string): string {
+  if (count === 0) {
+    return t("library.savedViewAny")
   }
-  return result.sort((left, right) => left.localeCompare(right))
+  return t(selectedKey, { count })
+}
+
+function toggleFacet(kind: LibraryFacetKind) {
+  activeFacet.value = activeFacet.value === kind ? null : kind
 }
 
 const canonicalFilterKey = (filters: SavedViewFiltersV1) => JSON.stringify(filters)
@@ -192,7 +243,9 @@ async function updateAdvancedFilters(
       | "catalog"
       | "tag"
       | "actor"
-      | "studio",
+      | "studio"
+      | "sort"
+      | "tab",
       string | undefined
     >
   >,
@@ -260,13 +313,68 @@ function onCatalogChange(value: unknown) {
   void updateAdvancedFilters({ catalog: next === "any" ? undefined : next })
 }
 
-function applyTextFilter(key: "tag" | "actor" | "studio", draft: string) {
-  const next = draft.trim()
-  const current = key === "tag" ? tagFilter.value : key === "actor" ? actorFilter.value : studioFilter.value
-  if (next === current) {
+function toggleTagFilter(tag: string) {
+  const normalized = tag.trim()
+  if (!normalized) {
     return
   }
-  void updateAdvancedFilters({ [key]: next || undefined })
+  const key = normalized.toLocaleLowerCase()
+  const next = tagFilters.value.filter((item) => item.toLocaleLowerCase() !== key)
+  if (next.length === tagFilters.value.length) {
+    next.push(normalized)
+  }
+  void updateAdvancedFilters({ tag: serializeLibraryTagFilters(next) })
+}
+
+function clearTagFilters() {
+  void updateAdvancedFilters({ tag: undefined })
+}
+
+function toggleDelimitedFilter(
+  key: "actor" | "studio",
+  current: readonly string[],
+  value: string,
+) {
+  const normalized = value.trim()
+  if (!normalized) {
+    return
+  }
+  const needle = normalized.toLocaleLowerCase()
+  const next = current.filter((item) => item.toLocaleLowerCase() !== needle)
+  if (next.length === current.length) {
+    next.push(normalized)
+  }
+  void updateAdvancedFilters({ [key]: serializeLibraryTagFilters(next) })
+}
+
+function toggleActorFilter(actor: string) {
+  toggleDelimitedFilter("actor", actorFilters.value, actor)
+}
+
+function clearActorFilters() {
+  void updateAdvancedFilters({ actor: undefined })
+}
+
+function toggleStudioFilter(studio: string) {
+  toggleDelimitedFilter("studio", studioFilters.value, studio)
+}
+
+function clearStudioFilters() {
+  void updateAdvancedFilters({ studio: undefined })
+}
+
+function onSortChange(value: unknown) {
+  const next = normalizeLibrarySortFilter(selectString(value) ?? "")
+  if (!next) return
+  const tab = libraryTabFromSortKey(next)
+  if (tab === "none") {
+    void updateAdvancedFilters({ sort: next, tab: undefined })
+    return
+  }
+  void updateAdvancedFilters({
+    sort: undefined,
+    tab: tab === "all" ? undefined : tab,
+  })
 }
 
 function clearAdvancedFilters() {
@@ -348,25 +456,27 @@ const activeFilterChips = computed(() => {
       clear: () => void updateAdvancedFilters({ catalog: undefined }),
     })
   }
-  if (tagFilter.value) {
+  if (tagFilters.value.length > 0) {
+    for (const tag of tagFilters.value) {
+      chips.push({
+        key: `tag:${tag.toLocaleLowerCase()}`,
+        label: t("library.savedViewSummaryTag", { value: tag }),
+        clear: () => toggleTagFilter(tag),
+      })
+    }
+  }
+  for (const actor of actorFilters.value) {
     chips.push({
-      key: "tag",
-      label: t("library.savedViewSummaryTag", { value: tagFilter.value }),
-      clear: () => void updateAdvancedFilters({ tag: undefined }),
+      key: `actor:${actor.toLocaleLowerCase()}`,
+      label: t("library.savedViewSummaryActor", { value: actor }),
+      clear: () => toggleActorFilter(actor),
     })
   }
-  if (actorFilter.value) {
+  for (const studio of studioFilters.value) {
     chips.push({
-      key: "actor",
-      label: t("library.savedViewSummaryActor", { value: actorFilter.value }),
-      clear: () => void updateAdvancedFilters({ actor: undefined }),
-    })
-  }
-  if (studioFilter.value) {
-    chips.push({
-      key: "studio",
-      label: t("library.savedViewSummaryStudio", { value: studioFilter.value }),
-      clear: () => void updateAdvancedFilters({ studio: undefined }),
+      key: `studio:${studio.toLocaleLowerCase()}`,
+      label: t("library.savedViewSummaryStudio", { value: studio }),
+      clear: () => toggleStudioFilter(studio),
     })
   }
   return chips
@@ -464,9 +574,20 @@ async function confirmDelete() {
 function filterSummary(filters: SavedViewFiltersV1): string {
   const entries: string[] = []
   if (filters.q) entries.push(t("library.savedViewSummarySearch", { value: filters.q }))
-  if (filters.actor) entries.push(t("library.savedViewSummaryActor", { value: filters.actor }))
-  if (filters.tag) entries.push(t("library.savedViewSummaryTag", { value: filters.tag }))
-  if (filters.studio) entries.push(t("library.savedViewSummaryStudio", { value: filters.studio }))
+  const actors = parseLibraryTagFilterText(filters.actor)
+  if (actors.length > 0) {
+    entries.push(t("library.savedViewSummaryActor", { value: actors.join(" · ") }))
+  }
+  if (filters.tag) {
+    const tags = parseLibraryTagFilterText(filters.tag)
+    if (tags.length > 0) {
+      entries.push(t("library.savedViewSummaryTag", { value: tags.join(" · ") }))
+    }
+  }
+  const studios = parseLibraryTagFilterText(filters.studio)
+  if (studios.length > 0) {
+    entries.push(t("library.savedViewSummaryStudio", { value: studios.join(" · ") }))
+  }
   if (filters.playState && filters.playState !== "all") {
     entries.push(t(`library.savedViewPlay.${filters.playState}`))
   }
@@ -490,6 +611,9 @@ function filterSummary(filters: SavedViewFiltersV1): string {
   if (filters.catalog) {
     entries.push(t(`library.savedViewCatalogValue.${filters.catalog}`))
   }
+  if (filters.sort && filters.sort !== "added") {
+    entries.push(t(`library.savedViewSortValue.${filters.sort}`))
+  }
   return entries.join(" · ") || t("library.savedViewAllLibrary")
 }
 </script>
@@ -497,19 +621,41 @@ function filterSummary(filters: SavedViewFiltersV1): string {
 <template>
   <div
     data-library-saved-view-controls
-    class="flex min-w-0 flex-col items-end gap-2"
+    class="flex min-w-0 max-w-full flex-nowrap items-center justify-end gap-1.5"
   >
     <div
-      data-library-saved-view-actions
-      class="flex max-w-full min-w-0 flex-nowrap items-center justify-end gap-2"
+      v-if="mode !== 'trash' && activeFilterChips.length > 0"
+      data-library-filter-chips
+      class="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1.5 overflow-x-auto"
     >
-    <Popover v-if="mode !== 'trash'">
+      <Badge
+        v-for="chip in activeFilterChips"
+        :key="chip.key"
+        as-child
+        variant="secondary"
+      >
+        <button
+          type="button"
+          class="min-h-11 max-w-[10rem] sm:min-h-8"
+          :data-library-filter-chip="chip.key"
+          :aria-label="t('library.savedViewClearChipAria', { label: chip.label })"
+          @click="chip.clear"
+        >
+          <span class="min-w-0 truncate">{{ chip.label }}</span>
+          <X data-icon="inline-end" aria-hidden="true" />
+        </button>
+      </Badge>
+    </div>
+    <div
+      data-library-saved-view-actions
+      class="flex shrink-0 flex-nowrap items-center justify-end gap-1.5"
+    >
+    <Popover v-if="mode !== 'trash'" v-model:open="filterOpen">
       <PopoverTrigger as-child>
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
+          class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8"
           :aria-label="t('library.savedViewFilters')"
         >
           <Filter data-icon="inline-start" aria-hidden="true" />
@@ -521,17 +667,45 @@ function filterSummary(filters: SavedViewFiltersV1): string {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        class="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border-border/70"
+        class="w-auto max-w-[calc(100vw-2rem)] rounded-2xl border-border/70 p-3"
+        data-library-filter-menu
       >
-        <div class="flex max-h-[min(32rem,70vh)] flex-col gap-4 overflow-y-auto">
-          <div class="flex flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("library.savedViewFiltersTitle") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground">
-              {{ t("library.savedViewFiltersDescription") }}
-            </p>
-          </div>
+        <div class="flex flex-wrap items-start gap-3" data-library-filter-popover>
+          <LibraryTagFilterControl
+            v-if="activeFacet === 'tag'"
+            :metadata-tags="metadataTagSuggestions"
+            :user-tags="userTagSuggestions"
+            :selected-tags="tagFilters"
+            @clear="clearTagFilters"
+            @toggle-tag="toggleTagFilter"
+          />
+          <LibraryFacetPickerPanel
+            v-else-if="activeFacet === 'actor'"
+            test-id="library-actor-filter"
+            :title="t('library.savedViewActor')"
+            :search-label="t('library.savedViewActorSearch')"
+            :empty-label="t('library.savedViewActorEmpty')"
+            :selected="actorFilters"
+            :groups="actorPickerGroups"
+            @clear="clearActorFilters"
+            @toggle="toggleActorFilter"
+          />
+          <LibraryFacetPickerPanel
+            v-else-if="activeFacet === 'studio'"
+            test-id="library-studio-filter"
+            :title="t('library.savedViewStudio')"
+            :search-label="t('library.savedViewStudioSearch')"
+            :empty-label="t('library.savedViewStudioEmpty')"
+            :selected="studioFilters"
+            :groups="studioPickerGroups"
+            @clear="clearStudioFilters"
+            @toggle="toggleStudioFilter"
+          />
+          <div class="flex w-[min(28rem,calc(100vw-2rem))] shrink-0 flex-col gap-4">
+            <div class="flex max-h-[min(32rem,70vh)] flex-col gap-4 overflow-y-auto">
+          <p class="text-sm font-semibold text-foreground">
+            {{ t("library.savedViewFiltersTitle") }}
+          </p>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
@@ -675,53 +849,62 @@ function filterSummary(filters: SavedViewFiltersV1): string {
 
             <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:col-span-2">
               {{ t("library.savedViewTag") }}
-              <Input
-                v-model="tagDraft"
-                list="library-filter-tag-suggestions"
-                maxlength="200"
-                autocomplete="off"
-                :placeholder="t('library.savedViewTagPlaceholder')"
-                class="rounded-xl"
-                @keydown.enter.prevent="applyTextFilter('tag', tagDraft)"
-                @blur="applyTextFilter('tag', tagDraft)"
-              />
-              <datalist id="library-filter-tag-suggestions">
-                <option v-for="option in tagSuggestions" :key="option" :value="option" />
-              </datalist>
+              <Button
+                type="button"
+                size="sm"
+                data-library-tag-filter-toggle
+                class="h-9 w-full justify-start gap-1.5 rounded-xl"
+                :variant="tagFilters.length > 0 || activeFacet === 'tag' ? 'secondary' : 'outline'"
+                :aria-label="t('library.savedViewTag')"
+                :aria-pressed="tagFilters.length > 0"
+                :aria-expanded="activeFacet === 'tag'"
+                @click="toggleFacet('tag')"
+              >
+                <Tags class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+                <span class="min-w-0 truncate">
+                  {{ facetTriggerLabel(tagFilters.length, "library.savedViewTagSelectedCount") }}
+                </span>
+              </Button>
             </label>
 
             <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
               {{ t("library.savedViewActor") }}
-              <Input
-                v-model="actorDraft"
-                list="library-filter-actor-suggestions"
-                maxlength="200"
-                autocomplete="off"
-                :placeholder="t('library.savedViewActorPlaceholder')"
-                class="rounded-xl"
-                @keydown.enter.prevent="applyTextFilter('actor', actorDraft)"
-                @blur="applyTextFilter('actor', actorDraft)"
-              />
-              <datalist id="library-filter-actor-suggestions">
-                <option v-for="option in actorSuggestions" :key="option" :value="option" />
-              </datalist>
+              <Button
+                type="button"
+                size="sm"
+                data-library-actor-filter-toggle
+                class="h-9 w-full justify-start gap-1.5 rounded-xl"
+                :variant="actorFilters.length > 0 || activeFacet === 'actor' ? 'secondary' : 'outline'"
+                :aria-label="t('library.savedViewActor')"
+                :aria-pressed="actorFilters.length > 0"
+                :aria-expanded="activeFacet === 'actor'"
+                @click="toggleFacet('actor')"
+              >
+                <User class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+                <span class="min-w-0 truncate">
+                  {{ facetTriggerLabel(actorFilters.length, "library.savedViewActorSelectedCount") }}
+                </span>
+              </Button>
             </label>
 
             <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
               {{ t("library.savedViewStudio") }}
-              <Input
-                v-model="studioDraft"
-                list="library-filter-studio-suggestions"
-                maxlength="200"
-                autocomplete="off"
-                :placeholder="t('library.savedViewStudioPlaceholder')"
-                class="rounded-xl"
-                @keydown.enter.prevent="applyTextFilter('studio', studioDraft)"
-                @blur="applyTextFilter('studio', studioDraft)"
-              />
-              <datalist id="library-filter-studio-suggestions">
-                <option v-for="option in studioSuggestions" :key="option" :value="option" />
-              </datalist>
+              <Button
+                type="button"
+                size="sm"
+                data-library-studio-filter-toggle
+                class="h-9 w-full justify-start gap-1.5 rounded-xl"
+                :variant="studioFilters.length > 0 || activeFacet === 'studio' ? 'secondary' : 'outline'"
+                :aria-label="t('library.savedViewStudio')"
+                :aria-pressed="studioFilters.length > 0"
+                :aria-expanded="activeFacet === 'studio'"
+                @click="toggleFacet('studio')"
+              >
+                <Building2 class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+                <span class="min-w-0 truncate">
+                  {{ facetTriggerLabel(studioFilters.length, "library.savedViewStudioSelectedCount") }}
+                </span>
+              </Button>
             </label>
           </div>
 
@@ -735,25 +918,70 @@ function filterSummary(filters: SavedViewFiltersV1): string {
           >
             {{ t("library.savedViewClearFilters") }}
           </Button>
+            </div>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
+
+    <DropdownMenu v-if="mode !== 'trash'">
+      <DropdownMenuTrigger as-child>
+        <Button
+          type="button"
+          data-library-sort-toggle
+          class="min-h-11 max-w-[13rem] shrink-0 rounded-full px-3 sm:min-h-8"
+          :variant="sortActive ? 'secondary' : 'outline'"
+          :aria-label="t('library.savedViewSort')"
+          :aria-pressed="sortActive"
+        >
+          <ArrowUpDown data-icon="inline-start" aria-hidden="true" />
+          <span class="min-w-0 truncate">{{ sortButtonLabel }}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        class="w-56 rounded-2xl border-border/70"
+        data-library-sort-menu
+      >
+        <DropdownMenuLabel class="font-normal text-muted-foreground">
+          {{ t("library.savedViewSort") }}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            v-for="option in librarySortKeys"
+            :key="option"
+            :data-library-sort-option="option"
+            @click="onSortChange(option)"
+          >
+            <Check v-if="sort === option" aria-hidden="true" />
+            <ArrowUpDown v-else aria-hidden="true" />
+            <span class="min-w-0 flex-1 truncate">
+              {{ t(`library.savedViewSortValue.${option}`) }}
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
 
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
+          data-library-saved-views-toggle
+          class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8"
           :aria-label="t('library.savedViews')"
         >
           <Bookmark data-icon="inline-start" aria-hidden="true" />
           {{ t("library.savedViews") }}
-          <Badge v-if="savedViews.length > 0" variant="secondary">{{ savedViews.length }}</Badge>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" class="w-64 rounded-xl">
+      <DropdownMenuContent
+        align="end"
+        class="w-64 rounded-2xl border-border/70"
+        data-library-saved-views-menu
+      >
         <DropdownMenuGroup>
           <DropdownMenuItem :disabled="savedViews.length >= 50 || busy" @click="openCreateDialog">
             <Save aria-hidden="true" />
@@ -771,7 +999,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
               <Bookmark v-else aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent class="w-60 rounded-xl">
+            <DropdownMenuSubContent class="w-60 rounded-2xl border-border/70" data-library-saved-view-item-menu>
               <DropdownMenuLabel class="flex flex-col gap-1">
                 <span class="truncate text-foreground">{{ item.name }}</span>
                 <span class="line-clamp-2 font-normal text-muted-foreground">
@@ -817,24 +1045,6 @@ function filterSummary(filters: SavedViewFiltersV1): string {
       </DropdownMenuContent>
     </DropdownMenu>
       <slot />
-    </div>
-    <div
-      v-if="mode !== 'trash' && activeFilterChips.length > 0"
-      data-library-filter-chips
-      class="flex flex-wrap items-center justify-end gap-1.5"
-    >
-      <button
-        v-for="chip in activeFilterChips"
-        :key="chip.key"
-        type="button"
-        class="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-border/70 bg-muted/60 px-2.5 text-xs text-foreground hover:bg-muted sm:min-h-8"
-        :data-library-filter-chip="chip.key"
-        :aria-label="t('library.savedViewClearChipAria', { label: chip.label })"
-        @click="chip.clear"
-      >
-        <span class="min-w-0 truncate">{{ chip.label }}</span>
-        <X class="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
-      </button>
     </div>
   </div>
 

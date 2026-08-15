@@ -7,20 +7,28 @@ import {
   getDetailBrowseTargetMode,
   buildMovieRouteQuery,
   getBrowseSourceMode,
+  getLibraryActorExactFilters,
   getLibraryActorExactQuery,
   getLibrarySearchQuery,
   getLibraryAddedWithinDaysQuery,
   getLibraryPlayStateQuery,
   getLibraryResolutionQuery,
+  getLibrarySortQuery,
+  getLibrarySortQueryForRoute,
   getLibraryUserRatingQuery,
   getLibraryUnratedQuery,
   getLibraryYearQuery,
   getLibraryRuntimeQuery,
   getLibraryCatalogQuery,
+  getLibraryStudioExactFilters,
   getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
   getCuratedFrameTagQuery,
+  getCuratedFrameTagFilters,
+  getLibraryTagExactFilters,
+  serializeLibraryTagFilters,
+  serializeCuratedFrameTagFilters,
   mergeLibraryQuery,
   isLibraryBrowseRoute,
   mergeCuratedFramesQuery,
@@ -97,11 +105,31 @@ describe("library query helpers", () => {
     expect(getLibraryTabQuery(query)).toBe("top-rated")
   })
 
-  it("keeps tag detail browsing in tags mode but sends actor and studio filters to the library", () => {
-    expect(getDetailBrowseTargetMode("tags", "tag")).toBe("tags")
+  it("maps retired tags browse onto the library route", () => {
+    expect(resolveLibraryMode({ name: "tags", path: "/tags" })).toBe("library")
+    expect(getBrowseSourceMode({ browse: "tags" })).toBe("library")
+    expect(getBrowseSourceMode({ from: "tags" })).toBe("library")
+    expect(getDetailBrowseTargetMode("tags", "tag")).toBe("library")
     expect(getDetailBrowseTargetMode("tags", "actor")).toBe("library")
     expect(getDetailBrowseTargetMode("tags", "studio")).toBe("library")
     expect(getDetailBrowseTargetMode("favorites", "actor")).toBe("favorites")
+    expect(
+      buildSavedViewRouteTarget({
+        schemaVersion: 1,
+        mode: "tags",
+        tag: "Drama",
+      }),
+    ).toEqual({
+      name: "library",
+      query: {
+        tag: "Drama",
+      },
+    })
+    expect(buildBrowseRouteTarget("tags", { tag: "Drama" })).toEqual({
+      name: "library",
+      query: { tag: "Drama" },
+    })
+    expect(buildSavedViewFiltersV1("tags", { tag: "Drama" }).mode).toBe("library")
   })
 
   it("merges browse query patches and clears empty values", () => {
@@ -172,6 +200,8 @@ describe("library query helpers", () => {
     expect(getLibraryTagExactQuery({ tag: "4K" })).toBe("4K")
     expect(getLibraryTagExactQuery({})).toBe("")
     expect(getLibraryTagExactQuery({ tag: ["first", "ignored"] })).toBe("first")
+    expect(getLibraryTagExactFilters({ tag: "4K,fav,4k" })).toEqual(["4K", "fav"])
+    expect(serializeLibraryTagFilters([" fav ", "4K", "FAV"])).toBe("fav,4K")
 
     const merged = mergeLibraryQuery({ q: "foo", tag: "old" }, { tag: "new", q: undefined })
     expect(merged.tag).toBe("new")
@@ -181,6 +211,8 @@ describe("library query helpers", () => {
   it("reads exact actor filter and merges actor patch", () => {
     expect(getLibraryActorExactQuery({ actor: "Mina" })).toBe("Mina")
     expect(getLibraryActorExactQuery({})).toBe("")
+    expect(getLibraryActorExactFilters({ actor: "Mina,Lead,mina" })).toEqual(["Mina", "Lead"])
+    expect(serializeLibraryTagFilters([" Mina ", "Lead", "MINA"])).toBe("Mina,Lead")
 
     const merged = mergeLibraryQuery(
       { q: "foo", actor: "old" },
@@ -190,16 +222,16 @@ describe("library query helpers", () => {
     expect(merged.q).toBeUndefined()
   })
 
-  it("preserves actor in browse and movie route helpers", () => {
-    const q = { q: "x", actor: "Lead A", tab: "new" as const }
+  it("preserves comma-separated actors in browse and movie route helpers", () => {
+    const q = { q: "x", actor: "Lead A,Lead B", tab: "new" as const }
     expect(buildBrowseRouteTarget("library", q)).toEqual({
       name: "library",
-      query: { q: "x", actor: "Lead A", tab: "new" },
+      query: { q: "x", actor: "Lead A,Lead B", tab: "new" },
     })
     expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
       browse: "library",
       q: "x",
-      actor: "Lead A",
+      actor: "Lead A,Lead B",
       selected: "id-1",
       tab: "new",
     })
@@ -226,6 +258,7 @@ describe("library query helpers", () => {
   it("reads exact studio filter and merges studio patch", () => {
     expect(getLibraryStudioExactQuery({ studio: "Foo" })).toBe("Foo")
     expect(getLibraryStudioExactQuery({})).toBe("")
+    expect(getLibraryStudioExactFilters({ studio: "Foo,Bar,foo" })).toEqual(["Foo", "Bar"])
 
     const merged = mergeLibraryQuery(
       { q: "foo", studio: "old" },
@@ -235,16 +268,16 @@ describe("library query helpers", () => {
     expect(merged.q).toBeUndefined()
   })
 
-  it("preserves studio in browse and movie route helpers", () => {
-    const q = { q: "x", studio: "ACME", tab: "new" as const }
+  it("preserves comma-separated studios in browse and movie route helpers", () => {
+    const q = { q: "x", studio: "ACME,Other", tab: "new" as const }
     expect(buildBrowseRouteTarget("library", q)).toEqual({
       name: "library",
-      query: { q: "x", studio: "ACME", tab: "new" },
+      query: { q: "x", studio: "ACME,Other", tab: "new" },
     })
     expect(buildMovieRouteQuery(q, "library", "id-1")).toEqual({
       browse: "library",
       q: "x",
-      studio: "ACME",
+      studio: "ACME,Other",
       selected: "id-1",
       tab: "new",
     })
@@ -311,6 +344,7 @@ describe("library query helpers", () => {
       actor: "Mina",
       studio: undefined,
       tab: "top-rated",
+      sort: "rating",
       playState: "unwatched",
       userRating: 5,
       unrated: undefined,
@@ -334,9 +368,20 @@ describe("library query helpers", () => {
     })
   })
 
+  it("reads explicit library sort and falls back to tab mapping", () => {
+    expect(getLibrarySortQuery({ sort: "code" })).toBe("code")
+    expect(getLibrarySortQuery({ tab: "new" })).toBe("release")
+    expect(getLibrarySortQuery({ tab: "top-rated" })).toBe("rating")
+    expect(getLibrarySortQuery({})).toBe("added")
+    expect(getLibrarySortQueryForRoute({ tab: "new" })).toBeUndefined()
+    expect(getLibrarySortQueryForRoute({ sort: "code" })).toBe("code")
+  })
+
   it("reads and merges curated frame tag filter separately from curated search", () => {
     expect(getCuratedFrameTagQuery({ cft: "pose", cfq: "abc" })).toBe("pose")
     expect(getCuratedFrameTagQuery({})).toBe("")
+    expect(getCuratedFrameTagFilters({ cft: "pose,close-up,pose" })).toEqual(["pose", "close-up"])
+    expect(serializeCuratedFrameTagFilters([" pose ", "close-up", "POSE"])).toBe("pose,close-up")
 
     const merged = mergeCuratedFramesQuery(
       { cfq: "abc", cft: "old" },

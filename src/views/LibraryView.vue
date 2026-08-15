@@ -12,19 +12,21 @@ import MovieLibraryContextMenu from "@/components/jav-library/MovieLibraryContex
 import { pushAppToast, pushAppToastLoading } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { isTerminalTaskStatus, waitForTrackedTaskTerminal } from "@/composables/wait-tracked-task"
-import type { LibraryMode, LibraryTab } from "@/domain/library/types"
+import type { LibraryMode } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import {
   buildClearLibraryActorFilterQuery,
   buildSavedViewFiltersV1,
   getBrowseSourceMode,
-  getLibraryActorExactQuery,
+  getLibraryActorExactFilters,
   getLibrarySearchQuery,
-  getLibraryStudioExactQuery,
+  getLibrarySortQuery,
+  getLibraryStudioExactFilters,
   getLibraryTabQuery,
-  getLibraryTagExactQuery,
+  getLibraryTagExactFilters,
   mergeLibraryQuery,
   resolveLibraryMode,
+  serializeLibraryTagFilters,
 } from "@/lib/library-query"
 import { bumpMovieImageVersion } from "@/lib/image-version"
 import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
@@ -35,11 +37,7 @@ import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
 import { getProgress, playbackProgressRevision } from "@/lib/playback-progress-storage"
 import { hasPlayedMovie, playedMovieCount } from "@/lib/played-movies-storage"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
-import {
-  compareByAddedAtDesc,
-  compareByRatingDesc,
-  compareByReleaseDateDesc,
-} from "@/lib/movie-sort"
+import { compareMoviesByLibrarySort } from "@/lib/movie-sort"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -318,10 +316,11 @@ watch(
   [
     () => resolveLibraryMode(route),
     () => getLibraryTabQuery(route.query),
-    () => getLibraryTagExactQuery(route.query),
+    () => getLibrarySortQuery(route.query),
+    () => serializeLibraryTagFilters(getLibraryTagExactFilters(route.query)) ?? "",
     () => getLibrarySearchQuery(route.query),
-    () => getLibraryActorExactQuery(route.query),
-    () => getLibraryStudioExactQuery(route.query),
+    () => serializeLibraryTagFilters(getLibraryActorExactFilters(route.query)) ?? "",
+    () => serializeLibraryTagFilters(getLibraryStudioExactFilters(route.query)) ?? "",
   ],
   () => {
     clearBatchSelection()
@@ -542,8 +541,10 @@ const libraryMovies = computed(() =>
   libraryMode.value === "trash" ? libraryService.trashedMovies.value : libraryService.movies.value,
 )
 const searchQuery = computed(() => getLibrarySearchQuery(route.query))
-const tagExactQuery = computed(() => getLibraryTagExactQuery(route.query).trim())
-const actorExactQuery = computed(() => getLibraryActorExactQuery(route.query).trim())
+const actorExactFilters = computed(() => getLibraryActorExactFilters(route.query))
+const actorExactQuery = computed(() =>
+  actorExactFilters.value.length === 1 ? actorExactFilters.value[0]!.trim() : "",
+)
 const canonicalActorExactQuery = ref("")
 let actorResolveSequence = 0
 
@@ -572,14 +573,20 @@ watch(
 const effectiveActorExactQuery = computed(
   () => canonicalActorExactQuery.value || actorExactQuery.value,
 )
-const studioExactQuery = computed(() => getLibraryStudioExactQuery(route.query).trim())
-const savedViewFilters = computed(() => buildSavedViewFiltersV1(libraryMode.value, route.query))
+const studioExactFilters = computed(() => getLibraryStudioExactFilters(route.query))
+const savedViewFilters = computed(() => {
+  const filters = buildSavedViewFiltersV1(libraryMode.value, route.query)
+  if (actorExactFilters.value.length === 1 && effectiveActorExactQuery.value) {
+    return { ...filters, actor: effectiveActorExactQuery.value }
+  }
+  return filters
+})
 /**
  * 小写 -> 库内规范演员名（用于 q 与演员名匹配）。
  * 仅在「无 actor= 且顶栏 q 非空」时需要解析；有 `actor=` 或 q 为空时跳过全库扫描，避免大库下卡主线程。
  */
 const actorCanonicalByLower = computed(() => {
-  if (actorExactQuery.value) {
+  if (actorExactFilters.value.length > 0) {
     return new Map<string, string>()
   }
   const q = searchQuery.value.trim()
@@ -602,7 +609,7 @@ const actorCanonicalByLower = computed(() => {
 
 /** 未带 `actor=` 时，若整段 `q` 与某演员名一致（忽略大小写），视为按演员浏览 */
 const actorResolvedFromSearch = computed(() => {
-  if (actorExactQuery.value) {
+  if (actorExactFilters.value.length > 0) {
     return ""
   }
   const q = searchQuery.value.trim()
@@ -616,8 +623,6 @@ const actorResolvedFromSearch = computed(() => {
 const actorProfileDisplayName = computed(
   () => effectiveActorExactQuery.value || actorResolvedFromSearch.value,
 )
-
-const activeTab = computed<LibraryTab>(() => getLibraryTabQuery(route.query))
 
 const queryFilteredMovies = computed(() => {
   const qRaw = searchQuery.value.trim()
@@ -636,8 +641,6 @@ const queryFilteredMovies = computed(() => {
       .filter((movie) => isMovieRecentlyAdded(movie.addedAt))
       .slice()
       .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
-  } else if (mode === "tags") {
-    list = raw.slice().sort((left, right) => left.tags.join("").localeCompare(right.tags.join("")))
   } else {
     list = [...raw]
   }
@@ -648,23 +651,8 @@ const queryFilteredMovies = computed(() => {
     list = list.filter((movie) => movieSearchHaystack(movie).includes(queryLower))
   }
 
-  const tagExact = tagExactQuery.value
-  if (tagExact) {
-    list = list.filter(
-      (movie) => movie.tags.includes(tagExact) || movie.userTags.includes(tagExact),
-    )
-  }
-
-  const actorFromParam = effectiveActorExactQuery.value
-  if (actorFromParam) {
-    list = list.filter((movie) => movie.actors.includes(actorFromParam))
-  } else if (actorViaQ) {
+  if (actorViaQ && actorExactFilters.value.length === 0) {
     list = list.filter((movie) => movie.actors.includes(actorViaQ))
-  }
-
-  const studioExact = studioExactQuery.value
-  if (studioExact) {
-    list = list.filter((movie) => movie.studio.trim() === studioExact)
   }
 
   // These revisions make the Saved View result reactive after playback writes or hydrate.
@@ -676,20 +664,11 @@ const queryFilteredMovies = computed(() => {
   })
 })
 
-/** 回收站不使用 tab 子筛选（顶栏无「入库时间 / 发售日期 / 评分」） */
-const effectiveTab = computed<LibraryTab>(() =>
-  libraryMode.value === "trash" ? "all" : activeTab.value,
-)
-
 const visibleMovies = computed(() => {
-  switch (effectiveTab.value) {
-    case "new":
-      return queryFilteredMovies.value.slice().sort(compareByReleaseDateDesc)
-    case "top-rated":
-      return queryFilteredMovies.value.slice().sort(compareByRatingDesc)
-    default:
-      return queryFilteredMovies.value.slice().sort(compareByAddedAtDesc)
-  }
+  const sort = getLibrarySortQuery(route.query)
+  return queryFilteredMovies.value
+    .slice()
+    .sort((left, right) => compareMoviesByLibrarySort(left, right, sort))
 })
 
 const openPlayer = async (movieId?: string) => {
@@ -702,19 +681,6 @@ const openPlayer = async (movieId?: string) => {
   await router.push(
     buildPlayerRouteFromBrowseIntent(nextMovieId, route.query, libraryMode.value, "browse"),
   )
-}
-
-const replaceQuery = async (nextQuery: Partial<Record<"q" | "tab" | "from", string | undefined>>) => {
-  await router.replace({
-    name: libraryMode.value,
-    query: mergeLibraryQuery(route.query, nextQuery),
-  })
-}
-
-const updateActiveTab = async (value: LibraryTab) => {
-  await replaceQuery({
-    tab: value,
-  })
 }
 
 const openDetails = async (movieId: string) => {
@@ -733,29 +699,6 @@ const toggleFavorite = async (payload: { movieId: string; nextValue: boolean }) 
   }
 }
 
-/** Tags 页标签云：与详情 `browseByTag` 一致 */
-const browseByExactTag = async (tag: string) => {
-  const trimmed = tag.trim()
-  if (!trimmed) return
-  await router.replace({
-    name: libraryMode.value,
-    query: mergeLibraryQuery(route.query, {
-      tag: trimmed,
-      q: undefined,
-      actor: undefined,
-      studio: undefined,
-      tab: "all",
-    }),
-  })
-}
-
-const clearExactTagFilter = async () => {
-  await router.replace({
-    name: libraryMode.value,
-    query: mergeLibraryQuery(route.query, { tag: undefined }),
-  })
-}
-
 const clearExactActorFilter = async () => {
   await router.replace({
     name: libraryMode.value,
@@ -770,12 +713,12 @@ const clearExactStudioFilter = async () => {
   })
 }
 
-/** 回收站不展示 URL 带入的演员 / 厂商筛选条（与无搜索一致）；标签高亮由 LibraryPage 读 route */
+/** 回收站不展示 URL 带入的演员 / 厂商筛选条（与无搜索一致） */
 const activeActorForPage = computed(() =>
   libraryMode.value === "trash" ? "" : actorProfileDisplayName.value,
 )
 const activeStudioForPage = computed(() =>
-  libraryMode.value === "trash" ? "" : studioExactQuery.value,
+  libraryMode.value === "trash" ? "" : studioExactFilters.value.length === 1 ? studioExactFilters.value[0]! : "",
 )
 </script>
 
@@ -792,21 +735,16 @@ const activeStudioForPage = computed(() =>
       </p>
       <LibraryPage
         :mode="libraryMode"
-        :all-movies="libraryMovies"
         :visible-movies="visibleMovies"
-        :active-tab="effectiveTab"
         :batch-mode="batchMode"
         :batch-selected-ids="batchSelectedIdsList"
         :active-actor-filter="activeActorForPage"
         :active-studio-filter="activeStudioForPage"
         :actor-user-tag-suggestions="actorUserTagSuggestionPool"
         :scroll-preserve-key="libraryScrollKey"
-        @update:active-tab="updateActiveTab"
         @open-details="openDetails"
         @open-player="openPlayer"
         @toggle-favorite="toggleFavorite"
-        @browse-by-exact-tag="browseByExactTag"
-        @clear-exact-tag-filter="clearExactTagFilter"
         @clear-exact-actor-filter="clearExactActorFilter"
         @clear-exact-studio-filter="clearExactStudioFilter"
         @context-menu="onLibraryContextMenu"

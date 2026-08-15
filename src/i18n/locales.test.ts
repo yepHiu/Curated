@@ -15,6 +15,8 @@ const requiredLocaleKeys = [
   "curated.tagFilterAll",
   "curated.tagFilterEmpty",
   "curated.tagFilterNoMatches",
+  "curated.tagFilterSelectedCount",
+  "curated.tagFilterSelectedList",
   "curated.tagFilterShowMore",
   "curated.tagFilterShowLess",
   "curated.ariaFilterFrameTag",

@@ -10,25 +10,6 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    query: {},
-  }),
-}))
-
-vi.mock("@/lib/library-stats", () => ({
-  aggregateMetadataTagCounts: vi.fn(() => []),
-  aggregateUserTagCounts: vi.fn(() => []),
-}))
-
-vi.mock("@/lib/library-query", () => ({
-  getLibraryTagExactQuery: vi.fn(() => ""),
-}))
-
-vi.mock("@/components/ui/badge", () => ({
-  Badge: { template: "<div><slot /></div>" },
-}))
-
 vi.mock("@/components/ui/button", () => ({
   Button: {
     emits: ["click"],
@@ -36,22 +17,8 @@ vi.mock("@/components/ui/button", () => ({
   },
 }))
 
-vi.mock("@/components/ui/card", () => ({
-  Card: { template: "<div><slot /></div>" },
-  CardContent: { template: "<div><slot /></div>" },
-  CardHeader: { template: "<div><slot /></div>" },
-  CardTitle: { template: "<div><slot /></div>" },
-}))
-
-vi.mock("@/components/ui/tabs", () => ({
-  Tabs: { template: "<div data-tabs><slot /></div>" },
-  TabsList: { template: "<div data-tabs-list><slot /></div>" },
-  TabsTrigger: { template: "<button data-tabs-trigger><slot /></button>" },
-}))
-
 vi.mock("lucide-vue-next", () => ({
   CheckSquare: { template: "<span />" },
-  ChevronDown: { template: "<span />" },
   ListChecks: { template: "<span />" },
   X: { template: "<span />" },
 }))
@@ -83,69 +50,48 @@ describe("LibraryPage", () => {
     const wrapper = mount(LibraryPage, {
       props: {
         mode: "library",
-        allMovies: [],
         visibleMovies: [],
-        activeTab: "all",
         activeActorFilter: "Alpha Star",
         actorUserTagSuggestions: [],
       },
     })
 
     const html = wrapper.html()
-    const tabsIndex = html.indexOf("data-tabs")
+    const toolbarIndex = html.indexOf("data-saved-view-controls")
     const headerIndex = html.indexOf("data-virtual-masonry-header")
     const actorCardIndex = html.indexOf("data-actor-profile-card")
     const gridIndex = html.indexOf("data-virtual-masonry-grid")
 
-    expect(tabsIndex).toBeGreaterThanOrEqual(0)
-    expect(headerIndex).toBeGreaterThan(tabsIndex)
+    expect(toolbarIndex).toBeGreaterThanOrEqual(0)
+    expect(headerIndex).toBeGreaterThan(toolbarIndex)
     expect(actorCardIndex).toBeGreaterThan(headerIndex)
     expect(gridIndex).toBeGreaterThan(actorCardIndex)
     expect(wrapper.find("[data-virtual-masonry-header] [data-actor-profile-card]").exists()).toBe(true)
   })
 
-  it("does not render actor profile card inside tags mode layout", () => {
-    const wrapper = mount(LibraryPage, {
-      props: {
-        mode: "tags",
-        allMovies: [],
-        visibleMovies: [],
-        activeTab: "all",
-        activeActorFilter: "Alpha Star",
-        actorUserTagSuggestions: [],
-      },
-    })
-
-    expect(wrapper.find("[data-actor-profile-card]").exists()).toBe(false)
-  })
-
-  it("uses a three-column mobile tab grid with 44px touch targets", () => {
+  it("keeps a compact toolbar without the old sort tabs", () => {
     const wrapper = mount(LibraryPage, {
       props: {
         mode: "library",
-        allMovies: [],
         visibleMovies: [],
-        activeTab: "all",
       },
     })
 
     expect(wrapper.get("h1").classes()).toContain("sr-only")
-    expect(wrapper.get("[data-library-filter-tabs]").classes()).toEqual(
-      expect.arrayContaining(["grid", "grid-cols-3", "w-full"]),
-    )
-    for (const trigger of wrapper.findAll("[data-library-tab-trigger]")) {
-      expect(trigger.classes()).toContain("min-h-11")
-    }
+    expect(wrapper.find("[data-library-filter-tabs]").exists()).toBe(false)
+    expect(wrapper.find("[data-library-tab-trigger]").exists()).toBe(false)
     expect(wrapper.get("[data-library-batch-toggle]").classes()).toContain("min-h-11")
+    expect(wrapper.get("[data-library-batch-toggle]").classes()).not.toContain("min-h-12")
+    expect(wrapper.get("[data-saved-view-controls]").element.parentElement?.className).toContain(
+      "justify-end",
+    )
   })
 
   it("places batch manage in the same saved-view action cluster as filters", () => {
     const wrapper = mount(LibraryPage, {
       props: {
         mode: "library",
-        allMovies: [],
         visibleMovies: [],
-        activeTab: "all",
       },
     })
 

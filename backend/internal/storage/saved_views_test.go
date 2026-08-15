@@ -154,12 +154,16 @@ func TestListMoviesSavedViewFilters(t *testing.T) {
 			t.Fatalf("persist %s: %v", item.code, err)
 		}
 		ids[item.code] = outcome.MovieID
+		actors := []string{item.actor}
+		if item.code == "VIEW-001" {
+			actors = []string{item.actor, "Actor Dual"}
+		}
 		if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
 			MovieID: outcome.MovieID,
 			Number:  item.code,
 			Title:   item.code,
 			Studio:  item.studio,
-			Actors:  []string{item.actor},
+			Actors:  actors,
 			Tags:    []string{item.tag},
 		}); err != nil {
 			t.Fatalf("metadata %s: %v", item.code, err)
@@ -229,8 +233,20 @@ func TestListMoviesSavedViewFilters(t *testing.T) {
 	five := 5.0
 	four := 4.0
 	assertIDs("tag", contracts.ListMoviesRequest{Tag: "Featured"}, "VIEW-001")
+	if err := store.PatchMovieUserPrefs(ctx, ids["VIEW-001"], contracts.PatchMovieInput{
+		UserTagsSet: true,
+		UserTags:    []string{"mine"},
+	}); err != nil {
+		t.Fatalf("add user tag: %v", err)
+	}
+	assertIDs("user and metadata tags AND", contracts.ListMoviesRequest{Tag: "Featured,mine"}, "VIEW-001")
+	assertIDs("repeated tags", contracts.ListMoviesRequest{Tags: []string{"Featured", "mine"}}, "VIEW-001")
+	assertIDs("unmatched AND", contracts.ListMoviesRequest{Tag: "Featured,Drama"})
 	assertIDs("actor", contracts.ListMoviesRequest{Actor: "Actor B"}, "VIEW-002")
+	assertIDs("actors AND", contracts.ListMoviesRequest{Actor: "Actor A,Actor Dual"}, "VIEW-001")
+	assertIDs("actors AND unmatched", contracts.ListMoviesRequest{Actor: "Actor A,Actor B"})
 	assertIDs("studio", contracts.ListMoviesRequest{Studio: "Studio C"}, "VIEW-003")
+	assertIDs("studios OR", contracts.ListMoviesRequest{Studio: "Studio A,Studio C"}, "VIEW-001", "VIEW-003")
 	assertIDs("4k", contracts.ListMoviesRequest{Resolution: "4k"}, "VIEW-001")
 	assertIDs("rating", contracts.ListMoviesRequest{UserRating: &five}, "VIEW-001")
 	assertIDs("min rating", contracts.ListMoviesRequest{UserRating: &four}, "VIEW-001", "VIEW-002")

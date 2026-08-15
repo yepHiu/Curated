@@ -75,18 +75,14 @@ test("375px library controls remain touchable without clipping or horizontal ove
 
   await expect(page.locator("h1")).toHaveCount(1)
   await expect(page.locator("h1")).not.toHaveText("")
-  await expect(page.locator("[data-library-filter-tabs]")).toBeVisible()
+  await expect(page.locator("[data-library-filter-tabs]")).toHaveCount(0)
+  await expect(page.locator("[data-library-batch-toggle]")).toBeVisible()
 
   const hasHorizontalOverflow = await page.evaluate(() => {
     const root = document.documentElement
     return root.scrollWidth > root.clientWidth + 1
   })
   expect(hasHorizontalOverflow).toBe(false)
-
-  for (const trigger of await page.locator("[data-library-tab-trigger]").all()) {
-    const box = await trigger.boundingBox()
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
-  }
 
   const batchToggleBox = await page.locator("[data-library-batch-toggle]").boundingBox()
   expect(batchToggleBox?.height ?? 0).toBeGreaterThanOrEqual(44)

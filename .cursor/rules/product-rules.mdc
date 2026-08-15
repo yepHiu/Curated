@@ -7,9 +7,10 @@ alwaysApply: true
 
 - Treat the current app as a desktop-oriented media library prototype focused on `browse -> inspect -> play -> configure`.
 - Prioritize the four visible product surfaces: library browsing, detail inspection, player focus, and settings control.
-- `library`, `favorites`, `recent`, and `tags` should feel like one continuous browsing experience, not four separate apps.
-- Search, tab filters, and selected-movie state are core navigation behavior; preserve them when changing layouts or components.
+- `library`, `favorites`, and `recent` should feel like one continuous browsing experience, not separate apps. Tag browsing lives in the library filter picker (`tag=`), not a standalone page.
+- Search, filter query, and selected-movie state are core navigation behavior; preserve them when changing layouts or components.
 - Keep the library experience poster-first, compact, and fast to scan; avoid drifting into a table-heavy admin dashboard unless explicitly requested.
+- Curated is a productized desktop app, not a tutorial or admin console. Do not add instructional helper paragraphs under every feature, section title, popover, toolbar, or nested block. Prefer short labels and obvious controls. Empty-state copy is for actually empty surfaces; toasts/errors are for failed or irreversible actions. Put product-behavior explanations in docs and project rules, not in the UI. Destructive dialogs may keep one line of consequence copy.
 - Detail pages should deepen context on one title with clear metadata hierarchy and related content, not generic hero-banner marketing layouts.
 - Player pages should remain low-chrome and video-first; controls support playback but should not compete with the media surface.
 - Settings should model real library operations such as paths, scan cadence, metadata workflow, playback preferences, and manual maintenance actions.

@@ -55,6 +55,7 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
       values ? `${key}:${JSON.stringify(values)}` : key,
+    locale: { value: "en" },
   }),
 }))
 
@@ -100,6 +101,7 @@ function mountControls(slots?: { default?: string }) {
         DropdownMenuContent: SlotStub,
         DropdownMenuGroup: SlotStub,
         DropdownMenuItem: ButtonStub,
+        DropdownMenuCheckboxItem: ButtonStub,
         DropdownMenuLabel: SlotStub,
         DropdownMenuSeparator: SlotStub,
         DropdownMenuSub: SlotStub,
@@ -117,6 +119,7 @@ function mountControls(slots?: { default?: string }) {
         SelectTrigger: SlotStub,
         SelectValue: SlotStub,
         Bookmark: true,
+        ArrowUpDown: true,
         Check: true,
         ChevronDown: true,
         ChevronUp: true,
@@ -125,6 +128,9 @@ function mountControls(slots?: { default?: string }) {
         Pencil: true,
         RefreshCw: true,
         Save: true,
+        Tags: true,
+        User: true,
+        Building2: true,
         Trash2: true,
         X: true,
       },
@@ -141,6 +147,15 @@ function buttonByText(wrapper: ReturnType<typeof mountControls>, text: string) {
 }
 
 beforeEach(() => {
+  routeMock.query = {
+    q: "Mina",
+    playState: "unwatched",
+    resolution: "2160p",
+    selected: "movie-1",
+    autoplay: "1",
+    t: "42",
+  }
+  serviceMock.movies.value = []
   serviceMock.refreshSavedViews.mockClear()
   serviceMock.createSavedView.mockReset()
   serviceMock.updateSavedView.mockReset()
@@ -206,17 +221,102 @@ describe("LibrarySavedViewsControls", () => {
     expect(wrapper.find("[data-library-filter-chip=resolution]").exists()).toBe(true)
   })
 
+  it("opens one left-aligned facet picker at a time for tags actors and studios", async () => {
+    serviceMock.movies.value = [
+      {
+        year: 2024,
+        tags: ["soft"],
+        userTags: ["fav"],
+        actors: ["Mina"],
+        studio: "Studio A",
+      },
+    ]
+    const wrapper = mountControls()
+    const layout = wrapper.get("[data-library-filter-popover]")
+    expect(layout.classes()).toEqual(expect.arrayContaining(["flex", "flex-wrap", "items-start", "gap-3"]))
+    expect(wrapper.find("[data-library-tag-filter-menu]").exists()).toBe(false)
+    expect(wrapper.find("[data-library-facet-picker=library-actor-filter]").exists()).toBe(false)
+
+    await wrapper.get("[data-library-tag-filter-toggle]").trigger("click")
+    expect(wrapper.text()).toContain("soft")
+    expect(wrapper.text()).toContain("fav")
+    expect(wrapper.find("[data-library-facet-picker=library-actor-filter]").exists()).toBe(false)
+
+    await wrapper.get("[data-library-actor-filter-toggle]").trigger("click")
+    expect(wrapper.find("[data-library-tag-filter-option]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("Mina")
+
+    await wrapper.get("[data-library-studio-filter-toggle]").trigger("click")
+    expect(wrapper.find("[data-library-facet-picker=library-actor-filter]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("Studio A")
+  })
+
+  it("renders a separate sort control that highlights the active sort without chips", async () => {
+    const idle = mountControls()
+    const idleToggle = idle.get("[data-library-sort-toggle]")
+    expect(idleToggle.text()).toContain("library.savedViewSort")
+    expect(idleToggle.attributes("aria-pressed")).toBe("false")
+    expect(idle.find("[data-library-filter-chip=sort]").exists()).toBe(false)
+    expect(idle.find("[data-library-sort-select]").exists()).toBe(false)
+
+    await idle.get('[data-library-sort-option="code"]').trigger("click")
+    await flushPromises()
+    expect(routerMock.replace).toHaveBeenCalledWith({
+      name: "library",
+      query: expect.objectContaining({
+        sort: "code",
+      }),
+    })
+
+    routeMock.query = { ...routeMock.query, sort: "code" }
+    const active = mountControls()
+    const activeToggle = active.get("[data-library-sort-toggle]")
+    expect(activeToggle.text()).toContain("library.savedViewSortValue.code")
+    expect(activeToggle.attributes("aria-pressed")).toBe("true")
+    expect(active.find("[data-library-filter-chip=sort]").exists()).toBe(false)
+  })
+
   it("keeps filter, saved views, and trailing actions on one unwrapped row", () => {
     const wrapper = mountControls({
       default: '<button data-trailing-action type="button">batch</button>',
     })
+    const controls = wrapper.get("[data-library-saved-view-controls]")
     const row = wrapper.get("[data-library-saved-view-actions]")
+    expect(controls.classes()).toEqual(
+      expect.arrayContaining(["flex", "flex-nowrap", "items-center"]),
+    )
     expect(row.classes()).toEqual(
       expect.arrayContaining(["flex", "flex-nowrap", "items-center"]),
     )
     expect(row.find("[data-trailing-action]").exists()).toBe(true)
     expect(row.text()).toContain("library.savedViewFilters")
     expect(row.text()).toContain("library.savedViews")
+    expect(wrapper.get("[data-library-saved-views-toggle]").text()).not.toMatch(/\d/)
     expect(wrapper.get("[data-library-filter-chips]").find("[data-trailing-action]").exists()).toBe(false)
+  })
+
+  it("places active filter chips to the left of the filter button on the same row", () => {
+    const wrapper = mountControls()
+    const html = wrapper.get("[data-library-saved-view-controls]").html()
+    const chipsAt = html.indexOf("data-library-filter-chips")
+    const filterAt = html.indexOf("library.savedViewFilters")
+    expect(chipsAt).toBeGreaterThan(-1)
+    expect(filterAt).toBeGreaterThan(chipsAt)
+    expect(wrapper.get("[data-library-filter-chips]").classes()).toEqual(
+      expect.arrayContaining(["flex-nowrap", "overflow-x-auto"]),
+    )
+  })
+
+  it("uses the filter popover radius on sort and saved-view menus", () => {
+    const wrapper = mountControls()
+    const filterMenu = wrapper.get("[data-library-filter-menu]")
+    const sortMenu = wrapper.get("[data-library-sort-menu]")
+    const savedViewsMenu = wrapper.get("[data-library-saved-views-menu]")
+    const savedViewItemMenu = wrapper.get("[data-library-saved-view-item-menu]")
+
+    expect(filterMenu.classes()).toContain("rounded-2xl")
+    expect(sortMenu.classes()).toContain("rounded-2xl")
+    expect(savedViewsMenu.classes()).toContain("rounded-2xl")
+    expect(savedViewItemMenu.classes()).toContain("rounded-2xl")
   })
 })

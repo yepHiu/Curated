@@ -28,15 +28,16 @@ func normalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 		SchemaVersion: contracts.SavedViewSchemaVersion,
 		Mode:          strings.ToLower(strings.TrimSpace(input.Mode)),
 		Query:         strings.TrimSpace(input.Query),
-		Tag:           strings.TrimSpace(input.Tag),
-		Actor:         strings.TrimSpace(input.Actor),
-		Studio:        strings.TrimSpace(input.Studio),
+		Tag:           strings.Join(storage.ParseMovieTagFilters(input.Tag), ","),
+		Actor:         strings.Join(storage.ParseMovieTagFilters(input.Actor), ","),
+		Studio:        strings.Join(storage.ParseMovieTagFilters(input.Studio), ","),
 		Tab:           strings.ToLower(strings.TrimSpace(input.Tab)),
 		PlayState:     strings.ToLower(strings.TrimSpace(input.PlayState)),
 		Resolution:    normalizeSavedViewResolution(input.Resolution),
 		Year:          normalizeSavedViewYear(input.Year),
 		Runtime:       strings.ToLower(strings.TrimSpace(input.Runtime)),
 		Catalog:       strings.ToLower(strings.TrimSpace(input.Catalog)),
+		Sort:          strings.ToLower(strings.TrimSpace(input.Sort)),
 	}
 	if out.Mode == "" {
 		out.Mode = "library"
@@ -83,6 +84,12 @@ func normalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 	}
 	if out.Catalog != "" && !oneOf(out.Catalog, "unscraped", "no-cover") {
 		return contracts.SavedViewFiltersV1{}, errors.New("invalid saved view catalog")
+	}
+	if out.Sort != "" && !oneOf(out.Sort, "added", "release", "rating", "code", "actor", "studio", "year") {
+		return contracts.SavedViewFiltersV1{}, errors.New("invalid saved view sort")
+	}
+	if out.Sort == "added" {
+		out.Sort = ""
 	}
 	if input.AddedWithinDays < 0 || input.AddedWithinDays > 3650 {
 		return contracts.SavedViewFiltersV1{}, errors.New("saved view addedWithinDays must be between 1 and 3650")

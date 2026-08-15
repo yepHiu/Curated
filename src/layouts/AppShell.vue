@@ -26,10 +26,10 @@ import {
 } from "@/lib/actors-route-query"
 import {
   getCuratedFrameSearchQuery,
-  getLibraryActorExactQuery,
+  getLibraryActorExactFilters,
   getLibrarySearchQuery,
-  getLibraryStudioExactQuery,
-  getLibraryTagExactQuery,
+  getLibraryStudioExactFilters,
+  getLibraryTagExactFilters,
   getSelectedMovieQuery,
   isLibraryBrowseRoute,
   mergeCuratedFramesQuery,
@@ -461,9 +461,12 @@ watch(
       return
     }
     const qPart = getLibrarySearchQuery(route.query)
-    const tagPart = getLibraryTagExactQuery(route.query).trim()
-    const actorPart = getLibraryActorExactQuery(route.query).trim()
-    const studioPart = getLibraryStudioExactQuery(route.query).trim()
+    const tagFilters = getLibraryTagExactFilters(route.query)
+    const tagPart = tagFilters.length === 1 ? tagFilters[0]! : ""
+    const actorFilters = getLibraryActorExactFilters(route.query)
+    const actorPart = actorFilters.length === 1 ? actorFilters[0]! : ""
+    const studioFilters = getLibraryStudioExactFilters(route.query)
+    const studioPart = studioFilters.length === 1 ? studioFilters[0]! : ""
     const next = qPart || tagPart || actorPart || studioPart
     if (next !== searchDraft.value) {
       searchDraft.value = next
@@ -484,30 +487,61 @@ watchDebounced(
     }
     const normalized = value.trim()
     const currentQ = getLibrarySearchQuery(route.query).trim()
-    const currentTag = getLibraryTagExactQuery(route.query).trim()
-    const currentActor = getLibraryActorExactQuery(route.query).trim()
-    const currentStudio = getLibraryStudioExactQuery(route.query).trim()
+    const currentTagFilters = getLibraryTagExactFilters(route.query)
+    const currentTag = currentTagFilters.length === 1 ? currentTagFilters[0]! : ""
+    const hasTagFilter = currentTagFilters.length > 0
+    const currentActorFilters = getLibraryActorExactFilters(route.query)
+    const currentActor = currentActorFilters.length === 1 ? currentActorFilters[0]! : ""
+    const hasActorFilter = currentActorFilters.length > 0
+    const currentStudioFilters = getLibraryStudioExactFilters(route.query)
+    const currentStudio = currentStudioFilters.length === 1 ? currentStudioFilters[0]! : ""
+    const hasStudioFilter = currentStudioFilters.length > 0
     const syncedToTextSearch =
-      normalized === currentQ && (currentQ !== "" || (!currentTag && !currentActor && !currentStudio))
+      normalized === currentQ && (currentQ !== "" || (!hasTagFilter && !hasActorFilter && !hasStudioFilter))
     const syncedToTagFilter =
-      currentTag !== "" && normalized === currentTag && currentQ === "" && !currentActor && !currentStudio
+      currentTagFilters.length === 1 &&
+      normalized === currentTag &&
+      currentQ === "" &&
+      !hasActorFilter &&
+      !hasStudioFilter
+    const syncedToMultiTagFilter =
+      currentTagFilters.length > 1 &&
+      normalized === "" &&
+      currentQ === "" &&
+      !hasActorFilter &&
+      !hasStudioFilter
     const syncedToActorFilter =
-      currentActor !== "" &&
+      currentActorFilters.length === 1 &&
       normalized === currentActor &&
       currentQ === "" &&
-      !currentTag &&
-      !currentStudio
+      !hasTagFilter &&
+      !hasStudioFilter
+    const syncedToMultiActorFilter =
+      currentActorFilters.length > 1 &&
+      normalized === "" &&
+      currentQ === "" &&
+      !hasTagFilter &&
+      !hasStudioFilter
     const syncedToStudioFilter =
-      currentStudio !== "" &&
+      currentStudioFilters.length === 1 &&
       normalized === currentStudio &&
       currentQ === "" &&
-      !currentTag &&
-      !currentActor
+      !hasTagFilter &&
+      !hasActorFilter
+    const syncedToMultiStudioFilter =
+      currentStudioFilters.length > 1 &&
+      normalized === "" &&
+      currentQ === "" &&
+      !hasTagFilter &&
+      !hasActorFilter
     if (
       syncedToTextSearch ||
       syncedToTagFilter ||
+      syncedToMultiTagFilter ||
       syncedToActorFilter ||
-      syncedToStudioFilter
+      syncedToMultiActorFilter ||
+      syncedToStudioFilter ||
+      syncedToMultiStudioFilter
     ) {
       return
     }

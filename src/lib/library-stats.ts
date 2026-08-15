@@ -34,6 +34,56 @@ export interface TagCountEntry {
   count: number
 }
 
+export interface NamedCountEntry {
+  name: string
+  count: number
+}
+
+function sortNamedCounts(entries: NamedCountEntry[], locale: string): NamedCountEntry[] {
+  return entries.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count
+    return a.name.localeCompare(b.name, locale, { numeric: true })
+  })
+}
+
+/** Count how often each trimmed name appears; first-seen casing wins. */
+export function aggregateNamedCounts(values: readonly string[], locale: string): NamedCountEntry[] {
+  const map = new Map<string, NamedCountEntry>()
+  for (const raw of values) {
+    const name = raw.trim()
+    if (!name) continue
+    const key = name.toLocaleLowerCase()
+    const existing = map.get(key)
+    if (existing) {
+      existing.count += 1
+    } else {
+      map.set(key, { name, count: 1 })
+    }
+  }
+  return sortNamedCounts([...map.values()], locale)
+}
+
+/** Keep an active filter visible even if it is no longer in the current inventory. */
+export function withCurrentNamedCounts(
+  rows: readonly NamedCountEntry[],
+  current: readonly string[],
+  locale: string,
+): NamedCountEntry[] {
+  const map = new Map<string, NamedCountEntry>()
+  for (const row of rows) {
+    map.set(row.name.toLocaleLowerCase(), { ...row })
+  }
+  for (const value of current) {
+    const name = value.trim()
+    if (!name) continue
+    const key = name.toLocaleLowerCase()
+    if (!map.has(key)) {
+      map.set(key, { name, count: 0 })
+    }
+  }
+  return sortNamedCounts([...map.values()], locale)
+}
+
 /** 元数据/NFO 标签：按影片命中次数聚合，次数降序 */
 export function aggregateMetadataTagCounts(movies: readonly Movie[], locale: string): TagCountEntry[] {
   const map = new Map<string, number>()

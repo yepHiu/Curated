@@ -6,10 +6,10 @@ import AppShell from "./AppShell.vue"
 const routerMocks = vi.hoisted(() => {
   const replace = vi.fn()
   const route = {
-    fullPath: "/tags",
-    name: "tags",
+    fullPath: "/library",
+    name: "library",
     params: {},
-    path: "/tags",
+    path: "/library",
     query: {},
   }
 
@@ -136,10 +136,10 @@ describe("AppShell library search route sync", () => {
     mediaQueryMatches.value = true
     routerMocks.replace.mockClear()
     routerMocks.route = reactive({
-      fullPath: "/tags",
-      name: "tags",
+      fullPath: "/library",
+      name: "library",
       params: {},
-      path: "/tags",
+      path: "/library",
       query: {},
     })
   })
@@ -149,7 +149,7 @@ describe("AppShell library search route sync", () => {
 
     await nextTick()
     routerMocks.replace.mockClear()
-    routerMocks.route.fullPath = "/tags?tag=Drama"
+    routerMocks.route.fullPath = "/library?tag=Drama"
     routerMocks.route.query = { tag: "Drama" }
 
     await nextTick()

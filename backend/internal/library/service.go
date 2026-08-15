@@ -37,9 +37,8 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 
 	filtered := make([]contracts.MovieDetailDTO, 0, len(s.movies))
 	query := strings.TrimSpace(strings.ToLower(request.Query))
-
-	actorExact := strings.TrimSpace(request.Actor)
-	studioExact := strings.TrimSpace(request.Studio)
+	actors := parseExactFilters(request.Actor)
+	studios := parseExactFilters(request.Studio)
 	for _, movie := range s.movies {
 		if request.Mode == "favorites" && !movie.IsFavorite {
 			continue
@@ -53,11 +52,11 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 			}
 		}
 
-		if actorExact != "" && !slices.Contains(movie.Actors, actorExact) {
+		if len(actors) > 0 && !movieMatchesActors(movie.Actors, actors) {
 			continue
 		}
 
-		if studioExact != "" && strings.TrimSpace(eff.Studio) != studioExact {
+		if len(studios) > 0 && !movieMatchesStudios(eff.Studio, studios) {
 			continue
 		}
 
@@ -170,9 +169,9 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			IsFavorite:     false,
 			AddedAt:        time.Now().UTC().Format("2006-01-02"),
 			Location:       result.Path,
-				Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
-				Year: 0,
-			},
+			Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
+			Year:           0,
+		},
 		Summary:        "Metadata pending scrape.",
 		MetadataRating: 0,
 		UserRating:     nil,
@@ -252,6 +251,51 @@ func coalesceSummary(summary string) string {
 		return "Metadata pending scrape."
 	}
 	return summary
+}
+
+func parseExactFilters(value string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0)
+	for _, part := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func movieMatchesActors(movieActors []string, wanted []string) bool {
+	set := make(map[string]struct{}, len(movieActors))
+	for _, actor := range movieActors {
+		key := strings.ToLower(strings.TrimSpace(actor))
+		if key == "" {
+			continue
+		}
+		set[key] = struct{}{}
+	}
+	for _, actor := range wanted {
+		if _, ok := set[strings.ToLower(strings.TrimSpace(actor))]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func movieMatchesStudios(effectiveStudio string, wanted []string) bool {
+	studio := strings.TrimSpace(effectiveStudio)
+	for _, candidate := range wanted {
+		if studio == strings.TrimSpace(candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchesQuery(movie contracts.MovieDetailDTO, searchText, query string) bool {

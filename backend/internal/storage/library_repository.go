@@ -287,8 +287,28 @@ const sqlMovieEffectiveRuntime = `COALESCE(m.user_runtime_minutes, m.runtime_min
 // - request.Mode==favorites：额外要求 is_favorite；recent：仅最近 30 天入库。
 // - tags 是前端标签聚合布局模式，后端返回与 library 相同的活动影片集合。
 // - Query：在「生效」标题、番号、片商、简介上做不区分大小写的子串匹配（LIKE）。
-// - Tag / Actor：通过关联表精确匹配；Studio：与「生效」片商 TRIM 后全等。
+// - Tag / Tags：通过关联表精确匹配（用户标签或 INFO/nfo 标签均可；多个标签为 AND）；Actor：逗号分隔多个演员为 AND（须同时出演，含 alias）；Studio：逗号分隔多个片商为 OR（生效片商 TRIM 后全等）。
 // - PlayState / UserRating / Resolution / AddedAfter：Saved Views 所需的稳定筛选语义。
+func ParseMovieTagFilters(values ...string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			key := strings.ToLower(trimmed)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
 func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	clauses := make([]string, 0, 10)
 	args := make([]any, 0, 16)
@@ -314,16 +334,16 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		args = append(args, like, like, like, like)
 	}
 
-	if tag := strings.TrimSpace(request.Tag); tag != "" {
+	for _, tag := range ParseMovieTagFilters(append([]string{request.Tag}, request.Tags...)...) {
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM movie_tags mt
 			INNER JOIN tags tag_filter ON tag_filter.id = mt.tag_id
-			WHERE mt.movie_id = m.id AND tag_filter.name = ?
+			WHERE mt.movie_id = m.id AND LOWER(tag_filter.name) = LOWER(?)
 		)`)
 		args = append(args, tag)
 	}
 
-	if actor := strings.TrimSpace(request.Actor); actor != "" {
+	for _, actor := range ParseMovieTagFilters(request.Actor) {
 		normalizedActor := NormalizeActorIdentity(actor)
 		clauses = append(clauses, `EXISTS (
 			SELECT 1 FROM movie_actors ma
@@ -338,9 +358,18 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		args = append(args, actor, normalizedActor, normalizedActor)
 	}
 
-	if studio := strings.TrimSpace(request.Studio); studio != "" {
+	if studios := ParseMovieTagFilters(request.Studio); len(studios) == 1 {
 		clauses = append(clauses, `TRIM(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) = ?`)
-		args = append(args, studio)
+		args = append(args, studios[0])
+	} else if len(studios) > 1 {
+		placeholders := strings.TrimRight(strings.Repeat("?,", len(studios)), ",")
+		clauses = append(clauses, fmt.Sprintf(
+			`TRIM(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) IN (%s)`,
+			placeholders,
+		))
+		for _, studio := range studios {
+			args = append(args, studio)
+		}
 	}
 
 	switch strings.ToLower(strings.TrimSpace(request.PlayState)) {

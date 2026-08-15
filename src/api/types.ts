@@ -651,11 +651,11 @@ export interface ListActorsParams {
 export interface ListMoviesParams {
   mode?: string
   q?: string
-  /** 精确匹配元数据或用户标签 */
+  /** Exact tag match; comma-separated or repeated values require every tag (metadata or user tags). */
   tag?: string
-  /** 精确演员名，与路由 `actor` 一致 */
+  /** Exact actor names; comma-separated or repeated values require every actor (AND). */
   actor?: string
-  /** 精确厂商名，与路由 `studio` 一致 */
+  /** Exact studio names; comma-separated or repeated values match any studio (OR). */
   studio?: string
   playState?: "all" | "unwatched" | "in-progress" | "completed"
   /** Minimum local user rating 0–5. Ignored when `unrated` is true. */
@@ -769,15 +769,28 @@ export type SavedViewTab = "all" | "new" | "top-rated"
 export type SavedViewPlayState = "all" | "unwatched" | "in-progress" | "completed"
 export type SavedViewRuntime = "short" | "standard" | "long"
 export type SavedViewCatalog = "unscraped" | "no-cover"
+export type SavedViewSort =
+  | "added"
+  | "release"
+  | "rating"
+  | "code"
+  | "actor"
+  | "studio"
+  | "year"
 
 export interface SavedViewFiltersV1 {
   schemaVersion: 1
   mode?: SavedViewMode
   q?: string
+  /** Comma-separated exact tags; movies must include every tag in metadata or user tags. */
   tag?: string
+  /** Comma-separated exact actors; movies must include every selected actor (AND). */
   actor?: string
+  /** Comma-separated exact studios; movies may match any selected studio (OR). */
   studio?: string
   tab?: SavedViewTab
+  /** Grid sort; omitted means added-at (or the legacy tab mapping). */
+  sort?: SavedViewSort
   playState?: SavedViewPlayState
   /** Minimum local user rating 0–5. Ignored when `unrated` is true. */
   userRating?: number
@@ -1028,7 +1041,9 @@ export interface ListCuratedFramesParams {
   q?: string
   actor?: string
   movieId?: string
+  /** Exact tag match; when multiple values are provided, frames must include every tag. */
   tag?: string
+  tags?: string[]
   limit?: number
   offset?: number
 }

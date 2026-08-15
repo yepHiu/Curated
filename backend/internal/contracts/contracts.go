@@ -223,10 +223,14 @@ type BackupRestorePreflightDTO struct {
 // ListMoviesRequest filters the library movie listing using the same canonical
 // semantics that Saved Views expose to the renderer.
 type ListMoviesRequest struct {
-	Mode       string   `json:"mode,omitempty"`
-	Query      string   `json:"query,omitempty"`
-	Tag        string   `json:"tag,omitempty"`
-	Actor      string   `json:"actor,omitempty"`
+	Mode  string `json:"mode,omitempty"`
+	Query string `json:"query,omitempty"`
+	// Tag / Tags are exact matches against metadata (nfo) or user tags; multiple values are AND.
+	Tag  string   `json:"tag,omitempty"`
+	Tags []string `json:"tags,omitempty"`
+	// Actor is comma-separated exact actor names (AND; aliases resolve to canonical).
+	Actor string `json:"actor,omitempty"`
+	// Studio is comma-separated effective studio names (OR).
 	Studio     string   `json:"studio,omitempty"`
 	PlayState  string   `json:"playState,omitempty"`
 	UserRating *float64 `json:"userRating,omitempty"`
@@ -260,6 +264,7 @@ type SavedViewFiltersV1 struct {
 	Year            string   `json:"year,omitempty"`
 	Runtime         string   `json:"runtime,omitempty"`
 	Catalog         string   `json:"catalog,omitempty"`
+	Sort            string   `json:"sort,omitempty"`
 }
 
 // SavedViewDTO is one ordered user-defined library view.
@@ -864,7 +869,7 @@ type SettingsDTO struct {
 	OrganizeLibrary            bool              `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
-	// AutoActorProfileScrape: when true, movie metadata scrapes may enqueue missing actor profile scrapes (library-config.cfg).
+	// AutoActorProfileScrape: when true, movie scrapes and a bounded library sweep may enqueue missing actor profile scrapes (library-config.cfg).
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape"`
 	// AutoDownloadUpdates: when true, startup update checks may automatically download and verify a newer installer.
 	AutoDownloadUpdates bool `json:"autoDownloadUpdates"`

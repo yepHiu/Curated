@@ -16,6 +16,7 @@ alwaysApply: false
 - Preserve internal scrolling containers; avoid changes that make the whole shell scroll when only the content area should scroll.
 - Reuse existing page building blocks like `MovieCard`, `DetailPanel`, `PlayerPage`, `SettingsPage`, and routed `views` before creating parallel variants.
 - Library cards should stay compact, poster-first, and fully clickable; avoid reintroducing large action-heavy card footers unless explicitly requested.
+- Do not add instructional helper copy under library filters, toolbars, popovers, or section titles. Labels, chips, and empty states are enough; see **`product-rules.mdc`**.
 - When changing shared movie card sizing, keep library grid and `Related titles` visually consistent unless the task explicitly asks them to diverge.
 - Detail pages should follow the current media-library pattern: left poster, right metadata, clear hierarchy, and no oversized hero banners.
 - Player pages should stay video-first and low-chrome; avoid adding extra explanatory cards or secondary panels unless explicitly requested.

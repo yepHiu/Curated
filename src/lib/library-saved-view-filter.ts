@@ -1,7 +1,7 @@
 import type { SavedViewFiltersV1 } from "@/api/types"
 import type { Movie } from "@/domain/movie/types"
 import type { PlaybackProgressEntry } from "@/lib/playback-progress-storage"
-import { normalizeLibraryResolutionFilter } from "@/lib/library-query"
+import { normalizeLibraryResolutionFilter, parseLibraryTagFilterText } from "@/lib/library-query"
 
 export interface SavedViewFilterRuntime {
   now?: Date
@@ -96,6 +96,53 @@ function matchesCatalog(movie: Movie, catalog: SavedViewFiltersV1["catalog"]): b
   return !movie.coverUrl?.trim() && !movie.thumbUrl?.trim()
 }
 
+function movieHasLibraryTag(movie: Movie, tag: string): boolean {
+  const key = tag.trim().toLocaleLowerCase()
+  if (!key) {
+    return false
+  }
+  return [...movie.tags, ...movie.userTags].some((value) => value.trim().toLocaleLowerCase() === key)
+}
+
+export function movieMatchesLibraryTags(movie: Movie, tags: readonly string[]): boolean {
+  if (tags.length === 0) {
+    return true
+  }
+  return tags.every((tag) => movieHasLibraryTag(movie, tag))
+}
+
+function movieHasLibraryActor(movie: Movie, actor: string): boolean {
+  const key = actor.trim().toLocaleLowerCase()
+  if (!key) {
+    return false
+  }
+  return movie.actors.some((value) => value.trim().toLocaleLowerCase() === key)
+}
+
+/** Exact actor filters use AND: the movie must include every selected actor. */
+export function movieMatchesLibraryActors(movie: Movie, actors: readonly string[]): boolean {
+  if (actors.length === 0) {
+    return true
+  }
+  return actors.every((actor) => movieHasLibraryActor(movie, actor))
+}
+
+function movieHasLibraryStudio(movie: Movie, studio: string): boolean {
+  const key = studio.trim().toLocaleLowerCase()
+  if (!key) {
+    return false
+  }
+  return movie.studio.trim().toLocaleLowerCase() === key
+}
+
+/** Exact studio filters use OR: the effective studio may match any selected name. */
+export function movieMatchesLibraryStudios(movie: Movie, studios: readonly string[]): boolean {
+  if (studios.length === 0) {
+    return true
+  }
+  return studios.some((studio) => movieHasLibraryStudio(movie, studio))
+}
+
 function matchesAddedWindow(movie: Movie, days: number | undefined, now: Date): boolean {
   if (days === undefined) {
     return true
@@ -122,6 +169,15 @@ export function filterMoviesBySavedView(
       return false
     }
     if (!matchesUserRating(movie, filters)) {
+      return false
+    }
+    if (!movieMatchesLibraryTags(movie, parseLibraryTagFilterText(filters.tag))) {
+      return false
+    }
+    if (!movieMatchesLibraryActors(movie, parseLibraryTagFilterText(filters.actor))) {
+      return false
+    }
+    if (!movieMatchesLibraryStudios(movie, parseLibraryTagFilterText(filters.studio))) {
       return false
     }
     return (

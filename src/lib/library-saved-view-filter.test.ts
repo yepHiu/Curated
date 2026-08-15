@@ -115,4 +115,36 @@ describe("filterMoviesBySavedView", () => {
       ),
     ).toEqual(["unwatched-4k", "in-progress", "completed", "metadata-five", "unknown-year"])
   })
+
+  it("requires every selected tag across user tags and metadata tags", () => {
+    const tagged = [
+      movie("both", { tags: ["Featured"], userTags: ["mine"] }),
+      movie("meta-only", { tags: ["Featured"], userTags: [] }),
+      movie("user-only", { tags: ["Drama"], userTags: ["mine"] }),
+    ]
+    expect(
+      filterMoviesBySavedView(tagged, { schemaVersion: 1, tag: "Featured,mine" }, runtime).map((item) => item.id),
+    ).toEqual(["both"])
+    expect(
+      filterMoviesBySavedView(tagged, { schemaVersion: 1, tag: "mine" }, runtime).map((item) => item.id),
+    ).toEqual(["both", "user-only"])
+  })
+
+  it("requires every selected actor and any selected studio", () => {
+    const cast = [
+      movie("both", { actors: ["Actor A", "Actor B"], studio: "Studio A" }),
+      movie("one-actor", { actors: ["Actor A"], studio: "Studio B" }),
+      movie("other-studio", { actors: ["Actor B"], studio: "Studio C" }),
+    ]
+    expect(
+      filterMoviesBySavedView(cast, { schemaVersion: 1, actor: "Actor A,Actor B" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["both"])
+    expect(
+      filterMoviesBySavedView(cast, { schemaVersion: 1, studio: "Studio A,Studio C" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["both", "other-studio"])
+  })
 })

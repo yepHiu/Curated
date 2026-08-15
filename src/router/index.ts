@@ -42,7 +42,13 @@ const router = createRouter({
         {
           path: "tags",
           name: "tags",
-          component: () => import("@/views/LibraryView.vue"),
+          redirect: (to) => {
+            const query: LocationQuery = { ...to.query }
+            if (query.from === "tags") {
+              delete query.from
+            }
+            return { name: "library", query }
+          },
         },
         {
           path: "trash",

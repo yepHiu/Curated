@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Settings2,
   Sparkles,
-  Tags,
   Trash2,
   Users,
   X,
@@ -133,7 +132,6 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
       { label: t("nav.home"), page: "home", icon: House },
       { label: t("nav.library"), page: "library", icon: LibraryBig },
       { label: t("nav.actors"), page: "actors", icon: Users },
-      { label: t("nav.tags"), page: "tags", icon: Tags },
       { label: t("nav.trash"), page: "trash", icon: Trash2 },
     ],
     yours: [
