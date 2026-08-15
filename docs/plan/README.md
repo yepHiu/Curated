@@ -19,7 +19,7 @@
 
 ## 当前主计划
 
-当前执行中的主计划是 [`2026-07-19-project-feature-quality-audit.md`](2026-07-19-project-feature-quality-audit.md)。Milestone A～C 已验证；当前 Milestone D 的独立执行入口是 [`2026-07-20-personalization-implementation-plan.md`](2026-07-20-personalization-implementation-plan.md)，对应 REQ-0019～REQ-0022。容器、WebDAV、合规解耦、漫画库和 Android 等文档在未进入 PRD 且未被选为 Milestone E 主分支前，均不与主计划并行实施。
+质量审计主计划是 [`2026-07-19-project-feature-quality-audit.md`](2026-07-19-project-feature-quality-audit.md)。Milestone A～C 已验证；Milestone D（REQ-0019～REQ-0022）已随 1.4.12 实现，真实 Chromium QA 仍待补。1.5.1 之后当前选定的下一执行入口是 [`2026-08-14-scrape-governance-implementation-plan.md`](2026-08-14-scrape-governance-implementation-plan.md)，对应 REQ-0023。消息中心改版 REQ-0024 与消息政策台账 REQ-0025 已开始落地（[`2026-08-14-message-center-repair-plan.md`](2026-08-14-message-center-repair-plan.md)、[`../prd/message-catalog.md`](../prd/message-catalog.md)），不抢刮削调度实现。资料库筛选强化 REQ-0026 见 [`2026-08-14-library-filter-strengthening.md`](2026-08-14-library-filter-strengthening.md)。SFW 合规产品已决定另建新项目，不在本仓库改造；容器、WebDAV、漫画库、Android 与 metadata sidecar 在未进入 PRD 前不并行实施。
 
 ## 状态流转
 
