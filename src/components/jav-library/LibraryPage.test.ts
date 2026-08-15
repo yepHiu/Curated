@@ -64,7 +64,7 @@ vi.mock("@/components/jav-library/ActorProfileCard.vue", () => ({
 }))
 
 vi.mock("@/components/jav-library/LibrarySavedViewsControls.vue", () => ({
-  default: { template: "<div data-saved-view-controls />" },
+  default: { template: '<div data-saved-view-controls><slot /></div>' },
 }))
 
 vi.mock("@/components/jav-library/VirtualMovieMasonry.vue", () => ({
@@ -137,5 +137,20 @@ describe("LibraryPage", () => {
       expect(trigger.classes()).toContain("min-h-11")
     }
     expect(wrapper.get("[data-library-batch-toggle]").classes()).toContain("min-h-11")
+  })
+
+  it("places batch manage in the same saved-view action cluster as filters", () => {
+    const wrapper = mount(LibraryPage, {
+      props: {
+        mode: "library",
+        allMovies: [],
+        visibleMovies: [],
+        activeTab: "all",
+      },
+    })
+
+    expect(
+      wrapper.get("[data-saved-view-controls]").find("[data-library-batch-toggle]").exists(),
+    ).toBe(true)
   })
 })

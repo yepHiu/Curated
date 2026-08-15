@@ -44,6 +44,58 @@ function matchesResolution(movie: Movie, resolution: string | undefined): boolea
   return normalizeLibraryResolutionFilter(movie.resolution) === wanted
 }
 
+function hasLocalUserRating(movie: Movie): boolean {
+  return typeof movie.userRating === "number"
+}
+
+function matchesUserRating(movie: Movie, filters: SavedViewFiltersV1): boolean {
+  if (filters.unrated) {
+    return !hasLocalUserRating(movie)
+  }
+  if (filters.userRating === undefined) {
+    return true
+  }
+  return hasLocalUserRating(movie) && movie.userRating! >= filters.userRating
+}
+
+function matchesYear(movie: Movie, year: string | undefined): boolean {
+  const wanted = year?.trim().toLowerCase() ?? ""
+  if (!wanted) {
+    return true
+  }
+  if (wanted === "unknown") {
+    return !Number.isInteger(movie.year) || movie.year < 1800 || movie.year > 3000
+  }
+  return movie.year === Number(wanted)
+}
+
+function matchesRuntime(movie: Movie, runtime: SavedViewFiltersV1["runtime"]): boolean {
+  if (!runtime) {
+    return true
+  }
+  const minutes = movie.runtimeMinutes
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return false
+  }
+  if (runtime === "short") {
+    return minutes < 90
+  }
+  if (runtime === "standard") {
+    return minutes >= 90 && minutes <= 150
+  }
+  return minutes > 150
+}
+
+function matchesCatalog(movie: Movie, catalog: SavedViewFiltersV1["catalog"]): boolean {
+  if (!catalog) {
+    return true
+  }
+  if (catalog === "unscraped") {
+    return movie.actors.length === 0 && movie.tags.length === 0
+  }
+  return !movie.coverUrl?.trim() && !movie.thumbUrl?.trim()
+}
+
 function matchesAddedWindow(movie: Movie, days: number | undefined, now: Date): boolean {
   if (days === undefined) {
     return true
@@ -57,7 +109,7 @@ function matchesAddedWindow(movie: Movie, days: number | undefined, now: Date): 
 
 /**
  * Applies the Saved Views-only filters after the existing mode/q/entity filters.
- * Exact user rating deliberately ignores scraper/site rating fallbacks.
+ * `userRating` is a minimum local score and never falls back to scraper/site rating.
  */
 export function filterMoviesBySavedView(
   movies: readonly Movie[],
@@ -69,15 +121,15 @@ export function filterMoviesBySavedView(
     if (!matchesPlayState(movie, filters.playState, runtime)) {
       return false
     }
-    if (
-      filters.userRating !== undefined &&
-      (typeof movie.userRating !== "number" || movie.userRating !== filters.userRating)
-    ) {
+    if (!matchesUserRating(movie, filters)) {
       return false
     }
     return (
       matchesResolution(movie, filters.resolution) &&
-      matchesAddedWindow(movie, filters.addedWithinDays, now)
+      matchesAddedWindow(movie, filters.addedWithinDays, now) &&
+      matchesYear(movie, filters.year) &&
+      matchesRuntime(movie, filters.runtime) &&
+      matchesCatalog(movie, filters.catalog)
     )
   })
 }

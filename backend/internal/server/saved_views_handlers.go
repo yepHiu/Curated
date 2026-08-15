@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -33,6 +34,9 @@ func normalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 		Tab:           strings.ToLower(strings.TrimSpace(input.Tab)),
 		PlayState:     strings.ToLower(strings.TrimSpace(input.PlayState)),
 		Resolution:    normalizeSavedViewResolution(input.Resolution),
+		Year:          normalizeSavedViewYear(input.Year),
+		Runtime:       strings.ToLower(strings.TrimSpace(input.Runtime)),
+		Catalog:       strings.ToLower(strings.TrimSpace(input.Catalog)),
 	}
 	if out.Mode == "" {
 		out.Mode = "library"
@@ -67,6 +71,19 @@ func normalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 		}
 		out.UserRating = &value
 	}
+	if input.Unrated {
+		out.Unrated = true
+		out.UserRating = nil
+	}
+	if out.Year == "" && strings.TrimSpace(input.Year) != "" {
+		return contracts.SavedViewFiltersV1{}, errors.New("saved view year must be unknown or a year from 1800 to 3000")
+	}
+	if out.Runtime != "" && !oneOf(out.Runtime, "short", "standard", "long") {
+		return contracts.SavedViewFiltersV1{}, errors.New("invalid saved view runtime")
+	}
+	if out.Catalog != "" && !oneOf(out.Catalog, "unscraped", "no-cover") {
+		return contracts.SavedViewFiltersV1{}, errors.New("invalid saved view catalog")
+	}
 	if input.AddedWithinDays < 0 || input.AddedWithinDays > 3650 {
 		return contracts.SavedViewFiltersV1{}, errors.New("saved view addedWithinDays must be between 1 and 3650")
 	}
@@ -81,6 +98,24 @@ func normalizeSavedViewFilters(input contracts.SavedViewFiltersV1) (contracts.Sa
 		}, nil
 	}
 	return out, nil
+}
+
+func normalizeSavedViewYear(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return ""
+	}
+	if normalized == "unknown" {
+		return "unknown"
+	}
+	if len(normalized) != 4 {
+		return ""
+	}
+	year, err := strconv.Atoi(normalized)
+	if err != nil || year < 1800 || year > 3000 {
+		return ""
+	}
+	return normalized
 }
 
 func normalizeSavedViewResolution(value string) string {

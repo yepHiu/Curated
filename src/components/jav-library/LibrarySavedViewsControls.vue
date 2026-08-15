@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  X,
 } from "lucide-vue-next"
 import type { SavedViewDTO, SavedViewFiltersV1 } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -52,10 +53,17 @@ import { pushAppToast } from "@/composables/use-app-toast"
 import {
   buildSavedViewFiltersV1,
   buildSavedViewRouteTarget,
+  getLibraryActorExactQuery,
   getLibraryAddedWithinDaysQuery,
+  getLibraryCatalogQuery,
   getLibraryPlayStateQuery,
   getLibraryResolutionQuery,
+  getLibraryRuntimeQuery,
+  getLibraryStudioExactQuery,
+  getLibraryTagExactQuery,
+  getLibraryUnratedQuery,
   getLibraryUserRatingQuery,
+  getLibraryYearQuery,
   mergeLibraryQuery,
   resolveLibraryMode,
 } from "@/lib/library-query"
@@ -79,15 +87,72 @@ const savedViews = computed(() => libraryService.savedViews.value)
 const currentFilters = computed(() => buildSavedViewFiltersV1(mode.value, route.query))
 const playState = computed(() => getLibraryPlayStateQuery(route.query))
 const userRating = computed(() => getLibraryUserRatingQuery(route.query))
+const unrated = computed(() => getLibraryUnratedQuery(route.query))
 const resolution = computed(() => getLibraryResolutionQuery(route.query))
 const addedWithinDays = computed(() => getLibraryAddedWithinDaysQuery(route.query))
+const year = computed(() => getLibraryYearQuery(route.query))
+const runtime = computed(() => getLibraryRuntimeQuery(route.query))
+const catalog = computed(() => getLibraryCatalogQuery(route.query))
+const tagFilter = computed(() => getLibraryTagExactQuery(route.query).trim())
+const actorFilter = computed(() => getLibraryActorExactQuery(route.query).trim())
+const studioFilter = computed(() => getLibraryStudioExactQuery(route.query).trim())
+const ratingSelectValue = computed(() => {
+  if (unrated.value) return "unrated"
+  return userRating.value === undefined ? "any" : String(userRating.value)
+})
 const advancedFilterCount = computed(
   () =>
     Number(playState.value !== "all") +
-    Number(userRating.value !== undefined) +
+    Number(userRating.value !== undefined && !unrated.value) +
+    Number(unrated.value) +
     Number(resolution.value !== "") +
-    Number(addedWithinDays.value !== undefined),
+    Number(addedWithinDays.value !== undefined) +
+    Number(year.value !== "") +
+    Number(runtime.value !== "") +
+    Number(catalog.value !== "") +
+    Number(tagFilter.value !== "") +
+    Number(actorFilter.value !== "") +
+    Number(studioFilter.value !== ""),
 )
+const yearOptions = computed(() => {
+  const years = new Set<number>()
+  for (const movie of libraryService.movies.value) {
+    if (Number.isInteger(movie.year) && movie.year >= 1800 && movie.year <= 3000) {
+      years.add(movie.year)
+    }
+  }
+  return [...years].sort((left, right) => right - left)
+})
+const tagSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.flatMap((movie) => [...movie.tags, ...movie.userTags])))
+const actorSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.flatMap((movie) => movie.actors)))
+const studioSuggestions = computed(() => uniqueFacetValues(libraryService.movies.value.map((movie) => movie.studio)))
+const tagDraft = ref("")
+const actorDraft = ref("")
+const studioDraft = ref("")
+
+watch(tagFilter, (value) => {
+  tagDraft.value = value
+}, { immediate: true })
+watch(actorFilter, (value) => {
+  actorDraft.value = value
+}, { immediate: true })
+watch(studioFilter, (value) => {
+  studioDraft.value = value
+}, { immediate: true })
+
+function uniqueFacetValues(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of values) {
+    const trimmed = value.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLocaleLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(trimmed)
+  }
+  return result.sort((left, right) => left.localeCompare(right))
+}
 
 const canonicalFilterKey = (filters: SavedViewFiltersV1) => JSON.stringify(filters)
 
@@ -115,7 +180,22 @@ onMounted(() => {
 })
 
 async function updateAdvancedFilters(
-  patch: Partial<Record<"playState" | "userRating" | "resolution" | "addedWithinDays", string | undefined>>,
+  patch: Partial<
+    Record<
+      | "playState"
+      | "userRating"
+      | "unrated"
+      | "resolution"
+      | "addedWithinDays"
+      | "year"
+      | "runtime"
+      | "catalog"
+      | "tag"
+      | "actor"
+      | "studio",
+      string | undefined
+    >
+  >,
 ) {
   await router.replace({
     name: mode.value,
@@ -139,7 +219,15 @@ function onPlayStateChange(value: unknown) {
 function onRatingChange(value: unknown) {
   const next = selectString(value)
   if (!next) return
-  void updateAdvancedFilters({ userRating: next === "any" ? undefined : next })
+  if (next === "any") {
+    void updateAdvancedFilters({ userRating: undefined, unrated: undefined })
+    return
+  }
+  if (next === "unrated") {
+    void updateAdvancedFilters({ userRating: undefined, unrated: "1" })
+    return
+  }
+  void updateAdvancedFilters({ userRating: next, unrated: undefined })
 }
 
 function onResolutionChange(value: unknown) {
@@ -154,14 +242,135 @@ function onAddedWindowChange(value: unknown) {
   void updateAdvancedFilters({ addedWithinDays: next === "any" ? undefined : next })
 }
 
+function onYearChange(value: unknown) {
+  const next = selectString(value)
+  if (!next) return
+  void updateAdvancedFilters({ year: next === "any" ? undefined : next })
+}
+
+function onRuntimeChange(value: unknown) {
+  const next = selectString(value)
+  if (!next) return
+  void updateAdvancedFilters({ runtime: next === "any" ? undefined : next })
+}
+
+function onCatalogChange(value: unknown) {
+  const next = selectString(value)
+  if (!next) return
+  void updateAdvancedFilters({ catalog: next === "any" ? undefined : next })
+}
+
+function applyTextFilter(key: "tag" | "actor" | "studio", draft: string) {
+  const next = draft.trim()
+  const current = key === "tag" ? tagFilter.value : key === "actor" ? actorFilter.value : studioFilter.value
+  if (next === current) {
+    return
+  }
+  void updateAdvancedFilters({ [key]: next || undefined })
+}
+
 function clearAdvancedFilters() {
   void updateAdvancedFilters({
     playState: undefined,
     userRating: undefined,
+    unrated: undefined,
     resolution: undefined,
     addedWithinDays: undefined,
+    year: undefined,
+    runtime: undefined,
+    catalog: undefined,
+    tag: undefined,
+    actor: undefined,
+    studio: undefined,
   })
 }
+
+const activeFilterChips = computed(() => {
+  const chips: { key: string; label: string; clear: () => void }[] = []
+  if (playState.value !== "all") {
+    chips.push({
+      key: "playState",
+      label: t(`library.savedViewPlay.${playState.value}`),
+      clear: () => void updateAdvancedFilters({ playState: undefined }),
+    })
+  }
+  if (unrated.value) {
+    chips.push({
+      key: "unrated",
+      label: t("library.savedViewUnrated"),
+      clear: () => void updateAdvancedFilters({ unrated: undefined }),
+    })
+  } else if (userRating.value !== undefined) {
+    chips.push({
+      key: "userRating",
+      label: t("library.savedViewRatingAtLeast", { value: userRating.value }),
+      clear: () => void updateAdvancedFilters({ userRating: undefined }),
+    })
+  }
+  if (resolution.value) {
+    chips.push({
+      key: "resolution",
+      label: resolution.value.toUpperCase(),
+      clear: () => void updateAdvancedFilters({ resolution: undefined }),
+    })
+  }
+  if (addedWithinDays.value !== undefined) {
+    chips.push({
+      key: "addedWithinDays",
+      label: t("library.savedViewAddedDays", { days: addedWithinDays.value }),
+      clear: () => void updateAdvancedFilters({ addedWithinDays: undefined }),
+    })
+  }
+  if (year.value === "unknown") {
+    chips.push({
+      key: "year",
+      label: t("library.savedViewYearUnknown"),
+      clear: () => void updateAdvancedFilters({ year: undefined }),
+    })
+  } else if (year.value) {
+    chips.push({
+      key: "year",
+      label: year.value,
+      clear: () => void updateAdvancedFilters({ year: undefined }),
+    })
+  }
+  if (runtime.value) {
+    chips.push({
+      key: "runtime",
+      label: t(`library.savedViewRuntimeValue.${runtime.value}`),
+      clear: () => void updateAdvancedFilters({ runtime: undefined }),
+    })
+  }
+  if (catalog.value) {
+    chips.push({
+      key: "catalog",
+      label: t(`library.savedViewCatalogValue.${catalog.value}`),
+      clear: () => void updateAdvancedFilters({ catalog: undefined }),
+    })
+  }
+  if (tagFilter.value) {
+    chips.push({
+      key: "tag",
+      label: t("library.savedViewSummaryTag", { value: tagFilter.value }),
+      clear: () => void updateAdvancedFilters({ tag: undefined }),
+    })
+  }
+  if (actorFilter.value) {
+    chips.push({
+      key: "actor",
+      label: t("library.savedViewSummaryActor", { value: actorFilter.value }),
+      clear: () => void updateAdvancedFilters({ actor: undefined }),
+    })
+  }
+  if (studioFilter.value) {
+    chips.push({
+      key: "studio",
+      label: t("library.savedViewSummaryStudio", { value: studioFilter.value }),
+      clear: () => void updateAdvancedFilters({ studio: undefined }),
+    })
+  }
+  return chips
+})
 
 function openCreateDialog() {
   editMode.value = "create"
@@ -261,12 +470,25 @@ function filterSummary(filters: SavedViewFiltersV1): string {
   if (filters.playState && filters.playState !== "all") {
     entries.push(t(`library.savedViewPlay.${filters.playState}`))
   }
-  if (filters.userRating !== undefined) {
-    entries.push(t("library.savedViewRatingValue", { value: filters.userRating }))
+  if (filters.unrated) {
+    entries.push(t("library.savedViewUnrated"))
+  } else if (filters.userRating !== undefined) {
+    entries.push(t("library.savedViewRatingAtLeast", { value: filters.userRating }))
   }
   if (filters.resolution) entries.push(filters.resolution.toUpperCase())
   if (filters.addedWithinDays) {
     entries.push(t("library.savedViewAddedDays", { days: filters.addedWithinDays }))
+  }
+  if (filters.year === "unknown") {
+    entries.push(t("library.savedViewYearUnknown"))
+  } else if (filters.year) {
+    entries.push(filters.year)
+  }
+  if (filters.runtime) {
+    entries.push(t(`library.savedViewRuntimeValue.${filters.runtime}`))
+  }
+  if (filters.catalog) {
+    entries.push(t(`library.savedViewCatalogValue.${filters.catalog}`))
   }
   return entries.join(" · ") || t("library.savedViewAllLibrary")
 }
@@ -275,15 +497,19 @@ function filterSummary(filters: SavedViewFiltersV1): string {
 <template>
   <div
     data-library-saved-view-controls
-    class="flex min-w-0 flex-wrap items-center justify-end gap-2"
+    class="flex min-w-0 flex-col items-end gap-2"
   >
+    <div
+      data-library-saved-view-actions
+      class="flex max-w-full min-w-0 flex-nowrap items-center justify-end gap-2"
+    >
     <Popover v-if="mode !== 'trash'">
       <PopoverTrigger as-child>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          class="min-h-11 rounded-xl sm:min-h-8"
+          class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
           :aria-label="t('library.savedViewFilters')"
         >
           <Filter data-icon="inline-start" aria-hidden="true" />
@@ -295,9 +521,9 @@ function filterSummary(filters: SavedViewFiltersV1): string {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        class="w-[min(22rem,calc(100vw-2rem))] rounded-2xl border-border/70"
+        class="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border-border/70"
       >
-        <div class="flex flex-col gap-4">
+        <div class="flex max-h-[min(32rem,70vh)] flex-col gap-4 overflow-y-auto">
           <div class="flex flex-col gap-1">
             <p class="text-sm font-semibold text-foreground">
               {{ t("library.savedViewFiltersTitle") }}
@@ -328,7 +554,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
             <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
               {{ t("library.savedViewUserRating") }}
               <Select
-                :model-value="userRating === undefined ? 'any' : String(userRating)"
+                :model-value="ratingSelectValue"
                 @update:model-value="onRatingChange"
               >
                 <SelectTrigger class="w-full rounded-xl">
@@ -337,8 +563,9 @@ function filterSummary(filters: SavedViewFiltersV1): string {
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="any">{{ t("library.savedViewAny") }}</SelectItem>
-                    <SelectItem v-for="value in [5, 4, 3, 2, 1, 0]" :key="value" :value="String(value)">
-                      {{ t("library.savedViewRatingValue", { value }) }}
+                    <SelectItem value="unrated">{{ t("library.savedViewUnrated") }}</SelectItem>
+                    <SelectItem v-for="value in [5, 4, 3, 2, 1]" :key="value" :value="String(value)">
+                      {{ t("library.savedViewRatingAtLeast", { value }) }}
                     </SelectItem>
                   </SelectGroup>
                 </SelectContent>
@@ -385,6 +612,117 @@ function filterSummary(filters: SavedViewFiltersV1): string {
                 </SelectContent>
               </Select>
             </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+              {{ t("library.savedViewYear") }}
+              <Select
+                :model-value="year || 'any'"
+                @update:model-value="onYearChange"
+              >
+                <SelectTrigger class="w-full rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="any">{{ t("library.savedViewAny") }}</SelectItem>
+                    <SelectItem value="unknown">{{ t("library.savedViewYearUnknown") }}</SelectItem>
+                    <SelectItem v-for="option in yearOptions" :key="option" :value="String(option)">
+                      {{ option }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+              {{ t("library.savedViewRuntime") }}
+              <Select
+                :model-value="runtime || 'any'"
+                @update:model-value="onRuntimeChange"
+              >
+                <SelectTrigger class="w-full rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="any">{{ t("library.savedViewAny") }}</SelectItem>
+                    <SelectItem value="short">{{ t("library.savedViewRuntimeValue.short") }}</SelectItem>
+                    <SelectItem value="standard">{{ t("library.savedViewRuntimeValue.standard") }}</SelectItem>
+                    <SelectItem value="long">{{ t("library.savedViewRuntimeValue.long") }}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:col-span-2">
+              {{ t("library.savedViewCatalog") }}
+              <Select
+                :model-value="catalog || 'any'"
+                @update:model-value="onCatalogChange"
+              >
+                <SelectTrigger class="w-full rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="any">{{ t("library.savedViewAny") }}</SelectItem>
+                    <SelectItem value="unscraped">{{ t("library.savedViewCatalogValue.unscraped") }}</SelectItem>
+                    <SelectItem value="no-cover">{{ t("library.savedViewCatalogValue.no-cover") }}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:col-span-2">
+              {{ t("library.savedViewTag") }}
+              <Input
+                v-model="tagDraft"
+                list="library-filter-tag-suggestions"
+                maxlength="200"
+                autocomplete="off"
+                :placeholder="t('library.savedViewTagPlaceholder')"
+                class="rounded-xl"
+                @keydown.enter.prevent="applyTextFilter('tag', tagDraft)"
+                @blur="applyTextFilter('tag', tagDraft)"
+              />
+              <datalist id="library-filter-tag-suggestions">
+                <option v-for="option in tagSuggestions" :key="option" :value="option" />
+              </datalist>
+            </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+              {{ t("library.savedViewActor") }}
+              <Input
+                v-model="actorDraft"
+                list="library-filter-actor-suggestions"
+                maxlength="200"
+                autocomplete="off"
+                :placeholder="t('library.savedViewActorPlaceholder')"
+                class="rounded-xl"
+                @keydown.enter.prevent="applyTextFilter('actor', actorDraft)"
+                @blur="applyTextFilter('actor', actorDraft)"
+              />
+              <datalist id="library-filter-actor-suggestions">
+                <option v-for="option in actorSuggestions" :key="option" :value="option" />
+              </datalist>
+            </label>
+
+            <label class="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+              {{ t("library.savedViewStudio") }}
+              <Input
+                v-model="studioDraft"
+                list="library-filter-studio-suggestions"
+                maxlength="200"
+                autocomplete="off"
+                :placeholder="t('library.savedViewStudioPlaceholder')"
+                class="rounded-xl"
+                @keydown.enter.prevent="applyTextFilter('studio', studioDraft)"
+                @blur="applyTextFilter('studio', studioDraft)"
+              />
+              <datalist id="library-filter-studio-suggestions">
+                <option v-for="option in studioSuggestions" :key="option" :value="option" />
+              </datalist>
+            </label>
           </div>
 
           <Button
@@ -407,7 +745,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
           type="button"
           variant="outline"
           size="sm"
-          class="min-h-11 rounded-xl sm:min-h-8"
+          class="min-h-11 shrink-0 rounded-xl sm:min-h-8"
           :aria-label="t('library.savedViews')"
         >
           <Bookmark data-icon="inline-start" aria-hidden="true" />
@@ -478,6 +816,26 @@ function filterSummary(filters: SavedViewFiltersV1): string {
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+      <slot />
+    </div>
+    <div
+      v-if="mode !== 'trash' && activeFilterChips.length > 0"
+      data-library-filter-chips
+      class="flex flex-wrap items-center justify-end gap-1.5"
+    >
+      <button
+        v-for="chip in activeFilterChips"
+        :key="chip.key"
+        type="button"
+        class="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-border/70 bg-muted/60 px-2.5 text-xs text-foreground hover:bg-muted sm:min-h-8"
+        :data-library-filter-chip="chip.key"
+        :aria-label="t('library.savedViewClearChipAria', { label: chip.label })"
+        @click="chip.clear"
+      >
+        <span class="min-w-0 truncate">{{ chip.label }}</span>
+        <X class="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
+      </button>
+    </div>
   </div>
 
   <Dialog v-model:open="editDialogOpen">

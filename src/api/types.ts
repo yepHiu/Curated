@@ -186,6 +186,8 @@ export interface MovieDetailDTO extends MovieListItemDTO {
   userRating?: number | null
   /** 演员展示名 -> 头像 URL（SQLite actors.avatar，依赖演员资料刮削） */
   actorAvatarUrls?: Record<string, string>
+  /** 写出当前元数据的刮削源；尚未刮削时省略 */
+  metadataProvider?: string
 }
 
 export interface MoviesPageDTO {
@@ -656,11 +658,17 @@ export interface ListMoviesParams {
   /** 精确厂商名，与路由 `studio` 一致 */
   studio?: string
   playState?: "all" | "unwatched" | "in-progress" | "completed"
+  /** Minimum local user rating 0–5. Ignored when `unrated` is true. */
   userRating?: number
+  unrated?: boolean
   /** `4k` 同时匹配 4K / 2160p / UHD */
   resolution?: string
   /** RFC3339 或 YYYY-MM-DD；后端转换为 UTC 后做 added_at 下界筛选 */
   addedAfter?: string
+  /** Exact year or `unknown` */
+  year?: string
+  runtime?: SavedViewRuntime
+  catalog?: SavedViewCatalog
   limit?: number
   offset?: number
 }
@@ -759,6 +767,8 @@ export interface ActorMergeAuditListDTO {
 export type SavedViewMode = "library" | "favorites" | "recent" | "tags" | "trash"
 export type SavedViewTab = "all" | "new" | "top-rated"
 export type SavedViewPlayState = "all" | "unwatched" | "in-progress" | "completed"
+export type SavedViewRuntime = "short" | "standard" | "long"
+export type SavedViewCatalog = "unscraped" | "no-cover"
 
 export interface SavedViewFiltersV1 {
   schemaVersion: 1
@@ -769,9 +779,16 @@ export interface SavedViewFiltersV1 {
   studio?: string
   tab?: SavedViewTab
   playState?: SavedViewPlayState
+  /** Minimum local user rating 0–5. Ignored when `unrated` is true. */
   userRating?: number
+  /** Only movies with no local user rating. */
+  unrated?: boolean
   resolution?: string
   addedWithinDays?: number
+  /** Exact release year, or `unknown` when year is missing. */
+  year?: string
+  runtime?: SavedViewRuntime
+  catalog?: SavedViewCatalog
 }
 
 export interface SavedViewDTO {

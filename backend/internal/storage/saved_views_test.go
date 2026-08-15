@@ -165,7 +165,7 @@ func TestListMoviesSavedViewFilters(t *testing.T) {
 			t.Fatalf("metadata %s: %v", item.code, err)
 		}
 		if _, err := store.db.ExecContext(ctx, `
-			UPDATE movies SET resolution = ?, added_at = ?, user_rating = ? WHERE id = ?`,
+			UPDATE movies SET resolution = ?, added_at = ?, user_rating = ?, year = 2026, runtime_minutes = 120 WHERE id = ?`,
 			item.resolution,
 			item.addedAt,
 			item.userRating,
@@ -181,6 +181,28 @@ func TestListMoviesSavedViewFilters(t *testing.T) {
 				t.Fatalf("progress %s: %v", item.code, err)
 			}
 		}
+	}
+
+	unratedOutcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "saved-view-filter-test",
+		Path:     filepath.Join(t.TempDir(), "VIEW-004.mp4"),
+		FileName: "VIEW-004.mp4",
+		Number:   "VIEW-004",
+	})
+	if err != nil {
+		t.Fatalf("persist VIEW-004: %v", err)
+	}
+	ids["VIEW-004"] = unratedOutcome.MovieID
+	if _, err := store.db.ExecContext(ctx, `
+		UPDATE movies
+		SET user_rating = NULL,
+			year = 0,
+			runtime_minutes = 60,
+			cover_url = '',
+			thumb_url = '',
+			added_at = '2025-02-01T00:00:00Z'
+		WHERE id = ?`, unratedOutcome.MovieID); err != nil {
+		t.Fatalf("update VIEW-004: %v", err)
 	}
 
 	assertIDs := func(name string, request contracts.ListMoviesRequest, want ...string) {
@@ -205,15 +227,22 @@ func TestListMoviesSavedViewFilters(t *testing.T) {
 	}
 
 	five := 5.0
+	four := 4.0
 	assertIDs("tag", contracts.ListMoviesRequest{Tag: "Featured"}, "VIEW-001")
 	assertIDs("actor", contracts.ListMoviesRequest{Actor: "Actor B"}, "VIEW-002")
 	assertIDs("studio", contracts.ListMoviesRequest{Studio: "Studio C"}, "VIEW-003")
 	assertIDs("4k", contracts.ListMoviesRequest{Resolution: "4k"}, "VIEW-001")
 	assertIDs("rating", contracts.ListMoviesRequest{UserRating: &five}, "VIEW-001")
+	assertIDs("min rating", contracts.ListMoviesRequest{UserRating: &four}, "VIEW-001", "VIEW-002")
 	assertIDs("recent", contracts.ListMoviesRequest{AddedAfter: "2026-07-01T00:00:00Z"}, "VIEW-001")
-	assertIDs("unwatched", contracts.ListMoviesRequest{PlayState: "unwatched"}, "VIEW-001")
+	assertIDs("unwatched", contracts.ListMoviesRequest{PlayState: "unwatched"}, "VIEW-001", "VIEW-004")
 	assertIDs("in progress", contracts.ListMoviesRequest{PlayState: "in-progress"}, "VIEW-002")
 	assertIDs("completed", contracts.ListMoviesRequest{PlayState: "completed"}, "VIEW-003")
+	assertIDs("unrated", contracts.ListMoviesRequest{Unrated: true}, "VIEW-004")
+	assertIDs("unknown year", contracts.ListMoviesRequest{Year: "unknown"}, "VIEW-004")
+	assertIDs("short runtime", contracts.ListMoviesRequest{Runtime: "short"}, "VIEW-004")
+	assertIDs("unscraped", contracts.ListMoviesRequest{Catalog: "unscraped"}, "VIEW-004")
+	assertIDs("no cover", contracts.ListMoviesRequest{Catalog: "no-cover"}, "VIEW-001", "VIEW-002", "VIEW-003", "VIEW-004")
 
 	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{UserRating: &five, Limit: 10})
 	if err != nil || len(page.Items) != 1 {

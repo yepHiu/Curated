@@ -1,10 +1,17 @@
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
-import type { SavedViewFiltersV1, SavedViewPlayState } from "@/api/types"
+import type {
+  SavedViewCatalog,
+  SavedViewFiltersV1,
+  SavedViewPlayState,
+  SavedViewRuntime,
+} from "@/api/types"
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteRecordName } from "vue-router"
 
 const libraryModes = ["library", "favorites", "recent", "tags", "trash"] as const
 const libraryTabs = ["all", "new", "top-rated"] as const
 const libraryPlayStates = ["all", "unwatched", "in-progress", "completed"] as const
+const libraryRuntimes = ["short", "standard", "long"] as const
+const libraryCatalogs = ["unscraped", "no-cover"] as const
 const libraryNavigationTransientKeys = ["from", "browse", "back", "autoplay", "t"] as const
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey) =>
@@ -183,6 +190,49 @@ export const getLibraryAddedWithinDaysQuery = (query: LocationQuery): number | u
   return Number.isInteger(value) && value >= 1 && value <= 3650 ? value : undefined
 }
 
+export const getLibraryUnratedQuery = (query: LocationQuery): boolean => {
+  const raw = typeof query.unrated === "string" ? query.unrated.trim().toLowerCase() : ""
+  return raw === "1" || raw === "true"
+}
+
+export const normalizeLibraryYearFilter = (value: string): string => {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) {
+    return ""
+  }
+  if (normalized === "unknown") {
+    return "unknown"
+  }
+  if (!/^\d{4}$/.test(normalized)) {
+    return ""
+  }
+  const year = Number(normalized)
+  return year >= 1800 && year <= 3000 ? normalized : ""
+}
+
+export const getLibraryYearQuery = (query: LocationQuery): string =>
+  normalizeLibraryYearFilter(typeof query.year === "string" ? query.year : "")
+
+export const normalizeLibraryRuntimeFilter = (value: string): SavedViewRuntime | "" => {
+  const normalized = value.trim().toLowerCase()
+  return libraryRuntimes.includes(normalized as SavedViewRuntime)
+    ? (normalized as SavedViewRuntime)
+    : ""
+}
+
+export const getLibraryRuntimeQuery = (query: LocationQuery): SavedViewRuntime | "" =>
+  normalizeLibraryRuntimeFilter(typeof query.runtime === "string" ? query.runtime : "")
+
+export const normalizeLibraryCatalogFilter = (value: string): SavedViewCatalog | "" => {
+  const normalized = value.trim().toLowerCase()
+  return libraryCatalogs.includes(normalized as SavedViewCatalog)
+    ? (normalized as SavedViewCatalog)
+    : ""
+}
+
+export const getLibraryCatalogQuery = (query: LocationQuery): SavedViewCatalog | "" =>
+  normalizeLibraryCatalogFilter(typeof query.catalog === "string" ? query.catalog : "")
+
 export const buildSavedViewFiltersV1 = (
   mode: LibraryMode,
   query: LocationQuery,
@@ -195,9 +245,13 @@ export const buildSavedViewFiltersV1 = (
   studio: getLibraryStudioExactQuery(query).trim() || undefined,
   tab: getLibraryTabQuery(query),
   playState: getLibraryPlayStateQuery(query),
-  userRating: getLibraryUserRatingQuery(query),
+  userRating: getLibraryUnratedQuery(query) ? undefined : getLibraryUserRatingQuery(query),
+  unrated: getLibraryUnratedQuery(query) || undefined,
   resolution: getLibraryResolutionQuery(query) || undefined,
   addedWithinDays: getLibraryAddedWithinDaysQuery(query),
+  year: getLibraryYearQuery(query) || undefined,
+  runtime: getLibraryRuntimeQuery(query) || undefined,
+  catalog: getLibraryCatalogQuery(query) || undefined,
 })
 
 export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => ({
@@ -209,10 +263,15 @@ export const buildSavedViewRouteTarget = (filters: SavedViewFiltersV1) => ({
     studio: filters.studio,
     tab: filters.tab,
     playState: filters.playState,
-    userRating: filters.userRating === undefined ? undefined : String(filters.userRating),
+    userRating:
+      filters.unrated || filters.userRating === undefined ? undefined : String(filters.userRating),
+    unrated: filters.unrated ? "1" : undefined,
     resolution: normalizeLibraryResolutionFilter(filters.resolution ?? "") || undefined,
     addedWithinDays:
       filters.addedWithinDays === undefined ? undefined : String(filters.addedWithinDays),
+    year: normalizeLibraryYearFilter(filters.year ?? "") || undefined,
+    runtime: normalizeLibraryRuntimeFilter(filters.runtime ?? "") || undefined,
+    catalog: normalizeLibraryCatalogFilter(filters.catalog ?? "") || undefined,
   }),
 })
 
@@ -235,14 +294,18 @@ export const getBrowseContextQuery = (query: LocationQuery) => ({
   playState:
     getLibraryPlayStateQuery(query) === "all" ? undefined : getLibraryPlayStateQuery(query),
   userRating:
-    getLibraryUserRatingQuery(query) === undefined
+    getLibraryUnratedQuery(query) || getLibraryUserRatingQuery(query) === undefined
       ? undefined
       : String(getLibraryUserRatingQuery(query)),
+  unrated: getLibraryUnratedQuery(query) ? "1" : undefined,
   resolution: getLibraryResolutionQuery(query) || undefined,
   addedWithinDays:
     getLibraryAddedWithinDaysQuery(query) === undefined
       ? undefined
       : String(getLibraryAddedWithinDaysQuery(query)),
+  year: getLibraryYearQuery(query) || undefined,
+  runtime: getLibraryRuntimeQuery(query) || undefined,
+  catalog: getLibraryCatalogQuery(query) || undefined,
   selected: getSelectedMovieQuery(query),
 })
 
@@ -256,8 +319,12 @@ type LibraryQueryPatchKey =
   | "studio"
   | "playState"
   | "userRating"
+  | "unrated"
   | "resolution"
   | "addedWithinDays"
+  | "year"
+  | "runtime"
+  | "catalog"
 
 export const mergeLibraryQuery = (
   sourceQuery: LocationQuery,
@@ -323,6 +390,22 @@ export const mergeLibraryQuery = (
     applyValue("addedWithinDays", patch.addedWithinDays)
   }
 
+  if (hasOwnKey(patch, "unrated")) {
+    applyValue("unrated", patch.unrated === "1" || patch.unrated === "true" ? "1" : undefined)
+  }
+
+  if (hasOwnKey(patch, "year")) {
+    applyValue("year", normalizeLibraryYearFilter(patch.year ?? "") || undefined)
+  }
+
+  if (hasOwnKey(patch, "runtime")) {
+    applyValue("runtime", normalizeLibraryRuntimeFilter(patch.runtime ?? "") || undefined)
+  }
+
+  if (hasOwnKey(patch, "catalog")) {
+    applyValue("catalog", normalizeLibraryCatalogFilter(patch.catalog ?? "") || undefined)
+  }
+
   return nextQuery
 }
 
@@ -336,14 +419,18 @@ export const buildBrowseRouteTarget = (page: LibraryMode, currentQuery: Location
     tab: getLibraryTabQuery(currentQuery),
     playState: getLibraryPlayStateQuery(currentQuery),
     userRating:
-      getLibraryUserRatingQuery(currentQuery) === undefined
+      getLibraryUnratedQuery(currentQuery) || getLibraryUserRatingQuery(currentQuery) === undefined
         ? undefined
         : String(getLibraryUserRatingQuery(currentQuery)),
+    unrated: getLibraryUnratedQuery(currentQuery) ? "1" : undefined,
     resolution: getLibraryResolutionQuery(currentQuery) || undefined,
     addedWithinDays:
       getLibraryAddedWithinDaysQuery(currentQuery) === undefined
         ? undefined
         : String(getLibraryAddedWithinDaysQuery(currentQuery)),
+    year: getLibraryYearQuery(currentQuery) || undefined,
+    runtime: getLibraryRuntimeQuery(currentQuery) || undefined,
+    catalog: getLibraryCatalogQuery(currentQuery) || undefined,
     selected: getSelectedMovieQuery(currentQuery),
   }),
 })

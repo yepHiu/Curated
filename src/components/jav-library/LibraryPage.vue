@@ -372,42 +372,45 @@ function isChipActive(tag: string): boolean {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <div class="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+      <div class="flex w-full min-w-0 shrink-0 justify-end sm:w-auto">
         <template v-if="!batchModeOn">
-          <LibrarySavedViewsControls />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            data-library-batch-toggle
-            class="min-h-11 gap-1.5 rounded-xl sm:min-h-8"
-            @click="emit('enterBatchMode')"
-          >
-            <ListChecks class="size-4 opacity-80" aria-hidden="true" />
-            {{ t("library.batchManage") }}
-          </Button>
+          <LibrarySavedViewsControls>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-library-batch-toggle
+              class="min-h-11 shrink-0 gap-1.5 rounded-xl sm:min-h-8"
+              @click="emit('enterBatchMode')"
+            >
+              <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+              {{ t("library.batchManage") }}
+            </Button>
+          </LibrarySavedViewsControls>
         </template>
         <template v-else>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            class="min-h-11 gap-1.5 rounded-xl sm:min-h-8"
-            @click="emit('selectAllVisibleInBatch')"
-          >
-            <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
-            {{ t("library.batchSelectVisible") }}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            class="min-h-11 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:min-h-8"
-            @click="emit('exitBatchMode')"
-          >
-            <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-            {{ t("library.batchExitToolbar") }}
-          </Button>
+          <div class="flex max-w-full min-w-0 flex-nowrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="min-h-11 shrink-0 gap-1.5 rounded-xl sm:min-h-8"
+              @click="emit('selectAllVisibleInBatch')"
+            >
+              <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+              {{ t("library.batchSelectVisible") }}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="min-h-11 shrink-0 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:min-h-8"
+              @click="emit('exitBatchMode')"
+            >
+              <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+              {{ t("library.batchExitToolbar") }}
+            </Button>
+          </div>
         </template>
       </div>
     </div>

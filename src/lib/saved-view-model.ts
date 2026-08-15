@@ -1,5 +1,10 @@
 import type { SavedViewFiltersV1, SavedViewMode, SavedViewPlayState, SavedViewTab } from "@/api/types"
-import { normalizeLibraryResolutionFilter } from "@/lib/library-query"
+import {
+  normalizeLibraryCatalogFilter,
+  normalizeLibraryResolutionFilter,
+  normalizeLibraryRuntimeFilter,
+  normalizeLibraryYearFilter,
+} from "@/lib/library-query"
 
 const modes = new Set<SavedViewMode>(["library", "favorites", "recent", "tags", "trash"])
 const tabs = new Set<SavedViewTab>(["all", "new", "top-rated"])
@@ -43,9 +48,22 @@ export function normalizeSavedViewFiltersV1(input: SavedViewFiltersV1): SavedVie
   ) {
     throw new Error("saved view addedWithinDays must be between 1 and 3650")
   }
+  const year = normalizeLibraryYearFilter(input.year ?? "")
+  const runtime = normalizeLibraryRuntimeFilter(input.runtime ?? "")
+  const catalog = normalizeLibraryCatalogFilter(input.catalog ?? "")
+  if (input.year?.trim() && !year) {
+    throw new Error("saved view year must be unknown or a year from 1800 to 3000")
+  }
+  if (input.runtime?.trim() && !runtime) {
+    throw new Error("invalid saved view runtime")
+  }
+  if (input.catalog?.trim() && !catalog) {
+    throw new Error("invalid saved view catalog")
+  }
   if (mode === "trash") {
     return { schemaVersion: 1, mode: "trash", tab: "all", playState: "all" }
   }
+  const unrated = input.unrated === true
   return {
     schemaVersion: 1,
     mode,
@@ -55,9 +73,13 @@ export function normalizeSavedViewFiltersV1(input: SavedViewFiltersV1): SavedVie
     studio: normalizeText(input.studio),
     tab,
     playState,
-    userRating: input.userRating,
+    userRating: unrated ? undefined : input.userRating,
+    unrated: unrated || undefined,
     resolution: normalizeLibraryResolutionFilter(input.resolution ?? "") || undefined,
     addedWithinDays: input.addedWithinDays,
+    year: year || undefined,
+    runtime: runtime || undefined,
+    catalog: catalog || undefined,
   }
 }
 

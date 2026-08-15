@@ -560,6 +560,27 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		}
 		addedAfter = parsed.UTC().Format(time.RFC3339Nano)
 	}
+	unratedRaw := strings.ToLower(strings.TrimSpace(query.Get("unrated")))
+	unrated := unratedRaw == "1" || unratedRaw == "true" || unratedRaw == "yes"
+	if unratedRaw != "" && !unrated && unratedRaw != "0" && unratedRaw != "false" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid unrated")
+		return
+	}
+	year := normalizeSavedViewYear(query.Get("year"))
+	if raw := strings.TrimSpace(query.Get("year")); raw != "" && year == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "year must be unknown or a year from 1800 to 3000")
+		return
+	}
+	runtimeFilter := strings.ToLower(strings.TrimSpace(query.Get("runtime")))
+	if runtimeFilter != "" && !oneOf(runtimeFilter, "short", "standard", "long") {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid runtime")
+		return
+	}
+	catalog := strings.ToLower(strings.TrimSpace(query.Get("catalog")))
+	if catalog != "" && !oneOf(catalog, "unscraped", "no-cover") {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid catalog")
+		return
+	}
 
 	request := contracts.ListMoviesRequest{
 		Mode:       mode,
@@ -569,8 +590,12 @@ func (h *Handler) handleListMovies(w http.ResponseWriter, r *http.Request) {
 		Studio:     query.Get("studio"),
 		PlayState:  playState,
 		UserRating: userRating,
+		Unrated:    unrated,
 		Resolution: normalizeSavedViewResolution(query.Get("resolution")),
 		AddedAfter: addedAfter,
+		Year:       year,
+		Runtime:    runtimeFilter,
+		Catalog:    catalog,
 		Limit:      limit,
 		Offset:     offset,
 	}

@@ -21,6 +21,7 @@ const routerMock = vi.hoisted(() => ({
 }))
 
 const serviceMock = vi.hoisted(() => ({
+  movies: { value: [] as { year: number; tags: string[]; userTags: string[]; actors: string[]; studio: string }[] },
   savedViews: {
     value: [
       {
@@ -81,8 +82,9 @@ const InputStub = {
     '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 }
 
-function mountControls() {
+function mountControls(slots?: { default?: string }) {
   return mount(LibrarySavedViewsControls, {
+    ...(slots ? { slots } : {}),
     global: {
       stubs: {
         Badge: SlotStub,
@@ -124,6 +126,7 @@ function mountControls() {
         RefreshCw: true,
         Save: true,
         Trash2: true,
+        X: true,
       },
     },
   })
@@ -162,7 +165,7 @@ describe("LibrarySavedViewsControls", () => {
     expect(serviceMock.refreshSavedViews).toHaveBeenCalledTimes(1)
 
     await buttonByText(wrapper, "library.savedViewSaveCurrent").trigger("click")
-    await wrapper.get("input").setValue("Mina 4K")
+    await wrapper.get('input[placeholder="library.savedViewNamePlaceholder"]').setValue("Mina 4K")
     await buttonByText(wrapper, "library.savedViewSave").trigger("click")
     await flushPromises()
 
@@ -194,5 +197,26 @@ describe("LibrarySavedViewsControls", () => {
         userRating: "5",
       },
     })
+  })
+
+  it("shows dismissible chips for active URL filters", () => {
+    const wrapper = mountControls()
+    expect(wrapper.find("[data-library-filter-chips]").exists()).toBe(true)
+    expect(wrapper.find("[data-library-filter-chip=playState]").exists()).toBe(true)
+    expect(wrapper.find("[data-library-filter-chip=resolution]").exists()).toBe(true)
+  })
+
+  it("keeps filter, saved views, and trailing actions on one unwrapped row", () => {
+    const wrapper = mountControls({
+      default: '<button data-trailing-action type="button">batch</button>',
+    })
+    const row = wrapper.get("[data-library-saved-view-actions]")
+    expect(row.classes()).toEqual(
+      expect.arrayContaining(["flex", "flex-nowrap", "items-center"]),
+    )
+    expect(row.find("[data-trailing-action]").exists()).toBe(true)
+    expect(row.text()).toContain("library.savedViewFilters")
+    expect(row.text()).toContain("library.savedViews")
+    expect(wrapper.get("[data-library-filter-chips]").find("[data-trailing-action]").exists()).toBe(false)
   })
 })

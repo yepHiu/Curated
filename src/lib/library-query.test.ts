@@ -13,6 +13,10 @@ import {
   getLibraryPlayStateQuery,
   getLibraryResolutionQuery,
   getLibraryUserRatingQuery,
+  getLibraryUnratedQuery,
+  getLibraryYearQuery,
+  getLibraryRuntimeQuery,
+  getLibraryCatalogQuery,
   getLibraryStudioExactQuery,
   getLibraryTabQuery,
   getLibraryTagExactQuery,
@@ -252,21 +256,32 @@ describe("library query helpers", () => {
       userRating: "5",
       resolution: "2160P",
       addedWithinDays: "30",
+      year: "2024",
+      runtime: "long",
+      catalog: "unscraped",
+      unrated: "1",
       selected: "movie-1",
       autoplay: "1",
       t: "42",
     }
     expect(getLibraryPlayStateQuery(query)).toBe("unwatched")
     expect(getLibraryUserRatingQuery(query)).toBe(5)
+    expect(getLibraryUnratedQuery(query)).toBe(true)
     expect(getLibraryResolutionQuery(query)).toBe("4k")
     expect(getLibraryAddedWithinDaysQuery(query)).toBe(30)
+    expect(getLibraryYearQuery(query)).toBe("2024")
+    expect(getLibraryRuntimeQuery(query)).toBe("long")
+    expect(getLibraryCatalogQuery(query)).toBe("unscraped")
     expect(buildBrowseRouteTarget("favorites", query)).toEqual({
       name: "favorites",
       query: {
         playState: "unwatched",
-        userRating: "5",
+        unrated: "1",
         resolution: "4k",
         addedWithinDays: "30",
+        year: "2024",
+        runtime: "long",
+        catalog: "unscraped",
         selected: "movie-1",
       },
     })
@@ -298,8 +313,12 @@ describe("library query helpers", () => {
       tab: "top-rated",
       playState: "unwatched",
       userRating: 5,
+      unrated: undefined,
       resolution: "4k",
       addedWithinDays: 90,
+      year: undefined,
+      runtime: undefined,
+      catalog: undefined,
     })
     expect(buildSavedViewRouteTarget(filters)).toEqual({
       name: "library",

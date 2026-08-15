@@ -850,9 +850,13 @@ Query：
 | `actor` | string | 精确匹配演员名 |
 | `studio` | string | 精确匹配有效片商名 |
 | `playState` | string | `all` / `unwatched` / `in-progress` / `completed`；播放进度达到 95% 视为完成 |
-| `userRating` | number | 精确匹配用户本地评分 0～5；不使用刮削评分替代 |
+| `userRating` | number | 用户本地评分**最低分** 0～5；不使用刮削评分替代。与 `unrated` 同时出现时以未评分为准 |
+| `unrated` | boolean | `1` / `true` / `yes` 只返回没有本地用户评分的影片 |
 | `resolution` | string | 精确分辨率；`4k` 同时匹配 `4K` / `2160p` / `UHD` / `3840x2160` |
 | `addedAfter` | string | RFC3339 或 `YYYY-MM-DD` 入库时间下界 |
+| `year` | string | 精确发行年 `YYYY`（1800–3000），或 `unknown` 表示有效年份缺失 |
+| `runtime` | string | `short`（&lt;90 分钟）/ `standard`（90–150）/ `long`（&gt;150）；时长未知的影片不匹配 |
+| `catalog` | string | `unscraped`：无演员且无元数据标签；`no-cover`：无封面且无缩略图 |
 | `limit` | number | 默认 50 |
 | `offset` | number | 默认 0 |
 
@@ -913,6 +917,7 @@ Query：
 | `metadataRating` | 元数据评分 |
 | `userRating` | 用户评分；无覆盖时省略或为 null |
 | `actorAvatarUrls` | 演员名到头像 URL 的映射 |
+| `metadataProvider` | 写出当前元数据的刮削源名称；尚未刮削时省略 |
 
 错误：
 
@@ -2733,14 +2738,17 @@ Body：
     "mode": "library",
     "tab": "all",
     "playState": "unwatched",
-    "userRating": 5,
+    "userRating": 4,
+    "year": "2024",
+    "runtime": "long",
+    "catalog": "unscraped",
     "resolution": "4k",
     "addedWithinDays": 365
   }
 }
 ```
 
-成功：`201 SavedViewDTO`。名称 trim 后为 1～40 个 Unicode 字符，忽略大小写及首尾空白后必须唯一；每个库最多 50 个视图。筛选文本最长 200 字符，`addedWithinDays` 为 1～3650。服务端重新规范化所有字段，`2160p` / `UHD` 等保存为 `4k`。
+成功：`201 SavedViewDTO`。名称 trim 后为 1～40 个 Unicode 字符，忽略大小写及首尾空白后必须唯一；每个库最多 50 个视图。筛选文本最长 200 字符，`addedWithinDays` 为 1～3650。`userRating` 表示本地评分最低分；`unrated` 为 true 时忽略 `userRating`。可选 `year`（`YYYY` 或 `unknown`）、`runtime`（`short` / `standard` / `long`）、`catalog`（`unscraped` / `no-cover`）。服务端重新规范化所有字段，`2160p` / `UHD` 等保存为 `4k`。
 
 #### `PATCH /api/library/saved-views/{savedViewId}`
 

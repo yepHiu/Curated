@@ -66,13 +66,53 @@ describe("filterMoviesBySavedView", () => {
     ).toEqual(["unwatched-4k"])
   })
 
-  it("applies a relative added window from the evaluation time", () => {
+  it("treats userRating as a minimum and can isolate unrated movies", () => {
     expect(
-      filterMoviesBySavedView(
-        movies,
-        { schemaVersion: 1, addedWithinDays: 30 },
-        runtime,
-      ).map((item) => item.id),
-    ).toEqual(["unwatched-4k", "in-progress", "metadata-five"])
+      filterMoviesBySavedView(movies, { schemaVersion: 1, userRating: 4 }, runtime).map((item) => item.id),
+    ).toEqual(["unwatched-4k", "in-progress"])
+    expect(
+      filterMoviesBySavedView(movies, { schemaVersion: 1, unrated: true, userRating: 5 }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["metadata-five"])
+  })
+
+  it("filters by year runtime and catalog gaps", () => {
+    const extra = [
+      movie("old-short", {
+        year: 2018,
+        runtimeMinutes: 60,
+        actors: ["A"],
+        tags: ["Featured"],
+        coverUrl: "https://example/cover.jpg",
+        thumbUrl: "https://example/thumb.jpg",
+      }),
+      movie("unknown-year", {
+        year: 0,
+        runtimeMinutes: 200,
+        actors: [],
+        tags: [],
+      }),
+    ]
+    expect(
+      filterMoviesBySavedView([...movies, ...extra], { schemaVersion: 1, year: "2018" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["old-short"])
+    expect(
+      filterMoviesBySavedView([...movies, ...extra], { schemaVersion: 1, year: "unknown" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["unknown-year"])
+    expect(
+      filterMoviesBySavedView([...movies, ...extra], { schemaVersion: 1, runtime: "short" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["old-short"])
+    expect(
+      filterMoviesBySavedView([...movies, ...extra], { schemaVersion: 1, catalog: "unscraped" }, runtime).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["unwatched-4k", "in-progress", "completed", "metadata-five", "unknown-year"])
   })
 })

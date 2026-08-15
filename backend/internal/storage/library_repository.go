@@ -28,6 +28,7 @@ type movieRow struct {
 	CoverURL        string
 	ThumbURL        string
 	PreviewVideoURL string
+	Provider        string
 	TrashedAt       string
 }
 
@@ -74,26 +75,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 
 	for rows.Next() {
 		var row movieRow
-		if err := rows.Scan(
-			&row.ID,
-			&row.Title,
-			&row.Code,
-			&row.Studio,
-			&row.Summary,
-			&row.RuntimeMinutes,
-			&row.MetadataRating,
-			&row.UserRating,
-			&row.IsFavorite,
-			&row.AddedAt,
-			&row.Location,
-			&row.Resolution,
-			&row.Year,
-			&row.ReleaseDate,
-			&row.CoverURL,
-			&row.ThumbURL,
-			&row.PreviewVideoURL,
-			&row.TrashedAt,
-		); err != nil {
+		if err := scanMovieRow(rows, &row); err != nil {
 			return contracts.MoviesPageDTO{}, err
 		}
 		records = append(records, row)
@@ -152,31 +134,12 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 // GetMovieDetail loads the full movie detail including summary, preview images, and actor avatars.
 func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contracts.MovieDetailDTO, error) {
 	var row movieRow
-	err := s.db.QueryRowContext(
+	err := scanMovieRow(s.db.QueryRowContext(
 		ctx,
 		movieSelectEffectiveColumns+`
 		FROM movies m WHERE m.id = ?`,
 		movieID,
-	).Scan(
-		&row.ID,
-		&row.Title,
-		&row.Code,
-		&row.Studio,
-		&row.Summary,
-		&row.RuntimeMinutes,
-		&row.MetadataRating,
-		&row.UserRating,
-		&row.IsFavorite,
-		&row.AddedAt,
-		&row.Location,
-		&row.Resolution,
-		&row.Year,
-		&row.ReleaseDate,
-		&row.CoverURL,
-		&row.ThumbURL,
-		&row.PreviewVideoURL,
-		&row.TrashedAt,
-	)
+	), &row)
 	if err != nil {
 		return contracts.MovieDetailDTO{}, err
 	}
@@ -231,7 +194,32 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		MetadataRating:   row.MetadataRating,
 		UserRating:       userRatingPtr(row.UserRating),
 		ActorAvatarURLs:  actorAvatars,
+		MetadataProvider: strings.TrimSpace(row.Provider),
 	}, nil
+}
+
+func scanMovieRow(scanner interface{ Scan(dest ...any) error }, row *movieRow) error {
+	return scanner.Scan(
+		&row.ID,
+		&row.Title,
+		&row.Code,
+		&row.Studio,
+		&row.Summary,
+		&row.RuntimeMinutes,
+		&row.MetadataRating,
+		&row.UserRating,
+		&row.IsFavorite,
+		&row.AddedAt,
+		&row.Location,
+		&row.Resolution,
+		&row.Year,
+		&row.ReleaseDate,
+		&row.CoverURL,
+		&row.ThumbURL,
+		&row.PreviewVideoURL,
+		&row.Provider,
+		&row.TrashedAt,
+	)
 }
 
 func (s *SQLiteStore) lookupActorAvatarURLsByMovieID(ctx context.Context, movieID string) (map[string]string, error) {
@@ -281,8 +269,18 @@ SELECT m.id,
 		ELSE m.year
 	END AS year,
 	COALESCE(NULLIF(TRIM(m.user_release_date), ''), m.release_date) AS release_date,
-	m.cover_url, m.thumb_url, m.preview_video_url,
+	m.cover_url, m.thumb_url, m.preview_video_url, m.provider,
 	IFNULL(m.trashed_at, '') AS trashed_at`
+
+const sqlMovieEffectiveYear = `CASE
+		WHEN NULLIF(TRIM(m.user_release_date), '') IS NOT NULL
+			AND LENGTH(TRIM(m.user_release_date)) >= 4
+			AND CAST(SUBSTR(TRIM(m.user_release_date), 1, 4) AS INTEGER) BETWEEN 1800 AND 3000
+		THEN CAST(SUBSTR(TRIM(m.user_release_date), 1, 4) AS INTEGER)
+		ELSE m.year
+	END`
+
+const sqlMovieEffectiveRuntime = `COALESCE(m.user_runtime_minutes, m.runtime_minutes)`
 
 // buildMovieFilters 根据列表请求拼 WHERE 子句与参数，供 ListMovies 等 COUNT/LIMIT 查询复用。
 // - mode=trash：仅回收站；否则仅非回收站（见 sqlMovie*Clause）。
@@ -369,8 +367,10 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 		)`)
 	}
 
-	if request.UserRating != nil {
-		clauses = append(clauses, "m.user_rating = ?")
+	if request.Unrated {
+		clauses = append(clauses, "m.user_rating IS NULL")
+	} else if request.UserRating != nil {
+		clauses = append(clauses, "m.user_rating >= ?")
 		args = append(args, *request.UserRating)
 	}
 
@@ -386,6 +386,37 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	if addedAfter := strings.TrimSpace(request.AddedAfter); addedAfter != "" {
 		clauses = append(clauses, "julianday(m.added_at) >= julianday(?)")
 		args = append(args, addedAfter)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(request.Year)) {
+	case "":
+	case "unknown":
+		clauses = append(clauses, "("+sqlMovieEffectiveYear+") NOT BETWEEN 1800 AND 3000")
+	default:
+		clauses = append(clauses, "("+sqlMovieEffectiveYear+") = ?")
+		args = append(args, strings.TrimSpace(request.Year))
+	}
+
+	switch strings.ToLower(strings.TrimSpace(request.Runtime)) {
+	case "short":
+		clauses = append(clauses, "("+sqlMovieEffectiveRuntime+") > 0 AND ("+sqlMovieEffectiveRuntime+") < 90")
+	case "standard":
+		clauses = append(clauses, "("+sqlMovieEffectiveRuntime+") >= 90 AND ("+sqlMovieEffectiveRuntime+") <= 150")
+	case "long":
+		clauses = append(clauses, "("+sqlMovieEffectiveRuntime+") > 150")
+	}
+
+	switch strings.ToLower(strings.TrimSpace(request.Catalog)) {
+	case "unscraped":
+		clauses = append(clauses, `NOT EXISTS (
+			SELECT 1 FROM movie_actors ma WHERE ma.movie_id = m.id
+		) AND NOT EXISTS (
+			SELECT 1 FROM movie_tags mt
+			INNER JOIN tags catalog_tag ON catalog_tag.id = mt.tag_id
+			WHERE mt.movie_id = m.id AND catalog_tag.type = 'nfo'
+		)`)
+	case "no-cover":
+		clauses = append(clauses, `NULLIF(TRIM(m.cover_url), '') IS NULL AND NULLIF(TRIM(m.thumb_url), '') IS NULL`)
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args

@@ -230,8 +230,12 @@ type ListMoviesRequest struct {
 	Studio     string   `json:"studio,omitempty"`
 	PlayState  string   `json:"playState,omitempty"`
 	UserRating *float64 `json:"userRating,omitempty"`
+	Unrated    bool     `json:"unrated,omitempty"`
 	Resolution string   `json:"resolution,omitempty"`
 	AddedAfter string   `json:"addedAfter,omitempty"`
+	Year       string   `json:"year,omitempty"`
+	Runtime    string   `json:"runtime,omitempty"`
+	Catalog    string   `json:"catalog,omitempty"`
 	Limit      int      `json:"limit,omitempty"`
 	Offset     int      `json:"offset,omitempty"`
 }
@@ -250,8 +254,12 @@ type SavedViewFiltersV1 struct {
 	Tab             string   `json:"tab,omitempty"`
 	PlayState       string   `json:"playState,omitempty"`
 	UserRating      *float64 `json:"userRating,omitempty"`
+	Unrated         bool     `json:"unrated,omitempty"`
 	Resolution      string   `json:"resolution,omitempty"`
 	AddedWithinDays int      `json:"addedWithinDays,omitempty"`
+	Year            string   `json:"year,omitempty"`
+	Runtime         string   `json:"runtime,omitempty"`
+	Catalog         string   `json:"catalog,omitempty"`
 }
 
 // SavedViewDTO is one ordered user-defined library view.
@@ -527,6 +535,9 @@ type MovieDetailDTO struct {
 	UserRating     *float64 `json:"userRating,omitempty"`
 	// ActorAvatarURLs maps library actor display name (actors.name) -> actors.avatar URL after profile scrape.
 	ActorAvatarURLs map[string]string `json:"actorAvatarUrls,omitempty"`
+	// MetadataProvider is the Metatube movie provider that produced the current scraped metadata.
+	// Empty when the title has not been scraped yet.
+	MetadataProvider string `json:"metadataProvider,omitempty"`
 	// User*Override: in-memory seed only (json:"-"); SQLite applies overrides in SQL. EffectiveXXX for API = merge in EffectiveMovieDetailDTO.
 	UserTitleOverride          *string `json:"-"`
 	UserStudioOverride         *string `json:"-"`

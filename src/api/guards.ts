@@ -454,7 +454,8 @@ export function isMovieDetailDTO(value: unknown): value is MovieDetailDTO {
     isOptionalNullableNumber(value.userRating) &&
     isOptionalStringArray(value.previewImages) &&
     isOptionalString(value.previewVideoUrl) &&
-    isOptionalStringRecord(value.actorAvatarUrls)
+    isOptionalStringRecord(value.actorAvatarUrls) &&
+    isOptionalString(value.metadataProvider)
   )
 }
 
@@ -485,8 +486,12 @@ function isSavedViewFiltersV1(value: unknown): value is SavedViewFiltersV1 {
     isOptionalString(value.actor) &&
     isOptionalString(value.studio) &&
     isOptionalFiniteNumber(value.userRating) &&
+    (value.unrated === undefined || value.unrated === true || value.unrated === false) &&
     isOptionalString(value.resolution) &&
-    (value.addedWithinDays === undefined || isNonNegativeInteger(value.addedWithinDays))
+    (value.addedWithinDays === undefined || isNonNegativeInteger(value.addedWithinDays)) &&
+    (value.year === undefined || value.year === "unknown" || /^\d{4}$/.test(String(value.year))) &&
+    (value.runtime === undefined || ["short", "standard", "long"].includes(String(value.runtime))) &&
+    (value.catalog === undefined || ["unscraped", "no-cover"].includes(String(value.catalog)))
   )
 }
 
