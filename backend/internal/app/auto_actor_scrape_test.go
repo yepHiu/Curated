@@ -128,17 +128,18 @@ func TestAutoQueueMissingActorProfileScrapes_QueuesOnlyMissingActorsWhenEnabled(
 		cfg: config.Config{
 			Scraper: config.ScraperConfig{TaskTimeoutSeconds: 1},
 		},
-		logger:                        zap.NewNop(),
-		store:                         store,
-		scraper:                       scraperStub,
-		tasks:                         tm,
-		appCtx:                        ctx,
-		scrapeSem:                     make(chan struct{}, 2),
-		autoActorProfileScrape:        true,
-		autoActorProfileScrapePending: make(map[string]struct{}),
+		logger:                          zap.NewNop(),
+		store:                           store,
+		scraper:                         scraperStub,
+		tasks:                           tm,
+		appCtx:                          ctx,
+		scrapeSem:                       make(chan struct{}, 2),
+		autoActorProfileScrape:          true,
+		autoActorProfileScrapePending:   make(map[string]struct{}),
+		autoActorProfileScrapeAttempted: make(map[string]time.Time),
 	}
 
-	a.enqueueAutoActorProfileScrapes(ctx, []string{"Actor Missing", "Actor Ready", "Actor Missing"})
+	a.enqueueAutoActorProfileScrapes(ctx, []string{"Actor Missing", "Actor Ready", "Actor Missing"}, "auto.movie-metadata", false)
 
 	waitForActorTaskCount(t, tm, 1)
 	if got := scraperStub.ActorCalls(); len(got) != 1 || got[0] != "Actor Missing" {
@@ -169,18 +170,146 @@ func TestAutoQueueMissingActorProfileScrapes_DisabledSkipsAll(t *testing.T) {
 		cfg: config.Config{
 			Scraper: config.ScraperConfig{TaskTimeoutSeconds: 1},
 		},
-		logger:                        zap.NewNop(),
-		store:                         store,
-		scraper:                       scraperStub,
-		tasks:                         tm,
-		appCtx:                        ctx,
-		scrapeSem:                     make(chan struct{}, 1),
-		autoActorProfileScrape:        false,
-		autoActorProfileScrapePending: make(map[string]struct{}),
+		logger:                          zap.NewNop(),
+		store:                           store,
+		scraper:                         scraperStub,
+		tasks:                           tm,
+		appCtx:                          ctx,
+		scrapeSem:                       make(chan struct{}, 1),
+		autoActorProfileScrape:          false,
+		autoActorProfileScrapePending:   make(map[string]struct{}),
+		autoActorProfileScrapeAttempted: make(map[string]time.Time),
 	}
 
-	a.enqueueAutoActorProfileScrapes(ctx, []string{"Actor Missing"})
+	a.enqueueAutoActorProfileScrapes(ctx, []string{"Actor Missing"}, "auto.movie-metadata", false)
 	time.Sleep(100 * time.Millisecond)
+
+	if got := scraperStub.ActorCalls(); len(got) != 0 {
+		t.Fatalf("actor scrape calls = %#v, want none", got)
+	}
+	if recent := tm.ListRecentFinished(10); len(recent) != 0 {
+		t.Fatalf("expected no finished tasks, got %+v", recent)
+	}
+}
+
+func newAutoActorSweepApp(t *testing.T, store *storage.SQLiteStore, scraperStub *stubActorAutoScrapeScraper, enabled bool) (*App, *tasks.Manager) {
+	t.Helper()
+	tm := tasks.NewManager()
+	return &App{
+		cfg: config.Config{
+			Scraper: config.ScraperConfig{TaskTimeoutSeconds: 1},
+		},
+		logger:                          zap.NewNop(),
+		store:                           store,
+		scraper:                         scraperStub,
+		tasks:                           tm,
+		appCtx:                          context.Background(),
+		scrapeSem:                       make(chan struct{}, 2),
+		autoActorProfileScrape:          enabled,
+		autoActorProfileScrapePending:   make(map[string]struct{}),
+		autoActorProfileScrapeAttempted: make(map[string]time.Time),
+	}, tm
+}
+
+func TestMissingLibraryActorProfileSweep_QueuesOnlyMissingActors(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "sweep.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seedMovieWithActors(t, store, "ABC-200", []string{"Sweep Missing", "Sweep Ready"})
+	if err := store.UpdateActorProfile(ctx, scraper.ActorProfile{
+		DisplayName: "Sweep Ready",
+		Summary:     "already scraped",
+	}); err != nil {
+		t.Fatalf("update actor profile: %v", err)
+	}
+
+	scraperStub := &stubActorAutoScrapeScraper{}
+	a, tm := newAutoActorSweepApp(t, store, scraperStub, true)
+	a.enqueueMissingLibraryActorProfileSweep(ctx)
+
+	waitForActorTaskCount(t, tm, 1)
+	if got := scraperStub.ActorCalls(); len(got) != 1 || got[0] != "Sweep Missing" {
+		t.Fatalf("actor scrape calls = %#v, want [Sweep Missing]", got)
+	}
+}
+
+func TestMissingLibraryActorProfileSweep_CooldownSkipsRetryUntilMovieTrigger(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "cooldown.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seedMovieWithActors(t, store, "ABC-201", []string{"Cooldown Actor"})
+
+	scraperStub := &stubActorAutoScrapeScraper{}
+	a, tm := newAutoActorSweepApp(t, store, scraperStub, true)
+	a.enqueueMissingLibraryActorProfileSweep(ctx)
+	waitForActorTaskCount(t, tm, 1)
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		a.autoActorProfileScrapePendingMu.Lock()
+		empty := len(a.autoActorProfileScrapePending) == 0
+		a.autoActorProfileScrapePendingMu.Unlock()
+		if empty {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	a.enqueueMissingLibraryActorProfileSweep(ctx)
+	time.Sleep(80 * time.Millisecond)
+	if got := scraperStub.ActorCalls(); len(got) != 1 {
+		t.Fatalf("after cooldown sweep actor scrape calls = %#v, want 1", got)
+	}
+
+	a.enqueueAutoActorProfileScrapes(ctx, []string{"Cooldown Actor"}, "auto.movie-metadata", false)
+	waitForActorTaskCount(t, tm, 2)
+	if got := scraperStub.ActorCalls(); len(got) != 2 {
+		t.Fatalf("movie trigger should retry after cooldown, calls = %#v", got)
+	}
+}
+
+func TestMissingLibraryActorProfileSweep_DisabledSkipsAll(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := storage.NewSQLiteStore(filepath.Join(root, "disabled-sweep.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seedMovieWithActors(t, store, "ABC-202", []string{"Disabled Sweep"})
+	scraperStub := &stubActorAutoScrapeScraper{}
+	a, tm := newAutoActorSweepApp(t, store, scraperStub, false)
+	a.enqueueMissingLibraryActorProfileSweep(ctx)
+	time.Sleep(80 * time.Millisecond)
 
 	if got := scraperStub.ActorCalls(); len(got) != 0 {
 		t.Fatalf("actor scrape calls = %#v, want none", got)

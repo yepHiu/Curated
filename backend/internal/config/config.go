@@ -37,7 +37,7 @@ type Config struct {
 	OrganizeLibrary bool `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true (default), fsnotify on library roots may queue debounced scans (and follow-on scrape). Persisted in library-config.cfg.
 	AutoLibraryWatch bool `json:"autoLibraryWatch"`
-	// AutoActorProfileScrape: when true, successful movie metadata scrapes may enqueue missing actor profile scrapes. Persisted in library-config.cfg and default-off to avoid surprise outbound requests.
+	// AutoActorProfileScrape: when true, missing actor profiles may be auto-queued after movie scrapes and by a bounded library sweep. Persisted in library-config.cfg and default-off to avoid surprise outbound requests.
 	AutoActorProfileScrape bool `json:"autoActorProfileScrape,omitempty"`
 	// AutoDownloadUpdates: when true, frontend startup update checks may download and verify an available installer. Persisted in library-config.cfg and default-off.
 	AutoDownloadUpdates bool `json:"autoDownloadUpdates,omitempty"`

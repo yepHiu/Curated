@@ -194,3 +194,74 @@ func TestReplaceActorExternalLinksByName_RejectsInvalidURL(t *testing.T) {
 		t.Fatalf("err = %v, want ErrInvalidActorExternalLinks", err)
 	}
 }
+
+func seedActorLibraryMovie(t *testing.T, store *SQLiteStore, code string, actors []string) string {
+	t.Helper()
+	ctx := context.Background()
+	outcome, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-" + code,
+		Path:     filepath.Join(t.TempDir(), code+".mp4"),
+		FileName: code + ".mp4",
+		Number:   code,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveMovieMetadata(ctx, scraper.Metadata{
+		MovieID:        outcome.MovieID,
+		Number:         code,
+		Title:          code,
+		Summary:        "s",
+		Provider:       "p",
+		Studio:         "St",
+		Actors:         actors,
+		RuntimeMinutes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return outcome.MovieID
+}
+
+func TestListActorsNeedingProfileScrape(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "needs-scrape.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	seedActorLibraryMovie(t, store, "NEED-1", []string{"Missing One", "Ready Avatar"})
+	seedActorLibraryMovie(t, store, "NEED-2", []string{"Missing Popular"})
+	seedActorLibraryMovie(t, store, "NEED-3", []string{"Missing Popular"})
+	trashedID := seedActorLibraryMovie(t, store, "NEED-TRASH", []string{"Trash Only"})
+	if err := store.TrashMovie(ctx, trashedID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateActorProfile(ctx, scraper.ActorProfile{
+		DisplayName: "Ready Avatar",
+		AvatarURL:   "https://example.test/a.jpg",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	names, err := store.ListActorsNeedingProfileScrape(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 2 || names[0] != "Missing Popular" || names[1] != "Missing One" {
+		t.Fatalf("names = %#v, want [Missing Popular Missing One]", names)
+	}
+
+	limited, err := store.ListActorsNeedingProfileScrape(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(limited) != 1 || limited[0] != "Missing Popular" {
+		t.Fatalf("limited = %#v, want [Missing Popular]", limited)
+	}
+}

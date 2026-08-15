@@ -118,6 +118,56 @@ func (s *SQLiteStore) ActorProfileNeedsScrape(ctx context.Context, name string) 
 	}
 }
 
+const (
+	defaultActorsNeedingProfileScrapeLimit = 50
+	maxActorsNeedingProfileScrapeLimit     = 100
+)
+
+// ListActorsNeedingProfileScrape returns canonical names of library actors who still
+// lack both avatar and summary and appear in at least one active (non-trash) movie.
+// Results prefer actors with more titles, then name, and are capped by limit.
+func (s *SQLiteStore) ListActorsNeedingProfileScrape(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = defaultActorsNeedingProfileScrapeLimit
+	}
+	if limit > maxActorsNeedingProfileScrapeLimit {
+		limit = maxActorsNeedingProfileScrapeLimit
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.name
+		FROM actors a
+		INNER JOIN movie_actors ma ON ma.actor_id = a.id
+		INNER JOIN movies m ON m.id = ma.movie_id
+		WHERE `+sqlMovieActiveClause+`
+		  AND TRIM(a.avatar) = ''
+		  AND TRIM(a.summary) = ''
+		GROUP BY a.id, a.name
+		HAVING COUNT(DISTINCT ma.movie_id) > 0
+		ORDER BY COUNT(DISTINCT ma.movie_id) DESC, a.name COLLATE NOCASE ASC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	names := make([]string, 0, limit)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
 // UpdateActorProfile persists scraped fields for the library actor row keyed by DisplayName.
 func (s *SQLiteStore) UpdateActorProfile(ctx context.Context, p scraper.ActorProfile) error {
 	name := strings.TrimSpace(p.DisplayName)

@@ -72,7 +72,7 @@ type App struct {
 	// autoLibraryWatch gates fsnotify-driven scan enqueue; persisted to library-config.cfg.
 	autoLibraryWatch   bool
 	autoLibraryWatchMu sync.RWMutex
-	// autoActorProfileScrape gates scan/import-time actor profile scrape enqueue; persisted to library-config.cfg.
+	// autoActorProfileScrape gates missing actor profile scrape enqueue; persisted to library-config.cfg.
 	autoActorProfileScrape   bool
 	autoActorProfileScrapeMu sync.RWMutex
 	// autoDownloadUpdates allows startup update checks to auto-download and verify installers; persisted to library-config.cfg.
@@ -95,7 +95,9 @@ type App struct {
 	backupDirectoryMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
+	autoActorProfileScrapeAttempted map[string]time.Time
 	autoActorProfileScrapePendingMu sync.Mutex
+	autoActorProfileSweepMu         sync.Mutex
 	// playerSettingsMu protects cfg.Player and live playback-runtime updates.
 	playerSettingsMu sync.RWMutex
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
@@ -177,25 +179,26 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 			FFmpegCommand:   cfg.Player.FFmpegCommand,
 			SessionRoot:     cfg.Player.StreamSessionRoot,
 		}),
-		devCPUSampler:                 devmetrics.NewCPUSampler(),
-		appUpdate:                     appupdate.NewService(store, logger),
-		storageHealth:                 storagehealth.NewChecker(storagehealth.NewDefaultProbe(), store),
-		organizeLibrary:               cfg.OrganizeLibrary,
-		autoLibraryWatch:              cfg.AutoLibraryWatch,
-		autoActorProfileScrape:        cfg.AutoActorProfileScrape,
-		autoDownloadUpdates:           cfg.AutoDownloadUpdates,
-		launchAtLogin:                 cfg.LaunchAtLogin,
-		curatedFrameExportFormat:      config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
-		curatedFrameExportMode:        config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
-		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
-		backupDirectory:               strings.TrimSpace(cfg.BackupDirectory),
-		autoActorProfileScrapePending: make(map[string]struct{}),
-		scrapeMovieInflight:           make(map[string]string),
-		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
-		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
-		appCtx:                        ctx,
-		scrapeSem:                     make(chan struct{}, scrapeConc),
-		watchScanPending:              make(map[string]struct{}),
+		devCPUSampler:                   devmetrics.NewCPUSampler(),
+		appUpdate:                       appupdate.NewService(store, logger),
+		storageHealth:                   storagehealth.NewChecker(storagehealth.NewDefaultProbe(), store),
+		organizeLibrary:                 cfg.OrganizeLibrary,
+		autoLibraryWatch:                cfg.AutoLibraryWatch,
+		autoActorProfileScrape:          cfg.AutoActorProfileScrape,
+		autoDownloadUpdates:             cfg.AutoDownloadUpdates,
+		launchAtLogin:                   cfg.LaunchAtLogin,
+		curatedFrameExportFormat:        config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
+		curatedFrameExportMode:          config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
+		defaultImportLibraryPathID:      strings.TrimSpace(cfg.DefaultImportLibraryPathID),
+		backupDirectory:                 strings.TrimSpace(cfg.BackupDirectory),
+		autoActorProfileScrapePending:   make(map[string]struct{}),
+		autoActorProfileScrapeAttempted: make(map[string]time.Time),
+		scrapeMovieInflight:             make(map[string]string),
+		metadataMovieProviderChain:      cfg.MetadataMovieProviderChain,
+		librarySettingsPath:             strings.TrimSpace(librarySettingsPath),
+		appCtx:                          ctx,
+		scrapeSem:                       make(chan struct{}, scrapeConc),
+		watchScanPending:                make(map[string]struct{}),
 	}
 	app.appUpdate.SetCacheDir(cfg.CacheDir)
 	app.appUpdate.SetTaskManager(app.tasks)
@@ -429,6 +432,9 @@ func (a *App) SetAutoActorProfileScrape(v bool) error {
 	a.autoActorProfileScrape = v
 	a.cfg.AutoActorProfileScrape = v
 	a.autoActorProfileScrapeMu.Unlock()
+	if v {
+		go a.enqueueMissingLibraryActorProfileSweep(a.autoActorSweepContext())
+	}
 	return nil
 }
 
@@ -1702,7 +1708,7 @@ func (a *App) runMovieScrapeBody(ctx context.Context, parentCtx context.Context,
 	}
 
 	a.library.ApplyScrapedMetadata(metadata)
-	a.enqueueAutoActorProfileScrapes(ctx, metadata.Actors)
+	a.enqueueAutoActorProfileScrapes(ctx, metadata.Actors, "auto.movie-metadata", false)
 
 	task = a.tasks.Complete(task.TaskID, fmt.Sprintf("Metadata saved for %s", result.Number))
 	task.Provider = strings.TrimSpace(metadata.Provider)
@@ -1866,7 +1872,7 @@ func normalizeActorScrapePendingKey(actorName string) string {
 	return strings.ToLower(strings.TrimSpace(actorName))
 }
 
-func (a *App) claimAutoActorProfileScrape(actorName string) bool {
+func (a *App) claimAutoActorProfileScrape(actorName string, respectCooldown bool) bool {
 	key := normalizeActorScrapePendingKey(actorName)
 	if key == "" {
 		return false
@@ -1879,7 +1885,16 @@ func (a *App) claimAutoActorProfileScrape(actorName string) bool {
 	if _, exists := a.autoActorProfileScrapePending[key]; exists {
 		return false
 	}
+	if a.autoActorProfileScrapeAttempted == nil {
+		a.autoActorProfileScrapeAttempted = make(map[string]time.Time)
+	}
+	if respectCooldown {
+		if at, ok := a.autoActorProfileScrapeAttempted[key]; ok && time.Since(at) < autoActorProfileScrapeCooldown {
+			return false
+		}
+	}
 	a.autoActorProfileScrapePending[key] = struct{}{}
+	a.autoActorProfileScrapeAttempted[key] = time.Now()
 	return true
 }
 
@@ -1920,9 +1935,13 @@ func (a *App) enqueueActorProfileScrapeTask(task contracts.TaskDTO, actorName st
 	}(task, actorName)
 }
 
-func (a *App) enqueueAutoActorProfileScrapes(ctx context.Context, actorNames []string) {
+func (a *App) enqueueAutoActorProfileScrapes(ctx context.Context, actorNames []string, trigger string, respectCooldown bool) {
 	if !a.AutoActorProfileScrape() {
 		return
+	}
+	trigger = strings.TrimSpace(trigger)
+	if trigger == "" {
+		trigger = "auto.movie-metadata"
 	}
 	seen := make(map[string]struct{}, len(actorNames))
 	for _, rawName := range actorNames {
@@ -1944,13 +1963,13 @@ func (a *App) enqueueAutoActorProfileScrapes(ctx context.Context, actorNames []s
 		if !needsScrape {
 			continue
 		}
-		if !a.claimAutoActorProfileScrape(name) {
+		if !a.claimAutoActorProfileScrape(name, respectCooldown) {
 			continue
 		}
 
 		task, err := a.createActorProfileScrapeTask(ctx, name, map[string]any{
 			"actorName": name,
-			"trigger":   "auto.movie-metadata",
+			"trigger":   trigger,
 		})
 		if err != nil {
 			a.releaseAutoActorProfileScrape(name)
