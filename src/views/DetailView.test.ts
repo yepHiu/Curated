@@ -59,6 +59,8 @@ const serviceMocks = vi.hoisted(() => ({
   revealMovieInFileManager: vi.fn(),
 }))
 const scanTrackerStartMock = vi.hoisted(() => vi.fn())
+const pushAppToastMock = vi.hoisted(() => vi.fn())
+const pushAppToastLoadingMock = vi.hoisted(() => vi.fn(() => "loading-toast-1"))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -140,6 +142,11 @@ vi.mock("@/composables/use-scan-task-tracker", () => ({
   }),
 }))
 
+vi.mock("@/composables/use-app-toast", () => ({
+  pushAppToast: pushAppToastMock,
+  pushAppToastLoading: pushAppToastLoadingMock,
+}))
+
 describe("DetailView", () => {
   beforeEach(() => {
     routeState.name = "detail"
@@ -164,6 +171,9 @@ describe("DetailView", () => {
     serviceMocks.refreshMovieMetadata.mockReset()
     serviceMocks.revealMovieInFileManager.mockReset()
     scanTrackerStartMock.mockReset()
+    pushAppToastMock.mockReset()
+    pushAppToastLoadingMock.mockReset()
+    pushAppToastLoadingMock.mockReturnValue("loading-toast-1")
     routerPushMock.mockReset()
     routerReplaceMock.mockReset()
   })
@@ -260,7 +270,13 @@ describe("DetailView", () => {
     await flushPromises()
 
     expect(serviceMocks.refreshMovieMetadata).toHaveBeenCalledWith("movie-1")
-    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", { notifyMovieScrape: true })
+    expect(pushAppToastLoadingMock).toHaveBeenCalledWith("toasts.manualMovieScrapeStarted")
+    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", {
+      notifyMovieScrape: true,
+      hideProgressDock: true,
+      loadingToastId: "loading-toast-1",
+      scrapeCode: "CODE-1",
+    })
   })
 
   it("returns to the browse route when Escape is pressed", async () => {

@@ -141,6 +141,7 @@ async function handleCheckNow() {
       {
         variant: "warning",
         notification: {
+          messageId: "MSG-0024",
           type: "update",
           title: t("notificationCenter.titles.updateAvailable"),
           source: { route: "/settings?section=about" },

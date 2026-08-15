@@ -6,6 +6,7 @@ async function freshNotificationCenter(options?: { preserveStorage?: boolean }) 
   vi.resetModules()
   if (!options?.preserveStorage) {
     localStorage.clear()
+    sessionStorage.clear()
   }
   const { useNotificationCenter } = await import("@/composables/use-notification-center")
   return useNotificationCenter()
@@ -23,6 +24,7 @@ function notificationInput(index: number) {
 afterEach(() => {
   vi.useRealTimers()
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe("useNotificationCenter", () => {
@@ -41,20 +43,48 @@ describe("useNotificationCenter", () => {
     expect(center.notifications.value.some((n) => n.message === "message-0")).toBe(false)
   })
 
-  it("treats notifications added while the center is open as already read", async () => {
+  it("does not count notify items toward the badge", async () => {
+    const center = await freshNotificationCenter()
+    center.addNotification(notificationInput(1))
+    expect(center.unreadCount.value).toBe(0)
+    expect(center.unreadNotifications.value).toHaveLength(1)
+  })
+
+  it("treats notify items added while the center is open as already read", async () => {
     const center = await freshNotificationCenter()
 
     center.addNotification(notificationInput(1))
-    expect(center.unreadCount.value).toBe(1)
+    expect(center.unreadNotifications.value).toHaveLength(1)
 
-    expect(typeof center.setCenterOpen).toBe("function")
     center.setCenterOpen(true)
-    expect(center.unreadCount.value).toBe(0)
+    expect(center.unreadNotifications.value).toHaveLength(0)
 
     center.addNotification(notificationInput(2))
 
-    expect(center.unreadCount.value).toBe(0)
+    expect(center.unreadNotifications.value).toHaveLength(0)
     expect(center.readNotifications.value.map((n) => n.message)).toContain("message-2")
+  })
+
+  it("keeps needs-you items in the badge while the center is open", async () => {
+    const center = await freshNotificationCenter()
+    center.addNotification({
+      ...notificationInput(1),
+      level: "needs-you",
+      messageId: "MSG-0010",
+    })
+    expect(center.unreadCount.value).toBe(1)
+
+    center.setCenterOpen(true)
+    expect(center.unreadCount.value).toBe(1)
+    expect(center.needsYouNotifications.value).toHaveLength(1)
+
+    center.addNotification({
+      ...notificationInput(2),
+      level: "needs-you",
+      messageId: "MSG-0011",
+      source: { taskId: "import-1" },
+    })
+    expect(center.unreadCount.value).toBe(2)
   })
 
   it("deduplicates notifications from the same task source", async () => {
@@ -88,6 +118,41 @@ describe("useNotificationCenter", () => {
       source: { taskId: "task-1" },
       read: false,
     })
+  })
+
+  it("collapses grouped watch events into one recent row", async () => {
+    const center = await freshNotificationCenter()
+    center.addNotification({
+      ...notificationInput(1),
+      messageId: "MSG-0027",
+      group: "library-watch-scan",
+    })
+    center.addNotification({
+      type: "scan",
+      severity: "success",
+      title: "Scan digest",
+      message: "latest watch scan",
+      messageId: "MSG-0027",
+      group: "library-watch-scan",
+    })
+    expect(center.notifications.value).toHaveLength(1)
+    expect(center.notifications.value[0].message).toBe("latest watch scan")
+    expect(center.unreadCount.value).toBe(0)
+  })
+
+  it("resolves needs-you storage alerts when the matching path is online", async () => {
+    const center = await freshNotificationCenter()
+    center.addNotification({
+      ...notificationInput(1),
+      type: "storage",
+      severity: "warning",
+      messageId: "MSG-0010",
+      source: { libraryPathId: "library-b", route: "/settings?section=library" },
+    })
+    expect(center.unreadCount.value).toBe(1)
+    center.resolveMatching((item) => item.source?.libraryPathId === "library-b")
+    expect(center.unreadCount.value).toBe(0)
+    expect(center.needsYouNotifications.value).toHaveLength(0)
   })
 
   it("drops malformed persisted notifications during load", async () => {
@@ -134,6 +199,7 @@ describe("useNotificationCenter", () => {
       severity: "error",
       title: "Valid error",
       message: "still useful",
+      level: "needs-you",
       source: { taskId: "task-1", route: "/settings" },
     })
     expect(center.notifications.value[0].source).not.toHaveProperty("movieId")

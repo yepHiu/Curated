@@ -7,7 +7,7 @@ import { HttpClientError } from "@/api/http-client"
 import type { PatchMovieBody, TaskDTO } from "@/api/types"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
-import { pushAppToast } from "@/composables/use-app-toast"
+import { pushAppToast, pushAppToastLoading } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import {
   getBrowseSourceMode,
@@ -67,7 +67,6 @@ const restoreError = ref("")
 const permanentDeleteBusy = ref(false)
 const permanentDeleteError = ref("")
 const metadataRefreshBusy = ref(false)
-const metadataRefreshError = ref("")
 
 watch(
   () => movieId.value,
@@ -102,15 +101,11 @@ watch(scanTaskTracker.activeTask, async (task) => {
   if (mid !== id) return
 
   if (task.status === "completed") {
-    metadataRefreshError.value = ""
-    // 递增图片版本号，强制刷新海报/缩略图缓存
     bumpMovieImageVersion(id)
     const loaded = await libraryService.loadMovieDetail(id)
     if (loaded) {
       detailMovie.value = loaded
     }
-  } else if (task.status === "failed" || task.status === "partial_failed") {
-    metadataRefreshError.value = task.errorMessage?.trim() || t("detail.scrapeFailed")
   }
 })
 
@@ -322,25 +317,29 @@ const handleDeleteMoviePermanently = async (id: string) => {
 }
 
 const handleRefreshMetadata = async (id: string) => {
-  metadataRefreshError.value = ""
   metadataRefreshBusy.value = true
+  const code = detailMovie.value?.code?.trim() || id
+  const loadingToastId = pushAppToastLoading(t("toasts.manualMovieScrapeStarted", { code }))
   try {
     const task = await libraryService.refreshMovieMetadata(id)
     if (!task?.taskId) {
-      metadataRefreshError.value = USE_WEB_API
-        ? t("detail.refreshTaskFail")
-        : t("detail.refreshMockMode")
+      pushAppToast(USE_WEB_API ? t("detail.refreshTaskFail") : t("detail.refreshMockMode"), {
+        variant: "warning",
+        id: loadingToastId,
+      })
       return
     }
-    scanTaskTracker.start(task.taskId, { notifyMovieScrape: true })
+    scanTaskTracker.start(task.taskId, {
+      notifyMovieScrape: true,
+      hideProgressDock: true,
+      loadingToastId,
+      scrapeCode: code,
+    })
   } catch (err) {
-    const message =
-      err instanceof HttpClientError
-        ? (err.apiError?.message ?? err.message)
-        : err instanceof Error
-          ? err.message
-          : t("detail.refreshFailGeneric")
-    metadataRefreshError.value = message
+    pushAppToast(t("toasts.manualMovieScrapeStartFailed", { code }), {
+      variant: "destructive",
+      id: loadingToastId,
+    })
     console.error("[DetailView] refresh metadata failed", err)
   } finally {
     metadataRefreshBusy.value = false
@@ -458,12 +457,6 @@ useEventListener("keydown", (event: KeyboardEvent) => {
         class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ permanentDeleteError }}
-      </p>
-      <p
-        v-if="metadataRefreshError"
-        class="mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-      >
-        {{ metadataRefreshError }}
       </p>
       <DetailPage
         :movie="detailMovie"

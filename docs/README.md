@@ -11,7 +11,7 @@
 | **`ops/`** | 研发与发版向：Agent 构建与测试说明、**打包历史 CSV** 与相关 Markdown、CI/CD 与双库/假库/转型类方案文档等 |
 | **`review/`** | 一次性架构评审、代码/前端质量与性能类审计（历史快照性质） |
 | **`plan/`** | 排期与实施计划、分阶段技术方案（持续更新同主题时优先**改**旧文） |
-| **`prd/`** | 需求表与 PRD 材料（如 `requirements.csv`） |
+| **`prd/`** | 需求表与 PRD 材料（`requirements.csv`、消息政策台账 `message-catalog.csv`） |
 | **`release-notes/`** | 发版说明 |
 
 `docs/film-scanner/` 若存在，为**参考/实验**材料，不视为生产运行时代码树的一部分。

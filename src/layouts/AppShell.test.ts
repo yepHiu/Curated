@@ -102,6 +102,10 @@ vi.mock("@/components/jav-library/ScanProgressDock.vue", () => ({
   default: { name: "ScanProgressDock", template: "<div />" },
 }))
 
+vi.mock("@/components/notification-center/NotificationCenter.vue", () => ({
+  default: { name: "NotificationCenter", template: "<div data-notification-center />" },
+}))
+
 vi.mock("@/components/jav-library/MovieImportDialog.vue", () => ({
   default: { name: "MovieImportDialog", template: "<button data-movie-import>import.trigger</button>" },
 }))

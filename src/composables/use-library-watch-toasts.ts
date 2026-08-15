@@ -216,13 +216,21 @@ export function useLibraryWatchToasts() {
       }
       markToastSeen(task.taskId)
       needsMovieReload = true
+      const scanFailed = task.status === "failed"
       pushAppToast(libraryWatchScanToastMessage(task), {
         variant: taskTerminalToastVariant(task.status),
-        notification: {
-          type: "scan",
-          title: t("notificationCenter.titles.scanDone"),
-          source: { taskId: task.taskId },
-        },
+        ...(scanFailed || !fsnotifyScanNoChange(task)
+          ? {
+              notification: {
+                messageId: scanFailed ? ("MSG-0013" as const) : ("MSG-0027" as const),
+                type: "scan" as const,
+                title: scanFailed
+                  ? t("notificationCenter.titles.scanFailed")
+                  : t("notificationCenter.titles.scanDone"),
+                source: { taskId: task.taskId },
+              },
+            }
+          : {}),
       })
     }
 
@@ -251,12 +259,24 @@ export function useLibraryWatchToasts() {
       if (!isFsnotifyLinkedScrape(task)) {
         continue
       }
-      const msg = task.message ?? ""
-      pushAppToast(t("toasts.libraryWatchScrapeDone", { message: msg }), {
+      const code = taskMetaString(task, "number").trim()
+      const toastKey =
+        task.status === "completed"
+          ? code
+            ? "toasts.libraryWatchScrapeDone"
+            : "toasts.libraryWatchScrapeDoneGeneric"
+          : code
+            ? "toasts.libraryWatchScrapeFailed"
+            : "toasts.libraryWatchScrapeFailedGeneric"
+      pushAppToast(t(toastKey, { code }), {
         variant: taskTerminalToastVariant(task.status),
         notification: {
+          messageId: "MSG-0028",
           type: "scrape",
-          title: t("notificationCenter.titles.scrapeDone"),
+          title:
+            task.status === "completed"
+              ? t("notificationCenter.titles.scrapeDone")
+              : t("notificationCenter.titles.scrapeFailed"),
           source: { taskId: task.taskId },
         },
       })

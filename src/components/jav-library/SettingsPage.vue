@@ -1481,6 +1481,7 @@ function notifyStorageBlocked(status: LibraryPathStorageStatusDTO) {
     variant: "warning",
     durationMs: 6500,
     notification: {
+      messageId: "MSG-0010",
       type: "storage",
       title: t("notificationCenter.titles.storageOffline"),
       source: {
@@ -1546,14 +1547,6 @@ async function rebindLibraryPathStorage(path: { id: string }) {
     pushAppToast(t("settings.storageStatusRebindSuccess"), {
       variant: "success",
       durationMs: 3200,
-      notification: {
-        type: "storage",
-        title: t("notificationCenter.titles.storageRebound"),
-        source: {
-          route: "/settings?section=library",
-          libraryPathId: path.id,
-        },
-      },
     })
   } catch (err) {
     console.error("[settings] rebind library path storage failed", err)

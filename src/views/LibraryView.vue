@@ -9,7 +9,7 @@ import LibraryPage from "@/components/jav-library/LibraryPage.vue"
 import MovieDeleteConfirmDialog from "@/components/jav-library/MovieDeleteConfirmDialog.vue"
 import MovieEditDialog from "@/components/jav-library/MovieEditDialog.vue"
 import MovieLibraryContextMenu from "@/components/jav-library/MovieLibraryContextMenu.vue"
-import { pushAppToast } from "@/composables/use-app-toast"
+import { pushAppToast, pushAppToastLoading } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
 import { isTerminalTaskStatus, waitForTrackedTaskTerminal } from "@/composables/wait-tracked-task"
 import type { LibraryMode, LibraryTab } from "@/domain/library/types"
@@ -124,8 +124,6 @@ watch(scanTaskTracker.activeTask, async (task) => {
   if (task.status === "completed") {
     bumpMovieImageVersion(mid)
     await libraryService.loadMovieDetail(mid)
-  } else if (task.status === "failed" || task.status === "partial_failed") {
-    pushAppToast(task.errorMessage?.trim() || t("detail.scrapeFailed"), { variant: "destructive" })
   }
 })
 
@@ -137,26 +135,31 @@ function onContextEdit() {
 }
 
 async function handleContextRefreshMetadata() {
-  const id = libraryContextMenu.value?.movie.id
-  if (!id) return
+  const movie = libraryContextMenu.value?.movie
+  if (!movie) return
   metadataRefreshBusy.value = true
+  const code = movie.code?.trim() || movie.id
+  const loadingToastId = pushAppToastLoading(t("toasts.manualMovieScrapeStarted", { code }))
   try {
-    const task = await libraryService.refreshMovieMetadata(id)
+    const task = await libraryService.refreshMovieMetadata(movie.id)
     if (!task?.taskId) {
       pushAppToast(USE_WEB_API ? t("detail.refreshTaskFail") : t("detail.refreshMockMode"), {
         variant: "warning",
+        id: loadingToastId,
       })
       return
     }
-    scanTaskTracker.start(task.taskId, { notifyMovieScrape: true })
+    scanTaskTracker.start(task.taskId, {
+      notifyMovieScrape: true,
+      hideProgressDock: true,
+      loadingToastId,
+      scrapeCode: code,
+    })
   } catch (err) {
-    const message =
-      err instanceof HttpClientError
-        ? (err.apiError?.message ?? err.message)
-        : err instanceof Error
-          ? err.message
-          : t("detail.refreshFailGeneric")
-    pushAppToast(message, { variant: "destructive" })
+    pushAppToast(t("toasts.manualMovieScrapeStartFailed", { code }), {
+      variant: "destructive",
+      id: loadingToastId,
+    })
     console.error("[LibraryView] refresh metadata failed", err)
   } finally {
     metadataRefreshBusy.value = false
@@ -342,7 +345,7 @@ async function runBatchRefreshMetadata() {
           fail++
           continue
         }
-        scanTaskTracker.start(task.taskId)
+        scanTaskTracker.start(task.taskId, { hideProgressDock: true })
         const final = await waitForTrackedTaskTerminal(
           () => scanTaskTracker.activeTask.value,
           task.taskId,

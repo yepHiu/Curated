@@ -246,6 +246,7 @@ describe("useAppUpdate", () => {
       title: "notificationCenter.titles.updateAvailable",
       message: "settings.appUpdateToastAvailable:1.1.0",
       source: { route: "/settings?section=about" },
+      messageId: "MSG-0024",
     })
   })
 

@@ -1,7 +1,12 @@
 import { computed, onUnmounted, ref, shallowRef } from "vue"
 import type { TaskDTO } from "@/api/types"
 import { api } from "@/api/endpoints"
-import { pushAppToast, taskTerminalToastVariant } from "@/composables/use-app-toast"
+import {
+  dismissAppToast,
+  pushAppToast,
+  taskTerminalToastVariant,
+  type AppToastId,
+} from "@/composables/use-app-toast"
 import { i18n } from "@/i18n"
 import {
   subscribeBackendEvents,
@@ -36,6 +41,8 @@ interface ScanTaskTrackerStartOptions {
   hideProgressDock?: boolean
   notifyScanStart?: boolean
   notifyMovieScrape?: boolean
+  loadingToastId?: AppToastId
+  scrapeCode?: string
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null
@@ -44,13 +51,19 @@ let trackedTaskId: string | null = null
 const trackedTaskOptions = ref<ScanTaskTrackerStartOptions>({})
 let consumerCount = 0
 let backendEventsSubscription: BackendEventSubscription | null = null
+let trackedLoadingToastId: AppToastId | null = null
 
-const progressTask = computed(() =>
-  trackedTaskOptions.value.hideProgressDock ? null : activeTask.value,
-)
-const progressPollError = computed(() =>
-  trackedTaskOptions.value.hideProgressDock ? null : pollError.value,
-)
+const progressTask = computed(() => {
+  if (trackedTaskOptions.value.hideProgressDock) return null
+  const task = activeTask.value
+  if (task?.type === "scrape.movie") return null
+  return task
+})
+const progressPollError = computed(() => {
+  if (trackedTaskOptions.value.hideProgressDock) return null
+  if (activeTask.value?.type === "scrape.movie") return null
+  return pollError.value
+})
 
 function clearDismissTimer() {
   if (dismissTimer) {
@@ -110,12 +123,67 @@ function movieScrapeNotificationSource(task: TaskDTO) {
   }
 }
 
+function clearLoadingToast() {
+  if (trackedLoadingToastId == null) {
+    return
+  }
+  dismissAppToast(trackedLoadingToastId)
+  trackedLoadingToastId = null
+}
+
+function attachLoadingToast(id: AppToastId | undefined) {
+  if (id == null) {
+    clearLoadingToast()
+    return
+  }
+  if (trackedLoadingToastId != null && trackedLoadingToastId !== id) {
+    dismissAppToast(trackedLoadingToastId)
+  }
+  trackedLoadingToastId = id
+}
+
+function taskMetaString(task: TaskDTO, key: string): string {
+  const value = task.metadata?.[key]
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function movieScrapeCode(task: TaskDTO): string {
+  return taskMetaString(task, "number") || trackedTaskOptions.value.scrapeCode?.trim() || ""
+}
+
 function movieScrapeToastMessage(task: TaskDTO) {
   const tr = i18n.global.t
-  const message = task.errorMessage?.trim() || task.message?.trim() || ""
-  return task.status === "completed"
-    ? tr("toasts.manualMovieScrapeDone", { message })
-    : tr("toasts.manualMovieScrapeFailed", { message })
+  const code = movieScrapeCode(task)
+  if (task.status === "completed") {
+    return code
+      ? tr("toasts.manualMovieScrapeDone", { code })
+      : tr("toasts.manualMovieScrapeDoneGeneric")
+  }
+  if (task.status === "cancelled") {
+    return code
+      ? tr("toasts.manualMovieScrapeCancelled", { code })
+      : tr("toasts.manualMovieScrapeCancelledGeneric")
+  }
+  return code
+    ? tr("toasts.manualMovieScrapeFailed", { code })
+    : tr("toasts.manualMovieScrapeFailedGeneric")
+}
+
+function movieScrapeToastOptions(task: TaskDTO) {
+  const tr = i18n.global.t
+  return {
+    variant: taskTerminalToastVariant(task.status),
+    ...(trackedLoadingToastId == null ? {} : { id: trackedLoadingToastId }),
+    notification: {
+      messageId: task.status === "completed" ? ("MSG-0021" as const) : ("MSG-0022" as const),
+      type: "scrape" as const,
+      title:
+        task.status === "completed"
+          ? tr("notificationCenter.titles.scrapeDone")
+          : tr("notificationCenter.titles.scrapeFailed"),
+      source: movieScrapeNotificationSource(task),
+    },
+  }
 }
 
 function scheduleTerminalDismiss(taskId: string) {
@@ -145,6 +213,7 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
         {
           variant: taskTerminalToastVariant(t.status),
           notification: {
+            messageId: t.status === "completed" ? ("MSG-0020" as const) : ("MSG-0013" as const),
             type: "scan",
             title:
               t.status === "completed"
@@ -157,18 +226,8 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
     }
     void libraryService.reloadMoviesFromApi()
   } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
-    const tr = i18n.global.t
-    pushAppToast(movieScrapeToastMessage(t), {
-      variant: taskTerminalToastVariant(t.status),
-      notification: {
-        type: "scrape",
-        title:
-          t.status === "completed"
-            ? tr("notificationCenter.titles.scrapeDone")
-            : tr("notificationCenter.titles.scrapeFailed"),
-        source: movieScrapeNotificationSource(t),
-      },
-    })
+    pushAppToast(movieScrapeToastMessage(t), movieScrapeToastOptions(t))
+    trackedLoadingToastId = null
   } else if (t.type === "import.movies") {
     const tr = i18n.global.t
     if (t.status === "completed") {
@@ -179,6 +238,7 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
         {
           variant: taskTerminalToastVariant(t.status),
           notification: {
+            messageId: "MSG-0023",
             type: "system",
             title: tr("notificationCenter.titles.importDone"),
             source: importNotificationSource(t.taskId),
@@ -195,6 +255,7 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
           variant: taskTerminalToastVariant(t.status),
           durationMs: 6500,
           notification: {
+            messageId: "MSG-0012",
             type: "system",
             title: tr("notificationCenter.titles.importFailed"),
             source: importNotificationSource(t.taskId),
@@ -208,6 +269,7 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
           variant: taskTerminalToastVariant(t.status),
           durationMs: 6500,
           notification: {
+            messageId: "MSG-0011",
             type: "system",
             title: tr("notificationCenter.titles.importFailed"),
             source: importNotificationSource(t.taskId),
@@ -252,7 +314,16 @@ async function poll() {
     stopPolling()
     stopBackendEvents()
     activeTask.value = null
-    pollError.value = e instanceof Error ? e.message : i18n.global.t("scanTask.fetchFailed")
+    const message = e instanceof Error ? e.message : i18n.global.t("scanTask.fetchFailed")
+    pollError.value = message
+    const loadingId = trackedLoadingToastId
+    if (trackedTaskOptions.value.notifyMovieScrape || loadingId != null) {
+      pushAppToast(message, {
+        variant: "destructive",
+        ...(loadingId == null ? {} : { id: loadingId }),
+      })
+    }
+    trackedLoadingToastId = null
     trackedTaskId = null
     trackedTaskOptions.value = {}
   }
@@ -262,6 +333,7 @@ function dismiss() {
   clearDismissTimer()
   stopPolling()
   stopBackendEvents()
+  clearLoadingToast()
   trackedTaskId = null
   trackedTaskOptions.value = {}
   activeTask.value = null
@@ -279,6 +351,7 @@ export function useScanTaskTracker() {
     clearDismissTimer()
     stopPolling()
     stopBackendEvents()
+    clearLoadingToast()
     trackedTaskId = null
     trackedTaskOptions.value = {}
     activeTask.value = null
@@ -289,6 +362,7 @@ export function useScanTaskTracker() {
     clearDismissTimer()
     stopPolling()
     stopBackendEvents()
+    attachLoadingToast(options.loadingToastId)
     trackedTaskId = taskId
     trackedTaskOptions.value = { ...options }
     activeTask.value = null
@@ -298,11 +372,6 @@ export function useScanTaskTracker() {
       pushAppToast(tr("toasts.manualLibraryScanStarted"), {
         variant: "default",
         durationMs: 2600,
-        notification: {
-          type: "scan",
-          title: tr("notificationCenter.titles.scanStarted"),
-          source: libraryScanNotificationSource(taskId),
-        },
       })
     }
     backendEventsSubscription = subscribeBackendEvents({

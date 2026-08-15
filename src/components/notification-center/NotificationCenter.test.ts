@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const notificationState = vi.hoisted(() => ({
   read: [] as TestNotification[],
   unread: [] as TestNotification[],
+  needsYou: [] as TestNotification[],
   markAllRead: vi.fn(),
   dismissOne: vi.fn(),
   clearAll: vi.fn(),
@@ -14,12 +15,13 @@ const routerPush = vi.hoisted(() => vi.fn())
 
 type TestNotification = {
   id: string
-  type: "scan" | "scrape" | "update" | "error" | "system"
+  type: "scan" | "scrape" | "update" | "error" | "system" | "storage"
   severity: "info" | "success" | "warning" | "error"
   title: string
   message: string
   timestamp: number
   read: boolean
+  level?: "notify" | "needs-you"
   source?: { route?: string }
 }
 
@@ -36,13 +38,23 @@ vi.mock("vue-router", () => ({
   }),
 }))
 
+vi.mock("@/composables/use-message-center-now", async () => {
+  const { computed: vueComputed } = await vi.importActual<typeof import("vue")>("vue")
+  return {
+    useMessageCenterNow: () => ({
+      nowItems: vueComputed(() => []),
+    }),
+  }
+})
+
 vi.mock("@/composables/use-notification-center", async () => {
-  const { computed } = await vi.importActual<typeof import("vue")>("vue")
+  const { computed: vueComputed } = await vi.importActual<typeof import("vue")>("vue")
   return {
     useNotificationCenter: () => ({
-      unreadNotifications: computed(() => notificationState.unread),
-      readNotifications: computed(() => notificationState.read),
-      unreadCount: computed(() => notificationState.unread.length),
+      unreadNotifications: vueComputed(() => notificationState.unread),
+      readNotifications: vueComputed(() => notificationState.read),
+      needsYouNotifications: vueComputed(() => notificationState.needsYou),
+      unreadCount: vueComputed(() => notificationState.needsYou.length),
       markAllRead: notificationState.markAllRead,
       dismissOne: notificationState.dismissOne,
       clearAll: notificationState.clearAll,
@@ -53,7 +65,7 @@ vi.mock("@/composables/use-notification-center", async () => {
 
 function makeNotification(
   index: number,
-  overrides?: Partial<Pick<TestNotification, "type" | "severity" | "read" | "title" | "message">>,
+  overrides?: Partial<Pick<TestNotification, "type" | "severity" | "read" | "title" | "message" | "level">>,
 ): TestNotification {
   return {
     id: `${overrides?.read === false ? "unread" : "read"}-${index}`,
@@ -63,6 +75,7 @@ function makeNotification(
     message: overrides?.message ?? `read-message-${index}`,
     timestamp: Date.now() - index * 1000,
     read: overrides?.read ?? true,
+    level: overrides?.level ?? "notify",
   }
 }
 
@@ -73,7 +86,7 @@ async function mountCenter() {
       stubs: {
         ArrowLeft: true,
         ArrowRight: true,
-        Bell: true,
+        MessageSquare: true,
         Check: true,
         ChevronDown: true,
         Button: { template: "<button v-bind=\"$attrs\"><slot /></button>" },
@@ -94,6 +107,7 @@ async function mountCenter() {
 beforeEach(() => {
   notificationState.read = []
   notificationState.unread = []
+  notificationState.needsYou = []
   notificationState.markAllRead.mockClear()
   notificationState.dismissOne.mockClear()
   notificationState.clearAll.mockClear()
@@ -116,9 +130,10 @@ describe("NotificationCenter", () => {
   })
 
   it("caps the unread badge label at 99+", async () => {
-    notificationState.unread = Array.from({ length: 105 }, (_, index) =>
+    notificationState.needsYou = Array.from({ length: 105 }, (_, index) =>
       makeNotification(index, {
         read: false,
+        level: "needs-you",
         title: `Unread ${index}`,
         message: `unread-message-${index}`,
       }),
@@ -129,7 +144,7 @@ describe("NotificationCenter", () => {
     expect(wrapper.text()).toContain("99+")
   })
 
-  it("filters the main list to notifications that need attention", async () => {
+  it("shows needs-you items separately from informational recent messages", async () => {
     notificationState.unread = [
       makeNotification(1, {
         read: false,
@@ -137,14 +152,18 @@ describe("NotificationCenter", () => {
         title: "Informational",
         message: "FYI",
       }),
+    ]
+    notificationState.needsYou = [
       makeNotification(2, {
         read: false,
+        level: "needs-you",
         severity: "warning",
         title: "Warning item",
         message: "Needs review",
       }),
       makeNotification(3, {
         read: false,
+        level: "needs-you",
         severity: "error",
         title: "Error item",
         message: "Needs action",
@@ -152,47 +171,45 @@ describe("NotificationCenter", () => {
     ]
 
     const wrapper = await mountCenter()
+    expect(wrapper.text()).toContain("notificationCenter.needsYouSection")
+    expect(wrapper.text()).toContain("Warning item")
+    expect(wrapper.text()).toContain("Error item")
     expect(wrapper.text()).toContain("Informational")
-    expect(wrapper.text()).toContain("Warning item")
-    expect(wrapper.text()).toContain("Error item")
-
-    await wrapper.get('[data-test="notification-filter-attention"]').trigger("click")
-
-    expect(wrapper.text()).not.toContain("Informational")
-    expect(wrapper.text()).toContain("Warning item")
-    expect(wrapper.text()).toContain("Error item")
+    expect(wrapper.text()).toContain("notificationCenter.recentSection")
   })
 
   it("navigates source-backed rows without dismissing them", async () => {
-    notificationState.unread = [
+    notificationState.needsYou = [
       {
         ...makeNotification(1, {
           read: false,
-          type: "update",
-          title: "Update available",
-          message: "Curated v1.4.3 is ready",
+          type: "storage",
+          level: "needs-you",
+          title: "Storage offline",
+          message: "Disk is offline",
         }),
-        source: { route: "/settings?section=about" },
+        source: { route: "/settings?section=library" },
       },
     ]
 
     const wrapper = await mountCenter()
     await wrapper.get('[data-test="notification-row-action"]').trigger("click")
 
-    expect(routerPush).toHaveBeenCalledWith("/settings?section=about")
+    expect(routerPush).toHaveBeenCalledWith("/settings?section=library")
     expect(notificationState.dismissOne).not.toHaveBeenCalled()
   })
 
   it("dismisses a row only through the explicit dismiss action", async () => {
-    notificationState.unread = [
+    notificationState.needsYou = [
       {
         ...makeNotification(1, {
           read: false,
-          type: "update",
-          title: "Update available",
-          message: "Curated v1.4.3 is ready",
+          type: "storage",
+          level: "needs-you",
+          title: "Storage offline",
+          message: "Disk is offline",
         }),
-        source: { route: "/settings?section=about" },
+        source: { route: "/settings?section=library" },
       },
     ]
 

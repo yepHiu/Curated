@@ -143,6 +143,7 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
           variant: "destructive",
           durationMs: 6000,
           notification: {
+            messageId: "MSG-0026",
             type: "scrape",
             title: t("notificationCenter.titles.scrapeFailed"),
             source: actorNotificationSource(name),
@@ -159,6 +160,7 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
           variant: "success",
           durationMs: 4000,
           notification: {
+            messageId: "MSG-0025",
             type: "scrape",
             title: t("notificationCenter.titles.scrapeDone"),
             source: actorNotificationSource(name),
@@ -178,6 +180,7 @@ async function runScrapePipeline(seq: number, name: string, force: boolean): Pro
         variant: "destructive",
         durationMs: 6000,
         notification: {
+          messageId: "MSG-0026",
           type: "scrape",
           title: t("notificationCenter.titles.scrapeFailed"),
           source: actorNotificationSource(name),

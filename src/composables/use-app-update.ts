@@ -47,6 +47,7 @@ function maybeRecordUpdateAvailableNotification(next: AppUpdateStatusDTO) {
   }
   notifiedUpdateVersions.add(version)
   useNotificationCenter().addNotification({
+    messageId: "MSG-0024",
     type: "update",
     severity: "warning",
     title: i18n.global.t("notificationCenter.titles.updateAvailable"),

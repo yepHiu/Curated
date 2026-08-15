@@ -78,6 +78,7 @@ function makeMovieScrapeTask(status: TaskDTO["status"]): TaskDTO {
     message: "Metadata updated",
     metadata: {
       movieId: "movie-1",
+      number: "ABC-123",
     },
   }
 }
@@ -255,7 +256,7 @@ describe("useScanTaskTracker", () => {
     wrapper.unmount()
   })
 
-  it("shows a persisted start notification when a manual scan opts in", async () => {
+  it("toasts scan start without writing a message-center row", async () => {
     vi.useFakeTimers()
     mocks.getTaskStatus.mockResolvedValueOnce(makeTask("running"))
 
@@ -274,13 +275,12 @@ describe("useScanTaskTracker", () => {
       "toasts.manualLibraryScanStarted",
       expect.objectContaining({
         variant: "default",
-        notification: expect.objectContaining({
-          type: "scan",
-          title: "notificationCenter.titles.scanStarted",
-          source: { taskId: "task-1", route: "/settings?section=library" },
-        }),
       }),
     )
+    const startToast = mocks.pushAppToast.mock.calls.find(
+      (call) => call[0] === "toasts.manualLibraryScanStarted",
+    )
+    expect(startToast?.[1]).not.toHaveProperty("notification")
 
     wrapper.unmount()
   })
@@ -307,6 +307,33 @@ describe("useScanTaskTracker", () => {
     await flushPromises()
 
     expect(wrapper.get("[data-active]").text()).toBe("task-1")
+    expect(wrapper.get("[data-progress]").text()).toBe("")
+
+    wrapper.unmount()
+  })
+
+  it("keeps movie scrape tasks out of the progress dock even without hideProgressDock", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeMovieScrapeTask("running"))
+
+    const Harness = defineComponent({
+      setup() {
+        const { activeTask, progressTask, start } = useScanTaskTracker()
+        start("scrape-1", { notifyMovieScrape: true })
+        return { activeTask, progressTask }
+      },
+      template: `
+        <div>
+          <span data-active>{{ activeTask?.taskId ?? "" }}</span>
+          <span data-progress>{{ progressTask?.taskId ?? "" }}</span>
+        </div>
+      `,
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(wrapper.get("[data-active]").text()).toBe("scrape-1")
     expect(wrapper.get("[data-progress]").text()).toBe("")
 
     wrapper.unmount()
@@ -370,6 +397,62 @@ describe("useScanTaskTracker", () => {
             route: "/detail/movie-1",
           },
         }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it("replaces a scrape loading toast with the terminal notification", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeMovieScrapeTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("scrape-1", { notifyMovieScrape: true, loadingToastId: "loading-1" })
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualMovieScrapeDone",
+      expect.objectContaining({
+        variant: "success",
+        id: "loading-1",
+        notification: expect.objectContaining({
+          type: "scrape",
+          title: "notificationCenter.titles.scrapeDone",
+        }),
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it("turns a scrape loading toast into an error when task status cannot be fetched", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockRejectedValueOnce(new Error("network down"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("scrape-1", { notifyMovieScrape: true, loadingToastId: "loading-1" })
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "network down",
+      expect.objectContaining({
+        variant: "destructive",
+        id: "loading-1",
       }),
     )
 

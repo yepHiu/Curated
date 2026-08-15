@@ -2,6 +2,7 @@ import { onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import type { LibraryPathStorageStatusDTO } from "@/api/types"
 import { pushAppToast } from "@/composables/use-app-toast"
+import { useNotificationCenter } from "@/composables/use-notification-center"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
@@ -43,6 +44,20 @@ export function useLibraryStorageStatusAlerts() {
   async function checkAndNotify() {
     await libraryService.checkLibraryPathStorageStatus()
     const offline = libraryService.libraryPathStorageStatuses.value.filter(abnormal)
+    const onlineIds = new Set(
+      libraryService.libraryPathStorageStatuses.value
+        .filter((status) => status.status === "online")
+        .map((status) => status.libraryPathId),
+    )
+    useNotificationCenter().resolveMatching((item) => {
+      if (item.messageId !== "MSG-0010") {
+        return false
+      }
+      if (!item.source?.libraryPathId) {
+        return offline.length === 0
+      }
+      return onlineIds.has(item.source.libraryPathId)
+    })
     if (offline.length === 0) {
       return
     }
@@ -68,6 +83,7 @@ export function useLibraryStorageStatusAlerts() {
           variant: "warning",
           durationMs: 8000,
           notification: {
+            messageId: "MSG-0010",
             type: "storage",
             title: t("notificationCenter.titles.storageOffline"),
             source: {
@@ -84,6 +100,7 @@ export function useLibraryStorageStatusAlerts() {
       variant: "warning",
       durationMs: 9000,
       notification: {
+        messageId: "MSG-0010",
         type: "storage",
         title: t("notificationCenter.titles.storageOffline"),
         source: { route: SETTINGS_LIBRARY_ROUTE },

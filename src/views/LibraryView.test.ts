@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import LibraryView from "./LibraryView.vue"
 
 const pushAppToastMock = vi.hoisted(() => vi.fn())
+const pushAppToastLoadingMock = vi.hoisted(() => vi.fn(() => "loading-toast-1"))
 const routerMocks = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock("vue-router", () => ({
 
 vi.mock("@/composables/use-app-toast", () => ({
   pushAppToast: pushAppToastMock,
+  pushAppToastLoading: pushAppToastLoadingMock,
 }))
 
 vi.mock("@/composables/use-scan-task-tracker", () => ({
@@ -73,7 +75,7 @@ vi.mock("@/components/jav-library/LibraryPage.vue", () => ({
           data-open-context-menu
           @click="$emit('contextMenu', {
             event: { clientX: 24, clientY: 24 },
-            movie: { id: 'movie-1', title: 'Movie 1' }
+            movie: { id: 'movie-1', title: 'Movie 1', code: 'M-1' }
           })"
         >Context</button>
       </div>
@@ -113,9 +115,11 @@ afterEach(() => {
   serviceMocks.getActorProfile.mockReset()
   scanTrackerStartMock.mockReset()
   pushAppToastMock.mockReset()
+  pushAppToastLoadingMock.mockReset()
   routerMocks.push.mockReset()
   routerMocks.replace.mockReset()
   vi.restoreAllMocks()
+  pushAppToastLoadingMock.mockReturnValue("loading-toast-1")
 })
 
 describe("LibraryView feedback", () => {
@@ -155,7 +159,13 @@ describe("LibraryView feedback", () => {
     await flushPromises()
 
     expect(serviceMocks.refreshMovieMetadata).toHaveBeenCalledWith("movie-1")
-    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", { notifyMovieScrape: true })
+    expect(pushAppToastLoadingMock).toHaveBeenCalledWith("toasts.manualMovieScrapeStarted")
+    expect(scanTrackerStartMock).toHaveBeenCalledWith("task-1", {
+      notifyMovieScrape: true,
+      hideProgressDock: true,
+      loadingToastId: "loading-toast-1",
+      scrapeCode: "M-1",
+    })
   })
 
   it("resolves an actor alias to the canonical route and local movie filter", async () => {

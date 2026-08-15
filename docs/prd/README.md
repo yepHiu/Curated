@@ -2,6 +2,8 @@
 
 `docs/prd/requirements.csv` is the repository PRD ledger for Curated. Each row is a stable requirement record that can be refined over time, linked to implementation work, and tracked through release.
 
+Message prompt / display policy is a separate ledger: `docs/prd/message-catalog.csv`. See [message-catalog.md](message-catalog.md). It does not replace this requirements file.
+
 ## Source Of Truth
 
 - Treat `docs/prd/requirements.csv` as the source of truth for requirement metadata and status.
@@ -90,6 +92,7 @@ Run the validator from the repository root:
 
 ```powershell
 python scripts/prd/prd_lint.py docs/prd/requirements.csv
+python scripts/prd/message_catalog_lint.py docs/prd/message-catalog.csv
 ```
 
 For unit tests:

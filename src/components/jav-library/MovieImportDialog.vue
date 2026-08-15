@@ -194,6 +194,7 @@ async function submitImport() {
         variant: "warning",
         durationMs: 6500,
         notification: {
+          messageId: "MSG-0010",
           type: "storage",
           title: t("notificationCenter.titles.storageOffline"),
           source: { route: "/settings?section=library", libraryPathId: id },
