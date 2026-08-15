@@ -860,13 +860,13 @@ function clearActorsSearch() {
                 variant="ghost"
                 size="icon"
                 data-theme-toggle
-                class="size-10 rounded-xl text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                class="size-11 rounded-2xl text-muted-foreground hover:bg-muted/70 hover:text-foreground lg:size-9"
                 :aria-label="t('shell.themeToggleAria')"
                 :title="t('shell.themeToggleHint')"
                 @click="onShellAppearanceSwitch(resolvedMode !== 'dark')"
               >
-                <Moon v-if="resolvedMode === 'dark'" class="size-4" aria-hidden="true" />
-                <Sun v-else class="size-4" aria-hidden="true" />
+                <Moon v-if="resolvedMode === 'dark'" class="size-5" aria-hidden="true" />
+                <Sun v-else class="size-5" aria-hidden="true" />
               </Button>
             </div>
           </div>
