@@ -82,7 +82,7 @@ type TaskConfig struct {
 type ScraperConfig struct {
 	RequestTimeoutSeconds int `json:"requestTimeoutSeconds"`
 	TaskTimeoutSeconds    int `json:"taskTimeoutSeconds"`
-	// MaxConcurrent limits parallel scrape.movie goroutines after scan (0 = default 4).
+	// MaxConcurrent limits parallel scrape.movie and scrape.actor pipelines across the whole app (0 = default 4).
 	MaxConcurrent int `json:"maxConcurrent,omitempty"`
 }
 

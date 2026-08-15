@@ -109,9 +109,12 @@ type App struct {
 	httpHandlerOnce sync.Once
 	httpHandler     http.Handler
 
-	// scrapeSem limits concurrent scrape.movie pipelines (network + DB).
+	// scrapeSem limits concurrent scrape.movie / scrape.actor pipelines (network + DB).
 	scrapeSem chan struct{}
 	scrapeWg  sync.WaitGroup
+	// scrapeMovieInflight dedupes in-flight movie scrapes by movieId -> taskId.
+	scrapeMovieMu       sync.Mutex
+	scrapeMovieInflight map[string]string
 
 	watchScanMu      sync.Mutex
 	watchScanPending map[string]struct{}
@@ -187,6 +190,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		defaultImportLibraryPathID:    strings.TrimSpace(cfg.DefaultImportLibraryPathID),
 		backupDirectory:               strings.TrimSpace(cfg.BackupDirectory),
 		autoActorProfileScrapePending: make(map[string]struct{}),
+		scrapeMovieInflight:           make(map[string]string),
 		metadataMovieProviderChain:    cfg.MetadataMovieProviderChain,
 		librarySettingsPath:           strings.TrimSpace(librarySettingsPath),
 		appCtx:                        ctx,
@@ -1575,8 +1579,14 @@ func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result 
 	a.scrapeWg.Add(1)
 	go func(r contracts.ScanFileResultDTO, parent string) {
 		defer a.scrapeWg.Done()
-		a.scrapeSem <- struct{}{}
-		defer func() { <-a.scrapeSem }()
+		if err := a.acquireScrapeSlot(parentCtx); err != nil {
+			a.logger.Info("scan scrape cancelled before start",
+				zap.String("movieId", r.MovieID),
+				zap.Error(err),
+			)
+			return
+		}
+		defer a.releaseScrapeSlot()
 		a.runScrape(parentCtx, output, r, parent)
 	}(result, parentScanTaskID)
 }
@@ -1768,10 +1778,31 @@ func (a *App) startAsyncMovieMetadataScrape(ctx context.Context, detail contract
 	if err != nil {
 		return contracts.TaskDTO{}, err
 	}
+	if existingID, ok := a.lookupMovieScrape(result.MovieID); ok {
+		if existing, found := a.tasks.Get(existingID); found {
+			return existing, nil
+		}
+	}
 	task := a.beginMovieScrapeTask(ctx, io.Discard, result, "")
+	if existingID, claimed := a.claimMovieScrape(result.MovieID, task.TaskID); !claimed {
+		a.persistFailedScrapeTask(task.TaskID, "duplicate movie scrape skipped")
+		if existing, found := a.tasks.Get(existingID); found {
+			return existing, nil
+		}
+		return task, nil
+	}
+	a.scrapeWg.Add(1)
 	go func() {
+		defer a.scrapeWg.Done()
+		defer a.finishMovieScrape(result.MovieID, task.TaskID)
 		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
 		defer cancel()
+		if err := a.acquireScrapeSlot(scrapeCtx); err != nil {
+			failed := a.persistFailedScrapeTask(task.TaskID, err.Error())
+			a.finishMovieMetadataScrapeAttempt(a.appCtx, result, failed)
+			return
+		}
+		defer a.releaseScrapeSlot()
 		a.runMovieScrapeBody(scrapeCtx, a.appCtx, io.Discard, task, result)
 	}()
 	return task, nil
@@ -1878,10 +1909,13 @@ func (a *App) enqueueActorProfileScrapeTask(task contracts.TaskDTO, actorName st
 		if onDone != nil {
 			defer onDone()
 		}
-		a.scrapeSem <- struct{}{}
-		defer func() { <-a.scrapeSem }()
 		scrapeCtx, cancel := context.WithTimeout(a.appCtx, time.Duration(a.cfg.Scraper.TaskTimeoutSeconds)*time.Second)
 		defer cancel()
+		if err := a.acquireScrapeSlot(scrapeCtx); err != nil {
+			a.persistFailedScrapeTask(t.TaskID, err.Error())
+			return
+		}
+		defer a.releaseScrapeSlot()
 		a.runActorScrapeBody(scrapeCtx, t, name)
 	}(task, actorName)
 }
