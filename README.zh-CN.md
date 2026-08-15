@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon/curated-title-nobg.png" alt="Curated" width="520" />
+  <img src="icon/curated-wordmark.png" alt="Curated" width="520" />
 </p>
 
 <p align="center">
@@ -19,345 +19,79 @@
 
 # Curated
 
-Curated 是一个本地优先的媒体资料库应用，采用 Vue 3 前端与 Go + SQLite 后端。当前仓库以 Electron 桌面壳承载共享 Web UI 和 HTTP 服务边界，并具备面向 Windows 的发布打包、托盘生命周期、元数据刮削、播放链路、萃取帧管理、手柄控制以及完整的设置系统。
+Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，以及 Electron 桌面壳。产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。
 
-完整功能清单请参见 [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)。
+本 README 只做公开入口。启动细节、配置、打包，以及 `docs/` 里各篇文章的索引，见 **[docs/guide.md](docs/guide.md)**。HTTP API 参考是 **[API.md](API.md)**。
 
-产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。Go 模块名为 **`curated-backend`**，服务端入口位于 **`backend/cmd/curated`**。
+## 下载
 
-## 项目亮点
+正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
 
-- **本地优先** — Vue 3 SPA 前端 + Go HTTP API 后端 + SQLite 持久化。
-- **双模式开发** — 真实 API 模式（全链路后端）与 Mock 模式（快速 UI 迭代）共用同一服务层。
-- **完善的资料库管理** — 虚拟化海报网格、收藏、评分、标签、演员资料、回收站/恢复、影片笔记，以及支持 fsnotify 自动扫描的多目录资料库。
-- **可重启恢复的影片导入** — 支持拖拽、文件选择或文件夹选择导入，带进度跟踪与 SQLite 持久化的大文件断点续传，后端重启后仍可恢复。
-- **存储在线检测** — 优先支持 Windows 外置硬盘场景，针对已配置库路径检测硬盘离线或卷身份变化，并通过启动提醒、消息中心、扫描/导入阻断与手动重绑降低误操作风险。
-- **可验证备份包** — 使用 `VACUUM INTO` 创建一致 SQLite 快照，可选包含资料库配置，支持 SHA-256 manifest、SQLite 完整性验证、设置页创建/验证/恢复预检、离线原子恢复与保留回滚副本。
-- **可审计路径迁移** — 提供离线 dry-run/apply CLI，用于盘符、挂载点及 Windows→Unix 前缀迁移，包含路径段匹配、目标/冲突检查、自动验证备份、单事务更新、存储绑定重置与持久化审计记录。
-- **资料库健康与有界修复** — Settings → Maintenance 以只读方式检查 SQLite、存储根、源文件、资源、元数据、孤儿用户状态和导入暂存，finding ID 稳定且对离线存储安全。缺失/失败元数据重试需要显式确认，按任务跟踪并可识别重启中断；孤儿状态或严格限定的暂存清理必须重新核对当前 finding、写入审计，并且永不删除最终影片文件。
-- **保存的视图** — 可保存、应用、重命名、排序、更新和删除资料库筛选，覆盖未看/播放中/已完成、用户评分、演员/标签/厂牌、分辨率、搜索、排序和相对导入时间。Web API 写入 SQLite，Mock 使用独立 localStorage；当前影片和播放位置等瞬态导航不会进入视图定义。
-- **元数据刮削** — 多数据源支持，可配置策略（自动全局 / 国内友好 / 自定义链路 / 指定源），数据源健康检查，机器可读的故障分类。
-- **播放能力** — HTML5 视频播放（Range 流）、续播进度、每日观看统计、HLS 会话（remux/转码管线）、外部播放器接力、播放会话诊断。
-- **可解释的首页推荐** — 基于 UTC 日的 hero 与推荐快照写入 SQLite，每条推荐携带真实理由。显式本地反馈支持“不感兴趣”、有界稍后推荐、演员/片商/标签降权、即时撤销和集中移除；单纯刷新绝不会创建反馈。
-- **个人洞察** — 懒加载、本地优先的看板汇总最近 30/90/365 天或全部时间的观看时长、开始/当前已完成影片、完成率、本地评分，以及有界的 canonical 演员/厂牌/标签排行。Web API 只返回 SQLite 聚合，Mock 通过同一服务边界计算；无分母时不会显示误导性的 `0%`。
-- **萃取帧** — 帧截图、浏览、打标、筛选与多格式导出（JPG/WebP/PNG），导出的图片包含嵌入式元数据。
-- **演员身份管理** — 演员浏览、资料详情、用户标签、外部链接、同源头像缓存、异步元数据刮削，以及 Unicode 规范化 alias 和“只读预览 + 明确确认”的事务归并；影片关联与审计历史会被保留。
-- **手柄控制** — 基于 Web Gamepad API 的标准手柄支持（含 DualSense）：全局焦点导航、资料库网格选择、播放器控制。
-- **Windows 发布打包** — 以 Electron 桌面程序作为安装入口，包含 Inno Setup 安装器、便携包、FFmpeg 集成、发布清单、开机自启，以及基于 GitHub Releases 的更新检查与安装器直接下载。
-- **Electron 桌面壳层** — 当前仓库内的 Electron 主进程会启动或复用 Go HTTP 后端，并在开发态启动或复用 Vite 前端；使用 Curated 图标与托盘加载现有 Web UI；关闭窗口会隐藏到托盘，并只暴露原生目录选择这一类窄 preload 能力，不把业务 REST API 搬到 IPC。生产安装包中的 `Curated.exe` 是 Electron 壳，Go 后端位于 `resources/app/curated.exe`。
-- **设置与配置** — 完整的设置界面（概览、常规、影片存储、元数据、网络、萃取帧、关于、维护），支持资料库级配置持久化、代理与日志控制。
+- **安装器（推荐）：** `Curated-Setup-<version>.exe`
+- **便携包：** `Curated-<version>-windows-x64.zip`
+
+已安装的应用也可以在 设置 → 关于 中检查并下载新的安装器。
+
+## 亮点
+
+- 本地优先：Vue 3 SPA、Go HTTP API、SQLite，以及面向 Windows 的 Electron 托盘壳。
+- 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。
+- 资料库浏览、刮削、导入、播放、萃取帧、演员身份、每日推荐与个人洞察。
+- 可选 PIN 锁、可验证备份、路径迁移、资料库健康与有界修复。
+- 基于 GitHub Releases 的更新检查与安装器下载；正式包内置 FFmpeg 与本地 `hls.js`。
 
 ## 快速开始
 
-### 环境要求
-
-- **Node.js**：与 Vite 8 兼容的当前 LTS 版本
-- **pnpm**：仓库使用 `pnpm-lock.yaml`
-- **Go**：`1.25.4+`
-
-### 启动后端
+环境：与 Vite 8 兼容的当前 Node.js LTS、**pnpm**、Go `1.25.4+`。
 
 ```bash
-cd backend
-go run ./cmd/curated
+cd backend && go run ./cmd/curated
 ```
-
-开发默认值：
-
-- HTTP 地址：`127.0.0.1:8080`（仅本机 loopback）
-- 健康名：`curated-dev`
-
-Windows 开发辅助命令：
-
-```bash
-pnpm backend:build:dev
-```
-
-该命令会生成 `backend/runtime/curated-dev.exe`。
-
-### 备份、验证与恢复
-
-Web API 模式下，Settings -> Maintenance 可以创建并立即验证备份包、验证已有备份以及执行恢复预检。这里填写的是后端所在机器的绝对目录，Curated 会自动生成带 UTC 时间戳的包文件名。备份创建成功后，只把目录（不含生成的文件名）作为 `backupDirectory` 写入 `library-config.cfg`，刷新页面或重启后端后会自动回填。Curated 刻意不提供在线恢复按钮；真正恢复仍是离线维护操作。
-
-维护命令统一从 `backend/` 运行；若数据库路径来自自定义主配置，请额外传入 `-config path/to/config.json`：
-
-```powershell
-go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
-go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
-go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
-```
-
-创建和验证不会替换当前数据。真正恢复必须离线执行：先完全退出 Curated，确认 preflight 成功并阅读警告，再显式确认：
-
-```powershell
-go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
-```
-
-第一版备份包含一致 SQLite 快照，以及存在时的 `library-config.cfg`；不包含媒体源文件和用户资产文件。manifest 记录文件大小、SHA-256、应用标识、范围和已应用迁移；验证会逐文件校验，并实际执行 SQLite `quick_check` 与 `foreign_key_check`。恢复会拒绝未来迁移和磁盘空间不足，在同目录原子替换文件，并把旧数据库/配置保留为 `.pre-restore-*` 回滚证据。
-
-### 迁移已保存路径
-
-盘符、挂载点或资料库根目录变化时，先完全退出 Curated，再执行只读 plan。源与目标必须是绝对 Windows、UNC 或 Unix 路径；匹配按路径段进行，因此 `D:\Media` 不会误匹配 `D:\Media2`。
-
-```powershell
-go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
-```
-
-apply 必须提供一个尚不存在的备份包路径并显式确认。Curated 会先创建并验证迁移前备份，再开启单事务更新：
-
-```powershell
-go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
-```
-
-白名单仅包含 `library_paths.path`、`movies.location`、`scan_items.path`、`media_assets.local_path`、`actors.avatar_local_path`、`library_path_storage_bindings.root_path` 与 `app_update_status.downloaded_file_path`；不会改写自由文本或 URL。目标冲突、目标类型错误和目标缺失默认阻止 apply。若执行当前操作系统无法检查目标的跨平台迁移，可显式使用 `-allow-missing-paths` 承担风险。旧前缀下的存储 binding 会被删除，使 Curated 下次启动时重新探测并绑定新卷；成功 apply 会执行 SQLite 完整性检查，并让 `path_migration_audits` 与路径变更在同一事务提交。
-
-### 启动前端
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Vite 开发服务器通常运行在 `http://localhost:5173`。
+- 后端默认：`http://127.0.0.1:8080`（仅 loopback），健康名 `curated-dev`。
+- 前端默认：`http://localhost:5173`。
+- 根目录 `.env` 设置 `VITE_USE_WEB_API=true` 走真实 API，否则为 Mock。
+- 桌面壳：`pnpm dev:electron`。
+- Windows 开发二进制：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-### 启动 Electron 壳层 MVP
+备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。
 
-```powershell
-pnpm dev:electron
-```
+## 文档
 
-该命令会构建 `backend/runtime/curated-dev.exe` 与 `electron-dist/`，用 `-mode http` 启动或复用 Go 后端，等待 `/api/health` 后再启动或复用 `http://127.0.0.1:5173` 的 Vite 前端，并在带 Curated 图标的 BrowserWindow 中打开该前端地址。Electron 启动的 Vite 会带上 `VITE_USE_WEB_API=true`，并把 API 指向 Electron 管理的后端；打包态安装后的 `Curated.exe` 是 Electron 壳，内置 Go 后端位于 `resources/app/curated.exe`，Electron 会加载 `http://127.0.0.1:8081` 上由后端托管的静态 UI。关闭窗口会隐藏到托盘，后端与 Web 入口继续运行；托盘菜单可重新打开 Curated、在浏览器打开 Web 端、打开 Settings 或真正退出应用。业务接口仍走 HTTP；preload 仅暴露 `window.javLibrary.pickDirectory()`，让设置页等现有目录选择流程调用 Electron 原生目录对话框。
-
-### 真实 API 与 Mock 模式
-
-- 在仓库根目录 `.env` 中设置 `VITE_USE_WEB_API=true`，即可启用真实后端 API。
-- 其他值会保持为 Mock 模式。
-- 本机 loopback 的 Web API 开发态会直连 `http://127.0.0.1:8080`；Vite 的 `/api` 代理仍作为 fallback 和非 loopback 开发路径保留。
-
-## 功能
-
-### 资料库
-
-- 面向大规模资料库的虚拟化海报网格浏览，选中状态基于 URL。
-- 虚拟化海报网格支持标准手柄导航。
-- 收藏、评分（0-5）、用户标签与元数据标签。
-- 多目录资料库管理：添加、编辑、删除、在文件管理器中打开。
-- 入库整理（`organizeLibrary` 设置）与回收站/恢复流程。
-- 影片笔记/备注持久化。
-- 按演员浏览时显示演员资料卡片。
-- 支持按关键词、演员或标签搜索。
-
-### 扫描与元数据
-
-- 手动与自动扫描，后台任务跟踪。
-- 基于 fsnotify 的目录监听与防抖自动扫描（`autoLibraryWatch`）。
-- 通过 metatube-sdk-go 刮削影片元数据，异步任务执行。
-- 多数据源支持，可配置策略：`auto-global`、`auto-cn-friendly`、`custom-chain`、`specified`。
-- 数据源健康检查（单个/全部），带故障分类。
-- 影片刮削成功后自动补刮演员资料（`autoActorProfileScrape`）。
-
-### 导入
-
-- 顶栏影片导入：支持拖拽、文件选择或文件夹选择。
-- 进度跟踪，含文件级状态与失败通知。
-- 大文件分块断点续传，支持提交/取消生命周期。
-- session、文件与 chunk 范围通过 SQLite 持久化，后端重启后恢复原任务，并可协调提交中断。
-- 过期会话和严格限定的孤立暂存目录由可审计 janitor 清理；目标盘离线时延迟清理，最终目标文件永不由 janitor 删除。
-- 冲突检测（不覆盖已存在的目标文件）。
-- 可配置默认导入目标资料库路径。
-- 当默认导入目标硬盘离线或不再匹配绑定卷时，导入会被阻断并显示存储提醒。
-
-### 播放
-
-- HTML5 视频播放，支持 HTTP Range 流。
-- 续播进度持久化（Web API 模式存 SQLite，Mock 模式存 localStorage）。
-- 播放描述符层：统一直播、remux 与转码路径。
-- HLS 会话支持，含会话诊断与最近会话列表；浏览器无原生 HLS 时按需加载官方 `hls.js/light`，无需运行时 CDN。
-- 外部播放器接力，基于可配置的浏览器协议模板（PotPlayer 预设）。
-- 每日观看统计（设置 → 概览，91 天窗口）。
-- 播放统计叠加层、时间轴缩略图预览与萃取帧截图。
-- 路由导航上下文：时间戳（`?t=`）与返回路径（`?from=history`）。
-- 播放中侧栏返回。
-
-### 演员
-
-- 演员浏览：支持搜索、标签筛选、排序与分页。
-- 演员资料详情与元数据展示。
-- 用户标签编辑与外部链接管理。
-- 同源头像交付（后端缓存）。
-- 演员元数据异步刮削。
-- canonical 演员身份采用 NFKC、大小写折叠与空白折叠；旧名称会在资料、搜索、资料库筛选、刮削和影片元数据写入中统一解析为 canonical actor。
-- 演员详情页提供归并工作台：先只读预览影响和 profile 冲突，再携带防陈旧 token 明确确认并在单个事务中执行；归并审计可查询。Web API 使用 SQLite migrations `0035`/`0036`，Mock 使用 `curated-actor-merges-v1`。
-
-### 萃取帧
-
-- 播放中截取帧。
-- 浏览：分页、文本搜索、按标签/演员/影片筛选。
-- 标签编辑与帧删除。
-- 统计概览、标签分类与演员分类。
-- 导出为 JPG（EXIF）、WebP（EXIF）、PNG（iTXt）或 ZIP，包含嵌入式元数据（tags、schemaVersion、exportedAt、appName、appVersion）。
-- 可配置导出格式偏好（`curatedFrameExportFormat`）。
-
-### 首页与推荐
-
-- 基于 UTC 日的每日推荐快照，SQLite 持久化。
-- Hero 轮播与推荐栏，跨设备一致。
-- 无放回加权采样，含冷却窗口与推荐次数衰减。
-- 演员与厂牌多样性均衡。
-- 强制刷新，支持保留 hero 与排除当前推荐。
-- 每条推荐持久化真实 reason code，前端只负责翻译，不自行反推理由。
-- 支持“不感兴趣”、1～365 天稍后推荐、演员/片商/标签有界降权、撤销与本地反馈管理。
-
-### 个人洞察
-
-- 懒加载 `/insights` 工作区，提供最近 30 天、90 天、365 天和全部时间的本地日历范围。
-- 展示观看时长、开始观看影片数、当前进度达到 90% 的完成数/完成率、当前本地评分数和平均分，并明确分母口径。
-- canonical 演员、厂牌和去重标签排行采用有界 `full-per-entity` 归因；跨实体合计可能按设计超过 100%。
-- Web API 只返回后端聚合；Mock 在 `LibraryService` 后读取本地观看时长/进度。无分母指标显示为不可用，而不是伪造 `0%`。
-
-### 设置与配置
-
-- 完整设置界面：概览、常规、影片存储、元数据、网络、萃取帧、关于、维护。
-- Web API 模式的维护页提供受 PIN 保护的备份创建、包验证与离线恢复预检，并跨刷新/重启记住最近一次成功创建所用的备份目录；Mock 模式会禁用真实文件系统维护操作。
-- 资料库级配置持久化到 `config/library-config.cfg`，原子写入。
-- 代理配置，含 JavBus 与 Google 连通性测试。
-- 后端日志：可配置目录、保留天数与级别。
-- 基于 GitHub Releases 的应用更新检查，含侧栏角标与安装器直接下载。
-- Windows 开机自启（`launchAtLogin`）。
-
-### 手柄控制
-
-- 基于 Web Gamepad API 的标准手柄支持，含 DualSense。
-- 全局焦点导航、资料库网格选择、播放器控制。
-- 大步进退、萃取帧截图与统计/控制层切换。
-- 浏览器本地设置开关（localStorage 持久化）。
-
-### 打包发布
-
-- Windows 发布流程：`pnpm release:publish`（Python CLI 编排）。
-- 安装后的生产入口：`Curated.exe` 是 Electron 桌面壳；release Go 后端打包为 `resources/app/curated.exe`，由 Electron 拥有生命周期时以 `-mode http` 启动。
-- 托盘常驻运行，本地前端托管于 loopback `127.0.0.1:8081`。
-- Inno Setup 安装器与便携 zip 分发。
-- FFmpeg 集成与发布清单生成。
-- 打包历史台账（`docs/ops/package-build-history.csv`）。
-
-### 开发者体验
-
-- 双模式开发：真实 API 模式与 Mock 模式快速迭代。
-- 前端：Vue 3 + TypeScript + Vite 8 + Tailwind CSS v4 + shadcn-vue。
-- 后端：Go 1.25+ + SQLite (modernc) + Zap 日志 + 整洁架构。
-- 国际化：English、简体中文、日本語（vue-i18n）。
-- 开发版性能监控栏（仅 dev 构建）。
-- 错误边界与客户端请求超时。
-- 全领域结构化错误码。
-
-## 配置
-
-运行时配置分为前端环境变量和后端设置两部分。
-
-### 前端
-
-- `VITE_USE_WEB_API=true`：启用真实后端
-- `VITE_API_BASE_URL`：覆盖 API 基地址；未设置时，本机 loopback 的 Web API 开发态会直连开发后端 `:8080`，避免大文件上传经过 Vite 代理；release `:8081` 静态托管和其他模式仍使用同源 `/api`
-- `VITE_LOG_LEVEL`：浏览器日志级别默认值
-
-### 后端
-
-后端会从 JSON 读取主运行配置，并合并以下资料库级配置文件：
-
-- `config/library-config.cfg`
-
-`config/library-config.example.cfg` 是受版本控制、经过脱敏的正式包示例；本机专用的
-`library-config.cfg` 不会复制进可分发产物。
-
-常见资料库级配置包括：
-
-- `organizeLibrary`
-- `metadataMovieProvider`
-- `metadataMovieStrategy`
-- `defaultImportLibraryPathId`
-- `backupDirectory`（只保存目录；空值表示未记住备份目标）
-- `autoLibraryWatch`
-- `autoActorProfileScrape`
-- `launchAtLogin`
-- `curatedFrameExportFormat`（默认 `jpg`；可选：`jpg`、`webp`、`png`）
-- `proxy`
-- 后端日志目录与保留设置
-
-  空 `logDir` 表示”使用默认日志目录”，而不是关闭文件日志：
-  正式包写入 `LOCALAPPDATA\\Curated\\logs`，开发态写入 `backend/runtime/logs`。
-
-开发与发布构建分别默认监听仅本机可达的 `127.0.0.1:8080` 与 `127.0.0.1:8081`。若要把独立服务端显式开放到局域网，应先在 loopback 模式下完成应用 PIN 初始化，再通过主运行时 JSON 配置同时设置非 loopback `httpAddr` 与 `"lanEnabled": true`，例如 `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`。未显式开启 LAN 或尚未配置 PIN 时，Curated 会拒绝启动非 loopback 监听。浏览器 CORS 只允许同源、loopback 开发 Origin，以及主配置 `corsAllowedOrigins` 中精确列出的额外 Origin，不再回显任意携带凭据的 Origin；连续五次无效 PIN 设置/解锁尝试会触发带 `Retry-After` 的指数退避。Curated 对本机与 LAN 统一使用全局 PIN 锁，设置页可查看当前设备、IP、浏览器与最近活动，并确认撤销单个或全部其他永久信任设备；内置前端仍使用同源 `/api`。
-
-## API
-
-Curated 提供基于 Go 的 HTTP API，用于资料库、播放、演员身份与归并、设置、存储在线检测和萃取帧相关能力。
-
-完整接口参考请见 [API.md](API.md)。
-
-资料库存储在线检测使用 `/api/library/paths/storage-status` 相关接口识别离线或卷身份不匹配的库路径。当前实现优先覆盖 Windows；macOS 与 Linux 目前使用基础路径探测，并作为后续适配项。
+| 文档 | 用途 |
+| --- | --- |
+| [docs/guide.md](docs/guide.md) | 详细手册与文档索引 |
+| [API.md](API.md) | 公开 HTTP API 参考 |
+| [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) | 已实现 / 目标功能目录 |
+| [docs/README.md](docs/README.md) | `docs/` 子目录怎么用 |
 
 ## 仓库结构
 
 ```text
-.
-├── src/                    # Vue SPA：页面、UI、业务组件、API 客户端、适配器
-├── backend/
-│   ├── cmd/curated/        # 后端入口
-│   └── internal/           # app、config、storage、server、scanner、scraper、tasks、desktop
-├── config/                 # 资料库级运行配置
-├── docs/                   # 见 docs/README.md：reference、product、ops、plan 等
-├── icon/                   # 品牌设计源文件
-└── package.json            # pnpm 脚本与依赖
+src/        Vue SPA
+backend/    Go 模块 curated-backend（`cmd/curated`）
+electron/   桌面壳 MVP
+config/     资料库级运行配置（保留在仓库根目录）
+docs/       手册、规范、产品、运维、计划、PRD
+icon/       品牌源文件（wordmark / appicon / mark）
 ```
-
-根目录政策补充：
-
-- `videos_test/` 固定保留在仓库根目录，作为本地测试素材目录。
-- `config/` 继续保留在仓库根目录，承载资料库级运行配置；不要并入 `backend/internal/config`。
-- `backend/runtime/` 是允许的开发态运行产物目录。
-- 新的本地临时状态优先放到 `.workspace/`。
-- Go 构建缓存不要创建在仓库内；release 脚本已经改为使用系统临时目录承载后端构建缓存。
-
-## 发布与打包
-
-推荐发布入口：
-
-```powershell
-pnpm release:publish
-```
-
-关键说明：
-
-- 生产包版本号统一由 `scripts/release/version.json` 管理。
-- 当前版本基线为 `1.5.1`。
-- `pnpm release:*` 现在统一由 `python scripts/release/release_cli.py` 编排。
-- `pnpm release:publish` 会先构建 Vue 前端、release Go 后端和 Electron main process，再组装产物。
-- 发布流程会生成 Windows Electron 发布目录、便携包、安装器可执行文件和发布清单。
-- 组装目录会复制 Electron runtime 到 `release/Curated`，把 `electron.exe` 重命名为 `Curated.exe`，写入 `resources/app/package.json`，并把 `electron-dist/`、`frontend-dist/` 和 Go 后端 `curated.exe` 放入 `resources/app/`。
-- 打包态 Web UI 的入口文档与 SPA fallback 使用 `no-store`，带哈希的 `/assets/*` 保持 immutable 长缓存；Electron 还会给 renderer 入口附加应用版本，installer 覆盖升级前只清理受管理的新旧 `frontend-dist` 目录，防止升级后继续显示旧桌面页面。
-- 打包历史台账已经迁移到 `docs/ops/package-build-history.csv`，文件采用 UTF-8 with BOM，便于 Excel / WPS 直接打开。
-- 安装包仍然继续使用 Inno Setup，只是由 Python 负责渲染 `.iss` 模板并调用 `ISCC.exe`；安装后快捷方式和安装完成后的启动入口都指向 `{app}\Curated.exe`。
-- 设置页可以为当前用户持久化 Windows 开机自启动；这类登录触发的启动会静默进入托盘，不会自动打开浏览器页面。
-
-更多发布资料：
-
-- [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
-- [docs/ops/package-build-history.csv](docs/ops/package-build-history.csv)
-- [docs/ops/2026-04-02-package-build-history.md](docs/ops/2026-04-02-package-build-history.md)
-
-## 文档
-
-- [API.md](API.md)：公开 HTTP API 参考
-- [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md)：完整功能清单（所有已实现特性）
-- [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md)：产品设计与目标架构
-- [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md)：实现事实与稳定项目记忆
-- [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html)：架构总览
-- [docs/reference/2026-03-21-library-organize.md](docs/reference/2026-03-21-library-organize.md)：资料库整理说明
-- [docs/reference/2026-03-24-frontend-ui-spec.md](docs/reference/2026-03-24-frontend-ui-spec.md)：前端 UI 规范
 
 ## 说明
 
-- 当前仓库仍处于 **Web-first** 实现阶段。
-- Electron 当前已作为最小桌面壳层落在 `electron/`，并具备托盘生命周期管理与窄范围原生目录选择 preload 桥；更深的 IPC 桥、mpv/进程控制、更广泛的原生文件桥和手柄硬件集成仍是后续目标方向。
-- `docs/film-scanner/` 主要保存参考资料和夹具，而不是生产模块布局。
+- 当前阶段是 Web 优先 + 最小 Electron 壳。更深的 IPC、mpv 与广泛原生桥接仍是目标方向。
+- `docs/film-scanner/` 是参考材料，不是生产模块树。
+
+## 参与过本仓库的模型
+
+后续若有大模型接手本仓库工作，请把名称追加到下面。
+
+- Composer 2.5
+- DeepSeek V4
+- GPT 5.5
+- GPT 5.6 Terra sol
+- Grok 4.6

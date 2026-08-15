@@ -1,6 +1,12 @@
 # Curated 文档目录说明
 
-本目录为**仓库内**说明与规划类材料；**对外公开 API** 以仓库根目录 `API.md` 为准，**产品入口说明**以根目录 `README.md`（及 `README.zh-CN.md` / `README.ja-JP.md`）为准。
+本目录为**仓库内**说明与规划类材料。
+
+- **对外短入口**：仓库根目录 `README.md`（及 `README.zh-CN.md` / `README.ja-JP.md`）
+- **详细手册与文章索引**：[guide.md](guide.md)
+- **对外公开 API**：仓库根目录 `API.md`
+
+新同学或 Agent 先读根 README，再读 [guide.md](guide.md)；不要把操作细节重新堆回根 README。
 
 ## 一级子目录
 
@@ -13,6 +19,7 @@
 | **`plan/`** | 排期与实施计划、分阶段技术方案（持续更新同主题时优先**改**旧文） |
 | **`prd/`** | 需求表与 PRD 材料（`requirements.csv`、消息政策台账 `message-catalog.csv`） |
 | **`release-notes/`** | 发版说明 |
+| **`features/`** | 已实现功能目录 |
 
 `docs/film-scanner/` 若存在，为**参考/实验**材料，不视为生产运行时代码树的一部分。
 
@@ -23,3 +30,4 @@
 - 产品愿景与域模型、与具体 sprint 无强绑定的长文 → `docs/product/`
 - 构建、发布台账、环境/CI、运维向说明 → `docs/ops/`
 - 仅反映某次评审结论文档 → `docs/review/`
+- 根 README 变长的操作说明、跨目录文章索引 → 更新 [guide.md](guide.md)，不要把长文写回根 README

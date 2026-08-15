@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon/curated-title-nobg.png" alt="Curated" width="520" />
+  <img src="icon/curated-wordmark.png" alt="Curated" width="520" />
 </p>
 
 <p align="center">
@@ -19,361 +19,79 @@
 
 # Curated
 
-Curated is a local-first media library application built with a Vue 3 frontend and a Go + SQLite backend. The current repository ships an Electron desktop shell around a shared Web UI and HTTP service boundary, with Windows-friendly release packaging, tray lifecycle, metadata scraping, playback workflows, curated-frame management, and a comprehensive settings system.
+Curated is a local-first media library: Vue 3 frontend, Go + SQLite backend, and an Electron desktop shell. The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**.
 
-See [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) for the full catalog of implemented features.
+This README is the short public entry. For setup details, configuration, packaging, and links into the rest of `docs/`, see **[docs/guide.md](docs/guide.md)**. The HTTP API reference is **[API.md](API.md)**.
 
-The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**. The Go module is **`curated-backend`** and the server entrypoint is **`backend/cmd/curated`**.
+## Download
+
+Official Windows packages are on **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**. Use the [latest release](https://github.com/yepHiu/Curated/releases/latest).
+
+- **Installer (recommended):** `Curated-Setup-<version>.exe`
+- **Portable:** `Curated-<version>-windows-x64.zip`
+
+Installed apps can also check and download a newer installer from Settings → About.
 
 ## Highlights
 
-- **Local-first** — Vue 3 SPA frontend + Go HTTP API backend + SQLite persistence.
-- **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
-- **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
-- **Restart-safe movie import** — Drag-and-drop, file selection, or folder selection with progress tracking and SQLite-backed resumable uploads that recover across backend restarts.
-- **Storage presence checks** — Windows-first detection for configured library roots backed by external drives, with startup alerts, message-center entries, scan/import blocking, and manual rebind when a volume changes.
-- **Verified backup packages** — Consistent SQLite snapshots created with `VACUUM INTO`, optional library-config capture, SHA-256 manifest verification, SQLite integrity checks, Settings-based create/verify/preflight controls, offline atomic restore, and retained rollback copies.
-- **Audited path migration** — Offline dry-run/apply CLI for drive-letter, mount-point, and Windows-to-Unix prefix changes, with segment-aware matching, target/conflict checks, automatic verified backup, one-transaction updates, binding reset, and a persisted audit record.
-- **Library Health & bounded repairs** — Settings → Maintenance runs read-only SQLite, storage, source-file, asset, metadata, orphan-state, and import-staging diagnostics with stable finding IDs and offline-safe checks. Missing/failed metadata retries are explicitly confirmed, task-tracked, restart-aware, and bounded; orphan state or strictly scoped staging cleanup requires a fresh finding and writes audit evidence without deleting final movie files.
-- **Saved Views** — Save, apply, rename, reorder, update, and delete reusable library filters for unwatched/in-progress/completed state, exact local rating, actor/tag/studio, resolution, search, sorting, and relative import windows. Web API mode persists versioned definitions in SQLite; Mock mode uses an isolated localStorage key, and transient movie/playback navigation never enters a saved definition.
-- **Metadata scraping** — Multi-provider support with configurable strategies, provider health checks, and machine-readable failure categories for network troubleshooting.
-- **Playback** — HTML5 video with Range streaming, resume playback, daily watch-time statistics, HLS session support with remux/transcode pipeline, external player handoff, and playback session diagnostics.
-- **Offline desktop resources** — Packaged UI uses local Outfit font assets and the npm-bundled official `hls.js/light` build for Curated's single-rendition local streams; the desktop build no longer depends on Google Fonts or a CDN HLS loader.
-- **Backend events** — `GET /api/events` streams task lifecycle updates over SSE so scan/import/scrape UI can react in real time while keeping polling as fallback.
-- **Explainable homepage recommendations** — UTC-based hero and recommendation snapshots persist in SQLite with truthful reason codes. Explicit local-only feedback supports not-interested, bounded snooze, actor/studio/tag down-ranking, immediate undo, and centralized removal; refresh alone never creates feedback.
-- **Personal Insights** — A lazy local-only dashboard summarizes 30/90/365-day or all-time watch duration, started/currently-complete movies, completion rate, local ratings, and bounded canonical actor/studio/tag rankings. Web API mode aggregates in SQLite without returning raw history; Mock mode computes behind the same service boundary, and empty denominators never become a misleading `0%`.
-- **Curated frames** — Frame capture, browsing, tagging, filtering, and multi-format export (JPG/WebP/PNG) with embedded metadata.
-- **Actor identity management** — Actor browsing, profile detail, user tags, external links, same-origin avatar caching, async metadata scraping, Unicode-normalized aliases, and a read-only-preview/confirmed transactional merge workflow that preserves associations and audit history.
-- **PIN App Lock** - Optional Web API app lock with Argon2id-hashed PIN storage, PIN-length metadata for the keyboard-first lock screen, HTTP-only unlock sessions, idle-timeout locking, PIN change controls, exponential backoff after repeated failed attempts, and a Settings UI for reviewing and revoking trusted-forever devices without exposing session bearer tokens.
-- **Windows release packaging** — Electron desktop app as the installed entrypoint, Inno Setup installer, portable zip, FFmpeg bundling, release manifest generation, Windows login autostart, and GitHub Releases-based update checks with in-app installer download, SHA256 verification, and explicit installer launch.
-- **Electron shell MVP** — In-repo Electron main process that starts or reuses the Go HTTP backend, starts or reuses Vite in development, uses the Curated app icon and tray, hides to tray on window close, loads the existing Web UI, marks backend requests as `Curated Desktop` for connected-client visibility, and exposes only a narrow native directory-picker bridge instead of replacing REST APIs with IPC. Packaged releases install `Curated.exe` as the Electron shell and place the Go backend at `resources/app/curated.exe`.
-- **Settings & configuration** — Full settings UI (Overview, General, Video storage, Metadata, Network, Curated frames, About, Maintenance) with library-level config persistence, proxy support, connected-client visibility, and logging controls.
+- Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
+- Dual-mode development: real Web API or Mock UI behind the same service layer.
+- Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
+- Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
+- GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
 
-## Quick Start
+## Quick start
 
-### Requirements
-
-- **Node.js**: current LTS compatible with Vite 8
-- **pnpm**: required; this repository uses `pnpm-lock.yaml`
-- **Go**: `1.25.4+`
-
-### Start The Backend
+Requirements: Node.js current LTS (Vite 8), **pnpm**, Go `1.25.4+`.
 
 ```bash
-cd backend
-go run ./cmd/curated
+cd backend && go run ./cmd/curated
 ```
-
-Development defaults:
-
-- HTTP address: `127.0.0.1:8080` (loopback only)
-- health name: `curated-dev`
-
-Windows development helper:
-
-```bash
-pnpm backend:build:dev
-```
-
-This produces `backend/runtime/curated-dev.exe`.
-
-### Back Up, Verify, and Restore
-
-In Web API mode, Settings -> Maintenance can create and immediately verify a package, verify an existing package, and run restore preflight. Enter an absolute directory on the backend machine; Curated generates a fresh UTC-timestamped package filename. After a package is created successfully, the directory (not the generated filename) is persisted as `backupDirectory` in `library-config.cfg` and prefilled after refresh or restart. Curated deliberately exposes no online restore button; restore remains an offline maintenance operation.
-
-Run maintenance commands from `backend/`; add `-config path/to/config.json` when the database path comes from a custom main config:
-
-```powershell
-go run ./cmd/curated -maintenance backup-create -backup-path C:\Backups\curated.curated-backup
-go run ./cmd/curated -maintenance backup-verify -backup-path C:\Backups\curated.curated-backup
-go run ./cmd/curated -maintenance backup-preflight -backup-path C:\Backups\curated.curated-backup
-```
-
-Creating and verifying a backup do not replace live data. A restore is deliberately offline: fully quit Curated first, review a successful preflight, then provide explicit confirmation:
-
-```powershell
-go run ./cmd/curated -maintenance backup-restore -backup-path C:\Backups\curated.curated-backup -confirm-restore
-```
-
-The package contains a consistent SQLite snapshot and, when present, `library-config.cfg`. It does not include media source files or user asset files in the first format version. The manifest records file sizes, SHA-256 hashes, application identity, scope, and applied migrations. Verification checks every declared file plus SQLite `quick_check` and `foreign_key_check`; restore rejects future migrations and insufficient disk space, replaces files atomically, and retains the previous database/config as `.pre-restore-*` rollback evidence.
-
-### Migrate Stored Paths
-
-When a drive letter, mount point, or library root changes, fully quit Curated and run a read-only plan first. Source and target roots must be absolute Windows, UNC, or Unix paths. Matching is path-segment aware, so `D:\Media` never matches `D:\Media2`.
-
-```powershell
-go run ./cmd/curated -maintenance path-migrate-plan -path-from D:\Media -path-to E:\Media
-```
-
-Apply requires an unused backup destination and explicit confirmation. Curated creates and verifies that pre-migration package before opening the one-transaction update:
-
-```powershell
-go run ./cmd/curated -maintenance path-migrate-apply -path-from D:\Media -path-to E:\Media -backup-path D:\Backups\before-path-migration.curated-backup -confirm-path-migration
-```
-
-The whitelist is limited to `library_paths.path`, `movies.location`, `scan_items.path`, `media_assets.local_path`, `actors.avatar_local_path`, `library_path_storage_bindings.root_path`, and `app_update_status.downloaded_file_path`; free text and URLs are never rewritten. Existing destination conflicts, wrong target types, and missing targets block apply. For a deliberate cross-platform migration whose targets cannot be inspected on the current OS, `-allow-missing-paths` is an explicit risk override. Storage bindings under the old prefix are removed so Curated can detect and bind the new volume on next startup. Successful apply runs SQLite integrity checks and writes `path_migration_audits` in the same transaction as the path changes.
-
-### Start The Frontend
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-The Vite development server usually runs on `http://localhost:5173`.
+- Backend default: `http://127.0.0.1:8080` (loopback), health name `curated-dev`.
+- Frontend default: `http://localhost:5173`.
+- Set `VITE_USE_WEB_API=true` in root `.env` for the real API; otherwise Mock mode.
+- Desktop shell: `pnpm dev:electron`.
+- Windows dev binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`.
 
-### Real API vs Mock Mode
-
-- Set `VITE_USE_WEB_API=true` in the repository root `.env` to use the real backend API.
-- Any other value keeps the frontend in mock mode.
-- In local loopback Web API development, the frontend connects directly to `http://127.0.0.1:8080` for API calls; the Vite `/api` proxy remains available for fallback and non-loopback development.
-
-### Start The Electron Shell MVP
-
-```powershell
-pnpm dev:electron
-```
-
-The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-dist/`, starts or reuses the Go backend in `-mode http`, waits for `/api/health`, then starts or reuses the Vite frontend at `http://127.0.0.1:5173` and opens that URL in a secure BrowserWindow with the Curated app icon. The Vite renderer is launched with `VITE_USE_WEB_API=true` and points API calls at the Electron-managed backend; in packaged builds, the installed `Curated.exe` is the Electron shell, the bundled Go backend lives at `resources/app/curated.exe`, and Electron loads the backend-hosted static UI on `http://127.0.0.1:8081`. Electron marks backend requests with `X-Curated-Client: desktop-electron`, the app version, and desktop OS headers so the backend reports the client as `Curated Desktop` instead of plain Chrome and can display Windows 11 instead of Chromium's legacy `Windows NT 10.0` token. Closing the window hides it to the tray so the backend and Web entry keep running; use the tray menu to reopen Curated, open the Web UI in a browser, open Settings, or quit the app. Business APIs remain HTTP; preload exposes only `window.javLibrary.pickDirectory()` so existing folder-picking flows can use Electron's native directory dialog.
-
-## Features
-
-### Library
-
-- Virtualized poster-grid browsing for large libraries with URL-backed selection.
-- Favorites, ratings (0-5), user tags, and metadata tags.
-- Multi-root library paths: add, edit, delete, and reveal in OS file manager.
-- Library organization with structured folder naming (`organizeLibrary` setting).
-- Trash/restore workflow: soft-delete, restore, or permanent-delete.
-- Movie comments/notes persisted per movie.
-- Actor profile card overlay when browsing by actor.
-- Search by query, actor, or tag.
-
-### Scanning & Metadata
-
-- Manual and auto-scan with background task tracking.
-- fsnotify-based directory watch with debounced auto-scan (`autoLibraryWatch`).
-- Movie metadata scraping via metatube-sdk-go with async task execution.
-- Multiple metadata providers with configurable strategies: `auto-global`, `auto-cn-friendly`, `custom-chain`, `specified`.
-- Provider health checks (ping single / ping all) with failure categories.
-- Auto actor profile scrape on successful movie scrape (`autoActorProfileScrape`).
-
-### Import
-
-- Top-bar movie import via drag-and-drop, file selection, or folder selection.
-- Progress tracking with per-file status and failure notifications.
-- Resumable chunked upload for large files with commit/abort lifecycle.
-- SQLite-backed session, file, and chunk-range recovery across backend restarts, including interrupted commit reconciliation.
-- Audited janitor cleanup for expired and narrowly scoped orphan staging directories; offline target storage defers cleanup, and final destination files are never deleted.
-- Conflict detection (existing target files are not overwritten).
-- Configurable default import library path.
-- Imports are blocked with a storage warning when the default target drive is offline or no longer matches the bound volume.
-
-### Playback
-
-- HTML5 video playback with HTTP Range streaming.
-- Resume playback with persisted progress (SQLite in Web API mode, localStorage in mock mode).
-- Playback descriptor seam for direct-play, remux, and transcode paths.
-- HLS session support with session diagnostics and recent-session listing.
-- Browser HLS fallback loads the official bundled `hls.js/light` build on demand, without a runtime CDN dependency.
-- External player handoff via configurable browser protocol template (PotPlayer preset).
-- Daily watch-time statistics in Settings → Overview (91-day window).
-- Player stats overlay, preview timeline thumbnails, and curated-frame capture.
-- Route navigation context: timestamp (`?t=`) and return path (`?from=history`).
-- Active playback sidebar return.
-
-### Actors
-
-- Actor browsing with search, tag filter, sort, and pagination.
-- Actor profile detail with metadata display.
-- User tag editing and external links management.
-- Same-origin actor avatar delivery through backend-managed caching.
-- Actor metadata scraping as async task.
-- Canonical actor identities with NFKC/case/whitespace normalization; old names resolve through persisted aliases across profile, search, library filters, scraping, and metadata ingestion.
-- Actor detail merge workbench with read-only impact preview, explicit profile-conflict decisions, stale-preview protection, one-transaction apply, and queryable audits. Web API uses SQLite migrations `0035`/`0036`; Mock uses `curated-actor-merges-v1`.
-
-### Curated Frames
-
-- Frame capture from player during playback.
-- Browsing with pagination, text search, and filtering by tag, actor, or movie.
-- Tag editing and frame deletion.
-- Stats overview, tag facets, and actor facets.
-- Export in JPG (EXIF), WebP (EXIF), PNG (iTXt), or ZIP with embedded metadata (tags, schemaVersion, exportedAt, appName, appVersion).
-- Configurable export format and default export style preferences (`curatedFrameExportFormat`, `curatedFrameExportMode`).
-
-### Homepage & Recommendations
-
-- UTC-based daily recommendation snapshot persisted in SQLite.
-- Hero carousel and recommendation rail with cross-device consistency.
-- Weighted sampling without replacement with cooling windows and count decay.
-- Actor and studio diversity balancing.
-- Force-refresh with hero preservation and recommendation exclusion.
-- Persisted reason codes for every recommendation; the renderer only localizes backend explanations.
-- Explicit not-interested, 1–365 day snooze, and bounded actor/studio/tag down-ranking with undo and local feedback management.
-
-### Personal Insights
-
-- Lazy `/insights` workspace with 30-day, 90-day, 365-day, and all-time local-calendar ranges.
-- Watch duration, distinct started movies, current 90%-progress completion count/rate, current local rating count, and average rating with explicit denominator semantics.
-- Canonical actor, studio, and deduplicated tag rankings use bounded `full-per-entity` attribution; totals across entities may exceed 100% by design.
-- Web API mode returns only server-side aggregates; Mock mode uses local watch-time/progress storage behind `LibraryService`. Empty denominators render as unavailable rather than a false `0%`.
-
-### Security
-
-- Optional PIN App Lock in Settings -> Security.
-- PIN values are stored as Argon2id salted hashes in SQLite; plaintext PIN values are never persisted. The configured PIN length is stored separately so the lock screen renders the correct number of PIN cells.
-- Unlock sessions are server-side and carried by the browser through an HTTP-only `curated_auth` cookie.
-- Users can choose an idle-lock delay for regular devices. UI activity and protected API use extend the idle deadline, so Curated locks after inactivity rather than on a fixed countdown.
-- After one successful unlock, users can trust the current device indefinitely until it is explicitly locked or the session is revoked.
-- Settings -> Security opens PIN setup and PIN change in shadcn-vue dialogs from entry buttons; changing the configured PIN requires the current PIN plus the new PIN confirmation.
-- The lock screen uses a compact shadcn-vue card with PIN cells based on the configured PIN length and keyboard input only; it does not show library artwork or other sensitive media context.
-- In Web API mode, locked requests to protected `/api/*` endpoints return `423 AUTH_LOCKED`; mock mode keeps PIN disabled for fast UI iteration.
-- Settings -> Security lists active trusted-forever devices with current-device, IP, browser, and last-activity context; users can revoke one other device or all other trusted devices after confirmation. Curated uses one global PIN policy for local and LAN clients.
-
-### Settings & Configuration
-
-- Full settings UI: Overview, General, Security, Video storage, Metadata, Network, Curated frames, About, Maintenance.
-- Maintenance provides PIN-protected backup creation, package verification, and offline-restore preflight in Web API mode; the last successfully used backup directory is remembered across refreshes and restarts. Mock mode disables filesystem maintenance actions.
-- Library-level config persisted to `config/library-config.cfg` with atomic writes.
-- Proxy configuration with JavBus and Google ping tests.
-- Backend logging: configurable directory, retention, and level.
-- App update checks against GitHub Releases with sidebar badge, in-app installer download, SHA256 verification, an opt-in General-settings auto-download toggle, and explicit user-confirmed installer launch.
-- Windows login autostart (`launchAtLogin`).
-
-### Packaging & Release
-
-- Windows release workflow: `pnpm release:publish` via Python CLI.
-- Installed release entrypoint: `Curated.exe` is the Electron desktop shell; the release Go backend is bundled as `resources/app/curated.exe` and started with `-mode http` when Electron owns it.
-- Tray-mode runtime with local frontend hosting on loopback `127.0.0.1:8081`.
-- Inno Setup installer and portable zip distribution.
-- FFmpeg bundling and release manifest generation.
-- Package build history ledger (`docs/ops/package-build-history.csv`).
-
-### Developer Experience
-
-- Dual-mode development: real API mode and mock mode for fast UI iteration.
-- Frontend: Vue 3 + TypeScript + Vite 8 + Tailwind CSS v4 + shadcn-vue.
-- Backend: Go 1.25+ + SQLite (modernc) + Zap logging + clean architecture.
-- i18n: English, 简体中文, 日本語 via vue-i18n.
-- Dev performance monitor bar (dev builds only).
-- Error boundary and client request timeout.
-- Structured error codes across all backend domains.
-
-## Configuration
-
-Runtime configuration is split between frontend environment variables and backend settings.
-
-### Frontend
-
-- `VITE_USE_WEB_API=true`: use the real backend
-- `VITE_API_BASE_URL`: override the API base URL; when unset, local loopback Web API development connects directly to dev backend `:8080` to avoid proxying large uploads through Vite, while release hosting on `:8081` and other modes use same-origin `/api`
-- `VITE_LOG_LEVEL`: optional browser log level default
-
-### Backend
-
-The backend reads its main runtime config from JSON and merges library-level settings from:
-
-- `config/library-config.cfg`
-
-`config/library-config.example.cfg` is the tracked, sanitized sample used by release packaging. The
-machine-specific `library-config.cfg` is never copied into distributable packages.
-
-Common library-level settings include:
-
-- `organizeLibrary`
-- `metadataMovieProvider`
-- `metadataMovieStrategy`
-- `defaultImportLibraryPathId`
-- `backupDirectory` (directory only; empty means no remembered backup destination)
-- `autoLibraryWatch`
-- `autoActorProfileScrape`
-- `autoDownloadUpdates`
-- `launchAtLogin`
-- `curatedFrameExportFormat` (default `jpg`; accepted values: `jpg`, `webp`, `png`)
-- `curatedFrameExportMode` (default `raw`; accepted values: `raw`, `watermarked`; controls the general curated-frame export action while explicit raw/watermarked actions remain available)
-- `proxy`
-- backend log directory and retention settings
-  Empty `logDir` means "use the default log directory" rather than disabling file logging:
-  release builds use `LOCALAPPDATA\\Curated\\logs`, while dev builds use `backend/runtime/logs`.
-
-Development and release builds default to loopback-only `127.0.0.1:8080` and `127.0.0.1:8081`. To expose a standalone server on the LAN, first configure an application PIN while Curated is running on loopback, then pass a main runtime JSON config with both an explicit non-loopback `httpAddr` and `"lanEnabled": true`, for example `{"httpAddr":"0.0.0.0:8081","lanEnabled":true}`. Curated refuses to start a non-loopback listener when LAN opt-in is absent or the PIN has not been initialized. Browser CORS access is limited to same-origin, loopback development origins, and exact additional origins listed in main config `corsAllowedOrigins`; arbitrary credentialed Origin reflection is not supported. The bundled frontend continues to use same-origin `/api`.
-
-## API
-
-Curated exposes a Go HTTP API for authentication/PIN App Lock, library, playback, actor identity/merge, settings, connected-client visibility, storage presence, and curated-frame workflows.
-
-See [API.md](API.md) for the full endpoint reference.
-
-Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Session, file, and synchronized chunk-range state is persisted in SQLite, restored with the original task after backend restart, and reconciled if a commit was interrupted. A scoped janitor records cleanup audits for expired/terminal sessions and old `.curated-import/upload_<id>` orphans; it defers while target storage is offline, never overwrites conflicts, and never deletes final destination files. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
-
-Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
-
-GIF clip capture uses `POST /api/library/movies/{movieId}/clips` with a bounded `startSec/endSec` range (0.4–6 seconds) and returns an async task. Pass `curatedFrameId` to persist the GIF beside a curated frame in the app-owned `curated-frame-motions` directory; the library exposes it through `GET /api/curated-frames/{id}/motion`. Without an associated frame, poll `GET /api/tasks/{taskId}` and use the temporary artifact route; those unassociated artifacts are removed after 24 hours. The backend validates the source movie path against configured library roots.
-
-Library storage presence uses endpoints under `/api/library/paths/storage-status` to detect offline or mismatched backing volumes. The current implementation is Windows-first; macOS and Linux use a fallback path probe and remain future adaptation targets.
-
-## Repository Layout
-
-```text
-.
-├── src/                    # Vue SPA: views, UI, domain components, API client, adapters
-├── backend/
-│   ├── cmd/curated/        # Backend entrypoint
-│   └── internal/           # App, config, storage, server, scanner, scraper, tasks, desktop
-├── config/                 # Library-level runtime config
-├── docs/                   # See docs/README.md: reference, product, ops, plan, prd, release-notes
-├── icon/                   # Brand design source assets
-└── package.json            # pnpm scripts and dependencies
-```
-
-Root directory policy notes:
-
-- `videos_test/` stays at the repository root as a fixed local test-fixture directory.
-- `config/` stays at the repository root for library-level runtime config; do not merge it into `backend/internal/config`.
-- `backend/runtime/` is the allowed dev-runtime output area.
-- New local-only scratch state should prefer `.workspace/`.
-- Go build caches should not be created inside the repository; release tooling now uses system temporary directories for backend build cache paths.
-
-## Release And Packaging
-
-Recommended release entrypoint:
-
-```powershell
-pnpm release:publish
-```
-
-Key notes:
-
-- Production package versioning is owned by `scripts/release/version.json`.
-- The current base line is `1.5.1`.
-- `pnpm release:*` is now backed by `python scripts/release/release_cli.py`.
-- `pnpm release:publish` builds the Vue frontend, the release Go backend, and the Electron main process before assembling artifacts.
-- Release packaging assembles a Windows-oriented Electron staging directory, portable zip, installer executable, and release manifest.
-- The assembled app copies the Electron runtime to `release/Curated`, renames `electron.exe` to `Curated.exe`, writes `resources/app/package.json`, places `electron-dist/` and `frontend-dist/` under `resources/app/`, and bundles the Go backend as `resources/app/curated.exe`.
-- Packaged Web UI entry documents and SPA fallbacks are served with `no-store`; hashed `/assets/*` remain immutable. Electron also versions its renderer entry URL, and installer upgrades remove only the managed legacy/current `frontend-dist` directories before copying the new build, preventing an older cached desktop UI from surviving an application update.
-- Release packaging bundles FFmpeg into `resources/app/third_party/ffmpeg/bin/`: it first uses `backend/third_party/ffmpeg/bin/`, then falls back to a real local FFmpeg installation discovered from Scoop or PATH, and fails fast if no runtime is available.
-- The package build ledger now lives in `docs/ops/package-build-history.csv` and is written in UTF-8 with BOM for Excel / WPS compatibility.
-- The installer still uses Inno Setup under Python orchestration; `scripts/release/windows/Curated.iss.tpl` remains the template source and launches `{app}\Curated.exe`.
-- Settings can persist Windows login autostart for the current user; autostart launches Curated silently in tray mode without opening the browser on that login-triggered run.
-
-Additional release references:
-
-- [docs/plan/2026-03-31-production-packaging-and-config-strategy.md](docs/plan/2026-03-31-production-packaging-and-config-strategy.md)
-- [docs/ops/package-build-history.csv](docs/ops/package-build-history.csv)
-- [docs/ops/2026-04-02-package-build-history.md](docs/ops/2026-04-02-package-build-history.md)
+Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md).
 
 ## Documentation
 
-- [API.md](API.md): public HTTP API reference
-- [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md): comprehensive feature catalog (all implemented features)
-- [docs/product/2026-03-20-jav-libary.md](docs/product/2026-03-20-jav-libary.md): product design and target architecture
-- [docs/reference/2026-03-20-project-memory.md](docs/reference/2026-03-20-project-memory.md): implementation facts and stable project memory
-- [docs/reference/architecture-and-implementation.html](docs/reference/architecture-and-implementation.html): architecture overview
-- [docs/reference/2026-03-21-library-organize.md](docs/reference/2026-03-21-library-organize.md): library organization notes
-- [docs/reference/2026-03-24-frontend-ui-spec.md](docs/reference/2026-03-24-frontend-ui-spec.md): UI tokens and frontend patterns
+| Document | What it is |
+| --- | --- |
+| [docs/guide.md](docs/guide.md) | Detailed handbook and documentation index |
+| [API.md](API.md) | Public HTTP API reference |
+| [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) | Shipped vs target feature catalog |
+| [docs/README.md](docs/README.md) | How `docs/` subfolders are used |
+
+## Repository layout
+
+```text
+src/        Vue SPA
+backend/    Go module curated-backend (`cmd/curated`)
+electron/   Desktop shell MVP
+config/     Library-level runtime config (stays at repo root)
+docs/       Handbook, reference, product, ops, plan, PRD
+icon/       Brand source assets (wordmark / appicon / mark)
+```
 
 ## Notes
 
-- The current repository is in the **web-first** implementation phase.
-- Electron currently exists as a minimal desktop shell under `electron/`; it has tray lifecycle management and a narrow native directory-picker preload bridge, while deeper IPC bridges, mpv/process control, broader native file bridges, and controller hardware integrations remain future target-direction items.
-- `docs/film-scanner/` contains reference material and fixtures rather than the production module layout.
+- Current phase is web-first with a minimal Electron shell. Deeper IPC, mpv, and broad native bridges remain target-direction work.
+- `docs/film-scanner/` is reference material, not the production module tree.
+
+## Models that helped build this project
+
+When a later large language model takes over work in this repository, add its name to the list below.
+
+- Composer 2.5
+- DeepSeek V4
+- GPT 5.5
+- GPT 5.6 Terra sol
+- Grok 4.6

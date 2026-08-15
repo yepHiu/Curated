@@ -1,5 +1,8 @@
 # Curated README And API Docs Redesign
 
+状态：superseded  
+替代来源：[docs/guide.md](../guide.md)（详细手册）与根目录短 README。本文件记录的「README 承载完整功能/配置/发布长文」结构已被「短 README + `docs/guide.md` 索引」取代；`API.md` 仍是唯一公开 API 参考。
+
 ## 1. Goal
 
 Restructure the repository's public-facing documentation so it reads like a polished GitHub open source project instead of an internal engineering note set.
@@ -78,7 +81,7 @@ The new README style should be closer to polished GitHub open source projects.
 
 The top section should include:
 
-- the existing branded logo image from `icon/curated-title-nobg.png`
+- the existing branded logo image from `icon/curated-wordmark.png`
 - a concise one-line product description
 - language switch links:
   - English

@@ -1,5 +1,8 @@
 # Curated README And API Docs Implementation Plan
 
+状态：superseded  
+替代来源：[docs/guide.md](../guide.md) 与 [2026-08-16-readme-short-entry-and-guide.md](2026-08-16-readme-short-entry-and-guide.md)。`API.md` 作为唯一公开 API 参考仍然有效；根 README 已改为短入口，操作长文不再放在 README。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Introduce a dedicated root-level `API.md`, redesign the README into a polished GitHub-style English homepage, add complete Chinese and Japanese README translations, and write the new maintenance rules into project memory.
@@ -119,7 +122,7 @@ Retain:
 
 ```md
 <p align="center">
-  <img src="icon/curated-title-nobg.png" alt="Curated" width="520" />
+  <img src="icon/curated-wordmark.png" alt="Curated" width="520" />
 </p>
 ```
 
