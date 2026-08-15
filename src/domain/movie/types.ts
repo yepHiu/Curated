@@ -34,6 +34,8 @@ export interface Movie {
   previewVideoUrl?: string
   /** 演员名 -> 头像 URL（Web API 详情；刮削演员资料后才有） */
   actorAvatarUrls?: Record<string, string>
+  /** 当前元数据来自哪个刮削源；未刮削时省略 */
+  metadataProvider?: string
   /** 在回收站时为 RFC3339；正常库中省略 */
   trashedAt?: string
   /**

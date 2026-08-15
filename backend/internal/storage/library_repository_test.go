@@ -206,6 +206,7 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 		Title:          "Example Title",
 		Summary:        "Example Summary",
 		Studio:         "Sample Studio",
+		Provider:       "javbus",
 		Actors:         []string{"Actor B", "Actor A"},
 		Tags:           []string{"Tag B", "Tag A"},
 		RuntimeMinutes: 120,
@@ -231,6 +232,9 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 	}
 	if movie.Summary != "Example Summary" || movie.Code != "ABC-123" {
 		t.Fatalf("unexpected movie detail: %+v", movie)
+	}
+	if movie.MetadataProvider != "javbus" {
+		t.Fatalf("expected metadata provider javbus, got %q", movie.MetadataProvider)
 	}
 	if movie.MetadataRating != 4.5 || movie.Rating != 4.5 || movie.UserRating != nil {
 		t.Fatalf("expected metadata rating 4.5 and no user override, got %+v", movie)

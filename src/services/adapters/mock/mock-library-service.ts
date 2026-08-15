@@ -657,6 +657,7 @@ const buildMovie = (index: number): Movie => {
     tags: [...seed.tags, index % 6 === 0 ? "Trending" : "Catalog"],
     thumbUrl: `https://picsum.photos/seed/jav-thumb-${prefix}-${serial}/280/400`,
     coverUrl: `https://picsum.photos/seed/jav-cover-${prefix}-${serial}/560/840`,
+    metadataProvider: ["JavBus", "FANZA", "JavLibrary"][index % 3],
     previewImages: [
       `https://picsum.photos/seed/jav-p1-${prefix}-${serial}/640/360`,
       `https://picsum.photos/seed/jav-p2-${prefix}-${serial}/640/360`,

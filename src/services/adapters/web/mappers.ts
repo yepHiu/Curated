@@ -68,5 +68,6 @@ export function mapMovieDetail(dto: MovieDetailDTO): Movie {
       dto.actorAvatarUrls && Object.keys(dto.actorAvatarUrls).length > 0
         ? { ...dto.actorAvatarUrls }
         : undefined,
+    metadataProvider: dto.metadataProvider?.trim() || undefined,
   }
 }

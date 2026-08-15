@@ -151,6 +151,29 @@ describe("DetailPanel", () => {
     expect(link!.attributes("class")).toContain("select-none")
   })
 
+  it("shows the scraped metadata provider after year and resolution", () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ metadataProvider: "JavBus" }),
+      },
+    })
+
+    const provider = wrapper.get("[data-metadata-provider]")
+    expect(provider.text()).toContain("JavBus")
+    expect(wrapper.text()).toContain("2026")
+    expect(wrapper.text()).toContain("1080p")
+  })
+
+  it("hides the metadata provider when the movie has not been scraped", () => {
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ metadataProvider: "  " }),
+      },
+    })
+
+    expect(wrapper.find("[data-metadata-provider]").exists()).toBe(false)
+  })
+
   it("emits user rating updates from the rating stars", async () => {
     const wrapper = mount(DetailPanel, {
       props: {

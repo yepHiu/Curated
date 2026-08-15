@@ -228,6 +228,7 @@ func (s *Service) ApplyScrapedMetadata(metadata scraper.Metadata) {
 		if len(metadata.PreviewImages) > 0 {
 			movie.PreviewImages = append([]string{}, metadata.PreviewImages...)
 		}
+		movie.MetadataProvider = strings.TrimSpace(metadata.Provider)
 		syncEffectiveRating(&movie)
 		s.movies[index] = movie
 		return

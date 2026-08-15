@@ -78,6 +78,8 @@ const canRevealInFileManager = computed(
   () => useWebApi && Boolean(props.movie.location?.trim()) && !isTrashed.value,
 )
 
+const metadataProvider = computed(() => props.movie.metadataProvider?.trim() ?? "")
+
 const javdbSearchUrl = computed(
   () => `https://javdb.com/search?q=${encodeURIComponent(props.movie.code.trim())}&f=all`,
 )
@@ -452,6 +454,11 @@ function pickUserTagSuggestion(tag: string) {
                 <span>—</span>
               </template>
               <span aria-hidden="true"> · {{ movie.year }} · {{ movie.resolution }}</span>
+              <span
+                v-if="metadataProvider"
+                data-metadata-provider
+                :aria-label="t('detailPanel.ariaMetadataProvider', { provider: metadataProvider })"
+              > · {{ metadataProvider }}</span>
             </CardDescription>
           </div>
 
