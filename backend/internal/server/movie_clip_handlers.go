@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/executil"
 	"curated-backend/internal/playback"
 	"curated-backend/internal/storage"
 )
@@ -197,7 +197,7 @@ func (h *Handler) runMovieClipTask(taskID, sourcePath string, startSec, duration
 	filter := fmt.Sprintf("fps=%d,scale=%d:-1:flags=lanczos:force_original_aspect_ratio=decrease", fps, width)
 	h.tasks.Start(taskID, "generating GIF")
 	h.tasks.Progress(taskID, 5, "generating GIF")
-	cmd := exec.CommandContext(ctx, ffmpeg,
+	cmd := executil.CommandContext(ctx, ffmpeg,
 		"-hide_banner", "-loglevel", "error", "-y",
 		"-ss", strconv.FormatFloat(startSec, 'f', 3, 64),
 		"-i", sourcePath,
