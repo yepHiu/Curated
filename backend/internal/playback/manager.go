@@ -87,9 +87,11 @@ type StartHLSSessionOptions struct {
 type buildProfileOptions struct {
 	PreferredProfile string
 	StartPositionSec float64
-	PreferRemux      bool
-	SourceVideoCodec string
-	SourceAudioCodec string
+	// RemuxInputSeekSec enables the stream-copy remux profile when non-nil; the
+	// pointed value is the keyframe-aligned input seek for that session.
+	RemuxInputSeekSec *float64
+	SourceVideoCodec  string
+	SourceAudioCodec  string
 }
 
 // Manager governs HLS stream push sessions, including lifecycle, file resolution, and diagnostics.
@@ -206,11 +208,11 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 		options.StartPositionSec = 0
 	}
 	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", buildProfileOptions{
-		PreferredProfile: preferredProfile,
-		StartPositionSec: options.StartPositionSec,
-		PreferRemux:      options.PreferRemux,
-		SourceVideoCodec: options.SourceVideoCodec,
-		SourceAudioCodec: options.SourceAudioCodec,
+		PreferredProfile:  preferredProfile,
+		StartPositionSec:  options.StartPositionSec,
+		RemuxInputSeekSec: resolveRemuxInputSeek(ctx, cfg, sourcePath, options),
+		SourceVideoCodec:  options.SourceVideoCodec,
+		SourceAudioCodec:  options.SourceAudioCodec,
 	})
 
 	var lastErr error
@@ -611,6 +613,9 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	remuxHLSArgs := []string{
 		"-c:v", "copy",
 		"-c:a", "copy",
+		// Mid-stream stream-copy starts keep their original timestamps, so force
+		// the segment media timeline to begin at zero (= TimelineOriginSec).
+		"-avoid_negative_ts", "make_zero",
 		"-f", "hls",
 		"-hls_init_time", hlsInitialSegmentSeconds,
 		"-hls_time", hlsTargetSegmentSeconds,
@@ -623,19 +628,22 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		playlistPath,
 	}
 
+	remuxTimelineOrigin := 0.0
+	remuxInputSeekArgs := []string(nil)
+	if options.RemuxInputSeekSec != nil {
+		remuxTimelineOrigin = *options.RemuxInputSeekSec
+		if remuxTimelineOrigin > 0.001 {
+			remuxInputSeekArgs = []string{"-ss", formatSeekOffset(remuxTimelineOrigin)}
+		}
+	}
+
 	profiles := make([]transcodeProfile, 0, 4)
-	if shouldPreferRemuxProfile(options) {
+	if options.RemuxInputSeekSec != nil {
 		profiles = append(profiles, transcodeProfile{
 			Name:              "remux_copy",
 			SessionKind:       "remux-hls",
-			TimelineOriginSec: seekPlan.InputSeekSec,
-			Args: append(
-				append(
-					append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-					accurateSeekArgs...,
-				),
-				remuxHLSArgs...,
-			),
+			TimelineOriginSec: remuxTimelineOrigin,
+			Args:              buildProfileArgs(inputPrefix, remuxInputSeekArgs, sourcePath, nil, nil, remuxHLSArgs),
 		})
 	}
 	if cfg.HardwareDecode {
@@ -646,37 +654,22 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 					Name:              "h264_nvenc",
 					SessionKind:       "transcode-hls",
 					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: append(
-						append(
-							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-							append(accurateSeekArgs, "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19")...,
-						),
-						transcodeHLSArgs...,
-					),
+					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+						[]string{"-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19"}, transcodeHLSArgs),
 				},
 				transcodeProfile{
 					Name:              "h264_qsv",
 					SessionKind:       "transcode-hls",
 					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: append(
-						append(
-							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-							append(accurateSeekArgs, "-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20")...,
-						),
-						transcodeHLSArgs...,
-					),
+					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+						[]string{"-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20"}, transcodeHLSArgs),
 				},
 				transcodeProfile{
 					Name:              "h264_amf",
 					SessionKind:       "transcode-hls",
 					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: append(
-						append(
-							append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-							append(accurateSeekArgs, "-c:v", "h264_amf", "-quality", "quality")...,
-						),
-						transcodeHLSArgs...,
-					),
+					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+						[]string{"-c:v", "h264_amf", "-quality", "quality"}, transcodeHLSArgs),
 				},
 			)
 		case "darwin":
@@ -684,13 +677,8 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 				Name:              "h264_videotoolbox",
 				SessionKind:       "transcode-hls",
 				TimelineOriginSec: seekPlan.RequestedStartSec,
-				Args: append(
-					append(
-						append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-						append(accurateSeekArgs, "-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1")...,
-					),
-					transcodeHLSArgs...,
-				),
+				Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+					[]string{"-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"}, transcodeHLSArgs),
 			})
 		}
 	}
@@ -714,18 +702,49 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		Name:              "libx264",
 		SessionKind:       "transcode-hls",
 		TimelineOriginSec: seekPlan.RequestedStartSec,
-		Args: append(
-			append(
-				append(append(append([]string{}, inputPrefix...), inputSeekArgs...), "-i", sourcePath),
-				append(accurateSeekArgs, "-c:v", "libx264", "-preset", "veryfast", "-crf", "17")...,
-			),
-			transcodeHLSArgs...,
-		),
+		Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+			[]string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "17"}, transcodeHLSArgs),
 	})
 	if configuredPreference == "libx264" {
 		return []transcodeProfile{profiles[len(profiles)-1]}
 	}
 	return profiles
+}
+
+// buildProfileArgs assembles one ffmpeg command line shared by every profile:
+// global+input options, input seek, the source, output-side precise seek,
+// encoder options, and the HLS muxer options.
+func buildProfileArgs(inputPrefix []string, inputSeekArgs []string, sourcePath string, accurateSeekArgs []string, encoderArgs []string, hlsArgs []string) []string {
+	args := make([]string, 0, len(inputPrefix)+len(inputSeekArgs)+2+len(accurateSeekArgs)+len(encoderArgs)+len(hlsArgs))
+	args = append(args, inputPrefix...)
+	args = append(args, inputSeekArgs...)
+	args = append(args, "-i", sourcePath)
+	args = append(args, accurateSeekArgs...)
+	args = append(args, encoderArgs...)
+	args = append(args, hlsArgs...)
+	return args
+}
+
+// resolveRemuxInputSeek decides whether a stream-copy session can serve this
+// start request. Start-at-zero always can; mid-stream starts must align to the
+// last keyframe at or before the requested position, otherwise accurate
+// transcode remains the only option.
+func resolveRemuxInputSeek(ctx context.Context, cfg Config, sourcePath string, options StartHLSSessionOptions) *float64 {
+	if !options.PreferRemux {
+		return nil
+	}
+	if !canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
+		return nil
+	}
+	if options.StartPositionSec <= 0.001 {
+		zero := 0.0
+		return &zero
+	}
+	keyframeSec, ok := probeKeyframeAtOrBeforeFunc(ctx, sourcePath, cfg.FFmpegCommand, options.StartPositionSec, keyframeProbeWindowSec)
+	if !ok {
+		return nil
+	}
+	return &keyframeSec
 }
 
 func formatSeekOffset(startPositionSec float64) string {
@@ -765,21 +784,6 @@ func buildSeekPlan(startPositionSec float64) seekPlan {
 		plan.AccurateArgs = []string{"-ss", formatSeekOffset(plan.AccurateSeekSec)}
 	}
 	return plan
-}
-
-func buildSeekArgs(startPositionSec float64) ([]string, []string) {
-	plan := buildSeekPlan(startPositionSec)
-	return plan.InputArgs, plan.AccurateArgs
-}
-
-func shouldPreferRemuxProfile(options buildProfileOptions) bool {
-	if !options.PreferRemux {
-		return false
-	}
-	if !canStreamCopyCodecsForHLS(options.SourceVideoCodec, options.SourceAudioCodec) {
-		return false
-	}
-	return options.StartPositionSec <= 0.001
 }
 
 func (m *Manager) cleanupExpiredSessions(now time.Time) []*sessionState {

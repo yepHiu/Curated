@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"context"
 	"runtime"
 	"strings"
 	"testing"
@@ -161,15 +162,16 @@ func TestBuildTranscodeProfilesUsesHybridSeekWindowWhenRequested(t *testing.T) {
 }
 
 func TestBuildTranscodeProfilesPrefersRemuxBeforeFullTranscodeWhenEligible(t *testing.T) {
+	zero := 0.0
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
 		buildProfileOptions{
-			PreferRemux:      true,
-			SourceVideoCodec: "h264",
-			SourceAudioCodec: "aac",
+			RemuxInputSeekSec: &zero,
+			SourceVideoCodec:  "h264",
+			SourceAudioCodec:  "aac",
 		},
 	)
 	if len(profiles) < 2 {
@@ -182,19 +184,23 @@ func TestBuildTranscodeProfilesPrefersRemuxBeforeFullTranscodeWhenEligible(t *te
 	if !strings.Contains(args, "-c:v copy") || !strings.Contains(args, "-c:a copy") {
 		t.Fatalf("expected remux profile to copy both codecs, got %q", args)
 	}
+	if !strings.Contains(args, "-avoid_negative_ts make_zero") {
+		t.Fatalf("expected remux profile to normalize copied timestamps, got %q", args)
+	}
 }
 
 func TestBuildTranscodeProfilesUsesActualTimelineOriginForRemuxSessions(t *testing.T) {
+	zero := 0.0
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
 		buildProfileOptions{
-			StartPositionSec: 0,
-			PreferRemux:      true,
-			SourceVideoCodec: "h264",
-			SourceAudioCodec: "aac",
+			StartPositionSec:  0,
+			RemuxInputSeekSec: &zero,
+			SourceVideoCodec:  "h264",
+			SourceAudioCodec:  "aac",
 		},
 	)
 	if len(profiles) < 1 {
@@ -206,26 +212,111 @@ func TestBuildTranscodeProfilesUsesActualTimelineOriginForRemuxSessions(t *testi
 	if profiles[0].TimelineOriginSec != 0 {
 		t.Fatalf("timeline origin = %v, want 0", profiles[0].TimelineOriginSec)
 	}
+	args := strings.Join(profiles[0].Args, " ")
+	if strings.Contains(args, "-ss") {
+		t.Fatalf("start-at-zero remux must not add input seek args, got %q", args)
+	}
 }
 
-func TestBuildTranscodeProfilesSkipsRemuxWhenStartingMidStream(t *testing.T) {
+func TestBuildTranscodeProfilesUsesKeyframeAlignedRemuxForMidStreamStarts(t *testing.T) {
+	keyframe := 3719.512
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
 		buildProfileOptions{
-			StartPositionSec: 3723.5,
-			PreferRemux:      true,
-			SourceVideoCodec: "h264",
-			SourceAudioCodec: "aac",
+			StartPositionSec:  3723.5,
+			RemuxInputSeekSec: &keyframe,
+			SourceVideoCodec:  "h264",
+			SourceAudioCodec:  "aac",
 		},
 	)
-	if len(profiles) == 0 {
-		t.Fatal("expected at least one transcode fallback profile")
+	if len(profiles) < 2 {
+		t.Fatalf("expected remux profile plus software fallback, got %d profiles", len(profiles))
 	}
-	if profiles[0].Name == "remux_copy" {
-		t.Fatalf("unexpected remux profile for mid-stream start: %+v", profiles[0])
+	if profiles[0].Name != "remux_copy" {
+		t.Fatalf("first profile = %q, want remux_copy", profiles[0].Name)
+	}
+	if profiles[0].TimelineOriginSec != keyframe {
+		t.Fatalf("timeline origin = %v, want %v", profiles[0].TimelineOriginSec, keyframe)
+	}
+	args := profiles[0].Args
+	inputIndex := -1
+	seekIndex := -1
+	for idx, arg := range args {
+		switch arg {
+		case "-i":
+			inputIndex = idx
+		case "-ss":
+			seekIndex = idx
+		}
+	}
+	if inputIndex < 0 || seekIndex < 0 || seekIndex > inputIndex {
+		t.Fatalf("expected keyframe seek before input, got %q", strings.Join(args, " "))
+	}
+	if seekIndex+1 >= len(args) || args[seekIndex+1] != "3719.512" {
+		t.Fatalf("expected keyframe seek offset 3719.512, got %q", strings.Join(args, " "))
+	}
+	if strings.Count(strings.Join(args, " "), "-ss") != 1 {
+		t.Fatalf("stream-copy remux must not add output-side precise seek, got %q", strings.Join(args, " "))
+	}
+}
+
+func TestResolveRemuxInputSeekFallsBackWhenKeyframeProbeMisses(t *testing.T) {
+	restore := probeKeyframeAtOrBeforeFunc
+	probeKeyframeAtOrBeforeFunc = func(ctx context.Context, sourcePath string, ffmpegCommand string, targetSec float64, windowSec float64) (float64, bool) {
+		return 0, false
+	}
+	defer func() { probeKeyframeAtOrBeforeFunc = restore }()
+
+	if seek := resolveRemuxInputSeek(context.Background(), Config{}, "movie.mkv", StartHLSSessionOptions{
+		StartPositionSec: 3723.5,
+		PreferRemux:      true,
+		SourceVideoCodec: "h264",
+		SourceAudioCodec: "aac",
+	}); seek != nil {
+		t.Fatalf("expected no remux when keyframe probe misses, got %v", *seek)
+	}
+
+	zero := 0.0
+	if seek := resolveRemuxInputSeek(context.Background(), Config{}, "movie.mkv", StartHLSSessionOptions{
+		StartPositionSec: 0,
+		PreferRemux:      true,
+		SourceVideoCodec: "h264",
+		SourceAudioCodec: "aac",
+	}); seek == nil || *seek != zero {
+		t.Fatal("expected start-at-zero remux without probing the source")
+	}
+
+	if seek := resolveRemuxInputSeek(context.Background(), Config{}, "movie.mkv", StartHLSSessionOptions{
+		StartPositionSec: 3723.5,
+		PreferRemux:      true,
+		SourceVideoCodec: "h264",
+		SourceAudioCodec: "flac",
+	}); seek != nil {
+		t.Fatal("expected no remux when codecs are not HLS-friendly")
+	}
+}
+
+func TestResolveRemuxInputSeekUsesProbedKeyframe(t *testing.T) {
+	restore := probeKeyframeAtOrBeforeFunc
+	probeKeyframeAtOrBeforeFunc = func(ctx context.Context, sourcePath string, ffmpegCommand string, targetSec float64, windowSec float64) (float64, bool) {
+		if targetSec != 3723.5 {
+			t.Fatalf("probe target = %v, want 3723.5", targetSec)
+		}
+		return 3719.512, true
+	}
+	defer func() { probeKeyframeAtOrBeforeFunc = restore }()
+
+	seek := resolveRemuxInputSeek(context.Background(), Config{}, "movie.mkv", StartHLSSessionOptions{
+		StartPositionSec: 3723.5,
+		PreferRemux:      true,
+		SourceVideoCodec: "h264",
+		SourceAudioCodec: "aac",
+	})
+	if seek == nil || *seek != 3719.512 {
+		t.Fatalf("expected keyframe-aligned remux seek, got %v", seek)
 	}
 }
 
@@ -249,13 +340,22 @@ func TestBuildTranscodeProfilesKeepsRequestedTimelineOriginForTranscodeSessions(
 }
 
 func TestBuildTranscodeProfilesSkipsRemuxWhenSourceAudioIsNotHlsFriendly(t *testing.T) {
+	// Codec eligibility now resolves in resolveRemuxInputSeek; an HLS-unfriendly
+	// audio track yields a nil seek, which must suppress the remux profile.
+	if seek := resolveRemuxInputSeek(context.Background(), Config{}, "movie.mkv", StartHLSSessionOptions{
+		PreferRemux:      true,
+		SourceVideoCodec: "h264",
+		SourceAudioCodec: "dts",
+	}); seek != nil {
+		t.Fatalf("expected no remux seek for dts audio, got %v", *seek)
+	}
+
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},
 		"movie.mkv",
 		"segment-%05d.ts",
 		"index.m3u8",
 		buildProfileOptions{
-			PreferRemux:      true,
 			SourceVideoCodec: "h264",
 			SourceAudioCodec: "dts",
 		},
