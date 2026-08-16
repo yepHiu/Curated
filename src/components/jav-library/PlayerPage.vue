@@ -25,6 +25,7 @@ import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
+import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -50,6 +51,7 @@ import {
   saveCuratedFrameCandidate,
   type CuratedFrameCaptureCandidate,
 } from "@/lib/curated-frames/save-capture"
+import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import {
   getCuratedCaptureFeedbackSoundEnabled,
   getCuratedCaptureKeyCode,
@@ -126,6 +128,7 @@ import {
   toFiniteNumber,
   type PlaybackStatsSnapshot,
 } from "@/lib/player-playback-stats"
+import type { FrameMarkerInput } from "@/lib/player-frame-markers"
 import { usePlayerClipCapture } from "@/composables/use-player-clip-capture"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
 import { useLibraryService } from "@/services/library-service"
@@ -344,6 +347,40 @@ let pendingCuratedFrameCapture: Promise<
   { ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }
 > | null = null
 
+/** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
+const frameMarkers = ref<FrameMarkerInput[]>([])
+const FRAME_MARKERS_PAGE_SIZE = 200
+
+async function loadCuratedFrameMarkers() {
+  const movieId = props.movie.id
+  try {
+    const collected: FrameMarkerInput[] = []
+    for (let offset = 0; ; offset += FRAME_MARKERS_PAGE_SIZE) {
+      const page = await listCuratedFramesPage({
+        movieId,
+        limit: FRAME_MARKERS_PAGE_SIZE,
+        offset,
+      })
+      collected.push(...page.items.map((row) => ({ id: row.id, positionSec: row.positionSec })))
+      if (page.items.length === 0 || collected.length >= page.total) break
+    }
+    if (movieId === props.movie.id) {
+      frameMarkers.value = collected
+    }
+  } catch {
+    // 标记是增强展示，加载失败时静默降级为无标记
+  }
+}
+
+function appendCuratedFrameMarker(saved: { id: string; positionSec: number }) {
+  if (frameMarkers.value.some((marker) => marker.id === saved.id)) return
+  frameMarkers.value = [...frameMarkers.value, { id: saved.id, positionSec: saved.positionSec }]
+}
+
+function onFrameMarkerSeek(sec: number) {
+  void seekToAbsolutePlaybackTime(sec)
+}
+
 function beginCuratedPress() {
   if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
@@ -386,6 +423,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (!frameResult.ok) {
       throw new Error(frameResult.reason)
     }
+    appendCuratedFrameMarker(frameResult)
     const task = await libraryService.createMovieClip(props.movie.id, {
       startSec: input.startSec,
       endSec: input.endSec,
@@ -955,6 +993,7 @@ function onWindowBeforeUnload() {
 
 onMounted(() => {
   refreshPipSupport()
+  void loadCuratedFrameMarkers()
   const probe = document.createElement("video")
   if (!canPlayHlsNatively(probe)) {
     preloadHlsLibrary()
@@ -1690,6 +1729,7 @@ async function runCuratedCapture() {
   }
 
   curatedCaptureFeedback.value = { phase: "success", positionSec }
+  appendCuratedFrameMarker(result)
   curatedCaptureAnnouncement.value = t("player.captureFeedbackSuccess", {
     time: formatClock(positionSec),
   })
@@ -2727,6 +2767,13 @@ const videoPreloadMode = computed(() =>
                 :style="bufferedAheadStyle"
               />
             </div>
+
+            <PlayerProgressFrameMarkers
+              v-if="frameMarkers.length > 0 && totalDurationSec > 0"
+              :markers="frameMarkers"
+              :duration-sec="totalDurationSec"
+              @seek="onFrameMarkerSeek"
+            />
           </div>
 
           <p
