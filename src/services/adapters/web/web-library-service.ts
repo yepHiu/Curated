@@ -47,6 +47,7 @@ import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
 import { i18n } from "@/i18n"
+import { clientVideoCodecsQueryParam, resolvePlaybackCapabilities } from "@/lib/playback-capabilities"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
 import type { LibraryService } from "@/services/contracts/library-service"
@@ -1031,7 +1032,7 @@ function createWebLibraryService(): LibraryService {
       if (prefetched) {
         return await prefetched
       }
-      const dto = await api.getMoviePlayback(id)
+      const dto = await api.getMoviePlayback(id, { clientVideoCodecs: clientVideoCodecsParam() })
       if (!dto.url) {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }
@@ -1267,6 +1268,15 @@ const moviePlaybackPrefetches = new Map<string, MoviePlaybackPrefetch>()
 const MOVIE_PLAYBACK_PREFETCH_TTL_MS = 10_000
 
 /**
+ * Browser-reported decodable mp4-family codecs for the descriptor request, so
+ * the backend can route HEVC/AV1 sources this browser cannot decode to HLS
+ * instead of failing with a decode error. Null omits the parameter entirely.
+ */
+function clientVideoCodecsParam(): string | null {
+  return clientVideoCodecsQueryParam(resolvePlaybackCapabilities())
+}
+
+/**
  * Start a playback descriptor request ahead of the player page mounting. For
  * HLS-eligible movies the GET also boots the server-side session, so the route
  * transition overlaps ffmpeg startup instead of serializing behind it. Entries
@@ -1280,12 +1290,14 @@ function prefetchMoviePlaybackRequest(movieId: string): void {
   moviePlaybackPrefetches.delete(movieId)
   let promise: Promise<PlaybackDescriptorDTO>
   try {
-    promise = api.getMoviePlayback(movieId).then((dto) => {
-      if (!dto.url) {
-        dto.url = moviePlaybackAbsoluteUrl(movieId)
-      }
-      return dto
-    })
+    promise = api
+      .getMoviePlayback(movieId, { clientVideoCodecs: clientVideoCodecsParam() })
+      .then((dto) => {
+        if (!dto.url) {
+          dto.url = moviePlaybackAbsoluteUrl(movieId)
+        }
+        return dto
+      })
   } catch {
     return
   }

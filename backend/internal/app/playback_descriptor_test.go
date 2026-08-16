@@ -158,3 +158,77 @@ func TestBuildPlaybackDecisionFallsBackToTranscodeHLSWhenAudioNeedsConversion(t 
 		t.Fatalf("reasonCode = %q, want browser_container_unsupported", decision.ReasonCode)
 	}
 }
+
+func TestBuildPlaybackDecisionHonorsClientVideoCodecs(t *testing.T) {
+	t.Parallel()
+
+	base := func(clientVideoCodecs []string) playbackDecisionInput {
+		return playbackDecisionInput{
+			Location: "D:/media/movie-hevc.mp4",
+			MediaInfo: playback.MediaInfo{
+				Container:  "mp4",
+				VideoCodec: "hevc",
+				AudioCodec: "aac",
+			},
+			StreamPushEnabled: true,
+			ClientVideoCodecs: clientVideoCodecs,
+		}
+	}
+
+	// No capability report keeps the static whitelist (legacy behavior).
+	if decision := buildPlaybackDecision(base(nil)); decision.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode without client codecs = %q, want direct", decision.Mode)
+	}
+
+	// A browser that cannot decode HEVC must get the HLS plan instead of a
+	// descriptor the video element will fail to decode.
+	fallback := buildPlaybackDecision(base([]string{"h264"}))
+	if fallback.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode without hevc support = %q, want hls", fallback.Mode)
+	}
+	if fallback.ReasonCode != "browser_codec_unsupported" {
+		t.Fatalf("reasonCode = %q, want browser_codec_unsupported", fallback.ReasonCode)
+	}
+	if fallback.SessionKind != playbackSessionKindTranscodeHLS {
+		t.Fatalf("sessionKind = %q, want transcode-hls; hevc is never remux-eligible", fallback.SessionKind)
+	}
+
+	// A browser reporting HEVC keeps direct play.
+	if decision := buildPlaybackDecision(base([]string{"h264", "hvc1"})); decision.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode with hevc support = %q, want direct", decision.Mode)
+	}
+
+	// The capability report must not affect other containers.
+	webm := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:/media/movie.webm",
+		MediaInfo: playback.MediaInfo{
+			Container:  "webm",
+			VideoCodec: "vp9",
+			AudioCodec: "opus",
+		},
+		StreamPushEnabled:   true,
+		ClientVideoCodecs:   []string{"h264"},
+	})
+	if webm.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("webm mode = %q, want direct; client codecs only narrow the mp4 family", webm.Mode)
+	}
+}
+
+func TestBuildPlaybackDecisionTreatsUnknownCodecAsUnsupportedWhenClientNarrows(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:/media/movie-unknown.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:  "mp4",
+			VideoCodec: "",
+			AudioCodec: "aac",
+		},
+		StreamPushEnabled: true,
+		ClientVideoCodecs: []string{"h264"},
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want hls for unknown codec under an explicit capability set", decision.Mode)
+	}
+}

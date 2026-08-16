@@ -19,6 +19,10 @@ type playbackDecisionInput struct {
 	MediaInfo         playback.MediaInfo
 	StreamPushEnabled bool
 	ForceStreamPush   bool
+	// ClientVideoCodecs carries the browser-reported decodable mp4-family video
+	// codecs from the `clientVideoCodecs` descriptor query parameter. Nil keeps
+	// the static whitelist behavior for callers that report nothing.
+	ClientVideoCodecs []string
 }
 
 type playbackDecision struct {
@@ -37,7 +41,7 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	container := normalizeSourceContainer(input.MediaInfo.Container, input.Location)
 	videoCodec := normalizeCodecName(input.MediaInfo.VideoCodec)
 	audioCodec := normalizeCodecName(input.MediaInfo.AudioCodec)
-	directEligible := isBrowserDirectPlayCandidate(input.Location, container, videoCodec, audioCodec)
+	directEligible := isBrowserDirectPlayCandidate(input.Location, container, videoCodec, audioCodec, input.ClientVideoCodecs)
 	remuxEligible := canRemuxToHLS(videoCodec, audioCodec)
 
 	decision := playbackDecision{
@@ -129,12 +133,11 @@ func browserContainerSupportedByExtension(location string) bool {
 	}
 }
 
-func isBrowserDirectPlayCandidate(location string, container string, videoCodec string, audioCodec string) bool {
+func isBrowserDirectPlayCandidate(location string, container string, videoCodec string, audioCodec string, clientVideoCodecs []string) bool {
 	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(location)))
 	switch ext {
 	case ".mp4", ".m4v":
-		return isCodecEmptyOrOneOf(videoCodec, "h264", "hevc", "av1") &&
-			isCodecEmptyOrOneOf(audioCodec, "aac", "mp3")
+		return mp4FamilyDirectPlayCandidate(videoCodec, audioCodec, clientVideoCodecs)
 	case ".webm":
 		return isCodecEmptyOrOneOf(videoCodec, "vp8", "vp9", "av1") &&
 			isCodecEmptyOrOneOf(audioCodec, "opus", "vorbis")
@@ -145,8 +148,7 @@ func isBrowserDirectPlayCandidate(location string, container string, videoCodec 
 
 	switch container {
 	case "mp4", "mov":
-		return isCodecEmptyOrOneOf(videoCodec, "h264", "hevc", "av1") &&
-			isCodecEmptyOrOneOf(audioCodec, "aac", "mp3")
+		return mp4FamilyDirectPlayCandidate(videoCodec, audioCodec, clientVideoCodecs)
 	case "webm":
 		return isCodecEmptyOrOneOf(videoCodec, "vp8", "vp9", "av1") &&
 			isCodecEmptyOrOneOf(audioCodec, "opus", "vorbis")
@@ -156,6 +158,31 @@ func isBrowserDirectPlayCandidate(location string, container string, videoCodec 
 	default:
 		return false
 	}
+}
+
+// mp4FamilyDirectPlayCandidate applies the static mp4 whitelist plus the
+// browser-reported codec capability. HEVC and AV1 support varies across
+// browsers and hardware, so a reported capability set overrides the whitelist.
+func mp4FamilyDirectPlayCandidate(videoCodec string, audioCodec string, clientVideoCodecs []string) bool {
+	if !(isCodecEmptyOrOneOf(videoCodec, "h264", "hevc", "av1") &&
+		isCodecEmptyOrOneOf(audioCodec, "aac", "mp3")) {
+		return false
+	}
+	if len(clientVideoCodecs) == 0 {
+		return true
+	}
+	normalized := normalizeCodecName(videoCodec)
+	if normalized == "" {
+		// The client narrowed capability to an explicit set; an unknown codec
+		// must prefer the HLS fallback over a likely decode error.
+		return false
+	}
+	for _, candidate := range clientVideoCodecs {
+		if normalizeCodecName(candidate) == normalized {
+			return true
+		}
+	}
+	return false
 }
 
 func canRemuxToHLS(videoCodec string, audioCodec string) bool {

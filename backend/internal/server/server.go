@@ -174,7 +174,9 @@ type DevPerformanceProvider interface {
 
 // PlaybackResolver resolves movie playback descriptors and manages HLS playback sessions.
 type PlaybackResolver interface {
-	ResolvePlayback(ctx context.Context, movieID string) (contracts.PlaybackDescriptorDTO, error)
+	// clientVideoCodecs optionally carries browser-reported decodable mp4-family
+	// video codecs (the `clientVideoCodecs` query parameter).
+	ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error)
 	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
 	GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error)
 	ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error)
@@ -879,6 +881,27 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
 }
 
+// parseClientVideoCodecs reads the optional comma-separated
+// `clientVideoCodecs` query parameter reported by the browser. It returns nil
+// when the client reports nothing, keeping the backend's static whitelist.
+func parseClientVideoCodecs(r *http.Request) []string {
+	raw := strings.TrimSpace(r.URL.Query().Get("clientVideoCodecs"))
+	if raw == "" {
+		return nil
+	}
+	codecs := make([]string, 0, 4)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			codecs = append(codecs, part)
+		}
+	}
+	if len(codecs) == 0 {
+		return nil
+	}
+	return codecs
+}
+
 func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -892,7 +915,7 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 	}
 
 	if h.playbackResolver != nil {
-		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID)
+		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID, parseClientVideoCodecs(r))
 		if err == nil {
 			writeJSON(w, http.StatusOK, dto)
 			return

@@ -524,8 +524,11 @@ export const api = {
       .then((value) => assertApiResponse("GET /library/movies/:id", value, isMovieDetailDTO))
   },
 
-  getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO> {
-    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback`)
+  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null }): Promise<PlaybackDescriptorDTO> {
+    const query = options?.clientVideoCodecs
+      ? `?clientVideoCodecs=${encodeURIComponent(options.clientVideoCodecs)}`
+      : ""
+    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${query}`)
   },
 
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO> {
