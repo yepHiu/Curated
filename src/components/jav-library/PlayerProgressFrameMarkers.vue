@@ -96,7 +96,7 @@ function onSeek(cluster: FrameMarkerCluster) {
       />
       <span
         v-if="cluster.items.length > 1"
-        class="absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-[5px] py-[3px] text-[10px] font-bold leading-none text-primary-foreground"
+        class="absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] leading-none font-bold whitespace-nowrap text-primary"
       >
         ×{{ cluster.items.length }}
       </span>
