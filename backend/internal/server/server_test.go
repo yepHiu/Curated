@@ -794,6 +794,24 @@ func TestHandleStreamMovie_OKAndRange(t *testing.T) {
 	if string(partial) != "-mp4" {
 		t.Fatalf("partial body = %q, want -mp4", string(partial))
 	}
+
+	etag := resp.Header.Get("ETag")
+	if etag == "" {
+		t.Fatal("expected stream response to carry an ETag")
+	}
+	req3, err := http.NewRequest(http.MethodGet, fullURL, http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req3.Header.Set("If-None-Match", etag)
+	resp3, err := http.DefaultClient.Do(req3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusNotModified {
+		t.Fatalf("If-None-Match status = %d, want 304", resp3.StatusCode)
+	}
 }
 
 func TestHandleGetMoviePlaybackDescriptor_OK(t *testing.T) {

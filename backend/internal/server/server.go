@@ -873,6 +873,9 @@ func (h *Handler) handleStreamMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A size+modtime ETag lets http.ServeContent answer If-None-Match and
+	// If-Range revalidation for byte-range clients without transferring data.
+	w.Header().Set("ETag", fmt.Sprintf(`"%x-%x"`, st.Size(), st.ModTime().UnixNano()))
 	http.ServeContent(w, r, dispName, st.ModTime(), f)
 }
 
