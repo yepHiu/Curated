@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -98,6 +97,9 @@ type buildProfileOptions struct {
 	RemuxInputSeekSec *float64
 	SourceVideoCodec  string
 	SourceAudioCodec  string
+	// EncoderAvailability filters hardware encoder profiles; nil keeps every
+	// candidate so capability-unknown setups keep the try-and-fail chain.
+	EncoderAvailability map[string]bool
 }
 
 // Manager governs HLS stream push sessions, including lifecycle, file resolution, and diagnostics.
@@ -112,6 +114,11 @@ type Manager struct {
 	recentSnapshots []SessionSnapshot
 	janitorCancel   context.CancelFunc
 	janitorDone     chan struct{}
+	// encoderProbes caches per-command hardware encoder capability results so
+	// session startup can skip encoders that cannot run instead of timing out
+	// through the readiness chain once per profile.
+	encoderProbeMu sync.Mutex
+	encoderProbes  map[string]*encoderProbeState
 }
 
 // SessionSnapshot is a point-in-time view of a session for diagnostics endpoints.
@@ -136,6 +143,11 @@ func New(cfg Config) *Manager {
 		janitorDone:     make(chan struct{}),
 	}
 	manager.startJanitorLoop()
+	if cfg.Enabled {
+		// Warm encoder capability in the background; browsing the library gives
+		// the probe enough time to finish before the first playback request.
+		go manager.warmEncoderProbe()
+	}
 	return manager
 }
 
@@ -214,11 +226,12 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 		options.StartPositionSec = 0
 	}
 	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", buildProfileOptions{
-		PreferredProfile:  preferredProfile,
-		StartPositionSec:  options.StartPositionSec,
-		RemuxInputSeekSec: resolveRemuxInputSeek(ctx, cfg, sourcePath, options),
-		SourceVideoCodec:  options.SourceVideoCodec,
-		SourceAudioCodec:  options.SourceAudioCodec,
+		PreferredProfile:    preferredProfile,
+		StartPositionSec:    options.StartPositionSec,
+		RemuxInputSeekSec:   resolveRemuxInputSeek(ctx, cfg, sourcePath, options),
+		SourceVideoCodec:    options.SourceVideoCodec,
+		SourceAudioCodec:    options.SourceAudioCodec,
+		EncoderAvailability: m.encoderAvailabilitySnapshot(cmdName, 2*time.Second),
 	})
 
 	var lastErr error
@@ -653,38 +666,15 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 		})
 	}
 	if cfg.HardwareDecode {
-		switch runtime.GOOS {
-		case "windows":
-			profiles = append(profiles,
-				transcodeProfile{
-					Name:              "h264_nvenc",
-					SessionKind:       "transcode-hls",
-					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
-						[]string{"-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19"}, transcodeHLSArgs),
-				},
-				transcodeProfile{
-					Name:              "h264_qsv",
-					SessionKind:       "transcode-hls",
-					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
-						[]string{"-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20"}, transcodeHLSArgs),
-				},
-				transcodeProfile{
-					Name:              "h264_amf",
-					SessionKind:       "transcode-hls",
-					TimelineOriginSec: seekPlan.RequestedStartSec,
-					Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
-						[]string{"-c:v", "h264_amf", "-quality", "quality"}, transcodeHLSArgs),
-				},
-			)
-		case "darwin":
+		for _, spec := range hardwareEncoderSpecs() {
+			if !encoderAllowed(options.EncoderAvailability, spec.Name) {
+				continue
+			}
 			profiles = append(profiles, transcodeProfile{
-				Name:              "h264_videotoolbox",
+				Name:              spec.Name,
 				SessionKind:       "transcode-hls",
 				TimelineOriginSec: seekPlan.RequestedStartSec,
-				Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
-					[]string{"-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"}, transcodeHLSArgs),
+				Args:              buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs, spec.EncoderArgs, transcodeHLSArgs),
 			})
 		}
 	}
