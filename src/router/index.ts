@@ -1,5 +1,6 @@
-import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
+import { createRouter, createWebHashHistory, type LocationQuery, type RouteLocationNormalized } from "vue-router"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
+import { useLibraryService } from "@/services/library-service"
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -107,6 +108,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (!isAuthLockEnabled() || to.name === "lock") {
+    prefetchPlaybackForRoute(to)
     return true
   }
   try {
@@ -122,7 +124,26 @@ router.beforeEach(async (to) => {
   } catch (error) {
     console.warn("[router] auth status check failed", error)
   }
+  prefetchPlaybackForRoute(to)
   return true
 })
+
+/**
+ * Warm the playback descriptor while the player route is still resolving. For
+ * HLS-eligible movies the descriptor GET also boots the server-side session, so
+ * ffmpeg startup overlaps the route transition and movie hydration instead of
+ * serializing after them. Best effort only; the player page fetches the
+ * descriptor itself when nothing warm is available.
+ */
+function prefetchPlaybackForRoute(to: RouteLocationNormalized): void {
+  if (to.name !== "player") return
+  const id = typeof to.params.id === "string" ? to.params.id.trim() : ""
+  if (!id) return
+  try {
+    useLibraryService().prefetchMoviePlayback(id)
+  } catch {
+    // Prefetch is best effort and must never block navigation.
+  }
+}
 
 export default router

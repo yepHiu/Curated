@@ -1777,6 +1777,10 @@ export const mockLibraryService: LibraryService = {
     return null
   },
 
+  prefetchMoviePlayback() {
+    // Mock: descriptors resolve locally; nothing to prefetch.
+  },
+
   async createPlaybackSession() {
     return null
   },

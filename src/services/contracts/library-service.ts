@@ -178,6 +178,11 @@ export interface LibraryService {
    * Mock：返回 null。
    */
   getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null>
+  /**
+   * 尽力预取播放描述符（点击进入播放器时提前发起）。Web：短 TTL 一次性缓存，
+   * 下一次 `getMoviePlayback` 直接消费；Mock：无操作。
+   */
+  prefetchMoviePlayback(movieId: string): void
   createPlaybackSession(
     movieId: string,
     mode: PlaybackDescriptorDTO["mode"],

@@ -1027,11 +1027,21 @@ function createWebLibraryService(): LibraryService {
       if (!id) {
         return null
       }
+      const prefetched = takeFreshMoviePlaybackPrefetch(id)
+      if (prefetched) {
+        return await prefetched
+      }
       const dto = await api.getMoviePlayback(id)
       if (!dto.url) {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }
       return dto
+    },
+
+    prefetchMoviePlayback(movieId: string) {
+      const id = movieId.trim()
+      if (!id) return
+      prefetchMoviePlaybackRequest(id)
     },
 
     async createPlaybackSession(
@@ -1072,14 +1082,19 @@ function createWebLibraryService(): LibraryService {
     async ensureMovieCached(movieId: string) {
       const trimmed = movieId.trim()
       if (!trimmed) return
-      await ensureLoaded()
       if (
         moviesState.value.some((m) => m.id === trimmed) ||
         trashedMoviesState.value.some((m) => m.id === trimmed)
       ) {
         return
       }
-      await loadMovieDetail(trimmed)
+      // Deep links (sidebar resume chip, external URLs) previously waited for
+      // the full paginated library load before the player page could mount.
+      // Resolve the single detail request first; it merges the movie into the
+      // list state, and the full library load stays a rare fallback.
+      const movie = await loadMovieDetail(trimmed)
+      if (movie) return
+      await ensureLoaded()
     },
 
     mergeMovieIntoCache(movie: Movie) {
@@ -1241,6 +1256,55 @@ function createWebLibraryService(): LibraryService {
   }
 
   return impl
+}
+
+type MoviePlaybackPrefetch = {
+  promise: Promise<PlaybackDescriptorDTO>
+  createdAt: number
+}
+
+const moviePlaybackPrefetches = new Map<string, MoviePlaybackPrefetch>()
+const MOVIE_PLAYBACK_PREFETCH_TTL_MS = 10_000
+
+/**
+ * Start a playback descriptor request ahead of the player page mounting. For
+ * HLS-eligible movies the GET also boots the server-side session, so the route
+ * transition overlaps ffmpeg startup instead of serializing behind it. Entries
+ * are consume-once and short-lived; failed requests are dropped immediately.
+ */
+function prefetchMoviePlaybackRequest(movieId: string): void {
+  const existing = moviePlaybackPrefetches.get(movieId)
+  if (existing && Date.now() - existing.createdAt < MOVIE_PLAYBACK_PREFETCH_TTL_MS) {
+    return
+  }
+  moviePlaybackPrefetches.delete(movieId)
+  let promise: Promise<PlaybackDescriptorDTO>
+  try {
+    promise = api.getMoviePlayback(movieId).then((dto) => {
+      if (!dto.url) {
+        dto.url = moviePlaybackAbsoluteUrl(movieId)
+      }
+      return dto
+    })
+  } catch {
+    return
+  }
+  moviePlaybackPrefetches.set(movieId, { promise, createdAt: Date.now() })
+  void promise.catch(() => {
+    if (moviePlaybackPrefetches.get(movieId)?.promise === promise) {
+      moviePlaybackPrefetches.delete(movieId)
+    }
+  })
+}
+
+function takeFreshMoviePlaybackPrefetch(movieId: string): Promise<PlaybackDescriptorDTO> | null {
+  const entry = moviePlaybackPrefetches.get(movieId)
+  if (!entry) return null
+  moviePlaybackPrefetches.delete(movieId)
+  if (Date.now() - entry.createdAt >= MOVIE_PLAYBACK_PREFETCH_TTL_MS) {
+    return null
+  }
+  return entry.promise
 }
 
 export async function loadMovieDetail(movieId: string): Promise<Movie | undefined> {

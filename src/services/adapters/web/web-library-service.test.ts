@@ -8,6 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   listMovies: vi.fn(),
   listConnectedClients: vi.fn(),
   getMovie: vi.fn(),
+  getMoviePlayback: vi.fn(),
   patchMovie: vi.fn(),
   deleteMovie: vi.fn(),
   restoreMovie: vi.fn(),
@@ -121,6 +122,7 @@ beforeEach(() => {
   apiMocks.listMovies.mockReset()
   apiMocks.listConnectedClients.mockReset()
   apiMocks.getMovie.mockReset()
+  apiMocks.getMoviePlayback.mockReset()
   apiMocks.patchMovie.mockReset()
   apiMocks.deleteMovie.mockReset()
   apiMocks.restoreMovie.mockReset()
@@ -1017,5 +1019,107 @@ describe("webLibraryService loading", () => {
       dimension: "tag",
       limit: 10,
     })
+  })
+})
+
+describe("webLibraryService playback prefetch", () => {
+  function playbackDto(id: string, url = "") {
+    return {
+      movieId: id,
+      mode: "direct" as const,
+      url,
+      canDirectPlay: true,
+    }
+  }
+
+  it("resolves an uncached movie via the detail endpoint without the full library load", async () => {
+    let resolveList: ((value: { items: MovieListItemDTO[]; total: number; limit: number; offset: number }) => void) | undefined
+    apiMocks.listMovies.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveList = resolve
+        }),
+    )
+    apiMocks.getMovie.mockResolvedValueOnce(movieDetailDto("movie-deep"))
+
+    // Cold service: never started, so the list request above stays pending.
+    const serviceModule = await import("./web-library-service")
+    await serviceModule.webLibraryService.ensureMovieCached(" movie-deep ")
+
+    expect(apiMocks.getMovie).toHaveBeenCalledWith("movie-deep")
+    expect(apiMocks.listMovies).not.toHaveBeenCalled()
+    expect(
+      serviceModule.webLibraryService.movies.value.some((movie) => movie.id === "movie-deep"),
+    ).toBe(true)
+    resolveList?.({ items: [], total: 0, limit: 500, offset: 0 })
+  })
+
+  it("falls back to the full library load when the detail request finds nothing", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.getMovie.mockResolvedValueOnce(undefined)
+
+    const serviceModule = await import("./web-library-service")
+    await serviceModule.webLibraryService.ensureMovieCached(" movie-gone ")
+
+    expect(apiMocks.getMovie).toHaveBeenCalledWith("movie-gone")
+    expect(apiMocks.listMovies).toHaveBeenCalledTimes(1)
+  })
+
+  it("consumes a fresh prefetch exactly once and fills the stream URL", async () => {
+    apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1"))
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    webLibraryService.prefetchMoviePlayback(" movie-1 ")
+    await flushPromises()
+
+    await expect(webLibraryService.getMoviePlayback("movie-1")).resolves.toMatchObject({
+      movieId: "movie-1",
+      mode: "direct",
+    })
+    // Consume-once: the descriptor reflects server state at request time, so a
+    // later request must hit the API again instead of reusing the snapshot.
+    apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1", "/api/library/movies/movie-1/stream"))
+    await webLibraryService.getMoviePlayback("movie-1")
+
+    expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(2)
+  })
+
+  it("reuses an in-flight prefetch and never serves a failed one", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.getMoviePlayback.mockRejectedValueOnce(new Error("descriptor failed"))
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    webLibraryService.prefetchMoviePlayback("movie-1")
+    webLibraryService.prefetchMoviePlayback(" movie-1 ")
+    expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(1)
+
+    await expect(webLibraryService.getMoviePlayback("movie-1")).rejects.toBeTruthy()
+
+    apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1"))
+    await expect(webLibraryService.getMoviePlayback("movie-1")).resolves.toMatchObject({
+      movieId: "movie-1",
+    })
+    expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(2)
+  })
+
+  it("drops a stale prefetch instead of serving an outdated descriptor", async () => {
+    vi.useFakeTimers()
+    try {
+      apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+      const { webLibraryService } = await loadStartedWebLibraryService()
+
+      apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1"))
+      webLibraryService.prefetchMoviePlayback("movie-1")
+      vi.advanceTimersByTime(15_000)
+
+      apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1", "/fresh"))
+      await expect(webLibraryService.getMoviePlayback("movie-1")).resolves.toMatchObject({
+        url: "/fresh",
+      })
+      expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
