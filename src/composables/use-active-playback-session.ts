@@ -35,6 +35,20 @@ const NEAR_END_RATIO = 0.95
 
 let activePlaybackRevision = 0
 
+/**
+ * The player publishes on every timeupdate (~4Hz). Sidebar consumers only need
+ * coarse position granularity, so skip no-op updates that would otherwise
+ * allocate a new snapshot and ripple through every computed each tick.
+ */
+const ACTIVE_PLAYBACK_POSITION_EPSILON_SEC = 0.75
+
+let lastPublishedSnapshot: {
+  movieId: string
+  status: ActivePlaybackStatus
+  positionSec: number
+  durationSec: number
+} | null = null
+
 const storedActivePlaybackSession = ref<StoredActivePlaybackSession | null>(null)
 const dismissedActivePlayback = ref<{ movieId: string; revision: number } | null>(null)
 
@@ -107,6 +121,23 @@ export function updateActivePlaybackSession(input: UpdateActivePlaybackSessionIn
 
   const positionSec = normalizeNonNegativeSeconds(input.positionSec)
   const durationSec = normalizeNonNegativeSeconds(input.durationSec)
+  const last = lastPublishedSnapshot
+  if (
+    last &&
+    last.movieId === movieId &&
+    last.status === input.status &&
+    last.durationSec === durationSec &&
+    Math.abs(last.positionSec - positionSec) < ACTIVE_PLAYBACK_POSITION_EPSILON_SEC
+  ) {
+    return
+  }
+  lastPublishedSnapshot = {
+    movieId,
+    status: input.status,
+    positionSec,
+    durationSec,
+  }
+
   const revision = ++activePlaybackRevision
 
   storedActivePlaybackSession.value = {
@@ -133,6 +164,7 @@ export function clearActivePlaybackSession(movieId?: string) {
   if (id && storedActivePlaybackSession.value?.movieId !== id) return
   storedActivePlaybackSession.value = null
   dismissedActivePlayback.value = null
+  lastPublishedSnapshot = null
 }
 
 export function dismissActivePlaybackSession(movieId?: string) {

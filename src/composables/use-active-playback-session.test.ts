@@ -118,4 +118,35 @@ describe("useActivePlaybackSession", () => {
     clearActivePlaybackSession("movie-1")
     expect(activePlaybackSession.value).toBeNull()
   })
+
+  it("skips sub-epsilon position updates but never skips status changes", () => {
+    resetActivePlaybackSession()
+
+    const publish = (positionSec: number, status: "playing" | "paused" = "playing") => {
+      updateActivePlaybackSession({
+        movieId: "movie-1",
+        title: "Movie title",
+        positionSec,
+        durationSec: 120,
+        status,
+        routeQuery: {},
+      })
+    }
+
+    publish(40)
+    expect(activePlaybackSession.value?.positionSec).toBe(40)
+
+    // timeupdate ticks land far below the epsilon and must not republish
+    publish(40.25)
+    publish(40.5)
+    expect(activePlaybackSession.value?.positionSec).toBe(40)
+
+    publish(41)
+    expect(activePlaybackSession.value?.positionSec).toBe(41)
+
+    // a pause at the same position is a material change and publishes immediately
+    publish(41, "paused")
+    expect(activePlaybackSession.value?.status).toBe("paused")
+    expect(activePlaybackSession.value?.positionSec).toBe(41)
+  })
 })
