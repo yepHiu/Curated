@@ -85,9 +85,9 @@ export function clusterFrameMarkers(
 
 - Props：`markers: readonly FrameMarkerInput[]`、`durationSec: number`；Emits：`seek: [sec: number]`。
 - 根元素：`absolute inset-x-0 top-1/2 z-[12] h-0 pointer-events-none`，挂在 `progressSliderRootRef` 的 relative 容器内（buffered 层之上，不遮挡 Slider 交互）。
-- 刻度元素：`pointer-events-auto`，单帧 `w-[3px]` 竖线穿轨（高约 10px，上下各出 2px）；主色 `bg-primary`（`#fe628e`）+ 1px 深色描边保证在亮轨道上也可见。
+- 刻度元素：`pointer-events-auto`，单帧 `w-[2px]` 竖线穿轨（高约 10px，上下各出 2px）；主色 `bg-primary`（`#fe628e`）+ 1px 深色描边保证在亮轨道上也可见。
 - 命中区：伪元素扩展至 ≥44px 高、≥12px 宽（触控标准），不影响视觉宽度。
-- 合并簇：刻度稍宽（5px）+ 挂在刻度正下方的数量文本（`×5`，`text-[10px]` 主色纯文本，完整低于轨道、不遮挡刻线）。
+- 合并簇：刻度稍宽（3px）+ 挂在刻度正下方的数量文本（`×5`，`text-[10px]` 主色纯文本，完整低于轨道、不遮挡刻线）。
 - hover 提示：纯 CSS/受控浮层显示 `formatClock` 时间；簇显示「n 个萃取帧 · 最早 hh:mm:ss」。无缩略图（二期候选）。
 - 可访问性：刻度为 `button`，`aria-label` 用 i18n key；`tabindex` 参与焦点顺序但位于 Slider 之后。
 - 宽度自测：`onMounted` 对根元素挂 `ResizeObserver` → 本地 ref；`onBeforeUnmount` 断开。

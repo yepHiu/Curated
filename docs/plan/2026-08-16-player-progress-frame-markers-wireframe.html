@@ -98,7 +98,7 @@
   .marker-layer { position: absolute; inset-inline: 0; top: 0; bottom: 0; pointer-events: none; }
   .tick {
     position: absolute; top: 50%; transform: translate(-50%, -50%);
-    width: 3px; height: 11px; border-radius: 2px;
+    width: 2px; height: 11px; border-radius: 2px;
     background: var(--primary);
     box-shadow: 0 0 0 1px rgba(0,0,0,.55);
     pointer-events: auto; cursor: pointer; z-index: 3;
@@ -108,7 +108,7 @@
     width: 12px; height: 44px;
   }
   .tick:hover { background: #ff9cb9; }
-  .tick.cluster { width: 5px; height: 12px; }
+  .tick.cluster { width: 3px; height: 12px; }
   .cluster-badge {
     position: absolute; left: 50%; top: calc(50% + 10px); transform: translateX(-50%);
     color: var(--primary);
@@ -138,8 +138,8 @@
   .detail-card h3 { font-size: 13px; color: var(--text-dim); font-weight: 500; margin-bottom: 26px; }
   .zoom-bar-zone { position: relative; height: 30px; }
   .zoom-bar-zone .bar-track { height: 8px; }
-  .zoom-bar-zone .tick { height: 15px; width: 4px; }
-  .zoom-bar-zone .tick.cluster { width: 7px; height: 16px; }
+  .zoom-bar-zone .tick { height: 15px; width: 3px; }
+  .zoom-bar-zone .tick.cluster { width: 4px; height: 16px; }
   .zoom-bar-zone .cluster-badge { font-size: 11px; padding: 3px 7px; top: calc(50% + 12px); }
   .zoom-bar-zone .tooltip { bottom: 40px; font-size: 13px; }
   .static-tip {
@@ -261,7 +261,7 @@
   <section>
     <h2>④ 规格与已确认决策</h2>
     <div class="spec-grid">
-      <div class="spec-item"><div class="k">Q1 标记样式</div><div class="v"><b>竖线刻度穿轨</b>：单帧 3px，主色 #fe628e + 深色描边</div></div>
+      <div class="spec-item"><div class="k">Q1 标记样式</div><div class="v"><b>竖线刻度穿轨</b>：单帧 2px、合并簇 3px，主色 #fe628e + 深色描边</div></div>
       <div class="spec-item"><div class="k">Q2 簇交互</div><div class="v"><b>点击跳簇内最早帧</b>；悬停显示帧数 + 最早时刻</div></div>
       <div class="spec-item"><div class="k">Q3 标记范围</div><div class="v"><b>该片全部萃取帧</b>，不区分标签（筛选/着色列后续迭代）</div></div>
       <div class="spec-item"><div class="k">密集判定</div><div class="v">像素级贪心聚类，与<b>簇首帧</b>距离 &lt; <b>12px</b> 并入；单簇宽度有界</div></div>
