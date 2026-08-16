@@ -2752,7 +2752,7 @@ const videoPreloadMode = computed(() =>
               :step="0.1"
               :disabled="!playbackSrc || totalDurationSec <= 0"
               :aria-label="t('player.progressAria')"
-              class="relative z-10 w-full"
+              class="relative z-10 w-full [&_[data-slot=slider-thumb]]:invisible"
               @update:model-value="onProgressSliderInput"
               @value-commit="onProgressSliderCommit"
             />
