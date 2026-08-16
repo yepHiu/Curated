@@ -122,6 +122,38 @@ func TestBuildTranscodeProfilesKeepsSessionOutputsRelativeToCmdDir(t *testing.T)
 	}
 }
 
+func TestBuildTranscodeProfilesPacesInputReading(t *testing.T) {
+	profiles := buildTranscodeProfiles(
+		Config{HardwareDecode: false},
+		"movie.mkv",
+		"segment-%05d.ts",
+		"index.m3u8",
+		buildProfileOptions{StartPositionSec: 0},
+	)
+	if len(profiles) == 0 {
+		t.Fatal("expected at least one profile")
+	}
+	for _, profile := range profiles {
+		args := profile.Args
+		inputIndex := -1
+		readRateIndex := -1
+		for idx, arg := range args {
+			switch arg {
+			case "-i":
+				inputIndex = idx
+			case "-readrate":
+				readRateIndex = idx
+			}
+		}
+		if inputIndex < 0 || readRateIndex < 0 || readRateIndex > inputIndex {
+			t.Fatalf("expected -readrate before input for profile %q, got %q", profile.Name, strings.Join(args, " "))
+		}
+		if readRateIndex+1 >= len(args) || args[readRateIndex+1] != "2.5" {
+			t.Fatalf("expected -readrate 2.5 for profile %q, got %q", profile.Name, strings.Join(args, " "))
+		}
+	}
+}
+
 func TestBuildTranscodeProfilesUsesHybridSeekWindowWhenRequested(t *testing.T) {
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: false},

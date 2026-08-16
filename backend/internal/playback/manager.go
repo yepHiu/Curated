@@ -33,6 +33,12 @@ const (
 	hlsInitialSegmentSeconds      = "2"
 	hlsTargetSegmentSeconds       = "2"
 	hlsStartupSegmentAheadTimeout = 2500 * time.Millisecond
+	// inputReadRate caps ffmpeg's input reading at 2.5x realtime. The player
+	// supports up to 2x playback speed, so 2.5x keeps ahead of the fastest
+	// consumer while spreading transcode CPU over the watch session instead of
+	// finishing the whole file in an early full-speed burst. Abandoned or paused
+	// sessions stop growing shortly after the client stops pulling segments.
+	inputReadRate = "2.5"
 )
 
 // Config holds playback stream push settings including ffmpeg invocation and session lifecycle.
@@ -586,7 +592,7 @@ func startTranscodeSession(
 }
 
 func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, options buildProfileOptions) []transcodeProfile {
-	inputPrefix := []string{"-y"}
+	inputPrefix := []string{"-y", "-readrate", inputReadRate}
 	if cfg.HardwareDecode {
 		inputPrefix = append(inputPrefix, "-hwaccel", "auto")
 	}
