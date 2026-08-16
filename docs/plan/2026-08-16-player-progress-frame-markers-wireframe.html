@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>播放器进度条萃取帧标记 · UI 稿</title>
+<style>
+  :root {
+    --primary: #fe628e;
+    --primary-dark: #1d0910;
+    --page: #0d0d0f;
+    --card: #141417;
+    --card-border: #232329;
+    --text: #ededf0;
+    --text-dim: #9b9ba6;
+    --track: rgba(255, 255, 255, 0.20);
+    --buffered: rgba(255, 255, 255, 0.26);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    line-height: 1.6;
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { margin-bottom: 36px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p { color: var(--text-dim); font-size: 13px; margin-top: 6px; }
+  header p code { color: var(--primary); font-size: 12px; }
+  section { margin-bottom: 44px; }
+  section > h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  section > p.desc { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  /* ============ 播放器全貌 ============ */
+  .player {
+    position: relative;
+    aspect-ratio: 16 / 8.4;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
+  }
+  .player .placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #26262c; font-size: 13px; letter-spacing: 2px;
+  }
+  .chrome {
+    position: absolute; inset-inline: 0; bottom: 0; z-index: 10;
+    padding: 16px 20px 14px;
+    background: linear-gradient(to top, rgba(0,0,0,.92), rgba(0,0,0,.65), transparent);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .time-row {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: rgba(255,255,255,.72);
+    font-variant-numeric: tabular-nums;
+  }
+  .controls-row { display: flex; justify-content: space-between; align-items: center; }
+  .controls-left, .controls-right { display: flex; align-items: center; gap: 8px; }
+  .ctl-btn {
+    width: 36px; height: 36px; border-radius: 999px;
+    background: rgba(255,255,255,.10); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer;
+  }
+  .ctl-btn.main { width: 44px; height: 44px; background: var(--primary); color: var(--primary-dark); font-size: 17px; }
+  .volume {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.08); border-radius: 999px;
+    padding: 6px 16px; font-size: 13px; color: rgba(255,255,255,.8);
+  }
+  .vol-track { width: 110px; height: 5px; border-radius: 999px; background: var(--track); position: relative; }
+  .vol-track::after { content: ""; position: absolute; inset: 0 40% 0 0; border-radius: 999px; background: #fff; }
+
+  /* ============ 进度条 + 刻度层 ============ */
+  .bar-zone { position: relative; height: 26px; cursor: pointer; }
+  .bar-track {
+    position: absolute; inset-inline: 0; top: 50%; transform: translateY(-50%);
+    height: 6px; border-radius: 999px; background: var(--track); overflow: hidden;
+  }
+  .bar-buffered { position: absolute; inset: 0 auto 0 62%; background: var(--buffered); }
+  .bar-played { position: absolute; inset: 0 auto 0 0; width: 34%; background: var(--primary); }
+  .thumb {
+    position: absolute; top: 50%; left: 34%; transform: translate(-50%, -50%);
+    width: 15px; height: 15px; border-radius: 999px; background: #fff;
+    box-shadow: 0 0 0 1px var(--primary); z-index: 4; pointer-events: none;
+  }
+  /* 刻度层：pointer-events none，刻度自身 auto —— 与真实实现一致 */
+  .marker-layer { position: absolute; inset-inline: 0; top: 0; bottom: 0; pointer-events: none; }
+  .tick {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 3px; height: 11px; border-radius: 2px;
+    background: var(--primary);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.55);
+    pointer-events: auto; cursor: pointer; z-index: 3;
+  }
+  .tick::after { /* 44px 触控命中区 */
+    content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 12px; height: 44px;
+  }
+  .tick:hover { background: #ff9cb9; }
+  .tick.cluster { width: 5px; height: 12px; }
+  .cluster-badge {
+    position: absolute; left: 50%; bottom: calc(50% + 11px); transform: translateX(-50%);
+    background: var(--primary); color: var(--primary-dark);
+    font-size: 10px; font-weight: 700; line-height: 1;
+    padding: 3px 5px; border-radius: 999px; white-space: nowrap;
+    pointer-events: none;
+  }
+  /* hover 提示 */
+  .tooltip {
+    position: absolute; bottom: 30px; transform: translateX(-50%);
+    background: rgba(12,12,14,.94); border: 1px solid #2c2c33;
+    color: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
+    padding: 5px 9px; border-radius: 8px; white-space: nowrap;
+    pointer-events: none; z-index: 20; display: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  }
+  .tooltip .dim { color: var(--text-dim); }
+  .tooltip.show { display: block; }
+
+  /* ============ 细节放大卡 ============ */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .detail-grid { grid-template-columns: 1fr; } }
+  .detail-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 26px 24px 30px; position: relative;
+  }
+  .detail-card h3 { font-size: 13px; color: var(--text-dim); font-weight: 500; margin-bottom: 26px; }
+  .zoom-bar-zone { position: relative; height: 30px; }
+  .zoom-bar-zone .bar-track { height: 8px; }
+  .zoom-bar-zone .tick { height: 15px; width: 4px; }
+  .zoom-bar-zone .tick.cluster { width: 7px; height: 16px; }
+  .zoom-bar-zone .cluster-badge { font-size: 11px; padding: 3px 7px; bottom: calc(50% + 13px); }
+  .zoom-bar-zone .tooltip { bottom: 40px; font-size: 13px; }
+  .static-tip {
+    position: absolute; bottom: 42px; transform: translateX(-50%);
+    background: rgba(12,12,14,.94); border: 1px solid #2c2c33; color: #fff;
+    font-size: 13px; font-variant-numeric: tabular-nums; padding: 6px 10px;
+    border-radius: 8px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  }
+  .static-tip .dim { color: var(--text-dim); }
+
+  /* ============ 宽度自适应演示 ============ */
+  .adaptive-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 22px; }
+  .adaptive-controls { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; font-size: 13px; color: var(--text-dim); }
+  .adaptive-controls input[type="range"] { flex: 1; accent-color: var(--primary); }
+  #adaptiveBarZone { margin: 0 auto; }
+  .adaptive-caption {
+    margin-top: 18px; font-size: 13px; color: var(--text-dim);
+    font-variant-numeric: tabular-nums; text-align: center;
+  }
+  .adaptive-caption b { color: var(--text); font-weight: 600; }
+
+  /* ============ 规格面板 ============ */
+  .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .spec-item { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 14px 16px; }
+  .spec-item .k { font-size: 12px; color: var(--primary); font-weight: 600; margin-bottom: 4px; }
+  .spec-item .v { font-size: 12.5px; color: var(--text-dim); }
+  .spec-item .v b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>播放器进度条 · 萃取帧标记 — UI 稿</h1>
+    <p>
+      需求：<code>docs/plan/2026-08-16-player-progress-curated-frame-markers.md</code> ·
+      实施计划：<code>docs/plan/2026-08-16-player-progress-frame-markers-plan.md</code> ·
+      2026-08-16 · 已确认：竖线刻度穿轨 / 簇点击跳最早帧 / 标记全部萃取帧
+    </p>
+  </header>
+
+  <!-- ① 播放器全貌（可交互） -->
+  <section>
+    <h2>① 播放器底部控制栏全貌（可交互示意）</h2>
+    <p class="desc">刻度可直接点击跳转（演示中会移动播放头）；悬停显示时间提示。示例数据：12 个萃取帧，其中两处密集（×5、×2）。</p>
+    <div class="player">
+      <div class="placeholder">VIDEO</div>
+      <div class="chrome">
+        <div class="time-row"><span id="heroCurrent">00:40:48</span><span>02:00:00</span></div>
+        <div class="bar-zone" id="heroBarZone">
+          <div class="bar-track"><div class="bar-buffered"></div><div class="bar-played" id="heroPlayed"></div></div>
+          <div class="thumb" id="heroThumb"></div>
+          <div class="marker-layer" id="heroMarkers"></div>
+          <div class="tooltip" id="heroTooltip"></div>
+        </div>
+        <div class="controls-row">
+          <div class="controls-left">
+            <div class="ctl-btn">⏪</div>
+            <div class="ctl-btn main">⏸</div>
+            <div class="ctl-btn">⏩</div>
+          </div>
+          <div class="controls-right">
+            <div class="volume">🔊 <div class="vol-track"></div></div>
+            <div class="ctl-btn">⤢</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 细节状态 -->
+  <section>
+    <h2>② 标记细节状态</h2>
+    <p class="desc">左：悬停单帧刻度，提示帧时刻。右：悬停合并簇，提示帧数与最早时刻；点击跳到簇内最早帧。</p>
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h3>悬停 · 单帧刻度</h3>
+        <div class="zoom-bar-zone">
+          <div class="bar-track"></div>
+          <div class="tick" style="left: 22%"></div>
+          <div class="tick" style="left: 46%"></div>
+          <div class="tick" style="left: 78%"></div>
+          <div class="static-tip" style="left: 46%"><span class="dim">萃取帧</span> 00:41:02</div>
+        </div>
+      </div>
+      <div class="detail-card">
+        <h3>悬停 · 合并簇（×5）</h3>
+        <div class="zoom-bar-zone">
+          <div class="bar-track"></div>
+          <div class="tick" style="left: 18%"></div>
+          <div class="tick cluster" style="left: 52%"></div>
+          <div class="cluster-badge" style="left: 52%; bottom: calc(50% + 13px)">×5</div>
+          <div class="tick" style="left: 84%"></div>
+          <div class="static-tip" style="left: 52%"><span class="dim">5 个萃取帧 · 最早</span> 01:02:31</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 宽度自适应 -->
+  <section>
+    <h2>③ 密集合并 · 宽度自适应（需求 2a / 2b / 2c）</h2>
+    <p class="desc">同一段帧序列，拖动滑杆改变进度条宽度，观察分簇实时重算。判定：与簇首帧像素距离 &lt; 12px 即并入该簇。</p>
+    <div class="adaptive-card">
+      <div class="adaptive-controls">
+        <span>窄</span>
+        <input type="range" id="widthRange" min="240" max="1000" value="560">
+        <span>宽</span>
+      </div>
+      <div class="bar-zone zoom-bar-zone" id="adaptiveBarZone" style="height: 34px">
+        <div class="bar-track"></div>
+        <div class="marker-layer" id="adaptiveMarkers"></div>
+      </div>
+      <div class="adaptive-caption" id="adaptiveCaption"></div>
+    </div>
+  </section>
+
+  <!-- ④ 规格 -->
+  <section>
+    <h2>④ 规格与已确认决策</h2>
+    <div class="spec-grid">
+      <div class="spec-item"><div class="k">Q1 标记样式</div><div class="v"><b>竖线刻度穿轨</b>：单帧 3px，主色 #fe628e + 深色描边</div></div>
+      <div class="spec-item"><div class="k">Q2 簇交互</div><div class="v"><b>点击跳簇内最早帧</b>；悬停显示帧数 + 最早时刻</div></div>
+      <div class="spec-item"><div class="k">Q3 标记范围</div><div class="v"><b>该片全部萃取帧</b>，不区分标签（筛选/着色列后续迭代）</div></div>
+      <div class="spec-item"><div class="k">密集判定</div><div class="v">像素级贪心聚类，与<b>簇首帧</b>距离 &lt; <b>12px</b> 并入；单簇宽度有界</div></div>
+      <div class="spec-item"><div class="k">数字展示</div><div class="v">簇内 ≥ 2 帧显示 <b>×n</b> 角标；位置取簇内像素中点</div></div>
+      <div class="spec-item"><div class="k">宽度计算</div><div class="v"><b>ResizeObserver</b> 自测容器宽度；首测前不合并，测量后纠正；缩放/全屏自动重算</div></div>
+      <div class="spec-item"><div class="k">交互保护</div><div class="v">刻度层 <b>pointer-events-none</b>、刻度自身可点；不阻挡拖动进度；命中区 ≥ 44px</div></div>
+      <div class="spec-item"><div class="k">实时性</div><div class="v">播放中萃取保存成功后<b>立即追加</b>刻度；跨页面删除不实时同步（首期）</div></div>
+      <div class="spec-item"><div class="k">数据与范围</div><div class="v">复用 <b>GET /api/curated-frames?movieId=</b>（Mock 同口径）；<b>无后端改动</b>；外部播放器不适用</div></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ===== 与实施计划一致的聚类逻辑（演示用镜像实现） ===== */
+const MIN_SEPARATION_PX = 12;
+
+function fmt(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(h)}:${p(m)}:${p(s)}`;
+}
+
+function cluster(markers, duration, width, minSep = MIN_SEPARATION_PX) {
+  const valid = markers.filter((m) => m >= 0 && m <= duration).sort((a, b) => a - b);
+  if (duration <= 0) return [];
+  if (width <= 0) return valid.map((m) => ({ members: [m], ratio: m / duration, seek: m }));
+  const px = (m) => (m / duration) * width;
+  const out = [];
+  let cur = [valid[0]];
+  for (let i = 1; i < valid.length; i++) {
+    if (px(valid[i]) - px(cur[0]) < minSep) cur.push(valid[i]);
+    else { out.push(cur); cur = [valid[i]]; }
+  }
+  out.push(cur);
+  return out.map((members) => {
+    const midPx = (px(members[0]) + px(members[members.length - 1])) / 2;
+    return { members, ratio: midPx / width, seek: members[0] };
+  });
+}
+
+function renderTicks(layer, clusters, { badge = true, onSeek, onHover } = {}) {
+  layer.innerHTML = "";
+  for (const c of clusters) {
+    const t = document.createElement("div");
+    t.className = "tick" + (c.members.length > 1 ? " cluster" : "");
+    t.style.left = (c.ratio * 100) + "%";
+    if (badge && c.members.length > 1) {
+      const b = document.createElement("div");
+      b.className = "cluster-badge";
+      b.textContent = "×" + c.members.length;
+      t.appendChild(b);
+    }
+    t.addEventListener("click", (e) => { e.stopPropagation(); onSeek && onSeek(c); });
+    t.addEventListener("mouseenter", () => onHover && onHover(c, t));
+    t.addEventListener("mouseleave", () => onHover && onHover(null, t));
+    layer.appendChild(t);
+  }
+}
+
+/* ===== ① 播放器全貌 ===== */
+const DURATION = 7200;
+const HERO_FRAMES = [220, 1180, 2493, 2495.4, 2497, 2499, 2500.6, 3600, 4100, 4102.3, 5300, 6100, 6650, 6990];
+const heroZone = document.getElementById("heroBarZone");
+const heroLayer = document.getElementById("heroMarkers");
+const heroTip = document.getElementById("heroTooltip");
+
+function heroRender() {
+  const w = heroZone.clientWidth;
+  renderTicks(heroLayer, cluster(HERO_FRAMES, DURATION, w), {
+    onSeek: (c) => {
+      document.getElementById("heroPlayed").style.width = (c.seek / DURATION * 100) + "%";
+      document.getElementById("heroThumb").style.left = (c.seek / DURATION * 100) + "%";
+      document.getElementById("heroCurrent").textContent = fmt(c.seek);
+    },
+    onHover: (c, el) => {
+      if (!c) { heroTip.classList.remove("show"); return; }
+      heroTip.innerHTML = c.members.length > 1
+        ? `<span class="dim">${c.members.length} 个萃取帧 · 最早</span> ${fmt(c.seek)}`
+        : `<span class="dim">萃取帧</span> ${fmt(c.seek)}`;
+      heroTip.style.left = el.style.left;
+      heroTip.classList.add("show");
+    },
+  });
+}
+heroRender();
+new ResizeObserver(heroRender).observe(heroZone);
+heroZone.addEventListener("click", (e) => {
+  if (e.target.classList.contains("tick")) return;
+  const r = heroZone.getBoundingClientRect();
+  const sec = (e.clientX - r.left) / r.width * DURATION;
+  document.getElementById("heroPlayed").style.width = (sec / DURATION * 100) + "%";
+  document.getElementById("heroThumb").style.left = (sec / DURATION * 100) + "%";
+  document.getElementById("heroCurrent").textContent = fmt(sec);
+});
+
+/* ===== ③ 宽度自适应演示 ===== */
+const ADAPTIVE_FRAMES = [200, 210, 218, 900, 1500, 1510, 1522, 1536, 2600, 3000, 3060, 3800];
+const adaptiveZone = document.getElementById("adaptiveBarZone");
+const adaptiveLayer = document.getElementById("adaptiveMarkers");
+const widthRange = document.getElementById("widthRange");
+const adaptiveCaption = document.getElementById("adaptiveCaption");
+
+function adaptiveRender() {
+  const w = Number(widthRange.value);
+  adaptiveZone.style.width = w + "px";
+  const clusters = cluster(ADAPTIVE_FRAMES, DURATION, w);
+  const merged = clusters.filter((c) => c.members.length > 1);
+  renderTicks(adaptiveLayer, clusters, {
+    onHover: (c, el) => {
+      if (!c) { adaptiveLayer.title = ""; return; }
+      el.title = c.members.length > 1
+        ? `${c.members.length} 个萃取帧 · 最早 ${fmt(c.seek)}（点击跳转）`
+        : `萃取帧 ${fmt(c.seek)}（点击跳转）`;
+    },
+  });
+  adaptiveCaption.innerHTML =
+    `宽度 <b>${w}px</b> · 12 个萃取帧 → <b>${clusters.length}</b> 个标记` +
+    (merged.length ? `（合并簇：${merged.map((c) => "×" + c.members.length).join("、")}）` : "（无合并）") +
+    ` · 演示簇位置见 title 提示`;
+}
+widthRange.addEventListener("input", adaptiveRender);
+adaptiveRender();
+</script>
+</body>
+</html>
