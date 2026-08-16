@@ -26,6 +26,12 @@ watch(
       hydrating.value = false
       return
     }
+    // Warm the playback descriptor while this view hydrates the movie, so the
+    // descriptor GET (which also boots the server-side HLS session) overlaps
+    // movie hydration and the player page mount instead of serializing after
+    // them. PlayerView only loads after the auth guard passes, so locked
+    // startup never touches protected playback endpoints.
+    libraryService.prefetchMoviePlayback(id)
     if (libraryService.getMovieById(id)) {
       hydrating.value = false
       return

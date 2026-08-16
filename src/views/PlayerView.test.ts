@@ -10,6 +10,7 @@ const serviceState = vi.hoisted(() => ({
 }))
 const serviceMocks = vi.hoisted(() => ({
   ensureMovieCached: vi.fn(),
+  prefetchMoviePlayback: vi.fn(),
 }))
 const recordMoviePlayedMock = vi.hoisted(() => vi.fn())
 
@@ -27,6 +28,7 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     getMovieById: (id?: string) => (id ? serviceState.movies.get(id) : undefined),
     ensureMovieCached: serviceMocks.ensureMovieCached,
+    prefetchMoviePlayback: serviceMocks.prefetchMoviePlayback,
   }),
 }))
 
@@ -72,6 +74,7 @@ beforeEach(() => {
   routeState.query = {}
   serviceState.movies = new Map()
   serviceMocks.ensureMovieCached.mockReset()
+  serviceMocks.prefetchMoviePlayback.mockReset()
   recordMoviePlayedMock.mockReset()
 })
 
@@ -143,5 +146,22 @@ describe("PlayerView", () => {
     expect(wrapper.text()).toContain("player.loadingTarget")
     expect(serviceMocks.ensureMovieCached).toHaveBeenCalledWith("movie-1")
     expect(recordMoviePlayedMock).not.toHaveBeenCalled()
+  })
+
+  it("warms the playback descriptor for valid movie ids only", async () => {
+    routeState.params = { id: "movie-1" }
+    serviceState.movies.set("movie-1", movie("movie-1"))
+
+    await mountPlayerView()
+
+    expect(serviceMocks.prefetchMoviePlayback).toHaveBeenCalledWith("movie-1")
+  })
+
+  it("does not prefetch for missing route ids", async () => {
+    routeState.params = {}
+
+    await mountPlayerView()
+
+    expect(serviceMocks.prefetchMoviePlayback).not.toHaveBeenCalled()
   })
 })
