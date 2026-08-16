@@ -92,7 +92,7 @@ function onSeek(cluster: FrameMarkerCluster) {
     >
       <span
         class="block rounded-full bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.55)] group-hover:bg-primary/85"
-        :class="cluster.items.length > 1 ? 'h-3 w-[5px]' : 'h-[11px] w-[3px]'"
+        :class="cluster.items.length > 1 ? 'h-3 w-[3px]' : 'h-[11px] w-[2px]'"
       />
       <span
         v-if="cluster.items.length > 1"
