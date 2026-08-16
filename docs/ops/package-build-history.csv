@@ -412,3 +412,20 @@ b099c92a fix: preserve completed GIF clip state
 6943a999 feat: improve curated frame capture feedback
 cf93e6d3 feat: add watermarked curated frame export
 f6b3a9f9 chore(release): prepare 1.4.13 package",versionSource=auto-patch; BuildStamp=20260808.190310; portable=versionSource=explicit; installer=versionSource=explicit
+2026-08-16,1.5.2,aaefd417,master,release:publish,release/manifest/release.json,失败,wujiahui,"aaefd417 docs: sync project facts after tonight library and scrape work
+6a78f1e9 docs: keep README short and move the handbook to docs/guide
+525f158c fix: hide empty continue-watching row and show more titles
+0a53deb1 feat: allow AND multi-tag filtering for curated frames
+5ef1b9f8 feat: add library facet pickers and retire the tags browse page
+53cb659e feat: auto-scrape missing actor profiles in the background
+7470bd7f chore: rename Curated brand icons to kebab-case roles
+6f78bc4d docs: record scrape, message-center, and library-filter requirements
+2bb7bbe3 fix: match header theme toggle to message icon size
+2826efce feat: show scraped metadata provider on movie details
+6cc9b4a7 feat: strengthen library filters with chips and richer conditions
+bcd77839 feat: add policy-driven message center with Now and needs-you
+edbe7f7c feat: share scrape slots and skip duplicate movie scrapes
+5d6129ca fix: run GIF clip capture through executil
+5ee801c6 chore(release): publish Curated 1.5.1
+e293c1d2 feat: streamline media capture and library navigation",versionSource=auto-patch; BuildStamp=20260815.195953; error=pnpm typecheck failed with exit code 2
+2026-08-16,1.5.2,6fb6119d,master,release:publish,release/portable/Curated-1.5.2-windows-x64.zip; release/installer/Curated-Setup-1.5.2.exe; release/manifest/release.json,成功,wujiahui,6fb6119d fix: unblock production typecheck for library and message tests,versionSource=auto-patch; BuildStamp=20260815.200138; portable=versionSource=explicit; installer=versionSource=explicit
