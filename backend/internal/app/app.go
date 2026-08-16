@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -2645,7 +2646,7 @@ func (a *App) resolvePlaybackMediaInfo(ctx context.Context, location string) pla
 		return playback.MediaInfo{}
 	}
 
-	mediaInfo, err := playback.ProbeMediaInfo(ctx, location, a.cfg.Player.FFmpegCommand)
+	mediaInfo, err := a.probeMediaInfoWithPersistentCache(ctx, location)
 	if err != nil {
 		if a.logger != nil {
 			a.logger.Debug("playback media probe failed", zap.Error(err), zap.String("location", location))
@@ -2653,6 +2654,50 @@ func (a *App) resolvePlaybackMediaInfo(ctx context.Context, location string) pla
 		return playback.MediaInfo{}
 	}
 	return mediaInfo
+}
+
+// probeMediaInfoWithPersistentCache layers the SQLite probe cache under the
+// in-memory one inside playback.ProbeMediaInfo, so a backend restart does not
+// re-run ffprobe for every movie's first playback descriptor request.
+func (a *App) probeMediaInfoWithPersistentCache(ctx context.Context, location string) (playback.MediaInfo, error) {
+	cleanPath := filepath.Clean(location)
+	info, err := os.Stat(location)
+	if err != nil {
+		return playback.MediaInfo{}, err
+	}
+
+	if a.store != nil {
+		cached, cacheErr := a.store.GetMediaProbeCache(ctx, cleanPath)
+		if cacheErr == nil && cached != nil &&
+			cached.SizeBytes == info.Size() && cached.MtimeUnixNs == info.ModTime().UnixNano() {
+			return playback.MediaInfo{
+				Container:   cached.Container,
+				VideoCodec:  cached.VideoCodec,
+				AudioCodec:  cached.AudioCodec,
+				DurationSec: cached.DurationSec,
+			}, nil
+		}
+	}
+
+	mediaInfo, err := playback.ProbeMediaInfo(ctx, location, a.cfg.Player.FFmpegCommand)
+	if err != nil {
+		return playback.MediaInfo{}, err
+	}
+
+	if a.store != nil {
+		// Best effort: cache freshness is guarded by size+modtime, so a failed
+		// write only costs the next request one ffprobe run.
+		_ = a.store.UpsertMediaProbeCache(ctx, storage.MediaProbeCacheRow{
+			Path:        cleanPath,
+			SizeBytes:   info.Size(),
+			MtimeUnixNs: info.ModTime().UnixNano(),
+			Container:   mediaInfo.Container,
+			VideoCodec:  mediaInfo.VideoCodec,
+			AudioCodec:  mediaInfo.AudioCodec,
+			DurationSec: mediaInfo.DurationSec,
+		})
+	}
+	return mediaInfo, nil
 }
 
 func resolveDirectPlaybackMimeType(fileName string) (mimeType string, canDirectPlay bool) {
