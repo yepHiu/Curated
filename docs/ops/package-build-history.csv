@@ -429,3 +429,26 @@ edbe7f7c feat: share scrape slots and skip duplicate movie scrapes
 5ee801c6 chore(release): publish Curated 1.5.1
 e293c1d2 feat: streamline media capture and library navigation",versionSource=auto-patch; BuildStamp=20260815.195953; error=pnpm typecheck failed with exit code 2
 2026-08-16,1.5.2,6fb6119d,master,release:publish,release/portable/Curated-1.5.2-windows-x64.zip; release/installer/Curated-Setup-1.5.2.exe; release/manifest/release.json,成功,wujiahui,6fb6119d fix: unblock production typecheck for library and message tests,versionSource=auto-patch; BuildStamp=20260815.200138; portable=versionSource=explicit; installer=versionSource=explicit
+2026-08-17,1.5.3,e8309dd1,master,release:publish,release/portable/Curated-1.5.3-windows-x64.zip; release/installer/Curated-Setup-1.5.3.exe; release/manifest/release.json,成功,wujiahui,"e8309dd1 chore(release): record Curated 1.5.2 package
+ee3a905c feat: show paired primary triangles over the progress bar on hover
+03a5d112 fix: hide slider thumb on player progress bar
+dd21af3e docs: note narrower marker tick widths in frame marker docs
+5cfa2804 fix: narrow frame marker tick lines
+c54f2bac docs: reflect plain-text cluster count styling in frame marker docs
+e1666c6d fix: render dense frame marker count as plain primary text
+2f3d0240 docs: align frame marker badge placement with below-track design
+d6242d46 fix: hang dense frame count badge below the progress track
+29b4972f docs: sync playback performance changes across project facts and API docs
+4a1571cc fix: keep locked startup free of playback prefetch requests
+d1231da6 perf: skip no-op active playback session publishes
+03a43111 perf: negotiate direct play with browser codec capability
+ffda5c72 perf: cut serial requests before first player frame
+62ac909d perf: add size+modtime ETag to direct movie stream
+e099d1c1 perf: persist media probe results across restarts
+6c1e4646 docs: sync player frame markers feature facts and plan status
+48f8aa40 feat: mark curated frames on player progress bar
+9469751b perf: probe hardware encoder capability before session start
+4436cba5 feat: add player progress frame marker overlay component
+51b31c9a perf: pace ffmpeg session input at 2.5x realtime
+8aadc8bc perf: keyframe-aligned remux for mid-stream HLS starts
+806df1d8 feat: add pure clustering util for player frame markers",versionSource=auto-patch; BuildStamp=20260816.162419; portable=versionSource=explicit; installer=versionSource=explicit
