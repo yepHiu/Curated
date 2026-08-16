@@ -1062,6 +1062,7 @@ Body：
 
 - 支持 `GET` 和 `HEAD`。
 - 支持 Range，由 `http.ServeContent` 处理。
+- 响应携带基于 `size+mtime` 的强 `ETag`，支持 `If-None-Match` / `If-Range` 再验证。
 - 客户端通常不应直接拼接该 URL，而是先调用 `/playback` 获取 descriptor。
 
 #### `GET /api/library/movies/{movieId}/asset/{kind}`
@@ -1456,6 +1457,8 @@ Query：
 
 用途：获取播放描述，客户端应以此作为播放入口。
 
+可选 query：`clientVideoCodecs=h264,hevc`——逗号分隔的浏览器可解码 mp4 家族视频编码（`h264` / `hevc` / `av1`，别名 `avc1`、`hvc1`/`hev1` 会归一化）。提供时后端只在该集合内判定 mp4/mov 直放（未知编码视为不支持并走 HLS），未提供时保持静态白名单。Webm/Ogg 不受该参数影响。
+
 成功：`200 PlaybackDescriptorDTO`
 
 ```json
@@ -1483,7 +1486,7 @@ Query：
 | `url` | 播放 URL，可能是相对路径 |
 | `mimeType` | 媒体类型 |
 | `transcodeProfile` | 转码档位 |
-| `startPositionSec` | 请求创建会话时的起播点 |
+| `startPositionSec` | 会话媒体时间轴的实际起点；remux 会话为对齐到的关键帧时间，客户端应结合 `resumePositionSec` 做本地微调 |
 | `resumePositionSec` | 已保存续播点 |
 | `canDirectPlay` | 是否支持直放 |
 | `reasonCode` / `reasonMessage` | 模式选择诊断 |

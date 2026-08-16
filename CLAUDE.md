@@ -241,7 +241,7 @@ PUT    /api/library/saved-views/order       # Transactionally replace the comple
 PATCH  /api/library/saved-views/{id}        # Rename and/or replace canonical filters
 DELETE /api/library/saved-views/{id}        # Delete only the view definition
 GET    /api/library/movies/{id}             # Get movie detail
-GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam)
+GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam); optional `clientVideoCodecs=h264,hevc,av1` query narrows mp4-family direct play to browser-reported codecs
 POST   /api/library/movies/{id}/playback-session  # Create explicit playback session (for example HLS stream push)
 GET    /api/playback/sessions/recent        # List active + recently archived playback sessions for diagnostics
 GET    /api/playback/sessions/{id}          # Get playback session status snapshot

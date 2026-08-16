@@ -89,6 +89,15 @@ alwaysApply: true
 - Playback descriptors now carry structured decision diagnostics in addition to `mode`: `sessionKind`, `reasonCode`, `reasonMessage`, `sourceContainer`, `sourceVideoCodec`, `sourceAudioCodec`.
 - Playback planning is no longer extension-only. Backend resolution now probes media metadata first, then chooses between `direct-file`, `remux-hls`, and `transcode-hls`.
 - HLS session startup is now remux-first when the source is already HLS-friendly (`h264` video + compatible audio), with automatic fallback to hardware/software transcode profiles if stream-copy startup fails.
+- **2026-08 播放性能优化（当前行为）**：
+  - **中段 remux**：续播 / 窗口外 seek 现在优先走 stream-copy remux——`ffprobe -read_intervals` 探测目标位置之前最后一个视频关键帧（`backend/internal/playback/keyframe_probe.go`，30 秒窗口），会话从关键帧起播，`descriptor.startPositionSec` = 关键帧时间、`resumePositionSec` = 请求位置，前端在 `loadedmetadata` 时本地微调差值；探测不到关键帧才回退精确转码链。
+  - **输入节流**：所有 FFmpeg 会话带 `-readrate 2.5`（覆盖 2x 倍速上限），CPU 与磁盘写入摊到观看期，不再全速跑完整片。
+  - **编码器能力预探测**：Manager 创建时后台预热、会话启动时最长等 2 秒——`ffmpeg -encoders` 列表 + lavfi 微型测试编码（`backend/internal/playback/encoder_probe.go`）按 ffmpeg 命令缓存，不可用编码器直接从 profile 链移除；探测未知时保留原 try-and-fail 链。
+  - **probe 持久化**：migration **`0038_media_probe_cache.sql`**（表 `media_probe_cache`，path 主键 + size/mtime 守卫）跨重启复用 ffprobe 结果；内存 `sync.Map` 仍是 L1。
+  - **直连 stream ETag**：`/stream` 响应携带 `size+mtime` 强 ETag，支持 `If-None-Match`/`If-Range`。
+  - **客户端能力协商**：`GET /playback?clientVideoCodecs=h264,hevc`（前端 `src/lib/playback-capabilities.ts` 每个 tab 会话 `canPlayType` 探测一次）收窄 mp4 家族直放判定；浏览器不能解码 HEVC/AV1 时直接给 HLS，不再依赖 decode-error 回退。
+  - **前端冷启动**：`ensureMovieCached` 先打单条详情接口、全库列表加载仅作兜底；`PlayerView` 挂载即 `prefetchMoviePlayback`（consume-once、10s TTL、失败即弃），描述符 GET（含 HLS 会话启动）与影片 hydrate 并行。注意预取挂在 PlayerView（守卫通过后才加载）而非 router，避免锁定启动触碰受保护端点。
+  - **侧栏会话节流**：`updateActivePlaybackSession` 对 movie/status/duration 不变且位置移动 < 0.75s 的发布直接跳过。
 - HLS session governance now includes an idle-session janitor plus diagnostics routes: `GET /api/playback/sessions/recent` and `GET /api/playback/sessions/{id}`. The manager keeps active sessions and a bounded in-memory archive of recently closed or expired sessions so those endpoints remain useful after cleanup.
 - The current in-page HLS browser path loads the npm-bundled official `hls.js/light` build on demand when native HLS is unavailable. Curated currently serves a single local rendition and uses the light build's MSE/XHR/event/level APIs; subtitle, EME/DRM, alternate-audio, and CMCD controllers from the full build are not required. Packaged desktop builds also import Outfit from `@fontsource/outfit`, so the shell no longer depends on Google Fonts or a CDN HLS script at runtime.
 - `GET/PATCH /api/settings` now includes playback runtime preferences such as `nativePlayerEnabled`, `nativePlayerCommand`, `streamPushEnabled`, `ffmpegCommand`, `preferNativePlayer`, `seekForwardStepSec`, and `seekBackwardStepSec`, update/autostart flags such as `autoDownloadUpdates` and `launchAtLogin`, plus `launchAtLoginSupported`.
