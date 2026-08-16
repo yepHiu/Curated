@@ -1254,6 +1254,23 @@ function startOptimisticSeek(
   isPlaybackWaiting.value = options.enterWaitingState === true
 }
 
+/** 悬停进度条时的指针位置（0–1），驱动轨道上下的一对主题色三角指示 */
+const progressHoverRatio = ref<number | null>(null)
+
+function onProgressHoverMove(event: MouseEvent) {
+  const root = progressSliderRootRef.value
+  if (!root || !(totalDurationSec.value > 0)) return
+  const rect = root.getBoundingClientRect()
+  if (!(rect.width > 0)) return
+  const ratio = (event.clientX - rect.left) / rect.width
+  if (!Number.isFinite(ratio)) return
+  progressHoverRatio.value = Math.min(1, Math.max(0, ratio))
+}
+
+function onProgressHoverLeave() {
+  progressHoverRatio.value = null
+}
+
 function onProgressSliderInput(values?: number[]) {
   const next = normalizeProgressTargetSec(values?.[0] ?? 0)
   isScrubbingProgress.value = true
@@ -2745,7 +2762,12 @@ const videoPreloadMode = computed(() =>
             <span>{{ totalDurationSec > 0 ? formatClock(totalDurationSec) : "\u2014" }}</span>
           </div>
 
-          <div ref="progressSliderRootRef" class="relative">
+          <div
+            ref="progressSliderRootRef"
+            class="relative"
+            @mousemove="onProgressHoverMove"
+            @mouseleave="onProgressHoverLeave"
+          >
             <Slider
               :model-value="progressSliderValue"
               :max="Math.max(totalDurationSec, 0.25)"
@@ -2774,6 +2796,21 @@ const videoPreloadMode = computed(() =>
               :duration-sec="totalDurationSec"
               @seek="onFrameMarkerSeek"
             />
+
+            <div
+              v-if="progressHoverRatio != null"
+              data-slot="player-progress-hover-indicator"
+              class="pointer-events-none absolute top-1/2 z-[13] h-0 -translate-x-1/2"
+              :style="{ left: `${progressHoverRatio * 100}%` }"
+              aria-hidden="true"
+            >
+              <span
+                class="absolute bottom-[4px] left-1/2 -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-primary"
+              />
+              <span
+                class="absolute top-[4px] left-1/2 -translate-x-1/2 border-x-[5px] border-b-[6px] border-x-transparent border-b-primary"
+              />
+            </div>
           </div>
 
           <p
