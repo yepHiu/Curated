@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
@@ -7,8 +7,6 @@ import {
   Bookmark,
   Building2,
   Check,
-  ChevronDown,
-  ChevronUp,
   Filter,
   LoaderCircle,
   Pencil,
@@ -92,10 +90,13 @@ const router = useRouter()
 const libraryService = useLibraryService()
 
 const busy = ref(false)
-const editDialogOpen = ref(false)
+const savedViewsMenuOpen = ref(false)
+const createPanelOpen = ref(false)
+const createNameDraft = ref("")
+const createNameInputRef = ref<{ $el?: HTMLElement } | null>(null)
+const renameDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
-const editMode = ref<"create" | "rename">("create")
-const editTarget = ref<SavedViewDTO | null>(null)
+const renameTarget = ref<SavedViewDTO | null>(null)
 const deleteTarget = ref<SavedViewDTO | null>(null)
 const nameDraft = ref("")
 
@@ -482,34 +483,61 @@ const activeFilterChips = computed(() => {
   return chips
 })
 
-function openCreateDialog() {
-  editMode.value = "create"
-  editTarget.value = null
-  nameDraft.value = ""
-  editDialogOpen.value = true
+function focusCreateNameInput() {
+  const input = createNameInputRef.value?.$el
+  if (input instanceof HTMLInputElement) {
+    input.focus()
+    input.select()
+  }
 }
+
+function onCreatePanelOpenAutoFocus(event: Event) {
+  event.preventDefault()
+  void nextTick(() => {
+    focusCreateNameInput()
+  })
+}
+
+watch(createPanelOpen, (open) => {
+  if (!open) return
+  createNameDraft.value = ""
+  void nextTick(() => {
+    focusCreateNameInput()
+  })
+})
 
 function openRenameDialog(item: SavedViewDTO) {
-  editMode.value = "rename"
-  editTarget.value = item
+  renameTarget.value = item
   nameDraft.value = item.name
-  editDialogOpen.value = true
+  renameDialogOpen.value = true
 }
 
-async function submitEdit() {
-  if (!nameDraft.value.trim() || busy.value) {
+async function submitCreate() {
+  if (!createNameDraft.value.trim() || busy.value) {
     return
   }
   busy.value = true
   try {
-    if (editMode.value === "create") {
-      await libraryService.createSavedView(nameDraft.value, currentFilters.value)
-      pushAppToast(t("library.savedViewCreated"), { variant: "success" })
-    } else if (editTarget.value) {
-      await libraryService.updateSavedView(editTarget.value.id, { name: nameDraft.value })
-      pushAppToast(t("library.savedViewRenamed"), { variant: "success" })
-    }
-    editDialogOpen.value = false
+    await libraryService.createSavedView(createNameDraft.value, currentFilters.value)
+    pushAppToast(t("library.savedViewCreated"), { variant: "success" })
+    createPanelOpen.value = false
+    savedViewsMenuOpen.value = false
+  } catch (error) {
+    pushAppToast(errorMessage(error), { variant: "destructive" })
+  } finally {
+    busy.value = false
+  }
+}
+
+async function submitRename() {
+  if (!renameTarget.value || !nameDraft.value.trim() || busy.value) {
+    return
+  }
+  busy.value = true
+  try {
+    await libraryService.updateSavedView(renameTarget.value.id, { name: nameDraft.value })
+    pushAppToast(t("library.savedViewRenamed"), { variant: "success" })
+    renameDialogOpen.value = false
   } catch (error) {
     pushAppToast(errorMessage(error), { variant: "destructive" })
   } finally {
@@ -518,7 +546,12 @@ async function submitEdit() {
 }
 
 async function applySavedView(item: SavedViewDTO) {
+  savedViewsMenuOpen.value = false
   await router.push(buildSavedViewRouteTarget(item.filters))
+}
+
+function onSavedViewDoubleClick(item: SavedViewDTO) {
+  void applySavedView(item)
 }
 
 async function updateSavedViewFilters(item: SavedViewDTO) {
@@ -527,24 +560,6 @@ async function updateSavedViewFilters(item: SavedViewDTO) {
   try {
     await libraryService.updateSavedView(item.id, { filters: currentFilters.value })
     pushAppToast(t("library.savedViewUpdated"), { variant: "success" })
-  } catch (error) {
-    pushAppToast(errorMessage(error), { variant: "destructive" })
-  } finally {
-    busy.value = false
-  }
-}
-
-async function moveSavedView(item: SavedViewDTO, direction: -1 | 1) {
-  const index = savedViews.value.findIndex((candidate) => candidate.id === item.id)
-  const target = index + direction
-  if (index < 0 || target < 0 || target >= savedViews.value.length || busy.value) {
-    return
-  }
-  const ids = savedViews.value.map((candidate) => candidate.id)
-  ;[ids[index], ids[target]] = [ids[target]!, ids[index]!]
-  busy.value = true
-  try {
-    await libraryService.reorderSavedViews(ids)
   } catch (error) {
     pushAppToast(errorMessage(error), { variant: "destructive" })
   } finally {
@@ -964,7 +979,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
       </DropdownMenuContent>
     </DropdownMenu>
 
-    <DropdownMenu>
+    <DropdownMenu v-model:open="savedViewsMenuOpen">
       <DropdownMenuTrigger as-child>
         <Button
           type="button"
@@ -983,18 +998,62 @@ function filterSummary(filters: SavedViewFiltersV1): string {
         data-library-saved-views-menu
       >
         <DropdownMenuGroup>
-          <DropdownMenuItem :disabled="savedViews.length >= 50 || busy" @click="openCreateDialog">
-            <Save aria-hidden="true" />
-            {{ t("library.savedViewSaveCurrent") }}
-          </DropdownMenuItem>
+          <DropdownMenuSub v-model:open="createPanelOpen">
+            <DropdownMenuSubTrigger
+              :disabled="savedViews.length >= 50 || busy"
+              data-library-saved-view-create-trigger
+            >
+              <Save aria-hidden="true" />
+              <span class="min-w-0 flex-1 whitespace-normal text-left leading-snug">
+                {{ t("library.savedViewSaveCurrent") }}
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              class="w-64 overflow-visible rounded-2xl border-border/70 p-3"
+              data-library-saved-view-create-panel
+              :align-offset="-4"
+              :align-flip="false"
+              @openAutoFocus="onCreatePanelOpenAutoFocus"
+            >
+              <form class="flex flex-col gap-3" @submit.prevent="submitCreate" @keydown.stop>
+                <label class="flex flex-col gap-2 text-sm font-medium text-foreground">
+                  {{ t("library.savedViewName") }}
+                  <Input
+                    ref="createNameInputRef"
+                    v-model="createNameDraft"
+                    maxlength="40"
+                    autocomplete="off"
+                    data-library-saved-view-create-name
+                    :placeholder="t('library.savedViewNamePlaceholder')"
+                    :disabled="busy"
+                    @pointerdown.stop
+                  />
+                </label>
+                <div class="flex justify-end">
+                  <Button
+                    type="submit"
+                    class="min-h-8 rounded-full px-4"
+                    :disabled="busy || !createNameDraft.trim()"
+                    @click="submitCreate"
+                  >
+                    <LoaderCircle v-if="busy" data-icon="inline-start" class="animate-spin" aria-hidden="true" />
+                    {{ t("library.savedViewSave") }}
+                  </Button>
+                </div>
+              </form>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuLabel v-if="savedViews.length === 0" class="font-normal text-muted-foreground">
           {{ t("library.savedViewEmpty") }}
         </DropdownMenuLabel>
         <DropdownMenuGroup v-else>
-          <DropdownMenuSub v-for="(item, index) in savedViews" :key="item.id">
-            <DropdownMenuSubTrigger>
+          <DropdownMenuSub v-for="item in savedViews" :key="item.id">
+            <DropdownMenuSubTrigger
+              :data-library-saved-view-item="item.id"
+              @dblclick.prevent.stop="onSavedViewDoubleClick(item)"
+            >
               <Check v-if="activeSavedViewId === item.id" aria-hidden="true" />
               <Bookmark v-else aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
@@ -1023,17 +1082,6 @@ function filterSummary(filters: SavedViewFiltersV1): string {
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem :disabled="index === 0 || busy" @click="moveSavedView(item, -1)">
-                  <ChevronUp aria-hidden="true" />
-                  {{ t("library.savedViewMoveUp") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  :disabled="index === savedViews.length - 1 || busy"
-                  @click="moveSavedView(item, 1)"
-                >
-                  <ChevronDown aria-hidden="true" />
-                  {{ t("library.savedViewMoveDown") }}
-                </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" @click="openDeleteDialog(item)">
                   <Trash2 aria-hidden="true" />
                   {{ t("library.savedViewDelete") }}
@@ -1048,22 +1096,14 @@ function filterSummary(filters: SavedViewFiltersV1): string {
     </div>
   </div>
 
-  <Dialog v-model:open="editDialogOpen">
+  <Dialog v-model:open="renameDialogOpen">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>
-          {{
-            editMode === "create"
-              ? t("library.savedViewCreateTitle")
-              : t("library.savedViewRenameTitle")
-          }}
+          {{ t("library.savedViewRenameTitle") }}
         </DialogTitle>
         <DialogDescription class="text-pretty">
-          {{
-            editMode === "create"
-              ? t("library.savedViewCreateDescription")
-              : t("library.savedViewRenameDescription")
-          }}
+          {{ t("library.savedViewRenameDescription") }}
         </DialogDescription>
       </DialogHeader>
       <label class="flex flex-col gap-2 text-sm font-medium text-foreground">
@@ -1073,21 +1113,18 @@ function filterSummary(filters: SavedViewFiltersV1): string {
           maxlength="40"
           autocomplete="off"
           :placeholder="t('library.savedViewNamePlaceholder')"
-          @keydown.enter.prevent="submitEdit"
+          @keydown.enter.prevent="submitRename"
         />
       </label>
-      <p v-if="editMode === 'create'" class="text-xs leading-relaxed text-muted-foreground">
-        {{ filterSummary(currentFilters) }}
-      </p>
       <DialogFooter class="gap-3">
         <DialogClose as-child>
           <Button type="button" variant="outline" :disabled="busy">
             {{ t("common.cancel") }}
           </Button>
         </DialogClose>
-        <Button type="button" :disabled="busy || !nameDraft.trim()" @click="submitEdit">
+        <Button type="button" :disabled="busy || !nameDraft.trim()" @click="submitRename">
           <LoaderCircle v-if="busy" data-icon="inline-start" class="animate-spin" aria-hidden="true" />
-          {{ editMode === "create" ? t("library.savedViewSave") : t("library.savedViewRename") }}
+          {{ t("library.savedViewRename") }}
         </Button>
       </DialogFooter>
     </DialogContent>

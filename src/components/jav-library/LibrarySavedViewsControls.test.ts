@@ -121,8 +121,6 @@ function mountControls(slots?: { default?: string }) {
         Bookmark: true,
         ArrowUpDown: true,
         Check: true,
-        ChevronDown: true,
-        ChevronUp: true,
         Filter: true,
         LoaderCircle: true,
         Pencil: true,
@@ -178,9 +176,11 @@ describe("LibrarySavedViewsControls", () => {
     const wrapper = mountControls()
     await flushPromises()
     expect(serviceMock.refreshSavedViews).toHaveBeenCalledTimes(1)
+    expect(wrapper.find("[data-library-saved-view-create-panel]").exists()).toBe(true)
+    expect(wrapper.text()).toContain("library.savedViewSaveCurrent")
+    expect(wrapper.text()).not.toContain("library.savedViewCreateTitle")
 
-    await buttonByText(wrapper, "library.savedViewSaveCurrent").trigger("click")
-    await wrapper.get('input[placeholder="library.savedViewNamePlaceholder"]').setValue("Mina 4K")
+    await wrapper.get("[data-library-saved-view-create-name]").setValue("Mina 4K")
     await buttonByText(wrapper, "library.savedViewSave").trigger("click")
     await flushPromises()
 
@@ -203,6 +203,20 @@ describe("LibrarySavedViewsControls", () => {
   it("applies a Saved View by rebuilding a transient-free route target", async () => {
     const wrapper = mountControls()
     await buttonByText(wrapper, "library.savedViewApply").trigger("click")
+    await flushPromises()
+
+    expect(routerMock.push).toHaveBeenCalledWith({
+      name: "favorites",
+      query: {
+        tab: "top-rated",
+        userRating: "5",
+      },
+    })
+  })
+
+  it("applies a Saved View when its menu option is double-clicked", async () => {
+    const wrapper = mountControls()
+    await wrapper.get("[data-library-saved-view-item=view-1]").trigger("dblclick")
     await flushPromises()
 
     expect(routerMock.push).toHaveBeenCalledWith({
@@ -307,16 +321,35 @@ describe("LibrarySavedViewsControls", () => {
     )
   })
 
+  it("does not expose move up or move down actions for saved views", () => {
+    const wrapper = mountControls()
+    const text = wrapper.get("[data-library-saved-view-item-menu]").text()
+    expect(text).toContain("library.savedViewApply")
+    expect(text).toContain("library.savedViewDelete")
+    expect(text).not.toContain("library.savedViewMoveUp")
+    expect(text).not.toContain("library.savedViewMoveDown")
+  })
+
   it("uses the filter popover radius on sort and saved-view menus", () => {
     const wrapper = mountControls()
     const filterMenu = wrapper.get("[data-library-filter-menu]")
     const sortMenu = wrapper.get("[data-library-sort-menu]")
     const savedViewsMenu = wrapper.get("[data-library-saved-views-menu]")
     const savedViewItemMenu = wrapper.get("[data-library-saved-view-item-menu]")
+    const createPanel = wrapper.get("[data-library-saved-view-create-panel]")
 
     expect(filterMenu.classes()).toContain("rounded-2xl")
     expect(sortMenu.classes()).toContain("rounded-2xl")
     expect(savedViewsMenu.classes()).toContain("rounded-2xl")
     expect(savedViewItemMenu.classes()).toContain("rounded-2xl")
+    expect(createPanel.classes()).toContain("rounded-2xl")
+  })
+
+  it("keeps the save-bookmark action as a trailing capsule button", () => {
+    const wrapper = mountControls()
+    const saveButton = buttonByText(wrapper, "library.savedViewSave")
+    expect(saveButton.classes()).toEqual(expect.arrayContaining(["rounded-full", "px-4"]))
+    expect(saveButton.classes()).not.toContain("w-full")
+    expect(saveButton.element.parentElement?.classList.contains("justify-end")).toBe(true)
   })
 })

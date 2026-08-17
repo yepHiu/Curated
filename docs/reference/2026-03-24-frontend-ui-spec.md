@@ -96,6 +96,18 @@
 - 资料库路由保留一个语义 `h1`，即使视觉上下文主要由壳层搜索和筛选条承担，也不能让页面从无一级标题直接进入卡片标题。
 - 轻量回归使用 `pnpm test:e2e` 的 375×812 Chromium 用例验证横向溢出、上述触控尺寸和 overflow badge 边界；它不替代需明确同意才能运行的完整 `pnpm test:display`。
 
+### 7.2 嵌套下拉与二级菜单
+
+下拉菜单再展开另一级面板时，按两个独立浮层处理，不要贴死在触发行旁边。
+
+- 一级菜单相对触发器：`sideOffset: 4`（`DropdownMenuContent` / `PopoverContent` 默认）。
+- 二级菜单相对父菜单：`sideOffset: 8`（`DropdownMenuSubContent` 默认），避免两个 `rounded-2xl` 面板重叠。
+- 与父菜单并列的伴随面板（例如书签命名）必须与父菜单顶边对齐：父菜单 `p-1` 时使用 `align-offset: -4`，并关闭 `align-flip`。
+- 指向单个菜单项的操作子菜单仍对齐该行，但同样保持 8px 水平间距。
+- 二级短表单的主按钮为右对齐胶囊按钮（`rounded-full`），按文案宽度收缩，不要做成全宽。
+
+当前参考实现：`src/components/jav-library/LibrarySavedViewsControls.vue`。
+
 ## 8. 维护要求
 
 - 修改全局主题令牌、基础组件默认样式或关键业务组件视觉结构后，应同步更新本文件。

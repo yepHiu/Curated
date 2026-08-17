@@ -8,7 +8,13 @@ import {
 } from "reka-ui"
 import { cn } from "@/lib/utils"
 
-const props = defineProps<DropdownMenuSubContentProps & { class?: HTMLAttributes["class"] }>()
+const props = withDefaults(
+  defineProps<DropdownMenuSubContentProps & { class?: HTMLAttributes["class"] }>(),
+  {
+    /** Keep a visible gap from the parent menu so rounded panels do not overlap. */
+    sideOffset: 8,
+  },
+)
 const emits = defineEmits<DropdownMenuSubContentEmits>()
 
 const delegatedProps = reactiveOmit(props, "class")

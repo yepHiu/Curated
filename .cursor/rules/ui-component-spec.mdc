@@ -96,6 +96,18 @@ alwaysApply: false
 - `LibraryPage` 不再展示入库/发售/评分三列 Tabs；排序只走工具栏排序按钮。每个路由页面保留唯一语义 `h1`（可在视觉上 `sr-only`）。
 - `MovieCard` 标签可收缩并省略，但末尾 `+N` overflow badge 必须 `shrink-0` 且保持在卡片边界内。
 
+## 嵌套下拉 / 二级菜单（MUST）
+
+下拉菜单再向一侧展开另一级面板时（`DropdownMenuSub` / `DropdownMenuSubContent`，以及同类 Popover 二级面），必须当成**两个独立浮层**来排，而不是贴在触发行旁边的附属条。
+
+- **水平间距**：二级面板与父菜单之间使用 **`sideOffset: 8`**（`DropdownMenuSubContent` 默认值）。一级菜单相对触发按钮仍用 **`sideOffset: 4`**。禁止把二级 `sideOffset` 留在 `0`，以免两个 `rounded-2xl` 面板贴边或视觉重叠。
+- **顶对齐**：与父菜单并列的**伴随面板**（命名、筛选摘要、短表单）必须与父菜单**顶边对齐**。父菜单默认 `p-1` 时，用 **`align-offset: -4`** 抵消内边距，并设 **`align-flip: false`**，避免碰撞检测把面板改成底对齐。
+- **行对齐例外**：指向某一菜单项的操作子菜单（应用 / 重命名 / 删除）仍对齐该行；但同样遵守 8px 水平间距。
+- **禁止**：二级面板与父菜单重叠、错开顶边却没有明确的行锚点、用全宽主按钮把短表单撑成对话框。
+- **短表单主按钮**：放在面板内右下；**胶囊形**（`rounded-full`），按内容宽度收缩，**不得 `w-full`**。
+
+参考：`LibrarySavedViewsControls` 的书签菜单与「保存当前视图为书签」命名面板。
+
 ## 变更同步
 
 修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/reference/2026-03-24-frontend-ui-spec.md`** 与本文件相关条目。
