@@ -20,7 +20,6 @@ describe("PlayerPlaylistRevealTab", () => {
     expect(wrapper.emitted("enter")).toHaveLength(1)
 
     await wrapper.setProps({ visible: true })
-    expect(wrapper.get("[data-player-playlist-tab]").exists()).toBe(true)
     expect(wrapper.get("[data-player-playlist-tab]").classes()).toEqual(
       expect.arrayContaining(["h-16", "w-6"]),
     )
