@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,6 +147,18 @@ func (h *Handler) handleCreateMovieImportUpload(w http.ResponseWriter, r *http.R
 	}
 	if len(body.Files) > maxMovieImportUploadFiles {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "upload manifest contains too many files")
+		return
+	}
+	manifestTotalBytes := int64(0)
+	for _, manifest := range body.Files {
+		if manifestTotalBytes > maxMovieImportUploadTotalBytes-manifest.Size {
+			manifestTotalBytes = maxMovieImportUploadTotalBytes
+			break
+		}
+		manifestTotalBytes += manifest.Size
+	}
+	if err := ensureImportDiskSpace(targetRoot, manifestTotalBytes); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeImportNotEnoughSpace, "not enough disk space on the default import path")
 		return
 	}
 
@@ -743,6 +756,20 @@ func (s *movieImportUploadSession) dto(task contracts.TaskDTO) contracts.MovieIm
 	files := make([]contracts.MovieImportUploadFileDTO, 0, len(s.fileOrder))
 	for _, fileID := range s.fileOrder {
 		file := s.files[fileID]
+		chunks := make([]contracts.MovieImportUploadChunkDTO, 0, len(file.chunks))
+		indexes := make([]int, 0, len(file.chunks))
+		for index := range file.chunks {
+			indexes = append(indexes, index)
+		}
+		sort.Ints(indexes)
+		for _, index := range indexes {
+			uploaded := file.chunks[index]
+			chunks = append(chunks, contracts.MovieImportUploadChunkDTO{
+				Index:  int64(index),
+				Offset: uploaded.offset,
+				Size:   uploaded.size,
+			})
+		}
 		files = append(files, contracts.MovieImportUploadFileDTO{
 			FileID:        file.fileID,
 			RelativePath:  file.safeRelPath,
@@ -750,6 +777,7 @@ func (s *movieImportUploadSession) dto(task contracts.TaskDTO) contracts.MovieIm
 			BytesReceived: file.bytesReceived,
 			Complete:      file.bytesReceived == file.size,
 			State:         file.state,
+			Chunks:        chunks,
 		})
 	}
 	return contracts.MovieImportUploadDTO{

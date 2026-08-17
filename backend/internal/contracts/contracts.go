@@ -481,6 +481,32 @@ type GetTaskStatusRequest struct {
 	TaskID string `json:"taskId"`
 }
 
+// SupportedVideoExtensions lists the video container extensions recognized across
+// the whole library pipeline (directory watch, library scan, movie import).
+// Extensions are lowercase without a leading dot. Keep in sync with the frontend
+// mirror in src/components/jav-library/MovieImportDialog.vue.
+var SupportedVideoExtensions = []string{
+	"mp4", "m4v", "mkv", "avi", "mov", "wmv", "webm", "ts", "m2ts",
+	"flv", "mpeg", "mpg", "ogv", "rmvb", "iso",
+}
+
+var supportedVideoExtensionSet = func() map[string]struct{} {
+	set := make(map[string]struct{}, len(SupportedVideoExtensions))
+	for _, ext := range SupportedVideoExtensions {
+		set[ext] = struct{}{}
+	}
+	return set
+}()
+
+// IsSupportedVideoExtension reports whether ext (case-insensitive, optional
+// leading dot) is a supported video container extension.
+func IsSupportedVideoExtension(ext string) bool {
+	ext = strings.ToLower(strings.TrimSpace(ext))
+	ext = strings.TrimPrefix(ext, ".")
+	_, ok := supportedVideoExtensionSet[ext]
+	return ok
+}
+
 // ScanFileResultDTO is a per-file scan outcome (imported, updated, or skipped).
 type ScanFileResultDTO struct {
 	TaskID       string `json:"taskId"`
@@ -969,14 +995,23 @@ type CreateMovieImportUploadRequest struct {
 	Files []MovieImportUploadFileManifest `json:"files"`
 }
 
+// MovieImportUploadChunkDTO reports one persisted upload chunk range so clients
+// can resume precisely instead of re-uploading completed chunks.
+type MovieImportUploadChunkDTO struct {
+	Index  int64 `json:"index"`
+	Offset int64 `json:"offset"`
+	Size   int64 `json:"size"`
+}
+
 // MovieImportUploadFileDTO reports server-side state for one resumable import file.
 type MovieImportUploadFileDTO struct {
-	FileID        string `json:"fileId"`
-	RelativePath  string `json:"relativePath"`
-	Size          int64  `json:"size"`
-	BytesReceived int64  `json:"bytesReceived"`
-	Complete      bool   `json:"complete"`
-	State         string `json:"state,omitempty"`
+	FileID        string                       `json:"fileId"`
+	RelativePath  string                       `json:"relativePath"`
+	Size          int64                        `json:"size"`
+	BytesReceived int64                        `json:"bytesReceived"`
+	Complete      bool                         `json:"complete"`
+	State         string                       `json:"state,omitempty"`
+	Chunks        []MovieImportUploadChunkDTO `json:"chunks,omitempty"`
 }
 
 // MovieImportUploadDTO reports resumable import upload session state.

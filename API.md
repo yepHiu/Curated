@@ -1906,14 +1906,15 @@ Form fields：
 | --- | --- | --- |
 | `files` | file，重复 | 影片文件 |
 | `relativePath` | string，重复 | 可在每个文件前传入，用于保留目录相对路径 |
-| `totalBytes` | string / number | 可选，总字节数，用于进度 |
+| `totalBytes` | string / number | 可选，总字节数，用于进度与磁盘空间预检 |
 
 成功：`202 TaskDTO`
 
 约束与行为：
 
 - 必须先配置 `defaultImportLibraryPathId`。
-- 只接受视频扩展名：`.mp4`, `.m4v`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.webm`, `.ts`, `.m2ts`, `.flv`, `.mpeg`, `.mpg`, `.ogv`, `.rmvb`, `.iso`。
+- 只接受视频扩展名：`.mp4`, `.m4v`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.webm`, `.ts`, `.m2ts`, `.flv`, `.mpeg`, `.mpg`, `.ogv`, `.rmvb`, `.iso`（与目录扫描 / 监听共用同一份白名单，复制进库根的文件同样会被收录）。
+- 携带 `totalBytes` 时会先做磁盘空间预检：目标卷剩余空间不足以容纳声明总量（含安全余量）时，直接返回 `400 IMPORT_NOT_ENOUGH_SPACE`，不开始复制。
 - 后端复制文件到默认库根，不移动或删除客户端源文件。
 - 目标文件已存在则该文件失败，不覆盖。
 - 至少成功复制一个文件时会尝试启动受限扫描。
@@ -1987,7 +1988,9 @@ Body：
 
 - 默认 chunk size：32 MiB。
 - manifest 请求体上限为 2 MiB，最多 10,000 个文件；未知字段、尾随 JSON、重复目标路径、空文件和总大小溢出都会返回 `400 COMMON_BAD_REQUEST`。
+- 创建会话前会做磁盘空间预检：目标卷剩余空间不足以容纳 manifest 总量（含安全余量）时，返回 `400 IMPORT_NOT_ENOUGH_SPACE`，不创建暂存文件。
 - migration `0029_movie_import_upload_sessions.sql` 把 session、文件、已接收 chunk 范围和清理审计持久化到 SQLite。活跃会话使用 24 小时滑动有效期，每个成功分片会续期。
+- `GET` 会话状态与每次 `PUT` 分片的响应中，每个文件带 `chunks` 数组（`index` / `offset` / `size`），列出服务端已持久化的分片范围；续传客户端可据此精确跳过已上传分片。
 - staging 目录：`<target-library-root>/.curated-import/<uploadId>/`。
 - 后端启动时会从 SQLite 恢复 `uploading` / `committing` 会话及原 task ID，并以 chunk 范围账本重新推导字节计数；不会把预分配文件长度当成已上传字节。
 - `recoveryStatus` 为 `ready`、`unavailable` 或 `unrecoverable`。目标盘暂时离线时返回 `unavailable` 并保留会话；盘符恢复后，后续 GET、PUT 或 commit 会重新协调。`recoveryError` 仅在需要诊断时出现。
@@ -3047,6 +3050,8 @@ interface MovieImportUploadDTO {
     size: number
     bytesReceived: number
     complete: boolean
+    // 服务端已持久化的分片范围，按 index 升序；供续传客户端跳过已上传分片
+    chunks?: Array<{ index: number; offset: number; size: number }>
   }>
   task: TaskDTO
 }

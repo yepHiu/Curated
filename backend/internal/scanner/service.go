@@ -30,17 +30,16 @@ type Hooks struct {
 	OnFileDetected func(result contracts.ScanFileResultDTO) error
 }
 
-// NewService creates a scanner that recognizes common container extensions (mp4, mkv, avi, mov, ts).
+// NewService creates a scanner that recognizes the shared video container
+// extension whitelist (contracts.SupportedVideoExtensions).
 func NewService(logger *zap.Logger) *Service {
+	extensions := make(map[string]struct{}, len(contracts.SupportedVideoExtensions))
+	for _, ext := range contracts.SupportedVideoExtensions {
+		extensions[ext] = struct{}{}
+	}
 	return &Service{
-		logger: logger,
-		extensions: map[string]struct{}{
-			"mp4": {},
-			"mkv": {},
-			"avi": {},
-			"mov": {},
-			"ts":  {},
-		},
+		logger:     logger,
+		extensions: extensions,
 	}
 }
 

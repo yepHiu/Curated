@@ -1,10 +1,11 @@
 //go:build !windows
 
-package backup
+package diskutil
 
 import "golang.org/x/sys/unix"
 
-func availableDiskBytes(path string) (uint64, error) {
+// AvailableDiskBytes reports free bytes available to unprivileged users via statfs.
+func AvailableDiskBytes(path string) (uint64, error) {
 	var stat unix.Statfs_t
 	if err := unix.Statfs(path, &stat); err != nil {
 		return 0, err

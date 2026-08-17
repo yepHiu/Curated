@@ -60,3 +60,26 @@ func TestWatcherCreateDirectorySchedulesScan(t *testing.T) {
 		t.Fatal("timed out waiting for directory create to enqueue a scan")
 	}
 }
+
+func TestIsVideoPathUsesSharedWhitelist(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{filepath.Join("library", "ABC-123.mp4"), true},
+		{filepath.Join("library", "ABC-123.rmvb"), true},
+		{filepath.Join("library", "ABC-123.wmv"), true},
+		{filepath.Join("library", "ABC-123.iso"), true},
+		{filepath.Join("library", "ABC-123.m2ts"), true},
+		{filepath.Join("library", "video.part"), false},
+		{filepath.Join("library", "still-copying.mp4.tmp"), false},
+		{filepath.Join("library", ".ABC-123.mp4"), false},
+		{filepath.Join("library", "ABC-123.mp4~"), false},
+		{filepath.Join("library", "notes.txt"), false},
+	}
+	for _, tc := range cases {
+		if got := isVideoPath(tc.path); got != tc.want {
+			t.Fatalf("isVideoPath(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}

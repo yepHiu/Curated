@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"go.uber.org/zap"
@@ -69,6 +70,28 @@ func multipartMoviesBody(t *testing.T, files map[string]string) (*bytes.Buffer, 
 	t.Helper()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
+	for name, content := range files {
+		part, err := writer.CreateFormFile("files", name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(part, content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return body, writer.FormDataContentType()
+}
+
+func multipartMoviesBodyWithTotalBytes(t *testing.T, files map[string]string, totalBytes int64) (*bytes.Buffer, string) {
+	t.Helper()
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("totalBytes", strconv.FormatInt(totalBytes, 10)); err != nil {
+		t.Fatal(err)
+	}
 	for name, content := range files {
 		part, err := writer.CreateFormFile("files", name)
 		if err != nil {
@@ -621,5 +644,275 @@ func TestImportLocalMoviesRouteNotRegistered(t *testing.T) {
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status = %d body=%s, want 404", rr.Code, rr.Body.String())
+	}
+}
+
+func TestHandleImportMovies_RejectsImportBeyondAvailableDiskSpace(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store := newImportTestStore(t, root)
+	libRoot := filepath.Join(root, "library")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path, err := store.AddLibraryPath(context.Background(), libRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scans := &recordingScanStarter{}
+	h := NewHandler(Deps{
+		Cfg:                         config.Config{},
+		Logger:                      zap.NewNop(),
+		Store:                       store,
+		Tasks:                       tasks.NewManager(),
+		ScanStarter:                 scans,
+		DefaultImportLibraryPathCtl: &stubDefaultImportLibraryPathCtl{id: path.ID},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body, contentType := multipartMoviesBodyWithTotalBytes(t, map[string]string{"IMP-BIG.mp4": "x"}, int64(1)<<62)
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/import/movies", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s, want 400", resp.StatusCode, string(b))
+	}
+	var appErr contracts.AppError
+	if err := json.NewDecoder(resp.Body).Decode(&appErr); err != nil {
+		t.Fatal(err)
+	}
+	if appErr.Code != contracts.ErrorCodeImportNotEnoughSpace {
+		t.Fatalf("error code = %q, want %q", appErr.Code, contracts.ErrorCodeImportNotEnoughSpace)
+	}
+	if _, err := os.Stat(filepath.Join(libRoot, "IMP-BIG.mp4")); !os.IsNotExist(err) {
+		t.Fatalf("file should not be copied, stat err = %v", err)
+	}
+	if len(scans.paths) != 0 {
+		t.Fatalf("scan should not start, paths = %#v", scans.paths)
+	}
+}
+
+func TestHandleImportMovies_CopiesUnifiedWhitelistExtension(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store := newImportTestStore(t, root)
+	libRoot := filepath.Join(root, "library")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path, err := store.AddLibraryPath(context.Background(), libRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scans := &recordingScanStarter{}
+	h := NewHandler(Deps{
+		Cfg:                         config.Config{},
+		Logger:                      zap.NewNop(),
+		Store:                       store,
+		Tasks:                       tasks.NewManager(),
+		ScanStarter:                 scans,
+		DefaultImportLibraryPathCtl: &stubDefaultImportLibraryPathCtl{id: path.ID},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	body, contentType := multipartMoviesBody(t, map[string]string{"IMP-009.rmvb": "fake-rmvb"})
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/import/movies", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s, want 202", resp.StatusCode, string(b))
+	}
+	var task contracts.TaskDTO
+	if err := json.NewDecoder(resp.Body).Decode(&task); err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != contracts.TaskCompleted {
+		t.Fatalf("task status = %q, want completed", task.Status)
+	}
+	if _, err := os.Stat(filepath.Join(libRoot, "IMP-009.rmvb")); err != nil {
+		t.Fatalf("unified whitelist extension not copied: %v", err)
+	}
+	if len(scans.paths) != 1 {
+		t.Fatalf("scan paths = %#v, want one scan", scans.paths)
+	}
+}
+
+func TestHandleImportMovieUploadSession_RejectsManifestBeyondAvailableDiskSpace(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store := newImportTestStore(t, root)
+	libRoot := filepath.Join(root, "library")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path, err := store.AddLibraryPath(context.Background(), libRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(Deps{
+		Cfg:                         config.Config{},
+		Logger:                      zap.NewNop(),
+		Store:                       store,
+		Tasks:                       tasks.NewManager(),
+		ScanStarter:                 &recordingScanStarter{},
+		DefaultImportLibraryPathCtl: &stubDefaultImportLibraryPathCtl{id: path.ID},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	createBody := bytes.NewBufferString(`{"files":[{"relativePath":"IMP-BIG.mp4","size":4611686018427387904,"lastModified":1234}]}`)
+	createReq, err := http.NewRequest(http.MethodPost, srv.URL+"/api/import/movies/uploads", createBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp.Body.Close()
+	if createResp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(createResp.Body)
+		t.Fatalf("create status = %d body=%s, want 400", createResp.StatusCode, string(b))
+	}
+	var appErr contracts.AppError
+	if err := json.NewDecoder(createResp.Body).Decode(&appErr); err != nil {
+		t.Fatal(err)
+	}
+	if appErr.Code != contracts.ErrorCodeImportNotEnoughSpace {
+		t.Fatalf("error code = %q, want %q", appErr.Code, contracts.ErrorCodeImportNotEnoughSpace)
+	}
+	if _, err := os.Stat(filepath.Join(libRoot, ".curated-import")); !os.IsNotExist(err) {
+		t.Fatalf("staging dir should not be created, stat err = %v", err)
+	}
+}
+
+func TestHandleImportMovieUploadSession_ExposesChunkRangesForResume(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	store := newImportTestStore(t, root)
+	libRoot := filepath.Join(root, "library")
+	if err := os.MkdirAll(libRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path, err := store.AddLibraryPath(context.Background(), libRoot, "library")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(Deps{
+		Cfg:                         config.Config{},
+		Logger:                      zap.NewNop(),
+		Store:                       store,
+		Tasks:                       tasks.NewManager(),
+		ScanStarter:                 &recordingScanStarter{},
+		DefaultImportLibraryPathCtl: &stubDefaultImportLibraryPathCtl{id: path.ID},
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	createBody := bytes.NewBufferString(`{"files":[{"relativePath":"IMP-CHUNKS.mp4","size":24,"lastModified":1234}]}`)
+	createReq, err := http.NewRequest(http.MethodPost, srv.URL+"/api/import/movies/uploads", createBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := http.DefaultClient.Do(createReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer createResp.Body.Close()
+	if createResp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(createResp.Body)
+		t.Fatalf("create status = %d body=%s, want 201", createResp.StatusCode, string(b))
+	}
+	var created struct {
+		UploadID string `json:"uploadId"`
+		Files    []struct {
+			FileID string `json:"fileId"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(createResp.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	putChunk := func(chunkIndex, offset int, payload string) {
+		t.Helper()
+		chunkReq, err := http.NewRequest(
+			http.MethodPut,
+			srv.URL+"/api/import/movies/uploads/"+created.UploadID+"/files/"+created.Files[0].FileID+"/chunks/"+strconv.Itoa(chunkIndex),
+			bytes.NewBufferString(payload),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		chunkReq.Header.Set("Content-Type", "application/octet-stream")
+		chunkReq.Header.Set("X-Curated-Offset", strconv.Itoa(offset))
+		chunkReq.Header.Set("X-Curated-Chunk-Size", strconv.Itoa(len(payload)))
+		chunkResp, err := http.DefaultClient.Do(chunkReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer chunkResp.Body.Close()
+		if chunkResp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(chunkResp.Body)
+			t.Fatalf("chunk %d status = %d body=%s, want 200", chunkIndex, chunkResp.StatusCode, string(b))
+		}
+	}
+	putChunk(0, 0, "AAAAAA")
+	putChunk(2, 18, "CCCCCC")
+
+	statusResp, err := http.Get(srv.URL + "/api/import/movies/uploads/" + created.UploadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer statusResp.Body.Close()
+	if statusResp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(statusResp.Body)
+		t.Fatalf("status status = %d body=%s, want 200", statusResp.StatusCode, string(b))
+	}
+	var status struct {
+		BytesReceived int64 `json:"bytesReceived"`
+		Files         []struct {
+			BytesReceived int64 `json:"bytesReceived"`
+			Chunks        []struct {
+				Index  int64 `json:"index"`
+				Offset int64 `json:"offset"`
+				Size   int64 `json:"size"`
+			} `json:"chunks"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(statusResp.Body).Decode(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status.BytesReceived != 12 || len(status.Files) != 1 || status.Files[0].BytesReceived != 12 {
+		t.Fatalf("received bytes = %d, want 12", status.BytesReceived)
+	}
+	got := status.Files[0].Chunks
+	if len(got) != 2 {
+		t.Fatalf("chunks = %#v, want 2 entries", got)
+	}
+	if got[0].Index != 0 || got[0].Offset != 0 || got[0].Size != 6 {
+		t.Fatalf("chunks[0] = %#v, want {0,0,6}", got[0])
+	}
+	if got[1].Index != 2 || got[1].Offset != 18 || got[1].Size != 6 {
+		t.Fatalf("chunks[1] = %#v, want {2,18,6}", got[1])
 	}
 }

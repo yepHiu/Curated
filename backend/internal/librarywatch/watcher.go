@@ -13,6 +13,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"go.uber.org/zap"
+
+	"curated-backend/internal/contracts"
 )
 
 // PathLister returns current library root paths (absolute).
@@ -45,10 +47,6 @@ type Watcher struct {
 	debounceMu    sync.Mutex
 	debounceTimer *time.Timer
 	pendingRoots  map[string]struct{}
-}
-
-var videoExtensions = map[string]struct{}{
-	"mp4": {}, "mkv": {}, "avi": {}, "mov": {}, "ts": {},
 }
 
 // New builds a watcher (does not start I/O until Run).
@@ -360,10 +358,5 @@ func isVideoPath(p string) bool {
 	if strings.HasPrefix(base, ".") || strings.HasSuffix(base, "~") {
 		return false
 	}
-	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(base)), ".")
-	if ext == "" {
-		return false
-	}
-	_, ok := videoExtensions[ext]
-	return ok
+	return contracts.IsSupportedVideoExtension(filepath.Ext(base))
 }

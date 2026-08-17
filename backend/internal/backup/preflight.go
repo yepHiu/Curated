@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"curated-backend/internal/diskutil"
 	"curated-backend/internal/storage"
 )
 
@@ -95,7 +96,7 @@ func PreflightRestore(ctx context.Context, options PreflightOptions) (RestorePre
 	if parentErr != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("locate target volume: %v", parentErr))
 	} else {
-		available, spaceErr := availableDiskBytes(spacePath)
+		available, spaceErr := diskutil.AvailableDiskBytes(spacePath)
 		if spaceErr != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("check target disk space: %v", spaceErr))
 		} else {

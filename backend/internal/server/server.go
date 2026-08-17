@@ -28,6 +28,7 @@ import (
 	"curated-backend/internal/clienttracker"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/diskutil"
 	"curated-backend/internal/proxyenv"
 	"curated-backend/internal/scraper/metatube"
 	"curated-backend/internal/shellopen"
@@ -2490,6 +2491,14 @@ func (h *Handler) handleImportMovies(w http.ResponseWriter, r *http.Request) {
 			case "totalBytes":
 				if n, err := strconv.ParseInt(strings.TrimSpace(string(value)), 10, 64); err == nil && n > 0 {
 					declaredBytes = n
+					if totalFiles == 0 {
+						if err := ensureImportDiskSpace(targetRoot, declaredBytes); err != nil {
+							task = h.tasks.Fail(task.TaskID, contracts.ErrorCodeImportNotEnoughSpace, "not enough disk space on the default import path")
+							h.saveTaskSnapshot(r.Context(), task)
+							writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeImportNotEnoughSpace, "not enough disk space on the default import path")
+							return
+						}
+					}
 				}
 			}
 			_ = part.Close()
@@ -2783,12 +2792,31 @@ func importDestinationPath(root string, relativePath string) (string, error) {
 }
 
 func isSupportedImportVideoPath(path string) bool {
-	switch strings.ToLower(filepath.Ext(strings.TrimSpace(path))) {
-	case ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".ts", ".m2ts", ".flv", ".mpeg", ".mpg", ".ogv", ".rmvb", ".iso":
-		return true
-	default:
-		return false
+	return contracts.IsSupportedVideoExtension(filepath.Ext(strings.TrimSpace(path)))
+}
+
+// importDiskSpaceMarginBytes keeps a safety buffer on top of the declared import
+// payload so a copy does not fill the target volume to the last byte.
+const importDiskSpaceMarginBytes = 512 * 1024 * 1024
+
+var errImportNotEnoughSpace = errors.New("target volume does not have enough free space for the import payload")
+
+// ensureImportDiskSpace returns errImportNotEnoughSpace when targetRoot cannot
+// hold requiredBytes plus the safety margin. The probe is advisory: on lookup
+// failure the import proceeds and still relies on write-time error classification.
+func ensureImportDiskSpace(targetRoot string, requiredBytes int64) error {
+	if requiredBytes <= 0 {
+		return nil
 	}
+	available, err := diskutil.AvailableDiskBytes(targetRoot)
+	if err != nil {
+		return nil
+	}
+	need := uint64(requiredBytes)
+	if need > available || available-need < importDiskSpaceMarginBytes {
+		return errImportNotEnoughSpace
+	}
+	return nil
 }
 
 func copyImportPartToFile(tempPath string, src io.Reader, onProgress func(delta int64)) (int64, error) {

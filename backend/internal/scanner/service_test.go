@@ -84,3 +84,25 @@ func mustWriteFile(t *testing.T, path string) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 }
+
+func TestScanDiscoversSharedExtensionWhitelistFiles(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "ABC-201.rmvb"))
+	mustWriteFile(t, filepath.Join(root, "ABC-202.wmv"))
+	mustWriteFile(t, filepath.Join(root, "ABC-203.iso"))
+	mustWriteFile(t, filepath.Join(root, "still-copying.mp4.tmp"))
+
+	service := NewService(zap.NewNop())
+	summary, err := service.Scan(context.Background(), "task-ext", []string{root}, Hooks{})
+	if err != nil {
+		t.Fatalf("scan returned error: %v", err)
+	}
+	if summary.FilesDiscovered != 3 {
+		t.Fatalf("files discovered = %d, want 3 (shared whitelist extensions)", summary.FilesDiscovered)
+	}
+	if summary.RecognizedNumber != 3 {
+		t.Fatalf("recognized numbers = %d, want 3", summary.RecognizedNumber)
+	}
+}

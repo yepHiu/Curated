@@ -1,6 +1,6 @@
 //go:build windows
 
-package backup
+package diskutil
 
 import (
 	"fmt"
@@ -8,7 +8,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func availableDiskBytes(path string) (uint64, error) {
+// AvailableDiskBytes reports free bytes available to the current user via GetDiskFreeSpaceEx.
+func AvailableDiskBytes(path string) (uint64, error) {
 	pathPtr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return 0, err
