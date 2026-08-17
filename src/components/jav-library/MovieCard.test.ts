@@ -1,9 +1,9 @@
-import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { mount, type VueWrapper } from "@vue/test-utils"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { Movie } from "@/domain/movie/types"
 
-import MovieCard from "./MovieCard.vue"
+import MovieCard, { MOVIE_CARD_OPEN_DETAILS_DELAY_MS } from "./MovieCard.vue"
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -35,7 +35,17 @@ function makeMovie(overrides: Partial<Movie> = {}): Movie {
   }
 }
 
+function dispatchCardClick(wrapper: VueWrapper, detail: number) {
+  wrapper.get("[data-movie-card-id] button").element.dispatchEvent(
+    new MouseEvent("click", { bubbles: true, cancelable: true, detail }),
+  )
+}
+
 describe("MovieCard", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("prefers the card thumbnail over the detail cover", () => {
     const wrapper = mount(MovieCard, {
       props: {
@@ -93,7 +103,28 @@ describe("MovieCard", () => {
     expect(wrapper.get("[data-movie-favorite-toggle]").classes()).toContain("size-11")
   })
 
-  it("keeps the batch selection visual compact inside its touch target", () => {
+  it("uses a theme border instead of a checkbox for batch selection", async () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie(),
+        batchMode: true,
+        batchChecked: true,
+      },
+    })
+
+    expect(wrapper.find("input[type=checkbox]").exists()).toBe(false)
+    expect(wrapper.get("[data-movie-card-selected]").classes()).toEqual(
+      expect.arrayContaining(["border-2", "border-primary"]),
+    )
+    const toggle = wrapper.get("[data-movie-batch-toggle]")
+    expect(toggle.attributes("aria-pressed")).toBe("true")
+    await toggle.trigger("click")
+    expect(wrapper.emitted("toggleBatchSelect")).toEqual([
+      [{ movieId: "movie-card-1", shiftKey: false }],
+    ])
+  })
+
+  it("emits a shift-click batch selection payload", async () => {
     const wrapper = mount(MovieCard, {
       props: {
         movie: makeMovie(),
@@ -101,7 +132,51 @@ describe("MovieCard", () => {
       },
     })
 
-    expect(wrapper.get("[data-movie-batch-toggle]").classes()).toContain("size-11")
-    expect(wrapper.get("[data-movie-batch-toggle-visual]").classes()).toContain("size-7")
+    await wrapper.get("[data-movie-batch-toggle]").trigger("click", { shiftKey: true })
+    expect(wrapper.emitted("toggleBatchSelect")).toEqual([
+      [{ movieId: "movie-card-1", shiftKey: true }],
+    ])
+  })
+
+  it("opens details after a delayed single click", async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    dispatchCardClick(wrapper, 1)
+    expect(wrapper.emitted("openDetails")).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(MOVIE_CARD_OPEN_DETAILS_DELAY_MS)
+    expect(wrapper.emitted("openDetails")).toEqual([["movie-card-1"]])
+    expect(wrapper.emitted("openPlayer")).toBeUndefined()
+  })
+
+  it("opens the player on double-click without opening details", async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    dispatchCardClick(wrapper, 1)
+    dispatchCardClick(wrapper, 2)
+    await vi.runOnlyPendingTimersAsync()
+    expect(wrapper.emitted("openPlayer")).toEqual([["movie-card-1"]])
+    expect(wrapper.emitted("openDetails")).toBeUndefined()
+  })
+
+  it("opens details immediately from a keyboard activation", async () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie(),
+      },
+    })
+
+    dispatchCardClick(wrapper, 0)
+    expect(wrapper.emitted("openDetails")).toEqual([["movie-card-1"]])
+    expect(wrapper.emitted("openPlayer")).toBeUndefined()
   })
 })

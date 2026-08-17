@@ -1,5 +1,35 @@
+<script lang="ts">
+/** Wait to distinguish a single click (details) from a double-click (player). */
+export const MOVIE_CARD_OPEN_DETAILS_DELAY_MS = 300
+
+let pendingOpenDetailsTimer: ReturnType<typeof setTimeout> | null = null
+let pendingOpenDetailsMovieId = ""
+
+function clearPendingOpenDetails(movieId?: string) {
+  if (movieId && pendingOpenDetailsMovieId !== movieId) {
+    return
+  }
+  if (pendingOpenDetailsTimer == null) {
+    return
+  }
+  clearTimeout(pendingOpenDetailsTimer)
+  pendingOpenDetailsTimer = null
+  pendingOpenDetailsMovieId = ""
+}
+
+function scheduleOpenDetails(movieId: string, open: () => void) {
+  clearPendingOpenDetails()
+  pendingOpenDetailsMovieId = movieId
+  pendingOpenDetailsTimer = setTimeout(() => {
+    pendingOpenDetailsTimer = null
+    pendingOpenDetailsMovieId = ""
+    open()
+  }, MOVIE_CARD_OPEN_DETAILS_DELAY_MS)
+}
+</script>
+
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { Heart, Star } from "lucide-vue-next"
 import type { Movie } from "@/domain/movie/types"
@@ -41,7 +71,7 @@ const emit = defineEmits<{
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   contextMenu: [event: MouseEvent]
-  toggleBatchSelect: [movieId: string]
+  toggleBatchSelect: [payload: { movieId: string; shiftKey: boolean }]
 }>()
 
 const { t } = useI18n()
@@ -124,17 +154,41 @@ const fullStarBadgePositionClass = computed(() => {
   return `${h} ${v}`
 })
 
-const handleOpenDetails = () => {
+const handleCardClick = (event: MouseEvent) => {
   if (props.batchMode) {
-    emit("toggleBatchSelect", props.movie.id)
+    clearPendingOpenDetails(props.movie.id)
+    emit("toggleBatchSelect", { movieId: props.movie.id, shiftKey: event.shiftKey })
     return
   }
-  emit("openDetails", props.movie.id)
+
+  if (event.detail >= 2) {
+    clearPendingOpenDetails()
+    emit("openPlayer", props.movie.id)
+    return
+  }
+
+  if (event.detail === 0) {
+    clearPendingOpenDetails()
+    emit("openDetails", props.movie.id)
+    return
+  }
+
+  const movieId = props.movie.id
+  scheduleOpenDetails(movieId, () => {
+    emit("openDetails", movieId)
+  })
 }
 
-function onBatchCheckboxChange() {
-  emit("toggleBatchSelect", props.movie.id)
-}
+watch(
+  () => props.movie.id,
+  (_id, previousId) => {
+    clearPendingOpenDetails(previousId)
+  },
+)
+
+onBeforeUnmount(() => {
+  clearPendingOpenDetails(props.movie.id)
+})
 
 const handleFavoriteChange = (nextValue: boolean) => {
   emit("toggleFavorite", { movieId: props.movie.id, nextValue })
@@ -143,13 +197,23 @@ const handleFavoriteChange = (nextValue: boolean) => {
 
 <template>
   <Card
-    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none"
+    :class="
+      props.batchChecked
+        ? 'border-2 border-primary shadow-lg shadow-primary/20'
+        : 'border border-border/70 hover:border-primary/25 hover:shadow-lg'
+    "
     :data-movie-card-id="movie.id"
+    :data-movie-card-selected="props.batchChecked ? 'true' : undefined"
   >
     <button
       type="button"
-      class="flex w-full flex-col text-left focus-visible:outline-none"
-      @click="handleOpenDetails"
+      class="flex w-full flex-col text-left select-none focus-visible:outline-none"
+      :data-movie-batch-toggle="props.batchMode ? '' : undefined"
+      :aria-pressed="props.batchMode ? props.batchChecked : undefined"
+      :aria-label="props.batchMode ? t('library.batchCardToggleAria') : undefined"
+      @click="handleCardClick"
+      @dblclick.prevent
       @contextmenu.prevent="emit('contextMenu', $event)"
     >
       <div class="p-[var(--movie-card-padding)] pb-0">
@@ -157,25 +221,6 @@ const handleFavoriteChange = (nextValue: boolean) => {
           class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 aspect-[358/537]"
           :class="posterSrc ? 'bg-muted/30' : `bg-gradient-to-br p-2.5 ${movie.tone}`"
         >
-          <label
-            v-if="props.batchMode"
-            data-movie-batch-toggle
-            class="absolute top-2 right-2 z-[4] flex size-11 cursor-pointer items-center justify-center"
-            @click.stop
-          >
-            <span
-              data-movie-batch-toggle-visual
-              class="flex size-7 items-center justify-center rounded-md border border-border/45 bg-background/25 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
-            >
-              <input
-                type="checkbox"
-                class="size-4 cursor-pointer rounded accent-primary"
-                :checked="props.batchChecked"
-                :aria-label="t('library.batchCardToggleAria')"
-                @change="onBatchCheckboxChange"
-              />
-            </span>
-          </label>
           <MediaStill
             v-if="posterSrc"
             :src="posterSrc"

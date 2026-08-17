@@ -13,7 +13,7 @@ const props = defineProps<{
   mode: LibraryMode
   visibleMovies: readonly Movie[]
   batchMode?: boolean
-  /** 多选 id 列表（来自父级 Set 快照，用于卡片勾选态） */
+  /** 多选 id 列表（来自父级 Set 快照，用于卡片选中态） */
   batchSelectedIds?: readonly string[]
   /** 当前 URL 精确演员筛选（`actor=`） */
   activeActorFilter?: string
@@ -34,7 +34,7 @@ const emit = defineEmits<{
   enterBatchMode: []
   exitBatchMode: []
   selectAllVisibleInBatch: []
-  toggleBatchSelect: [movieId: string]
+  toggleBatchSelect: [payload: { movieId: string; shiftKey: boolean }]
 }>()
 
 const { t } = useI18n()

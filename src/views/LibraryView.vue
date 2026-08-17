@@ -28,6 +28,7 @@ import {
   resolveLibraryMode,
   serializeLibraryTagFilters,
 } from "@/lib/library-query"
+import { applyLibraryBatchToggle } from "@/lib/library-batch-selection"
 import { bumpMovieImageVersion } from "@/lib/image-version"
 import { buildLibraryBrowseScrollKey } from "@/lib/library-scroll-key"
 import { buildDetailRouteFromBrowse, buildPlayerRouteFromBrowseIntent } from "@/lib/navigation-intent"
@@ -60,6 +61,7 @@ const BATCH_SELECT_VISIBLE_MAX = 100
 
 const batchMode = ref(false)
 const batchSelectedIds = shallowRef<Set<string>>(new Set())
+const batchAnchorId = ref<string | null>(null)
 const batchScrapeBusy = ref(false)
 const batchScrapeProgress = ref<{ current: number; total: number } | null>(null)
 const batchOperationBusy = ref(false)
@@ -276,6 +278,7 @@ function patchMovieDisplayForLibraryEdit(body: PatchMovieBody, done: (err?: unkn
 
 function clearBatchSelection() {
   batchSelectedIds.value = new Set()
+  batchAnchorId.value = null
 }
 
 function enterBatchMode() {
@@ -288,16 +291,22 @@ function exitBatchMode() {
   clearBatchSelection()
 }
 
-function toggleBatchSelect(movieId: string) {
-  const id = movieId.trim()
-  if (!id) return
-  const next = new Set(batchSelectedIds.value)
-  if (next.has(id)) {
-    next.delete(id)
-  } else {
-    next.add(id)
+function toggleBatchSelect(payload: { movieId: string; shiftKey?: boolean }) {
+  const result = applyLibraryBatchToggle({
+    selectedIds: batchSelectedIds.value,
+    orderedIds: visibleMovies.value.map((movie) => movie.id),
+    movieId: payload.movieId,
+    shiftKey: payload.shiftKey === true,
+    anchorId: batchAnchorId.value,
+    maxCount: BATCH_SELECT_VISIBLE_MAX,
+  })
+  batchSelectedIds.value = result.selectedIds
+  batchAnchorId.value = result.anchorId
+  if (result.truncated) {
+    pushAppToast(t("library.batchSelectVisibleCap", { max: BATCH_SELECT_VISIBLE_MAX }), {
+      variant: "warning",
+    })
   }
-  batchSelectedIds.value = next
 }
 
 function selectAllVisibleInBatch() {
@@ -307,9 +316,11 @@ function selectAllVisibleInBatch() {
       variant: "warning",
     })
     batchSelectedIds.value = new Set(ids.slice(0, BATCH_SELECT_VISIBLE_MAX))
+    batchAnchorId.value = ids[0] ?? null
     return
   }
   batchSelectedIds.value = new Set(ids)
+  batchAnchorId.value = ids[0] ?? null
 }
 
 watch(

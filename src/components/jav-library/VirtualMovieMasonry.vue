@@ -53,7 +53,7 @@ const emit = defineEmits<{
   openPlayer: [movieId: string]
   toggleFavorite: [payload: { movieId: string; nextValue: boolean }]
   contextMenu: [payload: { event: MouseEvent; movie: Movie }]
-  toggleBatchSelect: [movieId: string]
+  toggleBatchSelect: [payload: { movieId: string; shiftKey: boolean }]
 }>()
 
 const hasHeaderSlot = computed(() => Boolean(slots.header))
