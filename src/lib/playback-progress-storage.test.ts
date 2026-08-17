@@ -97,6 +97,9 @@ describe("playback progress storage", () => {
     saveProgress("movie-1", 10.8, 100)
     expect(getResumeSecondsForOpenPlayer("movie-1")).toBe(10)
 
+    saveProgress("movie-1", 95, 100)
+    expect(getResumeSecondsForOpenPlayer("movie-1")).toBeUndefined()
+
     saveProgress("movie-1", 4.9, 100)
     expect(getResumeSecondsForOpenPlayer("movie-1")).toBeUndefined()
   })

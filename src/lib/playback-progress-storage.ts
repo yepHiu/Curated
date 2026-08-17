@@ -4,6 +4,7 @@
 
 import { ref } from "vue"
 import { api } from "@/api/endpoints"
+import { isNearPlaybackEnd } from "@/lib/playback-targets"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
@@ -201,6 +202,6 @@ export function getResumeSecondsForOpenPlayer(movieId: string): number | undefin
   const pos = row.positionSec
   const dur = row.durationSec
   if (pos < 5) return undefined
-  if (dur > 0 && pos >= dur * 0.95) return undefined
+  if (isNearPlaybackEnd(pos, dur)) return undefined
   return Math.floor(pos)
 }

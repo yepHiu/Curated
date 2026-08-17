@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest"
 import {
   descriptorMatchesRequestedPlaybackTarget,
+  isNearPlaybackEnd,
   resolveHlsLocalSeekTargetSec,
   resolvePreferredPlaybackTargetSec,
 } from "@/lib/playback-targets"
+
+describe("isNearPlaybackEnd", () => {
+  it("treats progress at or above 95% as near the end", () => {
+    expect(isNearPlaybackEnd(95, 100)).toBe(true)
+    expect(isNearPlaybackEnd(100, 100)).toBe(true)
+    expect(isNearPlaybackEnd(94.9, 100)).toBe(false)
+  })
+
+  it("ignores missing or invalid duration and position", () => {
+    expect(isNearPlaybackEnd(100, 0)).toBe(false)
+    expect(isNearPlaybackEnd(undefined, 100)).toBe(false)
+    expect(isNearPlaybackEnd(100, undefined)).toBe(false)
+  })
+})
 
 describe("descriptorMatchesRequestedPlaybackTarget", () => {
   it("prefers exact resumePositionSec over HLS session timeline origin", () => {
@@ -92,6 +107,31 @@ describe("resolvePreferredPlaybackTargetSec", () => {
         canDirectPlay: true,
       }, -10),
     ).toBeUndefined()
+  })
+
+  it("drops near-end resume targets so playback restarts from the beginning", () => {
+    expect(
+      resolvePreferredPlaybackTargetSec(
+        undefined,
+        {
+          movieId: "movie-1",
+          mode: "direct",
+          url: "/api/library/movies/movie-1/play",
+          resumePositionSec: 118,
+          durationSec: 120,
+          canDirectPlay: true,
+        },
+        118,
+      ),
+    ).toBeUndefined()
+
+    expect(
+      resolvePreferredPlaybackTargetSec(undefined, null, 99, 100),
+    ).toBeUndefined()
+
+    expect(
+      resolvePreferredPlaybackTargetSec(50, null, 99, 100),
+    ).toBe(50)
   })
 })
 

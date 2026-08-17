@@ -173,6 +173,31 @@ describe("navigation intent helpers", () => {
     })
   })
 
+  it("keeps the detail parent when hopping to the next player movie", () => {
+    const nextPlayerRoute = buildPlayerRouteFromBrowseIntent(
+      "movie-2",
+      {
+        actor: "Mina Kaze",
+        autoplay: "1",
+        back: "detail",
+        browse: "library",
+        detailBack: "actor",
+        selected: "movie-1",
+      },
+      "library",
+      "detail",
+    ) as { query: Record<string, string> }
+
+    expect(nextPlayerRoute.query).toEqual({
+      actor: "Mina Kaze",
+      autoplay: "1",
+      back: "detail",
+      browse: "library",
+      detailBack: "actor",
+      selected: "movie-2",
+    })
+  })
+
   it("parses explicit and legacy back-target query semantics", () => {
     expect(getNavigationBackTarget({ back: "home" })).toBe("home")
     expect(getNavigationBackTarget({ back: "browse" })).toBe("browse")

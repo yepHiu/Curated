@@ -63,6 +63,8 @@ vi.mock("@/i18n", () => ({
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     playerSettings: serviceState.playerSettings,
+    movies: { value: [] },
+    trashedMovies: { value: [] },
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,

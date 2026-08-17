@@ -48,9 +48,14 @@ function buildPlayerQuery(
 
   // `back` belongs to the player itself. Preserve the detail page's parent
   // separately so player -> detail -> parent keeps the full navigation chain.
+  // Player-to-player hops already store that parent as `detailBack`.
   delete query.detailBack
-  if (back === "detail" && isDetailBackTarget(currentQuery.back)) {
-    query.detailBack = currentQuery.back
+  if (back === "detail") {
+    if (isDetailBackTarget(currentQuery.back)) {
+      query.detailBack = currentQuery.back
+    } else if (isDetailBackTarget(currentQuery.detailBack)) {
+      query.detailBack = currentQuery.detailBack
+    }
   }
 
   const resumeSec = getResumeSecondsForOpenPlayer(movieId)

@@ -62,6 +62,8 @@ vi.mock("@/i18n", () => ({
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     playerSettings: serviceState.playerSettings,
+    movies: { value: [] },
+    trashedMovies: { value: [] },
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,
@@ -157,10 +159,10 @@ async function mountPlayerPage(props: { movie?: Movie; autoplay?: boolean } = {}
   return wrapper
 }
 
-function frameRow(id: string, positionSec: number) {
+function frameRow(id: string, positionSec: number, movieId = "movie-1") {
   return {
     id,
-    movieId: "movie-1",
+    movieId,
     title: "Movie title",
     code: "ABC-123",
     actors: ["Mina"],
@@ -293,6 +295,47 @@ describe("PlayerPage progress frame markers", () => {
       await nextTick()
 
       expect(wrapper.findAll("[data-frame-marker]")).toHaveLength(0)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it("reloads markers when the player advances to another movie", async () => {
+    framePageMocks.listCuratedFramesPage
+      .mockResolvedValueOnce({
+        items: [frameRow("f1", 30)],
+        total: 1,
+        limit: 200,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: [frameRow("f2", 90, "movie-2")],
+        total: 1,
+        limit: 200,
+        offset: 0,
+      })
+    serviceMocks.getMoviePlayback.mockResolvedValue(directDescriptor())
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+      expect(wrapper.findAll("[data-frame-marker]")).toHaveLength(1)
+      expect(wrapper.get("[data-frame-marker]").attributes("style")).toContain("left: 25%")
+
+      await wrapper.setProps({
+        movie: movie({ id: "movie-2", title: "Next title", code: "DEF-456" }),
+      })
+      await flushPromises()
+      await nextTick()
+
+      expect(framePageMocks.listCuratedFramesPage).toHaveBeenLastCalledWith({
+        movieId: "movie-2",
+        limit: 200,
+        offset: 0,
+      })
+      expect(wrapper.findAll("[data-frame-marker]")).toHaveLength(1)
+      expect(wrapper.get("[data-frame-marker]").attributes("style")).toContain("left: 75%")
     } finally {
       wrapper.unmount()
     }

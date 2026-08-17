@@ -57,6 +57,8 @@ vi.mock("@/i18n", () => ({
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     playerSettings: serviceState.playerSettings,
+    movies: { value: [] },
+    trashedMovies: { value: [] },
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,
@@ -283,6 +285,39 @@ describe("PlayerPage loading states", () => {
       await wrapper.get("video").trigger("ended")
 
       expect(activePlaybackMocks.clearActivePlaybackSession).toHaveBeenCalledWith("movie-1")
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it("restarts an HLS session at the beginning when the descriptor is already near the end", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "hls",
+      url: "/api/playback/sessions/old/hls/index.m3u8",
+      sessionId: "old-session",
+      startPositionSec: 118,
+      resumePositionSec: 119,
+      durationSec: 120,
+      canDirectPlay: false,
+    })
+    serviceMocks.createPlaybackSession.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "hls",
+      url: "/api/playback/sessions/new/hls/index.m3u8",
+      sessionId: "new-session",
+      startPositionSec: 0,
+      resumePositionSec: 0,
+      durationSec: 120,
+      canDirectPlay: false,
+    })
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0)
+      expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("old-session")
     } finally {
       wrapper.unmount()
     }

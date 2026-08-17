@@ -13,9 +13,11 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  FastForward,
   Pause,
   PictureInPicture2,
   Play,
+  Rewind,
   SkipBack,
   SkipForward,
   Volume2,
@@ -25,6 +27,8 @@ import type { Movie } from "@/domain/movie/types"
 import { HttpClientError } from "@/api/http-client"
 import { moviePlaybackAbsoluteUrl, resolveMoviePlaybackSourceUrl } from "@/api/playback-url"
 import PlayerPlaybackSettingsMenu from "@/components/jav-library/PlayerPlaybackSettingsMenu.vue"
+import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vue"
+import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
 import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -68,6 +72,8 @@ import {
 import { createPlaybackWatchTimeTracker } from "@/lib/playback-watch-time-tracker"
 import {
   descriptorMatchesRequestedPlaybackTarget,
+  isNearPlaybackEnd,
+  resolveDescriptorPlaybackTargetSec,
   resolveHlsLocalSeekTargetSec,
   resolvePreferredPlaybackTargetSec,
 } from "@/lib/playback-targets"
@@ -130,7 +136,14 @@ import {
 } from "@/lib/player-playback-stats"
 import type { FrameMarkerInput } from "@/lib/player-frame-markers"
 import { usePlayerClipCapture } from "@/composables/use-player-clip-capture"
+import { getBrowseSourceMode } from "@/lib/library-query"
+import {
+  buildPlayerRouteFromActorIntent,
+  buildPlayerRouteFromBrowseIntent,
+} from "@/lib/navigation-intent"
 import { usePlayerImmersiveChrome } from "@/lib/player-immersive-chrome"
+import { getPlayerPlaylistActorName, resolvePlayerPlaylistSource } from "@/lib/player-playlist"
+import { usePlayerPlaylist } from "@/composables/use-player-playlist"
 import { useLibraryService } from "@/services/library-service"
 
 const props = withDefaults(
@@ -146,6 +159,68 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+const playlistMovieId = computed(() => props.movie.id)
+const {
+  active: playlistActive,
+  items: playlistItems,
+  visibleItems: playlistVisibleItems,
+  currentIndex: playlistCurrentIndex,
+  previous: playlistPrevious,
+  next: playlistNext,
+  panelOpen: playlistPanelOpen,
+  autoAdvance: playlistAutoAdvance,
+  hiddenBeforeCount: playlistHiddenBeforeCount,
+  hiddenAfterCount: playlistHiddenAfterCount,
+  setAutoAdvance: setPlaylistAutoAdvance,
+  openPanel: openPlaylistPanel,
+  closePanel: closePlaylistPanel,
+  slideWindow: slidePlaylistVisibleWindow,
+} = usePlayerPlaylist(playlistMovieId)
+const playlistTabVisible = ref(false)
+
+watch(playlistPanelOpen, (open) => {
+  if (open) {
+    playlistTabVisible.value = false
+  }
+})
+
+async function openPlaylistMovie(movieId: string) {
+  const id = movieId.trim()
+  if (!id || id === props.movie.id) {
+    return
+  }
+  flushPlaybackProgress()
+  const source = resolvePlayerPlaylistSource(route.query)
+  if (source === "actor" && route.query.back === "actor") {
+    const actor = getPlayerPlaylistActorName(route.query)
+    if (!actor) {
+      return
+    }
+    await router.push(buildPlayerRouteFromActorIntent(id, actor))
+    return
+  }
+  const back = route.query.back === "detail" ? "detail" : "browse"
+  await router.push(
+    buildPlayerRouteFromBrowseIntent(id, route.query, getBrowseSourceMode(route.query), back),
+  )
+}
+
+function openPlaylistPrevious() {
+  const target = playlistPrevious.value
+  if (!target) {
+    return
+  }
+  void openPlaylistMovie(target.id)
+}
+
+function openPlaylistNext() {
+  const target = playlistNext.value
+  if (!target) {
+    return
+  }
+  void openPlaylistMovie(target.id)
+}
+
 const watchTimeTracker = createPlaybackWatchTimeTracker({ movieId: props.movie.id })
 const playbackSeekBackwardStep = computed(() =>
   Math.max(1, Number(libraryService.playerSettings.value.seekBackwardStepSec ?? 10)),
@@ -193,7 +268,10 @@ const autoplayConsumedForMovieId = ref<string | null>(null)
 const resumeAppliedForMovieId = ref<string | null>(null)
 
 const PROGRESS_SAVE_INTERVAL_MS = 4000
+const AUTO_ADVANCE_MIN_ELAPSED_MS = 2000
 let lastProgressSaveAt = 0
+let moviePlaybackStartedAtMs = 0
+let restartedFromNearEnd = false
 let playbackLoadSeq = 0
 let hlsDirectFallbackInFlight = false
 let playbackFallbackNoticeKey = ""
@@ -842,20 +920,32 @@ async function loadPlayback() {
   try {
     let descriptor = await libraryService.getMoviePlayback(movieId)
     const requestedStartSec = parseResumeSecondsFromQuery(route.query.t)
-    if (
-      descriptor?.mode === "hls" &&
-      requestedStartSec !== undefined &&
-      !descriptorMatchesRequestedPlaybackTarget(requestedStartSec, descriptor)
-    ) {
-      const reseekedDescriptor = await libraryService.createPlaybackSession(
-        movieId,
-        "hls",
-        Math.max(0, requestedStartSec),
-      )
-      if (descriptor.sessionId) {
-        await releasePlaybackSession(descriptor.sessionId)
+    const storedProgress = getProgress(movieId)
+    const durationHint = descriptor?.durationSec ?? storedProgress?.durationSec ?? 0
+    const preferredStartSec = resolvePreferredPlaybackTargetSec(
+      requestedStartSec,
+      descriptor,
+      storedProgress?.positionSec,
+      durationHint,
+    )
+    if (descriptor?.mode === "hls") {
+      const descriptorTarget = resolveDescriptorPlaybackTargetSec(descriptor)
+      const wantsStartSec = preferredStartSec ?? 0
+      const needsReseek =
+        preferredStartSec !== undefined
+          ? !descriptorMatchesRequestedPlaybackTarget(preferredStartSec, descriptor)
+          : isNearPlaybackEnd(descriptorTarget, durationHint)
+      if (needsReseek) {
+        const reseekedDescriptor = await libraryService.createPlaybackSession(
+          movieId,
+          "hls",
+          Math.max(0, wantsStartSec),
+        )
+        if (descriptor.sessionId) {
+          await releasePlaybackSession(descriptor.sessionId)
+        }
+        descriptor = reseekedDescriptor
       }
-      descriptor = reseekedDescriptor
     }
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
       if (descriptor?.sessionId) {
@@ -972,6 +1062,10 @@ watch(
     autoplayConsumedForMovieId.value = null
     resumeAppliedForMovieId.value = null
     lastProgressSaveAt = 0
+    moviePlaybackStartedAtMs = 0
+    restartedFromNearEnd = false
+    frameMarkers.value = []
+    void loadCuratedFrameMarkers()
     syncSrc()
     await nextTick()
     await syncVideoSource()
@@ -993,7 +1087,6 @@ function onWindowBeforeUnload() {
 
 onMounted(() => {
   refreshPipSupport()
-  void loadCuratedFrameMarkers()
   const probe = document.createElement("video")
   if (!canPlayHlsNatively(probe)) {
     preloadHlsLibrary()
@@ -1132,6 +1225,7 @@ function onLoadedMetadata() {
     fromQuery,
     playbackDescriptor.value,
     getProgress(props.movie.id)?.positionSec,
+    totalDurationSec.value,
   )
 
   if (playbackDescriptor.value?.mode === "hls") {
@@ -1163,7 +1257,14 @@ function onLoadedMetadata() {
   if (resumeAppliedForMovieId.value === props.movie.id) return
   if (dur <= 0) return
 
-  if (targetSec === undefined) return
+  if (targetSec === undefined) {
+    resumeAppliedForMovieId.value = props.movie.id
+    if (fromQuery !== undefined) {
+      stripTFromRoute()
+    }
+    void tryStartPlaybackIfRequested()
+    return
+  }
 
   const clamped = Math.min(Math.max(0, targetSec), Math.max(0, dur - 0.25))
   v.currentTime = clamped
@@ -1333,6 +1434,9 @@ async function onCanPlayForAutoplay() {
 
 function onPlay() {
   isPlaying.value = true
+  if (moviePlaybackStartedAtMs === 0) {
+    moviePlaybackStartedAtMs = Date.now()
+  }
   watchTimeTracker.onPlay(getAbsolutePlaybackTime())
   markPlaybackReady()
   startFpsTracking()
@@ -1370,6 +1474,19 @@ function onVideoEnded() {
   markPlaybackReady()
   clearActivePlaybackSession(props.movie.id)
   void terminateActiveHlsPlaybackSession("HLS session closed after playback ended")
+  const elapsedMs = moviePlaybackStartedAtMs === 0 ? 0 : Date.now() - moviePlaybackStartedAtMs
+  if (!restartedFromNearEnd && elapsedMs < AUTO_ADVANCE_MIN_ELAPSED_MS) {
+    restartedFromNearEnd = true
+    moviePlaybackStartedAtMs = 0
+    void seekToAbsolutePlaybackTime(0, {
+      forceSessionSwap: playbackDescriptor.value?.mode === "hls",
+      resumeAfterSwap: true,
+    })
+    return
+  }
+  if (playlistActive.value && playlistAutoAdvance.value && playlistNext.value) {
+    void openPlaylistMovie(playlistNext.value.id)
+  }
 }
 
 function onVideoError() {
@@ -1404,16 +1521,22 @@ async function togglePlayPause() {
       }
       if (
         descriptor.mode === "hls" &&
-        (!descriptor.sessionId || currentTime.value >= Math.max(0, totalDurationSec.value - 0.15))
+        (!descriptor.sessionId || isNearPlaybackEnd(currentTime.value, totalDurationSec.value))
       ) {
-        const restartAtSec =
-          currentTime.value >= Math.max(0, totalDurationSec.value - 0.15) ? 0 : currentTime.value
+        const restartAtSec = isNearPlaybackEnd(currentTime.value, totalDurationSec.value)
+          ? 0
+          : currentTime.value
         void seekToAbsolutePlaybackTime(restartAtSec, {
           forceSessionSwap: true,
           resumeAfterSwap: true,
         })
         showPlaybackFeedbackIfChromeHidden("play")
         return
+      }
+      if (isNearPlaybackEnd(currentTime.value, totalDurationSec.value)) {
+        v.currentTime = 0
+        currentTime.value = 0
+        progressSliderValue.value = [0]
       }
       autoplayConsumedForMovieId.value = props.movie.id
       resumePlaybackWhenReady = true
@@ -1638,6 +1761,11 @@ function onPlaybackKeydown(e: KeyboardEvent) {
   if (playerContextMenu.value && e.key === "Escape") {
     e.preventDefault()
     closePlayerContextMenu()
+    return
+  }
+  if (playlistPanelOpen.value && e.key === "Escape") {
+    e.preventDefault()
+    closePlaylistPanel()
     return
   }
   if (!playbackSrc.value) return
@@ -2191,6 +2319,10 @@ async function seekToAbsolutePlaybackTime(
   if (descriptor.mode !== "hls") {
     v.currentTime = clampedTarget
     currentTime.value = clampedTarget
+    if (options.resumeAfterSwap) {
+      resumePlaybackWhenReady = true
+      void tryStartPlaybackIfRequested()
+    }
     return
   }
 
@@ -2461,6 +2593,7 @@ const videoPreloadMode = computed(() =>
       :class="surfaceCursorClass"
       @contextmenu="onPlayerContextMenu"
     >
+      <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div
         class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5"
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
@@ -2501,12 +2634,12 @@ const videoPreloadMode = computed(() =>
               )
             "
           >
-            <SkipBack
+            <Rewind
               v-if="immersiveFeedback.kind === 'seek' && immersiveFeedback.direction === 'backward'"
               class="size-4"
               aria-hidden="true"
             />
-            <SkipForward
+            <FastForward
               v-else-if="immersiveFeedback.kind === 'seek'"
               class="size-4"
               aria-hidden="true"
@@ -2594,11 +2727,18 @@ const videoPreloadMode = computed(() =>
         </div>
       </div>
 
-      <div
-        class="relative flex min-h-0 flex-1 items-center justify-center"
-        :class="videoAreaCursorClass"
-        @click="onVideoSurfaceClick"
-      >
+        <div
+          class="relative flex min-h-0 flex-1 items-center justify-center"
+          :class="videoAreaCursorClass"
+          @click="onVideoSurfaceClick"
+        >
+        <PlayerPlaylistRevealTab
+          v-if="playlistActive && !playlistPanelOpen"
+          :visible="playlistTabVisible"
+          @enter="playlistTabVisible = true"
+          @leave="playlistTabVisible = false"
+          @open="openPlaylistPanel"
+        />
         <Transition
           enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
           enter-from-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
@@ -2826,13 +2966,26 @@ const videoPreloadMode = computed(() =>
           >
             <div class="flex items-center justify-center gap-2 sm:justify-start">
               <Button
+                v-if="playlistActive"
+                variant="secondary"
+                size="icon"
+                class="rounded-full bg-white/10 text-white hover:bg-white/20"
+                :disabled="!playlistPrevious"
+                data-player-playlist-prev
+                :aria-label="t('player.playlistPrevAria')"
+                @click="openPlaylistPrevious"
+              >
+                <SkipBack />
+              </Button>
+              <Button
                 variant="secondary"
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
+                :aria-label="t('player.seekBackAria', { seconds: playbackSeekBackwardStep })"
                 @click="seekDelta(-playbackSeekBackwardStep)"
               >
-                <SkipBack />
+                <Rewind />
               </Button>
               <Button
                 size="icon-lg"
@@ -2848,7 +3001,20 @@ const videoPreloadMode = computed(() =>
                 size="icon"
                 class="rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
+                :aria-label="t('player.seekForwardAria', { seconds: playbackSeekForwardStep })"
                 @click="seekDelta(playbackSeekForwardStep)"
+              >
+                <FastForward />
+              </Button>
+              <Button
+                v-if="playlistActive"
+                variant="secondary"
+                size="icon"
+                class="rounded-full bg-white/10 text-white hover:bg-white/20"
+                :disabled="!playlistNext"
+                data-player-playlist-next
+                :aria-label="t('player.playlistNextAria')"
+                @click="openPlaylistNext"
               >
                 <SkipForward />
               </Button>
@@ -2941,6 +3107,29 @@ const videoPreloadMode = computed(() =>
           </div>
         </div>
       </div>
+    </div>
+    <button
+      v-if="playlistActive && playlistPanelOpen"
+      type="button"
+      data-player-playlist-dismiss
+      class="absolute inset-0 z-30 bg-black/25"
+      :aria-label="t('player.playlistCloseAria')"
+      @click="closePlaylistPanel"
+    />
+    <PlayerPlaylistPanel
+      v-if="playlistActive && playlistPanelOpen"
+      :movies="playlistVisibleItems"
+      :current-movie-id="movie.id"
+      :auto-advance="playlistAutoAdvance"
+      :hidden-before-count="playlistHiddenBeforeCount"
+      :hidden-after-count="playlistHiddenAfterCount"
+      :total-count="playlistItems.length"
+      :current-index="playlistCurrentIndex"
+      @close="closePlaylistPanel"
+      @select="openPlaylistMovie"
+      @update:auto-advance="setPlaylistAutoAdvance"
+      @slide-window="slidePlaylistVisibleWindow"
+    />
     </div>
   </div>
   <Teleport to="body">
