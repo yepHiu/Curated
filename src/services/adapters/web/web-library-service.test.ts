@@ -15,6 +15,8 @@ const apiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   patchSettings: vi.fn(),
   importMovies: vi.fn(),
+  getMovieImportUpload: vi.fn(),
+  deleteMovieImportUpload: vi.fn(),
   listSavedViews: vi.fn(),
   createSavedView: vi.fn(),
   patchSavedView: vi.fn(),
@@ -119,6 +121,7 @@ async function loadStartedWebLibraryService() {
 beforeEach(() => {
   vi.resetModules()
   window.location.hash = ""
+  window.localStorage.clear()
   apiMocks.listMovies.mockReset()
   apiMocks.listConnectedClients.mockReset()
   apiMocks.getMovie.mockReset()
@@ -129,6 +132,8 @@ beforeEach(() => {
   apiMocks.getSettings.mockReset()
   apiMocks.patchSettings.mockReset()
   apiMocks.importMovies.mockReset()
+  apiMocks.getMovieImportUpload.mockReset()
+  apiMocks.deleteMovieImportUpload.mockReset()
   apiMocks.listSavedViews.mockReset()
   apiMocks.createSavedView.mockReset()
   apiMocks.patchSavedView.mockReset()
@@ -421,8 +426,186 @@ describe("webLibraryService mutations", () => {
     const onUploadProgress = vi.fn()
     const task = await webLibraryService.importMovies([file], { onUploadProgress })
 
-    expect(apiMocks.importMovies).toHaveBeenCalledWith([file], { onUploadProgress })
+    expect(apiMocks.importMovies).toHaveBeenCalledWith(
+      [file],
+      expect.objectContaining({ onUploadProgress, onUploadSessionCreated: expect.any(Function) }),
+    )
     expect(task?.taskId).toBe("import-1")
+  })
+
+  it("resumes a resumable session by uploadId and clears the local ledger entry on success", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.importMovies.mockResolvedValueOnce({
+      taskId: "import-resume-1",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-01T00:00:00.000Z",
+      progress: 100,
+    })
+    window.localStorage.setItem(
+      "curated-movie-import-uploads-v1",
+      JSON.stringify([
+        {
+          uploadId: "upload_resume00000001",
+          targetLibraryPathId: "library-a",
+          chunkSize: 32,
+          files: [{ relativePath: "IMP-BIG.mp4", size: 8, lastModified: 1234 }],
+          createdAt: "2026-08-17T00:00:00.000Z",
+          lastActiveAt: new Date().toISOString(),
+        },
+      ]),
+    )
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    const file = new File(["fake-mp4"], "IMP-BIG.mp4", { type: "video/mp4" })
+    const task = await webLibraryService.importMovies([file], {
+      resumeUploadId: "upload_resume00000001",
+    })
+
+    expect(apiMocks.importMovies).toHaveBeenCalledWith(
+      [file],
+      expect.objectContaining({ resumeUploadId: "upload_resume00000001" }),
+    )
+    expect(task?.taskId).toBe("import-resume-1")
+    expect(window.localStorage.getItem("curated-movie-import-uploads-v1")).toBe("[]")
+  })
+
+  it("keeps the ledger entry when a resumable import attempt fails", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.importMovies.mockRejectedValueOnce(new Error("network down"))
+    window.localStorage.setItem(
+      "curated-movie-import-uploads-v1",
+      JSON.stringify([
+        {
+          uploadId: "upload_resume00000002",
+          targetLibraryPathId: "library-a",
+          chunkSize: 32,
+          files: [{ relativePath: "IMP-BIG2.mp4", size: 8, lastModified: 1234 }],
+          createdAt: "2026-08-17T00:00:00.000Z",
+          lastActiveAt: new Date().toISOString(),
+        },
+      ]),
+    )
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    const file = new File(["fake-mp4"], "IMP-BIG2.mp4", { type: "video/mp4" })
+    await expect(
+      webLibraryService.importMovies([file], { resumeUploadId: "upload_resume00000002" }),
+    ).rejects.toThrow("network down")
+
+    const stored = JSON.parse(
+      window.localStorage.getItem("curated-movie-import-uploads-v1") ?? "[]",
+    )
+    expect(stored).toHaveLength(1)
+    expect(stored[0].uploadId).toBe("upload_resume00000002")
+  })
+
+  it("lists resumable sessions and prunes terminal or missing ones from the ledger", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    // resetModules 后适配器持有新模块图的 HttpClientError；动态导入保证 instanceof 同一身份
+    const { HttpClientError: FreshHttpClientError } = await import("@/api/http-client")
+    const now = new Date().toISOString()
+    const seed = [
+      {
+        uploadId: "upload_alive00000001",
+        targetLibraryPathId: "library-a",
+        chunkSize: 32,
+        files: [{ relativePath: "IMP-A.mp4", size: 10, lastModified: 1 }],
+        createdAt: now,
+        lastActiveAt: now,
+      },
+      {
+        uploadId: "upload_dead0000000002",
+        targetLibraryPathId: "library-a",
+        chunkSize: 32,
+        files: [{ relativePath: "IMP-B.mp4", size: 10, lastModified: 2 }],
+        createdAt: now,
+        lastActiveAt: now,
+      },
+      {
+        uploadId: "upload_gone0000000003",
+        targetLibraryPathId: "library-a",
+        chunkSize: 32,
+        files: [{ relativePath: "IMP-C.mp4", size: 10, lastModified: 3 }],
+        createdAt: now,
+        lastActiveAt: now,
+      },
+    ]
+    window.localStorage.setItem("curated-movie-import-uploads-v1", JSON.stringify(seed))
+    apiMocks.getMovieImportUpload.mockImplementation(async (uploadId: string) => {
+      if (uploadId === "upload_alive00000001") {
+        return {
+          uploadId,
+          targetPath: "D:/Library",
+          chunkSize: 32,
+          bytesReceived: 4,
+          totalBytes: 10,
+          state: "uploading",
+          expiresAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+          files: [],
+          task: {} as never,
+        }
+      }
+      if (uploadId === "upload_dead0000000002") {
+        return {
+          uploadId,
+          targetPath: "D:/Library",
+          chunkSize: 32,
+          bytesReceived: 10,
+          totalBytes: 10,
+          state: "committed",
+          files: [],
+          task: {} as never,
+        }
+      }
+      throw new FreshHttpClientError(404)
+    })
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    const sessions = await webLibraryService.listResumableMovieImports()
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]).toMatchObject({
+      uploadId: "upload_alive00000001",
+      totalBytes: 10,
+      bytesReceived: 4,
+    })
+    expect(sessions[0].files).toEqual([{ relativePath: "IMP-A.mp4", size: 10, lastModified: 1 }])
+    const stored = JSON.parse(
+      window.localStorage.getItem("curated-movie-import-uploads-v1") ?? "[]",
+    )
+    expect(stored.map((entry: { uploadId: string }) => entry.uploadId)).toEqual([
+      "upload_alive00000001",
+    ])
+  })
+
+  it("abandons a resumable upload by deleting the server session and ledger entry", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    const now = new Date().toISOString()
+    window.localStorage.setItem(
+      "curated-movie-import-uploads-v1",
+      JSON.stringify([
+        {
+          uploadId: "upload_abandon000001",
+          targetLibraryPathId: "library-a",
+          chunkSize: 32,
+          files: [{ relativePath: "IMP-D.mp4", size: 10, lastModified: 4 }],
+          createdAt: now,
+          lastActiveAt: now,
+        },
+      ]),
+    )
+    apiMocks.deleteMovieImportUpload.mockResolvedValueOnce(undefined)
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    await webLibraryService.abandonMovieImportUpload("upload_abandon000001")
+
+    expect(apiMocks.deleteMovieImportUpload).toHaveBeenCalledWith("upload_abandon000001")
+    expect(window.localStorage.getItem("curated-movie-import-uploads-v1")).toBe("[]")
   })
 
   it("short-circuits blank movie ids without waiting for library loading", async () => {

@@ -730,6 +730,100 @@ describe("api endpoint response validation", () => {
     expect(post).toHaveBeenNthCalledWith(2, "/import/movies/uploads/upload_retry/commit")
   })
 
+  it("resumes an interrupted upload and only sends missing chunks", async () => {
+    const task = {
+      taskId: "import.movies-upload-resume",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-02T00:00:00Z",
+      progress: 100,
+    }
+    const sessionStatus = {
+      uploadId: "upload_resume",
+      targetPath: "D:/Library",
+      chunkSize: 4,
+      bytesReceived: 4,
+      totalBytes: 8,
+      state: "uploading",
+      files: [
+        {
+          fileId: "file_resume",
+          relativePath: "IMP-RESUME.mp4",
+          size: 8,
+          bytesReceived: 4,
+          complete: false,
+          chunks: [{ index: 0, offset: 0, size: 4 }],
+        },
+      ],
+      task,
+    }
+    const get = vi.spyOn(httpClient, "get")
+    get.mockResolvedValueOnce(sessionStatus)
+    const post = vi.spyOn(httpClient, "post")
+    post.mockResolvedValueOnce(task)
+    const putBinary = vi.spyOn(httpClient as typeof httpClient & {
+      putBinaryWithProgress: (
+        path: string,
+        body: Blob,
+        options?: {
+          headers?: Record<string, string>
+          diagnosticContext?: Record<string, unknown>
+          onUploadProgress?: (progress: { loaded: number; total: number; percent: number }) => void
+        },
+      ) => Promise<unknown>
+    }, "putBinaryWithProgress")
+    putBinary.mockImplementation(async (_path, _body, options) => {
+      const total = Number(options?.headers?.["X-Curated-Chunk-Size"] ?? 0)
+      options?.onUploadProgress?.({ loaded: total, total, percent: 100 })
+      return sessionStatus
+    })
+    const onUploadProgress = vi.fn()
+    const file = new File(["fake-mp4"], "IMP-RESUME.mp4", { type: "video/mp4" })
+
+    await expect(
+      api.importMovies([file], { onUploadProgress, resumeUploadId: "upload_resume" }),
+    ).resolves.toEqual(task)
+
+    expect(get).toHaveBeenCalledWith("/import/movies/uploads/upload_resume")
+    expect(putBinary).toHaveBeenCalledTimes(1)
+    expect(putBinary).toHaveBeenCalledWith(
+      "/import/movies/uploads/upload_resume/files/file_resume/chunks/1",
+      expect.any(Blob),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Curated-Offset": "4",
+          "X-Curated-Chunk-Size": "4",
+        },
+      }),
+    )
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith("/import/movies/uploads/upload_resume/commit")
+    // 进度基线从服务端已接收的 4 字节起算
+    expect(onUploadProgress).toHaveBeenLastCalledWith({ loaded: 8, total: 8, percent: 100 })
+  })
+
+  it("rejects resuming a session that is no longer uploading", async () => {
+    const get = vi.spyOn(httpClient, "get")
+    get.mockResolvedValueOnce({
+      uploadId: "upload_stale",
+      targetPath: "D:/Library",
+      chunkSize: 4,
+      bytesReceived: 4,
+      totalBytes: 8,
+      state: "expired",
+      files: [],
+      task: {},
+    })
+    const post = vi.spyOn(httpClient, "post")
+    const file = new File(["fake-mp4"], "IMP-STALE.mp4", { type: "video/mp4" })
+
+    await expect(
+      api.importMovies([file], { resumeUploadId: "upload_stale" }),
+    ).rejects.toThrow("Upload session upload_stale is no longer accepting chunks")
+    expect(post).not.toHaveBeenCalled()
+  })
+
   it("validates actor merge preview, apply audit, and audit list responses", async () => {
     const association = {
       sourceCount: 1,

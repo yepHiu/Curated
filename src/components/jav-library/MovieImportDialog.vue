@@ -17,6 +17,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import { matchesMovieImportUploadFiles } from "@/lib/movie-import-upload-ledger"
+import type { ResumableMovieImportSession } from "@/services/contracts/library-service"
 import { useLibraryService } from "@/services/library-service"
 
 const { t } = useI18n()
@@ -27,6 +29,9 @@ const open = ref(false)
 const selectedFiles = ref<File[]>([])
 const dragActive = ref(false)
 const busy = ref(false)
+const resumableSessions = ref<ResumableMovieImportSession[]>([])
+const abandonConfirmId = ref("")
+const abandonBusyId = ref("")
 const uploadProgress = ref<MovieImportUploadProgress | null>(null)
 const importError = ref("")
 const skippedCount = ref(0)
@@ -34,6 +39,8 @@ const skippedCount = ref(0)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
 
+// Mirrors backend/internal/contracts.SupportedVideoExtensions (scanner / watch /
+// import share one whitelist). Keep both lists in sync.
 const videoExtensions = new Set([
   ".mp4",
   ".m4v",
@@ -86,17 +93,77 @@ const selectedTotalBytes = computed(() =>
   selectedFiles.value.reduce((sum, file) => sum + file.size, 0),
 )
 
+const matchedResumeSession = computed<ResumableMovieImportSession | null>(() => {
+  if (!selectedFiles.value.length) return null
+  const fingerprints = selectedFiles.value.map((file) => ({
+    relativePath: relativePathForFile(file),
+    size: file.size,
+    lastModified: file.lastModified,
+  }))
+  for (const session of resumableSessions.value) {
+    if (matchesMovieImportUploadFiles(session.files, fingerprints)) return session
+  }
+  return null
+})
+
 watch(open, (next) => {
   if (next) {
     importError.value = ""
+    abandonConfirmId.value = ""
     void libraryService.refreshSettings().then(() => {
       const id = defaultImportPathId.value
       if (id) {
         void libraryService.checkLibraryPathStorageStatus([id])
       }
     })
+    void refreshResumableSessions()
   }
 })
+
+async function refreshResumableSessions() {
+  try {
+    resumableSessions.value = await libraryService.listResumableMovieImports()
+  } catch {
+    // 列表加载失败不阻塞导入主流程
+    resumableSessions.value = []
+  }
+}
+
+function sessionPercent(session: ResumableMovieImportSession): number {
+  if (session.totalBytes <= 0) return 0
+  return Math.min(100, Math.max(0, Math.round((session.bytesReceived / session.totalBytes) * 100)))
+}
+
+function formatSessionExpiry(session: ResumableMovieImportSession): string {
+  const expiresAtMs = session.expiresAt ? Date.parse(session.expiresAt) : Number.NaN
+  if (!Number.isFinite(expiresAtMs)) return ""
+  const remainingMs = expiresAtMs - Date.now()
+  if (remainingMs <= 0) return t("import.resumableExpiresMinutes", { minutes: 0 })
+  const hours = Math.floor(remainingMs / 3_600_000)
+  if (hours >= 1) return t("import.resumableExpiresHours", { hours })
+  const minutes = Math.max(1, Math.ceil(remainingMs / 60_000))
+  return t("import.resumableExpiresMinutes", { minutes })
+}
+
+async function abandonSession(session: ResumableMovieImportSession) {
+  if (busy.value || abandonBusyId.value) return
+  if (abandonConfirmId.value !== session.uploadId) {
+    abandonConfirmId.value = session.uploadId
+    return
+  }
+  abandonConfirmId.value = ""
+  abandonBusyId.value = session.uploadId
+  try {
+    await libraryService.abandonMovieImportUpload(session.uploadId)
+    resumableSessions.value = resumableSessions.value.filter(
+      (item) => item.uploadId !== session.uploadId,
+    )
+  } catch (err) {
+    pushAppToast(errorMessage(err), { variant: "destructive", durationMs: 6500 })
+  } finally {
+    abandonBusyId.value = ""
+  }
+}
 
 function fileExtension(name: string): string {
   const idx = name.lastIndexOf(".")
@@ -205,15 +272,30 @@ async function submitImport() {
   }
   importError.value = ""
   busy.value = true
-  uploadProgress.value = { loaded: 0, total: selectedTotalBytes.value, percent: 0 }
+  const resumeSession = matchedResumeSession.value
+  if (resumeSession) {
+    uploadProgress.value = {
+      loaded: resumeSession.bytesReceived,
+      total: resumeSession.totalBytes,
+      percent: sessionPercent(resumeSession),
+    }
+  } else {
+    uploadProgress.value = { loaded: 0, total: selectedTotalBytes.value, percent: 0 }
+  }
   try {
     const task = await libraryService.importMovies(selectedFiles.value, {
       onUploadProgress(progress) {
         uploadProgress.value = progress
       },
+      resumeUploadId: resumeSession?.uploadId,
     })
     if (task?.taskId) {
       taskTracker.start(task.taskId)
+    }
+    if (resumeSession) {
+      resumableSessions.value = resumableSessions.value.filter(
+        (item) => item.uploadId !== resumeSession.uploadId,
+      )
     }
     pushAppToast(t("import.queuedToast"), { variant: "success", durationMs: 2600 })
     clearSelection()
@@ -221,6 +303,8 @@ async function submitImport() {
   } catch (err) {
     importError.value = errorMessage(err)
     pushAppToast(importError.value, { variant: "destructive", durationMs: 6500 })
+    // 失败后核对一次会话状态：终态会话会被服务层从账本剔除
+    void refreshResumableSessions()
   } finally {
     busy.value = false
   }
@@ -233,15 +317,15 @@ async function submitImport() {
       <Button
         data-import-trigger
         type="button"
-        variant="default"
-        class="min-h-11 rounded-full lg:min-h-9"
+        variant="ghost"
+        class="min-h-11 rounded-full text-muted-foreground hover:bg-muted/70 hover:text-foreground lg:min-h-9"
         :aria-label="t('import.trigger')"
       >
         <svg
           v-if="busy"
           data-import-trigger-progress
           data-icon="inline-start"
-          class="size-4 -rotate-90 text-primary-foreground"
+          class="size-4 -rotate-90 text-foreground"
           viewBox="0 0 36 36"
           role="progressbar"
           :aria-valuenow="progressValue"
@@ -250,7 +334,7 @@ async function submitImport() {
           :aria-label="t('import.importing')"
         >
           <circle
-            class="text-primary-foreground/35"
+            class="text-foreground/35"
             cx="18"
             cy="18"
             r="15.9155"
@@ -305,6 +389,51 @@ async function submitImport() {
         >
           {{ t("import.storageUnavailable") }} {{ targetStorageUnavailableMessage }}
         </p>
+
+        <div
+          v-if="resumableSessions.length"
+          data-import-resumable
+          class="flex flex-col gap-2 rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5"
+        >
+          <span class="text-xs font-medium text-muted-foreground">
+            {{ t("import.resumableTitle") }}
+          </span>
+          <div
+            v-for="session in resumableSessions"
+            :key="session.uploadId"
+            data-import-resumable-item
+            class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/60 px-2.5 py-2"
+          >
+            <div class="flex min-w-0 flex-col gap-0.5">
+              <span class="truncate text-sm">
+                {{ t("import.resumableSummary", {
+                  count: session.files.length,
+                  size: formatBytes(session.totalBytes),
+                }) }}
+              </span>
+              <span class="text-xs text-muted-foreground">
+                {{ t("import.resumableProgress", { percent: sessionPercent(session) }) }}
+                <template v-if="formatSessionExpiry(session)"> · {{ formatSessionExpiry(session) }}</template>
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="h-8 shrink-0 rounded-lg px-2 text-xs text-muted-foreground hover:text-destructive"
+              :disabled="busy || abandonBusyId === session.uploadId"
+              :data-import-resumable-abandon="session.uploadId"
+              @click="abandonSession(session)"
+            >
+              {{ abandonConfirmId === session.uploadId
+                ? t("import.abandonConfirm")
+                : t("import.abandon") }}
+            </Button>
+          </div>
+          <p class="text-xs text-muted-foreground">
+            {{ t("import.resumableHint") }}
+          </p>
+        </div>
 
         <div
           class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors"
@@ -381,6 +510,14 @@ async function submitImport() {
 
         <p v-if="skippedCount > 0" class="text-xs text-muted-foreground">
           {{ t("import.skippedUnsupported", { count: skippedCount }) }}
+        </p>
+
+        <p
+          v-if="matchedResumeSession"
+          data-import-resume-match
+          class="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-xs text-foreground"
+        >
+          {{ t("import.resumableMatched", { percent: sessionPercent(matchedResumeSession) }) }}
         </p>
 
         <div v-if="busy" class="flex flex-col gap-2">

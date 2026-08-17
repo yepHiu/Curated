@@ -42,7 +42,7 @@ import type {
   SavedViewFiltersV1,
 } from "@/api/types"
 import { HttpClientError } from "@/api/http-client"
-import { api } from "@/api/endpoints"
+import { api, movieImportUploadFileManifests } from "@/api/endpoints"
 import { moviePlaybackAbsoluteUrl } from "@/api/playback-url"
 import type { LibrarySetting } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
@@ -50,7 +50,13 @@ import { i18n } from "@/i18n"
 import { clientVideoCodecsQueryParam, resolvePlaybackCapabilities } from "@/lib/playback-capabilities"
 import { curatedFramesRevision } from "@/lib/curated-frames/revision"
 import { buildSettingsDashboardStats } from "@/lib/library-stats"
-import type { LibraryService } from "@/services/contracts/library-service"
+import {
+  addMovieImportUploadLedgerEntry,
+  loadMovieImportUploadLedger,
+  removeMovieImportUploadLedgerEntry,
+  touchMovieImportUploadLedgerEntry,
+} from "@/lib/movie-import-upload-ledger"
+import type { LibraryService, ResumableMovieImportSession } from "@/services/contracts/library-service"
 import { normalizeHardwareEncoderPreference } from "@/lib/playback-settings-normalize"
 import { mapMovieDetail, mapMovieListItem } from "./mappers"
 
@@ -995,7 +1001,67 @@ function createWebLibraryService(): LibraryService {
       if (selected.length === 0) {
         return null
       }
-      return await api.importMovies(selected, options)
+      const resumeUploadId = options?.resumeUploadId?.trim()
+      if (resumeUploadId) {
+        // 成功（含 commit 完成）才移除账本；失败保留条目供下次继续
+        const task = await api.importMovies(selected, options)
+        removeMovieImportUploadLedgerEntry(resumeUploadId)
+        return task
+      }
+      return await api.importMovies(selected, {
+        ...options,
+        onUploadSessionCreated: (upload) => {
+          addMovieImportUploadLedgerEntry({
+            uploadId: upload.uploadId,
+            targetLibraryPathId: defaultImportLibraryPathIdState.value,
+            chunkSize: upload.chunkSize,
+            files: movieImportUploadFileManifests(selected),
+            createdAt: new Date().toISOString(),
+            lastActiveAt: new Date().toISOString(),
+          })
+        },
+      })
+    },
+
+    async listResumableMovieImports(): Promise<ResumableMovieImportSession[]> {
+      const sessions: ResumableMovieImportSession[] = []
+      for (const entry of loadMovieImportUploadLedger()) {
+        try {
+          const dto = await api.getMovieImportUpload(entry.uploadId)
+          const expiresAtMs = dto.expiresAt ? Date.parse(dto.expiresAt) : Number.NaN
+          const expired = Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()
+          if (dto.state !== "uploading" || expired) {
+            removeMovieImportUploadLedgerEntry(entry.uploadId)
+            continue
+          }
+          touchMovieImportUploadLedgerEntry(entry.uploadId)
+          sessions.push({
+            uploadId: entry.uploadId,
+            files: entry.files,
+            totalBytes: dto.totalBytes,
+            bytesReceived: dto.bytesReceived,
+            expiresAt: dto.expiresAt,
+          })
+        } catch (error) {
+          // 会话已不存在（如被清理）时移除本地账本；网络错误保留条目下次再核对
+          if (error instanceof HttpClientError && error.status === 404) {
+            removeMovieImportUploadLedgerEntry(entry.uploadId)
+          }
+        }
+      }
+      return sessions
+    },
+
+    async abandonMovieImportUpload(uploadId: string): Promise<void> {
+      const trimmed = uploadId.trim()
+      if (!trimmed) {
+        return
+      }
+      try {
+        await api.deleteMovieImportUpload(trimmed)
+      } finally {
+        removeMovieImportUploadLedgerEntry(trimmed)
+      }
     },
 
     async scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null> {

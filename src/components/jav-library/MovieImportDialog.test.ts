@@ -12,6 +12,8 @@ const serviceState = vi.hoisted(() => ({
   refreshSettings: vi.fn(),
   checkLibraryPathStorageStatus: vi.fn(),
   importMovies: vi.fn(),
+  listResumableMovieImports: vi.fn(),
+  abandonMovieImportUpload: vi.fn(),
 }))
 
 const tracker = vi.hoisted(() => ({
@@ -39,6 +41,8 @@ vi.mock("@/services/library-service", () => ({
     refreshSettings: serviceState.refreshSettings,
     checkLibraryPathStorageStatus: serviceState.checkLibraryPathStorageStatus,
     importMovies: serviceState.importMovies,
+    listResumableMovieImports: serviceState.listResumableMovieImports,
+    abandonMovieImportUpload: serviceState.abandonMovieImportUpload,
   }),
 }))
 
@@ -78,11 +82,19 @@ beforeEach(() => {
   ]
   serviceState.defaultImportLibraryPathId = "library-a"
   serviceState.libraryPathStorageStatuses = []
-  serviceState.refreshSettings.mockReset()
-  serviceState.checkLibraryPathStorageStatus.mockReset()
+  serviceState.refreshSettings.mockReset().mockResolvedValue(undefined)
+  serviceState.checkLibraryPathStorageStatus.mockReset().mockResolvedValue(undefined)
   serviceState.importMovies.mockReset()
+  serviceState.listResumableMovieImports.mockReset().mockResolvedValue([])
+  serviceState.abandonMovieImportUpload.mockReset().mockResolvedValue(undefined)
   tracker.start.mockReset()
 })
+
+async function openDialogAndLoadSessions(wrapper: ReturnType<typeof mount>) {
+  const vm = wrapper.vm as unknown as { open: boolean }
+  vm.open = true
+  await flushPromises()
+}
 
 describe("MovieImportDialog", () => {
   it("disables submit without a default import path", () => {
@@ -194,5 +206,92 @@ describe("MovieImportDialog", () => {
 
     expect(wrapper.get("[data-import-submit]").attributes("disabled")).toBeDefined()
     expect(wrapper.text()).toContain("import.storageUnavailable")
+  })
+
+  it("lists resumable sessions when the dialog opens", async () => {
+    serviceState.listResumableMovieImports.mockResolvedValueOnce([
+      {
+        uploadId: "upload_resume00000001",
+        files: [{ relativePath: "IMP-BIG.mp4", size: 8589934592, lastModified: 1234 }],
+        totalBytes: 8589934592,
+        bytesReceived: 4294967296,
+        expiresAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+      },
+    ])
+    const wrapper = mount(MovieImportDialog)
+    await openDialogAndLoadSessions(wrapper)
+
+    expect(serviceState.listResumableMovieImports).toHaveBeenCalledTimes(1)
+    expect(wrapper.get("[data-import-resumable]").text()).toContain("import.resumableTitle")
+    expect(wrapper.get("[data-import-resumable-item]").text()).toContain("import.resumableProgress")
+    expect(wrapper.find("[data-import-resume-match]").exists()).toBe(false)
+  })
+
+  it("submits with the matched resume session and shows the match banner", async () => {
+    const file = new File(["movie"], "IMP-001.mp4", { type: "video/mp4" })
+    serviceState.listResumableMovieImports.mockResolvedValueOnce([
+      {
+        uploadId: "upload_match0000000001",
+        files: [
+          { relativePath: "IMP-001.mp4", size: file.size, lastModified: file.lastModified },
+        ],
+        totalBytes: file.size,
+        bytesReceived: 2,
+        expiresAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+      },
+    ])
+    serviceState.importMovies.mockResolvedValueOnce({
+      taskId: "import-resume-1",
+      type: "import.movies",
+      status: "completed",
+      createdAt: "2026-05-01T00:00:00.000Z",
+      progress: 100,
+    })
+    const wrapper = mount(MovieImportDialog)
+    await openDialogAndLoadSessions(wrapper)
+    const input = wrapper.get<HTMLInputElement>("[data-import-file-input]")
+    Object.defineProperty(input.element, "files", {
+      value: [file],
+      configurable: true,
+    })
+    await input.trigger("change")
+    await flushPromises()
+
+    expect(wrapper.get("[data-import-resume-match]").text()).toContain("import.resumableMatched")
+
+    await wrapper.get("[data-import-submit]").trigger("click")
+    await flushPromises()
+
+    expect(serviceState.importMovies).toHaveBeenCalledWith(
+      [file],
+      expect.objectContaining({ resumeUploadId: "upload_match0000000001" }),
+    )
+  })
+
+  it("abandons a resumable session after a two-click confirmation", async () => {
+    serviceState.listResumableMovieImports.mockResolvedValueOnce([
+      {
+        uploadId: "upload_abandon000001",
+        files: [{ relativePath: "IMP-GONE.mp4", size: 1024, lastModified: 1234 }],
+        totalBytes: 1024,
+        bytesReceived: 512,
+        expiresAt: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+      },
+    ])
+    const wrapper = mount(MovieImportDialog)
+    await openDialogAndLoadSessions(wrapper)
+
+    const abandonButton = wrapper.get<HTMLButtonElement>(
+      "[data-import-resumable-abandon='upload_abandon000001']",
+    )
+    await abandonButton.trigger("click")
+    expect(serviceState.abandonMovieImportUpload).not.toHaveBeenCalled()
+    expect(abandonButton.text()).toContain("import.abandonConfirm")
+
+    await abandonButton.trigger("click")
+    await flushPromises()
+
+    expect(serviceState.abandonMovieImportUpload).toHaveBeenCalledWith("upload_abandon000001")
+    expect(wrapper.find("[data-import-resumable-item]").exists()).toBe(false)
   })
 })

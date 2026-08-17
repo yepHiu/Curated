@@ -92,7 +92,7 @@ import {
   mergeMockPrefsIntoMovie,
   upsertMockMoviePrefs,
 } from "@/lib/mock-movie-prefs-storage"
-import type { LibraryService } from "@/services/contracts/library-service"
+import type { LibraryService, ResumableMovieImportSession } from "@/services/contracts/library-service"
 import {
   getCuratedFrameExportMode,
   setCuratedFrameExportMode as persistCuratedFrameExportMode,
@@ -1755,6 +1755,15 @@ export const mockLibraryService: LibraryService = {
   async scanLibraryPaths() {
     // Mock: no backend scan.
     return null
+  },
+
+  async listResumableMovieImports(): Promise<ResumableMovieImportSession[]> {
+    // Mock 没有真实上传会话，不存在可恢复条目。
+    return []
+  },
+
+  async abandonMovieImportUpload(): Promise<void> {
+    // Mock 没有可放弃的续传会话。
   },
 
   async getTaskStatus(taskId: string): Promise<TaskDTO> {

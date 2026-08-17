@@ -28,6 +28,7 @@ import type {
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   MovieImportUploadProgress,
+  MovieImportUploadFileManifest,
   NativePlaybackLaunchDTO,
   MovieCommentDTO,
   PersonalInsightsBreakdownDTO,
@@ -55,6 +56,16 @@ import type {
 } from "@/api/types"
 import type { LibrarySetting, LibraryStat } from "@/domain/library/types"
 import type { Movie } from "@/domain/movie/types"
+
+/** 一个可继续的断点续传上传会话（本地账本 + 后端状态核对后的视图模型）。 */
+export interface ResumableMovieImportSession {
+  uploadId: string
+  /** 会话创建时的文件指纹（relativePath + size + lastModified），用于匹配重新选择的文件。 */
+  files: MovieImportUploadFileManifest[]
+  totalBytes: number
+  bytesReceived: number
+  expiresAt?: string
+}
 
 export interface LibraryService {
   movies: ComputedRef<readonly Movie[]>
@@ -148,10 +159,21 @@ export interface LibraryService {
   removeLibraryPath(id: string): Promise<void>
   revealLibraryPathInFileManager(id: string): Promise<void>
   setDefaultImportLibraryPathId(id: string): Promise<void>
+  /**
+   * 导入影片。resumeUploadId 指向既有续传会话时只补传缺失分片再提交；
+   * Web 下大文件自动走断点续传并把会话写入本地账本。
+   */
   importMovies(
     files: File[],
-    options?: { onUploadProgress?: (progress: MovieImportUploadProgress) => void },
+    options?: {
+      onUploadProgress?: (progress: MovieImportUploadProgress) => void
+      resumeUploadId?: string
+    },
   ): Promise<TaskDTO | null>
+  /** 当前可继续的续传会话列表（Web：本地账本 + 后端状态核对；Mock：恒为空）。 */
+  listResumableMovieImports(): Promise<ResumableMovieImportSession[]>
+  /** 放弃一个未完成的续传会话：删除服务端暂存与本地账本条目。 */
+  abandonMovieImportUpload(uploadId: string): Promise<void>
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>

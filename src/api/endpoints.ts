@@ -137,6 +137,10 @@ interface MovieImportApiOptions {
   resumableThresholdBytes?: number
   resumableChunkMaxAttempts?: number
   resumableChunkRetryDelayMs?: number
+  /** 续传既有会话（GET 状态 → 只补传缺失分片 → commit），而不是新建会话。 */
+  resumeUploadId?: string
+  /** 新建续传会话成功后回调（供调用方写入本地账本）。 */
+  onUploadSessionCreated?: (upload: MovieImportUploadDTO) => void
 }
 
 function relativePathForFile(file: File): string {
@@ -152,13 +156,16 @@ function shouldUseResumableImport(
 }
 
 function movieImportUploadManifest(files: File[]): CreateMovieImportUploadBody {
-  return {
-    files: files.map((file) => ({
-      relativePath: relativePathForFile(file),
-      size: file.size,
-      lastModified: file.lastModified,
-    })),
-  }
+  return { files: movieImportUploadFileManifests(files) }
+}
+
+/** 导出给适配层写入本地续传账本（relativePath + size + lastModified 指纹）。 */
+export function movieImportUploadFileManifests(files: File[]): CreateMovieImportUploadBody["files"] {
+  return files.map((file) => ({
+    relativePath: relativePathForFile(file),
+    size: file.size,
+    lastModified: file.lastModified,
+  }))
 }
 
 function findUploadFileSource(files: File[], relativePath: string, fallbackIndex: number): File {
@@ -213,7 +220,8 @@ async function uploadMovieFileChunks(
   } = {},
 ): Promise<void> {
   const chunkSize = upload.chunkSize > 0 ? upload.chunkSize : 32 * 1024 * 1024
-  let completedBytes = 0
+  // 续传时服务端已收到的字节作为进度基线，本次只累加新上传的分片
+  let completedBytes = Math.max(0, Math.min(upload.bytesReceived, upload.totalBytes))
   const chunkRetryOptions = {
     maxAttempts: options.chunkMaxAttempts ?? DEFAULT_UPLOAD_CHUNK_MAX_ATTEMPTS,
     retryDelayMs: options.chunkRetryDelayMs ?? DEFAULT_UPLOAD_CHUNK_RETRY_DELAY_MS,
@@ -222,11 +230,28 @@ async function uploadMovieFileChunks(
   for (let fileIndex = 0; fileIndex < upload.files.length; fileIndex += 1) {
     const uploadFile = upload.files[fileIndex]
     const sourceFile = findUploadFileSource(files, uploadFile.relativePath, fileIndex)
+    if (sourceFile.size !== uploadFile.size) {
+      throw new Error(
+        `Selected file does not match upload session entry ${uploadFile.relativePath}; start a new import instead`,
+      )
+    }
+    const persistedChunks = new Map((uploadFile.chunks ?? []).map((chunk) => [chunk.index, chunk]))
     for (let offset = 0, chunkIndex = 0; offset < sourceFile.size; chunkIndex += 1) {
       const end = Math.min(offset + chunkSize, sourceFile.size)
-      const chunk = sourceFile.slice(offset, end)
       const chunkBytes = end - offset
       const chunkOffset = offset
+      const persisted = persistedChunks.get(chunkIndex)
+      if (persisted) {
+        if (persisted.offset !== chunkOffset || persisted.size !== chunkBytes) {
+          throw new Error(
+            `Upload session chunk layout mismatch for ${uploadFile.relativePath}; start a new import instead`,
+          )
+        }
+        // 服务端已有该分片，跳过重传
+        offset = end
+        continue
+      }
+      const chunk = sourceFile.slice(offset, end)
       await putMovieImportChunkWithRetry(
         `/import/movies/uploads/${encodeURIComponent(upload.uploadId)}/files/${encodeURIComponent(uploadFile.fileId)}/chunks/${chunkIndex}`,
         chunk,
@@ -268,6 +293,27 @@ async function uploadMovieFileChunks(
       })
     }
   }
+}
+
+async function resumeMovieImportUpload(
+  uploadId: string,
+  files: File[],
+  options: MovieImportApiOptions = {},
+): Promise<TaskDTO> {
+  const upload = await httpClient.get<MovieImportUploadDTO>(
+    `/import/movies/uploads/${encodeURIComponent(uploadId)}`,
+  )
+  if (upload.state !== "uploading") {
+    throw new Error(`Upload session ${uploadId} is no longer accepting chunks`)
+  }
+  await uploadMovieFileChunks(upload, files, {
+    onUploadProgress: options.onUploadProgress,
+    chunkMaxAttempts: options.resumableChunkMaxAttempts,
+    chunkRetryDelayMs: options.resumableChunkRetryDelayMs,
+  })
+  return httpClient.post<TaskDTO>(
+    `/import/movies/uploads/${encodeURIComponent(uploadId)}/commit`,
+  )
 }
 
 export const api = {
@@ -585,10 +631,14 @@ export const api = {
     files: File[],
     options?: MovieImportApiOptions,
   ): Promise<TaskDTO> {
+    if (options?.resumeUploadId?.trim()) {
+      return resumeMovieImportUpload(options.resumeUploadId.trim(), files, options)
+    }
     if (shouldUseResumableImport(files, options?.resumableThresholdBytes)) {
       return httpClient
         .post<MovieImportUploadDTO>("/import/movies/uploads", movieImportUploadManifest(files))
         .then(async (upload) => {
+          options?.onUploadSessionCreated?.(upload)
           await uploadMovieFileChunks(upload, files, {
             onUploadProgress: options?.onUploadProgress,
             chunkMaxAttempts: options?.resumableChunkMaxAttempts,
@@ -613,6 +663,16 @@ export const api = {
     return httpClient.postFormWithProgress<TaskDTO>("/import/movies", form, {
       onUploadProgress: options?.onUploadProgress,
     })
+  },
+
+  getMovieImportUpload(uploadId: string): Promise<MovieImportUploadDTO> {
+    return httpClient.get<MovieImportUploadDTO>(
+      `/import/movies/uploads/${encodeURIComponent(uploadId)}`,
+    )
+  },
+
+  deleteMovieImportUpload(uploadId: string): Promise<void> {
+    return httpClient.delete(`/import/movies/uploads/${encodeURIComponent(uploadId)}`)
   },
 
   addLibraryPath(body: AddLibraryPathBody): Promise<AddLibraryPathResultDTO> {

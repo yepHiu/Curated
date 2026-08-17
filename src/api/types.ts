@@ -567,6 +567,12 @@ export interface CreateMovieImportUploadBody {
   files: MovieImportUploadFileManifest[]
 }
 
+export interface MovieImportUploadChunkDTO {
+  index: number
+  offset: number
+  size: number
+}
+
 export interface MovieImportUploadFileDTO {
   fileId: string
   relativePath: string
@@ -574,6 +580,8 @@ export interface MovieImportUploadFileDTO {
   bytesReceived: number
   complete: boolean
   state?: string
+  /** Persisted chunk ranges; lets a resumed client skip already-uploaded chunks. */
+  chunks?: MovieImportUploadChunkDTO[]
 }
 
 export interface MovieImportUploadDTO {
