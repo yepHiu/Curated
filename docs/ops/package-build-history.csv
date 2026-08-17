@@ -452,3 +452,14 @@ e099d1c1 perf: persist media probe results across restarts
 51b31c9a perf: pace ffmpeg session input at 2.5x realtime
 8aadc8bc perf: keyframe-aligned remux for mid-stream HLS starts
 806df1d8 feat: add pure clustering util for player frame markers",versionSource=auto-patch; BuildStamp=20260816.162419; portable=versionSource=explicit; installer=versionSource=explicit
+2026-08-18,1.5.4,acfa1062,master,release:publish,release/manifest/release.json,失败,wujiahui,"acfa1062 i18n: add playlist, import resume, and bookmark copy
+3b3d88b5 docs: record AI integration research notes
+af63aa18 fix: keep saved-view nested menus as separate panels
+776173db docs: capture player playlist first-slice requirements
+51bd3b74 feat: play a library or actor queue from the player
+cb219c13 feat: double-click library cards to play and shift-select in batch
+238d456f docs: record movie import resume and scan-alignment work
+6bb0782a feat: resume interrupted movie import uploads
+76d166a4 fix: scan imported video types and preflight import disk space
+b1ce2dcc chore(release): publish Curated 1.5.3",versionSource=auto-patch; BuildStamp=20260817.165452; error=pnpm typecheck failed with exit code 2
+2026-08-18,1.5.4,d620ebb9,master,release:publish,release/portable/Curated-1.5.4-windows-x64.zip; release/installer/Curated-Setup-1.5.4.exe; release/manifest/release.json,成功,wujiahui,d620ebb9 fix: drop invalid exists() check in playlist reveal tab test,versionSource=auto-patch; BuildStamp=20260817.165606; portable=versionSource=explicit; installer=versionSource=explicit
