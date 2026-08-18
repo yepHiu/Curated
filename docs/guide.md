@@ -268,6 +268,9 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [PRD ledger](prd/requirements.csv) | Stable `REQ-xxxx` status |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
+| [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
+| [Agent user-facing PRD](plan/2026-08-19-agent-user-prd.md) | Initial user-side Agent requirements (REQ-0029 through REQ-0043) |
+| [Agent milestone plan](plan/2026-08-19-agent-milestone-plan.md) | Execution milestones E1-E4 with the experimental gate and floating Agent Window |
 | [Library filter strengthening](plan/2026-08-14-library-filter-strengthening.md) | Current library filter work (REQ-0026) |
 | [Scrape governance](plan/2026-08-14-scrape-governance-implementation-plan.md) | Current scrape-governance work (REQ-0023) |
 | [Actor missing-profile auto-scrape](plan/2026-08-16-actor-missing-profile-auto-scrape.md) | Actor backfill scrape (REQ-0027) |

@@ -1,6 +1,7 @@
 # AI 接入调研（2026-08-17）
 
 > 状态：调研文档（未实施）。产品：Curated。范围：AI/LLM 能力接入的场景、对外接口、Agent 集成方式与现成方案、可拓展的需求方向。
+> 后续深化：能力分层、原子工具注册表与交互布局设计见 `2026-08-18-agent-capability-and-interaction-design.md`。
 > 结论基于当前代码事实（`backend/` Go + SQLite、`src/` Vue3 + shadcn-vue、服务层 web/mock 双适配）与 2026-08 外部生态调研。
 
 ## 0. 现状基线（与 AI 接入相关的事实）
