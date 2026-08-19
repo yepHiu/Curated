@@ -125,6 +125,18 @@ type PlayerSettingsController interface {
 	SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error
 }
 
+// AISettingsController exposes and updates the experimental agent provider configuration (library-config.cfg).
+type AISettingsController interface {
+	AIProviderSettings() contracts.AIProviderSettingsDTO
+	SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) error
+}
+
+// AIChatProvider streams experimental agent chat completions and tests provider connectivity.
+type AIChatProvider interface {
+	StreamAIChat(ctx context.Context, messages []contracts.AIChatMessage, onDelta func(string)) error
+	TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) contracts.AIProviderTestResponse
+}
+
 // LaunchAtLoginController exposes whether Windows login autostart is enabled and whether the current runtime supports it.
 type LaunchAtLoginController interface {
 	LaunchAtLogin() bool
@@ -251,6 +263,8 @@ type Handler struct {
 	proxyCtl                       ProxyController
 	backendLogCtl                  BackendLogSettingsController
 	playerSettingsCtl              PlayerSettingsController
+	aiSettingsCtl                  AISettingsController
+	aiChatProvider                 AIChatProvider
 	movieMetadataRefresher         MovieMetadataRefresher
 	actorProfileRefresher          ActorProfileRefresher
 	libraryWatchReloader           LibraryWatchReloader
@@ -292,6 +306,8 @@ type Deps struct {
 	ProxyCtl                         ProxyController
 	BackendLogCtl                    BackendLogSettingsController
 	PlayerSettingsCtl                PlayerSettingsController
+	AISettingsCtl                    AISettingsController
+	AIChatProvider                   AIChatProvider
 	MovieMetadataRefresher           MovieMetadataRefresher
 	ActorProfileRefresher            ActorProfileRefresher
 	LibraryWatchReloader             LibraryWatchReloader
@@ -356,6 +372,8 @@ func NewHandler(deps Deps) *Handler {
 		proxyCtl:                       deps.ProxyCtl,
 		backendLogCtl:                  deps.BackendLogCtl,
 		playerSettingsCtl:              deps.PlayerSettingsCtl,
+		aiSettingsCtl:                  deps.AISettingsCtl,
+		aiChatProvider:                 deps.AIChatProvider,
 		movieMetadataRefresher:         deps.MovieMetadataRefresher,
 		actorProfileRefresher:          deps.ActorProfileRefresher,
 		libraryWatchReloader:           deps.LibraryWatchReloader,
@@ -495,6 +513,9 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
 	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
+
+	mux.HandleFunc("POST /api/ai/provider/test", h.handleAIProviderTest)
+	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
 
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
@@ -1846,6 +1867,9 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 			Password: p.Password,
 		}
 	}
+	if h.aiSettingsCtl != nil {
+		dto.AIProvider = h.aiSettingsCtl.AIProviderSettings()
+	}
 	if h.backendLogCtl != nil {
 		dto.BackendLog = h.backendLogCtl.BackendLogSettings()
 	}
@@ -1957,7 +1981,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1971,7 +1995,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2312,6 +2336,32 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,
 				message: fixedSettingsPatchMessage("failed to save proxy settings"),
+			},
+		})
+	}
+
+	if body.AIProvider != nil {
+		if h.aiSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai provider settings not available")
+			return
+		}
+		prev := h.aiSettingsCtl.AIProviderSettings()
+		target := *body.AIProvider
+		ops = append(ops, settingsPatchOperation{
+			name:  "aiProvider",
+			apply: func() error { return h.aiSettingsCtl.SetAIProviderSettingsPatch(target) },
+			rollback: func() error {
+				return h.aiSettingsCtl.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{
+					Kind:    &prev.Kind,
+					BaseURL: &prev.BaseURL,
+					APIKey:  &prev.APIKey,
+					Model:   &prev.Model,
+				})
+			},
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
 			},
 		})
 	}

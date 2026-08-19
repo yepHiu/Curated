@@ -71,6 +71,8 @@ type Config struct {
 	Player                 PlayerConfig  `json:"player"`
 	// Proxy configures HTTP/SOCKS5 proxy for outbound metadata scraping requests. Persisted in library-config.cfg.
 	Proxy ProxyConfig `json:"proxy,omitempty"`
+	// AIProvider configures the experimental agent LLM provider (OpenAI-compatible chat completions). Persisted in library-config.cfg.
+	AIProvider AIProviderConfig `json:"aiProvider,omitempty"`
 }
 
 // TaskConfig holds timeout and concurrency settings for background tasks.
@@ -138,6 +140,35 @@ type ProxyConfig struct {
 	Username string `json:"username,omitempty"`
 	// Password for proxy authentication (optional).
 	Password string `json:"password,omitempty"`
+}
+
+// AIProviderKindOpenAICompatible is the only provider protocol recognized by the experimental agent.
+const AIProviderKindOpenAICompatible = "openai-compatible"
+
+// AIProviderConfig configures the experimental AI agent provider. All fields may be
+// empty, which means "not configured" (agent UI degrades to setup guidance).
+type AIProviderConfig struct {
+	// Kind selects the provider protocol; empty normalizes to openai-compatible.
+	Kind string `json:"kind,omitempty"`
+	// BaseURL is the OpenAI-compatible API root, e.g. http://127.0.0.1:11434/v1.
+	BaseURL string `json:"baseUrl,omitempty"`
+	// APIKey is the bearer token sent as Authorization; empty for local servers without auth.
+	APIKey string `json:"apiKey,omitempty"`
+	// Model is the chat completions model name, e.g. qwen3 or gpt-4o-mini.
+	Model string `json:"model,omitempty"`
+}
+
+// NormalizeAIProviderKind returns the canonical provider kind for cfg.
+func NormalizeAIProviderKind(kind string) string {
+	if strings.TrimSpace(strings.ToLower(kind)) == "" {
+		return AIProviderKindOpenAICompatible
+	}
+	return strings.TrimSpace(strings.ToLower(kind))
+}
+
+// ValidAIProviderKind reports whether kind is a recognized provider protocol.
+func ValidAIProviderKind(kind string) bool {
+	return NormalizeAIProviderKind(kind) == AIProviderKindOpenAICompatible
 }
 
 // DefaultHTTPAddr returns the compiled loopback-only HTTP listen address:

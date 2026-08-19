@@ -32,6 +32,9 @@ import type {
   PatchBackendLogBody,
   PatchMovieBody,
   PatchPlayerSettingsBody,
+  AIProviderSettingsDTO,
+  AIProviderTestResponse,
+  PatchAIProviderBody,
   PlayerSettingsDTO,
   ProxySettingsDTO,
   SettingsDTO,
@@ -84,6 +87,8 @@ const metadataMovieProvidersState = ref<string[]>([])
 const metadataMovieProviderChainState = ref<string[]>([])
 const metadataMovieScrapeModeState = ref<MetadataMovieScrapeMode>("auto")
 const proxyState = ref<ProxySettingsDTO>({ enabled: false })
+const aiProviderState = ref<AIProviderSettingsDTO>({ kind: "openai-compatible", baseUrl: "", model: "" })
+let aiProviderSaveSeq = 0
 const playerSettingsState = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
@@ -387,6 +392,7 @@ async function refreshLibraryPathsFromApi() {
     applyPlayerSettingsFromDTO(settings)
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
+    aiProviderState.value = settings.aiProvider ?? { kind: "openai-compatible", baseUrl: "", model: "" }
     backendLogState.value = settings.backendLog ?? {
       logDir: "",
       logLevel: "info",
@@ -433,6 +439,7 @@ function createWebLibraryService(): LibraryService {
     metadataMovieProviderChain: computed(() => metadataMovieProviderChainState.value),
     metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeState.value),
     proxy: computed(() => proxyState.value),
+    aiProvider: computed(() => aiProviderState.value),
     playerSettings: computed(() => playerSettingsState.value),
     backendLog: computed(() => backendLogState.value),
 
@@ -454,6 +461,33 @@ function createWebLibraryService(): LibraryService {
         }
         throw err
       }
+    },
+
+    async setAIProvider(patch: PatchAIProviderBody) {
+      const seq = ++aiProviderSaveSeq
+      const prev = aiProviderState.value
+      aiProviderState.value = {
+        ...prev,
+        ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
+        ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey } : {}),
+        ...(patch.model !== undefined ? { model: patch.model } : {}),
+      }
+      try {
+        const next = await api.patchSettings({ aiProvider: patch })
+        if (seq === aiProviderSaveSeq) {
+          aiProviderState.value =
+            next.aiProvider ?? { kind: "openai-compatible", baseUrl: "", model: "" }
+        }
+      } catch (err) {
+        if (seq === aiProviderSaveSeq) {
+          aiProviderState.value = prev
+        }
+        throw err
+      }
+    },
+
+    async testAIProvider(provider?: AIProviderSettingsDTO): Promise<AIProviderTestResponse> {
+      return api.testAIProvider(provider ? { provider } : {})
     },
 
     async patchPlayerSettings(patch: PatchPlayerSettingsBody) {

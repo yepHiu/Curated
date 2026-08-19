@@ -144,6 +144,11 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 	}
+	if v, ok := m["aiProvider"]; ok {
+		if err := parseAIProviderConfig(v, &cfg.AIProvider); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
 	if v, ok := m["logDir"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {
@@ -451,6 +456,49 @@ func parseJSONBool(v any, key string) (bool, error) {
 	default:
 		return false, fmt.Errorf("%s: unsupported type %T", key, v)
 	}
+}
+
+// parseAIProviderConfig parses a JSON object into AIProviderConfig.
+func parseAIProviderConfig(v any, cfg *AIProviderConfig) error {
+	if v == nil {
+		return nil
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("aiProvider: expected object, got %T", v)
+	}
+	if kind, ok := m["kind"]; ok {
+		s, err := parseJSONStringTrim(kind)
+		if err != nil {
+			return fmt.Errorf("aiProvider.kind: %w", err)
+		}
+		if !ValidAIProviderKind(s) {
+			return fmt.Errorf("aiProvider.kind: unsupported kind %q", s)
+		}
+		cfg.Kind = NormalizeAIProviderKind(s)
+	}
+	if url, ok := m["baseUrl"]; ok {
+		s, err := parseJSONStringTrim(url)
+		if err != nil {
+			return fmt.Errorf("aiProvider.baseUrl: %w", err)
+		}
+		cfg.BaseURL = s
+	}
+	if apiKey, ok := m["apiKey"]; ok {
+		s, err := parseJSONStringTrim(apiKey)
+		if err != nil {
+			return fmt.Errorf("aiProvider.apiKey: %w", err)
+		}
+		cfg.APIKey = s
+	}
+	if model, ok := m["model"]; ok {
+		s, err := parseJSONStringTrim(model)
+		if err != nil {
+			return fmt.Errorf("aiProvider.model: %w", err)
+		}
+		cfg.Model = s
+	}
+	return nil
 }
 
 // parseProxyConfig parses a JSON object into ProxyConfig.

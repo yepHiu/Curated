@@ -833,4 +833,11 @@ export const api = {
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse> {
     return httpClient.post<ProxyJavBusPingResponse>("/proxy/ping-google", body ?? {})
   },
+
+  /** 实验：测试 Agent provider 连通；provider 缺省时测试已保存配置 */
+  testAIProvider(
+    body?: import("./types").AIProviderTestRequestBody,
+  ): Promise<import("./types").AIProviderTestResponse> {
+    return httpClient.post<import("./types").AIProviderTestResponse>("/ai/provider/test", body ?? {})
+  },
 }

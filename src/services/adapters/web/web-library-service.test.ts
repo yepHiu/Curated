@@ -91,6 +91,7 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
     metadataMovieProviderChain: [],
     metadataMovieScrapeMode: "auto",
     proxy: { enabled: false },
+    aiProvider: { kind: "openai-compatible", baseUrl: "", model: "" },
     backendLog: {
       logDir: "",
       logLevel: "info",

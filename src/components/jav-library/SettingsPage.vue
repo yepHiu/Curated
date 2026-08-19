@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   inject,
   nextTick,
   onBeforeUnmount,
@@ -61,6 +62,10 @@ import SettingsLibraryPathsSection from "@/components/jav-library/settings/Setti
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
+/** 实验性功能区懒加载，避免 SettingsView chunk 超出首屏预算（bundle budget 硬门） */
+const SettingsExperimentalSection = defineAsyncComponent(
+  () => import("@/components/jav-library/settings/SettingsExperimentalSection.vue"),
+)
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
@@ -2318,6 +2323,21 @@ async function runMetadataRefreshForSelected() {
         :health-supported="useWebApi"
         @run-full-scan="runFullScan"
       />
+    </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('experimental')"
+      value="experimental"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
+    <section
+      id="settings-section-experimental"
+      class="space-y-6"
+      :aria-label="t('settings.navExperimental')"
+    >
+    <h2 class="sr-only">{{ t("settings.navExperimental") }}</h2>
+      <SettingsExperimentalSection :use-web-api="useWebApi" />
     </section>
     </TabsContent>
 

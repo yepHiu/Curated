@@ -8,6 +8,9 @@ import type {
   ApplyActorMergeRequest,
   ActorProfileDTO,
   ActorsListDTO,
+  AIProviderSettingsDTO,
+  AIProviderTestResponse,
+  PatchAIProviderBody,
   BackendLogSettingsDTO,
   BackupManifestDTO,
   BackupRestorePreflightDTO,
@@ -128,6 +131,11 @@ export interface LibraryService {
   /** HTTP 代理配置 */
   proxy: ComputedRef<ProxySettingsDTO>
   setProxy(config: ProxySettingsDTO): Promise<void>
+  /** 实验性 Agent provider 配置（Web：library-config.cfg；Mock：localStorage） */
+  aiProvider: ComputedRef<AIProviderSettingsDTO>
+  setAIProvider(patch: PatchAIProviderBody): Promise<void>
+  /** 实验：测试 provider 连通；可选传草稿配置（不先保存） */
+  testAIProvider(provider?: AIProviderSettingsDTO): Promise<AIProviderTestResponse>
   /** 播放器 / HLS / 原生播放器偏好 */
   playerSettings: ComputedRef<PlayerSettingsDTO>
   patchPlayerSettings(patch: PatchPlayerSettingsBody): Promise<void>

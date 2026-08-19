@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
-import { LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
+import { Bot, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import MovieImportDialog from "@/components/jav-library/MovieImportDialog.vue"
@@ -42,6 +42,16 @@ import NotificationCenter from "@/components/notification-center/NotificationCen
 import { useTheme } from "@/composables/use-theme"
 import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAgentWindow } from "@/composables/use-agent-window"
+
+/** 实验性 Agent Window：懒加载，不进首屏 bundle（开关默认关闭时零成本） */
+const AgentWindowPanel = defineAsyncComponent(
+  () => import("@/components/agent-window/AgentWindow.vue"),
+)
+
+const { enabled: agentEnabled } = useExperimentalAgent()
+const { open: agentWindowOpen, openWindow: openAgentWindow } = useAgentWindow()
 
 useLibraryWatchToasts()
 useLibraryStorageStatusAlerts()
@@ -888,6 +898,20 @@ function clearActorsSearch() {
               class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
             >
               <MovieImportDialog />
+              <Button
+                v-if="agentEnabled"
+                type="button"
+                variant="ghost"
+                size="icon"
+                data-agent-entry
+                class="size-11 rounded-2xl text-muted-foreground hover:bg-muted/70 hover:text-foreground lg:size-9"
+                :class="agentWindowOpen ? 'text-primary' : ''"
+                :aria-label="t('shell.agentWindowAria')"
+                :title="t('shell.agentWindowAria')"
+                @click="openAgentWindow"
+              >
+                <Bot class="size-5" aria-hidden="true" />
+              </Button>
               <NotificationCenter />
               <Button
                 type="button"
@@ -918,6 +942,7 @@ function clearActorsSearch() {
     </div>
 
     <ScanProgressDock />
+    <AgentWindowPanel v-if="agentEnabled" />
     <DevPerformanceBar v-if="isDev" />
     <Toaster :theme="resolvedMode" />
 

@@ -916,6 +916,8 @@ type SettingsDTO struct {
 	MetadataMovieStrategy string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
+	// AIProvider is the experimental agent LLM provider configuration (library-config.cfg).
+	AIProvider AIProviderSettingsDTO `json:"aiProvider"`
 	// BackendLog: file/console log settings persisted in library-config.cfg; restart backend to apply to Zap sinks.
 	BackendLog BackendLogSettingsDTO `json:"backendLog"`
 }
@@ -958,6 +960,47 @@ type ProxyJavBusPingResponse struct {
 	Message    string `json:"message,omitempty"`
 }
 
+// AIProviderSettingsDTO mirrors config.AIProviderConfig for the Settings experimental section.
+// All fields may be empty, meaning the agent provider is not configured yet.
+type AIProviderSettingsDTO struct {
+	Kind    string `json:"kind"`
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey,omitempty"`
+	Model   string `json:"model"`
+}
+
+// PatchAIProviderSettings is the partial update for aiProvider; nil pointer = leave unchanged.
+type PatchAIProviderSettings struct {
+	Kind    *string `json:"kind,omitempty"`
+	BaseURL *string `json:"baseUrl,omitempty"`
+	APIKey  *string `json:"apiKey,omitempty"`
+	Model   *string `json:"model,omitempty"`
+}
+
+// AIProviderTestRequest is the body for POST /api/ai/provider/test. When Provider
+// is nil the currently persisted provider config is tested (same contract as proxy pings).
+type AIProviderTestRequest struct {
+	Provider *AIProviderSettingsDTO `json:"provider,omitempty"`
+}
+
+// AIProviderTestResponse reports whether the provider answers a minimal chat completion.
+type AIProviderTestResponse struct {
+	OK        bool   `json:"ok"`
+	LatencyMs int64  `json:"latencyMs"`
+	Message   string `json:"message,omitempty"`
+}
+
+// AIChatMessage is one message of an experimental agent chat turn (system | user | assistant).
+type AIChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// AIChatRequest is the body for POST /api/ai/chat (E1: plain streaming chat, no tools).
+type AIChatRequest struct {
+	Messages []AIChatMessage `json:"messages"`
+}
+
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
 	OrganizeLibrary            *bool                   `json:"organizeLibrary,omitempty"`
@@ -979,6 +1022,8 @@ type PatchSettingsRequest struct {
 	MetadataMovieStrategy *string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy: nil = no change; non-nil object replaces current proxy config.
 	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
+	// AIProvider: nil = no change; non-nil partial fields merge into the experimental agent provider config.
+	AIProvider *PatchAIProviderSettings `json:"aiProvider,omitempty"`
 	// BackendLog: nil = no change; non-empty partial fields merge into current and persist.
 	BackendLog *PatchBackendLogSettings `json:"backendLog,omitempty"`
 }
@@ -1005,12 +1050,12 @@ type MovieImportUploadChunkDTO struct {
 
 // MovieImportUploadFileDTO reports server-side state for one resumable import file.
 type MovieImportUploadFileDTO struct {
-	FileID        string                       `json:"fileId"`
-	RelativePath  string                       `json:"relativePath"`
-	Size          int64                        `json:"size"`
-	BytesReceived int64                        `json:"bytesReceived"`
-	Complete      bool                         `json:"complete"`
-	State         string                       `json:"state,omitempty"`
+	FileID        string                      `json:"fileId"`
+	RelativePath  string                      `json:"relativePath"`
+	Size          int64                       `json:"size"`
+	BytesReceived int64                       `json:"bytesReceived"`
+	Complete      bool                        `json:"complete"`
+	State         string                      `json:"state,omitempty"`
 	Chunks        []MovieImportUploadChunkDTO `json:"chunks,omitempty"`
 }
 
@@ -1481,6 +1526,8 @@ const (
 	ErrorCodeSavedViewLimit                       = "SAVED_VIEW_LIMIT_REACHED"
 	ErrorCodeRecommendationFeedbackInvalid        = "RECOMMENDATION_FEEDBACK_INVALID"
 	ErrorCodeRecommendationFeedbackTargetNotFound = "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND"
+	ErrorCodeAIProviderUnavailable                = "AI_PROVIDER_UNAVAILABLE"
+	ErrorCodeAIChatFailed                         = "AI_CHAT_FAILED"
 	ErrorCodeRecommendationFeedbackLimit          = "RECOMMENDATION_FEEDBACK_LIMIT_REACHED"
 	ErrorCodeActorMergeInvalid                    = "ACTOR_MERGE_INVALID"
 	ErrorCodeActorMergeNotFound                   = "ACTOR_MERGE_NOT_FOUND"

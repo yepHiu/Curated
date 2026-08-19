@@ -115,6 +115,36 @@ const metadataMovieProviderChainMock = ref<string[]>([])
 const metadataMovieScrapeModeMock = ref<MetadataMovieScrapeMode>("auto")
 /** Mock：HTTP 代理配置 */
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
+/** Mock：实验性 Agent provider 配置（localStorage 持久化，便于刷新后保留演示配置） */
+const AI_PROVIDER_MOCK_STORAGE_KEY = "curated-ai-provider-mock-v1"
+
+function readAIProviderMock(): import("@/api/types").AIProviderSettingsDTO {
+  try {
+    const raw = localStorage.getItem(AI_PROVIDER_MOCK_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as import("@/api/types").AIProviderSettingsDTO
+      return {
+        kind: parsed.kind || "openai-compatible",
+        baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
+        apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+        model: typeof parsed.model === "string" ? parsed.model : "",
+      }
+    }
+  } catch {
+    // ignore malformed local storage
+  }
+  return { kind: "openai-compatible", baseUrl: "", model: "" }
+}
+
+function persistAIProviderMock(value: import("@/api/types").AIProviderSettingsDTO) {
+  try {
+    localStorage.setItem(AI_PROVIDER_MOCK_STORAGE_KEY, JSON.stringify(value))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+const aiProviderMock = ref<import("@/api/types").AIProviderSettingsDTO>(readAIProviderMock())
 const playerSettingsMock = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
@@ -1135,11 +1165,35 @@ export const mockLibraryService: LibraryService = {
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
   metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeMock.value),
   proxy: computed(() => proxyMock.value),
+  aiProvider: computed(() => aiProviderMock.value),
   playerSettings: computed(() => playerSettingsMock.value),
   backendLog: computed(() => backendLogMock.value),
 
   async setProxy(config: import("@/api/types").ProxySettingsDTO) {
     proxyMock.value = { ...config }
+  },
+
+  async setAIProvider(patch: import("@/api/types").PatchAIProviderBody) {
+    const prev = aiProviderMock.value
+    const next: import("@/api/types").AIProviderSettingsDTO = {
+      ...prev,
+      ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
+      ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey } : {}),
+      ...(patch.model !== undefined ? { model: patch.model } : {}),
+    }
+    aiProviderMock.value = next
+    persistAIProviderMock(next)
+  },
+
+  async testAIProvider(
+    provider?: import("@/api/types").AIProviderSettingsDTO,
+  ): Promise<import("@/api/types").AIProviderTestResponse> {
+    const target = provider ?? aiProviderMock.value
+    if (!target.baseUrl.trim() || !target.model.trim()) {
+      return { ok: false, latencyMs: 0, message: "mock: baseUrl and model are required" }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return { ok: true, latencyMs: 42 }
   },
 
   async patchPlayerSettings(patch: PatchPlayerSettingsBody) {

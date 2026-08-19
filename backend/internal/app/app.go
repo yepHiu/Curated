@@ -101,6 +101,8 @@ type App struct {
 	autoActorProfileSweepMu         sync.Mutex
 	// playerSettingsMu protects cfg.Player and live playback-runtime updates.
 	playerSettingsMu sync.RWMutex
+	// aiProviderMu protects cfg.AIProvider (library-config.cfg) for the experimental agent.
+	aiProviderMu sync.RWMutex
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
 	metadataMovieMu            sync.RWMutex
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
@@ -2796,6 +2798,8 @@ func (a *App) HTTPHandler() http.Handler {
 			ProxyCtl:                         a,
 			BackendLogCtl:                    a,
 			PlayerSettingsCtl:                a,
+			AISettingsCtl:                    a,
+			AIChatProvider:                   a,
 			MovieMetadataRefresher:           a,
 			ActorProfileRefresher:            a,
 			LibraryWatchReloader:             a,

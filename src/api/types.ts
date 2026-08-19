@@ -318,6 +318,8 @@ export interface SettingsDTO {
   metadataMovieStrategy?: MetadataMovieStrategy
   /** HTTP 代理配置 */
   proxy: ProxySettingsDTO
+  /** 实验性 Agent provider 配置（library-config.cfg） */
+  aiProvider: AIProviderSettingsDTO
   /** 后端进程日志（文件 + 级别）；重启后端后作用于 Zap */
   backendLog: BackendLogSettingsDTO
 }
@@ -327,6 +329,38 @@ export interface ProxySettingsDTO {
   url?: string
   username?: string
   password?: string
+}
+
+/** 实验：Agent LLM provider 配置（OpenAI 兼容）；baseUrl/model 为空表示未配置 */
+export interface AIProviderSettingsDTO {
+  kind: string
+  baseUrl: string
+  apiKey?: string
+  model: string
+}
+
+/** 实验：Agent provider 局部更新；未发送字段保持不变，空字符串清除 */
+export interface PatchAIProviderBody {
+  baseUrl?: string
+  apiKey?: string
+  model?: string
+}
+
+/** POST /api/ai/provider/test — 可选传入草稿配置而未保存时先测试 */
+export interface AIProviderTestRequestBody {
+  provider?: AIProviderSettingsDTO
+}
+
+export interface AIProviderTestResponse {
+  ok: boolean
+  latencyMs: number
+  message?: string
+}
+
+/** POST /api/ai/chat 的消息行（E1：纯流式对话，无工具） */
+export interface AIChatMessageDTO {
+  role: "system" | "user" | "assistant"
+  content: string
 }
 
 /** 后端日志目录与级别（library-config.cfg）；空 logDir 表示使用当前构建的默认日志目录 */
@@ -527,6 +561,8 @@ export interface PatchSettingsBody {
   metadataMovieStrategy?: MetadataMovieStrategy
   /** 代理配置；发送则替换当前配置 */
   proxy?: ProxySettingsDTO
+  /** 实验性 Agent provider 配置；发送则合并更新 */
+  aiProvider?: PatchAIProviderBody
   /** 合并写入后端日志设置 */
   backendLog?: PatchBackendLogBody
 }

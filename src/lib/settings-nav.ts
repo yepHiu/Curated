@@ -9,6 +9,7 @@ export type SettingsSectionSlug =
   | "curated"
   | "playback"
   | "maintenance"
+  | "experimental"
   | "about"
 
 export function settingsSectionDomId(slug: SettingsSectionSlug): string {
@@ -25,6 +26,7 @@ export const SETTINGS_NAV_ITEMS: { slug: SettingsSectionSlug; labelKey: string }
   { slug: "curated", labelKey: "settings.navCurated" },
   { slug: "playback", labelKey: "settings.navPlayback" },
   { slug: "maintenance", labelKey: "settings.navMaintenance" },
+  { slug: "experimental", labelKey: "settings.navExperimental" },
   { slug: "about", labelKey: "settings.navAbout" },
 ]
 
