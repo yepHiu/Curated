@@ -1,7 +1,7 @@
 # Agent 执行里程碑计划（E1–E4）
 
 日期：2026-08-19
-状态：proposed（执行计划；对应需求 REQ-0029～REQ-0043，均 `idea`）
+状态：in-progress（**E1 已实现**：全部自动化门通过——后端 `go build/vet/test`、前端 `typecheck/lint/test(863)/build`（含 bundle 预算）；真机联调（启动后端 + Ollama 实测对话）待用户验证。E2 起待启动。需求台账 REQ-0039/0043 已推进 `in_progress`）
 上游：[`2026-08-18-agent-charter.md`](2026-08-18-agent-charter.md)（宪法，B1–B7 基建不变）· [`2026-08-19-agent-user-prd.md`](2026-08-19-agent-user-prd.md)（用户需求）
 
 ## 0. 总原则（2026-08-19 用户决策）

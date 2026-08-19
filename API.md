@@ -2441,6 +2441,65 @@ Body 可选：
 
 成功：`200 ProxyJavBusPingResponse`
 
+### 4.15b Experimental Agent（实验性）
+
+实验性 Agent（E1，见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。两个端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。
+
+#### `POST /api/ai/provider/test`
+
+用途：用草稿 provider 配置或已保存配置发起一次极小的 chat completion，验证 OpenAI 兼容端点连通性。
+
+Body 可选：
+
+```json
+{
+  "provider": {
+    "kind": "openai-compatible",
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "apiKey": "",
+    "model": "qwen3"
+  }
+}
+```
+
+成功：`200 AIProviderTestResponse`
+
+```json
+{
+  "ok": true,
+  "latencyMs": 812,
+  "message": ""
+}
+```
+
+说明：
+
+- 省略 `provider` 时测试当前持久化配置；出站走已配置的代理，超时约 15 秒。
+- 连接失败仍返回 `200`，body 中 `ok=false` 且 `message` 带原因（与 proxy ping 契约一致）。
+
+#### `POST /api/ai/chat`
+
+用途：实验性 Agent Window 的流式对话（E1：纯聊天，无工具调用）。
+
+Body：
+
+```json
+{
+  "messages": [
+    { "role": "system", "content": "You are Curated." },
+    { "role": "user", "content": "你好" }
+  ]
+}
+```
+
+成功：`200 text/event-stream`，事件依次为 `message_start` → `text_delta`（多次，`{ "type": "text_delta", "delta": "…" }`）→ `message_done`；失败时以 `error` 事件结束（`{ "type": "error", "code": "AI_PROVIDER_UNAVAILABLE" | "AI_CHAT_FAILED", "message": "…" }`）。
+
+说明：
+
+- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。
+- provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回，不产生 `message_done`。
+- 客户端断开即取消上游请求；实现方不应经 30s 超时的通用 HTTP 客户端消费该流。
+
 ### 4.16 Maintenance Backups
 
 以下三个端点都需要已解锁的 PIN 会话，只接受运行 Curated 后端那台机器上的绝对路径。请求 body 上限为 64 KiB，未知字段、尾随 JSON、相对路径和空路径都会以 `400 BACKUP_INVALID_REQUEST` 拒绝。它们不会替换正在使用的数据库，也没有在线 restore 端点。
@@ -3241,6 +3300,8 @@ interface ActorMergeValuesSummaryDTO {
 | `POST` | `/api/providers/ping-all` | `PingAllProvidersResponse` |
 | `POST` | `/api/proxy/ping-javbus` | `ProxyJavBusPingResponse` |
 | `POST` | `/api/proxy/ping-google` | `ProxyJavBusPingResponse` |
+| `POST` | `/api/ai/provider/test` | `AIProviderTestResponse` |
+| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`message_done`/`error`） |
 
 ## 7. 维护规则
 

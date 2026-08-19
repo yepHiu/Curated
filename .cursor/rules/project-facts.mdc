@@ -3,6 +3,14 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-08 Experimental Agent (E1)
+
+- 实验性 Agent 首期（charter `docs/plan/2026-08-18-agent-charter.md`、执行计划 `docs/plan/2026-08-19-agent-milestone-plan.md`，分支 `agent-enhance`）已落地：`backend/internal/llm` 是零依赖的 OpenAI 兼容 chat completions 客户端（流式 + 非流式；E2 引入工具调用时再评估 openai-go SDK）。provider 配置存 `library-config.cfg` 的 `aiProvider`（`kind`/`baseUrl`/`apiKey`/`model`，仅 `openai-compatible`），经 `GET/PATCH /api/settings` 的 `aiProvider` 字段读写。
+- 新端点（均在 PIN 中间件内）：`POST /api/ai/provider/test`（草稿或已存配置的最小 chat completion 探测，失败也返回 `200` + `ok:false`，契约同 proxy ping）；`POST /api/ai/chat`（SSE：`message_start` → `text_delta`* → `message_done`，或 `error` 事件带 `AI_PROVIDER_UNAVAILABLE`/`AI_CHAT_FAILED`；消息上限 50 条/单条 64K runes/总量 256K runes，必须含 `user`；E1 无工具调用）。出站均走现有 `proxyenv` 代理；流式请求无整体 client 超时，靠请求 ctx 取消。
+- 前端 gating：`src/lib/experimental-agent.ts` 的开关持久化在 localStorage `curated-agent-experimental-v1`（每浏览器状态，E4 毕业时迁后端全局键），**纯 UI 呈现层**——开关关闭时顶栏 Bot 入口、Agent Window、Settings 实验区表单一律不渲染，后端端点照常注册。开启开关自动弹出一次 Agent Window。
+- Settings 侧栏新增「实验性功能」分区（`settings-nav.ts` slug `experimental`；`SettingsExperimentalSection.vue` 以 `defineAsyncComponent` 从 SettingsView chunk 拆出以满足 bundle 预算硬门）。Agent Window 为 Cursor 式浮动窗口（`src/components/agent-window/AgentWindow.vue`，AppShell 内 `defineAsyncComponent` 懒加载；可拖动、Escape/按钮关闭、位置记忆 localStorage `curated-agent-window-state-v1`、移动端全屏；关闭即 abort 进行中的流）。
+- AI 前端服务层：`src/services/contracts/ai-service.ts` + `adapters/web/web-ai-service.ts`（fetch + ReadableStream 解析 SSE，**不走 30s 超时的 http-client**）+ `adapters/mock/mock-ai-service.ts`（假流式）；切换在 `src/services/ai-service.ts`（`VITE_USE_WEB_API`）。provider 设置方法挂在 libraryService 契约上（`aiProvider`/`setAIProvider`/`testAIProvider`；Mock 持久化 localStorage `curated-ai-provider-mock-v1`）。
+
 ## 2026-08 GIF Clip Capture
 
 - Web API GIF clips use `POST /api/library/movies/{movieId}/clips` with bounded `startSec/endSec` (0.4–6 seconds), `format: "gif"`, optional `fps` (1–20), `width` (160–960) and `curatedFrameId`. When associated with a curated frame, the completed GIF is persisted under the app cache's `curated-frame-motions` directory and exposed through `GET /api/curated-frames/{id}/motion`; unassociated tasks continue to use `GET /api/tasks/{taskId}/artifact`.
