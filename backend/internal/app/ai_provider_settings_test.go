@@ -99,7 +99,9 @@ func TestStreamAIChatNotConfiguredWrapsInvalidConfig(t *testing.T) {
 		logger:              zap.NewNop(),
 		librarySettingsPath: filepath.Join(t.TempDir(), "library-config.cfg"),
 	}
-	err := a.StreamAIChat(context.Background(), []contracts.AIChatMessage{{Role: "user", Content: "hi"}}, nil)
+	err := a.StreamAIChat(context.Background(), contracts.AIChatRequest{
+		Messages: []contracts.AIChatMessage{{Role: "user", Content: "hi"}},
+	}, nil)
 	if err == nil {
 		t.Fatal("StreamAIChat() = nil, want not-configured error")
 	}

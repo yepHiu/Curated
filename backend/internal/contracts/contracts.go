@@ -996,9 +996,134 @@ type AIChatMessage struct {
 	Content string `json:"content"`
 }
 
-// AIChatRequest is the body for POST /api/ai/chat (E1: plain streaming chat, no tools).
+// AIChatRequest is the body for POST /api/ai/chat (E2: agent loop with read tools).
 type AIChatRequest struct {
-	Messages []AIChatMessage `json:"messages"`
+	SessionID string          `json:"sessionId,omitempty"`
+	Messages  []AIChatMessage `json:"messages"`
+	Context   *AIChatContext  `json:"context,omitempty"`
+	Locale    string          `json:"locale,omitempty"`
+}
+
+// AIChatContext is optional page context injected into the system prompt.
+type AIChatContext struct {
+	Route     string          `json:"route,omitempty"`
+	MovieID   string          `json:"movieId,omitempty"`
+	ActorName string          `json:"actorName,omitempty"`
+	Query     string          `json:"query,omitempty"`
+	Mentions  []AIChatMention `json:"mentions,omitempty"`
+}
+
+// AIChatMention is one user @-reference from the Agent composer.
+type AIChatMention struct {
+	Kind  string `json:"kind"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// AIChatSessionDTO is one persisted agent conversation.
+type AIChatSessionDTO struct {
+	ID        string `json:"id"`
+	Title     string `json:"title,omitempty"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type AIChatSessionListDTO struct {
+	Items []AIChatSessionDTO `json:"items"`
+}
+
+type AIChatStoredMessageDTO struct {
+	ID         string `json:"id"`
+	SessionID  string `json:"sessionId"`
+	Role       string `json:"role"`
+	Content    string `json:"content"`
+	ToolName   string `json:"toolName,omitempty"`
+	ToolCallID string `json:"toolCallId,omitempty"`
+	Seq        int    `json:"seq"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+type AIChatSessionDetailDTO struct {
+	AIChatSessionDTO
+	Messages []AIChatStoredMessageDTO `json:"messages"`
+}
+
+// AIAgentMovieCardDTO is a chat-ui projection of a movie already retrieved this turn.
+type AIAgentMovieCardDTO struct {
+	MovieID  string   `json:"movieId"`
+	Title    string   `json:"title,omitempty"`
+	Code     string   `json:"code,omitempty"`
+	Actors   []string `json:"actors,omitempty"`
+	CoverURL string   `json:"coverUrl,omitempty"`
+	ThumbURL string   `json:"thumbUrl,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+}
+
+// AIConfirmChangeDTO is one field-level diff row on a write preview.
+type AIConfirmChangeDTO struct {
+	Path   string `json:"path"`
+	Before any    `json:"before"`
+	After  any    `json:"after"`
+}
+
+// AIActionRequest is the body for POST /api/ai/actions/{name}.
+type AIActionRequest struct {
+	MovieID      string `json:"movieId,omitempty"`
+	Body         string `json:"body,omitempty"`
+	Locale       string `json:"locale,omitempty"`
+	TargetLocale string `json:"targetLocale,omitempty"`
+	Range        string `json:"range,omitempty"`
+	Timezone     string `json:"timezone,omitempty"`
+}
+
+// AIActionPreviewDTO is returned by a write-preview action (no persistence yet).
+type AIActionPreviewDTO struct {
+	Action       string               `json:"action"`
+	Name         string               `json:"name"`
+	SessionID    string               `json:"sessionId"`
+	OriginalText string               `json:"originalText,omitempty"`
+	ProposedText string               `json:"proposedText,omitempty"`
+	Changes      []AIConfirmChangeDTO `json:"changes,omitempty"`
+	ConfirmToken string               `json:"confirmToken,omitempty"`
+	ExpiresAt    string               `json:"expiresAt,omitempty"`
+	Arguments    json.RawMessage      `json:"arguments,omitempty"`
+	Noop         bool                 `json:"noop,omitempty"`
+}
+
+// AIToolApplyRequest confirms a previously previewed write tool.
+type AIToolApplyRequest struct {
+	SessionID    string          `json:"sessionId"`
+	Name         string          `json:"name"`
+	Arguments    json.RawMessage `json:"arguments"`
+	ConfirmToken string          `json:"confirmToken"`
+}
+
+// AIToolApplyDTO is returned after a confirmed write.
+type AIToolApplyDTO struct {
+	OK   bool   `json:"ok"`
+	Name string `json:"name"`
+	Data any    `json:"data,omitempty"`
+}
+
+// AIChatSSEEvent is one server-sent event on POST /api/ai/chat.
+type AIChatSSEEvent struct {
+	Type         string                `json:"type"`
+	SessionID    string                `json:"sessionId,omitempty"`
+	MessageID    string                `json:"messageId,omitempty"`
+	Seq          int                   `json:"seq,omitempty"`
+	Delta        string                `json:"delta,omitempty"`
+	ToolCallID   string                `json:"toolCallId,omitempty"`
+	Name         string                `json:"name,omitempty"`
+	OK           *bool                 `json:"ok,omitempty"`
+	Summary      string                `json:"summary,omitempty"`
+	Truncated    bool                  `json:"truncated,omitempty"`
+	Movies       []AIAgentMovieCardDTO `json:"movies,omitempty"`
+	ConfirmToken string                `json:"confirmToken,omitempty"`
+	ExpiresAt    string                `json:"expiresAt,omitempty"`
+	Changes      []AIConfirmChangeDTO  `json:"changes,omitempty"`
+	Arguments    json.RawMessage       `json:"arguments,omitempty"`
+	Code         string                `json:"code,omitempty"`
+	Message      string                `json:"message,omitempty"`
 }
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
@@ -1528,6 +1653,11 @@ const (
 	ErrorCodeRecommendationFeedbackTargetNotFound = "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND"
 	ErrorCodeAIProviderUnavailable                = "AI_PROVIDER_UNAVAILABLE"
 	ErrorCodeAIChatFailed                         = "AI_CHAT_FAILED"
+	ErrorCodeAIToolInvalidArgs                    = "AI_TOOL_INVALID_ARGS"
+	ErrorCodeAIToolNotFound                       = "AI_TOOL_NOT_FOUND"
+	ErrorCodeAIConfirmRequired                    = "AI_CONFIRM_REQUIRED"
+	ErrorCodeAIConfirmExpired                     = "AI_CONFIRM_EXPIRED"
+	ErrorCodeAIRateLimited                        = "AI_RATE_LIMITED"
 	ErrorCodeRecommendationFeedbackLimit          = "RECOMMENDATION_FEEDBACK_LIMIT_REACHED"
 	ErrorCodeActorMergeInvalid                    = "ACTOR_MERGE_INVALID"
 	ErrorCodeActorMergeNotFound                   = "ACTOR_MERGE_NOT_FOUND"

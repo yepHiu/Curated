@@ -133,8 +133,14 @@ type AISettingsController interface {
 
 // AIChatProvider streams experimental agent chat completions and tests provider connectivity.
 type AIChatProvider interface {
-	StreamAIChat(ctx context.Context, messages []contracts.AIChatMessage, onDelta func(string)) error
+	StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emit func(contracts.AIChatSSEEvent)) error
 	TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) contracts.AIProviderTestResponse
+	ListAIChatSessions(ctx context.Context) (contracts.AIChatSessionListDTO, error)
+	CreateAIChatSession(ctx context.Context, title string) (contracts.AIChatSessionDTO, error)
+	GetAIChatSession(ctx context.Context, id string) (contracts.AIChatSessionDetailDTO, error)
+	DeleteAIChatSession(ctx context.Context, id string) error
+	RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error)
+	ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest) (contracts.AIToolApplyDTO, error)
 }
 
 // LaunchAtLoginController exposes whether Windows login autostart is enabled and whether the current runtime supports it.
@@ -516,6 +522,12 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("POST /api/ai/provider/test", h.handleAIProviderTest)
 	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
+	mux.HandleFunc("GET /api/ai/sessions", h.handleListAIChatSessions)
+	mux.HandleFunc("POST /api/ai/sessions", h.handleCreateAIChatSession)
+	mux.HandleFunc("GET /api/ai/sessions/{sessionId}", h.handleGetAIChatSession)
+	mux.HandleFunc("DELETE /api/ai/sessions/{sessionId}", h.handleDeleteAIChatSession)
+	mux.HandleFunc("POST /api/ai/actions/{name}", h.handleAIAction)
+	mux.HandleFunc("POST /api/ai/confirm", h.handleAIConfirm)
 
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }

@@ -119,34 +119,6 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 	return contracts.AIProviderTestResponse{OK: true, LatencyMs: latency}
 }
 
-// StreamAIChat streams an OpenAI-compatible chat completion for the experimental
-// agent window (E1: plain chat, no tool calls). onDelta receives content deltas.
-func (a *App) StreamAIChat(ctx context.Context, messages []contracts.AIChatMessage, onDelta func(string)) error {
-	cfg, err := normalizeAIProviderConfig(a.currentAIProviderConfig())
-	if err != nil {
-		return fmt.Errorf("%w: %v", llm.ErrInvalidConfig, err)
-	}
-	if strings.TrimSpace(cfg.BaseURL) == "" || strings.TrimSpace(cfg.Model) == "" {
-		return ErrAIProviderNotConfigured
-	}
-	// Streaming must not carry a whole-request client timeout; ctx (client
-	// disconnect) governs the lifetime instead.
-	client, err := newAIHTTPClient(a.currentProxyConfig(), 0)
-	if err != nil {
-		return err
-	}
-	chat := make([]llm.ChatMessage, 0, len(messages))
-	for _, m := range messages {
-		chat = append(chat, llm.ChatMessage{Role: m.Role, Content: m.Content})
-	}
-	_, err = llm.NewClient(llm.ClientConfig{
-		BaseURL: cfg.BaseURL,
-		APIKey:  cfg.APIKey,
-		Model:   cfg.Model,
-	}, client).StreamChat(ctx, chat, onDelta)
-	return err
-}
-
 func (a *App) currentAIProviderConfig() config.AIProviderConfig {
 	a.aiProviderMu.RLock()
 	defer a.aiProviderMu.RUnlock()

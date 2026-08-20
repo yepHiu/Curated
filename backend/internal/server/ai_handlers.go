@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +14,9 @@ import (
 	"curated-backend/internal/llm"
 )
 
-// Experimental agent endpoints (charter E1): provider connectivity test plus a
-// plain streaming chat with no tool calls. All routes stay behind the shared
-// /api auth-lock middleware like every other endpoint.
+// Experimental agent endpoints (charter E2): provider test, agent loop SSE,
+// and persisted chat sessions. All routes stay behind the shared /api auth-lock
+// middleware like every other endpoint.
 
 // aiChatMessageLimits bound POST /api/ai/chat input so a runaway client cannot
 // balloon provider costs in one request.
@@ -61,8 +62,9 @@ func (h *Handler) handleAIProviderTest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// handleAIChat streams one plain chat completion as SSE events:
-// message_start -> text_delta* -> message_done, or a terminal error event.
+// handleAIChat streams one agent turn as SSE events:
+// message_start -> (text_delta | tool_call_started | tool_call_result | movie_cards)* -> message_done,
+// or a terminal error event.
 func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -96,13 +98,11 @@ func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	if err := writeSSEJSON(w, "message_start", map[string]any{"type": "message_start"}); err != nil {
-		return
-	}
-	flusher.Flush()
-
-	err := h.aiChatProvider.StreamAIChat(r.Context(), req.Messages, func(delta string) {
-		_ = writeSSEJSON(w, "text_delta", map[string]any{"type": "text_delta", "delta": delta})
+	err := h.aiChatProvider.StreamAIChat(r.Context(), req, func(ev contracts.AIChatSSEEvent) {
+		if strings.TrimSpace(ev.Type) == "" {
+			return
+		}
+		_ = writeSSEJSON(w, ev.Type, ev)
 		flusher.Flush()
 	})
 	if err != nil {
@@ -110,16 +110,182 @@ func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, llm.ErrInvalidConfig) {
 			code = contracts.ErrorCodeAIProviderUnavailable
 		}
+		if errors.Is(err, sql.ErrNoRows) {
+			code = contracts.ErrorCodeNotFound
+		}
 		_ = writeSSEJSON(w, "error", map[string]any{
 			"type":    "error",
 			"code":    code,
 			"message": err.Error(),
 		})
 		flusher.Flush()
+	}
+}
+
+func (h *Handler) handleListAIChatSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	_ = writeSSEJSON(w, "message_done", map[string]any{"type": "message_done"})
-	flusher.Flush()
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai chat runtime not available")
+		return
+	}
+	dto, err := h.aiChatProvider.ListAIChatSessions(r.Context())
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleCreateAIChatSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai chat runtime not available")
+		return
+	}
+	var body struct {
+		Title string `json:"title"`
+	}
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid request body")
+			return
+		}
+	}
+	dto, err := h.aiChatProvider.CreateAIChatSession(r.Context(), body.Title)
+	if err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, dto)
+}
+
+func (h *Handler) handleGetAIChatSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai chat runtime not available")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("sessionId"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId is required")
+		return
+	}
+	dto, err := h.aiChatProvider.GetAIChatSession(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "ai chat session not found")
+			return
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleDeleteAIChatSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai chat runtime not available")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("sessionId"))
+	if id == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId is required")
+		return
+	}
+	if err := h.aiChatProvider.DeleteAIChatSession(r.Context(), id); err != nil {
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "ai chat session not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleAIAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai action runtime not available")
+		return
+	}
+	name := strings.TrimSpace(r.PathValue("name"))
+	if name == "" {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "action name is required")
+		return
+	}
+	var req contracts.AIActionRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid request body")
+			return
+		}
+	}
+	dto, err := h.aiChatProvider.RunAIAction(r.Context(), name, req)
+	if err != nil {
+		writeAIActionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *Handler) handleAIConfirm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if h.aiChatProvider == nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai action runtime not available")
+		return
+	}
+	var req contracts.AIToolApplyRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid request body")
+			return
+		}
+	}
+	dto, err := h.aiChatProvider.ApplyAITool(r.Context(), req)
+	if err != nil {
+		writeAIActionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func writeAIActionError(w http.ResponseWriter, err error) {
+	if errors.Is(err, llm.ErrInvalidConfig) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeAIProviderUnavailable, err.Error())
+		return
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "unknown action"):
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, msg)
+	case strings.Contains(msg, "movie not found"):
+		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, msg)
+	case strings.Contains(msg, "confirm token"):
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeAIConfirmExpired, msg)
+	case strings.Contains(msg, "required") || strings.Contains(msg, "empty") || strings.Contains(msg, "too long"):
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, msg)
+	default:
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeAIChatFailed, msg)
+	}
 }
 
 func validateAIChatMessages(messages []contracts.AIChatMessage) error {

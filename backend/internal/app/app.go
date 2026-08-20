@@ -103,6 +103,7 @@ type App struct {
 	playerSettingsMu sync.RWMutex
 	// aiProviderMu protects cfg.AIProvider (library-config.cfg) for the experimental agent.
 	aiProviderMu sync.RWMutex
+	agentRT      agentRuntime
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
 	metadataMovieMu            sync.RWMutex
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence

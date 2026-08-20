@@ -72,6 +72,36 @@ func TestStreamChatAccumulatesDeltasAndIgnoresHeartbeats(t *testing.T) {
 	}
 }
 
+func TestStreamTurnForwardsReasoningContent(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"先查库\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"有结果\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	t.Cleanup(server.Close)
+
+	var thinking []string
+	var deltas []string
+	turn, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		StreamTurn(context.Background(), TurnRequest{
+			Messages: []ChatMessage{{Role: "user", Content: "hi"}},
+			OnThinking: func(delta string) {
+				thinking = append(thinking, delta)
+			},
+		}, func(delta string) { deltas = append(deltas, delta) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(thinking, ""), "先查库"; got != want {
+		t.Fatalf("thinking = %q, want %q", got, want)
+	}
+	if turn.Content != "有结果" || strings.Join(deltas, "") != "有结果" {
+		t.Fatalf("content = %q deltas=%q", turn.Content, deltas)
+	}
+}
+
 func TestStreamChatSurfacesProviderErrorBody(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -114,5 +144,31 @@ func TestStreamChatRejectsInvalidConfigBeforeRequest(t *testing.T) {
 		StreamChat(context.Background(), []ChatMessage{{Role: "user", Content: "hi"}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "invalid") {
 		t.Fatalf("StreamChat() = %v, want invalid config error", err)
+	}
+}
+
+func TestStreamTurnAccumulatesToolCallDeltas(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"search_movies\",\"arguments\":\"{\\\"q\\\"\"}}]}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\":\\\"ABC\\\"}\"}}]}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	t.Cleanup(server.Close)
+
+	turn, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		StreamTurn(context.Background(), TurnRequest{
+			Messages: []ChatMessage{{Role: "user", Content: "find ABC"}},
+			Tools:    []ToolSpec{{Name: "search_movies", Parameters: map[string]any{"type": "object"}}},
+		}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turn.ToolCalls) != 1 {
+		t.Fatalf("tool calls = %+v", turn.ToolCalls)
+	}
+	if turn.ToolCalls[0].Name() != "search_movies" || turn.ToolCalls[0].Args() != `{"q":"ABC"}` {
+		t.Fatalf("call = %+v", turn.ToolCalls[0])
 	}
 }
