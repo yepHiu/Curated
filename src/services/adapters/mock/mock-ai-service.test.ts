@@ -12,7 +12,7 @@ describe("mockAIService.streamChat", () => {
 
   it("streams fake deltas containing the user message", async () => {
     const deltas: string[] = []
-    const promise = mockAIService.streamChat([{ role: "user", content: "你好" }], {
+    const promise = mockAIService.streamChat({ messages: [{ role: "user", content: "你好" }] }, {
       onDelta: (delta) => deltas.push(delta),
     })
     await vi.advanceTimersByTimeAsync(10_000)
@@ -23,14 +23,72 @@ describe("mockAIService.streamChat", () => {
 
   it("rejects when no user message is present", async () => {
     await expect(
-      mockAIService.streamChat([{ role: "system", content: "s" }], { onDelta: () => {} }),
+      mockAIService.streamChat({ messages: [{ role: "system", content: "s" }] }, { onDelta: () => {} }),
     ).rejects.toThrow(/user/)
+  })
+
+  it("emits a fake tool card for a library question", async () => {
+    const tools: string[] = []
+    const promise = mockAIService.streamChat(
+      { messages: [{ role: "user", content: "这个月看了多久" }] },
+      {
+        onDelta: () => {},
+        onToolStart: (event) => tools.push(event.name),
+        onToolResult: (event) => tools.push(`${event.name}:${event.summary}`),
+      },
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+    await promise
+    expect(tools[0]).toBe("get_insights_overview")
+    expect(tools[1]).toContain("watchedSeconds")
+  })
+
+  it("emits movie cards for a picker question", async () => {
+    const movies: { movieId: string }[] = []
+    const promise = mockAIService.streamChat(
+      { messages: [{ role: "user", content: "今晚看什么" }] },
+      {
+        onDelta: () => {},
+        onMovieCards: (items) => movies.push(...items),
+      },
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+    await promise
+    expect(movies[0]?.movieId).toBe("mock-movie-1")
+  })
+
+  it("returns a fake comment polish preview", async () => {
+    const preview = await mockAIService.runAction("polish_comment", {
+      movieId: "m1",
+      body: "slow ending",
+    })
+    expect(preview.confirmToken).toBeTruthy()
+    expect(preview.proposedText).toContain("slow ending")
+    const applied = await mockAIService.confirmTool({
+      sessionId: preview.sessionId,
+      name: preview.name,
+      arguments: preview.arguments ?? {},
+      confirmToken: preview.confirmToken ?? "",
+    })
+    expect(applied.ok).toBe(true)
+  })
+
+  it("returns a fake summary cleanup preview", async () => {
+    const preview = await mockAIService.runAction("clean_summary", { movieId: "m1" })
+    expect(preview.name).toBe("update_movie_display_overrides")
+    expect(preview.proposedText).toContain("Clean plot")
+  })
+
+  it("returns a fake insights narrative without a confirm token", async () => {
+    const preview = await mockAIService.runAction("insights_narrative", { range: "30d", timezone: "UTC" })
+    expect(preview.noop).toBe(true)
+    expect(preview.proposedText).toContain("full-per-entity")
   })
 
   it("resolves without deltas when aborted mid-stream", async () => {
     const controller = new AbortController()
     const deltas: string[] = []
-    const promise = mockAIService.streamChat([{ role: "user", content: "hi" }], {
+    const promise = mockAIService.streamChat({ messages: [{ role: "user", content: "hi" }] }, {
       onDelta: (delta) => {
         deltas.push(delta)
         controller.abort()

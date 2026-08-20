@@ -8,6 +8,11 @@ const serviceMocks = vi.hoisted(() => ({
   putMovieComment: vi.fn(),
 }))
 
+const aiMocks = vi.hoisted(() => ({
+  runAction: vi.fn(),
+  confirmTool: vi.fn(),
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     locale: { value: "en" },
@@ -18,6 +23,23 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@/services/library-service", () => ({
   useLibraryService: () => serviceMocks,
+}))
+
+vi.mock("@/services/ai-service", () => ({
+  useAIService: () => aiMocks,
+}))
+
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: { name: "Dialog", template: "<div v-if='open'><slot /></div>", props: ["open"] },
+  DialogContent: { name: "DialogContent", template: "<div><slot /></div>" },
+  DialogDescription: { name: "DialogDescription", template: "<p><slot /></p>" },
+  DialogFooter: { name: "DialogFooter", template: "<div><slot /></div>" },
+  DialogHeader: { name: "DialogHeader", template: "<header><slot /></header>" },
+  DialogTitle: { name: "DialogTitle", template: "<h3><slot /></h3>" },
+}))
+
+vi.mock("@/components/ui/button", () => ({
+  Button: { name: "Button", template: "<button type='button'><slot /></button>" },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -54,6 +76,9 @@ describe("MovieCommentSection", () => {
         updatedAt: "2026-05-11T12:01:00Z",
       }),
     )
+    aiMocks.runAction.mockReset()
+    aiMocks.confirmTool.mockReset()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -171,4 +196,41 @@ describe("MovieCommentSection", () => {
     expect(wrapper.get("textarea").attributes("readonly")).toBeDefined()
   })
 
+  it("hides AI comment actions while the experimental gate is off", async () => {
+    const wrapper = await mountComment()
+    expect(wrapper.find("[data-comment-ai-actions]").exists()).toBe(false)
+  })
+
+  it("previews a polish action then applies through the confirm API", async () => {
+    const { useExperimentalAgent } = await import("@/lib/experimental-agent")
+    useExperimentalAgent().setEnabled(true)
+    aiMocks.runAction.mockResolvedValue({
+      action: "polish_comment",
+      name: "save_movie_comment",
+      sessionId: "act_1",
+      originalText: "saved note",
+      proposedText: "polished note",
+      confirmToken: "cfm_1",
+      arguments: { movieId: "movie-1", body: "polished note" },
+    })
+    aiMocks.confirmTool.mockResolvedValue({
+      ok: true,
+      name: "save_movie_comment",
+      data: { body: "polished note", updatedAt: "2026-08-21T00:00:00Z" },
+    })
+    const wrapper = await mountComment()
+    expect(wrapper.find("[data-comment-ai-actions]").exists()).toBe(true)
+    expect(wrapper.get("[data-comment-field]").find("[data-comment-ai-polish]").exists()).toBe(true)
+    await wrapper.get("[data-comment-ai-polish]").trigger("click")
+    await flushPromises()
+    expect(aiMocks.runAction).toHaveBeenCalledWith("polish_comment", {
+      movieId: "movie-1",
+      body: "saved note",
+    })
+    await wrapper.get("[data-comment-ai-apply]").trigger("click")
+    await flushPromises()
+    expect(aiMocks.confirmTool).toHaveBeenCalled()
+    expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe("polished note")
+    useExperimentalAgent().setEnabled(false)
+  })
 })

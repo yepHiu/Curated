@@ -840,4 +840,33 @@ export const api = {
   ): Promise<import("./types").AIProviderTestResponse> {
     return httpClient.post<import("./types").AIProviderTestResponse>("/ai/provider/test", body ?? {})
   },
+
+  listAIChatSessions(): Promise<import("./types").AIChatSessionListDTO> {
+    return httpClient.get<import("./types").AIChatSessionListDTO>("/ai/sessions")
+  },
+
+  createAIChatSession(title?: string): Promise<import("./types").AIChatSessionDTO> {
+    return httpClient.post<import("./types").AIChatSessionDTO>("/ai/sessions", { title: title ?? "" })
+  },
+
+  getAIChatSession(id: string): Promise<import("./types").AIChatSessionDetailDTO> {
+    return httpClient.get<import("./types").AIChatSessionDetailDTO>(
+      `/ai/sessions/${encodeURIComponent(id)}`,
+    )
+  },
+
+  deleteAIChatSession(id: string): Promise<void> {
+    return httpClient.delete(`/ai/sessions/${encodeURIComponent(id)}`)
+  },
+
+  runAIAction(name: string, body: import("./types").AIActionRequestBody): Promise<import("./types").AIActionPreviewDTO> {
+    return httpClient.post<import("./types").AIActionPreviewDTO>(
+      `/ai/actions/${encodeURIComponent(name)}`,
+      body,
+    )
+  },
+
+  confirmAITool(body: import("./types").AIToolApplyRequestBody): Promise<import("./types").AIToolApplyDTO> {
+    return httpClient.post<import("./types").AIToolApplyDTO>("/ai/confirm", body)
+  },
 }

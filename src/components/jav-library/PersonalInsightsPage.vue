@@ -11,6 +11,7 @@ import {
   RotateCw,
   Star,
 } from "lucide-vue-next"
+import { Sparkles } from "lucide-vue-next"
 import type {
   PersonalInsightsBreakdownDTO,
   PersonalInsightsDimension,
@@ -27,6 +28,9 @@ import {
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIService } from "@/services/ai-service"
+import { AIServiceError } from "@/services/contracts/ai-service"
 import { useLibraryService } from "@/services/library-service"
 
 interface MetricCard {
@@ -56,6 +60,8 @@ const breakdownDefinitions: Array<{
 
 const { t, locale } = useI18n()
 const libraryService = useLibraryService()
+const aiService = useAIService()
+const { enabled: agentEnabled } = useExperimentalAgent()
 const selectedRange = ref<PersonalInsightsRange>("30d")
 const loading = ref(true)
 const loadError = ref(false)
@@ -65,6 +71,9 @@ const breakdowns = ref<Record<PersonalInsightsDimension, PersonalInsightsBreakdo
   studio: null,
   tag: null,
 })
+const narrative = ref("")
+const narrativeBusy = ref(false)
+const narrativeError = ref("")
 let requestSequence = 0
 
 const timezone = (() => {
@@ -168,6 +177,8 @@ async function loadInsights() {
   loadError.value = false
   overview.value = null
   breakdowns.value = { actor: null, studio: null, tag: null }
+  narrative.value = ""
+  narrativeError.value = ""
   try {
     const params = { range: selectedRange.value, timezone }
     const [nextOverview, actor, studio, tag] = await Promise.all([
@@ -189,6 +200,37 @@ async function loadInsights() {
 
 watch(selectedRange, () => void loadInsights(), { immediate: true })
 onBeforeUnmount(() => { requestSequence += 1 })
+
+async function generateNarrative() {
+  if (!agentEnabled.value || narrativeBusy.value || !overview.value) {
+    return
+  }
+  if (isEmpty.value) {
+    narrativeError.value = t("insights.aiReadoutEmpty")
+    return
+  }
+  narrativeBusy.value = true
+  narrativeError.value = ""
+  try {
+    const dto = await aiService.runAction("insights_narrative", {
+      range: selectedRange.value,
+      timezone,
+      locale: locale.value,
+    })
+    narrative.value = dto.proposedText?.trim() ?? ""
+    if (!narrative.value) {
+      narrativeError.value = t("insights.aiReadoutError")
+    }
+  } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE") {
+      narrativeError.value = t("insights.aiReadoutUnconfigured")
+    } else {
+      narrativeError.value = t("insights.aiReadoutError")
+    }
+  } finally {
+    narrativeBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -224,6 +266,30 @@ onBeforeUnmount(() => { requestSequence += 1 })
             <span>{{ t(option.labelKey) }}</span>
           </label>
         </fieldset>
+
+        <div v-if="agentEnabled" class="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="min-h-11 rounded-lg md:h-8 md:min-h-8"
+            :disabled="narrativeBusy || loading || !overview"
+            data-insights-ai-readout
+            @click="generateNarrative"
+          >
+            <Sparkles class="size-4" />
+            {{ t("insights.aiReadout") }}
+          </Button>
+        </div>
+        <p v-if="narrativeError" class="text-sm text-destructive">{{ narrativeError }}</p>
+        <Card v-if="narrative" data-insights-ai-narrative class="border-border/70">
+          <CardHeader class="pb-2">
+            <CardTitle class="text-base">{{ t("insights.aiReadoutTitle") }}</CardTitle>
+          </CardHeader>
+          <CardContent class="whitespace-pre-wrap text-sm leading-relaxed">
+            {{ narrative }}
+          </CardContent>
+        </Card>
 
         <p v-if="overview" class="text-xs leading-relaxed text-muted-foreground">
           {{ t("insights.rangeSummary", { from: overview.from, to: overview.to, timezone: overview.timezone }) }}

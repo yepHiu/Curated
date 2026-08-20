@@ -357,10 +357,101 @@ export interface AIProviderTestResponse {
   message?: string
 }
 
-/** POST /api/ai/chat 的消息行（E1：纯流式对话，无工具） */
+/** POST /api/ai/chat 的消息行 */
 export interface AIChatMessageDTO {
   role: "system" | "user" | "assistant"
   content: string
+}
+
+export interface AIChatMentionDTO {
+  kind: "movie" | "actor" | "tag"
+  id: string
+  label: string
+}
+
+export interface AIChatContextDTO {
+  route?: string
+  movieId?: string
+  actorName?: string
+  query?: string
+  mentions?: AIChatMentionDTO[]
+}
+
+export interface AIChatSessionDTO {
+  id: string
+  title?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AIChatSessionListDTO {
+  items: AIChatSessionDTO[]
+}
+
+export interface AIChatStoredMessageDTO {
+  id: string
+  sessionId: string
+  role: string
+  content: string
+  toolName?: string
+  toolCallId?: string
+  seq: number
+  createdAt: string
+}
+
+export interface AIChatSessionDetailDTO extends AIChatSessionDTO {
+  messages: AIChatStoredMessageDTO[]
+}
+
+export interface AIAgentMovieCardDTO {
+  movieId: string
+  title?: string
+  code?: string
+  actors?: string[]
+  coverUrl?: string
+  thumbUrl?: string
+  reason?: string
+}
+
+export interface AIConfirmChangeDTO {
+  path: string
+  before?: unknown
+  after?: unknown
+}
+
+export interface AIActionRequestBody {
+  movieId?: string
+  body?: string
+  locale?: string
+  targetLocale?: string
+  range?: string
+  timezone?: string
+}
+
+export interface AIActionPreviewDTO {
+  action: string
+  name: string
+  sessionId: string
+  originalText?: string
+  proposedText?: string
+  changes?: AIConfirmChangeDTO[]
+  confirmToken?: string
+  expiresAt?: string
+  arguments?: Record<string, unknown>
+  noop?: boolean
+}
+
+export interface AIToolApplyRequestBody {
+  sessionId: string
+  name: string
+  arguments: Record<string, unknown>
+  confirmToken: string
+}
+
+export interface AIToolApplyDTO {
+  ok: boolean
+  name: string
+  data?: unknown
 }
 
 /** 后端日志目录与级别（library-config.cfg）；空 logDir 表示使用当前构建的默认日志目录 */
