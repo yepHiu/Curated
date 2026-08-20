@@ -2443,7 +2443,7 @@ Body 可选：
 
 ### 4.15b Experimental Agent（实验性）
 
-实验性 Agent（E1，见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。两个端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。
+实验性 Agent（E2，见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。当前生产工具全部只读。
 
 #### `POST /api/ai/provider/test`
 
@@ -2479,26 +2479,73 @@ Body 可选：
 
 #### `POST /api/ai/chat`
 
-用途：实验性 Agent Window 的流式对话（E1：纯聊天，无工具调用）。
+用途：实验性 Agent Window 的流式对话（E2：只读工具循环 + 会话）。
 
 Body：
 
 ```json
 {
+  "sessionId": "ses_…",
+  "locale": "zh-CN",
+  "context": { "route": "detail", "movieId": "…", "actorName": "", "query": "", "mentions": [{ "kind": "movie", "id": "…", "label": "Hello" }] },
   "messages": [
-    { "role": "system", "content": "You are Curated." },
-    { "role": "user", "content": "你好" }
+    { "role": "user", "content": "这个月看了多久" }
   ]
 }
 ```
 
-成功：`200 text/event-stream`，事件依次为 `message_start` → `text_delta`（多次，`{ "type": "text_delta", "delta": "…" }`）→ `message_done`；失败时以 `error` 事件结束（`{ "type": "error", "code": "AI_PROVIDER_UNAVAILABLE" | "AI_CHAT_FAILED", "message": "…" }`）。
+成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `thinking_delta` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
 
 说明：
 
 - 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。
-- provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回，不产生 `message_done`。
-- 客户端断开即取消上游请求；实现方不应经 30s 超时的通用 HTTP 客户端消费该流。
+- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），写入系统提示的 `<source>`，最多 8 条。
+- 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
+- 单轮工具步数默认 15，触顶后强制收尾并在文本中说明。
+- provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回。
+- 推荐或点名具体影片时，模型应调用 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知 ID 被拒绝，不会出卡。
+- 写工具 `save_movie_comment` / `update_movie_display_overrides` / `create_saved_view` 只产生 preview。成功后额外发出 `confirm_required`（`changes` / `confirmToken` / `expiresAt` / `arguments`）并结束本轮；真正写入走 `POST /api/ai/confirm`，chat 通道的模型不能自行 apply。
+
+#### `POST /api/ai/actions/{name}`
+
+用途：实验性就地 Action（E3）。`name` 为 `polish_comment`、`clean_summary`、`translate_title` 或 `insights_narrative`。无会话循环。
+
+- `polish_comment`：笔记润色，经 `save_movie_comment` preview。模型自识别原文语言并同语言润色。Body：`{ "movieId", "body?" }`。
+- `clean_summary`：清洗当前展示简介，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列。Body：`{ "movieId" }`。
+- `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`。Body：`{ "movieId", "locale?" }`。
+- `insights_narrative`：只读解读，无确认卡。后端先调 insights 聚合再生成文本。Body：`{ "range?", "timezone?", "locale?" }`。
+
+成功：`200 AIActionPreviewDTO`。写类含 `confirmToken`（无改动时 `noop: true`）。`insights_narrative` 只返回 `proposedText` 且 `noop: true`。未配 provider 为 `400 AI_PROVIDER_UNAVAILABLE`。未知 name 为 `404`。
+
+#### `POST /api/ai/confirm`
+
+用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 必须与 preview 时字节一致。
+
+成功：`200 AIToolApplyDTO`。token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。
+
+#### `GET /api/ai/sessions`
+
+用途：列出最近的 Agent 会话（默认最多 20 条，按 `updatedAt` 降序）。
+
+成功：`200 AIChatSessionListDTO`
+
+#### `POST /api/ai/sessions`
+
+用途：创建空会话。Body 可选 `{ "title": "…" }`。
+
+成功：`201 AIChatSessionDTO`
+
+#### `GET /api/ai/sessions/{sessionId}`
+
+用途：读取会话及其消息。
+
+成功：`200 AIChatSessionDetailDTO`；不存在时 `404 COMMON_NOT_FOUND`。
+
+#### `DELETE /api/ai/sessions/{sessionId}`
+
+用途：删除一个会话及其消息。
+
+成功：`204`；不存在时 `404 COMMON_NOT_FOUND`。
 
 ### 4.16 Maintenance Backups
 
@@ -3301,7 +3348,13 @@ interface ActorMergeValuesSummaryDTO {
 | `POST` | `/api/proxy/ping-javbus` | `ProxyJavBusPingResponse` |
 | `POST` | `/api/proxy/ping-google` | `ProxyJavBusPingResponse` |
 | `POST` | `/api/ai/provider/test` | `AIProviderTestResponse` |
-| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`message_done`/`error`） |
+| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`tool_call_started`/`tool_call_result`/`movie_cards`/`confirm_required`/`message_done`/`error`） |
+| `GET` | `/api/ai/sessions` | `AIChatSessionListDTO` |
+| `POST` | `/api/ai/sessions` | `AIChatSessionDTO` |
+| `GET` | `/api/ai/sessions/{sessionId}` | `AIChatSessionDetailDTO` |
+| `DELETE` | `/api/ai/sessions/{sessionId}` | `204` |
+| `POST` | `/api/ai/actions/{name}` | `AIActionPreviewDTO` |
+| `POST` | `/api/ai/confirm` | `AIToolApplyDTO` |
 
 ## 7. 维护规则
 

@@ -1,7 +1,7 @@
 # Agent 执行里程碑计划（E1–E4）
 
 日期：2026-08-19
-状态：in-progress（**E1 已实现**：全部自动化门通过——后端 `go build/vet/test`、前端 `typecheck/lint/test(863)/build`（含 bundle 预算）；真机联调（启动后端 + Ollama 实测对话）待用户验证。E2 起待启动。需求台账 REQ-0039/0043 已推进 `in_progress`）
+状态：in-progress（**E1 已实现**；**E2 已实现**；**E3 进行中**：确认协议与用户数据写工具已落地——笔记润色、简介清洗、标题翻译、Insights 解读、一句话 Saved View。MCP 与毕业仍属后续期。）
 上游：[`2026-08-18-agent-charter.md`](2026-08-18-agent-charter.md)（宪法，B1–B7 基建不变）· [`2026-08-19-agent-user-prd.md`](2026-08-19-agent-user-prd.md)（用户需求）
 
 ## 0. 总原则（2026-08-19 用户决策）
@@ -12,6 +12,8 @@
 4. **基建不缩水**：后端仍按 charter B1–B7 全量推进，gating 只影响前端呈现，不影响网关/审计/权限；
 5. **MCP（B4）不受 gating 影响**：外部客户端自带交互，仅依赖 B2+B3，可在 E2 后任意时点独立交付。
 
+**2026-08-20 补充**：Agent Window 主界面按成熟 Agent 应用（以 Cursor 为参照）推进——对话记录改走左侧历史侧栏（分组/切换/删除），主线程与 composer 对齐 Cursor 的信息架构；工具过程收成一条可折叠状态条（产品化命名、loading / 思考流、完成后折叠），`present_movies` 只作为成品影片卡；composer 支持 `@` 引用影片/演员/标签。仍保持实验门控与浮动窗口载体，不提前做毕业期右侧抽屉。
+
 ## 1. 已确认的 UI 需求（E1 范围）
 
 1. **设置页侧栏新增「实验性功能」类目**：作为通用实验容器（未来其他实验功能也入驻），Agent 是第一个入驻者；组件 `SettingsExperimentalSection.vue` + `src/lib/settings-nav.ts` 新条目。
@@ -20,9 +22,9 @@
 4. **Agent Window（浮动对话窗口）**：
    - 开启开关后自动弹出一次，之后经顶栏 ✦ 图标（`NotificationCenter` 旁，gated）唤起；
    - 可拖动（标题栏）、可关闭（按钮/Escape）、位置与尺寸记忆（localStorage）、移动端全屏化；
-   - 内容：流式消息区 + 输入框（Enter 发送）；E1 单会话，E2 起会话持久化与切换；
+   - 内容：Cursor 式布局——左侧对话历史侧栏（按今天/昨天/近 7 天/更早分组，可新建/切换/删除）+ 主线程（Markdown/GFM 渲染、折叠过程条、影片卡）+ 底部 composer（`@` 引用）；窄窗与移动端侧栏改为遮罩层；
    - 视觉与工程约束照旧：shadcn-vue + 设计令牌、dark、三语 i18n、≥44px 触控、**懒加载不进首屏 bundle**；
-   - 组件落点：`src/components/agent-window/`（AgentWindow / ChatStream / ChatComposer）+ `src/composables/use-agent-window.ts`、`use-experimental-agent.ts`（gating 状态）。
+   - 组件落点：`src/components/agent-window/`（AgentWindow / AgentChatSidebar / AgentChatThread / AgentChatComposer）+ `src/composables/use-agent-window.ts`、`src/lib/experimental-agent.ts`（gating 状态）。
 
 ## 2. E1 实验一期：开关 + Provider + 能对话
 
@@ -50,6 +52,10 @@
 
 **验收**："这个月看了多久""XX 演员没看的有几部"答案数字真实可对账；候选推荐来自真实检索且条件可见；工具调用内联卡可见；步数触顶明确汇报；审计表含全部调用；Mock 假工具结果。
 
+**E2 落地（2026-08-19）**：`backend/internal/agent/{core,tools,run,prompts}`、migration `0039_ai_agent.sql`、`POST /api/ai/chat` 走 AgentLoop、`/api/ai/sessions*`、前端工具卡与会话切换。恶意剧本单测覆盖伪造 confirm token 与步数触顶。写工具 / MCP / 就地 Action 仍不在本期。
+
+**E2 补片（2026-08-20）**：会话式选片的推荐卡片已落地。`present_movies` 是 UI 投影（不查库）；`movieId` 必须来自本轮 `search_movies` / `get_movie_detail` / `get_watch_history`。SSE `movie_cards` 在助手回复下渲染横条影片卡，点击进详情且不关闭 Agent Window。过程条不再铺开 raw 工具名：产品化文案 + loading/思考 + 完成后折叠。composer `@` 引用经 `context.mentions` 注入系统提示。详见 [`2026-08-20-agent-chat-movie-cards.md`](2026-08-20-agent-chat-movie-cards.md)。
+
 ## 4. E3 实验三期：写能力 + 就地动作（能干活）
 
 **目标**：Agent 从"能问"到"能做"，写路径唯一入口 = preview→apply。
@@ -61,6 +67,10 @@
 | 一句话视图 | NL → 筛选确认卡 → 创建 Saved View | REQ-0033 |
 
 **验收**：确认前零写入、token 校验、审计含 preview/apply；就地按钮 diff 预览后走既有端点语义写回；批量 >25 转任务并经 ScanProgressDock 展示。
+
+**E3.1 落地（2026-08-21）**：`save_movie_comment` preview/apply、`POST /api/ai/actions/polish_comment`（模型自识别原文语言并同语言润色；不提供扩写/翻译按钮）、`POST /api/ai/confirm`、SSE `confirm_required`、详情页笔记润色与 Agent Window 确认卡。详见 [`2026-08-21-agent-e3-comment-actions.md`](2026-08-21-agent-e3-comment-actions.md)。
+
+**E3.2–E3.4 落地（2026-08-21）**：`update_movie_display_overrides` + `clean_summary` / `translate_title`（编辑对话框输入框内按钮）；只读 `insights_narrative`（Insights 页）；`create_saved_view`（对话里解析筛选并出确认卡）。详见 [`2026-08-21-agent-e3-write-actions.md`](2026-08-21-agent-e3-write-actions.md)。
 
 ## 5. E4 毕业期：转正与对外
 

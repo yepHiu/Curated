@@ -83,7 +83,7 @@
 
 **验收要点**：原文在应用前绝不丢失；AI 不得编造笔记中不存在的事实（提示词约束 + 无工具调用，L1 纯文本变换）；未配 provider 时按钮降级；字符上限沿用现有 `MAX_MOVIE_COMMENT_RUNES`；三语 UI。
 
-**落实**：action preset `polish_comment` / `expand_comment` / `translate_comment`，`POST /api/ai/actions/{name}`（B7）；写回经网关 `save_movie_comment` 的 preview→apply（B6），确认动作即 UI diff 确认卡。
+**落实**：action preset `polish_comment`，`POST /api/ai/actions/polish_comment`（B7）；模型自行识别原文语言并保持同语言润色（不提供扩写/翻译按钮）；写回经网关 `save_movie_comment` 的 preview→apply（B6），确认动作即 UI diff 确认卡。
 
 ### REQ-0030 刮削摘要一键清洗（P0，批次 A）
 
