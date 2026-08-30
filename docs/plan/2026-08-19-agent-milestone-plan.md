@@ -462,3 +462,88 @@ and: 写入次数、confirm token 和库外 movieId 等安全不变量
 若 R0 eval runner 或 Context v1 校验未完成，今天到此停止，不开始 R2 Plan Card。若 Context v1 通过但前端 chips 尚未完成，可以只合入后端/契约/eval 的独立提交，前端留在下一小步；不得为了“端到端看起来完成”放松服务器 allowlist 或引用校验。
 
 今天全部完成后，下一次工作只从 **R1.2：证据 envelope 与实体歧义交互** 开始：让每个关键结果带来源、筛选、截断和本地/库外标记，并要求用户在歧义对象中选择。R2 的任务计划卡仍需等待 R1 的上下文与对账评测稳定。
+
+## 11. R1.2 完成后的下一步：先验收可信闭环（2026-08-31）
+
+### 11.1 当前结论
+
+R1.2 的第一个可用闭环已完成并以最小提交落库：外置 `agent-system-v2`、`resolve_entities`、歧义候选点选、证据 envelope、本地/源站边界与 `completed` / `partial` / `needs_input` / `cancelled` / `failed` 收口均已实现。下一步的首要目标不是增加更多工具，而是证明这些规则在真实 Provider 和异常路径下稳定成立。
+
+**本轮不做**：独立影片 alias 表、长期偏好记忆、任意批量写入、MCP、通用网页搜索、Window → Drawer 重构。原始抓取标题在 `user_title` 覆盖后仍可被搜索，已足够作为当前“标题别名”的可验证实现；只有真实验收暴露缺口时才评估持久 alias 数据模型。
+
+### 11.2 P0：真实 Provider 冒烟验收（下一实施项）
+
+在合成/非敏感测试资料库和本地 Provider 配置上执行一次人工验收；不得把真实 API Key、用户影片清单或聊天全文加入测试 fixture、日志或提交。
+
+| 场景 | 预期结果 | 通过标准 |
+|---|---|---|
+| 演员 canonical / alias 唯一命中 | Agent 使用唯一实体继续查询 | 过程条展示 `matched` 和本地证据；无伪造 actor 名称 |
+| 同名演员或同标题影片 | Agent 停在候选选择 | 未点选前不深入读取、不查询 Provider、不生成本地影片卡 |
+| 修改过 display title 的影片 | 原始抓取标题仍可找到影片 | 返回同一个本地 `movieId`，且不需要手工 alias 记录 |
+| Provider 作品结果 | 清楚区分已入库与未入库 | 库外条目没有本地 `movieId`，不会进入 `present_movies` |
+| Provider / 源页面失败 | 给出已确认内容、失败原因和下一步 | 结果为 `partial`，保留失败 evidence 与可重试建议 |
+| 分页或正文截断 | 不宣称结果完整 | 明示截断/游标或范围，结果为 `partial` |
+| 点击停止 | 流式过程立即结束 | 前端显示 `cancelled`，保留已完成只读内容，且不留下 loading |
+
+**产出**：一份不含隐私数据的验收记录；若发现稳定缺口，记录“输入、期望、实际、证据事件、最小复现步骤”，再进入修复，而不是先扩工具或重写提示词。
+
+**执行记录（2026-08-31）**：本机开发前后端已按项目脚本启动并通过健康检查（`127.0.0.1:8080` 与 `127.0.0.1:5173`）。尝试调用当前配置的最小 Provider 连通性检查时，后端按设计返回 `AUTH_LOCKED`；未尝试绕过 PIN、读取配置或输出 API Key。真实 Provider 冒烟验收等待用户在本机完成解锁后继续。
+
+### 11.3 P0：补齐确定性评测，形成 R1 通过门槛
+
+将人工发现的行为固化为不访问网络的 Go scripted-streamer eval 与前端 Mock/组件测试。优先补足以下尚未覆盖或覆盖不足的场景：
+
+1. Provider / source-page 失败后，`message_done.outcome` 为 `partial`，并携带可读失败 evidence；
+2. 分页或源页面截断后，答案不得声称“全部”或“仅有这些”；
+3. 模型空文本回复稳定收束为 `failed`；
+4. 服务端 context cancellation 输出 `cancelled`；浏览器 abort 保持本地取消卡；
+5. provider 行的 `inLibrary=true/false` 与 `movieId` 边界；
+6. canonical / alias 演员解析，以及同名候选在确认前不能升级为可信引用；
+7. `needs_input` 后用户点选候选，新请求经后端复验后才成为可信锚点。
+
+**R1 Gate**：上述评测全部通过；既有实体、证据、写入 preview/confirm 的回归继续通过；没有任何案例能通过歧义候选、provider 库外结果或模型文本伪造本地 ID / 写入授权。
+
+**执行记录（2026-08-31）**：已新增并通过 `EVAL-R1-002` 至 `EVAL-R1-005`：Provider 失败的 `partial + provider evidence`、截断结果的 `partial + cursor/filter evidence`、模型空回复的 `failed`、以及服务端取消的 `cancelled`。命令：`cd backend && go test ./internal/agent/eval/... ./internal/agent/run/...`。
+
+### 11.4 P1：质量收口与可复现发布信号
+
+R1 Gate 通过后执行本项目统一质量门：根目录运行 `pnpm typecheck`、`pnpm lint`、相关 Vitest，阶段收口运行 `pnpm test`；后端在 `backend/` 运行 `go test ./...` 与 `go vet ./...`。UI 变更另跑 `pnpm test:e2e`，构建变更再运行 `pnpm build`。
+
+当前已有的移动端 e2e 超时和 bundle hard-budget 超限应单列为工程质量任务，不能通过放宽断言或调高预算消除；同时也不应阻塞 R1 可信行为的验证。修复时分别以最小复现和构建产物分析定位，避免与 Agent 功能改动混在同一个提交中。
+
+### 11.5 R2.1：只读任务计划卡（仅在 R1 Gate 后启动）
+
+R1 稳定后，下一项功能应是**只读任务计划卡**，首批只服务两类任务：
+
+1. 找片决策：先显示目标、可用筛选、已知候选、缺失条件与下一步；
+2. 来源信息核对：先显示本地事实、源站事实、时间范围、尚未证实的信息与后续读取计划。
+
+计划卡只提升过程透明度，不授予任何新权限：
+
+```text
+目标 → 已确认事实（附 evidence） → 缺失信息 / 候选选择 → 只读工具步骤 → 结果或 partial 收口
+```
+
+任何可能持久化的动作依然必须进入既有 `preview → UI confirm → apply` 路径。R2.1 的 DoD 是：计划在工具执行前可见；用户能中止或在需要时补充候选/条件；读失败可给出最小替代路径；完成与未完成范围仍由 outcome 和 evidence 表达。
+
+### 11.6 后续优先级（R2.1 之后）
+
+| 优先级 | 方向 | 进入条件 |
+|---|---|---|
+| P1 | 用户可读的最近操作 / 审计视图 | R2.1 稳定；对写入、preview、apply、拒绝和失败可追溯 |
+| P1 | Agent Window 键盘、焦点、移动端和无障碍验收 | R1 Gate 通过；先补焦点归还、确认卡键盘路径与流式播报节流 |
+| P1 | 延迟、工具耗时、失败类别的最小观测 | 不保存原始敏感 prompt/response；先观测后设配额 |
+| P2 | 受控批量“计划 → 抽样预览 → 确认 → 后台任务” | R2.1 与审计稳定；超过 25 项必须后台任务且可取消 |
+| P2 | 显式、可编辑、可删除的用户偏好 | 先验证找片任务有重复使用价值；禁止将模型猜测自动持久化 |
+| P2 | 最小只读 MCP | 稳定 schema、Gateway、权限、审计与契约测试均具备；不暴露内部 prompt、confirm token 或写工具 |
+
+### 11.7 建议的下一次工作日切片
+
+按“验收 → eval → 小修复（若有）→ Gate”顺序完成，不与新工具或 UI 重构并行。建议把每项拆为独立提交：
+
+1. `test(agent): cover trusted outcome edge cases`：后端确定性 eval / loop 测试；
+2. `test(agent): verify resolution and provider boundary UI`：Mock 与组件测试；
+3. `fix(agent): ...`：仅在验收发现问题时创建，按根因拆分；
+4. `docs(agent): record R1 validation results`：记录无隐私验收结论和 Gate 状态。
+
+在 Gate 通过前，不启动 R2.1、批量写、长期记忆或 MCP；这样可以确保后续 Agent 能力建立在“能承认不确定、能够举证、不会越过用户选择”的稳定基础上。
