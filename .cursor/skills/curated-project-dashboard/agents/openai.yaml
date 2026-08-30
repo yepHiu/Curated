@@ -1,0 +1,4 @@
+interface:
+  display_name: "Curated Project Dashboard"
+  short_description: "Refresh Curated's project-status dashboard."
+  default_prompt: "Use $curated-project-dashboard to refresh the Curated project overview dashboard from the current PRD, Git, branches, and worktrees."
