@@ -23,6 +23,10 @@ func TestR0BaselineContracts(t *testing.T) {
 		{ID: "EVAL-R0-004", Run: evalReadFailureStaysVisible},
 		{ID: "EVAL-R0-005", Run: evalForgedConfirmCannotWrite},
 		{ID: "EVAL-R1-001", Run: evalAmbiguousEntityNeedsInput},
+		{ID: "EVAL-R1-002", Run: evalProviderFailureIsPartialWithEvidence},
+		{ID: "EVAL-R1-003", Run: evalTruncatedLookupIsPartialWithEvidence},
+		{ID: "EVAL-R1-004", Run: evalEmptyModelAnswerFails},
+		{ID: "EVAL-R1-005", Run: evalCancellationIsClosed},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -165,6 +169,113 @@ func evalReadFailureStaysVisible(ctx context.Context) error {
 	}
 	if !failed || !strings.Contains(text.String(), "could not verify") {
 		return fmt.Errorf("read failure was not surfaced: failed=%v text=%q", failed, text.String())
+	}
+	return nil
+}
+
+func evalProviderFailureIsPartialWithEvidence(ctx context.Context) error {
+	registry := core.NewRegistry()
+	if err := registry.Register(core.ToolDefinition{
+		Name: core.SearchProviderTitlesName, Description: "synthetic provider failure", ParamsSchema: evalObjectSchema(), Permission: core.PermissionRead, Domain: core.DomainQuery,
+		Handler: func(context.Context, core.Call) (core.Result, error) {
+			return core.Result{OK: false, Error: &core.ToolError{Code: "AI_PROVIDER_UNAVAILABLE", Message: "provider unavailable"}}, nil
+		},
+	}); err != nil {
+		return err
+	}
+	loop := run.NewLoop(core.NewGateway(registry, nil, nil, nil), &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "provider", Function: llm.ToolCallFunction{Name: core.SearchProviderTitlesName, Arguments: `{}`}}}},
+		{Content: "The source-site lookup failed, so I can only report confirmed local facts."},
+	}}, core.SanitizeFull, "en")
+	var evidence *contracts.AIEvidenceDTO
+	var outcome *contracts.AIChatOutcomeDTO
+	if err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "find provider titles"}}, nil, func(event contracts.AIChatSSEEvent) {
+		if event.Type == "tool_call_result" {
+			evidence = event.Evidence
+		}
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}); err != nil {
+		return err
+	}
+	if evidence == nil || evidence.Source != "provider" || !evidence.Failed || evidence.ErrorCode != "AI_PROVIDER_UNAVAILABLE" {
+		return fmt.Errorf("provider failure evidence = %+v", evidence)
+	}
+	if outcome == nil || outcome.Status != "partial" || !outcome.Retryable {
+		return fmt.Errorf("provider failure outcome = %+v", outcome)
+	}
+	return nil
+}
+
+func evalTruncatedLookupIsPartialWithEvidence(ctx context.Context) error {
+	registry := core.NewRegistry()
+	if err := registry.Register(core.ToolDefinition{
+		Name: "search_truncated_catalog", Description: "synthetic truncated lookup", ParamsSchema: evalObjectSchema(), Permission: core.PermissionRead, Domain: core.DomainQuery,
+		Handler: func(context.Context, core.Call) (core.Result, error) {
+			return core.Result{
+				OK: true, Truncated: true, NextCursor: "next-page",
+				Data: map[string]any{"source": map[string]any{"query": map[string]any{"q": "sample", "limit": 20}}},
+			}, nil
+		},
+	}); err != nil {
+		return err
+	}
+	loop := run.NewLoop(core.NewGateway(registry, nil, nil, nil), &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "truncated", Function: llm.ToolCallFunction{Name: "search_truncated_catalog", Arguments: `{}`}}}},
+		{Content: "Here are the confirmed results from the first page; the lookup was truncated."},
+	}}, core.SanitizeFull, "en")
+	var evidence *contracts.AIEvidenceDTO
+	var outcome *contracts.AIChatOutcomeDTO
+	if err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "list every result"}}, nil, func(event contracts.AIChatSSEEvent) {
+		if event.Type == "tool_call_result" {
+			evidence = event.Evidence
+		}
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}); err != nil {
+		return err
+	}
+	if evidence == nil || !evidence.Truncated || evidence.NextCursor != "next-page" || evidence.Filters["q"] != "sample" || evidence.Filters["limit"] != "20" {
+		return fmt.Errorf("truncation evidence = %+v", evidence)
+	}
+	if outcome == nil || outcome.Status != "partial" || outcome.Retryable {
+		return fmt.Errorf("truncation outcome = %+v", outcome)
+	}
+	return nil
+}
+
+func evalEmptyModelAnswerFails(ctx context.Context) error {
+	loop := run.NewLoop(core.NewGateway(core.NewRegistry(), nil, nil, nil), &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{{}}}, core.SanitizeFull, "en")
+	var outcome *contracts.AIChatOutcomeDTO
+	if err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "answer"}}, nil, func(event contracts.AIChatSSEEvent) {
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}); err != nil {
+		return err
+	}
+	if outcome == nil || outcome.Status != "failed" || !outcome.Retryable {
+		return fmt.Errorf("empty answer outcome = %+v", outcome)
+	}
+	return nil
+}
+
+func evalCancellationIsClosed(_ context.Context) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	loop := run.NewLoop(core.NewGateway(core.NewRegistry(), nil, nil, nil), &llm.ScriptedStreamer{}, core.SanitizeFull, "en")
+	var outcome *contracts.AIChatOutcomeDTO
+	if err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "stop"}}, nil, func(event contracts.AIChatSSEEvent) {
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}); err != nil {
+		return err
+	}
+	if outcome == nil || outcome.Status != "cancelled" || outcome.Retryable {
+		return fmt.Errorf("cancellation outcome = %+v", outcome)
 	}
 	return nil
 }
