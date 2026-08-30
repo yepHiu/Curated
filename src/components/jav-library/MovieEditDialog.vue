@@ -39,9 +39,10 @@ const editDraftStudio = ref("")
 const editDraftSummary = ref("")
 const editDraftRelease = ref("")
 const editDraftRuntime = ref("")
-const aiBusy = ref(false)
+const aiBusyField = ref<"title" | "summary" | null>(null)
 const preview = ref<AIActionPreviewDTO | null>(null)
 const previewOpen = ref(false)
+const aiBusy = computed(() => aiBusyField.value !== null)
 
 const releaseDateInputRx = /^\d{4}-\d{2}-\d{2}$/
 const showAgentActions = computed(() => agentEnabled.value)
@@ -110,19 +111,32 @@ function submitMovieEditDialog() {
   })
 }
 
-async function runDisplayAction(name: "clean_summary" | "translate_title") {
+type DisplayActionName = "translate_title" | "translate_summary"
+
+function fieldForDisplayAction(name: string): "title" | "summary" {
+  return name === "translate_title" ? "title" : "summary"
+}
+
+async function runDisplayAction(name: DisplayActionName) {
   if (!showAgentActions.value || aiBusy.value) {
     return
   }
-  aiBusy.value = true
+  const field = fieldForDisplayAction(name)
+  const body = field === "title" ? editDraftTitle.value.trim() : editDraftSummary.value.trim()
+  if (!body) {
+    return
+  }
+  aiBusyField.value = field
   movieEditError.value = ""
   try {
     const dto = await aiService.runAction(name, {
       movieId: props.movie.id,
+      body,
       locale: locale.value,
     })
     if (dto.noop) {
-      movieEditError.value = name === "clean_summary" ? t("detailPanel.movieAiCleanNoop") : t("detailPanel.movieAiTranslateNoop")
+      movieEditError.value =
+        name === "translate_summary" ? t("detailPanel.movieAiTranslateSummaryNoop") : t("detailPanel.movieAiTranslateNoop")
       return
     }
     preview.value = dto
@@ -134,7 +148,7 @@ async function runDisplayAction(name: "clean_summary" | "translate_title") {
       movieEditError.value = err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieAiError")
     }
   } finally {
-    aiBusy.value = false
+    aiBusyField.value = null
   }
 }
 
@@ -144,7 +158,7 @@ async function applyDisplayPreview() {
     previewOpen.value = false
     return
   }
-  aiBusy.value = true
+  aiBusyField.value = fieldForDisplayAction(current.action)
   movieEditError.value = ""
   try {
     await aiService.confirmTool({
@@ -156,8 +170,7 @@ async function applyDisplayPreview() {
     await libraryService.loadMovieDetail(props.movie.id)
     if (current.action === "translate_title") {
       editDraftTitle.value = current.proposedText ?? editDraftTitle.value
-    }
-    if (current.action === "clean_summary") {
+    } else if (current.action === "translate_summary") {
       editDraftSummary.value = current.proposedText ?? editDraftSummary.value
     }
     previewOpen.value = false
@@ -165,7 +178,7 @@ async function applyDisplayPreview() {
   } catch (err) {
     movieEditError.value = err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieAiApplyError")
   } finally {
-    aiBusy.value = false
+    aiBusyField.value = null
   }
 }
 
@@ -233,7 +246,7 @@ function discardDisplayPreview() {
                 data-movie-edit-ai-translate
                 @click="runDisplayAction('translate_title')"
               >
-                <Loader2 v-if="aiBusy" class="size-4 motion-safe:animate-spin" />
+                <Loader2 v-if="aiBusyField === 'title'" class="size-4 motion-safe:animate-spin" />
                 <Sparkles v-else class="size-4" />
                 {{ t("detailPanel.movieAiTranslateTitle") }}
               </Button>
@@ -272,12 +285,12 @@ function discardDisplayPreview() {
                 size="sm"
                 class="min-h-11 rounded-lg text-muted-foreground hover:text-foreground md:h-8 md:min-h-8"
                 :disabled="aiBusy || !editDraftSummary.trim()"
-                data-movie-edit-ai-clean
-                @click="runDisplayAction('clean_summary')"
+                data-movie-edit-ai-translate-summary
+                @click="runDisplayAction('translate_summary')"
               >
-                <Loader2 v-if="aiBusy" class="size-4 motion-safe:animate-spin" />
+                <Loader2 v-if="aiBusyField === 'summary'" class="size-4 motion-safe:animate-spin" />
                 <Sparkles v-else class="size-4" />
-                {{ t("detailPanel.movieAiCleanSummary") }}
+                {{ t("detailPanel.movieAiTranslateSummary") }}
               </Button>
             </div>
           </div>

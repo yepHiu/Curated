@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { Movie } from "@/domain/movie/types"
 import MovieEditDialog from "./MovieEditDialog.vue"
 
@@ -76,38 +76,58 @@ function mountDialog(open = true) {
 }
 
 describe("MovieEditDialog AI actions", () => {
+  beforeEach(() => {
+    aiMocks.runAction.mockReset()
+    aiMocks.confirmTool.mockReset()
+    libraryMocks.loadMovieDetail.mockReset()
+  })
   it("hides in-field AI buttons while the experimental gate is off", () => {
     const wrapper = mountDialog()
-    expect(wrapper.find("[data-movie-edit-ai-clean]").exists()).toBe(false)
+    expect(wrapper.find("[data-movie-edit-ai-translate-summary]").exists()).toBe(false)
     expect(wrapper.find("[data-movie-edit-ai-translate]").exists()).toBe(false)
   })
 
-  it("previews a summary cleanup then applies through confirm", async () => {
+  it("previews a summary translation then applies through confirm", async () => {
     const { useExperimentalAgent } = await import("@/lib/experimental-agent")
     useExperimentalAgent().setEnabled(true)
     aiMocks.runAction.mockResolvedValue({
-      action: "clean_summary",
+      action: "translate_summary",
       name: "update_movie_display_overrides",
       sessionId: "act_1",
       originalText: movie.summary,
-      proposedText: "Clean plot.",
+      proposedText: "Localized plot.",
       confirmToken: "cfm_1",
-      arguments: { movieId: "m1", userSummary: "Clean plot." },
+      arguments: { movieId: "m1", userSummary: "Localized plot." },
     })
     aiMocks.confirmTool.mockResolvedValue({ ok: true, name: "update_movie_display_overrides" })
     libraryMocks.loadMovieDetail.mockResolvedValue(movie)
     const wrapper = mountDialog()
-    expect(wrapper.get("[data-movie-edit-summary-field]").find("[data-movie-edit-ai-clean]").exists()).toBe(true)
-    await wrapper.get("[data-movie-edit-ai-clean]").trigger("click")
+    expect(wrapper.get("[data-movie-edit-summary-field]").find("[data-movie-edit-ai-translate-summary]").exists()).toBe(true)
+    await wrapper.get("[data-movie-edit-ai-translate-summary]").trigger("click")
     await flushPromises()
-    expect(aiMocks.runAction).toHaveBeenCalledWith("clean_summary", {
+    expect(aiMocks.runAction).toHaveBeenCalledWith("translate_summary", {
       movieId: "m1",
+      body: movie.summary,
       locale: "zh-CN",
     })
+    expect(aiMocks.runAction).not.toHaveBeenCalledWith("translate_title", expect.anything())
     await wrapper.get("[data-movie-edit-ai-apply]").trigger("click")
     await flushPromises()
     expect(aiMocks.confirmTool).toHaveBeenCalled()
     expect(libraryMocks.loadMovieDetail).toHaveBeenCalledWith("m1")
+    useExperimentalAgent().setEnabled(false)
+  })
+
+  it("shows a spinner only on the clicked field while a summary action is in flight", async () => {
+    const { useExperimentalAgent } = await import("@/lib/experimental-agent")
+    useExperimentalAgent().setEnabled(true)
+    aiMocks.runAction.mockReturnValue(new Promise(() => {}))
+    const wrapper = mountDialog()
+    await wrapper.get("[data-movie-edit-ai-translate-summary]").trigger("click")
+    await flushPromises()
+    expect(wrapper.get("[data-movie-edit-ai-translate-summary]").html()).toContain("animate-spin")
+    expect(wrapper.get("[data-movie-edit-ai-translate]").html()).not.toContain("animate-spin")
+    expect(aiMocks.runAction).toHaveBeenCalledTimes(1)
     useExperimentalAgent().setEnabled(false)
   })
 })
