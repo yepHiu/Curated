@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"curated-backend/internal/contracts"
@@ -114,5 +115,71 @@ func TestPersistScanMovieSkipsWhenTargetPathBelongsToAnotherMovie(t *testing.T) 
 	}
 	if originalLocation != "D:/Media/ABC-123/ABC-123.mp4" {
 		t.Fatalf("original movie location changed to %q", originalLocation)
+	}
+}
+
+func TestPersistScanMovieSkipsTrashedPathAndAllowsLaterImport(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store, err := NewSQLiteStore(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() {
+		_ = store.Close()
+	}()
+
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	trashedPath := "E:/JAV/Curated/SIRO-5705/SIRO-5705.mp4"
+	trashed, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-1",
+		Path:     trashedPath,
+		FileName: "SIRO-5705.mp4",
+		Number:   "SIRO-5705",
+	})
+	if err != nil {
+		t.Fatalf("persist trashed movie: %v", err)
+	}
+	if err := store.TrashMovie(ctx, trashed.MovieID); err != nil {
+		t.Fatalf("trash movie: %v", err)
+	}
+
+	skip, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-2",
+		Path:     trashedPath,
+		FileName: "SIRO-5705.mp4",
+		Number:   "SIRO-5705",
+	})
+	if err != nil {
+		t.Fatalf("persist over trashed path should skip, not error: %v", err)
+	}
+	if skip.Status != "skipped" || skip.Reason != "trashed_already_indexed" {
+		t.Fatalf("skip = %+v, want skipped trashed_already_indexed", skip)
+	}
+
+	imported, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		TaskID:   "task-3",
+		Path:     "E:/JAV/Curated/SONE-305-C.mp4",
+		FileName: "SONE-305-C.mp4",
+		Number:   "SONE-305",
+	})
+	if err != nil {
+		t.Fatalf("persist movie after trashed path skip: %v", err)
+	}
+	if imported.Status != "imported" {
+		t.Fatalf("expected imported after trash skip, got %+v", imported)
+	}
+
+	var trashedAt string
+	if err := store.db.QueryRowContext(ctx, `SELECT IFNULL(trashed_at, '') FROM movies WHERE id = ?`, trashed.MovieID).Scan(&trashedAt); err != nil {
+		t.Fatalf("query trashed_at: %v", err)
+	}
+	if strings.TrimSpace(trashedAt) == "" {
+		t.Fatal("scanning a trashed path must not restore the movie")
 	}
 }

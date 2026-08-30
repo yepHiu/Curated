@@ -27,6 +27,8 @@ import type {
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   MovieCommentDTO,
+  ImportMovieCodeCheckDTO,
+  ImportMovieCodeMatchDTO,
   PersonalInsightsBreakdownDTO,
   PersonalInsightsDimension,
   PersonalInsightsOverviewDTO,
@@ -57,6 +59,11 @@ import { listSortedByUpdatedDesc } from "@/lib/playback-progress-storage"
 import { listPlaybackWatchTimeMovieEntries } from "@/lib/playback-watch-time-storage"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
+import {
+  classifyMovieCodes,
+  extractMovieNumber,
+  strongerMovieCodeMatch,
+} from "@/lib/movie-number"
 import { HttpClientError } from "@/api/http-client"
 import {
   normalizeSavedViewFiltersV1,
@@ -1767,6 +1774,45 @@ export const mockLibraryService: LibraryService = {
     defaultImportLibraryPathIdMock.value = trimmed
   },
 
+  async checkImportMovieCodes(names: string[]): Promise<ImportMovieCodeCheckDTO> {
+    const trimmed = names.map((name) => name.trim()).filter(Boolean)
+    if (trimmed.length === 0) {
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "filenames are required")
+    }
+    const active = moviesState.value.filter((movie) => !movie.trashedAt?.trim())
+    const items = trimmed.map((name) => {
+      const extractedCode = extractMovieNumber(name)
+      const matches: ImportMovieCodeMatchDTO[] = []
+      if (extractedCode) {
+        const byId = new Map<string, ImportMovieCodeMatchDTO>()
+        for (const movie of active) {
+          const kind = strongerMovieCodeMatch(
+            classifyMovieCodes(extractedCode, movie.code),
+            classifyMovieCodes(extractedCode, movie.id),
+          )
+          if (!kind) continue
+          const prev = byId.get(movie.id)
+          byId.set(movie.id, {
+            movieId: movie.id,
+            code: movie.code || extractedCode,
+            title: movie.title,
+            matchKind: prev ? (strongerMovieCodeMatch(prev.matchKind, kind) || kind) : kind,
+          })
+        }
+        matches.push(...byId.values())
+      }
+      return {
+        name,
+        extractedCode: extractedCode || undefined,
+        matches,
+      }
+    })
+    return {
+      items,
+      matchedCount: items.filter((item) => item.matches.length > 0).length,
+    }
+  },
+
   async importMovies(files: File[]): Promise<TaskDTO | null> {
     const selected = files.filter((file) => file.name.trim())
     if (selected.length === 0) {
@@ -1845,6 +1891,10 @@ export const mockLibraryService: LibraryService = {
   },
 
   async createPlaybackSession() {
+    return null
+  },
+
+  async getPlaybackSession() {
     return null
   },
 

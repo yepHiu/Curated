@@ -3,9 +3,10 @@ import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { FilePlus2, FolderInput, UploadCloud, X } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
-import type { LibraryPathStorageStatusDTO, MovieImportUploadProgress } from "@/api/types"
+import type { LibraryPathStorageStatusDTO, MovieImportUploadProgress, ImportMovieCodeCheckItemDTO } from "@/api/types"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useScanTaskTracker } from "@/composables/use-scan-task-tracker"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -35,6 +36,8 @@ const abandonBusyId = ref("")
 const uploadProgress = ref<MovieImportUploadProgress | null>(null)
 const importError = ref("")
 const skippedCount = ref(0)
+const checkItems = ref<ImportMovieCodeCheckItemDTO[]>([])
+let codeCheckSeq = 0
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
@@ -178,6 +181,33 @@ function isVideoFile(file: File): boolean {
   return videoExtensions.has(fileExtension(relativePathForFile(file)))
 }
 
+function checkItemForFile(file: File): ImportMovieCodeCheckItemDTO | undefined {
+  const name = relativePathForFile(file)
+  return checkItems.value.find((item) => item.name === name)
+}
+
+function fileAlreadyImported(file: File): boolean {
+  return (checkItemForFile(file)?.matches.length ?? 0) > 0
+}
+
+async function refreshCodeCheck(files: File[]) {
+  const seq = ++codeCheckSeq
+  if (files.length === 0) {
+    checkItems.value = []
+    return
+  }
+  try {
+    const result = await libraryService.checkImportMovieCodes(
+      files.map((file) => relativePathForFile(file)),
+    )
+    if (seq !== codeCheckSeq) return
+    checkItems.value = result.items
+  } catch {
+    if (seq !== codeCheckSeq) return
+    checkItems.value = []
+  }
+}
+
 function addFiles(files: File[]) {
   importError.value = ""
   const next = [...selectedFiles.value]
@@ -194,6 +224,7 @@ function addFiles(files: File[]) {
   }
   selectedFiles.value = next
   skippedCount.value = skipped
+  void refreshCodeCheck(next)
 }
 
 function clearSelection() {
@@ -201,12 +232,21 @@ function clearSelection() {
   skippedCount.value = 0
   uploadProgress.value = null
   importError.value = ""
+  checkItems.value = []
+  codeCheckSeq += 1
   if (fileInputRef.value) fileInputRef.value.value = ""
   if (folderInputRef.value) folderInputRef.value.value = ""
 }
 
 function removeFile(index: number) {
+  const file = selectedFiles.value[index]
   selectedFiles.value = selectedFiles.value.filter((_, i) => i !== index)
+  if (!file) return
+  const name = relativePathForFile(file)
+  checkItems.value = checkItems.value.filter((item) => item.name !== name)
+  if (selectedFiles.value.length === 0) {
+    checkItems.value = []
+  }
 }
 
 function openFilePicker() {
@@ -484,13 +524,24 @@ async function submitImport() {
               {{ t("import.clear") }}
             </Button>
           </div>
-          <div class="max-h-40 overflow-y-auto rounded-xl border border-border/70">
+          <div class="max-h-48 overflow-y-auto rounded-xl border border-border/70">
             <div
               v-for="(file, index) in selectedFiles"
               :key="`${relativePathForFile(file)}-${file.size}`"
               class="flex items-center justify-between gap-3 border-b border-border/50 px-3 py-2 text-sm last:border-b-0"
+              :data-import-code-row="relativePathForFile(file)"
             >
-              <span class="min-w-0 truncate font-mono text-xs">{{ relativePathForFile(file) }}</span>
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <span class="min-w-0 truncate font-mono text-xs">{{ relativePathForFile(file) }}</span>
+                <Badge
+                  v-if="fileAlreadyImported(file)"
+                  data-import-already-imported
+                  variant="warning"
+                  class="shrink-0"
+                >
+                  {{ t("import.alreadyImported") }}
+                </Badge>
+              </div>
               <div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                 <span>{{ formatBytes(file.size) }}</span>
                 <Button

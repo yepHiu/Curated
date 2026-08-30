@@ -1488,7 +1488,27 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 
 			outcome, err := a.store.PersistScanMovie(ctx, result)
 			if err != nil {
-				return err
+				a.logger.Error("scan persist movie failed; skipping file",
+					zap.Error(err),
+					zap.String("taskId", taskID),
+					zap.String("path", result.Path),
+					zap.String("number", result.Number),
+				)
+				skippedCount++
+				result.Status = "skipped"
+				result.Reason = "persist_failed"
+				if saveErr := a.store.SaveScanItem(ctx, result); saveErr != nil {
+					a.logger.Error("failed to persist scan skip item after persist error",
+						zap.Error(saveErr),
+						zap.String("taskId", taskID),
+						zap.String("path", result.Path),
+					)
+					return nil
+				}
+				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
+					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
+				}
+				return nil
 			}
 
 			result.MovieID = outcome.MovieID
@@ -1531,6 +1551,11 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		if errors.Is(err, context.Canceled) {
 			code = contracts.ErrorCodeScanCancelled
 		}
+		a.logger.Error("scan.library failed",
+			zap.Error(err),
+			zap.String("taskId", taskID),
+			zap.String("errorCode", code),
+		)
 		task := a.tasks.Fail(taskID, code, err.Error())
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed task", zap.Error(saveErr), zap.String("taskId", taskID))

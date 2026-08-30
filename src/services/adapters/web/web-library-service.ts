@@ -29,6 +29,7 @@ import type {
   PersonalInsightsOverviewDTO,
   PersonalInsightsRange,
   PlaybackDescriptorDTO,
+  PlaybackSessionStatusDTO,
   PatchBackendLogBody,
   PatchMovieBody,
   PatchPlayerSettingsBody,
@@ -1030,6 +1031,10 @@ function createWebLibraryService(): LibraryService {
       }
     },
 
+    async checkImportMovieCodes(names) {
+      return await api.checkImportMovieCodes({ names })
+    },
+
     async importMovies(files, options) {
       const selected = files.filter((file) => file.size >= 0)
       if (selected.length === 0) {
@@ -1162,6 +1167,18 @@ function createWebLibraryService(): LibraryService {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }
       return dto
+    },
+
+    async getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO | null> {
+      const id = sessionId.trim()
+      if (!id) {
+        return null
+      }
+      try {
+        return await api.getPlaybackSession(id)
+      } catch {
+        return null
+      }
     },
 
     async launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null> {

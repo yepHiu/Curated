@@ -32,6 +32,7 @@ import type {
   MetadataRefreshQueuedDTO,
   MovieImportUploadProgress,
   MovieImportUploadFileManifest,
+  ImportMovieCodeCheckDTO,
   NativePlaybackLaunchDTO,
   MovieCommentDTO,
   PersonalInsightsBreakdownDTO,
@@ -39,6 +40,7 @@ import type {
   PersonalInsightsOverviewDTO,
   PersonalInsightsRange,
   PlaybackDescriptorDTO,
+  PlaybackSessionStatusDTO,
   PatchBackendLogBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
@@ -178,6 +180,8 @@ export interface LibraryService {
       resumeUploadId?: string
     },
   ): Promise<TaskDTO | null>
+  /** 导入前按文件名解析番号，检查库中是否已有相同或类似条目。 */
+  checkImportMovieCodes(names: string[]): Promise<ImportMovieCodeCheckDTO>
   /** 当前可继续的续传会话列表（Web：本地账本 + 后端状态核对；Mock：恒为空）。 */
   listResumableMovieImports(): Promise<ResumableMovieImportSession[]>
   /** 放弃一个未完成的续传会话：删除服务端暂存与本地账本条目。 */
@@ -218,6 +222,7 @@ export interface LibraryService {
     mode: PlaybackDescriptorDTO["mode"],
     startPositionSec?: number,
   ): Promise<PlaybackDescriptorDTO | null>
+  getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO | null>
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>
   /**
    * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。

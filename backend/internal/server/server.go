@@ -479,6 +479,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
 	mux.HandleFunc("POST /api/import/movies", h.handleImportMovies)
+	mux.HandleFunc("POST /api/import/movies/code-check", h.handleCheckImportMovieCodes)
 	mux.HandleFunc("POST /api/import/movies/uploads", h.handleCreateMovieImportUpload)
 	mux.HandleFunc("GET /api/import/movies/uploads/{uploadId}", h.handleGetMovieImportUpload)
 	mux.HandleFunc("DELETE /api/import/movies/uploads/{uploadId}", h.handleAbortMovieImportUpload)

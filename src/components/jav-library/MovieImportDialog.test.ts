@@ -14,6 +14,7 @@ const serviceState = vi.hoisted(() => ({
   importMovies: vi.fn(),
   listResumableMovieImports: vi.fn(),
   abandonMovieImportUpload: vi.fn(),
+  checkImportMovieCodes: vi.fn(),
 }))
 
 const tracker = vi.hoisted(() => ({
@@ -43,6 +44,7 @@ vi.mock("@/services/library-service", () => ({
     importMovies: serviceState.importMovies,
     listResumableMovieImports: serviceState.listResumableMovieImports,
     abandonMovieImportUpload: serviceState.abandonMovieImportUpload,
+    checkImportMovieCodes: serviceState.checkImportMovieCodes,
   }),
 }))
 
@@ -72,6 +74,13 @@ vi.mock("@/components/ui/button", () => ({
   },
 }))
 
+vi.mock("@/components/ui/badge", () => ({
+  Badge: {
+    name: "Badge",
+    template: "<span data-badge><slot /></span>",
+  },
+}))
+
 vi.mock("@/components/ui/progress", () => ({
   Progress: { name: "Progress", props: ["modelValue"], template: "<div data-progress />" },
 }))
@@ -87,6 +96,10 @@ beforeEach(() => {
   serviceState.importMovies.mockReset()
   serviceState.listResumableMovieImports.mockReset().mockResolvedValue([])
   serviceState.abandonMovieImportUpload.mockReset().mockResolvedValue(undefined)
+  serviceState.checkImportMovieCodes.mockReset().mockImplementation(async (names: string[]) => ({
+    items: names.map((name) => ({ name, matches: [] })),
+    matchedCount: 0,
+  }))
   tracker.start.mockReset()
 })
 
@@ -122,9 +135,11 @@ describe("MovieImportDialog", () => {
     })
 
     await input.trigger("change")
+    await flushPromises()
     await wrapper.get("[data-import-submit]").trigger("click")
     await flushPromises()
 
+    expect(serviceState.checkImportMovieCodes).toHaveBeenCalledWith(["IMP-001.mp4"])
     expect(serviceState.importMovies).toHaveBeenCalledWith(
       [file],
       expect.objectContaining({ onUploadProgress: expect.any(Function) }),
@@ -155,6 +170,7 @@ describe("MovieImportDialog", () => {
     })
 
     await input.trigger("change")
+    await flushPromises()
     await wrapper.get("[data-import-submit]").trigger("click")
     await flushPromises()
 
@@ -293,5 +309,41 @@ describe("MovieImportDialog", () => {
 
     expect(serviceState.abandonMovieImportUpload).toHaveBeenCalledWith("upload_abandon000001")
     expect(wrapper.find("[data-import-resumable-item]").exists()).toBe(false)
+  })
+
+  it("marks files whose catalog codes already exist after selection", async () => {
+    const keep = new File(["keep"], "NEW-001.mp4", { type: "video/mp4" })
+    const duplicate = new File(["dup"], "SSIS-001-C.mp4", { type: "video/mp4" })
+    serviceState.checkImportMovieCodes.mockResolvedValueOnce({
+      items: [
+        { name: "NEW-001.mp4", extractedCode: "NEW-001", matches: [] },
+        {
+          name: "SSIS-001-C.mp4",
+          extractedCode: "SSIS-001",
+          matches: [
+            { movieId: "ssis-001", code: "SSIS-001", title: "Existing title", matchKind: "exact" },
+          ],
+        },
+      ],
+      matchedCount: 1,
+    })
+    const wrapper = mount(MovieImportDialog)
+    const input = wrapper.get<HTMLInputElement>("[data-import-file-input]")
+    Object.defineProperty(input.element, "files", {
+      value: [keep, duplicate],
+      configurable: true,
+    })
+    await input.trigger("change")
+    await flushPromises()
+
+    expect(serviceState.checkImportMovieCodes).toHaveBeenCalledWith(["NEW-001.mp4", "SSIS-001-C.mp4"])
+    const duplicateRow = wrapper.get("[data-import-code-row='SSIS-001-C.mp4']")
+    const duplicateBadge = duplicateRow.get("[data-import-already-imported]")
+    const duplicateName = duplicateRow.get("span.font-mono")
+    expect(duplicateBadge.text()).toContain("import.alreadyImported")
+    expect(duplicateName.element.parentElement).toBe(duplicateBadge.element.parentElement)
+    expect(wrapper.get("[data-import-code-row='NEW-001.mp4']").find("[data-import-already-imported]").exists()).toBe(false)
+    expect(wrapper.get("[data-import-submit]").text()).toContain("import.submit")
+    expect(wrapper.find("[data-import-next]").exists()).toBe(false)
   })
 })

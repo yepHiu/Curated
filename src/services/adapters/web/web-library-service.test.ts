@@ -15,6 +15,7 @@ const apiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   patchSettings: vi.fn(),
   importMovies: vi.fn(),
+  checkImportMovieCodes: vi.fn(),
   getMovieImportUpload: vi.fn(),
   deleteMovieImportUpload: vi.fn(),
   listSavedViews: vi.fn(),
@@ -133,6 +134,7 @@ beforeEach(() => {
   apiMocks.getSettings.mockReset()
   apiMocks.patchSettings.mockReset()
   apiMocks.importMovies.mockReset()
+  apiMocks.checkImportMovieCodes.mockReset()
   apiMocks.getMovieImportUpload.mockReset()
   apiMocks.deleteMovieImportUpload.mockReset()
   apiMocks.listSavedViews.mockReset()
@@ -432,6 +434,29 @@ describe("webLibraryService mutations", () => {
       expect.objectContaining({ onUploadProgress, onUploadSessionCreated: expect.any(Function) }),
     )
     expect(task?.taskId).toBe("import-1")
+  })
+
+  it("forwards import catalog-code checks to the API", async () => {
+    apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
+    apiMocks.checkImportMovieCodes.mockResolvedValueOnce({
+      items: [
+        {
+          name: "SSIS-001-C.mp4",
+          extractedCode: "SSIS-001",
+          matches: [
+            { movieId: "ssis-001", code: "SSIS-001", title: "Existing", matchKind: "exact" },
+          ],
+        },
+      ],
+      matchedCount: 1,
+    })
+
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    await flushPromises()
+    const result = await webLibraryService.checkImportMovieCodes(["SSIS-001-C.mp4"])
+
+    expect(apiMocks.checkImportMovieCodes).toHaveBeenCalledWith({ names: ["SSIS-001-C.mp4"] })
+    expect(result.matchedCount).toBe(1)
   })
 
   it("resumes a resumable session by uploadId and clears the local ledger entry on success", async () => {

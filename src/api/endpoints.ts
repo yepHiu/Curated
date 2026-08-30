@@ -11,6 +11,7 @@ import {
   isLibraryHealthReportDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
+  isImportMovieCodeCheckDTO,
   isSavedViewDTO,
   isSavedViewsDTO,
   isRecommendationFeedbackDTO,
@@ -93,10 +94,13 @@ import type {
   NativePlaybackLaunchDTO,
   MetadataScrapeByPathsBody,
   MovieImportUploadDTO,
+  CheckImportMovieCodesBody,
+  ImportMovieCodeCheckDTO,
   MovieCommentDTO,
   MovieDetailDTO,
   MoviesPageDTO,
   PlaybackDescriptorDTO,
+  PlaybackSessionStatusDTO,
   PatchActorExternalLinksBody,
   PatchAuthSettingsBody,
   PatchCuratedFrameTagsBody,
@@ -625,6 +629,12 @@ export const api = {
 
   patchSettings(body: PatchSettingsBody): Promise<SettingsDTO> {
     return httpClient.patch<SettingsDTO>("/settings", body)
+  },
+
+  checkImportMovieCodes(body: CheckImportMovieCodesBody): Promise<ImportMovieCodeCheckDTO> {
+    return httpClient
+      .post<ImportMovieCodeCheckDTO>("/import/movies/code-check", body)
+      .then((value) => assertApiResponse("POST /import/movies/code-check", value, isImportMovieCodeCheckDTO))
   },
 
   importMovies(
