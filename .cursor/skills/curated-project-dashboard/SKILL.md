@@ -5,7 +5,7 @@ description: Refresh Curated's static project overview dashboard from the PRD, i
 
 # Curated Project Dashboard
 
-Use this Skill to refresh `docs/plan/2026-08-31-project-overview-dashboard.html` when someone asks for an updated project overview, delivery status, Git/branch summary, or worktree inventory.
+Use this Skill to refresh the root-level `project-overview-dashboard.html` when someone asks for an updated project overview, delivery status, Git/branch summary, or worktree inventory.
 
 The dashboard is a **static, timestamped snapshot**. It must say when it was collected and link back to its live sources; it is never a replacement for the PRD, source code, or Git.
 
@@ -35,6 +35,6 @@ The dashboard is a **static, timestamped snapshot**. It must say when it was col
 
 - Begin with `git status --short --branch`. Never reset, clean, stash, switch branches, or alter unrelated worktree files.
 - If the dashboard itself has conflicting uncommitted edits, stop and ask for direction rather than overwriting them. Otherwise use `apply_patch` for the HTML and only update `docs/guide.md` when its dashboard link changes.
-- Validate with `git diff --check -- docs/plan/2026-08-31-project-overview-dashboard.html docs/guide.md` and confirm the rendered content contains all six dashboard sections. No frontend build is required for a documentation-only snapshot.
+- Validate with `git diff --check -- project-overview-dashboard.html docs/guide.md README.md` and confirm the rendered content contains all six dashboard sections. No frontend build is required for a documentation-only snapshot.
 - When the repository commit workflow applies, stage only the dashboard and any intentionally changed index file, inspect the staged diff, then create one documentation-only commit. Never push unless the user explicitly asks.
 - Finish by linking the dashboard, giving its snapshot timestamp, identifying the sources refreshed, and disclosing any unavailable or stale-after-commit Git information.

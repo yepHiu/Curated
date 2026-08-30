@@ -266,7 +266,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | Document | Use it for |
 | --- | --- |
 | [PRD ledger](prd/requirements.csv) | Stable `REQ-xxxx` status |
-| [Project overview dashboard](plan/2026-08-31-project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
+| [Project overview dashboard](../project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |

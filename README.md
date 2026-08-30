@@ -66,6 +66,7 @@ Backup, restore, path migration, configuration keys, and release packaging are d
 | Document | What it is |
 | --- | --- |
 | [docs/guide.md](docs/guide.md) | Detailed handbook and documentation index |
+| [project-overview-dashboard.html](project-overview-dashboard.html) | Visual snapshot of project delivery, active requirements, Git, and worktrees |
 | [API.md](API.md) | Public HTTP API reference |
 | [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) | Shipped vs target feature catalog |
 | [docs/README.md](docs/README.md) | How `docs/` subfolders are used |
