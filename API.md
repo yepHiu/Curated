@@ -1489,7 +1489,7 @@ Query：
 | `startPositionSec` | 会话媒体时间轴的实际起点；remux 会话为对齐到的关键帧时间，客户端应结合 `resumePositionSec` 做本地微调 |
 | `resumePositionSec` | 已保存续播点 |
 | `canDirectPlay` | 是否支持直放 |
-| `reasonCode` / `reasonMessage` | 模式选择诊断 |
+| `reasonCode` / `reasonMessage` | 模式选择诊断。常见值：`browser_direct_play_supported`、`browser_container_unsupported`、`browser_codec_unsupported`、`force_stream_push`、`source_timestamps_unstable`（ffprobe `r_frame_rate` 与 `avg_frame_rate` 相差超过约 2%、平均帧率显式为 `0/0`/`N/A`，或片头视频包 PTS 为负；在 stream push 开启时改走 HLS，h264 优先 remux） |
 | `audioTracks` / `subtitleTracks` | 音轨 / 字幕轨信息 |
 
 #### `POST /api/library/movies/{movieId}/playback-session`
@@ -1506,6 +1506,8 @@ Body：
 ```
 
 `mode` 省略时默认为 `direct`。
+
+HLS 推流为 event playlist + fMP4。转码会话会尽量等到约 4 个媒体分片（约 8 秒）进入 playlist，或最多等待 12 秒后仍返回描述符；remux 在首片就绪后即可返回。分片以临时文件写完再 rename，未完成的 `.tmp` 不会被会话文件接口提供。
 
 成功：`201 PlaybackDescriptorDTO`
 
@@ -1552,15 +1554,20 @@ Query：
 {
   "sessionId": "session-1",
   "movieId": "movie-1",
-  "sessionKind": "hls",
-  "transcodeProfile": "default",
+  "sessionKind": "transcode-hls",
+  "transcodeProfile": "libx264",
   "startPositionSec": 120.5,
   "startedAt": "2026-06-07T12:00:00Z",
   "lastAccessedAt": "2026-06-07T12:01:00Z",
   "expiresAt": "2026-06-07T13:00:00Z",
-  "state": "running"
+  "state": "running",
+  "encoderSpeed": "1.24x",
+  "writtenDurationSec": 8.5,
+  "lastSeekKind": "swap"
 }
 ```
+
+`encoderSpeed` / `writtenDurationSec` 来自 FFmpeg `-progress`（会话相对时间轴上已写出的时长）。`lastSeekKind` 为 `start`（从头起播）或 `swap`（中段新开会话）；窗口内复用由播放器本地记为 `reuse`，不必上报。
 
 #### `GET /api/playback/sessions/{sessionId}/hls/{file}`
 
@@ -1569,7 +1576,8 @@ Query：
 成功：
 
 - `.m3u8`：`application/vnd.apple.mpegurl`
-- `.ts`：`video/mp2t`
+- `.m4s` / `.mp4`：`video/mp4`（当前会话为 fMP4 HLS）
+- `.ts`：`video/mp2t`（兼容旧会话）
 - 其他：`http.ServeFile` 自动推断
 
 说明：
@@ -1893,6 +1901,46 @@ Body 可选：
 说明：只有当前路径被识别为 `online` 时才会持久化新绑定。
 
 ### 4.12 Movie Imports
+
+#### `POST /api/import/movies/code-check`
+
+用途：导入前按文件名解析番号，检查活动库中是否已有相同或类似条目。只读，不复制文件。
+
+Body：
+
+```json
+{
+  "names": ["489155.com@SSIS-001-C.mp4", "folder/holiday.mp4"]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `names` | string[] | 相对路径或文件名，最多 200 条，单条最多 512 个 Unicode 字符 |
+
+成功：`200 ImportMovieCodeCheckDTO`
+
+```json
+{
+  "items": [
+    {
+      "name": "489155.com@SSIS-001-C.mp4",
+      "extractedCode": "SSIS-001",
+      "matches": [
+        {
+          "movieId": "ssis-001",
+          "code": "SSIS-001",
+          "title": "Example",
+          "matchKind": "exact"
+        }
+      ]
+    }
+  ],
+  "matchedCount": 1
+}
+```
+
+`matchKind` 为 `exact`（规范化后相同）或 `similar`（连字符分段前缀变体）。无法解析番号时 `extractedCode` 省略、`matches` 为空数组。回收站影片不参与匹配。无效 body 返回 `400 COMMON_BAD_REQUEST`。
 
 #### `POST /api/import/movies`
 
@@ -2487,7 +2535,16 @@ Body：
 {
   "sessionId": "ses_…",
   "locale": "zh-CN",
-  "context": { "route": "detail", "movieId": "…", "actorName": "", "query": "", "mentions": [{ "kind": "movie", "id": "…", "label": "Hello" }] },
+  "context": {
+    "contextVersion": 1,
+    "route": "detail",
+    "movieId": "…",
+    "query": "",
+    "selectedMovieIds": ["…"],
+    "selectedActors": ["Canonical actor name"],
+    "activeFilters": { "query": "…", "tag": "…", "actor": "…", "playState": "unwatched", "runtime": "short" },
+    "mentions": [{ "kind": "movie", "id": "…", "label": "Hello" }]
+  },
   "messages": [
     { "role": "user", "content": "这个月看了多久" }
   ]
@@ -2499,27 +2556,31 @@ Body：
 说明：
 
 - 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。
-- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），写入系统提示的 `<source>`，最多 8 条。
+- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
+- `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
 - 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
 - 单轮工具步数默认 15，触顶后强制收尾并在文本中说明。
 - provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回。
-- 推荐或点名具体影片时，模型应调用 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知 ID 被拒绝，不会出卡。
+- 推荐或点名具体影片时，模型应调用 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知 ID 被拒绝，不会出卡。库外源站作品（`search_provider_titles` 且 `inLibrary=false`）没有 `movieId`，不能用于 `present_movies`。
+- `get_movie_detail` / `get_actor_profile` 在已刮削时带 `homepage`；影片另有 `metadataRating`、`metadataProvider`。
+- `search_provider_titles` 只接受本轮已见的 `actorName` 和/或 `movieId`（含页面 context / `@` 引用），禁止自由文本 `query`。底层走已配置刮削源站检索并对账本地番号；失败留在工具结果内。
+- `get_source_page` 只接受本轮工具结果里出现过的 https `homepage` / `externalLinks`；拒绝非 https、私网与允许名单外跳转；抽出可见文本约 32KiB。
 - 写工具 `save_movie_comment` / `update_movie_display_overrides` / `create_saved_view` 只产生 preview。成功后额外发出 `confirm_required`（`changes` / `confirmToken` / `expiresAt` / `arguments`）并结束本轮；真正写入走 `POST /api/ai/confirm`，chat 通道的模型不能自行 apply。
 
 #### `POST /api/ai/actions/{name}`
 
-用途：实验性就地 Action（E3）。`name` 为 `polish_comment`、`clean_summary`、`translate_title` 或 `insights_narrative`。无会话循环。
+用途：实验性就地 Action（E3）。`name` 为 `polish_comment`、`translate_summary`、`translate_title` 或 `insights_narrative`。无会话循环。
 
 - `polish_comment`：笔记润色，经 `save_movie_comment` preview。模型自识别原文语言并同语言润色。Body：`{ "movieId", "body?" }`。
-- `clean_summary`：清洗当前展示简介，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列。Body：`{ "movieId" }`。
-- `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`。Body：`{ "movieId", "locale?" }`。
+- `translate_summary`：把当前展示简介翻译到界面语言，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列，也不改标题。Body：`{ "movieId", "body?", "locale?" }`。
+- `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`，不改简介。Body：`{ "movieId", "body?", "locale?" }`。
 - `insights_narrative`：只读解读，无确认卡。后端先调 insights 聚合再生成文本。Body：`{ "range?", "timezone?", "locale?" }`。
 
 成功：`200 AIActionPreviewDTO`。写类含 `confirmToken`（无改动时 `noop: true`）。`insights_narrative` 只返回 `proposedText` 且 `noop: true`。未配 provider 为 `400 AI_PROVIDER_UNAVAILABLE`。未知 name 为 `404`。
 
 #### `POST /api/ai/confirm`
 
-用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 必须与 preview 时字节一致。
+用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 须与 preview 语义一致（确认前会规范化 JSON）。
 
 成功：`200 AIToolApplyDTO`。token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。
 
@@ -3311,6 +3372,7 @@ interface ActorMergeValuesSummaryDTO {
 | `DELETE` | `/api/library/movies/{movieId}` | `204` |
 | `GET` | `/api/settings` | `SettingsDTO` |
 | `PATCH` | `/api/settings` | `SettingsDTO` |
+| `POST` | `/api/import/movies/code-check` | `ImportMovieCodeCheckDTO` |
 | `POST` | `/api/import/movies` | `TaskDTO` |
 | `POST` | `/api/import/movies/uploads` | `MovieImportUploadDTO` |
 | `GET` | `/api/import/movies/uploads/{uploadId}` | `MovieImportUploadDTO` |
