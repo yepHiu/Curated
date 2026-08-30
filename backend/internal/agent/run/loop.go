@@ -40,6 +40,9 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	}
 	l.gateway.ResetSessionSteps(sessionID)
 	l.gateway.ResetMovieRefs(sessionID)
+	l.gateway.ResetActorRefs(sessionID)
+	l.gateway.ResetSourceURLs(sessionID)
+	seedTurnEntities(l.gateway, sessionID, page)
 	seq := 0
 	nextSeq := func() int {
 		seq++
@@ -120,6 +123,8 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			})
 			if result.OK {
 				l.gateway.RememberMovieRefs(sessionID, core.ExtractMovieRefs(result))
+				l.gateway.RememberActorNames(sessionID, core.ExtractActorNames(result))
+				l.gateway.RememberSourceURLs(sessionID, core.ExtractSourceURLs(result))
 			}
 			summary := toolSummary(call.Name(), result)
 			ok := result.OK
@@ -136,12 +141,16 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				})
 			}
 			if result.ConfirmToken != "" {
+				confirmArgs := result.ConfirmArgs
+				if len(confirmArgs) == 0 {
+					confirmArgs = args
+				}
 				emit(contracts.AIChatSSEEvent{
 					Type: "confirm_required", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 					ToolCallID: toolCallID, Name: call.Name(),
 					ConfirmToken: result.ConfirmToken, ExpiresAt: result.ExpiresAt,
 					Changes:   confirmChanges(result.Changes),
-					Arguments: args,
+					Arguments: confirmArgs,
 					Summary:   summary,
 					OK:        &ok,
 				})
@@ -278,4 +287,40 @@ func confirmChanges(changes []core.Change) []contracts.AIConfirmChangeDTO {
 		})
 	}
 	return out
+}
+
+func seedTurnEntities(gateway *core.Gateway, sessionID string, page *contracts.AIChatContext) {
+	if gateway == nil || page == nil {
+		return
+	}
+	if id := strings.TrimSpace(page.MovieID); id != "" {
+		gateway.RememberMovieRefs(sessionID, []core.MovieRef{{ID: id}})
+	}
+	if name := strings.TrimSpace(page.ActorName); name != "" {
+		gateway.RememberActorNames(sessionID, []string{name})
+	}
+	for _, rawID := range page.SelectedMovieIDs {
+		if id := strings.TrimSpace(rawID); id != "" {
+			gateway.RememberMovieRefs(sessionID, []core.MovieRef{{ID: id}})
+		}
+	}
+	gateway.RememberActorNames(sessionID, page.SelectedActors)
+	for _, mention := range page.Mentions {
+		kind := strings.ToLower(strings.TrimSpace(mention.Kind))
+		switch kind {
+		case "movie":
+			if id := strings.TrimSpace(mention.ID); id != "" {
+				gateway.RememberMovieRefs(sessionID, []core.MovieRef{{ID: id}})
+			}
+		case "actor":
+			names := make([]string, 0, 2)
+			if label := strings.TrimSpace(mention.Label); label != "" {
+				names = append(names, label)
+			}
+			if id := strings.TrimSpace(mention.ID); id != "" {
+				names = append(names, id)
+			}
+			gateway.RememberActorNames(sessionID, names)
+		}
+	}
 }

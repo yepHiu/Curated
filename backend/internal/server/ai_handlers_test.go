@@ -82,7 +82,7 @@ func (s *stubAIChatProvider) DeleteAIChatSession(_ context.Context, id string) e
 
 func (s *stubAIChatProvider) RunAIAction(_ context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
 	switch name {
-	case "polish_comment", "clean_summary", "translate_title", "insights_narrative":
+	case "polish_comment", "translate_summary", "translate_title", "insights_narrative":
 	default:
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
 	}
@@ -227,6 +227,60 @@ func TestAIChatRejectsInvalidBodies(t *testing.T) {
 				t.Fatalf("status = %d, want 400", resp.StatusCode)
 			}
 		})
+	}
+}
+
+func TestAIChatNormalizesBoundedContextV1(t *testing.T) {
+	t.Parallel()
+	chat := &stubAIChatProvider{}
+	server := newAIHandler(t, chat, nil)
+
+	resp, err := http.Post(server.URL+"/api/ai/chat", "application/json", strings.NewReader(`{
+  "messages":[{"role":"user","content":"find one"}],
+  "context":{
+    "contextVersion":1,
+    "route":" library ",
+    "selectedMovieIds":["m1","m1","m2"],
+    "selectedActors":[" Ada ","Ada"],
+    "activeFilters":{"query":" hello ","playState":"unwatched","runtime":"short"}
+  }
+}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if chat.request.Context == nil {
+		t.Fatal("context was not passed to provider")
+	}
+	got := chat.request.Context
+	if got.Route != "library" || len(got.SelectedMovieIDs) != 2 || got.SelectedMovieIDs[0] != "m1" || len(got.SelectedActors) != 1 || got.SelectedActors[0] != "Ada" {
+		t.Fatalf("normalized context = %+v", got)
+	}
+	if got.ActiveFilters == nil || got.ActiveFilters.Query != "hello" || got.ActiveFilters.PlayState != "unwatched" {
+		t.Fatalf("filters = %+v", got.ActiveFilters)
+	}
+}
+
+func TestAIChatRejectsUnsupportedOrUnversionedContextV1(t *testing.T) {
+	t.Parallel()
+	server := newAIHandler(t, &stubAIChatProvider{}, nil)
+	cases := []string{
+		`{"messages":[{"role":"user","content":"hi"}],"context":{"contextVersion":2}}`,
+		`{"messages":[{"role":"user","content":"hi"}],"context":{"selectedMovieIds":["m1"]}}`,
+		`{"messages":[{"role":"user","content":"hi"}],"context":{"contextVersion":1,"activeFilters":{"playState":"invented"}}}`,
+	}
+	for _, body := range cases {
+		resp, err := http.Post(server.URL+"/api/ai/chat", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("status = %d for %s", resp.StatusCode, body)
+		}
 	}
 }
 

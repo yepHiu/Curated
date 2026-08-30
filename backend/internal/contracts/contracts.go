@@ -569,6 +569,8 @@ type MovieDetailDTO struct {
 	// MetadataProvider is the Metatube movie provider that produced the current scraped metadata.
 	// Empty when the title has not been scraped yet.
 	MetadataProvider string `json:"metadataProvider,omitempty"`
+	// Homepage is the scraped source-site URL (movies.homepage). Empty when not scraped.
+	Homepage string `json:"homepage,omitempty"`
 	// User*Override: in-memory seed only (json:"-"); SQLite applies overrides in SQL. EffectiveXXX for API = merge in EffectiveMovieDetailDTO.
 	UserTitleOverride          *string `json:"-"`
 	UserStudioOverride         *string `json:"-"`
@@ -1006,11 +1008,17 @@ type AIChatRequest struct {
 
 // AIChatContext is optional page context injected into the system prompt.
 type AIChatContext struct {
-	Route     string          `json:"route,omitempty"`
-	MovieID   string          `json:"movieId,omitempty"`
-	ActorName string          `json:"actorName,omitempty"`
-	Query     string          `json:"query,omitempty"`
-	Mentions  []AIChatMention `json:"mentions,omitempty"`
+	// ContextVersion is omitted by legacy clients. Version 1 adds the bounded,
+	// explicit selection and filter projection below.
+	ContextVersion   int                  `json:"contextVersion,omitempty"`
+	Route            string               `json:"route,omitempty"`
+	MovieID          string               `json:"movieId,omitempty"`
+	ActorName        string               `json:"actorName,omitempty"`
+	Query            string               `json:"query,omitempty"`
+	Mentions         []AIChatMention      `json:"mentions,omitempty"`
+	SelectedMovieIDs []string             `json:"selectedMovieIds,omitempty"`
+	SelectedActors   []string             `json:"selectedActors,omitempty"`
+	ActiveFilters    *AIChatActiveFilters `json:"activeFilters,omitempty"`
 }
 
 // AIChatMention is one user @-reference from the Agent composer.
@@ -1018,6 +1026,17 @@ type AIChatMention struct {
 	Kind  string `json:"kind"`
 	ID    string `json:"id"`
 	Label string `json:"label"`
+}
+
+// AIChatActiveFilters is the small allowlisted subset of a current library
+// view that can be shown to the model as one-turn context. It is not a saved
+// view and must not gain navigation-only fields.
+type AIChatActiveFilters struct {
+	Query     string `json:"query,omitempty"`
+	Tag       string `json:"tag,omitempty"`
+	Actor     string `json:"actor,omitempty"`
+	PlayState string `json:"playState,omitempty"`
+	Runtime   string `json:"runtime,omitempty"`
 }
 
 // AIChatSessionDTO is one persisted agent conversation.
@@ -1163,6 +1182,32 @@ type MovieImportUploadFileManifest struct {
 // CreateMovieImportUploadRequest is the body for POST /api/import/movies/uploads.
 type CreateMovieImportUploadRequest struct {
 	Files []MovieImportUploadFileManifest `json:"files"`
+}
+
+// CheckImportMovieCodesRequest is the body for POST /api/import/movies/code-check.
+type CheckImportMovieCodesRequest struct {
+	Names []string `json:"names"`
+}
+
+// ImportMovieCodeMatchDTO is one library movie that matches an incoming filename.
+type ImportMovieCodeMatchDTO struct {
+	MovieID   string `json:"movieId"`
+	Code      string `json:"code"`
+	Title     string `json:"title"`
+	MatchKind string `json:"matchKind"`
+}
+
+// ImportMovieCodeCheckItemDTO is the catalog-code check result for one filename.
+type ImportMovieCodeCheckItemDTO struct {
+	Name          string                    `json:"name"`
+	ExtractedCode string                    `json:"extractedCode,omitempty"`
+	Matches       []ImportMovieCodeMatchDTO `json:"matches"`
+}
+
+// ImportMovieCodeCheckDTO is the response for POST /api/import/movies/code-check.
+type ImportMovieCodeCheckDTO struct {
+	Items        []ImportMovieCodeCheckItemDTO `json:"items"`
+	MatchedCount int                           `json:"matchedCount"`
 }
 
 // MovieImportUploadChunkDTO reports one persisted upload chunk range so clients
@@ -1384,17 +1429,20 @@ type CreatePlaybackSessionRequest struct {
 
 // PlaybackSessionStatusDTO is a snapshot of a playback session for diagnostics.
 type PlaybackSessionStatusDTO struct {
-	SessionID        string  `json:"sessionId"`
-	MovieID          string  `json:"movieId"`
-	SessionKind      string  `json:"sessionKind,omitempty"`
-	TranscodeProfile string  `json:"transcodeProfile,omitempty"`
-	StartPositionSec float64 `json:"startPositionSec,omitempty"`
-	StartedAt        string  `json:"startedAt,omitempty"`
-	LastAccessedAt   string  `json:"lastAccessedAt,omitempty"`
-	ExpiresAt        string  `json:"expiresAt,omitempty"`
-	FinishedAt       string  `json:"finishedAt,omitempty"`
-	State            string  `json:"state,omitempty"`
-	LastError        string  `json:"lastError,omitempty"`
+	SessionID          string  `json:"sessionId"`
+	MovieID            string  `json:"movieId"`
+	SessionKind        string  `json:"sessionKind,omitempty"`
+	TranscodeProfile   string  `json:"transcodeProfile,omitempty"`
+	StartPositionSec   float64 `json:"startPositionSec,omitempty"`
+	StartedAt          string  `json:"startedAt,omitempty"`
+	LastAccessedAt     string  `json:"lastAccessedAt,omitempty"`
+	ExpiresAt          string  `json:"expiresAt,omitempty"`
+	FinishedAt         string  `json:"finishedAt,omitempty"`
+	State              string  `json:"state,omitempty"`
+	LastError          string  `json:"lastError,omitempty"`
+	EncoderSpeed       string  `json:"encoderSpeed,omitempty"`
+	WrittenDurationSec float64 `json:"writtenDurationSec,omitempty"`
+	LastSeekKind       string  `json:"lastSeekKind,omitempty"`
 }
 
 // PlaybackSessionListDTO lists recent active or archived playback sessions.

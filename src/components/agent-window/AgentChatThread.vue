@@ -89,6 +89,7 @@ defineExpose({
         :entry="entry"
         @apply="emit('applyConfirm', entry.id)"
         @discard="emit('discardConfirm', entry.id)"
+        @open-movie="emit('openMovie', $event)"
       />
     </template>
 

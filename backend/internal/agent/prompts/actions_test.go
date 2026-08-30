@@ -21,10 +21,10 @@ func TestCommentActionPromptGroundsInSource(t *testing.T) {
 	}
 }
 
-func TestCleanSummaryPromptRemovesAds(t *testing.T) {
+func TestTranslateSummaryPromptUsesLocale(t *testing.T) {
 	t.Parallel()
-	got := CleanSummaryPrompt("Visit xxxx.com for the full version")
-	for _, want := range []string{"<source>", "Visit xxxx.com", "already clean", "Remove ads"} {
+	got := TranslateSummaryPrompt("Visit xxxx.com for the plot.", "zh-CN")
+	for _, want := range []string{"<source>", "Visit xxxx.com", "zh-CN", "synopsis"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q:\n%s", want, got)
 		}

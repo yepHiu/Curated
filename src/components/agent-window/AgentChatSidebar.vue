@@ -14,6 +14,7 @@ const emit = defineEmits<{
   create: []
   select: [id: string]
   delete: [id: string]
+  titlePointerdown: [event: PointerEvent]
 }>()
 
 const { t } = useI18n()
@@ -34,6 +35,15 @@ function sessionTitle(session: AIChatSessionDTO) {
     class="flex h-full w-[220px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     data-agent-window-sidebar
   >
+    <div
+      class="flex min-h-11 shrink-0 cursor-grab items-center border-b border-sidebar-border px-3 active:cursor-grabbing md:min-h-10"
+      data-agent-window-brand
+      @pointerdown="emit('titlePointerdown', $event)"
+    >
+      <p class="font-curated truncate text-base font-semibold tracking-wide text-primary">
+        {{ t("agentWindow.title") }}
+      </p>
+    </div>
     <div class="p-2">
       <button
         type="button"

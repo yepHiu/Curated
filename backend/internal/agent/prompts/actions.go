@@ -7,7 +7,7 @@ import (
 
 const (
 	ActionPolishComment     = "polish_comment"
-	ActionCleanSummary      = "clean_summary"
+	ActionTranslateSummary  = "translate_summary"
 	ActionTranslateTitle    = "translate_title"
 	ActionInsightsNarrative = "insights_narrative"
 )
@@ -18,7 +18,7 @@ func IsCommentAction(name string) bool {
 
 func IsDisplayAction(name string) bool {
 	switch strings.TrimSpace(name) {
-	case ActionCleanSummary, ActionTranslateTitle:
+	case ActionTranslateSummary, ActionTranslateTitle:
 		return true
 	default:
 		return false
@@ -50,35 +50,38 @@ func FormatCommentActionUser(body string) string {
 	return fmt.Sprintf("Note:\n%s", body)
 }
 
-func CleanSummaryPrompt(summary string) string {
+func TranslateDisplayPrompt(kind, source, locale string) string {
+	target := strings.TrimSpace(locale)
+	if target == "" {
+		target = "zh-CN"
+	}
+	label := strings.TrimSpace(kind)
+	if label == "" {
+		label = "text"
+	}
 	var b strings.Builder
-	b.WriteString("You clean a scraped movie synopsis for Curated. ")
-	b.WriteString("Return only the cleaned synopsis. No title, no quotes, no markdown fences. ")
-	b.WriteString("Remove ads, watermarks, site signatures, download links, and promotional filler. ")
-	b.WriteString("Keep the plot description. Do not invent plot, actors, or facts that are not in the source. ")
-	b.WriteString("Keep the source language. If the synopsis is already clean, return it unchanged.\n")
+	b.WriteString("You localize a movie display ")
+	b.WriteString(label)
+	b.WriteString(" for Curated. ")
+	b.WriteString("Return only the localized ")
+	b.WriteString(label)
+	b.WriteString(" text. No quotes, no markdown fences, no extra commentary. ")
+	b.WriteString("Target language: ")
+	b.WriteString(target)
+	b.WriteString(". Keep the meaning and paragraph structure. Do not add codes, actor names, ads, or marketing copy that the source does not contain. ")
+	b.WriteString("If the text is already in the target language, return it unchanged.\n")
 	b.WriteString("<source>\n")
-	b.WriteString(summary)
+	b.WriteString(source)
 	b.WriteString("\n</source>")
 	return b.String()
 }
 
 func TranslateTitlePrompt(title, locale string) string {
-	target := strings.TrimSpace(locale)
-	if target == "" {
-		target = "zh-CN"
-	}
-	var b strings.Builder
-	b.WriteString("You localize a movie display title for Curated. ")
-	b.WriteString("Return only the localized title text. No quotes, no markdown fences, no extra commentary. ")
-	b.WriteString("Target language: ")
-	b.WriteString(target)
-	b.WriteString(". Keep the meaning. Do not add codes, actor names, or marketing copy that the source title does not contain. ")
-	b.WriteString("If the title is already in the target language, return it unchanged.\n")
-	b.WriteString("<source>\n")
-	b.WriteString(title)
-	b.WriteString("\n</source>")
-	return b.String()
+	return TranslateDisplayPrompt("title", title, locale)
+}
+
+func TranslateSummaryPrompt(summary, locale string) string {
+	return TranslateDisplayPrompt("synopsis", summary, locale)
 }
 
 func InsightsNarrativePrompt(locale, payload string) string {

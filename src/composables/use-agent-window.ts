@@ -133,6 +133,9 @@ export function useAgentWindow() {
     closeWindow() {
       open.value = false
     },
+    toggleWindow() {
+      open.value = !open.value
+    },
     moveTo(x: number, y: number) {
       position.value = clampPosition({ x, y })
       persistCurrent()

@@ -136,8 +136,9 @@ type chatCompletionResponse struct {
 	Choices []struct {
 		FinishReason string `json:"finish_reason"`
 		Message      struct {
-			Content   string     `json:"content"`
-			ToolCalls []ToolCall `json:"tool_calls"`
+			Content          flexibleText `json:"content"`
+			ReasoningContent string       `json:"reasoning_content"`
+			ToolCalls        []ToolCall   `json:"tool_calls"`
 		} `json:"message"`
 		Delta struct {
 			Content          string          `json:"content"`
@@ -149,6 +150,44 @@ type chatCompletionResponse struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 	} `json:"error,omitempty"`
+}
+
+// flexibleText accepts OpenAI string content or multipart [{type,text}] arrays.
+type flexibleText string
+
+func (t *flexibleText) UnmarshalJSON(raw []byte) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		*t = ""
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(trimmed, &s); err == nil {
+		*t = flexibleText(s)
+		return nil
+	}
+	var parts []any
+	if err := json.Unmarshal(trimmed, &parts); err != nil {
+		*t = ""
+		return nil
+	}
+	var b strings.Builder
+	for _, part := range parts {
+		switch p := part.(type) {
+		case string:
+			b.WriteString(p)
+		case map[string]any:
+			if text, ok := p["text"].(string); ok {
+				b.WriteString(text)
+				continue
+			}
+			if text, ok := p["content"].(string); ok {
+				b.WriteString(text)
+			}
+		}
+	}
+	*t = flexibleText(b.String())
+	return nil
 }
 
 type toolCallDelta struct {
@@ -245,7 +284,50 @@ func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens
 	if len(parsed.Choices) == 0 {
 		return "", fmt.Errorf("provider returned no choices")
 	}
-	return parsed.Choices[0].Message.Content, nil
+	choice := parsed.Choices[0]
+	text := extractChoiceText(choice.Message.Content, choice.Message.ReasoningContent)
+	if strings.TrimSpace(text) == "" {
+		switch {
+		case strings.EqualFold(choice.FinishReason, "length"):
+			return "", fmt.Errorf("provider returned empty text (output truncated)")
+		case strings.TrimSpace(choice.Message.ReasoningContent) != "":
+			return "", fmt.Errorf("provider returned empty text (reasoning only)")
+		default:
+			return "", fmt.Errorf("provider returned empty text")
+		}
+	}
+	return text, nil
+}
+
+func extractChoiceText(content flexibleText, reasoning string) string {
+	text := stripThinkBlocks(string(content))
+	if text != "" {
+		return text
+	}
+	strippedReasoning := stripThinkBlocks(reasoning)
+	if strippedReasoning != "" && strippedReasoning != strings.TrimSpace(reasoning) {
+		return strippedReasoning
+	}
+	return ""
+}
+
+func stripThinkBlocks(raw string) string {
+	s := strings.TrimSpace(raw)
+	for {
+		lower := strings.ToLower(s)
+		start := strings.Index(lower, "<think>")
+		if start < 0 {
+			break
+		}
+		rest := s[start+len("<think>"):]
+		endRel := strings.Index(strings.ToLower(rest), "</think>")
+		if endRel < 0 {
+			s = strings.TrimSpace(s[:start])
+			break
+		}
+		s = strings.TrimSpace(s[:start] + rest[endRel+len("</think>"):])
+	}
+	return strings.TrimSpace(strings.TrimPrefix(s, "</think>"))
 }
 
 // StreamChat performs a streaming chat completion. Each content delta is passed

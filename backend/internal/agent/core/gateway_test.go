@@ -37,6 +37,23 @@ func TestValidateArgsRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestValidateArgsCoercesNumericStrings(t *testing.T) {
+	t.Parallel()
+	schema := objectSchema(map[string]Schema{
+		"limit": {Type: "integer", Minimum: floatPtr(1), Maximum: floatPtr(50)},
+		"q":     {Type: "string"},
+	})
+	got, err := ValidateArgs(schema, json.RawMessage(`{"limit":"10","q":123}`))
+	if err != nil {
+		t.Fatalf("coerce: %v", err)
+	}
+	if got["q"] == nil {
+		t.Fatal("missing q")
+	}
+}
+
+func floatPtr(v float64) *float64 { return &v }
+
 func TestGatewaySchemaPermissionBudgetConfirmAndAudit(t *testing.T) {
 	t.Parallel()
 	reg := NewRegistry()

@@ -12,7 +12,8 @@ const STORAGE_KEY = "curated-agent-window-state-v1"
 describe("useAgentWindow", () => {
   beforeEach(() => {
     localStorage.clear()
-    const { moveTo, resizeTo } = useAgentWindow()
+    const { moveTo, resizeTo, closeWindow } = useAgentWindow()
+    closeWindow()
     moveTo(40, 40)
     resizeTo(AGENT_WINDOW_WIDTH, AGENT_WINDOW_HEIGHT)
   })
@@ -57,5 +58,15 @@ describe("useAgentWindow", () => {
     })
     setSidebarOpen(true)
     expect(sidebarOpen.value).toBe(true)
+  })
+
+  it("toggles the floating window open and closed", () => {
+    const { open, openWindow, toggleWindow } = useAgentWindow()
+    openWindow()
+    expect(open.value).toBe(true)
+    toggleWindow()
+    expect(open.value).toBe(false)
+    toggleWindow()
+    expect(open.value).toBe(true)
   })
 })

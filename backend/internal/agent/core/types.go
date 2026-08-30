@@ -19,12 +19,17 @@ const (
 	DomainGovernance = "governance"
 	DomainTask       = "task"
 
-	PresentMoviesName                = "present_movies"
-	PresentMoviesMaxItems            = 6
-	SaveMovieCommentName             = "save_movie_comment"
-	UpdateMovieDisplayOverridesName  = "update_movie_display_overrides"
-	CreateSavedViewName              = "create_saved_view"
-	MaxMovieSummaryBytes             = 120_000
+	PresentMoviesName               = "present_movies"
+	PresentMoviesMaxItems           = 6
+	SearchProviderTitlesName        = "search_provider_titles"
+	GetSourcePageName               = "get_source_page"
+	ProviderSearchDefaultLimit      = 15
+	ProviderSearchMaxLimit          = 25
+	MaxSourcePageBytes              = 32 * 1024
+	SaveMovieCommentName            = "save_movie_comment"
+	UpdateMovieDisplayOverridesName = "update_movie_display_overrides"
+	CreateSavedViewName             = "create_saved_view"
+	MaxMovieSummaryBytes            = 120_000
 
 	ChannelChat   = "chat"
 	ChannelAction = "action"
@@ -64,6 +69,9 @@ type ToolDefinition struct {
 	// Apply runs the write-apply branch. When set, a call with ConfirmTok
 	// consumes the preview token and executes Apply instead of Handler.
 	Apply Handler
+	// NormalizeArgs rewrites model JSON before schema validation and
+	// confirm hashing. Optional.
+	NormalizeArgs func(json.RawMessage) (json.RawMessage, error)
 }
 
 // Handler executes a validated tool call. Write tools may return preview data
@@ -103,6 +111,8 @@ type Result struct {
 	Changes      []Change   `json:"changes,omitempty"`
 	ConfirmToken string     `json:"confirmToken,omitempty"`
 	ExpiresAt    string     `json:"expiresAt,omitempty"`
+	// ConfirmArgs is the JSON hashed into the preview token. Not sent to the model.
+	ConfirmArgs json.RawMessage `json:"-"`
 }
 
 // AuditRecord is an append-only invocation row.

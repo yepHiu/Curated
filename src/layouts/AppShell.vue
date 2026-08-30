@@ -51,7 +51,7 @@ const AgentWindowPanel = defineAsyncComponent(
 )
 
 const { enabled: agentEnabled } = useExperimentalAgent()
-const { open: agentWindowOpen, openWindow: openAgentWindow } = useAgentWindow()
+const { open: agentWindowOpen, toggleWindow: toggleAgentWindow } = useAgentWindow()
 
 useLibraryWatchToasts()
 useLibraryStorageStatusAlerts()
@@ -908,7 +908,9 @@ function clearActorsSearch() {
                 :class="agentWindowOpen ? 'text-primary' : ''"
                 :aria-label="t('shell.agentWindowAria')"
                 :title="t('shell.agentWindowAria')"
-                @click="openAgentWindow"
+                :aria-expanded="agentWindowOpen ? 'true' : 'false'"
+                :aria-pressed="agentWindowOpen ? 'true' : 'false'"
+                @click="toggleAgentWindow"
               >
                 <Bot class="size-5" aria-hidden="true" />
               </Button>

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"curated-backend/internal/agent/core"
@@ -169,6 +170,37 @@ func TestCreateSavedViewPreviewThenApply(t *testing.T) {
 	}
 	applied := gw.Invoke(context.Background(), core.Call{
 		Name: core.CreateSavedViewName, Args: args, SessionID: "act_v", Channel: core.ChannelAction,
+		ConfirmTok: preview.ConfirmToken,
+	})
+	if !applied.OK || write.views != 1 {
+		t.Fatalf("apply = %+v views=%d", applied, write.views)
+	}
+}
+
+func TestCreateSavedViewNormalizesMessyModelArgs(t *testing.T) {
+	t.Parallel()
+	reg := core.NewRegistry()
+	write := &stubWrite{}
+	if err := RegisterWriteTools(reg, write); err != nil {
+		t.Fatal(err)
+	}
+	gw := core.NewGateway(reg, core.NewConfirmStore(), nil, func() core.Settings { return core.Settings{} })
+	args := json.RawMessage(`{"name":"未看完","filters":{"playState":"in-progress","runtime":30,"query":"foo","selected":"abc","schemaVersion":"1"}}`)
+	preview := gw.Invoke(context.Background(), core.Call{
+		Name: core.CreateSavedViewName, Args: args, SessionID: "act_messy", Channel: core.ChannelAction,
+	})
+	if !preview.OK || preview.ConfirmToken == "" {
+		t.Fatalf("preview = %+v", preview)
+	}
+	raw, _ := json.Marshal(preview.Data)
+	if !strings.Contains(string(raw), `"runtime":"short"`) {
+		t.Fatalf("expected runtime bucket short, got %s", raw)
+	}
+	if strings.Contains(string(raw), "selected") {
+		t.Fatalf("navigation field leaked: %s", raw)
+	}
+	applied := gw.Invoke(context.Background(), core.Call{
+		Name: core.CreateSavedViewName, Args: preview.ConfirmArgs, SessionID: "act_messy", Channel: core.ChannelAction,
 		ConfirmTok: preview.ConfirmToken,
 	})
 	if !applied.OK || write.views != 1 {

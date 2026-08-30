@@ -20,13 +20,15 @@ var (
 
 // Gateway runs the seven-step tool pipeline. Every channel must enter here.
 type Gateway struct {
-	registry  *Registry
-	confirm   *ConfirmStore
-	audit     AuditSink
-	settings  func() Settings
-	budget    *budgetTracker
-	movieRefs *MovieRefStore
-	now       func() time.Time
+	registry   *Registry
+	confirm    *ConfirmStore
+	audit      AuditSink
+	settings   func() Settings
+	budget     *budgetTracker
+	movieRefs  *MovieRefStore
+	actorRefs  *ActorRefStore
+	sourceURLs *SourceURLStore
+	now        func() time.Time
 }
 
 func NewGateway(registry *Registry, confirm *ConfirmStore, audit AuditSink, settings func() Settings) *Gateway {
@@ -37,13 +39,15 @@ func NewGateway(registry *Registry, confirm *ConfirmStore, audit AuditSink, sett
 		confirm = NewConfirmStore()
 	}
 	return &Gateway{
-		registry:  registry,
-		confirm:   confirm,
-		audit:     audit,
-		settings:  settings,
-		budget:    newBudgetTracker(),
-		movieRefs: NewMovieRefStore(),
-		now:       time.Now,
+		registry:   registry,
+		confirm:    confirm,
+		audit:      audit,
+		settings:   settings,
+		budget:     newBudgetTracker(),
+		movieRefs:  NewMovieRefStore(),
+		actorRefs:  NewActorRefStore(),
+		sourceURLs: NewSourceURLStore(),
+		now:        time.Now,
 	}
 }
 
@@ -78,6 +82,14 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		return fail(ErrToolNotFound, "AI_TOOL_NOT_FOUND", "unknown tool"), "", ResultRejected, "AI_TOOL_NOT_FOUND"
 	}
 	settings := g.settings()
+
+	if def.NormalizeArgs != nil {
+		normalized, err := def.NormalizeArgs(call.Args)
+		if err != nil {
+			return fail(ErrInvalidArgs, "AI_TOOL_INVALID_ARGS", err.Error()), def.Permission, ResultRejected, "AI_TOOL_INVALID_ARGS"
+		}
+		call.Args = normalized
+	}
 
 	if _, err := ValidateArgs(def.ParamsSchema, call.Args); err != nil {
 		return fail(ErrInvalidArgs, "AI_TOOL_INVALID_ARGS", err.Error()), def.Permission, ResultRejected, "AI_TOOL_INVALID_ARGS"
@@ -137,6 +149,7 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		if issueErr == nil {
 			raw.ConfirmToken = rec.Token
 			raw.ExpiresAt = rec.ExpiresAt.UTC().Format(time.RFC3339)
+			raw.ConfirmArgs = append(json.RawMessage(nil), call.Args...)
 		}
 	}
 	if apply {
@@ -208,6 +221,48 @@ func (g *Gateway) ResetMovieRefs(sessionID string) {
 		return
 	}
 	g.movieRefs.Reset(sessionID)
+}
+
+func (g *Gateway) ActorRefs() *ActorRefStore {
+	if g == nil {
+		return nil
+	}
+	return g.actorRefs
+}
+
+func (g *Gateway) RememberActorNames(sessionID string, names []string) {
+	if g == nil || g.actorRefs == nil {
+		return
+	}
+	g.actorRefs.Remember(sessionID, names)
+}
+
+func (g *Gateway) ResetActorRefs(sessionID string) {
+	if g == nil || g.actorRefs == nil {
+		return
+	}
+	g.actorRefs.Reset(sessionID)
+}
+
+func (g *Gateway) SourceURLs() *SourceURLStore {
+	if g == nil {
+		return nil
+	}
+	return g.sourceURLs
+}
+
+func (g *Gateway) RememberSourceURLs(sessionID string, urls []string) {
+	if g == nil || g.sourceURLs == nil {
+		return
+	}
+	g.sourceURLs.Remember(sessionID, urls)
+}
+
+func (g *Gateway) ResetSourceURLs(sessionID string) {
+	if g == nil || g.sourceURLs == nil {
+		return
+	}
+	g.sourceURLs.Reset(sessionID)
 }
 
 func ResultJSON(result Result) json.RawMessage {

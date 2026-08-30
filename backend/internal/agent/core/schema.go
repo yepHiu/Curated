@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -86,7 +87,7 @@ func validateValue(schema Schema, value any, path string) error {
 		}
 		return nil
 	case "string":
-		str, ok := value.(string)
+		str, ok := stringifySchemaValue(value)
 		if !ok {
 			return fmt.Errorf("%s: expected string", loc)
 		}
@@ -159,8 +160,35 @@ func jsonNumber(value any) (float64, bool) {
 	case json.Number:
 		v, err := n.Float64()
 		return v, err == nil
+	case string:
+		v, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		return v, err == nil
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
 	default:
 		return 0, false
+	}
+}
+
+func stringifySchemaValue(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case float64:
+		if v == float64(int64(v)) {
+			return strconv.FormatInt(int64(v), 10), true
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case json.Number:
+		return v.String(), true
+	case int:
+		return strconv.Itoa(v), true
+	case int64:
+		return strconv.FormatInt(v, 10), true
+	default:
+		return "", false
 	}
 }
 

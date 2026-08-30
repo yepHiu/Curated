@@ -60,6 +60,15 @@ function fakeToolFor(content: string): { name: string; summary: string } | null 
   if (/看了|多久|统计|insight/i.test(content)) {
     return { name: "get_insights_overview", summary: "watchedSeconds: 3600, startedMovies: 4" }
   }
+  if (/长评|读页|source page/i.test(content)) {
+    return { name: "get_source_page", summary: "truncated: false, 240 chars" }
+  }
+  if (/长评|源站页|read the page|get_source_page/i.test(content)) {
+    return { name: "get_source_page", summary: "text: Sample source-site review." }
+  }
+  if (/还拍过|源站|评价怎么样|filmography|related titles/i.test(content)) {
+    return { name: "search_provider_titles", summary: "items: 2, inLibrary: 1" }
+  }
   if (/演员|actor/i.test(content)) {
     return { name: "list_actors", summary: "total: 3, items truncated" }
   }
@@ -168,7 +177,12 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
 export const mockAIService: AIService = {
   streamChat,
   async listSessions() {
-    return sessions.map(({ messages: _messages, ...dto }) => dto)
+    return sessions.map((session) => ({
+      id: session.id,
+      title: session.title,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+    }))
   },
   async createSession(title) {
     return ensureSession(undefined, title)
@@ -194,10 +208,10 @@ export const mockAIService: AIService = {
         noop: true,
       }
     }
-    if (name === "clean_summary" || name === "translate_title") {
-      const original = name === "clean_summary" ? "Visit ads.example for the plot." : (body.body ?? "Sample Title")
-      const proposed = name === "clean_summary" ? "Clean plot only." : `Localized: ${original}`
-      const field = name === "clean_summary" ? "userSummary" : "userTitle"
+    if (name === "translate_summary" || name === "translate_title") {
+      const original = body.body ?? (name === "translate_summary" ? "Visit ads.example for the plot." : "Sample Title")
+      const proposed = `Localized: ${original}`
+      const field = name === "translate_summary" ? "userSummary" : "userTitle"
       return {
         action: name,
         name: "update_movie_display_overrides",

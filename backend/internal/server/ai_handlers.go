@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
@@ -24,6 +25,9 @@ const (
 	aiChatMaxMessages     = 50
 	aiChatMaxContentRunes = 256 * 1024
 	aiChatMaxMessageRunes = 64 * 1024
+	aiChatContextVersion  = 1
+	aiChatMaxContextRefs  = 8
+	aiChatMaxContextRunes = 200
 )
 
 // handleAIProviderTest reports whether the configured (or drafted) provider
@@ -84,6 +88,10 @@ func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := validateAIChatMessages(req.Messages); err != nil {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+		return
+	}
+	if err := normalizeAIChatContext(req.Context); err != nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 		return
 	}
@@ -320,6 +328,120 @@ func validateAIChatMessages(messages []contracts.AIChatMessage) error {
 	}
 	if total > aiChatMaxContentRunes {
 		return fmt.Errorf("messages total content exceeds %d runes", aiChatMaxContentRunes)
+	}
+	return nil
+}
+
+// normalizeAIChatContext bounds the browser-supplied page projection before it
+// can reach the system prompt. Context is helpful only when it is explicit and
+// small; it is never accepted as arbitrary page text or an executable filter.
+func normalizeAIChatContext(page *contracts.AIChatContext) error {
+	if page == nil {
+		return nil
+	}
+	if page.ContextVersion < 0 || page.ContextVersion > aiChatContextVersion {
+		return fmt.Errorf("unsupported contextVersion")
+	}
+	usesV1Fields := len(page.SelectedMovieIDs) > 0 || len(page.SelectedActors) > 0 || page.ActiveFilters != nil
+	if usesV1Fields && page.ContextVersion != aiChatContextVersion {
+		return fmt.Errorf("contextVersion 1 is required for selected entities or activeFilters")
+	}
+	if err := normalizeAIChatContextString(&page.Route, 80, "context.route"); err != nil {
+		return err
+	}
+	if err := normalizeAIChatContextString(&page.MovieID, 128, "context.movieId"); err != nil {
+		return err
+	}
+	if err := normalizeAIChatContextString(&page.ActorName, 160, "context.actorName"); err != nil {
+		return err
+	}
+	if err := normalizeAIChatContextString(&page.Query, aiChatMaxContextRunes, "context.query"); err != nil {
+		return err
+	}
+	if len(page.Mentions) > aiChatMaxContextRefs {
+		return fmt.Errorf("context.mentions exceed the limit of %d", aiChatMaxContextRefs)
+	}
+	for i := range page.Mentions {
+		mention := &page.Mentions[i]
+		mention.Kind = strings.ToLower(strings.TrimSpace(mention.Kind))
+		if mention.Kind != "movie" && mention.Kind != "actor" && mention.Kind != "tag" {
+			return fmt.Errorf("context.mentions[%d].kind is invalid", i)
+		}
+		if err := normalizeAIChatContextString(&mention.ID, 160, fmt.Sprintf("context.mentions[%d].id", i)); err != nil {
+			return err
+		}
+		if err := normalizeAIChatContextString(&mention.Label, 80, fmt.Sprintf("context.mentions[%d].label", i)); err != nil {
+			return err
+		}
+		if mention.ID == "" && mention.Label == "" {
+			return fmt.Errorf("context.mentions[%d] requires an id or label", i)
+		}
+	}
+	var err error
+	if page.SelectedMovieIDs, err = normalizeAIChatContextRefs(page.SelectedMovieIDs, 128, "context.selectedMovieIds"); err != nil {
+		return err
+	}
+	if page.SelectedActors, err = normalizeAIChatContextRefs(page.SelectedActors, 160, "context.selectedActors"); err != nil {
+		return err
+	}
+	if filters := page.ActiveFilters; filters != nil {
+		if err := normalizeAIChatContextString(&filters.Query, aiChatMaxContextRunes, "context.activeFilters.query"); err != nil {
+			return err
+		}
+		if err := normalizeAIChatContextString(&filters.Tag, aiChatMaxContextRunes, "context.activeFilters.tag"); err != nil {
+			return err
+		}
+		if err := normalizeAIChatContextString(&filters.Actor, aiChatMaxContextRunes, "context.activeFilters.actor"); err != nil {
+			return err
+		}
+		if err := normalizeAIChatContextString(&filters.PlayState, 32, "context.activeFilters.playState"); err != nil {
+			return err
+		}
+		if err := normalizeAIChatContextString(&filters.Runtime, 32, "context.activeFilters.runtime"); err != nil {
+			return err
+		}
+		if filters.PlayState != "" && filters.PlayState != "all" && filters.PlayState != "unwatched" && filters.PlayState != "in-progress" && filters.PlayState != "completed" {
+			return fmt.Errorf("context.activeFilters.playState is invalid")
+		}
+		if filters.Runtime != "" && filters.Runtime != "short" && filters.Runtime != "standard" && filters.Runtime != "long" {
+			return fmt.Errorf("context.activeFilters.runtime is invalid")
+		}
+		if filters.Query == "" && filters.Tag == "" && filters.Actor == "" && filters.PlayState == "" && filters.Runtime == "" {
+			page.ActiveFilters = nil
+		}
+	}
+	return nil
+}
+
+func normalizeAIChatContextRefs(values []string, maxRunes int, field string) ([]string, error) {
+	if len(values) > aiChatMaxContextRefs {
+		return nil, fmt.Errorf("%s exceed the limit of %d", field, aiChatMaxContextRefs)
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for i, value := range values {
+		if err := normalizeAIChatContextString(&value, maxRunes, fmt.Sprintf("%s[%d]", field, i)); err != nil {
+			return nil, err
+		}
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func normalizeAIChatContextString(value *string, maxRunes int, field string) error {
+	if value == nil {
+		return nil
+	}
+	*value = strings.TrimSpace(*value)
+	if utf8.RuneCountInString(*value) > maxRunes {
+		return fmt.Errorf("%s exceeds %d runes", field, maxRunes)
 	}
 	return nil
 }

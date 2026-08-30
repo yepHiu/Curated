@@ -43,6 +43,36 @@ describe("mockAIService.streamChat", () => {
     expect(tools[1]).toContain("watchedSeconds")
   })
 
+  it("emits a fake provider title lookup for related works", async () => {
+    const tools: string[] = []
+    const promise = mockAIService.streamChat(
+      { messages: [{ role: "user", content: "她还拍过什么" }] },
+      {
+        onDelta: () => {},
+        onToolStart: (event) => tools.push(event.name),
+        onToolResult: (event) => tools.push(`${event.name}:${event.summary}`),
+      },
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+    await promise
+    expect(tools[0]).toBe("search_provider_titles")
+    expect(tools[1]).toContain("inLibrary")
+  })
+
+  it("emits a fake source page read", async () => {
+    const tools: string[] = []
+    const promise = mockAIService.streamChat(
+      { messages: [{ role: "user", content: "读一下源站页长评" }] },
+      {
+        onDelta: () => {},
+        onToolStart: (event) => tools.push(event.name),
+      },
+    )
+    await vi.advanceTimersByTimeAsync(10_000)
+    await promise
+    expect(tools[0]).toBe("get_source_page")
+  })
+
   it("emits movie cards for a picker question", async () => {
     const movies: { movieId: string }[] = []
     const promise = mockAIService.streamChat(
@@ -73,10 +103,11 @@ describe("mockAIService.streamChat", () => {
     expect(applied.ok).toBe(true)
   })
 
-  it("returns a fake summary cleanup preview", async () => {
-    const preview = await mockAIService.runAction("clean_summary", { movieId: "m1" })
+  it("returns a fake summary translation preview", async () => {
+    const preview = await mockAIService.runAction("translate_summary", { movieId: "m1", body: "Old plot." })
     expect(preview.name).toBe("update_movie_display_overrides")
-    expect(preview.proposedText).toContain("Clean plot")
+    expect(preview.proposedText).toContain("Localized")
+    expect(preview.arguments).toMatchObject({ userSummary: expect.any(String) })
   })
 
   it("returns a fake insights narrative without a confirm token", async () => {

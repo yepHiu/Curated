@@ -207,6 +207,7 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 		Summary:        "Example Summary",
 		Studio:         "Sample Studio",
 		Provider:       "javbus",
+		Homepage:        "https://www.javbus.com/ABC-123",
 		Actors:         []string{"Actor B", "Actor A"},
 		Tags:           []string{"Tag B", "Tag A"},
 		RuntimeMinutes: 120,
@@ -236,6 +237,9 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 	if movie.MetadataProvider != "javbus" {
 		t.Fatalf("expected metadata provider javbus, got %q", movie.MetadataProvider)
 	}
+	if movie.Homepage != "https://www.javbus.com/ABC-123" {
+		t.Fatalf("expected homepage, got %q", movie.Homepage)
+	}
 	if movie.MetadataRating != 4.5 || movie.Rating != 4.5 || movie.UserRating != nil {
 		t.Fatalf("expected metadata rating 4.5 and no user override, got %+v", movie)
 	}
@@ -259,5 +263,47 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 	}
 	if len(page.Items) != 1 || page.Items[0].Rating != 2.0 {
 		t.Fatalf("list effective rating want 2.0, got %+v", page.Items[0])
+	}
+}
+
+func TestListActiveMovieCodeIndexSkipsTrash(t *testing.T) {
+	t.Parallel()
+
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "code-index.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := store.db.ExecContext(ctx, `
+		INSERT INTO movies (
+			id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+			added_at, location, resolution, year, created_at, updated_at
+		) VALUES (?, ?, ?, '', '', 0, 0, 0, ?, ?, '1080p', 0, ?, ?)`,
+		"ssis-001", "Active", "SSIS-001", now, filepath.Join(t.TempDir(), "a.mp4"), now, now,
+	); err != nil {
+		t.Fatalf("insert active: %v", err)
+	}
+	if _, err := store.db.ExecContext(ctx, `
+		INSERT INTO movies (
+			id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+			added_at, location, resolution, year, trashed_at, created_at, updated_at
+		) VALUES (?, ?, ?, '', '', 0, 0, 0, ?, ?, '1080p', 0, ?, ?, ?)`,
+		"ssis-002", "Trashed", "SSIS-002", now, filepath.Join(t.TempDir(), "b.mp4"), now, now, now,
+	); err != nil {
+		t.Fatalf("insert trash: %v", err)
+	}
+
+	index, err := store.ListActiveMovieCodeIndex(ctx)
+	if err != nil {
+		t.Fatalf("ListActiveMovieCodeIndex: %v", err)
+	}
+	if len(index) != 1 || index[0].ID != "ssis-001" || index[0].Code != "SSIS-001" {
+		t.Fatalf("index = %+v", index)
 	}
 }

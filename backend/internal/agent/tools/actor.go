@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"strings"
 
 	"curated-backend/internal/agent/core"
 	"curated-backend/internal/contracts"
@@ -56,7 +57,7 @@ func listActors(q LibraryQuery) core.ToolDefinition {
 func getActorProfile(q LibraryQuery) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name:        "get_actor_profile",
-		Description: "Get one actor profile by display name or alias. Includes summary, aliases, user tags, and user external links.",
+		Description: "Get one actor profile by display name or alias. Includes summary, scraped homepage, aliases, user tags, and user external links.",
 		ParamsSchema: object(map[string]core.Schema{
 			"name": strField("Actor display name or alias"),
 		}, "name"),
@@ -68,14 +69,18 @@ func getActorProfile(q LibraryQuery) core.ToolDefinition {
 			if err != nil {
 				return core.Result{OK: false, Error: &core.ToolError{Code: "AI_TOOL_INVALID_ARGS", Message: "actor not found"}}, nil
 			}
-			return core.Result{OK: true, Data: wrapSource(map[string]any{
+			payload := map[string]any{
 				"name":           profile.Name,
 				"summary":        profile.Summary,
 				"aliases":        profile.Aliases,
 				"userTags":       profile.UserTags,
 				"externalLinks":  profile.ExternalLinks,
 				"hasLocalAvatar": profile.HasLocalAvatar,
-			})}, nil
+			}
+			if homepage := strings.TrimSpace(profile.Homepage); homepage != "" {
+				payload["homepage"] = homepage
+			}
+			return core.Result{OK: true, Data: wrapSource(payload)}, nil
 		},
 	}
 }

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"curated-backend/internal/agent/core"
@@ -218,7 +221,7 @@ func applyUpdateMovieDisplay(ctx context.Context, w LibraryWrite, call core.Call
 
 func createSavedView(w LibraryWrite) core.ToolDefinition {
 	filters := object(map[string]core.Schema{
-		"schemaVersion":   intField("Must be 1", 1, 1),
+		"schemaVersion":   intField("Must be 1; omitted defaults to 1", 1, 1),
 		"mode":            core.Schema{Type: "string", Enum: []string{"library", "favorites", "recent", "tags", "trash"}},
 		"q":               strField("Search query"),
 		"tag":             strField("Comma-separated tags, AND"),
@@ -231,10 +234,10 @@ func createSavedView(w LibraryWrite) core.ToolDefinition {
 		"resolution":      strField("Normalized resolution such as 1080p or 4k"),
 		"addedWithinDays": intField("Relative added window in days", 1, 3650),
 		"year":            strField("Year YYYY or unknown"),
-		"runtime":         core.Schema{Type: "string", Enum: []string{"short", "standard", "long"}},
+		"runtime":         core.Schema{Type: "string", Enum: []string{"short", "standard", "long"}, Description: "short (<90m), standard (90-150m), long (>150m); minute counts are accepted and mapped"},
 		"catalog":         core.Schema{Type: "string", Enum: []string{"unscraped", "no-cover"}},
 		"sort":            core.Schema{Type: "string", Enum: []string{"added", "release", "rating", "code", "actor", "studio", "year"}},
-	}, "schemaVersion")
+	})
 	schema := object(map[string]core.Schema{
 		"name":    strField("Saved view display name"),
 		"filters": filters,
@@ -246,13 +249,14 @@ func createSavedView(w LibraryWrite) core.ToolDefinition {
 		return applyCreateSavedView(ctx, w, call)
 	}
 	return core.ToolDefinition{
-		Name:         core.CreateSavedViewName,
-		Description:  "Propose creating a Saved View from canonical library filters v1. Never include navigation fields such as selected, from, browse, back, autoplay, or t. Does not write until the user confirms. If the request cannot be expressed with current filters, explain what is missing instead of calling this tool.",
-		ParamsSchema: schema,
-		Permission:   core.PermissionWritePreview,
-		Domain:       core.DomainUserWrite,
-		Handler:      preview,
-		Apply:        apply,
+		Name:          core.CreateSavedViewName,
+		Description:   "Propose creating a Saved View from canonical library filters v1. schemaVersion defaults to 1. runtime may be short/standard/long or a minute count. Never include navigation fields such as selected, from, browse, back, autoplay, or t. Does not write until the user confirms. If the request cannot be expressed with current filters, explain what is missing instead of calling this tool.",
+		ParamsSchema:  schema,
+		Permission:    core.PermissionWritePreview,
+		Domain:        core.DomainUserWrite,
+		Handler:       preview,
+		Apply:         apply,
+		NormalizeArgs: normalizeCreateSavedViewArgs,
 	}
 }
 
@@ -317,6 +321,159 @@ func decodeSavedViewArgs(raw json.RawMessage) (string, contracts.SavedViewFilter
 		return "", contracts.SavedViewFiltersV1{}, err
 	}
 	return name, filters, nil
+}
+
+func normalizeCreateSavedViewArgs(raw json.RawMessage) (json.RawMessage, error) {
+	args, err := decodeWriteArgs(raw)
+	if err != nil {
+		return nil, err
+	}
+	filtersMap, err := savedViewFiltersMap(args["filters"])
+	if err != nil {
+		return nil, err
+	}
+	if _, hasQ := filtersMap["q"]; !hasQ {
+		if query, ok := filtersMap["query"]; ok {
+			filtersMap["q"] = query
+		}
+	}
+	delete(filtersMap, "query")
+
+	if sv, ok := coerceJSONInt(filtersMap["schemaVersion"]); ok && sv > 0 {
+		filtersMap["schemaVersion"] = sv
+	} else {
+		filtersMap["schemaVersion"] = 1
+	}
+
+	if v, ok := filtersMap["runtime"]; ok {
+		if bucket := coerceSavedViewRuntime(v); bucket != "" {
+			filtersMap["runtime"] = bucket
+		} else {
+			delete(filtersMap, "runtime")
+		}
+	}
+	if v, ok := filtersMap["addedWithinDays"]; ok {
+		if n, ok := coerceJSONInt(v); ok && n >= 1 && n <= 3650 {
+			filtersMap["addedWithinDays"] = n
+		} else {
+			delete(filtersMap, "addedWithinDays")
+		}
+	}
+	if v, ok := filtersMap["userRating"]; ok {
+		if n, ok := coerceJSONFloat(v); ok {
+			filtersMap["userRating"] = n
+		} else {
+			delete(filtersMap, "userRating")
+		}
+	}
+
+	allowed := map[string]struct{}{
+		"schemaVersion": {}, "mode": {}, "q": {}, "tag": {}, "actor": {}, "studio": {},
+		"tab": {}, "playState": {}, "userRating": {}, "unrated": {}, "resolution": {},
+		"addedWithinDays": {}, "year": {}, "runtime": {}, "catalog": {}, "sort": {},
+	}
+	for key := range filtersMap {
+		if _, ok := allowed[key]; !ok {
+			delete(filtersMap, key)
+		}
+	}
+
+	out := map[string]any{"filters": filtersMap}
+	if name := strArg(args, "name"); name != "" {
+		out["name"] = name
+	} else if v, ok := args["name"]; ok {
+		out["name"] = v
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		return nil, err
+	}
+	return encoded, nil
+}
+
+func savedViewFiltersMap(raw any) (map[string]any, error) {
+	if raw == nil {
+		return map[string]any{}, nil
+	}
+	if s, ok := raw.(string); ok {
+		trimmed := strings.TrimSpace(s)
+		if trimmed == "" {
+			return map[string]any{}, nil
+		}
+		var parsed any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+			return nil, fmt.Errorf("filters must be an object")
+		}
+		raw = parsed
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("filters must be an object")
+	}
+	return obj, nil
+}
+
+func coerceJSONInt(v any) (int, bool) {
+	n, ok := coerceJSONFloat(v)
+	if !ok || n != float64(int64(n)) {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func coerceJSONFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		return f, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func coerceSavedViewRuntime(v any) string {
+	switch t := v.(type) {
+	case string:
+		s := strings.ToLower(strings.TrimSpace(t))
+		if s == "short" || s == "standard" || s == "long" {
+			return s
+		}
+		if n, err := strconv.Atoi(s); err == nil {
+			return runtimeMinutesBucket(n)
+		}
+	case float64:
+		return runtimeMinutesBucket(int(t))
+	case json.Number:
+		parsed, err := t.Int64()
+		if err == nil {
+			return runtimeMinutesBucket(int(parsed))
+		}
+	case int:
+		return runtimeMinutesBucket(t)
+	}
+	return ""
+}
+
+func runtimeMinutesBucket(minutes int) string {
+	if minutes <= 0 {
+		return ""
+	}
+	if minutes < 90 {
+		return "short"
+	}
+	if minutes <= 150 {
+		return "standard"
+	}
+	return "long"
 }
 
 func optionalStringArg(args map[string]any, key string) (bool, string) {

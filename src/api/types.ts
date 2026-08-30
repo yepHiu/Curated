@@ -369,12 +369,27 @@ export interface AIChatMentionDTO {
   label: string
 }
 
+/** Bounded, one-turn projection of the active library filters. */
+export interface AIChatActiveFiltersDTO {
+  query?: string
+  tag?: string
+  actor?: string
+  playState?: "all" | "unwatched" | "in-progress" | "completed"
+  runtime?: "short" | "standard" | "long"
+}
+
 export interface AIChatContextDTO {
+  /** Omit for the legacy page-context shape. Version 1 enables explicit selections and filters. */
+  contextVersion?: 1
   route?: string
   movieId?: string
   actorName?: string
   query?: string
   mentions?: AIChatMentionDTO[]
+  selectedMovieIds?: string[]
+  /** Actor public list rows use canonical names, not a stable actor ID. */
+  selectedActors?: string[]
+  activeFilters?: AIChatActiveFiltersDTO
 }
 
 export interface AIChatSessionDTO {
@@ -692,6 +707,30 @@ export interface MovieImportUploadFileManifest {
 
 export interface CreateMovieImportUploadBody {
   files: MovieImportUploadFileManifest[]
+}
+
+export type ImportMovieCodeMatchKind = "exact" | "similar"
+
+export interface CheckImportMovieCodesBody {
+  names: string[]
+}
+
+export interface ImportMovieCodeMatchDTO {
+  movieId: string
+  code: string
+  title: string
+  matchKind: ImportMovieCodeMatchKind
+}
+
+export interface ImportMovieCodeCheckItemDTO {
+  name: string
+  extractedCode?: string
+  matches: ImportMovieCodeMatchDTO[]
+}
+
+export interface ImportMovieCodeCheckDTO {
+  items: ImportMovieCodeCheckItemDTO[]
+  matchedCount: number
 }
 
 export interface MovieImportUploadChunkDTO {
@@ -1120,6 +1159,23 @@ export interface PlaybackDescriptorDTO {
 export interface CreatePlaybackSessionBody {
   mode?: PlaybackMode
   startPositionSec?: number
+}
+
+export interface PlaybackSessionStatusDTO {
+  sessionId: string
+  movieId: string
+  sessionKind?: string
+  transcodeProfile?: string
+  startPositionSec?: number
+  startedAt?: string
+  lastAccessedAt?: string
+  expiresAt?: string
+  finishedAt?: string
+  state?: string
+  lastError?: string
+  encoderSpeed?: string
+  writtenDurationSec?: number
+  lastSeekKind?: string
 }
 
 export interface NativePlaybackLaunchDTO {

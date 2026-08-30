@@ -14,6 +14,10 @@ export const AGENT_TOOL_I18N_KEYS: Record<string, string> = {
   get_curated_frames_stats: "agentWindow.tools.frameStats",
   get_task_status: "agentWindow.tools.taskStatus",
   save_movie_comment: "agentWindow.tools.saveComment",
+  update_movie_display_overrides: "agentWindow.tools.updateDisplay",
+  create_saved_view: "agentWindow.tools.createSavedView",
+  search_provider_titles: "agentWindow.tools.searchProviderTitles",
+  get_source_page: "agentWindow.tools.getSourcePage",
 }
 
 export function isAgentProcessTool(name: string): boolean {

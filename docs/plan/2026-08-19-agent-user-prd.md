@@ -1,7 +1,7 @@
 # Agent 用户侧 PRD（初版）
 
 日期：2026-08-19
-状态：proposed（需求已按 `idea` 状态登记 `docs/prd/requirements.csv` REQ-0029～REQ-0043，共 15 条；执行顺序以 `2026-08-19-agent-milestone-plan.md` 的 E1–E4 为准）
+状态：proposed（需求已登记 `docs/prd/requirements.csv` REQ-0029～REQ-0044；执行顺序以 `2026-08-19-agent-milestone-plan.md` 的 E1–E5 为准。REQ-0044 细则见 [`2026-08-21-agent-provider-related-lookup.md`](2026-08-21-agent-provider-related-lookup.md)）
 上游文档：[`2026-08-18-agent-charter.md`](2026-08-18-agent-charter.md)（宪法，本文一切设计受其约束）
 
 ## 0. 前提与范围
@@ -25,8 +25,8 @@
 | REQ | 一句话需求 | 层级 | 交互面 | 依赖 | 优先级 | 批次 |
 |---|---|---|---|---|---|---|
 | REQ-0039 | AI 设置与隐私治理面板 | — | 设置 | B1+B2 | P0 | A（M0） |
-| REQ-0029 | AI 笔记助手（润色/扩写/翻译） | L1 | 详情页就地 | REQ-0039 | P0 | A（M1） |
-| REQ-0030 | 刮削摘要一键清洗 | L1 | 详情页就地 | REQ-0039 | P0 | A（M1） |
+| REQ-0029 | AI 笔记助手（仅润色） | L1 | 详情页就地 | REQ-0039 | P0 | A（M1） |
+| REQ-0030 | 刮削摘要一键翻译 | L1 | 详情页就地 | REQ-0039 | P0 | A（M1） |
 | REQ-0031 | 洞察 AI 解读 | L2 | Insights 就地 | REQ-0039 | P0 | A（M1） |
 | REQ-0032 | Copilot 库管家（问答/查找/决策） | L2 | Copilot 抽屉 | REQ-0039, B3+B5 | P1 | B（M2） |
 | REQ-0033 | 一句话视图（NL → Saved View） | L3 | Copilot 抽屉 | REQ-0032 | P1 | C（M3） |
@@ -38,6 +38,7 @@
 | REQ-0040 | 会话式选片推荐（今晚看什么） | L2 | Copilot 抽屉 | REQ-0032 | P1 | B（M2） |
 | REQ-0041 | AI 标题翻译与本地化 | L1 | 详情页就地 | REQ-0039 | P1 | A（M1） |
 | REQ-0042 | AI 用户标签与偏好画像 | L3 | Copilot/批量栏/Insights | REQ-0032 | P1 | C（M3） |
+| REQ-0044 | 源站周边（评价 / 介绍 / 库外作品） | L2 | Agent Window | REQ-0032 | P1 | E5（E3 后可并行，不阻塞 E4） |
 | REQ-0043 | 实验性功能门控 + Agent Window | — | 设置 + 浮动窗口 | — | P0 | E1 |
 
 发布批次：**A** = 首个用户价值闭环（配置 + 四个就地动作，含标题翻译）；**B** = Copilot 只读（问答 + 选片推荐）；**C** = 写能力与治理；**D** = 自动化。REQ-0038 不占批次，B4 落地即可独立发布。
@@ -77,23 +78,23 @@
 
 ### REQ-0029 AI 笔记助手（P0，批次 A）
 
-**场景**：阿哲看完一部片，在详情页笔记框写了句"节奏慢但结尾反转不错，演员阵容强"。他想存成一条像样的短评——点笔记区的「AI 润色」，出现 diff 预览：AI 把口语扩写成了三句结构化短评。他看完点「应用」，笔记保存；也可以点「放弃」回到原文。
+**场景**：阿哲看完一部片，在详情页笔记框写了句"节奏慢但结尾反转不错，演员阵容强"。他想把口语整理成一条像样的短评——点笔记区的「AI 润色」，出现 diff 预览：AI 整理了措辞、不改事实。他看完点「应用」，笔记保存；也可以点「放弃」回到原文。
 
-**需求**：详情页笔记区（`MovieCommentSection`）提供三个动作：**润色**（整理语言不改事实）、**扩写**（补充结构，不虚构内容）、**翻译**（zh/en/ja 互译）。结果一律先 diff 预览，用户确认后写回（走既有 `PUT comment` 语义）。
+**需求**：详情页笔记区（`MovieCommentSection`）只提供 **润色**（整理语言、不改事实、保持原文语言）。结果先 diff 预览，用户确认后写回（走既有 `PUT comment` 语义）。**不做扩写、不做笔记翻译**（2026-08-21 确认）；简介/标题翻译分别是 REQ-0030 / REQ-0041。
 
-**验收要点**：原文在应用前绝不丢失；AI 不得编造笔记中不存在的事实（提示词约束 + 无工具调用，L1 纯文本变换）；未配 provider 时按钮降级；字符上限沿用现有 `MAX_MOVIE_COMMENT_RUNES`；三语 UI。
+**验收要点**：原文在应用前绝不丢失；AI 不得编造笔记中不存在的事实（提示词约束 + 无工具调用，L1 纯文本变换）；同语言润色；未配 provider 时按钮降级；字符上限沿用现有 `MAX_MOVIE_COMMENT_RUNES`；三语 UI；界面上没有扩写或翻译笔记的入口。
 
-**落实**：action preset `polish_comment`，`POST /api/ai/actions/polish_comment`（B7）；模型自行识别原文语言并保持同语言润色（不提供扩写/翻译按钮）；写回经网关 `save_movie_comment` 的 preview→apply（B6），确认动作即 UI diff 确认卡。
+**落实**：action preset `polish_comment`，`POST /api/ai/actions/polish_comment`（B7）；模型自行识别原文语言并保持同语言润色；写回经网关 `save_movie_comment` 的 preview→apply（B6），确认动作即 UI diff 确认卡。
 
-### REQ-0030 刮削摘要一键清洗（P0，批次 A）
+### REQ-0030 刮削摘要一键翻译（P0，批次 A）
 
-**场景**：老陈点开一部新刮的片，简介开头是"请访问 xxxx.com 获取完整版"，中间夹着推广话术，结尾还有一行网站签名。他不想手删，点元数据编辑里的「AI 清洗」——预览显示清洗后的干净简介，确认后保存。原始刮削文本仍在库里可查（展示覆盖设计）。
+**场景**：老陈点开一部新刮的片，简介是日文或英文。他不想手翻，点元数据编辑简介框里的「AI 翻译」——预览显示界面语言的简介，确认后保存。原始刮削文本仍在库里可查（展示覆盖设计）。标题框里的「AI 翻译」是另一条独立动作，点简介不会带动标题。
 
-**需求**：详情页/`MovieEditDialog` 提供「AI 清洗简介」：去除广告、水印、推广、站点签名，保留剧情描述本体；结果写入 `user_summary`（展示覆盖列），**永不改动刮削原始列**。
+**需求**：详情页/`MovieEditDialog` 提供「AI 翻译简介」：把当前展示简介译到界面语言；结果写入 `user_summary`（展示覆盖列），**永不改动刮削原始列，也不改标题**。
 
-**验收要点**：刮削原始 summary 只读保留，清洗结果可随时通过清空覆盖恢复显示原文；diff 预览；对无明显污染的简介提示"无需清洗"而不强行改写。
+**验收要点**：刮削原始 summary 只读保留，翻译结果可随时通过清空覆盖恢复显示原文；diff 预览；已是目标语言时提示无需翻译；标题翻译与简介翻译互不触发。
 
-**落实**：preset `clean_summary`（L1）；写回走 `update_movie_display_overrides` preview→apply。批量入口（库页批量栏"批量清洗"）随 REQ-0036 批量代理再上。
+**落实**：preset `translate_summary`（L1）；写回走 `update_movie_display_overrides` preview→apply。批量入口随 REQ-0036 批量代理再上。
 
 ### REQ-0031 洞察 AI 解读（P0，批次 A）
 
@@ -167,7 +168,7 @@
 
 **验收要点**：批量 >25 必须转任务（P-10）；循环内不轮询等待（charter §6.4），终态经 `task.updated` SSE 续报；失败明细可追问可重试；与 REQ-0023 的刮削并发治理共用限流。
 
-**落实**：`search_movies`（定位目标）+ `trigger_movie_scrape`（转任务）+ `get_task_status`；复用 Health repairs 的批量确认交互模式。同类指令可扩展：批量清洗简介（REQ-0030 的批量形态）。
+**落实**：`search_movies`（定位目标）+ `trigger_movie_scrape`（转任务）+ `get_task_status`；复用 Health repairs 的批量确认交互模式。同类指令可扩展：批量翻译简介（REQ-0030 的批量形态）。
 
 ### REQ-0037 每周库报告（P2，批次 D）
 
@@ -215,9 +216,19 @@
 
 **落实**：扩展用户数据写/治理域工具——新增 `suggest_movie_user_tags`（propose）与用户标签写工具（对齐现有 PATCH userTags 语义，与 INFO 标签的 `modify_movie_tags` 分列，不共用）；偏好画像复用 insights 聚合 + 检索；批量执行走 REQ-0036 的任务模式。
 
+### REQ-0044 源站周边：评价、介绍、库外作品（P1，E5）
+
+**场景**：阿哲在 Agent Window 问「这个演员还拍过什么？评价怎么样？」库里只有几部，但 Metatube 源站页和检索里有评分、介绍和更多番号。Agent 先读已刮的 `homepage` / 站点评分，再按演员检索源站作品列表，标出哪些已在库内；需要长评时才打开本轮已经出现的源站 URL。不拿去搜天气或新闻。
+
+**需求**：沿刮削源站补周边，不接通用网页搜索。分三期：暴露已落库的 homepage 与站点评分；`search_provider_titles` 列出库内外番号；可选 `get_source_page` 只读本轮已知 https 源站页。库外作品不得伪装成本地 `movieId`，也不得进入 `present_movies`。
+
+**验收要点**：无锚点（本轮未见的 movieId/演员）的检索被拒绝；无 `search_web`；页面读取拒绝允许名单外的 URL；失败留在工具结果里，非 AI 功能不受影响；Mock 能假跑「还拍过什么」。
+
+**落实**：细则见 [`2026-08-21-agent-provider-related-lookup.md`](2026-08-21-agent-provider-related-lookup.md)。Phase A/B/C 已落地（2026-08-21）。底层复用 Metatube `SearchMovie*` 与已存 `movies.homepage` / `actors.homepage`，出站走现有 `proxyenv`。
+
 ### 组合场景：把选中的影片"整理一下"
 
-用户对选中影片说"帮我整理一下"时，**不引入新工具，而是 L3 编排**：Agent 按需组合 REQ-0030 清洗简介 + REQ-0041 翻译标题 + REQ-0042 建议标签，逐项出确认卡后执行。PRD 不为此单立需求（复合是 Agent 规划层的事，即 charter P-04 的产品面表述），其可用性随上述三条需求自然达成。
+用户对选中影片说"帮我整理一下"时，**不引入新工具，而是 L3 编排**：Agent 按需组合 REQ-0030 翻译简介 + REQ-0041 翻译标题 + REQ-0042 建议标签，逐项出确认卡后执行。PRD 不为此单立需求（复合是 Agent 规划层的事，即 charter P-04 的产品面表述），其可用性随上述三条需求自然达成。
 
 ---
 
@@ -232,12 +243,14 @@ REQ-0039 设置面板(A)
                           │                      ├─► REQ-0034 标签管家(C)
                           │                      ├─► REQ-0035 演员归并(C, 另需 B6)
                           │                      ├─► REQ-0036 批量代理(C, 另需 B6)
-                          │                      └─► REQ-0042 AI 用户标签与画像(C, 另需 B6)
+                          │                      ├─► REQ-0042 AI 用户标签与画像(C, 另需 B6)
+                          │                      └─► REQ-0044 源站周边(E5, 不阻塞毕业)
 REQ-0038 MCP(依赖 B4, 独立交付, 不占批次)
 ```
 
 ## 5. 本 PRD 不做的事
 
+- 通用网页搜索（`search_web`）、天气/新闻闲聊：不在本 PRD，REQ-0044 明确排除；
 - 语义搜索/嵌入、多模态、字幕链路：远期候选池（charter §8.3），进入前须过价值主张检验并另立需求；
 - 多 Agent、Agent 自主后台常驻、跳过确认的快捷写：负面路线图（charter §8.4）永久排除；
 - Copilot 内直接播放/转码控制：charter §8.4"现在不做"，Agent 只给导航建议；
@@ -245,6 +258,6 @@ REQ-0038 MCP(依赖 B4, 独立交付, 不占批次)
 
 ## 6. 登记与流转说明
 
-- 15 条需求已按 `idea` 状态登记 `docs/prd/requirements.csv`（REQ-0029～REQ-0043），`detail_doc` 指向本文；
+- 16 条需求已登记 `docs/prd/requirements.csv`（REQ-0029～REQ-0044）。多数 `detail_doc` 指向本文；REQ-0044 指向 [`2026-08-21-agent-provider-related-lookup.md`](2026-08-21-agent-provider-related-lookup.md)；
 - 按仓库 PRD 工作流：某条需求决定实施时改状态为 `specified`/`planned` 并补全 acceptance_criteria（本文 §3 各条"验收要点"即底稿）；
 - 本文档与 charter 联动修订：若某需求实施中需要违反任一 P-xx 铁律，先修宪（charter §9.2）再动工。

@@ -33,7 +33,7 @@
 
 现有落点非常直接，都有端点和存储：
 
-- **影片笔记润色/扩写/翻译**：`MovieCommentSection.vue` + `GET/PUT /api/library/movies/{id}/comment`（`library_movie_comments`）。加一个"AI 润色"按钮，diff 预览后保存。
+- **影片笔记润色**：`MovieCommentSection.vue` + `GET/PUT /api/library/movies/{id}/comment`（`library_movie_comments`）。加一个"AI 润色"按钮，diff 预览后保存。后续产品确认不做扩写/翻译（见 REQ-0029）。
 - **刮削摘要清洗**：刮削来的 `summary` 常含广告/水印/推广文字。AI 清洗后写入 `user_summary`（展示覆盖列已存在，设计上就是为这类覆盖准备的）。`MovieEditDialog.vue` 同理可加标题/厂牌建议。
 - **标签归一化与翻译**：`tags` 来自多 provider 刮削，混杂（中/英/日、同义标签）。AI 批量归并建议（复用 actor merge 的 preview→confirm 交互范式）。
 - **萃取帧打标签**：`curated_frames` 的 `tags_json`，AI 根据影片上下文建议标签。

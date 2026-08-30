@@ -2,7 +2,7 @@
 
 日期：2026-08-18
 状态：proposed（进入开发前需按 `docs/plan/README.md` 流程登记 REQ-xxxx）
-关联需求：REQ-0029～REQ-0042（`idea`，见 `docs/prd/requirements.csv`；用户侧 PRD 见 [`2026-08-19-agent-user-prd.md`](2026-08-19-agent-user-prd.md)）；基建 B1–B7 与里程碑 M0–M4 见第八章
+关联需求：REQ-0029～REQ-0044（见 `docs/prd/requirements.csv`；用户侧 PRD 见 [`2026-08-19-agent-user-prd.md`](2026-08-19-agent-user-prd.md)）；基建 B1–B7 与执行里程碑 E1–E5 见第八章
 
 ## 0. 文档地位与使用方式
 
@@ -336,7 +336,7 @@ Action presets（UI 按钮的固定模板）只是网关的普通调用方：禁
 
 | 位置 | 动作 |
 |---|---|
-| 详情页笔记区（`MovieCommentSection`） | 润色/扩写/翻译（diff 后写 comment） |
+| 详情页笔记区（`MovieCommentSection`） | 润色（diff 后写 comment；不做扩写/翻译） |
 | 详情页元数据（`MovieEditDialog`） | 清洗刮削摘要（写 `user_summary`） |
 | 资料库批量栏（`LibraryBatchActionBar`） | 批量归一化标签 / 批量补摘要（转任务） |
 | Insights 页（`PersonalInsightsPage`） | AI 解读本期数据（只读生成，页内渲染） |
@@ -390,18 +390,21 @@ Action presets（UI 按钮的固定模板）只是网关的普通调用方：禁
 | B6 | 写域/治理域 + 确认协议打通 | 写路径唯一入口 = preview→apply |
 | B7 | `/api/ai/actions` + 首批 presets | 详情页润色/清洗按钮 |
 
-### 8.2 执行里程碑（E1–E4，2026-08-19 确认，取代 M0–M4）
+### 8.2 执行里程碑（E1–E5；E1–E4 于 2026-08-19 确认，E5 于 2026-08-21 提案）
 
 - **E1 开关 + Provider + 能对话** = B1 + B5-lite + 实验性功能门控 + 浮动 Agent Window（REQ-0043；REQ-0039 实验形态）；
 - **E2 能查库** = B2 + B3 + B5 完整（REQ-0032/0040）；
 - **E3 能干活** = B6 + B7 + gated 就地动作与一句话视图（REQ-0029/0030/0041/0031/0033）；
-- **E4 毕业与对外** = B4（可在 E2 后并行，不必等 E4）+ 设置毕业（REQ-0039 完整形态）+ 交互毕业（Agent Window vs 抽屉届时决策）+ 治理与自动化（REQ-0034/0035/0036/0037/0042/0038）。
+- **E4 毕业与对外** = B4（可在 E2 后并行，不必等 E4）+ 设置毕业（REQ-0039 完整形态）+ 交互毕业（Agent Window vs 抽屉届时决策）+ 治理与自动化（REQ-0034/0035/0036/0037/0042/0038）；
+- **E5 源站周边（提案）** = 查询域扩展：暴露刮削 homepage/评分 + Metatube 作品检索 + 可选已知 URL 读页（REQ-0044）；可在 E3 后与 E4 并行。
 
 执行细节、实验期 UI 需求与每期 DoD 见 [`2026-08-19-agent-milestone-plan.md`](2026-08-19-agent-milestone-plan.md)；旧 M0–M4 / 批次 A–D 的映射见该文档 §6。B1–B7 基建步骤与交付判据（8.1）不变。
 
 ### 8.3 远期方向候选池（未排期，进入前须过第一章价值主张检验）
 
 语义搜索与嵌入（本地 embedding，跨语言搜索、相似推荐，引入 `semantic_search` 新动词）；多模态（萃取帧评分、自动选封面）；字幕链路（Whisper → 全文检索 → 片段定位）；每周口味报告与库体检报告（L4，产出入通知中心）；自然语言视图市场（一句话生成 Saved View 并分享导出）；导入番号识别兜底（`ExtractNumber` 失败时 LLM 解析）；用量与成本面板深化。
+
+**已提案移出候选池**：源站周边（评价 / 演员介绍 / 库外作品）见 REQ-0044 与 [`2026-08-21-agent-provider-related-lookup.md`](2026-08-21-agent-provider-related-lookup.md)；明确**不做**通用 `search_web`。
 
 ### 8.4 负面路线图（明确不做 / 现在不做）
 
@@ -410,7 +413,7 @@ Action presets（UI 按钮的固定模板）只是网关的普通调用方：禁
 - **不做**Agent 自主后台常驻循环（循环只在用户请求生命周期内）；
 - **不做**Agent 修改任何系统设置（P-03）；
 - **不做**云端 provider 默认开启或默认上传数据（P-06）；
-- **现在不做**：Agent 框架引入（ADR-1 条件未到）、常驻侧栏 Copilot、Copilot 内直接播放/转码控制（播放链路复杂，先让 Agent 给出导航建议）、多用户/协作语义。
+- **现在不做**：Agent 框架引入（ADR-1 条件未到）、常驻侧栏 Copilot、Copilot 内直接播放/转码控制（播放链路复杂，先让 Agent 给出导航建议）、多用户/协作语义、通用网页搜索引擎（`search_web` / 天气新闻问答）。
 
 ---
 
@@ -440,3 +443,4 @@ Agent 相关功能落地后按 `AGENTS.md` 既有约定同步：`project-facts.m
 |---|---|---|
 | 2026-08-18 | 全文 | 首版：综合调研、能力与交互设计、基建设计三份文档成稿 |
 | 2026-08-19 | §7、§8 | 确认实验期交互形态（实验性功能门控 + 浮动 Agent Window，REQ-0043）与执行里程碑 E1–E4；§8.2 原 M0–M4 序列被取代；用户需求扩充 REQ-0040～0042 |
+| 2026-08-21 | §8.2、§8.3、§8.4 | 增补 E5 源站周边（REQ-0044）；通用网页搜索列入现在不做 |

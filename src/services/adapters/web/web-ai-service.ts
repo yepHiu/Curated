@@ -144,12 +144,41 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
   if (buffer.trim()) handleEventBlock(buffer)
 }
 
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const base = resolveApiBaseUrl(import.meta.env)
+  let resp: Response
+  try {
+    resp = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    throw new AIServiceError((err as Error).message ?? "network error")
+  }
+  const text = await resp.text()
+  let parsed: unknown
+  if (text.trim()) {
+    try {
+      parsed = JSON.parse(text) as unknown
+    } catch {
+      parsed = undefined
+    }
+  }
+  if (!resp.ok) {
+    const apiErr = parsed as { code?: string; message?: string } | undefined
+    throw new AIServiceError(apiErr?.message || `HTTP ${resp.status}`, apiErr?.code)
+  }
+  return parsed as T
+}
+
 export const webAIService: AIService = {
   streamChat,
   listSessions: async () => (await api.listAIChatSessions()).items ?? [],
   createSession: (title) => api.createAIChatSession(title),
   getSession: (id) => api.getAIChatSession(id),
   deleteSession: (id) => api.deleteAIChatSession(id),
-  runAction: (name, body) => api.runAIAction(name, body),
-  confirmTool: (body) => api.confirmAITool(body),
+  runAction: (name, body) => postJSON(`/ai/actions/${encodeURIComponent(name)}`, body),
+  confirmTool: (body) => postJSON("/ai/confirm", body),
 }

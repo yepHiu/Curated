@@ -170,6 +170,92 @@ func TestLoopPresentMoviesEmitsCardsAfterSearch(t *testing.T) {
 	}
 }
 
+func TestLoopSeedsPageActorForProviderSearch(t *testing.T) {
+	t.Parallel()
+	reg := core.NewRegistry()
+	query := stubQueryForLoop{movie: contracts.MovieListItemDTO{ID: "m1", Title: "Hello", Code: "ABC-123", Actors: []string{"Alice"}}}
+	if err := tools.RegisterQueryTools(reg, query); err != nil {
+		t.Fatal(err)
+	}
+	gateway := core.NewGateway(reg, nil, nil, nil)
+	if err := tools.RegisterProviderTools(reg, query, stubLoopProvider{
+		hits: []tools.ProviderTitleHit{{Code: "ABC-124", Title: "Other", Provider: "javbus"}},
+	}, nil, gateway.MovieRefs(), gateway.ActorRefs(), gateway.SourceURLs()); err != nil {
+		t.Fatal(err)
+	}
+	streamer := &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{
+			ID:       "call_provider",
+			Function: llm.ToolCallFunction{Name: core.SearchProviderTitlesName, Arguments: `{"actorName":"Alice"}`},
+		}}},
+		{Content: "源站还有其他作品。"},
+	}}
+	loop := NewLoop(gateway, streamer, core.SanitizeFull, "zh-CN")
+	var events []contracts.AIChatSSEEvent
+	err := loop.Run(context.Background(), "ses_test", "msg_test", []llm.ChatMessage{{Role: "user", Content: "还拍过什么"}}, &contracts.AIChatContext{ActorName: "Alice"}, func(ev contracts.AIChatSSEEvent) {
+		events = append(events, ev)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var okResult bool
+	for _, ev := range events {
+		if ev.Type == "tool_call_result" && ev.Name == core.SearchProviderTitlesName && ev.OK != nil && *ev.OK {
+			okResult = true
+		}
+	}
+	if !okResult {
+		t.Fatalf("page actor should anchor provider search: %+v", events)
+	}
+}
+
+func TestLoopSeedsSelectedContextEntities(t *testing.T) {
+	t.Parallel()
+	reg := core.NewRegistry()
+	query := stubQueryForLoop{movie: contracts.MovieListItemDTO{ID: "m1", Title: "Hello", Code: "ABC-123", Actors: []string{"Alice"}}}
+	if err := tools.RegisterQueryTools(reg, query); err != nil {
+		t.Fatal(err)
+	}
+	gateway := core.NewGateway(reg, nil, nil, nil)
+	if err := tools.RegisterPresentTools(reg, gateway.MovieRefs()); err != nil {
+		t.Fatal(err)
+	}
+	streamer := &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{
+			ID:       "call_present",
+			Function: llm.ToolCallFunction{Name: core.PresentMoviesName, Arguments: `{"items":[{"movieId":"m1","reason":"selected"}]}`},
+		}}},
+		{Content: "已展示选中的影片。"},
+	}}
+	loop := NewLoop(gateway, streamer, core.SanitizeFull, "zh-CN")
+	var events []contracts.AIChatSSEEvent
+	err := loop.Run(context.Background(), "ses_selected", "msg_selected", []llm.ChatMessage{{Role: "user", Content: "展示这部"}}, &contracts.AIChatContext{
+		ContextVersion:   1,
+		SelectedMovieIDs: []string{"m1"},
+	}, func(event contracts.AIChatSSEEvent) { events = append(events, event) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range events {
+		if event.Type == "movie_cards" && len(event.Movies) == 1 && event.Movies[0].MovieID == "m1" {
+			return
+		}
+	}
+	t.Fatalf("selected local movie was not seeded: %+v", events)
+}
+
+type stubLoopProvider struct {
+	hits []tools.ProviderTitleHit
+}
+
+func (s stubLoopProvider) SearchProviderTitles(context.Context, string, int) ([]tools.ProviderTitleHit, error) {
+	return s.hits, nil
+}
+
+func (stubLoopProvider) FindLibraryMoviesByCodes(context.Context, []string) (map[string]contracts.MovieListItemDTO, error) {
+	return map[string]contracts.MovieListItemDTO{}, nil
+}
+
 func TestLoopEmitsConfirmRequiredAndStops(t *testing.T) {
 	t.Parallel()
 	reg := core.NewRegistry()

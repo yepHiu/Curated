@@ -56,3 +56,17 @@ type Service interface {
 	// CheckProviderHealth pings a single provider and returns its health status.
 	CheckProviderHealth(ctx context.Context, name string) (status string, latencyMs int64, err error)
 }
+
+// TitleHit is one bounded provider search row. It is not a local library movie.
+type TitleHit struct {
+	Number   string
+	Title    string
+	Provider string
+	Homepage string
+	Score    float64
+}
+
+// TitleSearcher looks up related titles on configured scrape providers without starting scrape.movie.
+type TitleSearcher interface {
+	SearchTitles(ctx context.Context, keyword string, limit int) ([]TitleHit, error)
+}

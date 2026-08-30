@@ -7,9 +7,9 @@
 ## 范围
 
 - 写工具 `update_movie_display_overrides`：只写 `user_title` / `user_summary`，确认前零写入。
-- Action `clean_summary`、`translate_title`：详情编辑对话框输入框内的 ghost 按钮，走 preview→confirm。
+- Action `translate_summary`、`translate_title`：详情编辑对话框输入框内的独立 ghost 按钮，各自只改简介或标题，走 preview→confirm。
 - Action `insights_narrative`：Insights 页只读解读，经查询工具取真实聚合后再生成文本，无确认卡。
-- 写工具 `create_saved_view`：Agent Window 把自然语言解析成 Saved View v1 筛选，确认卡展示 name + filters 后再创建。瞬时导航字段不进 schema。
+- 写工具 `create_saved_view`：Agent Window 把自然语言解析成 Saved View v1 筛选，确认卡展示 name + JSON filters 后再创建。缺 `schemaVersion`、片长分钟数、多余导航字段会在入网关前规范化。瞬时导航字段不进 schema。
 
 ## 不做
 

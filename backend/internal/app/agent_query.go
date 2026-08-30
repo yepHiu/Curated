@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"curated-backend/internal/agent/tools"
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/scraper"
 	"curated-backend/internal/storage"
 )
 
@@ -191,4 +193,36 @@ func (a *App) GetTask(_ context.Context, taskID string) (contracts.TaskDTO, bool
 		return contracts.TaskDTO{}, false
 	}
 	return a.tasks.Get(taskID)
+}
+
+func (a *App) SearchProviderTitles(ctx context.Context, keyword string, limit int) ([]tools.ProviderTitleHit, error) {
+	if a == nil || a.scraper == nil {
+		return nil, fmt.Errorf("metadata search is unavailable")
+	}
+	searcher, ok := a.scraper.(scraper.TitleSearcher)
+	if !ok {
+		return nil, fmt.Errorf("metadata search is unavailable")
+	}
+	hits, err := searcher.SearchTitles(ctx, keyword, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]tools.ProviderTitleHit, 0, len(hits))
+	for _, hit := range hits {
+		out = append(out, tools.ProviderTitleHit{
+			Code:     hit.Number,
+			Title:    hit.Title,
+			Provider: hit.Provider,
+			Homepage: hit.Homepage,
+			Score:    hit.Score,
+		})
+	}
+	return out, nil
+}
+
+func (a *App) FindLibraryMoviesByCodes(ctx context.Context, codes []string) (map[string]contracts.MovieListItemDTO, error) {
+	if a == nil || a.store == nil {
+		return map[string]contracts.MovieListItemDTO{}, nil
+	}
+	return a.store.FindActiveMoviesByCodes(ctx, codes)
 }

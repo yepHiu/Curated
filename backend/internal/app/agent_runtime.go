@@ -60,6 +60,9 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 		if err := tools.RegisterPresentTools(reg, gw.MovieRefs()); err != nil && a.logger != nil {
 			a.logger.Warn("register agent present tools failed")
 		}
+		if err := tools.RegisterProviderTools(reg, a, a, a, gw.MovieRefs(), gw.ActorRefs(), gw.SourceURLs()); err != nil && a.logger != nil {
+			a.logger.Warn("register agent provider tools failed")
+		}
 		if err := tools.RegisterWriteTools(reg, a); err != nil && a.logger != nil {
 			a.logger.Warn("register agent write tools failed")
 		}
@@ -137,11 +140,47 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 			emit(ev)
 		}
 	}
-	runErr := loop.Run(ctx, session.ID, messageID, history, req.Context, wrapped)
+	page := a.projectAIChatContext(ctx, req.Context)
+	runErr := loop.Run(ctx, session.ID, messageID, history, page, wrapped)
 	if a.store != nil && assistant.Len() > 0 {
 		_, _ = a.store.AppendAIChatMessage(ctx, session.ID, "assistant", assistant.String(), "", "")
 	}
 	return runErr
+}
+
+// projectAIChatContext resolves the v1 explicit selections against the local
+// library before the loop can seed its per-turn reference stores. Browser
+// values are suggestions only: unknown movie ids and actor names are removed
+// rather than becoming trusted present/provider anchors.
+func (a *App) projectAIChatContext(ctx context.Context, input *contracts.AIChatContext) *contracts.AIChatContext {
+	if input == nil {
+		return nil
+	}
+	page := *input
+	page.Mentions = append([]contracts.AIChatMention(nil), input.Mentions...)
+	page.SelectedMovieIDs = nil
+	page.SelectedActors = nil
+	if input.ActiveFilters != nil {
+		filters := *input.ActiveFilters
+		page.ActiveFilters = &filters
+	}
+	if input.ContextVersion != 1 || a == nil || a.store == nil {
+		return &page
+	}
+	for _, id := range input.SelectedMovieIDs {
+		exists, err := a.store.MovieExists(ctx, id)
+		if err == nil && exists {
+			page.SelectedMovieIDs = append(page.SelectedMovieIDs, id)
+		}
+	}
+	for _, name := range input.SelectedActors {
+		profile, err := a.store.GetActorProfile(ctx, name)
+		if err != nil || strings.TrimSpace(profile.Name) == "" {
+			continue
+		}
+		page.SelectedActors = append(page.SelectedActors, profile.Name)
+	}
+	return &page
 }
 
 func (a *App) ListAIChatSessions(ctx context.Context) (contracts.AIChatSessionListDTO, error) {

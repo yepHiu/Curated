@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -135,6 +136,79 @@ func TestCompleteReturnsFirstChoiceContent(t *testing.T) {
 	}
 	if got != "pong" {
 		t.Fatalf("Complete() = %q, want pong", got)
+	}
+}
+
+func TestCompleteOmitsMaxTokensWhenUnlimited(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(raw), "max_tokens") {
+			t.Errorf("request should omit max_tokens, got %s", raw)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		Complete(context.Background(), []ChatMessage{{Role: "user", Content: "ping"}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "ok" {
+		t.Fatalf("Complete() = %q, want ok", got)
+	}
+}
+
+func TestCompleteReadsMultipartContentAndStripsThink(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":[{"type":"text","text":"<think>先想</think>译名"}]}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		Complete(context.Background(), []ChatMessage{{Role: "user", Content: "ping"}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "译名" {
+		t.Fatalf("Complete() = %q, want 译名", got)
+	}
+}
+
+func TestCompleteUsesReasoningAfterThinkTags(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","reasoning_content":"<think>内部推理</think>\n中文标题"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		Complete(context.Background(), []ChatMessage{{Role: "user", Content: "ping"}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "中文标题" {
+		t.Fatalf("Complete() = %q, want 中文标题", got)
+	}
+}
+
+func TestCompleteEmptyReasoningOnlyIsError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"","reasoning_content":"只是在想题目"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "m"}, server.Client()).
+		Complete(context.Background(), []ChatMessage{{Role: "user", Content: "ping"}}, 0)
+	if err == nil || !strings.Contains(err.Error(), "reasoning only") {
+		t.Fatalf("Complete() error = %v, want reasoning only", err)
 	}
 }
 

@@ -1,7 +1,7 @@
 # Agent 执行里程碑计划（E1–E4）
 
 日期：2026-08-19
-状态：in-progress（**E1 已实现**；**E2 已实现**；**E3 进行中**：确认协议与用户数据写工具已落地——笔记润色、简介清洗、标题翻译、Insights 解读、一句话 Saved View。MCP 与毕业仍属后续期。）
+状态：in-progress（**E1 已实现**；**E2 已实现**；**E3 核心已落地**；**E5.A/B/C 已落地**（源站锚点 + `search_provider_titles` + `get_source_page`）。MCP 与毕业仍属后续期。）
 上游：[`2026-08-18-agent-charter.md`](2026-08-18-agent-charter.md)（宪法，B1–B7 基建不变）· [`2026-08-19-agent-user-prd.md`](2026-08-19-agent-user-prd.md)（用户需求）
 
 ## 0. 总原则（2026-08-19 用户决策）
@@ -63,14 +63,26 @@
 | 交付 | 内容 | 对应 |
 |---|---|---|
 | 确认协议 + 写域工具 | 确认卡（字段级 diff → 应用/放弃）；用户数据写域工具上线 | B6 |
-| Action 通道 + presets | `/api/ai/actions/{name}`；首批：润色笔记、清洗简介、翻译标题、Insights 解读；**就地按钮全部受 gating**（开关开启才显示） | B7、REQ-0029/0030/0041/0031 |
+| Action 通道 + presets | `/api/ai/actions/{name}`；首批：润色笔记、翻译简介、翻译标题、Insights 解读；**就地按钮全部受 gating**（开关开启才显示） | B7、REQ-0029/0030/0041/0031 |
 | 一句话视图 | NL → 筛选确认卡 → 创建 Saved View | REQ-0033 |
 
 **验收**：确认前零写入、token 校验、审计含 preview/apply；就地按钮 diff 预览后走既有端点语义写回；批量 >25 转任务并经 ScanProgressDock 展示。
 
-**E3.1 落地（2026-08-21）**：`save_movie_comment` preview/apply、`POST /api/ai/actions/polish_comment`（模型自识别原文语言并同语言润色；不提供扩写/翻译按钮）、`POST /api/ai/confirm`、SSE `confirm_required`、详情页笔记润色与 Agent Window 确认卡。详见 [`2026-08-21-agent-e3-comment-actions.md`](2026-08-21-agent-e3-comment-actions.md)。
+**E3.1 落地（2026-08-21）**：`save_movie_comment` preview/apply、`POST /api/ai/actions/polish_comment`（模型自识别原文语言并同语言润色）、`POST /api/ai/confirm`、SSE `confirm_required`、详情页笔记润色与 Agent Window 确认卡。笔记助手**产品确认不做扩写/翻译**。详见 [`2026-08-21-agent-e3-comment-actions.md`](2026-08-21-agent-e3-comment-actions.md)。
 
-**E3.2–E3.4 落地（2026-08-21）**：`update_movie_display_overrides` + `clean_summary` / `translate_title`（编辑对话框输入框内按钮）；只读 `insights_narrative`（Insights 页）；`create_saved_view`（对话里解析筛选并出确认卡）。详见 [`2026-08-21-agent-e3-write-actions.md`](2026-08-21-agent-e3-write-actions.md)。
+**E3.2–E3.4 落地（2026-08-21）**：`update_movie_display_overrides` + `translate_summary` / `translate_title`（编辑对话框输入框内独立按钮）；只读 `insights_narrative`（Insights 页）；`create_saved_view`（对话里解析筛选并出确认卡）。详见 [`2026-08-21-agent-e3-write-actions.md`](2026-08-21-agent-e3-write-actions.md)。
+
+## 4.5 E5 实验后续：源站周边（提案，不阻塞 E4）
+
+**目标**：Agent 能回答影片评价、演员介绍、以及该演员在库外的其他作品，沿 Metatube 源站 URL 与检索，不接通用网页搜索。
+
+| 交付 | 内容 | 对应 |
+|---|---|---|
+| 暴露已有锚点 | `get_movie_detail` / `get_actor_profile` 带 `homepage`、站点评分、provider | REQ-0044 Phase A |
+| 源站作品检索 | `search_provider_titles`（本轮 movieId 或 actorName），库外条目无 `movieId` | REQ-0044 Phase B |
+| 可选读页 | `get_source_page` 仅允许本轮已知 https 源站 URL | REQ-0044 Phase C |
+
+**验收与分期**见 [`2026-08-21-agent-provider-related-lookup.md`](2026-08-21-agent-provider-related-lookup.md)。**E5.A/B/C 已落地**（2026-08-21）：详情工具暴露 homepage/评分/provider；`search_provider_titles` 本轮锚点 + Metatube 有界检索；`get_source_page` 只读本轮 https 源站页。
 
 ## 5. E4 毕业期：转正与对外
 
@@ -102,3 +114,327 @@ PRD 批次列（A–D）继续作为价值分组标签，执行顺序以本文 E
 - charter P-12：网关管道单测、Agent 循环恶意剧本（自 E2 起）、提示词 golden transcript（自 E2 起）；
 - gating 验证：开关关闭时构建产物中不渲染任何 Agent UI（组件测试覆盖）；
 - 文档同步义务（charter §9.3）：`project-facts.mdc` / `API.md`（新端点）/ 本计划勾选进度；需求状态在 `requirements.csv` 同步推进（E1 启动时 REQ-0043/0039 至少 `specified`）。
+
+## 8. 当前阶段优化优先级（2026-08-30）
+
+> 本节是对 E1–E5 已落地范围的产品化建议；它不改变 charter 的安全边界，也不授权 Agent 新的写权限。目标是先验证价值、补齐可控性和可用性，再进入 MCP、批量自动化等 E4 范围。
+
+| 优先级 | 改进项 | 问题与建议 | 验收信号 |
+|---|---|---|---|
+| P0 | 端到端质量门禁与变更拆分 | 当前工作区同时含 Agent、播放与导入的大批未提交变更。按功能域拆成最小提交；每项合入前执行前端 typecheck/lint/相关 Vitest、后端相关 `go test`，阶段结束再跑完整 DoD。新增真实 provider 的可控冒烟测试（仅人工/本地密钥），避免把密钥纳入 CI。 | 每个变更可独立回滚；全量 DoD 绿；无 `git diff --check` 问题；release 前可复现。 |
+| P0 | AI 失败、取消与降级体验 | 将“未配置、鉴权失败、限流、超时、网络中断、用户停止、工具拒绝”统一为带恢复动作的状态卡：说明原因、提供“去设置 / 重试 / 编辑请求 / 查看详情”。保留原输入和对话上下文，不能因流中断丢失用户文本。 | 任一错误均有可操作恢复路径；取消后无残留 loading；重试不重复执行已确认写入。 |
+| P0 | 写入可解释性与审计可见性 | 现有 gateway 已记录审计、确认卡已给出 diff；E4 前应先提供用户可读的最近操作记录：时间、模型、工具、影响对象、preview/apply/拒绝结果、错误摘要与筛选。默认不保存原始敏感 prompt/响应，或明确其保留期与脱敏规则。 | 每次写前可看影响，写后可追溯；用户能区分“模型建议”与“已实际写入”。 |
+| P0 | 从“工具问答”升级为“任务完成” | 当前能力已能多步调工具，但首批写操作仍是单点动作。为高价值任务定义显式工作流：找片决策、资料库诊断、来源信息核对、元数据纠错建议、受控整理。每个工作流先输出目标、已知事实、缺失信息和下一步计划；读工具失败时可在同一安全边界内换检索路径或要求澄清，写操作仍必须停在 preview/confirm。 | 用户能看到任务进度与未完成原因；模型不会在工具失败后虚构完成；复杂请求可在一次会话内得到可执行计划或受控结果。 |
+| P0 | 评测集驱动的能力迭代 | 在扩充工具前建立不含真实私密数据的 golden/eval 任务集，覆盖：多条件找片、统计口径、库内外作品区分、来源 URL 安全、确认前零写入、工具超时/拒绝、错误恢复。对每次 prompt、模型或工具变更比较任务完成率、引用正确率、错误写入率与平均工具步数。 | 新能力有可量化回归门禁；模型/Provider 替换不会悄然降低准确性或越权。 |
+| P0 | 深化检索与实体上下文 | Agent 已有 `@` 提及和多组读取工具，但应让它显式识别当前页面、当前选中影片/演员、有效筛选、最近一次搜索和用户纠正，并将这些作为可见、可移除的会话上下文。补足跨实体检索与结果对账：影片番号、标题别名、演员别名、资料库路径/可播放性、源站记录必须能说明匹配依据。 | 代词如“这部/刚才那位/这些”稳定解析；结果可区分本地实体、源站实体与不确定匹配，不会因同名或别名误操作。 |
+| P1 | 用户可控的长期偏好与纠错记忆 | 会话持久化不等于偏好记忆。新增用户可查看、编辑、禁用的偏好/约束层，例如语言、时长、观看状态、避开条件、收藏优先级，以及“这类推荐不对”的反馈。不得把模型猜测直接变成长期记忆。 | 同类找片任务随反馈改善；用户可查看和一键删除每条记忆；没有隐式持久化的模型画像。 |
+| P1 | 对话结果的事实依据与置信边界 | 每个关键结论显示可展开的“依据”：本地影片/演员/统计、源站 provider、数据时间和可能的不完整性；对库外条目稳定标记“未在资料库”。推荐卡补足匹配条件、排除原因与一键调整条件，避免把模型推断包装成事实。 | 用户能回到具体影片、筛选或统计验证结论；源站失败不会伪造答案。 |
+| P2 | 高价值的受控批量工作流 | 不直接给模型任意批量写权限。优先完成可解释的“建议 → 影响范围 → 抽样预览 → 确认 → 后台任务”：标签归一化、演员候选合并、缺失元数据修复计划、用户标签建议。每项须复用现有事务、审计和失败明细。 | Agent 能完成真实资料库维护任务，同时不会对 >25 项目标进行不可逆静默写入。 |
+| P3 | 首次使用引导与 Provider 健康状态 | 首次使用引导可晚于核心能力；Provider 健康信息仍保留在设置页：最近测试时间、目标地址掩码、模型名与失败诊断，严禁展示 API Key。 | 用户需要排障时可自助判断配置状态，不影响能力研发优先级。 |
+| P1 | Agent Window 的可访问、键盘与移动端验收 | 现有 Escape、aria-label 和 `aria-live` 是良好基础；补齐打开后的焦点管理、焦点陷阱/归还、聊天历史和确认卡的完整键盘路径、流式内容节流播报、拖动/缩放的键盘替代。375px、窄桌面、深浅主题及 `prefers-reduced-motion` 建立视觉回归。交互目标保持至少 44px。 | 键盘可完成发送、停止、确认、取消与切换会话；屏幕阅读器不被逐 token 播报淹没；移动端无横向溢出。 |
+| P1 | 成本、延迟与配额可观测性 | 在服务端记录请求耗时、首 token 时间、输入/输出 token（provider 返回时）、工具耗时、失败类别；前端只显示必要的“正在查询/正在生成”阶段与慢请求说明。为单会话/单日设可配置上限与清晰的超额提示，先做观测再决定默认阈值。 | 可按模型与工具定位慢点和失败点；无意外长时间流式请求或不可解释费用。 |
+| P2 | 以实际使用数据决定 Window 与 Drawer | 不应只凭偏好决定 E4 形态。先埋点/本地匿名统计：启动率、完成率、窗口遮挡主任务比例、移动端关闭率、会话复用率、确认卡放弃率。达到预定样本后再选择保留浮窗、改右侧抽屉或两者兼容。 | 有明确决策记录和指标阈值，而不是一次不可逆的视觉重构。 |
+| P2 | MCP 采用最小只读面并单独发布 | MCP 先只暴露稳定、投影后的只读工具；沿用 PIN、速率限制、审计和同一权限网关。不要把 Agent 内部 prompt、确认 token 或写工具直接映射给 MCP。先做 stdio 契约测试，再决定 HTTP transport。 | 未配 LLM 也能使用；外部客户端不能绕过权限、确认或脱敏。 |
+| P2 | 批量能力从“计划卡”而非自由写入开始 | REQ-0034/0035/0036/0042 应先交付只读建议/影响面/抽样预览和取消能力；超过 25 项统一转后台任务，逐项结果可导出。对标签合并、演员合并等高风险操作坚持复用现有事务与人工确认流程。 | 无自动批量写；失败可定位到对象；任务可取消、重试和审计。 |
+
+### 建议的实现顺序
+
+1. **先收口当前变更并跑质量门禁**，不把播放/导入优化与 Agent 毕业需求绑成同一发布。
+2. **建立评测集，补任务规划、实体上下文与失败恢复**；先证明 Agent 能稳定完成复杂任务，再继续增加工具数量。
+3. **补可见审计与事实依据**，让每次检索、建议和写入都可复核；这也是能力扩大后的安全基线。
+4. **交付少量高价值、受控的批量工作流**，每项坚持 plan/preview/confirm/task，而非开放自由批量写。
+5. **随后再做长期偏好、E4 交互形态和最小只读 MCP**；首次使用引导保持低优先级，按需要补齐。
+
+## 9. 后续路线图与实施计划：能力优先（2026-08-30）
+
+### 9.1 目标、边界与交付原则
+
+**目标**：将实验性 Agent 从「可调用原子工具的聊天窗口」提升为「能在可验证、可取消、可审计边界内完成资料库任务的助手」。路线图不以“增加工具数量”为完成标准，而以用户任务完成率、事实正确率和零越权写入为标准。
+
+**不在本路线图内**：通用网页搜索、多 Agent 自主协作、常驻后台自主执行、绕过确认的写入、Copilot 直接控制播放/转码。视觉性首次使用引导为 P3，不阻塞能力建设。多模态/字幕/向量检索不是本轮前置依赖；只有在下列本地检索、实体对账和评测指标稳定后，才另立需求评估。
+
+**每一阶段的共通约束**：
+
+1. 所有数据读取仍经 `agent/core.Gateway`，写入仍只能走 `write-preview → confirm → write-apply`；不新增旁路。
+2. 工具返回必须区分 `ok`、`error`、`truncated`、`previewed`、`confirmed` / `rejected`，模型不得把工具错误描述为成功。
+3. 每项新增能力均要有 mock、单元测试、恶意路径测试和至少一个端到端用户任务；没有评测样本、验收信号和回归测试不得宣布完成。
+4. 所有页面/会话上下文默认可见、可移除；所有长期偏好默认由用户显式保存、可编辑和可删除。
+5. 与当前播放、导入优化保持独立提交与独立发布判定；不得以 Agent 能力开发掩盖其质量状态。
+
+### 9.2 全局能力架构
+
+```text
+用户任务 / 当前页面 / 显式 @ 引用 / 已保存偏好
+                    │
+                    ▼
+         Context Resolver（可见且可移除）
+                    │
+                    ▼
+  Task Planner（目标、事实、缺口、受限下一步）
+                    │
+                    ▼
+Gateway（schema / projection / rate limit / audit / confirm）
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+   Read / provider tools   Preview / apply tools
+          │                   │
+          └─────────┬─────────┘
+                    ▼
+ Evidence + Result Reconciler（依据、未知项、完成状态）
+                    │
+                    ▼
+聊天结果 / 计划卡 / 确认卡 / 后台任务状态 / 审计记录
+```
+
+实现时不新增一个能绕开现有循环的“总控 Agent”。`run.Loop` 仍负责有限步数的模型循环，`core.Gateway` 仍是唯一权限、超时、审计和确认入口。`Context Resolver`、`Task Planner` 和 `Result Reconciler` 是显式数据结构与 UI 协议，而不是仅靠 prompt 暗示模型“应该记住”。
+
+### 9.3 阶段 R0：收口、基线与评测基础
+
+**定位**：先让后续能力迭代可比较、可回滚；这是 R1–R4 的硬前置，而非功能发布。
+
+| 项目 | 实施内容 |
+|---|---|
+| 变更收口 | 将当前 Agent、播放、导入改动按最小修改单元拆分；每个提交只包含一项可描述、可测试的行为变更与必要文档，不混入格式化噪声。 |
+| 评测契约 | 定义标准任务输入、允许工具轨迹、期望事实、禁止行为、评分方式；样本为合成资料库或脱敏 fixture，禁止导入真实用户数据、实际 API Key 或真实会话。 |
+| 评测覆盖 | 首批至少覆盖多条件找片、统计口径、别名歧义、库内/库外区分、源站 URL 限制、截断/分页、确认前零写入、重复确认、工具拒绝、超时、取消和模型空回复。 |
+| 指标 | 记录任务完成率、事实/实体正确率、工具错误后虚构成功率、错误写入率、平均工具步数、端到端时延与首 token 时延。错误写入率必须为零。 |
+| Provider 对比 | 对可配置的 OpenAI-compatible Provider 使用同一评测集；CI 只跑 fake provider/录制 fixture，真实 Provider 冒烟仅在本地人工执行并且不输出密钥。 |
+
+**建议代码落点**：
+
+- 后端测试：`backend/internal/agent/{core,run,tools}/*_test.go`、`backend/internal/llm/client_test.go`；把跨层场景放在一个明确的 Agent eval test helper，避免把基准断言分散进不相关业务测试。
+- 前端测试：`src/components/agent-window/*.test.ts`、`src/services/adapters/mock/mock-ai-service.test.ts`；Mock 必须能确定性重放“工具成功/失败/确认/取消”轨迹。
+- 文档与台账：本计划、`docs/prd/requirements.csv`、必要时 `project-facts.mdc`；记录基线的模型版本和评测数据版本，但不记录密钥或私有请求体。
+
+**完成定义（DoD）**：评测样本可在本地重复运行；每个样本输出结构化结果；现有 E1–E5 行为在基线中固定；质量门禁通过 `pnpm typecheck`、`pnpm lint`、相关 Vitest、`cd backend && go test ./...`、`go vet ./...`。R0 只增加测试/台账，不改变用户可见行为。
+
+### 9.4 阶段 R1：上下文解析、实体对账与证据回答
+
+**用户价值**：用户可以自然地说“这部”“刚才那位”“这些未看的”，Agent 不再因丢失页面状态、同名实体或库外记录而给出错误对象；每个关键结论都能回到资料来源复核。
+
+#### R1.1 上下文协议
+
+将当前 `context.mentions` 扩展为版本化、显式的聊天上下文 DTO，建议包含：
+
+- `route` / `pageKind`：当前页面与对象类型；
+- `selectedMovieIds` / `selectedActors`：用户当前明确选中的实体；当前公开 Actor 契约以规范名称表示，尚未暴露稳定 actor ID；
+- `activeFilters`：可序列化且已脱敏的列表筛选；
+- `recentEntityRefs`：本会话已解析的影片、演员、源站条目；
+- `userConstraints`：仅本会话有效的“不要/优先/时长”等明确约束；
+- `contextVersion`：用于拒绝未知字段与将来兼容升级。
+
+前端在 composer 中以可见 chips 展示这些上下文，用户可逐个移除；后端以 allowlist 投影，而不是信任浏览器传来的任意字段或详情文本。
+
+#### R1.2 实体与结果对账
+
+- 增加影片番号、标题别名、演员别名的规范化匹配结果，结果包含 `matched`、`ambiguous`、`unmatched` 三种状态及可展示理由；有歧义时禁止直接进入写工具。
+- 建立本地影片、源站 provider 条目、库外候选的统一引用格式。只有本地影片允许携带本地 `movieId` 和进入 `present_movies`；库外候选必须保留 provider/source 标识。
+- 读取工具返回关键事实时同时给出最小证据元数据：数据来源（local/provider）、检索时间、筛选条件、截断/分页状态和可导航的本地实体引用。
+- 当工具失败、数据缺失或结果截断时，`run.Loop` 的结束语必须出现“未完成/不确定原因”和可行下一步；禁止用语言模型猜测替代工具结果。
+
+**建议代码落点**：
+
+- 契约：`backend/internal/contracts/contracts.go`、`src/api/types.ts`、`src/services/contracts/ai-service.ts`。
+- 后端：`backend/internal/app/agent_runtime.go`（请求上下文投影）、`backend/internal/agent/core/{movie_refs,actor_refs,source_urls}.go`（规范化与安全锚点）、`backend/internal/agent/tools/{movie,actor,provider,source_page}.go`（证据 envelope）、`backend/internal/agent/run/loop.go`（结束状态）。
+- 前端：`AgentChatComposer.vue`（上下文 chips）、`AgentChatThread.vue` / `AgentChatMovieCard.vue`（事实依据和库外标识）、`AgentWindow.vue`（路由/选择同步）。
+
+**验收场景**：
+
+1. 从电影详情说“这部的演员还拍过什么”，返回本地和库外作品，两类不可混淆。
+2. 在筛选后的库页说“这些里面找一部 90 分钟内没看过的”，Agent 使用当前筛选并显示其附加条件。
+3. 同名演员或番号候选不唯一时，Agent 明确要求选择，不能进行写操作。
+4. 源站读页失败、检索截断或本地资料缺失时，答案标出边界，不伪造详情。
+
+### 9.5 阶段 R2：任务规划与受控执行
+
+**用户价值**：复杂需求不再退化成多轮手工指令；用户先看到 Agent 的任务理解和计划，之后可观察每一步的事实、失败和最终完成状态。
+
+#### R2.1 计划卡协议
+
+为具有两个以上读取步骤、或含潜在写操作的请求新增 `task_plan` SSE 事件和前端 Plan Card。计划卡包含：
+
+- 任务目标与成功标准；
+- 已知事实、待确认信息与风险；
+- 有序步骤（每步只显示产品化动作，不泄露内部 prompt）；
+- 每步的只读/预览/确认写入属性；
+- 预计影响范围和是否会转后台任务；
+- 用户可选的“继续”“修改条件”“取消”。
+
+Plan Card 是执行透明度，不是额外授权：计划确认仅允许继续读取或生成 preview；任何持久化写入仍依赖现有 confirm token。
+
+#### R2.2 首批任务模板
+
+按价值和风险从低到高交付，不开放“任意自然语言写库”。
+
+| 模板 | 读取/推理 | 写入边界 | 首版结果 |
+|---|---|---|---|
+| 找片决策 | 当前筛选、观看历史、可播放性、时长、偏好约束 | 无写入 | 带匹配/排除理由的候选与可调条件 |
+| 资料库诊断 | 路径状态、扫描结果、媒体探测、健康 finding、元数据失败 | 无写入 | 按严重度排序的诊断与修复建议；链接既有修复入口 |
+| 来源信息核对 | 本地元数据、provider 检索、受限源页 | 无写入 | 本地/源站差异和置信边界；不自动覆盖元数据 |
+| 元数据修正建议 | 诊断结果、现有字段、provider 证据 | preview/confirm | 字段级 diff；先只支持既有安全 user override 语义 |
+| 受控整理 | 标签/演员/重复候选、影响范围 | preview/confirm/task | 先产生建议与样本，再进入 R3 的批量任务 |
+
+#### R2.3 循环和错误恢复
+
+- `run.Loop` 在工具级 `error` 后只能执行白名单内的替代读步骤，或结束为 `partial` / `blocked`；不得重试写 apply。
+- 将完成状态标准化为 `completed`、`partial`、`needs_input`、`cancelled`、`failed`，在 SSE 和会话历史中持久化。
+- 已生成 preview 的会话恢复时必须检查 confirm token 的 TTL、参数 hash 和目标当前版本；过期或已变更时强制重新 preview。
+- 单轮仍遵守 `DefaultStepLimit`；达到上限时输出已经完成的事实、未完成步骤及继续方式。
+
+**建议代码落点**：
+
+- `backend/internal/agent/run/loop.go` 与 `backend/internal/agent/core/types.go`：事件、状态、允许恢复策略；
+- `backend/internal/contracts/contracts.go`、`src/api/types.ts`、`src/services/adapters/{web,mock}/mock-ai-service.ts`：SSE/DTO 兼容；
+- `src/components/agent-window/AgentChatProcess.vue` 与新增的 Plan Card 组件：进度、取消、部分完成和确认边界；
+- `backend/internal/app/agent_query.go` / `agent_actions.go`：每个任务模板的 application 层编排，保持 tool handler 不承载 UI 策略。
+
+**验收场景**：用户请求“整理一下这批影片”时，先看到范围和可执行步骤；若元数据源失败，诊断/建议步骤显示 partial，未确认的写入为零；取消后会话保留已完成只读结论但不继续动作。
+
+### 9.6 阶段 R3：高价值批量治理与用户反馈闭环
+
+**用户价值**：Agent 开始处理真正耗时的资料库维护任务，同时保留人工决策权和完整恢复线索；推荐能吸收明确反馈，而不是黑箱地“越用越像”。
+
+#### R3.1 批量治理按三层交付
+
+1. **建议层（只读）**：标签相似组、演员合并候选、缺失元数据候选、用户标签建议；给出依据、影响计数、样本和不确定性。
+2. **计划层（preview）**：用户勾选候选，系统计算字段级/实体级影响、冲突、后台任务门槛和预计耗时。
+3. **执行层（confirm/task）**：`≤25` 项按确认协议执行，`>25` 必须创建可取消后台任务；逐项结果、错误、跳过原因和审计均可导出。
+
+标签、演员归并等高风险行为只能复用现有业务事务、合并对话框和审计模型；Agent 只负责提出候选、汇总和触发受控入口，不能直接写底层表。
+
+#### R3.2 显式偏好与反馈
+
+- 创建独立、用户可见的偏好记录：语言、时长、观看状态、收藏优先级、避开条件等；区分“仅当前会话”与“保存为默认”。
+- 推荐卡提供轻量反馈：适合/不适合、原因可选；反馈先写为结构化用户偏好，不把模型推断直接持久化。
+- 设置页提供查看、编辑、单条删除、全部清除和关闭使用偏好的入口；偏好不能写入刮削字段或 INFO 标签。
+
+**建议代码落点**：新的数据库 migration 与 storage repository、`backend/internal/app` 的业务用例、`agent/tools/write.go` 中受权限控制的 preview/apply 工具；前端落点为 Agent 推荐卡、批量任务状态组件和 Settings。新增端点时按仓库规则同步 `API.md`、`CLAUDE.md`、`project-facts.mdc` 和实现说明文档。
+
+**验收场景**：
+
+- 100 项标签候选只能生成计划和后台任务，无法被一次聊天自动写入；任务可取消，失败项有可读原因。
+- 用户说“不要时长超过 90 分钟的推荐”，只影响本会话；选择“保存偏好”后才跨会话生效，且可删除。
+- Agent 推荐/整理永不触碰刮削 INFO 标签；用户标签变更可审计、可筛选并可按来源清理。
+
+### 9.7 阶段 R4：E4 毕业、最小 MCP 与运行治理
+
+**进入条件**：R0 评测基线稳定；R1/R2 核心任务达到团队预设的完成率和事实正确率；连续评测无错误写入；审计、取消、部分完成和权限拒绝均已通过回归。
+
+| 交付 | 实施顺序 | 边界 |
+|---|---|---|
+| 正式 AI 设置与审计 | 将实验 Provider 配置演进为正式 AI 分区；补隐私说明、权限、用量、审计、数据保留和一键清理 | 仍保持用户显式启用；模型不得修改自身设置 |
+| Window / Drawer 决策 | 使用任务完成率、遮挡率、移动端关闭率、会话复用率、确认放弃率作决策，而非一次性重写 UI | 可以保留 Window；迁移 Drawer 需保留会话与键盘/移动端验收 |
+| 最小只读 MCP | 先提供稳定 schema 的 stdio 只读工具，复用 projection、PIN（HTTP 时）、审计、速率限制和 schema 测试；随后才评估 HTTP transport | 不暴露内部 prompt、confirm token、写工具或任意 provider 配置 |
+| 运行治理 | 用量/延迟、慢工具、失败类别、Provider 健康和 session 清理策略进入正式运维面 | 指标默认最小化采集，避免保留敏感 Prompt/响应正文 |
+
+MCP 是独立发布单元，不能因尚未完成批量能力而阻塞，也不能成为绕开现有 Gateway 的捷径。
+
+### 9.8 发布节奏、质量门禁与决策点
+
+该路线图以阶段依赖而非日历承诺表达；实际开始 R1、R2、R3 前都应先完成上一阶段 DoD。建议每一阶段采用“设计/契约 → 后端安全路径 → Mock 与前端 → 评测/回归 → 文档/最小提交”的小闭环。
+
+| Gate | 通过条件 | 不通过时的处理 |
+|---|---|---|
+| G0：评测基线 | R0 样本可重复，当前 E1–E5 有基准结果 | 暂停新增工具，先修复不稳定/无断言路径 |
+| G1：上下文可信 | 代词、别名、库内外对账和截断场景均通过 | 不开放依赖实体定位的写流程 |
+| G2：任务可信 | 计划、部分完成、取消、工具失败恢复和确认 TTL 测试通过 | 仅保留现有原子工具，不发布任务模板 |
+| G3：批量可信 | preview/confirm/task、取消、审计、逐项错误和恢复测试通过 | 批量能力保持建议层，只读发布 |
+| G4：对外可信 | MCP 契约、安全、限流、审计、PIN/CORS（若 HTTP）测试通过 | 仅交付本地 UI，不发布外部连接器 |
+
+每个 Gate 的最小验证命令遵循 `docs/ops/2026-04-08-agent-build-and-test.md`：前端 `pnpm typecheck`、`pnpm lint`、相关 `pnpm test -- <files>`，阶段收口运行 `pnpm test`、`pnpm test:e2e`、`pnpm build`；后端在 `backend/` 运行相关包测试，阶段收口运行 `go test ./...` 与 `go vet ./...`。涉及 Electron 壳时追加 `pnpm test:electron`。
+
+### 9.9 下一次实施从哪里开始
+
+下一项建议启动 **R0.2：建立 Agent 评测契约与确定性 Mock 场景**，随后立即实施 **R1.1：版本化聊天上下文和实体对账**。这是投入最小、对找片、来源查询、推荐、写前确认和未来 MCP 都能复用的能力底座。不要先做新的模型花活或无限制工具；只有能被评测、溯源和拒绝的能力，才值得扩大到用户资料库。
+
+## 10. 今日实施计划（2026-08-30）：R0.2 + R1.1 首个垂直切片
+
+### 10.1 今日目标与明确不做项
+
+**今日目标**：完成可重复的 Agent 评测最小闭环，并让单次聊天请求以向后兼容方式携带、校验和使用更可靠的“当前页面 + 显式选择实体 + 筛选条件”上下文。交付的不是新的写工具，而是一条可验证的能力底座。
+
+**今天不做**：任务计划卡（R2）、批量标签/演员治理（R3）、MCP、长期偏好、通用网页搜索、播放控制、多模态/向量检索，以及把 `activeFilters` 直接交给任意底层查询。今天也不修改 Agent 的写权限和确认协议。
+
+### 10.2 今日完成定义
+
+当且仅当以下四项均成立，今日任务可视为完成：
+
+1. 存在可确定性重放的 Agent eval 场景清单与 runner；至少覆盖成功找片、实体歧义/拒绝、库内外边界、工具错误不得虚构成功、写入 preview/confirm 安全边界五类。
+2. `POST /api/ai/chat` 的 `context` 契约新增版本和有限的选择/筛选投影，旧客户端不传新字段时行为不变；未知/超量/不安全字段被忽略或以稳定错误拒绝，不能进入 prompt。
+3. Agent Window 能将当前可验证的页面上下文发送给后端，并将已发送的选择/筛选上下文以可移除、非持久的形式显示；不把完整页面文本、影片简介、路径或隐私字段塞进 prompt。
+4. 后端单元/集成测试和前端 Mock/组件测试覆盖上述主路径；相关检查绿色，文档、契约和测试保持同步。
+
+### 10.3 工作包与执行顺序
+
+| 顺序 | 工作包 | 实施内容 | 主要文件 | 产出 / 验收 |
+|---:|---|---|---|---|
+| 1 | 基线确认（只读） | 记录当前 `AIChatContext`、`agentPageContext`、`run.Loop` 注入上下文、Movie/Actor Ref Store、Mock SSE 的真实行为；选定合成 fixture，不使用用户资料库。 | `backend/internal/contracts/contracts.go`、`backend/internal/app/agent_runtime.go`、`backend/internal/agent/run/loop.go`、`src/components/agent-window/AgentWindow.vue` | 简短的 eval fixture 说明；不会因“计划假设”而修改错误层。 |
+| 2 | R0.2 评测契约与 runner | 建立确定性的 testcase 定义：输入消息、上下文、脚本化模型 turn、允许/禁止工具、期望 SSE 事件、期望引用与禁止写入。先采用 Go `llm.ScriptedStreamer` 和 stub query/provider，禁止测试访问网络。 | 建议新增 `backend/internal/agent/eval/`（或同层 `run` 测试 helper）；复用 `run/loop_test.go` 的 `collectEvents` / fake 工具模式 | 一条命令可输出每例通过/失败；测试失败必须指出违反的工具、事件或安全不变量。 |
+| 3 | 首批五个 eval 用例 | A. 当前页面演员为源站检索锚点；B. 当前筛选下多条件找片；C. 库外 provider 条目不得进入 `present_movies`；D. 读取工具 error 后回答必须标为未完成/不确定，不能声明成功；E. 伪造/过期确认不得写入。 | `backend/internal/agent/{run,tools,core}/*_test.go`，必要时新增 eval fixture | 形成 R0 基准；A/C/E 复用并收紧已有测试，B/D 为本日新增缺口。 |
+| 4 | R1.1 契约设计与后端校验 | **已实施（2026-08-30）**：在 `AIChatContext` 加入 `contextVersion`、受限 `selectedMovieIds`、受限 `selectedActors`、`activeFilters`。当前公开 Actor 行只暴露规范名称，服务端将其解析为本地 canonical name；`activeFilters` 只允许 `query`/`tag`/`actor`/`playState`/`runtime`，并有大小与枚举限制。未知 JSON 字段按标准解码忽略；不支持的版本、超量和非法枚举稳定拒绝。默认保留 `route/movieId/actorName/query/mentions`。 | `backend/internal/contracts/contracts.go`、`backend/internal/server/ai_handlers.go`、`backend/internal/app/agent_runtime.go`，相应 `*_test.go` | 请求解析、长度限制、allowlist、旧客户端兼容均有测试；经投影后的上下文才允许进入 system prompt/loop。 |
+| 5 | R1.1 引用锚定与对账 | **已实施首个切片（2026-08-30）**：应用层确认 `selectedMovieIds` 存在、将 `selectedActors` 解析为 canonical name，再在本轮开始写入既有 `MovieRefStore` / `ActorRefStore`。它们只作为读工具、`present_movies`、provider 查询的本轮锚点，不能自动执行 write apply。别名/同名歧义交互仍属 R1.2。 | `backend/internal/app/agent_runtime.go`、`backend/internal/agent/core/{movie_refs,actor_refs}.go`、`backend/internal/agent/run/loop.go` | “这部/这些”可依赖明确选择的本地引用；伪造/不存在的影片 ID 与未解析演员不会被提升为可信锚点。 |
+| 6 | 前端 DTO、页面投影与可移除上下文 | 同步 TypeScript 契约和 Web/Mock adapter。`AgentWindow` 仅从 route 与现有页面状态构造安全投影；composer 显示页面、已选实体、筛选 chips，均可在发送前移除。无有效选择时不伪造 `selected*`。Mock 支持检验入参并重放至少一个“筛选上下文 → 候选结果”的场景。 | `src/api/types.ts`、`src/services/contracts/ai-service.ts`、`src/services/adapters/{web,mock}/`、`src/components/agent-window/{AgentWindow,AgentChatComposer}.vue` 及测试 | 发出的 JSON 与 Go DTO 对齐；用户能看见/撤销上下文；移动端不产生横向溢出。 |
+| 7 | 验证、文档与最小提交 | 先跑相关 Go 与 Vitest，再跑阶段质量门禁；更新本计划的实际状态与 `requirements.csv`（仅在功能完成时调整百分比/状态）。按“eval 基础”“上下文契约与后端”“前端上下文 UI”拆分最小提交；不 `git push`。 | 本计划、必要的 API/事实文档、测试与实现文件 | 所有命令通过；每个提交可独立说明、构建、回滚。 |
+
+### 10.4 技术设计决策（今日锁定）
+
+#### Context v1 的最小形状
+
+```json
+{
+  "contextVersion": 1,
+  "route": "library",
+  "selectedMovieIds": ["local-movie-id"],
+  "selectedActors": ["Canonical actor name"],
+  "activeFilters": {
+    "query": "...",
+    "playState": "unwatched",
+    "runtime": "short"
+  },
+  "mentions": [{ "kind": "movie", "id": "local-movie-id", "label": "..." }]
+}
+```
+
+- 本实现的 `activeFilters` 只允许 `query`、`tag`、`actor`、`playState`、`runtime`；最大字段值长度为 200 runes，选择项最多 8 条。评分范围及分钟级时长留待后续独立扩展。
+- 公开 Actor 列表当前没有稳定 actor ID，故使用 `selectedActors` 名称；不得把它直接信任为锚点。服务端先通过本地 actor profile 解析为规范名称，再写入本轮 `ActorRefStore`。
+- `selectedMovieIds` 必须通过本地 repository 校验存在性；仅凭前端 ID 不足以授予其在 `present_movies`、源站查询或任何写操作中的使用资格。
+- `contextVersion` 缺失视为旧 v0 并沿用已有字段；大于服务器支持版本返回稳定 `BAD_REQUEST`，而不是猜测语义。
+- 上下文为单次请求输入；今天不存入 `ai_chat_messages`，不建立隐式长期记忆。
+
+#### Eval case 的最小格式
+
+每个 case 用明确 ID（例如 `EVAL-R0-001`）记录：
+
+```text
+given: 合成库、上下文、脚本化模型 turn
+when: 运行一个 Agent turn
+then: 允许的工具序列 / 必须出现或禁止出现的 SSE 事件 / 期望实体引用
+and: 写入次数、confirm token 和库外 movieId 等安全不变量
+```
+
+今日的 eval 不是替代单元测试：schema/permission/URL/confirm 仍保留各自单测；eval 只验证它们跨 Loop、工具和 SSE 组合后没有失效。
+
+### 10.5 今日测试矩阵
+
+| 层 | 必跑 | 重点断言 |
+|---|---|---|
+| Go core/tools | `cd backend && go test ./internal/agent/core/... ./internal/agent/tools/...` | 引用 store 的 session 隔离、伪造 ID/actor、库外条目、confirm token 与 URL allowlist。 |
+| Go loop/app/server | `cd backend && go test ./internal/agent/run/... ./internal/app/... ./internal/server/...` | eval 重放、context 校验和投影、工具错误边界、SSE 事件顺序。 |
+| 前端定向 | `pnpm test -- src/components/agent-window/AgentWindow.test.ts src/components/agent-window/AgentChatComposer.test.ts src/services/adapters/mock/mock-ai-service.test.ts` | context wire payload、chip 移除、停止/错误、Mock 确定性重放。 |
+| 阶段收口 | `pnpm typecheck`; `pnpm lint`; `pnpm test`; `cd backend && go test ./...`; `cd backend && go vet ./...` | 全量回归与静态质量。若改动 UI，再按需要运行 `pnpm test:e2e`；涉及 Electron 才运行 `pnpm test:electron`。 |
+
+### 10.6 今日结束时的交付清单
+
+- [x] R0 eval runner 与五个合成场景；初始基线由 `cd backend && go test ./internal/agent/eval/...` 输出。
+- [x] Context v1 的 Go/TypeScript 契约、服务器投影与向后兼容测试。
+- [x] 选择影片/演员和小型筛选 allowlist 的可信引用链；没有扩展写权限。
+- [x] Agent Window 上下文 chips 的发送前可见与可移除能力，以及对应组件测试。
+- [ ] 阶段收口质量门完全通过，文档已同步。已通过：定向 Agent Vitest（35 项）、`pnpm typecheck`、`pnpm lint`、全量 `pnpm test`（209 文件 / 952 项）、`cd backend && go test ./...`、`go vet ./...`。待独立收口：`pnpm test:e2e` 为 4/5（375px 资料库控件用例等待既有 `[data-mobile-theme-toggle]` 超时）；`pnpm build` 的 bundle budget 报总 JS 2354.82 kB raw / 774.13 kB gzip，分别超 2250 kB / 750 kB 限制。两项均不通过放宽预算解决。
+- [ ] 最小修改单元提交完成；当前工作区同时包含 Agent、播放、导入等大量并行未提交改动，须先按行为切分并仅暂存本切片。不会推送、不删除现有 release 产物。
+
+### 10.7 今天的停止条件与明日衔接
+
+若 R0 eval runner 或 Context v1 校验未完成，今天到此停止，不开始 R2 Plan Card。若 Context v1 通过但前端 chips 尚未完成，可以只合入后端/契约/eval 的独立提交，前端留在下一小步；不得为了“端到端看起来完成”放松服务器 allowlist 或引用校验。
+
+今天全部完成后，下一次工作只从 **R1.2：证据 envelope 与实体歧义交互** 开始：让每个关键结果带来源、筛选、截断和本地/库外标记，并要求用户在歧义对象中选择。R2 的任务计划卡仍需等待 R1 的上下文与对账评测稳定。

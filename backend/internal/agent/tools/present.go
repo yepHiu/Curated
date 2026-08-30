@@ -32,8 +32,8 @@ func presentMovies(refs *core.MovieRefStore) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name: core.PresentMoviesName,
 		Description: "Show up to 6 movie cards in the chat UI. Call this when recommending or pointing at specific titles. " +
-			"movieId values must come from search_movies, get_movie_detail, or get_watch_history in this turn. " +
-			"Never invent IDs. Optional reason is one sentence citing retrieved fields (actors, runtime, tags, rating).",
+			"movieId must come from search_movies, get_movie_detail, get_watch_history, or in-library search_provider_titles rows in this turn. " +
+			"Never invent IDs. Off-library provider titles have no movieId. Optional reason is one sentence citing retrieved fields (actors, runtime, tags, rating).",
 		ParamsSchema: schema,
 		Permission:   core.PermissionRead,
 		Domain:       core.DomainPresent,

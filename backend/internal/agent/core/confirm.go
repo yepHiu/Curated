@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -36,8 +37,26 @@ func NewConfirmStore() *ConfirmStore {
 }
 
 func HashArgs(raw json.RawMessage) string {
-	sum := sha256.Sum256([]byte(string(raw)))
+	sum := sha256.Sum256(CanonicalJSON(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+// CanonicalJSON unmarshals then remarsals so key order and number formatting
+// do not drift between the model, SSE, and the browser confirm POST.
+func CanonicalJSON(raw json.RawMessage) []byte {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		return []byte("{}")
+	}
+	var value any
+	if err := json.Unmarshal(trimmed, &value); err != nil {
+		return trimmed
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return trimmed
+	}
+	return encoded
 }
 
 func (s *ConfirmStore) Issue(sessionID, toolName string, args json.RawMessage) (ConfirmRecord, error) {

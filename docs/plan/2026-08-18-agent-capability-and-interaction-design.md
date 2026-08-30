@@ -31,7 +31,7 @@
 ### 1.2 场景清单（按层级标注）
 
 **L1（就地按钮，最快见效）**
-- 影片笔记润色 / 扩写 / 翻译（`MovieCommentSection` + `library_movie_comments`）
+- 影片笔记润色（`MovieCommentSection` + `library_movie_comments`；不做扩写/翻译）
 - 刮削摘要清洗去广告 → 写 `user_summary`（展示覆盖列本就是干这个的）
 - 标题/厂牌建议（`MovieEditDialog` 的 AI 预填）
 
@@ -157,7 +157,7 @@
 
 | 位置 | 动作 | 结果交互 |
 |---|---|---|
-| 详情页笔记区（`MovieCommentSection`） | 润色/扩写/翻译 | diff 预览 → 应用写回（走既有 PUT） |
+| 详情页笔记区（`MovieCommentSection`） | 润色 | diff 预览 → 应用写回（走既有 PUT） |
 | 详情页元数据（`MovieEditDialog`） | 清洗刮削摘要 | diff 预览 → 写 `user_summary` |
 | 资料库批量栏（`LibraryBatchActionBar`） | 批量归一化标签 / 批量补摘要 | 转后台任务，进度走 `ScanProgressDock` |
 | Insights 页（`PersonalInsightsPage`） | AI 解读本期数据 | 页面内流式/一次性渲染成卡片 |

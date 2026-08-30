@@ -32,6 +32,7 @@ vi.mock("vue-router", () => ({
 }))
 
 const confirmToolMock = vi.hoisted(() => vi.fn())
+const refreshSavedViewsMock = vi.hoisted(() => vi.fn())
 
 vi.mock("@/services/ai-service", () => ({
   useAIService: () => ({
@@ -59,7 +60,9 @@ vi.mock("@/services/library-service", () => ({
         },
       ],
     },
+    trashedMovies: { value: [] },
     listActors: async () => ({ actors: [{ name: "Ada", movieCount: 1 }], total: 1 }),
+    refreshSavedViews: refreshSavedViewsMock,
   }),
 }))
 
@@ -87,9 +90,13 @@ describe("AgentWindow", () => {
     createSessionMock.mockReset()
     getSessionMock.mockReset()
     deleteSessionMock.mockReset()
+    confirmToolMock.mockReset()
+    refreshSavedViewsMock.mockReset()
     pushMock.mockReset()
     listSessionsMock.mockResolvedValue([])
     createSessionMock.mockResolvedValue({ id: "ses_new", title: "", createdAt: "", updatedAt: "" })
+    confirmToolMock.mockResolvedValue({ ok: true, name: "create_saved_view", data: {} })
+    refreshSavedViewsMock.mockResolvedValue(undefined)
     const { setEnabled } = useExperimentalAgent()
     setEnabled(true)
     const windowState = useAgentWindow()
@@ -389,9 +396,69 @@ describe("AgentWindow", () => {
     expect(wrapper.find("[data-agent-window-sidebar]").exists()).toBe(false)
   })
 
-  it("sends remaining @ mentions in chat context", async () => {
-    streamChatMock.mockImplementation(async (input: { context?: { mentions?: { kind: string; id: string }[] } }, handlers: { onDelta: (d: string) => void }) => {
+  it("refreshes saved views after confirming a new bookmark", async () => {
+    streamChatMock.mockImplementation(
+      async (
+        _input: unknown,
+        handlers: {
+          onConfirmRequired?: (event: {
+            name: string
+            confirmToken: string
+            changes: { path: string; before?: unknown; after?: unknown }[]
+            arguments: Record<string, unknown>
+            sessionId?: string
+          }) => void
+        },
+      ) => {
+        handlers.onConfirmRequired?.({
+          name: "create_saved_view",
+          confirmToken: "cfm_1",
+          changes: [
+            { path: "savedView.name", before: "", after: "未看完" },
+            { path: "savedView.filters", before: null, after: { schemaVersion: 1, playState: "unwatched" } },
+          ],
+          arguments: { name: "未看完", filters: { schemaVersion: 1, playState: "unwatched" } },
+          sessionId: "ses_1",
+        })
+      },
+    )
+    const wrapper = mountWindow()
+    await flushPromises()
+    await wrapper.find("[data-agent-window-input]").setValue("帮我存成书签")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.find("[data-agent-confirm-card]").exists()).toBe(true)
+    await wrapper.find("[data-agent-confirm-apply]").trigger("click")
+    await flushPromises()
+
+    expect(confirmToolMock).toHaveBeenCalledWith({
+      sessionId: "ses_1",
+      name: "create_saved_view",
+      arguments: { name: "未看完", filters: { schemaVersion: 1, playState: "unwatched" } },
+      confirmToken: "cfm_1",
+    })
+    expect(refreshSavedViewsMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps the chrome header in the content column and brands the sidebar", () => {
+    const wrapper = mountWindow()
+    const sidebar = wrapper.find("[data-agent-window-sidebar]")
+    const header = wrapper.find("[data-agent-window-header]")
+    const brand = sidebar.find("[data-agent-window-brand]")
+    expect(brand.exists()).toBe(true)
+    expect(brand.text()).toBe("agentWindow.title")
+    expect(brand.find("p").classes()).toContain("font-curated")
+    expect(sidebar.find("[data-agent-window-header]").exists()).toBe(false)
+    expect(wrapper.find("[data-agent-chat-wide]").find("[data-agent-window-header]").exists()).toBe(true)
+    expect(header.find("[data-agent-window-sidebar-toggle]").exists()).toBe(true)
+  })
+
+  it("sends remaining @ mentions as explicit selected context", async () => {
+	streamChatMock.mockImplementation(async (input: { context?: { mentions?: { kind: string; id: string }[]; contextVersion?: number; selectedMovieIds?: string[] } }, handlers: { onDelta: (d: string) => void }) => {
       expect(input.context?.mentions).toEqual([{ kind: "movie", id: "m1", label: "Hello" }])
+	  expect(input.context?.contextVersion).toBe(1)
+	  expect(input.context?.selectedMovieIds).toEqual(["m1"])
       handlers.onDelta("收到")
     })
     const wrapper = mountWindow()
@@ -400,6 +467,22 @@ describe("AgentWindow", () => {
     await wrapper.find('[data-agent-mention-item="movie:m1"]').trigger("mousedown")
     await flushPromises()
     expect((wrapper.find("[data-agent-window-input]").element as HTMLTextAreaElement).value).toContain("@Hello")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+    expect(streamChatMock).toHaveBeenCalled()
+  })
+
+  it("shows and lets the user remove page context before sending", async () => {
+    streamChatMock.mockImplementation(async (input: { context?: { route?: string } }, handlers: { onDelta: (d: string) => void }) => {
+      expect(input.context?.route).toBeUndefined()
+      handlers.onDelta("收到")
+    })
+    const wrapper = mountWindow()
+    await flushPromises()
+    expect(wrapper.find('[data-agent-context-chip="route"]').exists()).toBe(true)
+    await wrapper.find('[data-agent-context-chip="route"]').trigger("click")
+    expect(wrapper.find('[data-agent-context-chip="route"]').exists()).toBe(false)
+    await wrapper.find("[data-agent-window-input]").setValue("不带页面上下文")
     await wrapper.find("[data-agent-window-send]").trigger("click")
     await flushPromises()
     expect(streamChatMock).toHaveBeenCalled()

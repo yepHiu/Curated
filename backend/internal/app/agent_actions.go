@@ -77,7 +77,7 @@ func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, 
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
 		{Role: "system", Content: prompts.CommentActionPrompt(original)},
 		{Role: "user", Content: prompts.FormatCommentActionUser(original)},
-	}, 800)
+	}, 0)
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
 	}
@@ -164,6 +164,17 @@ func sanitizeActionText(raw string) string {
 	return strings.TrimSpace(text)
 }
 
+func clipUTF8Bytes(value string, max int) string {
+	if max <= 0 || len(value) <= max {
+		return value
+	}
+	value = value[:max]
+	for len(value) > 0 && !utf8.ValidString(value) {
+		value = value[:len(value)-1]
+	}
+	return value
+}
+
 func confirmChangeDTOs(changes []core.Change) []contracts.AIConfirmChangeDTO {
 	if len(changes) == 0 {
 		return nil
@@ -187,35 +198,39 @@ func (a *App) runDisplayAction(ctx context.Context, completer commentCompleter, 
 	var original string
 	var system string
 	var userKind string
-	maxTokens := 800
+	locale := strings.TrimSpace(req.TargetLocale)
+	if locale == "" {
+		locale = strings.TrimSpace(req.Locale)
+	}
+	draft := strings.TrimSpace(req.Body)
 	switch name {
-	case prompts.ActionCleanSummary:
-		original = strings.TrimSpace(detail.Summary)
+	case prompts.ActionTranslateSummary:
+		original = draft
+		if original == "" {
+			original = strings.TrimSpace(detail.Summary)
+		}
 		if original == "" {
 			return contracts.AIActionPreviewDTO{}, fmt.Errorf("summary is empty")
 		}
-		system = prompts.CleanSummaryPrompt(original)
+		system = prompts.TranslateSummaryPrompt(original, locale)
 		userKind = "Synopsis"
-		maxTokens = 1600
 	case prompts.ActionTranslateTitle:
-		original = strings.TrimSpace(detail.Title)
+		original = draft
+		if original == "" {
+			original = strings.TrimSpace(detail.Title)
+		}
 		if original == "" {
 			return contracts.AIActionPreviewDTO{}, fmt.Errorf("title is empty")
 		}
-		locale := strings.TrimSpace(req.TargetLocale)
-		if locale == "" {
-			locale = strings.TrimSpace(req.Locale)
-		}
 		system = prompts.TranslateTitlePrompt(original, locale)
 		userKind = "Title"
-		maxTokens = 200
 	default:
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
 	}
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
 		{Role: "system", Content: system},
 		{Role: "user", Content: prompts.FormatPlainUser(userKind, original)},
-	}, maxTokens)
+	}, 0)
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
 	}
@@ -224,10 +239,8 @@ func (a *App) runDisplayAction(ctx context.Context, completer commentCompleter, 
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("provider returned empty text")
 	}
 	argsMap := map[string]string{"movieId": movieID}
-	if name == prompts.ActionCleanSummary {
-		if len(proposed) > core.MaxMovieSummaryBytes {
-			proposed = proposed[:core.MaxMovieSummaryBytes]
-		}
+	if name == prompts.ActionTranslateSummary {
+		proposed = clipUTF8Bytes(proposed, core.MaxMovieSummaryBytes)
 		argsMap["userSummary"] = proposed
 	} else {
 		argsMap["userTitle"] = proposed
@@ -279,7 +292,7 @@ func (a *App) runInsightsNarrative(ctx context.Context, completer commentComplet
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
 		{Role: "system", Content: prompts.InsightsNarrativePrompt(locale, payload)},
 		{Role: "user", Content: prompts.FormatPlainUser("Insights", rangeValue)},
-	}, 700)
+	}, 0)
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
 	}

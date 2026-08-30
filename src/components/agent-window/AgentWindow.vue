@@ -16,6 +16,7 @@ import {
   useAgentWindow,
 } from "@/composables/use-agent-window"
 import { useAIService } from "@/services/ai-service"
+import { useLibraryService } from "@/services/library-service"
 import { AIServiceError } from "@/services/contracts/ai-service"
 import AgentChatComposer from "./AgentChatComposer.vue"
 import AgentChatSidebar from "./AgentChatSidebar.vue"
@@ -29,6 +30,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const aiService = useAIService()
+const libraryService = useLibraryService()
 const {
   open,
   position,
@@ -46,6 +48,7 @@ const sessions = ref<AIChatSessionDTO[]>([])
 const sessionId = ref("")
 const draft = ref("")
 const mentions = ref<AgentMention[]>([])
+const omittedContext = ref<string[]>([])
 const streaming = ref(false)
 const providerUnconfigured = ref(false)
 const errorMessage = ref("")
@@ -66,7 +69,7 @@ const chatWide = computed(
 
 const headerTitle = computed(() => {
   const title = sessions.value.find((item) => item.id === sessionId.value)?.title?.trim()
-  return title || t("agentWindow.title")
+  return title || t("agentWindow.sessionPlaceholder")
 })
 
 function nextEntryId(prefix: string) {
@@ -98,7 +101,9 @@ watch(open, async (isOpen) => {
     await refreshSessions()
     await nextTick()
     composerRef.value?.focus()
+    return
   }
+  abortController?.abort()
 }, { immediate: true })
 
 function close() {
@@ -277,8 +282,24 @@ function collapseProcess(assistantId: string) {
   }
 }
 
-function chatContextFrom(text: string, active: AgentMention[]): AIChatContextDTO | undefined {
+function chatContextFrom(text: string, active: AgentMention[], omitted: readonly string[] = []): AIChatContextDTO | undefined {
   const page: AIChatContextDTO = { ...(agentPageContext(route) ?? {}) }
+  const omittedKeys = new Set(omitted)
+  if (omittedKeys.has("route")) delete page.route
+  if (omittedKeys.has("movie")) delete page.movieId
+  if (omittedKeys.has("actor")) delete page.actorName
+  if (page.activeFilters) {
+    const filters = { ...page.activeFilters }
+    if (omittedKeys.has("filter:query")) {
+      delete filters.query
+      delete page.query
+    }
+    if (omittedKeys.has("filter:tag")) delete filters.tag
+    if (omittedKeys.has("filter:actor")) delete filters.actor
+    if (omittedKeys.has("filter:playState")) delete filters.playState
+    if (omittedKeys.has("filter:runtime")) delete filters.runtime
+    page.activeFilters = Object.keys(filters).length > 0 ? filters : undefined
+  }
   const kept = mentionsStillInText(active, text).slice(0, 8)
   if (kept.length > 0) {
     page.mentions = kept.map((item) => ({
@@ -286,8 +307,37 @@ function chatContextFrom(text: string, active: AgentMention[]): AIChatContextDTO
       id: item.id,
       label: item.label,
     }))
+    const movieIds = kept.filter((item) => item.kind === "movie").map((item) => item.id)
+    const actors = kept.filter((item) => item.kind === "actor").map((item) => item.id || item.label)
+    if (movieIds.length > 0) page.selectedMovieIds = [...new Set(movieIds)]
+    if (actors.length > 0) page.selectedActors = [...new Set(actors)]
+    if (page.selectedMovieIds?.length || page.selectedActors?.length) page.contextVersion = 1
+  }
+  if (!page.activeFilters && !page.selectedMovieIds?.length && !page.selectedActors?.length) {
+    delete page.contextVersion
   }
   return Object.keys(page).length > 0 ? page : undefined
+}
+
+type AgentContextChip = { key: string; label: string }
+
+const contextChips = computed<AgentContextChip[]>(() => {
+  const page = chatContextFrom(draft.value, mentions.value, omittedContext.value)
+  if (!page) return []
+  const chips: AgentContextChip[] = []
+  if (page.route) chips.push({ key: "route", label: t("agentWindow.contextRoute", { route: page.route }) })
+  if (page.movieId) chips.push({ key: "movie", label: t("agentWindow.contextMovie", { id: page.movieId }) })
+  if (page.actorName) chips.push({ key: "actor", label: t("agentWindow.contextActor", { name: page.actorName }) })
+  if (page.activeFilters?.query) chips.push({ key: "filter:query", label: t("agentWindow.contextQuery", { value: page.activeFilters.query }) })
+  if (page.activeFilters?.tag) chips.push({ key: "filter:tag", label: t("agentWindow.contextTag", { value: page.activeFilters.tag }) })
+  if (page.activeFilters?.actor) chips.push({ key: "filter:actor", label: t("agentWindow.contextFilterActor", { value: page.activeFilters.actor }) })
+  if (page.activeFilters?.playState) chips.push({ key: "filter:playState", label: t("agentWindow.contextPlayState", { value: page.activeFilters.playState }) })
+  if (page.activeFilters?.runtime) chips.push({ key: "filter:runtime", label: t("agentWindow.contextRuntime", { value: page.activeFilters.runtime }) })
+  return chips
+})
+
+function omitContext(key: string) {
+  if (!omittedContext.value.includes(key)) omittedContext.value = [...omittedContext.value, key]
 }
 
 function removeAssistantTurn(assistantId: string) {
@@ -319,6 +369,13 @@ async function applyConfirm(entryId: string) {
       confirmToken: entry.confirmToken,
     })
     entry.status = "applied"
+    if (entry.name === "create_saved_view") {
+      try {
+        await libraryService.refreshSavedViews()
+      } catch {
+        // Write already succeeded; the next library visit can catch up.
+      }
+    }
   } catch (err) {
     entry.status = "pending"
     entry.error = err instanceof AIServiceError ? err.message : (err as Error).message
@@ -345,6 +402,8 @@ async function send() {
   draft.value = ""
   const activeMentions = mentions.value
   mentions.value = []
+  const activeContext = chatContextFrom(content, activeMentions, omittedContext.value)
+  omittedContext.value = []
   entries.value.push({ id: nextEntryId("user"), kind: "user", content })
 
   const history: AIChatMessageDTO[] = entries.value.flatMap((entry) => {
@@ -377,7 +436,7 @@ async function send() {
       {
         messages: history,
         sessionId: sessionId.value || undefined,
-        context: chatContextFrom(content, activeMentions),
+        context: activeContext,
         locale: locale.value,
       },
       {
@@ -555,48 +614,6 @@ watch(
       aria-label="Curated Agent"
       data-agent-window
     >
-      <div
-        class="flex min-h-11 cursor-grab items-center gap-1 border-b border-border px-1.5 py-1 text-foreground active:cursor-grabbing md:min-h-10"
-        :class="isMobileViewport ? '' : 'touch-none'"
-        data-agent-window-header
-        @pointerdown="onHeaderPointerdown"
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-          :aria-label="t('agentWindow.toggleSidebar')"
-          :aria-pressed="sidebarOpen"
-          data-agent-window-sidebar-toggle
-          @click="setSidebarOpen(!sidebarOpen)"
-        >
-          <PanelLeft class="size-4" />
-        </Button>
-        <p class="min-w-0 flex-1 truncate px-1 text-[13px] font-medium">{{ headerTitle }}</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-          :aria-label="t('agentWindow.newChat')"
-          data-agent-window-header-new
-          @click="startNewChat"
-        >
-          <Plus class="size-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-          :aria-label="t('agentWindow.close')"
-          @click="close"
-        >
-          <X class="size-4" />
-        </Button>
-      </div>
-
       <div class="relative flex min-h-0 flex-1">
         <AgentChatSidebar
           v-if="sidebarOpen && !sidebarOverlays"
@@ -605,53 +622,113 @@ watch(
           @create="startNewChat"
           @select="selectSession"
           @delete="deleteChat"
+          @title-pointerdown="onHeaderPointerdown"
         />
         <div
-          class="flex min-h-0 min-w-0 flex-1 flex-col"
+          class="relative flex min-h-0 min-w-0 flex-1 flex-col"
           :data-agent-chat-wide="chatWide ? 'true' : 'false'"
         >
-          <AgentChatThread
-            ref="threadRef"
-            :entries="entries"
-            :provider-unconfigured="providerUnconfigured"
-            :error-message="errorMessage"
-            :wide="chatWide"
-            @close="close"
-            @open-movie="openMovieDetail"
-            @apply-confirm="applyConfirm"
-            @discard-confirm="discardConfirm"
-          />
           <div
-            class="mx-auto w-full shrink-0"
-            :class="chatWide ? 'max-w-[52rem] px-6' : 'px-4'"
+            class="flex min-h-11 shrink-0 cursor-grab items-center gap-1 border-b border-border px-1.5 py-1 text-foreground active:cursor-grabbing md:min-h-10"
+            :class="isMobileViewport ? '' : 'touch-none'"
+            data-agent-window-header
+            @pointerdown="onHeaderPointerdown"
           >
-            <AgentChatComposer
-              ref="composerRef"
-              v-model="draft"
-              v-model:mentions="mentions"
-              :streaming="streaming"
-              @send="send"
-              @stop="stop"
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+              :aria-label="t('agentWindow.toggleSidebar')"
+              :aria-pressed="sidebarOpen"
+              data-agent-window-sidebar-toggle
+              @click="setSidebarOpen(!sidebarOpen)"
+            >
+              <PanelLeft class="size-4" />
+            </Button>
+            <p class="min-w-0 flex-1 truncate px-1 text-[13px] font-medium">{{ headerTitle }}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+              :aria-label="t('agentWindow.newChat')"
+              data-agent-window-header-new
+              @click="startNewChat"
+            >
+              <Plus class="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+              :aria-label="t('agentWindow.close')"
+              @click="close"
+            >
+              <X class="size-4" />
+            </Button>
+          </div>
+          <div class="relative flex min-h-0 flex-1 flex-col">
+            <AgentChatThread
+              ref="threadRef"
+              :entries="entries"
+              :provider-unconfigured="providerUnconfigured"
+              :error-message="errorMessage"
+              :wide="chatWide"
+              @close="close"
+              @open-movie="openMovieDetail"
+              @apply-confirm="applyConfirm"
+              @discard-confirm="discardConfirm"
             />
+            <div
+              class="mx-auto w-full shrink-0"
+              :class="chatWide ? 'max-w-[52rem] px-6' : 'px-4'"
+            >
+              <div v-if="contextChips.length" class="flex flex-wrap gap-2 border-t border-border/60 py-2" data-agent-context-chips>
+                <Button
+                  v-for="chip in contextChips"
+                  :key="chip.key"
+                  type="button"
+                  variant="secondary"
+                  class="h-auto min-h-11 max-w-full gap-1 rounded-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+                  :aria-label="t('agentWindow.removeContext', { context: chip.label })"
+                  :data-agent-context-chip="chip.key"
+                  @click="omitContext(chip.key)"
+                >
+                  <span class="truncate">{{ chip.label }}</span>
+                  <X class="size-3.5 shrink-0" aria-hidden="true" />
+                </Button>
+              </div>
+              <AgentChatComposer
+                ref="composerRef"
+                v-model="draft"
+                v-model:mentions="mentions"
+                :streaming="streaming"
+                @send="send"
+                @stop="stop"
+              />
+            </div>
+            <template v-if="sidebarOpen && sidebarOverlays">
+              <button
+                type="button"
+                class="absolute inset-0 z-20 bg-background/70"
+                :aria-label="t('agentWindow.toggleSidebar')"
+                data-agent-window-sidebar-backdrop
+                @click="setSidebarOpen(false)"
+              />
+              <AgentChatSidebar
+                class="absolute inset-y-0 left-0 z-40 shadow-md"
+                :sessions="sessions"
+                :active-id="sessionId"
+                @create="startNewChat"
+                @select="selectSession"
+                @delete="deleteChat"
+                @title-pointerdown="onHeaderPointerdown"
+              />
+            </template>
           </div>
         </div>
-        <template v-if="sidebarOpen && sidebarOverlays">
-          <button
-            type="button"
-            class="absolute inset-0 z-30 bg-background/70"
-            :aria-label="t('agentWindow.toggleSidebar')"
-            data-agent-window-sidebar-backdrop
-            @click="setSidebarOpen(false)"
-          />
-          <AgentChatSidebar
-            class="absolute inset-y-0 left-0 z-40 shadow-md"
-            :sessions="sessions"
-            :active-id="sessionId"
-            @create="startNewChat"
-            @select="selectSession"
-            @delete="deleteChat"
-          />
-        </template>
       </div>
 
       <template v-if="!isMobileViewport">
