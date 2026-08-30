@@ -10,6 +10,8 @@ import {
   formatSourceFormatLabel,
   formatTimecodeLabel,
   formatTranscodeProfileLabel,
+  formatEncoderSpeedLabel,
+  formatSeekKindLabel,
   isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
 
@@ -63,6 +65,12 @@ describe("player playback stats formatting", () => {
     expect(formatTranscodeProfileLabel("h264_nvenc")).toBe("NVIDIA NVENC")
     expect(formatTranscodeProfileLabel("libx264")).toBe("libx264")
     expect(formatTranscodeProfileLabel("unknown")).toBe("N/A")
+    expect(formatEncoderSpeedLabel("1.24x")).toBe("1.24x")
+    expect(formatEncoderSpeedLabel(" ")).toBe("N/A")
+    expect(formatSeekKindLabel("reuse")).toBe("Reuse")
+    expect(formatSeekKindLabel("swap")).toBe("Swap")
+    expect(formatSeekKindLabel("start")).toBe("Start")
+    expect(formatSeekKindLabel("")).toBe("N/A")
   })
 
   it("detects unavailable stat labels", () => {

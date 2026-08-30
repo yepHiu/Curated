@@ -45,9 +45,12 @@ export function buildHlsPlaybackConfig(): Record<string, unknown> {
     startFragPrefetch: true,
     enableWorker: true,
     lowLatencyMode: false,
-    maxBufferLength: 30,
-    maxMaxBufferLength: 60,
+    maxBufferLength: 60,
+    maxMaxBufferLength: 120,
     backBufferLength: 90,
+    // Event playlists stay "live" while ffmpeg is still writing. Prefer waiting
+    // for the next transcoded fragment over giving up and restarting playback.
+    maxStarvationDelay: 12,
     xhrSetup(xhr: XMLHttpRequest) {
       xhr.withCredentials = true
     },

@@ -32,6 +32,9 @@ describe("buildHlsPlaybackConfig", () => {
       startFragPrefetch: true,
       enableWorker: true,
       lowLatencyMode: false,
+      maxBufferLength: 60,
+      maxMaxBufferLength: 120,
+      maxStarvationDelay: 12,
     })
   })
 

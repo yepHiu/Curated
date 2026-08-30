@@ -2411,6 +2411,7 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 			PreferRemux:      decision.PreferRemux,
 			SourceVideoCodec: decision.SourceVideoCodec,
 			SourceAudioCodec: decision.SourceAudioCodec,
+			SourceContainer:  decision.SourceContainer,
 		})
 		if err != nil {
 			if a.logger != nil {
@@ -2471,6 +2472,7 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 			PreferRemux:      decision.PreferRemux,
 			SourceVideoCodec: decision.SourceVideoCodec,
 			SourceAudioCodec: decision.SourceAudioCodec,
+			SourceContainer:  decision.SourceContainer,
 		})
 		if err != nil {
 			return contracts.PlaybackDescriptorDTO{}, err
@@ -2650,17 +2652,20 @@ func buildDirectPlaybackDescriptor(
 
 func playbackSessionStatusDTO(snapshot playback.SessionSnapshot) contracts.PlaybackSessionStatusDTO {
 	return contracts.PlaybackSessionStatusDTO{
-		SessionID:        snapshot.Session.ID,
-		MovieID:          snapshot.Session.MovieID,
-		SessionKind:      snapshot.Session.Kind,
-		TranscodeProfile: snapshot.Session.ProfileName,
-		StartPositionSec: snapshot.Session.StartPositionSec,
-		StartedAt:        formatOptionalPlaybackTime(snapshot.Session.StartedAt),
-		LastAccessedAt:   formatOptionalPlaybackTime(snapshot.LastAccessedAt),
-		ExpiresAt:        formatOptionalPlaybackTime(snapshot.ExpiresAt),
-		FinishedAt:       formatOptionalPlaybackTime(snapshot.FinishedAt),
-		State:            snapshot.State,
-		LastError:        strings.TrimSpace(snapshot.LastError),
+		SessionID:          snapshot.Session.ID,
+		MovieID:            snapshot.Session.MovieID,
+		SessionKind:        snapshot.Session.Kind,
+		TranscodeProfile:   snapshot.Session.ProfileName,
+		StartPositionSec:   snapshot.Session.StartPositionSec,
+		StartedAt:          formatOptionalPlaybackTime(snapshot.Session.StartedAt),
+		LastAccessedAt:     formatOptionalPlaybackTime(snapshot.LastAccessedAt),
+		ExpiresAt:          formatOptionalPlaybackTime(snapshot.ExpiresAt),
+		FinishedAt:         formatOptionalPlaybackTime(snapshot.FinishedAt),
+		State:              snapshot.State,
+		LastError:          strings.TrimSpace(snapshot.LastError),
+		EncoderSpeed:       strings.TrimSpace(snapshot.EncoderSpeed),
+		WrittenDurationSec: snapshot.WrittenDurationSec,
+		LastSeekKind:       strings.TrimSpace(snapshot.LastSeekKind),
 	}
 }
 
@@ -2700,12 +2705,16 @@ func (a *App) probeMediaInfoWithPersistentCache(ctx context.Context, location st
 	if a.store != nil {
 		cached, cacheErr := a.store.GetMediaProbeCache(ctx, cleanPath)
 		if cacheErr == nil && cached != nil &&
-			cached.SizeBytes == info.Size() && cached.MtimeUnixNs == info.ModTime().UnixNano() {
+			cached.SizeBytes == info.Size() && cached.MtimeUnixNs == info.ModTime().UnixNano() &&
+			cached.ProbeSchema >= storage.MediaProbeCacheSchema {
 			return playback.MediaInfo{
-				Container:   cached.Container,
-				VideoCodec:  cached.VideoCodec,
-				AudioCodec:  cached.AudioCodec,
-				DurationSec: cached.DurationSec,
+				Container:           cached.Container,
+				VideoCodec:          cached.VideoCodec,
+				AudioCodec:          cached.AudioCodec,
+				DurationSec:         cached.DurationSec,
+				RFrameRate:          cached.RFrameRate,
+				AvgFrameRate:        cached.AvgFrameRate,
+				HasNegativeVideoPTS: cached.HasNegativeVideoPTS != 0,
 			}, nil
 		}
 	}
@@ -2719,16 +2728,27 @@ func (a *App) probeMediaInfoWithPersistentCache(ctx context.Context, location st
 		// Best effort: cache freshness is guarded by size+modtime, so a failed
 		// write only costs the next request one ffprobe run.
 		_ = a.store.UpsertMediaProbeCache(ctx, storage.MediaProbeCacheRow{
-			Path:        cleanPath,
-			SizeBytes:   info.Size(),
-			MtimeUnixNs: info.ModTime().UnixNano(),
-			Container:   mediaInfo.Container,
-			VideoCodec:  mediaInfo.VideoCodec,
-			AudioCodec:  mediaInfo.AudioCodec,
-			DurationSec: mediaInfo.DurationSec,
+			Path:                cleanPath,
+			SizeBytes:           info.Size(),
+			MtimeUnixNs:         info.ModTime().UnixNano(),
+			Container:           mediaInfo.Container,
+			VideoCodec:          mediaInfo.VideoCodec,
+			AudioCodec:          mediaInfo.AudioCodec,
+			DurationSec:         mediaInfo.DurationSec,
+			RFrameRate:          mediaInfo.RFrameRate,
+			AvgFrameRate:        mediaInfo.AvgFrameRate,
+			HasNegativeVideoPTS: boolToInt(mediaInfo.HasNegativeVideoPTS),
+			ProbeSchema:         storage.MediaProbeCacheSchema,
 		})
 	}
 	return mediaInfo, nil
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func resolveDirectPlaybackMimeType(fileName string) (mimeType string, canDirectPlay bool) {

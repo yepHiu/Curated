@@ -23,21 +23,24 @@ import (
 
 var (
 	// ErrSessionNotFound is returned when a playback session ID is not found in the active registry or recent snapshots.
-	ErrSessionNotFound    = errors.New("playback session not found")
+	ErrSessionNotFound = errors.New("playback session not found")
 	// ErrStreamPushDisabled is returned when stream push is not enabled in the manager configuration.
 	ErrStreamPushDisabled = errors.New("stream push is disabled")
 )
 
 const (
-	hlsInitialSegmentSeconds      = "2"
-	hlsTargetSegmentSeconds       = "2"
-	hlsStartupSegmentAheadTimeout = 2500 * time.Millisecond
-	// inputReadRate caps ffmpeg's input reading at 2.5x realtime. The player
-	// supports up to 2x playback speed, so 2.5x keeps ahead of the fastest
-	// consumer while spreading transcode CPU over the watch session instead of
-	// finishing the whole file in an early full-speed burst. Abandoned or paused
-	// sessions stop growing shortly after the client stops pulling segments.
-	inputReadRate = "2.5"
+	hlsInitialSegmentSeconds       = "2"
+	hlsTargetSegmentSeconds        = "2"
+	hlsStartupTranscodeLeadTimeout = 12 * time.Second
+	hlsSegmentPattern              = "segment-%05d.m4s"
+	hlsInitFilename                = "init.mp4"
+	hlsFirstSegmentName            = "segment-00000.m4s"
+	hlsFourthSegmentName           = "segment-00003.m4s"
+	// Remux (stream-copy) can run tens of times realtime, so it stays capped at
+	// 2.5x. Hardware transcode follows the client with pause/resume. Software
+	// libx264 is CPU-bound, so it keeps a modest readrate ceiling.
+	inputReadRateRemux    = "2.5"
+	inputReadRateSoftware = "1.5"
 )
 
 // Config holds playback stream push settings including ffmpeg invocation and session lifecycle.
@@ -64,14 +67,20 @@ type Session struct {
 }
 
 type sessionState struct {
-	mu             sync.RWMutex
-	session        Session
-	cancel         context.CancelFunc
-	cmd            *exec.Cmd
-	waitCh         chan error
-	lastAccessedAt time.Time
-	finishedAt     time.Time
-	lastError      string
+	mu                 sync.RWMutex
+	session            Session
+	cancel             context.CancelFunc
+	cmd                *exec.Cmd
+	waitCh             chan error
+	lastAccessedAt     time.Time
+	finishedAt         time.Time
+	lastError          string
+	encoderSpeed       string
+	writtenDurationSec float64
+	lastSeekKind       string
+	stdin              io.WriteCloser
+	throttlePaused     bool
+	lastRequestedSec   float64
 }
 
 type transcodeProfile struct {
@@ -87,6 +96,7 @@ type StartHLSSessionOptions struct {
 	PreferRemux      bool
 	SourceVideoCodec string
 	SourceAudioCodec string
+	SourceContainer  string
 }
 
 type buildProfileOptions struct {
@@ -95,8 +105,13 @@ type buildProfileOptions struct {
 	// RemuxInputSeekSec enables the stream-copy remux profile when non-nil; the
 	// pointed value is the keyframe-aligned input seek for that session.
 	RemuxInputSeekSec *float64
-	SourceVideoCodec  string
-	SourceAudioCodec  string
+	// TranscodeKeyframeSec is the last keyframe at or before StartPositionSec.
+	// Nil means the probe missed or was not needed (start at zero).
+	TranscodeKeyframeSec *float64
+	SourceVideoCodec     string
+	SourceAudioCodec     string
+	SourceContainer      string
+	SourcePath           string
 	// EncoderAvailability filters hardware encoder profiles; nil keeps every
 	// candidate so capability-unknown setups keep the try-and-fail chain.
 	EncoderAvailability map[string]bool
@@ -128,8 +143,11 @@ type SessionSnapshot struct {
 	ExpiresAt      time.Time
 	FinishedAt     time.Time
 	// State is a coarse lifecycle label exposed to diagnostics endpoints.
-	State     string
-	LastError string
+	State              string
+	LastError          string
+	EncoderSpeed       string
+	WrittenDurationSec float64
+	LastSeekKind       string
 }
 
 const recentSessionHistoryLimit = 32
@@ -215,7 +233,7 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	}
 
 	playlistPath := filepath.Join(dir, "index.m3u8")
-	segmentPattern := "segment-%05d.ts"
+	segmentPattern := hlsSegmentPattern
 
 	cmdName := resolveFFmpegCommand(cfg.FFmpegCommand)
 	preferredProfile := ""
@@ -225,13 +243,17 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	if options.StartPositionSec < 0 {
 		options.StartPositionSec = 0
 	}
+	keyframe := probeStartKeyframe(ctx, cfg, sourcePath, options.StartPositionSec)
 	profiles := buildTranscodeProfiles(cfg, sourcePath, segmentPattern, "index.m3u8", buildProfileOptions{
-		PreferredProfile:    preferredProfile,
-		StartPositionSec:    options.StartPositionSec,
-		RemuxInputSeekSec:   resolveRemuxInputSeek(ctx, cfg, sourcePath, options),
-		SourceVideoCodec:    options.SourceVideoCodec,
-		SourceAudioCodec:    options.SourceAudioCodec,
-		EncoderAvailability: m.encoderAvailabilitySnapshot(cmdName, 2*time.Second),
+		PreferredProfile:     preferredProfile,
+		StartPositionSec:     options.StartPositionSec,
+		RemuxInputSeekSec:    remuxSeekFromKeyframe(options, keyframe),
+		TranscodeKeyframeSec: keyframe,
+		SourceVideoCodec:     options.SourceVideoCodec,
+		SourceAudioCodec:     options.SourceAudioCodec,
+		SourceContainer:      options.SourceContainer,
+		SourcePath:           sourcePath,
+		EncoderAvailability:  m.encoderAvailabilitySnapshot(cmdName, 2*time.Second),
 	})
 
 	var lastErr error
@@ -277,6 +299,11 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	if cleanName == "." || cleanName == "" || strings.Contains(cleanName, "..") {
 		return "", ErrSessionNotFound
 	}
+	if strings.HasSuffix(strings.ToLower(cleanName), ".tmp") {
+		return "", ErrSessionNotFound
+	}
+	noteRequestedHLSFile(state, cleanName)
+	state.maybeThrottle()
 	abs := filepath.Join(state.session.Directory, cleanName)
 	rel, err := filepath.Rel(state.session.Directory, abs)
 	if err != nil || strings.HasPrefix(rel, "..") {
@@ -547,7 +574,11 @@ func startTranscodeSession(
 	runCtx, cancel := context.WithCancel(context.Background())
 	cmd := executil.CommandContext(runCtx, cmdName, profile.Args...)
 	cmd.Dir = dir
-	cmd.Stdout = io.Discard
+	stdout, stdoutErr := cmd.StdoutPipe()
+	if stdoutErr != nil {
+		cmd.Stdout = io.Discard
+	}
+	stdin, stdinErr := cmd.StdinPipe()
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
@@ -570,6 +601,16 @@ func startTranscodeSession(
 		cmd:            cmd,
 		waitCh:         make(chan error, 1),
 		lastAccessedAt: time.Now().UTC(),
+		lastSeekKind:   sessionSeekKindForOrigin(profile.TimelineOriginSec),
+	}
+	if stdinErr == nil {
+		state.stdin = stdin
+	}
+	if stdoutErr == nil {
+		go consumeFFmpegProgress(stdout, func(parsed ffmpegProgress) {
+			state.applyProgress(parsed)
+			state.maybeThrottle()
+		})
 	}
 
 	go func() {
@@ -583,7 +624,13 @@ func startTranscodeSession(
 		stderrText := strings.TrimSpace(stderr.String())
 		return nil, fmt.Errorf("%s session failed: %w: %s", profile.Name, err, stderrText)
 	}
-	firstSegmentPath := filepath.Join(dir, "segment-00000.ts")
+	initPath := filepath.Join(dir, hlsInitFilename)
+	if err := waitForNonEmptyFileOrProcessExit(ctx, initPath, state.waitCh, 8*time.Second); err != nil {
+		cancel()
+		stderrText := strings.TrimSpace(stderr.String())
+		return nil, fmt.Errorf("%s fMP4 init failed: %w: %s", profile.Name, err, stderrText)
+	}
+	firstSegmentPath := filepath.Join(dir, hlsFirstSegmentName)
 	if err := waitForNonEmptyFileOrProcessExit(ctx, firstSegmentPath, state.waitCh, 8*time.Second); err != nil {
 		cancel()
 		stderrText := strings.TrimSpace(stderr.String())
@@ -594,58 +641,56 @@ func startTranscodeSession(
 		stderrText := strings.TrimSpace(stderr.String())
 		return nil, fmt.Errorf("%s playlist readiness failed: %w: %s", profile.Name, err, stderrText)
 	}
-	secondSegmentPath := filepath.Join(dir, "segment-00001.ts")
-	if _, err := waitForPlaylistSegmentReferenceOptional(ctx, playlistPath, filepath.Base(secondSegmentPath), state.waitCh, hlsStartupSegmentAheadTimeout); err != nil {
-		cancel()
-		stderrText := strings.TrimSpace(stderr.String())
-		return nil, fmt.Errorf("%s startup buffer failed: %w: %s", profile.Name, err, stderrText)
+	if profile.SessionKind == "transcode-hls" {
+		if _, err := waitForPlaylistSegmentReferenceOptional(ctx, playlistPath, hlsFourthSegmentName, state.waitCh, hlsStartupTranscodeLeadTimeout); err != nil {
+			cancel()
+			stderrText := strings.TrimSpace(stderr.String())
+			return nil, fmt.Errorf("%s startup buffer failed: %w: %s", profile.Name, err, stderrText)
+		}
 	}
 
 	return state, nil
 }
 
 func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, options buildProfileOptions) []transcodeProfile {
-	inputPrefix := []string{"-y", "-readrate", inputReadRate}
-	if cfg.HardwareDecode {
-		inputPrefix = append(inputPrefix, "-hwaccel", "auto")
-	}
-	seekPlan := buildSeekPlan(options.StartPositionSec)
+	remuxInputPrefix := buildHLSInputPrefix(inputReadRateRemux)
+	transcodeInputPrefix := buildHLSInputPrefix("")
+	seekPlan := buildTranscodeSeekPlan(options)
 	inputSeekArgs, accurateSeekArgs := seekPlan.InputArgs, seekPlan.AccurateArgs
 	configuredPreference := normalizeHardwareEncoderProfileName(cfg.HardwareEncoder)
 
-	transcodeHLSArgs := []string{
-		"-pix_fmt", "yuv420p",
-		"-c:a", "aac",
-		"-ac", "2",
-		"-force_key_frames", "expr:gte(t,n_forced*2)",
+	hlsMuxerArgs := []string{
 		"-f", "hls",
+		"-hls_segment_type", "fmp4",
+		"-hls_fmp4_init_filename", hlsInitFilename,
 		"-hls_init_time", hlsInitialSegmentSeconds,
 		"-hls_time", hlsTargetSegmentSeconds,
 		"-hls_list_size", "0",
 		"-hls_allow_cache", "0",
-		"-hls_flags", "independent_segments",
+		"-hls_flags", "independent_segments+temp_file",
 		"-hls_playlist_type", "event",
 		"-start_number", "0",
 		"-hls_segment_filename", segmentPattern,
 		playlistPath,
 	}
-	remuxHLSArgs := []string{
+	transcodeHLSArgs := append([]string{
+		"-fps_mode", "cfr",
+		"-pix_fmt", "yuv420p",
+		"-c:a", "aac",
+		"-ac", "2",
+		"-force_key_frames", "expr:gte(t,n_forced*2)",
+	}, hlsMuxerArgs...)
+	remuxHLSArgs := append([]string{
 		"-c:v", "copy",
 		"-c:a", "copy",
 		// Mid-stream stream-copy starts keep their original timestamps, so force
 		// the segment media timeline to begin at zero (= TimelineOriginSec).
 		"-avoid_negative_ts", "make_zero",
-		"-f", "hls",
-		"-hls_init_time", hlsInitialSegmentSeconds,
-		"-hls_time", hlsTargetSegmentSeconds,
-		"-hls_list_size", "0",
-		"-hls_allow_cache", "0",
-		"-hls_flags", "independent_segments",
-		"-hls_playlist_type", "event",
-		"-start_number", "0",
-		"-hls_segment_filename", segmentPattern,
-		playlistPath,
-	}
+		"-fflags", "+genpts",
+		"-muxdelay", "0",
+		"-muxpreload", "0",
+	}, hlsMuxerArgs...)
+	remuxInputPrefix = append(remuxInputPrefix, "-ignore_editlist", "1")
 
 	remuxTimelineOrigin := 0.0
 	remuxInputSeekArgs := []string(nil)
@@ -662,7 +707,7 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 			Name:              "remux_copy",
 			SessionKind:       "remux-hls",
 			TimelineOriginSec: remuxTimelineOrigin,
-			Args:              buildProfileArgs(inputPrefix, remuxInputSeekArgs, sourcePath, nil, nil, remuxHLSArgs),
+			Args:              buildProfileArgs(remuxInputPrefix, remuxInputSeekArgs, sourcePath, nil, nil, remuxHLSArgs),
 		})
 	}
 	if cfg.HardwareDecode {
@@ -670,11 +715,15 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 			if !encoderAllowed(options.EncoderAvailability, spec.Name) {
 				continue
 			}
+			hwPrefix := transcodeInputPrefix
+			if len(spec.InputArgs) > 0 {
+				hwPrefix = append(append([]string{}, transcodeInputPrefix...), spec.InputArgs...)
+			}
 			profiles = append(profiles, transcodeProfile{
 				Name:              spec.Name,
 				SessionKind:       "transcode-hls",
-				TimelineOriginSec: seekPlan.RequestedStartSec,
-				Args:              buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs, spec.EncoderArgs, transcodeHLSArgs),
+				TimelineOriginSec: seekPlan.TimelineOriginSec,
+				Args:              buildProfileArgs(hwPrefix, inputSeekArgs, sourcePath, accurateSeekArgs, spec.EncoderArgs, transcodeHLSArgs),
 			})
 		}
 	}
@@ -682,29 +731,49 @@ func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string
 	if configuredPreference != "" {
 		options.PreferredProfile = configuredPreference
 	}
-	if options.PreferredProfile != "" {
-		for idx, profile := range profiles {
-			if profile.Name != options.PreferredProfile {
-				continue
-			}
-			if idx > 0 {
-				profiles[0], profiles[idx] = profiles[idx], profiles[0]
-			}
-			break
-		}
-	}
+	profiles = preferHardwareTranscodeProfile(profiles, options.PreferredProfile)
 
+	softwarePrefix := buildHLSInputPrefix(inputReadRateSoftware)
 	profiles = append(profiles, transcodeProfile{
 		Name:              "libx264",
 		SessionKind:       "transcode-hls",
-		TimelineOriginSec: seekPlan.RequestedStartSec,
-		Args: buildProfileArgs(inputPrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
-			[]string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "17"}, transcodeHLSArgs),
+		TimelineOriginSec: seekPlan.TimelineOriginSec,
+		Args: buildProfileArgs(softwarePrefix, inputSeekArgs, sourcePath, accurateSeekArgs,
+			[]string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "22"}, transcodeHLSArgs),
 	})
 	if configuredPreference == "libx264" {
 		return []transcodeProfile{profiles[len(profiles)-1]}
 	}
 	return profiles
+}
+
+func preferHardwareTranscodeProfile(profiles []transcodeProfile, name string) []transcodeProfile {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "libx264" || name == "remux_copy" {
+		return profiles
+	}
+	start := 0
+	if len(profiles) > 0 && profiles[0].SessionKind == "remux-hls" {
+		start = 1
+	}
+	for idx := start; idx < len(profiles); idx++ {
+		if profiles[idx].Name != name {
+			continue
+		}
+		if idx > start {
+			profiles[start], profiles[idx] = profiles[idx], profiles[start]
+		}
+		break
+	}
+	return profiles
+}
+
+func buildHLSInputPrefix(readRate string) []string {
+	prefix := []string{"-y", "-progress", "pipe:1"}
+	if strings.TrimSpace(readRate) != "" {
+		prefix = append(prefix, "-readrate", readRate)
+	}
+	return prefix
 }
 
 // buildProfileArgs assembles one ffmpeg command line shared by every profile:
@@ -721,11 +790,18 @@ func buildProfileArgs(inputPrefix []string, inputSeekArgs []string, sourcePath s
 	return args
 }
 
-// resolveRemuxInputSeek decides whether a stream-copy session can serve this
-// start request. Start-at-zero always can; mid-stream starts must align to the
-// last keyframe at or before the requested position, otherwise accurate
-// transcode remains the only option.
-func resolveRemuxInputSeek(ctx context.Context, cfg Config, sourcePath string, options StartHLSSessionOptions) *float64 {
+func probeStartKeyframe(ctx context.Context, cfg Config, sourcePath string, startPositionSec float64) *float64 {
+	if startPositionSec <= 0.001 {
+		return nil
+	}
+	keyframeSec, ok := probeKeyframeAtOrBeforeFunc(ctx, sourcePath, cfg.FFmpegCommand, startPositionSec, keyframeProbeWindowSec)
+	if !ok {
+		return nil
+	}
+	return &keyframeSec
+}
+
+func remuxSeekFromKeyframe(options StartHLSSessionOptions, keyframe *float64) *float64 {
 	if !options.PreferRemux {
 		return nil
 	}
@@ -736,11 +812,15 @@ func resolveRemuxInputSeek(ctx context.Context, cfg Config, sourcePath string, o
 		zero := 0.0
 		return &zero
 	}
-	keyframeSec, ok := probeKeyframeAtOrBeforeFunc(ctx, sourcePath, cfg.FFmpegCommand, options.StartPositionSec, keyframeProbeWindowSec)
-	if !ok {
-		return nil
-	}
-	return &keyframeSec
+	return keyframe
+}
+
+// resolveRemuxInputSeek decides whether a stream-copy session can serve this
+// start request. Start-at-zero always can; mid-stream starts must align to the
+// last keyframe at or before the requested position, otherwise transcode remains
+// the fallback.
+func resolveRemuxInputSeek(ctx context.Context, cfg Config, sourcePath string, options StartHLSSessionOptions) *float64 {
+	return remuxSeekFromKeyframe(options, probeStartKeyframe(ctx, cfg, sourcePath, options.StartPositionSec))
 }
 
 func formatSeekOffset(startPositionSec float64) string {
@@ -752,13 +832,57 @@ func formatSeekOffset(startPositionSec float64) string {
 
 type seekPlan struct {
 	RequestedStartSec float64
+	TimelineOriginSec float64
 	InputSeekSec      float64
 	AccurateSeekSec   float64
 	InputArgs         []string
 	AccurateArgs      []string
 }
 
-func buildSeekPlan(startPositionSec float64) seekPlan {
+func needsSlowTranscodeSeek(container string, sourcePath string) bool {
+	name := strings.ToLower(strings.TrimSpace(container))
+	if name == "" {
+		name = strings.TrimPrefix(strings.ToLower(filepath.Ext(strings.TrimSpace(sourcePath))), ".")
+	}
+	switch name {
+	case "avi", "wmv", "asf":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildTranscodeSeekPlan(options buildProfileOptions) seekPlan {
+	startPositionSec := options.StartPositionSec
+	if startPositionSec <= 0 {
+		return seekPlan{}
+	}
+	if needsSlowTranscodeSeek(options.SourceContainer, options.SourcePath) {
+		return buildHybridSeekPlan(startPositionSec)
+	}
+	origin := startPositionSec
+	if options.TranscodeKeyframeSec != nil {
+		origin = *options.TranscodeKeyframeSec
+		if origin < 0 {
+			origin = 0
+		}
+	}
+	return buildFastInputSeekPlan(origin, startPositionSec)
+}
+
+func buildFastInputSeekPlan(originSec float64, requestedSec float64) seekPlan {
+	plan := seekPlan{
+		RequestedStartSec: requestedSec,
+		TimelineOriginSec: originSec,
+	}
+	if originSec > 0.001 {
+		plan.InputSeekSec = originSec
+		plan.InputArgs = []string{"-ss", formatSeekOffset(originSec)}
+	}
+	return plan
+}
+
+func buildHybridSeekPlan(startPositionSec float64) seekPlan {
 	plan := seekPlan{}
 	if startPositionSec <= 0 {
 		return plan
@@ -766,6 +890,7 @@ func buildSeekPlan(startPositionSec float64) seekPlan {
 
 	const preciseSeekWindowSec = 2.0
 	plan.RequestedStartSec = startPositionSec
+	plan.TimelineOriginSec = startPositionSec
 	plan.InputSeekSec = startPositionSec - preciseSeekWindowSec
 	if plan.InputSeekSec < 0 {
 		plan.InputSeekSec = 0
@@ -823,7 +948,9 @@ func (m *Manager) replaceSession(sessionID string, state *sessionState, profileN
 		staleStates = append(staleStates, existingState)
 	}
 	m.sessions[sessionID] = state
-	m.lastSuccessfulProfile = profileName
+	if state.session.Kind == "transcode-hls" && profileName != "" && profileName != "libx264" {
+		m.lastSuccessfulProfile = profileName
+	}
 	return staleStates
 }
 
@@ -860,6 +987,13 @@ func stopSessionState(state *sessionState) {
 	if state == nil {
 		return
 	}
+	state.mu.Lock()
+	stdin := state.stdin
+	state.stdin = nil
+	state.mu.Unlock()
+	if stdin != nil {
+		_ = stdin.Close()
+	}
 	if state.cancel != nil {
 		state.cancel()
 	}
@@ -893,6 +1027,58 @@ func (s *sessionState) touchAt(now time.Time) {
 	}
 	s.mu.Lock()
 	s.lastAccessedAt = now
+	s.mu.Unlock()
+}
+
+func (s *sessionState) applyProgress(parsed ffmpegProgress) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if parsed.HasSpeed {
+		s.encoderSpeed = formatEncoderSpeed(parsed.Speed)
+	}
+	if parsed.HasOutTime {
+		s.writtenDurationSec = parsed.OutTimeSec
+	}
+}
+
+func noteRequestedHLSFile(state *sessionState, name string) {
+	if state == nil {
+		return
+	}
+	mediaSec, ok := mediaTimeFromHLSFileName(name, hlsSegmentDurationSec)
+	if !ok {
+		return
+	}
+	state.mu.Lock()
+	if mediaSec > state.lastRequestedSec {
+		state.lastRequestedSec = mediaSec
+	}
+	state.mu.Unlock()
+}
+
+func (s *sessionState) maybeThrottle() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	action := nextThrottleAction(s.throttlePaused, s.writtenDurationSec, s.lastRequestedSec, throttlePauseLeadSec, throttleResumeLeadSec)
+	stdin := s.stdin
+	s.mu.Unlock()
+	if action == throttleNone || stdin == nil {
+		return
+	}
+	key := "u"
+	if action == throttlePause {
+		key = "p"
+	}
+	if _, err := io.WriteString(stdin, key); err != nil {
+		return
+	}
+	s.mu.Lock()
+	s.throttlePaused = action == throttlePause
 	s.mu.Unlock()
 }
 
@@ -935,11 +1121,14 @@ func (s *sessionState) snapshot(timeout time.Duration) SessionSnapshot {
 		lastAccessedAt = s.session.StartedAt
 	}
 	snapshot := SessionSnapshot{
-		Session:        s.session,
-		LastAccessedAt: lastAccessedAt,
-		FinishedAt:     s.finishedAt,
-		State:          "running",
-		LastError:      strings.TrimSpace(s.lastError),
+		Session:            s.session,
+		LastAccessedAt:     lastAccessedAt,
+		FinishedAt:         s.finishedAt,
+		State:              "running",
+		LastError:          strings.TrimSpace(s.lastError),
+		EncoderSpeed:       s.encoderSpeed,
+		WrittenDurationSec: s.writtenDurationSec,
+		LastSeekKind:       s.lastSeekKind,
 	}
 	if timeout > 0 {
 		snapshot.ExpiresAt = lastAccessedAt.Add(timeout)

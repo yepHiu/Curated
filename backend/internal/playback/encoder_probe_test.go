@@ -24,7 +24,7 @@ func TestBuildTranscodeProfilesFiltersUnavailableHardwareEncoders(t *testing.T) 
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: true},
 		"movie.mkv",
-		"segment-%05d.ts",
+		"segment-%05d.m4s",
 		"index.m3u8",
 		buildProfileOptions{EncoderAvailability: availability},
 	)
@@ -48,7 +48,7 @@ func TestBuildTranscodeProfilesKeepsAllEncodersWhenCapabilityUnknown(t *testing.
 	profiles := buildTranscodeProfiles(
 		Config{HardwareDecode: true},
 		"movie.mkv",
-		"segment-%05d.ts",
+		"segment-%05d.m4s",
 		"index.m3u8",
 		buildProfileOptions{EncoderAvailability: nil},
 	)
@@ -106,6 +106,37 @@ func TestEncoderAvailabilitySnapshotCachesPerCommand(t *testing.T) {
 	probeEncoderRuntimeFunc = func(cmdName string, encoder string) bool { return false }
 	if snapshot := manager.encoderAvailabilitySnapshot("ffmpeg-two", 0); snapshot != nil {
 		t.Fatalf("expected separate in-flight probe for the second command, got %v", snapshot)
+	}
+}
+
+func TestHardwareEncoderSpecsUseRealtimePresets(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Skip("realtime NVENC/QSV/AMF presets are Windows-only in this phase")
+	}
+	specs := hardwareEncoderSpecs()
+	joined := make(map[string]string, len(specs))
+	for _, spec := range specs {
+		joined[spec.Name] = strings.Join(spec.EncoderArgs, " ")
+	}
+	if args := joined["h264_nvenc"]; !strings.Contains(args, "-preset p4") || !strings.Contains(args, "-cq 23") {
+		t.Fatalf("h264_nvenc args = %q, want realtime p4 cq 23", args)
+	}
+	if args := joined["h264_qsv"]; !strings.Contains(args, "-preset fast") || !strings.Contains(args, "-global_quality 24") {
+		t.Fatalf("h264_qsv args = %q, want realtime fast global_quality 24", args)
+	}
+	if args := joined["h264_amf"]; !strings.Contains(args, "-quality speed") {
+		t.Fatalf("h264_amf args = %q, want realtime quality speed", args)
+	}
+	inputs := make(map[string]string, len(specs))
+	for _, spec := range specs {
+		inputs[spec.Name] = strings.Join(spec.InputArgs, " ")
+	}
+	if args := inputs["h264_amf"]; args != "-hwaccel d3d11va" {
+		t.Fatalf("h264_amf input args = %q, want -hwaccel d3d11va", args)
+	}
+	if args := inputs["h264_qsv"]; args != "-hwaccel qsv" {
+		t.Fatalf("h264_qsv input args = %q, want -hwaccel qsv", args)
 	}
 }
 

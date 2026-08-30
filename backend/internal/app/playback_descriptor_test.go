@@ -206,8 +206,8 @@ func TestBuildPlaybackDecisionHonorsClientVideoCodecs(t *testing.T) {
 			VideoCodec: "vp9",
 			AudioCodec: "opus",
 		},
-		StreamPushEnabled:   true,
-		ClientVideoCodecs:   []string{"h264"},
+		StreamPushEnabled: true,
+		ClientVideoCodecs: []string{"h264"},
 	})
 	if webm.Mode != contracts.PlaybackModeDirect {
 		t.Fatalf("webm mode = %q, want direct; client codecs only narrow the mp4 family", webm.Mode)
@@ -230,5 +230,145 @@ func TestBuildPlaybackDecisionTreatsUnknownCodecAsUnsupportedWhenClientNarrows(t
 
 	if decision.Mode != contracts.PlaybackModeHLS {
 		t.Fatalf("mode = %q, want hls for unknown codec under an explicit capability set", decision.Mode)
+	}
+}
+
+func TestBuildPlaybackDecisionRemuxesUnstableTimestampsWhenStreamPushEnabled(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-vfr.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:    "mp4",
+			VideoCodec:   "h264",
+			AudioCodec:   "aac",
+			RFrameRate:   "60/1",
+			AvgFrameRate: "24/1",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeHLS)
+	}
+	if decision.SessionKind != playbackSessionKindRemuxHLS {
+		t.Fatalf("sessionKind = %q, want %q", decision.SessionKind, playbackSessionKindRemuxHLS)
+	}
+	if !decision.PreferRemux {
+		t.Fatal("expected remux-first HLS for h264/aac with unstable timestamps")
+	}
+	if decision.CanDirectPlay {
+		t.Fatal("unstable timestamps must not stay on browser direct play")
+	}
+	if decision.ReasonCode != "source_timestamps_unstable" {
+		t.Fatalf("reasonCode = %q, want source_timestamps_unstable", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionKeepsDirectPlayWhenStreamPushDisabledDespiteUnstableTimestamps(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-vfr.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:    "mp4",
+			VideoCodec:   "h264",
+			AudioCodec:   "aac",
+			RFrameRate:   "60/1",
+			AvgFrameRate: "24/1",
+		},
+		StreamPushEnabled: false,
+	})
+
+	if decision.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeDirect)
+	}
+	if decision.SessionKind != playbackSessionKindDirectFile {
+		t.Fatalf("sessionKind = %q, want %q", decision.SessionKind, playbackSessionKindDirectFile)
+	}
+	if decision.ReasonCode != "browser_direct_play_supported" {
+		t.Fatalf("reasonCode = %q, want browser_direct_play_supported", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionTranscodesUnstableTimestampsWhenRemuxIneligible(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-hevc-vfr.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:    "mp4",
+			VideoCodec:   "hevc",
+			AudioCodec:   "aac",
+			RFrameRate:   "60/1",
+			AvgFrameRate: "24/1",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeHLS)
+	}
+	if decision.SessionKind != playbackSessionKindTranscodeHLS {
+		t.Fatalf("sessionKind = %q, want transcode-hls; hevc is not remux-eligible", decision.SessionKind)
+	}
+	if decision.PreferRemux {
+		t.Fatal("hevc must not request remux")
+	}
+	if decision.ReasonCode != "source_timestamps_unstable" {
+		t.Fatalf("reasonCode = %q, want source_timestamps_unstable", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionKeepsDirectPlayForMatchingFrameRates(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\media\\movie-cfr.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:    "mp4",
+			VideoCodec:   "h264",
+			AudioCodec:   "aac",
+			RFrameRate:   "30000/1001",
+			AvgFrameRate: "30/1",
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeDirect {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeDirect)
+	}
+	if decision.ReasonCode != "browser_direct_play_supported" {
+		t.Fatalf("reasonCode = %q, want browser_direct_play_supported", decision.ReasonCode)
+	}
+}
+
+func TestBuildPlaybackDecisionTranscodesNegativePrimingPTS(t *testing.T) {
+	t.Parallel()
+
+	decision := buildPlaybackDecision(playbackDecisionInput{
+		Location: "D:\\test_curated\\DVDMS-981\\DVDMS-981.mp4",
+		MediaInfo: playback.MediaInfo{
+			Container:           "mp4",
+			VideoCodec:          "h264",
+			AudioCodec:          "aac",
+			RFrameRate:          "30000/1001",
+			AvgFrameRate:        "1283454521/42825027",
+			HasNegativeVideoPTS: true,
+		},
+		StreamPushEnabled: true,
+	})
+
+	if decision.Mode != contracts.PlaybackModeHLS {
+		t.Fatalf("mode = %q, want %q", decision.Mode, contracts.PlaybackModeHLS)
+	}
+	if decision.SessionKind != playbackSessionKindTranscodeHLS {
+		t.Fatalf("sessionKind = %q, want transcode-hls for negative priming PTS", decision.SessionKind)
+	}
+	if decision.PreferRemux {
+		t.Fatal("negative priming PTS must not stay on stream-copy remux")
+	}
+	if decision.ReasonCode != "source_timestamps_unstable" {
+		t.Fatalf("reasonCode = %q, want source_timestamps_unstable", decision.ReasonCode)
 	}
 }

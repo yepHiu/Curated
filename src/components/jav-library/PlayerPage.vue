@@ -115,8 +115,19 @@ import {
   formatSourceFormatLabel,
   formatTimecodeLabel,
   formatTranscodeProfileLabel,
+  formatEncoderSpeedLabel,
+  formatSeekKindLabel,
   isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
+import {
+  HLS_STARTUP_BUFFER_SEC,
+  HLS_STARTUP_BUFFER_WAIT_MS,
+  getMediaWrittenEndSec,
+  hlsSeekReuseLeadSec,
+  isPrematureHlsEndedEvent,
+  shouldReuseHlsSessionForSeek,
+  waitForMediaWrittenEnd,
+} from "@/lib/player-hls-seek"
 import {
   clampAbsolutePlaybackTarget as clampPlaybackTarget,
   formatPlaybackClock as formatClock,
@@ -255,6 +266,14 @@ const playbackStats = ref<PlaybackStatsState>({
   height: null,
   fps: null,
 })
+const sessionDiagnostics = ref({
+  encoderSpeed: "",
+  writtenDurationSec: null as number | null,
+  lastSeekKind: "",
+})
+const SESSION_DIAGNOSTICS_POLL_MS = 1000
+let sessionDiagnosticsPollId: number | null = null
+let sessionDiagnosticsPollGen = 0
 let frameCallbackId: number | null = null
 let fallbackFpsTimer: number | null = null
 let fpsSampleWindowStartAt = 0
@@ -273,11 +292,13 @@ let lastProgressSaveAt = 0
 let moviePlaybackStartedAtMs = 0
 let restartedFromNearEnd = false
 let playbackLoadSeq = 0
+let hlsWindowWaitGeneration = 0
 let hlsDirectFallbackInFlight = false
 let playbackFallbackNoticeKey = ""
 let playbackSessionCleanupId: string | null = null
 let resumePlaybackWhenReady = false
 let hlsPrewarmSeq = 0
+let hlsStartupBufferPending = false
 let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
 
 const playbackSrc = ref<string | null>(null)
@@ -687,6 +708,61 @@ watch([isPlaying, playbackSrc, optimisticSeekTargetSec, isPlaybackWaiting], () =
   syncPlaybackClockLoopState()
 }, { immediate: true })
 
+function stopSessionDiagnosticsPoll() {
+  if (sessionDiagnosticsPollId !== null) {
+    window.clearInterval(sessionDiagnosticsPollId)
+    sessionDiagnosticsPollId = null
+  }
+}
+
+function markHlsSeekKind(kind: "reuse" | "swap") {
+  sessionDiagnostics.value = {
+    ...sessionDiagnostics.value,
+    lastSeekKind: kind,
+  }
+}
+
+async function refreshSessionDiagnostics(sessionId: string, gen: number) {
+  const status = await libraryService.getPlaybackSession(sessionId)
+  if (gen !== sessionDiagnosticsPollGen) return
+  if (!status) return
+  const localKind = sessionDiagnostics.value.lastSeekKind
+  const written = status.writtenDurationSec
+  sessionDiagnostics.value = {
+    encoderSpeed: status.encoderSpeed?.trim() || sessionDiagnostics.value.encoderSpeed,
+    writtenDurationSec:
+      written != null && Number.isFinite(written) ? written : sessionDiagnostics.value.writtenDurationSec,
+    lastSeekKind: localKind === "reuse" ? "reuse" : status.lastSeekKind?.trim() || localKind,
+  }
+}
+
+function syncSessionDiagnosticsPoll() {
+  stopSessionDiagnosticsPoll()
+  const sessionId = playbackDescriptor.value?.sessionId?.trim() || ""
+  if (!sessionId || playbackDescriptor.value?.mode !== "hls") {
+    sessionDiagnosticsPollGen += 1
+    sessionDiagnostics.value = {
+      encoderSpeed: "",
+      writtenDurationSec: null,
+      lastSeekKind: "",
+    }
+    return
+  }
+  const gen = ++sessionDiagnosticsPollGen
+  void refreshSessionDiagnostics(sessionId, gen)
+  sessionDiagnosticsPollId = window.setInterval(() => {
+    void refreshSessionDiagnostics(sessionId, gen)
+  }, SESSION_DIAGNOSTICS_POLL_MS)
+}
+
+watch(
+  () => playbackDescriptor.value?.sessionId,
+  () => {
+    syncSessionDiagnosticsPoll()
+  },
+  { immediate: true },
+)
+
 watch(
   playbackSrc,
   async (src) => {
@@ -751,6 +827,7 @@ async function syncVideoSource() {
     playbackError.value = t("player.decodeError")
   }
   if (mode === "hls") {
+    hlsStartupBufferPending = true
     if (shouldResetVideoElementBeforeModeAttach(previousMode, "hls")) {
       resetVideoElementPlaybackPipeline(v)
     }
@@ -860,6 +937,23 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
   resumePlaybackWhenReady = false
   playbackError.value = ""
 
+  if (playbackMode === "hls" && hlsStartupBufferPending) {
+    const waitGen = hlsWindowWaitGeneration
+    isPlaybackWaiting.value = true
+    await waitForMediaWrittenEnd(v, HLS_STARTUP_BUFFER_SEC, {
+      timeoutMs: HLS_STARTUP_BUFFER_WAIT_MS,
+      isAborted: () => waitGen !== hlsWindowWaitGeneration || videoRef.value !== v,
+    })
+    if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v || !playbackSrc.value) {
+      resumePlaybackWhenReady = shouldResumePlayback
+      if (shouldHandleRouteAutoplay) {
+        autoplayConsumedForMovieId.value = null
+      }
+      return false
+    }
+    hlsStartupBufferPending = false
+  }
+
   try {
     await v.play()
     if (shouldHandleRouteAutoplay) {
@@ -908,6 +1002,7 @@ function syncSrc() {
 
 async function loadPlayback() {
   const seq = ++playbackLoadSeq
+  hlsWindowWaitGeneration += 1
   const movieId = props.movie.id.trim()
   if (!movieId) {
     if (seq === playbackLoadSeq) {
@@ -1101,6 +1196,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  hlsWindowWaitGeneration += 1
   flushPlaybackProgress()
   stopCurrentVideoPlaybackPipeline()
 })
@@ -1118,6 +1214,7 @@ onUnmounted(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
   stopPlaybackClockSyncLoop()
+  stopSessionDiagnosticsPoll()
   if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
   if (clipPollTimer !== null) clearTimeout(clipPollTimer)
   if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
@@ -1468,6 +1565,18 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
 }
 
 function onVideoEnded() {
+  if (
+    playbackDescriptor.value?.mode === "hls" &&
+    isPrematureHlsEndedEvent({
+      absoluteTimeSec: getAbsolutePlaybackTime(),
+      totalDurationSec: totalDurationSec.value,
+    })
+  ) {
+    isPlaybackWaiting.value = true
+    publishActivePlaybackSession("waiting")
+    void resumeHlsAfterWindowExhaustion()
+    return
+  }
   watchTimeTracker.onPause(getAbsolutePlaybackTime())
   flushPlaybackProgress()
   isPlaying.value = false
@@ -1698,6 +1807,7 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
   const previousSessionId = currentDescriptor.sessionId
   const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
   const seq = ++playbackLoadSeq
+  hlsWindowWaitGeneration += 1
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   isPlaybackWaiting.value = shouldEnterSeekWaitingState(nextMode)
@@ -2302,6 +2412,19 @@ function clampAbsolutePlaybackTarget(targetSec: number): number {
   return clampPlaybackTarget(targetSec, totalDurationSec.value)
 }
 
+async function resumeHlsAfterWindowExhaustion() {
+  const v = videoRef.value
+  if (!v || playbackDescriptor.value?.mode !== "hls") return
+  const waitGen = ++hlsWindowWaitGeneration
+  const catchUpTarget = getMediaWrittenEndSec(v) + 0.6
+  const caughtUp = await waitForMediaWrittenEnd(v, catchUpTarget, {
+    isAborted: () => waitGen !== hlsWindowWaitGeneration,
+  })
+  if (waitGen !== hlsWindowWaitGeneration || !caughtUp || videoRef.value !== v) return
+  resumePlaybackWhenReady = true
+  void tryStartPlaybackIfRequested()
+}
+
 async function seekToAbsolutePlaybackTime(
   targetSec: number,
   options: {
@@ -2327,27 +2450,53 @@ async function seekToAbsolutePlaybackTime(
   }
 
   const localTarget = clampedTarget - playbackTimelineOffsetSec(descriptor)
-  const localDuration = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
+  const writtenEnd = getMediaWrittenEndSec(v)
+  const waitGen = ++hlsWindowWaitGeneration
+  const shouldResumePlayback = options.resumeAfterSwap || (isPlaying.value && !v.paused)
   if (
-    !options.forceSessionSwap &&
-    localTarget >= 0 &&
-    (localDuration <= 0 || localTarget <= localDuration + 0.25)
+    shouldReuseHlsSessionForSeek({
+      forceSessionSwap: options.forceSessionSwap,
+      localTargetSec: localTarget,
+      writtenEndSec: writtenEnd,
+      reuseLeadSec: hlsSeekReuseLeadSec(descriptor.sessionKind),
+    })
   ) {
-    v.currentTime = localTarget
-    currentTime.value = clampedTarget
-    return
+    if (localTarget > writtenEnd + 0.25) {
+      if (shouldResumePlayback) {
+        v.pause()
+      }
+      const caughtUp = await waitForMediaWrittenEnd(v, localTarget, {
+        isAborted: () => waitGen !== hlsWindowWaitGeneration,
+      })
+      if (waitGen !== hlsWindowWaitGeneration) return
+      if (caughtUp && videoRef.value === v) {
+        v.currentTime = localTarget
+        currentTime.value = clampedTarget
+        markHlsSeekKind("reuse")
+        if (shouldResumePlayback) {
+          resumePlaybackWhenReady = true
+          void tryStartPlaybackIfRequested()
+        }
+        return
+      }
+    } else {
+      v.currentTime = localTarget
+      currentTime.value = clampedTarget
+      markHlsSeekKind("reuse")
+      return
+    }
   }
 
   const movieId = props.movie.id.trim()
   if (!movieId) return
   const previousSessionId = descriptor.sessionId
-  const shouldResumePlayback = options.resumeAfterSwap || (isPlaying.value && !videoRef.value?.paused)
   const seq = ++playbackLoadSeq
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   playbackError.value = ""
 
   try {
+    markHlsSeekKind("swap")
     const nextDescriptor = await libraryService.createPlaybackSession(
       movieId,
       "hls",
@@ -2461,6 +2610,21 @@ const playbackStatsRows = computed(() => {
       key: "transcode-profile",
       label: "Transcoder",
       value: formatTranscodeProfileLabel(descriptor?.transcodeProfile),
+    },
+    {
+      key: "encoder-speed",
+      label: "Encoder Speed",
+      value: formatEncoderSpeedLabel(sessionDiagnostics.value.encoderSpeed),
+    },
+    {
+      key: "written-window",
+      label: "Written Window",
+      value: formatTimecodeLabel(sessionDiagnostics.value.writtenDurationSec),
+    },
+    {
+      key: "last-seek",
+      label: "Last Seek",
+      value: formatSeekKindLabel(sessionDiagnostics.value.lastSeekKind),
     },
     {
       key: "reason-code",

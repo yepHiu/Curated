@@ -14,6 +14,7 @@ import (
 // both profile building and runtime capability probing.
 type hwEncoderProfileSpec struct {
 	Name        string
+	InputArgs   []string
 	EncoderArgs []string
 }
 
@@ -21,9 +22,9 @@ func hardwareEncoderSpecs() []hwEncoderProfileSpec {
 	switch runtime.GOOS {
 	case "windows":
 		return []hwEncoderProfileSpec{
-			{Name: "h264_nvenc", EncoderArgs: []string{"-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19"}},
-			{Name: "h264_qsv", EncoderArgs: []string{"-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "20"}},
-			{Name: "h264_amf", EncoderArgs: []string{"-c:v", "h264_amf", "-quality", "quality"}},
+			{Name: "h264_nvenc", InputArgs: []string{"-hwaccel", "d3d11va"}, EncoderArgs: []string{"-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23"}},
+			{Name: "h264_qsv", InputArgs: []string{"-hwaccel", "qsv"}, EncoderArgs: []string{"-c:v", "h264_qsv", "-preset", "fast", "-global_quality", "24"}},
+			{Name: "h264_amf", InputArgs: []string{"-hwaccel", "d3d11va"}, EncoderArgs: []string{"-c:v", "h264_amf", "-quality", "speed"}},
 		}
 	case "darwin":
 		return []hwEncoderProfileSpec{

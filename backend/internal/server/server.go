@@ -1124,6 +1124,8 @@ func (h *Handler) handleGetPlaybackSessionFile(w http.ResponseWriter, r *http.Re
 		return
 	case ".ts":
 		w.Header().Set("Content-Type", "video/mp2t")
+	case ".m4s", ".mp4":
+		w.Header().Set("Content-Type", "video/mp4")
 	}
 
 	http.ServeFile(w, r, absPath)

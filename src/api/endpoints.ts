@@ -595,6 +595,10 @@ export const api = {
     )
   },
 
+  getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO> {
+    return httpClient.get<PlaybackSessionStatusDTO>(`/playback/sessions/${encodeURIComponent(sessionId)}`)
+  },
+
   deletePlaybackSession(sessionId: string): Promise<void> {
     return httpClient.delete(`/playback/sessions/${encodeURIComponent(sessionId)}`)
   },
