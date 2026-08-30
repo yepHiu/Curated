@@ -46,7 +46,7 @@ func listActors(q LibraryQuery) core.ToolDefinition {
 			next, truncated := core.PageCursor(offset, limit, page.Total)
 			return core.Result{
 				OK:         true,
-				Data:       wrapSource(map[string]any{"total": page.Total, "items": items}),
+				Data:       wrapSource(map[string]any{"total": page.Total, "items": items, "query": map[string]any{"q": strArg(args, "q"), "actorTag": strArg(args, "actorTag"), "sort": strArg(args, "sort")}}),
 				Truncated:  truncated,
 				NextCursor: next,
 			}, nil

@@ -37,6 +37,7 @@ type WatchHistoryItem struct {
 
 func RegisterQueryTools(reg *core.Registry, query LibraryQuery) error {
 	defs := []core.ToolDefinition{
+		resolveEntities(query),
 		getLibraryOverview(query),
 		searchMovies(query),
 		getMovieDetail(query),

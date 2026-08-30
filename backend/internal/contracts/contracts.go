@@ -1078,6 +1078,59 @@ type AIAgentMovieCardDTO struct {
 	Reason   string   `json:"reason,omitempty"`
 }
 
+// AIAgentProviderTitleDTO is a provider-search row reconciled against the
+// local library. Rows with InLibrary=false never carry a MovieID.
+type AIAgentProviderTitleDTO struct {
+	Code      string  `json:"code,omitempty"`
+	Title     string  `json:"title,omitempty"`
+	Provider  string  `json:"provider,omitempty"`
+	Score     float64 `json:"score,omitempty"`
+	Homepage  string  `json:"homepage,omitempty"`
+	InLibrary bool    `json:"inLibrary"`
+	MovieID   string  `json:"movieId,omitempty"`
+}
+
+// AIEntityCandidateDTO is one safe, local-library entity candidate. Candidates
+// are display-only until the user explicitly selects one in a later request.
+type AIEntityCandidateDTO struct {
+	Kind      string   `json:"kind"`
+	MovieID   string   `json:"movieId,omitempty"`
+	ActorName string   `json:"actorName,omitempty"`
+	Title     string   `json:"title,omitempty"`
+	Code      string   `json:"code,omitempty"`
+	Aliases   []string `json:"aliases,omitempty"`
+	Reason    string   `json:"reason,omitempty"`
+}
+
+// AIEntityResolutionDTO is the bounded result of resolving a user-provided
+// movie code/title or actor canonical name/alias.
+type AIEntityResolutionDTO struct {
+	Query      string                 `json:"query"`
+	Kind       string                 `json:"kind"`
+	Status     string                 `json:"status"` // matched | ambiguous | unmatched
+	Candidates []AIEntityCandidateDTO `json:"candidates"`
+	Reason     string                 `json:"reason,omitempty"`
+}
+
+// AIEvidenceDTO tells the renderer where a tool result came from and the
+// retrieval scope. It deliberately contains no raw source-page content.
+type AIEvidenceDTO struct {
+	Source      string            `json:"source"` // local | provider | source_page
+	RetrievedAt string            `json:"retrievedAt"`
+	Filters     map[string]string `json:"filters,omitempty"`
+	Truncated   bool              `json:"truncated,omitempty"`
+	NextCursor  string            `json:"nextCursor,omitempty"`
+	Failed      bool              `json:"failed,omitempty"`
+	ErrorCode   string            `json:"errorCode,omitempty"`
+}
+
+// AIChatOutcomeDTO is the explicit terminal state of one streamed turn.
+type AIChatOutcomeDTO struct {
+	Status    string `json:"status"` // completed | partial | needs_input | cancelled | failed
+	Reason    string `json:"reason,omitempty"`
+	Retryable bool   `json:"retryable,omitempty"`
+}
+
 // AIConfirmChangeDTO is one field-level diff row on a write preview.
 type AIConfirmChangeDTO struct {
 	Path   string `json:"path"`
@@ -1126,23 +1179,27 @@ type AIToolApplyDTO struct {
 
 // AIChatSSEEvent is one server-sent event on POST /api/ai/chat.
 type AIChatSSEEvent struct {
-	Type         string                `json:"type"`
-	SessionID    string                `json:"sessionId,omitempty"`
-	MessageID    string                `json:"messageId,omitempty"`
-	Seq          int                   `json:"seq,omitempty"`
-	Delta        string                `json:"delta,omitempty"`
-	ToolCallID   string                `json:"toolCallId,omitempty"`
-	Name         string                `json:"name,omitempty"`
-	OK           *bool                 `json:"ok,omitempty"`
-	Summary      string                `json:"summary,omitempty"`
-	Truncated    bool                  `json:"truncated,omitempty"`
-	Movies       []AIAgentMovieCardDTO `json:"movies,omitempty"`
-	ConfirmToken string                `json:"confirmToken,omitempty"`
-	ExpiresAt    string                `json:"expiresAt,omitempty"`
-	Changes      []AIConfirmChangeDTO  `json:"changes,omitempty"`
-	Arguments    json.RawMessage       `json:"arguments,omitempty"`
-	Code         string                `json:"code,omitempty"`
-	Message      string                `json:"message,omitempty"`
+	Type         string                    `json:"type"`
+	SessionID    string                    `json:"sessionId,omitempty"`
+	MessageID    string                    `json:"messageId,omitempty"`
+	Seq          int                       `json:"seq,omitempty"`
+	Delta        string                    `json:"delta,omitempty"`
+	ToolCallID   string                    `json:"toolCallId,omitempty"`
+	Name         string                    `json:"name,omitempty"`
+	OK           *bool                     `json:"ok,omitempty"`
+	Summary      string                    `json:"summary,omitempty"`
+	Truncated    bool                      `json:"truncated,omitempty"`
+	Movies       []AIAgentMovieCardDTO     `json:"movies,omitempty"`
+	ProviderRows []AIAgentProviderTitleDTO `json:"providerRows,omitempty"`
+	Resolution   *AIEntityResolutionDTO    `json:"resolution,omitempty"`
+	Evidence     *AIEvidenceDTO            `json:"evidence,omitempty"`
+	Outcome      *AIChatOutcomeDTO         `json:"outcome,omitempty"`
+	ConfirmToken string                    `json:"confirmToken,omitempty"`
+	ExpiresAt    string                    `json:"expiresAt,omitempty"`
+	Changes      []AIConfirmChangeDTO      `json:"changes,omitempty"`
+	Arguments    json.RawMessage           `json:"arguments,omitempty"`
+	Code         string                    `json:"code,omitempty"`
+	Message      string                    `json:"message,omitempty"`
 }
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).

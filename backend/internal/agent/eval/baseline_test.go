@@ -22,10 +22,48 @@ func TestR0BaselineContracts(t *testing.T) {
 		{ID: "EVAL-R0-003", Run: evalOffLibraryMovieCannotPresent},
 		{ID: "EVAL-R0-004", Run: evalReadFailureStaysVisible},
 		{ID: "EVAL-R0-005", Run: evalForgedConfirmCannotWrite},
+		{ID: "EVAL-R1-001", Run: evalAmbiguousEntityNeedsInput},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func evalAmbiguousEntityNeedsInput(ctx context.Context) error {
+	registry := core.NewRegistry()
+	if err := registry.Register(core.ToolDefinition{
+		Name: "resolve_entities", Description: "synthetic ambiguity", ParamsSchema: evalObjectSchema(), Permission: core.PermissionRead, Domain: core.DomainQuery,
+		Handler: func(context.Context, core.Call) (core.Result, error) {
+			return core.Result{OK: true, Data: map[string]any{"source": map[string]any{
+				"query": "Same", "kind": "movie", "status": "ambiguous", "candidates": []map[string]any{{"kind": "movie", "movieId": "m1"}, {"kind": "movie", "movieId": "m2"}},
+			}}}, nil
+		},
+	}); err != nil {
+		return err
+	}
+	loop := run.NewLoop(core.NewGateway(registry, nil, nil, nil), &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "resolve", Function: llm.ToolCallFunction{Name: "resolve_entities", Arguments: `{}`}}}},
+		{Content: "Please choose one candidate."},
+	}}, core.SanitizeFull, "en")
+	var resolution *contracts.AIEntityResolutionDTO
+	var outcome *contracts.AIChatOutcomeDTO
+	if err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "show Same"}}, nil, func(event contracts.AIChatSSEEvent) {
+		if event.Type == "tool_call_result" {
+			resolution = event.Resolution
+		}
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}); err != nil {
+		return err
+	}
+	if resolution == nil || resolution.Status != "ambiguous" || len(resolution.Candidates) != 2 {
+		return fmt.Errorf("ambiguous candidates not surfaced: %+v", resolution)
+	}
+	if outcome == nil || outcome.Status != "needs_input" {
+		return fmt.Errorf("ambiguous outcome = %+v", outcome)
+	}
+	return nil
 }
 
 func evalSelectedLocalMovie(ctx context.Context) error {

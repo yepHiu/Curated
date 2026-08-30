@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"curated-backend/internal/agent/core"
@@ -54,10 +55,20 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	tools := l.toolSpecs()
 	steps := 0
 	stepLimit := l.gateway.StepLimit()
+	hadFailure := false
+	hadTruncation := false
+	needsInput := false
+	emitDone := func(status, reason string, retryable bool) {
+		emit(contracts.AIChatSSEEvent{
+			Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
+			Outcome: &contracts.AIChatOutcomeDTO{Status: status, Reason: reason, Retryable: retryable},
+		})
+	}
 
 	for {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			emitDone("cancelled", "The user cancelled this request before it finished.", false)
+			return nil
 		}
 		choice := ""
 		if steps >= stepLimit {
@@ -85,10 +96,23 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			})
 		})
 		if err != nil {
+			emitDone("failed", "The model response could not be completed.", true)
 			return err
 		}
 		if len(turn.ToolCalls) == 0 {
-			emit(contracts.AIChatSSEEvent{Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
+			if strings.TrimSpace(turn.Content) == "" {
+				emitDone("failed", "The model returned no answer.", true)
+			} else if needsInput {
+				emitDone("needs_input", "A local entity needs the user's selection or a more specific name.", false)
+			} else if hadFailure || hadTruncation {
+				reason := "Some requested evidence could not be fully retrieved."
+				if hadFailure {
+					reason = "One or more retrievals failed; the answer contains only confirmed results."
+				}
+				emitDone("partial", reason, hadFailure)
+			} else {
+				emitDone("completed", "", false)
+			}
 			return nil
 		}
 		if steps >= stepLimit {
@@ -96,7 +120,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				Type: "text_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 				Delta: "\n\n已达到本轮工具步数上限，未能继续查询。",
 			})
-			emit(contracts.AIChatSSEEvent{Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
+			emitDone("partial", "The tool-step limit was reached before the lookup could finish.", true)
 			return nil
 		}
 
@@ -126,13 +150,35 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				l.gateway.RememberActorNames(sessionID, core.ExtractActorNames(result))
 				l.gateway.RememberSourceURLs(sessionID, core.ExtractSourceURLs(result))
 			}
+			if !result.OK {
+				hadFailure = true
+			}
+			if result.Truncated {
+				hadTruncation = true
+			}
+			resolution := entityResolutionFromResult(call.Name(), result)
+			if resolution != nil {
+				if resolution.Status == "matched" {
+					for _, candidate := range resolution.Candidates {
+						if candidate.MovieID != "" {
+							l.gateway.RememberMovieRefs(sessionID, []core.MovieRef{{ID: candidate.MovieID, Title: candidate.Title, Code: candidate.Code}})
+						}
+						if candidate.ActorName != "" {
+							l.gateway.RememberActorNames(sessionID, []string{candidate.ActorName})
+						}
+					}
+				} else {
+					needsInput = true
+				}
+			}
 			summary := toolSummary(call.Name(), result)
 			ok := result.OK
 			movies := presentMovieCards(call.Name(), result)
+			providerRows := providerTitleRows(call.Name(), result)
 			emit(contracts.AIChatSSEEvent{
 				Type: "tool_call_result", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 				ToolCallID: toolCallID, Name: call.Name(), OK: &ok, Summary: summary, Truncated: result.Truncated,
-				Movies: movies,
+				Movies: movies, ProviderRows: providerRows, Resolution: resolution, Evidence: evidenceForTool(call.Name(), result),
 			})
 			if len(movies) > 0 {
 				emit(contracts.AIChatSSEEvent{
@@ -154,7 +200,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 					Summary:   summary,
 					OK:        &ok,
 				})
-				emit(contracts.AIChatSSEEvent{Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
+				emitDone("completed", "A write preview is waiting for UI confirmation.", false)
 				return nil
 			}
 			payload, _ := json.Marshal(result)
@@ -168,6 +214,102 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			}
 		}
 	}
+}
+
+func providerTitleRows(name string, result core.Result) []contracts.AIAgentProviderTitleDTO {
+	if name != core.SearchProviderTitlesName || !result.OK || result.Data == nil {
+		return nil
+	}
+	raw, err := json.Marshal(result.Data)
+	if err != nil {
+		return nil
+	}
+	var envelope struct {
+		Source struct {
+			Items []contracts.AIAgentProviderTitleDTO `json:"items"`
+		} `json:"source"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil
+	}
+	return envelope.Source.Items
+}
+
+func entityResolutionFromResult(name string, result core.Result) *contracts.AIEntityResolutionDTO {
+	if name != "resolve_entities" || !result.OK || result.Data == nil {
+		return nil
+	}
+	raw, err := json.Marshal(result.Data)
+	if err != nil {
+		return nil
+	}
+	var envelope struct {
+		Source contracts.AIEntityResolutionDTO `json:"source"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil || envelope.Source.Status == "" {
+		return nil
+	}
+	return &envelope.Source
+}
+
+func evidenceForTool(name string, result core.Result) *contracts.AIEvidenceDTO {
+	evidence := &contracts.AIEvidenceDTO{
+		Source:      evidenceSource(name),
+		RetrievedAt: time.Now().UTC().Format(time.RFC3339),
+		Truncated:   result.Truncated,
+		NextCursor:  result.NextCursor,
+	}
+	if result.Error != nil {
+		evidence.Failed = true
+		evidence.ErrorCode = result.Error.Code
+	}
+	if result.Data != nil {
+		evidence.Filters = evidenceFilters(result.Data)
+	}
+	return evidence
+}
+
+func evidenceSource(name string) string {
+	switch name {
+	case core.SearchProviderTitlesName:
+		return "provider"
+	case core.GetSourcePageName:
+		return "source_page"
+	default:
+		return "local"
+	}
+}
+
+func evidenceFilters(data any) map[string]string {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return nil
+	}
+	var envelope struct {
+		Source map[string]any `json:"source"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil || envelope.Source == nil {
+		return nil
+	}
+	query, ok := envelope.Source["query"].(map[string]any)
+	if !ok || len(query) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(query))
+	for key, value := range query {
+		switch v := value.(type) {
+		case string:
+			if strings.TrimSpace(v) != "" {
+				out[key] = strings.TrimSpace(v)
+			}
+		case float64:
+			out[key] = fmt.Sprintf("%v", v)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (l *Loop) toolSpecs() []llm.ToolSpec {

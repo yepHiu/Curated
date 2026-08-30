@@ -59,6 +59,32 @@ func TestListMovies_RecentModeUsesThirtyDayWindow(t *testing.T) {
 	}
 }
 
+func TestListMovies_QueryKeepsScrapedTitleReachableAfterUserTitleOverride(t *testing.T) {
+	t.Parallel()
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "title-alias.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := store.db.ExecContext(ctx, `
+		INSERT INTO movies (id, title, user_title, code, studio, summary, runtime_minutes, rating, is_favorite, added_at, location, resolution, year, created_at, updated_at)
+		VALUES ('m-title', 'Scraped Original Title', 'My Display Title', 'ABC-123', '', '', 0, 0, 0, ?, 'D:/Media/ABC-123.mp4', '1080p', 0, ?, ?)`, now, now, now); err != nil {
+		t.Fatal(err)
+	}
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Query: "scraped original", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].ID != "m-title" || page.Items[0].Title != "My Display Title" {
+		t.Fatalf("page = %+v", page)
+	}
+}
+
 func TestListMovies_EmptyRelationsEncodeAsArrays(t *testing.T) {
 	t.Parallel()
 
@@ -207,7 +233,7 @@ func TestListMoviesAndGetMovieDetail(t *testing.T) {
 		Summary:        "Example Summary",
 		Studio:         "Sample Studio",
 		Provider:       "javbus",
-		Homepage:        "https://www.javbus.com/ABC-123",
+		Homepage:       "https://www.javbus.com/ABC-123",
 		Actors:         []string{"Actor B", "Actor A"},
 		Tags:           []string{"Tag B", "Tag A"},
 		RuntimeMinutes: 120,

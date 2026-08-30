@@ -67,7 +67,9 @@ func (h *Handler) handleAIProviderTest(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAIChat streams one agent turn as SSE events:
-// message_start -> (text_delta | tool_call_started | tool_call_result | movie_cards)* -> message_done,
+// message_start -> (thinking_delta | text_delta | tool_call_started | tool_call_result | movie_cards)* -> message_done,
+// where tool_call_result can carry evidence, provider rows, or entity resolution
+// and message_done always carries an explicit outcome when produced by the loop,
 // or a terminal error event.
 func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

@@ -73,7 +73,7 @@ func getSourcePage(pages SourcePageFetcher, urls *core.SourceURLStore) core.Tool
 				"finalUrl":  page.FinalURL,
 				"text":      page.Text,
 				"truncated": page.Truncated,
-			})}, nil
+			}), Truncated: page.Truncated}, nil
 		},
 	}
 }

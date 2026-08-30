@@ -101,10 +101,13 @@ func TestRegisterQueryToolsNames(t *testing.T) {
 	if _, ok := reg.Get("search_movies"); !ok {
 		t.Fatal("search_movies missing")
 	}
+	if _, ok := reg.Get(resolveEntitiesName); !ok {
+		t.Fatal("resolve_entities missing")
+	}
 	if _, ok := reg.Get("get_insights_overview"); !ok {
 		t.Fatal("get_insights_overview missing")
 	}
-	if len(reg.List()) != 11 {
-		t.Fatalf("tool count = %d, want 11", len(reg.List()))
+	if len(reg.List()) != 12 {
+		t.Fatalf("tool count = %d, want 12", len(reg.List()))
 	}
 }

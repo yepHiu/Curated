@@ -335,8 +335,11 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	query := strings.TrimSpace(strings.ToLower(request.Query))
 	if query != "" {
 		like := "%" + query + "%"
-		clauses = append(clauses, `(LOWER(COALESCE(NULLIF(TRIM(m.user_title), ''), m.title)) LIKE ? OR LOWER(m.code) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary)) LIKE ?)`)
-		args = append(args, like, like, like, like)
+		// Search both the effective display title and scraped title. A user
+		// display override must not make the original title unreachable to
+		// entity resolution or normal library search.
+		clauses = append(clauses, `(LOWER(COALESCE(NULLIF(TRIM(m.user_title), ''), m.title)) LIKE ? OR LOWER(m.title) LIKE ? OR LOWER(m.code) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary)) LIKE ?)`)
+		args = append(args, like, like, like, like, like)
 	}
 
 	for _, tag := range ParseMovieTagFilters(append([]string{request.Tag}, request.Tags...)...) {

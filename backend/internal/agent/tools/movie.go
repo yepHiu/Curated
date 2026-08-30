@@ -70,8 +70,10 @@ func searchMovies(q LibraryQuery) core.ToolDefinition {
 			}
 			next, truncated := core.PageCursor(offset, limit, page.Total)
 			return core.Result{
-				OK:         true,
-				Data:       wrapSource(map[string]any{"total": page.Total, "items": cards, "limit": limit, "offset": offset}),
+				OK: true,
+				Data: wrapSource(map[string]any{"total": page.Total, "items": cards, "limit": limit, "offset": offset,
+					"query": map[string]any{"q": strArg(args, "q"), "tag": strArg(args, "tag"), "actor": strArg(args, "actor"), "studio": strArg(args, "studio"), "playState": strArg(args, "playState"), "mode": mode},
+				}),
 				Truncated:  truncated,
 				NextCursor: next,
 			}, nil

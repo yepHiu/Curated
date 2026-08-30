@@ -114,12 +114,14 @@ func TestLoopStopsAtStepLimit(t *testing.T) {
 	}
 	joined := ""
 	var done bool
+	var outcome *contracts.AIChatOutcomeDTO
 	for _, ev := range events {
 		if ev.Type == "text_delta" {
 			joined += ev.Delta
 		}
 		if ev.Type == "message_done" {
 			done = true
+			outcome = ev.Outcome
 		}
 	}
 	if !strings.Contains(joined, "步数上限") {
@@ -127,6 +129,94 @@ func TestLoopStopsAtStepLimit(t *testing.T) {
 	}
 	if !done {
 		t.Fatalf("missing message_done")
+	}
+	if outcome == nil || outcome.Status != "partial" {
+		t.Fatalf("step limit outcome = %+v", outcome)
+	}
+}
+
+func TestLoopEmitsEvidenceAndPartialOutcomeAfterReadFailure(t *testing.T) {
+	t.Parallel()
+	reg := core.NewRegistry()
+	if err := reg.Register(core.ToolDefinition{
+		Name: "get_broken_source", Description: "broken", ParamsSchema: objectSchema(nil), Permission: core.PermissionRead, Domain: core.DomainQuery,
+		Handler: func(context.Context, core.Call) (core.Result, error) {
+			return core.Result{OK: false, Error: &core.ToolError{Code: "AI_CHAT_FAILED", Message: "source unavailable"}}, nil
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	loop := NewLoop(core.NewGateway(reg, nil, nil, nil), &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "broken", Function: llm.ToolCallFunction{Name: "get_broken_source", Arguments: `{}`}}}},
+		{Content: "Only confirmed facts are available."},
+	}}, core.SanitizeFull, "en")
+	events := collectEvents(t, loop, []llm.ChatMessage{{Role: "user", Content: "check source"}})
+	var evidence *contracts.AIEvidenceDTO
+	var outcome *contracts.AIChatOutcomeDTO
+	for _, event := range events {
+		if event.Type == "tool_call_result" {
+			evidence = event.Evidence
+		}
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}
+	if evidence == nil || !evidence.Failed || evidence.ErrorCode != "AI_CHAT_FAILED" || evidence.Source != "local" {
+		t.Fatalf("evidence = %+v", evidence)
+	}
+	if outcome == nil || outcome.Status != "partial" || !outcome.Retryable {
+		t.Fatalf("outcome = %+v", outcome)
+	}
+}
+
+func TestLoopDoesNotTrustAmbiguousEntityCandidates(t *testing.T) {
+	t.Parallel()
+	reg := core.NewRegistry()
+	if err := reg.Register(core.ToolDefinition{
+		Name: "resolve_entities", Description: "resolve", ParamsSchema: objectSchema(nil), Permission: core.PermissionRead, Domain: core.DomainQuery,
+		Handler: func(context.Context, core.Call) (core.Result, error) {
+			return core.Result{OK: true, Data: map[string]any{"source": map[string]any{
+				"query": "Same", "kind": "movie", "status": "ambiguous", "candidates": []map[string]any{
+					{"kind": "movie", "movieId": "m1", "title": "Same", "code": "ABC-001"},
+					{"kind": "movie", "movieId": "m2", "title": "Same", "code": "ABC-002"},
+				},
+			}}}, nil
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gateway := core.NewGateway(reg, nil, nil, nil)
+	if err := tools.RegisterPresentTools(reg, gateway.MovieRefs()); err != nil {
+		t.Fatal(err)
+	}
+	loop := NewLoop(gateway, &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "resolve", Function: llm.ToolCallFunction{Name: "resolve_entities", Arguments: `{}`}}}},
+		{ToolCalls: []llm.ToolCall{{ID: "present", Function: llm.ToolCallFunction{Name: core.PresentMoviesName, Arguments: `{"items":[{"movieId":"m1","reason":"guess"}]}`}}}},
+		{Content: "Please choose."},
+	}}, core.SanitizeFull, "en")
+	events := collectEvents(t, loop, []llm.ChatMessage{{Role: "user", Content: "show Same"}})
+	var resolution *contracts.AIEntityResolutionDTO
+	var presentOK *bool
+	var outcome *contracts.AIChatOutcomeDTO
+	for _, event := range events {
+		if event.Type == "tool_call_result" && event.Name == "resolve_entities" {
+			resolution = event.Resolution
+		}
+		if event.Type == "tool_call_result" && event.Name == core.PresentMoviesName {
+			presentOK = event.OK
+		}
+		if event.Type == "message_done" {
+			outcome = event.Outcome
+		}
+	}
+	if resolution == nil || resolution.Status != "ambiguous" {
+		t.Fatalf("resolution = %+v", resolution)
+	}
+	if presentOK == nil || *presentOK {
+		t.Fatalf("ambiguous candidate entered present_movies: %+v", events)
+	}
+	if outcome == nil || outcome.Status != "needs_input" {
+		t.Fatalf("outcome = %+v", outcome)
 	}
 }
 
@@ -199,13 +289,18 @@ func TestLoopSeedsPageActorForProviderSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var okResult bool
+	var providerRows []contracts.AIAgentProviderTitleDTO
 	for _, ev := range events {
 		if ev.Type == "tool_call_result" && ev.Name == core.SearchProviderTitlesName && ev.OK != nil && *ev.OK {
 			okResult = true
+			providerRows = ev.ProviderRows
 		}
 	}
 	if !okResult {
 		t.Fatalf("page actor should anchor provider search: %+v", events)
+	}
+	if len(providerRows) != 1 || providerRows[0].InLibrary || providerRows[0].MovieID != "" || providerRows[0].Code != "ABC-124" {
+		t.Fatalf("provider rows = %+v", providerRows)
 	}
 }
 

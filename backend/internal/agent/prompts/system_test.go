@@ -20,6 +20,11 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 		},
 	})
 	for _, want := range []string{
+		"# Curated Agent",
+		"## Role and completion",
+		"## Trust boundary and entity resolution",
+		"## Evidence and retrieval",
+		"## Completion and recovery",
 		"<source>",
 		"confirm tokens",
 		"save_movie_comment",
@@ -37,9 +42,25 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 		"zh-CN",
 		"@-mentions",
 		"movie id=m2 label=Hello",
+		"ambiguous",
+		"needs input",
+		"partial",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestSystemPromptUsesExternalTemplate(t *testing.T) {
+	t.Parallel()
+	if !strings.Contains(systemPromptTemplate, "# Curated Agent") {
+		t.Fatal("embedded system.md lost the prompt heading")
+	}
+	if strings.Contains(systemPromptTemplate, "Visible page context") {
+		t.Fatal("request-scoped context must remain outside the static prompt asset")
+	}
+	if Version != "agent-system-v2" {
+		t.Fatalf("version = %q", Version)
 	}
 }
