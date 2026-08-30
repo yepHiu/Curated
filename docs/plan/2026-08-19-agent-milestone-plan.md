@@ -346,17 +346,17 @@ MCP 是独立发布单元，不能因尚未完成批量能力而阻塞，也不�
 
 ### 9.9 下一次实施从哪里开始
 
-**R0.2 与 R1.1 首个垂直切片已于 2026-08-30 完成**：已有确定性 Eval runner、Context v1、已验证的本地影片/演员锚点，以及发送前可移除的上下文 chips。下一项应启动 **R1.2：证据 envelope 与实体歧义交互**，而不是继续增加工具或开始长期记忆。
+**R0.2 与 R1.1 首个垂直切片已于 2026-08-30 完成**：已有确定性 Eval runner、Context v1、已验证的本地影片/演员锚点，以及发送前可移除的上下文 chips。**R1.2 的首个可用闭环已于 2026-08-31 完成**：系统提示词升级为外置的 `agent-system-v2`、可解析本地影片/演员、可让用户点选歧义候选、工具结果携带证据范围，并在窗口中展示明确的完成状态。下一轮应先用真实 Provider trace 和扩展 eval 校验这个闭环，而不是继续增加工具或开始长期记忆。
 
-建议按以下三个小切片推进：
+已完成的三个小切片如下；其中“标题别名”当前指用户 display title 覆盖后仍可按底层刮削标题检索，不新建或伪造独立影片 alias 表。
 
-1. **实体解析结果**：为影片番号、标题别名和演员别名建立统一的 `matched` / `ambiguous` / `unmatched` 结果；每个结果附匹配依据。歧义实体只能显示候选并要求用户选择，绝不能进入任何写工具或 `present_movies` 的本地锚点。
-2. **事实证据与库内外标记**：读取工具以统一 evidence envelope 返回来源（local/provider）、检索时间、实际筛选条件、截断/分页状态和可导航的本地引用。源站库外条目始终显示为“未在资料库”，不能伪造 `movieId`。
-3. **失败与部分完成协议**：把工具失败、缺失数据、截断、取消和步数耗尽统一为 `completed` / `partial` / `needs_input` / `cancelled` / `failed`。结束语必须说明已确认事实、未完成原因及可行下一步，不能用模型推测填补工具错误。
+1. **实体解析结果**：`resolve_entities` 统一返回 `matched` / `ambiguous` / `unmatched`；演员先复用 canonical/alias profile 解析，影片按规范化番号或标题解析。歧义候选只通过 SSE 展示，用户在窗口点选后才在下一请求中成为 `selectedMovieIds` / `selectedActors`；候选本身不能进入 `present_movies` 或写工具锚点。
+2. **事实证据与库内外标记**：每个工具结果附带 `AIEvidenceDTO`（local/provider/source_page、UTC 检索时间、实际筛选、cursor、截断和错误码）；窗口在展开的过程条中显示来源与范围。Provider 条目继续保留 `inLibrary=false` 且无本地 `movieId` 的硬边界。
+3. **失败与部分完成协议**：`message_done` 现在携带 `completed` / `partial` / `needs_input` / `cancelled` / `failed`，窗口以状态卡说明失败、截断、取消或候选选择。模型无文本返回、工具失败、步数耗尽与用户停止都有稳定收口；正式回答仍由 v2 提示词要求先说明已确认事实与缺失原因。
 
 #### System Prompt v2 guardrail design
 
-现有 `agent-system-v1` 已建立了工具调用、未信任 `<source>`、本轮实体锚定、库内外边界和 preview → confirm 写入边界，**不应以增加大量逐工具指令的方式重写**。在 R1.2 的契约与评测先行后，将其演进为 `agent-system-v2`，目标是以更短、更可维护的结构补足决定 Agent 可信能力的行为契约。
+`agent-system-v2` 已以可评审的 [system.md](../../backend/internal/agent/prompts/system.md) 外置，并由 Go `embed` 加载；动态页面上下文继续保留在 Go 层投影，避免浏览器数据直接混入静态提示词。它保留工具调用、未信任 `<source>`、本轮实体锚定、库内外边界和 preview → confirm 写入边界，**不以增加大量逐工具指令的方式重写**。
 
 建议将提示词明确分为以下短小、互不重复的段落：
 
