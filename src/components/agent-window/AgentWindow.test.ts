@@ -488,6 +488,83 @@ describe("AgentWindow", () => {
     expect(streamChatMock).toHaveBeenCalled()
   })
 
+  it("renders a partial outcome with its evidence scope", async () => {
+    streamChatMock.mockImplementation(async (_input: unknown, handlers: {
+      onToolStart?: (event: { toolCallId: string; name: string }) => void
+      onToolResult?: (event: { toolCallId: string; name: string; ok: boolean; evidence?: { source: string; truncated?: boolean; filters?: Record<string, string> }; providerRows?: { code: string; title: string; provider: string; score: number; inLibrary: boolean }[] }) => void
+      onDelta: (delta: string) => void
+      onOutcome?: (outcome: { status: "partial"; reason: string; retryable: boolean }) => void
+    }) => {
+      handlers.onToolStart?.({ toolCallId: "provider", name: "search_provider_titles" })
+      handlers.onToolResult?.({
+        toolCallId: "provider",
+        name: "search_provider_titles",
+        ok: true,
+        evidence: { source: "provider", truncated: true, filters: { actorName: "Ada" } },
+        providerRows: [{ code: "ABC-123", title: "Provider title", provider: "Metatube", score: 4.2, inLibrary: false }],
+      })
+      handlers.onDelta("这是已确认的结果。")
+      handlers.onOutcome?.({ status: "partial", reason: "结果分页被截断。", retryable: true })
+    })
+    const wrapper = mountWindow()
+    await flushPromises()
+    await wrapper.find("[data-agent-window-input]").setValue("她还拍过什么")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.find("[data-agent-outcome]").text()).toContain("agentWindow.outcome.partial")
+    await wrapper.find("[data-agent-process-toggle]").trigger("click")
+    expect(wrapper.find("[data-agent-evidence-cards]").text()).toContain("agentWindow.evidenceProvider")
+    expect(wrapper.find("[data-agent-evidence-cards]").text()).toContain("agentWindow.evidenceTruncated")
+    expect(wrapper.find("[data-agent-provider-rows]").text()).toContain("agentWindow.providerOffLibrary")
+  })
+
+  it("requires a candidate selection before continuing an ambiguous entity request", async () => {
+    let calls = 0
+    streamChatMock.mockImplementation(async (input: { context?: { selectedMovieIds?: string[] } }, handlers: {
+      onToolStart?: (event: { toolCallId: string; name: string }) => void
+      onToolResult?: (event: { toolCallId: string; name: string; ok: boolean; resolution?: unknown }) => void
+      onOutcome?: (outcome: { status: "needs_input" | "completed" }) => void
+      onDelta: (delta: string) => void
+    }) => {
+      calls += 1
+      if (calls === 1) {
+        handlers.onToolStart?.({ toolCallId: "resolve", name: "resolve_entities" })
+        handlers.onToolResult?.({
+          toolCallId: "resolve",
+          name: "resolve_entities",
+          ok: true,
+          resolution: {
+            query: "Same",
+            kind: "movie",
+            status: "ambiguous",
+            candidates: [
+              { kind: "movie", movieId: "m1", title: "Same", code: "ABC-001" },
+              { kind: "movie", movieId: "m2", title: "Same", code: "ABC-002" },
+            ],
+          },
+        })
+        handlers.onDelta("我找到了多个匹配，请选择一个。")
+        handlers.onOutcome?.({ status: "needs_input" })
+        return
+      }
+      expect(input.context?.selectedMovieIds).toEqual(["m2"])
+      handlers.onDelta("已按你选择的影片继续。")
+      handlers.onOutcome?.({ status: "completed" })
+    })
+    const wrapper = mountWindow()
+    await flushPromises()
+    await wrapper.find("[data-agent-window-input]").setValue("查 Same")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.find("[data-agent-entity-resolution]").text()).toContain("agentWindow.resolutionAmbiguous")
+    await wrapper.find('[data-agent-entity-candidate="m2"]').trigger("click")
+    await flushPromises()
+    expect(calls).toBe(2)
+    expect(wrapper.text()).toContain("已按你选择的影片继续")
+  })
+
   it("keeps the window open when Escape closes the mention picker", async () => {
     const wrapper = mountWindow()
     await flushPromises()

@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import { onKeyStroke } from "@vueuse/core"
 import { PanelLeft, Plus, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
-import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO } from "@/api/types"
+import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIEntityCandidateDTO } from "@/api/types"
 import { agentPageContext } from "@/lib/agent-page-context"
 import { parsePresentMoviesContent } from "@/lib/agent-movie-cards"
 import { isAgentProcessTool } from "@/lib/agent-tool-labels"
@@ -282,7 +282,7 @@ function collapseProcess(assistantId: string) {
   }
 }
 
-function chatContextFrom(text: string, active: AgentMention[], omitted: readonly string[] = []): AIChatContextDTO | undefined {
+function chatContextFrom(text: string, active: AgentMention[], omitted: readonly string[] = [], selected?: AIEntityCandidateDTO): AIChatContextDTO | undefined {
   const page: AIChatContextDTO = { ...(agentPageContext(route) ?? {}) }
   const omittedKeys = new Set(omitted)
   if (omittedKeys.has("route")) delete page.route
@@ -312,6 +312,14 @@ function chatContextFrom(text: string, active: AgentMention[], omitted: readonly
     if (movieIds.length > 0) page.selectedMovieIds = [...new Set(movieIds)]
     if (actors.length > 0) page.selectedActors = [...new Set(actors)]
     if (page.selectedMovieIds?.length || page.selectedActors?.length) page.contextVersion = 1
+  }
+  if (selected?.kind === "movie" && selected.movieId) {
+    page.selectedMovieIds = [...new Set([...(page.selectedMovieIds ?? []), selected.movieId])]
+    page.contextVersion = 1
+  }
+  if (selected?.kind === "actor" && selected.actorName) {
+    page.selectedActors = [...new Set([...(page.selectedActors ?? []), selected.actorName])]
+    page.contextVersion = 1
   }
   if (!page.activeFilters && !page.selectedMovieIds?.length && !page.selectedActors?.length) {
     delete page.contextVersion
@@ -393,16 +401,22 @@ function removeEntryAt(index: number) {
 }
 
 function stop() {
+  if (!streaming.value) return
   abortController?.abort()
+  entries.value.push({
+    id: nextEntryId("outcome"),
+    kind: "outcome",
+    outcome: { status: "cancelled", reason: t("agentWindow.cancelledReason") },
+  })
 }
 
-async function send() {
+async function send(selected?: AIEntityCandidateDTO) {
   const content = draft.value.trim()
   if (!content || streaming.value) return
   draft.value = ""
   const activeMentions = mentions.value
   mentions.value = []
-  const activeContext = chatContextFrom(content, activeMentions, omittedContext.value)
+  const activeContext = chatContextFrom(content, activeMentions, omittedContext.value, selected)
   omittedContext.value = []
   entries.value.push({ id: nextEntryId("user"), kind: "user", content })
 
@@ -481,9 +495,14 @@ async function send() {
           if (card) {
             card.pending = false
             card.ok = event.ok
+            card.evidence = event.evidence
+            card.providerRows = event.providerRows
           }
           if (event.movies?.length) {
             attachMovies(assistantId, event.movies)
+          }
+          if (event.resolution && event.resolution.status !== "matched") {
+            entries.value.push({ id: nextEntryId("resolution"), kind: "resolution", resolution: event.resolution })
           }
           void scrollListToEnd()
         },
@@ -505,6 +524,11 @@ async function send() {
             sessionId: event.sessionId || sessionId.value,
             status: "pending",
           })
+          void scrollListToEnd()
+        },
+        onOutcome(outcome) {
+          if (seq !== streamSeq) return
+          entries.value.push({ id: nextEntryId("outcome"), kind: "outcome", outcome })
           void scrollListToEnd()
         },
       },
@@ -532,6 +556,15 @@ async function send() {
       void scrollListToEnd()
     }
   }
+}
+
+function selectEntity(entryId: string, candidate: AIEntityCandidateDTO) {
+  if (streaming.value) return
+  const entry = entries.value.find((item) => item.id === entryId)
+  if (!entry || entry.kind !== "resolution" || entry.selected) return
+  entry.selected = true
+  draft.value = `选择「${candidate.kind === "movie" ? candidate.title || candidate.code : candidate.actorName}」，请继续处理我刚才的请求。`
+  void send(candidate)
 }
 
 const dragging = ref(false)
@@ -680,6 +713,7 @@ watch(
               @open-movie="openMovieDetail"
               @apply-confirm="applyConfirm"
               @discard-confirm="discardConfirm"
+              @select-entity="selectEntity"
             />
             <div
               class="mx-auto w-full shrink-0"

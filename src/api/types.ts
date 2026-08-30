@@ -428,6 +428,50 @@ export interface AIAgentMovieCardDTO {
   reason?: string
 }
 
+export interface AIAgentProviderTitleDTO {
+  code?: string
+  title?: string
+  provider?: string
+  score?: number
+  homepage?: string
+  inLibrary: boolean
+  movieId?: string
+}
+
+export interface AIEntityCandidateDTO {
+  kind: "movie" | "actor"
+  movieId?: string
+  actorName?: string
+  title?: string
+  code?: string
+  aliases?: string[]
+  reason?: string
+}
+
+export interface AIEntityResolutionDTO {
+  query: string
+  kind: "auto" | "movie" | "actor"
+  status: "matched" | "ambiguous" | "unmatched"
+  candidates: AIEntityCandidateDTO[]
+  reason?: string
+}
+
+export interface AIEvidenceDTO {
+  source: "local" | "provider" | "source_page"
+  retrievedAt: string
+  filters?: Record<string, string>
+  truncated?: boolean
+  nextCursor?: string
+  failed?: boolean
+  errorCode?: string
+}
+
+export interface AIChatOutcomeDTO {
+  status: "completed" | "partial" | "needs_input" | "cancelled" | "failed"
+  reason?: string
+  retryable?: boolean
+}
+
 export interface AIConfirmChangeDTO {
   path: string
   before?: unknown

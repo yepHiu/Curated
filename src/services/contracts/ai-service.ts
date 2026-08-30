@@ -2,11 +2,15 @@ import type {
   AIActionPreviewDTO,
   AIActionRequestBody,
   AIAgentMovieCardDTO,
+  AIAgentProviderTitleDTO,
   AIChatContextDTO,
   AIChatMessageDTO,
+  AIChatOutcomeDTO,
   AIChatSessionDetailDTO,
   AIChatSessionDTO,
   AIConfirmChangeDTO,
+  AIEvidenceDTO,
+  AIEntityResolutionDTO,
   AIToolApplyDTO,
   AIToolApplyRequestBody,
 } from "@/api/types"
@@ -26,6 +30,9 @@ export interface AIChatToolEvent {
   summary?: string
   truncated?: boolean
   movies?: AIAgentMovieCardDTO[]
+  providerRows?: AIAgentProviderTitleDTO[]
+  evidence?: AIEvidenceDTO
+  resolution?: AIEntityResolutionDTO
 }
 
 export interface AIChatConfirmEvent {
@@ -46,6 +53,7 @@ export interface AIChatStreamHandlers {
   onConfirmRequired?(event: AIChatConfirmEvent): void
   onSession?(sessionId: string): void
   onThinking?(delta: string): void
+  onOutcome?(outcome: AIChatOutcomeDTO): void
   signal?: AbortSignal
 }
 

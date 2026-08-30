@@ -21,10 +21,14 @@ interface SSEEventPayload {
   summary?: string
   truncated?: boolean
   movies?: import("@/api/types").AIAgentMovieCardDTO[]
+  providerRows?: import("@/api/types").AIAgentProviderTitleDTO[]
   confirmToken?: string
   expiresAt?: string
   changes?: import("@/api/types").AIConfirmChangeDTO[]
   arguments?: Record<string, unknown>
+  evidence?: import("@/api/types").AIEvidenceDTO
+  resolution?: import("@/api/types").AIEntityResolutionDTO
+  outcome?: import("@/api/types").AIChatOutcomeDTO
 }
 
 /**
@@ -99,10 +103,16 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
           summary: payload.summary,
           truncated: payload.truncated,
           movies: payload.movies,
+          providerRows: payload.providerRows,
+          evidence: payload.evidence,
+          resolution: payload.resolution,
         })
         if (payload.movies?.length) {
           handlers.onMovieCards?.(payload.movies)
         }
+        break
+      case "message_done":
+        if (payload.outcome) handlers.onOutcome?.(payload.outcome)
         break
       case "movie_cards":
         if (payload.movies?.length) {

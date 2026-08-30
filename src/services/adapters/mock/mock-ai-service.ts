@@ -168,6 +168,7 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
       createdAt: nowIso(),
     })
     session.updatedAt = nowIso()
+    handlers.onOutcome?.({ status: "completed" })
   } catch (err) {
     if ((err as DOMException)?.name === "AbortError") return
     throw err

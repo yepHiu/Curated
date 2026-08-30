@@ -8,6 +8,8 @@ import AgentChatMovieCard from "./AgentChatMovieCard.vue"
 import AgentChatProcess from "./AgentChatProcess.vue"
 import AgentChatConfirm from "./AgentChatConfirm.vue"
 import AgentMarkdown from "./AgentMarkdown.vue"
+import AgentChatResolution from "./AgentChatResolution.vue"
+import AgentChatOutcome from "./AgentChatOutcome.vue"
 import type { AgentChatEntry } from "./types"
 
 defineProps<{
@@ -22,6 +24,7 @@ const emit = defineEmits<{
   openMovie: [movieId: string]
   applyConfirm: [id: string]
   discardConfirm: [id: string]
+  selectEntity: [entryId: string, candidate: import("@/api/types").AIEntityCandidateDTO]
 }>()
 
 const listRef = ref<HTMLElement | null>(null)
@@ -91,6 +94,13 @@ defineExpose({
         @discard="emit('discardConfirm', entry.id)"
         @open-movie="emit('openMovie', $event)"
       />
+      <AgentChatResolution
+        v-else-if="entry.kind === 'resolution'"
+        :resolution="entry.resolution"
+        :selected="entry.selected"
+        @select="emit('selectEntity', entry.id, $event)"
+      />
+      <AgentChatOutcome v-else-if="entry.kind === 'outcome'" :outcome="entry.outcome" />
     </template>
 
     <div

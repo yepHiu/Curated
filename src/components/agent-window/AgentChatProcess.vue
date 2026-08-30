@@ -73,6 +73,23 @@ const headline = computed(() => {
       <p v-if="entry.open && !busy && visibleTools.length" class="leading-relaxed" data-agent-process-tools>
         {{ visibleTools.map((name) => t(agentToolI18nKey(name))).join(" · ") }}
       </p>
+      <div v-if="entry.open && entry.tools.some((tool) => tool.evidence)" class="space-y-1.5" data-agent-evidence-cards>
+        <div v-for="tool in entry.tools.filter((item) => item.evidence)" :key="tool.toolCallId" class="rounded-lg border border-border/60 bg-background/60 px-2 py-1.5">
+          <p class="font-medium">{{ tool.evidence?.source === 'local' ? t('agentWindow.evidenceLocal') : tool.evidence?.source === 'provider' ? t('agentWindow.evidenceProvider') : t('agentWindow.evidenceSourcePage') }}</p>
+          <p class="mt-0.5 break-words text-[11px] leading-relaxed">
+            {{ tool.evidence?.failed ? t('agentWindow.evidenceFailed', { code: tool.evidence.errorCode || 'unknown' }) : tool.evidence?.truncated ? t('agentWindow.evidenceTruncated') : t('agentWindow.evidenceComplete') }}
+            <template v-if="tool.evidence?.filters && Object.keys(tool.evidence.filters).length">{{ t('agentWindow.evidenceFilters') }}{{ Object.entries(tool.evidence.filters).map(([key, value]) => `${key}=${value}`).join(' · ') }}</template>
+          </p>
+        </div>
+      </div>
+      <div v-if="entry.open && entry.tools.some((tool) => tool.providerRows?.length)" class="space-y-1.5" data-agent-provider-rows>
+        <div v-for="tool in entry.tools.filter((item) => item.providerRows?.length)" :key="`${tool.toolCallId}-provider`" class="space-y-1">
+          <div v-for="row in tool.providerRows" :key="`${row.provider}-${row.code}-${row.title}`" class="rounded-lg border border-border/60 bg-background/60 px-2 py-1.5">
+            <p class="font-medium">{{ row.code }}<span v-if="row.title"> · {{ row.title }}</span></p>
+            <p class="mt-0.5 text-[11px] leading-relaxed">{{ row.provider || t('agentWindow.providerFallback') }}<span v-if="row.score"> · {{ t('agentWindow.providerScore', { score: row.score }) }}</span> · {{ row.inLibrary ? t('agentWindow.providerInLibrary') : t('agentWindow.providerOffLibrary') }}</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

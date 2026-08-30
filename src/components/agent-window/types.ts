@@ -3,6 +3,8 @@ export type AgentProcessTool = {
   name: string
   pending: boolean
   ok?: boolean
+  evidence?: import("@/api/types").AIEvidenceDTO
+  providerRows?: import("@/api/types").AIAgentProviderTitleDTO[]
 }
 
 export type AgentChatEntry =
@@ -16,6 +18,13 @@ export type AgentChatEntry =
       tools: AgentProcessTool[]
       open: boolean
     }
+  | {
+      id: string
+      kind: "resolution"
+      resolution: import("@/api/types").AIEntityResolutionDTO
+      selected?: boolean
+    }
+  | { id: string; kind: "outcome"; outcome: import("@/api/types").AIChatOutcomeDTO }
   | {
       id: string
       kind: "confirm"
