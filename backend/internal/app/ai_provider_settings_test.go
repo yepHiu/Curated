@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -114,7 +115,22 @@ func TestTestAIProviderAgainstFakeEndpoint(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/chat/completions" {
+			var request struct {
+				MaxTokens int `json:"max_tokens"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Error(err)
+				w.WriteHeader(400)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
+			if request.MaxTokens < 128 {
+				_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"length","message":{"reasoning_content":"Checking connectivity","content":""}}]}`))
+				return
+			}
+			if request.MaxTokens > 1024 {
+				t.Error("connectivity probe is not bounded")
+			}
 			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"pong"}}]}`))
 			return
 		}

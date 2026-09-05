@@ -20,7 +20,11 @@ import (
 var ErrAIProviderNotConfigured = fmt.Errorf("%w: provider baseUrl and model are required", llm.ErrInvalidConfig)
 
 // aiProviderTestTimeout bounds the provider connectivity test request.
-const aiProviderTestTimeout = 15 * time.Second
+const aiProviderTestTimeout = 30 * time.Second
+
+// Reasoning providers may spend the first output tokens before producing text.
+// Keep the probe bounded, but do not exhaust its budget before the final "pong".
+const aiProviderTestOutputLimit = 1024
 
 // AIProviderSettings returns the current experimental agent provider configuration.
 func (a *App) AIProviderSettings() contracts.AIProviderSettingsDTO {
@@ -110,8 +114,8 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 		APIKey:  normalized.APIKey,
 		Model:   normalized.Model,
 	}, client).Complete(testCtx, []llm.ChatMessage{
-		{Role: "user", Content: "ping"},
-	}, 16)
+		{Role: "user", Content: "Reply with only the word pong."},
+	}, aiProviderTestOutputLimit)
 	latency := time.Since(start).Milliseconds()
 	if err != nil {
 		return contracts.AIProviderTestResponse{OK: false, LatencyMs: latency, Message: err.Error()}
