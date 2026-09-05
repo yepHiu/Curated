@@ -7,7 +7,7 @@ import { PanelLeft, Plus, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIEntityCandidateDTO } from "@/api/types"
 import { agentPageContext } from "@/lib/agent-page-context"
-import { parsePresentMoviesContent } from "@/lib/agent-movie-cards"
+import { restoreChatHistory } from "./restore-history"
 import { isAgentProcessTool } from "@/lib/agent-tool-labels"
 import { mentionsStillInText, type AgentMention } from "@/lib/agent-mentions"
 import {
@@ -162,61 +162,7 @@ async function loadSession(id: string) {
   try {
     const detail = await aiService.getSession(id)
     if (loadSeq !== sessionLoadSeq) return
-    let pendingMovies: AIAgentMovieCardDTO[] = []
-    let processTools: Extract<AgentChatEntry, { kind: "process" }>["tools"] = []
-    const next: AgentChatEntry[] = []
-    const flushProcess = () => {
-      if (processTools.length === 0) return
-      next.push({
-        id: nextEntryId("process"),
-        kind: "process",
-        thinking: "",
-        thinkingActive: false,
-        tools: processTools,
-        open: false,
-      })
-      processTools = []
-    }
-    for (const message of detail.messages) {
-      if (message.role === "user") {
-        flushProcess()
-        next.push({ id: message.id, kind: "user", content: message.content })
-        continue
-      }
-      if (message.role === "assistant") {
-        flushProcess()
-        next.push({
-          id: message.id,
-          kind: "assistant",
-          content: message.content,
-          movies: pendingMovies,
-        })
-        pendingMovies = []
-        continue
-      }
-      if (message.role === "tool") {
-        const movies = message.toolName === "present_movies" ? parsePresentMoviesContent(message.content) : []
-        if (movies.length) pendingMovies = movies
-        if (isAgentProcessTool(message.toolName || "")) {
-          processTools.push({
-            toolCallId: message.toolCallId || message.id,
-            name: message.toolName || "tool",
-            pending: false,
-            ok: true,
-          })
-        }
-      }
-    }
-    flushProcess()
-    if (pendingMovies.length) {
-      next.push({
-        id: nextEntryId("assistant"),
-        kind: "assistant",
-        content: "",
-        movies: pendingMovies,
-      })
-    }
-    entries.value = next
+    entries.value = restoreChatHistory(detail.messages)
   } catch {
     if (loadSeq !== sessionLoadSeq) return
     entries.value = []

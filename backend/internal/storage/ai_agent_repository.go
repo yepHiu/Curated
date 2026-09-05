@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -81,7 +82,11 @@ func (s *SQLiteStore) DeleteAIChatSession(ctx context.Context, id string) error 
 	return nil
 }
 
-func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, content, toolName, toolCallID string) (contracts.AIChatStoredMessageDTO, error) {
+func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, content, toolName, toolCallID string, events ...contracts.AIChatSSEEvent) (contracts.AIChatStoredMessageDTO, error) {
+	encoded, err := json.Marshal(events)
+	if err != nil {
+		return contracts.AIChatStoredMessageDTO{}, err
+	}
 	id, err := newAIID("msg_")
 	if err != nil {
 		return contracts.AIChatStoredMessageDTO{}, err
@@ -94,9 +99,9 @@ func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, 
 		return contracts.AIChatStoredMessageDTO{}, err
 	}
 	if _, err := s.db.ExecContext(ctx, `
-		INSERT INTO ai_chat_messages (id, session_id, role, content, tool_name, tool_call_id, seq, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, sessionID, role, content, toolName, toolCallID, seq, now); err != nil {
+		INSERT INTO ai_chat_messages (id, session_id, role, content, tool_name, tool_call_id, seq, created_at, events_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, sessionID, role, content, toolName, toolCallID, seq, now, string(encoded)); err != nil {
 		return contracts.AIChatStoredMessageDTO{}, err
 	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE ai_chat_sessions SET updated_at = ? WHERE id = ?`, now, sessionID); err != nil {
@@ -111,6 +116,7 @@ func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, 
 		ToolCallID: toolCallID,
 		Seq:        seq,
 		CreatedAt:  now,
+		Events:     events,
 	}, nil
 }
 
@@ -128,7 +134,7 @@ func (s *SQLiteStore) listRecentAIChatMessages(ctx context.Context, sessionID st
 		limit = 80
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, session_id, role, content, tool_name, tool_call_id, seq, created_at FROM (
+		SELECT id, session_id, role, content, tool_name, tool_call_id, seq, created_at, events_json FROM (
 			SELECT * FROM ai_chat_messages
 			WHERE session_id = ? AND (? = 0 OR role IN ('user', 'assistant'))
 			ORDER BY seq DESC LIMIT ?
@@ -140,8 +146,12 @@ func (s *SQLiteStore) listRecentAIChatMessages(ctx context.Context, sessionID st
 	out := make([]contracts.AIChatStoredMessageDTO, 0, limit)
 	for rows.Next() {
 		var dto contracts.AIChatStoredMessageDTO
-		if err := rows.Scan(&dto.ID, &dto.SessionID, &dto.Role, &dto.Content, &dto.ToolName, &dto.ToolCallID, &dto.Seq, &dto.CreatedAt); err != nil {
+		var encoded string
+		if err := rows.Scan(&dto.ID, &dto.SessionID, &dto.Role, &dto.Content, &dto.ToolName, &dto.ToolCallID, &dto.Seq, &dto.CreatedAt, &encoded); err != nil {
 			return nil, err
+		}
+		if err := json.Unmarshal([]byte(encoded), &dto.Events); err != nil {
+			return nil, fmt.Errorf("decode chat events: %w", err)
 		}
 		out = append(out, dto)
 	}

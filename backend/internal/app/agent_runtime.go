@@ -5,13 +5,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"curated-backend/internal/agent/core"
@@ -115,6 +115,7 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	messageID := newAgentID("msg_")
 	loop := run.NewLoop(a.ensureAgentGateway(), streamer, sanitizeModeForProvider(cfg.BaseURL), strings.TrimSpace(req.Locale))
 	var assistant strings.Builder
+	var events []contracts.AIChatSSEEvent
 	wrapped := func(ev contracts.AIChatSSEEvent) {
 		if ev.SessionID == "" {
 			ev.SessionID = session.ID
@@ -125,16 +126,12 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		switch ev.Type {
 		case "text_delta":
 			assistant.WriteString(ev.Delta)
-		case "tool_call_result":
-			if a.store != nil {
-				content := ev.Summary
-				if ev.Name == core.PresentMoviesName && len(ev.Movies) > 0 {
-					if encoded, err := json.Marshal(map[string]any{"movies": ev.Movies}); err == nil {
-						content = string(encoded)
-					}
-				}
-				_, _ = a.store.AppendAIChatMessage(ctx, session.ID, "tool", content, ev.Name, ev.ToolCallID)
-			}
+		case "tool_call_result", "movie_cards", "message_done", "confirm_required":
+			stored := ev
+			// History is evidence, never a source of write authority.
+			stored.ConfirmToken = ""
+			stored.Arguments = nil
+			events = append(events, stored)
 		}
 		if emit != nil {
 			emit(ev)
@@ -142,10 +139,31 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	}
 	page := a.projectAIChatContext(ctx, req.Context)
 	runErr := loop.Run(ctx, session.ID, messageID, history, page, wrapped)
-	if a.store != nil && assistant.Len() > 0 {
-		_, _ = a.store.AppendAIChatMessage(ctx, session.ID, "assistant", assistant.String(), "", "")
+	if err := a.persistAIChatTurn(ctx, session.ID, assistant.String(), events); err != nil {
+		return errors.Join(runErr, err)
 	}
 	return runErr
+}
+
+// Finish persistence even after browser cancellation, but never wait indefinitely.
+func (a *App) persistAIChatTurn(ctx context.Context, sessionID, text string, events []contracts.AIChatSSEEvent) error {
+	if a.store == nil {
+		return nil
+	}
+	if len(events) == 0 || events[len(events)-1].Type != "message_done" {
+		status := "failed"
+		if ctx.Err() != nil {
+			status = "cancelled"
+		}
+		events = append(events, contracts.AIChatSSEEvent{Type: "message_done", Outcome: &contracts.AIChatOutcomeDTO{Status: status}})
+	}
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, err := a.store.AppendAIChatMessage(finishCtx, sessionID, "assistant", text, "", "", events...)
+	if err != nil {
+		return fmt.Errorf("save AI turn: %w", err)
+	}
+	return nil
 }
 
 // projectAIChatContext resolves the v1 explicit selections against the local

@@ -279,6 +279,7 @@
     "confirmDiscard": "放弃",
     "confirmApplied": "已写入资料库",
     "confirmDiscarded": "已放弃这次改写",
+    "confirmArchived": "这是历史预览，不能再次应用。请查看当前资料，若仍需修改，请重新生成预览。",
     "mention": {
       "trigger": "引用",
       "placeholder": "引用影片、演员或标签",

@@ -163,7 +163,10 @@ function asText(value: unknown) {
         </div>
       </div>
     </template>
-    <p v-if="props.entry.status === 'applied'" class="text-sm text-muted-foreground">
+    <p v-if="props.entry.status === 'archived'" class="text-sm text-muted-foreground">
+      {{ t('agentWindow.confirmArchived') }}
+    </p>
+    <p v-else-if="props.entry.status === 'applied'" class="text-sm text-muted-foreground">
       {{ copy.appliedLabel }}
     </p>
     <p v-else-if="props.entry.status === 'discarded'" class="text-sm text-muted-foreground">

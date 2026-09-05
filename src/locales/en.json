@@ -279,6 +279,7 @@
     "confirmDiscard": "Discard",
     "confirmApplied": "Saved to the library",
     "confirmDiscarded": "Discarded this rewrite",
+    "confirmArchived": "This historical preview cannot be applied again. Check the current data and generate a new preview if needed.",
     "mention": {
       "trigger": "Mention",
       "placeholder": "Mention a title, actor, or tag",

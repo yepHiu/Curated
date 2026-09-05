@@ -404,6 +404,7 @@ export interface AIChatSessionListDTO {
 }
 
 export interface AIChatStoredMessageDTO {
+  events?: AIChatStoredEventDTO[]
   id: string
   sessionId: string
   role: string
@@ -426,6 +427,21 @@ export interface AIAgentMovieCardDTO {
   coverUrl?: string
   thumbUrl?: string
   reason?: string
+}
+
+/** Persisted result events; confirmation tokens are deliberately not stored. */
+export interface AIChatStoredEventDTO {
+  type: string
+  toolCallId?: string
+  name?: string
+  ok?: boolean
+  summary?: string
+  movies?: AIAgentMovieCardDTO[]
+  providerRows?: AIAgentProviderTitleDTO[]
+  evidence?: AIEvidenceDTO
+  resolution?: AIEntityResolutionDTO
+  outcome?: AIChatOutcomeDTO
+  changes?: AIConfirmChangeDTO[]
 }
 
 export interface AIAgentProviderTitleDTO {

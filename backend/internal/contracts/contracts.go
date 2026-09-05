@@ -1052,14 +1052,15 @@ type AIChatSessionListDTO struct {
 }
 
 type AIChatStoredMessageDTO struct {
-	ID         string `json:"id"`
-	SessionID  string `json:"sessionId"`
-	Role       string `json:"role"`
-	Content    string `json:"content"`
-	ToolName   string `json:"toolName,omitempty"`
-	ToolCallID string `json:"toolCallId,omitempty"`
-	Seq        int    `json:"seq"`
-	CreatedAt  string `json:"createdAt"`
+	Events     []AIChatSSEEvent `json:"events,omitempty"`
+	ID         string           `json:"id"`
+	SessionID  string           `json:"sessionId"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content"`
+	ToolName   string           `json:"toolName,omitempty"`
+	ToolCallID string           `json:"toolCallId,omitempty"`
+	Seq        int              `json:"seq"`
+	CreatedAt  string           `json:"createdAt"`
 }
 
 type AIChatSessionDetailDTO struct {

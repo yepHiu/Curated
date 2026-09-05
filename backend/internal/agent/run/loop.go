@@ -96,6 +96,10 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			})
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				emitDone("cancelled", "The user cancelled this request before it finished.", false)
+				return nil
+			}
 			emitDone("failed", "The model response could not be completed.", true)
 			return err
 		}

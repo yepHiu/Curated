@@ -34,6 +34,6 @@ export type AgentChatEntry =
       changes: import("@/api/types").AIConfirmChangeDTO[]
       arguments: Record<string, unknown>
       sessionId: string
-      status: "pending" | "applying" | "applied" | "discarded"
+      status: "pending" | "applying" | "applied" | "discarded" | "archived"
       error?: string
     }
