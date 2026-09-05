@@ -42,7 +42,6 @@ import {
   buildHlsPlaybackConfig,
   canPlayHlsNatively,
   loadHlsLibrary,
-  prewarmHlsResources,
   preloadHlsLibrary,
   startHlsLoadingAtSessionOrigin,
   type HlsInstance,
@@ -309,7 +308,6 @@ let hlsDirectFallbackInFlight = false
 let playbackFallbackNoticeKey = ""
 let playbackSessionCleanupId: string | null = null
 let resumePlaybackWhenReady = false
-let hlsPrewarmSeq = 0
 let hlsStartupBufferPending = false
 let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
 
@@ -319,8 +317,6 @@ const playbackError = ref("")
 const isResolvingPlayback = ref(false)
 const isSwitchingPlaybackSession = ref(false)
 const isPlaybackWaiting = ref(false)
-const isPrewarmingHls = ref(false)
-const hlsPrewarmProgress = ref(0)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
@@ -887,36 +883,6 @@ async function syncVideoSource() {
   refreshPlaybackStatsFromVideo()
 }
 
-async function prewarmHlsDescriptor(descriptor: PlaybackDescriptorDTO | null) {
-  const seq = ++hlsPrewarmSeq
-  const shouldPrewarm = descriptor?.mode === "hls" && Boolean(descriptor.url?.trim())
-  if (!shouldPrewarm) {
-    isPrewarmingHls.value = false
-    hlsPrewarmProgress.value = 0
-    return
-  }
-  isPrewarmingHls.value = true
-  hlsPrewarmProgress.value = 0.06
-  preloadHlsLibrary()
-  try {
-    await prewarmHlsResources(descriptor.url.trim(), {
-      resourceCount: 2,
-      timeoutMs: 3500,
-      onProgress: (progress) => {
-        if (seq !== hlsPrewarmSeq) return
-        hlsPrewarmProgress.value = progress
-      },
-    })
-  } catch {
-    // Best-effort only. Playback startup still proceeds normally.
-  } finally {
-    if (seq === hlsPrewarmSeq) {
-      isPrewarmingHls.value = false
-      hlsPrewarmProgress.value = 0
-    }
-  }
-}
-
 function canBrowserDirectPlayFromFileName(fileName?: string | null): boolean {
   const normalized = (fileName ?? "").trim().toLowerCase()
   return [".mp4", ".m4v", ".webm", ".ogv", ".m3u8"].some((ext) => normalized.endsWith(ext))
@@ -1001,8 +967,6 @@ function syncSrc() {
   playbackError.value = ""
   isResolvingPlayback.value = true
   isPlaybackWaiting.value = false
-  isPrewarmingHls.value = false
-  hlsPrewarmProgress.value = 0
   optimisticSeekTargetSec.value = null
   currentTime.value = 0
   duration.value = 0
@@ -1070,7 +1034,6 @@ async function loadPlayback() {
     }
     playbackDescriptor.value = descriptor
     playbackSrc.value = descriptor ? resolveMoviePlaybackSourceUrl(movieId, descriptor.url) : null
-    void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
     publishActivePlaybackSession("paused")
@@ -1107,10 +1070,7 @@ async function fallbackHlsToDirect(reason?: string) {
 
   hlsDirectFallbackInFlight = true
   try {
-    ++hlsPrewarmSeq
-    isPrewarmingHls.value = false
-    hlsPrewarmProgress.value = 0
-    bufferedUntilSec.value = 0
+        bufferedUntilSec.value = 0
     markPlaybackReady()
     const absolutePositionSec = getAbsolutePlaybackTime()
     const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
@@ -1903,7 +1863,6 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = normalizedDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, normalizedDescriptor.url)
-    void prewarmHlsDescriptor(normalizedDescriptor)
     currentTime.value = targetSec
     progressSliderValue.value = [targetSec]
   } catch (err) {
@@ -2143,17 +2102,13 @@ const playbackBusyLabel = computed(() => {
     return t("player.bufferingSeek")
   }
   if (isPlaybackWaiting.value) return t("player.buffering")
-  if (isPrewarmingHls.value && playbackDescriptor.value?.mode === "hls" && !isPlaying.value) {
-    return t("player.prewarmingStream")
-  }
+
   return ""
 })
 
 const showPlaybackBusyState = computed(() => Boolean(playbackBusyLabel.value))
 const showCenteredBusyOverlay = computed(() => showPlaybackBusyState.value)
-const prewarmProgressPercent = computed(() =>
-  Math.max(0, Math.min(100, Math.round(hlsPrewarmProgress.value * 100))),
-)
+
 
 function formatClientError(err: unknown, fallback: string): string {
   if (err instanceof HttpClientError) {
@@ -2583,7 +2538,6 @@ async function seekToAbsolutePlaybackTime(
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = nextDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, nextDescriptor.url)
-    void prewarmHlsDescriptor(nextDescriptor)
     currentTime.value = clampedTarget
     progressSliderValue.value = [clampedTarget]
   } catch (err) {
@@ -3111,12 +3065,7 @@ const videoPreloadMode = computed(() =>
             <div class="flex min-w-[12rem] max-w-sm flex-col items-center gap-3 rounded-[1.5rem] border border-white/12 bg-black/48 px-6 py-5 text-center text-white shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-md">
               <Loader2 class="size-8 animate-spin text-white/85" aria-hidden="true" />
               <span class="text-sm font-medium tracking-[0.01em] text-white/88">{{ playbackBusyLabel }}</span>
-              <span
-                v-if="isPrewarmingHls && playbackDescriptor?.mode === 'hls' && !isPlaying"
-                class="text-xs font-medium tabular-nums text-white/55"
-              >
-                {{ prewarmProgressPercent }}%
-              </span>
+
             </div>
           </div>
         </Transition>
