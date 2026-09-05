@@ -20,6 +20,7 @@ defineOptions({ name: "AgentChatComposer" })
 
 const props = defineProps<{
   streaming: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -209,7 +210,7 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
-    if (!props.streaming && draft.value.trim()) {
+    if (!props.streaming && !props.disabled && draft.value.trim()) {
       emit("send")
     }
   }
@@ -253,7 +254,7 @@ function onKeydown(e: KeyboardEvent) {
         rows="2"
         class="min-h-11 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
         :placeholder="t('agentWindow.inputPlaceholder')"
-        :disabled="streaming"
+        :disabled="streaming || disabled"
         data-agent-window-input
         @keydown="onKeydown"
         @input="syncFromTextarea"
@@ -266,7 +267,7 @@ function onKeydown(e: KeyboardEvent) {
           variant="ghost"
           size="icon"
           class="size-11 rounded-lg text-muted-foreground hover:text-foreground md:size-8"
-          :disabled="streaming"
+          :disabled="streaming || disabled"
           :aria-label="t('agentWindow.mention.trigger')"
           data-agent-mention-trigger
           @click="insertMentionTrigger"
@@ -278,7 +279,7 @@ function onKeydown(e: KeyboardEvent) {
           size="icon"
           class="size-11 rounded-lg md:size-8"
           :variant="streaming ? 'secondary' : 'default'"
-          :disabled="!streaming && !draft.trim()"
+          :disabled="disabled || (!streaming && !draft.trim())"
           :aria-label="streaming ? t('agentWindow.stop') : t('agentWindow.send')"
           data-agent-window-send
           @click="streaming ? emit('stop') : emit('send')"

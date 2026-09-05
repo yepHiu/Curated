@@ -50,6 +50,7 @@ const draft = ref("")
 const mentions = ref<AgentMention[]>([])
 const omittedContext = ref<string[]>([])
 const streaming = ref(false)
+const loadingSession = ref(false)
 const providerUnconfigured = ref(false)
 const errorMessage = ref("")
 const threadRef = ref<{ scrollToEnd: () => void } | null>(null)
@@ -57,6 +58,7 @@ const composerRef = ref<{ focus: () => void; mentionOpen?: boolean; closeMention
 
 let abortController: AbortController | null = null
 let streamSeq = 0
+let sessionLoadSeq = 0
 let entrySeq = 0
 
 const sidebarOverlays = computed(
@@ -93,6 +95,7 @@ onKeyStroke("Escape", (e) => {
 })
 
 onBeforeUnmount(() => {
+  sessionLoadSeq += 1
   abortController?.abort()
 })
 
@@ -126,11 +129,16 @@ function persistSessionId(id: string) {
 }
 
 async function refreshSessions() {
+  const loadSeq = sessionLoadSeq
   try {
-    sessions.value = await aiService.listSessions()
+    const rows = await aiService.listSessions()
+    if (loadSeq !== sessionLoadSeq) return
+    sessions.value = rows
   } catch {
+    if (loadSeq !== sessionLoadSeq) return
     sessions.value = []
   }
+  if (loadingSession.value) return
   const remembered = sessionId.value || localStorage.getItem(SESSION_STORAGE_KEY) || ""
   if (remembered && sessions.value.some((item) => item.id === remembered)) {
     if (sessionId.value !== remembered || entries.value.length === 0) {
@@ -144,9 +152,16 @@ async function refreshSessions() {
 }
 
 async function loadSession(id: string) {
+  abandonStream()
+  const loadSeq = ++sessionLoadSeq
+  loadingSession.value = true
   persistSessionId(id)
+  entries.value = []
+  errorMessage.value = ""
+  providerUnconfigured.value = false
   try {
     const detail = await aiService.getSession(id)
+    if (loadSeq !== sessionLoadSeq) return
     let pendingMovies: AIAgentMovieCardDTO[] = []
     let processTools: Extract<AgentChatEntry, { kind: "process" }>["tools"] = []
     const next: AgentChatEntry[] = []
@@ -203,7 +218,10 @@ async function loadSession(id: string) {
     }
     entries.value = next
   } catch {
+    if (loadSeq !== sessionLoadSeq) return
     entries.value = []
+  } finally {
+    if (loadSeq === sessionLoadSeq) loadingSession.value = false
   }
   void scrollListToEnd()
 }
@@ -216,13 +234,21 @@ async function selectSession(id: string) {
 }
 
 async function startNewChat() {
-  abortController?.abort()
+  abandonStream()
+  const loadSeq = ++sessionLoadSeq
+  loadingSession.value = true
+  persistSessionId("")
+  entries.value = []
   try {
     const created = await aiService.createSession()
+    if (loadSeq !== sessionLoadSeq) return
     sessions.value = [created, ...sessions.value.filter((item) => item.id !== created.id)]
     persistSessionId(created.id)
   } catch {
+    if (loadSeq !== sessionLoadSeq) return
     persistSessionId("")
+  } finally {
+    if (loadSeq === sessionLoadSeq) loadingSession.value = false
   }
   entries.value = []
   providerUnconfigured.value = false
@@ -238,7 +264,9 @@ async function startNewChat() {
 
 async function deleteChat(id: string) {
   if (sessionId.value === id) {
-    abortController?.abort()
+    abandonStream()
+    sessionLoadSeq += 1
+    loadingSession.value = false
   }
   try {
     await aiService.deleteSession(id)
@@ -410,9 +438,16 @@ function stop() {
   })
 }
 
+function abandonStream() {
+  streamSeq += 1
+  abortController?.abort()
+  abortController = null
+  streaming.value = false
+}
+
 async function send(selected?: AIEntityCandidateDTO) {
   const content = draft.value.trim()
-  if (!content || streaming.value) return
+  if (!content || streaming.value || loadingSession.value) return
   draft.value = ""
   const activeMentions = mentions.value
   mentions.value = []
@@ -441,7 +476,8 @@ async function send(selected?: AIEntityCandidateDTO) {
   streaming.value = true
   providerUnconfigured.value = false
   errorMessage.value = ""
-  abortController = new AbortController()
+  const controller = new AbortController()
+  abortController = controller
   const seq = ++streamSeq
   void scrollListToEnd()
 
@@ -454,13 +490,13 @@ async function send(selected?: AIEntityCandidateDTO) {
         locale: locale.value,
       },
       {
-        signal: abortController.signal,
+        signal: controller.signal,
         onSession(id) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           persistSessionId(id)
         },
         onThinking(delta) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           const current = findProcessFor(assistantId)
           if (!current) return
           current.thinking += delta
@@ -468,7 +504,7 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         onDelta(delta) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           collapseProcess(assistantId)
           const current = entries.value.find((entry) => entry.id === assistantId)
           if (current?.kind === "assistant") {
@@ -477,7 +513,7 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         onToolStart(event) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           const current = findProcessFor(assistantId)
           if (!current || !isAgentProcessTool(event.name)) return
           current.thinkingActive = false
@@ -489,7 +525,7 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         onToolResult(event) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           const current = findProcessFor(assistantId)
           const card = current?.tools.find((item) => item.toolCallId === event.toolCallId)
           if (card) {
@@ -507,12 +543,12 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         onMovieCards(movies) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           attachMovies(assistantId, movies)
           void scrollListToEnd()
         },
         onConfirmRequired(event) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           entries.value.push({
             id: nextEntryId("confirm"),
             kind: "confirm",
@@ -527,15 +563,15 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         onOutcome(outcome) {
-          if (seq !== streamSeq) return
+          if (seq !== streamSeq || controller.signal.aborted) return
           entries.value.push({ id: nextEntryId("outcome"), kind: "outcome", outcome })
           void scrollListToEnd()
         },
       },
     )
-    void refreshSessions()
+    if (seq === streamSeq && !controller.signal.aborted) void refreshSessions()
   } catch (err) {
-    if (!abortController.signal.aborted) {
+    if (seq === streamSeq && !controller.signal.aborted) {
       const aiErr = err instanceof AIServiceError ? err : null
       if (aiErr?.code === AI_PROVIDER_UNAVAILABLE_CODE) {
         providerUnconfigured.value = true
@@ -550,7 +586,7 @@ async function send(selected?: AIEntityCandidateDTO) {
       streaming.value = false
       collapseProcess(assistantId)
       const current = entries.value.find((entry) => entry.id === assistantId)
-      if (abortController.signal.aborted && current?.kind === "assistant" && !current.content && !current.movies?.length) {
+      if (controller.signal.aborted && current?.kind === "assistant" && !current.content && !current.movies?.length) {
         removeAssistantTurn(assistantId)
       }
       void scrollListToEnd()
@@ -739,6 +775,7 @@ watch(
                 v-model="draft"
                 v-model:mentions="mentions"
                 :streaming="streaming"
+                :disabled="loadingSession"
                 @send="send"
                 @stop="stop"
               />
@@ -794,3 +831,4 @@ watch(
     </div>
   </Teleport>
 </template>
+
