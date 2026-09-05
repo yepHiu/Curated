@@ -182,12 +182,27 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  it("cancels startup and releases a late descriptor without reseeking after unmount", async () => {
+    let finish!: (value: object) => void
+    serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    routeState.query = { t: "1200" }
+    const wrapper = await mountPlayerPage()
+    const options = serviceMocks.getMoviePlayback.mock.calls[0]?.[1]
+    expect(options.startPositionSec).toBe(1200)
+    wrapper.unmount()
+    expect(options.signal.aborted).toBe(true)
+    finish({ movieId: "movie-1", mode: "hls", sessionId: "late", startPositionSec: 600, durationSec: 7200 })
+    await flushPromises()
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("late")
+    expect(serviceMocks.createPlaybackSession).not.toHaveBeenCalled()
+  })
+
   it("shows the preparing overlay while the playback descriptor is loading", async () => {
     serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise(() => {}))
     const wrapper = await mountPlayerPage()
 
     try {
-      expect(serviceMocks.getMoviePlayback).toHaveBeenCalledWith("movie-1")
+      expect(serviceMocks.getMoviePlayback).toHaveBeenCalledWith("movie-1", expect.objectContaining({ signal: expect.any(AbortSignal) }))
       expect(wrapper.text()).toContain("common.loading")
       expect(wrapper.text()).toContain("player.preparingPlayback")
     } finally {
@@ -320,7 +335,7 @@ describe("PlayerPage loading states", () => {
     try {
       await flushPromises()
       await nextTick()
-      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0)
+      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0, expect.any(AbortSignal))
       expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("old-session")
     } finally {
       wrapper.unmount()

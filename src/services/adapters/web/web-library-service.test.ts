@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   listConnectedClients: vi.fn(),
   getMovie: vi.fn(),
   getMoviePlayback: vi.fn(),
+  deletePlaybackSession: vi.fn().mockResolvedValue(undefined),
   patchMovie: vi.fn(),
   deleteMovie: vi.fn(),
   restoreMovie: vi.fn(),
@@ -1294,6 +1295,37 @@ describe("webLibraryService playback prefetch", () => {
     expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(2)
   })
 
+  it("keeps slow in-flight prefetches and transfers cancellation to their consumer", async () => {
+    vi.useFakeTimers()
+    try {
+      let finish!: (value: object) => void
+      apiMocks.getMoviePlayback.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+      const { webLibraryService } = await loadStartedWebLibraryService()
+      const cancelLease = webLibraryService.prefetchMoviePlayback("movie-1", 1200)
+      await vi.advanceTimersByTimeAsync(15_000)
+      const controller = new AbortController()
+      const pending = webLibraryService.getMoviePlayback("movie-1", { startPositionSec: 1200, signal: controller.signal })
+      cancelLease?.()
+      const request = apiMocks.getMoviePlayback.mock.calls[0]?.[1]
+      expect(request.signal.aborted).toBe(false)
+      expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(1)
+      controller.abort()
+      expect(request.signal.aborted).toBe(true)
+      finish({ ...playbackDto("movie-1"), sessionId: "late-prefetch" })
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" })
+      expect(apiMocks.deletePlaybackSession).toHaveBeenCalledWith("late-prefetch")
+    } finally { vi.useRealTimers() }
+  })
+
+  it("does not reuse a descriptor prefetched for another start position", async () => {
+    apiMocks.getMoviePlayback.mockResolvedValue(playbackDto("movie-1"))
+    const { webLibraryService } = await loadStartedWebLibraryService()
+    const cancel = webLibraryService.prefetchMoviePlayback("movie-1", 600)
+    await webLibraryService.getMoviePlayback("movie-1", { startPositionSec: 1200 })
+    expect(apiMocks.getMoviePlayback).toHaveBeenCalledTimes(2)
+    cancel?.()
+  })
+
   it("reuses an in-flight prefetch and never serves a failed one", async () => {
     apiMocks.listMovies.mockResolvedValueOnce({ items: [], total: 0, limit: 500, offset: 0 })
     apiMocks.getMoviePlayback.mockRejectedValueOnce(new Error("descriptor failed"))
@@ -1320,7 +1352,8 @@ describe("webLibraryService playback prefetch", () => {
 
       apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1"))
       webLibraryService.prefetchMoviePlayback("movie-1")
-      vi.advanceTimersByTime(15_000)
+      await vi.advanceTimersByTimeAsync(0)
+      await vi.advanceTimersByTimeAsync(15_000)
 
       apiMocks.getMoviePlayback.mockResolvedValueOnce(playbackDto("movie-1", "/fresh"))
       await expect(webLibraryService.getMoviePlayback("movie-1")).resolves.toMatchObject({

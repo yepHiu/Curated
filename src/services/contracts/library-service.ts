@@ -211,16 +211,17 @@ export interface LibraryService {
    * Web：返回后端给出的播放描述（当前为 direct-play，后续可扩展 remux / transcode）。
    * Mock：返回 null。
    */
-  getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null>
+  getMoviePlayback(movieId: string, options?: { startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null>
   /**
    * 尽力预取播放描述符（点击进入播放器时提前发起）。Web：短 TTL 一次性缓存，
    * 下一次 `getMoviePlayback` 直接消费；Mock：无操作。
    */
-  prefetchMoviePlayback(movieId: string): void
+  prefetchMoviePlayback(movieId: string, startPositionSec?: number): (() => void) | void
   createPlaybackSession(
     movieId: string,
     mode: PlaybackDescriptorDTO["mode"],
     startPositionSec?: number,
+    signal?: AbortSignal,
   ): Promise<PlaybackDescriptorDTO | null>
   getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO | null>
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>

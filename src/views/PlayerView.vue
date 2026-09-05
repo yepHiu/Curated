@@ -5,6 +5,7 @@ import { useRoute } from "vue-router"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 import PlayerPage from "@/components/jav-library/PlayerPage.vue"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
+import { parseResumeSecondsFromQuery } from "@/lib/playback-progress-storage"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -21,7 +22,9 @@ const hydrating = ref(false)
 
 watch(
   movieId,
-  async (id) => {
+  async (id, _old, onCleanup) => {
+    let cancelled = false
+    onCleanup(() => { cancelled = true })
     if (!id) {
       hydrating.value = false
       return
@@ -31,9 +34,13 @@ watch(
     // movie hydration and the player page mount instead of serializing after
     // them. PlayerView only loads after the auth guard passes, so locked
     // startup never touches protected playback endpoints.
-    libraryService.prefetchMoviePlayback(id)
+    const start = parseResumeSecondsFromQuery(route.query.t)
+    const cancelPrefetch = start === undefined
+      ? libraryService.prefetchMoviePlayback(id)
+      : libraryService.prefetchMoviePlayback(id, start)
+    if (cancelPrefetch) onCleanup(cancelPrefetch)
     if (libraryService.getMovieById(id)) {
-      hydrating.value = false
+      if (!cancelled) hydrating.value = false
       return
     }
     if (!USE_WEB_API) {
@@ -44,7 +51,7 @@ watch(
     try {
       await libraryService.ensureMovieCached(id)
     } finally {
-      hydrating.value = false
+      if (!cancelled) hydrating.value = false
     }
   },
   { immediate: true },

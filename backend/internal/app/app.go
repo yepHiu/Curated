@@ -2377,7 +2377,11 @@ func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO,
 // ResolvePlayback builds a playback descriptor deciding between direct, HLS, and native playback.
 // clientVideoCodecs optionally carries browser-reported decodable mp4-family video codecs
 // (the `clientVideoCodecs` query parameter); nil keeps the static whitelist.
-func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error) {
+func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, startPositionSec *float64) (contracts.PlaybackDescriptorDTO, error) {
+	return a.resolvePlayback(ctx, movieID, clientVideoCodecs, startPositionSec, false)
+}
+
+func (a *App) resolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, requestedStart *float64, forceDirect bool) (contracts.PlaybackDescriptorDTO, error) {
 	detail, err := a.store.GetMovieDetail(ctx, movieID)
 	if err != nil {
 		return contracts.PlaybackDescriptorDTO{}, err
@@ -2393,19 +2397,14 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 	decision := buildPlaybackDecision(playbackDecisionInput{
 		Location:          location,
 		MediaInfo:         mediaInfo,
-		StreamPushEnabled: a.streams != nil && a.streams.Enabled(),
+		StreamPushEnabled: !forceDirect && a.streams != nil && a.streams.Enabled(),
 		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
 		ClientVideoCodecs: clientVideoCodecs,
 	})
 	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec, decision)
+	startPositionSec := normalizePlaybackStart(requestedStart, descriptor.ResumePositionSec, durationSec)
+	descriptor.ResumePositionSec = startPositionSec
 	if decision.Mode == contracts.PlaybackModeHLS {
-		startPositionSec := 0.0
-		if progress != nil && progress.PositionSec > 0 {
-			startPositionSec = progress.PositionSec
-		}
-		if durationSec > 0 && startPositionSec > durationSec {
-			startPositionSec = durationSec
-		}
 		session, err := a.streams.StartHLSSession(ctx, movieID, location, playback.StartHLSSessionOptions{
 			StartPositionSec: startPositionSec,
 			PreferRemux:      decision.PreferRemux,
@@ -2440,7 +2439,7 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 // CreatePlaybackSession explicitly creates an HLS playback session and returns its descriptor.
 func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
 	if mode == "" || mode == contracts.PlaybackModeDirect {
-		return a.ResolvePlayback(ctx, movieID, nil)
+		return a.resolvePlayback(ctx, movieID, nil, &startPositionSec, true)
 	}
 	detail, err := a.store.GetMovieDetail(ctx, movieID)
 	if err != nil {
@@ -2619,8 +2618,8 @@ func buildDirectPlaybackDescriptor(
 ) contracts.PlaybackDescriptorDTO {
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
 	mimeType, canDirectPlay := resolveDirectPlaybackMimeType(fileName)
-	if decision.CanDirectPlay {
-		canDirectPlay = true
+	if decision.ReasonCode != "" {
+		canDirectPlay = decision.CanDirectPlay
 	}
 
 	dto := contracts.PlaybackDescriptorDTO{

@@ -295,6 +295,15 @@ let lastProgressSaveAt = 0
 let moviePlaybackStartedAtMs = 0
 let restartedFromNearEnd = false
 let playbackLoadSeq = 0
+let playbackRequest: AbortController | null = null
+let playbackDisposed = false
+let sourceAttachSeq = 0
+
+function beginPlaybackRequest() {
+  playbackRequest?.abort()
+  playbackRequest = new AbortController()
+  return { seq: ++playbackLoadSeq, signal: playbackRequest.signal }
+}
 let hlsWindowWaitGeneration = 0
 let hlsDirectFallbackInFlight = false
 let playbackFallbackNoticeKey = ""
@@ -814,6 +823,7 @@ async function destroyHlsInstance() {
 }
 
 async function syncVideoSource() {
+  const attachSeq = ++sourceAttachSeq
   const src = playbackSrc.value?.trim() ?? ""
   const mode = playbackDescriptor.value?.mode ?? "direct"
   const previousMode = lastAppliedPlaybackMode
@@ -825,6 +835,7 @@ async function syncVideoSource() {
   }
   await destroyHlsInstance()
   await nextTick()
+  if (playbackDisposed || attachSeq !== sourceAttachSeq) return
   const v = videoRef.value
   if (!v) return
   if (mode === "direct" && playbackDescriptor.value?.canDirectPlay === false) {
@@ -845,7 +856,7 @@ async function syncVideoSource() {
     }
     try {
       const Hls = await loadHlsLibrary()
-      if (!playbackSrc.value || videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") {
+      if (playbackDisposed || attachSeq !== sourceAttachSeq || playbackSrc.value !== src || videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") {
         return
       }
       if (!Hls.isSupported()) {
@@ -1005,7 +1016,7 @@ function syncSrc() {
 }
 
 async function loadPlayback() {
-  const seq = ++playbackLoadSeq
+  const { seq, signal } = beginPlaybackRequest()
   hlsWindowWaitGeneration += 1
   const movieId = props.movie.id.trim()
   if (!movieId) {
@@ -1017,8 +1028,12 @@ async function loadPlayback() {
     return
   }
   try {
-    let descriptor = await libraryService.getMoviePlayback(movieId)
     const requestedStartSec = parseResumeSecondsFromQuery(route.query.t)
+    let descriptor = await libraryService.getMoviePlayback(movieId, { startPositionSec: requestedStartSec, signal })
+    if (playbackDisposed || seq !== playbackLoadSeq) {
+      await releasePlaybackSession(descriptor?.sessionId)
+      return
+    }
     const storedProgress = getProgress(movieId)
     const durationHint = descriptor?.durationSec ?? storedProgress?.durationSec ?? 0
     const preferredStartSec = resolvePreferredPlaybackTargetSec(
@@ -1039,6 +1054,7 @@ async function loadPlayback() {
           movieId,
           "hls",
           Math.max(0, wantsStartSec),
+          signal,
         )
         if (descriptor.sessionId) {
           await releasePlaybackSession(descriptor.sessionId)
@@ -1200,6 +1216,11 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  playbackDisposed = true
+  playbackLoadSeq += 1
+  sourceAttachSeq += 1
+  playbackRequest?.abort()
+  sessionDiagnosticsPollGen += 1
   hlsWindowWaitGeneration += 1
   flushPlaybackProgress()
   stopCurrentVideoPlaybackPipeline()
@@ -1833,7 +1854,7 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
   const targetSec = clampAbsolutePlaybackTarget(getAbsolutePlaybackTime())
   const previousSessionId = currentDescriptor.sessionId
   const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
-  const seq = ++playbackLoadSeq
+  const { seq, signal } = beginPlaybackRequest()
   hlsWindowWaitGeneration += 1
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
@@ -1845,8 +1866,14 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
       movieId,
       nextMode,
       targetSec,
+      signal,
     )
     if (!nextDescriptor) return
+
+    if (nextDescriptor.mode !== nextMode) {
+      await releasePlaybackSession(nextDescriptor.sessionId)
+      throw new Error(t("player.errGeneric"))
+    }
 
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
       if (nextDescriptor.sessionId) {
@@ -2528,7 +2555,7 @@ async function seekToAbsolutePlaybackTime(
   const movieId = props.movie.id.trim()
   if (!movieId) return
   const previousSessionId = descriptor.sessionId
-  const seq = ++playbackLoadSeq
+  const { seq, signal } = beginPlaybackRequest()
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   playbackError.value = ""
@@ -2539,6 +2566,7 @@ async function seekToAbsolutePlaybackTime(
       movieId,
       "hls",
       clampedTarget,
+      signal,
     )
     if (!nextDescriptor) return
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {

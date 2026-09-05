@@ -195,7 +195,7 @@ type DevPerformanceProvider interface {
 type PlaybackResolver interface {
 	// clientVideoCodecs optionally carries browser-reported decodable mp4-family
 	// video codecs (the `clientVideoCodecs` query parameter).
-	ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error)
+	ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, startPositionSec *float64) (contracts.PlaybackDescriptorDTO, error)
 	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
 	GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error)
 	ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error)
@@ -949,8 +949,17 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var startPositionSec *float64
+	if raw, present := r.URL.Query()["startPositionSec"]; present {
+		value, err := strconv.ParseFloat(raw[0], 64)
+		if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid startPositionSec")
+			return
+		}
+		startPositionSec = &value
+	}
 	if h.playbackResolver != nil {
-		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID, parseClientVideoCodecs(r))
+		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID, parseClientVideoCodecs(r), startPositionSec)
 		if err == nil {
 			writeJSON(w, http.StatusOK, dto)
 			return

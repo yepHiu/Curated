@@ -1128,32 +1128,37 @@ function createWebLibraryService(): LibraryService {
       return await api.startMetadataRefreshByPaths({ paths: cleaned })
     },
 
-    async getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null> {
+    async getMoviePlayback(movieId: string, options?: { startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null> {
       const id = movieId.trim()
       if (!id) {
         return null
       }
-      const prefetched = takeFreshMoviePlaybackPrefetch(id)
+      const prefetched = takeFreshMoviePlaybackPrefetch(id, options?.startPositionSec, options?.signal)
       if (prefetched) {
         return await prefetched
       }
-      const dto = await api.getMoviePlayback(id, { clientVideoCodecs: clientVideoCodecsParam() })
+      const dto = await api.getMoviePlayback(id, { clientVideoCodecs: clientVideoCodecsParam(), ...options })
+      if (options?.signal?.aborted) {
+        if (dto.sessionId) void api.deletePlaybackSession(dto.sessionId).catch(() => {})
+        throw new DOMException("Playback cancelled", "AbortError")
+      }
       if (!dto.url) {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }
       return dto
     },
 
-    prefetchMoviePlayback(movieId: string) {
+    prefetchMoviePlayback(movieId: string, startPositionSec?: number) {
       const id = movieId.trim()
       if (!id) return
-      prefetchMoviePlaybackRequest(id)
+      return prefetchMoviePlaybackRequest(id, startPositionSec)
     },
 
     async createPlaybackSession(
       movieId: string,
       mode: PlaybackDescriptorDTO["mode"],
       startPositionSec?: number,
+      signal?: AbortSignal,
     ): Promise<PlaybackDescriptorDTO | null> {
       const id = movieId.trim()
       if (!id) {
@@ -1162,7 +1167,11 @@ function createWebLibraryService(): LibraryService {
       const dto = await api.createPlaybackSession(id, {
         mode,
         startPositionSec,
-      })
+      }, signal)
+      if (signal?.aborted) {
+        if (dto.sessionId) void api.deletePlaybackSession(dto.sessionId).catch(() => {})
+        throw new DOMException("Playback cancelled", "AbortError")
+      }
       if (!dto.url) {
         dto.url = moviePlaybackAbsoluteUrl(id)
       }
@@ -1379,6 +1388,8 @@ function createWebLibraryService(): LibraryService {
 type MoviePlaybackPrefetch = {
   promise: Promise<PlaybackDescriptorDTO>
   createdAt: number
+  controller: AbortController
+  timer?: ReturnType<typeof setTimeout>
 }
 
 const moviePlaybackPrefetches = new Map<string, MoviePlaybackPrefetch>()
@@ -1399,16 +1410,29 @@ function clientVideoCodecsParam(): string | null {
  * transition overlaps ffmpeg startup instead of serializing behind it. Entries
  * are consume-once and short-lived; failed requests are dropped immediately.
  */
-function prefetchMoviePlaybackRequest(movieId: string): void {
-  const existing = moviePlaybackPrefetches.get(movieId)
-  if (existing && Date.now() - existing.createdAt < MOVIE_PLAYBACK_PREFETCH_TTL_MS) {
-    return
-  }
-  moviePlaybackPrefetches.delete(movieId)
+function playbackPrefetchKey(movieId: string, startPositionSec?: number): string {
+  return JSON.stringify([movieId, startPositionSec ?? null, clientVideoCodecsParam()])
+}
+
+function disposePlaybackPrefetch(key: string, entry: MoviePlaybackPrefetch): void {
+  if (moviePlaybackPrefetches.get(key) !== entry) return
+  moviePlaybackPrefetches.delete(key)
+  clearTimeout(entry.timer)
+  entry.controller.abort()
+  void entry.promise.then((dto) => {
+    if (dto.sessionId) return api.deletePlaybackSession(dto.sessionId)
+  }).catch(() => {})
+}
+
+function prefetchMoviePlaybackRequest(movieId: string, startPositionSec?: number): () => void {
+  const key = playbackPrefetchKey(movieId, startPositionSec)
+  const existing = moviePlaybackPrefetches.get(key)
+  if (existing) return () => disposePlaybackPrefetch(key, existing)
+  const controller = new AbortController()
   let promise: Promise<PlaybackDescriptorDTO>
   try {
     promise = api
-      .getMoviePlayback(movieId, { clientVideoCodecs: clientVideoCodecsParam() })
+      .getMoviePlayback(movieId, { clientVideoCodecs: clientVideoCodecsParam(), startPositionSec, signal: controller.signal })
       .then((dto) => {
         if (!dto.url) {
           dto.url = moviePlaybackAbsoluteUrl(movieId)
@@ -1416,24 +1440,43 @@ function prefetchMoviePlaybackRequest(movieId: string): void {
         return dto
       })
   } catch {
-    return
+    return () => {}
   }
-  moviePlaybackPrefetches.set(movieId, { promise, createdAt: Date.now() })
+  const entry: MoviePlaybackPrefetch = { promise, createdAt: Number.POSITIVE_INFINITY, controller }
+  moviePlaybackPrefetches.set(key, entry)
+  void promise.then(() => {
+    if (moviePlaybackPrefetches.get(key) !== entry) return
+    entry.createdAt = Date.now()
+    entry.timer = setTimeout(() => disposePlaybackPrefetch(key, entry), MOVIE_PLAYBACK_PREFETCH_TTL_MS)
+  }).catch(() => {})
   void promise.catch(() => {
-    if (moviePlaybackPrefetches.get(movieId)?.promise === promise) {
-      moviePlaybackPrefetches.delete(movieId)
+    if (moviePlaybackPrefetches.get(key) === entry) {
+      moviePlaybackPrefetches.delete(key)
     }
   })
+  return () => disposePlaybackPrefetch(key, entry)
 }
 
-function takeFreshMoviePlaybackPrefetch(movieId: string): Promise<PlaybackDescriptorDTO> | null {
-  const entry = moviePlaybackPrefetches.get(movieId)
+function takeFreshMoviePlaybackPrefetch(movieId: string, startPositionSec?: number, signal?: AbortSignal): Promise<PlaybackDescriptorDTO> | null {
+  const key = playbackPrefetchKey(movieId, startPositionSec)
+  const entry = moviePlaybackPrefetches.get(key)
   if (!entry) return null
-  moviePlaybackPrefetches.delete(movieId)
   if (Date.now() - entry.createdAt >= MOVIE_PLAYBACK_PREFETCH_TTL_MS) {
+    disposePlaybackPrefetch(key, entry)
     return null
   }
-  return entry.promise
+  moviePlaybackPrefetches.delete(key)
+  clearTimeout(entry.timer)
+  const abort = () => entry.controller.abort()
+  if (signal?.aborted) abort()
+  signal?.addEventListener("abort", abort, { once: true })
+  return entry.promise.then((dto) => {
+    if (entry.controller.signal.aborted) {
+      if (dto.sessionId) void api.deletePlaybackSession(dto.sessionId).catch(() => {})
+      throw new DOMException("Playback cancelled", "AbortError")
+    }
+    return dto
+  }).finally(() => signal?.removeEventListener("abort", abort))
 }
 
 export async function loadMovieDetail(movieId: string): Promise<Movie | undefined> {

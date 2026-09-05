@@ -574,11 +574,12 @@ export const api = {
       .then((value) => assertApiResponse("GET /library/movies/:id", value, isMovieDetailDTO))
   },
 
-  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null }): Promise<PlaybackDescriptorDTO> {
-    const query = options?.clientVideoCodecs
-      ? `?clientVideoCodecs=${encodeURIComponent(options.clientVideoCodecs)}`
-      : ""
-    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${query}`)
+  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO> {
+    const query = new URLSearchParams()
+    if (options?.clientVideoCodecs) query.set("clientVideoCodecs", options.clientVideoCodecs)
+    if (options?.startPositionSec !== undefined) query.set("startPositionSec", String(options.startPositionSec))
+    const suffix = query.size ? `?${query}` : ""
+    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${suffix}`, undefined, options?.signal)
   },
 
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO> {
@@ -588,10 +589,11 @@ export const api = {
     )
   },
 
-  createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody): Promise<PlaybackDescriptorDTO> {
+  createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody, signal?: AbortSignal): Promise<PlaybackDescriptorDTO> {
     return httpClient.post<PlaybackDescriptorDTO>(
       `/library/movies/${encodeURIComponent(movieId)}/playback-session`,
       body,
+      signal,
     )
   },
 

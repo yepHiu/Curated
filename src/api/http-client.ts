@@ -99,6 +99,10 @@ async function monitoredFetch(
   params?: Record<string, string | number | undefined>,
 ): Promise<Response> {
   const controller = new AbortController()
+  const externalSignal = init.signal
+  const abort = () => controller.abort()
+  if (externalSignal?.aborted) abort()
+  externalSignal?.addEventListener("abort", abort, { once: true })
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
   const requestId = DEV_REQUEST_MONITOR_ENABLED
     ? devRequestMonitor.startRequest({
@@ -128,6 +132,7 @@ async function monitoredFetch(
       })
     }
     if (error instanceof Error && error.name === "AbortError") {
+      if (externalSignal?.aborted) throw error
       throw new HttpClientError(0, {
         code: "COMMON_TIMEOUT",
         message: "Request timed out",
@@ -137,6 +142,7 @@ async function monitoredFetch(
     throw error
   } finally {
     clearTimeout(timeoutId)
+    externalSignal?.removeEventListener("abort", abort)
   }
 }
 
@@ -204,20 +210,22 @@ function formatUploadDiagnosticContext(context?: UploadDiagnosticContext): strin
 }
 
 export const httpClient = {
-  async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  async get<T>(path: string, params?: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
     const response = await monitoredFetch("GET", path, {
       headers: { "Accept": "application/json" },
+      signal,
     }, params)
     return handleResponse<T>(response)
   },
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
+  async post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const response = await monitoredFetch("POST", path, {
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
     })
     return handleResponse<T>(response)
   },
