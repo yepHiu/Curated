@@ -372,6 +372,7 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var dataLines []string
+	finished := false
 
 	processEvent := func() error {
 		if len(dataLines) == 0 {
@@ -379,12 +380,16 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 		}
 		data := strings.TrimSpace(strings.Join(dataLines, "\n"))
 		dataLines = dataLines[:0]
-		if data == "" || data == "[DONE]" {
+		if data == "[DONE]" {
+			finished = true
+			return nil
+		}
+		if data == "" {
 			return nil
 		}
 		var chunk chatCompletionResponse
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			return nil
+			return fmt.Errorf("invalid provider stream: %w", err)
 		}
 		if measured := chunk.Usage.measured(); measured != nil {
 			// Providers commonly send the final cumulative usage with choices:[].
@@ -397,6 +402,9 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 			return nil
 		}
 		choice := chunk.Choices[0]
+		if choice.FinishReason != "" {
+			finished = true
+		}
 		if thinking := choice.Delta.ReasoningContent; thinking != "" && req.OnThinking != nil {
 			req.OnThinking(thinking)
 		}
@@ -461,6 +469,9 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 	}
 	if err := processEvent(); err != nil {
 		return assembleTurn(full.String(), acc), err
+	}
+	if !finished {
+		return assembleTurn(full.String(), acc), io.ErrUnexpectedEOF
 	}
 	return assembleTurn(full.String(), acc), nil
 }

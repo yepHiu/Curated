@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"time"
 )
@@ -39,6 +40,9 @@ func ErrorCategory(err error) string {
 	}
 	if errors.Is(err, context.Canceled) {
 		return "cancelled"
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return "stream_interrupted"
 	}
 	if errors.Is(err, ErrInvalidConfig) {
 		return "configuration"

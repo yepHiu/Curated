@@ -60,3 +60,17 @@ func TestMeasuredUsageObservations(t *testing.T) {
 		})
 	}
 }
+
+func TestInterruptedStreamKeepsTextAndRecordsFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+	}))
+	defer server.Close()
+	c := NewClient(ClientConfig{BaseURL: server.URL, Model: "test"}, server.Client())
+	var observed Observation
+	c.Observe = func(o Observation) { observed = o }
+	turn, err := c.StreamTurn(context.Background(), TurnRequest{}, nil)
+	if err == nil || turn.Content != "partial" || observed.ErrorCode != "stream_interrupted" || observed.FirstTextMs == nil {
+		t.Fatalf("turn %+v observation %+v err %v", turn, observed, err)
+	}
+}
