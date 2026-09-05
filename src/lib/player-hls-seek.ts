@@ -1,6 +1,6 @@
 export const HLS_SEEK_REUSE_LEAD_SEC = 30
 export const HLS_TRANSCODE_SEEK_REUSE_LEAD_SEC = 60
-export const HLS_SEEK_CATCHUP_TIMEOUT_MS = 20_000
+export const HLS_SEEK_CATCHUP_TIMEOUT_MS = 4_000
 export const HLS_SEEK_CATCHUP_INTERVAL_MS = 200
 export const HLS_STARTUP_BUFFER_SEC = 8
 export const HLS_STARTUP_BUFFER_WAIT_MS = 4_000
@@ -48,15 +48,44 @@ export function shouldReuseHlsSessionForSeek(input: {
   localTargetSec: number
   writtenEndSec: number
   reuseLeadSec?: number
+  encoderSpeed?: string | number | null
+  maxCatchupSec?: number
 }): boolean {
   if (input.forceSessionSwap) return false
   if (!Number.isFinite(input.localTargetSec) || input.localTargetSec < 0) return false
   const written = Number.isFinite(input.writtenEndSec) && input.writtenEndSec > 0 ? input.writtenEndSec : 0
   const lead = Math.max(0, input.reuseLeadSec ?? HLS_SEEK_REUSE_LEAD_SEC)
-  if (written <= 0) {
-    return input.localTargetSec <= lead
+  const speed = Number.parseFloat(String(input.encoderSpeed ?? "1"))
+  const effectiveSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1
+  const catchup = Math.max(0, input.maxCatchupSec ?? HLS_SEEK_CATCHUP_TIMEOUT_MS / 1000)
+  return input.localTargetSec <= written + Math.min(lead, effectiveSpeed * catchup)
+}
+
+type BufferedMedia = {
+  currentTime: number
+  playbackRate: number
+  duration: number
+  buffered: { length: number; start(index: number): number; end(index: number): number }
+}
+
+export function bufferedPlaybackSeconds(media: BufferedMedia): number {
+  for (let i = 0; i < media.buffered.length; i += 1) {
+    if (media.currentTime >= media.buffered.start(i) && media.currentTime <= media.buffered.end(i)) {
+      return Math.max(0, media.buffered.end(i) - media.currentTime) / Math.max(0.1, media.playbackRate || 1)
+    }
   }
-  return input.localTargetSec <= written + lead
+  return 0
+}
+
+export function waitForPlaybackBuffer(media: MediaCatchupSource & BufferedMedia, seconds: number, options: {
+  timeoutMs?: number; isAborted?: () => boolean; remainingSec?: number
+} = {}): Promise<boolean> {
+  const remaining = options.remainingSec ?? Number.POSITIVE_INFINITY
+  const target = Math.min(seconds, Math.max(0, remaining) / Math.max(0.1, media.playbackRate || 1))
+  return waitForMediaWrittenEnd(media, 0, {
+    ...options,
+    isReady: () => bufferedPlaybackSeconds(media) >= Math.max(0.1, target - 0.1),
+  })
 }
 
 export function isPrematureHlsEndedEvent(input: {
@@ -80,11 +109,14 @@ export async function waitForMediaWrittenEnd(
     intervalMs?: number
     isAborted?: () => boolean
     now?: () => number
+    isReady?: () => boolean
   } = {},
 ): Promise<boolean> {
   if (!media || !Number.isFinite(targetSec)) return false
   const readyAt = targetSec - 0.25
-  if (getMediaWrittenEndSec(media) >= readyAt) return true
+  const isReady = options.isReady ?? (() => getMediaWrittenEndSec(media) >= readyAt)
+  if (options.isAborted?.()) return false
+  if (isReady()) return true
 
   const timeoutMs = Math.max(0, options.timeoutMs ?? HLS_SEEK_CATCHUP_TIMEOUT_MS)
   const intervalMs = Math.max(50, options.intervalMs ?? HLS_SEEK_CATCHUP_INTERVAL_MS)
@@ -104,7 +136,7 @@ export async function waitForMediaWrittenEnd(
         finish(false)
         return
       }
-      if (getMediaWrittenEndSec(media) >= readyAt) {
+      if (isReady()) {
         finish(true)
       }
     }

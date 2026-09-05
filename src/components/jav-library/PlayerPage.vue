@@ -122,6 +122,7 @@ import {
 import {
   HLS_STARTUP_BUFFER_SEC,
   HLS_STARTUP_BUFFER_WAIT_MS,
+  waitForPlaybackBuffer,
   getMediaWrittenEndSec,
   hlsSeekReuseLeadSec,
   isPrematureHlsEndedEvent,
@@ -921,8 +922,9 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
   if (playbackMode === "hls" && hlsStartupBufferPending) {
     const waitGen = hlsWindowWaitGeneration
     isPlaybackWaiting.value = true
-    await waitForMediaWrittenEnd(v, HLS_STARTUP_BUFFER_SEC, {
+    await waitForPlaybackBuffer(v, HLS_STARTUP_BUFFER_SEC, {
       timeoutMs: HLS_STARTUP_BUFFER_WAIT_MS,
+      remainingSec: Math.max(0, totalDurationSec.value - getAbsolutePlaybackTime()),
       isAborted: () => waitGen !== hlsWindowWaitGeneration || videoRef.value !== v,
     })
     if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v || !playbackSrc.value) {
@@ -2457,6 +2459,10 @@ async function seekToAbsolutePlaybackTime(
   const descriptor = playbackDescriptor.value
   if (!v || !descriptor || !playbackSrc.value) return
 
+  const { seq, signal } = beginPlaybackRequest()
+  isResolvingPlayback.value = false
+  isSwitchingPlaybackSession.value = false
+
   const clampedTarget = clampAbsolutePlaybackTarget(targetSec)
   isPlaybackWaiting.value = shouldEnterSeekWaitingState(descriptor.mode)
   if (descriptor.mode !== "hls") {
@@ -2472,17 +2478,19 @@ async function seekToAbsolutePlaybackTime(
   const localTarget = clampedTarget - playbackTimelineOffsetSec(descriptor)
   const writtenEnd = getMediaWrittenEndSec(v)
   const waitGen = ++hlsWindowWaitGeneration
-  const shouldResumePlayback = options.resumeAfterSwap || (isPlaying.value && !v.paused)
+  const shouldResumePlayback = options.resumeAfterSwap || resumePlaybackWhenReady || (isPlaying.value && !v.paused)
   if (
     shouldReuseHlsSessionForSeek({
       forceSessionSwap: options.forceSessionSwap,
       localTargetSec: localTarget,
       writtenEndSec: writtenEnd,
       reuseLeadSec: hlsSeekReuseLeadSec(descriptor.sessionKind),
+      encoderSpeed: sessionDiagnostics.value.encoderSpeed,
     })
   ) {
     if (localTarget > writtenEnd + 0.25) {
       if (shouldResumePlayback) {
+        resumePlaybackWhenReady = true
         v.pause()
       }
       const caughtUp = await waitForMediaWrittenEnd(v, localTarget, {
@@ -2510,7 +2518,6 @@ async function seekToAbsolutePlaybackTime(
   const movieId = props.movie.id.trim()
   if (!movieId) return
   const previousSessionId = descriptor.sessionId
-  const { seq, signal } = beginPlaybackRequest()
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   playbackError.value = ""

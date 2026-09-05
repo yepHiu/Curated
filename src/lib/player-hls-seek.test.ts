@@ -7,6 +7,8 @@ import {
   isPrematureHlsEndedEvent,
   shouldReuseHlsSessionForSeek,
   waitForMediaWrittenEnd,
+  bufferedPlaybackSeconds,
+  waitForPlaybackBuffer,
 } from "@/lib/player-hls-seek"
 
 function fakeMedia(duration: number, bufferedEnd?: number) {
@@ -64,6 +66,7 @@ describe("shouldReuseHlsSessionForSeek", () => {
       shouldReuseHlsSessionForSeek({
         localTargetSec: 14,
         writtenEndSec: 4,
+        encoderSpeed: "3x",
       }),
     ).toBe(true)
     expect(
@@ -104,6 +107,7 @@ describe("shouldReuseHlsSessionForSeek", () => {
         localTargetSec: 4 + HLS_SEEK_REUSE_LEAD_SEC + 1,
         writtenEndSec: 4,
         reuseLeadSec: hlsSeekReuseLeadSec("transcode-hls"),
+        encoderSpeed: "10x",
       }),
     ).toBe(true)
     expect(
@@ -118,7 +122,7 @@ describe("shouldReuseHlsSessionForSeek", () => {
   it("only reuses an unknown window near the session origin", () => {
     expect(
       shouldReuseHlsSessionForSeek({
-        localTargetSec: 10,
+        localTargetSec: 3,
         writtenEndSec: 0,
       }),
     ).toBe(true)
@@ -158,6 +162,26 @@ describe("waitForMediaWrittenEnd", () => {
   afterEach(() => {
     vi.clearAllTimers()
     vi.useRealTimers()
+  })
+
+  it("swaps instead of waiting when a slow encoder cannot catch up within budget", () => {
+    expect(shouldReuseHlsSessionForSeek({ localTargetSec: 70, writtenEndSec: 20, encoderSpeed: "1x", reuseLeadSec: 60 })).toBe(false)
+    expect(shouldReuseHlsSessionForSeek({ localTargetSec: 70, writtenEndSec: 20, encoderSpeed: "20x", reuseLeadSec: 60 })).toBe(true)
+  })
+
+  it("requires contiguous downloaded data after the current time, adjusted for speed", async () => {
+    vi.useFakeTimers()
+    const media = { ...fakeMedia(7200), currentTime: 30, playbackRate: 2,
+      buffered: { length: 2, start: (i: number) => i === 0 ? 0 : 100, end: (i: number): number => i === 0 ? 34 : 200 },
+    }
+    expect(bufferedPlaybackSeconds(media)).toBe(2)
+    const pending = waitForPlaybackBuffer(media, 8, { timeoutMs: 200 })
+    await vi.advanceTimersByTimeAsync(400)
+    expect(await pending).toBe(false)
+    media.buffered.end = (i: number) => i === 0 ? 48 : 200
+    expect(await waitForPlaybackBuffer(media, 8)).toBe(true)
+    media.currentTime = 50
+    expect(bufferedPlaybackSeconds(media)).toBe(0)
   })
 
   it("resolves immediately when the written window already covers the target", async () => {
