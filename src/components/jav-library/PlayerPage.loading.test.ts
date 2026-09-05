@@ -347,6 +347,66 @@ describe("PlayerPage loading states", () => {
     }
   })
 
+  it("steps to the previous and next frame with D and F outside form controls", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "direct",
+      url: "/api/library/movies/movie-1/stream",
+      durationSec: 120,
+      canDirectPlay: true,
+    })
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+
+      const video = wrapper.get("video").element as HTMLVideoElement
+      video.currentTime = 10
+      await wrapper.get("video").trigger("timeupdate")
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        value: false,
+      })
+      const pauseSpy = vi.mocked(HTMLMediaElement.prototype.pause)
+      pauseSpy.mockClear()
+
+      const previousFrame = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyD",
+        key: "d",
+      })
+      window.dispatchEvent(previousFrame)
+      expect(previousFrame.defaultPrevented).toBe(true)
+      expect(pauseSpy).toHaveBeenCalledTimes(1)
+      expect(video.currentTime).toBeCloseTo(10 - 1 / 30)
+
+      const nextFrame = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyF",
+        key: "f",
+      })
+      window.dispatchEvent(nextFrame)
+      expect(nextFrame.defaultPrevented).toBe(true)
+      expect(video.currentTime).toBeCloseTo(10)
+
+      const input = document.createElement("input")
+      document.body.appendChild(input)
+      input.dispatchEvent(new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyD",
+        key: "d",
+      }))
+      expect(video.currentTime).toBeCloseTo(10)
+      input.remove()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it("tears down the video media pipeline when the player unmounts", async () => {
     serviceMocks.getMoviePlayback.mockResolvedValueOnce({
       movieId: "movie-1",
@@ -373,5 +433,38 @@ describe("PlayerPage loading states", () => {
     expect(pauseSpy).toHaveBeenCalledTimes(1)
     expect(removeAttributeSpy).toHaveBeenCalledWith("src")
     expect(loadSpy).toHaveBeenCalledTimes(1)
+  })
+  it.each([[24, 0.5], [30, 2], [60, 1]])("steps a %ifps source at %sx and retains its cadence after pausing", async (fps, rate) => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({ movieId: "movie-1", mode: "direct", url: "/api/library/movies/movie-1/stream", durationSec: 120, canDirectPlay: true })
+    const wrapper = await mountPlayerPage()
+    try {
+      await flushPromises()
+      const video = wrapper.get("video").element as HTMLVideoElement
+      let callback!: VideoFrameRequestCallback
+      video.requestVideoFrameCallback = vi.fn(cb => { callback = cb; return 1 })
+      video.cancelVideoFrameCallback = vi.fn()
+      Object.defineProperty(video, "paused", { configurable: true, value: false })
+      await wrapper.get("video").trigger("loadedmetadata")
+      video.playbackRate = rate
+      const frame = (count: number, mediaTime: number, wallTime: number) => callback(wallTime, {
+        mediaTime, presentedFrames: count, presentationTime: wallTime, expectedDisplayTime: wallTime,
+        width: 1920, height: 1080, processingDuration: 0,
+      })
+      for (let index = 0; index <= 60; index++) frame(index + 1, index / fps, 1000 + index * 1000 / (fps * rate))
+      video.currentTime = 10
+      await wrapper.get("video").trigger("timeupdate")
+      window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", key: "f" }))
+      expect(video.currentTime).toBeCloseTo(10 + 1 / fps, 5)
+      Object.defineProperty(video, "paused", { configurable: true, value: true })
+      await wrapper.get("video").trigger("pause")
+      // Seek frames delivered after long pauses must not replace source cadence.
+      for (let index = 0; index < 4; index++) {
+        frame(62 + index, video.currentTime, 20000 + index * 1000)
+        window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", key: "f" }))
+      }
+      expect(video.currentTime).toBeCloseTo(10 + 5 / fps, 5)
+      window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyD", key: "d" }))
+      expect(video.currentTime).toBeCloseTo(10 + 4 / fps, 5)
+    } finally { wrapper.unmount() }
   })
 })

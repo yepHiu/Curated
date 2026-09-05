@@ -98,6 +98,7 @@ import {
   shouldBlurPlaybackSliderAfterCommit,
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
+import { createPlaybackFrameStepper } from "@/lib/player-frame-step"
 import {
   clearOptimisticSeekTargetIfSettled,
   hasAuthoritativeClockMoved,
@@ -138,6 +139,7 @@ import {
 } from "@/lib/player-playback-timeline"
 import {
   applyHlsBandwidthEstimateToPlaybackStats,
+  getHlsLevelFrameRate,
   applyHlsFragmentToPlaybackStats,
   applyHlsLevelToPlaybackStats,
   applyVideoDimensionsToPlaybackStats,
@@ -280,6 +282,7 @@ let fpsSampleWindowStartAt = 0
 let fpsSampleFrameCount = 0
 let fallbackLastDecodedFrames = 0
 let fallbackLastDecodedAt = 0
+const frameStepper = createPlaybackFrameStepper()
 
 /** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
 const autoplayConsumedForMovieId = ref<string | null>(null)
@@ -766,6 +769,7 @@ watch(
 watch(
   playbackSrc,
   async (src) => {
+    frameStepper.reset()
     closePlayerContextMenu()
     if (!src) {
       detailedStatsVisible.value = false
@@ -1541,6 +1545,7 @@ function onPlay() {
 }
 
 function onPause() {
+  frameStepper.interrupt()
   watchTimeTracker.onPause(getAbsolutePlaybackTime())
   isPlaying.value = false
   flushPlaybackProgress()
@@ -1707,6 +1712,26 @@ function seekDelta(deltaSec: number) {
   void seekToAbsolutePlaybackTime(previous + deltaSec, { previousDisplayedTimeSec: previous })
 }
 
+function stepFrame(direction: -1 | 1) {
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return
+  frameStepper.interrupt()
+
+  // A frame step should leave the target frame visible instead of continuing
+  // playback past it, matching desktop-player frame navigation.
+  if (!v.paused) {
+    v.pause()
+  }
+
+  const previous = currentTime.value
+  const descriptor = playbackDescriptor.value
+  const target = previous + direction * frameStepper.stepSec()
+  startOptimisticSeek(target, {
+    enterWaitingState: shouldEnterSeekWaitingState(descriptor?.mode),
+  })
+  void seekToAbsolutePlaybackTime(target, { previousDisplayedTimeSec: previous })
+}
+
 function onVideoWaiting() {
   if (!playbackSrc.value) return
   watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
@@ -1715,6 +1740,7 @@ function onVideoWaiting() {
 }
 
 function onVideoSeeking() {
+  frameStepper.interrupt()
   if (!playbackSrc.value) return
   watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
   isPlaybackWaiting.value = true
@@ -1722,6 +1748,7 @@ function onVideoSeeking() {
 }
 
 function onVideoSeeked() {
+  frameStepper.interrupt()
   currentTime.value = getAbsolutePlaybackTime()
   watchTimeTracker.onSeeking(currentTime.value)
   syncBufferedRangeFromVideo()
@@ -1898,9 +1925,13 @@ function onPlaybackKeydown(e: KeyboardEvent) {
       e.preventDefault()
       seekDelta(playbackSeekForwardStep.value)
       break
+    case "KeyD":
+      e.preventDefault()
+      stepFrame(-1)
+      break
     case "KeyF":
       e.preventDefault()
-      void toggleFullscreen()
+      stepFrame(1)
       break
     case "KeyP":
       if (pipSupported.value) {
@@ -2211,6 +2242,7 @@ function refreshPlaybackStatsFromVideo() {
 }
 
 function updatePlaybackStatsFromHlsLevel(level?: HlsLevel | null) {
+  frameStepper.setFrameRate(getHlsLevelFrameRate(level))
   playbackStats.value = applyHlsLevelToPlaybackStats(playbackStats.value, level)
 }
 
@@ -2318,6 +2350,7 @@ function bindHlsStats(
 }
 
 function stopFpsTracking() {
+  frameStepper.interrupt()
   const v = videoRef.value
   if (frameCallbackId !== null && v && typeof v.cancelVideoFrameCallback === "function") {
     v.cancelVideoFrameCallback(frameCallbackId)
@@ -2339,9 +2372,10 @@ function startFpsTracking() {
   if (!v || !playbackSrc.value) return
 
   if (typeof v.requestVideoFrameCallback === "function") {
-    const onFrame = (now: number) => {
+    const onFrame: VideoFrameRequestCallback = (now, metadata) => {
       const currentVideo = videoRef.value
       if (!currentVideo || currentVideo !== v || !playbackSrc.value) return
+      frameStepper.observe(metadata, !currentVideo.paused && !currentVideo.seeking)
       if (fpsSampleWindowStartAt === 0) {
         fpsSampleWindowStartAt = now
       }
@@ -2369,6 +2403,10 @@ function startFpsTracking() {
     const quality = currentVideo.getVideoPlaybackQuality()
     const now = performance.now()
     const decodedFrames = quality.totalVideoFrames
+    frameStepper.observe(
+      { mediaTime: currentVideo.currentTime, presentedFrames: decodedFrames },
+      !currentVideo.paused && !currentVideo.seeking,
+    )
     if (fallbackLastDecodedAt > 0) {
       const elapsed = now - fallbackLastDecodedAt
       const frameDelta = decodedFrames - fallbackLastDecodedFrames

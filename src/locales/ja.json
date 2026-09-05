@@ -1445,7 +1445,7 @@
     "playbackModeDirect": "Direct",
     "playbackModeHls": "HLS",
     "playbackModeDirectUnavailable": "このソースでは Direct 再生を使えません",
-    "hintBar": "クリック: 再生/停止 · Space/K · ←/J -{backward}秒 · →/L +{forward}秒 · {capture} キャプチャ · F 全画面 · P PiP · Esc · M ミュート · スピーカーでミュート切替 · ↑/↓ 音量",
+    "hintBar": "クリック: 再生/停止 · Space/K · D 前フレーム · F 次フレーム · ←/J -{backward}秒 · →/L +{forward}秒 · {capture} キャプチャ · P PiP · Esc · M ミュート · スピーカーでミュート切替 · ↑/↓ 音量",
     "captureNoVideo": "キャプチャできません（映像なし）",
     "captureFeedbackCapturing": "現在のフレームをキャプチャ中…",
     "captureFeedbackSuccess": "フレームを保存しました · {time}",

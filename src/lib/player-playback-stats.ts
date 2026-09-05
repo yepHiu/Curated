@@ -57,10 +57,7 @@ export function applyHlsLevelToPlaybackStats(
   if (!level) return current
   const width = toFiniteNumber(level.width)
   const height = toFiniteNumber(level.height)
-  const frameRate =
-    toFiniteNumber(level.frameRate) ??
-    toFiniteNumber(level.attrs?.["FRAME-RATE"]) ??
-    toFiniteNumber(level.attrs?.FRAME_RATE)
+  const frameRate = getHlsLevelFrameRate(level)
   const videoBitrate = toFiniteNumber(level.bitrate)
 
   return {
@@ -73,6 +70,12 @@ export function applyHlsLevelToPlaybackStats(
         ? Math.round(videoBitrate / 1000)
         : current.videoBitrateKbps,
   }
+}
+
+export function getHlsLevelFrameRate(level?: HlsLevelStatsFields | null): number | null {
+  return toFiniteNumber(level?.frameRate) ??
+    toFiniteNumber(level?.attrs?.["FRAME-RATE"]) ??
+    toFiniteNumber(level?.attrs?.FRAME_RATE)
 }
 
 export function applyHlsBandwidthEstimateToPlaybackStats(

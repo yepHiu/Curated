@@ -11,6 +11,7 @@ const RESERVED_CURATED_CAPTURE_KEY_CODES = new Set([
   "KeyK",
   "KeyL",
   "KeyM",
+  "KeyD",
   "KeyF",
   "KeyP",
 ])

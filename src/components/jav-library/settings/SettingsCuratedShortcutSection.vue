@@ -29,7 +29,7 @@ const listening = ref(false)
 const errorMessage = ref("")
 
 const currentLabel = computed(() => formatCuratedCaptureKeyLabel(currentCode.value))
-const reservedLabels = computed(() => ["Space", "←", "→", "↑", "↓", "Esc", "J", "K", "L", "M", "F", "P"])
+const reservedLabels = computed(() => ["Space", "←", "→", "↑", "↓", "Esc", "D", "F", "J", "K", "L", "M", "P"])
 
 function stopListening() {
   if (!listening.value) return
