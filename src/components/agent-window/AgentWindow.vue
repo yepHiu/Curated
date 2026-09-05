@@ -374,7 +374,7 @@ function removeAssistantTurn(assistantId: string) {
   const process = findProcessFor(assistantId)
   const index = entries.value.findIndex((entry) => entry.id === assistantId)
   if (index >= 0) removeEntryAt(index)
-  if (process) {
+  if (process && !process.tools.length && !process.thinking) {
     const processIndex = entries.value.findIndex((entry) => entry.id === process.id)
     if (processIndex >= 0) removeEntryAt(processIndex)
   }
@@ -569,8 +569,6 @@ async function send(selected?: AIEntityCandidateDTO) {
       } else {
         errorMessage.value = aiErr?.message ?? (err as Error).message ?? t("agentWindow.errorFallback")
       }
-      const current = entries.value.find((entry) => entry.id === assistantId)
-      if (current?.kind === "assistant" && !current.content && !current.movies?.length) removeAssistantTurn(assistantId)
       if (!draft.value.trim()) draft.value = content
       entries.value.push({ id: nextEntryId("outcome"), kind: "outcome",
         outcome: { status: "failed", reason: errorMessage.value || t("agentWindow.errorFallback"), retryable: true } })
@@ -582,7 +580,7 @@ async function send(selected?: AIEntityCandidateDTO) {
       for (const tool of findProcessFor(assistantId)?.tools ?? []) tool.pending = false
       collapseProcess(assistantId)
       const current = entries.value.find((entry) => entry.id === assistantId)
-      if (controller.signal.aborted && current?.kind === "assistant" && !current.content && !current.movies?.length) {
+      if (current?.kind === "assistant" && !current.content && !current.movies?.length) {
         removeAssistantTurn(assistantId)
       }
       void scrollListToEnd()

@@ -235,6 +235,25 @@ describe("AgentWindow session request ownership", () => {
     } finally { wrapper.unmount() }
   })
 
+  it.each(["needs_input", "partial", "error"])("removes empty answer but retains evidence after %s", async (status) => {
+    streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
+      handlers.onToolStart?.({ name: "search_movies", toolCallId: "read" })
+      if (status === "error") throw new Error("connection lost")
+      handlers.onOutcome?.({ status: status as "needs_input" | "partial", reason: "context budget reached" })
+    })
+    const wrapper = mountWindow()
+    try {
+      await flushPromises()
+      await wrapper.find("[data-agent-window-input]").setValue("question")
+      await wrapper.find("[data-agent-window-send]").trigger("click")
+      await flushPromises()
+      const entries = wrapper.findComponent({ name: "AgentChatThread" }).props("entries")
+      expect(entries).not.toEqual(expect.arrayContaining([expect.objectContaining({ kind: "assistant", content: "" })]))
+      expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "process", tools: [expect.objectContaining({ pending: false })] })]))
+      expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "outcome" })]))
+    } finally { wrapper.unmount() }
+  })
+
   it("retains partial output and restores the draft after a stream failure", async () => {
     streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
       handlers.onToolStart?.({ name: "search_movies", toolCallId: "interrupted" })
