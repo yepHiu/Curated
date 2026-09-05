@@ -39,8 +39,17 @@ const (
 )
 
 var launchInstallerProcess = func(ctx context.Context, installerPath string, args []string) error {
-	cmd := exec.CommandContext(ctx, installerPath, args...)
-	return cmd.Start()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// A successful launch hands ownership to the installer. Returning the HTTP
+	// response (or closing Curated during an upgrade) must not cancel it.
+	cmd := exec.Command(installerPath, args...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 // Service checks and caches packaged-app update availability from GitHub Releases.
