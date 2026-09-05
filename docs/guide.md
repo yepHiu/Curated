@@ -170,6 +170,14 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
 
+### Playback recovery
+
+Opening a curated frame passes its requested position into the first playback request. Each HLS playback session is independent, so opening the same movie on another device keeps the first device's session intact. A failed replacement can return to the previous stream until the replacement's first frame data arrives.
+
+HLS network and media failures get bounded recovery attempts before reporting an error; use the play button to retry after recovery is exhausted. An expired session is recreated at the current position. Short seeks wait at most four seconds for encoding to catch up, with the decision based on encoder speed. Startup waits for contiguous downloaded data ahead of the current position, accounting for playback speed.
+
+FFmpeg is paced and suspended/resumed when it runs far ahead of requested segments. Windows controls the actual FFmpeg child (including resolving Scoop shims); supported Unix builds use stop/continue signals. Unsupported process control falls back to paced input. Long event playlists still retain generated segments until session cleanup; per-byte cache quotas and on-demand VOD remain future work. Review and implementation evidence: [playback audit](plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md).
+
 ---
 
 ## 6. API

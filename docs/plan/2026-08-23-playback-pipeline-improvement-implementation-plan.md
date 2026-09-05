@@ -1,5 +1,7 @@
 # 播放链路改善实施计划
 
+> 2026-09-06 复审修复：下文历史落地记录中的 stdin `p/u`、固定 60 秒追赶窗口和预热方式已被后续修复替代。当前实现与验证见 [播放链路审计复审](2026-08-16-playback-pipeline-capability-and-performance-audit.md)：进程级暂停/恢复 + readrate 回退、独立会话及有界可取消启动、显式 direct 与首次起点、无重复媒体预热、实际连续缓冲和最多 4 秒动态追赶、有界恢复及换流回退。
+
 - 日期：2026-08-23
 - 状态：阶段 0、1、2 已落地；阶段 3–4 待实施
 - 对照研究：`docs/plan/2026-08-23-vlc-playback-pipeline-optimization.md`

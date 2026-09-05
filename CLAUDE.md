@@ -241,8 +241,8 @@ PUT    /api/library/saved-views/order       # Transactionally replace the comple
 PATCH  /api/library/saved-views/{id}        # Rename and/or replace canonical filters
 DELETE /api/library/saved-views/{id}        # Delete only the view definition
 GET    /api/library/movies/{id}             # Get movie detail
-GET    /api/library/movies/{id}/playback    # Playback descriptor; optional `clientVideoCodecs=h264,hevc,av1`; unstable r/avg frame rates can divert MP4 to HLS (`source_timestamps_unstable`) when stream push is on
-POST   /api/library/movies/{id}/playback-session  # Create explicit playback session (for example HLS stream push)
+GET    /api/library/movies/{id}/playback    # Descriptor; optional clientVideoCodecs and finite nonnegative startPositionSec; explicit target applied before the first HLS start
+POST   /api/library/movies/{id}/playback-session  # Independent HLS session or explicit direct /stream descriptor; direct never starts forced HLS
 GET    /api/playback/sessions/recent        # List active + recently archived playback sessions for diagnostics
 GET    /api/playback/sessions/{id}          # Get playback session status snapshot (encoderSpeed / writtenDurationSec / lastSeekKind)
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags, user* overrides

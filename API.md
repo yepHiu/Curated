@@ -1457,6 +1457,8 @@ Query：
 
 用途：获取播放描述，客户端应以此作为播放入口。
 
+可选 query：`startPositionSec=1200`——有限非负秒数（支持小数），优先于数据库续播点，在首次 HLS 启动前生效。省略时使用已保存进度；起点达到片长的 95% 时按播放器既有重播规则回到 0。无效值返回 `400 COMMON_BAD_REQUEST`。每次 HLS 请求创建独立 session，调用方在离开或换流后负责 DELETE；取消的请求在启动队列与准备阶段会停止。
+
 可选 query：`clientVideoCodecs=h264,hevc`——逗号分隔的浏览器可解码 mp4 家族视频编码（`h264` / `hevc` / `av1`，别名 `avc1`、`hvc1`/`hev1` 会归一化）。提供时后端只在该集合内判定 mp4/mov 直放（未知编码视为不支持并走 HLS），未提供时保持静态白名单。Webm/Ogg 不受该参数影响。
 
 成功：`200 PlaybackDescriptorDTO`
@@ -1487,7 +1489,7 @@ Query：
 | `mimeType` | 媒体类型 |
 | `transcodeProfile` | 转码档位 |
 | `startPositionSec` | 会话媒体时间轴的实际起点；remux 会话为对齐到的关键帧时间，客户端应结合 `resumePositionSec` 做本地微调 |
-| `resumePositionSec` | 已保存续播点 |
+| `resumePositionSec` | 本次有效续播点，可能来自显式起点或已保存进度 |
 | `canDirectPlay` | 是否支持直放 |
 | `reasonCode` / `reasonMessage` | 模式选择诊断。常见值：`browser_direct_play_supported`、`browser_container_unsupported`、`browser_codec_unsupported`、`force_stream_push`、`source_timestamps_unstable`（ffprobe `r_frame_rate` 与 `avg_frame_rate` 相差超过约 2%、平均帧率显式为 `0/0`/`N/A`，或片头视频包 PTS 为负；在 stream push 开启时改走 HLS，h264 优先 remux） |
 | `audioTracks` / `subtitleTracks` | 音轨 / 字幕轨信息 |
@@ -1505,7 +1507,9 @@ Body：
 }
 ```
 
-`mode` 省略时默认为 `direct`。
+`mode` 省略时默认为 `direct`。显式 direct 始终返回原文件 `/stream` 描述符，不会因 ForceStreamPush 再启动 HLS；`canDirectPlay` 仍反映源能力，前端需结合本机 codec 能力决定是否可用。
+
+HLS 会话不再按影片 ID 相互替换。新流可播后，调用方释放自己持有的旧 sessionId；同片多客户端不会互相抢占。Manager 默认最多同时准备 2 个、保留 8 个会话，排队与 profile 尝试共用 24 秒期限（内部 Config 可覆盖容量，暂无设置页选项）。旧 session 保留期间也计入容量；容量满时请求等待释放，超时后失败，不驱逐其他客户端。
 
 HLS 推流为 event playlist + fMP4。转码会话会尽量等到约 4 个媒体分片（约 8 秒）进入 playlist，或最多等待 12 秒后仍返回描述符；remux 在首片就绪后即可返回。分片以临时文件写完再 rename，未完成的 `.tmp` 不会被会话文件接口提供。
 

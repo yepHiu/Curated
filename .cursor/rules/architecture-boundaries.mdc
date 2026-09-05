@@ -23,6 +23,8 @@ alwaysApply: true
 
 ## Frontend Business Code
 
+- HLS session identity belongs to a playback instance, not a movie: creating a new session must not evict another client's session for the same movie. The renderer releases its previous session after new media data is available and cleans up cancelled/late requests. Startup capacity is bounded and cancellable.
+
 - Rendering code depends on composables, frontend service contracts, and shared types.
 - State management currently defaults to composables plus the service layer. Pinia or a similar store may be introduced incrementally for a small, bounded service or new feature when it clearly improves maintainability; avoid a big-bang migration or broad parallel global store.
 - Views/components must not import concrete Web/Mock adapters directly for library behavior. Use `useLibraryService()` and add service-contract methods when a new capability is needed.

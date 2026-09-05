@@ -37,6 +37,7 @@ Installed apps can also check and download a newer installer from Settings → A
 - Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
+- Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
 - Experimental AI with paginated chats, bounded context, and recoverable confirmed edits; see the [handbook](docs/guide.md#experimental-ai).
 - GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
