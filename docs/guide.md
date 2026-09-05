@@ -22,6 +22,14 @@ Longer product and architecture writing:
 - [Project memory](reference/2026-03-20-project-memory.md)
 - [Actor library design](product/2026-03-24-actor-libary.md)
 
+### Experimental AI
+
+Enable Agent in Settings → Experimental and configure an OpenAI-compatible provider. Persistent chats and edits require Web API mode and the Go backend. The current reliability implementation and remaining acceptance work are tracked in [the Agent milestone plan, section 13](plan/2026-08-19-agent-milestone-plan.md).
+
+Chat continuation sends the current question; the backend supplies the latest 80 user/assistant messages. Reopening a chat shows its latest 80 stored rows in chronological order. Older rows remain in SQLite; loading older pages and token-based context budgets are pending. New replies preserve tool evidence, failures, entity choices, and completion outcomes. Older records cannot recover evidence that was never stored. Historical editing previews are read-only: inspect current data and generate a fresh preview before applying.
+
+Interrupted replies retain partial text and restore the request to the composer. Chat requests time out after 90 seconds without data; polish, translation, and narrative actions have a two-minute deadline and a Cancel control. Closing the edit dialog, changing its target, or leaving the page cancels generation. Confirmed writes are never automatically retried. If a note, title, or summary changed after its preview, confirmation returns a conflict and leaves the current data intact; regenerate the preview to continue. Reusing a consumed confirmation ticket is rejected. A persistent apply receipt for recovering a lost success response is still pending.
+
 ---
 
 ## 2. Quick start

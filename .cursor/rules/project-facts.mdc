@@ -14,6 +14,8 @@ alwaysApply: true
 - Settings 侧栏「实验性功能」分区（`settings-nav.ts` slug `experimental`；`SettingsExperimentalSection.vue` 以 `defineAsyncComponent` 从 SettingsView chunk 拆出）。Agent Window 为 Cursor 式浮动窗口（`src/components/agent-window/AgentWindow.vue`，AppShell 内懒加载；可拖动、桌面端可调宽高、Escape/按钮关闭、位置与尺寸记忆 localStorage `curated-agent-window-state-v1`、左侧对话历史侧栏、会话切换/删除、对话 Markdown/GFM 渲染、折叠过程条（产品化工具名 + 思考流，`present_movies` 出影片卡而非过程）、composer `@` 引用影片/演员/标签、移动端全屏；关闭即 abort 进行中的流）。
 - AI 前端服务层：`src/services/contracts/ai-service.ts` + `adapters/web/web-ai-service.ts`（fetch + ReadableStream 解析 SSE，**不走 30s 超时的 http-client**）+ `adapters/mock/mock-ai-service.ts`（假流式 + 假工具结果）；切换在 `src/services/ai-service.ts`（`VITE_USE_WEB_API`）。provider 设置方法挂在 libraryService 契约上（`aiProvider`/`setAIProvider`/`testAIProvider`；Mock 持久化 localStorage `curated-ai-provider-mock-v1`）。
 
+- **2026-09-05 AI 可靠性首批**：续聊只提交本次输入；模型上下文使用最近 80 条 user/assistant（工具不占额度），历史接口返回最近 80 条存储记录正序，较早记录仍保留但翻页尚未实现。迁移 `0042_ai_chat_events.sql` 为 assistant 保存结构化结果事件；取消后最多用独立 5 秒上下文完成保存，失败不静默吞掉。历史确认卡不可再次 apply，不持久化 token/arguments。Web 聊天 90 秒无数据超时；Action 前后端 2 分钟期限并有取消入口。确认票据另绑定服务端预览旧值，笔记/标题/简介在 SQLite 事务中比较旧值，冲突返回 `409 AI_WRITE_CONFLICT`。持久化 apply 回执、token 预算、真实 Provider 验收与完整治理仍待做。
+
 ## 2026-08 GIF Clip Capture
 
 - Web API GIF clips use `POST /api/library/movies/{movieId}/clips` with bounded `startSec/endSec` (0.4–6 seconds), `format: "gif"`, optional `fps` (1–20), `width` (160–960) and `curatedFrameId`. When associated with a curated frame, the completed GIF is persisted under the app cache's `curated-frame-motions` directory and exposed through `GET /api/curated-frames/{id}/motion`; unassociated tasks continue to use `GET /api/tasks/{taskId}/artifact`.

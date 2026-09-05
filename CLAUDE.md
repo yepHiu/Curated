@@ -292,7 +292,7 @@ POST   /api/ai/provider/test                # Experimental agent: probe OpenAI-c
 POST   /api/ai/chat                         # Experimental agent SSE (thinking_delta + read tools + present_movies cards + search_provider_titles + get_source_page + confirm_required + session); PIN-protected
 GET    /api/ai/sessions                     # List persisted agent chats
 POST   /api/ai/sessions                     # Create an empty agent chat
-GET    /api/ai/sessions/{sessionId}         # Load one agent chat and messages
+GET    /api/ai/sessions/{sessionId}         # Latest 80 stored rows ascending; new assistant rows include result events (no write tokens)
 DELETE /api/ai/sessions/{sessionId}         # Delete one agent chat
 POST   /api/ai/actions/{name}               # Experimental agent L1/L2 action (polish_comment / translate_summary / translate_title / insights_narrative)
 POST   /api/ai/confirm                      # Apply a previewed write tool with confirmToken

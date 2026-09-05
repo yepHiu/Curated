@@ -2491,7 +2491,7 @@ Body 可选：
 
 ### 4.15b Experimental Agent（实验性）
 
-实验性 Agent（E2，见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。当前生产工具全部只读。
+实验性 Agent（见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。聊天中的写工具只产生预览，应用修改需要用户通过确认接口明确提交。
 
 #### `POST /api/ai/provider/test`
 
@@ -2555,7 +2555,7 @@ Body：
 
 说明：
 
-- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。
+- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后，从最近 80 条 user/assistant 记录构建上下文，工具记录不占窗口额度。
 - 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
 - `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
 - 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
@@ -2571,6 +2571,8 @@ Body：
 
 用途：实验性就地 Action（E3）。`name` 为 `polish_comment`、`translate_summary`、`translate_title` 或 `insights_narrative`。无会话循环。
 
+后端总期限为 2 分钟；Web 适配同样提供 2 分钟超时和可取消 signal。聊天流式请求由 Web 适配在连续 90 秒无数据时取消，并将缺失 `message_done` 的 EOF 视为中断；客户端保留部分回复，不自动重放确认写入。
+
 - `polish_comment`：笔记润色，经 `save_movie_comment` preview。模型自识别原文语言并同语言润色。Body：`{ "movieId", "body?" }`。
 - `translate_summary`：把当前展示简介翻译到界面语言，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列，也不改标题。Body：`{ "movieId", "body?", "locale?" }`。
 - `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`，不改简介。Body：`{ "movieId", "body?", "locale?" }`。
@@ -2582,7 +2584,7 @@ Body：
 
 用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 须与 preview 语义一致（确认前会规范化 JSON）。
 
-成功：`200 AIToolApplyDTO`。token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。
+成功：`200 AIToolApplyDTO`。token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。笔记、标题、简介的预览旧值由服务端绑定到确认票据；apply 在 SQLite 事务中比较，内容已变化时返回 `409 AI_WRITE_CONFLICT`，无部分写入。消费过的票据不可复用；尚无持久化结果回执。
 
 #### `GET /api/ai/sessions`
 
@@ -2598,7 +2600,7 @@ Body：
 
 #### `GET /api/ai/sessions/{sessionId}`
 
-用途：读取会话及其消息。
+用途：读取会话及其最近 80 条存储消息，按 seq 正序返回。新 assistant 记录可带 `events`（工具结果、影片卡、证据、实体解析、确认预览和完成状态）；不包含可用于写入的 confirmToken 或 arguments。历史确认预览仅展示，需重新生成后确认。旧消息没有 events 时保持兼容，工具成功状态未知。
 
 成功：`200 AIChatSessionDetailDTO`；不存在时 `404 COMMON_NOT_FOUND`。
 
