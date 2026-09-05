@@ -80,12 +80,14 @@ type Handler func(ctx context.Context, call Call) (Result, error)
 
 // Call is one invocation entering the gateway.
 type Call struct {
-	Name       string
-	Args       json.RawMessage
-	SessionID  string
-	Channel    string
-	ConfirmTok string
-	Sanitize   string
+	// Preconditions come only from the server-issued preview ticket.
+	Preconditions []Change
+	Name          string
+	Args          json.RawMessage
+	SessionID     string
+	Channel       string
+	ConfirmTok    string
+	Sanitize      string
 }
 
 // Change is one field-level preview row for write-preview.
@@ -101,16 +103,19 @@ type ToolError struct {
 	Message string `json:"message"`
 }
 
+func (e *ToolError) Error() string { return e.Message }
+
 // Result is the unified tool envelope.
 type Result struct {
-	OK           bool       `json:"ok"`
-	Data         any        `json:"data,omitempty"`
-	Error        *ToolError `json:"error,omitempty"`
-	Truncated    bool       `json:"truncated,omitempty"`
-	NextCursor   string     `json:"nextCursor,omitempty"`
-	Changes      []Change   `json:"changes,omitempty"`
-	ConfirmToken string     `json:"confirmToken,omitempty"`
-	ExpiresAt    string     `json:"expiresAt,omitempty"`
+	Preconditions []Change   `json:"-"`
+	OK            bool       `json:"ok"`
+	Data          any        `json:"data,omitempty"`
+	Error         *ToolError `json:"error,omitempty"`
+	Truncated     bool       `json:"truncated,omitempty"`
+	NextCursor    string     `json:"nextCursor,omitempty"`
+	Changes       []Change   `json:"changes,omitempty"`
+	ConfirmToken  string     `json:"confirmToken,omitempty"`
+	ExpiresAt     string     `json:"expiresAt,omitempty"`
 	// ConfirmArgs is the JSON hashed into the preview token. Not sent to the model.
 	ConfirmArgs json.RawMessage `json:"-"`
 }

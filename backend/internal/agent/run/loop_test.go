@@ -401,7 +401,7 @@ func (s *commentWriteStub) MovieExists(context.Context, string) (bool, error) { 
 func (s *commentWriteStub) GetMovieComment(context.Context, string) (contracts.MovieCommentDTO, error) {
 	return contracts.MovieCommentDTO{Body: s.body}, nil
 }
-func (s *commentWriteStub) UpsertMovieComment(_ context.Context, _, body string) (contracts.MovieCommentDTO, error) {
+func (s *commentWriteStub) UpsertMovieComment(_ context.Context, _, body string, expected ...string) (contracts.MovieCommentDTO, error) {
 	s.writes++
 	s.body = body
 	return contracts.MovieCommentDTO{Body: body, UpdatedAt: "t"}, nil

@@ -116,9 +116,11 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 	}
 
 	if apply {
-		if err := g.confirm.Consume(call.ConfirmTok, call.SessionID, call.Name, call.Args); err != nil {
+		preconditions, err := g.confirm.ConsumePreview(call.ConfirmTok, call.SessionID, call.Name, call.Args)
+		if err != nil {
 			return fail(ErrConfirmExpired, "AI_CONFIRM_EXPIRED", err.Error()), def.Permission, ResultRejected, "AI_CONFIRM_EXPIRED"
 		}
+		call.Preconditions = preconditions
 	}
 
 	timeout := ReadTimeout
@@ -145,7 +147,7 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 	}
 
 	if !apply && def.Permission == PermissionWritePreview && raw.ConfirmToken == "" && len(raw.Changes) > 0 {
-		rec, issueErr := g.confirm.Issue(call.SessionID, call.Name, call.Args)
+		rec, issueErr := g.confirm.Issue(call.SessionID, call.Name, call.Args, raw.Preconditions...)
 		if issueErr == nil {
 			raw.ConfirmToken = rec.Token
 			raw.ExpiresAt = rec.ExpiresAt.UTC().Format(time.RFC3339)

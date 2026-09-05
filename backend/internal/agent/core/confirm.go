@@ -13,11 +13,12 @@ import (
 
 // ConfirmRecord is a short-lived write ticket bound to session+tool+args.
 type ConfirmRecord struct {
-	Token     string
-	SessionID string
-	ToolName  string
-	ArgsHash  string
-	ExpiresAt time.Time
+	Preconditions []Change
+	Token         string
+	SessionID     string
+	ToolName      string
+	ArgsHash      string
+	ExpiresAt     time.Time
 }
 
 // ConfirmStore issues and consumes preview tokens. Process restart clears all tokens.
@@ -59,17 +60,18 @@ func CanonicalJSON(raw json.RawMessage) []byte {
 	return encoded
 }
 
-func (s *ConfirmStore) Issue(sessionID, toolName string, args json.RawMessage) (ConfirmRecord, error) {
+func (s *ConfirmStore) Issue(sessionID, toolName string, args json.RawMessage, preconditions ...Change) (ConfirmRecord, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
 		return ConfirmRecord{}, err
 	}
 	rec := ConfirmRecord{
-		Token:     "cfm_" + hex.EncodeToString(buf[:]),
-		SessionID: sessionID,
-		ToolName:  toolName,
-		ArgsHash:  HashArgs(args),
-		ExpiresAt: s.now().Add(s.ttl),
+		Preconditions: append([]Change(nil), preconditions...),
+		Token:         "cfm_" + hex.EncodeToString(buf[:]),
+		SessionID:     sessionID,
+		ToolName:      toolName,
+		ArgsHash:      HashArgs(args),
+		ExpiresAt:     s.now().Add(s.ttl),
 	}
 	s.mu.Lock()
 	s.tokens[rec.Token] = rec
@@ -78,8 +80,13 @@ func (s *ConfirmStore) Issue(sessionID, toolName string, args json.RawMessage) (
 }
 
 func (s *ConfirmStore) Consume(token, sessionID, toolName string, args json.RawMessage) error {
+	_, err := s.ConsumePreview(token, sessionID, toolName, args)
+	return err
+}
+
+func (s *ConfirmStore) ConsumePreview(token, sessionID, toolName string, args json.RawMessage) ([]Change, error) {
 	if token == "" {
-		return fmt.Errorf("confirm token is required")
+		return nil, fmt.Errorf("confirm token is required")
 	}
 	s.mu.Lock()
 	rec, ok := s.tokens[token]
@@ -88,16 +95,16 @@ func (s *ConfirmStore) Consume(token, sessionID, toolName string, args json.RawM
 	}
 	s.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("%w: confirm token is invalid", ErrConfirmExpired)
+		return nil, fmt.Errorf("%w: confirm token is invalid", ErrConfirmExpired)
 	}
 	if s.now().After(rec.ExpiresAt) {
-		return fmt.Errorf("%w: confirm token expired", ErrConfirmExpired)
+		return nil, fmt.Errorf("%w: confirm token expired", ErrConfirmExpired)
 	}
 	if rec.SessionID != sessionID || rec.ToolName != toolName {
-		return fmt.Errorf("confirm token does not match this call")
+		return nil, fmt.Errorf("confirm token does not match this call")
 	}
 	if rec.ArgsHash != HashArgs(args) {
-		return fmt.Errorf("confirm token arguments drifted")
+		return nil, fmt.Errorf("confirm token arguments drifted")
 	}
-	return nil
+	return rec.Preconditions, nil
 }

@@ -18,7 +18,7 @@ import (
 type LibraryWrite interface {
 	MovieExists(ctx context.Context, movieID string) (bool, error)
 	GetMovieComment(ctx context.Context, movieID string) (contracts.MovieCommentDTO, error)
-	UpsertMovieComment(ctx context.Context, movieID, body string) (contracts.MovieCommentDTO, error)
+	UpsertMovieComment(ctx context.Context, movieID, body string, expected ...string) (contracts.MovieCommentDTO, error)
 	GetMovieDetail(ctx context.Context, movieID string) (contracts.MovieDetailDTO, error)
 	PatchMovieDisplayOverrides(ctx context.Context, movieID string, patch contracts.PatchMovieInput) (contracts.MovieDetailDTO, error)
 	CreateSavedView(ctx context.Context, name string, filters contracts.SavedViewFiltersV1) (contracts.SavedViewDTO, error)
@@ -88,7 +88,8 @@ func previewSaveMovieComment(ctx context.Context, w LibraryWrite, call core.Call
 		return core.Result{OK: true, Data: map[string]any{"movieId": id, "noop": true}}, nil
 	}
 	return core.Result{
-		OK: true,
+		OK:            true,
+		Preconditions: []core.Change{{Path: "comment.body", Before: current.Body}},
 		Data: map[string]any{
 			"movieId": id,
 		},
@@ -107,8 +108,15 @@ func applySaveMovieComment(ctx context.Context, w LibraryWrite, call core.Call) 
 	}
 	id := strArg(args, "movieId")
 	body := strArg(args, "body")
-	dto, err := w.UpsertMovieComment(ctx, id, body)
+	before, valid := previewBefore(call, "comment.body")
+	if !valid {
+		return conflictResult(), nil
+	}
+	dto, err := w.UpsertMovieComment(ctx, id, body, before)
 	if err != nil {
+		if errors.Is(err, storage.ErrAIWriteConflict) {
+			return conflictResult(), nil
+		}
 		if errors.Is(err, storage.ErrMovieNotFound) {
 			return core.Result{Error: &core.ToolError{Code: "COMMON_NOT_FOUND", Message: "movie not found"}}, nil
 		}
@@ -181,7 +189,14 @@ func previewUpdateMovieDisplay(ctx context.Context, w LibraryWrite, call core.Ca
 	if len(changes) == 0 {
 		return core.Result{OK: true, Data: map[string]any{"movieId": id, "noop": true}}, nil
 	}
-	return core.Result{OK: true, Data: map[string]any{"movieId": id}, Changes: changes}, nil
+	var conditions []core.Change
+	if titleSet {
+		conditions = append(conditions, core.Change{Path: "display.userTitle", Before: current.Title})
+	}
+	if summarySet {
+		conditions = append(conditions, core.Change{Path: "display.userSummary", Before: current.Summary})
+	}
+	return core.Result{OK: true, Data: map[string]any{"movieId": id}, Changes: changes, Preconditions: conditions}, nil
 }
 
 func applyUpdateMovieDisplay(ctx context.Context, w LibraryWrite, call core.Call) (core.Result, error) {
@@ -193,6 +208,20 @@ func applyUpdateMovieDisplay(ctx context.Context, w LibraryWrite, call core.Call
 	titleSet, title := optionalStringArg(args, "userTitle")
 	summarySet, summary := optionalStringArg(args, "userSummary")
 	patch := contracts.PatchMovieInput{}
+	if titleSet {
+		before, valid := previewBefore(call, "display.userTitle")
+		if !valid {
+			return conflictResult(), nil
+		}
+		patch.ExpectedTitle = &before
+	}
+	if summarySet {
+		before, valid := previewBefore(call, "display.userSummary")
+		if !valid {
+			return conflictResult(), nil
+		}
+		patch.ExpectedSummary = &before
+	}
 	if titleSet {
 		patch.UserTitleSet = true
 		if title == "" {
@@ -211,12 +240,29 @@ func applyUpdateMovieDisplay(ctx context.Context, w LibraryWrite, call core.Call
 	}
 	dto, err := w.PatchMovieDisplayOverrides(ctx, id, patch)
 	if err != nil {
+		if errors.Is(err, storage.ErrAIWriteConflict) {
+			return conflictResult(), nil
+		}
 		if errors.Is(err, storage.ErrMovieNotFound) || errors.Is(err, storage.ErrMovieNotFoundForPatch) {
 			return core.Result{Error: &core.ToolError{Code: "COMMON_NOT_FOUND", Message: "movie not found"}}, nil
 		}
 		return core.Result{Error: &core.ToolError{Code: "AI_CHAT_FAILED", Message: err.Error()}}, nil
 	}
 	return core.Result{OK: true, Data: dto}, nil
+}
+
+func previewBefore(call core.Call, path string) (string, bool) {
+	for _, condition := range call.Preconditions {
+		if condition.Path == path {
+			before, ok := condition.Before.(string)
+			return before, ok
+		}
+	}
+	return "", false
+}
+
+func conflictResult() core.Result {
+	return core.Result{Error: &core.ToolError{Code: "AI_WRITE_CONFLICT", Message: storage.ErrAIWriteConflict.Error()}}
 }
 
 func createSavedView(w LibraryWrite) core.ToolDefinition {

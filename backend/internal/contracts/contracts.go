@@ -587,6 +587,9 @@ type MovieDetailDTO struct {
 // UserTitleSet etc.: JSON null or "" clears the user_* override (revert to scraped column). Non-empty string sets override.
 // UserRuntimeMinutesSet + UserRuntimeMinutesClear (JSON null): clear runtime override. Otherwise set minutes (>= 0).
 type PatchMovieInput struct {
+	// Internal optimistic concurrency preconditions; never accepted from JSON.
+	ExpectedTitle   *string `json:"-"`
+	ExpectedSummary *string `json:"-"`
 	Favorite        *bool
 	UserRatingSet   bool
 	UserRatingClear bool

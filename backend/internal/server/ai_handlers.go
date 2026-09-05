@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"curated-backend/internal/agent/core"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
@@ -279,6 +280,11 @@ func (h *Handler) handleAIConfirm(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeAIActionError(w http.ResponseWriter, err error) {
+	var toolErr *core.ToolError
+	if errors.As(err, &toolErr) && toolErr.Code == "AI_WRITE_CONFLICT" {
+		writeAppError(w, http.StatusConflict, toolErr.Code, toolErr.Message)
+		return
+	}
 	if errors.Is(err, llm.ErrInvalidConfig) {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeAIProviderUnavailable, err.Error())
 		return

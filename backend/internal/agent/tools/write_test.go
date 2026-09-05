@@ -8,6 +8,7 @@ import (
 
 	"curated-backend/internal/agent/core"
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/storage"
 )
 
 type stubWrite struct {
@@ -26,7 +27,10 @@ func (s *stubWrite) MovieExists(context.Context, string) (bool, error) {
 func (s *stubWrite) GetMovieComment(context.Context, string) (contracts.MovieCommentDTO, error) {
 	return s.comment, nil
 }
-func (s *stubWrite) UpsertMovieComment(_ context.Context, _, body string) (contracts.MovieCommentDTO, error) {
+func (s *stubWrite) UpsertMovieComment(_ context.Context, _, body string, expected ...string) (contracts.MovieCommentDTO, error) {
+	if len(expected) > 0 && expected[0] != s.comment.Body {
+		return contracts.MovieCommentDTO{}, storage.ErrAIWriteConflict
+	}
 	s.writes++
 	s.saved = body
 	return contracts.MovieCommentDTO{Body: body, UpdatedAt: "t"}, nil
@@ -35,6 +39,9 @@ func (s *stubWrite) GetMovieDetail(context.Context, string) (contracts.MovieDeta
 	return s.detail, nil
 }
 func (s *stubWrite) PatchMovieDisplayOverrides(_ context.Context, _ string, patch contracts.PatchMovieInput) (contracts.MovieDetailDTO, error) {
+	if (patch.ExpectedTitle != nil && *patch.ExpectedTitle != s.detail.Title) || (patch.ExpectedSummary != nil && *patch.ExpectedSummary != s.detail.Summary) {
+		return contracts.MovieDetailDTO{}, storage.ErrAIWriteConflict
+	}
 	s.writes++
 	s.patched = patch
 	out := s.detail

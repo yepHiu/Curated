@@ -149,7 +149,7 @@ func (a *App) ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest)
 		Sanitize:   core.SanitizeFull,
 	})
 	if result.Error != nil {
-		return contracts.AIToolApplyDTO{}, fmt.Errorf("%s", result.Error.Message)
+		return contracts.AIToolApplyDTO{}, result.Error
 	}
 	return contracts.AIToolApplyDTO{OK: true, Name: name, Data: result.Data}, nil
 }

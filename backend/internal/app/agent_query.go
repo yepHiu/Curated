@@ -74,8 +74,8 @@ func (a *App) MovieExists(ctx context.Context, movieID string) (bool, error) {
 	return a.store.MovieExists(ctx, movieID)
 }
 
-func (a *App) UpsertMovieComment(ctx context.Context, movieID, body string) (contracts.MovieCommentDTO, error) {
-	return a.store.UpsertMovieComment(ctx, movieID, body)
+func (a *App) UpsertMovieComment(ctx context.Context, movieID, body string, expected ...string) (contracts.MovieCommentDTO, error) {
+	return a.store.UpsertMovieComment(ctx, movieID, body, expected...)
 }
 
 func (a *App) PatchMovieDisplayOverrides(ctx context.Context, movieID string, patch contracts.PatchMovieInput) (contracts.MovieDetailDTO, error) {
