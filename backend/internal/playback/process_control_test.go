@@ -7,6 +7,7 @@ import (
 	"curated-backend/internal/executil"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -70,4 +71,50 @@ func TestThrottleUsesPublishedRemuxDurations(t *testing.T) {
 	if !ok || value != 18 {
 		t.Fatalf("got %v %v", value, ok)
 	}
+}
+
+func TestFFmpegSameMovieSessionsRemainIndependentlyPlayable(t *testing.T) {
+	name, err := exec.LookPath(resolveFFmpegCommand("ffmpeg"))
+	if err != nil {
+		t.Skip("FFmpeg not installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	source := filepath.Join(t.TempDir(), "synthetic.mp4")
+	fixture := executil.CommandContext(ctx, name, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=64x64:rate=10", "-t", "12", "-c:v", "libx264", "-preset", "ultrafast", source)
+	if output, err := fixture.CombinedOutput(); err != nil {
+		t.Fatalf("fixture: %v %s", err, output)
+	}
+	m := New(Config{Enabled: true, FFmpegCommand: name, SessionRoot: t.TempDir()})
+	defer m.Close()
+	type result struct {
+		session Session
+		err     error
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			session, err := m.StartHLSSession(ctx, "same-movie", source, StartHLSSessionOptions{SourceVideoCodec: "h264", SourceContainer: "mp4"})
+			results <- result{session, err}
+		}()
+	}
+	first, second := <-results, <-results
+	if first.err != nil || second.err != nil {
+		t.Fatalf("startup: %v / %v", first.err, second.err)
+	}
+	if first.session.ID == second.session.ID {
+		t.Fatal("sessions share an identity")
+	}
+	for _, session := range []Session{first.session, second.session} {
+		if _, err := m.ResolveFile(session.ID, hlsFirstSegmentName); err != nil {
+			t.Fatalf("session %s lost media: %v", session.ID, err)
+		}
+	}
+	if err := m.DeleteSession(first.session.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.ResolveFile(second.session.ID, hlsFirstSegmentName); err != nil {
+		t.Fatal("deleting one client interrupted the other", err)
+	}
+	t.Log("two real HLS sessions for the same synthetic movie remained independently readable")
 }

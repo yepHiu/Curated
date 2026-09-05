@@ -237,6 +237,38 @@ describe("PlayerPage loading states", () => {
     wrapper.unmount()
   })
 
+  it("cancels superseded seeks and releases late sessions without replacing the latest target", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const sources: string[] = []
+    class FakeHls {
+      static isSupported() { return true }
+      loadSource(src: string) { sources.push(src) }
+      attachMedia() {}
+      destroy() {}
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    const original = { movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", durationSec: 120, startPositionSec: 0, resumePositionSec: 0, canDirectPlay: false }
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce(original)
+    let finishFirst!: (value: object) => void
+    serviceMocks.createPlaybackSession.mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve }))
+    serviceMocks.createPlaybackSession.mockResolvedValueOnce({ ...original, sessionId: "latest", url: "/latest.m3u8", startPositionSec: 20, resumePositionSec: 20 })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    expect(serviceMocks.createPlaybackSession.mock.calls[0]?.[3].aborted).toBe(true)
+    finishFirst({ ...original, sessionId: "stale", url: "/stale.m3u8", startPositionSec: 10, resumePositionSec: 10 })
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/latest.m3u8")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("stale")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    await wrapper.get("video").trigger("loadeddata")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("original")
+    wrapper.unmount()
+  })
+
   it("cancels startup and releases a late descriptor without reseeking after unmount", async () => {
     let finish!: (value: object) => void
     serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
