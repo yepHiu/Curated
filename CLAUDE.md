@@ -288,6 +288,11 @@ GET    /api/settings                        # Get settings (includes backupDirec
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
+GET    /api/ai/settings                    # Global enable/read-only/privacy/limits/retention
+PATCH  /api/ai/settings                    # Persist policy, cancel active generation; PIN protected
+GET    /api/ai/usage                       # Measured usage + timing + outcome, filters/pagination
+GET    /api/ai/audit                       # Metadata-only tool activity, filters/pagination
+POST   /api/ai/cleanup                     # Expired metadata and standalone action receipts only
 POST   /api/ai/provider/test                # Bounded probe: 1024 output tokens / 30s; 200 + ok=false on failure
 POST   /api/ai/chat                         # Experimental agent SSE (thinking_delta + read tools + present_movies cards + search_provider_titles + get_source_page + confirm_required + session); PIN-protected
 GET    /api/ai/sessions                     # List persisted agent chats

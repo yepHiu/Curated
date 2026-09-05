@@ -44,6 +44,7 @@ alwaysApply: true
   - `launchAtLogin`
   - `backupDirectory`
   - `proxy`
+  - `aiProvider` / `aiGovernance`（正式 Settings → AI；缺省禁用，治理经 `/api/ai/settings` 保存）
   - `logDir` / `logFilePrefix` / `logMaxAgeDays` / `logLevel`
 - `PATCH /api/settings` 会部分更新这些资料库级设置。
 - 空 `logDir` 表示使用默认日志目录，而不是关闭文件日志：

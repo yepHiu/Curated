@@ -39,7 +39,7 @@ Installed apps can also check and download a newer installer from Settings → A
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
 - Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
-- Experimental AI with paginated chats, bounded context, and recoverable confirmed edits; see the [handbook](docs/guide.md#experimental-ai).
+- AI settings with global controls, measured token usage, timing and audit records; see the [handbook](docs/guide.md#ai-settings-and-governance).
 - GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
 
 ## Quick start

@@ -2497,7 +2497,35 @@ Body 可选：
 
 实验性 Agent（见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。聊天中的写工具只产生预览，应用修改需要用户通过确认接口明确提交。
 
-#### `POST /api/ai/provider/test`
+#### AI 设置与治理（2026-09-06）
+
+正式入口为 Settings → AI。以下路由均受 PIN/CORS 中间件保护，模型工具不能调用设置写入端点。现有 Provider 字段继续通过 `GET/PATCH /api/settings` 保存；`GET /api/settings` 额外返回 `aiGovernance`。
+
+| 方法 | 路径 | 行为 |
+| --- | --- | --- |
+| GET | `/api/ai/settings` | 返回全局 AI 治理设置 |
+| PATCH | `/api/ai/settings` | 部分更新；未知字段、错误类型、非法范围返回 `400 BAD_REQUEST` |
+| GET | `/api/ai/usage` | 过滤后的汇总与分页请求记录 |
+| GET | `/api/ai/audit` | 分页工具审计，仅元数据 |
+| POST | `/api/ai/cleanup` | 按已保存保留期清理到期记录，返回 `{runs,audit,receipts}` 删除数量 |
+
+设置默认值：
+
+```json
+{"enabled":false,"readOnly":false,"privacy":"auto","stepLimit":15,"writePerMinute":10,"retentionDays":30}
+```
+
+`privacy` 支持 `auto` / `minimal`；步骤 1–30、全局每分钟确认 1–60、保留天数 7–365。保存至 `library-config.cfg.aiGovernance`，并取消正在生成的请求；已接受的确认写事务先完成，再保存策略。禁用时聊天返回 SSE `error` / `AI_DISABLED`；Action/confirm 返回 `403 AI_DISABLED`。只读时写 Action/confirm 为 `403 AI_READ_ONLY`，Gateway 拒绝写预览/应用并记录审计。连通测试与治理查询仍可显式调用。旧浏览器实验开关不会自动赋予全局启用权限。
+
+查询参数：`days`（1–365，默认 30）、`limit`（1–100，默认 25）、`offset`（0–100000，默认 0）、`channel`（省略或 chat/action/test）、`status`。usage 的 status 为 completed/failed/partial/cancelled/needs_input；audit 为 ok/error/previewed/confirmed/rejected，或 failed（匹配 error/rejected）。非法参数返回 400。按时间及 id 降序分页；新请求可能移动 offset 边界，刷新后重新从首页浏览。
+
+usage 返回 `{summary,items,total,limit,offset}`。summary 包含 runs/failed/partial/cancelled/modelCalls/usageCalls/toolCalls、promptTokens/completionTokens/totalTokens、avgDurationMs/avgFirstTextMs。items 包含 id/startedAt/channel/action/sessionId/provider（kind）/model/promptVersion/status/errorCode/durationMs/firstTextMs，以及相同调用数、usage 覆盖数和 token 字段。`firstTextMs` 与平均值无样本时为 null；非流式调用不提供首正文延迟。token 累加值只能在 `usageCalls>0` 时作为已知用量展示；`usageCalls<modelCalls` 表示部分缺失，零覆盖必须显示未知，不能把数字 0 当作已测消耗。此数据不是上下文估算或费用报价。
+
+每轮 Chat、Action、连通测试在收尾记录一行。失败类别含 configuration/authentication/rate_limit/provider_http/network/timeout/cancelled/stream_interrupted/invalid_response/operation_failed/empty_response 和具体 AI 工具错误码；不保存原始错误响应。进入 App 之前被 HTTP 参数验证/PIN 拒绝的请求不计为模型轮次。结束前崩溃不保证统计落库；请求取消时使用独立最多 5 秒上下文保存。
+
+audit 返回 `{items,total,limit,offset}`，条目为 id/createdAt/channel/sessionId/tool/permission/result/errorCode/durationMs，不返回 args_summary 或原始文本。新的审计不再保存原始参数摘要。治理查询和新请求完成会自动清理到期统计、审计及未关联聊天会话的 Action 回执；聊天正文、聊天关联回执继续由删除会话管理。清理不撤销业务修改；未用确认票据继续遵循原 TTL。
+
+#### `POST /api/ai/provider/test`（连通性）
 
 用途：用草稿 provider 配置或已保存配置发起一次 chat completion，要求仅回复 pong，验证 OpenAI 兼容端点连通性。探针最多允许 1024 个输出 token、30 秒超时，给推理模型生成最终正文留出额度；空正文仍返回失败。
 
@@ -3420,6 +3448,10 @@ interface ActorMergeValuesSummaryDTO {
 | `POST` | `/api/providers/ping-all` | `PingAllProvidersResponse` |
 | `POST` | `/api/proxy/ping-javbus` | `ProxyJavBusPingResponse` |
 | `POST` | `/api/proxy/ping-google` | `ProxyJavBusPingResponse` |
+| `GET/PATCH` | `/api/ai/settings` | `AIGovernanceDTO` |
+| `GET` | `/api/ai/usage` | `AIReportDTO` |
+| `GET` | `/api/ai/audit` | `AIAuditPageDTO` |
+| `POST` | `/api/ai/cleanup` | `AICleanupDTO` |
 | `POST` | `/api/ai/provider/test` | `AIProviderTestResponse` |
 | `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`tool_call_started`/`tool_call_result`/`movie_cards`/`confirm_required`/`message_done`/`error`） |
 | `GET` | `/api/ai/sessions` | `AIChatSessionListDTO` |

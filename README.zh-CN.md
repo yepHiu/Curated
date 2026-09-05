@@ -36,6 +36,7 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 - 本地优先：Vue 3 SPA、Go HTTP API、SQLite，以及面向 Windows 的 Electron 托盘壳。
 - 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。
+- 正式 AI 设置提供全局开关、权限、实际 token 用量、耗时与审计；详见[操作手册](docs/guide.md#ai-settings-and-governance)。
 - 资料库浏览、刮削、导入、播放、萃取帧、演员身份、每日推荐与个人洞察。
 - 独立 HLS 会话、指定位置续播与有界错误恢复，详见[播放说明](docs/guide.md#playback-recovery)。
 - 可选 PIN 锁、可验证备份、路径迁移、资料库健康与有界修复。
