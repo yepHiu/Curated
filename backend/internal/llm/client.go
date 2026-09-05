@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // ChatMessage is one OpenAI-compatible chat message (system | user | assistant | tool).
@@ -95,6 +96,8 @@ func (c ClientConfig) Validate() error {
 type Client struct {
 	cfg        ClientConfig
 	httpClient *http.Client
+	// Observe is called once per request, including errors, without raw content.
+	Observe func(Observation)
 }
 
 // NewClient builds a client; httpClient must be non-nil (use a proxy-aware client
@@ -133,6 +136,7 @@ type streamOpts struct {
 }
 
 type chatCompletionResponse struct {
+	Usage   *wireUsage `json:"usage"`
 	Choices []struct {
 		FinishReason string `json:"finish_reason"`
 		Message      struct {
@@ -242,7 +246,7 @@ func (c *Client) do(ctx context.Context, body chatCompletionRequest) (*http.Resp
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		return nil, fmt.Errorf("provider returned HTTP %d: %s", resp.StatusCode, errorSnippet(resp.Body))
+		return nil, &HTTPError{Status: resp.StatusCode, Detail: fmt.Sprintf("provider returned HTTP %d: %s", resp.StatusCode, errorSnippet(resp.Body))}
 	}
 	return resp, nil
 }
@@ -258,7 +262,10 @@ func errorSnippet(r io.Reader) string {
 
 // Complete performs a non-streaming chat completion and returns the first
 // choice content. Used by the provider connectivity test.
-func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens int) (string, error) {
+func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens int) (textResult string, retErr error) {
+	started := time.Now()
+	observation := Observation{}
+	defer func() { c.observe(started, observation, retErr) }()
 	body := chatCompletionRequest{
 		Model:     strings.TrimSpace(c.cfg.Model),
 		Messages:  messages,
@@ -278,6 +285,7 @@ func (c *Client) Complete(ctx context.Context, messages []ChatMessage, maxTokens
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return "", fmt.Errorf("invalid provider response: %w", err)
 	}
+	observation.Usage = parsed.Usage.measured()
 	if parsed.Error != nil {
 		return "", fmt.Errorf("provider error: %s", parsed.Error.Message)
 	}
@@ -338,13 +346,17 @@ func (c *Client) StreamChat(ctx context.Context, messages []ChatMessage, onDelta
 }
 
 // StreamTurn streams one model turn, accumulating text deltas and tool-call fragments.
-func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(string)) (AssistantTurn, error) {
+func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(string)) (turnResult AssistantTurn, retErr error) {
+	started := time.Now()
+	observation := Observation{}
+	defer func() { c.observe(started, observation, retErr) }()
 	body := chatCompletionRequest{
-		Model:     strings.TrimSpace(c.cfg.Model),
-		Messages:  req.Messages,
-		Stream:    true,
-		MaxTokens: req.MaxTokens,
-		Tools:     encodeTools(req.Tools),
+		Model:      strings.TrimSpace(c.cfg.Model),
+		Messages:   req.Messages,
+		Stream:     true,
+		MaxTokens:  req.MaxTokens,
+		Tools:      encodeTools(req.Tools),
+		StreamOpts: &streamOpts{IncludeUsage: true},
 	}
 	if choice := strings.TrimSpace(req.ToolChoice); choice != "" {
 		body.ToolChoice = choice
@@ -374,6 +386,10 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			return nil
 		}
+		if measured := chunk.Usage.measured(); measured != nil {
+			// Providers commonly send the final cumulative usage with choices:[].
+			observation.Usage = measured
+		}
 		if chunk.Error != nil {
 			return fmt.Errorf("provider error: %s", chunk.Error.Message)
 		}
@@ -385,6 +401,10 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 			req.OnThinking(thinking)
 		}
 		if delta := choice.Delta.Content; delta != "" {
+			if observation.FirstTextMs == nil {
+				elapsed := time.Since(started).Milliseconds()
+				observation.FirstTextMs = &elapsed
+			}
 			full.WriteString(delta)
 			if onDelta != nil {
 				onDelta(delta)
