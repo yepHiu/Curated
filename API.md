@@ -2495,7 +2495,7 @@ Body 可选：
 
 #### `POST /api/ai/provider/test`
 
-用途：用草稿 provider 配置或已保存配置发起一次极小的 chat completion，验证 OpenAI 兼容端点连通性。
+用途：用草稿 provider 配置或已保存配置发起一次 chat completion，要求仅回复 pong，验证 OpenAI 兼容端点连通性。探针最多允许 1024 个输出 token、30 秒超时，给推理模型生成最终正文留出额度；空正文仍返回失败。
 
 Body 可选：
 
@@ -2555,7 +2555,8 @@ Body：
 
 说明：
 
-- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后，从最近 80 条 user/assistant 记录构建上下文，工具记录不占窗口额度。
+- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后读取最近 80 条 user/assistant 候选记录（工具记录不占额度），模型循环最终保留最多 24 条且历史正文预算约 24 KiB。本次输入不会被静默截断；省略较早历史时注入范围说明。
+- 每次模型调用前，对 messages 与工具 schema 的 JSON UTF-8 字节数做保守 token 估算，上限 65536。达到预算且未执行工具时返回 `needs_input`，已有工具结果时返回 `partial`，保留已完成结果并停止进一步调用。不切断工具 JSON；预算是本地估算，不是 Provider usage 或上下文窗口的精确测量，尚无自动摘要。
 - 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
 - `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
 - 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
@@ -2584,7 +2585,9 @@ Body：
 
 用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 须与 preview 语义一致（确认前会规范化 JSON）。
 
-成功：`200 AIToolApplyDTO`。token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。笔记、标题、简介的预览旧值由服务端绑定到确认票据；apply 在 SQLite 事务中比较，内容已变化时返回 `409 AI_WRITE_CONFLICT`，无部分写入。消费过的票据不可复用；尚无持久化结果回执。
+成功：`200 AIToolApplyDTO`（`ok`、`name`、`data`，重复成功确认另含 `replayed: true`）。尚未成功的 token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`；已存在回执但 session/tool/规范化参数绑定不匹配同样为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。笔记、标题、简介的预览旧值由服务端绑定到确认票据；apply 在 SQLite 事务中比较，内容已变化时返回 `409 AI_WRITE_CONFLICT`，无部分写入。
+
+成功写入与 `ai_apply_receipts` 回执在同一事务提交。相同 token/session/tool/规范化参数的重试直接返回当时结果，不重复写入，后端重启后仍可恢复；失败和过期的未执行票据不能借此重试执行。回执保存 token 的 SHA-256 而非原始 token。确认请求被接受后，即使客户端断连也会在有界写入期限内继续收口。`data` 是提交时快照：笔记含 body/updatedAt，展示字段含 id 及本次改变的 title/summary，保存视图含创建结果。`replayed: true` 时编辑器重新读取当前资料，避免用历史结果覆盖后续人工修改。删除聊天同步清除其回执；独立 Action 回执当前无自动保留期清理。
 
 #### `GET /api/ai/sessions`
 
@@ -2600,13 +2603,15 @@ Body：
 
 #### `GET /api/ai/sessions/{sessionId}`
 
-用途：读取会话及其最近 80 条存储消息，按 seq 正序返回。新 assistant 记录可带 `events`（工具结果、影片卡、证据、实体解析、确认预览和完成状态）；不包含可用于写入的 confirmToken 或 arguments。历史确认预览仅展示，需重新生成后确认。旧消息没有 events 时保持兼容，工具成功状态未知。
+用途：读取会话消息页，每页最多 80 条存储记录。首次不传 cursor 返回最新页；将响应的 `nextCursor` 原样作为 `?cursor=…` 传回即可读取更早页，省略 `nextCursor` 表示到底。游标是不透明字符串，Web API 按 `(seq,id)` 严格向前翻页，新增消息不移动旧页边界；每页仍按时间正序展示。非法游标返回 `400 COMMON_BAD_REQUEST`。
+
+新 assistant 记录可带 `events`（工具结果、影片卡、证据、实体解析、确认预览和完成状态）；不包含可用于写入的 confirmToken 或 arguments。确认事件可带不可执行的 `receiptId`，查询历史时根据已提交回执回填 `applied: true`。已应用预览显示已应用；其余历史预览仅展示，需要重新生成后确认。旧消息没有 events 时保持兼容，工具成功状态未知；回执实现前的历史操作不能补出可信的成功状态。
 
 成功：`200 AIChatSessionDetailDTO`；不存在时 `404 COMMON_NOT_FOUND`。
 
 #### `DELETE /api/ai/sessions/{sessionId}`
 
-用途：删除一个会话及其消息。
+用途：删除一个会话、其消息及对应的 AI apply 回执；不会撤销该会话之前已确认的业务修改。
 
 成功：`204`；不存在时 `404 COMMON_NOT_FOUND`。
 

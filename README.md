@@ -38,7 +38,7 @@ Installed apps can also check and download a newer installer from Settings → A
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
-- Experimental AI chat and editing previews with explicit confirmation; see the [handbook](docs/guide.md#experimental-ai).
+- Experimental AI with paginated chats, bounded context, and recoverable confirmed edits; see the [handbook](docs/guide.md#experimental-ai).
 - GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
 
 ## Quick start

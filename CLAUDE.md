@@ -288,14 +288,14 @@ GET    /api/settings                        # Get settings (includes backupDirec
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
-POST   /api/ai/provider/test                # Experimental agent: probe OpenAI-compatible provider (200 + ok=false on failure)
+POST   /api/ai/provider/test                # Bounded probe: 1024 output tokens / 30s; 200 + ok=false on failure
 POST   /api/ai/chat                         # Experimental agent SSE (thinking_delta + read tools + present_movies cards + search_provider_titles + get_source_page + confirm_required + session); PIN-protected
 GET    /api/ai/sessions                     # List persisted agent chats
 POST   /api/ai/sessions                     # Create an empty agent chat
-GET    /api/ai/sessions/{sessionId}         # Latest 80 stored rows ascending; new assistant rows include result events (no write tokens)
-DELETE /api/ai/sessions/{sessionId}         # Delete one agent chat
+GET    /api/ai/sessions/{sessionId}         # 80 rows per page, ?cursor / nextCursor; result events and applied receipt state (no write tokens)
+DELETE /api/ai/sessions/{sessionId}         # Delete one agent chat and its apply receipts; business changes remain
 POST   /api/ai/actions/{name}               # Experimental agent L1/L2 action (polish_comment / translate_summary / translate_title / insights_narrative)
-POST   /api/ai/confirm                      # Apply a previewed write tool with confirmToken
+POST   /api/ai/confirm                      # Atomic write + durable receipt; identical retry returns snapshot with replayed=true
 POST   /api/scans                           # Start scan task
 GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
