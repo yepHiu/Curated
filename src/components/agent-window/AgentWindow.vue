@@ -489,14 +489,18 @@ async function send(selected?: AIEntityCandidateDTO) {
         onThinking(delta) {
           if (seq !== streamSeq || controller.signal.aborted) return
           const current = findProcessFor(assistantId)
-          if (!current) return
+          if (!current || !delta) return
+          // Auto-open once; phase changes and later chunks must preserve the
+          // user's disclosure choice until the entire turn finishes.
+          if (!current.thinking) current.open = true
           current.thinking += delta
           current.thinkingActive = true
           void scrollListToEnd()
         },
         onDelta(delta) {
           if (seq !== streamSeq || controller.signal.aborted) return
-          collapseProcess(assistantId)
+          const process = findProcessFor(assistantId)
+          if (process) process.thinkingActive = false
           const current = entries.value.find((entry) => entry.id === assistantId)
           if (current?.kind === "assistant") {
             current.content += delta

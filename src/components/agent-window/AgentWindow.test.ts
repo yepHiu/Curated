@@ -3,7 +3,7 @@ import { ref } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import AgentWindow from "./AgentWindow.vue"
-import { AIServiceError } from "@/services/contracts/ai-service"
+import { AIServiceError, type AIChatStreamHandlers } from "@/services/contracts/ai-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
 
@@ -226,6 +226,59 @@ describe("AgentWindow", () => {
     expect(wrapper.find("[data-agent-process-tools]").text()).toContain("agentWindow.tools.searchMovies")
     expect(wrapper.find("[data-agent-process-tools]").text()).not.toContain("present_movies")
     expect(wrapper.find("[data-agent-thinking]").text()).toContain("先找未看")
+  })
+
+  it("keeps thinking mounted between streamed tool, reasoning and answer events", async () => {
+    let handlers!: AIChatStreamHandlers
+    let finish!: () => void
+    streamChatMock.mockImplementation((_input: unknown, callbacks: AIChatStreamHandlers) => {
+      handlers = callbacks
+      return new Promise<void>((resolve) => { finish = resolve })
+    })
+    const wrapper = mountWindow()
+    await flushPromises()
+    await wrapper.find("[data-agent-window-input]").setValue("查找影片")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+
+    handlers.onThinking?.("先检索")
+    await flushPromises()
+    const thinkingNode = wrapper.find("[data-agent-thinking]").element
+    const tool = { toolCallId: "lookup", name: "search_movies" }
+    handlers.onToolStart?.(tool)
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").element).toBe(thinkingNode)
+    const toolsNode = wrapper.find("[data-agent-process-tools]").element
+    handlers.onToolResult?.({ ...tool, ok: true })
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").element).toBe(thinkingNode)
+    expect(wrapper.find("[data-agent-process-tools]").element).toBe(toolsNode)
+    handlers.onDelta("找到一些影片")
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").element).toBe(thinkingNode)
+    handlers.onThinking?.("，再筛选")
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").element).toBe(thinkingNode)
+    expect(wrapper.find("[data-agent-process-tools]").element).toBe(toolsNode)
+
+    // A manual collapse must survive further reasoning and answer chunks.
+    await wrapper.find("[data-agent-process-toggle]").trigger("click")
+    expect(wrapper.find("[data-agent-thinking]").exists()).toBe(false)
+    handlers.onThinking?.("，比较结果")
+    handlers.onDelta("，推荐如下")
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").exists()).toBe(false)
+    await wrapper.find("[data-agent-process-toggle]").trigger("click")
+    const reopenedNode = wrapper.find("[data-agent-thinking]").element
+    handlers.onDelta("。")
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").element).toBe(reopenedNode)
+
+    finish()
+    await flushPromises()
+    expect(wrapper.find("[data-agent-thinking]").exists()).toBe(false)
+    await wrapper.find("[data-agent-process-toggle]").trigger("click")
+    expect(wrapper.find("[data-agent-thinking]").text()).toBe("先检索，再筛选，比较结果")
   })
 
   it("renders movie cards from a present_movies slate and opens detail", async () => {

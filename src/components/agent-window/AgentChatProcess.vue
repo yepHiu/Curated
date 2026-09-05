@@ -46,6 +46,7 @@ const headline = computed(() => {
       type="button"
       class="flex min-h-8 w-full items-center gap-1.5 rounded-lg px-1 py-1 text-left hover:bg-muted/40"
       data-agent-process-toggle
+      :aria-expanded="entry.open"
       @click="emit('toggle')"
     >
       <Loader2
@@ -62,7 +63,7 @@ const headline = computed(() => {
       <span class="min-w-0 truncate font-medium">{{ headline }}</span>
     </button>
     <div
-      v-if="(busy && entry.thinking) || entry.open"
+      v-if="entry.open"
       class="mt-1 space-y-1.5 px-1 pb-1"
       data-agent-process-body
     >
@@ -73,7 +74,7 @@ const headline = computed(() => {
       >
         {{ entry.thinking }}
       </p>
-      <p v-if="entry.open && !busy && visibleTools.length" class="leading-relaxed" data-agent-process-tools>
+      <p v-if="entry.open && visibleTools.length" class="leading-relaxed" data-agent-process-tools>
         {{ visibleTools.map((name) => t(agentToolI18nKey(name))).join(" · ") }}
       </p>
       <div v-if="entry.open && entry.tools.some((tool) => tool.evidence)" class="space-y-1.5" data-agent-evidence-cards>
