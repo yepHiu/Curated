@@ -315,9 +315,9 @@
         <h1>项目现在在哪里，下一步去哪里。</h1>
         <p class="lede">这是面向协作的静态项目看板：已交付、正在推进、尚未排期的方向，以及当前 Git 与 worktree 的真实快照被放在同一处对照。</p>
         <div class="snapshot-row" aria-label="快照元信息">
-          <span class="pill info">采集于 2026-08-31 00:06（UTC+08:00）</span>
+          <span class="pill info">采集于 2026-09-06 00:24（UTC+08:00）</span>
           <span class="pill ok">45 条 PRD 需求</span>
-          <span class="pill warn">当前分支存在未提交改动</span>
+          <span class="pill warn">采集时有 1 个未跟踪文档</span>
         </div>
       </div>
     </header>
@@ -327,6 +327,7 @@
         <a href="#overview">总览</a>
         <a href="#doing">正在做</a>
         <a href="#delivered">已交付</a>
+        <a href="#validation">验收与缺口</a>
         <a href="#not-now">暂不做</a>
         <a href="#git">Git / Worktree</a>
         <a href="#sources">数据来源</a>
@@ -357,7 +358,7 @@
             <p class="section-kicker">Now</p>
             <h2 id="doing-heading">当前正在做</h2>
           </div>
-          <p>12 个需求正处于 <code>in_progress</code>。主要能量集中在 AI Agent，另外两条独立主线是刮削治理和消息中心。</p>
+          <p>12 个需求正处于 <code>in_progress</code>。近期提交集中在 Agent 与播放可靠性；刮削治理和消息中心仍按台账列为进行中。</p>
         </div>
         <div class="two-column">
           <article class="panel">
@@ -374,13 +375,13 @@
           </article>
 
           <aside class="panel">
-            <div class="panel-header"><p class="table-label">当前工作区信号</p><h3>Agent v2 正在深化</h3></div>
+            <div class="panel-header"><p class="table-label">近期实现 · 9 月 5–6 日</p><h3>Agent 可靠性与播放修复已落地</h3></div>
             <div class="panel-body">
               <ul class="compact-list">
-                <li><strong>已合入的分支提交：</strong>Agent 的证据、歧义处理与 Prompt v2 护栏已成为最近提交主题。</li>
-                <li><strong>当前未提交切片：</strong>将系统提示拆为可审阅 Markdown，并为流式响应补充实体解析、证据与终态 DTO。</li>
-                <li><strong>接近交付的 E3/E5：</strong>笔记润色、标题/简介翻译、洞察解读、自然语言保存视图、Provider 相关查询，多数 PRD 记录为 90%。</li>
-                <li><strong>仍有关键缺口：</strong>AI 设置的隐私层级、用量统计与完整审计仍是低进度项，Agent UI 继续受实验开关保护。</li>
+                <li><strong>Agent 上下文：</strong>Prompt v2、实体歧义选择、检索证据与终态已提交；新增历史游标翻页、有界模型上下文和空回答收尾。</li>
+                <li><strong>确认写入：</strong>持久化回执与业务修改原子提交，支持重启后重放；旧值冲突拒绝写入，保护人工编辑。</li>
+                <li><strong>播放链路：</strong>F1–F10 修复已提交，覆盖同片会话隔离、失败交接回退、实际 FFmpeg 节流、取消回收与 seek / 缓冲判断。</li>
+                <li><strong>验收边界：</strong>22 个真实模型合成场景已有通过记录；完整 R1、隐私层级、用量统计与审计仍待完成，实验开关保持。</li>
               </ul>
             </div>
           </aside>
@@ -422,9 +423,36 @@
               <li><strong>前端：</strong>Vue 3 + TypeScript + Vite，shadcn-vue 与 Tailwind CSS v4；Mock 与 Web API 适配器并存。</li>
               <li><strong>后端：</strong>Go HTTP 服务运行在 SQLite 之上；开发态默认 loopback <code>:8080</code>。</li>
               <li><strong>桌面：</strong>Electron MVP 已具备后端启动/复用、托盘、隐藏到托盘、静态 Web UI 与目录选择桥接。</li>
-              <li><strong>播放：</strong>浏览器直放 + FFmpeg/HLS 管线已持续优化；当前仍是 Web 播放优先。</li>
+              <li><strong>播放：</strong>浏览器直放 + FFmpeg/HLS；同片多会话互不抢占，新流就绪后交接，HLS 错误有界恢复，显式起点与取消贯穿请求链。</li>
             </ul></div>
           </article>
+        </div>
+      </section>
+
+      <section id="validation" aria-labelledby="validation-heading">
+        <div class="section-head">
+          <div><p class="section-kicker">Validation</p><h2 id="validation-heading">已有验证与剩余缺口</h2></div>
+          <p>摘录 9 月 5–6 日实施记录；本次看板更新未重新执行业务测试，单项通过不等于完整发布门禁通过。</p>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">已有证据</p><h3>Agent 与播放可靠性</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>真实模型：</strong>DeepSeek 的 22 个不同合成场景均有通过记录，包含检索、歧义、确认预览、长历史和注入边界；由首轮与定向复验合计，使用临时 SQLite，未挂载真实资料库或源站工具。</li>
+              <li><strong>前端：</strong>最新播放修复记录为 215 个测试文件 / 990 项通过；随后新增连续 seek 用例，播放器加载组件 16 项定向通过；typecheck、lint 通过。</li>
+              <li><strong>后端：</strong>Go 全量测试及播放相关包 vet 通过；真实 FFmpeg 合成测试验证暂停 / 恢复与同片双会话独立读取。</li>
+              <li><strong>状态口径：</strong>PRD 仍为 16 项已验证、10 项已实现、12 项进行中、6 项想法、1 项已定义；本页不自行提升需求状态。</li>
+            </ul></div>
+          </article>
+          <aside class="panel">
+            <div class="panel-header"><p class="table-label">尚未全绿</p><h3>发布门禁与完整验收</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>构建体积：</strong>总 JS 为 2374.43 kB raw / 780.54 kB gzip，超过 2250 / 750 kB 门禁；修复前基线也超限，预算未放宽。</li>
+              <li><strong>浏览器 e2e：</strong>最新默认超时的串行运行 3 通过 / 2 失败：移动端旧元素定位、个人洞察冷启动超时。后者仅延长超时的诊断运行通过。</li>
+              <li><strong>Agent R1：</strong>演员别名、完整源站结果、多轮候选交互、三语言及移动端焦点 / 取消验收仍有缺口；用量治理和回执保留期管理未完成。</li>
+              <li><strong>播放边界：</strong>真实影片画质、LAN / GPU 基准和完整浏览器媒体验收待补；Go race 受本机工具链阻塞。缓存字节配额、按需 VOD、音频单独转码尚未实现。</li>
+            </ul></div>
+          </aside>
         </div>
       </section>
 
@@ -465,15 +493,15 @@
             <p class="section-kicker">Repository snapshot</p>
             <h2 id="git-heading">Git 提交、分支与 worktree</h2>
           </div>
-          <p>Git 状态采集于本看板顶部标注的时间点；生成或提交此 HTML 后，主工作区的未提交文件数量会自然增加。</p>
+          <p>以下为编辑本看板前的 Git 快照；不包含本次看板修改及其后续提交。远程信息来自本地引用，未执行 fetch。</p>
         </div>
 
         <div class="two-column">
           <article class="panel">
             <div class="panel-header"><p class="table-label">当前 checkout</p><h3><code>agent-enhance</code></h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>HEAD：</strong><code>3f3b774e</code> · <span lang="en">docs: define Agent prompt v2 guardrails</span></li>
-              <li><strong>相对 <code>master</code>：</strong>领先 15 个提交，落后 0 个提交；该分支当前没有设置 upstream。</li>
+              <li><strong>HEAD：</strong><code>b6321237</code> · <span lang="en">docs(playback): document reliability fixes and validation</span></li>
+              <li><strong>相对本地 <code>master</code>：</strong>领先 50 个提交，落后 0 个提交；该分支没有设置 upstream。本地 master 比已缓存的 origin/master 落后 1 个提交。</li>
               <li><strong>远程：</strong><code>origin</code> 指向 <code>git@github.com:yepHiu/Curated.git</code>。</li>
               <li><strong>生产版本源：</strong><code>scripts/release/version.json</code> 当前为 <strong>1.5.4</strong>。</li>
             </ul></div>
@@ -481,10 +509,10 @@
           <aside class="panel">
             <div class="panel-header"><p class="table-label">未提交状态</p><h3>主工作区：需保留，不自动清理</h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>已修改：</strong><code>backend/internal/agent/prompts/system.go</code>、<code>backend/internal/contracts/contracts.go</code>。</li>
-              <li><strong>新增未跟踪：</strong><code>backend/internal/agent/prompts/system.md</code>。</li>
-              <li><strong>变更主题：</strong>Prompt v2 的审阅化、实体歧义候选、检索证据元数据与流式终态结构。</li>
-              <li><strong>说明：</strong>这些改动并非本看板生成过程产生；看板不修改它们。</li>
+              <li><strong>已跟踪文件：</strong>采集时无修改，暂存区为空。</li>
+              <li><strong>新增未跟踪：</strong><code>docs/plan/2026-09-05-curated-figma-project-design.md</code>。</li>
+              <li><strong>已提交切片：</strong>此前看板列出的 Prompt v2 与流式 DTO 改动已进入当前分支历史。</li>
+              <li><strong>说明：</strong>未跟踪文档保留原状；文件存在不代表已批准进入 PRD。</li>
             </ul></div>
           </aside>
         </div>
@@ -494,21 +522,21 @@
             <caption>已注册 worktree（含当时的工作区脏净状态）</caption>
             <thead><tr><th scope="col">位置</th><th scope="col">分支 / HEAD</th><th scope="col">最新提交</th><th scope="col">状态</th><th scope="col">工作内容判断</th></tr></thead>
             <tbody>
-              <tr><td><strong>主工作区</strong><br /><code>C:\\Users\\wujiahui\\code\\jav-lib\\jav-shadcn</code></td><td><code>agent-enhance</code><br /><code>3f3b774e</code></td><td>2026-08-30<br />Agent Prompt v2 护栏文档</td><td><span class="state dirty">脏：2 修改 + 1 新增</span></td><td>当前主线开发：实验性 Agent 的证据与歧义处理。</td></tr>
-              <tr><td><strong>Codex worktree #4115</strong><br /><code>C:\\Users\\wujiahui\\.codex\\worktrees\\4115\\jav-shadcn</code></td><td><code>detached</code><br /><code>e2666ad2</code></td><td>2026-05-13<br />release 1.4.5 准备</td><td><span class="state detached">干净，游离 HEAD</span></td><td>旧发布快照；未绑定本地分支。</td></tr>
-              <tr><td><strong>漫画库 worktree</strong><br /><code>C:\\Users\\wujiahui\\.codex\\worktrees\\comic-library-mvp\\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">大量修改与新增</span></td><td>漫画与照片资料库的并行实验，尚不属于当前 PRD 主执行流。</td></tr>
+              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>agent-enhance</code><br /><code>b6321237</code></td><td>2026-09-06<br />播放可靠性修复与验收文档</td><td><span class="state dirty">1 个未跟踪文档</span></td><td>近期提交：Agent 可靠性与播放链路 F1–F10 修复。</td></tr>
+              <tr><td><strong>Codex worktree #4115</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\4115\jav-shadcn</code></td><td><code>detached</code><br /><code>e2666ad2</code></td><td>2026-05-13<br />release 1.4.5 准备</td><td><span class="state detached">干净，游离 HEAD</span></td><td>旧发布快照；未绑定本地分支。</td></tr>
+              <tr><td><strong>漫画库 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\comic-library-mvp\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">大量修改与新增</span></td><td>漫画与照片资料库的并行实验，尚不属于当前 PRD 主执行流。</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="section-head" style="margin-top:2rem; margin-bottom:0.75rem"><div><p class="section-kicker">Recent branch history</p><h2 style="font-size:1.35rem">当前分支相对 master 的最新提交</h2></div></div>
         <div class="commit-list" aria-label="当前分支近期提交">
-          <div class="commit"><span class="hash">3f3b774e</span><span class="date">2026-08-30</span><span class="subject">docs: define Agent prompt v2 guardrails</span></div>
-          <div class="commit"><span class="hash">e42f0328</span><span class="date">2026-08-30</span><span class="subject">docs: prioritize Agent evidence and ambiguity work</span></div>
-          <div class="commit"><span class="hash">0ead8b52</span><span class="date">2026-08-30</span><span class="subject">feat(skills): add curated development workflows</span></div>
-          <div class="commit"><span class="hash">f387ddab</span><span class="date">2026-08-30</span><span class="subject">docs: sync Agent import and playback behavior</span></div>
-          <div class="commit"><span class="hash">d1fa3f14</span><span class="date">2026-08-30</span><span class="subject">feat: improve HLS playback stability</span></div>
-          <div class="commit"><span class="hash">386cbe09</span><span class="date">2026-08-30</span><span class="subject">feat: check duplicate movie codes before import</span></div>
+          <div class="commit"><span class="hash">b6321237</span><span class="date">2026-09-06</span><span class="subject">docs(playback): document reliability fixes and validation</span></div>
+          <div class="commit"><span class="hash">8dc5de10</span><span class="date">2026-09-06</span><span class="subject">test(playback): verify real session isolation and superseded seeks</span></div>
+          <div class="commit"><span class="hash">ceb6bfaa</span><span class="date">2026-09-05</span><span class="subject">fix(playback): recover HLS errors and roll back failed handoffs</span></div>
+          <div class="commit"><span class="hash">e05ba547</span><span class="date">2026-09-05</span><span class="subject">fix(playback): throttle the actual FFmpeg process with bounded fallback</span></div>
+          <div class="commit"><span class="hash">9634d964</span><span class="date">2026-09-05</span><span class="subject">fix(playback): budget seek catchup and wait for contiguous buffer</span></div>
+          <div class="commit"><span class="hash">0497b72d</span><span class="date">2026-09-05</span><span class="subject">perf(playback): remove duplicate HLS media prewarming</span></div>
         </div>
       </section>
 
@@ -525,12 +553,14 @@
           <a class="source-link" href="docs/plan/README.md"><strong>计划状态规则</strong><span><code>docs/plan/README.md</code><br />区分 research / proposed / approved / in-progress / verified，说明当前主计划。</span></a>
           <a class="source-link" href=".cursor/rules/project-facts.mdc"><strong>当前实现事实</strong><span><code>.cursor/rules/project-facts.mdc</code><br />前后端、Electron、播放、Agent 与已实现能力。</span></a>
           <a class="source-link" href=".cursor/rules/architecture-boundaries.mdc"><strong>架构边界</strong><span><code>.cursor/rules/architecture-boundaries.mdc</code><br />当前 Electron/HTTP 形态与仍属目标的原生能力。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-19-agent-milestone-plan.md"><strong>Agent 实施与验收</strong><span>§14：历史翻页、持久化确认回执、22 个真实模型合成场景及完整 R1 缺口。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md"><strong>播放链路修复记录</strong><span>2026-09-06：F1–F10 修复、真实 FFmpeg 验证、构建与 e2e 门禁现状。</span></a>
         </div>
       </section>
     </main>
 
     <footer>
-      <div class="shell">Curated 项目概览看板 · 静态文档快照 · 生成日期 2026-08-31。请勿将本页替代 <code>requirements.csv</code>、源码或 Git 的实时状态。</div>
+      <div class="shell">Curated 项目概览看板 · 静态文档快照 · 更新日期 2026-09-06。请勿将本页替代 <code>requirements.csv</code>、源码或 Git 的实时状态。</div>
     </footer>
   </body>
 </html>
