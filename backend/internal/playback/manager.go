@@ -3,7 +3,6 @@
 package playback
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -69,21 +68,24 @@ type Session struct {
 }
 
 type sessionState struct {
-	mu                 sync.RWMutex
-	session            Session
-	cancel             context.CancelFunc
-	cmd                *exec.Cmd
-	waitCh             chan error
-	lastAccessedAt     time.Time
-	finishedAt         time.Time
-	lastError          string
-	encoderSpeed       string
-	writtenDurationSec float64
-	lastSeekKind       string
-	stdin              io.WriteCloser
-	throttlePaused     bool
-	lastRequestedSec   float64
-	releaseSlot        func()
+	mu                  sync.RWMutex
+	session             Session
+	cancel              context.CancelFunc
+	cmd                 *exec.Cmd
+	waitCh              chan error
+	done                chan struct{}
+	lastAccessedAt      time.Time
+	finishedAt          time.Time
+	lastError           string
+	encoderSpeed        string
+	writtenDurationSec  float64
+	lastSeekKind        string
+	stdin               io.WriteCloser
+	throttlePaused      bool
+	throttleUnavailable bool
+	stopping            bool
+	lastRequestedSec    float64
+	releaseSlot         func()
 }
 
 type transcodeProfile struct {
@@ -354,8 +356,6 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 	if strings.HasSuffix(strings.ToLower(cleanName), ".tmp") {
 		return "", ErrSessionNotFound
 	}
-	noteRequestedHLSFile(state, cleanName)
-	state.maybeThrottle()
 	abs := filepath.Join(state.session.Directory, cleanName)
 	rel, err := filepath.Rel(state.session.Directory, abs)
 	if err != nil || strings.HasPrefix(rel, "..") {
@@ -367,6 +367,8 @@ func (m *Manager) ResolveFile(sessionID string, name string) (string, error) {
 		}
 		return "", err
 	}
+	noteRequestedHLSFile(state, cleanName)
+	state.maybeThrottle()
 	return abs, nil
 }
 
@@ -638,7 +640,7 @@ func startTranscodeSession(
 		cmd.Stdout = io.Discard
 	}
 	stdin, stdinErr := cmd.StdinPipe()
-	var stderr bytes.Buffer
+	var stderr lockedTailBuffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		cancel()
@@ -659,12 +661,19 @@ func startTranscodeSession(
 		cancel:         cancel,
 		cmd:            cmd,
 		waitCh:         make(chan error, 1),
+		done:           make(chan struct{}),
 		lastAccessedAt: time.Now().UTC(),
 		lastSeekKind:   sessionSeekKindForOrigin(profile.TimelineOriginSec),
 	}
 	if stdinErr == nil {
 		state.stdin = stdin
 	}
+	ready := false
+	defer func() {
+		if !ready {
+			stopSessionState(state)
+		}
+	}()
 	if stdoutErr == nil {
 		go consumeFFmpegProgress(stdout, func(parsed ffmpegProgress) {
 			state.applyProgress(parsed)
@@ -676,6 +685,7 @@ func startTranscodeSession(
 		err := cmd.Wait()
 		markSessionFinished(state, err)
 		state.waitCh <- err
+		close(state.done)
 	}()
 
 	if err := waitForFileOrProcessExit(ctx, playlistPath, state.waitCh, 12*time.Second); err != nil {
@@ -708,12 +718,15 @@ func startTranscodeSession(
 		}
 	}
 
+	ready = true
 	return state, nil
 }
 
 func buildTranscodeProfiles(cfg Config, sourcePath string, segmentPattern string, playlistPath string, options buildProfileOptions) []transcodeProfile {
 	remuxInputPrefix := buildHLSInputPrefix(inputReadRateRemux)
-	transcodeInputPrefix := buildHLSInputPrefix("")
+	// Even if OS process control is unavailable, never leave a hardware encoder
+	// unpaced. Suspension handles the client-relative high/low watermarks.
+	transcodeInputPrefix := buildHLSInputPrefix(inputReadRateRemux)
 	seekPlan := buildTranscodeSeekPlan(options)
 	inputSeekArgs, accurateSeekArgs := seekPlan.InputArgs, seekPlan.AccurateArgs
 	configuredPreference := normalizeHardwareEncoderProfileName(cfg.HardwareEncoder)
@@ -1025,6 +1038,11 @@ func stopSessionState(state *sessionState) {
 		defer state.releaseSlot()
 	}
 	state.mu.Lock()
+	state.stopping = true
+	if state.throttlePaused && state.cmd != nil && state.cmd.Process != nil {
+		_ = setProcessPaused(state.cmd.Process, false)
+		state.throttlePaused = false
+	}
 	stdin := state.stdin
 	state.stdin = nil
 	state.mu.Unlock()
@@ -1038,6 +1056,11 @@ func stopSessionState(state *sessionState) {
 		if state.cmd != nil && state.cmd.Process != nil {
 			_ = state.cmd.Process.Kill()
 		}
+		_ = os.RemoveAll(state.session.Directory)
+		return
+	}
+	if state.done != nil {
+		<-state.done
 		_ = os.RemoveAll(state.session.Directory)
 		return
 	}
@@ -1085,7 +1108,11 @@ func noteRequestedHLSFile(state *sessionState, name string) {
 	if state == nil {
 		return
 	}
-	mediaSec, ok := mediaTimeFromHLSFileName(name, hlsSegmentDurationSec)
+	raw, err := os.ReadFile(state.session.PlaylistPath)
+	if err != nil {
+		return
+	}
+	mediaSec, ok := mediaTimeFromPlaylist(string(raw), name)
 	if !ok {
 		return
 	}
@@ -1101,22 +1128,23 @@ func (s *sessionState) maybeThrottle() {
 		return
 	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stopping || !s.finishedAt.IsZero() || s.throttleUnavailable || s.cmd == nil || s.cmd.Process == nil {
+		return
+	}
 	action := nextThrottleAction(s.throttlePaused, s.writtenDurationSec, s.lastRequestedSec, throttlePauseLeadSec, throttleResumeLeadSec)
-	stdin := s.stdin
-	s.mu.Unlock()
-	if action == throttleNone || stdin == nil {
+	if action == throttleNone {
 		return
 	}
-	key := "u"
-	if action == throttlePause {
-		key = "p"
-	}
-	if _, err := io.WriteString(stdin, key); err != nil {
+	if err := setProcessPaused(s.cmd.Process, action == throttlePause); err != nil {
+		// Keep the known state. Readrate remains the bounded fallback if pause
+		// is unsupported; a failed resume is retried on subsequent requests.
+		if action == throttlePause {
+			s.throttleUnavailable = true
+		}
 		return
 	}
-	s.mu.Lock()
 	s.throttlePaused = action == throttlePause
-	s.mu.Unlock()
 }
 
 func (s *sessionState) markFinishedAt(now time.Time, err error) {

@@ -22,6 +22,32 @@ const (
 
 var hlsSegmentIndexPattern = regexp.MustCompile(`(?i)^segment-(\d+)\.(m4s|ts)$`)
 
+// Stream-copy GOPs need not be two seconds. Use the published EXTINF durations
+// rather than multiplying the filename index by the target segment duration.
+func mediaTimeFromPlaylist(playlist, name string) (float64, bool) {
+	if !hlsSegmentIndexPattern.MatchString(name) {
+		return 0, false
+	}
+	position, duration := 0.0, 0.0
+	for _, raw := range strings.Split(playlist, "\n") {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "#EXTINF:") {
+			value, _, _ := strings.Cut(strings.TrimPrefix(line, "#EXTINF:"), ",")
+			duration, _ = strconv.ParseFloat(value, 64)
+		} else if line != "" && !strings.HasPrefix(line, "#") {
+			if duration <= 0 || !isFiniteFloat(duration) {
+				return 0, false
+			}
+			position += duration
+			if line == name {
+				return position, true
+			}
+			duration = 0
+		}
+	}
+	return 0, false
+}
+
 func nextThrottleAction(paused bool, writtenSec, requestedSec, pauseLeadSec, resumeLeadSec float64) throttleAction {
 	lead := writtenSec - requestedSec
 	if !paused && lead > pauseLeadSec {
