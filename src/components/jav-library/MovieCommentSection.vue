@@ -40,7 +40,7 @@ const { t, locale } = useI18n()
 const libraryService = useLibraryService()
 const aiService = useAIService()
 const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
-const { enabled: agentEnabled } = useExperimentalAgent()
+const { writeEnabled: agentEnabled } = useExperimentalAgent()
 
 const draft = ref("")
 const updatedAt = ref("")

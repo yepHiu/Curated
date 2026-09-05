@@ -123,7 +123,7 @@ defineExpose({
     >
       <p class="leading-relaxed text-muted-foreground">{{ t("agentWindow.unconfigured") }}</p>
       <Button as-child variant="outline" size="sm" class="w-fit rounded-full">
-        <RouterLink :to="{ name: 'settings', query: { section: 'experimental' } }" @click="emit('close')">
+        <RouterLink :to="{ name: 'settings', query: { section: 'ai' } }" @click="emit('close')">
           <Settings data-icon="inline-start" class="size-4" />
           {{ t("agentWindow.openSettings") }}
         </RouterLink>

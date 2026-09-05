@@ -44,6 +44,7 @@ import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-p
 import { useLibraryService } from "@/services/library-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
+import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
 
 /** 实验性 Agent Window：懒加载，不进首屏 bundle（开关默认关闭时零成本） */
 const AgentWindowPanel = defineAsyncComponent(
@@ -65,6 +66,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+useAIGovernanceSync()
 
 const isDev = import.meta.env.DEV
 

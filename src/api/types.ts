@@ -320,6 +320,7 @@ export interface SettingsDTO {
   proxy: ProxySettingsDTO
   /** 实验性 Agent provider 配置（library-config.cfg） */
   aiProvider: AIProviderSettingsDTO
+  aiGovernance?: import("@/services/contracts/ai-governance-service").AIGovernanceSettings
   /** 后端进程日志（文件 + 级别）；重启后端后作用于 Zap */
   backendLog: BackendLogSettingsDTO
 }

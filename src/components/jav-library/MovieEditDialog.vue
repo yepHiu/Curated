@@ -32,7 +32,7 @@ const { t, locale } = useI18n()
 const aiService = useAIService()
 const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
 const libraryService = useLibraryService()
-const { enabled: agentEnabled } = useExperimentalAgent()
+const { writeEnabled: agentEnabled } = useExperimentalAgent()
 
 const movieEditSaving = ref(false)
 const movieEditError = ref("")

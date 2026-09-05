@@ -66,6 +66,7 @@ import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNe
 const SettingsExperimentalSection = defineAsyncComponent(
   () => import("@/components/jav-library/settings/SettingsExperimentalSection.vue"),
 )
+const SettingsAISection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsAISection.vue"))
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
 import SettingsOverviewSection from "@/components/jav-library/settings/SettingsOverviewSection.vue"
 import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsPlaybackSection.vue"
@@ -2324,6 +2325,17 @@ async function runMetadataRefreshForSelected() {
         @run-full-scan="runFullScan"
       />
     </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('ai')"
+      value="ai"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
+      <section id="settings-section-ai" :aria-label="t('aiSettings.title')">
+        <h2 class="sr-only">{{ t('aiSettings.title') }}</h2>
+        <SettingsAISection :use-web-api="useWebApi" />
+      </section>
     </TabsContent>
 
     <TabsContent

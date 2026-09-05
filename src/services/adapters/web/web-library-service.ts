@@ -1,4 +1,5 @@
 import { computed, ref, shallowRef, watch, type Ref } from "vue"
+import { applyAIGovernance } from "@/lib/experimental-agent"
 import type {
   BackendLogSettingsDTO,
   ActorMergeAuditDTO,
@@ -394,6 +395,7 @@ async function refreshLibraryPathsFromApi() {
     applyMetadataMovieSettingsFromDTO(settings)
     proxyState.value = settings.proxy ?? { enabled: false }
     aiProviderState.value = settings.aiProvider ?? { kind: "openai-compatible", baseUrl: "", model: "" }
+    if (settings.aiGovernance) applyAIGovernance(settings.aiGovernance)
     backendLogState.value = settings.backendLog ?? {
       logDir: "",
       logLevel: "info",

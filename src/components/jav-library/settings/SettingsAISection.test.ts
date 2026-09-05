@@ -1,0 +1,79 @@
+import { flushPromises, mount } from "@vue/test-utils"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ref } from "vue"
+import { defaultAIGovernance, type AIReport } from "@/services/contracts/ai-governance-service"
+import SettingsAISection from "./SettingsAISection.vue"
+import { applyAIGovernance, useExperimentalAgent } from "@/lib/experimental-agent"
+
+const mocks = vi.hoisted(() => ({ getSettings: vi.fn(), saveSettings: vi.fn(), getUsage: vi.fn(), getAudit: vi.fn(), cleanup: vi.fn(), setAIProvider: vi.fn(), testAIProvider: vi.fn() }))
+vi.mock("@/services/ai-governance-service", () => ({ useAIGovernanceService: () => mocks }))
+vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ aiProvider: { value: { kind: "openai-compatible", baseUrl: "", model: "" } }, setAIProvider: mocks.setAIProvider, testAIProvider: mocks.testAIProvider }) }))
+vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string) => key }) }))
+
+function emptyReport(): AIReport {
+  return { items: [], total: 0, limit: 25, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
+}
+async function setup() { const wrapper = mount(SettingsAISection, { props: { useWebApi: true } }); await flushPromises(); return wrapper }
+beforeEach(() => {
+  vi.clearAllMocks()
+  applyAIGovernance(defaultAIGovernance())
+  mocks.getSettings.mockResolvedValue(defaultAIGovernance())
+  mocks.saveSettings.mockImplementation(async (value) => value)
+  mocks.getUsage.mockResolvedValue(emptyReport())
+  mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 })
+  mocks.cleanup.mockResolvedValue({ runs: 2, audit: 1, receipts: 0 })
+  mocks.setAIProvider.mockResolvedValue(undefined)
+  mocks.testAIProvider.mockResolvedValue({ ok: true, latencyMs: 10 })
+})
+describe("SettingsAISection", () => {
+  it("keeps provider configuration available while AI is disabled and shows unknown usage", async () => {
+    const wrapper = await setup()
+    expect(wrapper.find("#ai-base").exists()).toBe(true)
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("aiSettings.unknown")
+    expect(useExperimentalAgent().enabled.value).toBe(false)
+    wrapper.unmount()
+  })
+  it("applies global state only after saving and keeps the old state on failure", async () => {
+    const wrapper = await setup()
+    await wrapper.get("[data-ai-enabled]").trigger("click")
+    expect(useExperimentalAgent().enabled.value).toBe(false)
+    mocks.saveSettings.mockRejectedValueOnce(new Error("offline"))
+    await wrapper.get("[data-ai-save]").trigger("click"); await flushPromises()
+    expect(useExperimentalAgent().enabled.value).toBe(false)
+    expect(wrapper.get("[role=alert]").text()).toContain("offline")
+    await wrapper.get("[data-ai-save]").trigger("click"); await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), enabled: true })
+    expect(useExperimentalAgent().enabled.value).toBe(true)
+    wrapper.unmount()
+  })
+  it("marks partially reported usage and retries failed statistics loading", async () => {
+    const report = emptyReport(); report.summary.modelCalls = 2; report.summary.usageCalls = 1; report.summary.totalTokens = 30
+    mocks.getUsage.mockResolvedValue(report)
+    const wrapper = await setup()
+    expect(wrapper.get("[data-ai-token-total]").text()).toBe("30 (aiSettings.partialUsage)")
+    mocks.getUsage.mockRejectedValueOnce(new Error("query failed"))
+    await wrapper.get("[data-ai-refresh]").trigger("click"); await flushPromises()
+    expect(wrapper.find("[data-ai-summary]").exists()).toBe(false)
+    expect(wrapper.get("[role=alert]").text()).toContain("query failed")
+    await wrapper.get("[data-ai-refresh]").trigger("click"); await flushPromises()
+    expect(wrapper.find("[data-ai-summary]").exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it("rejects invalid policy locally and only cleans expired records on explicit click", async () => {
+    const wrapper = await setup()
+    expect(mocks.cleanup).not.toHaveBeenCalled()
+    await wrapper.get("#ai-retention").setValue("1")
+    expect(wrapper.get("[data-ai-save]").attributes("disabled")).toBeDefined()
+    await wrapper.get("[data-ai-cleanup]").trigger("click"); await flushPromises()
+    expect(mocks.cleanup).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+  it("preserves the provider failure after refreshing its recorded statistics", async () => {
+    const wrapper = await setup()
+    mocks.testAIProvider.mockResolvedValueOnce({ ok: false, message: "authentication failed" })
+    await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
+    expect(wrapper.get("[role=alert]").text()).toBe("settings.experimentalTestFail")
+    expect(mocks.getUsage).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+})
