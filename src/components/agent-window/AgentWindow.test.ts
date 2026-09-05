@@ -357,7 +357,11 @@ describe("AgentWindow", () => {
 
   it("renders desktop resize handles", () => {
     const wrapper = mountWindow()
-    expect(wrapper.find('[data-agent-window-resize="se"]').exists()).toBe(true)
+    for (const edge of ["nw", "ne", "sw", "se"]) {
+      const handle = wrapper.find(`[data-agent-window-resize="${edge}"]`)
+      expect(handle.exists()).toBe(true)
+      expect(handle.element.children).toHaveLength(0)
+    }
     expect(wrapper.find('[data-agent-window-resize="e"]').exists()).toBe(true)
     expect(wrapper.find('[data-agent-window-resize="s"]').exists()).toBe(true)
   })
@@ -378,6 +382,47 @@ describe("AgentWindow", () => {
     const style = wrapper.find("[data-agent-window]").attributes("style") ?? ""
     expect(style).toContain("width: 500px")
     expect(style).toContain("height: 640px")
+  })
+
+  it.each([
+    { edge: "nw", dx: -40, dy: -30, x: 60, y: 70 },
+    { edge: "ne", dx: 40, dy: -30, x: 100, y: 70 },
+    { edge: "sw", dx: -40, dy: 30, x: 60, y: 100 },
+    { edge: "se", dx: 40, dy: 30, x: 100, y: 100 },
+  ])("resizes from $edge while keeping the opposite corner fixed", async ({ edge, dx, dy, x, y }) => {
+    const state = useAgentWindow()
+    state.moveTo(100, 100)
+    state.resizeTo(420, 460)
+    const wrapper = mountWindow()
+    wrapper.find(`[data-agent-window-resize="${edge}"]`).element.dispatchEvent(
+      new PointerEvent("pointerdown", { button: 0, clientX: 200, clientY: 200, bubbles: true }),
+    )
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 200 + dx, clientY: 200 + dy }))
+    window.dispatchEvent(new PointerEvent("pointerup"))
+    await flushPromises()
+    expect(state.position.value).toEqual({ x, y })
+    expect(state.size.value).toEqual({ width: 460, height: 490 })
+  })
+
+  it("clamps top-left resizing at the viewport and minimum size and stops on cancellation", async () => {
+    const state = useAgentWindow()
+    state.moveTo(100, 100)
+    state.resizeTo(420, 460)
+    const wrapper = mountWindow()
+    wrapper.find('[data-agent-window-resize="nw"]').element.dispatchEvent(
+      new PointerEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, bubbles: true }),
+    )
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: -500, clientY: -500 }))
+    expect(state.position.value).toEqual({ x: 8, y: 8 })
+    expect(state.size.value).toEqual({ width: 512, height: 552 })
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 900, clientY: 900 }))
+    expect(state.position.value).toEqual({ x: 200, y: 200 })
+    expect(state.size.value).toEqual({ width: 320, height: 360 })
+    window.dispatchEvent(new PointerEvent("pointercancel"))
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 100, clientY: 100 }))
+    await flushPromises()
+    expect(state.position.value).toEqual({ x: 200, y: 200 })
+    expect(state.size.value).toEqual({ width: 320, height: 360 })
   })
 
   it("renders a history sidebar with persisted chats", async () => {

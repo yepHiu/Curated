@@ -12,6 +12,8 @@ import { isAgentProcessTool } from "@/lib/agent-tool-labels"
 import { mentionsStillInText, type AgentMention } from "@/lib/agent-mentions"
 import {
   AGENT_WINDOW_CHAT_WIDE_MIN,
+  AGENT_WINDOW_MIN_WIDTH,
+  AGENT_WINDOW_MIN_HEIGHT,
   AGENT_WINDOW_SIDEBAR_INLINE_MIN_WIDTH,
   useAgentWindow,
 } from "@/composables/use-agent-window"
@@ -626,7 +628,14 @@ function onHeaderPointerdown(e: PointerEvent) {
   window.addEventListener("pointerup", onUp)
 }
 
-type ResizeEdge = "e" | "s" | "se"
+type ResizeEdge = "e" | "s" | "se" | "sw" | "ne" | "nw"
+
+const resizeCorners = [
+  { edge: "nw", class: "top-0 left-0 cursor-nwse-resize" },
+  { edge: "ne", class: "top-0 right-0 cursor-nesw-resize" },
+  { edge: "sw", class: "bottom-0 left-0 cursor-nesw-resize" },
+  { edge: "se", class: "bottom-0 right-0 cursor-nwse-resize" },
+] as const
 
 function onResizePointerdown(edge: ResizeEdge, e: PointerEvent) {
   if (isMobileViewport.value || e.button !== 0) return
@@ -637,19 +646,35 @@ function onResizePointerdown(edge: ResizeEdge, e: PointerEvent) {
   const originY = e.clientY
   const baseWidth = size.value.width
   const baseHeight = size.value.height
+  const baseX = position.value.x
+  const baseY = position.value.y
 
   const onMove = (ev: PointerEvent) => {
-    const nextWidth = edge === "s" ? baseWidth : baseWidth + (ev.clientX - originX)
-    const nextHeight = edge === "e" ? baseHeight : baseHeight + (ev.clientY - originY)
+    const deltaX = ev.clientX - originX
+    const deltaY = ev.clientY - originY
+    // Clamp the moving origin before sizing so the opposite corner stays fixed.
+    const nextX = edge.includes("w")
+      ? Math.max(8, Math.min(baseX + deltaX, baseX + baseWidth - AGENT_WINDOW_MIN_WIDTH))
+      : baseX
+    const nextY = edge.includes("n")
+      ? Math.max(8, Math.min(baseY + deltaY, baseY + baseHeight - AGENT_WINDOW_MIN_HEIGHT))
+      : baseY
+    const nextWidth = edge.includes("w") ? baseWidth + baseX - nextX
+      : edge.includes("e") ? baseWidth + deltaX : baseWidth
+    const nextHeight = edge.includes("n") ? baseHeight + baseY - nextY
+      : edge.includes("s") ? baseHeight + deltaY : baseHeight
+    moveTo(nextX, nextY)
     resizeTo(nextWidth, nextHeight)
   }
   const onUp = () => {
     resizing.value = false
     window.removeEventListener("pointermove", onMove)
     window.removeEventListener("pointerup", onUp)
+    window.removeEventListener("pointercancel", onUp)
   }
   window.addEventListener("pointermove", onMove)
   window.addEventListener("pointerup", onUp)
+  window.addEventListener("pointercancel", onUp)
 }
 
 const windowStyle = ref<Record<string, string>>({})
@@ -818,17 +843,15 @@ watch(
           @pointerdown="onResizePointerdown('s', $event)"
         />
         <button
+          v-for="corner in resizeCorners"
+          :key="corner.edge"
           type="button"
-          class="absolute right-0 bottom-0 z-50 size-4 cursor-nwse-resize touch-none rounded-br-2xl"
+          class="absolute z-50 size-4 touch-none"
+          :class="corner.class"
           :aria-label="t('agentWindow.resize')"
-          data-agent-window-resize="se"
-          @pointerdown="onResizePointerdown('se', $event)"
-        >
-          <span
-            class="pointer-events-none absolute right-1.5 bottom-1.5 size-2 border-r-2 border-b-2 border-muted-foreground/55"
-            aria-hidden="true"
-          />
-        </button>
+          :data-agent-window-resize="corner.edge"
+          @pointerdown="onResizePointerdown(corner.edge, $event)"
+        />
       </template>
     </div>
   </Teleport>
