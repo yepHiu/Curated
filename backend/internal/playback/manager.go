@@ -52,6 +52,8 @@ type Config struct {
 	SessionRoot            string
 	SessionIdleTimeout     time.Duration
 	SessionJanitorInterval time.Duration
+	MaxConcurrentStarts    int
+	MaxSessions            int
 }
 
 // Session represents an active HLS playback session with its on-disk playlist and segment files.
@@ -81,6 +83,7 @@ type sessionState struct {
 	stdin              io.WriteCloser
 	throttlePaused     bool
 	lastRequestedSec   float64
+	releaseSlot        func()
 }
 
 type transcodeProfile struct {
@@ -121,7 +124,12 @@ type buildProfileOptions struct {
 type Manager struct {
 	cfg                   Config
 	lastSuccessfulProfile string
-	sessionStartMu        sync.Mutex
+	startSlots            chan struct{}
+	sessionSlots          chan struct{}
+	startWG               sync.WaitGroup
+	closed                bool
+	lifetime              context.Context
+	cancelLifetime        context.CancelFunc
 	mu                    sync.RWMutex
 	sessions              map[string]*sessionState
 	// recentSnapshots keeps a bounded in-memory history after sessions leave the
@@ -154,7 +162,19 @@ const recentSessionHistoryLimit = 32
 
 // New creates a playback Manager and starts its idle-session janitor loop.
 func New(cfg Config) *Manager {
+	starts, sessions := cfg.MaxConcurrentStarts, cfg.MaxSessions
+	if starts <= 0 {
+		starts = 2
+	}
+	if sessions <= 0 {
+		sessions = 8
+	}
+	lifetime, cancel := context.WithCancel(context.Background())
 	manager := &Manager{
+		startSlots:      make(chan struct{}, starts),
+		sessionSlots:    make(chan struct{}, sessions),
+		lifetime:        lifetime,
+		cancelLifetime:  cancel,
 		cfg:             cfg,
 		sessions:        make(map[string]*sessionState),
 		recentSnapshots: make([]SessionSnapshot, 0, recentSessionHistoryLimit),
@@ -194,8 +214,33 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	if m == nil {
 		return Session{}, ErrStreamPushDisabled
 	}
-	m.sessionStartMu.Lock()
-	defer m.sessionStartMu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, 24*time.Second)
+	defer cancel()
+	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return Session{}, context.Canceled
+	}
+	m.startWG.Add(1)
+	m.mu.Unlock()
+	defer m.startWG.Done()
+	stopCancel := context.AfterFunc(m.lifetime, cancel)
+	defer stopCancel()
+	if err := acquireSessionSlot(ctx, m.sessionSlots); err != nil {
+		return Session{}, err
+	}
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { <-m.sessionSlots }) }
+	keepSlot := false
+	defer func() {
+		if !keepSlot {
+			release()
+		}
+	}()
+	if err := acquireSessionSlot(ctx, m.startSlots); err != nil {
+		return Session{}, err
+	}
+	defer func() { <-m.startSlots }()
 
 	m.mu.RLock()
 	cfg := m.cfg
@@ -217,10 +262,6 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return Session{}, err
-	}
-
-	for _, stale := range m.takeSessionsForMovie(movieID) {
-		stopSessionState(stale)
 	}
 
 	sessionID, err := newSessionID()
@@ -258,6 +299,10 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 
 	var lastErr error
 	for index, profile := range profiles {
+		if err := ctx.Err(); err != nil {
+			lastErr = err
+			break
+		}
 		if index > 0 {
 			_ = os.RemoveAll(dir)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -267,6 +312,13 @@ func (m *Manager) StartHLSSession(ctx context.Context, movieID string, sourcePat
 
 		state, err := startTranscodeSession(ctx, cmdName, movieID, sessionID, dir, playlistPath, profile)
 		if err == nil {
+			if err = ctx.Err(); err != nil {
+				stopSessionState(state)
+				lastErr = err
+				break
+			}
+			state.releaseSlot = release
+			keepSlot = true
 			staleStates := m.replaceSession(sessionID, state, profile.Name)
 			for _, stale := range staleStates {
 				stopSessionState(stale)
@@ -401,13 +453,20 @@ func (m *Manager) Close() {
 	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return
+	}
+	m.closed = true
+	m.cancelLifetime()
+	m.mu.Unlock()
 	if m.janitorCancel != nil {
 		m.janitorCancel()
 		<-m.janitorDone
 	}
-	m.sessionStartMu.Lock()
+	m.startWG.Wait()
 	staleStates := m.takeAllSessionsLocked()
-	m.sessionStartMu.Unlock()
 	for _, stale := range staleStates {
 		stopSessionState(stale)
 	}
@@ -935,37 +994,12 @@ func (m *Manager) replaceSession(sessionID string, state *sessionState, profileN
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	staleStates := make([]*sessionState, 0, len(m.sessions))
-	for existingID, existingState := range m.sessions {
-		if existingID == sessionID {
-			continue
-		}
-		if existingState.session.MovieID != state.session.MovieID {
-			continue
-		}
-		delete(m.sessions, existingID)
-		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
-		staleStates = append(staleStates, existingState)
-	}
+	// A movie can be watched by several clients. Only its holder releases a
+	// session, after the replacement has become playable (or on disconnect).
+	staleStates := make([]*sessionState, 0)
 	m.sessions[sessionID] = state
 	if state.session.Kind == "transcode-hls" && profileName != "" && profileName != "libx264" {
 		m.lastSuccessfulProfile = profileName
-	}
-	return staleStates
-}
-
-func (m *Manager) takeSessionsForMovie(movieID string) []*sessionState {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	staleStates := make([]*sessionState, 0, len(m.sessions))
-	for existingID, existingState := range m.sessions {
-		if existingState.session.MovieID != movieID {
-			continue
-		}
-		delete(m.sessions, existingID)
-		m.archiveSessionStateLocked(existingState, "replaced", time.Now().UTC())
-		staleStates = append(staleStates, existingState)
 	}
 	return staleStates
 }
@@ -986,6 +1020,9 @@ func (m *Manager) takeAllSessionsLocked() []*sessionState {
 func stopSessionState(state *sessionState) {
 	if state == nil {
 		return
+	}
+	if state.releaseSlot != nil {
+		defer state.releaseSlot()
 	}
 	state.mu.Lock()
 	stdin := state.stdin

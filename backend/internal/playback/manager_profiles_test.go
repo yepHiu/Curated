@@ -586,7 +586,7 @@ func TestBuildTranscodeProfilesSkipsRemuxWhenSourceAudioIsNotHlsFriendly(t *test
 	}
 }
 
-func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
+func TestRegisterSessionPreservesOtherClientsWatchingSameMovie(t *testing.T) {
 	t.Parallel()
 	manager := New(Config{})
 	t.Cleanup(manager.Close)
@@ -594,18 +594,18 @@ func TestTakeSessionsForMovieRemovesOnlyMatchingMovieSessions(t *testing.T) {
 	manager.sessions["sess-b"] = &sessionState{session: Session{ID: "sess-b", MovieID: "movie-a"}}
 	manager.sessions["sess-c"] = &sessionState{session: Session{ID: "sess-c", MovieID: "movie-b"}}
 
-	stale := manager.takeSessionsForMovie("movie-a")
-	if len(stale) != 2 {
-		t.Fatalf("stale session count = %d, want 2", len(stale))
+	stale := manager.replaceSession("sess-new", &sessionState{session: Session{ID: "sess-new", MovieID: "movie-a"}}, "")
+	if len(stale) != 0 {
+		t.Fatalf("stale session count = %d, want 0", len(stale))
 	}
 	if _, ok := manager.sessions["sess-c"]; !ok {
 		t.Fatal("expected unrelated movie session to remain registered")
 	}
-	if _, ok := manager.sessions["sess-a"]; ok {
-		t.Fatal("expected sess-a to be removed")
+	if _, ok := manager.sessions["sess-a"]; !ok {
+		t.Fatal("expected sess-a to remain available")
 	}
-	if _, ok := manager.sessions["sess-b"]; ok {
-		t.Fatal("expected sess-b to be removed")
+	if _, ok := manager.sessions["sess-b"]; !ok {
+		t.Fatal("expected sess-b to remain available")
 	}
 }
 
