@@ -455,12 +455,9 @@ async function send(selected?: AIEntityCandidateDTO) {
   omittedContext.value = []
   entries.value.push({ id: nextEntryId("user"), kind: "user", content })
 
-  const history: AIChatMessageDTO[] = entries.value.flatMap((entry) => {
-    if (entry.kind === "user" || entry.kind === "assistant") {
-      return [{ role: entry.kind, content: entry.content }]
-    }
-    return []
-  })
+  // The server owns session history. Sending it again eventually exceeds the
+  // request limit and cannot restore tool evidence or trusted references.
+  const history: AIChatMessageDTO[] = [{ role: "user", content }]
   const process: AgentChatEntry = {
     id: nextEntryId("process"),
     kind: "process",

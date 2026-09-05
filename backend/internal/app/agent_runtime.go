@@ -108,7 +108,7 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	}
 
 	history, err := a.llmHistoryForSession(ctx, session.ID)
-	if err != nil {
+	if err != nil || len(history) == 0 {
 		history = requestHistoryWithoutSystem(req.Messages)
 	}
 
@@ -251,7 +251,7 @@ func (a *App) llmHistoryForSession(ctx context.Context, sessionID string) ([]llm
 	if a.store == nil {
 		return nil, nil
 	}
-	rows, err := a.store.ListAIChatMessages(ctx, sessionID, 80)
+	rows, err := a.store.ListAIChatContext(ctx, sessionID, 80)
 	if err != nil {
 		return nil, err
 	}

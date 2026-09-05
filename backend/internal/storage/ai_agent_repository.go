@@ -115,15 +115,24 @@ func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, 
 }
 
 func (s *SQLiteStore) ListAIChatMessages(ctx context.Context, sessionID string, limit int) ([]contracts.AIChatStoredMessageDTO, error) {
+	return s.listRecentAIChatMessages(ctx, sessionID, limit, false)
+}
+
+// ListAIChatContext excludes tool/event rows before limiting the model window.
+func (s *SQLiteStore) ListAIChatContext(ctx context.Context, sessionID string, limit int) ([]contracts.AIChatStoredMessageDTO, error) {
+	return s.listRecentAIChatMessages(ctx, sessionID, limit, true)
+}
+
+func (s *SQLiteStore) listRecentAIChatMessages(ctx context.Context, sessionID string, limit int, dialogueOnly bool) ([]contracts.AIChatStoredMessageDTO, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 80
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, session_id, role, content, tool_name, tool_call_id, seq, created_at
-		FROM ai_chat_messages
-		WHERE session_id = ?
-		ORDER BY seq ASC
-		LIMIT ?`, sessionID, limit)
+		SELECT id, session_id, role, content, tool_name, tool_call_id, seq, created_at FROM (
+			SELECT * FROM ai_chat_messages
+			WHERE session_id = ? AND (? = 0 OR role IN ('user', 'assistant'))
+			ORDER BY seq DESC LIMIT ?
+		) ORDER BY seq ASC`, sessionID, dialogueOnly, limit)
 	if err != nil {
 		return nil, err
 	}

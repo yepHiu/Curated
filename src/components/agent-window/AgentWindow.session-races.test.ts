@@ -166,7 +166,7 @@ describe("AgentWindow session request ownership", () => {
       await flushPromises()
       expect(sidebar.props("activeId")).toBe("ses_b")
       expect(requests[1]!.sessionId).toBe("ses_b")
-      expect(requests[1]!.messages.map(message => message.content)).toEqual(["history-ses_b", "question B"])
+      expect(requests[1]!.messages.map(message => message.content)).toEqual(["question B"])
       expect(wrapper.findComponent({ name: "AgentChatComposer" }).props("streaming")).toBe(true)
       expect(thread.props("errorMessage")).toBe("")
       expect(JSON.stringify(thread.props("entries"))).not.toContain("stale")

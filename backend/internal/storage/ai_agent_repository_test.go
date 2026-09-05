@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 )
@@ -51,5 +52,50 @@ func TestAIChatSessionPersistence(t *testing.T) {
 	listed, err = store.ListAIChatSessions(ctx, 10)
 	if err != nil || len(listed) != 0 {
 		t.Fatalf("after delete = %+v err=%v", listed, err)
+	}
+}
+
+func TestAIChatRecentContextSurvivesToolHeavyHistory(t *testing.T) {
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "history.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.CreateAIChatSession(ctx, "long session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 90; i++ {
+		for _, role := range []string{"user", "tool", "tool", "assistant"} {
+			if _, err := store.AppendAIChatMessage(ctx, session.ID, role, fmt.Sprintf("%s-%d", role, i), "", ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := store.AppendAIChatMessage(ctx, session.ID, "user", "latest question", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	history, err := store.ListAIChatMessages(ctx, session.ID, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 80 || history[0].Seq != 282 || history[79].Content != "latest question" {
+		t.Fatalf("wrong recent page: %+v", history)
+	}
+	window, err := store.ListAIChatContext(ctx, session.ID, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(window) != 80 || window[0].Content != "assistant-50" || window[79].Content != "latest question" {
+		t.Fatalf("wrong model window: %+v", window)
+	}
+	for i, row := range window {
+		if row.Role == "tool" || (i > 0 && row.Seq <= window[i-1].Seq) {
+			t.Fatalf("invalid context order/role: %+v", row)
+		}
 	}
 }
