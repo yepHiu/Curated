@@ -153,6 +153,7 @@ async function mountPlayerPage(props: { movie?: Movie; autoplay?: boolean } = {}
 }
 
 beforeEach(() => {
+  localStorage.clear()
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "false")
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
@@ -182,6 +183,60 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  it("reconnects fatal HLS network errors instead of changing to an unsupported direct source", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const startLoad = vi.fn()
+    const listeners = new Map<string, (event: string, data: unknown) => void>()
+    class FakeHls {
+      static Events = { ERROR: "error" }
+      static isSupported() { return true }
+      startLoad = startLoad
+      loadSource() {}
+      attachMedia() {}
+      destroy() {}
+      on(event: string, callback: (event: string, data: unknown) => void) { listeners.set(event, callback) }
+      off(event: string) { listeners.delete(event) }
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({ movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", fileName: "movie.mkv", canDirectPlay: false })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    listeners.get("error")?.("error", { fatal: true, type: "networkError" })
+    await flushPromises()
+    expect(startLoad).toHaveBeenCalledWith(0)
+    expect(serviceMocks.createPlaybackSession).not.toHaveBeenCalled()
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalled()
+    expect(wrapper.get("video").attributes("src") ?? "").not.toContain("/stream")
+    wrapper.unmount()
+  })
+
+  it("keeps the old session until replacement data arrives and rolls back on decode failure", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const sources: string[] = []
+    class FakeHls {
+      static isSupported() { return true }
+      loadSource(src: string) { sources.push(src) }
+      attachMedia() {}
+      destroy() {}
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    const original = { movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", durationSec: 120, startPositionSec: 0, resumePositionSec: 0, canDirectPlay: false }
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce(original)
+    serviceMocks.createPlaybackSession.mockResolvedValueOnce({ ...original, sessionId: "replacement", url: "/replacement.m3u8", startPositionSec: 10, resumePositionSec: 10 })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/replacement.m3u8")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    await wrapper.get("video").trigger("error")
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/original.m3u8")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("replacement")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    wrapper.unmount()
+  })
+
   it("cancels startup and releases a late descriptor without reseeking after unmount", async () => {
     let finish!: (value: object) => void
     serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))

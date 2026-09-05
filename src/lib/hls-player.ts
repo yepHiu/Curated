@@ -2,6 +2,7 @@ type HlsInstance = {
   loadSource(src: string): void
   attachMedia(video: HTMLVideoElement): void
   startLoad?(startPosition?: number, skipSeekToStartPosition?: boolean): void
+  recoverMediaError?(): void
   destroy(): void
   on?(event: string, handler: (event: string, data?: unknown) => void): void
   off?(event: string, handler: (event: string, data?: unknown) => void): void

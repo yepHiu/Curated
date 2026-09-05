@@ -98,6 +98,8 @@ import {
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
 import { createPlaybackFrameStepper } from "@/lib/player-frame-step"
+import { canDirectPlaySource, createHlsRecoveryPolicy } from "@/lib/player-hls-recovery"
+import { resolvePlaybackCapabilities } from "@/lib/playback-capabilities"
 import {
   clearOptimisticSeekTargetIfSettled,
   hasAuthoritativeClockMoved,
@@ -306,8 +308,13 @@ function beginPlaybackRequest() {
 }
 let hlsWindowWaitGeneration = 0
 let hlsDirectFallbackInFlight = false
+const hlsRecovery = createHlsRecoveryPolicy()
+let hlsRecoveryInFlight = false
+let hlsRecoveryTimer: ReturnType<typeof setTimeout> | undefined
+let sessionUnavailable = false
 let playbackFallbackNoticeKey = ""
-let playbackSessionCleanupId: string | null = null
+const playbackSessionCleanupIds = new Set<string>()
+let playbackRollback: { descriptor: PlaybackDescriptorDTO; position: number; resume: boolean } | null = null
 let resumePlaybackWhenReady = false
 let hlsStartupBufferPending = false
 let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
@@ -735,6 +742,8 @@ async function refreshSessionDiagnostics(sessionId: string, gen: number) {
   const status = await libraryService.getPlaybackSession(sessionId)
   if (gen !== sessionDiagnosticsPollGen) return
   if (!status) return
+  sessionUnavailable = ["expired", "failed", "stopped", "closed", "replaced"].includes(status.state ?? "")
+  if (sessionUnavailable && isPlaying.value && !hlsRecoveryInFlight) void recoverHlsPlayback("session")
   const localKind = sessionDiagnostics.value.lastSeekKind
   const written = status.writtenDurationSec
   sessionDiagnostics.value = {
@@ -884,11 +893,6 @@ async function syncVideoSource() {
   refreshPlaybackStatsFromVideo()
 }
 
-function canBrowserDirectPlayFromFileName(fileName?: string | null): boolean {
-  const normalized = (fileName ?? "").trim().toLowerCase()
-  return [".mp4", ".m4v", ".webm", ".ogv", ".m3u8"].some((ext) => normalized.endsWith(ext))
-}
-
 async function tryStartPlaybackIfRequested(): Promise<boolean> {
   const v = videoRef.value
   if (!v || !playbackSrc.value) return false
@@ -962,6 +966,11 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
 }
 
 function syncSrc() {
+  clearTimeout(hlsRecoveryTimer)
+  hlsRecovery.reset()
+  hlsRecoveryInFlight = false
+  sessionUnavailable = false
+  playbackRollback = null
   stopPlaybackClockSyncLoop()
   resetPlaybackClockSyncSample()
   flushScheduledPlaybackSessionCleanup()
@@ -1069,10 +1078,15 @@ async function fallbackHlsToDirect(reason?: string) {
   const current = playbackDescriptor.value
   const movieId = props.movie.id.trim()
   if (!current || current.mode !== "hls" || !movieId) return
+  if (!canDirectPlaySource(current, resolvePlaybackCapabilities().mp4VideoCodecs) || current.reasonCode === "source_timestamps_unstable") {
+    isPlaybackWaiting.value = false
+    playbackError.value = t("player.decodeError")
+    return
+  }
 
   hlsDirectFallbackInFlight = true
   try {
-        bufferedUntilSec.value = 0
+    bufferedUntilSec.value = 0
     markPlaybackReady()
     const absolutePositionSec = getAbsolutePlaybackTime()
     const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
@@ -1088,10 +1102,10 @@ async function fallbackHlsToDirect(reason?: string) {
       mode: "direct",
       sessionId: undefined,
       url: fallbackUrl,
-      mimeType: "video/mp4",
+      mimeType: current.fileName?.toLowerCase().endsWith(".webm") ? "video/webm" : "video/mp4",
       startPositionSec: undefined,
       resumePositionSec: absolutePositionSec,
-      canDirectPlay: canBrowserDirectPlayFromFileName(current.fileName),
+      canDirectPlay: true,
       reason: reason?.trim() || "hls fallback to direct playback",
     }
     playbackSrc.value = fallbackUrl
@@ -1100,6 +1114,82 @@ async function fallbackHlsToDirect(reason?: string) {
     pushAppToast(reason?.trim() || t("player.hlsFallbackToDirect"), { variant: "warning", durationMs: 5200 })
   } finally {
     hlsDirectFallbackInFlight = false
+  }
+}
+
+function restorePreviousPlayback(): boolean {
+  const previous = playbackRollback
+  if (!previous || playbackDisposed) return false
+  playbackRollback = null
+  clearTimeout(hlsRecoveryTimer)
+  beginPlaybackRequest()
+  hlsWindowWaitGeneration += 1
+  const failedId = playbackDescriptor.value?.sessionId
+  if (previous.descriptor.sessionId) playbackSessionCleanupIds.delete(previous.descriptor.sessionId)
+  playbackDescriptor.value = { ...previous.descriptor, resumePositionSec: previous.position }
+  playbackSrc.value = resolveMoviePlaybackSourceUrl(props.movie.id, previous.descriptor.url)
+  resumeAppliedForMovieId.value = null
+  resumePlaybackWhenReady = previous.resume
+  currentTime.value = previous.position
+  optimisticSeekTargetSec.value = null
+  isResolvingPlayback.value = false
+  isSwitchingPlaybackSession.value = false
+  playbackError.value = ""
+  if (failedId !== previous.descriptor.sessionId) void releasePlaybackSession(failedId)
+  pushAppToast(t("player.errGeneric"), { variant: "warning" })
+  return true
+}
+
+async function recoverHlsPlayback(type: string) {
+  const descriptor = playbackDescriptor.value
+  const v = videoRef.value
+  if (playbackDisposed || hlsRecoveryInFlight || descriptor?.mode !== "hls" || !v) return
+  const action = hlsRecovery.next(type)
+  clearTimeout(hlsRecoveryTimer)
+  if (action === "failed") {
+    isPlaybackWaiting.value = false
+    playbackError.value = t("player.playStartError")
+    resumePlaybackWhenReady = false
+    v.pause()
+    return
+  }
+  hlsRecoveryInFlight = true
+  const movieId = props.movie.id
+  const shouldResume = resumePlaybackWhenReady || isPlaying.value || !v.paused
+  playbackError.value = ""
+  isPlaybackWaiting.value = true
+  resumePlaybackWhenReady = shouldResume
+  try {
+    if (action === "network" && hlsInstance?.startLoad) {
+      hlsInstance.startLoad(v.currentTime)
+    } else if (action === "media" && hlsInstance?.recoverMediaError) {
+      hlsInstance.recoverMediaError()
+    } else {
+      if (action !== "session") hlsRecovery.next("session")
+      const pending = seekToAbsolutePlaybackTime(getAbsolutePlaybackTime(), { forceSessionSwap: true, resumeAfterSwap: shouldResume })
+      const requestSeq = playbackLoadSeq
+      await pending
+      if (playbackDisposed || movieId !== props.movie.id || requestSeq !== playbackLoadSeq) return
+      if (playbackDescriptor.value?.sessionId === descriptor.sessionId) {
+        playbackError.value = t("player.playStartError")
+        isPlaybackWaiting.value = false
+        return
+      }
+      // An expired session cannot be used for rollback.
+      playbackRollback = null
+      sessionUnavailable = false
+    }
+    const sessionId = playbackDescriptor.value?.sessionId
+    hlsRecoveryTimer = setTimeout(() => {
+      if (!playbackDisposed && playbackDescriptor.value?.sessionId === sessionId) void recoverHlsPlayback("session")
+    }, 8000)
+  } catch {
+    if (!playbackDisposed && movieId === props.movie.id) {
+      playbackError.value = t("player.playStartError")
+      isPlaybackWaiting.value = false
+    }
+  } finally {
+    hlsRecoveryInFlight = false
   }
 }
 
@@ -1178,6 +1268,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(hlsRecoveryTimer)
   playbackDisposed = true
   playbackLoadSeq += 1
   sourceAttachSeq += 1
@@ -1274,6 +1365,7 @@ const volumeIconIsMuted = computed(
 function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
+  if (!v.paused && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) clearTimeout(hlsRecoveryTimer)
   currentTime.value = getAbsolutePlaybackTime(v.currentTime)
   watchTimeTracker.onTimeUpdate(currentTime.value)
   syncBufferedRangeFromVideo()
@@ -1301,7 +1393,6 @@ function onLoadedMetadata() {
   v.volume = pct / 100
   v.muted = playbackMuted.value
   syncBufferedRangeFromVideo()
-  flushScheduledPlaybackSessionCleanup()
   publishActivePlaybackSession()
 
   const fromQuery = parseResumeSecondsFromQuery(route.query.t)
@@ -1511,6 +1602,7 @@ function stripAutoplayFromRoute() {
 
 /** 从详情/资料库点「播放」进入本页时，在可播后自动 play；成功后去掉 ?autoplay=1 */
 async function onCanPlayForAutoplay() {
+  clearTimeout(hlsRecoveryTimer)
   markPlaybackReady()
   syncBufferedRangeFromVideo()
   void tryStartPlaybackIfRequested()
@@ -1592,8 +1684,9 @@ function onVideoError() {
   isPlaybackWaiting.value = false
   clearActivePlaybackSession(props.movie.id)
   const v = videoRef.value
+  if (restorePreviousPlayback()) return
   if (playbackDescriptor.value?.mode === "hls") {
-    void fallbackHlsToDirect("video element failed while playing HLS")
+    void recoverHlsPlayback("mediaError")
     return
   }
   const code = v?.error?.code
@@ -1612,6 +1705,12 @@ async function togglePlayPause() {
   if (!v || !playbackSrc.value || !descriptor) return
   try {
     if (v.paused) {
+      if (descriptor.mode === "hls" && (playbackError.value || sessionUnavailable)) {
+        hlsRecovery.reset()
+        resumePlaybackWhenReady = true
+        void recoverHlsPlayback("session")
+        return
+      }
       if (descriptor.mode === "direct" && descriptor.canDirectPlay === false) {
         playbackError.value = t("player.decodeError")
         return
@@ -1740,6 +1839,9 @@ function onVideoSeeked() {
 }
 
 function onVideoLoadedData() {
+  playbackRollback = null
+  flushScheduledPlaybackSessionCleanup()
+  clearTimeout(hlsRecoveryTimer)
   syncBufferedRangeFromVideo()
   markPlaybackReady()
   publishActivePlaybackSession()
@@ -1862,6 +1964,7 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
     }
 
     resumeAppliedForMovieId.value = null
+    playbackRollback = { descriptor: currentDescriptor, position: targetSec, resume: shouldResumePlayback }
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = normalizedDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, normalizedDescriptor.url)
@@ -2088,8 +2191,7 @@ const canSwitchToDirectPlayback = computed(() => {
   const descriptor = playbackDescriptor.value
   if (!descriptor) return false
   if (descriptor.mode === "direct") return true
-  if (descriptor.canDirectPlay) return true
-  return canBrowserDirectPlayFromFileName(descriptor.fileName)
+  return canDirectPlaySource(descriptor, resolvePlaybackCapabilities().mp4VideoCodecs)
 })
 
 const playbackBusyLabel = computed(() => {
@@ -2322,7 +2424,10 @@ function bindHlsStats(
       "fatal" in data &&
       (data as { fatal?: unknown }).fatal === true
     if (!fatal) return
-    void fallbackHlsToDirect("fatal hls playback error")
+    if (hlsInstance !== player || playbackDisposed) return
+    if (restorePreviousPlayback()) return
+    const type = (data as { type?: unknown }).type
+    void recoverHlsPlayback(typeof type === "string" ? type : "session")
   })
 
   detachHlsStatsListeners = () => {
@@ -2420,14 +2525,12 @@ function getAbsolutePlaybackTime(
 function schedulePlaybackSessionCleanup(sessionId?: string) {
   const id = sessionId?.trim()
   if (!id) return
-  playbackSessionCleanupId = id
+  playbackSessionCleanupIds.add(id)
 }
 
 function flushScheduledPlaybackSessionCleanup() {
-  const id = playbackSessionCleanupId
-  if (!id) return
-  playbackSessionCleanupId = null
-  void releasePlaybackSession(id)
+  for (const id of playbackSessionCleanupIds) void releasePlaybackSession(id)
+  playbackSessionCleanupIds.clear()
 }
 
 function clampAbsolutePlaybackTarget(targetSec: number): number {
@@ -2442,7 +2545,8 @@ async function resumeHlsAfterWindowExhaustion() {
   const caughtUp = await waitForMediaWrittenEnd(v, catchUpTarget, {
     isAborted: () => waitGen !== hlsWindowWaitGeneration,
   })
-  if (waitGen !== hlsWindowWaitGeneration || !caughtUp || videoRef.value !== v) return
+  if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v) return
+  if (!caughtUp) { void recoverHlsPlayback("session"); return }
   resumePlaybackWhenReady = true
   void tryStartPlaybackIfRequested()
 }
@@ -2542,6 +2646,7 @@ async function seekToAbsolutePlaybackTime(
       resumePlaybackWhenReady = true
     }
     resumeAppliedForMovieId.value = null
+    playbackRollback = { descriptor, position: options.previousDisplayedTimeSec ?? getAbsolutePlaybackTime(), resume: Boolean(shouldResumePlayback) }
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = nextDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, nextDescriptor.url)
