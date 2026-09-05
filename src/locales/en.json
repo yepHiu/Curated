@@ -1590,6 +1590,9 @@
   },
   "aiSettings": {
     "title": "AI",
+    "governance": "Governance",
+    "policy": "Access policy",
+    "limits": "Data and limits",
     "enabled": "Enable AI for all clients",
     "readOnly": "Read-only mode",
     "confirmationHint": "When read-only mode is off, each change still requires preview and confirmation. Saving policy stops replies being generated.",

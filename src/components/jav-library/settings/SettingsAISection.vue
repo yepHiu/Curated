@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import { Bot, RefreshCw } from "lucide-vue-next"
+import { BarChart3, RefreshCw, Server, ShieldCheck } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -129,79 +129,101 @@ function page(kind: "runs" | "audit", delta: number) { if (kind === "runs") offs
 
 <template>
   <div class="flex min-w-0 flex-col gap-6" data-ai-settings>
-    <p v-if="error" role="alert" class="text-sm text-destructive" data-ai-settings-error>{{ error }}</p>
-    <p v-if="message" role="status" class="text-sm text-muted-foreground">{{ message }}</p>
-    <Button v-if="!ready" variant="outline" @click="initialize">{{ t('aiSettings.retry') }}</Button>
+    <p v-if="error" role="alert" class="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" data-ai-settings-error>{{ error }}</p>
+    <p v-if="message" role="status" class="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{{ message }}</p>
+    <Button v-if="!ready" variant="outline" size="sm" class="self-start" @click="initialize">{{ t('aiSettings.retry') }}</Button>
     <template v-if="ready">
-      <Card class="gap-2">
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-governance-card>
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
-          <Bot aria-hidden="true" /><CardTitle>{{ t('aiSettings.title') }}</CardTitle>
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><ShieldCheck class="size-4" /></span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.governance') }}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <Field orientation="horizontal"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
-            <Field orientation="horizontal"><FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
-            <FieldDescription>{{ t('aiSettings.confirmationHint') }}</FieldDescription>
-            <Field><FieldLabel for="ai-privacy">{{ t('aiSettings.privacy') }}</FieldLabel>
-              <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
-              <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
-            </Field>
-            <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" type="number" min="1" max="30" :disabled="busy" /></Field>
-            <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" type="number" min="1" max="60" :disabled="busy" /></Field>
-            <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" type="number" min="7" max="365" :disabled="busy" /></Field>
-            <FieldDescription>{{ t('aiSettings.retentionHint') }}</FieldDescription>
-            <div class="flex flex-wrap justify-end gap-3"><Button variant="outline" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button><Button :disabled="busy || !validSettings" data-ai-save @click="saveSettings">{{ t('settings.experimentalSave') }}</Button></div>
-          </FieldGroup>
+        <CardContent class="flex flex-col gap-3 pt-0">
+          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="policy">
+            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.policy') }}</h3>
+            <FieldGroup class="gap-3">
+              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><FieldLabel for="ai-enabled">{{ t('aiSettings.enabled') }}</FieldLabel><Switch id="ai-enabled" v-model="settings.enabled" :disabled="busy" data-ai-enabled /></Field>
+              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2"><FieldLabel for="ai-readonly">{{ t('aiSettings.readOnly') }}</FieldLabel><Switch id="ai-readonly" v-model="settings.readOnly" :disabled="busy" data-ai-readonly /></Field>
+              <FieldDescription>{{ t('aiSettings.confirmationHint') }}</FieldDescription>
+            </FieldGroup>
+          </section>
+          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="limits">
+            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.limits') }}</h3>
+            <FieldGroup class="gap-3">
+              <Field><FieldLabel for="ai-privacy">{{ t('aiSettings.privacy') }}</FieldLabel>
+                <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
+                <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
+              </Field>
+              <FieldGroup class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" type="number" min="1" max="30" :disabled="busy" /></Field>
+                <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" type="number" min="1" max="60" :disabled="busy" /></Field>
+                <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" type="number" min="7" max="365" :disabled="busy" /></Field>
+              </FieldGroup>
+              <FieldDescription>{{ t('aiSettings.retentionHint') }}</FieldDescription>
+            </FieldGroup>
+          </section>
+          <div class="flex flex-wrap justify-end gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
+            <Button variant="outline" size="sm" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button><Button size="sm" :disabled="busy || !validSettings" data-ai-save @click="saveSettings">{{ t('settings.experimentalSave') }}</Button>
+          </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle>{{ t('aiSettings.provider') }}</CardTitle></CardHeader>
-        <CardContent><FieldGroup>
-          <Field><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" autocomplete="off" :disabled="busy" /></Field>
-          <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" type="password" autocomplete="new-password" :disabled="busy" /></Field>
-          <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" autocomplete="off" :disabled="busy" /></Field>
-          <FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription>
-          <div class="flex flex-wrap justify-end gap-3"><Button variant="outline" :disabled="busy" data-ai-provider-test @click="testProvider">{{ t('settings.experimentalTest') }}</Button><Button :disabled="busy" data-ai-provider-save @click="saveProvider">{{ t('settings.experimentalSave') }}</Button></div>
-        </FieldGroup></CardContent>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-provider-card>
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><Server class="size-4" /></span><CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.provider') }}</CardTitle></CardHeader>
+        <CardContent class="flex flex-col gap-3 pt-0">
+          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+            <FieldGroup class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field class="md:col-span-2"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" autocomplete="off" :disabled="busy" /></Field>
+              <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" type="password" autocomplete="new-password" :disabled="busy" /></Field>
+              <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" autocomplete="off" :disabled="busy" /></Field>
+            </FieldGroup>
+          </section>
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ t('settings.experimentalTest') }}</Button><Button size="sm" :disabled="busy" data-ai-provider-save @click="saveProvider">{{ t('settings.experimentalSave') }}</Button></div></div>
+        </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle>{{ t('aiSettings.statistics') }}</CardTitle></CardHeader>
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><BarChart3 class="size-4" /></span><CardTitle class="min-w-0 text-lg tracking-tight">{{ t('aiSettings.statistics') }}</CardTitle></CardHeader>
         <CardContent class="flex min-w-0 flex-col gap-4">
           <p v-if="!useWebApi" class="text-sm text-muted-foreground">{{ t('aiSettings.mockHint') }}</p>
-          <FieldGroup class="sm:flex-row">
-            <Field><FieldLabel for="ai-days">{{ t('aiSettings.range') }}</FieldLabel><Select v-model="days"><SelectTrigger id="ai-days"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="day in ['7','30','90']" :key="day" :value="day">{{ t('aiSettings.days', { count: day }) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
-            <Field><FieldLabel for="ai-channel">{{ t('aiSettings.channel') }}</FieldLabel><Select v-model="channel"><SelectTrigger id="ai-channel"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','chat','action','test']" :key="item" :value="item">{{ t(`aiSettings.channels.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
-            <Field><FieldLabel for="ai-status">{{ t('aiSettings.status') }}</FieldLabel><Select v-model="status"><SelectTrigger id="ai-status"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','completed','failed','partial','cancelled','needs_input']" :key="item" :value="item">{{ t(`aiSettings.statuses.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
-          </FieldGroup>
-          <Button variant="outline" :disabled="loading" class="self-end" data-ai-refresh @click="refresh"><RefreshCw data-icon="inline-start" />{{ t('aiSettings.refresh') }}</Button>
+          <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" data-ai-settings-block="filters">
+            <FieldGroup class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field><FieldLabel for="ai-days">{{ t('aiSettings.range') }}</FieldLabel><Select v-model="days"><SelectTrigger id="ai-days"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="day in ['7','30','90']" :key="day" :value="day">{{ t('aiSettings.days', { count: day }) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+              <Field><FieldLabel for="ai-channel">{{ t('aiSettings.channel') }}</FieldLabel><Select v-model="channel"><SelectTrigger id="ai-channel"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','chat','action','test']" :key="item" :value="item">{{ t(`aiSettings.channels.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+              <Field><FieldLabel for="ai-status">{{ t('aiSettings.status') }}</FieldLabel><Select v-model="status"><SelectTrigger id="ai-status"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem v-for="item in ['all','completed','failed','partial','cancelled','needs_input']" :key="item" :value="item">{{ t(`aiSettings.statuses.${item}`) }}</SelectItem></SelectGroup></SelectContent></Select></Field>
+            </FieldGroup>
+            <Button variant="outline" size="sm" :disabled="loading" class="self-end" data-ai-refresh @click="refresh"><RefreshCw data-icon="inline-start" />{{ t('aiSettings.refresh') }}</Button>
+          </section>
           <p v-if="loading" role="status">{{ t('aiSettings.loading') }}</p>
-          <dl v-if="summary" class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-ai-summary>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.runs') }}</dt><dd>{{ summary.runs }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.failed') }}</dt><dd>{{ summary.failed }} / {{ summary.partial }} / {{ summary.cancelled }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.totalTokens') }}</dt><dd data-ai-token-total>{{ measured(summary.totalTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.coverage') }}</dt><dd>{{ summary.usageCalls }} / {{ summary.modelCalls }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.inputOutput') }}</dt><dd>{{ measured(summary.promptTokens, summary.usageCalls, summary.modelCalls) }} / {{ measured(summary.completionTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.toolCalls') }}</dt><dd>{{ summary.toolCalls }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.firstText') }}</dt><dd>{{ duration(summary.avgFirstTextMs) }}</dd></div>
-            <div><dt class="text-sm text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd>{{ duration(summary.avgDurationMs) }}</dd></div>
+          <dl v-if="summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-ai-summary>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.runs') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.runs }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.failed') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.failed }} / {{ summary.partial }} / {{ summary.cancelled }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.totalTokens') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums" data-ai-token-total>{{ measured(summary.totalTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.coverage') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.usageCalls }} / {{ summary.modelCalls }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.inputOutput') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ measured(summary.promptTokens, summary.usageCalls, summary.modelCalls) }} / {{ measured(summary.completionTokens, summary.usageCalls, summary.modelCalls) }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.toolCalls') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.toolCalls }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.firstText') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgFirstTextMs) }}</dd></div>
+            <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgDurationMs) }}</dd></div>
           </dl>
-          <p class="text-sm text-muted-foreground">{{ t('aiSettings.usageHint') }}</p>
-          <h3 class="text-sm font-semibold">{{ t('aiSettings.recentRuns') }}</h3>
-          <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-          <ul class="flex min-w-0 flex-col gap-3">
-            <li v-for="run in report?.items ?? []" :key="run.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-4">
+          <p class="rounded-lg border border-border/40 bg-background/30 p-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.usageHint') }}</p>
+          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="recent-runs">
+            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
+            <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
+            <ul class="flex min-w-0 flex-col gap-2">
+              <li v-for="run in report?.items ?? []" :key="run.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-3">
               <div class="flex flex-wrap items-center justify-between gap-2"><span class="break-all text-sm">{{ run.model || t('aiSettings.unknown') }}</span><Badge variant="secondary">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge></div>
               <p class="break-all text-xs text-muted-foreground">{{ time(run.startedAt) }} · {{ t(`aiSettings.channels.${run.channel}`) }} · {{ run.promptVersion }} · {{ run.provider }}</p>
               <p class="text-sm">{{ duration(run.durationMs) }} · {{ t('aiSettings.firstText') }}: {{ duration(run.firstTextMs) }} · {{ t('aiSettings.totalTokens') }}: {{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} · {{ t('aiSettings.toolCalls') }}: {{ run.toolCalls }}</p>
               <p v-if="run.errorCode" class="break-all text-sm text-destructive">{{ t('aiSettings.error') }}: {{ run.errorCode }}</p>
-            </li>
-          </ul>
-          <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-3"><span class="text-sm">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" :disabled="loading || offset === 0" @click="page('runs', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" :disabled="loading || offset + 25 >= report.total" @click="page('runs', 25)">{{ t('aiSettings.next') }}</Button></div>
-          <h3 class="text-sm font-semibold">{{ t('aiSettings.audit') }}</h3>
-          <p class="text-sm text-muted-foreground">{{ t('aiSettings.auditHint') }}</p>
-          <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-          <ul class="flex min-w-0 flex-col gap-3"><li v-for="entry in audit?.items ?? []" :key="entry.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-4"><div class="flex flex-wrap justify-between gap-2"><span class="break-all text-sm">{{ toolLabel(entry.tool) }}</span><Badge variant="secondary">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></div><p class="break-all text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}</p><p v-if="entry.errorCode" class="break-all text-sm text-destructive">{{ entry.errorCode }}</p></li></ul>
-          <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-3"><Button variant="outline" :disabled="loading || auditOffset === 0" @click="page('audit', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" :disabled="loading || auditOffset + 25 >= audit.total" @click="page('audit', 25)">{{ t('aiSettings.next') }}</Button></div>
+              </li>
+            </ul>
+            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + 25 >= report.total" @click="page('runs', 25)">{{ t('aiSettings.next') }}</Button></div>
+          </section>
+          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="audit">
+            <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
+            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.auditHint') }}</p>
+            <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
+            <ul class="flex min-w-0 flex-col gap-2"><li v-for="entry in audit?.items ?? []" :key="entry.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-3"><div class="flex flex-wrap justify-between gap-2"><span class="break-all text-sm">{{ toolLabel(entry.tool) }}</span><Badge variant="secondary">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></div><p class="break-all text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}</p><p v-if="entry.errorCode" class="break-all text-sm text-destructive">{{ entry.errorCode }}</p></li></ul>
+            <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + 25 >= audit.total" @click="page('audit', 25)">{{ t('aiSettings.next') }}</Button></div>
+          </section>
         </CardContent>
       </Card>
     </template>

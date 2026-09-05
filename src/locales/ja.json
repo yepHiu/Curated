@@ -1592,6 +1592,9 @@
   },
   "aiSettings": {
     "title": "AI",
+    "governance": "ガバナンス",
+    "policy": "アクセスポリシー",
+    "limits": "データと制限",
     "enabled": "すべてのクライアントで AI を有効化",
     "readOnly": "読み取り専用",
     "confirmationHint": "読み取り専用を解除しても、変更ごとにプレビューと確認が必要です。設定の保存は生成中の応答を停止します。",

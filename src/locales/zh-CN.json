@@ -1592,6 +1592,9 @@
   },
   "aiSettings": {
     "title": "AI",
+    "governance": "治理策略",
+    "policy": "访问策略",
+    "limits": "资料与限制",
     "enabled": "启用 AI（所有客户端）",
     "readOnly": "只读模式",
     "confirmationHint": "只读模式关闭时，资料修改仍需逐次预览确认。保存策略会停止正在生成的回复。",

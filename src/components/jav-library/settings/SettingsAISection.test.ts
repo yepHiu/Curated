@@ -33,6 +33,18 @@ describe("SettingsAISection", () => {
     expect(useExperimentalAgent().enabled.value).toBe(false)
     wrapper.unmount()
   })
+  it("organizes governance, provider, and records into the settings card hierarchy", async () => {
+    const wrapper = await setup()
+    expect(wrapper.find("[data-ai-governance-card]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-provider-card]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-statistics-card]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-settings-block=policy]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-settings-block=limits]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-settings-block=filters]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-settings-block=recent-runs]").exists()).toBe(true)
+    expect(wrapper.find("[data-ai-settings-block=audit]").exists()).toBe(true)
+    wrapper.unmount()
+  })
   it("applies global state only after saving and keeps the old state on failure", async () => {
     const wrapper = await setup()
     await wrapper.get("[data-ai-enabled]").trigger("click")
