@@ -205,6 +205,7 @@ describe("AgentWindow session request ownership", () => {
 
   it("retains partial output and restores the draft after a stream failure", async () => {
     streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
+      handlers.onToolStart?.({ name: "search_movies", toolCallId: "interrupted" })
       handlers.onDelta("partial answer")
       throw new Error("connection lost")
     })
@@ -216,6 +217,7 @@ describe("AgentWindow session request ownership", () => {
       await flushPromises()
       const entries = wrapper.findComponent({ name: "AgentChatThread" }).props("entries")
       expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "assistant", content: "partial answer" })]))
+      expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "process", tools: [expect.objectContaining({ pending: false })] })]))
       expect(wrapper.findComponent({ name: "AgentChatComposer" }).props("modelValue")).toBe("question")
       expect(wrapper.findComponent({ name: "AgentChatComposer" }).props("streaming")).toBe(false)
     } finally { wrapper.unmount() }

@@ -30,6 +30,9 @@ const headline = computed(() => {
   if (failed.value) {
     return t("agentWindow.toolFailed")
   }
+  if (props.entry.tools.some((item) => item.ok === undefined)) {
+    return t("agentWindow.toolUnknown")
+  }
   if (visibleTools.value.length > 0) {
     return t("agentWindow.toolOk")
   }

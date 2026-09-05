@@ -280,6 +280,7 @@
     "confirmApplied": "ライブラリに保存しました",
     "confirmDiscarded": "この書き換えを破棄しました",
     "confirmArchived": "この履歴のプレビューは再適用できません。現在のデータを確認し、必要であればプレビューを再生成してください。",
+    "toolUnknown": "完了結果が記録されていません",
     "mention": {
       "trigger": "メンション",
       "placeholder": "作品・俳優・タグを指定",

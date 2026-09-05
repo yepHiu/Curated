@@ -213,6 +213,7 @@
     "toolRunningNamed": "正在{name}",
     "toolOk": "已查库",
     "toolFailed": "查询失败",
+    "toolUnknown": "未记录完成结果",
     "thinking": "思考中",
     "thought": "已思考",
     "presentedMovies": "展示影片",

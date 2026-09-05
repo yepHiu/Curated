@@ -530,6 +530,8 @@ async function send(selected?: AIEntityCandidateDTO) {
   } finally {
     if (seq === streamSeq) {
       streaming.value = false
+      // A transport error/abort can arrive before a tool result event.
+      for (const tool of findProcessFor(assistantId)?.tools ?? []) tool.pending = false
       collapseProcess(assistantId)
       const current = entries.value.find((entry) => entry.id === assistantId)
       if (controller.signal.aborted && current?.kind === "assistant" && !current.content && !current.movies?.length) {
