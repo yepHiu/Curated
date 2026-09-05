@@ -14,6 +14,7 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
+	"curated-backend/internal/storage"
 )
 
 // Experimental agent endpoints (charter E2): provider test, agent loop SSE,
@@ -191,8 +192,12 @@ func (h *Handler) handleGetAIChatSession(w http.ResponseWriter, r *http.Request)
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "sessionId is required")
 		return
 	}
-	dto, err := h.aiChatProvider.GetAIChatSession(r.Context(), id)
+	dto, err := h.aiChatProvider.GetAIChatSession(r.Context(), id, r.URL.Query().Get("cursor"))
 	if err != nil {
+		if errors.Is(err, storage.ErrInvalidAIChatCursor) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
+			return
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "ai chat session not found")
 			return

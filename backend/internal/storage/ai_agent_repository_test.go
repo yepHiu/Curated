@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -97,5 +98,35 @@ func TestAIChatRecentContextSurvivesToolHeavyHistory(t *testing.T) {
 		if row.Role == "tool" || (i > 0 && row.Seq <= window[i-1].Seq) {
 			t.Fatalf("invalid context order/role: %+v", row)
 		}
+	}
+	page, cursor, err := store.ListAIChatMessagePage(ctx, session.ID, "")
+	if err != nil || len(page) != 80 || cursor == "" {
+		t.Fatalf("first page: %d %s %v", len(page), cursor, err)
+	}
+	seen := map[string]bool{}
+	for _, item := range page {
+		seen[item.ID] = true
+	}
+	// New messages cannot move a keyset cursor or create duplicate old rows.
+	if _, err := store.AppendAIChatMessage(ctx, session.ID, "user", "arrived after page one", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	for cursor != "" {
+		page, cursor, err = store.ListAIChatMessagePage(ctx, session.ID, cursor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page {
+			if seen[item.ID] {
+				t.Fatalf("duplicate %s", item.ID)
+			}
+			seen[item.ID] = true
+		}
+	}
+	if len(seen) != 361 {
+		t.Fatalf("lost messages: %d", len(seen))
+	}
+	if _, _, err := store.ListAIChatMessagePage(ctx, session.ID, "invalid"); !errors.Is(err, ErrInvalidAIChatCursor) {
+		t.Fatalf("invalid cursor: %v", err)
 	}
 }

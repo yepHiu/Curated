@@ -222,7 +222,7 @@ func (a *App) CreateAIChatSession(ctx context.Context, title string) (contracts.
 	return a.store.CreateAIChatSession(ctx, title)
 }
 
-func (a *App) GetAIChatSession(ctx context.Context, id string) (contracts.AIChatSessionDetailDTO, error) {
+func (a *App) GetAIChatSession(ctx context.Context, id string, cursor ...string) (contracts.AIChatSessionDetailDTO, error) {
 	if a.store == nil {
 		return contracts.AIChatSessionDetailDTO{}, sql.ErrNoRows
 	}
@@ -230,14 +230,18 @@ func (a *App) GetAIChatSession(ctx context.Context, id string) (contracts.AIChat
 	if err != nil {
 		return contracts.AIChatSessionDetailDTO{}, err
 	}
-	messages, err := a.store.ListAIChatMessages(ctx, id, 80)
+	before := ""
+	if len(cursor) > 0 {
+		before = cursor[0]
+	}
+	messages, nextCursor, err := a.store.ListAIChatMessagePage(ctx, id, before)
 	if err != nil {
 		return contracts.AIChatSessionDetailDTO{}, err
 	}
 	if messages == nil {
 		messages = []contracts.AIChatStoredMessageDTO{}
 	}
-	return contracts.AIChatSessionDetailDTO{AIChatSessionDTO: session, Messages: messages}, nil
+	return contracts.AIChatSessionDetailDTO{AIChatSessionDTO: session, Messages: messages, NextCursor: nextCursor}, nil
 }
 
 func (a *App) DeleteAIChatSession(ctx context.Context, id string) error {

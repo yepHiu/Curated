@@ -243,7 +243,7 @@ export const webAIService: AIService = {
   streamChat,
   listSessions: async () => (await api.listAIChatSessions()).items ?? [],
   createSession: (title) => api.createAIChatSession(title),
-  getSession: (id) => api.getAIChatSession(id),
+  getSession: (id, cursor) => api.getAIChatSession(id, cursor),
   deleteSession: (id) => api.deleteAIChatSession(id),
   runAction: (name, body, signal) => postJSON(`/ai/actions/${encodeURIComponent(name)}`, body, signal),
   confirmTool: (body) => postJSON("/ai/confirm", body),

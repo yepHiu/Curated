@@ -66,7 +66,7 @@ func (s *stubAIChatProvider) CreateAIChatSession(_ context.Context, title string
 	return dto, nil
 }
 
-func (s *stubAIChatProvider) GetAIChatSession(_ context.Context, id string) (contracts.AIChatSessionDetailDTO, error) {
+func (s *stubAIChatProvider) GetAIChatSession(_ context.Context, id string, cursor ...string) (contracts.AIChatSessionDetailDTO, error) {
 	return contracts.AIChatSessionDetailDTO{
 		AIChatSessionDTO: contracts.AIChatSessionDTO{ID: id, Title: "hi"},
 		Messages:         []contracts.AIChatStoredMessageDTO{},

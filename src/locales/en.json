@@ -281,6 +281,9 @@
     "confirmDiscarded": "Discarded this rewrite",
     "confirmArchived": "This historical preview cannot be applied again. Check the current data and generate a new preview if needed.",
     "toolUnknown": "No completion result recorded",
+    "historyOlder": "Load earlier messages",
+    "historyLoading": "Loading…",
+    "historyLoadFailed": "Could not load earlier messages. Please try again.",
     "mention": {
       "trigger": "Mention",
       "placeholder": "Mention a title, actor, or tag",

@@ -73,7 +73,7 @@ function mountWindow() {
     global: {
       stubs: {
         Teleport: true,
-        AgentChatThread: { name: 'AgentChatThread', props: ['entries', 'errorMessage'], template: '<div />', methods: { scrollToEnd() {} } },
+        AgentChatThread: { name: 'AgentChatThread', props: ['entries', 'errorMessage', 'hasOlder', 'loadingOlder'], emits: ['loadOlder'], template: '<div />', methods: { scrollToEnd() {}, captureAnchor() { return () => {} } } },
         AgentChatComposer: { name: 'AgentChatComposer', props: ['modelValue', 'streaming', 'disabled'], emits: ['update:modelValue', 'send'], template: `<div><input data-agent-window-input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /><button data-agent-window-send @click="$emit('send')" /></div>`, methods: { focus() {} } },
       },
     },
@@ -200,6 +200,38 @@ describe("AgentWindow session request ownership", () => {
       expect(wrapper.findComponent({ name: "AgentChatSidebar" }).props("activeId")).toBe("ses_c")
       expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).toContain("history-ses_c")
       expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).not.toContain("history-ses_b")
+    } finally { wrapper.unmount() }
+  })
+
+  it("prepends older pages without dropping new replies and ignores a stale page after switching", async () => {
+    listSessionsMock.mockResolvedValue(["ses_a", "ses_b"].map(id => ({ id, title: id, createdAt: "", updatedAt: "" })))
+    getSessionMock.mockImplementation(async (id: string) => ({ ...sessionDetail(id), nextCursor: "older" }))
+    streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => handlers.onDelta("live answer"))
+    const wrapper = mountWindow()
+    try {
+      await flushPromises()
+      await wrapper.find("[data-agent-window-input]").setValue("new question")
+      await wrapper.find("[data-agent-window-send]").trigger("click")
+      await flushPromises()
+      const older = deferred<AIChatSessionDetailDTO>()
+      getSessionMock.mockReturnValueOnce(older.promise)
+      wrapper.findComponent({ name: "AgentChatThread" }).vm.$emit("loadOlder")
+      await flushPromises()
+      expect(getSessionMock).toHaveBeenLastCalledWith("ses_a", "older")
+      older.resolve({ ...sessionDetail("ses_a"), nextCursor: "even-older", messages: [{ ...sessionDetail("ses_a").messages[0]!, id: "earlier", content: "earlier question" }] })
+      await flushPromises()
+      await vi.waitFor(() => expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).toContain("earlier question"))
+      expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).toContain("live answer")
+      const stale = deferred<AIChatSessionDetailDTO>()
+      getSessionMock.mockReturnValueOnce(stale.promise)
+      wrapper.findComponent({ name: "AgentChatThread" }).vm.$emit("loadOlder")
+      await flushPromises()
+      await wrapper.find('[data-agent-window-session="ses_b"]').trigger("click")
+      await flushPromises()
+      stale.resolve({ ...sessionDetail("ses_a"), messages: [{ ...sessionDetail("ses_a").messages[0]!, content: "stale history" }] })
+      await flushPromises()
+      expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).not.toContain("stale history")
+      expect(JSON.stringify(wrapper.findComponent({ name: "AgentChatThread" }).props("entries"))).toContain("history-ses_b")
     } finally { wrapper.unmount() }
   })
 

@@ -137,7 +137,7 @@ type AIChatProvider interface {
 	TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) contracts.AIProviderTestResponse
 	ListAIChatSessions(ctx context.Context) (contracts.AIChatSessionListDTO, error)
 	CreateAIChatSession(ctx context.Context, title string) (contracts.AIChatSessionDTO, error)
-	GetAIChatSession(ctx context.Context, id string) (contracts.AIChatSessionDetailDTO, error)
+	GetAIChatSession(ctx context.Context, id string, cursor ...string) (contracts.AIChatSessionDetailDTO, error)
 	DeleteAIChatSession(ctx context.Context, id string) error
 	RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error)
 	ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest) (contracts.AIToolApplyDTO, error)

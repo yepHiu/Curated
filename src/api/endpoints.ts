@@ -863,9 +863,9 @@ export const api = {
     return httpClient.post<import("./types").AIChatSessionDTO>("/ai/sessions", { title: title ?? "" })
   },
 
-  getAIChatSession(id: string): Promise<import("./types").AIChatSessionDetailDTO> {
+  getAIChatSession(id: string, cursor?: string): Promise<import("./types").AIChatSessionDetailDTO> {
     return httpClient.get<import("./types").AIChatSessionDetailDTO>(
-      `/ai/sessions/${encodeURIComponent(id)}`,
+      `/ai/sessions/${encodeURIComponent(id)}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
     )
   },
 

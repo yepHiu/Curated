@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -124,6 +126,34 @@ func (s *SQLiteStore) ListAIChatMessages(ctx context.Context, sessionID string, 
 	return s.listRecentAIChatMessages(ctx, sessionID, limit, false)
 }
 
+var ErrInvalidAIChatCursor = errors.New("invalid AI chat cursor")
+
+type aiChatCursor struct {
+	Seq int    `json:"seq"`
+	ID  string `json:"id"`
+}
+
+func (s *SQLiteStore) ListAIChatMessagePage(ctx context.Context, sessionID, cursor string) ([]contracts.AIChatStoredMessageDTO, string, error) {
+	var before aiChatCursor
+	if cursor != "" {
+		data, err := base64.RawURLEncoding.DecodeString(cursor)
+		if len(cursor) > 512 || err != nil || json.Unmarshal(data, &before) != nil || before.Seq <= 0 || before.ID == "" {
+			return nil, "", ErrInvalidAIChatCursor
+		}
+	}
+	items, err := s.queryAIChatMessages(ctx, sessionID, 81, false, before)
+	if err != nil {
+		return nil, "", err
+	}
+	next := ""
+	if len(items) > 80 {
+		items = items[1:]
+		data, _ := json.Marshal(aiChatCursor{Seq: items[0].Seq, ID: items[0].ID})
+		next = base64.RawURLEncoding.EncodeToString(data)
+	}
+	return items, next, nil
+}
+
 // ListAIChatContext excludes tool/event rows before limiting the model window.
 func (s *SQLiteStore) ListAIChatContext(ctx context.Context, sessionID string, limit int) ([]contracts.AIChatStoredMessageDTO, error) {
 	return s.listRecentAIChatMessages(ctx, sessionID, limit, true)
@@ -133,12 +163,17 @@ func (s *SQLiteStore) listRecentAIChatMessages(ctx context.Context, sessionID st
 	if limit <= 0 || limit > 200 {
 		limit = 80
 	}
+	return s.queryAIChatMessages(ctx, sessionID, limit, dialogueOnly, aiChatCursor{})
+}
+
+func (s *SQLiteStore) queryAIChatMessages(ctx context.Context, sessionID string, limit int, dialogueOnly bool, before aiChatCursor) ([]contracts.AIChatStoredMessageDTO, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, session_id, role, content, tool_name, tool_call_id, seq, created_at, events_json FROM (
 			SELECT * FROM ai_chat_messages
 			WHERE session_id = ? AND (? = 0 OR role IN ('user', 'assistant'))
-			ORDER BY seq DESC LIMIT ?
-		) ORDER BY seq ASC`, sessionID, dialogueOnly, limit)
+			AND (? = 0 OR seq < ? OR (seq = ? AND id < ?))
+			ORDER BY seq DESC, id DESC LIMIT ?
+		) ORDER BY seq ASC, id ASC`, sessionID, dialogueOnly, before.Seq, before.Seq, before.Seq, before.ID, limit)
 	if err != nil {
 		return nil, err
 	}

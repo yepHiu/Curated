@@ -17,9 +17,13 @@ defineProps<{
   providerUnconfigured: boolean
   errorMessage: string
   wide?: boolean
+  hasOlder?: boolean
+  loadingOlder?: boolean
+  historyDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
+  loadOlder: []
   close: []
   openMovie: [movieId: string]
   applyConfirm: [id: string]
@@ -31,6 +35,12 @@ const listRef = ref<HTMLElement | null>(null)
 const { t } = useI18n()
 
 defineExpose({
+  captureAnchor() {
+    const element = listRef.value
+    const height = element?.scrollHeight ?? 0
+    const top = element?.scrollTop ?? 0
+    return () => { if (element) element.scrollTop = top + element.scrollHeight - height }
+  },
   scrollToEnd() {
     if (listRef.value) {
       listRef.value.scrollTop = listRef.value.scrollHeight
@@ -51,6 +61,9 @@ defineExpose({
       :class="wide ? 'max-w-[52rem] px-6' : 'px-4'"
       data-agent-window-messages-inner
     >
+    <Button v-if="hasOlder" variant="ghost" size="sm" :disabled="loadingOlder || historyDisabled" data-agent-load-older @click="emit('loadOlder')">
+      {{ t(loadingOlder ? 'agentWindow.historyLoading' : 'agentWindow.historyOlder') }}
+    </Button>
     <p
       v-if="entries.length === 0 && !providerUnconfigured && !errorMessage"
       class="px-1 py-10 text-center text-sm text-muted-foreground"

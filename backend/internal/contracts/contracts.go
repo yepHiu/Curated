@@ -1068,7 +1068,8 @@ type AIChatStoredMessageDTO struct {
 
 type AIChatSessionDetailDTO struct {
 	AIChatSessionDTO
-	Messages []AIChatStoredMessageDTO `json:"messages"`
+	NextCursor string                   `json:"nextCursor,omitempty"`
+	Messages   []AIChatStoredMessageDTO `json:"messages"`
 }
 
 // AIAgentMovieCardDTO is a chat-ui projection of a movie already retrieved this turn.

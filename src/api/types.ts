@@ -416,6 +416,7 @@ export interface AIChatStoredMessageDTO {
 }
 
 export interface AIChatSessionDetailDTO extends AIChatSessionDTO {
+  nextCursor?: string
   messages: AIChatStoredMessageDTO[]
 }
 

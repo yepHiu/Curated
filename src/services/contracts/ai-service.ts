@@ -65,7 +65,7 @@ export interface AIService {
   streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHandlers): Promise<void>
   listSessions(): Promise<AIChatSessionDTO[]>
   createSession(title?: string): Promise<AIChatSessionDTO>
-  getSession(id: string): Promise<AIChatSessionDetailDTO>
+  getSession(id: string, cursor?: string): Promise<AIChatSessionDetailDTO>
   deleteSession(id: string): Promise<void>
   runAction(name: string, body: AIActionRequestBody, signal?: AbortSignal): Promise<AIActionPreviewDTO>
   confirmTool(body: AIToolApplyRequestBody): Promise<AIToolApplyDTO>

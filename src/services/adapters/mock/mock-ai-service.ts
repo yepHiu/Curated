@@ -188,12 +188,16 @@ export const mockAIService: AIService = {
   async createSession(title) {
     return ensureSession(undefined, title)
   },
-  async getSession(id) {
+  async getSession(id, cursor) {
     const found = sessions.find((item) => item.id === id)
     if (!found) {
       throw new AIServiceError("session not found", "COMMON_NOT_FOUND")
     }
-    return found
+    const before = cursor ? Number(cursor) : Infinity
+    if (cursor && (!Number.isSafeInteger(before) || before <= 0)) throw new AIServiceError("invalid cursor", "COMMON_BAD_REQUEST")
+    const eligible = found.messages.filter(message => message.seq < before)
+    const messages = eligible.slice(-80)
+    return { ...found, messages, nextCursor: eligible.length > 80 ? String(messages[0]!.seq) : undefined }
   },
   async deleteSession(id) {
     const index = sessions.findIndex((item) => item.id === id)

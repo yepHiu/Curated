@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import { onKeyStroke } from "@vueuse/core"
 import { PanelLeft, Plus, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
-import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIEntityCandidateDTO } from "@/api/types"
+import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIChatStoredMessageDTO, AIEntityCandidateDTO } from "@/api/types"
 import { agentPageContext } from "@/lib/agent-page-context"
 import { restoreChatHistory } from "./restore-history"
 import { isAgentProcessTool } from "@/lib/agent-tool-labels"
@@ -51,9 +51,13 @@ const mentions = ref<AgentMention[]>([])
 const omittedContext = ref<string[]>([])
 const streaming = ref(false)
 const loadingSession = ref(false)
+const loadingOlder = ref(false)
+const historyCursor = ref("")
+let storedHistory: AIChatStoredMessageDTO[] = []
+let historyEntryIds = new Set<string>()
 const providerUnconfigured = ref(false)
 const errorMessage = ref("")
-const threadRef = ref<{ scrollToEnd: () => void } | null>(null)
+const threadRef = ref<{ scrollToEnd: () => void; captureAnchor?: () => (() => void) } | null>(null)
 const composerRef = ref<{ focus: () => void; mentionOpen?: boolean; closeMentions?: () => void } | null>(null)
 
 let abortController: AbortController | null = null
@@ -120,11 +124,51 @@ async function scrollListToEnd() {
 }
 
 function persistSessionId(id: string) {
+  if (sessionId.value !== id) resetHistoryPage()
   sessionId.value = id
   if (id) {
     localStorage.setItem(SESSION_STORAGE_KEY, id)
   } else {
     localStorage.removeItem(SESSION_STORAGE_KEY)
+  }
+}
+
+function resetHistoryPage() {
+  historyCursor.value = ""
+  loadingOlder.value = false
+  storedHistory = []
+  historyEntryIds = new Set()
+}
+
+async function loadOlder() {
+  if (!historyCursor.value || loadingOlder.value || loadingSession.value || streaming.value) return
+  const seq = sessionLoadSeq
+  const id = sessionId.value
+  loadingOlder.value = true
+  errorMessage.value = ""
+  try {
+    const page = await aiService.getSession(id, historyCursor.value)
+    if (seq !== sessionLoadSeq || id !== sessionId.value) return
+    const restoreAnchor = threadRef.value?.captureAnchor?.()
+    const known = new Set(storedHistory.map(message => message.id))
+    storedHistory = [...page.messages.filter(message => !known.has(message.id)), ...storedHistory]
+    const live = entries.value.filter(entry => !historyEntryIds.has(entry.id))
+    const previous = new Map(entries.value.map(entry => [entry.id, entry]))
+    const restored = restoreChatHistory(storedHistory)
+    for (const entry of restored) {
+      const old = previous.get(entry.id)
+      if (entry.kind === "resolution" && old?.kind === "resolution") entry.selected = old.selected
+      if (entry.kind === "process" && old?.kind === "process") entry.open = old.open
+    }
+    historyEntryIds = new Set(restored.map(entry => entry.id))
+    entries.value = [...restored, ...live]
+    historyCursor.value = page.nextCursor ?? ""
+    await nextTick()
+    restoreAnchor?.()
+  } catch {
+    if (seq === sessionLoadSeq) errorMessage.value = t("agentWindow.historyLoadFailed")
+  } finally {
+    if (seq === sessionLoadSeq) loadingOlder.value = false
   }
 }
 
@@ -153,6 +197,7 @@ async function refreshSessions() {
 
 async function loadSession(id: string) {
   abandonStream()
+  resetHistoryPage()
   const loadSeq = ++sessionLoadSeq
   loadingSession.value = true
   persistSessionId(id)
@@ -163,6 +208,9 @@ async function loadSession(id: string) {
     const detail = await aiService.getSession(id)
     if (loadSeq !== sessionLoadSeq) return
     entries.value = restoreChatHistory(detail.messages)
+    storedHistory = detail.messages
+    historyEntryIds = new Set(entries.value.map(entry => entry.id))
+    historyCursor.value = detail.nextCursor ?? ""
   } catch {
     if (loadSeq !== sessionLoadSeq) return
     entries.value = []
@@ -393,7 +441,7 @@ function abandonStream() {
 
 async function send(selected?: AIEntityCandidateDTO) {
   const content = draft.value.trim()
-  if (!content || streaming.value || loadingSession.value) return
+  if (!content || streaming.value || loadingSession.value || loadingOlder.value) return
   draft.value = ""
   const activeMentions = mentions.value
   mentions.value = []
@@ -688,6 +736,10 @@ watch(
           </div>
           <div class="relative flex min-h-0 flex-1 flex-col">
             <AgentChatThread
+              :has-older="Boolean(historyCursor)"
+              :loading-older="loadingOlder"
+              :history-disabled="streaming || loadingSession"
+              @load-older="loadOlder"
               ref="threadRef"
               :entries="entries"
               :provider-unconfigured="providerUnconfigured"
@@ -723,7 +775,7 @@ watch(
                 v-model="draft"
                 v-model:mentions="mentions"
                 :streaming="streaming"
-                :disabled="loadingSession"
+                :disabled="loadingSession || loadingOlder"
                 @send="send"
                 @stop="stop"
               />
