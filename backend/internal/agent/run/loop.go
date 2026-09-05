@@ -75,6 +75,14 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			messages = append(messages, llm.ChatMessage{Role: "system", Content: prompts.StepLimitNudge()})
 			choice = "none"
 		}
+		if estimatedRequestTokens(messages, tools) > requestTokenEstimateBudget {
+			status := "needs_input"
+			if steps > 0 {
+				status = "partial"
+			}
+			emitDone(status, "The context budget was reached. Narrow the request or start a new conversation; completed results remain available.", false)
+			return nil
+		}
 		turn, err := l.streamer.StreamTurn(ctx, llm.TurnRequest{
 			Messages:   messages,
 			Tools:      tools,
@@ -333,12 +341,12 @@ func (l *Loop) toolSpecs() []llm.ToolSpec {
 }
 
 func buildMessages(history []llm.ChatMessage, page *contracts.AIChatContext, locale string) []llm.ChatMessage {
-	trimmed := history
-	if len(trimmed) > maxRecentMessages {
-		trimmed = trimmed[len(trimmed)-maxRecentMessages:]
-	}
+	trimmed, omitted := boundedHistory(history)
 	out := make([]llm.ChatMessage, 0, len(trimmed)+1)
 	out = append(out, llm.ChatMessage{Role: "system", Content: prompts.SystemPrompt(locale, page)})
+	if omitted {
+		out[0].Content += "\nEarlier conversation messages were omitted to fit the context budget. Do not assume missing facts or permissions; ask for clarification when needed."
+	}
 	out = append(out, trimmed...)
 	return out
 }
