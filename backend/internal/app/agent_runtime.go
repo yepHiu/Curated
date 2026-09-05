@@ -23,6 +23,7 @@ import (
 )
 
 type agentRuntime struct {
+	applyMu sync.Mutex
 	once    sync.Once
 	gateway *core.Gateway
 }
@@ -128,6 +129,9 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 			assistant.WriteString(ev.Delta)
 		case "tool_call_result", "movie_cards", "message_done", "confirm_required":
 			stored := ev
+			if stored.ConfirmToken != "" {
+				stored.ReceiptID = storage.NewAIApplyReceiptKey(stored.ConfirmToken, session.ID, stored.Name, "").TokenHash
+			}
 			// History is evidence, never a source of write authority.
 			stored.ConfirmToken = ""
 			stored.Arguments = nil
@@ -240,6 +244,9 @@ func (a *App) GetAIChatSession(ctx context.Context, id string, cursor ...string)
 	}
 	if messages == nil {
 		messages = []contracts.AIChatStoredMessageDTO{}
+	}
+	if err := a.store.RestoreAIReceiptStates(ctx, id, messages); err != nil {
+		return contracts.AIChatSessionDetailDTO{}, err
 	}
 	return contracts.AIChatSessionDetailDTO{AIChatSessionDTO: session, Messages: messages, NextCursor: nextCursor}, nil
 }

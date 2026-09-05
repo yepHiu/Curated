@@ -432,6 +432,8 @@ export interface AIAgentMovieCardDTO {
 
 /** Persisted result events; confirmation tokens are deliberately not stored. */
 export interface AIChatStoredEventDTO {
+  receiptId?: string
+  applied?: boolean
   type: string
   toolCallId?: string
   name?: string
@@ -525,6 +527,8 @@ export interface AIToolApplyRequestBody {
 }
 
 export interface AIToolApplyDTO {
+  /** Existing committed result; data is a historical snapshot. */
+  replayed?: boolean
   ok: boolean
   name: string
   data?: unknown

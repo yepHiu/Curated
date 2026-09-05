@@ -5,6 +5,12 @@ import type { AIChatStoredMessageDTO } from "@/api/types"
 const base = { id: "reply", sessionId: "s1", role: "assistant", seq: 2, createdAt: "", content: "partial answer" }
 
 describe("persisted AI turns", () => {
+  it("restores committed confirmations without granting write authority", () => {
+    const entries = restoreChatHistory([{ ...base, events: [
+      { type: "confirm_required", name: "save_movie_comment", receiptId: "hash", applied: true },
+    ] }])
+    expect(entries.find(e => e.kind === "confirm")).toMatchObject({ status: "applied", confirmToken: "", arguments: {} })
+  })
   it("restores failed tools, candidates and terminal outcome without reviving write authority", () => {
     const message: AIChatStoredMessageDTO = { ...base, events: [
       { type: "tool_call_result", name: "search_movies", toolCallId: "t1", ok: false },

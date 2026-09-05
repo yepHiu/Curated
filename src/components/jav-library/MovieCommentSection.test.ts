@@ -201,7 +201,7 @@ describe("MovieCommentSection", () => {
     expect(wrapper.find("[data-comment-ai-actions]").exists()).toBe(false)
   })
 
-  it("previews a polish action then applies through the confirm API", async () => {
+  it.each([false, true])("previews a polish action and preserves current data on replay=%s", async (replayed) => {
     const { useExperimentalAgent } = await import("@/lib/experimental-agent")
     useExperimentalAgent().setEnabled(true)
     aiMocks.runAction.mockResolvedValue({
@@ -214,6 +214,7 @@ describe("MovieCommentSection", () => {
       arguments: { movieId: "movie-1", body: "polished note" },
     })
     aiMocks.confirmTool.mockResolvedValue({
+      replayed,
       ok: true,
       name: "save_movie_comment",
       data: { body: "polished note", updatedAt: "2026-08-21T00:00:00Z" },
@@ -227,10 +228,13 @@ describe("MovieCommentSection", () => {
       movieId: "movie-1",
       body: "saved note",
     }, expect.any(AbortSignal))
+    serviceMocks.getMovieComment.mockResolvedValue({ body: "later manual note", updatedAt: "2026-09-05T00:00:00Z" })
     await wrapper.get("[data-comment-ai-apply]").trigger("click")
     await flushPromises()
     expect(aiMocks.confirmTool).toHaveBeenCalled()
-    expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe("polished note")
+    expect((wrapper.get("textarea").element as HTMLTextAreaElement).value).toBe(replayed ? "later manual note" : "polished note")
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(serviceMocks.putMovieComment).not.toHaveBeenCalled()
     useExperimentalAgent().setEnabled(false)
   })
 })

@@ -97,6 +97,9 @@ func (s *SQLiteStore) UpsertMovieComment(ctx context.Context, movieID string, bo
 	if err != nil {
 		return contracts.MovieCommentDTO{}, err
 	}
+	if err := saveAIApplyReceiptTx(ctx, tx, contracts.MovieCommentDTO{Body: body, UpdatedAt: now}); err != nil {
+		return contracts.MovieCommentDTO{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return contracts.MovieCommentDTO{}, err
 	}

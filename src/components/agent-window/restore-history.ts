@@ -38,7 +38,7 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
           trailing.push({ id, kind: "outcome", outcome: event.outcome })
         } else if (event.type === "confirm_required") {
           trailing.push({ id, kind: "confirm", name: event.name || "", changes: event.changes ?? [],
-            confirmToken: "", arguments: {}, sessionId: message.sessionId, status: "archived" })
+            confirmToken: "", arguments: {}, sessionId: message.sessionId, status: event.applied ? "applied" : "archived" })
         }
       }
       flush(message.id)

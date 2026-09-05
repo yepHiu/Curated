@@ -160,6 +160,7 @@ async function runDisplayAction(name: DisplayActionName) {
 
 async function applyDisplayPreview() {
   const current = preview.value
+  const movieId = props.movie.id
   if (!current?.confirmToken || !current.sessionId) {
     previewOpen.value = false
     return
@@ -167,17 +168,19 @@ async function applyDisplayPreview() {
   aiBusyField.value = fieldForDisplayAction(current.action)
   movieEditError.value = ""
   try {
-    await aiService.confirmTool({
+    const applied = await aiService.confirmTool({
       sessionId: current.sessionId,
       name: current.name,
-      arguments: current.arguments ?? { movieId: props.movie.id },
+      arguments: current.arguments ?? { movieId },
       confirmToken: current.confirmToken,
     })
-    await libraryService.loadMovieDetail(props.movie.id)
+    const latest = await libraryService.loadMovieDetail(movieId)
+    if (props.movie.id !== movieId || preview.value !== current) return
+    if (applied.replayed && !latest) throw new Error(t("detailPanel.movieAiApplyError"))
     if (current.action === "translate_title") {
-      editDraftTitle.value = current.proposedText ?? editDraftTitle.value
+      editDraftTitle.value = (applied.replayed ? latest?.title : current.proposedText) ?? editDraftTitle.value
     } else if (current.action === "translate_summary") {
-      editDraftSummary.value = current.proposedText ?? editDraftSummary.value
+      editDraftSummary.value = (applied.replayed ? latest?.summary : current.proposedText) ?? editDraftSummary.value
     }
     previewOpen.value = false
     preview.value = null

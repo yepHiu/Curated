@@ -87,7 +87,7 @@ describe("MovieEditDialog AI actions", () => {
     expect(wrapper.find("[data-movie-edit-ai-translate]").exists()).toBe(false)
   })
 
-  it("previews a summary translation then applies through confirm", async () => {
+  it.each([false, true])("applies summary translation and reloads current text on replay=%s", async (replayed) => {
     const { useExperimentalAgent } = await import("@/lib/experimental-agent")
     useExperimentalAgent().setEnabled(true)
     aiMocks.runAction.mockResolvedValue({
@@ -99,8 +99,8 @@ describe("MovieEditDialog AI actions", () => {
       confirmToken: "cfm_1",
       arguments: { movieId: "m1", userSummary: "Localized plot." },
     })
-    aiMocks.confirmTool.mockResolvedValue({ ok: true, name: "update_movie_display_overrides" })
-    libraryMocks.loadMovieDetail.mockResolvedValue(movie)
+    aiMocks.confirmTool.mockResolvedValue({ ok: true, name: "update_movie_display_overrides", replayed })
+    libraryMocks.loadMovieDetail.mockResolvedValue({ ...movie, summary: "Later manual summary" })
     const wrapper = mountDialog()
     expect(wrapper.get("[data-movie-edit-summary-field]").find("[data-movie-edit-ai-translate-summary]").exists()).toBe(true)
     await wrapper.get("[data-movie-edit-ai-translate-summary]").trigger("click")
@@ -115,6 +115,8 @@ describe("MovieEditDialog AI actions", () => {
     await flushPromises()
     expect(aiMocks.confirmTool).toHaveBeenCalled()
     expect(libraryMocks.loadMovieDetail).toHaveBeenCalledWith("m1")
+    expect((wrapper.get("[data-movie-edit-summary-field] textarea").element as HTMLTextAreaElement).value)
+      .toBe(replayed ? "Later manual summary" : "Localized plot.")
     useExperimentalAgent().setEnabled(false)
   })
 

@@ -222,6 +222,7 @@ async function polishComment() {
 
 async function applyCommentPreview() {
   const current = preview.value
+  const movieId = props.movieId
   if (!current?.confirmToken || !current.sessionId) {
     previewOpen.value = false
     return
@@ -232,10 +233,13 @@ async function applyCommentPreview() {
     const applied = await aiService.confirmTool({
       sessionId: current.sessionId,
       name: current.name,
-      arguments: current.arguments ?? { movieId: props.movieId, body: current.proposedText },
+      arguments: current.arguments ?? { movieId, body: current.proposedText },
       confirmToken: current.confirmToken,
     })
-    const data = applied.data as { body?: string; updatedAt?: string } | undefined
+    const data = applied.replayed
+      ? await libraryService.getMovieComment(movieId)
+      : applied.data as { body?: string; updatedAt?: string } | undefined
+    if (props.movieId !== movieId || preview.value !== current) return
     const body = data?.body ?? current.proposedText ?? ""
     draft.value = body
     lastSavedBody.value = body

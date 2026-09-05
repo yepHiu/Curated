@@ -73,7 +73,12 @@ func (s *SQLiteStore) ListAIChatSessions(ctx context.Context, limit int) ([]cont
 }
 
 func (s *SQLiteStore) DeleteAIChatSession(ctx context.Context, id string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM ai_chat_sessions WHERE id = ?`, id)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM ai_chat_sessions WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -81,7 +86,10 @@ func (s *SQLiteStore) DeleteAIChatSession(ctx context.Context, id string) error 
 	if n == 0 {
 		return fmt.Errorf("ai chat session not found")
 	}
-	return nil
+	if _, err := tx.ExecContext(ctx, `DELETE FROM ai_apply_receipts WHERE session_id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *SQLiteStore) AppendAIChatMessage(ctx context.Context, sessionID, role, content, toolName, toolCallID string, events ...contracts.AIChatSSEEvent) (contracts.AIChatStoredMessageDTO, error) {

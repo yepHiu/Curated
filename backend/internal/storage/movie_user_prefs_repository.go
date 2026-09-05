@@ -155,6 +155,9 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 		// Tag replace paths already verified movie exists when they ran
 	}
 
+	if err := saveAIDisplayReceiptTx(ctx, tx, movieID, patch); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}

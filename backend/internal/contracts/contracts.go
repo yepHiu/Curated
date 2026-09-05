@@ -1177,13 +1177,16 @@ type AIToolApplyRequest struct {
 
 // AIToolApplyDTO is returned after a confirmed write.
 type AIToolApplyDTO struct {
-	OK   bool   `json:"ok"`
-	Name string `json:"name"`
-	Data any    `json:"data,omitempty"`
+	Replayed bool   `json:"replayed,omitempty"`
+	OK       bool   `json:"ok"`
+	Name     string `json:"name"`
+	Data     any    `json:"data,omitempty"`
 }
 
 // AIChatSSEEvent is one server-sent event on POST /api/ai/chat.
 type AIChatSSEEvent struct {
+	ReceiptID    string                    `json:"receiptId,omitempty"`
+	Applied      bool                      `json:"applied,omitempty"`
 	Type         string                    `json:"type"`
 	SessionID    string                    `json:"sessionId,omitempty"`
 	MessageID    string                    `json:"messageId,omitempty"`

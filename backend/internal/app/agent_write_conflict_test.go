@@ -102,8 +102,8 @@ func TestAIWritePreviewRejectsInterveningEdit(t *testing.T) {
 			if result, err := a.ApplyAITool(ctx, request); err != nil || !result.OK {
 				t.Fatalf("fresh preview cannot apply: %+v %v", result, err)
 			}
-			if _, err := a.ApplyAITool(ctx, request); err == nil {
-				t.Fatal("successful ticket reused")
+			if replay, err := a.ApplyAITool(ctx, request); err != nil || !replay.OK {
+				t.Fatalf("cannot recover successful receipt: %+v %v", replay, err)
 			}
 		})
 	}

@@ -12,6 +12,7 @@ import (
 	"curated-backend/internal/agent/prompts"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/llm"
+	"curated-backend/internal/storage"
 )
 
 type commentCompleter interface {
@@ -140,7 +141,37 @@ func (a *App) ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest)
 	if len(args) == 0 {
 		args = json.RawMessage(`{}`)
 	}
-	result := a.ensureAgentGateway().Invoke(ctx, core.Call{
+	gw := a.ensureAgentGateway()
+	if def, ok := gw.Registry().Get(name); ok && def.NormalizeArgs != nil {
+		var err error
+		args, err = def.NormalizeArgs(args)
+		if err != nil {
+			return contracts.AIToolApplyDTO{}, err
+		}
+	}
+	// Serialize only confirmations; reads and model generation remain concurrent.
+	a.agentRT.applyMu.Lock()
+	defer a.agentRT.applyMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return contracts.AIToolApplyDTO{}, err
+	}
+	key := storage.NewAIApplyReceiptKey(strings.TrimSpace(req.ConfirmToken), sessionID, name, core.HashArgs(args))
+	if a.store != nil {
+		receipt, found, err := a.store.GetAIApplyReceipt(ctx, key)
+		if err != nil {
+			return contracts.AIToolApplyDTO{}, err
+		}
+		if found {
+			receipt.Replayed = true
+			return receipt, nil
+		}
+	}
+	// An accepted confirmation finishes within a deadline even if its response
+	// connection disappears; the write and its receipt commit atomically.
+	applyCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), core.WriteTimeout)
+	defer cancel()
+	applyCtx = storage.WithAIApplyReceipt(applyCtx, key)
+	result := gw.Invoke(applyCtx, core.Call{
 		Name:       name,
 		Args:       args,
 		SessionID:  sessionID,
@@ -148,6 +179,15 @@ func (a *App) ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest)
 		ConfirmTok: strings.TrimSpace(req.ConfirmToken),
 		Sanitize:   core.SanitizeFull,
 	})
+	if a.store != nil {
+		receipt, found, err := a.store.GetAIApplyReceipt(applyCtx, key)
+		if err != nil {
+			return contracts.AIToolApplyDTO{}, err
+		}
+		if found {
+			return receipt, nil
+		}
+	}
 	if result.Error != nil {
 		return contracts.AIToolApplyDTO{}, result.Error
 	}
