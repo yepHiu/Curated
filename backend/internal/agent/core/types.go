@@ -140,6 +140,9 @@ type AuditSink interface {
 // Settings controls permission overlay switches. Zero value is the safe default:
 // writes disabled, preview still allowed, MCP read-only.
 type Settings struct {
+	Disabled           bool
+	ReadOnly           bool
+	GlobalWriteLimit   bool
 	WriteEnabled       bool
 	LowRiskDirectWrite bool
 	MCPWriteExposed    bool

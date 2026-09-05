@@ -42,6 +42,7 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 	}
 
 	a.aiProviderMu.Lock()
+	defer a.aiProviderMu.Unlock()
 	target := a.cfg.AIProvider
 	if p.Kind != nil {
 		target.Kind = *p.Kind
@@ -57,10 +58,8 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 	}
 	normalized, err := normalizeAIProviderConfig(target)
 	if err != nil {
-		a.aiProviderMu.Unlock()
 		return err
 	}
-	a.aiProviderMu.Unlock()
 
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
 		provider := map[string]any{
@@ -76,9 +75,7 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 	}); err != nil {
 		return err
 	}
-	a.aiProviderMu.Lock()
 	a.cfg.AIProvider = normalized
-	a.aiProviderMu.Unlock()
 	return nil
 }
 
@@ -86,7 +83,15 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 // config (when override is non-nil) or the persisted config, reporting latency.
 // The response always carries OK=false on failure instead of an HTTP error so the
 // settings UI can render the message, matching the proxy ping contract.
-func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) contracts.AIProviderTestResponse {
+func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) (result contracts.AIProviderTestResponse) {
+	ctx, observation, finish := a.beginAIRun(ctx, "test", "")
+	defer func() {
+		var failure error
+		if !result.OK {
+			failure = llm.ErrInvalidConfig
+		}
+		finish(failure)
+	}()
 	cfg := a.currentAIProviderConfig()
 	if override != nil {
 		cfg = config.AIProviderConfig{
@@ -96,6 +101,8 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 			Model:   override.Model,
 		}
 	}
+	observation.row.Model = cfg.Model
+	observation.row.Provider = config.NormalizeAIProviderKind(cfg.Kind)
 	normalized, err := normalizeAIProviderConfig(cfg)
 	if err != nil {
 		return contracts.AIProviderTestResponse{OK: false, Message: err.Error()}
@@ -109,11 +116,13 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 	defer cancel()
 
 	start := time.Now()
-	_, err = llm.NewClient(llm.ClientConfig{
+	completer := llm.NewClient(llm.ClientConfig{
 		BaseURL: normalized.BaseURL,
 		APIKey:  normalized.APIKey,
 		Model:   normalized.Model,
-	}, client).Complete(testCtx, []llm.ChatMessage{
+	}, client)
+	completer.Observe = observation.observe
+	_, err = completer.Complete(testCtx, []llm.ChatMessage{
 		{Role: "user", Content: "Reply with only the word pong."},
 	}, aiProviderTestOutputLimit)
 	latency := time.Since(start).Milliseconds()

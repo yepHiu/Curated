@@ -149,6 +149,20 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 			return fmt.Errorf("library settings %q: %w", path, err)
 		}
 	}
+	if v, ok := m["aiGovernance"]; ok {
+		value := DefaultAIGovernance()
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("aiGovernance: %w", err)
+		}
+		if err := value.Validate(); err != nil {
+			return err
+		}
+		cfg.AIGovernance = &value
+	}
 	if v, ok := m["logDir"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

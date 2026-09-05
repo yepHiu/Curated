@@ -34,7 +34,7 @@ func TestAIWritePreviewRejectsInterveningEdit(t *testing.T) {
 			if err := store.PatchMovieUserPrefs(ctx, movie.MovieID, contracts.PatchMovieInput{UserTitleSet: true, UserTitle: "old title", UserSummarySet: true, UserSummary: "old summary"}); err != nil {
 				t.Fatal(err)
 			}
-			a := &App{store: store}
+			a := &App{store: store, cfg: enabledAITestConfig()}
 			tool := core.UpdateMovieDisplayOverridesName
 			args := map[string]string{"movieId": movie.MovieID}
 			switch field {

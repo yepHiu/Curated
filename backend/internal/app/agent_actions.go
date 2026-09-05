@@ -20,11 +20,21 @@ type commentCompleter interface {
 }
 
 // RunAIAction runs a single-shot action preset (E3 write-preview or read-only narrative).
-func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
+func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (preview contracts.AIActionPreviewDTO, retErr error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+	ctx, observation, finish := a.beginAIRun(ctx, "action", name)
+	defer func() {
+		if preview.SessionID != "" {
+			observation.row.SessionID = preview.SessionID
+		}
+		finish(retErr)
+	}()
 	if !prompts.KnownAction(name) {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
+	}
+	if err := a.aiPermission(name != prompts.ActionInsightsNarrative); err != nil {
+		return preview, err
 	}
 	cfg, err := normalizeAIProviderConfig(a.currentAIProviderConfig())
 	if err != nil {
@@ -33,6 +43,7 @@ func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActi
 	if strings.TrimSpace(cfg.BaseURL) == "" || strings.TrimSpace(cfg.Model) == "" {
 		return contracts.AIActionPreviewDTO{}, ErrAIProviderNotConfigured
 	}
+	observation.row.Model = cfg.Model
 	client, err := newAIHTTPClient(a.currentProxyConfig(), 0)
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
@@ -42,6 +53,7 @@ func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActi
 		APIKey:  cfg.APIKey,
 		Model:   cfg.Model,
 	}, client)
+	completer.Observe = observation.observe
 	switch {
 	case prompts.IsCommentAction(name):
 		return a.runCommentAction(ctx, completer, name, req)
@@ -126,6 +138,10 @@ func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, 
 
 // ApplyAITool consumes a confirm token and applies the previewed write.
 func (a *App) ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest) (contracts.AIToolApplyDTO, error) {
+	if err := a.aiPermission(true); err != nil {
+		a.auditAIDeniedApply(ctx, req, err)
+		return contracts.AIToolApplyDTO{}, err
+	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return contracts.AIToolApplyDTO{}, fmt.Errorf("name is required")
@@ -152,6 +168,10 @@ func (a *App) ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest)
 	// Serialize only confirmations; reads and model generation remain concurrent.
 	a.agentRT.applyMu.Lock()
 	defer a.agentRT.applyMu.Unlock()
+	if err := a.aiPermission(true); err != nil {
+		a.auditAIDeniedApply(ctx, req, err)
+		return contracts.AIToolApplyDTO{}, err
+	}
 	if err := ctx.Err(); err != nil {
 		return contracts.AIToolApplyDTO{}, err
 	}
@@ -354,12 +374,13 @@ func (a *App) runInsightsNarrative(ctx context.Context, completer commentComplet
 
 func (a *App) collectInsightsActionPayload(ctx context.Context, sessionID, rangeValue, timezone string) (string, error) {
 	gw := a.ensureAgentGateway()
+	projection := a.aiProjection(a.currentAIProviderConfig().BaseURL)
 	overview := gw.Invoke(ctx, core.Call{
 		Name:      "get_insights_overview",
 		Args:      mustJSON(map[string]string{"range": rangeValue, "timezone": timezone}),
 		SessionID: sessionID,
 		Channel:   core.ChannelAction,
-		Sanitize:  core.SanitizeFull,
+		Sanitize:  projection,
 	})
 	if overview.Error != nil {
 		return "", fmt.Errorf("%s", overview.Error.Message)
@@ -376,7 +397,7 @@ func (a *App) collectInsightsActionPayload(ctx context.Context, sessionID, range
 			}),
 			SessionID: sessionID,
 			Channel:   core.ChannelAction,
-			Sanitize:  core.SanitizeFull,
+			Sanitize:  projection,
 		})
 		if result.Error != nil {
 			return "", fmt.Errorf("%s", result.Error.Message)

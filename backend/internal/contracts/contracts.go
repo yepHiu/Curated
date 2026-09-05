@@ -922,7 +922,8 @@ type SettingsDTO struct {
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
 	// AIProvider is the experimental agent LLM provider configuration (library-config.cfg).
-	AIProvider AIProviderSettingsDTO `json:"aiProvider"`
+	AIProvider   AIProviderSettingsDTO `json:"aiProvider"`
+	AIGovernance *AIGovernanceDTO      `json:"aiGovernance,omitempty"`
 	// BackendLog: file/console log settings persisted in library-config.cfg; restart backend to apply to Zap sinks.
 	BackendLog BackendLogSettingsDTO `json:"backendLog"`
 }

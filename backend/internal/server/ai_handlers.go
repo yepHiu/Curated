@@ -119,6 +119,10 @@ func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		code := contracts.ErrorCodeAIChatFailed
+		var toolErr *core.ToolError
+		if errors.As(err, &toolErr) {
+			code = toolErr.Code
+		}
 		if errors.Is(err, llm.ErrInvalidConfig) {
 			code = contracts.ErrorCodeAIProviderUnavailable
 		}
@@ -286,6 +290,10 @@ func (h *Handler) handleAIConfirm(w http.ResponseWriter, r *http.Request) {
 
 func writeAIActionError(w http.ResponseWriter, err error) {
 	var toolErr *core.ToolError
+	if errors.As(err, &toolErr) && (toolErr.Code == "AI_DISABLED" || toolErr.Code == "AI_READ_ONLY" || toolErr.Code == "AI_TOOL_PERMISSION_DENIED") {
+		writeAppError(w, http.StatusForbidden, toolErr.Code, toolErr.Message)
+		return
+	}
 	if errors.As(err, &toolErr) && toolErr.Code == "AI_WRITE_CONFLICT" {
 		writeAppError(w, http.StatusConflict, toolErr.Code, toolErr.Message)
 		return

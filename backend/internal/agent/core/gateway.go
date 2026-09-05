@@ -82,6 +82,10 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		return fail(ErrToolNotFound, "AI_TOOL_NOT_FOUND", "unknown tool"), "", ResultRejected, "AI_TOOL_NOT_FOUND"
 	}
 	settings := g.settings()
+	writeBudgetKey := call.SessionID
+	if settings.GlobalWriteLimit {
+		writeBudgetKey = "_global"
+	}
 
 	if def.NormalizeArgs != nil {
 		normalized, err := def.NormalizeArgs(call.Args)
@@ -105,12 +109,15 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		return fail(ErrPermissionDenied, code, err.Error()), def.Permission, ResultRejected, code
 	}
 
-	step := g.budget.addStep(call.SessionID)
-	if step > settings.stepLimit() {
-		return fail(ErrRateLimited, "AI_RATE_LIMITED", "tool step limit reached"), def.Permission, ResultRejected, "AI_RATE_LIMITED"
+	// Human confirmation is outside the model's per-turn tool budget.
+	if !apply {
+		step := g.budget.addStep(call.SessionID)
+		if step > settings.stepLimit() {
+			return fail(ErrRateLimited, "AI_RATE_LIMITED", "tool step limit reached"), def.Permission, ResultRejected, "AI_RATE_LIMITED"
+		}
 	}
 	if apply {
-		if g.budget.writeCount(call.SessionID, g.now()) >= settings.writePerMinute() {
+		if g.budget.writeCount(writeBudgetKey, g.now()) >= settings.writePerMinute() {
 			return fail(ErrRateLimited, "AI_RATE_LIMITED", "write rate limit reached"), def.Permission, ResultRejected, "AI_RATE_LIMITED"
 		}
 	}
@@ -155,7 +162,7 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		}
 	}
 	if apply {
-		g.budget.addWrite(call.SessionID, g.now())
+		g.budget.addWrite(writeBudgetKey, g.now())
 	}
 
 	raw.Data = Project(raw.Data, call.Sanitize)

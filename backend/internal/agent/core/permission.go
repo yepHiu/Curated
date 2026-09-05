@@ -6,6 +6,12 @@ import (
 )
 
 func allowCall(def ToolDefinition, call Call, settings Settings) error {
+	if settings.Disabled {
+		return fmt.Errorf("AI is disabled")
+	}
+	if settings.ReadOnly && def.Permission != PermissionRead {
+		return fmt.Errorf("AI is read-only")
+	}
 	token := strings.TrimSpace(call.ConfirmTok)
 	switch def.Permission {
 	case PermissionRead:

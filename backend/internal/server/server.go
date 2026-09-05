@@ -529,6 +529,11 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/ai/sessions/{sessionId}", h.handleDeleteAIChatSession)
 	mux.HandleFunc("POST /api/ai/actions/{name}", h.handleAIAction)
 	mux.HandleFunc("POST /api/ai/confirm", h.handleAIConfirm)
+	mux.HandleFunc("GET /api/ai/settings", h.handleAIGovernance)
+	mux.HandleFunc("PATCH /api/ai/settings", h.handleAIGovernance)
+	mux.HandleFunc("GET /api/ai/usage", h.handleAIReport)
+	mux.HandleFunc("GET /api/ai/audit", h.handleAIAudit)
+	mux.HandleFunc("POST /api/ai/cleanup", h.handleAICleanup)
 
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
@@ -1893,6 +1898,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	}
 	if h.aiSettingsCtl != nil {
 		dto.AIProvider = h.aiSettingsCtl.AIProviderSettings()
+	}
+	if p, ok := h.aiChatProvider.(AIGovernanceProvider); ok {
+		settings := p.AIGovernanceSettings()
+		dto.AIGovernance = &settings
 	}
 	if h.backendLogCtl != nil {
 		dto.BackendLog = h.backendLogCtl.BackendLogSettings()

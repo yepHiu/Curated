@@ -23,9 +23,11 @@ import (
 )
 
 type agentRuntime struct {
-	applyMu sync.Mutex
-	once    sync.Once
-	gateway *core.Gateway
+	runsMu     sync.Mutex
+	activeRuns map[string]context.CancelFunc
+	applyMu    sync.Mutex
+	once       sync.Once
+	gateway    *core.Gateway
 }
 
 type agentAuditSink struct {
@@ -33,16 +35,25 @@ type agentAuditSink struct {
 }
 
 func (s agentAuditSink) RecordInvocation(ctx context.Context, rec core.AuditRecord) error {
+	if run, ok := ctx.Value(aiRunContextKey{}).(*aiRunObservation); ok {
+		run.row.ToolCalls++
+		run.row.SessionID = rec.SessionID
+		if rec.ErrorCode != "" && run.row.ErrorCode == "" {
+			run.row.ErrorCode = rec.ErrorCode
+		}
+	}
 	if s.store == nil {
 		return nil
 	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	return s.store.InsertAIToolInvocation(
 		ctx,
 		rec.Channel,
 		rec.SessionID,
 		rec.ToolName,
 		rec.Permission,
-		rec.ArgsSummary,
+		"", // New audit records contain metadata only, never user text or arguments.
 		rec.Result,
 		rec.ErrorCode,
 		rec.DurationMs,
@@ -56,7 +67,8 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 			a.logger.Warn("register agent query tools failed")
 		}
 		gw := core.NewGateway(reg, core.NewConfirmStore(), agentAuditSink{store: a.store}, func() core.Settings {
-			return core.Settings{}
+			cfg := a.AIGovernanceSettings()
+			return core.Settings{Disabled: !cfg.Enabled, ReadOnly: cfg.ReadOnly, GlobalWriteLimit: true, StepLimit: cfg.StepLimit, WritePerMinute: cfg.WritePerMinute}
 		})
 		if err := tools.RegisterPresentTools(reg, gw.MovieRefs()); err != nil && a.logger != nil {
 			a.logger.Warn("register agent present tools failed")
@@ -73,13 +85,19 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 }
 
 // StreamAIChat runs one experimental agent turn (E2: read tools + session persistence).
-func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emit func(contracts.AIChatSSEEvent)) error {
+func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emit func(contracts.AIChatSSEEvent)) (retErr error) {
+	ctx, observation, finish := a.beginAIRun(ctx, "chat", "")
+	defer func() { finish(retErr) }()
 	cfg, err := normalizeAIProviderConfig(a.currentAIProviderConfig())
 	if err != nil {
 		return fmt.Errorf("%w: %v", llm.ErrInvalidConfig, err)
 	}
 	if strings.TrimSpace(cfg.BaseURL) == "" || strings.TrimSpace(cfg.Model) == "" {
 		return ErrAIProviderNotConfigured
+	}
+	observation.row.Model = cfg.Model
+	if err := a.aiPermission(false); err != nil {
+		return err
 	}
 	client, err := newAIHTTPClient(a.currentProxyConfig(), 0)
 	if err != nil {
@@ -90,11 +108,13 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		APIKey:  cfg.APIKey,
 		Model:   cfg.Model,
 	}, client)
+	streamer.Observe = observation.observe
 
 	session, err := a.resolveAIChatSession(ctx, req)
 	if err != nil {
 		return err
 	}
+	observation.row.SessionID = session.ID
 	lastUser := lastAIChatUser(req.Messages)
 	if lastUser == nil {
 		return fmt.Errorf("messages must include at least one user message")
@@ -114,10 +134,13 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	}
 
 	messageID := newAgentID("msg_")
-	loop := run.NewLoop(a.ensureAgentGateway(), streamer, sanitizeModeForProvider(cfg.BaseURL), strings.TrimSpace(req.Locale))
+	loop := run.NewLoop(a.ensureAgentGateway(), streamer, a.aiProjection(cfg.BaseURL), strings.TrimSpace(req.Locale))
 	var assistant strings.Builder
 	var events []contracts.AIChatSSEEvent
 	wrapped := func(ev contracts.AIChatSSEEvent) {
+		if ev.Outcome != nil {
+			observation.row.Status = ev.Outcome.Status
+		}
 		if ev.SessionID == "" {
 			ev.SessionID = session.ID
 		}

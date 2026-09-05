@@ -72,7 +72,8 @@ type Config struct {
 	// Proxy configures HTTP/SOCKS5 proxy for outbound metadata scraping requests. Persisted in library-config.cfg.
 	Proxy ProxyConfig `json:"proxy,omitempty"`
 	// AIProvider configures the experimental agent LLM provider (OpenAI-compatible chat completions). Persisted in library-config.cfg.
-	AIProvider AIProviderConfig `json:"aiProvider,omitempty"`
+	AIProvider   AIProviderConfig    `json:"aiProvider,omitempty"`
+	AIGovernance *AIGovernanceConfig `json:"aiGovernance,omitempty"`
 }
 
 // TaskConfig holds timeout and concurrency settings for background tasks.

@@ -37,7 +37,7 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 				args = map[string]any{"name": "AI view", "filters": map[string]any{"schemaVersion": 1, "mode": "library"}}
 			}
 			encoded, _ := json.Marshal(args)
-			a := &App{store: store}
+			a := &App{store: store, cfg: enabledAITestConfig()}
 			session, err := store.CreateAIChatSession(ctx, "receipt test")
 			if err != nil {
 				t.Fatal(err)
@@ -90,7 +90,7 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			restarted := &App{store: store}
+			restarted := &App{store: store, cfg: enabledAITestConfig()}
 			replay, err := restarted.ApplyAITool(ctx, req)
 			if err != nil {
 				t.Fatal(err)

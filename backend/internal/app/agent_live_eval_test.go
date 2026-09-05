@@ -43,7 +43,7 @@ func TestAILiveSynthetic(t *testing.T) {
 	if err := store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	a := &App{store: store, cfg: config.Config{AIProvider: loaded.AIProvider, Proxy: loaded.Proxy}}
+	a := &App{store: store, cfg: config.Config{AIProvider: loaded.AIProvider, Proxy: loaded.Proxy, AIGovernance: enabledAITestConfig().AIGovernance}}
 	reg := core.NewRegistry()
 	gw := core.NewGateway(reg, nil, nil, nil)
 	for _, register := range []func() error{
