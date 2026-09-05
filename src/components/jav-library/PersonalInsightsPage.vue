@@ -29,6 +29,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIActionRequest } from "@/composables/use-ai-action-request"
 import { useAIService } from "@/services/ai-service"
 import { AIServiceError } from "@/services/contracts/ai-service"
 import { useLibraryService } from "@/services/library-service"
@@ -61,6 +62,7 @@ const breakdownDefinitions: Array<{
 const { t, locale } = useI18n()
 const libraryService = useLibraryService()
 const aiService = useAIService()
+const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
 const { enabled: agentEnabled } = useExperimentalAgent()
 const selectedRange = ref<PersonalInsightsRange>("30d")
 const loading = ref(true)
@@ -201,6 +203,9 @@ async function loadInsights() {
 watch(selectedRange, () => void loadInsights(), { immediate: true })
 onBeforeUnmount(() => { requestSequence += 1 })
 
+watch(selectedRange, cancelAIAction)
+watch(agentEnabled, cancelAIAction)
+
 async function generateNarrative() {
   if (!agentEnabled.value || narrativeBusy.value || !overview.value) {
     return
@@ -212,7 +217,7 @@ async function generateNarrative() {
   narrativeBusy.value = true
   narrativeError.value = ""
   try {
-    const dto = await aiService.runAction("insights_narrative", {
+    const dto = await runAIAction("insights_narrative", {
       range: selectedRange.value,
       timezone,
       locale: locale.value,
@@ -222,6 +227,7 @@ async function generateNarrative() {
       narrativeError.value = t("insights.aiReadoutError")
     }
   } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_CANCELLED") return
     if (err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE") {
       narrativeError.value = t("insights.aiReadoutUnconfigured")
     } else {
@@ -280,6 +286,7 @@ async function generateNarrative() {
             <Sparkles class="size-4" />
             {{ t("insights.aiReadout") }}
           </Button>
+          <Button v-if="aiActionPending" type="button" variant="ghost" size="sm" data-ai-action-cancel @click="cancelAIAction">{{ t("common.cancel") }}</Button>
         </div>
         <p v-if="narrativeError" class="text-sm text-destructive">{{ narrativeError }}</p>
         <Card v-if="narrative" data-insights-ai-narrative class="border-border/70">

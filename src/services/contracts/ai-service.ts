@@ -67,7 +67,7 @@ export interface AIService {
   createSession(title?: string): Promise<AIChatSessionDTO>
   getSession(id: string): Promise<AIChatSessionDetailDTO>
   deleteSession(id: string): Promise<void>
-  runAction(name: string, body: AIActionRequestBody): Promise<AIActionPreviewDTO>
+  runAction(name: string, body: AIActionRequestBody, signal?: AbortSignal): Promise<AIActionPreviewDTO>
   confirmTool(body: AIToolApplyRequestBody): Promise<AIToolApplyDTO>
 }
 

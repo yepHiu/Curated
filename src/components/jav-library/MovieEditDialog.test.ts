@@ -109,7 +109,7 @@ describe("MovieEditDialog AI actions", () => {
       movieId: "m1",
       body: movie.summary,
       locale: "zh-CN",
-    })
+    }, expect.any(AbortSignal))
     expect(aiMocks.runAction).not.toHaveBeenCalledWith("translate_title", expect.anything())
     await wrapper.get("[data-movie-edit-ai-apply]").trigger("click")
     await flushPromises()

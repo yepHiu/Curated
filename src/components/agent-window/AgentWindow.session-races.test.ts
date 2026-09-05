@@ -203,6 +203,24 @@ describe("AgentWindow session request ownership", () => {
     } finally { wrapper.unmount() }
   })
 
+  it("retains partial output and restores the draft after a stream failure", async () => {
+    streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
+      handlers.onDelta("partial answer")
+      throw new Error("connection lost")
+    })
+    const wrapper = mountWindow()
+    try {
+      await flushPromises()
+      await wrapper.find("[data-agent-window-input]").setValue("question")
+      await wrapper.find("[data-agent-window-send]").trigger("click")
+      await flushPromises()
+      const entries = wrapper.findComponent({ name: "AgentChatThread" }).props("entries")
+      expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "assistant", content: "partial answer" })]))
+      expect(wrapper.findComponent({ name: "AgentChatComposer" }).props("modelValue")).toBe("question")
+      expect(wrapper.findComponent({ name: "AgentChatComposer" }).props("streaming")).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+
   it("ignores a delayed new-chat creation after the user selects an existing chat", async () => {
     listSessionsMock.mockResolvedValue(["ses_a", "ses_b"].map(id => ({ id, title: id, createdAt: "", updatedAt: "" })))
     getSessionMock.mockImplementation(async (id: string) => sessionDetail(id))

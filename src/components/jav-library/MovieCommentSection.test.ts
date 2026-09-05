@@ -226,7 +226,7 @@ describe("MovieCommentSection", () => {
     expect(aiMocks.runAction).toHaveBeenCalledWith("polish_comment", {
       movieId: "movie-1",
       body: "saved note",
-    })
+    }, expect.any(AbortSignal))
     await wrapper.get("[data-comment-ai-apply]").trigger("click")
     await flushPromises()
     expect(aiMocks.confirmTool).toHaveBeenCalled()

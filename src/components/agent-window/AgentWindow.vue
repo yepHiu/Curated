@@ -518,11 +518,14 @@ async function send(selected?: AIEntityCandidateDTO) {
       const aiErr = err instanceof AIServiceError ? err : null
       if (aiErr?.code === AI_PROVIDER_UNAVAILABLE_CODE) {
         providerUnconfigured.value = true
-        removeAssistantTurn(assistantId)
       } else {
         errorMessage.value = aiErr?.message ?? (err as Error).message ?? t("agentWindow.errorFallback")
-        removeAssistantTurn(assistantId)
       }
+      const current = entries.value.find((entry) => entry.id === assistantId)
+      if (current?.kind === "assistant" && !current.content && !current.movies?.length) removeAssistantTurn(assistantId)
+      if (!draft.value.trim()) draft.value = content
+      entries.value.push({ id: nextEntryId("outcome"), kind: "outcome",
+        outcome: { status: "failed", reason: errorMessage.value || t("agentWindow.errorFallback"), retryable: true } })
     }
   } finally {
     if (seq === streamSeq) {

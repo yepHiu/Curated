@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIActionRequest } from "@/composables/use-ai-action-request"
 import { useAIService } from "@/services/ai-service"
 import { AIServiceError } from "@/services/contracts/ai-service"
 import { useLibraryService } from "@/services/library-service"
@@ -29,6 +30,7 @@ const open = defineModel<boolean>("open", { required: true })
 
 const { t, locale } = useI18n()
 const aiService = useAIService()
+const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
 const libraryService = useLibraryService()
 const { enabled: agentEnabled } = useExperimentalAgent()
 
@@ -117,6 +119,9 @@ function fieldForDisplayAction(name: string): "title" | "summary" {
   return name === "translate_title" ? "title" : "summary"
 }
 
+watch([() => props.movie.id, open], cancelAIAction)
+watch(agentEnabled, cancelAIAction)
+
 async function runDisplayAction(name: DisplayActionName) {
   if (!showAgentActions.value || aiBusy.value) {
     return
@@ -129,7 +134,7 @@ async function runDisplayAction(name: DisplayActionName) {
   aiBusyField.value = field
   movieEditError.value = ""
   try {
-    const dto = await aiService.runAction(name, {
+    const dto = await runAIAction(name, {
       movieId: props.movie.id,
       body,
       locale: locale.value,
@@ -142,6 +147,7 @@ async function runDisplayAction(name: DisplayActionName) {
     preview.value = dto
     previewOpen.value = true
   } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_CANCELLED") return
     if (err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE") {
       movieEditError.value = t("detailPanel.movieAiUnconfigured")
     } else {
@@ -250,6 +256,7 @@ function discardDisplayPreview() {
                 <Sparkles v-else class="size-4" />
                 {{ t("detailPanel.movieAiTranslateTitle") }}
               </Button>
+          <Button v-if="aiActionPending" type="button" variant="ghost" size="sm" data-ai-action-cancel @click="cancelAIAction">{{ t("common.cancel") }}</Button>
             </div>
           </div>
         </div>

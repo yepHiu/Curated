@@ -9,6 +9,28 @@ import { AIServiceError } from "@/services/contracts/ai-service"
 
 const AI_CHAT_ENDPOINT = "/ai/chat"
 
+function requestDeadline(parent: AbortSignal | undefined, milliseconds: number) {
+  const controller = new AbortController()
+  let timedOut = false
+  let timer: ReturnType<typeof setTimeout>
+  const reset = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => { timedOut = true; controller.abort() }, milliseconds)
+  }
+  const abort = () => controller.abort()
+  if (parent?.aborted) abort()
+  else parent?.addEventListener("abort", abort, { once: true })
+  reset()
+  return {
+    signal: controller.signal, reset,
+    check(error: unknown): never {
+      if (timedOut) throw new AIServiceError("AI request timed out. Please try again.", "AI_TIMEOUT")
+      throw error
+    },
+    dispose() { clearTimeout(timer); parent?.removeEventListener("abort", abort) },
+  }
+}
+
 interface SSEEventPayload {
   type?: string
   delta?: string
@@ -36,6 +58,17 @@ interface SSEEventPayload {
  * 不走 30s 超时的 http-client，用独立 fetch + ReadableStream 逐事件解析。
  */
 async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHandlers) {
+  const deadline = requestDeadline(handlers.signal, 90_000)
+  try {
+    await consumeChat(input, { ...handlers, signal: deadline.signal }, deadline.reset)
+  } catch (err) {
+    return deadline.check(err)
+  } finally {
+    deadline.dispose()
+  }
+}
+
+async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHandlers, received: () => void) {
   const base = resolveApiBaseUrl(import.meta.env)
   let resp: Response
   try {
@@ -52,17 +85,19 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
       signal: handlers.signal,
     })
   } catch (err) {
-    if (handlers.signal?.aborted) return
+    if (handlers.signal?.aborted) throw err
     throw new AIServiceError((err as Error).message ?? "network error")
   }
 
   if (!resp.ok || !resp.body) {
-    throw new AIServiceError(`HTTP ${resp.status}`)
+    const error = await resp.json().catch(() => ({})) as { code?: string; message?: string }
+    throw new AIServiceError(error.message || `HTTP ${resp.status}`, error.code)
   }
 
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
+  let completed = false
 
   const handleEventBlock = (block: string) => {
     const lines = block.split("\n")
@@ -112,6 +147,7 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
         }
         break
       case "message_done":
+        completed = true
         if (payload.outcome) handlers.onOutcome?.(payload.outcome)
         break
       case "movie_cards":
@@ -139,22 +175,41 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
     }
   }
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
+  try {
     for (;;) {
-      const sep = buffer.indexOf("\n\n")
-      if (sep < 0) break
-      const block = buffer.slice(0, sep)
-      buffer = buffer.slice(sep + 2)
-      handleEventBlock(block)
+      const { done, value } = await reader.read()
+      if (done) break
+      received()
+      buffer += decoder.decode(value, { stream: true })
+      buffer = buffer.replace(/\r\n/g, "\n")
+      for (;;) {
+        const sep = buffer.indexOf("\n\n")
+        if (sep < 0) break
+        const block = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+        handleEventBlock(block)
+      }
     }
+    if (buffer.trim()) handleEventBlock(buffer)
+    if (!completed) throw new AIServiceError("The AI response was interrupted. You can send the request again.", "AI_STREAM_INTERRUPTED")
+  } finally {
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
   }
-  if (buffer.trim()) handleEventBlock(buffer)
 }
 
-async function postJSON<T>(path: string, body: unknown): Promise<T> {
+async function postJSON<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const deadline = requestDeadline(signal, 120_000)
+  try {
+    return await fetchJSON<T>(path, body, deadline.signal)
+  } catch (err) {
+    return deadline.check(err)
+  } finally {
+    deadline.dispose()
+  }
+}
+
+async function fetchJSON<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
   const base = resolveApiBaseUrl(import.meta.env)
   let resp: Response
   try {
@@ -163,6 +218,7 @@ async function postJSON<T>(path: string, body: unknown): Promise<T> {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       credentials: "include",
       body: JSON.stringify(body),
+      signal,
     })
   } catch (err) {
     throw new AIServiceError((err as Error).message ?? "network error")
@@ -189,6 +245,6 @@ export const webAIService: AIService = {
   createSession: (title) => api.createAIChatSession(title),
   getSession: (id) => api.getAIChatSession(id),
   deleteSession: (id) => api.deleteAIChatSession(id),
-  runAction: (name, body) => postJSON(`/ai/actions/${encodeURIComponent(name)}`, body),
+  runAction: (name, body, signal) => postJSON(`/ai/actions/${encodeURIComponent(name)}`, body, signal),
   confirmTool: (body) => postJSON("/ai/confirm", body),
 }

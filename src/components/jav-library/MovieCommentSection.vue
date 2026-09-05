@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIActionRequest } from "@/composables/use-ai-action-request"
 import { useAIService } from "@/services/ai-service"
 import { AIServiceError } from "@/services/contracts/ai-service"
 import { useLibraryService } from "@/services/library-service"
@@ -38,6 +39,7 @@ const props = withDefaults(
 const { t, locale } = useI18n()
 const libraryService = useLibraryService()
 const aiService = useAIService()
+const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
 const { enabled: agentEnabled } = useExperimentalAgent()
 
 const draft = ref("")
@@ -176,6 +178,9 @@ async function saveCommentNow(movieId = props.movieId.trim()) {
 
 const showAgentActions = computed(() => agentEnabled.value && !props.readonly)
 
+watch(() => props.movieId, cancelAIAction)
+watch(agentEnabled, cancelAIAction)
+
 async function polishComment() {
   if (!showAgentActions.value || aiBusy.value) {
     return
@@ -193,7 +198,7 @@ async function polishComment() {
   aiBusy.value = true
   aiError.value = ""
   try {
-    const dto = await aiService.runAction("polish_comment", {
+    const dto = await runAIAction("polish_comment", {
       movieId: id,
       body,
     })
@@ -204,6 +209,7 @@ async function polishComment() {
     preview.value = dto
     previewOpen.value = true
   } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_CANCELLED") return
     if (err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE") {
       aiError.value = t("detailPage.commentAiUnconfigured")
     } else {
@@ -350,6 +356,7 @@ onBeforeUnmount(() => {
               <Sparkles v-else class="size-4" />
               {{ t("detailPage.commentAiPolish") }}
             </Button>
+          <Button v-if="aiActionPending" type="button" variant="ghost" size="sm" data-ai-action-cancel @click="cancelAIAction">{{ t("common.cancel") }}</Button>
           </div>
         </div>
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">

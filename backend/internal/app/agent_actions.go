@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"curated-backend/internal/agent/core"
@@ -19,6 +20,8 @@ type commentCompleter interface {
 
 // RunAIAction runs a single-shot action preset (E3 write-preview or read-only narrative).
 func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
 	if !prompts.KnownAction(name) {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
 	}
