@@ -4,6 +4,7 @@ import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import type { CuratedFrameExportFormat, CuratedFrameExportMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
   Card,
@@ -236,12 +237,16 @@ const { t } = useI18n()
             <legend class="sr-only">{{ t("settings.captureFeedbackSoundTitle") }}</legend>
             <div
               data-capture-feedback-row
-              class="flex min-w-0 items-center justify-center gap-4"
+              class="flex min-w-0 items-center justify-between gap-4"
             >
-              <p class="text-sm font-semibold text-foreground">
+              <Label
+                for="capture-feedback-sound"
+                class="min-w-0 cursor-pointer text-sm leading-relaxed font-semibold text-foreground"
+              >
                 {{ t("settings.captureFeedbackSoundTitle") }}
-              </p>
+              </Label>
               <Switch
+                id="capture-feedback-sound"
                 :model-value="captureFeedbackSoundEnabled"
                 :aria-label="t('settings.captureFeedbackSoundTitle')"
                 @update:model-value="emit('update:captureFeedbackSoundEnabled', Boolean($event))"
