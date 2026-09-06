@@ -3,5 +3,5 @@ allowBuilds:
 overrides:
   defu: 6.1.7
   picomatch: 4.0.5
-  postcss: 8.5.10
+  postcss: 8.5.28
   yaml: 2.8.3
