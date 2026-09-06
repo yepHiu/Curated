@@ -184,6 +184,38 @@ func (s *SQLiteStore) loadCuratedFrameMotion(ctx context.Context, frameID string
 	return &motion, nil
 }
 
+// loadCuratedFrameMotions attaches motion metadata in bounded batches, including
+// the legacy full-list caller, without reading image blobs or issuing N queries.
+func (s *SQLiteStore) loadCuratedFrameMotions(ctx context.Context, frames []CuratedFrameMeta) error {
+	for start := 0; start < len(frames); start += 200 {
+		end := min(start+200, len(frames))
+		args := make([]any, 0, end-start)
+		byID := make(map[string]int, end-start)
+		for i := start; i < end; i++ {
+			args = append(args, frames[i].ID)
+			byID[frames[i].ID] = i
+		}
+		rows, err := s.db.QueryContext(ctx, `SELECT frame_id, status, artifact_name, content_type, duration_sec, width, height, fps, file_size, error_message, created_at, updated_at FROM curated_frame_motions WHERE frame_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var m CuratedFrameMotionMeta
+			if err := rows.Scan(&m.FrameID, &m.Status, &m.ArtifactName, &m.ContentType, &m.DurationSec, &m.Width, &m.Height, &m.FPS, &m.FileSize, &m.ErrorMessage, &m.CreatedAt, &m.UpdatedAt); err != nil {
+				rows.Close()
+				return err
+			}
+			frames[byID[m.FrameID]].Motion = &m
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // CuratedFrameExists reports whether a curated frame exists.
 func (s *SQLiteStore) CuratedFrameExists(ctx context.Context, frameID string) (bool, error) {
 	var one int
@@ -329,7 +361,7 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames`+where+`
-		ORDER BY captured_at DESC
+		ORDER BY captured_at DESC, id DESC
 		LIMIT ? OFFSET ?
 	`, pageArgs...)
 	if err != nil {
@@ -353,11 +385,8 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	if err := rows.Close(); err != nil {
 		return CuratedFramePage{}, err
 	}
-	for i := range out {
-		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
-		if err != nil {
-			return CuratedFramePage{}, err
-		}
+	if err := s.loadCuratedFrameMotions(ctx, out); err != nil {
+		return CuratedFramePage{}, err
 	}
 	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
@@ -367,7 +396,7 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames
-		ORDER BY captured_at DESC
+		ORDER BY captured_at DESC, id DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -390,11 +419,8 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	for i := range out {
-		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
-		if err != nil {
-			return nil, err
-		}
+	if err := s.loadCuratedFrameMotions(ctx, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -471,18 +497,15 @@ func (s *SQLiteStore) GetCuratedFrameImage(ctx context.Context, id string) ([]by
 
 // GetCuratedFrameThumbnail returns the thumbnail blob for a curated frame, falling back to the full image.
 func (s *SQLiteStore) GetCuratedFrameThumbnail(ctx context.Context, id string) ([]byte, error) {
-	var thumb, image []byte
-	err := s.db.QueryRowContext(ctx, `SELECT thumb_blob, image_blob FROM curated_frames WHERE id = ?`, id).Scan(&thumb, &image)
+	var thumb []byte
+	err := s.db.QueryRowContext(ctx, `SELECT CASE WHEN length(thumb_blob) > 0 THEN thumb_blob ELSE image_blob END FROM curated_frames WHERE id = ?`, id).Scan(&thumb)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if len(thumb) > 0 {
-		return thumb, nil
-	}
-	return image, nil
+	return thumb, nil
 }
 
 // FindNearbyCuratedFrame returns the curated frame closest to a playback position within the given threshold.
