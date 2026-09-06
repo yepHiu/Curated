@@ -45,6 +45,19 @@ describe("SettingsAISection", () => {
     expect(wrapper.find("[data-ai-settings-block=audit]").exists()).toBe(true)
     wrapper.unmount()
   })
+  it("compacts request and audit records to one line with semantic status colors", async () => {
+    const report = emptyReport()
+    report.items = [{ id: "run-success", startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }, { id: "run-failure", startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "failed", errorCode: "AI_FAILED", durationMs: 12, firstTextMs: null, modelCalls: 1, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 }]
+    mocks.getUsage.mockResolvedValue(report)
+    mocks.getAudit.mockResolvedValue({ items: [{ id: "audit-success", createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "ok", errorCode: "", durationMs: 1 }, { id: "audit-failure", createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "error", errorCode: "AI_TOOL_FAILED", durationMs: 1 }], total: 2, limit: 25, offset: 0 })
+    const wrapper = await setup()
+    expect(wrapper.get('[data-ai-run-row="run-success"]').classes()).toContain("min-h-9")
+    expect(wrapper.get('[data-ai-run-row="run-success"] [data-slot="badge"]').classes()).toContain("text-success")
+    expect(wrapper.get('[data-ai-run-row="run-failure"] [data-slot="badge"]').classes()).toContain("text-danger")
+    expect(wrapper.get('[data-ai-audit-row="audit-success"] [data-slot="badge"]').classes()).toContain("text-success")
+    expect(wrapper.get('[data-ai-audit-row="audit-failure"] [data-slot="badge"]').classes()).toContain("text-danger")
+    wrapper.unmount()
+  })
   it("applies global state only after saving and keeps the old state on failure", async () => {
     const wrapper = await setup()
     await wrapper.get("[data-ai-enabled]").trigger("click")

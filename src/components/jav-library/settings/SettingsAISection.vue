@@ -11,7 +11,8 @@ import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAIGovernanceService } from "@/services/ai-governance-service"
 import { useLibraryService } from "@/services/library-service"
-import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry } from "@/services/contracts/ai-governance-service"
+import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry, type AIRun } from "@/services/contracts/ai-governance-service"
+import type { StatusTone } from "@/lib/ui/status-tone"
 import { applyAIGovernance } from "@/lib/experimental-agent"
 import { AGENT_TOOL_I18N_KEYS } from "@/lib/agent-tool-labels"
 
@@ -125,6 +126,24 @@ function measured(total: number, known: number, calls: number) {
 }
 function toolLabel(name: string) { const key = AGENT_TOOL_I18N_KEYS[name]; return key ? t(key) : name }
 function page(kind: "runs" | "audit", delta: number) { if (kind === "runs") offset.value += delta; else auditOffset.value += delta; void refresh() }
+function runStatusTone(value: string): StatusTone {
+  if (value === "completed") return "success"
+  if (value === "failed") return "danger"
+  if (value === "partial" || value === "needs_input") return "warning"
+  return "info"
+}
+function auditStatusTone(value: string): StatusTone {
+  if (value === "ok" || value === "confirmed") return "success"
+  if (value === "error" || value === "rejected") return "danger"
+  if (value === "previewed") return "warning"
+  return "info"
+}
+function runLine(run: AIRun) {
+  return `${run.model || t("aiSettings.unknown")} · ${t(`aiSettings.statuses.${run.status}`)} · ${time(run.startedAt)} · ${t(`aiSettings.channels.${run.channel}`)} · ${duration(run.durationMs)}${run.errorCode ? ` · ${run.errorCode}` : ""}`
+}
+function auditLine(entry: AIAuditEntry) {
+  return `${toolLabel(entry.tool)} · ${t(`aiSettings.auditResults.${entry.result}`)} · ${time(entry.createdAt)} · ${entry.permission} · ${duration(entry.durationMs)}${entry.errorCode ? ` · ${entry.errorCode}` : ""}`
+}
 </script>
 
 <template>
@@ -207,12 +226,11 @@ function page(kind: "runs" | "audit", delta: number) { if (kind === "runs") offs
           <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="recent-runs">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
             <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul class="flex min-w-0 flex-col gap-2">
-              <li v-for="run in report?.items ?? []" :key="run.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-3">
-              <div class="flex flex-wrap items-center justify-between gap-2"><span class="break-all text-sm">{{ run.model || t('aiSettings.unknown') }}</span><Badge variant="secondary">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge></div>
-              <p class="break-all text-xs text-muted-foreground">{{ time(run.startedAt) }} · {{ t(`aiSettings.channels.${run.channel}`) }} · {{ run.promptVersion }} · {{ run.provider }}</p>
-              <p class="text-sm">{{ duration(run.durationMs) }} · {{ t('aiSettings.firstText') }}: {{ duration(run.firstTextMs) }} · {{ t('aiSettings.totalTokens') }}: {{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} · {{ t('aiSettings.toolCalls') }}: {{ run.toolCalls }}</p>
-              <p v-if="run.errorCode" class="break-all text-sm text-destructive">{{ t('aiSettings.error') }}: {{ run.errorCode }}</p>
+            <ul class="flex min-w-0 flex-col gap-1.5">
+              <li v-for="run in report?.items ?? []" :key="run.id" :title="runLine(run)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-run-row="run.id" :data-status="run.status">
+                <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ run.model || t('aiSettings.unknown') }}</span>
+                <span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(run.startedAt) }} · {{ t(`aiSettings.channels.${run.channel}`) }} · {{ duration(run.durationMs) }} · {{ t('aiSettings.totalTokens') }}: {{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} · {{ t('aiSettings.toolCalls') }}: {{ run.toolCalls }}<template v-if="run.errorCode"> · {{ run.errorCode }}</template></span>
+                <Badge :variant="runStatusTone(run.status)">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge>
               </li>
             </ul>
             <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + 25 >= report.total" @click="page('runs', 25)">{{ t('aiSettings.next') }}</Button></div>
@@ -221,7 +239,7 @@ function page(kind: "runs" | "audit", delta: number) { if (kind === "runs") offs
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.auditHint') }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul class="flex min-w-0 flex-col gap-2"><li v-for="entry in audit?.items ?? []" :key="entry.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-3"><div class="flex flex-wrap justify-between gap-2"><span class="break-all text-sm">{{ toolLabel(entry.tool) }}</span><Badge variant="secondary">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></div><p class="break-all text-xs text-muted-foreground">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}</p><p v-if="entry.errorCode" class="break-all text-sm text-destructive">{{ entry.errorCode }}</p></li></ul>
+            <ul class="flex min-w-0 flex-col gap-1.5"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
             <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + 25 >= audit.total" @click="page('audit', 25)">{{ t('aiSettings.next') }}</Button></div>
           </section>
         </CardContent>
