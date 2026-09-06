@@ -16,6 +16,9 @@ release/
 scripts/
 !scripts/
 scripts/*
+!scripts/dev/
+scripts/dev/*
+!scripts/dev/copy-electron-preload.cjs
 !scripts/release/
 !scripts/prd/
 scripts/release/*
