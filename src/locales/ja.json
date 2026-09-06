@@ -558,7 +558,10 @@
     "clipCancelFailed": "キャンセルに失敗しました",
     "captureTooLarge": "原画像は12 MiBを超えています。ダウンロードまたはJPEG保存を選択してください",
     "captureDownloadOriginal": "原画像をダウンロード",
-    "captureCompress": "JPEGで保存"
+    "captureCompress": "JPEGで保存",
+    "captureSource": "ソースフレーム",
+    "sourceFrameFailed": "ソースフレームを取得できませんでした",
+    "fitImage": "全体表示"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",

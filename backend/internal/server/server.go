@@ -478,6 +478,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/movies/{movieId}/restore", h.handleRestoreMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/clips", h.handleCreateMovieClip)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/frame", h.handleExtractMovieFrame)
 	mux.HandleFunc("DELETE /api/tasks/{taskId}/clip", h.handleCancelMovieClip)
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)

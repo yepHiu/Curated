@@ -1621,6 +1621,11 @@ type CreateMovieClipBody struct {
 	CuratedFrameID string  `json:"curatedFrameId,omitempty"`
 }
 
+// ExtractMovieFrameBody requests a source-file frame at an absolute media time.
+type ExtractMovieFrameBody struct {
+	PositionSec float64 `json:"positionSec"`
+}
+
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.
 type PlayedMoviesListDTO struct {
 	MovieIDs []string `json:"movieIds"`

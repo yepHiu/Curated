@@ -558,7 +558,10 @@
     "clipCancelFailed": "取消失败，请重试",
     "captureTooLarge": "原图超过 12 MiB，可下载原图或选择 JPEG 压缩入库",
     "captureDownloadOriginal": "下载原图",
-    "captureCompress": "JPEG 压缩入库"
+    "captureCompress": "JPEG 压缩入库",
+    "captureSource": "源文件高清帧",
+    "sourceFrameFailed": "无法提取源文件帧，请稍后重试",
+    "fitImage": "适应窗口"
   },
   "stats": {
     "moviesInLibrary": "入库影片",

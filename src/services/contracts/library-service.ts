@@ -73,6 +73,7 @@ export interface ResumableMovieImportSession {
 }
 
 export interface LibraryService {
+  supportsSourceFrame: boolean
   movies: ComputedRef<readonly Movie[]>
   /** 电影主列表首轮加载是否已完成；true 代表拿到过一次明确结果，不代表一定有数据。 */
   moviesLoaded: ComputedRef<boolean>
@@ -190,6 +191,7 @@ export interface LibraryService {
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>
   cancelMovieClip(taskId: string): Promise<void>
+  extractMovieFrame(movieId: string, positionSec: number): Promise<Blob>
   createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>

@@ -1138,6 +1138,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 }
 
 export const mockLibraryService: LibraryService = {
+  supportsSourceFrame: false,
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
   moviesLoaded: computed(() => true),
   loadError: computed(() => null),
@@ -1294,6 +1295,7 @@ export const mockLibraryService: LibraryService = {
     throw new Error("GIF clip export requires Web API mode")
   },
   async cancelMovieClip(): Promise<void> { /* Mock does not generate clips. */ },
+  async extractMovieFrame(): Promise<Blob> { throw new Error('Source frame extraction requires Web API') },
 
   async verifyBackup(): Promise<never> {
     throw new Error("Backup maintenance requires Web API mode")

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useFocusWithin, onClickOutside, useEventListener } from "@vueuse/core"
+import FrameImageViewer from './FrameImageViewer.vue'
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -1568,13 +1569,11 @@ defineExpose({
                   :aria-current="isDialogEntryCurrent(entry) ? 'true' : undefined"
                 >
                   <div class="flex h-full w-full min-w-0 items-center justify-center bg-black">
-                    <img
+                    <FrameImageViewer
                       v-if="!isDialogEntryCurrent(entry) || !dialogMotionPlaying || entry.item.row.motion?.status !== 'ready' || !entry.item.row.motion.artifactUrl"
                       :src="dialogEntryImageUrl(entry)"
-                      alt=""
-                      class="box-border h-full w-full object-contain p-2 sm:p-4"
-                      decoding="async"
-                      draggable="false"
+                      :alt="`${entry.item.row.code} ${entry.item.row.positionSec}s`"
+                      :active="isDialogEntryCurrent(entry)"
                     />
                     <img
                       v-else-if="entry.item.row.motion.contentType === 'image/gif'"

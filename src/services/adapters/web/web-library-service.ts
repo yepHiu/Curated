@@ -416,6 +416,7 @@ async function refreshLibraryPathStorageStatusesFromApi() {
 
 function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
+    supportsSourceFrame: true,
     movies: computed(() => moviesState.value),
     moviesLoaded: computed(() => moviesLoadedState.value),
     loadError: computed(() => loadErrorState.value),
@@ -1117,6 +1118,7 @@ function createWebLibraryService(): LibraryService {
       return await api.createMovieClip(movieId, { ...body, format: body.format ?? "gif" })
     },
     async cancelMovieClip(taskId) { await api.cancelMovieClip(taskId) },
+    async extractMovieFrame(movieId, positionSec) { return api.extractMovieFrame(movieId, positionSec) },
 
     async refreshMovieMetadata(movieId: string): Promise<TaskDTO | null> {
       return await api.refreshMovieMetadata(movieId)

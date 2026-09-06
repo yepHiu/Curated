@@ -103,6 +103,22 @@ export function useCuratedCaptureQueue() {
     return completion
   }
 
+  function prepareSource(movie: Movie, positionSec: number, load: () => Promise<Blob>): CaptureJob | undefined {
+    for (const old of [...jobs.value]) if (old.phase === 'saved' && !old.exporting) dismiss(old)
+    const bytes = 32 * 1024 * 1024
+    if (disposed || jobs.value.length >= 4 || jobs.value.reduce((n,j) => n + j.bytes,0) + bytes > 128 * 1024 * 1024) return
+    const job = shallowReactive<CaptureJob>({ key:crypto.randomUUID(), movie:{...movie, actors:[...movie.actors]}, positionSec, phase:'capturing',preview:'',error:'',bytes,committed:false,exporting:false,capture:Promise.resolve() })
+    jobs.value.push(job)
+    job.capture = load().then(blob => {
+      if (disposed || !jobs.value.includes(job)) return
+      job.candidate = { id:job.key, blob, positionSec, capturedAt:new Date().toISOString() }
+      job.bytes = blob.size
+      job.preview = URL.createObjectURL(blob)
+      if (job.phase === 'capturing') job.phase = 'ready'
+    }).catch(() => { job.phase='error'; job.error=i18n.global.t('curated.sourceFrameFailed'); job.bytes=0; retain(job) })
+    return job
+  }
+
   async function undo(job: CaptureJob) {
     if (!job.committed || !job.candidate || job.exporting) return
     try { await deleteCuratedFrame(job.candidate.id); dismiss(job) }
@@ -139,5 +155,5 @@ export function useCuratedCaptureQueue() {
     for (const job of jobs.value) { if (job.preview) URL.revokeObjectURL(job.preview) }
     jobs.value = []
   })
-  return { jobs, latest, pendingCount, prepare, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
+  return { jobs, latest, pendingCount, prepare, prepareSource, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
 }

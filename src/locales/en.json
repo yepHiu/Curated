@@ -558,7 +558,10 @@
     "clipCancelFailed": "Could not cancel. Retry.",
     "captureTooLarge": "Original exceeds 12 MiB. Download it or save a JPEG copy.",
     "captureDownloadOriginal": "Download original",
-    "captureCompress": "Save JPEG copy"
+    "captureCompress": "Save JPEG copy",
+    "captureSource": "Source frame",
+    "sourceFrameFailed": "Could not extract source frame. Retry later.",
+    "fitImage": "Fit image"
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

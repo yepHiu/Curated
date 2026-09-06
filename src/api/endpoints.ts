@@ -752,6 +752,10 @@ export const api = {
   cancelMovieClip(taskId: string): Promise<void> {
     return httpClient.delete(`/tasks/${encodeURIComponent(taskId)}/clip`)
   },
+  async extractMovieFrame(movieId: string, positionSec: number): Promise<Blob> {
+    const { blob } = await httpClient.postBlob(`/library/movies/${encodeURIComponent(movieId)}/frame`, { positionSec })
+    return blob
+  },
 
   getRecentTasks(limit?: number): Promise<RecentTasksDTO> {
     return httpClient.get<RecentTasksDTO>("/tasks/recent", {

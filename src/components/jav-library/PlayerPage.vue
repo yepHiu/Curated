@@ -48,6 +48,7 @@ import {
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
 import { useCuratedCaptureQueue, type CaptureJob } from "@/composables/use-curated-capture-queue"
 import CaptureReceipt from "@/components/jav-library/CaptureReceipt.vue"
+import FrameImageViewer from "@/components/jav-library/FrameImageViewer.vue"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import {
@@ -614,6 +615,14 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
     clipExportError.value = ""
     clipFeedbackDismissTimer = null
   }, delayMs)
+}
+async function extractSourceFrame() {
+  const movie = { ...props.movie, actors: [...props.movie.actors] }
+  const position = getAbsolutePlaybackTime(videoRef.value?.currentTime ?? currentTime.value)
+  const job = captureQueue.prepareSource(movie, position, () => libraryService.extractMovieFrame(movie.id, position))
+  if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
+  const result = await captureQueue.submit(job)
+  if (result.ok && props.movie.id === movie.id) appendCuratedFrameMarker(result)
 }
 
 async function cancelClipExport() {
@@ -3063,7 +3072,7 @@ const videoPreloadMode = computed(() =>
         <Dialog v-model:open="capturePreviewOpen">
           <DialogContent class="max-w-[95vw] sm:max-w-[90vw]">
             <DialogTitle>{{ t('curated.captureView') }}</DialogTitle>
-            <img :src="capturePreviewUrl" :alt="movie.code" class="max-h-[80vh] w-full object-contain" />
+            <div class="h-[75vh]"><FrameImageViewer :src="capturePreviewUrl" :alt="movie.code" /></div>
           </DialogContent>
         </Dialog>
         <div class="sr-only" aria-live="polite" aria-atomic="true">
@@ -3111,6 +3120,7 @@ const videoPreloadMode = computed(() =>
         <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-3 z-20 flex gap-1 rounded-lg bg-background/90 p-1 text-foreground" @click.stop @pointerdown.stop>
           <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
           <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
+          <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
           <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : 'GIF' }}</Button>
           <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
         </div>
