@@ -16,7 +16,7 @@ function onLoad(event: Event) {
 }
 </script>
 <template>
-  <div class="relative h-full w-full min-w-0 overflow-hidden">
+  <div class="relative h-full w-full min-w-0 overflow-hidden [contain:inline-size]">
     <div class="flex h-full w-full overflow-auto" :class="zoomed ? 'items-start justify-start' : 'items-center justify-center'" :tabindex="zoomed ? 0 : undefined" :aria-label="alt">
       <img v-if="!failed" :key="retry" :src="src" :alt="alt" decoding="async" draggable="false" :class="zoomed ? 'max-w-none shrink-0' : 'h-full w-full object-contain p-2 sm:p-4'" @load="onLoad" @error="failed = true" />
     </div>
