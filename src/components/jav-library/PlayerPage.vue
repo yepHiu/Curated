@@ -3,9 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
-  AlertTriangle,
   Camera,
-  Check,
   Circle,
   ExternalLink,
   Film,
@@ -48,12 +46,9 @@ import {
   type HlsLevel,
 } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
-import {
-  captureCuratedFrameCandidate,
-  saveCuratedCaptureFromVideo,
-  saveCuratedFrameCandidate,
-  type CuratedFrameCaptureCandidate,
-} from "@/lib/curated-frames/save-capture"
+import { useCuratedCaptureQueue, type CaptureJob } from "@/composables/use-curated-capture-queue"
+import CaptureReceipt from "@/components/jav-library/CaptureReceipt.vue"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import {
   getCuratedCaptureFeedbackSoundEnabled,
@@ -422,13 +417,6 @@ function onDocumentFullscreenChange() {
 
 const curatedShutterActive = ref(false)
 const curatedCaptureError = ref("")
-type CuratedCaptureFeedback =
-  | { phase: "idle" }
-  | { phase: "capturing"; positionSec: number }
-  | { phase: "success"; positionSec: number }
-  | { phase: "error"; message: string }
-
-const curatedCaptureFeedback = ref<CuratedCaptureFeedback>({ phase: "idle" })
 const curatedCaptureAnnouncement = ref("")
 const curatedCaptureFeedbackSoundEnabled = ref(getCuratedCaptureFeedbackSoundEnabled())
 const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
@@ -437,7 +425,6 @@ const clipExportError = ref("")
 let clipPollTimer: number | null = null
 let clipFeedbackDismissTimer: number | null = null
 let curatedShutterTimer: number | null = null
-let curatedCaptureFeedbackTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
 let playbackClockSyncIntervalId: number | null = null
 let lastAuthoritativePlaybackTimeSec: number | null = null
@@ -458,9 +445,29 @@ const clipCapturePhase = clipCapture.phase
 const clipCaptureIsRecording = clipCapture.isRecording
 const clipCaptureElapsedSec = clipCapture.elapsedSec
 const clipCaptureProgress = clipCapture.progress
-let pendingCuratedFrameCapture: Promise<
-  { ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }
-> | null = null
+const captureQueue = useCuratedCaptureQueue()
+let pendingCaptureJob: CaptureJob | undefined
+const receiptJob = computed(() => [...captureQueue.jobs.value].reverse().find(job => job.movie.id === props.movie.id && job.phase !== 'ready'))
+const capturePreviewOpen = ref(false)
+const capturePreviewUrl = ref("")
+function viewCapture(job: CaptureJob) {
+  capturePreviewUrl.value = job.preview
+  capturePreviewOpen.value = true
+}
+function cancelCuratedPress() {
+  clipCapture.cancelPress()
+  if (pendingCaptureJob) captureQueue.dismiss(pendingCaptureJob)
+  pendingCaptureJob = undefined
+}
+async function retryCapture(job: CaptureJob) {
+  const result = await captureQueue.submit(job)
+  if (result.ok && props.movie.id === job.movie.id) appendCuratedFrameMarker(result)
+}
+async function undoCapture(job: CaptureJob) {
+  const id = job.candidate?.id
+  await captureQueue.undo(job)
+  if (!captureQueue.jobs.value.includes(job)) frameMarkers.value = frameMarkers.value.filter(marker => marker.id !== id)
+}
 
 /** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
 const frameMarkers = ref<FrameMarkerInput[]>([])
@@ -499,33 +506,30 @@ function onFrameMarkerSeek(sec: number) {
 function beginCuratedPress() {
   if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
-  if (video) {
-    currentTime.value = getAbsolutePlaybackTime(video.currentTime)
+  if (!video || video.seeking || video.readyState < 2) return
+  currentTime.value = getAbsolutePlaybackTime(video.currentTime)
+  pendingCaptureJob = captureQueue.prepare(video, props.movie, currentTime.value)
+  if (!pendingCaptureJob) {
+    curatedCaptureError.value = t('curated.captureQueueFull')
+    curatedCaptureAnnouncement.value = curatedCaptureError.value
+    return
   }
-  pendingCuratedFrameCapture = video
-    ? captureCuratedFrameCandidate(video, {
-      positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
-    })
-    : null
+  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
+  curatedShutterActive.value = true
+  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
+  curatedShutterTimer = window.setTimeout(() => { curatedShutterActive.value = false }, 220)
   clipCapture.startPress()
 }
 
 async function savePendingCuratedFrame() {
-  const pending = pendingCuratedFrameCapture
-  pendingCuratedFrameCapture = null
-  if (pending) {
-    const candidate = await pending
-    if (!candidate.ok) return candidate
-    return saveCuratedFrameCandidate(candidate.candidate, props.movie)
-  }
-  const video = videoRef.value
-  if (!video) return { ok: false as const, reason: t("player.captureNoVideo") }
-  return saveCuratedCaptureFromVideo(video, props.movie, {
-    positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
-  })
+  const job = pendingCaptureJob
+  pendingCaptureJob = undefined
+  if (!job) return { ok: false as const, reason: t('player.captureNoVideo') }
+  return captureQueue.submit(job)
 }
 
 async function submitClipExport(input: { startSec: number; endSec: number }) {
+  const movieId = pendingCaptureJob?.movie.id ?? props.movie.id
   clipExportError.value = ""
   clipExportUrl.value = ""
   clipExportTask.value = null
@@ -538,8 +542,8 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (!frameResult.ok) {
       throw new Error(frameResult.reason)
     }
-    appendCuratedFrameMarker(frameResult)
-    const task = await libraryService.createMovieClip(props.movie.id, {
+    if (movieId === props.movie.id) appendCuratedFrameMarker(frameResult)
+    const task = await libraryService.createMovieClip(movieId, {
       startSec: input.startSec,
       endSec: input.endSec,
       fps: 10,
@@ -1223,7 +1227,7 @@ function stripTFromRoute() {
 watch(
   () => props.movie.id,
   async () => {
-    clipCapture.cancelPress()
+    cancelCuratedPress()
     const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
     void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
@@ -1242,7 +1246,7 @@ watch(
 )
 
 function onVisibilityChange() {
-  if (document.visibilityState === "hidden") clipCapture.cancelPress()
+  if (document.visibilityState === "hidden") cancelCuratedPress()
   if (document.visibilityState === "hidden") {
     flushPlaybackProgress()
   }
@@ -1265,6 +1269,7 @@ onMounted(() => {
   window.addEventListener("mousemove", immersiveChrome.onPageMouseMove, { passive: true })
   document.addEventListener("visibilitychange", onVisibilityChange)
   window.addEventListener("beforeunload", onWindowBeforeUnload)
+  window.addEventListener("blur", cancelCuratedPress)
 })
 
 onBeforeUnmount(() => {
@@ -1291,9 +1296,9 @@ onUnmounted(() => {
   window.removeEventListener("mousemove", immersiveChrome.onPageMouseMove)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
+  window.removeEventListener("blur", cancelCuratedPress)
   stopPlaybackClockSyncLoop()
   stopSessionDiagnosticsPoll()
-  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
   if (clipPollTimer !== null) clearTimeout(clipPollTimer)
   if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
   disposeCuratedCaptureFeedbackAudio()
@@ -2072,52 +2077,27 @@ function onPlaybackKeyup(e: KeyboardEvent) {
 }
 
 async function runCuratedCapture() {
+  const job = pendingCaptureJob
+  if (!job) return
   curatedCaptureError.value = ""
-  const v = videoRef.value
-  if (!v || !playbackSrc.value) {
-    curatedCaptureError.value = t("player.captureNoVideo")
-    return
-  }
-  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
-  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
-
-  const positionSec = getAbsolutePlaybackTime(v.currentTime)
-  curatedCaptureFeedback.value = { phase: "capturing", positionSec }
-  curatedCaptureAnnouncement.value = t("player.captureFeedbackCapturing")
-  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
-
-  curatedShutterActive.value = true
-  curatedShutterTimer = window.setTimeout(() => {
-    curatedShutterActive.value = false
-    curatedShutterTimer = null
-  }, 600)
-
   const result = await savePendingCuratedFrame()
+  if (playbackDisposed || props.movie.id !== job.movie.id) return
   if (!result.ok) {
-    curatedCaptureError.value = result.reason
-    curatedShutterActive.value = false
-    curatedCaptureFeedback.value = { phase: "error", message: result.reason }
-    curatedCaptureAnnouncement.value = t("player.captureFeedbackError", { reason: result.reason })
-    curatedCaptureFeedbackTimer = window.setTimeout(() => {
-      curatedCaptureFeedback.value = { phase: "idle" }
-      curatedCaptureFeedbackTimer = null
-    }, 3200)
+    curatedCaptureAnnouncement.value = t('player.captureFeedbackError', { reason: result.reason })
     return
   }
-
-  curatedCaptureFeedback.value = { phase: "success", positionSec }
   appendCuratedFrameMarker(result)
-  curatedCaptureAnnouncement.value = t("player.captureFeedbackSuccess", {
-    time: formatClock(positionSec),
-  })
-  curatedCaptureFeedbackTimer = window.setTimeout(() => {
-    curatedCaptureFeedback.value = { phase: "idle" }
-    curatedCaptureFeedbackTimer = null
-  }, 900)
+  curatedCaptureAnnouncement.value = t('player.captureFeedbackSuccess', { time: formatClock(result.positionSec) })
+}
 
-  if (!chromeVisible.value) {
-    immersiveChrome.showCuratedFeedback(`${t("player.curatedLabel")} +1`)
-  }
+function captureSingleFrame() {
+  beginCuratedPress()
+  clipCapture.cancelPress()
+  void runCuratedCapture()
+}
+function toggleClipRecording() {
+  if (clipCapture.phase.value === 'recording' || clipCapture.phase.value === 'armed') clipCapture.finishPress()
+  else beginCuratedPress()
 }
 
 async function toggleFullscreen() {
@@ -3035,48 +3015,16 @@ const videoPreloadMode = computed(() =>
           @leave="playlistTabVisible = false"
           @open="openPlaylistPanel"
         />
-        <Transition
-          enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
-          enter-from-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
-          enter-to-class="opacity-100 translate-y-0 scale-100"
-          leave-active-class="transition duration-150 ease-in motion-reduce:transition-none"
-          leave-from-class="opacity-100 translate-y-0 scale-100"
-          leave-to-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
-        >
-          <div
-            v-if="curatedCaptureFeedback.phase !== 'idle'"
-            class="pointer-events-none absolute left-1/2 top-[8%] z-[20] inline-flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-2 rounded-full border bg-black/75 px-3 py-1.5 text-sm font-medium shadow-[0_12px_28px_rgba(0,0,0,0.3)] backdrop-blur-md"
-            :class="
-              curatedCaptureFeedback.phase === 'success'
-                ? 'border-emerald-300/35 text-emerald-200'
-                : curatedCaptureFeedback.phase === 'error'
-                  ? 'border-rose-300/40 text-rose-200'
-                  : 'border-primary/35 text-pink-200'
-            "
-            :role="curatedCaptureFeedback.phase === 'error' ? 'alert' : 'status'"
-            :aria-label="
-              curatedCaptureFeedback.phase === 'capturing'
-                ? t('player.captureFeedbackCapturing')
-                : curatedCaptureFeedback.phase === 'success'
-                  ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
-                  : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
-            "
-          >
-            <Camera v-if="curatedCaptureFeedback.phase === 'capturing'" class="size-4 shrink-0" aria-hidden="true" />
-            <Check v-else-if="curatedCaptureFeedback.phase === 'success'" class="size-4 shrink-0" aria-hidden="true" />
-            <AlertTriangle v-else class="size-4 shrink-0" aria-hidden="true" />
-            <span class="truncate">
-              {{
-                curatedCaptureFeedback.phase === 'capturing'
-                  ? t('player.captureFeedbackCapturing')
-                  : curatedCaptureFeedback.phase === 'success'
-                    ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
-                    : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
-              }}
-            </span>
-          </div>
-        </Transition>
-
+        <CaptureReceipt v-if="receiptJob && clipCapturePhase !== 'recording' && clipCapturePhase !== 'processing'"
+          :job="receiptJob" :pending="captureQueue.pendingCount.value"
+          @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
+          @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
+        <Dialog v-model:open="capturePreviewOpen">
+          <DialogContent class="max-w-[95vw] sm:max-w-[90vw]">
+            <DialogTitle>{{ t('curated.captureView') }}</DialogTitle>
+            <img :src="capturePreviewUrl" :alt="movie.code" class="max-h-[80vh] w-full object-contain" />
+          </DialogContent>
+        </Dialog>
         <div class="sr-only" aria-live="polite" aria-atomic="true">
           {{ curatedCaptureAnnouncement }}
         </div>
@@ -3089,7 +3037,7 @@ const videoPreloadMode = computed(() =>
           leave-to-class="opacity-0 translate-y-2"
         >
           <div
-            v-if="clipCapturePhase !== 'idle'"
+            v-if="clipCapturePhase !== 'idle' && clipCapturePhase !== 'armed'"
             class="pointer-events-none absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
             role="status"
             aria-live="polite"
@@ -3097,8 +3045,7 @@ const videoPreloadMode = computed(() =>
             <div class="flex items-center gap-2 text-sm font-semibold">
               <Circle v-if="clipCaptureIsRecording" class="size-3 fill-rose-400 text-rose-400" aria-hidden="true" />
               <Film v-else class="size-4 text-primary" aria-hidden="true" />
-              <span v-if="clipCapturePhase === 'armed'">{{ t('player.clipArmed') }}</span>
-              <span v-else-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
+              <span v-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
               <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
               <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
@@ -3117,6 +3064,12 @@ const videoPreloadMode = computed(() =>
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
+        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-3 z-20 flex gap-1 rounded-lg bg-background/90 p-1 text-foreground" @click.stop @pointerdown.stop>
+          <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
+          <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
+          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : 'GIF' }}</Button>
+          <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
+        </div>
         <video
           v-if="playbackSrc"
           ref="videoRef"
@@ -3464,7 +3417,7 @@ const videoPreloadMode = computed(() =>
 }
 
 .curated-shutter-ring {
-  animation: curated-shutter-inset 0.55s ease-out forwards;
+  animation: curated-shutter-inset 0.2s ease-out forwards;
   box-shadow: inset 0 0 0 8px hsl(var(--primary) / 0.42);
 }
 

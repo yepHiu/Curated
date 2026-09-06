@@ -10,7 +10,7 @@ import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
 export type SaveCuratedCaptureResult =
-  | { ok: true; id: string; positionSec: number }
+  | { ok: true; id: string; positionSec: number; exportFailed?: boolean }
   | { ok: false; reason: string }
 
 export type CuratedFrameCaptureCandidate = {
@@ -39,6 +39,8 @@ export async function captureCuratedFrameCandidate(
   video: HTMLVideoElement,
   options: SaveCuratedCaptureOptions = {},
 ): Promise<{ ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }> {
+  const positionSec = resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride)
+  const capturedAt = new Date().toISOString()
   const cap = await captureVideoFrameToPng(video)
   if (!cap.ok) {
     return { ok: false, reason: cap.reason }
@@ -48,8 +50,8 @@ export async function captureCuratedFrameCandidate(
     candidate: {
       id: crypto.randomUUID(),
       blob: cap.blob,
-      positionSec: resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride),
-      capturedAt: new Date().toISOString(),
+      positionSec,
+      capturedAt,
     },
   }
 }
@@ -57,6 +59,7 @@ export async function captureCuratedFrameCandidate(
 export async function saveCuratedFrameCandidate(
   candidate: CuratedFrameCaptureCandidate,
   movie: Movie,
+  options: { skipExport?: boolean } = {},
 ): Promise<SaveCuratedCaptureResult> {
   const row = {
     id: candidate.id,
@@ -96,24 +99,24 @@ export async function saveCuratedFrameCandidate(
     }
   }
 
+  let exportFailed = false
+  if (!options.skipExport) {
+    try { await exportCuratedFrameCandidate(candidate, movie) } catch { exportFailed = true }
+  }
+  return { ok: true, id: row.id, positionSec: row.positionSec, ...(exportFailed ? { exportFailed } : {}) }
+}
+
+export async function exportCuratedFrameCandidate(candidate: CuratedFrameCaptureCandidate, movie: Movie): Promise<void> {
   const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt)
   const mode = getCuratedFrameSaveMode()
   if (mode === "download") {
-    try {
-      triggerDownloadBlob(candidate.blob, filename)
-    } catch {
-      // 仍保留应用内记录
-    }
+    triggerDownloadBlob(candidate.blob, filename)
   }
   if (mode === "directory") {
-    try {
-      const dir = await getStoredDirectoryHandle()
-      if (dir) await writeBlobToDirectory(dir, candidate.blob, filename)
-    } catch {
-      // 权限或 API 失败时忽略，应用内记录已保存
-    }
+    const dir = await getStoredDirectoryHandle()
+    if (!dir) throw new Error(i18n.global.t('curated.exportDirectoryUnavailable'))
+    await writeBlobToDirectory(dir, candidate.blob, filename)
   }
-  return { ok: true, id: row.id, positionSec: row.positionSec }
 }
 
 /**

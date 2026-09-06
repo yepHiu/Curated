@@ -39,3 +39,24 @@ func TestCuratedStablePagesMotionAndThumbnailFallback(t *testing.T) {
 		t.Fatalf("thumbnail: %q %v", thumb, err)
 	}
 }
+
+func TestCaptureReplayRequiresSameImmutableData(t *testing.T) {
+	s := newMigratedTestStore(t)
+	ctx := context.Background()
+	meta := CuratedFrameMeta{ID: "retry", MovieID: "movie-retry", PositionSec: 12, CapturedAt: "2026-09-06T00:00:00Z"}
+	insertCuratedFrameForP1Test(t, s, meta)
+	for _, tc := range []struct {
+		meta CuratedFrameMeta
+		blob []byte
+		want bool
+	}{
+		{meta, []byte("png-retry"), true},
+		{meta, []byte("different"), false},
+		{CuratedFrameMeta{ID: meta.ID, MovieID: "other", PositionSec: 12, CapturedAt: meta.CapturedAt}, []byte("png-retry"), false},
+	} {
+		got, err := s.MatchesCuratedFrameCapture(ctx, tc.meta, tc.blob)
+		if err != nil || got != tc.want {
+			t.Fatalf("got %v, %v; want %v", got, err, tc.want)
+		}
+	}
+}

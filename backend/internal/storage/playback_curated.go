@@ -125,6 +125,17 @@ func (s *SQLiteStore) InsertCuratedFrame(ctx context.Context, meta CuratedFrameM
 	return s.InsertCuratedFrameWithThumbnail(ctx, meta, imageBlob, nil)
 }
 
+// MatchesCuratedFrameCapture only recognizes an exact replay of immutable
+// capture data. Later title/tag edits do not invalidate a capture receipt.
+func (s *SQLiteStore) MatchesCuratedFrameCapture(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte) (bool, error) {
+	var matches bool
+	err := s.db.QueryRowContext(ctx, `SELECT movie_id = ? AND position_sec = ? AND captured_at = ? AND image_blob = ? FROM curated_frames WHERE id = ?`, meta.MovieID, meta.PositionSec, meta.CapturedAt, imageBlob, meta.ID).Scan(&matches)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return matches, err
+}
+
 // InsertCuratedFrameWithThumbnail inserts a curated frame with both full image and thumbnail blobs.
 func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte, thumbBlob []byte) error {
 	actorsJSON, err := json.Marshal(meta.Actors)

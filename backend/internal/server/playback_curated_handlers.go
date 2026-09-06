@@ -384,6 +384,14 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 	if meta.Tags == nil {
 		meta.Tags = []string{}
 	}
+	if replayed, err := h.store.MatchesCuratedFrameCapture(ctx, meta, raw); err != nil {
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to verify capture receipt")
+		return
+	} else if replayed {
+		w.Header().Set("X-Curated-Replayed", "true")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	thumbBlob, thumbErr := curatedthumb.PNG(raw)
 	if thumbErr != nil {
 		h.logger.Warn("build curated frame thumbnail", zap.String("id", meta.ID), zap.Error(thumbErr))
@@ -391,6 +399,11 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 	}
 	if err := h.store.InsertCuratedFrameWithThumbnail(ctx, meta, raw, thumbBlob); err != nil {
 		if errors.Is(err, storage.ErrCuratedFrameDuplicateID) {
+			if replayed, checkErr := h.store.MatchesCuratedFrameCapture(ctx, meta, raw); checkErr == nil && replayed {
+				w.Header().Set("X-Curated-Replayed", "true")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			writeAppError(w, http.StatusConflict, contracts.ErrorCodeConflict, "curated frame id already exists")
 			return
 		}
