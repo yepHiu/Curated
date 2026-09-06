@@ -25,7 +25,9 @@ func TestCreateVerifyPreflightAndRestore(t *testing.T) {
 	root := t.TempDir()
 	sourceDatabase := filepath.Join(root, "source.db")
 	sourceStore := openMigratedStore(t, sourceDatabase)
-	if _, err := sourceStore.AddLibraryPath(ctx, `D:\Media`, "Source library"); err != nil {
+	sourceLibrary := filepath.Join(root, "source-media")
+	targetLibrary := filepath.Join(root, "old-media")
+	if _, err := sourceStore.AddLibraryPath(ctx, sourceLibrary, "Source library"); err != nil {
 		t.Fatalf("AddLibraryPath(source): %v", err)
 	}
 	t.Cleanup(func() { _ = sourceStore.Close() })
@@ -67,7 +69,7 @@ func TestCreateVerifyPreflightAndRestore(t *testing.T) {
 
 	targetDatabase := filepath.Join(root, "restore", "curated.db")
 	targetStore := openMigratedStore(t, targetDatabase)
-	if _, err := targetStore.AddLibraryPath(ctx, `E:\Old`, "Old library"); err != nil {
+	if _, err := targetStore.AddLibraryPath(ctx, targetLibrary, "Old library"); err != nil {
 		t.Fatalf("AddLibraryPath(target): %v", err)
 	}
 	if err := targetStore.Close(); err != nil {
@@ -117,8 +119,8 @@ func TestCreateVerifyPreflightAndRestore(t *testing.T) {
 	if restored.DatabaseRollbackPath == "" || restored.ConfigRollbackPath == "" {
 		t.Fatalf("restore did not retain rollback paths: %+v", restored)
 	}
-	assertLibraryPaths(t, targetDatabase, []string{`D:\Media`})
-	assertLibraryPaths(t, restored.DatabaseRollbackPath, []string{`E:\Old`})
+	assertLibraryPaths(t, targetDatabase, []string{sourceLibrary})
+	assertLibraryPaths(t, restored.DatabaseRollbackPath, []string{targetLibrary})
 	configContents, err := os.ReadFile(targetConfig)
 	if err != nil {
 		t.Fatalf("read restored config: %v", err)
