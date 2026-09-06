@@ -45,6 +45,11 @@ describe("SettingsAISection", () => {
     expect(wrapper.find("[data-ai-settings-block=audit]").exists()).toBe(true)
     wrapper.unmount()
   })
+  it("keeps limit fields wide enough for their labels at intermediate settings widths", async () => {
+    const wrapper = await setup()
+    expect(wrapper.get("[data-ai-limit-fields]").classes()).toContain("grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))]")
+    wrapper.unmount()
+  })
   it("loads five recent requests and ten audit records per page", async () => {
     const wrapper = await setup()
     expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 5, offset: 0 }))

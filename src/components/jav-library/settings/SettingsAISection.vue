@@ -196,7 +196,7 @@ function auditLine(entry: AIAuditEntry) {
                 <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
                 <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
               </Field>
-              <FieldGroup class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <FieldGroup class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3" data-ai-limit-fields>
                 <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" type="number" min="1" max="30" :disabled="busy" /></Field>
                 <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" type="number" min="1" max="60" :disabled="busy" /></Field>
                 <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" type="number" min="7" max="365" :disabled="busy" /></Field>
