@@ -100,8 +100,7 @@ describe("AgentWindow", () => {
     const { setEnabled } = useExperimentalAgent()
     setEnabled(true)
     const windowState = useAgentWindow()
-    windowState.moveTo(40, 40)
-    windowState.resizeTo(640, 560)
+    windowState.resizeTo(640)
     windowState.setSidebarOpen(true)
     windowState.openWindow()
     getSessionMock.mockResolvedValue({
@@ -120,7 +119,7 @@ describe("AgentWindow", () => {
     setEnabled(false)
   })
 
-  it("renders the dialog when open", () => {
+  it("renders the complementary panel when open", () => {
     const wrapper = mountWindow()
     expect(wrapper.find("[data-agent-window]").exists()).toBe(true)
     expect(wrapper.find("[data-agent-window-input]").exists()).toBe(true)
@@ -355,74 +354,39 @@ describe("AgentWindow", () => {
     expect(wrapper.find("[data-agent-window]").exists()).toBe(false)
   })
 
-  it("renders desktop resize handles", () => {
-    const wrapper = mountWindow()
-    for (const edge of ["nw", "ne", "sw", "se"]) {
-      const handle = wrapper.find(`[data-agent-window-resize="${edge}"]`)
-      expect(handle.exists()).toBe(true)
-      expect(handle.element.children).toHaveLength(0)
-    }
-    expect(wrapper.find('[data-agent-window-resize="e"]').exists()).toBe(true)
-    expect(wrapper.find('[data-agent-window-resize="s"]').exists()).toBe(true)
-  })
-
-  it("resizes from the bottom-right handle", async () => {
-    const { moveTo, resizeTo } = useAgentWindow()
-    moveTo(40, 40)
-    resizeTo(420, 560)
-    const wrapper = mountWindow()
-    const handle = wrapper.find('[data-agent-window-resize="se"]')
-    handle.element.dispatchEvent(
-      new PointerEvent("pointerdown", { button: 0, clientX: 460, clientY: 600, bubbles: true }),
-    )
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 540, clientY: 680 }))
-    window.dispatchEvent(new PointerEvent("pointerup", { clientX: 540, clientY: 680 }))
-    await flushPromises()
-
-    const style = wrapper.find("[data-agent-window]").attributes("style") ?? ""
-    expect(style).toContain("width: 500px")
-    expect(style).toContain("height: 640px")
-  })
-
-  it.each([
-    { edge: "nw", dx: -40, dy: -30, x: 60, y: 70 },
-    { edge: "ne", dx: 40, dy: -30, x: 100, y: 70 },
-    { edge: "sw", dx: -40, dy: 30, x: 60, y: 100 },
-    { edge: "se", dx: 40, dy: 30, x: 100, y: 100 },
-  ])("resizes from $edge while keeping the opposite corner fixed", async ({ edge, dx, dy, x, y }) => {
+  it("resizes the docked panel from its left divider and stops on cancellation", async () => {
     const state = useAgentWindow()
-    state.moveTo(100, 100)
-    state.resizeTo(420, 460)
+    state.resizeTo(420)
     const wrapper = mountWindow()
-    wrapper.find(`[data-agent-window-resize="${edge}"]`).element.dispatchEvent(
-      new PointerEvent("pointerdown", { button: 0, clientX: 200, clientY: 200, bubbles: true }),
-    )
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 200 + dx, clientY: 200 + dy }))
-    window.dispatchEvent(new PointerEvent("pointerup"))
-    await flushPromises()
-    expect(state.position.value).toEqual({ x, y })
-    expect(state.size.value).toEqual({ width: 460, height: 490 })
-  })
-
-  it("clamps top-left resizing at the viewport and minimum size and stops on cancellation", async () => {
-    const state = useAgentWindow()
-    state.moveTo(100, 100)
-    state.resizeTo(420, 460)
-    const wrapper = mountWindow()
-    wrapper.find('[data-agent-window-resize="nw"]').element.dispatchEvent(
-      new PointerEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, bubbles: true }),
-    )
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: -500, clientY: -500 }))
-    expect(state.position.value).toEqual({ x: 8, y: 8 })
-    expect(state.size.value).toEqual({ width: 512, height: 552 })
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 900, clientY: 900 }))
-    expect(state.position.value).toEqual({ x: 200, y: 200 })
-    expect(state.size.value).toEqual({ width: 320, height: 360 })
+    const handle = wrapper.find('[data-agent-window-resize="w"]')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-agent-window-resize]')).toHaveLength(1)
+    handle.element.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 600, bubbles: true }))
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 520 }))
+    expect(state.width.value).toBe(500)
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 1000 }))
+    expect(state.width.value).toBe(320)
     window.dispatchEvent(new PointerEvent("pointercancel"))
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 100, clientY: 100 }))
-    await flushPromises()
-    expect(state.position.value).toEqual({ x: 200, y: 200 })
-    expect(state.size.value).toEqual({ width: 320, height: 360 })
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 100 }))
+    expect(state.width.value).toBe(320)
+    wrapper.unmount()
+  })
+
+  it("supports keyboard resizing and removes drag listeners on unmount", async () => {
+    const state = useAgentWindow()
+    state.resizeTo(400)
+    const wrapper = mountWindow()
+    const handle = wrapper.find('[data-agent-window-resize="w"]')
+    await handle.trigger("keydown", { key: "ArrowLeft" })
+    expect(state.width.value).toBe(416)
+    await handle.trigger("keydown", { key: "ArrowRight", shiftKey: true })
+    expect(state.width.value).toBe(352)
+    await handle.trigger("keydown", { key: "Home" })
+    expect(state.width.value).toBe(320)
+    handle.element.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 600, bubbles: true }))
+    wrapper.unmount()
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 500 }))
+    expect(state.width.value).toBe(320)
   })
 
   it("renders a history sidebar with persisted chats", async () => {
@@ -682,13 +646,13 @@ describe("AgentWindow", () => {
   it("adds chat side padding when the window is wide", async () => {
     const wrapper = mountWindow()
     expect(wrapper.find("[data-agent-chat-wide]").attributes("data-agent-chat-wide")).toBe("false")
-    useAgentWindow().resizeTo(800, 560)
+    useAgentWindow().resizeTo(800)
     await flushPromises()
     expect(wrapper.find("[data-agent-chat-wide]").attributes("data-agent-chat-wide")).toBe("true")
   })
 
   it("keeps the message scroller on the window edge instead of the content column", async () => {
-    useAgentWindow().resizeTo(800, 560)
+    useAgentWindow().resizeTo(800)
     const wrapper = mountWindow()
     await flushPromises()
     const scroller = wrapper.find("[data-agent-window-messages]")

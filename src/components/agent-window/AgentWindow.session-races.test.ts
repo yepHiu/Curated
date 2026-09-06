@@ -111,8 +111,7 @@ describe("AgentWindow session request ownership", () => {
     const { setEnabled } = useExperimentalAgent()
     setEnabled(true)
     const windowState = useAgentWindow()
-    windowState.moveTo(40, 40)
-    windowState.resizeTo(640, 560)
+    windowState.resizeTo(640)
     windowState.setSidebarOpen(true)
     windowState.openWindow()
     getSessionMock.mockResolvedValue({

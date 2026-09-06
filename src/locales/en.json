@@ -190,7 +190,7 @@
     "backLibrary": "Back to library",
     "themeToggleAria": "Switch between light and dark appearance",
     "themeToggleHint": "On for dark, off for light; synced with Settings → Appearance.",
-    "agentWindowAria": "Open or close the Agent chat window"
+    "agentWindowAria": "Open or close the Agent panel"
   },
   "agentWindow": {
     "title": "Curated Agent",
@@ -217,7 +217,7 @@
     "thought": "Thought",
     "presentedMovies": "Showing titles",
     "openMovie": "Open movie details",
-    "resize": "Resize agent window",
+    "resize": "Resize Agent panel width",
     "contextRoute": "Page: {route}",
     "contextMovie": "Current title: {id}",
     "contextActor": "Current actor: {name}",

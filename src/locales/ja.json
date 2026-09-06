@@ -190,7 +190,7 @@
     "backLibrary": "ライブラリに戻る",
     "themeToggleAria": "ライト／ダーク外観の切り替え",
     "themeToggleHint": "オンでダーク、オフでライト。設定の「外観」と同期します。",
-    "agentWindowAria": "Agent チャットウィンドウを開閉"
+    "agentWindowAria": "Agent パネルを開閉"
   },
   "agentWindow": {
     "title": "Curated Agent",
@@ -217,7 +217,7 @@
     "thought": "考え済み",
     "presentedMovies": "作品を表示",
     "openMovie": "作品の詳細を開く",
-    "resize": "ウィンドウサイズを変更",
+    "resize": "Agent パネルの幅を変更",
     "contextRoute": "ページ：{route}",
     "contextMovie": "現在の作品：{id}",
     "contextActor": "現在の俳優：{name}",

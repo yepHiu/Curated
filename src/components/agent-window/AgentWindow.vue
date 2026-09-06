@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import { onKeyStroke } from "@vueuse/core"
+import { onKeyStroke, useElementSize } from "@vueuse/core"
 import { PanelLeft, Plus, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIChatStoredMessageDTO, AIEntityCandidateDTO } from "@/api/types"
@@ -13,7 +13,7 @@ import { mentionsStillInText, type AgentMention } from "@/lib/agent-mentions"
 import {
   AGENT_WINDOW_CHAT_WIDE_MIN,
   AGENT_WINDOW_MIN_WIDTH,
-  AGENT_WINDOW_MIN_HEIGHT,
+  AGENT_WINDOW_MAX_WIDTH,
   AGENT_WINDOW_SIDEBAR_INLINE_MIN_WIDTH,
   useAgentWindow,
 } from "@/composables/use-agent-window"
@@ -35,12 +35,10 @@ const aiService = useAIService()
 const libraryService = useLibraryService()
 const {
   open,
-  position,
-  size,
+  width,
   sidebarOpen,
   isMobileViewport,
   closeWindow,
-  moveTo,
   resizeTo,
   setSidebarOpen,
 } = useAgentWindow()
@@ -67,12 +65,20 @@ let streamSeq = 0
 let sessionLoadSeq = 0
 let entrySeq = 0
 
+const panelRef = ref<HTMLElement | null>(null)
+const { width: measuredWidth } = useElementSize(panelRef, { width: 0, height: 0 }, { box: "border-box" })
+const containerRef = computed(() => panelRef.value?.parentElement ?? null)
+const { width: containerWidth } = useElementSize(containerRef)
+const panelWidth = computed(() => measuredWidth.value || width.value)
+const maxPanelWidth = computed(() => Math.max(AGENT_WINDOW_MIN_WIDTH,
+  Math.min(AGENT_WINDOW_MAX_WIDTH, containerWidth.value ? Math.floor(containerWidth.value / 2) : AGENT_WINDOW_MAX_WIDTH)))
+
 const sidebarOverlays = computed(
-  () => isMobileViewport.value || size.value.width < AGENT_WINDOW_SIDEBAR_INLINE_MIN_WIDTH,
+  () => isMobileViewport.value || panelWidth.value < AGENT_WINDOW_SIDEBAR_INLINE_MIN_WIDTH,
 )
 
 const chatWide = computed(
-  () => !isMobileViewport.value && size.value.width >= AGENT_WINDOW_CHAT_WIDE_MIN,
+  () => !isMobileViewport.value && panelWidth.value >= AGENT_WINDOW_CHAT_WIDE_MIN,
 )
 
 const headerTitle = computed(() => {
@@ -385,6 +391,7 @@ function removeAssistantTurn(assistantId: string) {
 function openMovieDetail(movieId: string) {
   const id = movieId.trim()
   if (!id) return
+  if (isMobileViewport.value) close()
   void router.push({ name: "detail", params: { id } })
 }
 
@@ -603,258 +610,194 @@ function selectEntity(entryId: string, candidate: AIEntityCandidateDTO) {
   void send(candidate)
 }
 
-const dragging = ref(false)
 const resizing = ref(false)
+let stopResizing: (() => void) | undefined
 
-function onHeaderPointerdown(e: PointerEvent) {
-  if (isMobileViewport.value || e.button !== 0) return
-  const target = e.target as HTMLElement
-  if (target.closest("button, a, select")) return
-  dragging.value = true
-  const originX = e.clientX
-  const originY = e.clientY
-  const baseX = position.value.x
-  const baseY = position.value.y
-
-  const onMove = (ev: PointerEvent) => {
-    moveTo(baseX + (ev.clientX - originX), baseY + (ev.clientY - originY))
-  }
-  const onUp = () => {
-    dragging.value = false
-    window.removeEventListener("pointermove", onMove)
-    window.removeEventListener("pointerup", onUp)
-  }
-  window.addEventListener("pointermove", onMove)
-  window.addEventListener("pointerup", onUp)
+function resizePanel(nextWidth: number) {
+  resizeTo(Math.min(maxPanelWidth.value, nextWidth))
 }
 
-type ResizeEdge = "e" | "s" | "se" | "sw" | "ne" | "nw"
-
-const resizeCorners = [
-  { edge: "nw", class: "top-0 left-0 cursor-nwse-resize" },
-  { edge: "ne", class: "top-0 right-0 cursor-nesw-resize" },
-  { edge: "sw", class: "bottom-0 left-0 cursor-nesw-resize" },
-  { edge: "se", class: "bottom-0 right-0 cursor-nwse-resize" },
-] as const
-
-function onResizePointerdown(edge: ResizeEdge, e: PointerEvent) {
+function onResizePointerdown(e: PointerEvent) {
   if (isMobileViewport.value || e.button !== 0) return
   e.preventDefault()
-  e.stopPropagation()
+  stopResizing?.()
   resizing.value = true
   const originX = e.clientX
-  const originY = e.clientY
-  const baseWidth = size.value.width
-  const baseHeight = size.value.height
-  const baseX = position.value.x
-  const baseY = position.value.y
-
-  const onMove = (ev: PointerEvent) => {
-    const deltaX = ev.clientX - originX
-    const deltaY = ev.clientY - originY
-    // Clamp the moving origin before sizing so the opposite corner stays fixed.
-    const nextX = edge.includes("w")
-      ? Math.max(8, Math.min(baseX + deltaX, baseX + baseWidth - AGENT_WINDOW_MIN_WIDTH))
-      : baseX
-    const nextY = edge.includes("n")
-      ? Math.max(8, Math.min(baseY + deltaY, baseY + baseHeight - AGENT_WINDOW_MIN_HEIGHT))
-      : baseY
-    const nextWidth = edge.includes("w") ? baseWidth + baseX - nextX
-      : edge.includes("e") ? baseWidth + deltaX : baseWidth
-    const nextHeight = edge.includes("n") ? baseHeight + baseY - nextY
-      : edge.includes("s") ? baseHeight + deltaY : baseHeight
-    moveTo(nextX, nextY)
-    resizeTo(nextWidth, nextHeight)
-  }
-  const onUp = () => {
+  const baseWidth = panelWidth.value
+  const onMove = (event: PointerEvent) => resizePanel(baseWidth + originX - event.clientX)
+  stopResizing = () => {
     resizing.value = false
     window.removeEventListener("pointermove", onMove)
-    window.removeEventListener("pointerup", onUp)
-    window.removeEventListener("pointercancel", onUp)
+    window.removeEventListener("pointerup", onEnd)
+    window.removeEventListener("pointercancel", onEnd)
+    stopResizing = undefined
   }
+  const onEnd = () => stopResizing?.()
   window.addEventListener("pointermove", onMove)
-  window.addEventListener("pointerup", onUp)
-  window.addEventListener("pointercancel", onUp)
+  window.addEventListener("pointerup", onEnd)
+  window.addEventListener("pointercancel", onEnd)
 }
 
-const windowStyle = ref<Record<string, string>>({})
-watch(
-  [position, size, isMobileViewport],
-  () => {
-    windowStyle.value = isMobileViewport.value
-      ? {}
-      : {
-          left: `${position.value.x}px`,
-          top: `${position.value.y}px`,
-          width: `${size.value.width}px`,
-          height: `${size.value.height}px`,
-          maxHeight: "calc(100dvh - 24px)",
-        }
-  },
-  { immediate: true },
-)
+function onResizeKeydown(event: KeyboardEvent) {
+  const step = event.shiftKey ? 64 : 16
+  const next = event.key === "ArrowLeft" ? panelWidth.value + step
+    : event.key === "ArrowRight" ? panelWidth.value - step
+    : event.key === "Home" ? AGENT_WINDOW_MIN_WIDTH
+    : event.key === "End" ? maxPanelWidth.value : undefined
+  if (next === undefined) return
+  event.preventDefault()
+  resizePanel(next)
+}
+
+watch([open, isMobileViewport], () => stopResizing?.())
+onBeforeUnmount(() => stopResizing?.())
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="fixed z-[120] flex flex-col overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-lg max-md:inset-2"
-      :class="dragging || resizing ? 'select-none' : ''"
-      :style="windowStyle"
-      role="dialog"
-      aria-label="Curated Agent"
-      data-agent-window
-    >
-      <div class="relative flex min-h-0 flex-1">
-        <AgentChatSidebar
-          v-if="sidebarOpen && !sidebarOverlays"
-          :sessions="sessions"
-          :active-id="sessionId"
-          @create="startNewChat"
-          @select="selectSession"
-          @delete="deleteChat"
-          @title-pointerdown="onHeaderPointerdown"
-        />
+  <aside
+    v-if="open"
+    id="agent-panel"
+    ref="panelRef"
+    class="relative flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col overflow-hidden bg-background text-foreground lg:w-[min(var(--agent-panel-width),50%)] lg:border-l lg:border-border"
+    :class="{ 'select-none': resizing }"
+    :style="{ '--agent-panel-width': `${width}px` }"
+    aria-label="Curated Agent"
+    data-agent-window
+  >
+    <div class="relative flex min-h-0 flex-1">
+      <AgentChatSidebar
+        v-if="sidebarOpen && !sidebarOverlays"
+        :sessions="sessions"
+        :active-id="sessionId"
+        @create="startNewChat"
+        @select="selectSession"
+        @delete="deleteChat"
+      />
+      <div
+        class="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        :data-agent-chat-wide="chatWide ? 'true' : 'false'"
+      >
         <div
-          class="relative flex min-h-0 min-w-0 flex-1 flex-col"
-          :data-agent-chat-wide="chatWide ? 'true' : 'false'"
+          class="flex min-h-11 shrink-0 items-center gap-1 border-b border-border px-1.5 py-1 text-foreground md:min-h-10"
+          data-agent-window-header
         >
-          <div
-            class="flex min-h-11 shrink-0 cursor-grab items-center gap-1 border-b border-border px-1.5 py-1 text-foreground active:cursor-grabbing md:min-h-10"
-            :class="isMobileViewport ? '' : 'touch-none'"
-            data-agent-window-header
-            @pointerdown="onHeaderPointerdown"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+            :aria-label="t('agentWindow.toggleSidebar')"
+            :aria-pressed="sidebarOpen"
+            data-agent-window-sidebar-toggle
+            @click="setSidebarOpen(!sidebarOpen)"
           >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-              :aria-label="t('agentWindow.toggleSidebar')"
-              :aria-pressed="sidebarOpen"
-              data-agent-window-sidebar-toggle
-              @click="setSidebarOpen(!sidebarOpen)"
-            >
-              <PanelLeft class="size-4" />
-            </Button>
-            <p class="min-w-0 flex-1 truncate px-1 text-[13px] font-medium">{{ headerTitle }}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-              :aria-label="t('agentWindow.newChat')"
-              data-agent-window-header-new
-              @click="startNewChat"
-            >
-              <Plus class="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
-              :aria-label="t('agentWindow.close')"
-              @click="close"
-            >
-              <X class="size-4" />
-            </Button>
-          </div>
-          <div class="relative flex min-h-0 flex-1 flex-col">
-            <AgentChatThread
-              :has-older="Boolean(historyCursor)"
-              :loading-older="loadingOlder"
-              :history-disabled="streaming || loadingSession"
-              @load-older="loadOlder"
-              ref="threadRef"
-              :entries="entries"
-              :provider-unconfigured="providerUnconfigured"
-              :error-message="errorMessage"
-              :wide="chatWide"
-              @close="close"
-              @open-movie="openMovieDetail"
-              @apply-confirm="applyConfirm"
-              @discard-confirm="discardConfirm"
-              @select-entity="selectEntity"
-            />
-            <div
-              class="mx-auto w-full shrink-0"
-              :class="chatWide ? 'max-w-[52rem] px-6' : 'px-4'"
-            >
-              <div v-if="contextChips.length" class="flex flex-wrap gap-2 border-t border-border/60 py-2" data-agent-context-chips>
-                <Button
-                  v-for="chip in contextChips"
-                  :key="chip.key"
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  class="h-8 max-w-full gap-1 rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
-                  :aria-label="t('agentWindow.removeContext', { context: chip.label })"
-                  :data-agent-context-chip="chip.key"
-                  @click="omitContext(chip.key)"
-                >
-                  <span class="truncate">{{ chip.label }}</span>
-                  <X class="size-3.5 shrink-0" aria-hidden="true" />
-                </Button>
-              </div>
-              <AgentChatComposer
-                ref="composerRef"
-                v-model="draft"
-                v-model:mentions="mentions"
-                :streaming="streaming"
-                :disabled="loadingSession || loadingOlder"
-                @send="send"
-                @stop="stop"
-              />
-            </div>
-            <template v-if="sidebarOpen && sidebarOverlays">
-              <button
+            <PanelLeft class="size-4" />
+          </Button>
+          <p class="min-w-0 flex-1 truncate px-1 text-[13px] font-medium">{{ headerTitle }}</p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+            :aria-label="t('agentWindow.newChat')"
+            data-agent-window-header-new
+            @click="startNewChat"
+          >
+            <Plus class="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="size-11 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
+            :aria-label="t('agentWindow.close')"
+            @click="close"
+          >
+            <X class="size-4" />
+          </Button>
+        </div>
+        <div class="relative flex min-h-0 flex-1 flex-col">
+          <AgentChatThread
+            :has-older="Boolean(historyCursor)"
+            :loading-older="loadingOlder"
+            :history-disabled="streaming || loadingSession"
+            @load-older="loadOlder"
+            ref="threadRef"
+            :entries="entries"
+            :provider-unconfigured="providerUnconfigured"
+            :error-message="errorMessage"
+            :wide="chatWide"
+            @close="close"
+            @open-movie="openMovieDetail"
+            @apply-confirm="applyConfirm"
+            @discard-confirm="discardConfirm"
+            @select-entity="selectEntity"
+          />
+          <div
+            class="mx-auto w-full shrink-0"
+            :class="chatWide ? 'max-w-[52rem] px-6' : 'px-4'"
+          >
+            <div v-if="contextChips.length" class="flex flex-wrap gap-2 border-t border-border/60 py-2" data-agent-context-chips>
+              <Button
+                v-for="chip in contextChips"
+                :key="chip.key"
                 type="button"
-                class="absolute inset-0 z-20 bg-background/70"
-                :aria-label="t('agentWindow.toggleSidebar')"
-                data-agent-window-sidebar-backdrop
-                @click="setSidebarOpen(false)"
-              />
-              <AgentChatSidebar
-                class="absolute inset-y-0 left-0 z-40 shadow-md"
-                :sessions="sessions"
-                :active-id="sessionId"
-                @create="startNewChat"
-                @select="selectSession"
-                @delete="deleteChat"
-                @title-pointerdown="onHeaderPointerdown"
-              />
-            </template>
+                variant="secondary"
+                size="sm"
+                class="h-8 max-w-full gap-1 rounded-full px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+                :aria-label="t('agentWindow.removeContext', { context: chip.label })"
+                :data-agent-context-chip="chip.key"
+                @click="omitContext(chip.key)"
+              >
+                <span class="truncate">{{ chip.label }}</span>
+                <X class="size-3.5 shrink-0" aria-hidden="true" />
+              </Button>
+            </div>
+            <AgentChatComposer
+              ref="composerRef"
+              v-model="draft"
+              v-model:mentions="mentions"
+              :streaming="streaming"
+              :disabled="loadingSession || loadingOlder"
+              @send="send"
+              @stop="stop"
+            />
           </div>
+          <template v-if="sidebarOpen && sidebarOverlays">
+            <button
+              type="button"
+              class="absolute inset-0 z-20 bg-background/70"
+              :aria-label="t('agentWindow.toggleSidebar')"
+              data-agent-window-sidebar-backdrop
+              @click="setSidebarOpen(false)"
+            />
+            <AgentChatSidebar
+              class="absolute inset-y-0 left-0 z-40 shadow-md"
+              :sessions="sessions"
+              :active-id="sessionId"
+              @create="startNewChat"
+              @select="selectSession"
+              @delete="deleteChat"
+            />
+          </template>
         </div>
       </div>
-
-      <template v-if="!isMobileViewport">
-        <div
-          class="absolute top-0 right-0 z-20 h-11 w-2 cursor-ew-resize touch-none"
-          aria-hidden="true"
-          data-agent-window-resize="e"
-          @pointerdown="onResizePointerdown('e', $event)"
-        />
-        <div
-          class="absolute inset-x-0 bottom-0 z-20 h-2 cursor-ns-resize touch-none"
-          aria-hidden="true"
-          data-agent-window-resize="s"
-          @pointerdown="onResizePointerdown('s', $event)"
-        />
-        <button
-          v-for="corner in resizeCorners"
-          :key="corner.edge"
-          type="button"
-          class="absolute z-50 size-4 touch-none"
-          :class="corner.class"
-          :aria-label="t('agentWindow.resize')"
-          :data-agent-window-resize="corner.edge"
-          @pointerdown="onResizePointerdown(corner.edge, $event)"
-        />
-      </template>
     </div>
-  </Teleport>
-</template>
 
+    <div
+      v-if="!isMobileViewport"
+      role="separator"
+      tabindex="0"
+      aria-orientation="vertical"
+      :aria-label="t('agentWindow.resize')"
+      aria-controls="agent-panel"
+      :aria-valuemin="AGENT_WINDOW_MIN_WIDTH"
+      :aria-valuemax="maxPanelWidth"
+      :aria-valuenow="Math.round(panelWidth)"
+      class="absolute inset-y-0 left-0 z-50 w-1.5 cursor-col-resize touch-none hover:bg-primary/30 focus-visible:bg-primary/30 focus-visible:outline-none"
+      data-agent-window-resize="w"
+      @pointerdown="onResizePointerdown"
+      @keydown="onResizeKeydown"
+    />
+  </aside>
+</template>

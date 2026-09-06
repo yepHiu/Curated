@@ -1,72 +1,46 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import {
-  AGENT_WINDOW_HEIGHT,
-  AGENT_WINDOW_MIN_HEIGHT,
-  AGENT_WINDOW_MIN_WIDTH,
-  AGENT_WINDOW_WIDTH,
-  useAgentWindow,
-} from "./use-agent-window"
+import { AGENT_WINDOW_WIDTH, AGENT_WINDOW_MIN_WIDTH, AGENT_WINDOW_MAX_WIDTH, useAgentWindow } from "./use-agent-window"
 
-const STORAGE_KEY = "curated-agent-window-state-v1"
+const STORAGE_KEY = "curated-agent-panel-state-v1"
 
 describe("useAgentWindow", () => {
   beforeEach(() => {
     localStorage.clear()
-    const { moveTo, resizeTo, closeWindow } = useAgentWindow()
-    closeWindow()
-    moveTo(40, 40)
-    resizeTo(AGENT_WINDOW_WIDTH, AGENT_WINDOW_HEIGHT)
+    const state = useAgentWindow()
+    state.closeWindow()
+    state.resizeTo(AGENT_WINDOW_WIDTH)
+    state.setSidebarOpen(false)
   })
 
-  it("persists resized dimensions", () => {
-    const { size, resizeTo } = useAgentWindow()
-    resizeTo(500, 640)
-    expect(size.value).toEqual({ width: 500, height: 640 })
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")).toMatchObject({
-      x: 40,
-      y: 40,
-      width: 500,
-      height: 640,
-    })
+  it("persists panel width without floating coordinates", () => {
+    useAgentWindow().resizeTo(500)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")).toEqual({ width: 500, sidebarOpen: false })
   })
 
-  it("clamps size to the minimum", () => {
-    const { size, resizeTo } = useAgentWindow()
-    resizeTo(120, 80)
-    expect(size.value.width).toBe(AGENT_WINDOW_MIN_WIDTH)
-    expect(size.value.height).toBe(AGENT_WINDOW_MIN_HEIGHT)
+  it("clamps width and rejects non-finite dimensions", () => {
+    const state = useAgentWindow()
+    state.resizeTo(120)
+    expect(state.width.value).toBe(AGENT_WINDOW_MIN_WIDTH)
+    state.resizeTo(2000)
+    expect(state.width.value).toBe(AGENT_WINDOW_MAX_WIDTH)
+    state.resizeTo(NaN)
+    expect(state.width.value).toBe(AGENT_WINDOW_WIDTH)
   })
 
-  it("does not drop size when only moving", () => {
-    const { moveTo, resizeTo } = useAgentWindow()
-    resizeTo(480, 600)
-    moveTo(64, 72)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")).toMatchObject({
-      x: 64,
-      y: 72,
-      width: 480,
-      height: 600,
-    })
+  it("persists the history sidebar preference", () => {
+    const state = useAgentWindow()
+    state.setSidebarOpen(true)
+    expect(state.sidebarOpen.value).toBe(true)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}").sidebarOpen).toBe(true)
   })
 
-  it("persists sidebar open state", () => {
-    const { sidebarOpen, setSidebarOpen } = useAgentWindow()
-    setSidebarOpen(false)
-    expect(sidebarOpen.value).toBe(false)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")).toMatchObject({
-      sidebarOpen: false,
-    })
-    setSidebarOpen(true)
-    expect(sidebarOpen.value).toBe(true)
-  })
-
-  it("toggles the floating window open and closed", () => {
-    const { open, openWindow, toggleWindow } = useAgentWindow()
-    openWindow()
-    expect(open.value).toBe(true)
-    toggleWindow()
-    expect(open.value).toBe(false)
-    toggleWindow()
-    expect(open.value).toBe(true)
+  it("toggles the panel open and closed", () => {
+    const state = useAgentWindow()
+    state.openWindow()
+    expect(state.open.value).toBe(true)
+    state.toggleWindow()
+    expect(state.open.value).toBe(false)
+    state.toggleWindow()
+    expect(state.open.value).toBe(true)
   })
 })

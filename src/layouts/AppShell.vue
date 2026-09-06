@@ -905,6 +905,7 @@ function clearActorsSearch() {
                 type="button"
                 variant="ghost"
                 size="icon"
+                aria-controls="agent-panel"
                 data-agent-entry
                 class="size-11 rounded-2xl text-muted-foreground hover:bg-muted/70 hover:text-foreground lg:size-9"
                 :class="agentWindowOpen ? 'text-primary' : ''"
@@ -933,20 +934,22 @@ function clearActorsSearch() {
             </div>
           </div>
 
-          <div class="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div class="flex min-h-0 min-w-0 flex-1 overflow-hidden" data-agent-workspace>
             <div
+              v-show="!(agentEnabled && agentWindowOpen && !isLgUp)"
+              class="flex-1"
               data-router-view-frame
               :class="routerViewFrameClass"
             >
               <RouterView />
             </div>
+            <AgentWindowPanel v-if="agentEnabled" />
           </div>
         </section>
       </div>
     </div>
 
     <ScanProgressDock />
-    <AgentWindowPanel v-if="agentEnabled" />
     <DevPerformanceBar v-if="isDev" />
     <Toaster :theme="resolvedMode" />
 

@@ -190,7 +190,7 @@
     "backLibrary": "返回资料库",
     "themeToggleAria": "切换浅色或深色外观",
     "themeToggleHint": "开启为深色，关闭为浅色；与设置中「外观」同步。",
-    "agentWindowAria": "打开或关闭 Agent 对话窗口"
+    "agentWindowAria": "打开或关闭 Agent 面板"
   },
   "agentWindow": {
     "title": "Curated Agent",
@@ -221,7 +221,7 @@
     "thought": "已思考",
     "presentedMovies": "展示影片",
     "openMovie": "打开影片详情",
-    "resize": "调整窗口大小",
+    "resize": "调整 Agent 面板宽度",
     "contextRoute": "页面：{route}",
     "contextMovie": "当前影片：{id}",
     "contextActor": "当前演员：{name}",
