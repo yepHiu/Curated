@@ -439,6 +439,8 @@ const listWithUrls = ref<RowWithUrl[]>([])
 const totalRows = ref(0)
 const rowsLoading = ref(false)
 const rowsLoadingMore = ref(false)
+const rowsLoadError = ref(false)
+let rowsQueryVersion = 0
 const rowsScrollRoot = ref<HTMLElement | null>(null)
 const rowsLoadMoreSentinel = ref<HTMLElement | null>(null)
 const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
@@ -462,7 +464,10 @@ function currentCuratedTagFilters() {
 }
 
 async function reloadFromDb() {
+  const version = ++rowsQueryVersion
   rowsLoading.value = true
+  rowsLoadingMore.value = false
+  rowsLoadError.value = false
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
@@ -470,20 +475,26 @@ async function reloadFromDb() {
       limit: curatedPageLimit,
       offset: 0,
     })
+    if (version !== rowsQueryVersion) return
     rawRows.value = page.items
     totalRows.value = page.total
+  } catch {
+    if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {
-    rowsLoading.value = false
-    await nextTick()
-    maybeAutoLoadMoreRows()
+    if (version === rowsQueryVersion) {
+      rowsLoading.value = false
+      await nextTick()
+      if (!rowsLoadError.value) maybeAutoLoadMoreRows()
+    }
   }
 }
 
 async function loadMoreRows() {
-  if (rowsLoading.value || rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
+  if (rowsLoadError.value || rowsLoading.value || rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
     return
   }
   rowsLoadingMore.value = true
+  const version = rowsQueryVersion
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
@@ -491,12 +502,18 @@ async function loadMoreRows() {
       limit: curatedPageLimit,
       offset: rawRows.value.length,
     })
-    rawRows.value = [...rawRows.value, ...page.items]
+    if (version !== rowsQueryVersion) return
+    const known = new Set(rawRows.value.map((row) => row.id))
+    rawRows.value = [...rawRows.value, ...page.items.filter((row) => !known.has(row.id))]
     totalRows.value = page.total
+  } catch {
+    if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {
-    rowsLoadingMore.value = false
-    await nextTick()
-    maybeAutoLoadMoreRows()
+    if (version === rowsQueryVersion) {
+      rowsLoadingMore.value = false
+      await nextTick()
+      if (!rowsLoadError.value) maybeAutoLoadMoreRows()
+    }
   }
 }
 
@@ -515,16 +532,21 @@ watch(
 watch(
   rawRows,
   () => {
-    revokeAllUrls()
-    listWithUrls.value = rawRows.value.map((row) => ({
-      row,
-      url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id),
-    }))
+    const previous = new Map(listWithUrls.value.map((item) => [item.row.id, item]))
+    listWithUrls.value = rawRows.value.map((row) => {
+      const old = previous.get(row.id)
+      previous.delete(row.id)
+      if (old && old.row.imageBlob === row.imageBlob) return { row, url: old.url }
+      if (old?.url.startsWith('blob:')) URL.revokeObjectURL(old.url)
+      return { row, url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id) }
+    })
+    for (const old of previous.values()) if (old.url.startsWith('blob:')) URL.revokeObjectURL(old.url)
   },
   { immediate: true, deep: true },
 )
 
 onUnmounted(() => {
+  rowsQueryVersion++
   if (dialogTagSaveTimer) {
     clearTimeout(dialogTagSaveTimer)
     dialogTagSaveTimer = null
@@ -845,6 +867,8 @@ function resetDialogState() {
 }
 
 function dialogEntryImageUrl(entry: CuratedFrameDialogNavigationEntry<RowWithUrl>): string {
+  const index = dialogNavigationEntries.value.indexOf(entry)
+  if (Math.abs(index - selectedDialogNavigationIndex.value) > 1) return entry.item.url
   return entry.item.row.imageBlob ? entry.item.url : curatedFrameImageUrl(entry.item.row.id)
 }
 
@@ -1499,6 +1523,9 @@ defineExpose({
           @open="openFrameCardDialog"
         />
       </TabsContent>
+      <Button v-if="rowsLoadError" variant="outline" class="mx-auto" @click="reloadFromDb">
+        {{ t('curated.retryLoad') }}
+      </Button>
       <div
         v-if="hasMoreRows"
         ref="rowsLoadMoreSentinel"

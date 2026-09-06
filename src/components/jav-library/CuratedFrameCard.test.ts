@@ -106,7 +106,10 @@ describe("CuratedFrameCard", () => {
 
     expect(wrapper.find("video").exists()).toBe(false)
     await wrapper.trigger("mouseenter")
-    expect(wrapper.find("video").attributes("src")).toBe("/api/curated-frames/frame-a/motion")
+    expect(wrapper.find("img").attributes("src")).toBe("/api/curated-frames/frame-a/motion")
+    expect(wrapper.find("video").exists()).toBe(false)
+    await wrapper.get("img").trigger("error")
+    expect(wrapper.get("img").attributes("src")).toBe("blob:frame-a")
     await wrapper.trigger("mouseleave")
     expect(wrapper.find("video").exists()).toBe(false)
   })

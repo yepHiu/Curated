@@ -536,7 +536,8 @@
     "ariaClearFrameTagFilter": "Clear curated frame tag filter",
     "tagSaveDirty": "Tag changes are not saved yet.",
     "tagSaveFailed": "Saving tags failed. Draft kept in place.",
-    "tagSaveRetry": "Retry save"
+    "tagSaveRetry": "Retry save",
+    "retryLoad": "Loading failed. Retry"
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

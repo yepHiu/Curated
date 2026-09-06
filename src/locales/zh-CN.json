@@ -536,7 +536,8 @@
     "ariaClearFrameTagFilter": "清除萃取帧标签筛选",
     "tagSaveDirty": "标签变更尚未保存。",
     "tagSaveFailed": "标签保存失败，草稿已保留。",
-    "tagSaveRetry": "重试保存"
+    "tagSaveRetry": "重试保存",
+    "retryLoad": "加载失败，重试"
   },
   "stats": {
     "moviesInLibrary": "入库影片",
@@ -1412,8 +1413,8 @@
     "playStartError": "无法开始播放（浏览器可能阻止自动播放，请再试一次）。",
     "curatedCaptureErrorPrefix": "无法写入",
     "curatedLabel": "Curated",
-    "feedbackPlay": "\u7ee7\u7eed\u64ad\u653e",
-    "feedbackPause": "\u5df2\u6682\u505c",
+    "feedbackPlay": "继续播放",
+    "feedbackPause": "已暂停",
     "ariaCurated": "萃取当前帧",
     "errFileMissing": "无法播放该视频，请检查文件是否存在或已被移动。",
     "errGeneric": "播放出错，请稍后重试。",

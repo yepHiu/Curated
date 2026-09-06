@@ -536,7 +536,8 @@
     "ariaClearFrameTagFilter": "キュレートフレームのタグフィルターを解除",
     "tagSaveDirty": "タグの変更はまだ保存されていません。",
     "tagSaveFailed": "タグの保存に失敗しました。下書きは保持されています。",
-    "tagSaveRetry": "再保存"
+    "tagSaveRetry": "再保存",
+    "retryLoad": "読み込みに失敗しました。再試行"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",
@@ -1412,8 +1413,8 @@
     "playStartError": "再生を開始できませんでした（自動再生ブロックの可能性）。",
     "curatedCaptureErrorPrefix": "保存できませんでした",
     "curatedLabel": "Curated",
-    "feedbackPlay": "\u518d\u751f\u4e2d",
-    "feedbackPause": "\u4e00\u6642\u505c\u6b62",
+    "feedbackPlay": "再生中",
+    "feedbackPause": "一時停止",
     "ariaCurated": "現在フレームをキャプチャ（Curated）",
     "errFileMissing": "この動画を再生できません。ファイルの有無を確認してください。",
     "errGeneric": "再生エラー。後でもう一度。",
