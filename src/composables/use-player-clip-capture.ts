@@ -58,6 +58,7 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
 
   function startPress() {
     if (phase.value !== "idle") return
+    suppressNextClick.value = false
     const now = Number.isFinite(mediaTime()) ? Math.max(0, mediaTime()) : 0
     startSec.value = now
     endSec.value = null
@@ -89,9 +90,8 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
     pointerActive = false
     clearTimers()
     if (!wasLongPress) {
-      const wasArmed = phase.value === "armed"
       reset()
-      return { wasLongPress: false, ...(wasArmed ? {} : {}) }
+      return { wasLongPress: false }
     }
     const start = startSec.value ?? options.currentTime.value
     // Read the live media clock at release: pauses/buffering must not create

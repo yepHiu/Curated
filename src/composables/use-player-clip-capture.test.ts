@@ -148,4 +148,17 @@ describe("usePlayerClipCapture", () => {
     expect(capture.consumeClick()).toBe(true)
     expect(capture.consumeClick()).toBe(false)
   })
+
+  it("does not carry an unconsumed long-press click into a new gesture", () => {
+    const currentTime = ref(10)
+    const capture = usePlayerClipCapture({ currentTime, duration: ref(100), onClipReady: vi.fn() })
+    capture.startPress()
+    vi.advanceTimersByTime(400)
+    currentTime.value = 12
+    capture.finishPress()
+    capture.reset()
+    capture.startPress()
+    capture.finishPress()
+    expect(capture.consumeClick()).toBe(false)
+  })
 })
