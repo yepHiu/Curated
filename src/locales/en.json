@@ -553,7 +553,9 @@
     "captureAction": "Capture",
     "previousFrame": "Previous frame",
     "nextFrame": "Next frame",
-    "stopClip": "Finish GIF"
+    "stopClip": "Finish GIF",
+    "clipStatusRetrying": "Status unavailable. Retrying…",
+    "clipCancelFailed": "Could not cancel. Retry."
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

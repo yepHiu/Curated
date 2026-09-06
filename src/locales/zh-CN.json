@@ -553,7 +553,9 @@
     "captureAction": "截图",
     "previousFrame": "上一帧",
     "nextFrame": "下一帧",
-    "stopClip": "结束 GIF"
+    "stopClip": "结束 GIF",
+    "clipStatusRetrying": "状态暂不可用，正在重试…",
+    "clipCancelFailed": "取消失败，请重试"
   },
   "stats": {
     "moviesInLibrary": "入库影片",

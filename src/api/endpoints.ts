@@ -749,6 +749,9 @@ export const api = {
   createMovieClip(movieId: string, body: CreateMovieClipBody): Promise<TaskDTO> {
     return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/clips`, body)
   },
+  cancelMovieClip(taskId: string): Promise<void> {
+    return httpClient.delete(`/tasks/${encodeURIComponent(taskId)}/clip`)
+  },
 
   getRecentTasks(limit?: number): Promise<RecentTasksDTO> {
     return httpClient.get<RecentTasksDTO>("/tasks/recent", {

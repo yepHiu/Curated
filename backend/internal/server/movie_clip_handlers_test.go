@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,24 @@ import (
 	"curated-backend/internal/tasks"
 	"go.uber.org/zap"
 )
+
+func TestMovieClipQueueBudgetAndCancellation(t *testing.T) {
+	h := &Handler{}
+	h.initMovieClipQueue()
+	if cap(h.movieClipSlots) != 8 || cap(h.movieClipWorkers) != 2 {
+		t.Fatal("unexpected clip resource budget")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h.movieClipCancels.Store("clip-test", context.CancelFunc(cancel))
+	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/clip-test/clip", nil)
+	req.SetPathValue("taskId", "clip-test")
+	rec := httptest.NewRecorder()
+	h.handleCancelMovieClip(rec, req)
+	if rec.Code != http.StatusNoContent || ctx.Err() != context.Canceled {
+		t.Fatalf("cancel: %d %v", rec.Code, ctx.Err())
+	}
+}
 
 func TestMovieClipDefaultWidth(t *testing.T) {
 	if defaultMovieClipWidth != 640 {

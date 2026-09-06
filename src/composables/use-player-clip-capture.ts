@@ -8,6 +8,7 @@ export interface PlayerClipCaptureOptions {
   minDurationSec?: number
   maxDurationSec?: number
   longPressMs?: number
+  mediaTime?: () => number
   onClipReady: (input: { startSec: number; endSec: number }) => void | Promise<void>
 }
 
@@ -30,9 +31,9 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
   const longPressMs = options.longPressMs ?? 400
   let thresholdTimer: number | null = null
   let ticker: number | null = null
-  let recordingStartedAt: number | null = null
   let pointerActive = false
-  const recordingTickMs = 16
+  const recordingTickMs = 100
+  const mediaTime = () => options.mediaTime?.() ?? options.currentTime.value
 
   const isRecording = computed(() => phase.value === "recording")
   const progress = computed(() => Math.min(1, elapsedSec.value / maxDurationSec))
@@ -53,12 +54,11 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
     error.value = ""
     taskId.value = null
     pointerActive = false
-    recordingStartedAt = null
   }
 
   function startPress() {
     if (phase.value !== "idle") return
-    const now = Number.isFinite(options.currentTime.value) ? Math.max(0, options.currentTime.value) : 0
+    const now = Number.isFinite(mediaTime()) ? Math.max(0, mediaTime()) : 0
     startSec.value = now
     endSec.value = null
     elapsedSec.value = 0
@@ -72,12 +72,10 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
       // can pick up a stale seek/timeupdate value and make consecutive clips
       // start from the previous recording's position.
       phase.value = "recording"
-      recordingStartedAt = performance.now()
       ticker = window.setInterval(() => {
-        const mediaNow = Number.isFinite(options.currentTime.value) ? Math.max(0, options.currentTime.value) : now
+        const mediaNow = Number.isFinite(mediaTime()) ? Math.max(0, mediaTime()) : now
         const mediaElapsed = Math.max(0, mediaNow - (startSec.value ?? now))
-        const wallElapsed = recordingStartedAt === null ? 0 : Math.max(0, (performance.now() - recordingStartedAt) / 1000)
-        elapsedSec.value = Math.max(mediaElapsed, wallElapsed)
+        elapsedSec.value = mediaElapsed
         if (elapsedSec.value >= maxDurationSec) finishPress()
       }, recordingTickMs)
     }, longPressMs)
@@ -96,11 +94,13 @@ export function usePlayerClipCapture(options: PlayerClipCaptureOptions) {
       return { wasLongPress: false, ...(wasArmed ? {} : {}) }
     }
     const start = startSec.value ?? options.currentTime.value
-    // The media clock can lag behind the final keyup by several `timeupdate`
-    // intervals. Use the live elapsed recorder duration as the source of truth
-    // so a five-second hold does not collapse into the minimum 0.4s clip.
-    const recordedDuration = Math.max(minDurationSec, elapsedSec.value)
-    const end = Math.min(start + recordedDuration, start + maxDurationSec)
+    // Read the live media clock at release: pauses/buffering must not create
+    // unseen footage and playback rate must not be confused with wall time.
+    const end = Math.min(Math.max(start, mediaTime()), start + maxDurationSec, options.duration.value || Infinity)
+    if (end - start < minDurationSec) {
+      reset()
+      return { wasLongPress: false }
+    }
     startSec.value = start
     endSec.value = end
     elapsedSec.value = Math.max(0, end - start)

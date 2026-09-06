@@ -189,6 +189,7 @@ export interface LibraryService {
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>
+  cancelMovieClip(taskId: string): Promise<void>
   createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>

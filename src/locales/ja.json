@@ -553,7 +553,9 @@
     "captureAction": "キャプチャ",
     "previousFrame": "前のフレーム",
     "nextFrame": "次のフレーム",
-    "stopClip": "GIF を終了"
+    "stopClip": "GIF を終了",
+    "clipStatusRetrying": "状態を取得できません。再試行中…",
+    "clipCancelFailed": "キャンセルに失敗しました"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",

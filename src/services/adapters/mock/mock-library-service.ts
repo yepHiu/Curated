@@ -1293,6 +1293,7 @@ export const mockLibraryService: LibraryService = {
   async createMovieClip(): Promise<never> {
     throw new Error("GIF clip export requires Web API mode")
   },
+  async cancelMovieClip(): Promise<void> { /* Mock does not generate clips. */ },
 
   async verifyBackup(): Promise<never> {
     throw new Error("Backup maintenance requires Web API mode")

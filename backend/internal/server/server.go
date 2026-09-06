@@ -287,6 +287,10 @@ type Handler struct {
 	clientTracker                  *clienttracker.Tracker
 	authAttempts                   *authAttemptLimiter
 	movieClipArtifacts             *sync.Map
+	movieClipInit                  sync.Once
+	movieClipSlots                 chan struct{}
+	movieClipWorkers               chan struct{}
+	movieClipCancels               sync.Map
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -474,6 +478,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/movies/{movieId}/restore", h.handleRestoreMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/clips", h.handleCreateMovieClip)
+	mux.HandleFunc("DELETE /api/tasks/{taskId}/clip", h.handleCancelMovieClip)
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)

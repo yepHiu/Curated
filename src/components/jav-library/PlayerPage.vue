@@ -423,6 +423,8 @@ const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
 const clipExportUrl = ref("")
 const clipExportError = ref("")
 let clipPollTimer: number | null = null
+let clipPollGeneration = 0
+let clipPollFailures = 0
 let clipFeedbackDismissTimer: number | null = null
 let curatedShutterTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
@@ -431,6 +433,7 @@ let lastAuthoritativePlaybackTimeSec: number | null = null
 let progressSliderFocusRestoreTimer: number | null = null
 
 const clipCapture = usePlayerClipCapture({
+  mediaTime: () => videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value,
   // HTMLVideoElement.currentTime is not reactive. Feed the state machine the
   // reactive playback clock instead, refreshing it from the live video element
   // when a press starts so consecutive clips never reuse a cached timestamp.
@@ -529,6 +532,8 @@ async function savePendingCuratedFrame() {
 }
 
 async function submitClipExport(input: { startSec: number; endSec: number }) {
+  const generation = ++clipPollGeneration
+  clipPollFailures = 0
   const movieId = pendingCaptureJob?.movie.id ?? props.movie.id
   clipExportError.value = ""
   clipExportUrl.value = ""
@@ -550,9 +555,10 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
       width: 640,
       curatedFrameId: frameResult.id,
     })
+    if (generation !== clipPollGeneration || playbackDisposed) return
     clipExportTask.value = task
     clipCapture.taskId.value = task.taskId
-    await pollClipExportTask(task.taskId)
+    await pollClipExportTask(task.taskId, generation)
   } catch (err) {
     clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
     clipCapture.phase.value = "error"
@@ -561,9 +567,22 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
   }
 }
 
-async function pollClipExportTask(taskId: string) {
+async function pollClipExportTask(taskId: string, generation = clipPollGeneration) {
+  if (generation !== clipPollGeneration || playbackDisposed) return
   if (clipPollTimer !== null) window.clearTimeout(clipPollTimer)
-  const task = await libraryService.getTaskStatus(taskId)
+  let task: import("@/api/types").TaskDTO
+  try {
+    task = await libraryService.getTaskStatus(taskId)
+    if (generation !== clipPollGeneration || playbackDisposed) return
+    clipPollFailures = 0
+    clipExportError.value = ""
+  } catch {
+    if (generation !== clipPollGeneration || playbackDisposed) return
+    clipPollFailures++
+    clipExportError.value = t('curated.clipStatusRetrying')
+    clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), Math.min(30_000, 1000 * 2 ** Math.min(clipPollFailures, 5)))
+    return
+  }
   clipExportTask.value = task
   if (task.status === "completed") {
     const artifactUrl = typeof task.metadata?.artifactUrl === "string" ? task.metadata.artifactUrl : ""
@@ -583,7 +602,7 @@ async function pollClipExportTask(taskId: string) {
     scheduleClipFeedbackDismiss(3600)
     return
   }
-  clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId), 500)
+  clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), document.visibilityState === "hidden" ? 5000 : 1000)
 }
 
 function scheduleClipFeedbackDismiss(delayMs: number) {
@@ -595,6 +614,18 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
     clipExportError.value = ""
     clipFeedbackDismissTimer = null
   }, delayMs)
+}
+
+async function cancelClipExport() {
+  const taskId = clipCapture.taskId.value
+  if (!taskId) return
+  try {
+    await libraryService.cancelMovieClip(taskId)
+    clipPollGeneration++
+    if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+    clipCapture.reset()
+    clipExportError.value = ''
+  } catch { clipExportError.value = t('curated.clipCancelFailed') }
 }
 
 /** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
@@ -1228,6 +1259,10 @@ watch(
   () => props.movie.id,
   async () => {
     cancelCuratedPress()
+    clipPollGeneration++
+    clipCapture.reset()
+    if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+    if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
     const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
     void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
@@ -1625,6 +1660,10 @@ function onPlay() {
 }
 
 function onPause() {
+  if (clipCapture.isRecording.value) {
+    const result = clipCapture.finishPress()
+    if (!result.wasLongPress) void runCuratedCapture()
+  }
   frameStepper.interrupt()
   watchTimeTracker.onPause(getAbsolutePlaybackTime())
   isPlaying.value = false
@@ -1827,6 +1866,7 @@ function onVideoWaiting() {
 }
 
 function onVideoSeeking() {
+  cancelCuratedPress()
   frameStepper.interrupt()
   if (!playbackSrc.value) return
   watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
@@ -3038,7 +3078,9 @@ const videoPreloadMode = computed(() =>
         >
           <div
             v-if="clipCapturePhase !== 'idle' && clipCapturePhase !== 'armed'"
-            class="pointer-events-none absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
+            class="absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-foreground shadow-lg"
+            @click.stop
+            @pointerdown.stop
             role="status"
             aria-live="polite"
           >
@@ -3046,10 +3088,11 @@ const videoPreloadMode = computed(() =>
               <Circle v-if="clipCaptureIsRecording" class="size-3 fill-rose-400 text-rose-400" aria-hidden="true" />
               <Film v-else class="size-4 text-primary" aria-hidden="true" />
               <span v-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
-              <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
+              <span v-else-if="clipCapturePhase === 'processing'">{{ clipExportError || t('player.clipProcessing') }}</span>
               <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
               <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
+              <Button v-if="clipCapturePhase === 'processing' && clipCapture.taskId.value" size="sm" variant="ghost" @click="cancelClipExport">{{ t('common.cancel') }}</Button>
             </div>
             <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
               <div

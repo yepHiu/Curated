@@ -1116,6 +1116,7 @@ function createWebLibraryService(): LibraryService {
     async createMovieClip(movieId, body) {
       return await api.createMovieClip(movieId, { ...body, format: body.format ?? "gif" })
     },
+    async cancelMovieClip(taskId) { await api.cancelMovieClip(taskId) },
 
     async refreshMovieMetadata(movieId: string): Promise<TaskDTO | null> {
       return await api.refreshMovieMetadata(movieId)

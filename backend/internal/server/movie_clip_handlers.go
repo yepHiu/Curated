@@ -20,6 +20,23 @@ import (
 	"curated-backend/internal/storage"
 )
 
+func (h *Handler) initMovieClipQueue() {
+	h.movieClipInit.Do(func() {
+		h.movieClipSlots = make(chan struct{}, 8)
+		h.movieClipWorkers = make(chan struct{}, 2)
+	})
+}
+
+func (h *Handler) handleCancelMovieClip(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("taskId"))
+	if cancel, ok := h.movieClipCancels.Load(id); ok {
+		cancel.(context.CancelFunc)()
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "clip task is not active")
+}
+
 const (
 	maxMovieClipDurationSec = 6.0
 	minMovieClipDurationSec = 0.4
@@ -175,7 +192,36 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 		"fps":      fps,
 		"width":    width,
 	})
-	go h.runMovieClipTask(task.TaskID, sourcePath, req.StartSec, duration, fps, width, curatedFrameID)
+	h.initMovieClipQueue()
+	select {
+	case h.movieClipSlots <- struct{}{}:
+	default:
+		h.tasks.Fail(task.TaskID, "clip_queue_full", "clip queue is full")
+		if curatedFrameID != "" {
+			_ = h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", ErrorMessage: "clip queue is full"})
+		}
+		writeAppError(w, http.StatusTooManyRequests, contracts.ErrorCodeConflict, "clip queue is full")
+		return
+	}
+	parent := h.runtimeContext
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+	h.movieClipCancels.Store(task.TaskID, context.CancelFunc(cancel))
+	go func() {
+		defer func() { <-h.movieClipSlots; h.movieClipCancels.Delete(task.TaskID); cancel() }()
+		select {
+		case h.movieClipWorkers <- struct{}{}:
+			defer func() { <-h.movieClipWorkers }()
+			h.runMovieClipTaskContext(ctx, task.TaskID, sourcePath, req.StartSec, duration, fps, width, curatedFrameID)
+		case <-ctx.Done():
+			h.tasks.Fail(task.TaskID, "clip_cancelled", "clip cancelled or timed out")
+			if curatedFrameID != "" {
+				_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", ErrorMessage: "clip cancelled or timed out"})
+			}
+		}
+	}()
 	writeJSON(w, http.StatusAccepted, task)
 }
 
@@ -184,6 +230,12 @@ func (h *Handler) runMovieClipTask(taskID, sourcePath string, startSec, duration
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	h.runMovieClipTaskContext(ctx, taskID, sourcePath, startSec, duration, fps, width, curatedFrameID)
+}
+
+func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePath string, startSec, duration float64, fps, width int, curatedFrameID string) {
 	root := movieClipArtifactRoot(h)
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		if curatedFrameID != "" && h.store != nil {
@@ -199,6 +251,7 @@ func (h *Handler) runMovieClipTask(taskID, sourcePath string, startSec, duration
 	h.tasks.Progress(taskID, 5, "generating GIF")
 	cmd := executil.CommandContext(ctx, ffmpeg,
 		"-hide_banner", "-loglevel", "error", "-y",
+		"-threads", "2", "-filter_threads", "1",
 		"-ss", strconv.FormatFloat(startSec, 'f', 3, 64),
 		"-i", sourcePath,
 		"-t", strconv.FormatFloat(duration, 'f', 3, 64),
