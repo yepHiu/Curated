@@ -594,7 +594,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
 <template>
   <div
     data-library-saved-view-controls
-    class="flex min-w-0 max-w-full flex-nowrap items-center justify-end gap-1.5"
+    class="flex w-full min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto"
   >
     <div
       v-if="mode !== 'trash' && activeFilterChips.length > 0"
@@ -621,7 +621,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
     </div>
     <div
       data-library-saved-view-actions
-      class="flex shrink-0 flex-nowrap items-center justify-end gap-1.5"
+      class="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5"
     >
     <Popover v-if="mode !== 'trash'" v-model:open="filterOpen">
       <PopoverTrigger as-child>

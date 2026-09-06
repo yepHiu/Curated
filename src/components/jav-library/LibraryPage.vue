@@ -116,7 +116,7 @@ const pageTitleKey = computed(() => {
       class="flex min-w-0 w-full items-center justify-end"
     >
       <template v-if="!batchModeOn">
-        <LibrarySavedViewsControls class="min-w-0 w-full sm:w-auto sm:max-w-full">
+        <LibrarySavedViewsControls>
           <Button
             type="button"
             variant="outline"
