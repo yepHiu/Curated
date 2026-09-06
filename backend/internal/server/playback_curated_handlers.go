@@ -2,11 +2,13 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"mime"
 	"net/http"
@@ -70,6 +72,20 @@ func curatedImageContentType(blob []byte) string {
 		return "application/octet-stream"
 	}
 	return http.DetectContentType(blob)
+}
+
+func curatedImageNotModified(w http.ResponseWriter, r *http.Request, blob []byte) bool {
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(blob))
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	for _, candidate := range strings.Split(r.Header.Get("If-None-Match"), ",") {
+		candidate = strings.TrimPrefix(strings.TrimSpace(candidate), "W/")
+		if candidate == etag || candidate == "*" {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) handleListPlaybackProgress(w http.ResponseWriter, r *http.Request) {
@@ -264,6 +280,9 @@ func (h *Handler) handleGetCuratedFrameImage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.Header().Set("Content-Type", curatedImageContentType(blob))
+	if curatedImageNotModified(w, r, blob) {
+		return
+	}
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(blob)
@@ -290,6 +309,9 @@ func (h *Handler) handleGetCuratedFrameThumbnail(w http.ResponseWriter, r *http.
 		return
 	}
 	w.Header().Set("Content-Type", curatedImageContentType(blob))
+	if curatedImageNotModified(w, r, blob) {
+		return
+	}
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(blob)
@@ -366,6 +388,11 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "image too large or empty")
 		return
 	}
+	imageConfig, _, decodeErr := image.DecodeConfig(bytes.NewReader(raw))
+	if decodeErr != nil || imageConfig.Width <= 0 || imageConfig.Height <= 0 || int64(imageConfig.Width)*int64(imageConfig.Height) > 3840*2160*4 {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid image or image exceeds pixel budget")
+		return
+	}
 	ctx := r.Context()
 	ok, err := h.store.MovieExists(ctx, req.MovieID)
 	if err != nil {
@@ -404,7 +431,8 @@ func (h *Handler) handlePostCuratedFrame(w http.ResponseWriter, r *http.Request)
 	thumbBlob, thumbErr := curatedthumb.PNG(raw)
 	if thumbErr != nil {
 		h.logger.Warn("build curated frame thumbnail", zap.String("id", meta.ID), zap.Error(thumbErr))
-		thumbBlob = bytes.Clone(raw)
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid image data")
+		return
 	}
 	if err := h.store.InsertCuratedFrameWithThumbnail(ctx, meta, raw, thumbBlob); err != nil {
 		if errors.Is(err, storage.ErrCuratedFrameDuplicateID) {
