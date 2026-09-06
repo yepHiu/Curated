@@ -20,6 +20,8 @@ alwaysApply: true
 
 ## 2026-09-06 正式 AI 设置与治理
 
+- **AI 自动保存**：`SettingsAISection.vue` 使用 `use-ai-settings-autosave.ts` 分组串行保存治理/Provider；开关和策略选项立即提交，数字和文本输入停顿 550ms 或失焦后提交，切换分区前提交待保存有效草稿。加载初始化不写回，失败保留草稿并就地重试，服务层乐观更新/回滚不覆盖新输入。治理成功响应后才更新全局权限；自动保存不触发连通测试、清理或统计刷新。
+
 - `Settings → AI`（`section=ai`，`SettingsAISection.vue` 懒加载）提供模型配置、全局启用、只读模式、auto/minimal 工具结果投影、1–30 步上限、1–60 次全局每分钟确认限制、7–365 天记录保留。`aiGovernance` 存 `library-config.cfg`；缺省关闭，不把历史浏览器实验开关自动升级为全局授权。后端 Chat/Action/确认及 Gateway 都执行权限；保存治理设置取消正在生成的请求。连通测试在禁用状态仍可显式运行。
 - 新 PIN 保护端点：`GET/PATCH /api/ai/settings`、`GET /api/ai/usage`、`GET /api/ai/audit`、`POST /api/ai/cleanup`。`GET /api/settings` 也返回 `aiGovernance`。页面重新获得焦点时同步策略；后端始终为权限事实源。
 - 迁移 `0044_ai_observations.sql`：每轮聊天、Action、探针记录 model/provider kind/promptVersion、总耗时、首正文延迟（非流式 null）、模型调用数/usage 覆盖数/工具数、结果及错误类别。使用 `stream_options.include_usage`，处理末尾空 choices 用量包；只保存完整提供方计数，缺失为未知，部分缺失显示部分已知。没有价格表或推算账单。
