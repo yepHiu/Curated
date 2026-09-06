@@ -187,6 +187,8 @@ cd backend && go test ./...
 
 GitHub Actions 的 `.github/workflows/ci.yml` 在 pull request 与 `master` push 上执行以上质量门禁，并额外运行生产依赖 high 漏洞审计、前端/Electron 构建和发布脚本测试。display-scaling 套件保持人工选择，不在该工作流中运行。
 
+CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows 生产包保持一致；仓库检出不依赖开发机未跟踪的 `.env`。Mock 模式继续由独立的运行时 e2e 服务覆盖。复现生产构建时，在 PowerShell 中先执行 `$env:VITE_USE_WEB_API = 'true'`，再运行 `pnpm build`，不得通过放宽 bundle budget 绕过模式差异。
+
 ---
 
 ## 7. 与 Cursor 规则的关系
