@@ -463,3 +463,101 @@ cb219c13 feat: double-click library cards to play and shift-select in batch
 76d166a4 fix: scan imported video types and preflight import disk space
 b1ce2dcc chore(release): publish Curated 1.5.3",versionSource=auto-patch; BuildStamp=20260817.165452; error=pnpm typecheck failed with exit code 2
 2026-08-18,1.5.4,d620ebb9,master,release:publish,release/portable/Curated-1.5.4-windows-x64.zip; release/installer/Curated-Setup-1.5.4.exe; release/manifest/release.json,成功,wujiahui,d620ebb9 fix: drop invalid exists() check in playlist reveal tab test,versionSource=auto-patch; BuildStamp=20260817.165606; portable=versionSource=explicit; installer=versionSource=explicit
+2026-09-06,1.5.5,a05923de,master,release:publish,release/portable/Curated-1.5.5-windows-x64.zip; release/installer/Curated-Setup-1.5.5.exe; release/manifest/release.json,成功,wujiahui,"a05923de test(e2e): align theme selector and await responsive controls
+b96284f3 test(curated): install i18n for virtual frame grid
+a1110307 fix(deps): patch PostCSS and nanoid security advisories
+00aedbda Merge branch 'agent-enhance'
+9c845a59 style(agent): soften and narrow divider hover indicator
+9f9267da docs(agent): describe docked panel layout and controls
+dc5907b9 fix(library): wrap toolbar actions in narrow content panes
+cac64fa0 feat(agent): dock chat panel beside workspace content
+19da32e9 docs(ai): document automatic settings persistence
+7c988b22 feat(ai): autosave policy and provider settings
+d3de6960 docs(curated): record capture optimizations benchmarks and validation
+3fed3eb1 fix(curated): contain original image width inside preview dialogs
+50352f45 fix(curated): preserve preview lifetime and accessible capture feedback
+358d0e80 fix(curated): enable pixel inspection in standalone previews
+ba75a641 perf(i18n): load optional dictionaries as JSON assets
+7d10c9be fix(curated): reset click suppression for each capture gesture
+297244ab test(curated): verify source frames with synthetic video
+06da0098 fix(curated): validate images and honor conditional image requests
+a610ebf5 feat(curated): offer compact video clips alongside palette GIFs
+b6a3e889 feat(curated): review visual similarity without automatic deletion
+08bfa234 feat(curated): extract source frames and inspect original pixels
+97082371 docs(ui): record maintenance settings layout conventions
+d33ddac9 fix(settings): align maintenance sections with settings UI
+e5ab69e0 perf(curated): encode 4K frames off thread with bounded fallback
+85e18b7d perf(curated): use cursor pages and unload offscreen frame cards
+ad4ee28b fix(ai): preserve settings scroll position during pagination
+6e5fc8fc fix(curated): bound GIF jobs and track actual media duration
+2eae285c feat(curated): queue captures with replay-safe preview receipts
+acb3ad4a fix(settings): vertically center curated export controls
+902f83f3 perf(curated): load adjacent originals and preserve image URLs
+6f1b88fe perf(curated): bound thumbnail reads and batch motion queries
+94882796 fix(ai): prevent crowded limit fields
+da9a1be7 fix(settings): align capture feedback sound control
+8f63079e fix(ai): show provider connectivity results inline
+77253412 feat(ai): paginate requests and audit records separately
+c9db6da8 feat(ai): compact request and audit records
+a7281375 feat(ai): align settings panel with Curated UI system
+7c80419f fix(ai): compact agent context chips
+acb180a0 fix(ai): resize agent window from all four corners without grip icons
+a527b2ed fix(ai): keep thinking disclosure stable during streamed turns
+0bd9e59c docs(ai): document formal governance contracts and validation
+008e2ae0 feat(ai): add formal settings usage and audit panel
+3bf6a655 fix(ai): classify interrupted provider streams as failures
+12253914 feat(ai): enforce global governance and persist usage audit reports
+ddaa9e6a feat(ai): capture measured provider usage and request timing
+821e4152 docs: refresh project overview dashboard
+b6321237 docs(playback): document reliability fixes and validation
+8dc5de10 test(playback): verify real session isolation and superseded seeks
+ceb6bfaa fix(playback): recover HLS errors and roll back failed handoffs
+e05ba547 fix(playback): throttle the actual FFmpeg process with bounded fallback
+9634d964 fix(playback): budget seek catchup and wait for contiguous buffer
+0497b72d perf(playback): remove duplicate HLS media prewarming
+36845da4 fix(playback): honor explicit startup targets and cancel abandoned requests
+89f30e19 fix(playback): isolate sessions and bound cancellable startup
+867e7419 docs(agent): record reliability updates and live evaluation evidence
+dc7cdf4f test(agent): add opt-in synthetic real-provider evaluations
+091062fc fix(ai): allow bounded reasoning output in connectivity probes
+f3019ddf fix(agent): close empty answers while preserving tool evidence
+4fa8bb18 feat(agent): recover confirmed writes from durable receipts
+68ad630b feat(agent): bound history and model request context
+dd8ab0ae feat(agent): paginate chat history with stable cursors
+4eb77718 docs(agent): record reliability implementation and validation
+66479fb9 fix(agent): finish interrupted tool indicators without assuming success
+c209094a fix(agent): reject writes when previewed content has changed
+8ee77afc fix(agent): recover interrupted replies and bound action requests
+0bd2b260 fix(agent): preserve turn outcomes and evidence in history
+382182d6 fix(agent): retain recent dialogue in long chat sessions
+f292abc0 docs(agent): assess AI progress and reliability priorities
+9b617c39 docs: record code review fixes and validation results
+ec444955 fix(player): step frames using source media cadence
+8e527c44 fix(agent): isolate streams and history loads across session changes
+9978d100 fix(agent): validate source targets separately from proxy connections
+454d12c9 fix(update): detach installer lifetime from HTTP requests
+26441dce docs: move project dashboard to root
+df132006 docs(agent): record R1 validation
+28d95df9 test(agent): cover trusted outcome edge cases
+5e6df947 docs: record Agent v2 evidence workflow
+c82b40dd feat(agent): show evidence and selection states
+b55eeec2 feat(agent): add trusted resolution and evidence outcomes
+a406dea9 feat(skills): add project dashboard refresher
+a8af5dcf docs: add project overview dashboard
+3f3b774e docs: define Agent prompt v2 guardrails
+e42f0328 docs: prioritize Agent evidence and ambiguity work
+0ead8b52 feat(skills): add curated development workflows
+f387ddab docs: sync Agent import and playback behavior
+d1fa3f14 feat: improve HLS playback stability
+386cbe09 feat: check duplicate movie codes before import
+3c4ece54 feat: add in-place Agent display translation
+20a3cdc2 feat: expand experimental Agent workflows
+bfa5daab feat(skills): add curated development workflows
+0e04174c docs: record experimental agent E2/E3 write actions and requirement progress
+735b5453 feat: ship gated Agent Window writes and in-place E3 actions
+b2547f71 feat: add experimental agent tools, write-preview actions, and saved-view create
+d4eafec1 docs: record experimental agent E1 endpoints, facts, and requirement progress
+7fed1c2e feat: experimental agent E1 - provider settings, AI chat SSE, and floating agent window
+94183f61 test: make movie import upload ledger dates relative to now
+4ffd9888 docs: add agent charter, user PRD, and E1-E4 milestone plan
+79b8ebb9 chore(release): publish Curated 1.5.4",versionSource=auto-patch; BuildStamp=20260906.154156; portable=versionSource=explicit; installer=versionSource=explicit
