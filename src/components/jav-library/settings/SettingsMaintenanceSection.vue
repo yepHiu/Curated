@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue"
 import { useI18n } from "vue-i18n"
-import { BookOpen, ScanSearch, Wrench } from "lucide-vue-next"
+import { ScanSearch, Wrench } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -50,76 +50,37 @@ const { t } = useI18n()
 
         <section
           aria-labelledby="settings-manual-maintenance-title"
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+          class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
           data-settings-maintenance-block="manual"
         >
           <div class="flex min-w-0 flex-col gap-2">
-            <div class="flex items-center gap-2">
-              <ScanSearch class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <h3
-                id="settings-manual-maintenance-title"
-                class="text-sm font-semibold text-foreground"
-              >
-                {{ t("settings.manualCardTitle") }}
-              </h3>
-            </div>
-            <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.manualCardDesc") }}
-            </p>
-          </div>
-
-          <div
-            class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div class="flex min-w-0 flex-col gap-2">
-              <p class="text-sm font-medium text-foreground">
-                {{ t("settings.triggerFullScan") }}
-              </p>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("settings.triggerFullScanHint") }}
-              </p>
-            </div>
-            <Button
-              type="button"
-              class="h-auto min-h-11 w-full shrink-0 rounded-2xl px-5 font-medium sm:w-auto"
-              :disabled="fullScanBusy"
-              data-settings-comfortable-control
-              data-settings-full-scan
-              @click="emit('runFullScan')"
+            <h3
+              id="settings-manual-maintenance-title"
+              class="text-sm font-semibold text-foreground"
             >
-              <ScanSearch
-                data-icon="inline-start"
-                :class="fullScanBusy ? 'animate-pulse' : ''"
-              />
-              {{ t("common.run") }}
-            </Button>
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="settings-config-maintenance-title"
-          class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
-          data-settings-maintenance-block="config"
-        >
-          <div class="flex min-w-0 flex-col gap-2">
-            <div class="flex items-center gap-2">
-              <BookOpen class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <h3
-                id="settings-config-maintenance-title"
-                class="text-sm font-semibold text-foreground"
-              >
-                {{ t("settings.configCardTitle") }}
-              </h3>
-            </div>
+              {{ t("settings.triggerFullScan") }}
+            </h3>
             <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.configCardDesc") }}
+              {{ t("settings.triggerFullScanHint") }}
             </p>
           </div>
-          <p
-            class="rounded-lg border border-border/40 bg-background/30 p-3 text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm sm:leading-6"
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-auto min-h-11 w-full shrink-0 sm:h-8 sm:min-h-8 sm:w-auto"
+            :disabled="fullScanBusy"
+            data-settings-comfortable-control
+            data-settings-full-scan
+            @click="emit('runFullScan')"
           >
-            {{ t("settings.configCardBody") }}
-          </p>
+            <ScanSearch
+              data-icon="inline-start"
+              :class="{ 'motion-safe:animate-pulse': fullScanBusy }"
+            />
+            {{ t("common.run") }}
+          </Button>
         </section>
       </CardContent>
     </Card>

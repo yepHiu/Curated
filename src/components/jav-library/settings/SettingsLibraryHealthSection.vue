@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
   Download,
@@ -276,60 +275,50 @@ function downloadDiagnostics() {
   <div class="contents">
     <section
       aria-labelledby="settings-library-health-title"
-      class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+      class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
       data-settings-maintenance-block="health"
     >
-      <div class="flex min-w-0 flex-col gap-2">
-        <div class="flex items-center gap-2">
-          <Activity class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <div class="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex min-w-0 flex-col gap-2">
           <h3 id="settings-library-health-title" class="text-sm font-semibold text-foreground">
             {{ t("settings.libraryHealthTitle") }}
           </h3>
+          <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            {{ t("settings.libraryHealthDescription") }}
+          </p>
         </div>
-        <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          {{ t("settings.libraryHealthDescription") }}
-        </p>
+        <div class="flex flex-wrap justify-end gap-2 xl:shrink-0">
+          <Button
+            v-if="report"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            data-settings-comfortable-control
+            data-library-health-export
+            :disabled="reportBusy"
+            @click="downloadDiagnostics"
+          >
+            <Download data-icon="inline-start" />
+            {{ t("settings.libraryHealthExport") }}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            data-settings-comfortable-control
+            data-library-health-scan
+            :disabled="!supported || reportBusy || maintenanceActive"
+            @click="runHealthScan"
+          >
+            <LoaderCircle v-if="reportBusy" data-icon="inline-start" class="animate-spin" />
+            <RefreshCw v-else data-icon="inline-start" />
+            {{ reportBusy ? t("settings.libraryHealthScanning") : t("settings.libraryHealthScanAction") }}
+          </Button>
+        </div>
       </div>
 
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex min-w-0 flex-col gap-2">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.libraryHealthScanTitle") }}
-            </p>
-            <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ t("settings.libraryHealthScanHint") }}
-            </p>
-          </div>
-          <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button
-              v-if="report"
-              type="button"
-              variant="outline"
-              class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
-              data-settings-comfortable-control
-              data-library-health-export
-              :disabled="reportBusy"
-              @click="downloadDiagnostics"
-            >
-              <Download data-icon="inline-start" />
-              {{ t("settings.libraryHealthExport") }}
-            </Button>
-            <Button
-              type="button"
-              class="h-auto min-h-11 w-full rounded-2xl px-5 font-medium sm:w-auto"
-              data-settings-comfortable-control
-              data-library-health-scan
-              :disabled="!supported || reportBusy || maintenanceActive"
-              @click="runHealthScan"
-            >
-              <LoaderCircle v-if="reportBusy" data-icon="inline-start" class="animate-spin" />
-              <RefreshCw v-else data-icon="inline-start" />
-              {{ reportBusy ? t("settings.libraryHealthScanning") : t("settings.libraryHealthScanAction") }}
-            </Button>
-          </div>
-        </div>
-
+      <div class="flex min-w-0 flex-col gap-3">
         <p
           v-if="!supported"
           :class="[statusPanelClass('info'), 'text-xs leading-relaxed text-info sm:text-sm']"
@@ -347,25 +336,25 @@ function downloadDiagnostics() {
 
         <template v-if="report">
           <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/5 p-4">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthTotal") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.totalFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/5 p-4">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthCritical") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.criticalFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/5 p-4">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthWarnings") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.warningFindings }}</strong>
             </div>
-            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/40 bg-background/30 p-3">
+            <div class="flex min-w-0 flex-col gap-1 rounded-lg border border-border/50 bg-muted/5 p-4">
               <span class="text-xs text-muted-foreground">{{ t("settings.libraryHealthOfflineSkipped") }}</span>
               <strong class="text-xl font-semibold tabular-nums text-foreground">{{ report.summary.skippedOfflineFiles }}</strong>
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
+          <div class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-2">
                 <ShieldCheck class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -403,7 +392,7 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="repair" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3" aria-live="polite">
+          <div v-if="repair" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthRepairProgressTitle") }}</p>
               <Badge :variant="repairStatusVariant(repair.status)">
@@ -427,7 +416,7 @@ function downloadDiagnostics() {
             </ul>
           </div>
 
-          <div v-if="cleanupTask" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3" aria-live="polite">
+          <div v-if="cleanupTask" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupProgressTitle") }}</p>
               <Badge :variant="cleanupTask.status === 'completed' ? 'success' : cleanupActive ? 'info' : 'warning'">
@@ -438,17 +427,17 @@ function downloadDiagnostics() {
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ cleanupTask.message }}</p>
           </div>
 
-          <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="report.summary.categoryCounts.metadata_missing || report.summary.categoryCounts.metadata_failed" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-4 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthMetadataRepairTitle") }}</p>
               <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthMetadataRepairHint") }}</p>
             </div>
-            <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+            <div class="flex min-w-0 flex-wrap justify-end gap-2">
               <Button
                 v-if="report.summary.categoryCounts.metadata_missing"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
                 data-settings-comfortable-control
                 data-library-health-repair-missing
                 :disabled="repairActive"
@@ -461,7 +450,7 @@ function downloadDiagnostics() {
                 v-if="report.summary.categoryCounts.metadata_failed"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
                 data-settings-comfortable-control
                 data-library-health-repair-failed
                 :disabled="repairActive"
@@ -473,17 +462,17 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div v-if="orphanCleanupFindings.length || stagingCleanupFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-4 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex min-w-0 flex-col gap-2">
               <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthCleanupTitle") }}</p>
               <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthCleanupHint") }}</p>
             </div>
-            <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+            <div class="flex min-w-0 flex-wrap justify-end gap-2">
               <Button
                 v-if="orphanCleanupFindings.length"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
                 data-settings-comfortable-control
                 data-library-health-cleanup-orphans
                 :disabled="maintenanceActive"
@@ -496,7 +485,7 @@ function downloadDiagnostics() {
                 v-if="stagingCleanupFindings.length"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-11 w-full rounded-2xl px-4 sm:w-auto"
+                size="sm" class="h-auto min-h-11 sm:h-8 sm:min-h-8"
                 data-settings-comfortable-control
                 data-library-health-cleanup-staging
                 :disabled="maintenanceActive"
@@ -508,7 +497,7 @@ function downloadDiagnostics() {
             </div>
           </div>
 
-          <div v-if="visibleFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
+          <div v-if="visibleFindings.length" class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <div class="flex flex-wrap items-end justify-between gap-2">
               <div class="flex min-w-0 flex-col gap-1">
                 <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthFindingsTitle") }}</p>
@@ -518,12 +507,12 @@ function downloadDiagnostics() {
             </div>
             <Separator />
             <ul class="flex flex-col gap-2">
-              <li v-for="finding in visibleFindings" :key="finding.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
+              <li v-for="finding in visibleFindings" :key="finding.id" class="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/5 p-4">
                 <div class="flex flex-wrap items-center gap-2">
                   <Badge :variant="severityVariant(finding.severity)">{{ categoryLabel(finding.category) }}</Badge>
                   <strong class="min-w-0 truncate text-sm font-medium text-foreground">{{ finding.label }}</strong>
                 </div>
-                <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ finding.message }}</p>
+                <p class="break-words text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ finding.message }}</p>
                 <code v-if="finding.path" class="break-all text-xs text-muted-foreground">{{ finding.path }}</code>
               </li>
             </ul>
@@ -533,11 +522,7 @@ function downloadDiagnostics() {
           </div>
         </template>
 
-        <div v-else-if="!reportBusy" class="flex flex-col items-start gap-2 rounded-lg border border-dashed border-border/60 bg-background/30 p-3">
-          <FileWarning class="size-5 text-muted-foreground" aria-hidden="true" />
-          <p class="text-sm font-semibold text-foreground">{{ t("settings.libraryHealthIdleTitle") }}</p>
-          <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t("settings.libraryHealthIdleHint") }}</p>
-        </div>
+        <p v-else-if="!reportBusy" class="text-xs leading-relaxed text-muted-foreground" role="status">{{ t("settings.libraryHealthIdleTitle") }}</p>
       </div>
     </section>
 
