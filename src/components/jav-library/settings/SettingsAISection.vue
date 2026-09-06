@@ -15,6 +15,8 @@ import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry, typ
 import type { StatusTone } from "@/lib/ui/status-tone"
 import { applyAIGovernance } from "@/lib/experimental-agent"
 import { AGENT_TOOL_I18N_KEYS } from "@/lib/agent-tool-labels"
+import { useAISettingsAutosave } from "@/composables/use-ai-settings-autosave"
+import { pushAppToast } from "@/composables/use-app-toast"
 
 defineProps<{ useWebApi: boolean }>()
 const { t, locale } = useI18n()
@@ -53,8 +55,26 @@ const validSettings = computed(() => Number.isInteger(settings.value.stepLimit) 
   && Number.isInteger(settings.value.writePerMinute) && settings.value.writePerMinute >= 1 && settings.value.writePerMinute <= 60
   && Number.isInteger(settings.value.retentionDays) && settings.value.retentionDays >= 7 && settings.value.retentionDays <= 365)
 
+const settingsAutosave = useAISettingsAutosave({
+  read: () => ({ ...settings.value }),
+  enabled: () => ready.value,
+  valid: () => validSettings.value,
+  delay: (next, previous) => next.enabled !== previous.enabled || next.readOnly !== previous.readOnly || next.privacy !== previous.privacy ? 0 : 550,
+  save: async (value) => { applyAIGovernance(await service.saveSettings(value)) },
+  onDetachedError: (detail) => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
+})
+const providerAutosave = useAISettingsAutosave({
+  read: () => ({ baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() }),
+  enabled: () => ready.value,
+  valid: () => true,
+  save: (value) => library.setAIProvider(value),
+  onDetachedError: (detail) => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
+})
+
 function syncProvider() {
+  if (ready.value && (providerAutosave.dirty.value || providerAutosave.saving.value)) return
   const provider = library.aiProvider.value
+  providerAutosave.initialize({ baseUrl: provider.baseUrl.trim(), apiKey: provider.apiKey ?? "", model: provider.model.trim() })
   baseUrl.value = provider.baseUrl
   apiKey.value = provider.apiKey ?? ""
   model.value = provider.model
@@ -66,6 +86,7 @@ async function initialize() {
   try {
     const next = await service.getSettings()
     if (disposed) return
+    settingsAutosave.initialize(next)
     settings.value = next
     applyAIGovernance(next)
     ready.value = true
@@ -104,20 +125,6 @@ async function perform(action: () => Promise<void>) {
   try { await action() } catch (err) { error.value = (err as Error).message }
   finally { busy.value = false }
 }
-function saveSettings() {
-  if (!validSettings.value) return
-  void perform(async () => {
-    settings.value = await service.saveSettings({ ...settings.value })
-    applyAIGovernance(settings.value)
-    message.value = t("aiSettings.saved")
-  })
-}
-function saveProvider() {
-  void perform(async () => {
-    await library.setAIProvider({ baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() })
-    message.value = t("aiSettings.saved")
-  })
-}
 async function testProvider() {
   if (busy.value) return
   busy.value = true
@@ -126,6 +133,7 @@ async function testProvider() {
   message.value = ""
   providerTestResult.value = null
   try {
+    if (!await providerAutosave.flush() || disposed) return
     const result = await library.testAIProvider({ kind: "openai-compatible", baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() })
     await refresh()
     if (disposed) return
@@ -235,15 +243,23 @@ function auditLine(entry: AIAuditEntry) {
                 <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
               </Field>
               <FieldGroup class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3" data-ai-limit-fields>
-                <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" type="number" min="1" max="30" :disabled="busy" /></Field>
-                <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" type="number" min="1" max="60" :disabled="busy" /></Field>
-                <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" type="number" min="7" max="365" :disabled="busy" /></Field>
+                <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
+                <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
+                <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
               </FieldGroup>
               <FieldDescription>{{ t('aiSettings.retentionHint') }}</FieldDescription>
             </FieldGroup>
           </section>
-          <div class="flex flex-wrap justify-end gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
-            <Button variant="outline" size="sm" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button><Button size="sm" :disabled="busy || !validSettings" data-ai-save @click="saveSettings">{{ t('settings.experimentalSave') }}</Button>
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/30 p-3">
+            <div class="flex min-h-8 min-w-0 flex-1 flex-wrap items-center gap-2 text-xs" data-ai-policy-save-status>
+              <p v-if="!validSettings" role="alert" class="text-destructive">{{ t('aiSettings.invalidLimits') }}</p>
+              <template v-else-if="settingsAutosave.error.value">
+                <p role="alert" class="break-words text-destructive">{{ t('aiSettings.autoSaveFailed', { message: settingsAutosave.error.value }) }}</p>
+                <Button variant="outline" size="sm" data-ai-policy-retry @click="settingsAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
+              </template>
+              <p v-else role="status" class="text-muted-foreground">{{ settingsAutosave.saving.value || settingsAutosave.dirty.value ? t('common.saving') : settingsAutosave.saved.value ? t('settings.autoPersistSaved') : t('aiSettings.autoSaveHint') }}</p>
+            </div>
+            <Button variant="outline" size="sm" :disabled="busy" data-ai-cleanup @click="cleanup">{{ t('aiSettings.cleanup') }}</Button>
           </div>
         </CardContent>
       </Card>
@@ -252,12 +268,19 @@ function auditLine(entry: AIAuditEntry) {
         <CardContent class="flex flex-col gap-3 pt-0">
           <section class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <FieldGroup class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field class="md:col-span-2"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" autocomplete="off" :disabled="busy" /></Field>
-              <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" type="password" autocomplete="new-password" :disabled="busy" /></Field>
-              <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" autocomplete="off" :disabled="busy" /></Field>
+              <Field class="md:col-span-2"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
+              <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
+              <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
             </FieldGroup>
           </section>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button><Button size="sm" :disabled="busy" data-ai-provider-save @click="saveProvider">{{ t('settings.experimentalSave') }}</Button></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
+          <div class="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-xs" data-ai-provider-save-status>
+            <template v-if="providerAutosave.error.value">
+              <p role="alert" class="break-words text-destructive">{{ t('aiSettings.autoSaveFailed', { message: providerAutosave.error.value }) }}</p>
+              <Button variant="outline" size="sm" data-ai-provider-retry @click="providerAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
+            </template>
+            <p v-else role="status" class="text-muted-foreground">{{ providerAutosave.saving.value || providerAutosave.dirty.value ? t('common.saving') : providerAutosave.saved.value ? t('settings.autoPersistSaved') : t('aiSettings.autoSaveHint') }}</p>
+          </div>
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>

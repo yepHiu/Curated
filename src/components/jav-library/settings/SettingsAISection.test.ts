@@ -1,14 +1,16 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ref } from "vue"
-import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry } from "@/services/contracts/ai-governance-service"
+import type { AIProviderSettingsDTO } from "@/api/types"
+import { defaultAIGovernance, type AIGovernanceSettings, type AIReport, type AIPage, type AIAuditEntry } from "@/services/contracts/ai-governance-service"
 import SettingsAISection from "./SettingsAISection.vue"
 import { applyAIGovernance, useExperimentalAgent } from "@/lib/experimental-agent"
 
 const mocks = vi.hoisted(() => ({ getSettings: vi.fn(), saveSettings: vi.fn(), getUsage: vi.fn(), getAudit: vi.fn(), cleanup: vi.fn(), setAIProvider: vi.fn(), testAIProvider: vi.fn() }))
+const providerState = ref<AIProviderSettingsDTO>({ kind: "openai-compatible", baseUrl: "", model: "" })
 vi.mock("@/services/ai-governance-service", () => ({ useAIGovernanceService: () => mocks }))
-vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ aiProvider: { value: { kind: "openai-compatible", baseUrl: "", model: "" } }, setAIProvider: mocks.setAIProvider, testAIProvider: mocks.testAIProvider }) }))
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string) => key }) }))
+vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ aiProvider: providerState, setAIProvider: mocks.setAIProvider, testAIProvider: mocks.testAIProvider }) }))
+vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string, params?: { message?: string }) => params?.message ? `${key}: ${params.message}` : key }) }))
 
 function emptyReport(): AIReport {
   return { items: [], total: 0, limit: 5, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
@@ -24,22 +26,29 @@ function paginatedRecords() {
   return { report, audit }
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
   vi.clearAllMocks()
+  providerState.value = { kind: "openai-compatible", baseUrl: "", model: "" }
   applyAIGovernance(defaultAIGovernance())
   mocks.getSettings.mockResolvedValue(defaultAIGovernance())
   mocks.saveSettings.mockImplementation(async (value) => value)
   mocks.getUsage.mockResolvedValue(emptyReport())
   mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 })
   mocks.cleanup.mockResolvedValue({ runs: 2, audit: 1, receipts: 0 })
-  mocks.setAIProvider.mockResolvedValue(undefined)
+  mocks.setAIProvider.mockImplementation(async (value) => { providerState.value = { kind: "openai-compatible", ...value } })
   mocks.testAIProvider.mockResolvedValue({ ok: true, latencyMs: 10 })
 })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 describe("SettingsAISection", () => {
   it("keeps provider configuration available while AI is disabled and shows unknown usage", async () => {
     const wrapper = await setup()
     expect(wrapper.find("#ai-base").exists()).toBe(true)
     expect(wrapper.get("[data-ai-token-total]").text()).toBe("aiSettings.unknown")
     expect(useExperimentalAgent().enabled.value).toBe(false)
+    expect(wrapper.find("[data-ai-save]").exists()).toBe(false)
+    expect(wrapper.find("[data-ai-provider-save]").exists()).toBe(false)
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    expect(mocks.setAIProvider).not.toHaveBeenCalled()
     wrapper.unmount()
   })
   it("organizes governance, provider, and records into the settings card hierarchy", async () => {
@@ -124,13 +133,12 @@ describe("SettingsAISection", () => {
   })
   it("applies global state only after saving and keeps the old state on failure", async () => {
     const wrapper = await setup()
-    await wrapper.get("[data-ai-enabled]").trigger("click")
-    expect(useExperimentalAgent().enabled.value).toBe(false)
     mocks.saveSettings.mockRejectedValueOnce(new Error("offline"))
-    await wrapper.get("[data-ai-save]").trigger("click"); await flushPromises()
+    await wrapper.get("[data-ai-enabled]").trigger("click")
+    await flushPromises()
     expect(useExperimentalAgent().enabled.value).toBe(false)
     expect(wrapper.get("[role=alert]").text()).toContain("offline")
-    await wrapper.get("[data-ai-save]").trigger("click"); await flushPromises()
+    await wrapper.get("[data-ai-policy-retry]").trigger("click"); await flushPromises()
     expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), enabled: true })
     expect(useExperimentalAgent().enabled.value).toBe(true)
     wrapper.unmount()
@@ -148,11 +156,99 @@ describe("SettingsAISection", () => {
     expect(wrapper.find("[data-ai-summary]").exists()).toBe(true)
     wrapper.unmount()
   })
+  it("debounces numeric changes and saves them without refreshing statistics", async () => {
+    const wrapper = await setup()
+    await wrapper.get("#ai-steps").setValue("2")
+    await vi.advanceTimersByTimeAsync(300)
+    await wrapper.get("#ai-steps").setValue("20")
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(50)
+    expect(mocks.saveSettings).toHaveBeenCalledExactlyOnceWith({ ...defaultAIGovernance(), stepLimit: 20 })
+    expect(wrapper.get("[data-ai-policy-save-status]").text()).toContain("settings.autoPersistSaved")
+    expect(mocks.getUsage).toHaveBeenCalledOnce()
+    expect(mocks.getAudit).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+  it("serializes policy changes and never replaces a newer draft with an older response", async () => {
+    const wrapper = await setup()
+    let finish!: (value: AIGovernanceSettings) => void
+    mocks.saveSettings.mockReturnValueOnce(new Promise<AIGovernanceSettings>(resolve => { finish = resolve }))
+    await wrapper.get("[data-ai-enabled]").trigger("click")
+    await wrapper.get("#ai-steps").setValue("21")
+    await wrapper.get("[data-ai-enabled]").trigger("click")
+    await vi.advanceTimersByTimeAsync(600)
+    expect(mocks.saveSettings).toHaveBeenCalledTimes(1)
+    finish({ ...defaultAIGovernance(), enabled: true })
+    await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenCalledTimes(2)
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), stepLimit: 21 })
+    expect((wrapper.get("#ai-steps").element as HTMLInputElement).value).toBe("21")
+    expect(useExperimentalAgent().enabled.value).toBe(false)
+    wrapper.unmount()
+  })
+  it("automatically saves provider drafts and retains failed edits for retry", async () => {
+    const wrapper = await setup()
+    mocks.setAIProvider.mockRejectedValueOnce(new Error("offline"))
+    await wrapper.get("#ai-base").setValue("http://localhost:11434/v1")
+    await wrapper.get("#ai-model").setValue("local-model")
+    await vi.advanceTimersByTimeAsync(550)
+    expect(mocks.setAIProvider).toHaveBeenCalledExactlyOnceWith({ baseUrl: "http://localhost:11434/v1", model: "local-model", apiKey: "" })
+    expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("local-model")
+    expect(wrapper.get("[data-ai-provider-save-status]").text()).toContain("offline")
+    await wrapper.get("[data-ai-provider-retry]").trigger("click"); await flushPromises()
+    expect(wrapper.get("[data-ai-provider-save-status]").text()).toContain("settings.autoPersistSaved")
+    expect(mocks.testAIProvider).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it("flushes pending text edits on blur and before leaving the settings section", async () => {
+    const wrapper = await setup()
+    await wrapper.get("#ai-model").setValue("first-model")
+    await wrapper.get("#ai-model").trigger("blur"); await flushPromises()
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "first-model", apiKey: "" })
+    await wrapper.get("#ai-model").setValue("latest-model")
+    await wrapper.get("#ai-steps").setValue("22")
+    wrapper.unmount()
+    await flushPromises()
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "" })
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), stepLimit: 22 })
+  })
+  it("protects newer provider input from the service's optimistic updates and rollback", async () => {
+    const wrapper = await setup()
+    let rejectSave!: (error: Error) => void
+    mocks.setAIProvider.mockImplementationOnce(async (value) => {
+      const previous = providerState.value
+      providerState.value = { kind: "openai-compatible", ...value }
+      try { await new Promise<void>((_, reject) => { rejectSave = reject }) }
+      catch (error) { providerState.value = previous; throw error }
+    })
+    await wrapper.get("#ai-model").setValue("first-model")
+    await vi.advanceTimersByTimeAsync(550)
+    await wrapper.get("#ai-model").setValue("latest-model")
+    rejectSave(new Error("offline")); await flushPromises()
+    expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("latest-model")
+    await wrapper.get("[data-ai-provider-retry]").trigger("click"); await flushPromises()
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "" })
+    expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("latest-model")
+    wrapper.unmount()
+  })
+  it("flushes the model draft before an explicit connectivity test", async () => {
+    const wrapper = await setup()
+    await wrapper.get("#ai-model").setValue("local-model")
+    await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
+    expect(mocks.setAIProvider).toHaveBeenCalledOnce()
+    expect(mocks.testAIProvider).toHaveBeenCalledWith({ kind: "openai-compatible", baseUrl: "", apiKey: "", model: "local-model" })
+    expect(mocks.setAIProvider.mock.invocationCallOrder[0]).toBeLessThan(mocks.testAIProvider.mock.invocationCallOrder[0]!)
+    wrapper.unmount()
+  })
   it("rejects invalid policy locally and only cleans expired records on explicit click", async () => {
     const wrapper = await setup()
     expect(mocks.cleanup).not.toHaveBeenCalled()
     await wrapper.get("#ai-retention").setValue("1")
-    expect(wrapper.get("[data-ai-save]").attributes("disabled")).toBeDefined()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    expect(wrapper.get("#ai-retention").attributes("aria-invalid")).toBe("true")
+    expect(wrapper.get("[data-ai-policy-save-status]").text()).toContain("aiSettings.invalidLimits")
     await wrapper.get("[data-ai-cleanup]").trigger("click"); await flushPromises()
     expect(mocks.cleanup).toHaveBeenCalledOnce()
     wrapper.unmount()
@@ -162,7 +258,7 @@ describe("SettingsAISection", () => {
     mocks.testAIProvider.mockResolvedValueOnce({ ok: false, message: "authentication failed" })
     await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
     const result = wrapper.get("[data-ai-provider-test-result]")
-    expect(result.text()).toBe("settings.experimentalTestFail")
+    expect(result.text()).toContain("settings.experimentalTestFail")
     expect(result.attributes("data-status")).toBe("failed")
     expect(wrapper.find("[data-ai-settings-error]").exists()).toBe(false)
     expect(mocks.getUsage).toHaveBeenCalledTimes(2)
