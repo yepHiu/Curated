@@ -561,7 +561,11 @@
     "captureCompress": "JPEG 压缩入库",
     "captureSource": "源文件高清帧",
     "sourceFrameFailed": "无法提取源文件帧，请稍后重试",
-    "fitImage": "适应窗口"
+    "fitImage": "适应窗口",
+    "visualReview": "视觉相似检查",
+    "visualReviewScope": "已检查 {n} 张。仅检查当前已加载的前 200 张，最多显示 50 对；相似提示不代表重复，可打开大图后选择保留。",
+    "visualReviewEmpty": "未找到视觉相似候选",
+    "visualReviewFailed": "{n} 张图片读取失败，可关闭后重试"
   },
   "stats": {
     "moviesInLibrary": "入库影片",

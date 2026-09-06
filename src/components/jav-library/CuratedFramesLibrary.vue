@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useFocusWithin, onClickOutside, useEventListener } from "@vueuse/core"
 import FrameImageViewer from './FrameImageViewer.vue'
+import { findVisualFramePairs, hashFrameImage, type FrameVisualHash } from '@/lib/curated-frames/visual-similarity'
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -437,6 +438,42 @@ interface RowWithUrl {
 
 const rawRows = ref<CuratedFrameDbRow[]>([])
 const listWithUrls = ref<RowWithUrl[]>([])
+const visualReviewOpen = ref(false)
+const visualReviewBusy = ref(false)
+const visualReviewProgress = ref(0)
+const visualReviewFailed = ref(0)
+const visualPairs = ref<[RowWithUrl, RowWithUrl][]>([])
+let visualReviewController: AbortController | undefined
+
+async function reviewVisualSimilarity() {
+  visualReviewController?.abort()
+  const controller = new AbortController()
+  visualReviewController = controller
+  visualReviewOpen.value = true
+  visualReviewBusy.value = true
+  visualReviewProgress.value = 0
+  visualReviewFailed.value = 0
+  visualPairs.value = []
+  const items = listWithUrls.value.slice(0, 200)
+  const hashes: FrameVisualHash[] = []
+  let index = 0
+  const worker = async () => {
+    while (index < items.length && !controller.signal.aborted) {
+      const item = items[index++]!
+      try {
+        const bits = await hashFrameImage(item.url, controller.signal)
+        if (bits !== null) hashes.push({ id:item.row.id, movieId:item.row.movieId, bits })
+      } catch { if (!controller.signal.aborted) visualReviewFailed.value++ }
+      if (!controller.signal.aborted) visualReviewProgress.value++
+    }
+  }
+  await Promise.all([worker(), worker()])
+  if (controller.signal.aborted) return
+  const byId = new Map(items.map(item => [item.row.id,item]))
+  visualPairs.value = findVisualFramePairs(hashes).map(([a,b]) => [byId.get(a)!,byId.get(b)!])
+  visualReviewBusy.value = false
+}
+watch(visualReviewOpen, open => { if (!open) visualReviewController?.abort() })
 const totalRows = ref(0)
 let rowsNextCursor: string | undefined
 const rowsLoading = ref(false)
@@ -553,6 +590,7 @@ watch(
 )
 
 onUnmounted(() => {
+  visualReviewController?.abort()
   rowsQueryVersion++
   if (dialogTagSaveTimer) {
     clearTimeout(dialogTagSaveTimer)
@@ -1469,6 +1507,7 @@ defineExpose({
         @exit-batch-mode="exitBatchMode"
       >
         <template #actions-start>
+          <Button variant="outline" size="sm" :disabled="listWithUrls.length < 2" @click="reviewVisualSimilarity">{{ t('curated.visualReview') }}</Button>
           <CuratedFrameTagFilterBar
             :facets="curatedTagFacets"
             :selected-tags="activeTagFilters"
@@ -1544,6 +1583,21 @@ defineExpose({
       </div>
     </Tabs>
 
+    <Dialog v-model:open="visualReviewOpen">
+      <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+        <DialogTitle>{{ t('curated.visualReview') }}</DialogTitle>
+        <p class="text-sm text-muted-foreground">{{ t('curated.visualReviewScope', { n:visualReviewProgress }) }}</p>
+        <p v-if="visualReviewBusy">{{ t('common.loading') }}</p>
+        <p v-else-if="!visualPairs.length">{{ t('curated.visualReviewEmpty') }}</p>
+        <p v-if="visualReviewFailed" class="text-sm text-destructive">{{ t('curated.visualReviewFailed', { n:visualReviewFailed }) }}</p>
+        <div v-for="pair in visualPairs" :key="pair[0].row.id + pair[1].row.id" class="grid grid-cols-2 gap-3">
+          <button v-for="item in pair" :key="item.row.id" type="button" class="rounded-lg border border-border p-2 text-left focus-visible:ring-2 focus-visible:ring-ring" @click="visualReviewOpen = false; openFrameCardDialog(item)">
+            <img :src="item.url" :alt="item.row.code" class="aspect-video w-full object-contain" loading="lazy" />
+            <span class="text-xs">{{ item.row.code }} · {{ formatClock(item.row.positionSec) }}</span>
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog :open="dialogOpen" @update:open="handleDialogOpenChange">
       <!-- 覆盖 DialogContent 默认 sm:max-w-lg，否则整窗约 512px 宽，左侧预览会被压成一条 -->
       <DialogContent
