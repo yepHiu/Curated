@@ -15,6 +15,7 @@ const routerMocks = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   getMoviePlayback: vi.fn(),
   createPlaybackSession: vi.fn(),
+  getPlaybackSession: vi.fn(),
   deletePlaybackSession: vi.fn(),
 }))
 const activePlaybackMocks = vi.hoisted(() => ({
@@ -61,6 +62,7 @@ vi.mock("@/services/library-service", () => ({
     trashedMovies: { value: [] },
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
+    getPlaybackSession: serviceMocks.getPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,
   }),
 }))
@@ -151,6 +153,7 @@ async function mountPlayerPage(props: { movie?: Movie; autoplay?: boolean } = {}
 }
 
 beforeEach(() => {
+  localStorage.clear()
   vi.resetModules()
   vi.stubEnv("VITE_USE_WEB_API", "false")
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
@@ -160,6 +163,8 @@ beforeEach(() => {
   routerMocks.replace.mockReset()
   serviceMocks.getMoviePlayback.mockReset()
   serviceMocks.createPlaybackSession.mockReset()
+  serviceMocks.getPlaybackSession.mockReset()
+  serviceMocks.getPlaybackSession.mockResolvedValue(null)
   serviceMocks.deletePlaybackSession.mockReset()
   activePlaybackMocks.updateActivePlaybackSession.mockReset()
   activePlaybackMocks.clearActivePlaybackSession.mockReset()
@@ -178,12 +183,113 @@ afterEach(() => {
 })
 
 describe("PlayerPage loading states", () => {
+  it("reconnects fatal HLS network errors instead of changing to an unsupported direct source", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const startLoad = vi.fn()
+    const listeners = new Map<string, (event: string, data: unknown) => void>()
+    class FakeHls {
+      static Events = { ERROR: "error" }
+      static isSupported() { return true }
+      startLoad = startLoad
+      loadSource() {}
+      attachMedia() {}
+      destroy() {}
+      on(event: string, callback: (event: string, data: unknown) => void) { listeners.set(event, callback) }
+      off(event: string) { listeners.delete(event) }
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({ movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", fileName: "movie.mkv", canDirectPlay: false })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    listeners.get("error")?.("error", { fatal: true, type: "networkError" })
+    await flushPromises()
+    expect(startLoad).toHaveBeenCalledWith(0)
+    expect(serviceMocks.createPlaybackSession).not.toHaveBeenCalled()
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalled()
+    expect(wrapper.get("video").attributes("src") ?? "").not.toContain("/stream")
+    wrapper.unmount()
+  })
+
+  it("keeps the old session until replacement data arrives and rolls back on decode failure", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const sources: string[] = []
+    class FakeHls {
+      static isSupported() { return true }
+      loadSource(src: string) { sources.push(src) }
+      attachMedia() {}
+      destroy() {}
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    const original = { movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", durationSec: 120, startPositionSec: 0, resumePositionSec: 0, canDirectPlay: false }
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce(original)
+    serviceMocks.createPlaybackSession.mockResolvedValueOnce({ ...original, sessionId: "replacement", url: "/replacement.m3u8", startPositionSec: 10, resumePositionSec: 10 })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/replacement.m3u8")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    await wrapper.get("video").trigger("error")
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/original.m3u8")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("replacement")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    wrapper.unmount()
+  })
+
+  it("cancels superseded seeks and releases late sessions without replacing the latest target", async () => {
+    const { loadHlsLibrary } = await import("@/lib/hls-player")
+    const sources: string[] = []
+    class FakeHls {
+      static isSupported() { return true }
+      loadSource(src: string) { sources.push(src) }
+      attachMedia() {}
+      destroy() {}
+    }
+    vi.mocked(loadHlsLibrary).mockResolvedValue(FakeHls)
+    const original = { movieId: "movie-1", mode: "hls", sessionId: "original", url: "/original.m3u8", durationSec: 120, startPositionSec: 0, resumePositionSec: 0, canDirectPlay: false }
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce(original)
+    let finishFirst!: (value: object) => void
+    serviceMocks.createPlaybackSession.mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve }))
+    serviceMocks.createPlaybackSession.mockResolvedValueOnce({ ...original, sessionId: "latest", url: "/latest.m3u8", startPositionSec: 20, resumePositionSec: 20 })
+    const wrapper = await mountPlayerPage()
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }))
+    await flushPromises()
+    expect(serviceMocks.createPlaybackSession.mock.calls[0]?.[3].aborted).toBe(true)
+    finishFirst({ ...original, sessionId: "stale", url: "/stale.m3u8", startPositionSec: 10, resumePositionSec: 10 })
+    await flushPromises()
+    expect(sources.at(-1)).toContain("/latest.m3u8")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("stale")
+    expect(serviceMocks.deletePlaybackSession).not.toHaveBeenCalledWith("original")
+    await wrapper.get("video").trigger("loadeddata")
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("original")
+    wrapper.unmount()
+  })
+
+  it("cancels startup and releases a late descriptor without reseeking after unmount", async () => {
+    let finish!: (value: object) => void
+    serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    routeState.query = { t: "1200" }
+    const wrapper = await mountPlayerPage()
+    const options = serviceMocks.getMoviePlayback.mock.calls[0]?.[1]
+    expect(options.startPositionSec).toBe(1200)
+    wrapper.unmount()
+    expect(options.signal.aborted).toBe(true)
+    finish({ movieId: "movie-1", mode: "hls", sessionId: "late", startPositionSec: 600, durationSec: 7200 })
+    await flushPromises()
+    expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("late")
+    expect(serviceMocks.createPlaybackSession).not.toHaveBeenCalled()
+  })
+
   it("shows the preparing overlay while the playback descriptor is loading", async () => {
     serviceMocks.getMoviePlayback.mockReturnValueOnce(new Promise(() => {}))
     const wrapper = await mountPlayerPage()
 
     try {
-      expect(serviceMocks.getMoviePlayback).toHaveBeenCalledWith("movie-1")
+      expect(serviceMocks.getMoviePlayback).toHaveBeenCalledWith("movie-1", expect.objectContaining({ signal: expect.any(AbortSignal) }))
       expect(wrapper.text()).toContain("common.loading")
       expect(wrapper.text()).toContain("player.preparingPlayback")
     } finally {
@@ -316,7 +422,7 @@ describe("PlayerPage loading states", () => {
     try {
       await flushPromises()
       await nextTick()
-      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0)
+      expect(serviceMocks.createPlaybackSession).toHaveBeenCalledWith("movie-1", "hls", 0, expect.any(AbortSignal))
       expect(serviceMocks.deletePlaybackSession).toHaveBeenCalledWith("old-session")
     } finally {
       wrapper.unmount()
@@ -338,6 +444,66 @@ describe("PlayerPage loading states", () => {
       await nextTick()
 
       expect(wrapper.get("video").attributes("crossorigin")).toBe("use-credentials")
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it("steps to the previous and next frame with D and F outside form controls", async () => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({
+      movieId: "movie-1",
+      mode: "direct",
+      url: "/api/library/movies/movie-1/stream",
+      durationSec: 120,
+      canDirectPlay: true,
+    })
+    const wrapper = await mountPlayerPage()
+
+    try {
+      await flushPromises()
+      await nextTick()
+
+      const video = wrapper.get("video").element as HTMLVideoElement
+      video.currentTime = 10
+      await wrapper.get("video").trigger("timeupdate")
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        value: false,
+      })
+      const pauseSpy = vi.mocked(HTMLMediaElement.prototype.pause)
+      pauseSpy.mockClear()
+
+      const previousFrame = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyD",
+        key: "d",
+      })
+      window.dispatchEvent(previousFrame)
+      expect(previousFrame.defaultPrevented).toBe(true)
+      expect(pauseSpy).toHaveBeenCalledTimes(1)
+      expect(video.currentTime).toBeCloseTo(10 - 1 / 30)
+
+      const nextFrame = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyF",
+        key: "f",
+      })
+      window.dispatchEvent(nextFrame)
+      expect(nextFrame.defaultPrevented).toBe(true)
+      expect(video.currentTime).toBeCloseTo(10)
+
+      const input = document.createElement("input")
+      document.body.appendChild(input)
+      input.dispatchEvent(new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        code: "KeyD",
+        key: "d",
+      }))
+      expect(video.currentTime).toBeCloseTo(10)
+      input.remove()
     } finally {
       wrapper.unmount()
     }
@@ -369,5 +535,38 @@ describe("PlayerPage loading states", () => {
     expect(pauseSpy).toHaveBeenCalledTimes(1)
     expect(removeAttributeSpy).toHaveBeenCalledWith("src")
     expect(loadSpy).toHaveBeenCalledTimes(1)
+  })
+  it.each([[24, 0.5], [30, 2], [60, 1]])("steps a %ifps source at %sx and retains its cadence after pausing", async (fps, rate) => {
+    serviceMocks.getMoviePlayback.mockResolvedValueOnce({ movieId: "movie-1", mode: "direct", url: "/api/library/movies/movie-1/stream", durationSec: 120, canDirectPlay: true })
+    const wrapper = await mountPlayerPage()
+    try {
+      await flushPromises()
+      const video = wrapper.get("video").element as HTMLVideoElement
+      let callback!: VideoFrameRequestCallback
+      video.requestVideoFrameCallback = vi.fn(cb => { callback = cb; return 1 })
+      video.cancelVideoFrameCallback = vi.fn()
+      Object.defineProperty(video, "paused", { configurable: true, value: false })
+      await wrapper.get("video").trigger("loadedmetadata")
+      video.playbackRate = rate
+      const frame = (count: number, mediaTime: number, wallTime: number) => callback(wallTime, {
+        mediaTime, presentedFrames: count, presentationTime: wallTime, expectedDisplayTime: wallTime,
+        width: 1920, height: 1080, processingDuration: 0,
+      })
+      for (let index = 0; index <= 60; index++) frame(index + 1, index / fps, 1000 + index * 1000 / (fps * rate))
+      video.currentTime = 10
+      await wrapper.get("video").trigger("timeupdate")
+      window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", key: "f" }))
+      expect(video.currentTime).toBeCloseTo(10 + 1 / fps, 5)
+      Object.defineProperty(video, "paused", { configurable: true, value: true })
+      await wrapper.get("video").trigger("pause")
+      // Seek frames delivered after long pauses must not replace source cadence.
+      for (let index = 0; index < 4; index++) {
+        frame(62 + index, video.currentTime, 20000 + index * 1000)
+        window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", key: "f" }))
+      }
+      expect(video.currentTime).toBeCloseTo(10 + 5 / fps, 5)
+      window.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyD", key: "d" }))
+      expect(video.currentTime).toBeCloseTo(10 + 4 / fps, 5)
+    } finally { wrapper.unmount() }
   })
 })

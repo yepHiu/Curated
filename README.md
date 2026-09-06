@@ -37,7 +37,10 @@ Installed apps can also check and download a newer installer from Settings → A
 - Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
+- Capture previews with retry/undo, source-file frames and GIF/MP4/WebM clips; see [capture guidance](docs/guide.md#curated-capture-and-inspection).
+- Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
+- A docked Agent panel and AI settings with global controls, measured token usage, timing and audit records; see the [handbook](docs/guide.md#ai-settings-and-governance).
 - GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
 
 ## Quick start
@@ -66,6 +69,7 @@ Backup, restore, path migration, configuration keys, and release packaging are d
 | Document | What it is |
 | --- | --- |
 | [docs/guide.md](docs/guide.md) | Detailed handbook and documentation index |
+| [project-overview-dashboard.html](project-overview-dashboard.html) | Visual snapshot of project delivery, active requirements, Git, and worktrees |
 | [API.md](API.md) | Public HTTP API reference |
 | [docs/features/2026-05-03-feature-inventory.md](docs/features/2026-05-03-feature-inventory.md) | Shipped vs target feature catalog |
 | [docs/README.md](docs/README.md) | How `docs/` subfolders are used |

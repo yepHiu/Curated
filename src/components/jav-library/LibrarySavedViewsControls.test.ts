@@ -290,17 +290,17 @@ describe("LibrarySavedViewsControls", () => {
     expect(active.find("[data-library-filter-chip=sort]").exists()).toBe(false)
   })
 
-  it("keeps filter, saved views, and trailing actions on one unwrapped row", () => {
+  it("allows filter, saved views, and trailing actions to wrap in a narrow workspace", () => {
     const wrapper = mountControls({
       default: '<button data-trailing-action type="button">batch</button>',
     })
     const controls = wrapper.get("[data-library-saved-view-controls]")
     const row = wrapper.get("[data-library-saved-view-actions]")
     expect(controls.classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-nowrap", "items-center"]),
+      expect.arrayContaining(["flex", "flex-wrap", "items-center"]),
     )
     expect(row.classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-nowrap", "items-center"]),
+      expect.arrayContaining(["flex", "flex-wrap", "items-center"]),
     )
     expect(row.find("[data-trailing-action]").exists()).toBe(true)
     expect(row.text()).toContain("library.savedViewFilters")

@@ -241,10 +241,10 @@ PUT    /api/library/saved-views/order       # Transactionally replace the comple
 PATCH  /api/library/saved-views/{id}        # Rename and/or replace canonical filters
 DELETE /api/library/saved-views/{id}        # Delete only the view definition
 GET    /api/library/movies/{id}             # Get movie detail
-GET    /api/library/movies/{id}/playback    # Playback descriptor (direct-play metadata now; future remux/transcode seam); optional `clientVideoCodecs=h264,hevc,av1` query narrows mp4-family direct play to browser-reported codecs
-POST   /api/library/movies/{id}/playback-session  # Create explicit playback session (for example HLS stream push)
+GET    /api/library/movies/{id}/playback    # Descriptor; optional clientVideoCodecs and finite nonnegative startPositionSec; explicit target applied before the first HLS start
+POST   /api/library/movies/{id}/playback-session  # Independent HLS session or explicit direct /stream descriptor; direct never starts forced HLS
 GET    /api/playback/sessions/recent        # List active + recently archived playback sessions for diagnostics
-GET    /api/playback/sessions/{id}          # Get playback session status snapshot
+GET    /api/playback/sessions/{id}          # Get playback session status snapshot (encoderSpeed / writtenDurationSec / lastSeekKind)
 PATCH  /api/library/movies/{id}             # Update: isFavorite, rating (0-5), userTags, metadataTags, user* overrides
 DELETE /api/library/movies/{id}             # Delete movie (move to trash)
 DELETE /api/library/movies/{id}?permanent=true  # Permanently delete (must be in trash)
@@ -277,6 +277,7 @@ POST   /api/library/paths/{id}/storage-binding/rebind # Bind a library path to t
 PATCH  /api/library/paths/{id}              # Update library path
 DELETE /api/library/paths/{id}              # Delete library path
 POST   /api/library/metadata-scrape         # Batch metadata refresh by library paths
+POST   /api/import/movies/code-check        # Preview catalog-code matches for filenames before import
 POST   /api/import/movies                   # Copy uploaded movie files into the configured default library path (returns import.movies task)
 POST   /api/import/movies/uploads           # Create resumable movie import upload session for large browser uploads
 GET    /api/import/movies/uploads/{id}      # Get resumable upload status
@@ -287,18 +288,33 @@ GET    /api/settings                        # Get settings (includes backupDirec
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
+GET    /api/ai/settings                    # Global enable/read-only/privacy/limits/retention
+PATCH  /api/ai/settings                    # Persist policy, cancel active generation; PIN protected
+GET    /api/ai/usage                       # Measured usage + timing + outcome, filters/pagination
+GET    /api/ai/audit                       # Metadata-only tool activity, filters/pagination
+POST   /api/ai/cleanup                     # Expired metadata and standalone action receipts only
+POST   /api/ai/provider/test                # Bounded probe: 1024 output tokens / 30s; 200 + ok=false on failure
+POST   /api/ai/chat                         # Experimental agent SSE (thinking_delta + read tools + present_movies cards + search_provider_titles + get_source_page + confirm_required + session); PIN-protected
+GET    /api/ai/sessions                     # List persisted agent chats
+POST   /api/ai/sessions                     # Create an empty agent chat
+GET    /api/ai/sessions/{sessionId}         # 80 rows per page, ?cursor / nextCursor; result events and applied receipt state (no write tokens)
+DELETE /api/ai/sessions/{sessionId}         # Delete one agent chat and its apply receipts; business changes remain
+POST   /api/ai/actions/{name}               # Experimental agent L1/L2 action (polish_comment / translate_summary / translate_title / insights_narrative)
+POST   /api/ai/confirm                      # Atomic write + durable receipt; identical retry returns snapshot with replayed=true
 POST   /api/scans                           # Start scan task
 GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
-POST   /api/library/movies/{movieId}/clips # Queue bounded GIF clip generation; curatedFrameId persists it with a curated frame (0.4–6 seconds)
-GET    /api/tasks/{taskId}/artifact         # Download completed GIF clip artifact
+POST   /api/library/movies/{movieId}/clips # GIF/MP4/WebM, 0.4–6s, bounded queue and 2-minute deadline
+POST   /api/library/movies/{movieId}/frame # Source-file PNG at positionSec; bounded 20s extraction
+DELETE /api/tasks/{taskId}/clip # Cancel active queued/running clip; static frame remains
+GET    /api/tasks/{taskId}/artifact         # Download completed GIF/MP4/WebM clip artifact
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
 GET    /api/playback/watch-time/daily       # List daily watch-time totals for Settings overview
 POST   /api/playback/watch-time/daily       # Add one bounded watch-time delta
-GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset; returns total/limit/offset)
+GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset, cursor, skipTotal; returns nextCursor; total=-1 when skipped)
 GET    /api/curated-frames/stats            # Curated frames total count
 GET    /api/curated-frames/tags             # Curated frame tag facets
 GET    /api/curated-frames/actors           # Curated frame actor facets
@@ -457,7 +473,7 @@ Player startup should consume `GET /api/library/movies/{id}/playback` instead of
 - Descriptor now also carries structured playback diagnostics: `sessionKind`, `reasonCode`, `reasonMessage`, `sourceContainer`, `sourceVideoCodec`, `sourceAudioCodec`
 - Purpose: preserve current browser playback while creating the expansion seam for remux/transcode/native playback later
 - Browser playback may now move onto a backend-managed HLS session when stream push is enabled
-- HLS startup is remux-first when the source is already HLS-friendly, with fallback to hardware/software transcode profiles
+- HLS startup is remux-first when the source is already HLS-friendly, with fallback to hardware/software transcode profiles. Remux returns after the first fMP4 fragment; transcode waits for about four media segments (or up to 12s). HLS muxer uses `independent_segments+temp_file`. Transcode uses realtime encoder presets (libx264 CRF 22) without a fixed `-readrate`, and follows the client with ffmpeg stdin pause/resume instead of GPU decode+encode together.
 - The frontend keeps HLS playback inside the existing player page and loads the npm-bundled official `hls.js/light` build on demand when the browser lacks native HLS support; Curated's current single-rendition local stream does not require the full build's subtitle, EME/DRM, alternate-audio, or CMCD controllers, and packaged desktop builds no longer rely on a CDN HLS script
 - The backend now keeps a bounded in-memory archive for recent playback sessions so `GET /api/playback/sessions/recent` and `GET /api/playback/sessions/{id}` can diagnose recently stopped or expired HLS sessions
 - The current player page prefers browser-side local-player handoff for external playback. With the PotPlayer preset, the frontend uses a browser protocol template (default `potplayer:{url}`) instead of depending on backend process launch.

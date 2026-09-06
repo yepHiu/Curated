@@ -18,6 +18,7 @@ import type {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Separator } from "@/components/ui/separator"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
@@ -196,17 +197,16 @@ function formatBytes(value: number): string {
 <template>
   <section
     aria-labelledby="settings-backup-title"
-    class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
+    class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
     data-settings-maintenance-block="backup"
   >
     <div class="flex flex-col gap-2">
       <div class="flex min-w-0 flex-wrap items-center gap-2">
-        <DatabaseBackup class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <h3 id="settings-backup-title" class="min-w-0 text-sm font-semibold text-foreground">
           {{ t("settings.backupCardTitle") }}
         </h3>
-        <Badge :variant="supported ? 'success' : 'secondary'">
-          {{ supported ? t("settings.backupAvailable") : t("settings.backupWebRequired") }}
+        <Badge v-if="!supported" variant="secondary">
+          {{ t("settings.backupWebRequired") }}
         </Badge>
       </div>
       <p class="text-pretty text-xs leading-relaxed text-muted-foreground sm:text-sm">
@@ -214,21 +214,37 @@ function formatBytes(value: number): string {
       </p>
     </div>
 
-    <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3">
-      <div class="flex flex-col gap-2">
-        <label for="settings-backup-directory" class="text-sm font-medium text-foreground">
+    <FieldGroup class="gap-4">
+      <Field class="gap-3" :data-invalid="Boolean(directoryError)" :data-disabled="!supported || busy">
+        <FieldLabel for="settings-backup-directory">
           {{ t("settings.backupDirectoryLabel") }}
-        </label>
-        <Input
-          id="settings-backup-directory"
-          v-model="backupDirectoryDraft"
-          :disabled="!supported || busy"
-          :aria-invalid="Boolean(directoryError)"
-          aria-describedby="settings-backup-directory-help"
-          :placeholder="t('settings.backupDirectoryPlaceholder')"
-          autocomplete="off"
-          data-settings-backup-directory
-        />
+        </FieldLabel>
+        <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <Input
+            id="settings-backup-directory"
+            v-model="backupDirectoryDraft"
+            :disabled="!supported || busy"
+            :aria-invalid="Boolean(directoryError)"
+            aria-describedby="settings-backup-directory-help"
+            :placeholder="t('settings.backupDirectoryPlaceholder')"
+            autocomplete="off"
+            class="min-w-0 flex-1"
+            data-settings-backup-directory
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            :disabled="!supported || busy"
+            data-settings-comfortable-control
+            data-settings-backup-pick
+            @click="pickBackupDirectory"
+          >
+            <FolderOpen data-icon="inline-start" />
+            {{ t("settings.backupPickDirectory") }}
+          </Button>
+        </div>
         <p v-if="directoryError" id="settings-backup-directory-help" class="text-xs text-destructive" role="alert">
           {{ directoryError }}
         </p>
@@ -238,41 +254,29 @@ function formatBytes(value: number): string {
         <p v-else id="settings-backup-directory-help" class="text-xs leading-relaxed text-muted-foreground">
           {{ t("settings.backupDirectoryHint") }}
         </p>
-      </div>
-
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Button
-          type="button"
-          variant="outline"
-          class="h-auto min-h-11 w-full transition-colors"
-          :disabled="!supported || busy"
-          data-settings-comfortable-control
-          data-settings-backup-pick
-          @click="pickBackupDirectory"
-        >
-          <FolderOpen data-icon="inline-start" />
-          {{ t("settings.backupPickDirectory") }}
-        </Button>
-        <Button
-          type="button"
-          class="h-auto min-h-11 w-full transition-colors"
-          :disabled="!supported || busy"
-          data-settings-comfortable-control
-          data-settings-backup-create
-          @click="createAndVerifyBackup"
-        >
-          <RotateCw v-if="busyAction === 'create'" data-icon="inline-start" class="animate-spin" />
-          <DatabaseBackup v-else data-icon="inline-start" />
-          {{ t("settings.backupCreate") }}
-        </Button>
-      </div>
+        <div class="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            :disabled="!supported || busy"
+            data-settings-comfortable-control
+            data-settings-backup-create
+            @click="createAndVerifyBackup"
+          >
+            <RotateCw v-if="busyAction === 'create'" data-icon="inline-start" class="animate-spin" />
+            <DatabaseBackup v-else data-icon="inline-start" />
+            {{ t("settings.backupCreate") }}
+          </Button>
+        </div>
+      </Field>
 
       <Separator />
 
-      <div class="flex flex-col gap-2">
-        <label for="settings-backup-path" class="text-sm font-medium text-foreground">
+      <Field class="gap-3" :data-invalid="Boolean(pathError)" :data-disabled="!supported || busy">
+        <FieldLabel for="settings-backup-path">
           {{ t("settings.backupPathLabel") }}
-        </label>
+        </FieldLabel>
         <Input
           id="settings-backup-path"
           v-model="backupPathDraft"
@@ -289,103 +293,104 @@ function formatBytes(value: number): string {
         <p v-else id="settings-backup-path-help" class="text-xs leading-relaxed text-muted-foreground">
           {{ t("settings.backupPathHint") }}
         </p>
-      </div>
+        <div class="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            :disabled="!supported || busy"
+            data-settings-comfortable-control
+            data-settings-backup-verify
+            @click="verifyExistingBackup"
+          >
+            <FileCheck2 data-icon="inline-start" />
+            {{ t("settings.backupVerify") }}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-auto min-h-11 sm:h-8 sm:min-h-8"
+            :disabled="!supported || busy"
+            data-settings-comfortable-control
+            data-settings-backup-preflight
+            @click="preflightExistingBackup"
+          >
+            <ShieldCheck data-icon="inline-start" />
+            {{ t("settings.backupPreflight") }}
+          </Button>
+        </div>
+      </Field>
+    </FieldGroup>
 
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Button
-          type="button"
-          variant="secondary"
-          class="h-auto min-h-11 w-full transition-colors"
-          :disabled="!supported || busy"
-          data-settings-comfortable-control
-          data-settings-backup-verify
-          @click="verifyExistingBackup"
-        >
-          <FileCheck2 data-icon="inline-start" />
-          {{ t("settings.backupVerify") }}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          class="h-auto min-h-11 w-full transition-colors"
-          :disabled="!supported || busy"
-          data-settings-comfortable-control
-          data-settings-backup-preflight
-          @click="preflightExistingBackup"
-        >
-          <ShieldCheck data-icon="inline-start" />
-          {{ t("settings.backupPreflight") }}
-        </Button>
-      </div>
-    </div>
+    <p v-if="actionError" class="text-sm text-destructive" role="alert">
+      {{ actionError }}
+    </p>
+    <p v-if="directoryPersistenceError" class="text-sm text-warning" role="alert">
+      {{ directoryPersistenceError }}
+    </p>
 
-      <p v-if="actionError" class="text-sm text-destructive" role="alert">
-        {{ actionError }}
-      </p>
-      <p v-if="directoryPersistenceError" class="text-sm text-warning" role="alert">
-        {{ directoryPersistenceError }}
-      </p>
+    <template v-if="createdManifest || verification || preflight">
+      <Separator />
+      <div class="flex flex-col gap-3" aria-live="polite">
+        <div v-if="createdManifest" class="flex flex-wrap items-center gap-2 text-sm">
+          <Badge variant="success">{{ t("settings.backupCreated") }}</Badge>
+          <span class="text-muted-foreground">
+            {{ t("settings.backupManifestSummary", {
+              files: createdManifest.files.length,
+              migrations: createdManifest.schemaMigrations.length,
+            }) }}
+          </span>
+        </div>
 
-      <template v-if="createdManifest || verification || preflight">
-        <Separator />
-        <div class="flex flex-col gap-3" aria-live="polite">
-          <div v-if="createdManifest" class="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="success">{{ t("settings.backupCreated") }}</Badge>
+        <div v-if="verification" class="flex flex-col gap-2 text-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge :variant="verification.valid ? 'success' : 'danger'">
+              {{ verification.valid ? t("settings.backupValid") : t("settings.backupInvalid") }}
+            </Badge>
             <span class="text-muted-foreground">
-              {{ t("settings.backupManifestSummary", {
-                files: createdManifest.files.length,
-                migrations: createdManifest.schemaMigrations.length,
+              {{ t("settings.backupIntegritySummary", {
+                quick: verification.databaseIntegrity.quickCheck || '—',
+                foreignKeys: verification.databaseIntegrity.foreignKeyViolations,
               }) }}
             </span>
           </div>
-
-          <div v-if="verification" class="flex flex-col gap-2 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <Badge :variant="verification.valid ? 'success' : 'danger'">
-                {{ verification.valid ? t("settings.backupValid") : t("settings.backupInvalid") }}
-              </Badge>
-              <span class="text-muted-foreground">
-                {{ t("settings.backupIntegritySummary", {
-                  quick: verification.databaseIntegrity.quickCheck || '—',
-                  foreignKeys: verification.databaseIntegrity.foreignKeyViolations,
-                }) }}
-              </span>
-            </div>
-            <ul v-if="verification.errors.length" class="list-disc ps-5 text-destructive">
-              <li v-for="error in verification.errors" :key="error">{{ error }}</li>
-            </ul>
-            <ul v-if="verification.warnings.length" class="list-disc ps-5 text-muted-foreground">
-              <li v-for="warning in verification.warnings" :key="warning">{{ warning }}</li>
-            </ul>
-          </div>
-
-          <div v-if="preflight" class="flex flex-col gap-2 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <Badge :variant="preflight.canRestore ? 'success' : 'danger'">
-                {{ preflight.canRestore ? t("settings.backupPreflightReady") : t("settings.backupPreflightBlocked") }}
-              </Badge>
-              <span class="text-muted-foreground">
-                {{ t("settings.backupCapacitySummary", {
-                  required: formatBytes(preflight.requiredBytes),
-                  available: preflight.availableBytesKnown ? formatBytes(preflight.availableBytes) : '—',
-                }) }}
-              </span>
-            </div>
-            <ul v-if="preflight.errors.length" class="list-disc ps-5 text-destructive">
-              <li v-for="error in preflight.errors" :key="error">{{ error }}</li>
-            </ul>
-            <ul v-if="preflight.warnings.length" class="list-disc ps-5 text-muted-foreground">
-              <li v-for="warning in preflight.warnings" :key="warning">{{ warning }}</li>
-            </ul>
-          </div>
+          <ul v-if="verification.errors.length" class="list-disc ps-5 text-destructive">
+            <li v-for="error in verification.errors" :key="error">{{ error }}</li>
+          </ul>
+          <ul v-if="verification.warnings.length" class="list-disc ps-5 text-muted-foreground">
+            <li v-for="warning in verification.warnings" :key="warning">{{ warning }}</li>
+          </ul>
         </div>
-      </template>
 
-      <div :class="statusPanelClass('info')">
-        <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-          <ArchiveRestore class="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
-          <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
+        <div v-if="preflight" class="flex flex-col gap-2 text-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge :variant="preflight.canRestore ? 'success' : 'danger'">
+              {{ preflight.canRestore ? t("settings.backupPreflightReady") : t("settings.backupPreflightBlocked") }}
+            </Badge>
+            <span class="text-muted-foreground">
+              {{ t("settings.backupCapacitySummary", {
+                required: formatBytes(preflight.requiredBytes),
+                available: preflight.availableBytesKnown ? formatBytes(preflight.availableBytes) : '—',
+              }) }}
+            </span>
+          </div>
+          <ul v-if="preflight.errors.length" class="list-disc ps-5 text-destructive">
+            <li v-for="error in preflight.errors" :key="error">{{ error }}</li>
+          </ul>
+          <ul v-if="preflight.warnings.length" class="list-disc ps-5 text-muted-foreground">
+            <li v-for="warning in preflight.warnings" :key="warning">{{ warning }}</li>
+          </ul>
         </div>
       </div>
+    </template>
+
+    <div :class="statusPanelClass('info')">
+      <div class="flex gap-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+        <ArchiveRestore class="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
+        <p>{{ t("settings.backupOfflineRestoreHint") }}</p>
+      </div>
+    </div>
   </section>
 </template>

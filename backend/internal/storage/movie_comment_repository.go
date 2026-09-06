@@ -14,6 +14,8 @@ import (
 // ErrMovieCommentTooLong is returned when comment body exceeds MaxMovieCommentRunes.
 var ErrMovieCommentTooLong = errors.New("comment body too long")
 
+var ErrAIWriteConflict = errors.New("content changed since the preview; generate a new preview before applying")
+
 // MovieRowExists reports whether a movies row exists for id.
 func (s *SQLiteStore) MovieRowExists(ctx context.Context, movieID string) (bool, error) {
 	movieID = strings.TrimSpace(movieID)
@@ -52,7 +54,7 @@ func (s *SQLiteStore) GetMovieComment(ctx context.Context, movieID string) (cont
 }
 
 // UpsertMovieComment replaces the note for a movie (must exist in movies). Body is trimmed; length validated by rune count.
-func (s *SQLiteStore) UpsertMovieComment(ctx context.Context, movieID string, body string) (contracts.MovieCommentDTO, error) {
+func (s *SQLiteStore) UpsertMovieComment(ctx context.Context, movieID string, body string, expected ...string) (contracts.MovieCommentDTO, error) {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
 		return contracts.MovieCommentDTO{}, ErrMovieNotFound
@@ -76,6 +78,16 @@ func (s *SQLiteStore) UpsertMovieComment(ctx context.Context, movieID string, bo
 		return contracts.MovieCommentDTO{}, err
 	}
 
+	if len(expected) > 0 {
+		var before string
+		err := tx.QueryRowContext(ctx, `SELECT body FROM library_movie_comments WHERE movie_id = ?`, movieID).Scan(&before)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return contracts.MovieCommentDTO{}, err
+		}
+		if before != expected[0] {
+			return contracts.MovieCommentDTO{}, ErrAIWriteConflict
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO library_movie_comments (movie_id, body, updated_at) VALUES (?, ?, ?)
@@ -83,6 +95,9 @@ func (s *SQLiteStore) UpsertMovieComment(ctx context.Context, movieID string, bo
 		movieID, body, now,
 	)
 	if err != nil {
+		return contracts.MovieCommentDTO{}, err
+	}
+	if err := saveAIApplyReceiptTx(ctx, tx, contracts.MovieCommentDTO{Body: body, UpdatedAt: now}); err != nil {
 		return contracts.MovieCommentDTO{}, err
 	}
 	if err := tx.Commit(); err != nil {

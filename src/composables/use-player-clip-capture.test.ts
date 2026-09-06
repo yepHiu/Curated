@@ -43,7 +43,7 @@ describe("usePlayerClipCapture", () => {
     await vi.waitFor(() => expect(onClipReady).toHaveBeenCalledWith({ startSec: 12, endSec: 13.2 }))
   })
 
-  it("keeps the visible recording duration moving between media timeupdate events", () => {
+  it("does not advance a paused media clock with wall time", () => {
     const currentTime = ref(12)
     const capture = usePlayerClipCapture({
       currentTime,
@@ -56,10 +56,10 @@ describe("usePlayerClipCapture", () => {
     vi.advanceTimersByTime(650)
 
     expect(capture.isRecording.value).toBe(true)
-    expect(capture.elapsedSec.value).toBeGreaterThanOrEqual(0.6)
+    expect(capture.elapsedSec.value).toBe(0)
   })
 
-  it("uses the held duration when the media clock is stale at keyup", () => {
+  it("falls back to a still when no media elapsed during the hold", () => {
     const currentTime = ref(12)
     const onClipReady = vi.fn().mockResolvedValue(undefined)
     const capture = usePlayerClipCapture({
@@ -73,9 +73,8 @@ describe("usePlayerClipCapture", () => {
     vi.advanceTimersByTime(2500)
     const result = capture.finishPress()
 
-    expect(result.wasLongPress).toBe(true)
-    expect(result.startSec).toBe(12)
-    expect(result.endSec).toBeGreaterThanOrEqual(14.4)
+    expect(result.wasLongPress).toBe(false)
+    expect(onClipReady).not.toHaveBeenCalled()
   })
 
   it("keeps each clip anchored to the time captured when the press began", () => {
@@ -147,6 +146,19 @@ describe("usePlayerClipCapture", () => {
     expect(capture.phase.value).toBe("processing")
     expect(capture.finishPress().wasLongPress).toBe(false)
     expect(capture.consumeClick()).toBe(true)
+    expect(capture.consumeClick()).toBe(false)
+  })
+
+  it("does not carry an unconsumed long-press click into a new gesture", () => {
+    const currentTime = ref(10)
+    const capture = usePlayerClipCapture({ currentTime, duration: ref(100), onClipReady: vi.fn() })
+    capture.startPress()
+    vi.advanceTimersByTime(400)
+    currentTime.value = 12
+    capture.finishPress()
+    capture.reset()
+    capture.startPress()
+    capture.finishPress()
     expect(capture.consumeClick()).toBe(false)
   })
 })

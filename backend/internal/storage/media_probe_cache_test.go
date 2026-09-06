@@ -26,13 +26,17 @@ func TestMediaProbeCacheRoundTrip(t *testing.T) {
 	}
 
 	row := MediaProbeCacheRow{
-		Path:        path,
-		SizeBytes:   4096,
-		MtimeUnixNs: 1723800000000000000,
-		Container:   "matroska,webm",
-		VideoCodec:  "h264",
-		AudioCodec:  "aac",
-		DurationSec: 7182.5,
+		Path:         path,
+		SizeBytes:    4096,
+		MtimeUnixNs:  1723800000000000000,
+		Container:    "matroska,webm",
+		VideoCodec:   "h264",
+		AudioCodec:   "aac",
+		DurationSec:  7182.5,
+		RFrameRate:          "24000/1001",
+		AvgFrameRate:        "24000/1001",
+		HasNegativeVideoPTS: 1,
+		ProbeSchema:         MediaProbeCacheSchema,
 	}
 	if err := store.UpsertMediaProbeCache(ctx, row); err != nil {
 		t.Fatalf("upsert failed: %v", err)

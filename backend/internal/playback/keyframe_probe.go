@@ -12,8 +12,9 @@ import (
 )
 
 // keyframeProbeWindowSec bounds how far before the requested start we scan for a
-// video keyframe. Sources whose GOP is longer than this window fall back to
-// accurate transcode instead of a stream-copy session.
+// video keyframe. Remux uses that keyframe for stream-copy; transcode uses it
+// for a fast input seek. Sources whose GOP is longer than this window skip remux
+// and transcode from the requested timestamp instead.
 const keyframeProbeWindowSec = 30.0
 
 // probeKeyframeAtOrBeforeFunc is overridable so tests can exercise keyframe

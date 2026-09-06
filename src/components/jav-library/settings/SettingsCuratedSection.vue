@@ -4,6 +4,7 @@ import { FolderOpen, ImageDown, Info } from "lucide-vue-next"
 import type { CuratedFrameSaveMode } from "@/domain/curated-frame/types"
 import type { CuratedFrameExportFormat, CuratedFrameExportMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
   Card,
@@ -198,14 +199,14 @@ const { t } = useI18n()
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportModeTitle") }}</legend>
             <div
-              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
-              <div class="min-w-0 flex-1 space-y-1">
+              <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportModeTitle") }}
                 </p>
               </div>
-              <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2">
+              <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
                 <Select
                   :model-value="curatedFrameExportMode"
                   :disabled="curatedExportFormatSaving"
@@ -236,12 +237,16 @@ const { t } = useI18n()
             <legend class="sr-only">{{ t("settings.captureFeedbackSoundTitle") }}</legend>
             <div
               data-capture-feedback-row
-              class="flex min-w-0 items-center justify-center gap-4"
+              class="flex min-w-0 items-center justify-between gap-4"
             >
-              <p class="text-sm font-semibold text-foreground">
+              <Label
+                for="capture-feedback-sound"
+                class="min-w-0 cursor-pointer text-sm leading-relaxed font-semibold text-foreground"
+              >
                 {{ t("settings.captureFeedbackSoundTitle") }}
-              </p>
+              </Label>
               <Switch
+                id="capture-feedback-sound"
                 :model-value="captureFeedbackSoundEnabled"
                 :aria-label="t('settings.captureFeedbackSoundTitle')"
                 @update:model-value="emit('update:captureFeedbackSoundEnabled', Boolean($event))"
@@ -252,15 +257,15 @@ const { t } = useI18n()
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
             <div
-              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
-              <div class="min-w-0 flex-1 space-y-1">
+              <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportFormatTitle") }}
                 </p>
               </div>
               <div
-                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2"
+                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0"
               >
                 <span
                   v-if="curatedExportFormatSaving"

@@ -32,14 +32,14 @@ describe("SettingsMaintenanceSection", () => {
       },
     })
 
-    expect(wrapper.text()).toContain("settings.manualCardTitle")
-    expect(wrapper.text()).toContain("settings.configCardTitle")
+    expect(wrapper.text()).toContain("settings.triggerFullScan")
+    expect(wrapper.text()).not.toContain("settings.configCardTitle")
     expect(wrapper.findAll('[data-slot="card"]')).toHaveLength(1)
 
     const maintenanceBlocks = wrapper.findAll("[data-settings-maintenance-block]")
-    // The health block stays asynchronously loaded; the three synchronous
+    // The health block stays asynchronously loaded; the two synchronous
     // blocks lock the parent card composition while health has its own suite.
-    expect(maintenanceBlocks).toHaveLength(3)
+    expect(maintenanceBlocks).toHaveLength(2)
     expect(maintenanceBlocks.every((block) => block.classes().includes("p-4"))).toBe(true)
 
     await wrapper.get("[data-settings-full-scan]").trigger("click")

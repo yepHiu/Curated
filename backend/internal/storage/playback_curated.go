@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -125,6 +126,17 @@ func (s *SQLiteStore) InsertCuratedFrame(ctx context.Context, meta CuratedFrameM
 	return s.InsertCuratedFrameWithThumbnail(ctx, meta, imageBlob, nil)
 }
 
+// MatchesCuratedFrameCapture only recognizes an exact replay of immutable
+// capture data. Later title/tag edits do not invalidate a capture receipt.
+func (s *SQLiteStore) MatchesCuratedFrameCapture(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte) (bool, error) {
+	var matches bool
+	err := s.db.QueryRowContext(ctx, `SELECT movie_id = ? AND position_sec = ? AND captured_at = ? AND image_blob = ? FROM curated_frames WHERE id = ?`, meta.MovieID, meta.PositionSec, meta.CapturedAt, imageBlob, meta.ID).Scan(&matches)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return matches, err
+}
+
 // InsertCuratedFrameWithThumbnail inserts a curated frame with both full image and thumbnail blobs.
 func (s *SQLiteStore) InsertCuratedFrameWithThumbnail(ctx context.Context, meta CuratedFrameMeta, imageBlob []byte, thumbBlob []byte) error {
 	actorsJSON, err := json.Marshal(meta.Actors)
@@ -184,6 +196,38 @@ func (s *SQLiteStore) loadCuratedFrameMotion(ctx context.Context, frameID string
 	return &motion, nil
 }
 
+// loadCuratedFrameMotions attaches motion metadata in bounded batches, including
+// the legacy full-list caller, without reading image blobs or issuing N queries.
+func (s *SQLiteStore) loadCuratedFrameMotions(ctx context.Context, frames []CuratedFrameMeta) error {
+	for start := 0; start < len(frames); start += 200 {
+		end := min(start+200, len(frames))
+		args := make([]any, 0, end-start)
+		byID := make(map[string]int, end-start)
+		for i := start; i < end; i++ {
+			args = append(args, frames[i].ID)
+			byID[frames[i].ID] = i
+		}
+		rows, err := s.db.QueryContext(ctx, `SELECT frame_id, status, artifact_name, content_type, duration_sec, width, height, fps, file_size, error_message, created_at, updated_at FROM curated_frame_motions WHERE frame_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")+`)`, args...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var m CuratedFrameMotionMeta
+			if err := rows.Scan(&m.FrameID, &m.Status, &m.ArtifactName, &m.ContentType, &m.DurationSec, &m.Width, &m.Height, &m.FPS, &m.FileSize, &m.ErrorMessage, &m.CreatedAt, &m.UpdatedAt); err != nil {
+				rows.Close()
+				return err
+			}
+			frames[byID[m.FrameID]].Motion = &m
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // CuratedFrameExists reports whether a curated frame exists.
 func (s *SQLiteStore) CuratedFrameExists(ctx context.Context, frameID string) (bool, error) {
 	var one int
@@ -229,21 +273,38 @@ func (s *SQLiteStore) GetCuratedFrameMotion(ctx context.Context, frameID string)
 
 // CuratedFrameQuery holds filter and pagination parameters for curated frame search.
 type CuratedFrameQuery struct {
-	Query   string
-	Actor   string
-	MovieID string
-	Tag     string
-	Tags    []string
-	Limit   int
-	Offset  int
+	Cursor    string
+	SkipTotal bool
+	Query     string
+	Actor     string
+	MovieID   string
+	Tag       string
+	Tags      []string
+	Limit     int
+	Offset    int
 }
 
 // CuratedFramePage holds a paginated query result of curated frame metadata.
 type CuratedFramePage struct {
-	Items  []CuratedFrameMeta
-	Total  int
-	Limit  int
-	Offset int
+	NextCursor string
+	Items      []CuratedFrameMeta
+	Total      int
+	Limit      int
+	Offset     int
+}
+
+func DecodeCuratedFrameCursor(cursor string) (string, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	var values []string
+	if err != nil || len(raw) > 2048 || json.Unmarshal(raw, &values) != nil || len(values) != 2 || values[0] == "" || values[1] == "" {
+		return "", "", fmt.Errorf("invalid curated frame cursor")
+	}
+	return values[0], values[1], nil
+}
+
+func encodeCuratedFrameCursor(frame CuratedFrameMeta) string {
+	raw, _ := json.Marshal([]string{frame.CapturedAt, frame.ID})
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 // CuratedFrameFacet holds a named aggregation bucket and its count for curated frame facets.
@@ -320,16 +381,32 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	}
 	where, args := buildCuratedFrameWhere(q)
 
-	var total int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM curated_frames`+where, args...).Scan(&total); err != nil {
-		return CuratedFramePage{}, err
+	total := -1
+	if !q.SkipTotal {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM curated_frames`+where, args...).Scan(&total); err != nil {
+			return CuratedFramePage{}, err
+		}
+	}
+	if q.Cursor != "" {
+		at, id, err := DecodeCuratedFrameCursor(q.Cursor)
+		if err != nil {
+			return CuratedFramePage{}, err
+		}
+		if where == "" {
+			where = " WHERE "
+		} else {
+			where += " AND "
+		}
+		where += "(captured_at, id) < (?, ?)"
+		args = append(args, at, id)
+		offset = 0
 	}
 
 	pageArgs := append(append([]any{}, args...), limit, offset)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames`+where+`
-		ORDER BY captured_at DESC
+		ORDER BY captured_at DESC, id DESC
 		LIMIT ? OFFSET ?
 	`, pageArgs...)
 	if err != nil {
@@ -353,13 +430,14 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	if err := rows.Close(); err != nil {
 		return CuratedFramePage{}, err
 	}
-	for i := range out {
-		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
-		if err != nil {
-			return CuratedFramePage{}, err
-		}
+	if err := s.loadCuratedFrameMotions(ctx, out); err != nil {
+		return CuratedFramePage{}, err
 	}
-	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset}, nil
+	next := ""
+	if len(out) == limit {
+		next = encodeCuratedFrameCursor(out[len(out)-1])
+	}
+	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset, NextCursor: next}, nil
 }
 
 // ListCuratedFramesByCapturedAtDesc returns all curated frames ordered by capture time, newest first.
@@ -367,7 +445,7 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, movie_id, title, code, actors_json, position_sec, captured_at, tags_json
 		FROM curated_frames
-		ORDER BY captured_at DESC
+		ORDER BY captured_at DESC, id DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -390,11 +468,8 @@ func (s *SQLiteStore) ListCuratedFramesByCapturedAtDesc(ctx context.Context) ([]
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	for i := range out {
-		out[i].Motion, err = s.loadCuratedFrameMotion(ctx, out[i].ID)
-		if err != nil {
-			return nil, err
-		}
+	if err := s.loadCuratedFrameMotions(ctx, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -471,18 +546,15 @@ func (s *SQLiteStore) GetCuratedFrameImage(ctx context.Context, id string) ([]by
 
 // GetCuratedFrameThumbnail returns the thumbnail blob for a curated frame, falling back to the full image.
 func (s *SQLiteStore) GetCuratedFrameThumbnail(ctx context.Context, id string) ([]byte, error) {
-	var thumb, image []byte
-	err := s.db.QueryRowContext(ctx, `SELECT thumb_blob, image_blob FROM curated_frames WHERE id = ?`, id).Scan(&thumb, &image)
+	var thumb []byte
+	err := s.db.QueryRowContext(ctx, `SELECT CASE WHEN length(thumb_blob) > 0 THEN thumb_blob ELSE image_blob END FROM curated_frames WHERE id = ?`, id).Scan(&thumb)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if len(thumb) > 0 {
-		return thumb, nil
-	}
-	return image, nil
+	return thumb, nil
 }
 
 // FindNearbyCuratedFrame returns the curated frame closest to a playback position within the given threshold.

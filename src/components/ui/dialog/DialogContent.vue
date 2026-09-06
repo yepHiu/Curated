@@ -23,6 +23,7 @@ const props = withDefaults(
       showCloseButton?: boolean
       /** 仅短淡入淡出、无缩放，适合大图等重绘制场景 */
       minimalMotion?: boolean
+      portalTo?: HTMLElement | string
     }
   >(),
   {
@@ -32,13 +33,13 @@ const props = withDefaults(
 )
 const emits = defineEmits<DialogContentEmits>()
 
-const delegatedProps = reactiveOmit(props, "class", "minimalMotion", "showCloseButton")
+const delegatedProps = reactiveOmit(props, "class", "minimalMotion", "showCloseButton", "portalTo")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-  <DialogPortal>
+  <DialogPortal :to="portalTo">
     <DialogOverlay :minimal-motion="props.minimalMotion" />
     <DialogContent
       data-slot="dialog-content"

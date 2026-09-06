@@ -30,6 +30,8 @@ describe("player shortcut utilities", () => {
     expect(isCuratedCaptureKeyReserved("Space")).toBe(true)
     expect(isCuratedCaptureKeyReserved("ArrowUp")).toBe(true)
     expect(isCuratedCaptureKeyReserved("KeyK")).toBe(true)
+    expect(isCuratedCaptureKeyReserved("KeyD")).toBe(true)
+    expect(isCuratedCaptureKeyReserved("KeyF")).toBe(true)
     expect(isCuratedCaptureKeyReserved("KeyC")).toBe(false)
     expect(isCuratedCaptureKeyReserved("F8")).toBe(false)
   })

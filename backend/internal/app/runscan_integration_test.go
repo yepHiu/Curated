@@ -363,6 +363,96 @@ func TestIntegration_RunScan_MoreThan255MovieDirectories(t *testing.T) {
 	}
 }
 
+func TestIntegration_RunScan_TrashedLocationDoesNotAbortLaterImports(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	libRoot := filepath.Join(root, "lib")
+	if err := os.MkdirAll(filepath.Join(libRoot, "ABC-100"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(libRoot, "SIRO-5705"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(libRoot, "ABC-100", "ABC-100.mp4"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	siroPath := filepath.Join(libRoot, "SIRO-5705", "SIRO-5705.mp4")
+	if err := os.WriteFile(siroPath, []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sonePath := filepath.Join(libRoot, "SONE-305-C.mp4")
+	if err := os.WriteFile(sonePath, []byte("c"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dbPath := filepath.Join(root, "app.db")
+	store, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddLibraryPath(ctx, libRoot, "lib"); err != nil {
+		t.Fatal(err)
+	}
+
+	trashed, err := store.PersistScanMovie(ctx, contracts.ScanFileResultDTO{
+		Path:     siroPath,
+		FileName: "SIRO-5705.mp4",
+		Number:   "SIRO-5705",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.TrashMovie(ctx, trashed.MovieID); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Default()
+	cfg.DatabasePath = dbPath
+	cfg.CacheDir = filepath.Join(root, "cache")
+	cfg.OrganizeLibrary = false
+
+	a := newTestApp(t, store, cfg)
+	taskID := startScanTask(a, store, ctx, []string{libRoot})
+	var buf bytes.Buffer
+	a.runScan(ctx, &buf, taskID, []string{libRoot})
+
+	imported, _, skipped := decodeScanFileEvents(t, &buf)
+	if len(imported) != 2 {
+		t.Fatalf("imported=%d skipped=%d imported=%+v skipped=%+v", len(imported), len(skipped), imported, skipped)
+	}
+	gotCodes := map[string]struct{}{}
+	for _, item := range imported {
+		gotCodes[item.Number] = struct{}{}
+	}
+	if _, ok := gotCodes["ABC-100"]; !ok {
+		t.Fatalf("missing ABC-100 import: %+v", imported)
+	}
+	if _, ok := gotCodes["SONE-305"]; !ok {
+		t.Fatalf("missing SONE-305 import: %+v", imported)
+	}
+
+	task, ok := a.tasks.Get(taskID)
+	if !ok {
+		t.Fatal("scan task missing")
+	}
+	if task.Status != "completed" {
+		t.Fatalf("scan status=%q error=%s %s", task.Status, task.ErrorCode, task.ErrorMessage)
+	}
+
+	trashedStill, err := store.IsMovieTrashed(ctx, trashed.MovieID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !trashedStill {
+		t.Fatal("scan must not restore the trashed movie")
+	}
+}
+
 func TestIntegration_ClearFirstLibraryScanPendingAfterScan_Storage(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

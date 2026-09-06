@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
+import { Loader2, Sparkles } from "lucide-vue-next"
 import { useI18n } from "vue-i18n"
-import type { PatchMovieBody } from "@/api/types"
+import type { AIActionPreviewDTO, PatchMovieBody } from "@/api/types"
 import type { Movie } from "@/domain/movie/types"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,6 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIActionRequest } from "@/composables/use-ai-action-request"
+import { useAIService } from "@/services/ai-service"
+import { AIServiceError } from "@/services/contracts/ai-service"
+import { useLibraryService } from "@/services/library-service"
 
 const props = defineProps<{
   movie: Movie
@@ -22,7 +28,11 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { required: true })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const aiService = useAIService()
+const { run: runAIAction, pending: aiActionPending, cancel: cancelAIAction } = useAIActionRequest(aiService)
+const libraryService = useLibraryService()
+const { writeEnabled: agentEnabled } = useExperimentalAgent()
 
 const movieEditSaving = ref(false)
 const movieEditError = ref("")
@@ -31,8 +41,13 @@ const editDraftStudio = ref("")
 const editDraftSummary = ref("")
 const editDraftRelease = ref("")
 const editDraftRuntime = ref("")
+const aiBusyField = ref<"title" | "summary" | null>(null)
+const preview = ref<AIActionPreviewDTO | null>(null)
+const previewOpen = ref(false)
+const aiBusy = computed(() => aiBusyField.value !== null)
 
 const releaseDateInputRx = /^\d{4}-\d{2}-\d{2}$/
+const showAgentActions = computed(() => agentEnabled.value)
 
 function syncDraftsFromMovie() {
   movieEditError.value = ""
@@ -56,7 +71,7 @@ watch(open, (isOpen) => {
   if (isOpen) {
     syncDraftsFromMovie()
   }
-})
+}, { immediate: true })
 
 function buildMovieDisplayPatchBody(): PatchMovieBody {
   const rt = editDraftRuntime.value.trim()
@@ -96,6 +111,89 @@ function submitMovieEditDialog() {
     }
     open.value = false
   })
+}
+
+type DisplayActionName = "translate_title" | "translate_summary"
+
+function fieldForDisplayAction(name: string): "title" | "summary" {
+  return name === "translate_title" ? "title" : "summary"
+}
+
+watch([() => props.movie.id, open], cancelAIAction)
+watch(agentEnabled, cancelAIAction)
+
+async function runDisplayAction(name: DisplayActionName) {
+  if (!showAgentActions.value || aiBusy.value) {
+    return
+  }
+  const field = fieldForDisplayAction(name)
+  const body = field === "title" ? editDraftTitle.value.trim() : editDraftSummary.value.trim()
+  if (!body) {
+    return
+  }
+  aiBusyField.value = field
+  movieEditError.value = ""
+  try {
+    const dto = await runAIAction(name, {
+      movieId: props.movie.id,
+      body,
+      locale: locale.value,
+    })
+    if (dto.noop) {
+      movieEditError.value =
+        name === "translate_summary" ? t("detailPanel.movieAiTranslateSummaryNoop") : t("detailPanel.movieAiTranslateNoop")
+      return
+    }
+    preview.value = dto
+    previewOpen.value = true
+  } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_CANCELLED") return
+    if (err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE") {
+      movieEditError.value = t("detailPanel.movieAiUnconfigured")
+    } else {
+      movieEditError.value = err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieAiError")
+    }
+  } finally {
+    aiBusyField.value = null
+  }
+}
+
+async function applyDisplayPreview() {
+  const current = preview.value
+  const movieId = props.movie.id
+  if (!current?.confirmToken || !current.sessionId) {
+    previewOpen.value = false
+    return
+  }
+  aiBusyField.value = fieldForDisplayAction(current.action)
+  movieEditError.value = ""
+  try {
+    const applied = await aiService.confirmTool({
+      sessionId: current.sessionId,
+      name: current.name,
+      arguments: current.arguments ?? { movieId },
+      confirmToken: current.confirmToken,
+    })
+    const latest = await libraryService.loadMovieDetail(movieId)
+    if (props.movie.id !== movieId || preview.value !== current) return
+    if (applied.replayed && !latest) throw new Error(t("detailPanel.movieAiApplyError"))
+    if (current.action === "translate_title") {
+      editDraftTitle.value = (applied.replayed ? latest?.title : current.proposedText) ?? editDraftTitle.value
+    } else if (current.action === "translate_summary") {
+      editDraftSummary.value = (applied.replayed ? latest?.summary : current.proposedText) ?? editDraftSummary.value
+    }
+    previewOpen.value = false
+    preview.value = null
+  } catch (err) {
+    movieEditError.value = err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieAiApplyError")
+  } finally {
+    aiBusyField.value = null
+  }
+}
+
+function discardDisplayPreview() {
+  previewOpen.value = false
+  preview.value = null
 }
 </script>
 
@@ -137,12 +235,33 @@ function submitMovieEditDialog() {
           <label class="text-sm font-medium" for="movie-edit-title">{{
             t("detailPanel.fieldTitle")
           }}</label>
-          <Input
-            id="movie-edit-title"
-            v-model="editDraftTitle"
-            class="rounded-xl text-sm"
-            autocomplete="off"
-          />
+          <div
+            class="rounded-xl border border-border/60 bg-muted/40 text-foreground shadow-sm outline-none transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+            data-movie-edit-title-field
+          >
+            <Input
+              id="movie-edit-title"
+              v-model="editDraftTitle"
+              class="rounded-xl border-0 bg-transparent shadow-none focus-visible:border-0 focus-visible:ring-0"
+              autocomplete="off"
+            />
+            <div v-if="showAgentActions" class="flex items-center justify-end px-1 pb-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="min-h-11 rounded-lg text-muted-foreground hover:text-foreground md:h-8 md:min-h-8"
+                :disabled="aiBusy || !editDraftTitle.trim()"
+                data-movie-edit-ai-translate
+                @click="runDisplayAction('translate_title')"
+              >
+                <Loader2 v-if="aiBusyField === 'title'" class="size-4 motion-safe:animate-spin" />
+                <Sparkles v-else class="size-4" />
+                {{ t("detailPanel.movieAiTranslateTitle") }}
+              </Button>
+          <Button v-if="aiActionPending" type="button" variant="ghost" size="sm" data-ai-action-cancel @click="cancelAIAction">{{ t("common.cancel") }}</Button>
+            </div>
+          </div>
         </div>
         <div class="grid gap-2">
           <label class="text-sm font-medium" for="movie-edit-studio">{{
@@ -159,12 +278,32 @@ function submitMovieEditDialog() {
           <label class="text-sm font-medium" for="movie-edit-summary">{{
             t("detailPanel.fieldSummary")
           }}</label>
-          <textarea
-            id="movie-edit-summary"
-            v-model="editDraftSummary"
-            rows="5"
-            class="text-foreground placeholder:text-muted-foreground flex min-h-[120px] w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-sm shadow-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-          />
+          <div
+            class="rounded-xl border border-border/60 bg-muted/40 text-foreground shadow-sm outline-none transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+            data-movie-edit-summary-field
+          >
+            <textarea
+              id="movie-edit-summary"
+              v-model="editDraftSummary"
+              rows="5"
+              class="min-h-[120px] w-full resize-y border-0 bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+            <div v-if="showAgentActions" class="flex items-center justify-end px-1 pb-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="min-h-11 rounded-lg text-muted-foreground hover:text-foreground md:h-8 md:min-h-8"
+                :disabled="aiBusy || !editDraftSummary.trim()"
+                data-movie-edit-ai-translate-summary
+                @click="runDisplayAction('translate_summary')"
+              >
+                <Loader2 v-if="aiBusyField === 'summary'" class="size-4 motion-safe:animate-spin" />
+                <Sparkles v-else class="size-4" />
+                {{ t("detailPanel.movieAiTranslateSummary") }}
+              </Button>
+            </div>
+          </div>
         </div>
         <div class="grid gap-2 sm:grid-cols-2 sm:gap-3">
           <div class="grid gap-2">
@@ -206,6 +345,32 @@ function submitMovieEditDialog() {
           @click="submitMovieEditDialog"
         >
           {{ movieEditSaving ? t("detailPanel.movieEditSaving") : t("detailPanel.saveMovieEdit") }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  <Dialog :open="previewOpen" @update:open="previewOpen = $event">
+    <DialogContent class="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>{{ t("detailPanel.movieAiPreviewTitle") }}</DialogTitle>
+        <DialogDescription>{{ t("detailPanel.movieAiPreviewDesc") }}</DialogDescription>
+      </DialogHeader>
+      <div class="grid gap-3 text-sm">
+        <div>
+          <p class="mb-1 text-xs text-muted-foreground">{{ t("detailPanel.movieAiBefore") }}</p>
+          <p class="whitespace-pre-wrap rounded-lg bg-muted/50 p-2">{{ preview?.originalText || "—" }}</p>
+        </div>
+        <div>
+          <p class="mb-1 text-xs text-muted-foreground">{{ t("detailPanel.movieAiAfter") }}</p>
+          <p class="whitespace-pre-wrap rounded-lg bg-muted/50 p-2">{{ preview?.proposedText || "—" }}</p>
+        </div>
+      </div>
+      <DialogFooter class="gap-2">
+        <Button type="button" variant="outline" data-movie-edit-ai-discard @click="discardDisplayPreview">
+          {{ t("detailPanel.movieAiDiscard") }}
+        </Button>
+        <Button type="button" :disabled="aiBusy" data-movie-edit-ai-apply @click="applyDisplayPreview">
+          {{ t("detailPanel.movieAiApply") }}
         </Button>
       </DialogFooter>
     </DialogContent>

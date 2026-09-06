@@ -16,6 +16,7 @@ const routerMocks = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   getMoviePlayback: vi.fn(),
   createPlaybackSession: vi.fn(),
+  getPlaybackSession: vi.fn(),
   deletePlaybackSession: vi.fn(),
 }))
 
@@ -67,6 +68,7 @@ vi.mock("@/services/library-service", () => ({
     trashedMovies: { value: [] },
     getMoviePlayback: serviceMocks.getMoviePlayback,
     createPlaybackSession: serviceMocks.createPlaybackSession,
+    getPlaybackSession: serviceMocks.getPlaybackSession,
     deletePlaybackSession: serviceMocks.deletePlaybackSession,
   }),
 }))
@@ -176,6 +178,8 @@ beforeEach(() => {
   routerMocks.replace.mockReset()
   serviceMocks.getMoviePlayback.mockReset()
   serviceMocks.createPlaybackSession.mockReset()
+  serviceMocks.getPlaybackSession.mockReset()
+  serviceMocks.getPlaybackSession.mockResolvedValue(null)
   serviceMocks.deletePlaybackSession.mockReset()
   activePlaybackMocks.updateActivePlaybackSession.mockReset()
   activePlaybackMocks.clearActivePlaybackSession.mockReset()

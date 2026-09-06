@@ -43,6 +43,11 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	audioCodec := normalizeCodecName(input.MediaInfo.AudioCodec)
 	directEligible := isBrowserDirectPlayCandidate(input.Location, container, videoCodec, audioCodec, input.ClientVideoCodecs)
 	remuxEligible := canRemuxToHLS(videoCodec, audioCodec)
+	// Discarded priming IDRs / negative PTS still jitter after stream-copy remux
+	// because B-frames keep the original cadence. Re-encode those to CFR.
+	if remuxEligible && input.MediaInfo.HasNegativeVideoPTS {
+		remuxEligible = false
+	}
 
 	decision := playbackDecision{
 		Mode:             contracts.PlaybackModeDirect,
@@ -66,6 +71,18 @@ func buildPlaybackDecision(input playbackDecisionInput) playbackDecision {
 	}
 
 	if directEligible {
+		if input.StreamPushEnabled && input.MediaInfo.TimestampsUnstable() {
+			decision.Mode = contracts.PlaybackModeHLS
+			decision.SessionKind = chooseHLSSessionKind(remuxEligible)
+			decision.PreferRemux = remuxEligible
+			decision.CanDirectPlay = false
+			decision.ReasonCode = "source_timestamps_unstable"
+			decision.ReasonMessage = "Source frame timestamps look unstable for browser direct play, so HLS is preferred."
+			if input.MediaInfo.HasNegativeVideoPTS {
+				decision.ReasonMessage = "Source has negative priming timestamps; HLS transcode is used to keep a stable frame cadence."
+			}
+			return decision
+		}
 		return decision
 	}
 

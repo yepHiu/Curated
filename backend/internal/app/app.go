@@ -101,6 +101,9 @@ type App struct {
 	autoActorProfileSweepMu         sync.Mutex
 	// playerSettingsMu protects cfg.Player and live playback-runtime updates.
 	playerSettingsMu sync.RWMutex
+	// aiProviderMu protects cfg.AIProvider (library-config.cfg) for the experimental agent.
+	aiProviderMu sync.RWMutex
+	agentRT      agentRuntime
 	// metadataMovieMu protects cfg.MetadataMovieProvider/ProviderChain (library-config.cfg) during concurrent scrapes.
 	metadataMovieMu            sync.RWMutex
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
@@ -1485,7 +1488,27 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 
 			outcome, err := a.store.PersistScanMovie(ctx, result)
 			if err != nil {
-				return err
+				a.logger.Error("scan persist movie failed; skipping file",
+					zap.Error(err),
+					zap.String("taskId", taskID),
+					zap.String("path", result.Path),
+					zap.String("number", result.Number),
+				)
+				skippedCount++
+				result.Status = "skipped"
+				result.Reason = "persist_failed"
+				if saveErr := a.store.SaveScanItem(ctx, result); saveErr != nil {
+					a.logger.Error("failed to persist scan skip item after persist error",
+						zap.Error(saveErr),
+						zap.String("taskId", taskID),
+						zap.String("path", result.Path),
+					)
+					return nil
+				}
+				if emitErr := a.emitEvent(output, contracts.EventScanFileSkipped, result); emitErr != nil {
+					a.logger.Error("failed to emit scan skip event", zap.Error(emitErr), zap.String("taskId", taskID))
+				}
+				return nil
 			}
 
 			result.MovieID = outcome.MovieID
@@ -1528,6 +1551,11 @@ func (a *App) runScan(parentCtx context.Context, output io.Writer, taskID string
 		if errors.Is(err, context.Canceled) {
 			code = contracts.ErrorCodeScanCancelled
 		}
+		a.logger.Error("scan.library failed",
+			zap.Error(err),
+			zap.String("taskId", taskID),
+			zap.String("errorCode", code),
+		)
 		task := a.tasks.Fail(taskID, code, err.Error())
 		if saveErr := a.store.SaveTask(ctx, task); saveErr != nil {
 			a.logger.Error("failed to persist failed task", zap.Error(saveErr), zap.String("taskId", taskID))
@@ -2349,7 +2377,11 @@ func (a *App) StartScan(ctx context.Context, paths []string) (contracts.TaskDTO,
 // ResolvePlayback builds a playback descriptor deciding between direct, HLS, and native playback.
 // clientVideoCodecs optionally carries browser-reported decodable mp4-family video codecs
 // (the `clientVideoCodecs` query parameter); nil keeps the static whitelist.
-func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error) {
+func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, startPositionSec *float64) (contracts.PlaybackDescriptorDTO, error) {
+	return a.resolvePlayback(ctx, movieID, clientVideoCodecs, startPositionSec, false)
+}
+
+func (a *App) resolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, requestedStart *float64, forceDirect bool) (contracts.PlaybackDescriptorDTO, error) {
 	detail, err := a.store.GetMovieDetail(ctx, movieID)
 	if err != nil {
 		return contracts.PlaybackDescriptorDTO{}, err
@@ -2365,24 +2397,20 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 	decision := buildPlaybackDecision(playbackDecisionInput{
 		Location:          location,
 		MediaInfo:         mediaInfo,
-		StreamPushEnabled: a.streams != nil && a.streams.Enabled(),
+		StreamPushEnabled: !forceDirect && a.streams != nil && a.streams.Enabled(),
 		ForceStreamPush:   a.cfg.Player.ForceStreamPush,
 		ClientVideoCodecs: clientVideoCodecs,
 	})
 	descriptor := buildDirectPlaybackDescriptor(movieID, detail, progress, durationSec, decision)
+	startPositionSec := normalizePlaybackStart(requestedStart, descriptor.ResumePositionSec, durationSec)
+	descriptor.ResumePositionSec = startPositionSec
 	if decision.Mode == contracts.PlaybackModeHLS {
-		startPositionSec := 0.0
-		if progress != nil && progress.PositionSec > 0 {
-			startPositionSec = progress.PositionSec
-		}
-		if durationSec > 0 && startPositionSec > durationSec {
-			startPositionSec = durationSec
-		}
 		session, err := a.streams.StartHLSSession(ctx, movieID, location, playback.StartHLSSessionOptions{
 			StartPositionSec: startPositionSec,
 			PreferRemux:      decision.PreferRemux,
 			SourceVideoCodec: decision.SourceVideoCodec,
 			SourceAudioCodec: decision.SourceAudioCodec,
+			SourceContainer:  decision.SourceContainer,
 		})
 		if err != nil {
 			if a.logger != nil {
@@ -2411,7 +2439,7 @@ func (a *App) ResolvePlayback(ctx context.Context, movieID string, clientVideoCo
 // CreatePlaybackSession explicitly creates an HLS playback session and returns its descriptor.
 func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error) {
 	if mode == "" || mode == contracts.PlaybackModeDirect {
-		return a.ResolvePlayback(ctx, movieID, nil)
+		return a.resolvePlayback(ctx, movieID, nil, &startPositionSec, true)
 	}
 	detail, err := a.store.GetMovieDetail(ctx, movieID)
 	if err != nil {
@@ -2443,6 +2471,7 @@ func (a *App) CreatePlaybackSession(ctx context.Context, movieID string, mode co
 			PreferRemux:      decision.PreferRemux,
 			SourceVideoCodec: decision.SourceVideoCodec,
 			SourceAudioCodec: decision.SourceAudioCodec,
+			SourceContainer:  decision.SourceContainer,
 		})
 		if err != nil {
 			return contracts.PlaybackDescriptorDTO{}, err
@@ -2589,8 +2618,8 @@ func buildDirectPlaybackDescriptor(
 ) contracts.PlaybackDescriptorDTO {
 	fileName := filepath.Base(strings.TrimSpace(detail.Location))
 	mimeType, canDirectPlay := resolveDirectPlaybackMimeType(fileName)
-	if decision.CanDirectPlay {
-		canDirectPlay = true
+	if decision.ReasonCode != "" {
+		canDirectPlay = decision.CanDirectPlay
 	}
 
 	dto := contracts.PlaybackDescriptorDTO{
@@ -2622,17 +2651,20 @@ func buildDirectPlaybackDescriptor(
 
 func playbackSessionStatusDTO(snapshot playback.SessionSnapshot) contracts.PlaybackSessionStatusDTO {
 	return contracts.PlaybackSessionStatusDTO{
-		SessionID:        snapshot.Session.ID,
-		MovieID:          snapshot.Session.MovieID,
-		SessionKind:      snapshot.Session.Kind,
-		TranscodeProfile: snapshot.Session.ProfileName,
-		StartPositionSec: snapshot.Session.StartPositionSec,
-		StartedAt:        formatOptionalPlaybackTime(snapshot.Session.StartedAt),
-		LastAccessedAt:   formatOptionalPlaybackTime(snapshot.LastAccessedAt),
-		ExpiresAt:        formatOptionalPlaybackTime(snapshot.ExpiresAt),
-		FinishedAt:       formatOptionalPlaybackTime(snapshot.FinishedAt),
-		State:            snapshot.State,
-		LastError:        strings.TrimSpace(snapshot.LastError),
+		SessionID:          snapshot.Session.ID,
+		MovieID:            snapshot.Session.MovieID,
+		SessionKind:        snapshot.Session.Kind,
+		TranscodeProfile:   snapshot.Session.ProfileName,
+		StartPositionSec:   snapshot.Session.StartPositionSec,
+		StartedAt:          formatOptionalPlaybackTime(snapshot.Session.StartedAt),
+		LastAccessedAt:     formatOptionalPlaybackTime(snapshot.LastAccessedAt),
+		ExpiresAt:          formatOptionalPlaybackTime(snapshot.ExpiresAt),
+		FinishedAt:         formatOptionalPlaybackTime(snapshot.FinishedAt),
+		State:              snapshot.State,
+		LastError:          strings.TrimSpace(snapshot.LastError),
+		EncoderSpeed:       strings.TrimSpace(snapshot.EncoderSpeed),
+		WrittenDurationSec: snapshot.WrittenDurationSec,
+		LastSeekKind:       strings.TrimSpace(snapshot.LastSeekKind),
 	}
 }
 
@@ -2672,12 +2704,16 @@ func (a *App) probeMediaInfoWithPersistentCache(ctx context.Context, location st
 	if a.store != nil {
 		cached, cacheErr := a.store.GetMediaProbeCache(ctx, cleanPath)
 		if cacheErr == nil && cached != nil &&
-			cached.SizeBytes == info.Size() && cached.MtimeUnixNs == info.ModTime().UnixNano() {
+			cached.SizeBytes == info.Size() && cached.MtimeUnixNs == info.ModTime().UnixNano() &&
+			cached.ProbeSchema >= storage.MediaProbeCacheSchema {
 			return playback.MediaInfo{
-				Container:   cached.Container,
-				VideoCodec:  cached.VideoCodec,
-				AudioCodec:  cached.AudioCodec,
-				DurationSec: cached.DurationSec,
+				Container:           cached.Container,
+				VideoCodec:          cached.VideoCodec,
+				AudioCodec:          cached.AudioCodec,
+				DurationSec:         cached.DurationSec,
+				RFrameRate:          cached.RFrameRate,
+				AvgFrameRate:        cached.AvgFrameRate,
+				HasNegativeVideoPTS: cached.HasNegativeVideoPTS != 0,
 			}, nil
 		}
 	}
@@ -2691,16 +2727,27 @@ func (a *App) probeMediaInfoWithPersistentCache(ctx context.Context, location st
 		// Best effort: cache freshness is guarded by size+modtime, so a failed
 		// write only costs the next request one ffprobe run.
 		_ = a.store.UpsertMediaProbeCache(ctx, storage.MediaProbeCacheRow{
-			Path:        cleanPath,
-			SizeBytes:   info.Size(),
-			MtimeUnixNs: info.ModTime().UnixNano(),
-			Container:   mediaInfo.Container,
-			VideoCodec:  mediaInfo.VideoCodec,
-			AudioCodec:  mediaInfo.AudioCodec,
-			DurationSec: mediaInfo.DurationSec,
+			Path:                cleanPath,
+			SizeBytes:           info.Size(),
+			MtimeUnixNs:         info.ModTime().UnixNano(),
+			Container:           mediaInfo.Container,
+			VideoCodec:          mediaInfo.VideoCodec,
+			AudioCodec:          mediaInfo.AudioCodec,
+			DurationSec:         mediaInfo.DurationSec,
+			RFrameRate:          mediaInfo.RFrameRate,
+			AvgFrameRate:        mediaInfo.AvgFrameRate,
+			HasNegativeVideoPTS: boolToInt(mediaInfo.HasNegativeVideoPTS),
+			ProbeSchema:         storage.MediaProbeCacheSchema,
 		})
 	}
 	return mediaInfo, nil
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func resolveDirectPlaybackMimeType(fileName string) (mimeType string, canDirectPlay bool) {
@@ -2796,6 +2843,8 @@ func (a *App) HTTPHandler() http.Handler {
 			ProxyCtl:                         a,
 			BackendLogCtl:                    a,
 			PlayerSettingsCtl:                a,
+			AISettingsCtl:                    a,
+			AIChatProvider:                   a,
 			MovieMetadataRefresher:           a,
 			ActorProfileRefresher:            a,
 			LibraryWatchReloader:             a,

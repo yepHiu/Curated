@@ -19,6 +19,8 @@
 
 # Curated
 
+キャプチャのプレビュー・再試行・取り消し、ソースフレーム、GIF/MP4/WebM クリップに対応しています。[操作ガイド](docs/guide.md#curated-capture-and-inspection)を参照してください。
+
 Curated はローカルファーストのメディアライブラリです。Vue 3 フロントエンド、Go + SQLite バックエンド、Electron デスクトップシェルで構成されます。正式な製品名は **Curated** です。リポジトリ名や npm パッケージ名には引き続き **`jav-shadcn`** が使われている場合があります。
 
 この README は短い公開エントリです。セットアップ、設定、パッケージング、および `docs/` 内の各文書への案内は **[docs/guide.md](docs/guide.md)** を参照してください。HTTP API リファレンスは **[API.md](API.md)** です。
@@ -36,7 +38,9 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 - ローカルファーストの Vue 3 SPA、Go HTTP API、SQLite、Windows 向け Electron トレイシェル。
 - デュアルモード開発：実 Web API と Mock UI を同一サービス層で利用。
+- コンテンツ右側の Agent パネルと AI 設定で全体の有効化、権限、実測トークン、所要時間、監査を管理できます。[手引き](docs/guide.md#ai-settings-and-governance)を参照してください。
 - ライブラリ閲覧、スクレイピング、インポート、再生、キュレートフレーム、俳優アイデンティティ、おすすめ、個人インサイト。
+- 独立した HLS セッション、再開位置の指定、回数制限付きエラー回復。詳しくは[再生ガイド](docs/guide.md#playback-recovery)をご覧ください。
 - 任意の PIN ロック、検証可能なバックアップ、パス移行、ライブラリヘルス修復。
 - GitHub Releases に基づく更新確認とインストーラダウンロード。配布物には FFmpeg とローカル `hls.js` を同梱。
 

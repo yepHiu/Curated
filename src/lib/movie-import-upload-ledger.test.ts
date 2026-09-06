@@ -18,8 +18,9 @@ function makeEntry(overrides: Partial<Parameters<typeof addMovieImportUploadLedg
       { relativePath: "ABC-001.mp4", size: 1024, lastModified: 1755400000000 },
       { relativePath: "Folder/ABC-002.mkv", size: 2048, lastModified: 1755400000001 },
     ],
-    createdAt: "2026-08-17T00:00:00.000Z",
-    lastActiveAt: "2026-08-17T00:00:00.000Z",
+    // 相对当前时间生成，避免硬编码日期超过 TTL 后被剪枝（时间炸弹）
+    createdAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
     ...overrides,
   }
 }
@@ -97,13 +98,11 @@ describe("movie import upload ledger", () => {
   it("touches lastActiveAt for an existing entry only", () => {
     const before = makeEntry()
     addMovieImportUploadLedgerEntry(before)
-    touchMovieImportUploadLedgerEntry(
-      before.uploadId,
-      Date.parse("2026-08-18T00:00:00.000Z"),
-    )
+    const now = Date.now()
+    touchMovieImportUploadLedgerEntry(before.uploadId, now)
 
-    const entries = loadMovieImportUploadLedger(Date.parse("2026-08-18T00:00:00.000Z"))
-    expect(entries[0].lastActiveAt).toBe("2026-08-18T00:00:00.000Z")
+    const entries = loadMovieImportUploadLedger(now)
+    expect(entries[0].lastActiveAt).toBe(new Date(now).toISOString())
 
     touchMovieImportUploadLedgerEntry("upload_missing00000001")
     expect(loadMovieImportUploadLedger()).toHaveLength(1)

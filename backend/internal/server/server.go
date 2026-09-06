@@ -125,6 +125,24 @@ type PlayerSettingsController interface {
 	SetPlayerSettingsPatch(p contracts.PatchPlayerSettingsDTO) error
 }
 
+// AISettingsController exposes and updates the experimental agent provider configuration (library-config.cfg).
+type AISettingsController interface {
+	AIProviderSettings() contracts.AIProviderSettingsDTO
+	SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) error
+}
+
+// AIChatProvider streams experimental agent chat completions and tests provider connectivity.
+type AIChatProvider interface {
+	StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emit func(contracts.AIChatSSEEvent)) error
+	TestAIProvider(ctx context.Context, override *contracts.AIProviderSettingsDTO) contracts.AIProviderTestResponse
+	ListAIChatSessions(ctx context.Context) (contracts.AIChatSessionListDTO, error)
+	CreateAIChatSession(ctx context.Context, title string) (contracts.AIChatSessionDTO, error)
+	GetAIChatSession(ctx context.Context, id string, cursor ...string) (contracts.AIChatSessionDetailDTO, error)
+	DeleteAIChatSession(ctx context.Context, id string) error
+	RunAIAction(ctx context.Context, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error)
+	ApplyAITool(ctx context.Context, req contracts.AIToolApplyRequest) (contracts.AIToolApplyDTO, error)
+}
+
 // LaunchAtLoginController exposes whether Windows login autostart is enabled and whether the current runtime supports it.
 type LaunchAtLoginController interface {
 	LaunchAtLogin() bool
@@ -177,7 +195,7 @@ type DevPerformanceProvider interface {
 type PlaybackResolver interface {
 	// clientVideoCodecs optionally carries browser-reported decodable mp4-family
 	// video codecs (the `clientVideoCodecs` query parameter).
-	ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error)
+	ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, startPositionSec *float64) (contracts.PlaybackDescriptorDTO, error)
 	CreatePlaybackSession(ctx context.Context, movieID string, mode contracts.PlaybackMode, startPositionSec float64) (contracts.PlaybackDescriptorDTO, error)
 	GetPlaybackSession(ctx context.Context, sessionID string) (contracts.PlaybackSessionStatusDTO, error)
 	ListRecentPlaybackSessions(ctx context.Context, limit int) (contracts.PlaybackSessionListDTO, error)
@@ -251,6 +269,8 @@ type Handler struct {
 	proxyCtl                       ProxyController
 	backendLogCtl                  BackendLogSettingsController
 	playerSettingsCtl              PlayerSettingsController
+	aiSettingsCtl                  AISettingsController
+	aiChatProvider                 AIChatProvider
 	movieMetadataRefresher         MovieMetadataRefresher
 	actorProfileRefresher          ActorProfileRefresher
 	libraryWatchReloader           LibraryWatchReloader
@@ -267,6 +287,10 @@ type Handler struct {
 	clientTracker                  *clienttracker.Tracker
 	authAttempts                   *authAttemptLimiter
 	movieClipArtifacts             *sync.Map
+	movieClipInit                  sync.Once
+	movieClipSlots                 chan struct{}
+	movieClipWorkers               chan struct{}
+	movieClipCancels               sync.Map
 }
 
 // Deps bundles all dependencies needed to construct a Handler.
@@ -292,6 +316,8 @@ type Deps struct {
 	ProxyCtl                         ProxyController
 	BackendLogCtl                    BackendLogSettingsController
 	PlayerSettingsCtl                PlayerSettingsController
+	AISettingsCtl                    AISettingsController
+	AIChatProvider                   AIChatProvider
 	MovieMetadataRefresher           MovieMetadataRefresher
 	ActorProfileRefresher            ActorProfileRefresher
 	LibraryWatchReloader             LibraryWatchReloader
@@ -356,6 +382,8 @@ func NewHandler(deps Deps) *Handler {
 		proxyCtl:                       deps.ProxyCtl,
 		backendLogCtl:                  deps.BackendLogCtl,
 		playerSettingsCtl:              deps.PlayerSettingsCtl,
+		aiSettingsCtl:                  deps.AISettingsCtl,
+		aiChatProvider:                 deps.AIChatProvider,
 		movieMetadataRefresher:         deps.MovieMetadataRefresher,
 		actorProfileRefresher:          deps.ActorProfileRefresher,
 		libraryWatchReloader:           deps.LibraryWatchReloader,
@@ -450,11 +478,14 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/movies/{movieId}/restore", h.handleRestoreMovie)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/scrape", h.handleRefreshMovieMetadata)
 	mux.HandleFunc("POST /api/library/movies/{movieId}/clips", h.handleCreateMovieClip)
+	mux.HandleFunc("POST /api/library/movies/{movieId}/frame", h.handleExtractMovieFrame)
+	mux.HandleFunc("DELETE /api/tasks/{taskId}/clip", h.handleCancelMovieClip)
 	mux.HandleFunc("POST /api/library/metadata-scrape", h.handleMetadataScrapeByPaths)
 	mux.HandleFunc("DELETE /api/library/movies/{movieId}", h.handleDeleteMovie)
 	mux.HandleFunc("GET /api/settings", h.handleGetSettings)
 	mux.HandleFunc("PATCH /api/settings", h.handlePatchSettings)
 	mux.HandleFunc("POST /api/import/movies", h.handleImportMovies)
+	mux.HandleFunc("POST /api/import/movies/code-check", h.handleCheckImportMovieCodes)
 	mux.HandleFunc("POST /api/import/movies/uploads", h.handleCreateMovieImportUpload)
 	mux.HandleFunc("GET /api/import/movies/uploads/{uploadId}", h.handleGetMovieImportUpload)
 	mux.HandleFunc("DELETE /api/import/movies/uploads/{uploadId}", h.handleAbortMovieImportUpload)
@@ -495,6 +526,20 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("POST /api/proxy/ping-javbus", h.handleProxyPingJavbus)
 	mux.HandleFunc("POST /api/proxy/ping-google", h.handleProxyPingGoogle)
+
+	mux.HandleFunc("POST /api/ai/provider/test", h.handleAIProviderTest)
+	mux.HandleFunc("POST /api/ai/chat", h.handleAIChat)
+	mux.HandleFunc("GET /api/ai/sessions", h.handleListAIChatSessions)
+	mux.HandleFunc("POST /api/ai/sessions", h.handleCreateAIChatSession)
+	mux.HandleFunc("GET /api/ai/sessions/{sessionId}", h.handleGetAIChatSession)
+	mux.HandleFunc("DELETE /api/ai/sessions/{sessionId}", h.handleDeleteAIChatSession)
+	mux.HandleFunc("POST /api/ai/actions/{name}", h.handleAIAction)
+	mux.HandleFunc("POST /api/ai/confirm", h.handleAIConfirm)
+	mux.HandleFunc("GET /api/ai/settings", h.handleAIGovernance)
+	mux.HandleFunc("PATCH /api/ai/settings", h.handleAIGovernance)
+	mux.HandleFunc("GET /api/ai/usage", h.handleAIReport)
+	mux.HandleFunc("GET /api/ai/audit", h.handleAIAudit)
+	mux.HandleFunc("POST /api/ai/cleanup", h.handleAICleanup)
 
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
@@ -915,8 +960,17 @@ func (h *Handler) handleGetMoviePlayback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var startPositionSec *float64
+	if raw, present := r.URL.Query()["startPositionSec"]; present {
+		value, err := strconv.ParseFloat(raw[0], 64)
+		if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid startPositionSec")
+			return
+		}
+		startPositionSec = &value
+	}
 	if h.playbackResolver != nil {
-		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID, parseClientVideoCodecs(r))
+		dto, err := h.playbackResolver.ResolvePlayback(r.Context(), movieID, parseClientVideoCodecs(r), startPositionSec)
 		if err == nil {
 			writeJSON(w, http.StatusOK, dto)
 			return
@@ -1090,6 +1144,8 @@ func (h *Handler) handleGetPlaybackSessionFile(w http.ResponseWriter, r *http.Re
 		return
 	case ".ts":
 		w.Header().Set("Content-Type", "video/mp2t")
+	case ".m4s", ".mp4":
+		w.Header().Set("Content-Type", "video/mp4")
 	}
 
 	http.ServeFile(w, r, absPath)
@@ -1846,6 +1902,13 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 			Password: p.Password,
 		}
 	}
+	if h.aiSettingsCtl != nil {
+		dto.AIProvider = h.aiSettingsCtl.AIProviderSettings()
+	}
+	if p, ok := h.aiChatProvider.(AIGovernanceProvider); ok {
+		settings := p.AIGovernanceSettings()
+		dto.AIGovernance = &settings
+	}
 	if h.backendLogCtl != nil {
 		dto.BackendLog = h.backendLogCtl.BackendLogSettings()
 	}
@@ -1957,7 +2020,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1971,7 +2034,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2312,6 +2375,32 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,
 				message: fixedSettingsPatchMessage("failed to save proxy settings"),
+			},
+		})
+	}
+
+	if body.AIProvider != nil {
+		if h.aiSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "ai provider settings not available")
+			return
+		}
+		prev := h.aiSettingsCtl.AIProviderSettings()
+		target := *body.AIProvider
+		ops = append(ops, settingsPatchOperation{
+			name:  "aiProvider",
+			apply: func() error { return h.aiSettingsCtl.SetAIProviderSettingsPatch(target) },
+			rollback: func() error {
+				return h.aiSettingsCtl.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{
+					Kind:    &prev.Kind,
+					BaseURL: &prev.BaseURL,
+					APIKey:  &prev.APIKey,
+					Model:   &prev.Model,
+				})
+			},
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
 			},
 		})
 	}

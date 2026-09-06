@@ -119,6 +119,9 @@ func (s *SQLiteStore) CreateSavedView(
 	if err != nil {
 		return contracts.SavedViewDTO{}, err
 	}
+	if err := saveAIApplyReceiptTx(ctx, tx, contracts.SavedViewDTO{ID: id, Name: name, Filters: filters, SortOrder: count, CreatedAt: timestamp, UpdatedAt: timestamp}); err != nil {
+		return contracts.SavedViewDTO{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return contracts.SavedViewDTO{}, err
 	}

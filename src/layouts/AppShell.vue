@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
-import { LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
+import { Bot, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import MovieImportDialog from "@/components/jav-library/MovieImportDialog.vue"
@@ -42,6 +42,17 @@ import NotificationCenter from "@/components/notification-center/NotificationCen
 import { useTheme } from "@/composables/use-theme"
 import { devPerformanceBarHidden, setDevPerformanceBarHidden } from "@/lib/dev-performance/visibility"
 import { useLibraryService } from "@/services/library-service"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAgentWindow } from "@/composables/use-agent-window"
+import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
+
+/** 实验性 Agent Window：懒加载，不进首屏 bundle（开关默认关闭时零成本） */
+const AgentWindowPanel = defineAsyncComponent(
+  () => import("@/components/agent-window/AgentWindow.vue"),
+)
+
+const { enabled: agentEnabled } = useExperimentalAgent()
+const { open: agentWindowOpen, toggleWindow: toggleAgentWindow } = useAgentWindow()
 
 useLibraryWatchToasts()
 useLibraryStorageStatusAlerts()
@@ -55,6 +66,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
+useAIGovernanceSync()
 
 const isDev = import.meta.env.DEV
 
@@ -888,6 +900,23 @@ function clearActorsSearch() {
               class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-border/50 sm:border-l sm:pl-3 lg:pl-4"
             >
               <MovieImportDialog />
+              <Button
+                v-if="agentEnabled"
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-controls="agent-panel"
+                data-agent-entry
+                class="size-11 rounded-2xl text-muted-foreground hover:bg-muted/70 hover:text-foreground lg:size-9"
+                :class="agentWindowOpen ? 'text-primary' : ''"
+                :aria-label="t('shell.agentWindowAria')"
+                :title="t('shell.agentWindowAria')"
+                :aria-expanded="agentWindowOpen ? 'true' : 'false'"
+                :aria-pressed="agentWindowOpen ? 'true' : 'false'"
+                @click="toggleAgentWindow"
+              >
+                <Bot class="size-5" aria-hidden="true" />
+              </Button>
               <NotificationCenter />
               <Button
                 type="button"
@@ -905,13 +934,16 @@ function clearActorsSearch() {
             </div>
           </div>
 
-          <div class="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div class="flex min-h-0 min-w-0 flex-1 overflow-hidden" data-agent-workspace>
             <div
+              v-show="!(agentEnabled && agentWindowOpen && !isLgUp)"
+              class="flex-1"
               data-router-view-frame
               :class="routerViewFrameClass"
             >
               <RouterView />
             </div>
+            <AgentWindowPanel v-if="agentEnabled" />
           </div>
         </section>
       </div>

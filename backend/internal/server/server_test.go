@@ -2313,9 +2313,12 @@ func (s stubDevPerformanceProvider) GetDevPerformanceSummary(ctx context.Context
 	return s.dto
 }
 
-func (s stubPlaybackResolver) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string) (contracts.PlaybackDescriptorDTO, error) {
+func (s stubPlaybackResolver) ResolvePlayback(ctx context.Context, movieID string, clientVideoCodecs []string, startPositionSec *float64) (contracts.PlaybackDescriptorDTO, error) {
 	_ = ctx
 	dto := s.resolveDTO
+	if startPositionSec != nil {
+		dto.ResumePositionSec = *startPositionSec
+	}
 	dto.MovieID = movieID
 	return dto, nil
 }

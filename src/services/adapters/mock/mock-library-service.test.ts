@@ -193,6 +193,15 @@ describe("mockLibraryService", () => {
       failedFiles: 0,
     })
 
+    const first = mockLibraryService.movies.value[0]
+    const check = await mockLibraryService.checkImportMovieCodes([
+      `${first.code}-C.mp4`,
+      "holiday.mp4",
+    ])
+    expect(check.matchedCount).toBe(1)
+    expect(check.items[0]?.matches[0]?.movieId).toBe(first.id)
+    expect(check.items[1]?.matches).toEqual([])
+
     await mockLibraryService.setDefaultImportLibraryPathId("library-a")
   })
 

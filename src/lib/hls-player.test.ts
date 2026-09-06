@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   buildHlsPlaybackConfig,
-  prewarmHlsResources,
   startHlsLoadingAtSessionOrigin,
 } from "@/lib/hls-player"
 
@@ -32,6 +31,9 @@ describe("buildHlsPlaybackConfig", () => {
       startFragPrefetch: true,
       enableWorker: true,
       lowLatencyMode: false,
+      maxBufferLength: 60,
+      maxMaxBufferLength: 120,
+      maxStarvationDelay: 12,
     })
   })
 
@@ -72,31 +74,5 @@ describe("loadHlsLibrary", () => {
     expect(window.Hls).toBe(hlsMock.FakeHls)
     expect(appendSpy).not.toHaveBeenCalled()
     expect(document.querySelector('script[src*="cdn.jsdelivr.net"]')).toBeNull()
-  })
-})
-
-describe("prewarmHlsResources", () => {
-  it("fetches HLS playlists and media resources with credentials", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith("index.m3u8")) {
-        return new Response("#EXTM3U\n#EXTINF:1,\nseg0.ts\n", { status: 200 })
-      }
-      return new Response(new Uint8Array([1, 2, 3]), { status: 200 })
-    })
-    vi.stubGlobal("fetch", fetchMock)
-
-    await prewarmHlsResources("http://127.0.0.1:8080/api/playback/sessions/s1/hls/index.m3u8", {
-      resourceCount: 1,
-      timeoutMs: 1000,
-    })
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8080/api/playback/sessions/s1/hls/index.m3u8",
-      expect.objectContaining({ credentials: "include" }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8080/api/playback/sessions/s1/hls/seg0.ts",
-      expect.objectContaining({ credentials: "include" }),
-    )
   })
 })

@@ -10,7 +10,7 @@ import { getCuratedFrameSaveMode } from "@/lib/curated-frames/settings-storage"
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
 export type SaveCuratedCaptureResult =
-  | { ok: true; id: string; positionSec: number }
+  | { ok: true; id: string; positionSec: number; exportFailed?: boolean }
   | { ok: false; reason: string }
 
 export type CuratedFrameCaptureCandidate = {
@@ -22,6 +22,7 @@ export type CuratedFrameCaptureCandidate = {
 
 export type SaveCuratedCaptureOptions = {
   positionSecOverride?: number
+  onPreview?: (url: string) => void
 }
 
 export function resolveCuratedCapturePositionSec(
@@ -39,7 +40,9 @@ export async function captureCuratedFrameCandidate(
   video: HTMLVideoElement,
   options: SaveCuratedCaptureOptions = {},
 ): Promise<{ ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }> {
-  const cap = await captureVideoFrameToPng(video)
+  const positionSec = resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride)
+  const capturedAt = new Date().toISOString()
+  const cap = await captureVideoFrameToPng(video, options.onPreview)
   if (!cap.ok) {
     return { ok: false, reason: cap.reason }
   }
@@ -48,8 +51,8 @@ export async function captureCuratedFrameCandidate(
     candidate: {
       id: crypto.randomUUID(),
       blob: cap.blob,
-      positionSec: resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride),
-      capturedAt: new Date().toISOString(),
+      positionSec,
+      capturedAt,
     },
   }
 }
@@ -57,6 +60,7 @@ export async function captureCuratedFrameCandidate(
 export async function saveCuratedFrameCandidate(
   candidate: CuratedFrameCaptureCandidate,
   movie: Movie,
+  options: { skipExport?: boolean } = {},
 ): Promise<SaveCuratedCaptureResult> {
   const row = {
     id: candidate.id,
@@ -72,6 +76,7 @@ export async function saveCuratedFrameCandidate(
 
   try {
     if (USE_WEB) {
+      if (candidate.blob.size > 12 * 1024 * 1024) return { ok: false, reason: i18n.global.t('curated.captureTooLarge') }
       await api.createCuratedFrameUpload({
         id: row.id,
         movieId: row.movieId,
@@ -96,24 +101,24 @@ export async function saveCuratedFrameCandidate(
     }
   }
 
-  const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt)
+  let exportFailed = false
+  if (!options.skipExport) {
+    try { await exportCuratedFrameCandidate(candidate, movie) } catch { exportFailed = true }
+  }
+  return { ok: true, id: row.id, positionSec: row.positionSec, ...(exportFailed ? { exportFailed } : {}) }
+}
+
+export async function exportCuratedFrameCandidate(candidate: CuratedFrameCaptureCandidate, movie: Movie): Promise<void> {
+  const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt).replace(/\.png$/, candidate.blob.type === 'image/jpeg' ? '.jpg' : '.png')
   const mode = getCuratedFrameSaveMode()
   if (mode === "download") {
-    try {
-      triggerDownloadBlob(candidate.blob, filename)
-    } catch {
-      // 仍保留应用内记录
-    }
+    triggerDownloadBlob(candidate.blob, filename)
   }
   if (mode === "directory") {
-    try {
-      const dir = await getStoredDirectoryHandle()
-      if (dir) await writeBlobToDirectory(dir, candidate.blob, filename)
-    } catch {
-      // 权限或 API 失败时忽略，应用内记录已保存
-    }
+    const dir = await getStoredDirectoryHandle()
+    if (!dir) throw new Error(i18n.global.t('curated.exportDirectoryUnavailable'))
+    await writeBlobToDirectory(dir, candidate.blob, filename)
   }
-  return { ok: true, id: row.id, positionSec: row.positionSec }
 }
 
 /**

@@ -3,9 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
-  AlertTriangle,
   Camera,
-  Check,
+  ChevronDown,
   Circle,
   ExternalLink,
   Film,
@@ -31,6 +30,7 @@ import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vu
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
 import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
 import { Slider } from "@/components/ui/slider"
 import {
   clearActivePlaybackSession,
@@ -42,19 +42,16 @@ import {
   buildHlsPlaybackConfig,
   canPlayHlsNatively,
   loadHlsLibrary,
-  prewarmHlsResources,
   preloadHlsLibrary,
   startHlsLoadingAtSessionOrigin,
   type HlsInstance,
   type HlsLevel,
 } from "@/lib/hls-player"
 import { recordMoviePlayed } from "@/lib/played-movies-storage"
-import {
-  captureCuratedFrameCandidate,
-  saveCuratedCaptureFromVideo,
-  saveCuratedFrameCandidate,
-  type CuratedFrameCaptureCandidate,
-} from "@/lib/curated-frames/save-capture"
+import { useCuratedCaptureQueue, type CaptureJob } from "@/composables/use-curated-capture-queue"
+import CaptureReceipt from "@/components/jav-library/CaptureReceipt.vue"
+import FrameImageViewer from "@/components/jav-library/FrameImageViewer.vue"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { listCuratedFramesPage } from "@/lib/curated-frames/db"
 import {
   getCuratedCaptureFeedbackSoundEnabled,
@@ -98,6 +95,9 @@ import {
   shouldBlurPlaybackSliderAfterCommit,
   shouldIgnoreGlobalPlaybackHotkeysForTarget,
 } from "@/lib/player-shortcuts"
+import { createPlaybackFrameStepper } from "@/lib/player-frame-step"
+import { canDirectPlaySource, createHlsRecoveryPolicy } from "@/lib/player-hls-recovery"
+import { resolvePlaybackCapabilities } from "@/lib/playback-capabilities"
 import {
   clearOptimisticSeekTargetIfSettled,
   hasAuthoritativeClockMoved,
@@ -115,8 +115,20 @@ import {
   formatSourceFormatLabel,
   formatTimecodeLabel,
   formatTranscodeProfileLabel,
+  formatEncoderSpeedLabel,
+  formatSeekKindLabel,
   isPlaybackStatUnavailable,
 } from "@/lib/player-playback-stats-format"
+import {
+  HLS_STARTUP_BUFFER_SEC,
+  HLS_STARTUP_BUFFER_WAIT_MS,
+  waitForPlaybackBuffer,
+  getMediaWrittenEndSec,
+  hlsSeekReuseLeadSec,
+  isPrematureHlsEndedEvent,
+  shouldReuseHlsSessionForSeek,
+  waitForMediaWrittenEnd,
+} from "@/lib/player-hls-seek"
 import {
   clampAbsolutePlaybackTarget as clampPlaybackTarget,
   formatPlaybackClock as formatClock,
@@ -127,6 +139,7 @@ import {
 } from "@/lib/player-playback-timeline"
 import {
   applyHlsBandwidthEstimateToPlaybackStats,
+  getHlsLevelFrameRate,
   applyHlsFragmentToPlaybackStats,
   applyHlsLevelToPlaybackStats,
   applyVideoDimensionsToPlaybackStats,
@@ -255,12 +268,21 @@ const playbackStats = ref<PlaybackStatsState>({
   height: null,
   fps: null,
 })
+const sessionDiagnostics = ref({
+  encoderSpeed: "",
+  writtenDurationSec: null as number | null,
+  lastSeekKind: "",
+})
+const SESSION_DIAGNOSTICS_POLL_MS = 1000
+let sessionDiagnosticsPollId: number | null = null
+let sessionDiagnosticsPollGen = 0
 let frameCallbackId: number | null = null
 let fallbackFpsTimer: number | null = null
 let fpsSampleWindowStartAt = 0
 let fpsSampleFrameCount = 0
 let fallbackLastDecodedFrames = 0
 let fallbackLastDecodedAt = 0
+const frameStepper = createPlaybackFrameStepper()
 
 /** 每条片源只尝试一次入口自动播放，避免 canplay 重复触发 */
 const autoplayConsumedForMovieId = ref<string | null>(null)
@@ -273,11 +295,26 @@ let lastProgressSaveAt = 0
 let moviePlaybackStartedAtMs = 0
 let restartedFromNearEnd = false
 let playbackLoadSeq = 0
+let playbackRequest: AbortController | null = null
+let playbackDisposed = false
+let sourceAttachSeq = 0
+
+function beginPlaybackRequest() {
+  playbackRequest?.abort()
+  playbackRequest = new AbortController()
+  return { seq: ++playbackLoadSeq, signal: playbackRequest.signal }
+}
+let hlsWindowWaitGeneration = 0
 let hlsDirectFallbackInFlight = false
+const hlsRecovery = createHlsRecoveryPolicy()
+let hlsRecoveryInFlight = false
+let hlsRecoveryTimer: ReturnType<typeof setTimeout> | undefined
+let sessionUnavailable = false
 let playbackFallbackNoticeKey = ""
-let playbackSessionCleanupId: string | null = null
+const playbackSessionCleanupIds = new Set<string>()
+let playbackRollback: { descriptor: PlaybackDescriptorDTO; position: number; resume: boolean } | null = null
 let resumePlaybackWhenReady = false
-let hlsPrewarmSeq = 0
+let hlsStartupBufferPending = false
 let lastAppliedPlaybackMode: SessionPlaybackMode | undefined
 
 const playbackSrc = ref<string | null>(null)
@@ -286,8 +323,6 @@ const playbackError = ref("")
 const isResolvingPlayback = ref(false)
 const isSwitchingPlaybackSession = ref(false)
 const isPlaybackWaiting = ref(false)
-const isPrewarmingHls = ref(false)
-const hlsPrewarmProgress = ref(0)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
@@ -385,28 +420,24 @@ function onDocumentFullscreenChange() {
 
 const curatedShutterActive = ref(false)
 const curatedCaptureError = ref("")
-type CuratedCaptureFeedback =
-  | { phase: "idle" }
-  | { phase: "capturing"; positionSec: number }
-  | { phase: "success"; positionSec: number }
-  | { phase: "error"; message: string }
-
-const curatedCaptureFeedback = ref<CuratedCaptureFeedback>({ phase: "idle" })
 const curatedCaptureAnnouncement = ref("")
 const curatedCaptureFeedbackSoundEnabled = ref(getCuratedCaptureFeedbackSoundEnabled())
 const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
 const clipExportUrl = ref("")
 const clipExportError = ref("")
+const clipFormat = ref<'gif' | 'mp4' | 'webm'>('gif')
 let clipPollTimer: number | null = null
+let clipPollGeneration = 0
+let clipPollFailures = 0
 let clipFeedbackDismissTimer: number | null = null
 let curatedShutterTimer: number | null = null
-let curatedCaptureFeedbackTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
 let playbackClockSyncIntervalId: number | null = null
 let lastAuthoritativePlaybackTimeSec: number | null = null
 let progressSliderFocusRestoreTimer: number | null = null
 
 const clipCapture = usePlayerClipCapture({
+  mediaTime: () => videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value,
   // HTMLVideoElement.currentTime is not reactive. Feed the state machine the
   // reactive playback clock instead, refreshing it from the live video element
   // when a press starts so consecutive clips never reuse a cached timestamp.
@@ -421,12 +452,56 @@ const clipCapturePhase = clipCapture.phase
 const clipCaptureIsRecording = clipCapture.isRecording
 const clipCaptureElapsedSec = clipCapture.elapsedSec
 const clipCaptureProgress = clipCapture.progress
-let pendingCuratedFrameCapture: Promise<
-  { ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }
-> | null = null
+const captureQueue = useCuratedCaptureQueue()
+let pendingCaptureJob: CaptureJob | undefined
+const receiptJob = computed(() => {
+  const jobs = captureQueue.jobs.value.filter(job => job.movie.id === props.movie.id && job.phase !== 'ready')
+  return jobs.find(job => job.phase === 'error' || job.phase === 'export-error') ?? jobs[jobs.length - 1]
+})
+const capturePreviewOpen = ref(false)
+const captureLiveAnnouncement = computed(() => {
+  const phase = clipCapturePhase.value
+  if (phase === 'recording') return t('player.clipRecording')
+  if (phase === 'processing') return clipExportError.value || t('player.clipProcessing')
+  if (phase === 'success') return t('player.clipSavedToLibrary')
+  if (phase === 'error') return clipExportError.value || t('player.clipExportFailed')
+  const job = receiptJob.value
+  if (job?.error) return job.error
+  if (job?.committed) return t('curated.captureBatchSaved', { n: captureQueue.savedCount.value })
+  return curatedCaptureError.value || curatedCaptureAnnouncement.value
+})
+const capturePreviewUrl = ref("")
+function viewCapture(job: CaptureJob) {
+  if (!job.candidate) return
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
+  capturePreviewUrl.value = URL.createObjectURL(job.candidate.blob)
+  capturePreviewOpen.value = true
+}
+watch(capturePreviewOpen, (open) => {
+  if (open) return
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
+  capturePreviewUrl.value = ""
+})
+function cancelCuratedPress() {
+  clipCapture.cancelPress()
+  if (pendingCaptureJob) captureQueue.dismiss(pendingCaptureJob)
+  pendingCaptureJob = undefined
+}
+async function retryCapture(job: CaptureJob) {
+  const result = await captureQueue.submit(job)
+  if (result.ok && props.movie.id === job.movie.id) appendCuratedFrameMarker(result)
+}
+async function undoCapture(job: CaptureJob) {
+  const id = job.candidate?.id
+  await captureQueue.undo(job)
+  if (!captureQueue.jobs.value.includes(job)) frameMarkers.value = frameMarkers.value.filter(marker => marker.id !== id)
+}
 
 /** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
 const frameMarkers = ref<FrameMarkerInput[]>([])
+watch(() => captureQueue.jobs.value.filter(job => job.committed).map(job => job.key).join(','), () => {
+  for (const job of captureQueue.jobs.value) if (job.committed && job.candidate && job.movie.id === props.movie.id) appendCuratedFrameMarker(job.candidate)
+})
 const FRAME_MARKERS_PAGE_SIZE = 200
 
 async function loadCuratedFrameMarkers() {
@@ -443,7 +518,7 @@ async function loadCuratedFrameMarkers() {
       if (page.items.length === 0 || collected.length >= page.total) break
     }
     if (movieId === props.movie.id) {
-      frameMarkers.value = collected
+      frameMarkers.value = [...new Map([...collected, ...frameMarkers.value].map(marker => [marker.id, marker])).values()]
     }
   } catch {
     // 标记是增强展示，加载失败时静默降级为无标记
@@ -462,33 +537,32 @@ function onFrameMarkerSeek(sec: number) {
 function beginCuratedPress() {
   if (clipCapture.phase.value !== "idle") return
   const video = videoRef.value
-  if (video) {
-    currentTime.value = getAbsolutePlaybackTime(video.currentTime)
+  if (!video || video.seeking || video.readyState < 2) return
+  currentTime.value = getAbsolutePlaybackTime(video.currentTime)
+  pendingCaptureJob = captureQueue.prepare(video, props.movie, currentTime.value)
+  if (!pendingCaptureJob) {
+    curatedCaptureError.value = t('curated.captureQueueFull')
+    curatedCaptureAnnouncement.value = curatedCaptureError.value
+    return
   }
-  pendingCuratedFrameCapture = video
-    ? captureCuratedFrameCandidate(video, {
-      positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
-    })
-    : null
+  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
+  curatedShutterActive.value = true
+  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
+  curatedShutterTimer = window.setTimeout(() => { curatedShutterActive.value = false }, 220)
   clipCapture.startPress()
 }
 
 async function savePendingCuratedFrame() {
-  const pending = pendingCuratedFrameCapture
-  pendingCuratedFrameCapture = null
-  if (pending) {
-    const candidate = await pending
-    if (!candidate.ok) return candidate
-    return saveCuratedFrameCandidate(candidate.candidate, props.movie)
-  }
-  const video = videoRef.value
-  if (!video) return { ok: false as const, reason: t("player.captureNoVideo") }
-  return saveCuratedCaptureFromVideo(video, props.movie, {
-    positionSecOverride: getAbsolutePlaybackTime(video.currentTime),
-  })
+  const job = pendingCaptureJob
+  pendingCaptureJob = undefined
+  if (!job) return { ok: false as const, reason: t('player.captureNoVideo') }
+  return captureQueue.submit(job)
 }
 
 async function submitClipExport(input: { startSec: number; endSec: number }) {
+  const generation = ++clipPollGeneration
+  clipPollFailures = 0
+  const movieId = pendingCaptureJob?.movie.id ?? props.movie.id
   clipExportError.value = ""
   clipExportUrl.value = ""
   clipExportTask.value = null
@@ -501,18 +575,21 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (!frameResult.ok) {
       throw new Error(frameResult.reason)
     }
-    appendCuratedFrameMarker(frameResult)
-    const task = await libraryService.createMovieClip(props.movie.id, {
+    if (movieId === props.movie.id) appendCuratedFrameMarker(frameResult)
+    const task = await libraryService.createMovieClip(movieId, {
+      format: clipFormat.value,
       startSec: input.startSec,
       endSec: input.endSec,
       fps: 10,
       width: 640,
       curatedFrameId: frameResult.id,
     })
+    if (generation !== clipPollGeneration || playbackDisposed) return
     clipExportTask.value = task
     clipCapture.taskId.value = task.taskId
-    await pollClipExportTask(task.taskId)
+    await pollClipExportTask(task.taskId, generation)
   } catch (err) {
+    if (generation !== clipPollGeneration || playbackDisposed) return
     clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
     clipCapture.phase.value = "error"
     scheduleClipFeedbackDismiss(3600)
@@ -520,9 +597,22 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
   }
 }
 
-async function pollClipExportTask(taskId: string) {
+async function pollClipExportTask(taskId: string, generation = clipPollGeneration) {
+  if (generation !== clipPollGeneration || playbackDisposed) return
   if (clipPollTimer !== null) window.clearTimeout(clipPollTimer)
-  const task = await libraryService.getTaskStatus(taskId)
+  let task: import("@/api/types").TaskDTO
+  try {
+    task = await libraryService.getTaskStatus(taskId)
+    if (generation !== clipPollGeneration || playbackDisposed) return
+    clipPollFailures = 0
+    clipExportError.value = ""
+  } catch {
+    if (generation !== clipPollGeneration || playbackDisposed) return
+    clipPollFailures++
+    clipExportError.value = t('curated.clipStatusRetrying')
+    clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), Math.min(30_000, 1000 * 2 ** Math.min(clipPollFailures, 5)))
+    return
+  }
   clipExportTask.value = task
   if (task.status === "completed") {
     const artifactUrl = typeof task.metadata?.artifactUrl === "string" ? task.metadata.artifactUrl : ""
@@ -542,7 +632,7 @@ async function pollClipExportTask(taskId: string) {
     scheduleClipFeedbackDismiss(3600)
     return
   }
-  clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId), 500)
+  clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), document.visibilityState === "hidden" ? 5000 : 1000)
 }
 
 function scheduleClipFeedbackDismiss(delayMs: number) {
@@ -554,6 +644,26 @@ function scheduleClipFeedbackDismiss(delayMs: number) {
     clipExportError.value = ""
     clipFeedbackDismissTimer = null
   }, delayMs)
+}
+async function extractSourceFrame() {
+  const movie = { ...props.movie, actors: [...props.movie.actors] }
+  const position = getAbsolutePlaybackTime(videoRef.value?.currentTime ?? currentTime.value)
+  const job = captureQueue.prepareSource(movie, position, () => libraryService.extractMovieFrame(movie.id, position))
+  if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
+  const result = await captureQueue.submit(job)
+  if (result.ok && props.movie.id === movie.id) appendCuratedFrameMarker(result)
+}
+
+async function cancelClipExport() {
+  const taskId = clipCapture.taskId.value
+  if (!taskId) return
+  try {
+    await libraryService.cancelMovieClip(taskId)
+    clipPollGeneration++
+    if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+    clipCapture.reset()
+    clipExportError.value = ''
+  } catch { clipExportError.value = t('curated.clipCancelFailed') }
 }
 
 /** 播放中整页鼠标静止一段时间后隐藏控件与指针；只有再次移动鼠标才恢复 */
@@ -687,9 +797,67 @@ watch([isPlaying, playbackSrc, optimisticSeekTargetSec, isPlaybackWaiting], () =
   syncPlaybackClockLoopState()
 }, { immediate: true })
 
+function stopSessionDiagnosticsPoll() {
+  if (sessionDiagnosticsPollId !== null) {
+    window.clearInterval(sessionDiagnosticsPollId)
+    sessionDiagnosticsPollId = null
+  }
+}
+
+function markHlsSeekKind(kind: "reuse" | "swap") {
+  sessionDiagnostics.value = {
+    ...sessionDiagnostics.value,
+    lastSeekKind: kind,
+  }
+}
+
+async function refreshSessionDiagnostics(sessionId: string, gen: number) {
+  const status = await libraryService.getPlaybackSession(sessionId)
+  if (gen !== sessionDiagnosticsPollGen) return
+  if (!status) return
+  sessionUnavailable = ["expired", "failed", "stopped", "closed", "replaced"].includes(status.state ?? "")
+  if (sessionUnavailable && isPlaying.value && !hlsRecoveryInFlight) void recoverHlsPlayback("session")
+  const localKind = sessionDiagnostics.value.lastSeekKind
+  const written = status.writtenDurationSec
+  sessionDiagnostics.value = {
+    encoderSpeed: status.encoderSpeed?.trim() || sessionDiagnostics.value.encoderSpeed,
+    writtenDurationSec:
+      written != null && Number.isFinite(written) ? written : sessionDiagnostics.value.writtenDurationSec,
+    lastSeekKind: localKind === "reuse" ? "reuse" : status.lastSeekKind?.trim() || localKind,
+  }
+}
+
+function syncSessionDiagnosticsPoll() {
+  stopSessionDiagnosticsPoll()
+  const sessionId = playbackDescriptor.value?.sessionId?.trim() || ""
+  if (!sessionId || playbackDescriptor.value?.mode !== "hls") {
+    sessionDiagnosticsPollGen += 1
+    sessionDiagnostics.value = {
+      encoderSpeed: "",
+      writtenDurationSec: null,
+      lastSeekKind: "",
+    }
+    return
+  }
+  const gen = ++sessionDiagnosticsPollGen
+  void refreshSessionDiagnostics(sessionId, gen)
+  sessionDiagnosticsPollId = window.setInterval(() => {
+    void refreshSessionDiagnostics(sessionId, gen)
+  }, SESSION_DIAGNOSTICS_POLL_MS)
+}
+
+watch(
+  () => playbackDescriptor.value?.sessionId,
+  () => {
+    syncSessionDiagnosticsPoll()
+  },
+  { immediate: true },
+)
+
 watch(
   playbackSrc,
   async (src) => {
+    frameStepper.reset()
     closePlayerContextMenu()
     if (!src) {
       detailedStatsVisible.value = false
@@ -734,6 +902,7 @@ async function destroyHlsInstance() {
 }
 
 async function syncVideoSource() {
+  const attachSeq = ++sourceAttachSeq
   const src = playbackSrc.value?.trim() ?? ""
   const mode = playbackDescriptor.value?.mode ?? "direct"
   const previousMode = lastAppliedPlaybackMode
@@ -745,12 +914,14 @@ async function syncVideoSource() {
   }
   await destroyHlsInstance()
   await nextTick()
+  if (playbackDisposed || attachSeq !== sourceAttachSeq) return
   const v = videoRef.value
   if (!v) return
   if (mode === "direct" && playbackDescriptor.value?.canDirectPlay === false) {
     playbackError.value = t("player.decodeError")
   }
   if (mode === "hls") {
+    hlsStartupBufferPending = true
     if (shouldResetVideoElementBeforeModeAttach(previousMode, "hls")) {
       resetVideoElementPlaybackPipeline(v)
     }
@@ -764,7 +935,7 @@ async function syncVideoSource() {
     }
     try {
       const Hls = await loadHlsLibrary()
-      if (!playbackSrc.value || videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") {
+      if (playbackDisposed || attachSeq !== sourceAttachSeq || playbackSrc.value !== src || videoRef.value !== v || playbackDescriptor.value?.mode !== "hls") {
         return
       }
       if (!Hls.isSupported()) {
@@ -793,41 +964,6 @@ async function syncVideoSource() {
   applyPlaybackRateToVideo()
   lastAppliedPlaybackMode = "direct"
   refreshPlaybackStatsFromVideo()
-}
-
-async function prewarmHlsDescriptor(descriptor: PlaybackDescriptorDTO | null) {
-  const seq = ++hlsPrewarmSeq
-  const shouldPrewarm = descriptor?.mode === "hls" && Boolean(descriptor.url?.trim())
-  if (!shouldPrewarm) {
-    isPrewarmingHls.value = false
-    hlsPrewarmProgress.value = 0
-    return
-  }
-  isPrewarmingHls.value = true
-  hlsPrewarmProgress.value = 0.06
-  preloadHlsLibrary()
-  try {
-    await prewarmHlsResources(descriptor.url.trim(), {
-      resourceCount: 2,
-      timeoutMs: 3500,
-      onProgress: (progress) => {
-        if (seq !== hlsPrewarmSeq) return
-        hlsPrewarmProgress.value = progress
-      },
-    })
-  } catch {
-    // Best-effort only. Playback startup still proceeds normally.
-  } finally {
-    if (seq === hlsPrewarmSeq) {
-      isPrewarmingHls.value = false
-      hlsPrewarmProgress.value = 0
-    }
-  }
-}
-
-function canBrowserDirectPlayFromFileName(fileName?: string | null): boolean {
-  const normalized = (fileName ?? "").trim().toLowerCase()
-  return [".mp4", ".m4v", ".webm", ".ogv", ".m3u8"].some((ext) => normalized.endsWith(ext))
 }
 
 async function tryStartPlaybackIfRequested(): Promise<boolean> {
@@ -860,6 +996,24 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
   resumePlaybackWhenReady = false
   playbackError.value = ""
 
+  if (playbackMode === "hls" && hlsStartupBufferPending) {
+    const waitGen = hlsWindowWaitGeneration
+    isPlaybackWaiting.value = true
+    await waitForPlaybackBuffer(v, HLS_STARTUP_BUFFER_SEC, {
+      timeoutMs: HLS_STARTUP_BUFFER_WAIT_MS,
+      remainingSec: Math.max(0, totalDurationSec.value - getAbsolutePlaybackTime()),
+      isAborted: () => waitGen !== hlsWindowWaitGeneration || videoRef.value !== v,
+    })
+    if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v || !playbackSrc.value) {
+      resumePlaybackWhenReady = shouldResumePlayback
+      if (shouldHandleRouteAutoplay) {
+        autoplayConsumedForMovieId.value = null
+      }
+      return false
+    }
+    hlsStartupBufferPending = false
+  }
+
   try {
     await v.play()
     if (shouldHandleRouteAutoplay) {
@@ -885,6 +1039,11 @@ async function tryStartPlaybackIfRequested(): Promise<boolean> {
 }
 
 function syncSrc() {
+  clearTimeout(hlsRecoveryTimer)
+  hlsRecovery.reset()
+  hlsRecoveryInFlight = false
+  sessionUnavailable = false
+  playbackRollback = null
   stopPlaybackClockSyncLoop()
   resetPlaybackClockSyncSample()
   flushScheduledPlaybackSessionCleanup()
@@ -892,8 +1051,6 @@ function syncSrc() {
   playbackError.value = ""
   isResolvingPlayback.value = true
   isPlaybackWaiting.value = false
-  isPrewarmingHls.value = false
-  hlsPrewarmProgress.value = 0
   optimisticSeekTargetSec.value = null
   currentTime.value = 0
   duration.value = 0
@@ -907,7 +1064,8 @@ function syncSrc() {
 }
 
 async function loadPlayback() {
-  const seq = ++playbackLoadSeq
+  const { seq, signal } = beginPlaybackRequest()
+  hlsWindowWaitGeneration += 1
   const movieId = props.movie.id.trim()
   if (!movieId) {
     if (seq === playbackLoadSeq) {
@@ -918,8 +1076,12 @@ async function loadPlayback() {
     return
   }
   try {
-    let descriptor = await libraryService.getMoviePlayback(movieId)
     const requestedStartSec = parseResumeSecondsFromQuery(route.query.t)
+    let descriptor = await libraryService.getMoviePlayback(movieId, { startPositionSec: requestedStartSec, signal })
+    if (playbackDisposed || seq !== playbackLoadSeq) {
+      await releasePlaybackSession(descriptor?.sessionId)
+      return
+    }
     const storedProgress = getProgress(movieId)
     const durationHint = descriptor?.durationSec ?? storedProgress?.durationSec ?? 0
     const preferredStartSec = resolvePreferredPlaybackTargetSec(
@@ -940,6 +1102,7 @@ async function loadPlayback() {
           movieId,
           "hls",
           Math.max(0, wantsStartSec),
+          signal,
         )
         if (descriptor.sessionId) {
           await releasePlaybackSession(descriptor.sessionId)
@@ -955,7 +1118,6 @@ async function loadPlayback() {
     }
     playbackDescriptor.value = descriptor
     playbackSrc.value = descriptor ? resolveMoviePlaybackSourceUrl(movieId, descriptor.url) : null
-    void prewarmHlsDescriptor(descriptor)
     duration.value = resolveTotalDurationSec(descriptor, 0)
     currentTime.value = playbackTimelineOffsetSec(descriptor)
     publishActivePlaybackSession("paused")
@@ -989,12 +1151,14 @@ async function fallbackHlsToDirect(reason?: string) {
   const current = playbackDescriptor.value
   const movieId = props.movie.id.trim()
   if (!current || current.mode !== "hls" || !movieId) return
+  if (!canDirectPlaySource(current, resolvePlaybackCapabilities().mp4VideoCodecs) || current.reasonCode === "source_timestamps_unstable") {
+    isPlaybackWaiting.value = false
+    playbackError.value = t("player.decodeError")
+    return
+  }
 
   hlsDirectFallbackInFlight = true
   try {
-    ++hlsPrewarmSeq
-    isPrewarmingHls.value = false
-    hlsPrewarmProgress.value = 0
     bufferedUntilSec.value = 0
     markPlaybackReady()
     const absolutePositionSec = getAbsolutePlaybackTime()
@@ -1011,10 +1175,10 @@ async function fallbackHlsToDirect(reason?: string) {
       mode: "direct",
       sessionId: undefined,
       url: fallbackUrl,
-      mimeType: "video/mp4",
+      mimeType: current.fileName?.toLowerCase().endsWith(".webm") ? "video/webm" : "video/mp4",
       startPositionSec: undefined,
       resumePositionSec: absolutePositionSec,
-      canDirectPlay: canBrowserDirectPlayFromFileName(current.fileName),
+      canDirectPlay: true,
       reason: reason?.trim() || "hls fallback to direct playback",
     }
     playbackSrc.value = fallbackUrl
@@ -1023,6 +1187,82 @@ async function fallbackHlsToDirect(reason?: string) {
     pushAppToast(reason?.trim() || t("player.hlsFallbackToDirect"), { variant: "warning", durationMs: 5200 })
   } finally {
     hlsDirectFallbackInFlight = false
+  }
+}
+
+function restorePreviousPlayback(): boolean {
+  const previous = playbackRollback
+  if (!previous || playbackDisposed) return false
+  playbackRollback = null
+  clearTimeout(hlsRecoveryTimer)
+  beginPlaybackRequest()
+  hlsWindowWaitGeneration += 1
+  const failedId = playbackDescriptor.value?.sessionId
+  if (previous.descriptor.sessionId) playbackSessionCleanupIds.delete(previous.descriptor.sessionId)
+  playbackDescriptor.value = { ...previous.descriptor, resumePositionSec: previous.position }
+  playbackSrc.value = resolveMoviePlaybackSourceUrl(props.movie.id, previous.descriptor.url)
+  resumeAppliedForMovieId.value = null
+  resumePlaybackWhenReady = previous.resume
+  currentTime.value = previous.position
+  optimisticSeekTargetSec.value = null
+  isResolvingPlayback.value = false
+  isSwitchingPlaybackSession.value = false
+  playbackError.value = ""
+  if (failedId !== previous.descriptor.sessionId) void releasePlaybackSession(failedId)
+  pushAppToast(t("player.errGeneric"), { variant: "warning" })
+  return true
+}
+
+async function recoverHlsPlayback(type: string) {
+  const descriptor = playbackDescriptor.value
+  const v = videoRef.value
+  if (playbackDisposed || hlsRecoveryInFlight || descriptor?.mode !== "hls" || !v) return
+  const action = hlsRecovery.next(type)
+  clearTimeout(hlsRecoveryTimer)
+  if (action === "failed") {
+    isPlaybackWaiting.value = false
+    playbackError.value = t("player.playStartError")
+    resumePlaybackWhenReady = false
+    v.pause()
+    return
+  }
+  hlsRecoveryInFlight = true
+  const movieId = props.movie.id
+  const shouldResume = resumePlaybackWhenReady || isPlaying.value || !v.paused
+  playbackError.value = ""
+  isPlaybackWaiting.value = true
+  resumePlaybackWhenReady = shouldResume
+  try {
+    if (action === "network" && hlsInstance?.startLoad) {
+      hlsInstance.startLoad(v.currentTime)
+    } else if (action === "media" && hlsInstance?.recoverMediaError) {
+      hlsInstance.recoverMediaError()
+    } else {
+      if (action !== "session") hlsRecovery.next("session")
+      const pending = seekToAbsolutePlaybackTime(getAbsolutePlaybackTime(), { forceSessionSwap: true, resumeAfterSwap: shouldResume })
+      const requestSeq = playbackLoadSeq
+      await pending
+      if (playbackDisposed || movieId !== props.movie.id || requestSeq !== playbackLoadSeq) return
+      if (playbackDescriptor.value?.sessionId === descriptor.sessionId) {
+        playbackError.value = t("player.playStartError")
+        isPlaybackWaiting.value = false
+        return
+      }
+      // An expired session cannot be used for rollback.
+      playbackRollback = null
+      sessionUnavailable = false
+    }
+    const sessionId = playbackDescriptor.value?.sessionId
+    hlsRecoveryTimer = setTimeout(() => {
+      if (!playbackDisposed && playbackDescriptor.value?.sessionId === sessionId) void recoverHlsPlayback("session")
+    }, 8000)
+  } catch {
+    if (!playbackDisposed && movieId === props.movie.id) {
+      playbackError.value = t("player.playStartError")
+      isPlaybackWaiting.value = false
+    }
+  } finally {
+    hlsRecoveryInFlight = false
   }
 }
 
@@ -1056,7 +1296,12 @@ function stripTFromRoute() {
 watch(
   () => props.movie.id,
   async () => {
-    clipCapture.cancelPress()
+    cancelCuratedPress()
+    capturePreviewOpen.value = false
+    clipPollGeneration++
+    clipCapture.reset()
+    if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+    if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
     const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
     void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
@@ -1075,7 +1320,7 @@ watch(
 )
 
 function onVisibilityChange() {
-  if (document.visibilityState === "hidden") clipCapture.cancelPress()
+  if (document.visibilityState === "hidden") cancelCuratedPress()
   if (document.visibilityState === "hidden") {
     flushPlaybackProgress()
   }
@@ -1098,9 +1343,18 @@ onMounted(() => {
   window.addEventListener("mousemove", immersiveChrome.onPageMouseMove, { passive: true })
   document.addEventListener("visibilitychange", onVisibilityChange)
   window.addEventListener("beforeunload", onWindowBeforeUnload)
+  window.addEventListener("blur", cancelCuratedPress)
 })
 
 onBeforeUnmount(() => {
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
+  clearTimeout(hlsRecoveryTimer)
+  playbackDisposed = true
+  playbackLoadSeq += 1
+  sourceAttachSeq += 1
+  playbackRequest?.abort()
+  sessionDiagnosticsPollGen += 1
+  hlsWindowWaitGeneration += 1
   flushPlaybackProgress()
   stopCurrentVideoPlaybackPipeline()
 })
@@ -1117,8 +1371,9 @@ onUnmounted(() => {
   window.removeEventListener("mousemove", immersiveChrome.onPageMouseMove)
   document.removeEventListener("visibilitychange", onVisibilityChange)
   window.removeEventListener("beforeunload", onWindowBeforeUnload)
+  window.removeEventListener("blur", cancelCuratedPress)
   stopPlaybackClockSyncLoop()
-  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
+  stopSessionDiagnosticsPoll()
   if (clipPollTimer !== null) clearTimeout(clipPollTimer)
   if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
   disposeCuratedCaptureFeedbackAudio()
@@ -1190,6 +1445,7 @@ const volumeIconIsMuted = computed(
 function onTimeUpdate() {
   const v = videoRef.value
   if (!v) return
+  if (!v.paused && v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) clearTimeout(hlsRecoveryTimer)
   currentTime.value = getAbsolutePlaybackTime(v.currentTime)
   watchTimeTracker.onTimeUpdate(currentTime.value)
   syncBufferedRangeFromVideo()
@@ -1217,7 +1473,6 @@ function onLoadedMetadata() {
   v.volume = pct / 100
   v.muted = playbackMuted.value
   syncBufferedRangeFromVideo()
-  flushScheduledPlaybackSessionCleanup()
   publishActivePlaybackSession()
 
   const fromQuery = parseResumeSecondsFromQuery(route.query.t)
@@ -1427,6 +1682,7 @@ function stripAutoplayFromRoute() {
 
 /** 从详情/资料库点「播放」进入本页时，在可播后自动 play；成功后去掉 ?autoplay=1 */
 async function onCanPlayForAutoplay() {
+  clearTimeout(hlsRecoveryTimer)
   markPlaybackReady()
   syncBufferedRangeFromVideo()
   void tryStartPlaybackIfRequested()
@@ -1444,6 +1700,11 @@ function onPlay() {
 }
 
 function onPause() {
+  if (clipCapture.isRecording.value) {
+    const result = clipCapture.finishPress()
+    if (!result.wasLongPress) void runCuratedCapture()
+  }
+  frameStepper.interrupt()
   watchTimeTracker.onPause(getAbsolutePlaybackTime())
   isPlaying.value = false
   flushPlaybackProgress()
@@ -1468,6 +1729,18 @@ async function terminateActiveHlsPlaybackSession(reason?: string) {
 }
 
 function onVideoEnded() {
+  if (
+    playbackDescriptor.value?.mode === "hls" &&
+    isPrematureHlsEndedEvent({
+      absoluteTimeSec: getAbsolutePlaybackTime(),
+      totalDurationSec: totalDurationSec.value,
+    })
+  ) {
+    isPlaybackWaiting.value = true
+    publishActivePlaybackSession("waiting")
+    void resumeHlsAfterWindowExhaustion()
+    return
+  }
   watchTimeTracker.onPause(getAbsolutePlaybackTime())
   flushPlaybackProgress()
   isPlaying.value = false
@@ -1495,8 +1768,9 @@ function onVideoError() {
   isPlaybackWaiting.value = false
   clearActivePlaybackSession(props.movie.id)
   const v = videoRef.value
+  if (restorePreviousPlayback()) return
   if (playbackDescriptor.value?.mode === "hls") {
-    void fallbackHlsToDirect("video element failed while playing HLS")
+    void recoverHlsPlayback("mediaError")
     return
   }
   const code = v?.error?.code
@@ -1515,6 +1789,12 @@ async function togglePlayPause() {
   if (!v || !playbackSrc.value || !descriptor) return
   try {
     if (v.paused) {
+      if (descriptor.mode === "hls" && (playbackError.value || sessionUnavailable)) {
+        hlsRecovery.reset()
+        resumePlaybackWhenReady = true
+        void recoverHlsPlayback("session")
+        return
+      }
       if (descriptor.mode === "direct" && descriptor.canDirectPlay === false) {
         playbackError.value = t("player.decodeError")
         return
@@ -1598,6 +1878,26 @@ function seekDelta(deltaSec: number) {
   void seekToAbsolutePlaybackTime(previous + deltaSec, { previousDisplayedTimeSec: previous })
 }
 
+function stepFrame(direction: -1 | 1) {
+  const v = videoRef.value
+  if (!v || !playbackSrc.value) return
+  frameStepper.interrupt()
+
+  // A frame step should leave the target frame visible instead of continuing
+  // playback past it, matching desktop-player frame navigation.
+  if (!v.paused) {
+    v.pause()
+  }
+
+  const previous = currentTime.value
+  const descriptor = playbackDescriptor.value
+  const target = previous + direction * frameStepper.stepSec()
+  startOptimisticSeek(target, {
+    enterWaitingState: shouldEnterSeekWaitingState(descriptor?.mode),
+  })
+  void seekToAbsolutePlaybackTime(target, { previousDisplayedTimeSec: previous })
+}
+
 function onVideoWaiting() {
   if (!playbackSrc.value) return
   watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
@@ -1606,6 +1906,8 @@ function onVideoWaiting() {
 }
 
 function onVideoSeeking() {
+  cancelCuratedPress()
+  frameStepper.interrupt()
   if (!playbackSrc.value) return
   watchTimeTracker.onSeeking(getAbsolutePlaybackTime())
   isPlaybackWaiting.value = true
@@ -1613,6 +1915,7 @@ function onVideoSeeking() {
 }
 
 function onVideoSeeked() {
+  frameStepper.interrupt()
   currentTime.value = getAbsolutePlaybackTime()
   watchTimeTracker.onSeeking(currentTime.value)
   syncBufferedRangeFromVideo()
@@ -1621,6 +1924,9 @@ function onVideoSeeked() {
 }
 
 function onVideoLoadedData() {
+  playbackRollback = null
+  flushScheduledPlaybackSessionCleanup()
+  clearTimeout(hlsRecoveryTimer)
   syncBufferedRangeFromVideo()
   markPlaybackReady()
   publishActivePlaybackSession()
@@ -1697,7 +2003,8 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
   const targetSec = clampAbsolutePlaybackTarget(getAbsolutePlaybackTime())
   const previousSessionId = currentDescriptor.sessionId
   const shouldResumePlayback = isPlaying.value && !videoRef.value?.paused
-  const seq = ++playbackLoadSeq
+  const { seq, signal } = beginPlaybackRequest()
+  hlsWindowWaitGeneration += 1
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   isPlaybackWaiting.value = shouldEnterSeekWaitingState(nextMode)
@@ -1708,8 +2015,14 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
       movieId,
       nextMode,
       targetSec,
+      signal,
     )
     if (!nextDescriptor) return
+
+    if (nextDescriptor.mode !== nextMode) {
+      await releasePlaybackSession(nextDescriptor.sessionId)
+      throw new Error(t("player.errGeneric"))
+    }
 
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
       if (nextDescriptor.sessionId) {
@@ -1736,10 +2049,10 @@ async function switchPlaybackMode(nextMode: SessionPlaybackMode) {
     }
 
     resumeAppliedForMovieId.value = null
+    playbackRollback = { descriptor: currentDescriptor, position: targetSec, resume: shouldResumePlayback }
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = normalizedDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, normalizedDescriptor.url)
-    void prewarmHlsDescriptor(normalizedDescriptor)
     currentTime.value = targetSec
     progressSliderValue.value = [targetSec]
   } catch (err) {
@@ -1788,9 +2101,13 @@ function onPlaybackKeydown(e: KeyboardEvent) {
       e.preventDefault()
       seekDelta(playbackSeekForwardStep.value)
       break
+    case "KeyD":
+      e.preventDefault()
+      stepFrame(-1)
+      break
     case "KeyF":
       e.preventDefault()
-      void toggleFullscreen()
+      stepFrame(1)
       break
     case "KeyP":
       if (pipSupported.value) {
@@ -1840,52 +2157,30 @@ function onPlaybackKeyup(e: KeyboardEvent) {
 }
 
 async function runCuratedCapture() {
+  const job = pendingCaptureJob
+  if (!job) return
   curatedCaptureError.value = ""
-  const v = videoRef.value
-  if (!v || !playbackSrc.value) {
-    curatedCaptureError.value = t("player.captureNoVideo")
-    return
-  }
-  if (curatedShutterTimer) clearTimeout(curatedShutterTimer)
-  if (curatedCaptureFeedbackTimer !== null) clearTimeout(curatedCaptureFeedbackTimer)
-
-  const positionSec = getAbsolutePlaybackTime(v.currentTime)
-  curatedCaptureFeedback.value = { phase: "capturing", positionSec }
-  curatedCaptureAnnouncement.value = t("player.captureFeedbackCapturing")
-  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
-
-  curatedShutterActive.value = true
-  curatedShutterTimer = window.setTimeout(() => {
-    curatedShutterActive.value = false
-    curatedShutterTimer = null
-  }, 600)
-
   const result = await savePendingCuratedFrame()
+  if (playbackDisposed || props.movie.id !== job.movie.id) return
   if (!result.ok) {
-    curatedCaptureError.value = result.reason
-    curatedShutterActive.value = false
-    curatedCaptureFeedback.value = { phase: "error", message: result.reason }
-    curatedCaptureAnnouncement.value = t("player.captureFeedbackError", { reason: result.reason })
-    curatedCaptureFeedbackTimer = window.setTimeout(() => {
-      curatedCaptureFeedback.value = { phase: "idle" }
-      curatedCaptureFeedbackTimer = null
-    }, 3200)
+    curatedCaptureAnnouncement.value = t('player.captureFeedbackError', { reason: result.reason })
     return
   }
-
-  curatedCaptureFeedback.value = { phase: "success", positionSec }
   appendCuratedFrameMarker(result)
-  curatedCaptureAnnouncement.value = t("player.captureFeedbackSuccess", {
-    time: formatClock(positionSec),
-  })
-  curatedCaptureFeedbackTimer = window.setTimeout(() => {
-    curatedCaptureFeedback.value = { phase: "idle" }
-    curatedCaptureFeedbackTimer = null
-  }, 900)
+  curatedCaptureAnnouncement.value = t('player.captureFeedbackSuccess', { time: formatClock(result.positionSec) })
+}
 
-  if (!chromeVisible.value) {
-    immersiveChrome.showCuratedFeedback(`${t("player.curatedLabel")} +1`)
-  }
+function captureSingleFrame() {
+  const video = videoRef.value
+  if (!video || video.seeking || video.readyState < 2) return
+  const job = captureQueue.prepare(video, props.movie, getAbsolutePlaybackTime(video.currentTime))
+  if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
+  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
+  void retryCapture(job)
+}
+function toggleClipRecording() {
+  if (clipCapture.phase.value === 'recording' || clipCapture.phase.value === 'armed') clipCapture.finishPress()
+  else beginCuratedPress()
 }
 
 async function toggleFullscreen() {
@@ -1959,8 +2254,7 @@ const canSwitchToDirectPlayback = computed(() => {
   const descriptor = playbackDescriptor.value
   if (!descriptor) return false
   if (descriptor.mode === "direct") return true
-  if (descriptor.canDirectPlay) return true
-  return canBrowserDirectPlayFromFileName(descriptor.fileName)
+  return canDirectPlaySource(descriptor, resolvePlaybackCapabilities().mp4VideoCodecs)
 })
 
 const playbackBusyLabel = computed(() => {
@@ -1975,17 +2269,13 @@ const playbackBusyLabel = computed(() => {
     return t("player.bufferingSeek")
   }
   if (isPlaybackWaiting.value) return t("player.buffering")
-  if (isPrewarmingHls.value && playbackDescriptor.value?.mode === "hls" && !isPlaying.value) {
-    return t("player.prewarmingStream")
-  }
+
   return ""
 })
 
 const showPlaybackBusyState = computed(() => Boolean(playbackBusyLabel.value))
 const showCenteredBusyOverlay = computed(() => showPlaybackBusyState.value)
-const prewarmProgressPercent = computed(() =>
-  Math.max(0, Math.min(100, Math.round(hlsPrewarmProgress.value * 100))),
-)
+
 
 function formatClientError(err: unknown, fallback: string): string {
   if (err instanceof HttpClientError) {
@@ -2101,6 +2391,7 @@ function refreshPlaybackStatsFromVideo() {
 }
 
 function updatePlaybackStatsFromHlsLevel(level?: HlsLevel | null) {
+  frameStepper.setFrameRate(getHlsLevelFrameRate(level))
   playbackStats.value = applyHlsLevelToPlaybackStats(playbackStats.value, level)
 }
 
@@ -2196,7 +2487,10 @@ function bindHlsStats(
       "fatal" in data &&
       (data as { fatal?: unknown }).fatal === true
     if (!fatal) return
-    void fallbackHlsToDirect("fatal hls playback error")
+    if (hlsInstance !== player || playbackDisposed) return
+    if (restorePreviousPlayback()) return
+    const type = (data as { type?: unknown }).type
+    void recoverHlsPlayback(typeof type === "string" ? type : "session")
   })
 
   detachHlsStatsListeners = () => {
@@ -2208,6 +2502,7 @@ function bindHlsStats(
 }
 
 function stopFpsTracking() {
+  frameStepper.interrupt()
   const v = videoRef.value
   if (frameCallbackId !== null && v && typeof v.cancelVideoFrameCallback === "function") {
     v.cancelVideoFrameCallback(frameCallbackId)
@@ -2229,9 +2524,10 @@ function startFpsTracking() {
   if (!v || !playbackSrc.value) return
 
   if (typeof v.requestVideoFrameCallback === "function") {
-    const onFrame = (now: number) => {
+    const onFrame: VideoFrameRequestCallback = (now, metadata) => {
       const currentVideo = videoRef.value
       if (!currentVideo || currentVideo !== v || !playbackSrc.value) return
+      frameStepper.observe(metadata, !currentVideo.paused && !currentVideo.seeking)
       if (fpsSampleWindowStartAt === 0) {
         fpsSampleWindowStartAt = now
       }
@@ -2259,6 +2555,10 @@ function startFpsTracking() {
     const quality = currentVideo.getVideoPlaybackQuality()
     const now = performance.now()
     const decodedFrames = quality.totalVideoFrames
+    frameStepper.observe(
+      { mediaTime: currentVideo.currentTime, presentedFrames: decodedFrames },
+      !currentVideo.paused && !currentVideo.seeking,
+    )
     if (fallbackLastDecodedAt > 0) {
       const elapsed = now - fallbackLastDecodedAt
       const frameDelta = decodedFrames - fallbackLastDecodedFrames
@@ -2288,18 +2588,30 @@ function getAbsolutePlaybackTime(
 function schedulePlaybackSessionCleanup(sessionId?: string) {
   const id = sessionId?.trim()
   if (!id) return
-  playbackSessionCleanupId = id
+  playbackSessionCleanupIds.add(id)
 }
 
 function flushScheduledPlaybackSessionCleanup() {
-  const id = playbackSessionCleanupId
-  if (!id) return
-  playbackSessionCleanupId = null
-  void releasePlaybackSession(id)
+  for (const id of playbackSessionCleanupIds) void releasePlaybackSession(id)
+  playbackSessionCleanupIds.clear()
 }
 
 function clampAbsolutePlaybackTarget(targetSec: number): number {
   return clampPlaybackTarget(targetSec, totalDurationSec.value)
+}
+
+async function resumeHlsAfterWindowExhaustion() {
+  const v = videoRef.value
+  if (!v || playbackDescriptor.value?.mode !== "hls") return
+  const waitGen = ++hlsWindowWaitGeneration
+  const catchUpTarget = getMediaWrittenEndSec(v) + 0.6
+  const caughtUp = await waitForMediaWrittenEnd(v, catchUpTarget, {
+    isAborted: () => waitGen !== hlsWindowWaitGeneration,
+  })
+  if (waitGen !== hlsWindowWaitGeneration || videoRef.value !== v) return
+  if (!caughtUp) { void recoverHlsPlayback("session"); return }
+  resumePlaybackWhenReady = true
+  void tryStartPlaybackIfRequested()
 }
 
 async function seekToAbsolutePlaybackTime(
@@ -2314,6 +2626,10 @@ async function seekToAbsolutePlaybackTime(
   const descriptor = playbackDescriptor.value
   if (!v || !descriptor || !playbackSrc.value) return
 
+  const { seq, signal } = beginPlaybackRequest()
+  isResolvingPlayback.value = false
+  isSwitchingPlaybackSession.value = false
+
   const clampedTarget = clampAbsolutePlaybackTarget(targetSec)
   isPlaybackWaiting.value = shouldEnterSeekWaitingState(descriptor.mode)
   if (descriptor.mode !== "hls") {
@@ -2327,31 +2643,59 @@ async function seekToAbsolutePlaybackTime(
   }
 
   const localTarget = clampedTarget - playbackTimelineOffsetSec(descriptor)
-  const localDuration = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
+  const writtenEnd = getMediaWrittenEndSec(v)
+  const waitGen = ++hlsWindowWaitGeneration
+  const shouldResumePlayback = options.resumeAfterSwap || resumePlaybackWhenReady || (isPlaying.value && !v.paused)
   if (
-    !options.forceSessionSwap &&
-    localTarget >= 0 &&
-    (localDuration <= 0 || localTarget <= localDuration + 0.25)
+    shouldReuseHlsSessionForSeek({
+      forceSessionSwap: options.forceSessionSwap,
+      localTargetSec: localTarget,
+      writtenEndSec: writtenEnd,
+      reuseLeadSec: hlsSeekReuseLeadSec(descriptor.sessionKind),
+      encoderSpeed: sessionDiagnostics.value.encoderSpeed,
+    })
   ) {
-    v.currentTime = localTarget
-    currentTime.value = clampedTarget
-    return
+    if (localTarget > writtenEnd + 0.25) {
+      if (shouldResumePlayback) {
+        resumePlaybackWhenReady = true
+        v.pause()
+      }
+      const caughtUp = await waitForMediaWrittenEnd(v, localTarget, {
+        isAborted: () => waitGen !== hlsWindowWaitGeneration,
+      })
+      if (waitGen !== hlsWindowWaitGeneration) return
+      if (caughtUp && videoRef.value === v) {
+        v.currentTime = localTarget
+        currentTime.value = clampedTarget
+        markHlsSeekKind("reuse")
+        if (shouldResumePlayback) {
+          resumePlaybackWhenReady = true
+          void tryStartPlaybackIfRequested()
+        }
+        return
+      }
+    } else {
+      v.currentTime = localTarget
+      currentTime.value = clampedTarget
+      markHlsSeekKind("reuse")
+      return
+    }
   }
 
   const movieId = props.movie.id.trim()
   if (!movieId) return
   const previousSessionId = descriptor.sessionId
-  const shouldResumePlayback = options.resumeAfterSwap || (isPlaying.value && !videoRef.value?.paused)
-  const seq = ++playbackLoadSeq
   isResolvingPlayback.value = true
   isSwitchingPlaybackSession.value = true
   playbackError.value = ""
 
   try {
+    markHlsSeekKind("swap")
     const nextDescriptor = await libraryService.createPlaybackSession(
       movieId,
       "hls",
       clampedTarget,
+      signal,
     )
     if (!nextDescriptor) return
     if (movieId !== props.movie.id.trim() || seq !== playbackLoadSeq) {
@@ -2365,10 +2709,10 @@ async function seekToAbsolutePlaybackTime(
       resumePlaybackWhenReady = true
     }
     resumeAppliedForMovieId.value = null
+    playbackRollback = { descriptor, position: options.previousDisplayedTimeSec ?? getAbsolutePlaybackTime(), resume: Boolean(shouldResumePlayback) }
     schedulePlaybackSessionCleanup(previousSessionId)
     playbackDescriptor.value = nextDescriptor
     playbackSrc.value = resolveMoviePlaybackSourceUrl(movieId, nextDescriptor.url)
-    void prewarmHlsDescriptor(nextDescriptor)
     currentTime.value = clampedTarget
     progressSliderValue.value = [clampedTarget]
   } catch (err) {
@@ -2461,6 +2805,21 @@ const playbackStatsRows = computed(() => {
       key: "transcode-profile",
       label: "Transcoder",
       value: formatTranscodeProfileLabel(descriptor?.transcodeProfile),
+    },
+    {
+      key: "encoder-speed",
+      label: "Encoder Speed",
+      value: formatEncoderSpeedLabel(sessionDiagnostics.value.encoderSpeed),
+    },
+    {
+      key: "written-window",
+      label: "Written Window",
+      value: formatTimecodeLabel(sessionDiagnostics.value.writtenDurationSec),
+    },
+    {
+      key: "last-seek",
+      label: "Last Seek",
+      value: formatSeekKindLabel(sessionDiagnostics.value.lastSeekKind),
     },
     {
       key: "reason-code",
@@ -2739,50 +3098,20 @@ const videoPreloadMode = computed(() =>
           @leave="playlistTabVisible = false"
           @open="openPlaylistPanel"
         />
-        <Transition
-          enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
-          enter-from-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
-          enter-to-class="opacity-100 translate-y-0 scale-100"
-          leave-active-class="transition duration-150 ease-in motion-reduce:transition-none"
-          leave-from-class="opacity-100 translate-y-0 scale-100"
-          leave-to-class="opacity-0 -translate-y-1 scale-[.97] motion-reduce:scale-100"
-        >
-          <div
-            v-if="curatedCaptureFeedback.phase !== 'idle'"
-            class="pointer-events-none absolute left-1/2 top-[8%] z-[20] inline-flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-2 rounded-full border bg-black/75 px-3 py-1.5 text-sm font-medium shadow-[0_12px_28px_rgba(0,0,0,0.3)] backdrop-blur-md"
-            :class="
-              curatedCaptureFeedback.phase === 'success'
-                ? 'border-emerald-300/35 text-emerald-200'
-                : curatedCaptureFeedback.phase === 'error'
-                  ? 'border-rose-300/40 text-rose-200'
-                  : 'border-primary/35 text-pink-200'
-            "
-            :role="curatedCaptureFeedback.phase === 'error' ? 'alert' : 'status'"
-            :aria-label="
-              curatedCaptureFeedback.phase === 'capturing'
-                ? t('player.captureFeedbackCapturing')
-                : curatedCaptureFeedback.phase === 'success'
-                  ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
-                  : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
-            "
-          >
-            <Camera v-if="curatedCaptureFeedback.phase === 'capturing'" class="size-4 shrink-0" aria-hidden="true" />
-            <Check v-else-if="curatedCaptureFeedback.phase === 'success'" class="size-4 shrink-0" aria-hidden="true" />
-            <AlertTriangle v-else class="size-4 shrink-0" aria-hidden="true" />
-            <span class="truncate">
-              {{
-                curatedCaptureFeedback.phase === 'capturing'
-                  ? t('player.captureFeedbackCapturing')
-                  : curatedCaptureFeedback.phase === 'success'
-                    ? t('player.captureFeedbackSuccess', { time: formatClock(curatedCaptureFeedback.positionSec) })
-                    : t('player.captureFeedbackError', { reason: curatedCaptureFeedback.message })
-              }}
-            </span>
-          </div>
-        </Transition>
-
+        <CaptureReceipt v-if="receiptJob && clipCapturePhase !== 'recording' && clipCapturePhase !== 'processing'"
+          :job="receiptJob" :pending="captureQueue.pendingCount.value"
+          :saved-count="captureQueue.savedCount.value"
+          @download="captureQueue.downloadOriginal(receiptJob)" @compress="captureQueue.compressAndRetry(receiptJob)"
+          @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
+          @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
+        <Dialog v-model:open="capturePreviewOpen">
+          <DialogContent :portal-to="surfaceRef ?? undefined" class="max-w-[95vw] sm:max-w-[90vw]">
+            <DialogTitle>{{ t('curated.captureView') }}</DialogTitle>
+            <div class="h-[75vh]"><FrameImageViewer :src="capturePreviewUrl" :alt="movie.code" /></div>
+          </DialogContent>
+        </Dialog>
         <div class="sr-only" aria-live="polite" aria-atomic="true">
-          {{ curatedCaptureAnnouncement }}
+          {{ captureLiveAnnouncement }}
         </div>
         <Transition
           enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
@@ -2793,22 +3122,22 @@ const videoPreloadMode = computed(() =>
           leave-to-class="opacity-0 translate-y-2"
         >
           <div
-            v-if="clipCapturePhase !== 'idle'"
-            class="pointer-events-none absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-black/78 px-4 py-3 text-white shadow-[0_14px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
-            role="status"
-            aria-live="polite"
+            v-if="clipCapturePhase !== 'idle' && clipCapturePhase !== 'armed'"
+            class="absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-foreground shadow-lg"
+            @click.stop
+            @pointerdown.stop
           >
             <div class="flex items-center gap-2 text-sm font-semibold">
               <Circle v-if="clipCaptureIsRecording" class="size-3 fill-rose-400 text-rose-400" aria-hidden="true" />
               <Film v-else class="size-4 text-primary" aria-hidden="true" />
-              <span v-if="clipCapturePhase === 'armed'">{{ t('player.clipArmed') }}</span>
-              <span v-else-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
-              <span v-else-if="clipCapturePhase === 'processing'">{{ t('player.clipProcessing') }}</span>
+              <span v-if="clipCaptureIsRecording">{{ t('player.clipRecording') }}</span>
+              <span v-else-if="clipCapturePhase === 'processing'">{{ clipExportError || t('player.clipProcessing') }}</span>
               <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
-              <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
+              <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-muted-foreground">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
+              <Button v-if="clipCapturePhase === 'processing' && clipCapture.taskId.value" size="sm" variant="ghost" @click="cancelClipExport">{{ t('common.cancel') }}</Button>
             </div>
-            <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
+            <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-muted">
               <div
                 class="h-full origin-left rounded-full bg-rose-400 transition-transform duration-200 ease-linear motion-reduce:transition-none"
                 :style="{ transform: `scaleX(${clipCaptureProgress})` }"
@@ -2821,6 +3150,23 @@ const videoPreloadMode = computed(() =>
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
+        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-16 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
+          <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
+          <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
+          <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
+          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase() }}</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child><Button size="icon-sm" variant="ghost" :disabled="clipCapturePhase !== 'idle'" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent :portal-to="surfaceRef ?? undefined">
+              <DropdownMenuRadioGroup v-model="clipFormat">
+                <DropdownMenuRadioItem value="gif">GIF</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mp4">MP4</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="webm">WebM</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
+        </div>
         <video
           v-if="playbackSrc"
           ref="videoRef"
@@ -2881,12 +3227,7 @@ const videoPreloadMode = computed(() =>
             <div class="flex min-w-[12rem] max-w-sm flex-col items-center gap-3 rounded-[1.5rem] border border-white/12 bg-black/48 px-6 py-5 text-center text-white shadow-[0_18px_50px_rgba(0,0,0,0.38)] backdrop-blur-md">
               <Loader2 class="size-8 animate-spin text-white/85" aria-hidden="true" />
               <span class="text-sm font-medium tracking-[0.01em] text-white/88">{{ playbackBusyLabel }}</span>
-              <span
-                v-if="isPrewarmingHls && playbackDescriptor?.mode === 'hls' && !isPlaying"
-                class="text-xs font-medium tabular-nums text-white/55"
-              >
-                {{ prewarmProgressPercent }}%
-              </span>
+
             </div>
           </div>
         </Transition>
@@ -3173,7 +3514,7 @@ const videoPreloadMode = computed(() =>
 }
 
 .curated-shutter-ring {
-  animation: curated-shutter-inset 0.55s ease-out forwards;
+  animation: curated-shutter-inset 0.2s ease-out forwards;
   box-shadow: inset 0 0 0 8px hsl(var(--primary) / 0.42);
 }
 

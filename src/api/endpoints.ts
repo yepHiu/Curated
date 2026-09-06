@@ -11,6 +11,7 @@ import {
   isLibraryHealthReportDTO,
   isMovieDetailDTO,
   isMoviesPageDTO,
+  isImportMovieCodeCheckDTO,
   isSavedViewDTO,
   isSavedViewsDTO,
   isRecommendationFeedbackDTO,
@@ -93,10 +94,13 @@ import type {
   NativePlaybackLaunchDTO,
   MetadataScrapeByPathsBody,
   MovieImportUploadDTO,
+  CheckImportMovieCodesBody,
+  ImportMovieCodeCheckDTO,
   MovieCommentDTO,
   MovieDetailDTO,
   MoviesPageDTO,
   PlaybackDescriptorDTO,
+  PlaybackSessionStatusDTO,
   PatchActorExternalLinksBody,
   PatchAuthSettingsBody,
   PatchCuratedFrameTagsBody,
@@ -570,11 +574,12 @@ export const api = {
       .then((value) => assertApiResponse("GET /library/movies/:id", value, isMovieDetailDTO))
   },
 
-  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null }): Promise<PlaybackDescriptorDTO> {
-    const query = options?.clientVideoCodecs
-      ? `?clientVideoCodecs=${encodeURIComponent(options.clientVideoCodecs)}`
-      : ""
-    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${query}`)
+  getMoviePlayback(movieId: string, options?: { clientVideoCodecs?: string | null; startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO> {
+    const query = new URLSearchParams()
+    if (options?.clientVideoCodecs) query.set("clientVideoCodecs", options.clientVideoCodecs)
+    if (options?.startPositionSec !== undefined) query.set("startPositionSec", String(options.startPositionSec))
+    const suffix = query.size ? `?${query}` : ""
+    return httpClient.get<PlaybackDescriptorDTO>(`/library/movies/${encodeURIComponent(movieId)}/playback${suffix}`, undefined, options?.signal)
   },
 
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO> {
@@ -584,11 +589,16 @@ export const api = {
     )
   },
 
-  createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody): Promise<PlaybackDescriptorDTO> {
+  createPlaybackSession(movieId: string, body: CreatePlaybackSessionBody, signal?: AbortSignal): Promise<PlaybackDescriptorDTO> {
     return httpClient.post<PlaybackDescriptorDTO>(
       `/library/movies/${encodeURIComponent(movieId)}/playback-session`,
       body,
+      signal,
     )
+  },
+
+  getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO> {
+    return httpClient.get<PlaybackSessionStatusDTO>(`/playback/sessions/${encodeURIComponent(sessionId)}`)
   },
 
   deletePlaybackSession(sessionId: string): Promise<void> {
@@ -625,6 +635,12 @@ export const api = {
 
   patchSettings(body: PatchSettingsBody): Promise<SettingsDTO> {
     return httpClient.patch<SettingsDTO>("/settings", body)
+  },
+
+  checkImportMovieCodes(body: CheckImportMovieCodesBody): Promise<ImportMovieCodeCheckDTO> {
+    return httpClient
+      .post<ImportMovieCodeCheckDTO>("/import/movies/code-check", body)
+      .then((value) => assertApiResponse("POST /import/movies/code-check", value, isImportMovieCodeCheckDTO))
   },
 
   importMovies(
@@ -733,6 +749,13 @@ export const api = {
   createMovieClip(movieId: string, body: CreateMovieClipBody): Promise<TaskDTO> {
     return httpClient.post<TaskDTO>(`/library/movies/${encodeURIComponent(movieId)}/clips`, body)
   },
+  cancelMovieClip(taskId: string): Promise<void> {
+    return httpClient.delete(`/tasks/${encodeURIComponent(taskId)}/clip`)
+  },
+  async extractMovieFrame(movieId: string, positionSec: number): Promise<Blob> {
+    const { blob } = await httpClient.postBlob(`/library/movies/${encodeURIComponent(movieId)}/frame`, { positionSec })
+    return blob
+  },
 
   getRecentTasks(limit?: number): Promise<RecentTasksDTO> {
     return httpClient.get<RecentTasksDTO>("/tasks/recent", {
@@ -832,5 +855,41 @@ export const api = {
 
   pingProxyGoogle(body?: ProxyJavBusPingRequestBody): Promise<ProxyJavBusPingResponse> {
     return httpClient.post<ProxyJavBusPingResponse>("/proxy/ping-google", body ?? {})
+  },
+
+  /** 实验：测试 Agent provider 连通；provider 缺省时测试已保存配置 */
+  testAIProvider(
+    body?: import("./types").AIProviderTestRequestBody,
+  ): Promise<import("./types").AIProviderTestResponse> {
+    return httpClient.post<import("./types").AIProviderTestResponse>("/ai/provider/test", body ?? {})
+  },
+
+  listAIChatSessions(): Promise<import("./types").AIChatSessionListDTO> {
+    return httpClient.get<import("./types").AIChatSessionListDTO>("/ai/sessions")
+  },
+
+  createAIChatSession(title?: string): Promise<import("./types").AIChatSessionDTO> {
+    return httpClient.post<import("./types").AIChatSessionDTO>("/ai/sessions", { title: title ?? "" })
+  },
+
+  getAIChatSession(id: string, cursor?: string): Promise<import("./types").AIChatSessionDetailDTO> {
+    return httpClient.get<import("./types").AIChatSessionDetailDTO>(
+      `/ai/sessions/${encodeURIComponent(id)}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    )
+  },
+
+  deleteAIChatSession(id: string): Promise<void> {
+    return httpClient.delete(`/ai/sessions/${encodeURIComponent(id)}`)
+  },
+
+  runAIAction(name: string, body: import("./types").AIActionRequestBody): Promise<import("./types").AIActionPreviewDTO> {
+    return httpClient.post<import("./types").AIActionPreviewDTO>(
+      `/ai/actions/${encodeURIComponent(name)}`,
+      body,
+    )
+  },
+
+  confirmAITool(body: import("./types").AIToolApplyRequestBody): Promise<import("./types").AIToolApplyDTO> {
+    return httpClient.post<import("./types").AIToolApplyDTO>("/ai/confirm", body)
   },
 }

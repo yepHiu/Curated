@@ -318,6 +318,9 @@ export interface SettingsDTO {
   metadataMovieStrategy?: MetadataMovieStrategy
   /** HTTP 代理配置 */
   proxy: ProxySettingsDTO
+  /** 实验性 Agent provider 配置（library-config.cfg） */
+  aiProvider: AIProviderSettingsDTO
+  aiGovernance?: import("@/services/contracts/ai-governance-service").AIGovernanceSettings
   /** 后端进程日志（文件 + 级别）；重启后端后作用于 Zap */
   backendLog: BackendLogSettingsDTO
 }
@@ -327,6 +330,209 @@ export interface ProxySettingsDTO {
   url?: string
   username?: string
   password?: string
+}
+
+/** 实验：Agent LLM provider 配置（OpenAI 兼容）；baseUrl/model 为空表示未配置 */
+export interface AIProviderSettingsDTO {
+  kind: string
+  baseUrl: string
+  apiKey?: string
+  model: string
+}
+
+/** 实验：Agent provider 局部更新；未发送字段保持不变，空字符串清除 */
+export interface PatchAIProviderBody {
+  baseUrl?: string
+  apiKey?: string
+  model?: string
+}
+
+/** POST /api/ai/provider/test — 可选传入草稿配置而未保存时先测试 */
+export interface AIProviderTestRequestBody {
+  provider?: AIProviderSettingsDTO
+}
+
+export interface AIProviderTestResponse {
+  ok: boolean
+  latencyMs: number
+  message?: string
+}
+
+/** POST /api/ai/chat 的消息行 */
+export interface AIChatMessageDTO {
+  role: "system" | "user" | "assistant"
+  content: string
+}
+
+export interface AIChatMentionDTO {
+  kind: "movie" | "actor" | "tag"
+  id: string
+  label: string
+}
+
+/** Bounded, one-turn projection of the active library filters. */
+export interface AIChatActiveFiltersDTO {
+  query?: string
+  tag?: string
+  actor?: string
+  playState?: "all" | "unwatched" | "in-progress" | "completed"
+  runtime?: "short" | "standard" | "long"
+}
+
+export interface AIChatContextDTO {
+  /** Omit for the legacy page-context shape. Version 1 enables explicit selections and filters. */
+  contextVersion?: 1
+  route?: string
+  movieId?: string
+  actorName?: string
+  query?: string
+  mentions?: AIChatMentionDTO[]
+  selectedMovieIds?: string[]
+  /** Actor public list rows use canonical names, not a stable actor ID. */
+  selectedActors?: string[]
+  activeFilters?: AIChatActiveFiltersDTO
+}
+
+export interface AIChatSessionDTO {
+  id: string
+  title?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AIChatSessionListDTO {
+  items: AIChatSessionDTO[]
+}
+
+export interface AIChatStoredMessageDTO {
+  events?: AIChatStoredEventDTO[]
+  id: string
+  sessionId: string
+  role: string
+  content: string
+  toolName?: string
+  toolCallId?: string
+  seq: number
+  createdAt: string
+}
+
+export interface AIChatSessionDetailDTO extends AIChatSessionDTO {
+  nextCursor?: string
+  messages: AIChatStoredMessageDTO[]
+}
+
+export interface AIAgentMovieCardDTO {
+  movieId: string
+  title?: string
+  code?: string
+  actors?: string[]
+  coverUrl?: string
+  thumbUrl?: string
+  reason?: string
+}
+
+/** Persisted result events; confirmation tokens are deliberately not stored. */
+export interface AIChatStoredEventDTO {
+  receiptId?: string
+  applied?: boolean
+  type: string
+  toolCallId?: string
+  name?: string
+  ok?: boolean
+  summary?: string
+  movies?: AIAgentMovieCardDTO[]
+  providerRows?: AIAgentProviderTitleDTO[]
+  evidence?: AIEvidenceDTO
+  resolution?: AIEntityResolutionDTO
+  outcome?: AIChatOutcomeDTO
+  changes?: AIConfirmChangeDTO[]
+}
+
+export interface AIAgentProviderTitleDTO {
+  code?: string
+  title?: string
+  provider?: string
+  score?: number
+  homepage?: string
+  inLibrary: boolean
+  movieId?: string
+}
+
+export interface AIEntityCandidateDTO {
+  kind: "movie" | "actor"
+  movieId?: string
+  actorName?: string
+  title?: string
+  code?: string
+  aliases?: string[]
+  reason?: string
+}
+
+export interface AIEntityResolutionDTO {
+  query: string
+  kind: "auto" | "movie" | "actor"
+  status: "matched" | "ambiguous" | "unmatched"
+  candidates: AIEntityCandidateDTO[]
+  reason?: string
+}
+
+export interface AIEvidenceDTO {
+  source: "local" | "provider" | "source_page"
+  retrievedAt: string
+  filters?: Record<string, string>
+  truncated?: boolean
+  nextCursor?: string
+  failed?: boolean
+  errorCode?: string
+}
+
+export interface AIChatOutcomeDTO {
+  status: "completed" | "partial" | "needs_input" | "cancelled" | "failed"
+  reason?: string
+  retryable?: boolean
+}
+
+export interface AIConfirmChangeDTO {
+  path: string
+  before?: unknown
+  after?: unknown
+}
+
+export interface AIActionRequestBody {
+  movieId?: string
+  body?: string
+  locale?: string
+  targetLocale?: string
+  range?: string
+  timezone?: string
+}
+
+export interface AIActionPreviewDTO {
+  action: string
+  name: string
+  sessionId: string
+  originalText?: string
+  proposedText?: string
+  changes?: AIConfirmChangeDTO[]
+  confirmToken?: string
+  expiresAt?: string
+  arguments?: Record<string, unknown>
+  noop?: boolean
+}
+
+export interface AIToolApplyRequestBody {
+  sessionId: string
+  name: string
+  arguments: Record<string, unknown>
+  confirmToken: string
+}
+
+export interface AIToolApplyDTO {
+  /** Existing committed result; data is a historical snapshot. */
+  replayed?: boolean
+  ok: boolean
+  name: string
+  data?: unknown
 }
 
 /** 后端日志目录与级别（library-config.cfg）；空 logDir 表示使用当前构建的默认日志目录 */
@@ -527,6 +733,8 @@ export interface PatchSettingsBody {
   metadataMovieStrategy?: MetadataMovieStrategy
   /** 代理配置；发送则替换当前配置 */
   proxy?: ProxySettingsDTO
+  /** 实验性 Agent provider 配置；发送则合并更新 */
+  aiProvider?: PatchAIProviderBody
   /** 合并写入后端日志设置 */
   backendLog?: PatchBackendLogBody
 }
@@ -565,6 +773,30 @@ export interface MovieImportUploadFileManifest {
 
 export interface CreateMovieImportUploadBody {
   files: MovieImportUploadFileManifest[]
+}
+
+export type ImportMovieCodeMatchKind = "exact" | "similar"
+
+export interface CheckImportMovieCodesBody {
+  names: string[]
+}
+
+export interface ImportMovieCodeMatchDTO {
+  movieId: string
+  code: string
+  title: string
+  matchKind: ImportMovieCodeMatchKind
+}
+
+export interface ImportMovieCodeCheckItemDTO {
+  name: string
+  extractedCode?: string
+  matches: ImportMovieCodeMatchDTO[]
+}
+
+export interface ImportMovieCodeCheckDTO {
+  items: ImportMovieCodeCheckItemDTO[]
+  matchedCount: number
 }
 
 export interface MovieImportUploadChunkDTO {
@@ -620,7 +852,7 @@ export interface ActorProfileDTO {
 export interface CreateMovieClipBody {
   startSec: number
   endSec: number
-  format: "gif"
+  format: "gif" | "mp4" | "webm"
   fps?: number
   width?: number
   curatedFrameId?: string
@@ -995,6 +1227,23 @@ export interface CreatePlaybackSessionBody {
   startPositionSec?: number
 }
 
+export interface PlaybackSessionStatusDTO {
+  sessionId: string
+  movieId: string
+  sessionKind?: string
+  transcodeProfile?: string
+  startPositionSec?: number
+  startedAt?: string
+  lastAccessedAt?: string
+  expiresAt?: string
+  finishedAt?: string
+  state?: string
+  lastError?: string
+  encoderSpeed?: string
+  writtenDurationSec?: number
+  lastSeekKind?: string
+}
+
 export interface NativePlaybackLaunchDTO {
   ok: boolean
   command?: string
@@ -1046,6 +1295,8 @@ export interface CuratedFrameMotionDTO {
 }
 
 export interface ListCuratedFramesParams {
+  cursor?: string
+  skipTotal?: boolean
   q?: string
   actor?: string
   movieId?: string
@@ -1057,6 +1308,7 @@ export interface ListCuratedFramesParams {
 }
 
 export interface CuratedFramesListDTO {
+  nextCursor?: string
   items: CuratedFrameItemDTO[]
   total: number
   limit: number

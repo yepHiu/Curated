@@ -1457,6 +1457,8 @@ Query：
 
 用途：获取播放描述，客户端应以此作为播放入口。
 
+可选 query：`startPositionSec=1200`——有限非负秒数（支持小数），优先于数据库续播点，在首次 HLS 启动前生效。省略时使用已保存进度；起点达到片长的 95% 时按播放器既有重播规则回到 0。无效值返回 `400 COMMON_BAD_REQUEST`。每次 HLS 请求创建独立 session，调用方在离开或换流后负责 DELETE；取消的请求在启动队列与准备阶段会停止。
+
 可选 query：`clientVideoCodecs=h264,hevc`——逗号分隔的浏览器可解码 mp4 家族视频编码（`h264` / `hevc` / `av1`，别名 `avc1`、`hvc1`/`hev1` 会归一化）。提供时后端只在该集合内判定 mp4/mov 直放（未知编码视为不支持并走 HLS），未提供时保持静态白名单。Webm/Ogg 不受该参数影响。
 
 成功：`200 PlaybackDescriptorDTO`
@@ -1487,9 +1489,9 @@ Query：
 | `mimeType` | 媒体类型 |
 | `transcodeProfile` | 转码档位 |
 | `startPositionSec` | 会话媒体时间轴的实际起点；remux 会话为对齐到的关键帧时间，客户端应结合 `resumePositionSec` 做本地微调 |
-| `resumePositionSec` | 已保存续播点 |
+| `resumePositionSec` | 本次有效续播点，可能来自显式起点或已保存进度 |
 | `canDirectPlay` | 是否支持直放 |
-| `reasonCode` / `reasonMessage` | 模式选择诊断 |
+| `reasonCode` / `reasonMessage` | 模式选择诊断。常见值：`browser_direct_play_supported`、`browser_container_unsupported`、`browser_codec_unsupported`、`force_stream_push`、`source_timestamps_unstable`（ffprobe `r_frame_rate` 与 `avg_frame_rate` 相差超过约 2%、平均帧率显式为 `0/0`/`N/A`，或片头视频包 PTS 为负；在 stream push 开启时改走 HLS，h264 优先 remux） |
 | `audioTracks` / `subtitleTracks` | 音轨 / 字幕轨信息 |
 
 #### `POST /api/library/movies/{movieId}/playback-session`
@@ -1505,7 +1507,11 @@ Body：
 }
 ```
 
-`mode` 省略时默认为 `direct`。
+`mode` 省略时默认为 `direct`。显式 direct 始终返回原文件 `/stream` 描述符，不会因 ForceStreamPush 再启动 HLS；`canDirectPlay` 仍反映源能力，前端需结合本机 codec 能力决定是否可用。
+
+HLS 会话不再按影片 ID 相互替换。新流可播后，调用方释放自己持有的旧 sessionId；同片多客户端不会互相抢占。Manager 默认最多同时准备 2 个、保留 8 个会话，排队与 profile 尝试共用 24 秒期限（内部 Config 可覆盖容量，暂无设置页选项）。旧 session 保留期间也计入容量；容量满时请求等待释放，超时后失败，不驱逐其他客户端。
+
+HLS 推流为 event playlist + fMP4。转码会话会尽量等到约 4 个媒体分片（约 8 秒）进入 playlist，或最多等待 12 秒后仍返回描述符；remux 在首片就绪后即可返回。分片以临时文件写完再 rename，未完成的 `.tmp` 不会被会话文件接口提供。
 
 成功：`201 PlaybackDescriptorDTO`
 
@@ -1552,15 +1558,20 @@ Query：
 {
   "sessionId": "session-1",
   "movieId": "movie-1",
-  "sessionKind": "hls",
-  "transcodeProfile": "default",
+  "sessionKind": "transcode-hls",
+  "transcodeProfile": "libx264",
   "startPositionSec": 120.5,
   "startedAt": "2026-06-07T12:00:00Z",
   "lastAccessedAt": "2026-06-07T12:01:00Z",
   "expiresAt": "2026-06-07T13:00:00Z",
-  "state": "running"
+  "state": "running",
+  "encoderSpeed": "1.24x",
+  "writtenDurationSec": 8.5,
+  "lastSeekKind": "swap"
 }
 ```
+
+`encoderSpeed` / `writtenDurationSec` 来自 FFmpeg `-progress`（会话相对时间轴上已写出的时长）。`lastSeekKind` 为 `start`（从头起播）或 `swap`（中段新开会话）；窗口内复用由播放器本地记为 `reuse`，不必上报。
 
 #### `GET /api/playback/sessions/{sessionId}/hls/{file}`
 
@@ -1569,7 +1580,8 @@ Query：
 成功：
 
 - `.m3u8`：`application/vnd.apple.mpegurl`
-- `.ts`：`video/mp2t`
+- `.m4s` / `.mp4`：`video/mp4`（当前会话为 fMP4 HLS）
+- `.ts`：`video/mp2t`（兼容旧会话）
 - 其他：`http.ServeFile` 自动推断
 
 说明：
@@ -1894,6 +1906,46 @@ Body 可选：
 
 ### 4.12 Movie Imports
 
+#### `POST /api/import/movies/code-check`
+
+用途：导入前按文件名解析番号，检查活动库中是否已有相同或类似条目。只读，不复制文件。
+
+Body：
+
+```json
+{
+  "names": ["489155.com@SSIS-001-C.mp4", "folder/holiday.mp4"]
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `names` | string[] | 相对路径或文件名，最多 200 条，单条最多 512 个 Unicode 字符 |
+
+成功：`200 ImportMovieCodeCheckDTO`
+
+```json
+{
+  "items": [
+    {
+      "name": "489155.com@SSIS-001-C.mp4",
+      "extractedCode": "SSIS-001",
+      "matches": [
+        {
+          "movieId": "ssis-001",
+          "code": "SSIS-001",
+          "title": "Example",
+          "matchKind": "exact"
+        }
+      ]
+    }
+  ],
+  "matchedCount": 1
+}
+```
+
+`matchKind` 为 `exact`（规范化后相同）或 `similar`（连字符分段前缀变体）。无法解析番号时 `extractedCode` 省略、`matches` 为空数组。回收站影片不参与匹配。无效 body 返回 `400 COMMON_BAD_REQUEST`。
+
 #### `POST /api/import/movies`
 
 用途：普通 multipart 导入影片文件。
@@ -2142,6 +2194,8 @@ data: {"type":"task.updated","task":{"taskId":"task-1","type":"scan.library","st
 
 用途：分页查询精选帧元数据。
 
+按 `(captured_at DESC, id DESC)` 稳定排序。响应可带 `nextCursor`；续页传 `cursor=<nextCursor>`，此时忽略 offset。续页可加 `skipTotal=true`，响应 `total=-1` 表示本页未重新统计，应沿用首屏总数。空页表示结束；非法 cursor 返回 400。
+
 Query：
 
 | 参数 | 类型 | 说明 |
@@ -2247,7 +2301,8 @@ Multipart：
 - `image` 不能为空，最大 12 MiB。
 - `imageBase64` 是标准 base64，不带 `data:image/...;base64,` 前缀。
 - `movieId` 必须存在。
-- `id` 重复返回 `409 COMMON_CONFLICT`。
+- PNG/JPEG 必须可解码，最多 33,177,600 像素；无效图片返回 400，不再将原始无效数据作为缩略图存入。
+- 同一 `id` 且 movieId、positionSec、capturedAt、原图字节完全相同，视为重放，返回 204 和 `X-Curated-Replayed: true`；不会覆盖后来编辑的标签。相同 id、不同捕获内容仍返回 `409 COMMON_CONFLICT`。
 
 成功：`204 No Content`
 
@@ -2262,6 +2317,22 @@ Multipart：
 用途：获取精选帧缩略图。
 
 成功：图片 bytes，`Cache-Control: private, max-age=3600`
+
+原图和缩略图均带内容 ETag，支持 `If-None-Match` / 304。缩略图正常路径只向 Go 返回小图，历史缺失记录回退原图。
+
+#### `POST /api/library/movies/{movieId}/frame`
+
+从源文件提取单帧，请求 `{ "positionSec": 42.5 }` 使用绝对媒体秒数；只读取已配置资料库内的主视频。成功为 `200 image/png`，附 `X-Frame-Width` / `X-Frame-Height`，不自动入库；前端再调用萃取帧上传接口。等待上限 20 秒，输出内存上限 32 MiB，像素上限 33,177,600，与片段共享最多 2 个编码工作槽；繁忙返回 429，不可用源返回 404，提取失败返回 422。应用 PIN 保护与其它资料库 API 相同。
+
+#### `POST /api/library/movies/{movieId}/clips`
+
+请求 `{ "startSec": 10, "endSec": 12, "format": "gif", "fps": 10, "width": 640, "curatedFrameId": "frame-id" }`。格式支持 gif（默认）、mp4、webm；区间 0.4–6 秒、fps 1–20、width 160–960。返回 `202 TaskDTO`，type 为 `movie_clip_gif` / `movie_clip_mp4` / `movie_clip_webm`。最多 8 个在途任务、2 个编码任务；排队与执行总期限 2 分钟，超量返回 429；FFmpeg 产物限制 128 MiB。
+
+轮询 `GET /api/tasks/{taskId}`。成功 metadata 包含 artifactUrl/contentType/filename；关联帧产物经 `GET /api/curated-frames/{id}/motion` 获取，未关联产物经 `GET /api/tasks/{taskId}/artifact` 获取并在约 24 小时后清理。根据 contentType 渲染 GIF 图片或 MP4/WebM 视频。
+
+#### `DELETE /api/tasks/{taskId}/clip`
+
+取消仍在排队或编码中的片段任务，返回 204；任务不活跃返回 404。取消会终止对应 FFmpeg，并以失败终态报告；已保存静态帧保留。
 
 #### `PATCH /api/curated-frames/{id}/tags`
 
@@ -2440,6 +2511,160 @@ Body 可选：
 用途：同上，但目标为 `https://www.google.com/`。
 
 成功：`200 ProxyJavBusPingResponse`
+
+### 4.15b Experimental Agent（实验性）
+
+实验性 Agent（见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。聊天中的写工具只产生预览，应用修改需要用户通过确认接口明确提交。
+
+#### AI 设置与治理（2026-09-06）
+
+正式入口为 Settings → AI。以下路由均受 PIN/CORS 中间件保护，模型工具不能调用设置写入端点。现有 Provider 字段继续通过 `GET/PATCH /api/settings` 保存；`GET /api/settings` 额外返回 `aiGovernance`。
+
+| 方法 | 路径 | 行为 |
+| --- | --- | --- |
+| GET | `/api/ai/settings` | 返回全局 AI 治理设置 |
+| PATCH | `/api/ai/settings` | 部分更新；未知字段、错误类型、非法范围返回 `400 BAD_REQUEST` |
+| GET | `/api/ai/usage` | 过滤后的汇总与分页请求记录 |
+| GET | `/api/ai/audit` | 分页工具审计，仅元数据 |
+| POST | `/api/ai/cleanup` | 按已保存保留期清理到期记录，返回 `{runs,audit,receipts}` 删除数量 |
+
+设置默认值：
+
+```json
+{"enabled":false,"readOnly":false,"privacy":"auto","stepLimit":15,"writePerMinute":10,"retentionDays":30}
+```
+
+`privacy` 支持 `auto` / `minimal`；步骤 1–30、全局每分钟确认 1–60、保留天数 7–365。保存至 `library-config.cfg.aiGovernance`，并取消正在生成的请求；已接受的确认写事务先完成，再保存策略。禁用时聊天返回 SSE `error` / `AI_DISABLED`；Action/confirm 返回 `403 AI_DISABLED`。只读时写 Action/confirm 为 `403 AI_READ_ONLY`，Gateway 拒绝写预览/应用并记录审计。连通测试与治理查询仍可显式调用。旧浏览器实验开关不会自动赋予全局启用权限。
+
+查询参数：`days`（1–365，默认 30）、`limit`（1–100，默认 25）、`offset`（0–100000，默认 0）、`channel`（省略或 chat/action/test）、`status`。usage 的 status 为 completed/failed/partial/cancelled/needs_input；audit 为 ok/error/previewed/confirmed/rejected，或 failed（匹配 error/rejected）。非法参数返回 400。按时间及 id 降序分页；新请求可能移动 offset 边界，刷新后重新从首页浏览。
+
+usage 返回 `{summary,items,total,limit,offset}`。summary 包含 runs/failed/partial/cancelled/modelCalls/usageCalls/toolCalls、promptTokens/completionTokens/totalTokens、avgDurationMs/avgFirstTextMs。items 包含 id/startedAt/channel/action/sessionId/provider（kind）/model/promptVersion/status/errorCode/durationMs/firstTextMs，以及相同调用数、usage 覆盖数和 token 字段。`firstTextMs` 与平均值无样本时为 null；非流式调用不提供首正文延迟。token 累加值只能在 `usageCalls>0` 时作为已知用量展示；`usageCalls<modelCalls` 表示部分缺失，零覆盖必须显示未知，不能把数字 0 当作已测消耗。此数据不是上下文估算或费用报价。
+
+每轮 Chat、Action、连通测试在收尾记录一行。失败类别含 configuration/authentication/rate_limit/provider_http/network/timeout/cancelled/stream_interrupted/invalid_response/operation_failed/empty_response 和具体 AI 工具错误码；不保存原始错误响应。进入 App 之前被 HTTP 参数验证/PIN 拒绝的请求不计为模型轮次。结束前崩溃不保证统计落库；请求取消时使用独立最多 5 秒上下文保存。
+
+audit 返回 `{items,total,limit,offset}`，条目为 id/createdAt/channel/sessionId/tool/permission/result/errorCode/durationMs，不返回 args_summary 或原始文本。新的审计不再保存原始参数摘要。治理查询和新请求完成会自动清理到期统计、审计及未关联聊天会话的 Action 回执；聊天正文、聊天关联回执继续由删除会话管理。清理不撤销业务修改；未用确认票据继续遵循原 TTL。
+
+#### `POST /api/ai/provider/test`（连通性）
+
+用途：用草稿 provider 配置或已保存配置发起一次 chat completion，要求仅回复 pong，验证 OpenAI 兼容端点连通性。探针最多允许 1024 个输出 token、30 秒超时，给推理模型生成最终正文留出额度；空正文仍返回失败。
+
+Body 可选：
+
+```json
+{
+  "provider": {
+    "kind": "openai-compatible",
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "apiKey": "",
+    "model": "qwen3"
+  }
+}
+```
+
+成功：`200 AIProviderTestResponse`
+
+```json
+{
+  "ok": true,
+  "latencyMs": 812,
+  "message": ""
+}
+```
+
+说明：
+
+- 省略 `provider` 时测试当前持久化配置；出站走已配置的代理，超时约 15 秒。
+- 连接失败仍返回 `200`，body 中 `ok=false` 且 `message` 带原因（与 proxy ping 契约一致）。
+
+#### `POST /api/ai/chat`
+
+用途：实验性 Agent Window 的流式对话（E2：只读工具循环 + 会话）。
+
+Body：
+
+```json
+{
+  "sessionId": "ses_…",
+  "locale": "zh-CN",
+  "context": {
+    "contextVersion": 1,
+    "route": "detail",
+    "movieId": "…",
+    "query": "",
+    "selectedMovieIds": ["…"],
+    "selectedActors": ["Canonical actor name"],
+    "activeFilters": { "query": "…", "tag": "…", "actor": "…", "playState": "unwatched", "runtime": "short" },
+    "mentions": [{ "kind": "movie", "id": "…", "label": "Hello" }]
+  },
+  "messages": [
+    { "role": "user", "content": "这个月看了多久" }
+  ]
+}
+```
+
+成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `thinking_delta` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
+
+说明：
+
+- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后读取最近 80 条 user/assistant 候选记录（工具记录不占额度），模型循环最终保留最多 24 条且历史正文预算约 24 KiB。本次输入不会被静默截断；省略较早历史时注入范围说明。
+- 每次模型调用前，对 messages 与工具 schema 的 JSON UTF-8 字节数做保守 token 估算，上限 65536。达到预算且未执行工具时返回 `needs_input`，已有工具结果时返回 `partial`，保留已完成结果并停止进一步调用。不切断工具 JSON；预算是本地估算，不是 Provider usage 或上下文窗口的精确测量，尚无自动摘要。
+- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
+- `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
+- 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
+- 单轮工具步数默认 15，触顶后强制收尾并在文本中说明。
+- provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回。
+- 推荐或点名具体影片时，模型应调用 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知 ID 被拒绝，不会出卡。库外源站作品（`search_provider_titles` 且 `inLibrary=false`）没有 `movieId`，不能用于 `present_movies`。
+- `get_movie_detail` / `get_actor_profile` 在已刮削时带 `homepage`；影片另有 `metadataRating`、`metadataProvider`。
+- `search_provider_titles` 只接受本轮已见的 `actorName` 和/或 `movieId`（含页面 context / `@` 引用），禁止自由文本 `query`。底层走已配置刮削源站检索并对账本地番号；失败留在工具结果内。
+- `get_source_page` 只接受本轮工具结果里出现过的 https `homepage` / `externalLinks`；拒绝非 https、私网与允许名单外跳转；抽出可见文本约 32KiB。
+- 写工具 `save_movie_comment` / `update_movie_display_overrides` / `create_saved_view` 只产生 preview。成功后额外发出 `confirm_required`（`changes` / `confirmToken` / `expiresAt` / `arguments`）并结束本轮；真正写入走 `POST /api/ai/confirm`，chat 通道的模型不能自行 apply。
+
+#### `POST /api/ai/actions/{name}`
+
+用途：实验性就地 Action（E3）。`name` 为 `polish_comment`、`translate_summary`、`translate_title` 或 `insights_narrative`。无会话循环。
+
+后端总期限为 2 分钟；Web 适配同样提供 2 分钟超时和可取消 signal。聊天流式请求由 Web 适配在连续 90 秒无数据时取消，并将缺失 `message_done` 的 EOF 视为中断；客户端保留部分回复，不自动重放确认写入。
+
+- `polish_comment`：笔记润色，经 `save_movie_comment` preview。模型自识别原文语言并同语言润色。Body：`{ "movieId", "body?" }`。
+- `translate_summary`：把当前展示简介翻译到界面语言，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列，也不改标题。Body：`{ "movieId", "body?", "locale?" }`。
+- `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`，不改简介。Body：`{ "movieId", "body?", "locale?" }`。
+- `insights_narrative`：只读解读，无确认卡。后端先调 insights 聚合再生成文本。Body：`{ "range?", "timezone?", "locale?" }`。
+
+成功：`200 AIActionPreviewDTO`。写类含 `confirmToken`（无改动时 `noop: true`）。`insights_narrative` 只返回 `proposedText` 且 `noop: true`。未配 provider 为 `400 AI_PROVIDER_UNAVAILABLE`。未知 name 为 `404`。
+
+#### `POST /api/ai/confirm`
+
+用途：用户确认后执行已 preview 的写工具。Body：`{ "sessionId", "name", "arguments", "confirmToken" }`。`arguments` 须与 preview 语义一致（确认前会规范化 JSON）。
+
+成功：`200 AIToolApplyDTO`（`ok`、`name`、`data`，重复成功确认另含 `replayed: true`）。尚未成功的 token 无效/过期/参数漂移为 `400 AI_CONFIRM_EXPIRED`；已存在回执但 session/tool/规范化参数绑定不匹配同样为 `400 AI_CONFIRM_EXPIRED`。确认前零写入。笔记、标题、简介的预览旧值由服务端绑定到确认票据；apply 在 SQLite 事务中比较，内容已变化时返回 `409 AI_WRITE_CONFLICT`，无部分写入。
+
+成功写入与 `ai_apply_receipts` 回执在同一事务提交。相同 token/session/tool/规范化参数的重试直接返回当时结果，不重复写入，后端重启后仍可恢复；失败和过期的未执行票据不能借此重试执行。回执保存 token 的 SHA-256 而非原始 token。确认请求被接受后，即使客户端断连也会在有界写入期限内继续收口。`data` 是提交时快照：笔记含 body/updatedAt，展示字段含 id 及本次改变的 title/summary，保存视图含创建结果。`replayed: true` 时编辑器重新读取当前资料，避免用历史结果覆盖后续人工修改。删除聊天同步清除其回执；独立 Action 回执当前无自动保留期清理。
+
+#### `GET /api/ai/sessions`
+
+用途：列出最近的 Agent 会话（默认最多 20 条，按 `updatedAt` 降序）。
+
+成功：`200 AIChatSessionListDTO`
+
+#### `POST /api/ai/sessions`
+
+用途：创建空会话。Body 可选 `{ "title": "…" }`。
+
+成功：`201 AIChatSessionDTO`
+
+#### `GET /api/ai/sessions/{sessionId}`
+
+用途：读取会话消息页，每页最多 80 条存储记录。首次不传 cursor 返回最新页；将响应的 `nextCursor` 原样作为 `?cursor=…` 传回即可读取更早页，省略 `nextCursor` 表示到底。游标是不透明字符串，Web API 按 `(seq,id)` 严格向前翻页，新增消息不移动旧页边界；每页仍按时间正序展示。非法游标返回 `400 COMMON_BAD_REQUEST`。
+
+新 assistant 记录可带 `events`（工具结果、影片卡、证据、实体解析、确认预览和完成状态）；不包含可用于写入的 confirmToken 或 arguments。确认事件可带不可执行的 `receiptId`，查询历史时根据已提交回执回填 `applied: true`。已应用预览显示已应用；其余历史预览仅展示，需要重新生成后确认。旧消息没有 events 时保持兼容，工具成功状态未知；回执实现前的历史操作不能补出可信的成功状态。
+
+成功：`200 AIChatSessionDetailDTO`；不存在时 `404 COMMON_NOT_FOUND`。
+
+#### `DELETE /api/ai/sessions/{sessionId}`
+
+用途：删除一个会话、其消息及对应的 AI apply 回执；不会撤销该会话之前已确认的业务修改。
+
+成功：`204`；不存在时 `404 COMMON_NOT_FOUND`。
 
 ### 4.16 Maintenance Backups
 
@@ -3205,6 +3430,7 @@ interface ActorMergeValuesSummaryDTO {
 | `DELETE` | `/api/library/movies/{movieId}` | `204` |
 | `GET` | `/api/settings` | `SettingsDTO` |
 | `PATCH` | `/api/settings` | `SettingsDTO` |
+| `POST` | `/api/import/movies/code-check` | `ImportMovieCodeCheckDTO` |
 | `POST` | `/api/import/movies` | `TaskDTO` |
 | `POST` | `/api/import/movies/uploads` | `MovieImportUploadDTO` |
 | `GET` | `/api/import/movies/uploads/{uploadId}` | `MovieImportUploadDTO` |
@@ -3241,6 +3467,18 @@ interface ActorMergeValuesSummaryDTO {
 | `POST` | `/api/providers/ping-all` | `PingAllProvidersResponse` |
 | `POST` | `/api/proxy/ping-javbus` | `ProxyJavBusPingResponse` |
 | `POST` | `/api/proxy/ping-google` | `ProxyJavBusPingResponse` |
+| `GET/PATCH` | `/api/ai/settings` | `AIGovernanceDTO` |
+| `GET` | `/api/ai/usage` | `AIReportDTO` |
+| `GET` | `/api/ai/audit` | `AIAuditPageDTO` |
+| `POST` | `/api/ai/cleanup` | `AICleanupDTO` |
+| `POST` | `/api/ai/provider/test` | `AIProviderTestResponse` |
+| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`tool_call_started`/`tool_call_result`/`movie_cards`/`confirm_required`/`message_done`/`error`） |
+| `GET` | `/api/ai/sessions` | `AIChatSessionListDTO` |
+| `POST` | `/api/ai/sessions` | `AIChatSessionDTO` |
+| `GET` | `/api/ai/sessions/{sessionId}` | `AIChatSessionDetailDTO` |
+| `DELETE` | `/api/ai/sessions/{sessionId}` | `204` |
+| `POST` | `/api/ai/actions/{name}` | `AIActionPreviewDTO` |
+| `POST` | `/api/ai/confirm` | `AIToolApplyDTO` |
 
 ## 7. 维护规则
 

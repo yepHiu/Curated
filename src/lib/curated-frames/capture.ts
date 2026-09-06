@@ -7,7 +7,7 @@ export type CaptureFrameResult =
 /**
  * 将当前 video 帧绘制为 PNG。跨域无 CORS 时 canvas 会被污染导致失败。
  */
-export function captureVideoFrameToPng(video: HTMLVideoElement): Promise<CaptureFrameResult> {
+export async function captureVideoFrameToPng(video: HTMLVideoElement, onPreview?: (url: string) => void): Promise<CaptureFrameResult> {
   const w = video.videoWidth
   const h = video.videoHeight
   if (!w || !h) {
@@ -24,6 +24,14 @@ export function captureVideoFrameToPng(video: HTMLVideoElement): Promise<Capture
 
   try {
     ctx.drawImage(video, 0, 0, w, h)
+    if (onPreview) {
+      const preview = document.createElement('canvas')
+      preview.width = 192
+      preview.height = Math.max(1, Math.round(192 * h / w))
+      preview.getContext('2d')?.drawImage(canvas, 0, 0, preview.width, preview.height)
+      onPreview(preview.toDataURL('image/jpeg', .8))
+      preview.width = preview.height = 1
+    }
   } catch {
     return Promise.resolve({
       ok: false,
@@ -31,8 +39,19 @@ export function captureVideoFrameToPng(video: HTMLVideoElement): Promise<Capture
     })
   }
 
+  // Large frames benefit from isolating encoder work. Unsupported browsers and
+  // worker failures retain the same frozen canvas and use the standard encoder.
+  if (w * h >= 3840 * 2160 && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined' && typeof createImageBitmap === 'function') {
+    try {
+      const { encodeCaptureOffThread } = await import('./capture-worker')
+      const blob = await encodeCaptureOffThread(canvas)
+      canvas.width = canvas.height = 1
+      return { ok: true, blob }
+    } catch { /* fallback to the frozen canvas */ }
+  }
+
   return new Promise((resolve) => {
-    canvas.toBlob(
+    try { canvas.toBlob(
       (blob) => {
         if (!blob) {
           resolve({ ok: false, reason: i18n.global.t("curated.captureBlobFail") })
@@ -41,8 +60,7 @@ export function captureVideoFrameToPng(video: HTMLVideoElement): Promise<Capture
         resolve({ ok: true, blob })
       },
       "image/png",
-      0.92,
-    )
+    ) } catch { resolve({ ok: false, reason: i18n.global.t('curated.captureCors') }) }
   })
 }
 

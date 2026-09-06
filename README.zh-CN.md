@@ -19,6 +19,8 @@
 
 # Curated
 
+萃取帧现支持截图预览、重试与撤销、源文件高清帧，以及 GIF/MP4/WebM 片段；详见[操作手册](docs/guide.md#curated-capture-and-inspection)。
+
 Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，以及 Electron 桌面壳。产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。
 
 本 README 只做公开入口。启动细节、配置、打包，以及 `docs/` 里各篇文章的索引，见 **[docs/guide.md](docs/guide.md)**。HTTP API 参考是 **[API.md](API.md)**。
@@ -36,7 +38,9 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 - 本地优先：Vue 3 SPA、Go HTTP API、SQLite，以及面向 Windows 的 Electron 托盘壳。
 - 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。
+- 内容区右侧 Agent 面板；正式 AI 设置提供全局开关、权限、实际 token 用量、耗时与审计；详见[操作手册](docs/guide.md#ai-settings-and-governance)。
 - 资料库浏览、刮削、导入、播放、萃取帧、演员身份、每日推荐与个人洞察。
+- 独立 HLS 会话、指定位置续播与有界错误恢复，详见[播放说明](docs/guide.md#playback-recovery)。
 - 可选 PIN 锁、可验证备份、路径迁移、资料库健康与有界修复。
 - 基于 GitHub Releases 的更新检查与安装器下载；正式包内置 FFmpeg 与本地 `hls.js`。
 

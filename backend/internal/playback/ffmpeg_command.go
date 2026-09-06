@@ -2,6 +2,7 @@ package playback
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,14 +15,40 @@ func resolveFFmpegCommand(configured string) string {
 			return bundled
 		}
 		if cmd != "" {
-			return cmd
+			return resolveFFmpegExecutable(cmd)
 		}
-		return defaultFFmpegBinaryName()
+		return resolveFFmpegExecutable(defaultFFmpegBinaryName())
 	}
 	if cmd == "" {
 		return defaultFFmpegBinaryName()
 	}
-	return cmd
+	return resolveFFmpegExecutable(cmd)
+}
+
+// Scoop launches a forwarding process. Suspend/kill must address FFmpeg itself,
+// otherwise its child continues encoding after the shim has stopped.
+func resolveFFmpegExecutable(command string) string {
+	path, err := exec.LookPath(command)
+	if err != nil || runtime.GOOS != "windows" {
+		return command
+	}
+	raw, err := os.ReadFile(strings.TrimSuffix(path, filepath.Ext(path)) + ".shim")
+	if err != nil {
+		return path
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "path" {
+			continue
+		}
+		target := strings.Trim(strings.TrimSpace(value), "\"")
+		if filepath.IsAbs(target) && strings.EqualFold(filepath.Base(target), "ffmpeg.exe") {
+			if info, err := os.Stat(target); err == nil && !info.IsDir() {
+				return target
+			}
+		}
+	}
+	return path
 }
 
 // ResolveFFmpegCommand exposes the configured/bundled command resolver to other

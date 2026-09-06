@@ -99,6 +99,20 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 	defer func() {
 		_ = tx.Rollback()
 	}()
+	if patch.ExpectedTitle != nil || patch.ExpectedSummary != nil {
+		var title, summary string
+		err := tx.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(TRIM(user_title), ''), title),
+			COALESCE(NULLIF(TRIM(user_summary), ''), summary) FROM movies WHERE id = ?`, movieID).Scan(&title, &summary)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrMovieNotFoundForPatch
+		}
+		if err != nil {
+			return err
+		}
+		if (patch.ExpectedTitle != nil && *patch.ExpectedTitle != title) || (patch.ExpectedSummary != nil && *patch.ExpectedSummary != summary) {
+			return ErrAIWriteConflict
+		}
+	}
 
 	if patch.UserTagsSet {
 		normalized, err := NormalizeUserTagsForPatch(patch.UserTags)
@@ -141,6 +155,9 @@ func (s *SQLiteStore) PatchMovieUserPrefs(ctx context.Context, movieID string, p
 		// Tag replace paths already verified movie exists when they ran
 	}
 
+	if err := saveAIDisplayReceiptTx(ctx, tx, movieID, patch); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}

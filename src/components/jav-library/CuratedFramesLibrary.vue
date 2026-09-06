@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useFocusWithin, onClickOutside, useEventListener } from "@vueuse/core"
+import FrameImageViewer from './FrameImageViewer.vue'
+import { findVisualFramePairs, hashFrameImage, type FrameVisualHash } from '@/lib/curated-frames/visual-similarity'
 import { computed, nextTick, onUnmounted, ref, useId, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -373,7 +375,8 @@ async function exportSingleFromDialogWatermarked() {
 function curatedFrameGifFilename(frame: CuratedFrameRecord): string {
   const source = frame.code.trim() || frame.id.trim() || "curated-frame"
   const safeName = source.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
-  return `curated-${safeName}.gif`
+  const extension = frame.motion?.contentType === "video/mp4" ? "mp4" : frame.motion?.contentType === "video/webm" ? "webm" : "gif"
+  return `curated-${safeName}.${extension}`
 }
 
 async function exportSingleGifFromDialog() {
@@ -386,7 +389,7 @@ async function exportSingleGifFromDialog() {
   exportBusy.value = true
   dialogExportError.value = ""
   try {
-    const response = await fetch(artifactUrl)
+    const response = await fetch(artifactUrl, { credentials: "include" })
     if (!response.ok) {
       throw new Error(`GIF export request failed: ${response.status}`)
     }
@@ -436,9 +439,48 @@ interface RowWithUrl {
 
 const rawRows = ref<CuratedFrameDbRow[]>([])
 const listWithUrls = ref<RowWithUrl[]>([])
+const visualReviewOpen = ref(false)
+const visualReviewBusy = ref(false)
+const visualReviewProgress = ref(0)
+const visualReviewFailed = ref(0)
+const visualPairs = ref<[RowWithUrl, RowWithUrl][]>([])
+let visualReviewController: AbortController | undefined
+
+async function reviewVisualSimilarity() {
+  visualReviewController?.abort()
+  const controller = new AbortController()
+  visualReviewController = controller
+  visualReviewOpen.value = true
+  visualReviewBusy.value = true
+  visualReviewProgress.value = 0
+  visualReviewFailed.value = 0
+  visualPairs.value = []
+  const items = listWithUrls.value.slice(0, 200)
+  const hashes: FrameVisualHash[] = []
+  let index = 0
+  const worker = async () => {
+    while (index < items.length && !controller.signal.aborted) {
+      const item = items[index++]!
+      try {
+        const bits = await hashFrameImage(item.url, controller.signal)
+        if (bits !== null) hashes.push({ id:item.row.id, movieId:item.row.movieId, bits })
+      } catch { if (!controller.signal.aborted) visualReviewFailed.value++ }
+      if (!controller.signal.aborted) visualReviewProgress.value++
+    }
+  }
+  await Promise.all([worker(), worker()])
+  if (controller.signal.aborted) return
+  const byId = new Map(items.map(item => [item.row.id,item]))
+  visualPairs.value = findVisualFramePairs(hashes).map(([a,b]) => [byId.get(a)!,byId.get(b)!])
+  visualReviewBusy.value = false
+}
+watch(visualReviewOpen, open => { if (!open) visualReviewController?.abort() })
 const totalRows = ref(0)
+let rowsNextCursor: string | undefined
 const rowsLoading = ref(false)
 const rowsLoadingMore = ref(false)
+const rowsLoadError = ref(false)
+let rowsQueryVersion = 0
 const rowsScrollRoot = ref<HTMLElement | null>(null)
 const rowsLoadMoreSentinel = ref<HTMLElement | null>(null)
 const curatedTagFacets = ref<CuratedFrameFacetItemDTO[]>([])
@@ -462,7 +504,10 @@ function currentCuratedTagFilters() {
 }
 
 async function reloadFromDb() {
+  const version = ++rowsQueryVersion
   rowsLoading.value = true
+  rowsLoadingMore.value = false
+  rowsLoadError.value = false
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
@@ -470,33 +515,50 @@ async function reloadFromDb() {
       limit: curatedPageLimit,
       offset: 0,
     })
+    if (version !== rowsQueryVersion) return
     rawRows.value = page.items
     totalRows.value = page.total
+    rowsNextCursor = page.nextCursor
+  } catch {
+    if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {
-    rowsLoading.value = false
-    await nextTick()
-    maybeAutoLoadMoreRows()
+    if (version === rowsQueryVersion) {
+      rowsLoading.value = false
+      await nextTick()
+      if (!rowsLoadError.value) maybeAutoLoadMoreRows()
+    }
   }
 }
 
 async function loadMoreRows() {
-  if (rowsLoading.value || rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
+  if (rowsLoadError.value || rowsLoading.value || rowsLoadingMore.value || rawRows.value.length >= totalRows.value) {
     return
   }
   rowsLoadingMore.value = true
+  const version = rowsQueryVersion
   try {
     const page = await listCuratedFramesPage({
       q: currentCuratedQuery(),
       tags: currentCuratedTagFilters(),
       limit: curatedPageLimit,
       offset: rawRows.value.length,
+      cursor: rowsNextCursor,
+      skipTotal: Boolean(rowsNextCursor),
     })
-    rawRows.value = [...rawRows.value, ...page.items]
-    totalRows.value = page.total
+    if (version !== rowsQueryVersion) return
+    const known = new Set(rawRows.value.map((row) => row.id))
+    rawRows.value = [...rawRows.value, ...page.items.filter((row) => !known.has(row.id))]
+    if (page.total >= 0) totalRows.value = page.total
+    rowsNextCursor = page.nextCursor
+    if (page.items.length === 0) totalRows.value = rawRows.value.length
+  } catch {
+    if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {
-    rowsLoadingMore.value = false
-    await nextTick()
-    maybeAutoLoadMoreRows()
+    if (version === rowsQueryVersion) {
+      rowsLoadingMore.value = false
+      await nextTick()
+      if (!rowsLoadError.value) maybeAutoLoadMoreRows()
+    }
   }
 }
 
@@ -515,16 +577,22 @@ watch(
 watch(
   rawRows,
   () => {
-    revokeAllUrls()
-    listWithUrls.value = rawRows.value.map((row) => ({
-      row,
-      url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id),
-    }))
+    const previous = new Map(listWithUrls.value.map((item) => [item.row.id, item]))
+    listWithUrls.value = rawRows.value.map((row) => {
+      const old = previous.get(row.id)
+      previous.delete(row.id)
+      if (old && old.row.imageBlob === row.imageBlob) return { row, url: old.url }
+      if (old?.url.startsWith('blob:')) URL.revokeObjectURL(old.url)
+      return { row, url: row.imageBlob ? URL.createObjectURL(row.imageBlob) : curatedFrameThumbnailUrl(row.id) }
+    })
+    for (const old of previous.values()) if (old.url.startsWith('blob:')) URL.revokeObjectURL(old.url)
   },
   { immediate: true, deep: true },
 )
 
 onUnmounted(() => {
+  visualReviewController?.abort()
+  rowsQueryVersion++
   if (dialogTagSaveTimer) {
     clearTimeout(dialogTagSaveTimer)
     dialogTagSaveTimer = null
@@ -845,6 +913,8 @@ function resetDialogState() {
 }
 
 function dialogEntryImageUrl(entry: CuratedFrameDialogNavigationEntry<RowWithUrl>): string {
+  const index = dialogNavigationEntries.value.indexOf(entry)
+  if (Math.abs(index - selectedDialogNavigationIndex.value) > 1) return entry.item.url
   return entry.item.row.imageBlob ? entry.item.url : curatedFrameImageUrl(entry.item.row.id)
 }
 
@@ -1416,6 +1486,7 @@ defineExpose({
   <div
     class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-[min(100%,120rem)] flex-col gap-6 px-3 sm:px-6"
   >
+    <Button v-if="rowsLoadError && isLibraryEmpty" variant="outline" class="mx-auto" @click="reloadFromDb">{{ t('curated.retryLoad') }}</Button>
     <CuratedFrameEmptyState
       v-if="isLibraryEmpty"
       variant="library"
@@ -1438,6 +1509,7 @@ defineExpose({
         @exit-batch-mode="exitBatchMode"
       >
         <template #actions-start>
+          <Button variant="outline" size="sm" :disabled="listWithUrls.length < 2" @click="reviewVisualSimilarity">{{ t('curated.visualReview') }}</Button>
           <CuratedFrameTagFilterBar
             :facets="curatedTagFacets"
             :selected-tags="activeTagFilters"
@@ -1499,6 +1571,9 @@ defineExpose({
           @open="openFrameCardDialog"
         />
       </TabsContent>
+      <Button v-if="rowsLoadError" variant="outline" class="mx-auto" @click="reloadFromDb">
+        {{ t('curated.retryLoad') }}
+      </Button>
       <div
         v-if="hasMoreRows"
         ref="rowsLoadMoreSentinel"
@@ -1510,6 +1585,21 @@ defineExpose({
       </div>
     </Tabs>
 
+    <Dialog v-model:open="visualReviewOpen">
+      <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+        <DialogTitle>{{ t('curated.visualReview') }}</DialogTitle>
+        <p class="text-sm text-muted-foreground">{{ t('curated.visualReviewScope', { n:visualReviewProgress }) }}</p>
+        <p v-if="visualReviewBusy">{{ t('common.loading') }}</p>
+        <p v-else-if="!visualPairs.length">{{ t('curated.visualReviewEmpty') }}</p>
+        <p v-if="visualReviewFailed" class="text-sm text-destructive">{{ t('curated.visualReviewFailed', { n:visualReviewFailed }) }}</p>
+        <div v-for="pair in visualPairs" :key="pair[0].row.id + pair[1].row.id" class="grid grid-cols-2 gap-3">
+          <button v-for="item in pair" :key="item.row.id" type="button" class="rounded-lg border border-border p-2 text-left focus-visible:ring-2 focus-visible:ring-ring" @click="visualReviewOpen = false; openFrameCardDialog(item)">
+            <img :src="item.url" :alt="item.row.code" class="aspect-video w-full object-contain" loading="lazy" />
+            <span class="text-xs">{{ item.row.code }} · {{ formatClock(item.row.positionSec) }}</span>
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog :open="dialogOpen" @update:open="handleDialogOpenChange">
       <!-- 覆盖 DialogContent 默认 sm:max-w-lg，否则整窗约 512px 宽，左侧预览会被压成一条 -->
       <DialogContent
@@ -1535,13 +1625,11 @@ defineExpose({
                   :aria-current="isDialogEntryCurrent(entry) ? 'true' : undefined"
                 >
                   <div class="flex h-full w-full min-w-0 items-center justify-center bg-black">
-                    <img
+                    <FrameImageViewer
                       v-if="!isDialogEntryCurrent(entry) || !dialogMotionPlaying || entry.item.row.motion?.status !== 'ready' || !entry.item.row.motion.artifactUrl"
                       :src="dialogEntryImageUrl(entry)"
-                      alt=""
-                      class="box-border h-full w-full object-contain p-2 sm:p-4"
-                      decoding="async"
-                      draggable="false"
+                      :alt="`${entry.item.row.code} ${entry.item.row.positionSec}s`"
+                      :active="isDialogEntryCurrent(entry)"
                     />
                     <img
                       v-else-if="entry.item.row.motion.contentType === 'image/gif'"

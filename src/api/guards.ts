@@ -22,6 +22,7 @@ import type {
   MovieDetailDTO,
   MovieListItemDTO,
   MoviesPageDTO,
+  ImportMovieCodeCheckDTO,
   PersonalInsightsBreakdownDTO,
   PersonalInsightsBreakdownItemDTO,
   PersonalInsightsOverviewDTO,
@@ -467,6 +468,32 @@ export function isMoviesPageDTO(value: unknown): value is MoviesPageDTO {
     isFiniteNumber(value.total) &&
     isFiniteNumber(value.limit) &&
     isFiniteNumber(value.offset)
+  )
+}
+
+function isImportMovieCodeMatchDTO(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isString(value.movieId) &&
+    isString(value.code) &&
+    isString(value.title) &&
+    (value.matchKind === "exact" || value.matchKind === "similar")
+  )
+}
+
+export function isImportMovieCodeCheckDTO(value: unknown): value is ImportMovieCodeCheckDTO {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.every(
+      (item) =>
+        isRecord(item) &&
+        isString(item.name) &&
+        isOptionalString(item.extractedCode) &&
+        Array.isArray(item.matches) &&
+        item.matches.every(isImportMovieCodeMatchDTO),
+    ) &&
+    isNonNegativeInteger(value.matchedCount)
   )
 }
 

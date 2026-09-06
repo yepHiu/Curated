@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"curated-backend/internal/contracts"
+	"curated-backend/internal/library/moviecode"
 )
 
 type movieRow struct {
@@ -30,6 +31,7 @@ type movieRow struct {
 	PreviewVideoURL string
 	Provider        string
 	TrashedAt       string
+	Homepage        string
 }
 
 // ListMovies returns paginated movie list items with actors, tags, and user preferences applied as display overrides.
@@ -195,6 +197,7 @@ func (s *SQLiteStore) GetMovieDetail(ctx context.Context, movieID string) (contr
 		UserRating:       userRatingPtr(row.UserRating),
 		ActorAvatarURLs:  actorAvatars,
 		MetadataProvider: strings.TrimSpace(row.Provider),
+		Homepage:         strings.TrimSpace(row.Homepage),
 	}, nil
 }
 
@@ -219,6 +222,7 @@ func scanMovieRow(scanner interface{ Scan(dest ...any) error }, row *movieRow) e
 		&row.PreviewVideoURL,
 		&row.Provider,
 		&row.TrashedAt,
+		&row.Homepage,
 	)
 }
 
@@ -270,7 +274,8 @@ SELECT m.id,
 	END AS year,
 	COALESCE(NULLIF(TRIM(m.user_release_date), ''), m.release_date) AS release_date,
 	m.cover_url, m.thumb_url, m.preview_video_url, m.provider,
-	IFNULL(m.trashed_at, '') AS trashed_at`
+	IFNULL(m.trashed_at, '') AS trashed_at,
+	IFNULL(m.homepage, '') AS homepage`
 
 const sqlMovieEffectiveYear = `CASE
 		WHEN NULLIF(TRIM(m.user_release_date), '') IS NOT NULL
@@ -330,8 +335,11 @@ func buildMovieFilters(request contracts.ListMoviesRequest) (string, []any) {
 	query := strings.TrimSpace(strings.ToLower(request.Query))
 	if query != "" {
 		like := "%" + query + "%"
-		clauses = append(clauses, `(LOWER(COALESCE(NULLIF(TRIM(m.user_title), ''), m.title)) LIKE ? OR LOWER(m.code) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary)) LIKE ?)`)
-		args = append(args, like, like, like, like)
+		// Search both the effective display title and scraped title. A user
+		// display override must not make the original title unreachable to
+		// entity resolution or normal library search.
+		clauses = append(clauses, `(LOWER(COALESCE(NULLIF(TRIM(m.user_title), ''), m.title)) LIKE ? OR LOWER(m.title) LIKE ? OR LOWER(m.code) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_studio), ''), m.studio)) LIKE ? OR LOWER(COALESCE(NULLIF(TRIM(m.user_summary), ''), m.summary)) LIKE ?)`)
+		args = append(args, like, like, like, like, like)
 	}
 
 	for _, tag := range ParseMovieTagFilters(append([]string{request.Tag}, request.Tags...)...) {
@@ -658,4 +666,89 @@ func (s *SQLiteStore) ListMovieIDsUnderLibraryRoots(ctx context.Context, roots [
 		}
 	}
 	return ids, rows.Err()
+}
+
+// FindActiveMoviesByCodes maps normalized video codes to active library rows.
+func (s *SQLiteStore) FindActiveMoviesByCodes(ctx context.Context, codes []string) (map[string]contracts.MovieListItemDTO, error) {
+	wanted := map[string]struct{}{}
+	var ids []string
+	var lowered []string
+	for _, raw := range codes {
+		normalized := moviecode.NormalizeForStorageID(raw)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := wanted[normalized]; ok {
+			continue
+		}
+		wanted[normalized] = struct{}{}
+		ids = append(ids, normalized)
+		lowered = append(lowered, strings.ToLower(strings.TrimSpace(raw)))
+	}
+	out := map[string]contracts.MovieListItemDTO{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	placeholders := inClausePlaceholders(len(ids))
+	query := `SELECT m.id, m.code, COALESCE(NULLIF(TRIM(m.user_title), ''), m.title) AS title
+		FROM movies m
+		WHERE IFNULL(m.trashed_at, '') = '' AND (m.id IN (` + placeholders + `) OR lower(m.code) IN (` + placeholders + `))`
+	args := make([]any, 0, len(ids)+len(lowered))
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	for _, code := range lowered {
+		args = append(args, code)
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item contracts.MovieListItemDTO
+		if err := rows.Scan(&item.ID, &item.Code, &item.Title); err != nil {
+			return nil, err
+		}
+		key := moviecode.NormalizeForStorageID(item.Code)
+		if key == "" {
+			key = moviecode.NormalizeForStorageID(item.ID)
+		}
+		if _, ok := wanted[key]; ok {
+			out[key] = item
+		}
+	}
+	return out, rows.Err()
+}
+
+// MovieCodeIndexItem is a compact active-library catalog row for import code checks.
+type MovieCodeIndexItem struct {
+	ID    string
+	Code  string
+	Title string
+}
+
+// ListActiveMovieCodeIndex returns id/code/title for every active movie.
+func (s *SQLiteStore) ListActiveMovieCodeIndex(ctx context.Context) ([]MovieCodeIndexItem, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT m.id, m.code, COALESCE(NULLIF(TRIM(m.user_title), ''), m.title) AS title
+		FROM movies m
+		WHERE IFNULL(m.trashed_at, '') = ''
+		ORDER BY m.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MovieCodeIndexItem
+	for rows.Next() {
+		var item MovieCodeIndexItem
+		if err := rows.Scan(&item.ID, &item.Code, &item.Title); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	if out == nil {
+		out = []MovieCodeIndexItem{}
+	}
+	return out, rows.Err()
 }

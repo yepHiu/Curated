@@ -569,6 +569,8 @@ type MovieDetailDTO struct {
 	// MetadataProvider is the Metatube movie provider that produced the current scraped metadata.
 	// Empty when the title has not been scraped yet.
 	MetadataProvider string `json:"metadataProvider,omitempty"`
+	// Homepage is the scraped source-site URL (movies.homepage). Empty when not scraped.
+	Homepage string `json:"homepage,omitempty"`
 	// User*Override: in-memory seed only (json:"-"); SQLite applies overrides in SQL. EffectiveXXX for API = merge in EffectiveMovieDetailDTO.
 	UserTitleOverride          *string `json:"-"`
 	UserStudioOverride         *string `json:"-"`
@@ -585,6 +587,9 @@ type MovieDetailDTO struct {
 // UserTitleSet etc.: JSON null or "" clears the user_* override (revert to scraped column). Non-empty string sets override.
 // UserRuntimeMinutesSet + UserRuntimeMinutesClear (JSON null): clear runtime override. Otherwise set minutes (>= 0).
 type PatchMovieInput struct {
+	// Internal optimistic concurrency preconditions; never accepted from JSON.
+	ExpectedTitle   *string `json:"-"`
+	ExpectedSummary *string `json:"-"`
 	Favorite        *bool
 	UserRatingSet   bool
 	UserRatingClear bool
@@ -916,6 +921,9 @@ type SettingsDTO struct {
 	MetadataMovieStrategy string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy configuration for outbound HTTP requests (scraping, metadata fetch).
 	Proxy ProxySettingsDTO `json:"proxy"`
+	// AIProvider is the experimental agent LLM provider configuration (library-config.cfg).
+	AIProvider   AIProviderSettingsDTO `json:"aiProvider"`
+	AIGovernance *AIGovernanceDTO      `json:"aiGovernance,omitempty"`
 	// BackendLog: file/console log settings persisted in library-config.cfg; restart backend to apply to Zap sinks.
 	BackendLog BackendLogSettingsDTO `json:"backendLog"`
 }
@@ -958,6 +966,251 @@ type ProxyJavBusPingResponse struct {
 	Message    string `json:"message,omitempty"`
 }
 
+// AIProviderSettingsDTO mirrors config.AIProviderConfig for the Settings experimental section.
+// All fields may be empty, meaning the agent provider is not configured yet.
+type AIProviderSettingsDTO struct {
+	Kind    string `json:"kind"`
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey,omitempty"`
+	Model   string `json:"model"`
+}
+
+// PatchAIProviderSettings is the partial update for aiProvider; nil pointer = leave unchanged.
+type PatchAIProviderSettings struct {
+	Kind    *string `json:"kind,omitempty"`
+	BaseURL *string `json:"baseUrl,omitempty"`
+	APIKey  *string `json:"apiKey,omitempty"`
+	Model   *string `json:"model,omitempty"`
+}
+
+// AIProviderTestRequest is the body for POST /api/ai/provider/test. When Provider
+// is nil the currently persisted provider config is tested (same contract as proxy pings).
+type AIProviderTestRequest struct {
+	Provider *AIProviderSettingsDTO `json:"provider,omitempty"`
+}
+
+// AIProviderTestResponse reports whether the provider answers a minimal chat completion.
+type AIProviderTestResponse struct {
+	OK        bool   `json:"ok"`
+	LatencyMs int64  `json:"latencyMs"`
+	Message   string `json:"message,omitempty"`
+}
+
+// AIChatMessage is one message of an experimental agent chat turn (system | user | assistant).
+type AIChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// AIChatRequest is the body for POST /api/ai/chat (E2: agent loop with read tools).
+type AIChatRequest struct {
+	SessionID string          `json:"sessionId,omitempty"`
+	Messages  []AIChatMessage `json:"messages"`
+	Context   *AIChatContext  `json:"context,omitempty"`
+	Locale    string          `json:"locale,omitempty"`
+}
+
+// AIChatContext is optional page context injected into the system prompt.
+type AIChatContext struct {
+	// ContextVersion is omitted by legacy clients. Version 1 adds the bounded,
+	// explicit selection and filter projection below.
+	ContextVersion   int                  `json:"contextVersion,omitempty"`
+	Route            string               `json:"route,omitempty"`
+	MovieID          string               `json:"movieId,omitempty"`
+	ActorName        string               `json:"actorName,omitempty"`
+	Query            string               `json:"query,omitempty"`
+	Mentions         []AIChatMention      `json:"mentions,omitempty"`
+	SelectedMovieIDs []string             `json:"selectedMovieIds,omitempty"`
+	SelectedActors   []string             `json:"selectedActors,omitempty"`
+	ActiveFilters    *AIChatActiveFilters `json:"activeFilters,omitempty"`
+}
+
+// AIChatMention is one user @-reference from the Agent composer.
+type AIChatMention struct {
+	Kind  string `json:"kind"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// AIChatActiveFilters is the small allowlisted subset of a current library
+// view that can be shown to the model as one-turn context. It is not a saved
+// view and must not gain navigation-only fields.
+type AIChatActiveFilters struct {
+	Query     string `json:"query,omitempty"`
+	Tag       string `json:"tag,omitempty"`
+	Actor     string `json:"actor,omitempty"`
+	PlayState string `json:"playState,omitempty"`
+	Runtime   string `json:"runtime,omitempty"`
+}
+
+// AIChatSessionDTO is one persisted agent conversation.
+type AIChatSessionDTO struct {
+	ID        string `json:"id"`
+	Title     string `json:"title,omitempty"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type AIChatSessionListDTO struct {
+	Items []AIChatSessionDTO `json:"items"`
+}
+
+type AIChatStoredMessageDTO struct {
+	Events     []AIChatSSEEvent `json:"events,omitempty"`
+	ID         string           `json:"id"`
+	SessionID  string           `json:"sessionId"`
+	Role       string           `json:"role"`
+	Content    string           `json:"content"`
+	ToolName   string           `json:"toolName,omitempty"`
+	ToolCallID string           `json:"toolCallId,omitempty"`
+	Seq        int              `json:"seq"`
+	CreatedAt  string           `json:"createdAt"`
+}
+
+type AIChatSessionDetailDTO struct {
+	AIChatSessionDTO
+	NextCursor string                   `json:"nextCursor,omitempty"`
+	Messages   []AIChatStoredMessageDTO `json:"messages"`
+}
+
+// AIAgentMovieCardDTO is a chat-ui projection of a movie already retrieved this turn.
+type AIAgentMovieCardDTO struct {
+	MovieID  string   `json:"movieId"`
+	Title    string   `json:"title,omitempty"`
+	Code     string   `json:"code,omitempty"`
+	Actors   []string `json:"actors,omitempty"`
+	CoverURL string   `json:"coverUrl,omitempty"`
+	ThumbURL string   `json:"thumbUrl,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+}
+
+// AIAgentProviderTitleDTO is a provider-search row reconciled against the
+// local library. Rows with InLibrary=false never carry a MovieID.
+type AIAgentProviderTitleDTO struct {
+	Code      string  `json:"code,omitempty"`
+	Title     string  `json:"title,omitempty"`
+	Provider  string  `json:"provider,omitempty"`
+	Score     float64 `json:"score,omitempty"`
+	Homepage  string  `json:"homepage,omitempty"`
+	InLibrary bool    `json:"inLibrary"`
+	MovieID   string  `json:"movieId,omitempty"`
+}
+
+// AIEntityCandidateDTO is one safe, local-library entity candidate. Candidates
+// are display-only until the user explicitly selects one in a later request.
+type AIEntityCandidateDTO struct {
+	Kind      string   `json:"kind"`
+	MovieID   string   `json:"movieId,omitempty"`
+	ActorName string   `json:"actorName,omitempty"`
+	Title     string   `json:"title,omitempty"`
+	Code      string   `json:"code,omitempty"`
+	Aliases   []string `json:"aliases,omitempty"`
+	Reason    string   `json:"reason,omitempty"`
+}
+
+// AIEntityResolutionDTO is the bounded result of resolving a user-provided
+// movie code/title or actor canonical name/alias.
+type AIEntityResolutionDTO struct {
+	Query      string                 `json:"query"`
+	Kind       string                 `json:"kind"`
+	Status     string                 `json:"status"` // matched | ambiguous | unmatched
+	Candidates []AIEntityCandidateDTO `json:"candidates"`
+	Reason     string                 `json:"reason,omitempty"`
+}
+
+// AIEvidenceDTO tells the renderer where a tool result came from and the
+// retrieval scope. It deliberately contains no raw source-page content.
+type AIEvidenceDTO struct {
+	Source      string            `json:"source"` // local | provider | source_page
+	RetrievedAt string            `json:"retrievedAt"`
+	Filters     map[string]string `json:"filters,omitempty"`
+	Truncated   bool              `json:"truncated,omitempty"`
+	NextCursor  string            `json:"nextCursor,omitempty"`
+	Failed      bool              `json:"failed,omitempty"`
+	ErrorCode   string            `json:"errorCode,omitempty"`
+}
+
+// AIChatOutcomeDTO is the explicit terminal state of one streamed turn.
+type AIChatOutcomeDTO struct {
+	Status    string `json:"status"` // completed | partial | needs_input | cancelled | failed
+	Reason    string `json:"reason,omitempty"`
+	Retryable bool   `json:"retryable,omitempty"`
+}
+
+// AIConfirmChangeDTO is one field-level diff row on a write preview.
+type AIConfirmChangeDTO struct {
+	Path   string `json:"path"`
+	Before any    `json:"before"`
+	After  any    `json:"after"`
+}
+
+// AIActionRequest is the body for POST /api/ai/actions/{name}.
+type AIActionRequest struct {
+	MovieID      string `json:"movieId,omitempty"`
+	Body         string `json:"body,omitempty"`
+	Locale       string `json:"locale,omitempty"`
+	TargetLocale string `json:"targetLocale,omitempty"`
+	Range        string `json:"range,omitempty"`
+	Timezone     string `json:"timezone,omitempty"`
+}
+
+// AIActionPreviewDTO is returned by a write-preview action (no persistence yet).
+type AIActionPreviewDTO struct {
+	Action       string               `json:"action"`
+	Name         string               `json:"name"`
+	SessionID    string               `json:"sessionId"`
+	OriginalText string               `json:"originalText,omitempty"`
+	ProposedText string               `json:"proposedText,omitempty"`
+	Changes      []AIConfirmChangeDTO `json:"changes,omitempty"`
+	ConfirmToken string               `json:"confirmToken,omitempty"`
+	ExpiresAt    string               `json:"expiresAt,omitempty"`
+	Arguments    json.RawMessage      `json:"arguments,omitempty"`
+	Noop         bool                 `json:"noop,omitempty"`
+}
+
+// AIToolApplyRequest confirms a previously previewed write tool.
+type AIToolApplyRequest struct {
+	SessionID    string          `json:"sessionId"`
+	Name         string          `json:"name"`
+	Arguments    json.RawMessage `json:"arguments"`
+	ConfirmToken string          `json:"confirmToken"`
+}
+
+// AIToolApplyDTO is returned after a confirmed write.
+type AIToolApplyDTO struct {
+	Replayed bool   `json:"replayed,omitempty"`
+	OK       bool   `json:"ok"`
+	Name     string `json:"name"`
+	Data     any    `json:"data,omitempty"`
+}
+
+// AIChatSSEEvent is one server-sent event on POST /api/ai/chat.
+type AIChatSSEEvent struct {
+	ReceiptID    string                    `json:"receiptId,omitempty"`
+	Applied      bool                      `json:"applied,omitempty"`
+	Type         string                    `json:"type"`
+	SessionID    string                    `json:"sessionId,omitempty"`
+	MessageID    string                    `json:"messageId,omitempty"`
+	Seq          int                       `json:"seq,omitempty"`
+	Delta        string                    `json:"delta,omitempty"`
+	ToolCallID   string                    `json:"toolCallId,omitempty"`
+	Name         string                    `json:"name,omitempty"`
+	OK           *bool                     `json:"ok,omitempty"`
+	Summary      string                    `json:"summary,omitempty"`
+	Truncated    bool                      `json:"truncated,omitempty"`
+	Movies       []AIAgentMovieCardDTO     `json:"movies,omitempty"`
+	ProviderRows []AIAgentProviderTitleDTO `json:"providerRows,omitempty"`
+	Resolution   *AIEntityResolutionDTO    `json:"resolution,omitempty"`
+	Evidence     *AIEvidenceDTO            `json:"evidence,omitempty"`
+	Outcome      *AIChatOutcomeDTO         `json:"outcome,omitempty"`
+	ConfirmToken string                    `json:"confirmToken,omitempty"`
+	ExpiresAt    string                    `json:"expiresAt,omitempty"`
+	Changes      []AIConfirmChangeDTO      `json:"changes,omitempty"`
+	Arguments    json.RawMessage           `json:"arguments,omitempty"`
+	Code         string                    `json:"code,omitempty"`
+	Message      string                    `json:"message,omitempty"`
+}
+
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).
 type PatchSettingsRequest struct {
 	OrganizeLibrary            *bool                   `json:"organizeLibrary,omitempty"`
@@ -979,6 +1232,8 @@ type PatchSettingsRequest struct {
 	MetadataMovieStrategy *string `json:"metadataMovieStrategy,omitempty"`
 	// Proxy: nil = no change; non-nil object replaces current proxy config.
 	Proxy *ProxySettingsDTO `json:"proxy,omitempty"`
+	// AIProvider: nil = no change; non-nil partial fields merge into the experimental agent provider config.
+	AIProvider *PatchAIProviderSettings `json:"aiProvider,omitempty"`
 	// BackendLog: nil = no change; non-empty partial fields merge into current and persist.
 	BackendLog *PatchBackendLogSettings `json:"backendLog,omitempty"`
 }
@@ -995,6 +1250,32 @@ type CreateMovieImportUploadRequest struct {
 	Files []MovieImportUploadFileManifest `json:"files"`
 }
 
+// CheckImportMovieCodesRequest is the body for POST /api/import/movies/code-check.
+type CheckImportMovieCodesRequest struct {
+	Names []string `json:"names"`
+}
+
+// ImportMovieCodeMatchDTO is one library movie that matches an incoming filename.
+type ImportMovieCodeMatchDTO struct {
+	MovieID   string `json:"movieId"`
+	Code      string `json:"code"`
+	Title     string `json:"title"`
+	MatchKind string `json:"matchKind"`
+}
+
+// ImportMovieCodeCheckItemDTO is the catalog-code check result for one filename.
+type ImportMovieCodeCheckItemDTO struct {
+	Name          string                    `json:"name"`
+	ExtractedCode string                    `json:"extractedCode,omitempty"`
+	Matches       []ImportMovieCodeMatchDTO `json:"matches"`
+}
+
+// ImportMovieCodeCheckDTO is the response for POST /api/import/movies/code-check.
+type ImportMovieCodeCheckDTO struct {
+	Items        []ImportMovieCodeCheckItemDTO `json:"items"`
+	MatchedCount int                           `json:"matchedCount"`
+}
+
 // MovieImportUploadChunkDTO reports one persisted upload chunk range so clients
 // can resume precisely instead of re-uploading completed chunks.
 type MovieImportUploadChunkDTO struct {
@@ -1005,12 +1286,12 @@ type MovieImportUploadChunkDTO struct {
 
 // MovieImportUploadFileDTO reports server-side state for one resumable import file.
 type MovieImportUploadFileDTO struct {
-	FileID        string                       `json:"fileId"`
-	RelativePath  string                       `json:"relativePath"`
-	Size          int64                        `json:"size"`
-	BytesReceived int64                        `json:"bytesReceived"`
-	Complete      bool                         `json:"complete"`
-	State         string                       `json:"state,omitempty"`
+	FileID        string                      `json:"fileId"`
+	RelativePath  string                      `json:"relativePath"`
+	Size          int64                       `json:"size"`
+	BytesReceived int64                       `json:"bytesReceived"`
+	Complete      bool                        `json:"complete"`
+	State         string                      `json:"state,omitempty"`
 	Chunks        []MovieImportUploadChunkDTO `json:"chunks,omitempty"`
 }
 
@@ -1214,17 +1495,20 @@ type CreatePlaybackSessionRequest struct {
 
 // PlaybackSessionStatusDTO is a snapshot of a playback session for diagnostics.
 type PlaybackSessionStatusDTO struct {
-	SessionID        string  `json:"sessionId"`
-	MovieID          string  `json:"movieId"`
-	SessionKind      string  `json:"sessionKind,omitempty"`
-	TranscodeProfile string  `json:"transcodeProfile,omitempty"`
-	StartPositionSec float64 `json:"startPositionSec,omitempty"`
-	StartedAt        string  `json:"startedAt,omitempty"`
-	LastAccessedAt   string  `json:"lastAccessedAt,omitempty"`
-	ExpiresAt        string  `json:"expiresAt,omitempty"`
-	FinishedAt       string  `json:"finishedAt,omitempty"`
-	State            string  `json:"state,omitempty"`
-	LastError        string  `json:"lastError,omitempty"`
+	SessionID          string  `json:"sessionId"`
+	MovieID            string  `json:"movieId"`
+	SessionKind        string  `json:"sessionKind,omitempty"`
+	TranscodeProfile   string  `json:"transcodeProfile,omitempty"`
+	StartPositionSec   float64 `json:"startPositionSec,omitempty"`
+	StartedAt          string  `json:"startedAt,omitempty"`
+	LastAccessedAt     string  `json:"lastAccessedAt,omitempty"`
+	ExpiresAt          string  `json:"expiresAt,omitempty"`
+	FinishedAt         string  `json:"finishedAt,omitempty"`
+	State              string  `json:"state,omitempty"`
+	LastError          string  `json:"lastError,omitempty"`
+	EncoderSpeed       string  `json:"encoderSpeed,omitempty"`
+	WrittenDurationSec float64 `json:"writtenDurationSec,omitempty"`
+	LastSeekKind       string  `json:"lastSeekKind,omitempty"`
 }
 
 // PlaybackSessionListDTO lists recent active or archived playback sessions.
@@ -1278,10 +1562,11 @@ type CuratedFrameMotionDTO struct {
 
 // CuratedFramesListDTO is a paginated curated frame listing.
 type CuratedFramesListDTO struct {
-	Items  []CuratedFrameItemDTO `json:"items"`
-	Total  int                   `json:"total"`
-	Limit  int                   `json:"limit"`
-	Offset int                   `json:"offset"`
+	NextCursor string                `json:"nextCursor,omitempty"`
+	Items      []CuratedFrameItemDTO `json:"items"`
+	Total      int                   `json:"total"`
+	Limit      int                   `json:"limit"`
+	Offset     int                   `json:"offset"`
 }
 
 // CreateCuratedFrameBody is the JSON body for POST /api/curated-frames (image as standard base64, no data: prefix).
@@ -1334,6 +1619,11 @@ type CreateMovieClipBody struct {
 	FPS            int     `json:"fps,omitempty"`
 	Width          int     `json:"width,omitempty"`
 	CuratedFrameID string  `json:"curatedFrameId,omitempty"`
+}
+
+// ExtractMovieFrameBody requests a source-file frame at an absolute media time.
+type ExtractMovieFrameBody struct {
+	PositionSec float64 `json:"positionSec"`
 }
 
 // PlayedMoviesListDTO is returned by GET /api/library/played-movies.
@@ -1481,6 +1771,13 @@ const (
 	ErrorCodeSavedViewLimit                       = "SAVED_VIEW_LIMIT_REACHED"
 	ErrorCodeRecommendationFeedbackInvalid        = "RECOMMENDATION_FEEDBACK_INVALID"
 	ErrorCodeRecommendationFeedbackTargetNotFound = "RECOMMENDATION_FEEDBACK_TARGET_NOT_FOUND"
+	ErrorCodeAIProviderUnavailable                = "AI_PROVIDER_UNAVAILABLE"
+	ErrorCodeAIChatFailed                         = "AI_CHAT_FAILED"
+	ErrorCodeAIToolInvalidArgs                    = "AI_TOOL_INVALID_ARGS"
+	ErrorCodeAIToolNotFound                       = "AI_TOOL_NOT_FOUND"
+	ErrorCodeAIConfirmRequired                    = "AI_CONFIRM_REQUIRED"
+	ErrorCodeAIConfirmExpired                     = "AI_CONFIRM_EXPIRED"
+	ErrorCodeAIRateLimited                        = "AI_RATE_LIMITED"
 	ErrorCodeRecommendationFeedbackLimit          = "RECOMMENDATION_FEEDBACK_LIMIT_REACHED"
 	ErrorCodeActorMergeInvalid                    = "ACTOR_MERGE_INVALID"
 	ErrorCodeActorMergeNotFound                   = "ACTOR_MERGE_NOT_FOUND"

@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Curated · 项目概览看板</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f4f7fb;
+        --surface: #ffffff;
+        --surface-strong: #17223b;
+        --surface-tint: #edf3ff;
+        --line: #dbe3f0;
+        --line-strong: #c5d1e3;
+        --text: #18233a;
+        --muted: #61708a;
+        --muted-strong: #46556e;
+        --accent: #3156d3;
+        --accent-strong: #1e3fb2;
+        --accent-tint: #e8eeff;
+        --success: #0b7a5b;
+        --success-tint: #e5f6ef;
+        --warning: #9a5c00;
+        --warning-tint: #fff2d7;
+        --danger: #b13943;
+        --danger-tint: #ffeaec;
+        --info: #28629c;
+        --info-tint: #e5f2ff;
+        --shadow: 0 12px 30px rgba(27, 47, 82, 0.08);
+        --radius-lg: 20px;
+        --radius-md: 13px;
+        --radius-sm: 9px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --canvas: #0f1728;
+          --surface: #182338;
+          --surface-strong: #e8eefb;
+          --surface-tint: #1e2d49;
+          --line: #30415d;
+          --line-strong: #435675;
+          --text: #e8eefb;
+          --muted: #aab9d1;
+          --muted-strong: #c3cde0;
+          --accent: #9bb2ff;
+          --accent-strong: #c3d0ff;
+          --accent-tint: #283b67;
+          --success: #71d2b3;
+          --success-tint: #173d37;
+          --warning: #fac66a;
+          --warning-tint: #4a3617;
+          --danger: #ffabb2;
+          --danger-tint: #4c2931;
+          --info: #93c8ff;
+          --info-tint: #1d3e5d;
+          --shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+        }
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background: var(--canvas);
+        color: var(--text);
+        font-family: Inter, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      a {
+        color: inherit;
+        text-decoration-color: color-mix(in srgb, currentColor 38%, transparent);
+        text-underline-offset: 3px;
+      }
+
+      a:hover { color: var(--accent); }
+      a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+      .skip-link {
+        position: fixed;
+        z-index: 10;
+        top: 0;
+        left: 1rem;
+        transform: translateY(-120%);
+        padding: 0.6rem 0.9rem;
+        border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+        background: var(--surface-strong);
+        color: var(--canvas);
+        font-weight: 700;
+      }
+
+      .skip-link:focus { transform: translateY(0); }
+
+      .shell { width: min(1440px, calc(100% - 40px)); margin: 0 auto; }
+
+      .masthead {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(2.2rem, 5vw, 4.8rem) 0 2rem;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .masthead::after {
+        position: absolute;
+        right: max(3vw, calc((100vw - 1440px) / 2));
+        bottom: -155px;
+        width: 370px;
+        height: 370px;
+        border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+        border-radius: 50%;
+        box-shadow: 0 0 0 42px color-mix(in srgb, var(--accent) 8%, transparent), 0 0 0 84px color-mix(in srgb, var(--accent) 4%, transparent);
+        content: "";
+        pointer-events: none;
+      }
+
+      .masthead .shell { position: relative; z-index: 1; }
+
+      .eyebrow, .section-kicker, .table-label {
+        margin: 0;
+        color: var(--accent);
+        font-size: 0.77rem;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      h1, h2, h3, p { margin-top: 0; }
+
+      h1 {
+        max-width: 900px;
+        margin: 0.48rem 0 0;
+        font-size: clamp(2.15rem, 6vw, 4.75rem);
+        line-height: 1.06;
+        letter-spacing: -0.052em;
+      }
+
+      .lede {
+        max-width: 765px;
+        margin: 1rem 0 0;
+        color: var(--muted-strong);
+        font-size: clamp(1rem, 2vw, 1.14rem);
+      }
+
+      .snapshot-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 1.4rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0.35rem 0.64rem;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted-strong);
+        font-size: 0.84rem;
+        font-weight: 650;
+      }
+
+      .pill::before {
+        width: 0.52rem;
+        height: 0.52rem;
+        margin-right: 0.48rem;
+        border-radius: 50%;
+        background: currentColor;
+        content: "";
+      }
+
+      .pill.info { border-color: color-mix(in srgb, var(--info) 48%, var(--line)); color: var(--info); background: var(--info-tint); }
+      .pill.warn { border-color: color-mix(in srgb, var(--warning) 45%, var(--line)); color: var(--warning); background: var(--warning-tint); }
+      .pill.ok { border-color: color-mix(in srgb, var(--success) 45%, var(--line)); color: var(--success); background: var(--success-tint); }
+
+      .nav-wrap { position: sticky; z-index: 3; top: 0; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--canvas) 92%, transparent); backdrop-filter: blur(13px); }
+      .quick-nav { display: flex; overflow-x: auto; gap: 0.25rem; padding: 0.62rem 0; scrollbar-width: thin; }
+      .quick-nav a { flex: 0 0 auto; padding: 0.45rem 0.66rem; border-radius: var(--radius-sm); color: var(--muted-strong); font-size: 0.9rem; font-weight: 700; text-decoration: none; }
+      .quick-nav a:hover { background: var(--accent-tint); color: var(--accent); }
+
+      main { padding: 2rem 0 4rem; }
+      section { scroll-margin-top: 4.5rem; }
+      section + section { margin-top: 3.2rem; }
+
+      .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+      .section-head h2 { margin: 0.2rem 0 0; font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.18; letter-spacing: -0.026em; }
+      .section-head > p:last-child { max-width: 560px; margin: 0; color: var(--muted); font-size: 0.91rem; text-align: right; }
+
+      .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.85rem; }
+      .metric { min-height: 151px; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow); }
+      .metric .value { display: block; margin-top: 0.4rem; font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 780; line-height: 1; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+      .metric .label { color: var(--muted-strong); font-size: 0.87rem; font-weight: 700; }
+      .metric .note { margin: 0.55rem 0 0; color: var(--muted); font-size: 0.78rem; }
+      .metric.verified { border-top: 4px solid var(--success); }
+      .metric.implemented { border-top: 4px solid var(--info); }
+      .metric.progress { border-top: 4px solid var(--accent); }
+      .metric.idea { border-top: 4px solid var(--warning); }
+      .metric.specified { border-top: 4px solid var(--line-strong); }
+
+      .two-column { display: grid; grid-template-columns: minmax(0, 1.13fr) minmax(310px, 0.87fr); gap: 1rem; }
+      .panel { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+      .panel-header { padding: 1.2rem 1.25rem 0.8rem; border-bottom: 1px solid var(--line); }
+      .panel-header h3 { margin: 0.2rem 0 0; font-size: 1.14rem; letter-spacing: -0.012em; }
+      .panel-body { padding: 1rem 1.25rem 1.25rem; }
+
+      .status-list { display: grid; gap: 0.7rem; }
+      .status-row { display: grid; grid-template-columns: 3.1rem minmax(0, 1fr) 3rem; align-items: center; gap: 0.75rem; }
+      .status-row .id { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem; }
+      .status-row .title { font-size: 0.92rem; font-weight: 720; line-height: 1.32; }
+      .status-row .progress-number { color: var(--accent); font-size: 0.85rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+      .progress-track { grid-column: 2 / -1; height: 0.42rem; overflow: hidden; border-radius: 999px; background: var(--surface-tint); }
+      .progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+
+      .compact-list { display: grid; gap: 0.8rem; padding: 0; margin: 0; list-style: none; }
+      .compact-list li { position: relative; padding-left: 1.05rem; color: var(--muted-strong); font-size: 0.93rem; }
+      .compact-list li::before { position: absolute; top: 0.58em; left: 0; width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--accent); content: ""; }
+      .compact-list strong { color: var(--text); }
+
+      .callout { padding: 1rem 1.08rem; border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--line)); border-radius: var(--radius-md); background: var(--warning-tint); color: color-mix(in srgb, var(--warning) 80%, var(--text)); }
+      .callout h3 { margin: 0; font-size: 0.97rem; }
+      .callout p { margin: 0.45rem 0 0; font-size: 0.9rem; }
+      .callout + .callout { margin-top: 0.75rem; }
+      .callout.info { border-color: color-mix(in srgb, var(--info) 40%, var(--line)); background: var(--info-tint); color: color-mix(in srgb, var(--info) 80%, var(--text)); }
+
+      .requirements { overflow: hidden; }
+      .requirement-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 58px 64px; gap: 0.75rem; align-items: center; padding: 0.8rem 1.25rem; border-top: 1px solid var(--line); }
+      .requirement-row:first-child { border-top: 0; }
+      .requirement-row:hover { background: var(--surface-tint); }
+      .req-id { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; }
+      .req-title { font-size: 0.92rem; font-weight: 720; }
+      .priority { justify-self: start; padding: 0.16rem 0.4rem; border-radius: 6px; background: var(--accent-tint); color: var(--accent); font-size: 0.72rem; font-weight: 850; }
+      .req-progress { color: var(--muted-strong); font-size: 0.85rem; font-weight: 760; text-align: right; font-variant-numeric: tabular-nums; }
+
+      .tag-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+      .tag { display: inline-flex; align-items: center; padding: 0.29rem 0.5rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-tint); color: var(--muted-strong); font-size: 0.8rem; font-weight: 680; }
+      .tag::before { width: 0.4rem; height: 0.4rem; margin-right: 0.37rem; border-radius: 50%; background: var(--warning); content: ""; }
+
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+      table { width: 100%; border-collapse: collapse; min-width: 880px; }
+      caption { padding: 1.15rem 1.25rem 0.8rem; color: var(--muted); font-size: 0.88rem; text-align: left; }
+      th, td { padding: 0.88rem 1rem; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+      th { border-top: 0; background: var(--surface-tint); color: var(--muted-strong); font-size: 0.75rem; letter-spacing: 0.07em; text-transform: uppercase; }
+      td { color: var(--muted-strong); font-size: 0.88rem; }
+      td strong, td code { color: var(--text); }
+      code { font-family: ui-monospace, Consolas, monospace; font-size: 0.83em; overflow-wrap: anywhere; }
+      .state { display: inline-flex; align-items: center; gap: 0.36rem; font-weight: 760; }
+      .state::before { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: currentColor; content: ""; }
+      .state.clean { color: var(--success); }
+      .state.dirty { color: var(--warning); }
+      .state.detached { color: var(--muted); }
+
+      .commit-list { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+      .commit { display: grid; grid-template-columns: 96px 105px minmax(0, 1fr); gap: 0.8rem; padding: 0.8rem 1rem; border-top: 1px solid var(--line); }
+      .commit:first-child { border-top: 0; }
+      .commit .hash { color: var(--accent); font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; font-weight: 800; }
+      .commit .date { color: var(--muted); font-size: 0.82rem; }
+      .commit .subject { color: var(--muted-strong); font-size: 0.9rem; font-weight: 650; }
+
+      .source-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+      .source-link { display: block; min-height: 118px; padding: 0.95rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--text); text-decoration: none; box-shadow: var(--shadow); }
+      .source-link:hover { border-color: var(--accent); background: var(--accent-tint); }
+      .source-link strong { display: block; font-size: 0.92rem; }
+      .source-link span { display: block; margin-top: 0.45rem; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+
+      footer { padding: 1.25rem 0 2.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.82rem; }
+
+      @media (max-width: 1024px) {
+        .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 760px) {
+        .shell { width: min(100% - 28px, 1440px); }
+        .masthead { padding-top: 2.4rem; }
+        .masthead::after { right: -195px; bottom: -185px; }
+        .section-head { display: block; }
+        .section-head > p:last-child { margin-top: 0.6rem; text-align: left; }
+        .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .two-column { grid-template-columns: 1fr; }
+        .requirement-row { grid-template-columns: 67px minmax(0, 1fr) 47px; gap: 0.55rem; padding: 0.8rem 1rem; }
+        .requirement-row .priority { grid-column: 2; }
+        .requirement-row .req-progress { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
+        .source-grid { grid-template-columns: 1fr; }
+        .commit { grid-template-columns: 76px 1fr; gap: 0.3rem 0.7rem; }
+        .commit .subject { grid-column: 1 / -1; }
+      }
+
+      @media (max-width: 430px) {
+        .metric-grid { grid-template-columns: 1fr; }
+        .metric { min-height: 115px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#overview">跳到看板内容</a>
+
+    <header class="masthead">
+      <div class="shell">
+        <p class="eyebrow">Curated · Project Snapshot</p>
+        <h1>项目现在在哪里，下一步去哪里。</h1>
+        <p class="lede">这是面向协作的静态项目看板：已交付、正在推进、尚未排期的方向，以及当前 Git 与 worktree 的真实快照被放在同一处对照。</p>
+        <div class="snapshot-row" aria-label="快照元信息">
+          <span class="pill info">采集于 2026-09-06 00:24（UTC+08:00）</span>
+          <span class="pill ok">45 条 PRD 需求</span>
+          <span class="pill warn">采集时有 1 个未跟踪文档</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="nav-wrap">
+      <nav class="shell quick-nav" aria-label="看板章节">
+        <a href="#overview">总览</a>
+        <a href="#doing">正在做</a>
+        <a href="#delivered">已交付</a>
+        <a href="#validation">验收与缺口</a>
+        <a href="#not-now">暂不做</a>
+        <a href="#git">Git / Worktree</a>
+        <a href="#sources">数据来源</a>
+      </nav>
+    </div>
+
+    <main id="overview" class="shell">
+      <section aria-labelledby="ledger-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">需求台账</p>
+            <h2 id="ledger-heading">当前需求状态</h2>
+          </div>
+          <p>唯一状态源为 <code>docs/prd/requirements.csv</code>；“有计划文档”本身不等于已经批准或正在实施。</p>
+        </div>
+        <div class="metric-grid" aria-label="需求状态计数">
+          <article class="metric verified"><span class="label">已验证</span><strong class="value">16</strong><p class="note">验收证据齐全（35.6%）</p></article>
+          <article class="metric implemented"><span class="label">已实现</span><strong class="value">10</strong><p class="note">功能完成，仍待完整验收（22.2%）</p></article>
+          <article class="metric progress"><span class="label">进行中</span><strong class="value">12</strong><p class="note">已进入工程实现（26.7%）</p></article>
+          <article class="metric idea"><span class="label">想法池</span><strong class="value">6</strong><p class="note">未进入排期或实现（13.3%）</p></article>
+          <article class="metric specified"><span class="label">已定义</span><strong class="value">1</strong><p class="note">流程台账自身的启动项（2.2%）</p></article>
+        </div>
+      </section>
+
+      <section id="doing" aria-labelledby="doing-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Now</p>
+            <h2 id="doing-heading">当前正在做</h2>
+          </div>
+          <p>12 个需求正处于 <code>in_progress</code>。近期提交集中在 Agent 与播放可靠性；刮削治理和消息中心仍按台账列为进行中。</p>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">优先推进 · PRD 快照</p><h3>进行中需求</h3></div>
+            <div class="panel-body">
+              <div class="status-list">
+                <div class="status-row"><span class="id">REQ-0023</span><span class="title">元数据刮削并发与 Provider 调度治理</span><span class="progress-number">20%</span><div class="progress-track"><span style="width:20%"></span></div></div>
+                <div class="status-row"><span class="id">REQ-0024</span><span class="title">把消息中心变成系统感知与分级提醒</span><span class="progress-number">60%</span><div class="progress-track"><span style="width:60%"></span></div></div>
+                <div class="status-row"><span class="id">REQ-0039</span><span class="title">AI 设置、隐私治理与审计面板</span><span class="progress-number">30%</span><div class="progress-track"><span style="width:30%"></span></div></div>
+                <div class="status-row"><span class="id">REQ-0032</span><span class="title">资料库 Copilot 多轮对话</span><span class="progress-number">70%</span><div class="progress-track"><span style="width:70%"></span></div></div>
+                <div class="status-row"><span class="id">REQ-0040</span><span class="title">对话式影片挑选</span><span class="progress-number">50%</span><div class="progress-track"><span style="width:50%"></span></div></div>
+              </div>
+            </div>
+          </article>
+
+          <aside class="panel">
+            <div class="panel-header"><p class="table-label">近期实现 · 9 月 5–6 日</p><h3>Agent 可靠性与播放修复已落地</h3></div>
+            <div class="panel-body">
+              <ul class="compact-list">
+                <li><strong>Agent 上下文：</strong>Prompt v2、实体歧义选择、检索证据与终态已提交；新增历史游标翻页、有界模型上下文和空回答收尾。</li>
+                <li><strong>确认写入：</strong>持久化回执与业务修改原子提交，支持重启后重放；旧值冲突拒绝写入，保护人工编辑。</li>
+                <li><strong>播放链路：</strong>F1–F10 修复已提交，覆盖同片会话隔离、失败交接回退、实际 FFmpeg 节流、取消回收与 seek / 缓冲判断。</li>
+                <li><strong>验收边界：</strong>22 个真实模型合成场景已有通过记录；完整 R1、隐私层级、用量统计与审计仍待完成，实验开关保持。</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <div class="requirements panel" style="margin-top:1rem" aria-label="其余进行中 Agent 需求">
+          <div class="panel-header"><p class="table-label">Agent 主线 · 其余进行中切片</p><h3>实验性功能：高完成度、尚未整体验收</h3></div>
+          <div class="requirement-row"><span class="req-id">REQ-0029</span><span class="req-title">AI 影片笔记润色</span><span class="priority">P0</span><span class="req-progress">90%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0030</span><span class="req-title">一键翻译刮削简介（只写用户覆盖字段）</span><span class="priority">P0</span><span class="req-progress">90%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0031</span><span class="req-title">Personal Insights 的 AI 叙事解读</span><span class="priority">P0</span><span class="req-progress">90%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0033</span><span class="req-title">一句话创建保存视图</span><span class="priority">P1</span><span class="req-progress">90%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0041</span><span class="req-title">AI 标题翻译与本地化</span><span class="priority">P1</span><span class="req-progress">90%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0043</span><span class="req-title">实验性开关与可浮动 Agent Window</span><span class="priority">P0</span><span class="req-progress">85%</span></div>
+          <div class="requirement-row"><span class="req-id">REQ-0044</span><span class="req-title">Agent 的 Provider 源站相关查询</span><span class="priority">P1</span><span class="req-progress">90%</span></div>
+        </div>
+      </section>
+
+      <section id="delivered" aria-labelledby="delivered-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Delivered</p>
+            <h2 id="delivered-heading">已经具备的产品底座</h2>
+          </div>
+          <p>以下为代码和项目事实明确记录的当前能力，不把目标架构当作已经完成。</p>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">产品能力</p><h3>资料库与用户数据</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>资料库主链路：</strong>扫描、元数据刮削、任务系统、SQLite 应用库与 REST API 已落地。</li>
+              <li><strong>长期数据安全：</strong>备份 / 校验 / 恢复、路径迁移、Library Health 与有限修复队列均已验证。</li>
+              <li><strong>浏览与个性化：</strong>保存视图、强筛选、每日推荐和显式负反馈、演员别名合并、个人洞察均已实现。</li>
+              <li><strong>导入稳健性：</strong>支持大文件可续传、重启恢复、空间预检、番号相似度检查与扫描 UNIQUE 中断保护。</li>
+            </ul></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">运行与体验</p><h3>当前技术形态</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>前端：</strong>Vue 3 + TypeScript + Vite，shadcn-vue 与 Tailwind CSS v4；Mock 与 Web API 适配器并存。</li>
+              <li><strong>后端：</strong>Go HTTP 服务运行在 SQLite 之上；开发态默认 loopback <code>:8080</code>。</li>
+              <li><strong>桌面：</strong>Electron MVP 已具备后端启动/复用、托盘、隐藏到托盘、静态 Web UI 与目录选择桥接。</li>
+              <li><strong>播放：</strong>浏览器直放 + FFmpeg/HLS；同片多会话互不抢占，新流就绪后交接，HLS 错误有界恢复，显式起点与取消贯穿请求链。</li>
+            </ul></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="validation" aria-labelledby="validation-heading">
+        <div class="section-head">
+          <div><p class="section-kicker">Validation</p><h2 id="validation-heading">已有验证与剩余缺口</h2></div>
+          <p>摘录 9 月 5–6 日实施记录；本次看板更新未重新执行业务测试，单项通过不等于完整发布门禁通过。</p>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">已有证据</p><h3>Agent 与播放可靠性</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>真实模型：</strong>DeepSeek 的 22 个不同合成场景均有通过记录，包含检索、歧义、确认预览、长历史和注入边界；由首轮与定向复验合计，使用临时 SQLite，未挂载真实资料库或源站工具。</li>
+              <li><strong>前端：</strong>最新播放修复记录为 215 个测试文件 / 990 项通过；随后新增连续 seek 用例，播放器加载组件 16 项定向通过；typecheck、lint 通过。</li>
+              <li><strong>后端：</strong>Go 全量测试及播放相关包 vet 通过；真实 FFmpeg 合成测试验证暂停 / 恢复与同片双会话独立读取。</li>
+              <li><strong>状态口径：</strong>PRD 仍为 16 项已验证、10 项已实现、12 项进行中、6 项想法、1 项已定义；本页不自行提升需求状态。</li>
+            </ul></div>
+          </article>
+          <aside class="panel">
+            <div class="panel-header"><p class="table-label">尚未全绿</p><h3>发布门禁与完整验收</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>构建体积：</strong>总 JS 为 2374.43 kB raw / 780.54 kB gzip，超过 2250 / 750 kB 门禁；修复前基线也超限，预算未放宽。</li>
+              <li><strong>浏览器 e2e：</strong>最新默认超时的串行运行 3 通过 / 2 失败：移动端旧元素定位、个人洞察冷启动超时。后者仅延长超时的诊断运行通过。</li>
+              <li><strong>Agent R1：</strong>演员别名、完整源站结果、多轮候选交互、三语言及移动端焦点 / 取消验收仍有缺口；用量治理和回执保留期管理未完成。</li>
+              <li><strong>播放边界：</strong>真实影片画质、LAN / GPU 基准和完整浏览器媒体验收待补；Go race 受本机工具链阻塞。缓存字节配额、按需 VOD、音频单独转码尚未实现。</li>
+            </ul></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="not-now" aria-labelledby="not-now-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Not now</p>
+            <h2 id="not-now-heading">明确未进入当前执行流</h2>
+          </div>
+          <p>这里区分「未实现但已有想法」和「已有目标架构、但当前刻意不做」，避免把探索当作承诺。</p>
+        </div>
+        <div class="two-column">
+          <div>
+            <div class="callout">
+              <h3>未排期的 AI 想法（6 项）</h3>
+              <p>标签规范化管家、演员合并建议、批量维护 Agent、每周资料库报告、对外 MCP、AI 用户标签与偏好画像，均为 <code>idea</code>，不是当前交付承诺。</p>
+            </div>
+            <div class="tag-row" style="margin-top:0.8rem" aria-label="想法池列表">
+              <span class="tag">REQ-0034 标签规范化</span><span class="tag">REQ-0035 演员合并建议</span><span class="tag">REQ-0036 批量维护</span><span class="tag">REQ-0037 周报</span><span class="tag">REQ-0038 外部 MCP</span><span class="tag">REQ-0042 AI 用户标签</span>
+            </div>
+          </div>
+          <div>
+            <div class="callout info">
+              <h3>当前架构边界：不是“已经有”的能力</h3>
+              <p>深度 Electron IPC、mpv 进程控制与广泛的原生文件/权限桥接仍属于未来桌面架构；Vue 业务层不能假定 Electron 或原生播放器存在。账号级多用户、冲突解决与远程同步也尚未进入当前实现。</p>
+            </div>
+            <div class="callout" style="margin-top:0.75rem">
+              <h3>当前主计划之外的产品方向</h3>
+              <p>计划状态规则明确：容器、WebDAV、漫画库、Android 与 metadata sidecar 尚未进入 PRD，不并行实施；SFW 合规产品已决定另建项目。下方的漫画/照片 worktree 是独立实验工作区，不等于主计划已批准。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="git" aria-labelledby="git-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Repository snapshot</p>
+            <h2 id="git-heading">Git 提交、分支与 worktree</h2>
+          </div>
+          <p>以下为编辑本看板前的 Git 快照；不包含本次看板修改及其后续提交。远程信息来自本地引用，未执行 fetch。</p>
+        </div>
+
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><p class="table-label">当前 checkout</p><h3><code>agent-enhance</code></h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>HEAD：</strong><code>b6321237</code> · <span lang="en">docs(playback): document reliability fixes and validation</span></li>
+              <li><strong>相对本地 <code>master</code>：</strong>领先 50 个提交，落后 0 个提交；该分支没有设置 upstream。本地 master 比已缓存的 origin/master 落后 1 个提交。</li>
+              <li><strong>远程：</strong><code>origin</code> 指向 <code>git@github.com:yepHiu/Curated.git</code>。</li>
+              <li><strong>生产版本源：</strong><code>scripts/release/version.json</code> 当前为 <strong>1.5.4</strong>。</li>
+            </ul></div>
+          </article>
+          <aside class="panel">
+            <div class="panel-header"><p class="table-label">未提交状态</p><h3>主工作区：需保留，不自动清理</h3></div>
+            <div class="panel-body"><ul class="compact-list">
+              <li><strong>已跟踪文件：</strong>采集时无修改，暂存区为空。</li>
+              <li><strong>新增未跟踪：</strong><code>docs/plan/2026-09-05-curated-figma-project-design.md</code>。</li>
+              <li><strong>已提交切片：</strong>此前看板列出的 Prompt v2 与流式 DTO 改动已进入当前分支历史。</li>
+              <li><strong>说明：</strong>未跟踪文档保留原状；文件存在不代表已批准进入 PRD。</li>
+            </ul></div>
+          </aside>
+        </div>
+
+        <div class="table-wrap" style="margin-top:1rem">
+          <table>
+            <caption>已注册 worktree（含当时的工作区脏净状态）</caption>
+            <thead><tr><th scope="col">位置</th><th scope="col">分支 / HEAD</th><th scope="col">最新提交</th><th scope="col">状态</th><th scope="col">工作内容判断</th></tr></thead>
+            <tbody>
+              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>agent-enhance</code><br /><code>b6321237</code></td><td>2026-09-06<br />播放可靠性修复与验收文档</td><td><span class="state dirty">1 个未跟踪文档</span></td><td>近期提交：Agent 可靠性与播放链路 F1–F10 修复。</td></tr>
+              <tr><td><strong>Codex worktree #4115</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\4115\jav-shadcn</code></td><td><code>detached</code><br /><code>e2666ad2</code></td><td>2026-05-13<br />release 1.4.5 准备</td><td><span class="state detached">干净，游离 HEAD</span></td><td>旧发布快照；未绑定本地分支。</td></tr>
+              <tr><td><strong>漫画库 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\comic-library-mvp\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">大量修改与新增</span></td><td>漫画与照片资料库的并行实验，尚不属于当前 PRD 主执行流。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-head" style="margin-top:2rem; margin-bottom:0.75rem"><div><p class="section-kicker">Recent branch history</p><h2 style="font-size:1.35rem">当前分支相对 master 的最新提交</h2></div></div>
+        <div class="commit-list" aria-label="当前分支近期提交">
+          <div class="commit"><span class="hash">b6321237</span><span class="date">2026-09-06</span><span class="subject">docs(playback): document reliability fixes and validation</span></div>
+          <div class="commit"><span class="hash">8dc5de10</span><span class="date">2026-09-06</span><span class="subject">test(playback): verify real session isolation and superseded seeks</span></div>
+          <div class="commit"><span class="hash">ceb6bfaa</span><span class="date">2026-09-05</span><span class="subject">fix(playback): recover HLS errors and roll back failed handoffs</span></div>
+          <div class="commit"><span class="hash">e05ba547</span><span class="date">2026-09-05</span><span class="subject">fix(playback): throttle the actual FFmpeg process with bounded fallback</span></div>
+          <div class="commit"><span class="hash">9634d964</span><span class="date">2026-09-05</span><span class="subject">fix(playback): budget seek catchup and wait for contiguous buffer</span></div>
+          <div class="commit"><span class="hash">0497b72d</span><span class="date">2026-09-05</span><span class="subject">perf(playback): remove duplicate HLS media prewarming</span></div>
+        </div>
+      </section>
+
+      <section id="sources" aria-labelledby="sources-heading">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Traceability</p>
+            <h2 id="sources-heading">看板依据</h2>
+          </div>
+          <p>如果代码、PRD 或 Git 状态发生变化，应以这些原始来源为准并重新生成快照。</p>
+        </div>
+        <div class="source-grid">
+          <a class="source-link" href="docs/prd/requirements.csv"><strong>PRD 需求台账</strong><span><code>docs/prd/requirements.csv</code><br />45 条需求及其 status、进度、验收与关联文档。</span></a>
+          <a class="source-link" href="docs/plan/README.md"><strong>计划状态规则</strong><span><code>docs/plan/README.md</code><br />区分 research / proposed / approved / in-progress / verified，说明当前主计划。</span></a>
+          <a class="source-link" href=".cursor/rules/project-facts.mdc"><strong>当前实现事实</strong><span><code>.cursor/rules/project-facts.mdc</code><br />前后端、Electron、播放、Agent 与已实现能力。</span></a>
+          <a class="source-link" href=".cursor/rules/architecture-boundaries.mdc"><strong>架构边界</strong><span><code>.cursor/rules/architecture-boundaries.mdc</code><br />当前 Electron/HTTP 形态与仍属目标的原生能力。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-19-agent-milestone-plan.md"><strong>Agent 实施与验收</strong><span>§14：历史翻页、持久化确认回执、22 个真实模型合成场景及完整 R1 缺口。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md"><strong>播放链路修复记录</strong><span>2026-09-06：F1–F10 修复、真实 FFmpeg 验证、构建与 e2e 门禁现状。</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="shell">Curated 项目概览看板 · 静态文档快照 · 更新日期 2026-09-06。请勿将本页替代 <code>requirements.csv</code>、源码或 Git 的实时状态。</div>
+    </footer>
+  </body>
+</html>

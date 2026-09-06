@@ -8,6 +8,9 @@ import type {
   ApplyActorMergeRequest,
   ActorProfileDTO,
   ActorsListDTO,
+  AIProviderSettingsDTO,
+  AIProviderTestResponse,
+  PatchAIProviderBody,
   BackendLogSettingsDTO,
   BackupManifestDTO,
   BackupRestorePreflightDTO,
@@ -29,6 +32,7 @@ import type {
   MetadataRefreshQueuedDTO,
   MovieImportUploadProgress,
   MovieImportUploadFileManifest,
+  ImportMovieCodeCheckDTO,
   NativePlaybackLaunchDTO,
   MovieCommentDTO,
   PersonalInsightsBreakdownDTO,
@@ -36,6 +40,7 @@ import type {
   PersonalInsightsOverviewDTO,
   PersonalInsightsRange,
   PlaybackDescriptorDTO,
+  PlaybackSessionStatusDTO,
   PatchBackendLogBody,
   PostCuratedFramesExportBody,
   PatchMovieBody,
@@ -68,6 +73,7 @@ export interface ResumableMovieImportSession {
 }
 
 export interface LibraryService {
+  supportsSourceFrame: boolean
   movies: ComputedRef<readonly Movie[]>
   /** 电影主列表首轮加载是否已完成；true 代表拿到过一次明确结果，不代表一定有数据。 */
   moviesLoaded: ComputedRef<boolean>
@@ -128,6 +134,11 @@ export interface LibraryService {
   /** HTTP 代理配置 */
   proxy: ComputedRef<ProxySettingsDTO>
   setProxy(config: ProxySettingsDTO): Promise<void>
+  /** 实验性 Agent provider 配置（Web：library-config.cfg；Mock：localStorage） */
+  aiProvider: ComputedRef<AIProviderSettingsDTO>
+  setAIProvider(patch: PatchAIProviderBody): Promise<void>
+  /** 实验：测试 provider 连通；可选传草稿配置（不先保存） */
+  testAIProvider(provider?: AIProviderSettingsDTO): Promise<AIProviderTestResponse>
   /** 播放器 / HLS / 原生播放器偏好 */
   playerSettings: ComputedRef<PlayerSettingsDTO>
   patchPlayerSettings(patch: PatchPlayerSettingsBody): Promise<void>
@@ -170,6 +181,8 @@ export interface LibraryService {
       resumeUploadId?: string
     },
   ): Promise<TaskDTO | null>
+  /** 导入前按文件名解析番号，检查库中是否已有相同或类似条目。 */
+  checkImportMovieCodes(names: string[]): Promise<ImportMovieCodeCheckDTO>
   /** 当前可继续的续传会话列表（Web：本地账本 + 后端状态核对；Mock：恒为空）。 */
   listResumableMovieImports(): Promise<ResumableMovieImportSession[]>
   /** 放弃一个未完成的续传会话：删除服务端暂存与本地账本条目。 */
@@ -177,7 +190,9 @@ export interface LibraryService {
   /** Returns task when web scan started; mock returns null. */
   scanLibraryPaths(paths?: string[]): Promise<TaskDTO | null>
   getTaskStatus(taskId: string): Promise<TaskDTO>
-  createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" }): Promise<TaskDTO>
+  cancelMovieClip(taskId: string): Promise<void>
+  extractMovieFrame(movieId: string, positionSec: number): Promise<Blob>
+  createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" | "mp4" | "webm" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
   /** Web：请求后端在系统文件管理器中显示该片主视频；Mock 会拒绝。 */
@@ -199,17 +214,19 @@ export interface LibraryService {
    * Web：返回后端给出的播放描述（当前为 direct-play，后续可扩展 remux / transcode）。
    * Mock：返回 null。
    */
-  getMoviePlayback(movieId: string): Promise<PlaybackDescriptorDTO | null>
+  getMoviePlayback(movieId: string, options?: { startPositionSec?: number; signal?: AbortSignal }): Promise<PlaybackDescriptorDTO | null>
   /**
    * 尽力预取播放描述符（点击进入播放器时提前发起）。Web：短 TTL 一次性缓存，
    * 下一次 `getMoviePlayback` 直接消费；Mock：无操作。
    */
-  prefetchMoviePlayback(movieId: string): void
+  prefetchMoviePlayback(movieId: string, startPositionSec?: number): (() => void) | void
   createPlaybackSession(
     movieId: string,
     mode: PlaybackDescriptorDTO["mode"],
     startPositionSec?: number,
+    signal?: AbortSignal,
   ): Promise<PlaybackDescriptorDTO | null>
+  getPlaybackSession(sessionId: string): Promise<PlaybackSessionStatusDTO | null>
   launchNativePlayback(movieId: string, startPositionSec?: number): Promise<NativePlaybackLaunchDTO | null>
   /**
    * 从当前库缓存中随机推荐若干部（排除自身），最多 `limit` 条（默认 6）。

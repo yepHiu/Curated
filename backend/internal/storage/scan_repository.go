@@ -87,35 +87,32 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		_ = tx.Rollback()
 	}()
 
-	var (
-		movieID  string
-		code     string
-		location string
-	)
-
-	pathErr := tx.QueryRowContext(
-		ctx,
-		`SELECT id, code, location FROM movies
-			 WHERE location = ?
-			   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')
-		 LIMIT 1`,
-		result.Path,
-	).Scan(&movieID, &code, &location)
-
+	located, pathErr := lookupScanMovie(ctx, tx, `location = ?`, result.Path)
 	switch {
 	case pathErr == nil:
 		if err := tx.Commit(); err != nil {
 			return ScanPersistOutcome{}, err
 		}
-		if code == result.Number {
+		if movieRowIsTrashed(located.trashedAt) {
+			reason := "trashed_path_indexed"
+			if located.code == result.Number {
+				reason = "trashed_already_indexed"
+			}
 			return ScanPersistOutcome{
-				MovieID: movieID,
+				MovieID: located.id,
+				Status:  "skipped",
+				Reason:  reason,
+			}, nil
+		}
+		if located.code == result.Number {
+			return ScanPersistOutcome{
+				MovieID: located.id,
 				Status:  "skipped",
 				Reason:  "already_indexed",
 			}, nil
 		}
 		return ScanPersistOutcome{
-			MovieID: movieID,
+			MovieID: located.id,
 			Status:  "skipped",
 			Reason:  "path_already_indexed",
 		}, nil
@@ -123,18 +120,10 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		return ScanPersistOutcome{}, pathErr
 	}
 
-	queryErr := tx.QueryRowContext(
-		ctx,
-		`SELECT id, code, location FROM movies
-			 WHERE code = ?
-			   AND (trashed_at IS NULL OR TRIM(trashed_at) = '')
-		 LIMIT 1`,
-		result.Number,
-	).Scan(&movieID, &code, &location)
-
+	matched, queryErr := lookupScanMovie(ctx, tx, `code = ?`, result.Number)
 	switch {
 	case errors.Is(queryErr, sql.ErrNoRows):
-		movieID = moviecode.NormalizeForStorageID(result.Number)
+		movieID := moviecode.NormalizeForStorageID(result.Number)
 		now := nowUTC()
 		addedAt := time.Now().UTC().Format("2006-01-02")
 
@@ -158,6 +147,16 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 			now,
 			now,
 		)
+		if isSQLiteUniqueConstraint(err) {
+			if err := tx.Commit(); err != nil {
+				return ScanPersistOutcome{}, err
+			}
+			return ScanPersistOutcome{
+				MovieID: movieID,
+				Status:  "skipped",
+				Reason:  "unique_constraint",
+			}, nil
+		}
 		if err != nil {
 			return ScanPersistOutcome{}, err
 		}
@@ -174,13 +173,34 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		return ScanPersistOutcome{}, queryErr
 	}
 
+	if movieRowIsTrashed(matched.trashedAt) {
+		if err := tx.Commit(); err != nil {
+			return ScanPersistOutcome{}, err
+		}
+		return ScanPersistOutcome{
+			MovieID: matched.id,
+			Status:  "skipped",
+			Reason:  "trashed_code_indexed",
+		}, nil
+	}
+
 	_, err = tx.ExecContext(
 		ctx,
 		`UPDATE movies SET location = ?, updated_at = ? WHERE id = ?`,
 		result.Path,
 		nowUTC(),
-		movieID,
+		matched.id,
 	)
+	if isSQLiteUniqueConstraint(err) {
+		if err := tx.Commit(); err != nil {
+			return ScanPersistOutcome{}, err
+		}
+		return ScanPersistOutcome{
+			MovieID: matched.id,
+			Status:  "skipped",
+			Reason:  "unique_constraint",
+		}, nil
+	}
 	if err != nil {
 		return ScanPersistOutcome{}, err
 	}
@@ -189,10 +209,31 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 		return ScanPersistOutcome{}, err
 	}
 	return ScanPersistOutcome{
-		MovieID: movieID,
+		MovieID: matched.id,
 		Status:  "updated",
 		Reason:  "path_refreshed",
 	}, nil
+}
+
+type scanMovieLookup struct {
+	id        string
+	code      string
+	location  string
+	trashedAt string
+}
+
+func lookupScanMovie(ctx context.Context, tx *sql.Tx, where string, arg string) (scanMovieLookup, error) {
+	var row scanMovieLookup
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT id, code, location, IFNULL(trashed_at, '') FROM movies WHERE `+where+` LIMIT 1`,
+		arg,
+	).Scan(&row.id, &row.code, &row.location, &row.trashedAt)
+	return row, err
+}
+
+func movieRowIsTrashed(trashedAt string) bool {
+	return strings.TrimSpace(trashedAt) != ""
 }
 
 func nowUTC() string {

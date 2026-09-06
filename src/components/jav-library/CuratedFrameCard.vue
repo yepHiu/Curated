@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
+import { usePreferredReducedMotion } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { Film } from "lucide-vue-next"
 import type { CuratedFrameDbRow } from "@/lib/curated-frames/db"
@@ -22,10 +23,12 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const motionActive = ref(false)
+const motionFailed = ref(false)
+const reducedMotion = usePreferredReducedMotion()
 const hasMotion = computed(() => props.row.motion?.status === "ready" && Boolean(props.row.motion.artifactUrl))
 
 function setMotionActive(active: boolean) {
-  if (hasMotion.value) motionActive.value = active
+  if (hasMotion.value) motionActive.value = active && reducedMotion.value !== 'reduce' && !motionFailed.value
 }
 </script>
 
@@ -58,7 +61,7 @@ function setMotionActive(active: boolean) {
     </span>
     <span
       v-if="row.motion"
-      class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white shadow-sm"
+      class="absolute bottom-12 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-medium text-foreground shadow-sm"
       :title="row.motion.status === 'ready' ? t('curated.motionAvailable') : t('curated.motionProcessing')"
     >
       <Film class="size-3" aria-hidden="true" />
@@ -73,8 +76,15 @@ function setMotionActive(active: boolean) {
       @focusout="setMotionActive(false)"
     >
       <div class="relative aspect-video w-full bg-black/80">
+        <img
+          v-if="motionActive && hasMotion && row.motion?.contentType === 'image/gif'"
+          :src="row.motion.artifactUrl"
+          :alt="t('curated.motionAvailable')"
+          class="h-full w-full object-contain"
+          @error="motionFailed = true; motionActive = false"
+        />
         <video
-          v-if="motionActive && hasMotion"
+          v-else-if="motionActive && hasMotion"
           :src="row.motion?.artifactUrl"
           :poster="imageUrl"
           class="h-full w-full object-contain"
@@ -84,6 +94,7 @@ function setMotionActive(active: boolean) {
           playsinline
           preload="metadata"
           :aria-label="t('curated.motionAvailable')"
+          @error="motionFailed = true; motionActive = false"
         />
         <img
           v-else
@@ -91,6 +102,7 @@ function setMotionActive(active: boolean) {
           :alt="row.code"
           class="h-full w-full object-contain"
           loading="lazy"
+          decoding="async"
         />
       </div>
       <div class="p-3">

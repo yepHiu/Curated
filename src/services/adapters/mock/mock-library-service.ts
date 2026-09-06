@@ -27,6 +27,8 @@ import type {
   MetadataMovieScrapeMode,
   MetadataRefreshQueuedDTO,
   MovieCommentDTO,
+  ImportMovieCodeCheckDTO,
+  ImportMovieCodeMatchDTO,
   PersonalInsightsBreakdownDTO,
   PersonalInsightsDimension,
   PersonalInsightsOverviewDTO,
@@ -57,6 +59,11 @@ import { listSortedByUpdatedDesc } from "@/lib/playback-progress-storage"
 import { listPlaybackWatchTimeMovieEntries } from "@/lib/playback-watch-time-storage"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { getLocalMovieComment, putLocalMovieComment } from "@/lib/movie-comment-local-storage"
+import {
+  classifyMovieCodes,
+  extractMovieNumber,
+  strongerMovieCodeMatch,
+} from "@/lib/movie-number"
 import { HttpClientError } from "@/api/http-client"
 import {
   normalizeSavedViewFiltersV1,
@@ -115,6 +122,36 @@ const metadataMovieProviderChainMock = ref<string[]>([])
 const metadataMovieScrapeModeMock = ref<MetadataMovieScrapeMode>("auto")
 /** Mock：HTTP 代理配置 */
 const proxyMock = ref<import("@/api/types").ProxySettingsDTO>({ enabled: false })
+/** Mock：实验性 Agent provider 配置（localStorage 持久化，便于刷新后保留演示配置） */
+const AI_PROVIDER_MOCK_STORAGE_KEY = "curated-ai-provider-mock-v1"
+
+function readAIProviderMock(): import("@/api/types").AIProviderSettingsDTO {
+  try {
+    const raw = localStorage.getItem(AI_PROVIDER_MOCK_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as import("@/api/types").AIProviderSettingsDTO
+      return {
+        kind: parsed.kind || "openai-compatible",
+        baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
+        apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+        model: typeof parsed.model === "string" ? parsed.model : "",
+      }
+    }
+  } catch {
+    // ignore malformed local storage
+  }
+  return { kind: "openai-compatible", baseUrl: "", model: "" }
+}
+
+function persistAIProviderMock(value: import("@/api/types").AIProviderSettingsDTO) {
+  try {
+    localStorage.setItem(AI_PROVIDER_MOCK_STORAGE_KEY, JSON.stringify(value))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+const aiProviderMock = ref<import("@/api/types").AIProviderSettingsDTO>(readAIProviderMock())
 const playerSettingsMock = ref<PlayerSettingsDTO>({
   hardwareDecode: true,
   hardwareEncoder: "auto",
@@ -1101,6 +1138,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 }
 
 export const mockLibraryService: LibraryService = {
+  supportsSourceFrame: false,
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
   moviesLoaded: computed(() => true),
   loadError: computed(() => null),
@@ -1135,11 +1173,35 @@ export const mockLibraryService: LibraryService = {
   metadataMovieProviderChain: computed(() => metadataMovieProviderChainMock.value),
   metadataMovieScrapeMode: computed(() => metadataMovieScrapeModeMock.value),
   proxy: computed(() => proxyMock.value),
+  aiProvider: computed(() => aiProviderMock.value),
   playerSettings: computed(() => playerSettingsMock.value),
   backendLog: computed(() => backendLogMock.value),
 
   async setProxy(config: import("@/api/types").ProxySettingsDTO) {
     proxyMock.value = { ...config }
+  },
+
+  async setAIProvider(patch: import("@/api/types").PatchAIProviderBody) {
+    const prev = aiProviderMock.value
+    const next: import("@/api/types").AIProviderSettingsDTO = {
+      ...prev,
+      ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
+      ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey } : {}),
+      ...(patch.model !== undefined ? { model: patch.model } : {}),
+    }
+    aiProviderMock.value = next
+    persistAIProviderMock(next)
+  },
+
+  async testAIProvider(
+    provider?: import("@/api/types").AIProviderSettingsDTO,
+  ): Promise<import("@/api/types").AIProviderTestResponse> {
+    const target = provider ?? aiProviderMock.value
+    if (!target.baseUrl.trim() || !target.model.trim()) {
+      return { ok: false, latencyMs: 0, message: "mock: baseUrl and model are required" }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    return { ok: true, latencyMs: 42 }
   },
 
   async patchPlayerSettings(patch: PatchPlayerSettingsBody) {
@@ -1232,6 +1294,8 @@ export const mockLibraryService: LibraryService = {
   async createMovieClip(): Promise<never> {
     throw new Error("GIF clip export requires Web API mode")
   },
+  async cancelMovieClip(): Promise<void> { /* Mock does not generate clips. */ },
+  async extractMovieFrame(): Promise<Blob> { throw new Error('Source frame extraction requires Web API') },
 
   async verifyBackup(): Promise<never> {
     throw new Error("Backup maintenance requires Web API mode")
@@ -1713,6 +1777,45 @@ export const mockLibraryService: LibraryService = {
     defaultImportLibraryPathIdMock.value = trimmed
   },
 
+  async checkImportMovieCodes(names: string[]): Promise<ImportMovieCodeCheckDTO> {
+    const trimmed = names.map((name) => name.trim()).filter(Boolean)
+    if (trimmed.length === 0) {
+      throw mockHttpError(400, "COMMON_BAD_REQUEST", "filenames are required")
+    }
+    const active = moviesState.value.filter((movie) => !movie.trashedAt?.trim())
+    const items = trimmed.map((name) => {
+      const extractedCode = extractMovieNumber(name)
+      const matches: ImportMovieCodeMatchDTO[] = []
+      if (extractedCode) {
+        const byId = new Map<string, ImportMovieCodeMatchDTO>()
+        for (const movie of active) {
+          const kind = strongerMovieCodeMatch(
+            classifyMovieCodes(extractedCode, movie.code),
+            classifyMovieCodes(extractedCode, movie.id),
+          )
+          if (!kind) continue
+          const prev = byId.get(movie.id)
+          byId.set(movie.id, {
+            movieId: movie.id,
+            code: movie.code || extractedCode,
+            title: movie.title,
+            matchKind: prev ? (strongerMovieCodeMatch(prev.matchKind, kind) || kind) : kind,
+          })
+        }
+        matches.push(...byId.values())
+      }
+      return {
+        name,
+        extractedCode: extractedCode || undefined,
+        matches,
+      }
+    })
+    return {
+      items,
+      matchedCount: items.filter((item) => item.matches.length > 0).length,
+    }
+  },
+
   async importMovies(files: File[]): Promise<TaskDTO | null> {
     const selected = files.filter((file) => file.name.trim())
     if (selected.length === 0) {
@@ -1791,6 +1894,10 @@ export const mockLibraryService: LibraryService = {
   },
 
   async createPlaybackSession() {
+    return null
+  },
+
+  async getPlaybackSession() {
     return null
   },
 

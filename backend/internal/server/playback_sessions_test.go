@@ -13,6 +13,33 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+func TestPlaybackStartQueryValidationAndForwarding(t *testing.T) {
+	h := NewHandler(Deps{Cfg: config.Config{}, Logger: zap.NewNop(), PlaybackResolver: stubPlaybackResolver{}})
+	for _, tc := range []struct {
+		query    string
+		status   int
+		position float64
+	}{
+		{"1200", 200, 1200}, {"0", 200, 0}, {"NaN", 400, 0}, {"+Inf", 400, 0}, {"-1", 400, 0}, {"", 400, 0},
+	} {
+		req := httptest.NewRequest("GET", "/api/library/movies/movie/playback?startPositionSec="+tc.query, nil)
+		rec := httptest.NewRecorder()
+		h.Routes().ServeHTTP(rec, req)
+		if rec.Code != tc.status {
+			t.Fatalf("%q: %d %s", tc.query, rec.Code, rec.Body.String())
+		}
+		if rec.Code == 200 {
+			var dto contracts.PlaybackDescriptorDTO
+			if err := json.Unmarshal(rec.Body.Bytes(), &dto); err != nil {
+				t.Fatal(err)
+			}
+			if dto.ResumePositionSec != tc.position {
+				t.Fatalf("not forwarded: %+v", dto)
+			}
+		}
+	}
+}
+
 func TestHandleGetRecentPlaybackSessions_OK(t *testing.T) {
 	t.Parallel()
 

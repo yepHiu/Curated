@@ -1,5 +1,7 @@
 import { createI18n } from "vue-i18n"
 import zhCN from "@/locales/zh-CN.json"
+import enMessagesUrl from '@/locales/en.json?url'
+import jaMessagesUrl from '@/locales/ja.json?url'
 import { htmlLangFor, resolveInitialLocale, type SupportedLocale } from "@/lib/locale-storage"
 
 export type { SupportedLocale }
@@ -24,10 +26,12 @@ const loadedLocales = new Set<SupportedLocale>(["zh-CN"])
 export async function ensureLocaleMessages(locale: SupportedLocale): Promise<void> {
   if (loadedLocales.has(locale)) return
 
-  const module = locale === "en"
-    ? await import("@/locales/en.json")
-    : await import("@/locales/ja.json")
-  i18n.global.setLocaleMessage(locale, module.default)
+  // Locale dictionaries are data assets: fetch/parse them on demand instead
+  // of shipping another executable JavaScript chunk for each language.
+  const response = await fetch(locale === 'en' ? enMessagesUrl : jaMessagesUrl)
+  if (!response.ok) throw new Error(`Failed to load locale ${locale}`)
+  const messages = await response.json()
+  i18n.global.setLocaleMessage(locale, messages)
   loadedLocales.add(locale)
 }
 

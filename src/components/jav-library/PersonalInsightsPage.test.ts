@@ -18,6 +18,12 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => serviceMocks,
 }))
 
+vi.mock("@/services/ai-service", () => ({
+  useAIService: () => ({
+    runAction: vi.fn(),
+  }),
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     locale: ref("en"),

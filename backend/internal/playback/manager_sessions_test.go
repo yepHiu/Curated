@@ -86,6 +86,38 @@ func TestResolveFileTouchesSessionLastAccessTime(t *testing.T) {
 	}
 }
 
+func TestResolveFileRejectsIncompleteTempSegments(t *testing.T) {
+	t.Parallel()
+
+	manager := New(Config{})
+	t.Cleanup(manager.Close)
+	dir := t.TempDir()
+	readyPath := filepath.Join(dir, "segment-00000.m4s")
+	tempPath := filepath.Join(dir, "segment-00001.m4s.tmp")
+	if err := os.WriteFile(readyPath, []byte("ready"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tempPath, []byte("partial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manager.sessions["sess-1"] = &sessionState{
+		session: Session{
+			ID:        "sess-1",
+			MovieID:   "movie-a",
+			Directory: dir,
+			StartedAt: time.Now().UTC(),
+		},
+		lastAccessedAt: time.Now().UTC(),
+	}
+
+	if _, err := manager.ResolveFile("sess-1", "segment-00000.m4s"); err != nil {
+		t.Fatalf("complete segment ResolveFile() error = %v", err)
+	}
+	if _, err := manager.ResolveFile("sess-1", "segment-00001.m4s.tmp"); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("temp segment error = %v, want ErrSessionNotFound", err)
+	}
+}
+
 func TestListSessionSnapshotsReturnsNewestFirst(t *testing.T) {
 	t.Parallel()
 
@@ -222,6 +254,15 @@ func TestSessionStateSnapshotTracksStateTransitions(t *testing.T) {
 	}
 	if running.State != "running" {
 		t.Fatalf("running State = %q, want running", running.State)
+	}
+
+	state.applyProgress(ffmpegProgress{HasSpeed: true, Speed: 1.24, HasOutTime: true, OutTimeSec: 8.5})
+	withProgress := state.snapshot(2 * time.Minute)
+	if withProgress.EncoderSpeed != "1.24x" {
+		t.Fatalf("encoder speed = %q, want 1.24x", withProgress.EncoderSpeed)
+	}
+	if withProgress.WrittenDurationSec != 8.5 {
+		t.Fatalf("written duration = %v, want 8.5", withProgress.WrittenDurationSec)
 	}
 
 	state.markFinishedAt(finishedAt, errors.New("transcoder exited"))

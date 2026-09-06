@@ -84,6 +84,24 @@ export function formatTranscodeProfileLabel(profile: string | null | undefined):
   }
 }
 
+export function formatEncoderSpeedLabel(speed: string | null | undefined): string {
+  const text = speed?.trim() || ""
+  return text || "N/A"
+}
+
+export function formatSeekKindLabel(kind: string | null | undefined): string {
+  switch ((kind ?? "").trim().toLowerCase()) {
+    case "reuse":
+      return "Reuse"
+    case "swap":
+      return "Swap"
+    case "start":
+      return "Start"
+    default:
+      return "N/A"
+  }
+}
+
 export function isPlaybackStatUnavailable(value: string): boolean {
   return value === "N/A"
 }
