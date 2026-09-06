@@ -852,7 +852,7 @@ export interface ActorProfileDTO {
 export interface CreateMovieClipBody {
   startSec: number
   endSec: number
-  format: "gif"
+  format: "gif" | "mp4" | "webm"
   fps?: number
   width?: number
   curatedFrameId?: string

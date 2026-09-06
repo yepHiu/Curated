@@ -375,7 +375,8 @@ async function exportSingleFromDialogWatermarked() {
 function curatedFrameGifFilename(frame: CuratedFrameRecord): string {
   const source = frame.code.trim() || frame.id.trim() || "curated-frame"
   const safeName = source.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
-  return `curated-${safeName}.gif`
+  const extension = frame.motion?.contentType === "video/mp4" ? "mp4" : frame.motion?.contentType === "video/webm" ? "webm" : "gif"
+  return `curated-${safeName}.${extension}`
 }
 
 async function exportSingleGifFromDialog() {
@@ -388,7 +389,7 @@ async function exportSingleGifFromDialog() {
   exportBusy.value = true
   dialogExportError.value = ""
   try {
-    const response = await fetch(artifactUrl)
+    const response = await fetch(artifactUrl, { credentials: "include" })
     if (!response.ok) {
       throw new Error(`GIF export request failed: ${response.status}`)
     }

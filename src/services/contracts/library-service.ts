@@ -192,7 +192,7 @@ export interface LibraryService {
   getTaskStatus(taskId: string): Promise<TaskDTO>
   cancelMovieClip(taskId: string): Promise<void>
   extractMovieFrame(movieId: string, positionSec: number): Promise<Blob>
-  createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" }): Promise<TaskDTO>
+  createMovieClip(movieId: string, body: Omit<CreateMovieClipBody, "format"> & { format?: "gif" | "mp4" | "webm" }): Promise<TaskDTO>
   /** 单部影片重新刮削；Web 返回任务供轮询；mock 返回 null。 */
   refreshMovieMetadata(movieId: string): Promise<TaskDTO | null>
   /** Web：请求后端在系统文件管理器中显示该片主视频；Mock 会拒绝。 */

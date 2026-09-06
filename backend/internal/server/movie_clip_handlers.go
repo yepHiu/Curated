@@ -62,7 +62,7 @@ func (h *Handler) startMovieClipArtifactJanitor(ctx context.Context) {
 			}
 			cutoff := time.Now().Add(-movieClipArtifactMaxAge)
 			for _, entry := range entries {
-				if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".gif") {
+				if entry.IsDir() || !isMovieClipExtension(filepath.Ext(entry.Name())) {
 					continue
 				}
 				path := filepath.Join(movieClipArtifactRoot(h), entry.Name())
@@ -112,8 +112,8 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 	if format == "" {
 		format = "gif"
 	}
-	if format != "gif" {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `format must be "gif"`)
+	if !isMovieClipExtension("." + format) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, `format must be gif, mp4 or webm`)
 		return
 	}
 	if req.StartSec < 0 || req.EndSec <= req.StartSec {
@@ -157,7 +157,7 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if err := h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{
-			FrameID: curatedFrameID, Status: "processing", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps,
+			FrameID: curatedFrameID, Status: "processing", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps,
 		}); err != nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to prepare curated frame motion")
 			return
@@ -176,7 +176,7 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 		}
 		if curatedFrameID != "" {
 			_ = h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{
-				FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps,
+				FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps,
 				ErrorMessage: "movie video is not available",
 			})
 		}
@@ -184,7 +184,7 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	task := h.tasks.Create("movie_clip_gif", map[string]any{
+	task := h.tasks.Create("movie_clip_"+format, map[string]any{
 		"movieId":  movieID,
 		"format":   format,
 		"startSec": req.StartSec,
@@ -198,7 +198,7 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 	default:
 		h.tasks.Fail(task.TaskID, "clip_queue_full", "clip queue is full")
 		if curatedFrameID != "" {
-			_ = h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", ErrorMessage: "clip queue is full"})
+			_ = h.store.UpsertCuratedFrameMotion(r.Context(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), ErrorMessage: "clip queue is full"})
 		}
 		writeAppError(w, http.StatusTooManyRequests, contracts.ErrorCodeConflict, "clip queue is full")
 		return
@@ -218,7 +218,7 @@ func (h *Handler) handleCreateMovieClip(w http.ResponseWriter, r *http.Request) 
 		case <-ctx.Done():
 			h.tasks.Fail(task.TaskID, "clip_cancelled", "clip cancelled or timed out")
 			if curatedFrameID != "" {
-				_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", ErrorMessage: "clip cancelled or timed out"})
+				_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), ErrorMessage: "clip cancelled or timed out"})
 			}
 		}
 	}()
@@ -236,28 +236,40 @@ func (h *Handler) runMovieClipTask(taskID, sourcePath string, startSec, duration
 }
 
 func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePath string, startSec, duration float64, fps, width int, curatedFrameID string) {
+	format := "gif"
+	if task, ok := h.tasks.Get(taskID); ok {
+		if value, ok := task.Metadata["format"].(string); ok && isMovieClipExtension("."+value) {
+			format = value
+		}
+	}
+
 	root := movieClipArtifactRoot(h)
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		if curatedFrameID != "" && h.store != nil {
-			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to prepare clip output directory"})
+			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to prepare clip output directory"})
 		}
 		h.tasks.Fail(taskID, "clip_artifact_directory_failed", "failed to prepare clip output directory")
 		return
 	}
-	outputPath := filepath.Join(root, "curated-clip-"+taskID+".gif")
+	outputPath := filepath.Join(root, "curated-clip-"+taskID+"."+format)
 	ffmpeg := playback.ResolveFFmpegCommand(h.cfg.Player.FFmpegCommand)
-	filter := fmt.Sprintf("fps=%d,scale=%d:-1:flags=lanczos:force_original_aspect_ratio=decrease", fps, width)
-	h.tasks.Start(taskID, "generating GIF")
-	h.tasks.Progress(taskID, 5, "generating GIF")
-	cmd := executil.CommandContext(ctx, ffmpeg,
-		"-hide_banner", "-loglevel", "error", "-y",
-		"-threads", "2", "-filter_threads", "1",
-		"-ss", strconv.FormatFloat(startSec, 'f', 3, 64),
-		"-i", sourcePath,
-		"-t", strconv.FormatFloat(duration, 'f', 3, 64),
-		"-vf", filter,
-		"-an", "-loop", "0", outputPath,
-	)
+	filter := fmt.Sprintf("fps=%d,scale=%d:-2:flags=lanczos:force_original_aspect_ratio=decrease", fps, width)
+	h.tasks.Start(taskID, "generating clip")
+	h.tasks.Progress(taskID, 5, "generating clip")
+
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-filter_threads", "1", "-ss", strconv.FormatFloat(startSec, 'f', 3, 64), "-i", sourcePath, "-t", strconv.FormatFloat(duration, 'f', 3, 64), "-an"}
+	switch format {
+	case "gif":
+		filter += ",split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3"
+		args = append(args, "-vf", filter, "-loop", "0")
+	case "mp4":
+		args = append(args, "-vf", filter, "-c:v", "libx264", "-threads", "2", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart")
+	case "webm":
+		args = append(args, "-vf", filter, "-c:v", "libvpx-vp9", "-threads", "2", "-deadline", "good", "-cpu-used", "4", "-crf", "32", "-b:v", "0", "-pix_fmt", "yuv420p")
+	}
+	args = append(args, "-fs", "134217728", outputPath)
+	cmd := executil.CommandContext(ctx, ffmpeg, args...)
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(outputPath)
 		message := strings.TrimSpace(string(output))
@@ -265,7 +277,7 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 			message = "ffmpeg failed to generate GIF"
 		}
 		if curatedFrameID != "" && h.store != nil {
-			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, ErrorMessage: message})
+			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: message})
 		}
 		h.tasks.Fail(taskID, "clip_ffmpeg_failed", message)
 		return
@@ -274,22 +286,22 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 	if statErr != nil || info.Size() == 0 {
 		_ = os.Remove(outputPath)
 		if curatedFrameID != "" && h.store != nil {
-			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "GIF output was not created"})
+			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "GIF output was not created"})
 		}
 		h.tasks.Fail(taskID, "clip_artifact_missing", "GIF output was not created")
 		return
 	}
 	artifactURL := "/api/tasks/" + taskID + "/artifact"
-	filename := "curated-clip-" + taskID + ".gif"
+	filename := "curated-clip-" + taskID + "." + format
 	if curatedFrameID != "" {
 		motionRoot := curatedFrameMotionRoot(h)
 		if err := os.MkdirAll(motionRoot, 0o755); err != nil {
 			_ = os.Remove(outputPath)
-			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to prepare curated frame motion directory"})
+			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to prepare curated frame motion directory"})
 			h.tasks.Fail(taskID, "clip_artifact_directory_failed", "failed to prepare curated frame motion directory")
 			return
 		}
-		filename = curatedFrameID + ".gif"
+		filename = curatedFrameID + "." + format
 		finalPath := filepath.Join(motionRoot, filename)
 		if err := os.Remove(finalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			_ = os.Remove(outputPath)
@@ -298,26 +310,26 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 		}
 		if err := os.Rename(outputPath, finalPath); err != nil {
 			_ = os.Remove(outputPath)
-			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to persist curated frame motion"})
+			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: "failed to persist curated frame motion"})
 			h.tasks.Fail(taskID, "clip_artifact_move_failed", "failed to persist curated frame motion")
 			return
 		}
-		if err := h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "ready", ArtifactName: filename, ContentType: "image/gif", DurationSec: duration, Width: width, FPS: fps, FileSize: info.Size()}); err != nil {
+		if err := h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "ready", ArtifactName: filename, ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, FileSize: info.Size()}); err != nil {
 			h.tasks.Fail(taskID, "clip_metadata_persist_failed", "failed to persist curated frame motion metadata")
 			return
 		}
 		artifactURL = "/api/curated-frames/" + url.PathEscape(curatedFrameID) + "/motion"
 	}
-	h.tasks.ProgressWithMetadata(taskID, 100, "GIF ready", map[string]any{
+	h.tasks.ProgressWithMetadata(taskID, 100, "clip ready", map[string]any{
 		"artifactUrl":    artifactURL,
-		"contentType":    "image/gif",
+		"contentType":    movieClipContentType(format),
 		"filename":       filename,
 		"curatedFrameId": curatedFrameID,
 	})
 	if h.movieClipArtifacts != nil && curatedFrameID == "" {
 		h.movieClipArtifacts.Store(taskID, outputPath)
 	}
-	h.tasks.Complete(taskID, "GIF ready")
+	h.tasks.Complete(taskID, "clip ready")
 }
 
 func (h *Handler) handleGetMovieClipArtifact(w http.ResponseWriter, r *http.Request) {
@@ -330,7 +342,7 @@ func (h *Handler) handleGetMovieClipArtifact(w http.ResponseWriter, r *http.Requ
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "task not found")
 		return
 	}
-	if task.Status != contracts.TaskCompleted || task.Type != "movie_clip_gif" {
+	if task.Status != contracts.TaskCompleted || !isMovieClipExtension("."+strings.TrimPrefix(task.Type, "movie_clip_")) {
 		writeAppError(w, http.StatusNotFound, contracts.ErrorCodeNotFound, "clip artifact is not ready")
 		return
 	}
@@ -349,7 +361,7 @@ func (h *Handler) handleGetMovieClipArtifact(w http.ResponseWriter, r *http.Requ
 	if name == "" {
 		name = filepath.Base(pathValue)
 	}
-	w.Header().Set("Content-Type", "image/gif")
+	w.Header().Set("Content-Type", movieClipContentType(strings.TrimPrefix(task.Type, "movie_clip_")))
 	w.Header().Set("Content-Disposition", contentDispositionAttachment(name, "curated-clip.gif"))
 	http.ServeFile(w, r, pathValue)
 }
@@ -365,4 +377,23 @@ func pathUnderRoot(pathValue, root string) bool {
 	}
 	prefix := cleanRoot + string(os.PathSeparator)
 	return strings.HasPrefix(strings.ToLower(absPath), strings.ToLower(prefix))
+}
+
+func isMovieClipExtension(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".gif", ".mp4", ".webm":
+		return true
+	default:
+		return false
+	}
+}
+func movieClipContentType(format string) string {
+	switch format {
+	case "mp4":
+		return "video/mp4"
+	case "webm":
+		return "video/webm"
+	default:
+		return "image/gif"
+	}
 }

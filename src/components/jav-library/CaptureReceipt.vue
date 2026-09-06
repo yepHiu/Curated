@@ -14,12 +14,12 @@ const time = computed(() => {
 })
 </script>
 <template>
-  <div class="absolute bottom-24 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-3 rounded-lg border border-border bg-background/95 p-2 text-foreground shadow-lg sm:left-5" @click.stop @pointerdown.stop @keydown.stop>
+  <div class="absolute bottom-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg border border-border bg-background/95 p-2 text-foreground shadow-lg sm:bottom-24 sm:left-5 sm:gap-3 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11" @click.stop @pointerdown.stop @keydown.stop>
     <button v-if="job.preview" type="button" class="shrink-0 rounded focus-visible:ring-2 focus-visible:ring-ring" :aria-label="t('curated.captureView')" @click="$emit('view')">
-      <img :src="job.preview" :alt="job.movie.code" class="h-[54px] w-24 rounded object-contain" />
+      <img :src="job.preview" :alt="job.movie.code" class="h-9 w-16 rounded object-contain sm:h-[54px] sm:w-24" />
     </button>
     <div class="flex min-w-0 flex-col gap-1">
-      <div class="flex items-center gap-2 text-sm">
+      <div class="flex flex-wrap items-center gap-1 text-sm sm:gap-2">
         <Loader2 v-if="busy" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         <AlertTriangle v-else-if="job.error" class="size-4 text-destructive" aria-hidden="true" />
         <Check v-else class="size-4" aria-hidden="true" />

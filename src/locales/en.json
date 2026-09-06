@@ -518,7 +518,7 @@
     "duplicateFrameExists": "A curated frame already exists near this playback moment; review it later in the curated frames library.",
     "duplicateReviewTitle": "Found {count} possible duplicate frame groups",
     "duplicateReviewBody": "Frames from the same movie within {threshold} seconds are marked here. Review them and delete the extras you do not want.",
-    "duplicateReviewBadge": "Possible duplicate",
+    "duplicateReviewBadge": "Nearby time",
     "motionAvailable": "Motion curated frame",
     "motionProcessing": "Motion clip is generating",
     "playMotion": "Play motion frame",
@@ -553,7 +553,7 @@
     "captureAction": "Capture",
     "previousFrame": "Previous frame",
     "nextFrame": "Next frame",
-    "stopClip": "Finish GIF",
+    "stopClip": "Finish clip",
     "clipStatusRetrying": "Status unavailable. Retrying…",
     "clipCancelFailed": "Could not cancel. Retry.",
     "captureTooLarge": "Original exceeds 12 MiB. Download it or save a JPEG copy.",
@@ -565,7 +565,8 @@
     "visualReview": "Review similar images",
     "visualReviewScope": "Checked {n}. Reviews the first 200 loaded frames, up to 50 pairs. Similarity is a hint; inspect before deleting.",
     "visualReviewEmpty": "No visually similar candidates",
-    "visualReviewFailed": "Could not read {n} images. Close and retry."
+    "visualReviewFailed": "Could not read {n} images. Close and retry.",
+    "clipFormat": "Motion clip format"
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

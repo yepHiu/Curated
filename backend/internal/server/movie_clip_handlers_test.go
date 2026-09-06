@@ -5,15 +5,50 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"curated-backend/internal/config"
+	"curated-backend/internal/executil"
 	"curated-backend/internal/tasks"
 	"go.uber.org/zap"
 )
+
+func TestMovieClipRealFormats(t *testing.T) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("FFmpeg not installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.mp4")
+	if output, err := executil.CommandContext(ctx, ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=10", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", source).CombinedOutput(); err != nil {
+		t.Fatalf("synthetic source: %v %s", err, output)
+	}
+	h := &Handler{cfg: config.Config{CacheDir: dir}, tasks: tasks.NewManager(), movieClipArtifacts: &sync.Map{}, runtimeContext: ctx}
+	for _, format := range []string{"gif", "mp4", "webm"} {
+		task := h.tasks.Create("movie_clip_"+format, map[string]any{"format": format})
+		h.runMovieClipTask(task.TaskID, source, 0, 0.6, 10, 320, "")
+		result, _ := h.tasks.Get(task.TaskID)
+		if string(result.Status) != "completed" {
+			t.Fatalf("%s: %+v", format, result)
+		}
+		if result.Metadata["contentType"] != movieClipContentType(format) {
+			t.Fatalf("wrong MIME: %+v", result)
+		}
+		path, _ := h.movieClipArtifacts.Load(task.TaskID)
+		info, err := os.Stat(path.(string))
+		if err != nil || info.Size() == 0 {
+			t.Fatalf("missing artifact: %v", err)
+		}
+		t.Logf("%s: %d bytes", format, info.Size())
+	}
+}
 
 func TestMovieClipQueueBudgetAndCancellation(t *testing.T) {
 	h := &Handler{}
@@ -49,7 +84,7 @@ func TestHandleCreateMovieClipRejectsInvalidRangesBeforeStorageLookup(t *testing
 		{name: "reversed range", body: `{"startSec":2,"endSec":1}`},
 		{name: "too short", body: `{"startSec":1,"endSec":1.1}`},
 		{name: "too long", body: `{"startSec":1,"endSec":8}`},
-		{name: "wrong format", body: `{"startSec":1,"endSec":2,"format":"mp4"}`},
+		{name: "wrong format", body: `{"startSec":1,"endSec":2,"format":"avi"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/library/movies/movie-1/clips", strings.NewReader(tc.body))

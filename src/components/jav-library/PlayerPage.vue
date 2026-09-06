@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
   Camera,
+  ChevronDown,
   Circle,
   ExternalLink,
   Film,
@@ -29,6 +30,7 @@ import PlayerPlaylistPanel from "@/components/jav-library/PlayerPlaylistPanel.vu
 import PlayerPlaylistRevealTab from "@/components/jav-library/PlayerPlaylistRevealTab.vue"
 import PlayerProgressFrameMarkers from "@/components/jav-library/PlayerProgressFrameMarkers.vue"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
 import { Slider } from "@/components/ui/slider"
 import {
   clearActivePlaybackSession,
@@ -423,6 +425,7 @@ const curatedCaptureFeedbackSoundEnabled = ref(getCuratedCaptureFeedbackSoundEna
 const clipExportTask = ref<import("@/api/types").TaskDTO | null>(null)
 const clipExportUrl = ref("")
 const clipExportError = ref("")
+const clipFormat = ref<'gif' | 'mp4' | 'webm'>('gif')
 let clipPollTimer: number | null = null
 let clipPollGeneration = 0
 let clipPollFailures = 0
@@ -550,6 +553,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     }
     if (movieId === props.movie.id) appendCuratedFrameMarker(frameResult)
     const task = await libraryService.createMovieClip(movieId, {
+      format: clipFormat.value,
       startSec: input.startSec,
       endSec: input.endSec,
       fps: 10,
@@ -2140,9 +2144,12 @@ async function runCuratedCapture() {
 }
 
 function captureSingleFrame() {
-  beginCuratedPress()
-  clipCapture.cancelPress()
-  void runCuratedCapture()
+  const video = videoRef.value
+  if (!video || video.seeking || video.readyState < 2) return
+  const job = captureQueue.prepare(video, props.movie, getAbsolutePlaybackTime(video.currentTime))
+  if (!job) { curatedCaptureError.value = t('curated.captureQueueFull'); return }
+  void playCuratedCaptureTriggerCue(curatedCaptureFeedbackSoundEnabled.value)
+  void retryCapture(job)
 }
 function toggleClipRecording() {
   if (clipCapture.phase.value === 'recording' || clipCapture.phase.value === 'armed') clipCapture.finishPress()
@@ -3070,7 +3077,7 @@ const videoPreloadMode = computed(() =>
           @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
           @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
         <Dialog v-model:open="capturePreviewOpen">
-          <DialogContent class="max-w-[95vw] sm:max-w-[90vw]">
+          <DialogContent :portal-to="surfaceRef ?? undefined" class="max-w-[95vw] sm:max-w-[90vw]">
             <DialogTitle>{{ t('curated.captureView') }}</DialogTitle>
             <div class="h-[75vh]"><FrameImageViewer :src="capturePreviewUrl" :alt="movie.code" /></div>
           </DialogContent>
@@ -3117,11 +3124,21 @@ const videoPreloadMode = computed(() =>
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
-        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-3 z-20 flex gap-1 rounded-lg bg-background/90 p-1 text-foreground" @click.stop @pointerdown.stop>
+        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
           <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
           <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
           <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
-          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : 'GIF' }}</Button>
+          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase() }}</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child><Button size="icon-sm" variant="ghost" :disabled="clipCapturePhase !== 'idle'" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent :portal-to="surfaceRef ?? undefined">
+              <DropdownMenuRadioGroup v-model="clipFormat">
+                <DropdownMenuRadioItem value="gif">GIF</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mp4">MP4</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="webm">WebM</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
         </div>
         <video

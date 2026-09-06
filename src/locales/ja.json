@@ -518,7 +518,7 @@
     "duplicateFrameExists": "この再生位置の近くに既存のキュレートフレームがあります。あとでライブラリで確認できます。",
     "duplicateReviewTitle": "重複の可能性があるフレームグループが {count} 件あります",
     "duplicateReviewBody": "同じ作品で {threshold} 秒以内のフレームをここでマークしています。内容を確認して不要なものを削除してください。",
-    "duplicateReviewBadge": "重複候補",
+    "duplicateReviewBadge": "近い時刻",
     "motionAvailable": "動くキュレートフレーム",
     "motionProcessing": "動的クリップを生成中",
     "playMotion": "動くフレームを再生",
@@ -553,7 +553,7 @@
     "captureAction": "キャプチャ",
     "previousFrame": "前のフレーム",
     "nextFrame": "次のフレーム",
-    "stopClip": "GIF を終了",
+    "stopClip": "クリップを終了",
     "clipStatusRetrying": "状態を取得できません。再試行中…",
     "clipCancelFailed": "キャンセルに失敗しました",
     "captureTooLarge": "原画像は12 MiBを超えています。ダウンロードまたはJPEG保存を選択してください",
@@ -565,7 +565,8 @@
     "visualReview": "類似画像を確認",
     "visualReviewScope": "{n} 枚を確認。読み込み済み先頭200枚、最大50組が対象です。類似は参考情報です。削除前に確認してください。",
     "visualReviewEmpty": "類似候補はありません",
-    "visualReviewFailed": "{n} 枚を読み込めませんでした。閉じて再試行してください。"
+    "visualReviewFailed": "{n} 枚を読み込めませんでした。閉じて再試行してください。",
+    "clipFormat": "動画クリップ形式"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",
