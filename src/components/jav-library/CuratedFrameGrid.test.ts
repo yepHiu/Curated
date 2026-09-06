@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils"
+import { createI18n } from "vue-i18n"
 import { describe, expect, it, vi } from "vitest"
 import CuratedFrameGrid from "./CuratedFrameGrid.vue"
 
@@ -41,6 +42,7 @@ const rowB = {
 describe("CuratedFrameGrid", () => {
   it("renders cards with formatted positions and selection state", () => {
     const wrapper = mount(CuratedFrameGrid, {
+      global: { plugins: [createI18n({ legacy: false, locale: "en", messages: {} })] },
       props: {
         items: [
           { row: rowA, url: "blob:a" },
@@ -66,6 +68,7 @@ describe("CuratedFrameGrid", () => {
 
   it("forwards card events with the original grid item", async () => {
     const wrapper = mount(CuratedFrameGrid, {
+      global: { plugins: [createI18n({ legacy: false, locale: "en", messages: {} })] },
       props: {
         items: [{ row: rowA, url: "blob:a" }],
         batchMode: true,
