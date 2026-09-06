@@ -26,6 +26,8 @@ Longer product and architecture writing:
 
 Enable AI in Settings → AI and configure an OpenAI-compatible provider. The backend global enable switch defaults off, including after upgrading from the browser-only experimental switch. Persistent chats and edits require Web API mode and the Go backend. The current reliability implementation and remaining acceptance work are tracked in [the Agent milestone plan, section 14](plan/2026-08-19-agent-milestone-plan.md). The connectivity probe permits up to 1024 output tokens within 30 seconds, so reasoning providers have room to produce a final answer.
 
+Use the Agent button in the top bar to open the right panel. At desktop widths (1024 CSS pixels and above), it shares the content area with the current page; drag the left divider to adjust its width, or focus the divider and use Left/Right (Shift for larger steps), Home, or End. The panel remembers its preferred width, is capped at half the content area, and scrolls independently. On narrower screens it fills the content area; closing it restores the mounted page. Closing also cancels an active response. History, page context, and mentions remain available.
+
 Chat continuation sends the current question. The backend retrieves 80 user/assistant candidates, then retains up to 24 messages within a 24 KiB history budget. Before every model call, JSON UTF-8 byte counts provide a conservative request estimate capped at 65536; these are not measured provider tokens. The newest input is never silently cut. Exceeding the budget asks the user to narrow the request or start a new chat, while keeping completed tool results. Automatic summaries are not implemented.
 
 Reopening a chat shows its latest 80 stored rows. Use Load earlier messages to read older pages without losing newly generated replies. New replies preserve tool evidence, failures, entity choices, and completion outcomes. Older records cannot recover evidence that was never stored. Historical editing previews are read-only; committed receipts mark known successful previews as applied, while other previews require fresh generation before confirmation.
@@ -318,7 +320,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
 | [Agent user-facing PRD](plan/2026-08-19-agent-user-prd.md) | Initial user-side Agent requirements (REQ-0029 through REQ-0043) |
-| [Agent milestone plan](plan/2026-08-19-agent-milestone-plan.md) | Execution milestones E1-E4 with the experimental gate and floating Agent Window |
+| [Agent milestone plan](plan/2026-08-19-agent-milestone-plan.md) | Execution milestones E1-E4 with AI governance and the docked Agent panel |
 | [Library filter strengthening](plan/2026-08-14-library-filter-strengthening.md) | Current library filter work (REQ-0026) |
 | [Scrape governance](plan/2026-08-14-scrape-governance-implementation-plan.md) | Current scrape-governance work (REQ-0023) |
 | [Actor missing-profile auto-scrape](plan/2026-08-16-actor-missing-profile-auto-scrape.md) | Actor backfill scrape (REQ-0027) |
