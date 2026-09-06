@@ -75,6 +75,8 @@
 
 **索引**：`.cursor/rules/ui-component-spec.mdc`「设置页 Tab 大卡片与内嵌区块」；实现目录 **`src/components/jav-library/settings/SettingsMetadata*.vue`**。
 
+维护页沿用上述结构：健康检查、备份与恢复检查、手动扫描为同卡片内的三个区块；输入与操作不再包重复的内层卡片。目录选择紧邻路径输入，创建/验证/预检靠右按内容宽度排列；主要维护操作手机端保留 44px 高度，`sm` 起恢复 32px 紧凑尺寸。健康报告沿用语义状态色，未扫描时显示简短状态。仅用于介绍未来架构的“配置模型”占位区不再显示。
+
 ## 5. 业务组件约束
 
 - `MovieCard`、`ActorLibraryCard`、`PlaybackHistoryCard`、`DetailPanel` 等业务组件优先保持产品语义，不应为临时展示环境或内部实验区引入专用 props。
