@@ -40,6 +40,12 @@ const auditOffset = ref(0)
 const report = ref<AIReport | null>(null)
 const audit = ref<AIPage<AIAuditEntry> | null>(null)
 const loading = ref(false)
+const paging = ref<"runs" | "audit" | null>(null)
+const pageError = ref<{ kind: "runs" | "audit"; message: string } | null>(null)
+const runsList = ref<HTMLElement | null>(null)
+const auditList = ref<HTMLElement | null>(null)
+const runsMinHeight = ref(0)
+const auditMinHeight = ref(0)
 let requestId = 0
 let disposed = false
 const summary = computed(() => report.value?.summary)
@@ -71,6 +77,10 @@ onBeforeUnmount(() => { disposed = true; requestId++ })
 
 async function refresh() {
   const id = ++requestId
+  paging.value = null
+  pageError.value = null
+  runsMinHeight.value = 0
+  auditMinHeight.value = 0
   loading.value = true
   error.value = ""
   report.value = null
@@ -143,11 +153,39 @@ function measured(total: number, known: number, calls: number) {
   return total.toLocaleString(locale.value) + (known < calls ? ` (${t("aiSettings.partialUsage")})` : "")
 }
 function toolLabel(name: string) { const key = AGENT_TOOL_I18N_KEYS[name]; return key ? t(key) : name }
-function page(kind: "runs" | "audit", direction: -1 | 1) {
+async function page(kind: "runs" | "audit", direction: -1 | 1) {
+  if (loading.value) return
   const pageSize = kind === "runs" ? RUNS_PAGE_SIZE : AUDIT_PAGE_SIZE
-  if (kind === "runs") offset.value = Math.max(0, offset.value + direction * pageSize)
-  else auditOffset.value = Math.max(0, auditOffset.value + direction * pageSize)
-  void refresh()
+  const current = kind === "runs" ? report.value : audit.value
+  if (!current) return
+  const nextOffset = Math.max(0, current.offset + direction * pageSize)
+  if (nextOffset === current.offset || nextOffset >= current.total) return
+  // Keep the list footprint when loading and when the final page has fewer rows.
+  const list = kind === "runs" ? runsList : auditList
+  const minHeight = kind === "runs" ? runsMinHeight : auditMinHeight
+  minHeight.value = Math.max(minHeight.value, list.value?.getBoundingClientRect().height ?? 0)
+  const id = ++requestId
+  loading.value = true
+  paging.value = kind
+  pageError.value = null
+  const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value, offset: nextOffset, limit: pageSize }
+  try {
+    if (kind === "runs") {
+      const next = await service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value })
+      if (id !== requestId || disposed) return
+      report.value = next
+      offset.value = next.offset
+    } else {
+      const next = await service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined })
+      if (id !== requestId || disposed) return
+      audit.value = next
+      auditOffset.value = next.offset
+    }
+  } catch (err) {
+    if (id === requestId && !disposed) pageError.value = { kind, message: (err as Error).message }
+  } finally {
+    if (id === requestId) { loading.value = false; paging.value = null }
+  }
 }
 function runStatusTone(value: string): StatusTone {
   if (value === "completed") return "success"
@@ -234,7 +272,7 @@ function auditLine(entry: AIAuditEntry) {
             </FieldGroup>
             <Button variant="outline" size="sm" :disabled="loading" class="self-end" data-ai-refresh @click="refresh"><RefreshCw data-icon="inline-start" />{{ t('aiSettings.refresh') }}</Button>
           </section>
-          <p v-if="loading" role="status">{{ t('aiSettings.loading') }}</p>
+          <p v-if="loading" role="status" :class="{ 'sr-only': paging }">{{ t('aiSettings.loading') }}</p>
           <dl v-if="summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-ai-summary>
             <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.runs') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.runs }}</dd></div>
             <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.failed') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ summary.failed }} / {{ summary.partial }} / {{ summary.cancelled }}</dd></div>
@@ -246,10 +284,11 @@ function auditLine(entry: AIAuditEntry) {
             <div class="rounded-lg border border-border/50 bg-muted/5 p-3"><dt class="text-xs text-muted-foreground">{{ t('aiSettings.duration') }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ duration(summary.avgDurationMs) }}</dd></div>
           </dl>
           <p class="rounded-lg border border-border/40 bg-background/30 p-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.usageHint') }}</p>
-          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="recent-runs">
+          <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'runs'" data-ai-settings-block="recent-runs">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.recentRuns') }}</h3>
+            <p v-if="pageError?.kind === 'runs'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p v-if="report && !report.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul class="flex min-w-0 flex-col gap-1.5">
+            <ul ref="runsList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: runsMinHeight ? `${runsMinHeight}px` : undefined }">
               <li v-for="run in report?.items ?? []" :key="run.id" :title="runLine(run)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-run-row="run.id" :data-status="run.status">
                 <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ run.model || t('aiSettings.unknown') }}</span>
                 <span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(run.startedAt) }} · {{ t(`aiSettings.channels.${run.channel}`) }} · {{ duration(run.durationMs) }} · {{ t('aiSettings.totalTokens') }}: {{ measured(run.totalTokens, run.usageCalls, run.modelCalls) }} · {{ t('aiSettings.toolCalls') }}: {{ run.toolCalls }}<template v-if="run.errorCode"> · {{ run.errorCode }}</template></span>
@@ -258,11 +297,12 @@ function auditLine(entry: AIAuditEntry) {
             </ul>
             <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + RUNS_PAGE_SIZE >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
-          <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="audit">
+          <section class="flex min-w-0 flex-col gap-3" :aria-busy="paging === 'audit'" data-ai-settings-block="audit">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
+            <p v-if="pageError?.kind === 'audit'" role="alert" class="text-sm text-destructive">{{ pageError.message }}</p>
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.auditHint') }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
-            <ul class="flex min-w-0 flex-col gap-1.5"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
+            <ul ref="auditList" class="flex min-w-0 flex-col gap-1.5" :style="{ minHeight: auditMinHeight ? `${auditMinHeight}px` : undefined }"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
             <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + AUDIT_PAGE_SIZE >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
         </CardContent>

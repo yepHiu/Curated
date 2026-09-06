@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ref } from "vue"
-import { defaultAIGovernance, type AIReport } from "@/services/contracts/ai-governance-service"
+import { defaultAIGovernance, type AIReport, type AIPage, type AIAuditEntry } from "@/services/contracts/ai-governance-service"
 import SettingsAISection from "./SettingsAISection.vue"
 import { applyAIGovernance, useExperimentalAgent } from "@/lib/experimental-agent"
 
@@ -14,6 +14,15 @@ function emptyReport(): AIReport {
   return { items: [], total: 0, limit: 5, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
 }
 async function setup() { const wrapper = mount(SettingsAISection, { props: { useWebApi: true } }); await flushPromises(); return wrapper }
+function paginatedRecords() {
+  const report = emptyReport()
+  report.total = 7
+  report.items = Array.from({ length: 5 }, (_, index) => ({ id: `run-${index}`, startedAt: "2026-09-06T00:00:00Z", channel: "chat", action: "", sessionId: "", provider: "test", model: "model", promptVersion: "v1", status: "completed", errorCode: "", durationMs: 12, firstTextMs: 4, modelCalls: 1, usageCalls: 1, toolCalls: 0, promptTokens: 2, completionTokens: 3, totalTokens: 5 }))
+  const audit: AIPage<AIAuditEntry> = { items: Array.from({ length: 10 }, (_, index) => ({ id: `audit-${index}`, createdAt: "2026-09-06T00:00:00Z", channel: "chat", sessionId: "", tool: "search_movies", permission: "read", result: "ok", errorCode: "", durationMs: 1 })), total: 12, limit: 10, offset: 0 }
+  mocks.getUsage.mockResolvedValue(report)
+  mocks.getAudit.mockResolvedValue(audit)
+  return { report, audit }
+}
 beforeEach(() => {
   vi.clearAllMocks()
   applyAIGovernance(defaultAIGovernance())
@@ -54,6 +63,50 @@ describe("SettingsAISection", () => {
     const wrapper = await setup()
     expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 5, offset: 0 }))
     expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 0 }))
+    wrapper.unmount()
+  })
+  it.each(["runs", "audit"] as const)("keeps content mounted while paging %s and only fetches that list", async (kind) => {
+    const { report, audit } = paginatedRecords()
+    const wrapper = await setup()
+    const block = wrapper.get(`[data-ai-settings-block=${kind === "runs" ? "recent-runs" : "audit"}]`)
+    const list = block.get("ul")
+    const measuredHeight = kind === "runs" ? 204 : 414
+    vi.spyOn(list.element, "getBoundingClientRect").mockReturnValue({ height: measuredHeight } as DOMRect)
+    const summaryElement = wrapper.get("[data-ai-summary]").element
+    const rowsBefore = wrapper.findAll("[data-ai-run-row], [data-ai-audit-row]").map(row => row.element)
+    const nextButton = block.findAll("button").at(-1)!
+    let resolvePage!: (value: AIReport | AIPage<AIAuditEntry>) => void
+    const pending = new Promise<AIReport | AIPage<AIAuditEntry>>(resolve => { resolvePage = resolve })
+    const target = kind === "runs" ? mocks.getUsage : mocks.getAudit
+    target.mockReturnValueOnce(pending)
+    await nextButton.trigger("click")
+    expect(block.attributes("aria-busy")).toBe("true")
+    expect(wrapper.get("[data-ai-summary]").element).toBe(summaryElement)
+    expect(wrapper.findAll("[data-ai-run-row], [data-ai-audit-row]").map(row => row.element)).toEqual(rowsBefore)
+    expect(nextButton.attributes("disabled")).toBeDefined()
+    expect(mocks.getUsage).toHaveBeenCalledTimes(kind === "runs" ? 2 : 1)
+    expect(mocks.getAudit).toHaveBeenCalledTimes(kind === "audit" ? 2 : 1)
+    resolvePage(kind === "runs" ? { ...report, offset: 5, items: report.items.slice(0, 2) } : { ...audit, offset: 10, items: audit.items.slice(0, 2) })
+    await flushPromises()
+    expect(list.element.style.minHeight).toBe(`${measuredHeight}px`)
+    expect(list.findAll("li")).toHaveLength(2)
+    expect(nextButton.element).toBe(block.findAll("button").at(-1)!.element)
+    expect(block.attributes("aria-busy")).toBe("false")
+    wrapper.unmount()
+  })
+  it("keeps the current page after a paging error and retries the same offset", async () => {
+    paginatedRecords()
+    const wrapper = await setup()
+    mocks.getUsage.mockRejectedValueOnce(new Error("page unavailable"))
+    const block = wrapper.get("[data-ai-settings-block=recent-runs]")
+    await block.findAll("button").at(-1)!.trigger("click"); await flushPromises()
+    expect(block.get("[role=alert]").text()).toBe("page unavailable")
+    expect(block.get("ul").findAll("li")).toHaveLength(5)
+    expect(block.text()).toContain("1–5 / 7")
+    expect(block.findAll("button")[0]!.attributes("disabled")).toBeDefined()
+    await block.findAll("button").at(-1)!.trigger("click"); await flushPromises()
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 5 }))
+    expect(mocks.getAudit).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
   it("compacts request and audit records to one line with semantic status colors", async () => {
