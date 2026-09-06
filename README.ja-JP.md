@@ -19,6 +19,8 @@
 
 # Curated
 
+キャプチャのプレビュー・再試行・取り消し、ソースフレーム、GIF/MP4/WebM クリップに対応しています。[操作ガイド](docs/guide.md#curated-capture-and-inspection)を参照してください。
+
 Curated はローカルファーストのメディアライブラリです。Vue 3 フロントエンド、Go + SQLite バックエンド、Electron デスクトップシェルで構成されます。正式な製品名は **Curated** です。リポジトリ名や npm パッケージ名には引き続き **`jav-shadcn`** が使われている場合があります。
 
 この README は短い公開エントリです。セットアップ、設定、パッケージング、および `docs/` 内の各文書への案内は **[docs/guide.md](docs/guide.md)** を参照してください。HTTP API リファレンスは **[API.md](API.md)** です。

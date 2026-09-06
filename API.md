@@ -2194,6 +2194,8 @@ data: {"type":"task.updated","task":{"taskId":"task-1","type":"scan.library","st
 
 用途：分页查询精选帧元数据。
 
+按 `(captured_at DESC, id DESC)` 稳定排序。响应可带 `nextCursor`；续页传 `cursor=<nextCursor>`，此时忽略 offset。续页可加 `skipTotal=true`，响应 `total=-1` 表示本页未重新统计，应沿用首屏总数。空页表示结束；非法 cursor 返回 400。
+
 Query：
 
 | 参数 | 类型 | 说明 |
@@ -2299,7 +2301,8 @@ Multipart：
 - `image` 不能为空，最大 12 MiB。
 - `imageBase64` 是标准 base64，不带 `data:image/...;base64,` 前缀。
 - `movieId` 必须存在。
-- `id` 重复返回 `409 COMMON_CONFLICT`。
+- PNG/JPEG 必须可解码，最多 33,177,600 像素；无效图片返回 400，不再将原始无效数据作为缩略图存入。
+- 同一 `id` 且 movieId、positionSec、capturedAt、原图字节完全相同，视为重放，返回 204 和 `X-Curated-Replayed: true`；不会覆盖后来编辑的标签。相同 id、不同捕获内容仍返回 `409 COMMON_CONFLICT`。
 
 成功：`204 No Content`
 
@@ -2314,6 +2317,22 @@ Multipart：
 用途：获取精选帧缩略图。
 
 成功：图片 bytes，`Cache-Control: private, max-age=3600`
+
+原图和缩略图均带内容 ETag，支持 `If-None-Match` / 304。缩略图正常路径只向 Go 返回小图，历史缺失记录回退原图。
+
+#### `POST /api/library/movies/{movieId}/frame`
+
+从源文件提取单帧，请求 `{ "positionSec": 42.5 }` 使用绝对媒体秒数；只读取已配置资料库内的主视频。成功为 `200 image/png`，附 `X-Frame-Width` / `X-Frame-Height`，不自动入库；前端再调用萃取帧上传接口。等待上限 20 秒，输出内存上限 32 MiB，像素上限 33,177,600，与片段共享最多 2 个编码工作槽；繁忙返回 429，不可用源返回 404，提取失败返回 422。应用 PIN 保护与其它资料库 API 相同。
+
+#### `POST /api/library/movies/{movieId}/clips`
+
+请求 `{ "startSec": 10, "endSec": 12, "format": "gif", "fps": 10, "width": 640, "curatedFrameId": "frame-id" }`。格式支持 gif（默认）、mp4、webm；区间 0.4–6 秒、fps 1–20、width 160–960。返回 `202 TaskDTO`，type 为 `movie_clip_gif` / `movie_clip_mp4` / `movie_clip_webm`。最多 8 个在途任务、2 个编码任务；排队与执行总期限 2 分钟，超量返回 429；FFmpeg 产物限制 128 MiB。
+
+轮询 `GET /api/tasks/{taskId}`。成功 metadata 包含 artifactUrl/contentType/filename；关联帧产物经 `GET /api/curated-frames/{id}/motion` 获取，未关联产物经 `GET /api/tasks/{taskId}/artifact` 获取并在约 24 小时后清理。根据 contentType 渲染 GIF 图片或 MP4/WebM 视频。
+
+#### `DELETE /api/tasks/{taskId}/clip`
+
+取消仍在排队或编码中的片段任务，返回 204；任务不活跃返回 404。取消会终止对应 FFmpeg，并以失败终态报告；已保存静态帧保留。
 
 #### `PATCH /api/curated-frames/{id}/tags`
 

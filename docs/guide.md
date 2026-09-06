@@ -171,12 +171,24 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Import | Drag/drop and folder import, resumable chunked upload, restart recovery, storage-presence checks |
 | Playback | HTML5 Range streaming, resume, HLS remux/transcode sessions, bundled `hls.js/light`, optional native-player handoff, daily watch-time |
 | Actors | Browse, profile, tags, links, avatar cache, scrape, canonical aliases, audited merge |
-| Curated frames | Capture, browse, multi-tag filter, export (JPG/WebP/PNG/ZIP), optional GIF motion |
+| Curated frames | Queued captures with preview/retry/undo, source-file frames, cursor browsing, visual similarity review, JPG/WebP/PNG/ZIP export and GIF/MP4/WebM motion |
 | Homepage / insights | Daily recommendations with reason codes and local feedback; Personal Insights ranges and actor/studio/tag breakdowns |
 | Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock |
 | Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
+
+### Curated capture and inspection
+
+Use the capture shortcut or the visible Capture button to save the current displayed frame. A small preview shows the captured media time, saving state and final receipt; successive captures share a bounded queue (four retained jobs, 128 MiB admission budget, one upload at a time). A failed item remains available for retry or original download for up to three minutes; successful receipts expire after twelve seconds. Undo removes the library entry, not an already downloaded external file. Directory export failure is reported separately and can be retried.
+
+4K PNG encoding uses a Worker when supported, with a frozen-canvas fallback. Original images remain PNG by default. If an image exceeds the 12 MiB upload limit, explicitly choose a JPEG copy or download the original. Source frame is available in Web API mode and reads the original file at the absolute media time; HLS/browser color conversion and variable frame rates may produce a different image from the displayed stream. It uses the same save receipt after extraction.
+
+Hold the shortcut to record a clip, or use the visible GIF/MP4/WebM action and press it again to finish. Choose the format in the adjacent menu. Media time determines duration; pause ends recording and seek cancels it. Clips are 0.4–6 seconds; the processing panel supports cancellation. GIF uses a palette, while MP4/WebM offer smaller playable files. Cancelling a clip preserves its static frame.
+
+The frame library loads originals only for the current and adjacent detail slides. Use 100% to inspect pixels and Fit image to return. Visual similarity reviews up to the first 200 loaded frames, at most 50 pairs, with two image reads at a time; it does not scan the entire library or delete automatically. Time-nearby badges remain distinct from image similarity. Offscreen card rows unload while retaining layout placeholders and keyboard entry points.
+
+Web frames remain in SQLite; migration 0045 adds stable ordering indexes. Mock IndexedDB upgrades to version 2 and moves full image blobs into a separate store transactionally; frame metadata and directory handles remain available. Measurements and implementation decisions are in [the curated-frame review](plan/2026-04-11-curated-frames-review.md#12-2026-09-06-实施记录与验证).
 
 ### Playback recovery
 

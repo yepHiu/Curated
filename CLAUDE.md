@@ -305,14 +305,16 @@ POST   /api/scans                           # Start scan task
 GET    /api/events                          # SSE backend events; currently streams task.updated snapshots
 GET    /api/tasks/recent                    # Recently finished tasks (for UI toasts)
 GET    /api/tasks/{taskId}                  # Get task status
-POST   /api/library/movies/{movieId}/clips # Queue bounded GIF clip generation; curatedFrameId persists it with a curated frame (0.4–6 seconds)
-GET    /api/tasks/{taskId}/artifact         # Download completed GIF clip artifact
+POST   /api/library/movies/{movieId}/clips # GIF/MP4/WebM, 0.4–6s, bounded queue and 2-minute deadline
+POST   /api/library/movies/{movieId}/frame # Source-file PNG at positionSec; bounded 20s extraction
+DELETE /api/tasks/{taskId}/clip # Cancel active queued/running clip; static frame remains
+GET    /api/tasks/{taskId}/artifact         # Download completed GIF/MP4/WebM clip artifact
 GET    /api/playback/progress               # List all playback progress
 PUT    /api/playback/progress/{movieId}     # Update playback progress
 DELETE /api/playback/progress/{movieId}     # Delete playback progress
 GET    /api/playback/watch-time/daily       # List daily watch-time totals for Settings overview
 POST   /api/playback/watch-time/daily       # Add one bounded watch-time delta
-GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset; returns total/limit/offset)
+GET    /api/curated-frames                  # List curated frames (q, actor, movieId, tag, limit, offset, cursor, skipTotal; returns nextCursor; total=-1 when skipped)
 GET    /api/curated-frames/stats            # Curated frames total count
 GET    /api/curated-frames/tags             # Curated frame tag facets
 GET    /api/curated-frames/actors           # Curated frame actor facets

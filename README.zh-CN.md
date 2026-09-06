@@ -19,6 +19,8 @@
 
 # Curated
 
+萃取帧现支持截图预览、重试与撤销、源文件高清帧，以及 GIF/MP4/WebM 片段；详见[操作手册](docs/guide.md#curated-capture-and-inspection)。
+
 Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，以及 Electron 桌面壳。产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。
 
 本 README 只做公开入口。启动细节、配置、打包，以及 `docs/` 里各篇文章的索引，见 **[docs/guide.md](docs/guide.md)**。HTTP API 参考是 **[API.md](API.md)**。
