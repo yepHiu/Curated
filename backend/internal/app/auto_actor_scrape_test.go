@@ -139,6 +139,8 @@ func TestAutoQueueMissingActorProfileScrapes_QueuesOnlyMissingActorsWhenEnabled(
 		autoActorProfileScrapeAttempted: make(map[string]time.Time),
 	}
 
+	defer a.Close() // Drain task persistence before the deferred store close.
+
 	a.enqueueAutoActorProfileScrapes(ctx, []string{"Actor Missing", "Actor Ready", "Actor Missing"}, "auto.movie-metadata", false)
 
 	waitForActorTaskCount(t, tm, 1)
@@ -236,6 +238,7 @@ func TestMissingLibraryActorProfileSweep_QueuesOnlyMissingActors(t *testing.T) {
 
 	scraperStub := &stubActorAutoScrapeScraper{}
 	a, tm := newAutoActorSweepApp(t, store, scraperStub, true)
+	defer a.Close()
 	a.enqueueMissingLibraryActorProfileSweep(ctx)
 
 	waitForActorTaskCount(t, tm, 1)
@@ -263,6 +266,7 @@ func TestMissingLibraryActorProfileSweep_CooldownSkipsRetryUntilMovieTrigger(t *
 
 	scraperStub := &stubActorAutoScrapeScraper{}
 	a, tm := newAutoActorSweepApp(t, store, scraperStub, true)
+	defer a.Close()
 	a.enqueueMissingLibraryActorProfileSweep(ctx)
 	waitForActorTaskCount(t, tm, 1)
 
