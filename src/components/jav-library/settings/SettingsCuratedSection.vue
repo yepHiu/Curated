@@ -199,14 +199,14 @@ const { t } = useI18n()
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportModeTitle") }}</legend>
             <div
-              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
-              <div class="min-w-0 flex-1 space-y-1">
+              <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportModeTitle") }}
                 </p>
               </div>
-              <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2">
+              <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
                 <Select
                   :model-value="curatedFrameExportMode"
                   :disabled="curatedExportFormatSaving"
@@ -257,15 +257,15 @@ const { t } = useI18n()
           <fieldset class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
             <legend class="sr-only">{{ t("settings.curatedExportFormatTitle") }}</legend>
             <div
-              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
-              <div class="min-w-0 flex-1 space-y-1">
+              <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-foreground">
                   {{ t("settings.curatedExportFormatTitle") }}
                 </p>
               </div>
               <div
-                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 pt-1 sm:w-auto sm:flex-shrink-0 sm:pt-2"
+                class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0"
               >
                 <span
                   v-if="curatedExportFormatSaving"
