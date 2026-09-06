@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-vue-next'
-const props = defineProps<{ src: string; alt: string; active?: boolean }>()
+const props = withDefaults(defineProps<{ src: string; alt: string; active?: boolean }>(), { active: true })
 const { t } = useI18n()
 const loaded = ref(false), failed = ref(false), zoomed = ref(false), retry = ref(0)
 const dimensions = ref('')
