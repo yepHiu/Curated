@@ -33,8 +33,10 @@ func TestBuildTranscodeProfilesFiltersUnavailableHardwareEncoders(t *testing.T) 
 		names = append(names, profile.Name)
 	}
 	joined := strings.Join(names, ",")
-	if strings.Contains(joined, specs[1].Name) {
-		t.Fatalf("expected unavailable encoder %q to be filtered, got %q", specs[1].Name, joined)
+	for _, spec := range specs[1:] {
+		if strings.Contains(joined, spec.Name) {
+			t.Fatalf("expected unavailable encoder %q to be filtered, got %q", spec.Name, joined)
+		}
 	}
 	if !strings.Contains(joined, specs[0].Name) {
 		t.Fatalf("expected available encoder %q to stay in the chain, got %q", specs[0].Name, joined)
@@ -52,8 +54,17 @@ func TestBuildTranscodeProfilesKeepsAllEncodersWhenCapabilityUnknown(t *testing.
 		"index.m3u8",
 		buildProfileOptions{EncoderAvailability: nil},
 	)
-	if len(profiles) < 2 {
-		t.Fatalf("expected hardware candidates plus fallback when capability is unknown, got %d", len(profiles))
+	specs := hardwareEncoderSpecs()
+	if len(profiles) != len(specs)+1 {
+		t.Fatalf("expected %d platform hardware candidates plus fallback, got %d profiles", len(specs), len(profiles))
+	}
+	for i, spec := range specs {
+		if profiles[i].Name != spec.Name {
+			t.Errorf("profile %d = %q, want %q", i, profiles[i].Name, spec.Name)
+		}
+	}
+	if profiles[len(profiles)-1].Name != "libx264" {
+		t.Fatal("expected software fallback as the last profile")
 	}
 }
 
