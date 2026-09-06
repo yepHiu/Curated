@@ -454,13 +454,34 @@ const clipCaptureElapsedSec = clipCapture.elapsedSec
 const clipCaptureProgress = clipCapture.progress
 const captureQueue = useCuratedCaptureQueue()
 let pendingCaptureJob: CaptureJob | undefined
-const receiptJob = computed(() => [...captureQueue.jobs.value].reverse().find(job => job.movie.id === props.movie.id && job.phase !== 'ready'))
+const receiptJob = computed(() => {
+  const jobs = captureQueue.jobs.value.filter(job => job.movie.id === props.movie.id && job.phase !== 'ready')
+  return jobs.find(job => job.phase === 'error' || job.phase === 'export-error') ?? jobs[jobs.length - 1]
+})
 const capturePreviewOpen = ref(false)
+const captureLiveAnnouncement = computed(() => {
+  const phase = clipCapturePhase.value
+  if (phase === 'recording') return t('player.clipRecording')
+  if (phase === 'processing') return clipExportError.value || t('player.clipProcessing')
+  if (phase === 'success') return t('player.clipSavedToLibrary')
+  if (phase === 'error') return clipExportError.value || t('player.clipExportFailed')
+  const job = receiptJob.value
+  if (job?.error) return job.error
+  if (job?.committed) return t('curated.captureBatchSaved', { n: captureQueue.savedCount.value })
+  return curatedCaptureError.value || curatedCaptureAnnouncement.value
+})
 const capturePreviewUrl = ref("")
 function viewCapture(job: CaptureJob) {
-  capturePreviewUrl.value = job.preview
+  if (!job.candidate) return
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
+  capturePreviewUrl.value = URL.createObjectURL(job.candidate.blob)
   capturePreviewOpen.value = true
 }
+watch(capturePreviewOpen, (open) => {
+  if (open) return
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
+  capturePreviewUrl.value = ""
+})
 function cancelCuratedPress() {
   clipCapture.cancelPress()
   if (pendingCaptureJob) captureQueue.dismiss(pendingCaptureJob)
@@ -478,6 +499,9 @@ async function undoCapture(job: CaptureJob) {
 
 /** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
 const frameMarkers = ref<FrameMarkerInput[]>([])
+watch(() => captureQueue.jobs.value.filter(job => job.committed).map(job => job.key).join(','), () => {
+  for (const job of captureQueue.jobs.value) if (job.committed && job.candidate && job.movie.id === props.movie.id) appendCuratedFrameMarker(job.candidate)
+})
 const FRAME_MARKERS_PAGE_SIZE = 200
 
 async function loadCuratedFrameMarkers() {
@@ -494,7 +518,7 @@ async function loadCuratedFrameMarkers() {
       if (page.items.length === 0 || collected.length >= page.total) break
     }
     if (movieId === props.movie.id) {
-      frameMarkers.value = collected
+      frameMarkers.value = [...new Map([...collected, ...frameMarkers.value].map(marker => [marker.id, marker])).values()]
     }
   } catch {
     // 标记是增强展示，加载失败时静默降级为无标记
@@ -565,6 +589,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     clipCapture.taskId.value = task.taskId
     await pollClipExportTask(task.taskId, generation)
   } catch (err) {
+    if (generation !== clipPollGeneration || playbackDisposed) return
     clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
     clipCapture.phase.value = "error"
     scheduleClipFeedbackDismiss(3600)
@@ -1272,6 +1297,7 @@ watch(
   () => props.movie.id,
   async () => {
     cancelCuratedPress()
+    capturePreviewOpen.value = false
     clipPollGeneration++
     clipCapture.reset()
     if (clipPollTimer !== null) clearTimeout(clipPollTimer)
@@ -1321,6 +1347,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (capturePreviewUrl.value) URL.revokeObjectURL(capturePreviewUrl.value)
   clearTimeout(hlsRecoveryTimer)
   playbackDisposed = true
   playbackLoadSeq += 1
@@ -3073,6 +3100,7 @@ const videoPreloadMode = computed(() =>
         />
         <CaptureReceipt v-if="receiptJob && clipCapturePhase !== 'recording' && clipCapturePhase !== 'processing'"
           :job="receiptJob" :pending="captureQueue.pendingCount.value"
+          :saved-count="captureQueue.savedCount.value"
           @download="captureQueue.downloadOriginal(receiptJob)" @compress="captureQueue.compressAndRetry(receiptJob)"
           @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
           @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
@@ -3083,7 +3111,7 @@ const videoPreloadMode = computed(() =>
           </DialogContent>
         </Dialog>
         <div class="sr-only" aria-live="polite" aria-atomic="true">
-          {{ curatedCaptureAnnouncement }}
+          {{ captureLiveAnnouncement }}
         </div>
         <Transition
           enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
@@ -3098,8 +3126,6 @@ const videoPreloadMode = computed(() =>
             class="absolute bottom-32 left-1/2 z-[19] w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-foreground shadow-lg"
             @click.stop
             @pointerdown.stop
-            role="status"
-            aria-live="polite"
           >
             <div class="flex items-center gap-2 text-sm font-semibold">
               <Circle v-if="clipCaptureIsRecording" class="size-3 fill-rose-400 text-rose-400" aria-hidden="true" />
@@ -3108,10 +3134,10 @@ const videoPreloadMode = computed(() =>
               <span v-else-if="clipCapturePhase === 'processing'">{{ clipExportError || t('player.clipProcessing') }}</span>
               <span v-else-if="clipCapturePhase === 'success'">{{ t('player.clipSavedToLibrary') }}</span>
               <span v-else>{{ clipExportError || t('player.clipExportFailed') }}</span>
-              <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-white/75">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
+              <span v-if="clipCaptureIsRecording" class="ml-auto font-mono tabular-nums text-muted-foreground">{{ clipCaptureElapsedSec.toFixed(1) }}s</span>
               <Button v-if="clipCapturePhase === 'processing' && clipCapture.taskId.value" size="sm" variant="ghost" @click="cancelClipExport">{{ t('common.cancel') }}</Button>
             </div>
-            <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
+            <div v-if="clipCaptureIsRecording" class="mt-2 h-1 overflow-hidden rounded-full bg-muted">
               <div
                 class="h-full origin-left rounded-full bg-rose-400 transition-transform duration-200 ease-linear motion-reduce:transition-none"
                 :style="{ transform: `scaleX(${clipCaptureProgress})` }"
@@ -3124,7 +3150,7 @@ const videoPreloadMode = computed(() =>
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
-        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
+        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-16 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
           <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
           <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
           <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>

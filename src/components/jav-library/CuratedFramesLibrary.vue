@@ -1486,6 +1486,7 @@ defineExpose({
   <div
     class="relative isolate mx-auto flex h-full min-h-0 w-full max-w-[min(100%,120rem)] flex-col gap-6 px-3 sm:px-6"
   >
+    <Button v-if="rowsLoadError && isLibraryEmpty" variant="outline" class="mx-auto" @click="reloadFromDb">{{ t('curated.retryLoad') }}</Button>
     <CuratedFrameEmptyState
       v-if="isLibraryEmpty"
       variant="library"

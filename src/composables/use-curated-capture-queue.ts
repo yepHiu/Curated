@@ -26,10 +26,12 @@ export interface CaptureJob {
 // one; admission is bounded before allocating a full-resolution canvas.
 export function useCuratedCaptureQueue() {
   const jobs = ref<CaptureJob[]>([])
+  const savedCount = ref(0)
   const latest = computed(() => jobs.value[jobs.value.length - 1])
   const pendingCount = computed(() => jobs.value.filter(j => ['capturing', 'queued', 'saving'].includes(j.phase)).length)
   let tail: Promise<unknown> = Promise.resolve()
   let disposed = false
+  let lastSavedAt = 0
   const expiry = new Map<CaptureJob, ReturnType<typeof setTimeout>>()
 
   function dismiss(job: CaptureJob) {
@@ -47,7 +49,7 @@ export function useCuratedCaptureQueue() {
   function retain(job: CaptureJob) {
     if (disposed) return
     clearTimeout(expiry.get(job))
-    expiry.set(job, setTimeout(() => dismiss(job), 180_000))
+    expiry.set(job, setTimeout(() => dismiss(job), job.phase === 'saved' ? 12_000 : 180_000))
   }
 
   function prepare(video: HTMLVideoElement, movie: Movie, positionSec: number): CaptureJob | undefined {
@@ -89,6 +91,11 @@ export function useCuratedCaptureQueue() {
       job.phase = result.ok ? 'saved' : 'error'
       job.error = result.ok ? '' : result.reason
       job.committed = result.ok
+      if (result.ok) {
+        const now = Date.now()
+        savedCount.value = now - lastSavedAt < 8000 ? savedCount.value + 1 : 1
+        lastSavedAt = now
+      }
       retain(job)
       if (result.ok && !disposed) void retryExport(job)
       return result
@@ -136,7 +143,7 @@ export function useCuratedCaptureQueue() {
     try {
       const bitmap = await createImageBitmap(job.candidate.blob)
       const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height
-      const ctx = canvas.getContext('2d'); if (!ctx) { bitmap.close(); return }
+      const ctx = canvas.getContext('2d'); if (!ctx) { bitmap.close(); throw new Error('canvas unavailable') }
       ctx.drawImage(bitmap, 0, 0); bitmap.close()
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', .9))
       canvas.width = canvas.height = 1
@@ -155,5 +162,5 @@ export function useCuratedCaptureQueue() {
     for (const job of jobs.value) { if (job.preview) URL.revokeObjectURL(job.preview) }
     jobs.value = []
   })
-  return { jobs, latest, pendingCount, prepare, prepareSource, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
+  return { jobs, latest, pendingCount, savedCount, prepare, prepareSource, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
 }

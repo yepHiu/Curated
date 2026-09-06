@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Loader2, Check, AlertTriangle, X } from 'lucide-vue-next'
 import type { CaptureJob } from '@/composables/use-curated-capture-queue'
-const props = defineProps<{ job: CaptureJob; pending: number }>()
+const props = defineProps<{ job: CaptureJob; pending: number; savedCount?: number }>()
 defineEmits<{ retry: []; retryExport: []; undo: []; view: []; dismiss: []; download: []; compress: [] }>()
 const { t } = useI18n()
 const busy = computed(() => ['capturing', 'queued', 'saving'].includes(props.job.phase))
@@ -14,7 +14,7 @@ const time = computed(() => {
 })
 </script>
 <template>
-  <div class="absolute bottom-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg border border-border bg-background/95 p-2 text-foreground shadow-lg sm:bottom-24 sm:left-5 sm:gap-3 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11" @click.stop @pointerdown.stop @keydown.stop>
+  <div class="absolute bottom-44 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg border border-border bg-background/95 p-2 text-foreground shadow-lg sm:bottom-24 sm:left-5 sm:gap-3 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11" @click.stop @pointerdown.stop @keydown.stop>
     <button v-if="job.preview" type="button" class="shrink-0 rounded focus-visible:ring-2 focus-visible:ring-ring" :aria-label="t('curated.captureView')" @click="$emit('view')">
       <img :src="job.preview" :alt="job.movie.code" class="h-9 w-16 rounded object-contain sm:h-[54px] sm:w-24" />
     </button>
@@ -27,6 +27,7 @@ const time = computed(() => {
         <span>{{ t(busy ? 'curated.captureSaving' : job.committed ? 'curated.captureSaved' : 'curated.captureFailed') }}</span>
       </div>
       <span v-if="pending > 1" class="text-xs text-muted-foreground">{{ t('curated.capturePending', { n: pending }) }}</span>
+      <span v-if="savedCount && savedCount > 1" class="text-xs text-muted-foreground">{{ t('curated.captureBatchSaved', { n:savedCount }) }}</span>
       <span v-if="job.error" class="max-w-64 text-xs text-destructive">{{ job.error }}</span>
       <div class="flex flex-wrap gap-1">
         <Button v-if="job.phase === 'error' && job.candidate" size="sm" variant="ghost" @click="$emit('download')">{{ t('curated.captureDownloadOriginal') }}</Button>
