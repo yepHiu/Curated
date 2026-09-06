@@ -109,7 +109,7 @@ test("375px library controls remain touchable without clipping or horizontal ove
     "[data-mobile-menu-trigger]",
     "[data-import-trigger]",
     "[data-notification-trigger]",
-    "[data-mobile-theme-toggle]",
+    "[data-theme-toggle]",
   ]) {
     const box = await page.locator(selector).boundingBox()
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
@@ -496,8 +496,10 @@ test("maintenance backup flow creates verifies and preflights without online res
     "[data-settings-backup-verify]",
     "[data-settings-backup-preflight]",
   ]) {
-    const bounds = await page.locator(selector).boundingBox()
-    expect(bounds?.height, selector).toBeGreaterThanOrEqual(44)
+    await expect.poll(async () => {
+      const bounds = await page.locator(selector).boundingBox()
+      return bounds?.height ?? 0
+    }, { message: selector }).toBeGreaterThanOrEqual(44)
   }
   expect(unknownApiRequests).toEqual([])
   expect(consoleErrors).toEqual([])
