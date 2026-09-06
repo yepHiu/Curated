@@ -28,6 +28,8 @@ const message = ref("")
 const baseUrl = ref("")
 const apiKey = ref("")
 const model = ref("")
+const testingProvider = ref(false)
+const providerTestResult = ref<{ ok: boolean; text: string } | null>(null)
 const days = ref("30")
 const channel = ref("all")
 const status = ref("all")
@@ -52,6 +54,7 @@ function syncProvider() {
   model.value = provider.model
 }
 watch(() => library.aiProvider.value, syncProvider)
+watch([baseUrl, apiKey, model], () => { providerTestResult.value = null })
 async function initialize() {
   error.value = ""
   try {
@@ -105,13 +108,26 @@ function saveProvider() {
     message.value = t("aiSettings.saved")
   })
 }
-function testProvider() {
-  void perform(async () => {
+async function testProvider() {
+  if (busy.value) return
+  busy.value = true
+  testingProvider.value = true
+  error.value = ""
+  message.value = ""
+  providerTestResult.value = null
+  try {
     const result = await library.testAIProvider({ kind: "openai-compatible", baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() })
     await refresh()
-    if (!result.ok) error.value = t("settings.experimentalTestFail", { message: result.message ?? "" })
-    else message.value = t("settings.experimentalTestOk", { ms: result.latencyMs })
-  })
+    if (disposed) return
+    providerTestResult.value = result.ok
+      ? { ok: true, text: t("settings.experimentalTestOk", { ms: result.latencyMs }) }
+      : { ok: false, text: t("settings.experimentalTestFail", { message: result.message ?? "" }) }
+  } catch (err) {
+    if (!disposed) providerTestResult.value = { ok: false, text: t("settings.experimentalTestFail", { message: (err as Error).message }) }
+  } finally {
+    busy.value = false
+    testingProvider.value = false
+  }
 }
 function cleanup() {
   void perform(async () => {
@@ -203,7 +219,7 @@ function auditLine(entry: AIAuditEntry) {
               <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" autocomplete="off" :disabled="busy" /></Field>
             </FieldGroup>
           </section>
-          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ t('settings.experimentalTest') }}</Button><Button size="sm" :disabled="busy" data-ai-provider-save @click="saveProvider">{{ t('settings.experimentalSave') }}</Button></div></div>
+          <div class="flex flex-col gap-3 rounded-lg border border-border/40 bg-background/30 p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><FieldDescription>{{ t('aiSettings.providerHint') }}</FieldDescription><div class="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" :disabled="busy" data-ai-provider-test @click="testProvider">{{ testingProvider ? t('settings.experimentalTestTesting') : t('settings.experimentalTest') }}</Button><Button size="sm" :disabled="busy" data-ai-provider-save @click="saveProvider">{{ t('settings.experimentalSave') }}</Button></div></div><p v-if="providerTestResult" :role="providerTestResult.ok ? 'status' : 'alert'" aria-live="polite" :class="['rounded-md border px-3 py-2 text-sm', providerTestResult.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive']" :data-status="providerTestResult.ok ? 'success' : 'failed'" data-ai-provider-test-result>{{ providerTestResult.text }}</p></div>
         </CardContent>
       </Card>
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm" data-ai-statistics-card>
