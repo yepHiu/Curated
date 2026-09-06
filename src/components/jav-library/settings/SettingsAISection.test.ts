@@ -11,7 +11,7 @@ vi.mock("@/services/library-service", () => ({ useLibraryService: () => ({ aiPro
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ locale: ref("en"), t: (key: string) => key }) }))
 
 function emptyReport(): AIReport {
-  return { items: [], total: 0, limit: 25, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
+  return { items: [], total: 0, limit: 5, offset: 0, summary: { runs: 0, failed: 0, partial: 0, cancelled: 0, modelCalls: 0, usageCalls: 0, toolCalls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, avgDurationMs: null, avgFirstTextMs: null } }
 }
 async function setup() { const wrapper = mount(SettingsAISection, { props: { useWebApi: true } }); await flushPromises(); return wrapper }
 beforeEach(() => {
@@ -20,7 +20,7 @@ beforeEach(() => {
   mocks.getSettings.mockResolvedValue(defaultAIGovernance())
   mocks.saveSettings.mockImplementation(async (value) => value)
   mocks.getUsage.mockResolvedValue(emptyReport())
-  mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 })
+  mocks.getAudit.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 })
   mocks.cleanup.mockResolvedValue({ runs: 2, audit: 1, receipts: 0 })
   mocks.setAIProvider.mockResolvedValue(undefined)
   mocks.testAIProvider.mockResolvedValue({ ok: true, latencyMs: 10 })
@@ -43,6 +43,12 @@ describe("SettingsAISection", () => {
     expect(wrapper.find("[data-ai-settings-block=filters]").exists()).toBe(true)
     expect(wrapper.find("[data-ai-settings-block=recent-runs]").exists()).toBe(true)
     expect(wrapper.find("[data-ai-settings-block=audit]").exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it("loads five recent requests and ten audit records per page", async () => {
+    const wrapper = await setup()
+    expect(mocks.getUsage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 5, offset: 0 }))
+    expect(mocks.getAudit).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 0 }))
     wrapper.unmount()
   })
   it("compacts request and audit records to one line with semantic status colors", async () => {

@@ -31,6 +31,8 @@ const model = ref("")
 const days = ref("30")
 const channel = ref("all")
 const status = ref("all")
+const RUNS_PAGE_SIZE = 5
+const AUDIT_PAGE_SIZE = 10
 const offset = ref(0)
 const auditOffset = ref(0)
 const report = ref<AIReport | null>(null)
@@ -70,11 +72,11 @@ async function refresh() {
   error.value = ""
   report.value = null
   audit.value = null
-  const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value, limit: 25 }
+  const query = { days: Number(days.value), channel: channel.value === "all" ? undefined : channel.value }
   try {
     const [nextReport, nextAudit] = await Promise.all([
-      service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value }),
-      service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value }),
+      service.getUsage({ ...query, status: status.value === "all" ? undefined : status.value, offset: offset.value, limit: RUNS_PAGE_SIZE }),
+      service.getAudit({ ...query, status: status.value === "failed" ? "failed" : undefined, offset: auditOffset.value, limit: AUDIT_PAGE_SIZE }),
     ])
     if (id !== requestId || disposed) return
     report.value = nextReport
@@ -125,7 +127,12 @@ function measured(total: number, known: number, calls: number) {
   return total.toLocaleString(locale.value) + (known < calls ? ` (${t("aiSettings.partialUsage")})` : "")
 }
 function toolLabel(name: string) { const key = AGENT_TOOL_I18N_KEYS[name]; return key ? t(key) : name }
-function page(kind: "runs" | "audit", delta: number) { if (kind === "runs") offset.value += delta; else auditOffset.value += delta; void refresh() }
+function page(kind: "runs" | "audit", direction: -1 | 1) {
+  const pageSize = kind === "runs" ? RUNS_PAGE_SIZE : AUDIT_PAGE_SIZE
+  if (kind === "runs") offset.value = Math.max(0, offset.value + direction * pageSize)
+  else auditOffset.value = Math.max(0, auditOffset.value + direction * pageSize)
+  void refresh()
+}
 function runStatusTone(value: string): StatusTone {
   if (value === "completed") return "success"
   if (value === "failed") return "danger"
@@ -233,14 +240,14 @@ function auditLine(entry: AIAuditEntry) {
                 <Badge :variant="runStatusTone(run.status)">{{ t(`aiSettings.statuses.${run.status}`) }}</Badge>
               </li>
             </ul>
-            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + 25 >= report.total" @click="page('runs', 25)">{{ t('aiSettings.next') }}</Button></div>
+            <div v-if="report && report.total > report.limit" class="flex flex-wrap items-center justify-end gap-2"><span class="mr-auto text-xs text-muted-foreground">{{ offset + 1 }}–{{ Math.min(offset + report.limit, report.total) }} / {{ report.total }}</span><Button variant="outline" size="sm" :disabled="loading || offset === 0" @click="page('runs', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || offset + RUNS_PAGE_SIZE >= report.total" @click="page('runs', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
           <section class="flex min-w-0 flex-col gap-3" data-ai-settings-block="audit">
             <h3 class="text-sm font-semibold text-foreground">{{ t('aiSettings.audit') }}</h3>
             <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">{{ t('aiSettings.auditHint') }}</p>
             <p v-if="audit && !audit.total" class="text-sm text-muted-foreground">{{ t('aiSettings.empty') }}</p>
             <ul class="flex min-w-0 flex-col gap-1.5"><li v-for="entry in audit?.items ?? []" :key="entry.id" :title="auditLine(entry)" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg border border-border/50 bg-muted/5 px-3 py-1.5" :data-ai-audit-row="entry.id" :data-status="entry.result"><span class="min-w-0 flex-1 truncate text-sm font-medium">{{ toolLabel(entry.tool) }}</span><span class="hidden min-w-0 truncate text-xs text-muted-foreground md:block">{{ time(entry.createdAt) }} · {{ entry.permission }} · {{ duration(entry.durationMs) }}<template v-if="entry.errorCode"> · {{ entry.errorCode }}</template></span><Badge :variant="auditStatusTone(entry.result)">{{ t(`aiSettings.auditResults.${entry.result}`) }}</Badge></li></ul>
-            <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -25)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + 25 >= audit.total" @click="page('audit', 25)">{{ t('aiSettings.next') }}</Button></div>
+            <div v-if="audit && audit.total > audit.limit" class="flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" :disabled="loading || auditOffset === 0" @click="page('audit', -1)">{{ t('aiSettings.previous') }}</Button><Button variant="outline" size="sm" :disabled="loading || auditOffset + AUDIT_PAGE_SIZE >= audit.total" @click="page('audit', 1)">{{ t('aiSettings.next') }}</Button></div>
           </section>
         </CardContent>
       </Card>
