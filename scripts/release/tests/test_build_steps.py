@@ -17,6 +17,8 @@ from scripts.release.release_lib.build_steps import assemble_release, build_back
 
 class BuildStepsTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+        self.ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
         self.temp_root = REPO_ROOT / ".tmp-release-tests" / self.id().replace(".", "_")
         if self.temp_root.exists():
             shutil.rmtree(self.temp_root)
@@ -78,8 +80,8 @@ class BuildStepsTests(unittest.TestCase):
     def test_bundle_ffmpeg_runtime_copies_discovered_real_binaries(self) -> None:
         source_bin_dir = self.temp_root / "tools" / "ffmpeg" / "bin"
         source_bin_dir.mkdir(parents=True)
-        ffmpeg_source = source_bin_dir / "ffmpeg.exe"
-        ffprobe_source = source_bin_dir / "ffprobe.exe"
+        ffmpeg_source = source_bin_dir / self.ffmpeg_name
+        ffprobe_source = source_bin_dir / self.ffprobe_name
         ffmpeg_source.write_bytes(b"real ffmpeg")
         ffprobe_source.write_bytes(b"real ffprobe")
         release_dir = self.temp_root / "release" / "Curated"
@@ -99,11 +101,11 @@ class BuildStepsTests(unittest.TestCase):
 
         self.assertEqual(source, "test-runtime")
         self.assertEqual(
-            (release_dir / "third_party" / "ffmpeg" / "bin" / "ffmpeg.exe").read_bytes(),
+            (release_dir / "third_party" / "ffmpeg" / "bin" / self.ffmpeg_name).read_bytes(),
             b"real ffmpeg",
         )
         self.assertEqual(
-            (release_dir / "third_party" / "ffmpeg" / "bin" / "ffprobe.exe").read_bytes(),
+            (release_dir / "third_party" / "ffmpeg" / "bin" / self.ffprobe_name).read_bytes(),
             b"real ffprobe",
         )
         notice = release_dir / "third_party" / "ffmpeg" / "README-Curated-Bundle.txt"
@@ -112,8 +114,8 @@ class BuildStepsTests(unittest.TestCase):
     def test_bundle_ffmpeg_runtime_prefers_repository_runtime(self) -> None:
         repo_bin_dir = self.temp_root / "backend" / "third_party" / "ffmpeg" / "bin"
         repo_bin_dir.mkdir(parents=True)
-        (repo_bin_dir / "ffmpeg.exe").write_bytes(b"repo ffmpeg")
-        (repo_bin_dir / "ffprobe.exe").write_bytes(b"repo ffprobe")
+        (repo_bin_dir / self.ffmpeg_name).write_bytes(b"repo ffmpeg")
+        (repo_bin_dir / self.ffprobe_name).write_bytes(b"repo ffprobe")
         release_dir = self.temp_root / "release" / "Curated"
         release_dir.mkdir(parents=True)
 
@@ -121,11 +123,11 @@ class BuildStepsTests(unittest.TestCase):
 
         self.assertEqual(source, "backend/third_party")
         self.assertEqual(
-            (release_dir / "third_party" / "ffmpeg" / "bin" / "ffmpeg.exe").read_bytes(),
+            (release_dir / "third_party" / "ffmpeg" / "bin" / self.ffmpeg_name).read_bytes(),
             b"repo ffmpeg",
         )
         self.assertEqual(
-            (release_dir / "third_party" / "ffmpeg" / "bin" / "ffprobe.exe").read_bytes(),
+            (release_dir / "third_party" / "ffmpeg" / "bin" / self.ffprobe_name).read_bytes(),
             b"repo ffprobe",
         )
 
@@ -143,11 +145,11 @@ class BuildStepsTests(unittest.TestCase):
     def test_discover_ffmpeg_runtime_rejects_scoop_shims_and_uses_scoop_real_path(self) -> None:
         source_bin_dir = self.temp_root / "scoop" / "apps" / "ffmpeg" / "current" / "bin"
         source_bin_dir.mkdir(parents=True)
-        ffmpeg_source = source_bin_dir / "ffmpeg.exe"
-        ffprobe_source = source_bin_dir / "ffprobe.exe"
+        ffmpeg_source = source_bin_dir / self.ffmpeg_name
+        ffprobe_source = source_bin_dir / self.ffprobe_name
         ffmpeg_source.write_bytes(b"real ffmpeg")
         ffprobe_source.write_bytes(b"real ffprobe")
-        shim_path = self.temp_root / "scoop" / "shims" / "ffmpeg.exe"
+        shim_path = self.temp_root / "scoop" / "shims" / self.ffmpeg_name
         shim_path.parent.mkdir(parents=True)
         shim_path.write_bytes(b"shim")
 
@@ -223,8 +225,8 @@ class BuildStepsTests(unittest.TestCase):
 
         repo_ffmpeg_dir = self.temp_root / "backend" / "third_party" / "ffmpeg" / "bin"
         repo_ffmpeg_dir.mkdir(parents=True)
-        (repo_ffmpeg_dir / "ffmpeg.exe").write_bytes(b"ffmpeg")
-        (repo_ffmpeg_dir / "ffprobe.exe").write_bytes(b"ffprobe")
+        (repo_ffmpeg_dir / self.ffmpeg_name).write_bytes(b"ffmpeg")
+        (repo_ffmpeg_dir / self.ffprobe_name).write_bytes(b"ffprobe")
 
         with patch("scripts.release.release_lib.build_steps.get_repo_root", return_value=self.temp_root):
             output = assemble_release(
@@ -244,7 +246,7 @@ class BuildStepsTests(unittest.TestCase):
         self.assertTrue((app_dir / "frontend-dist" / "index.html").is_file())
         self.assertTrue((app_dir / "electron-dist" / "main.js").is_file())
         self.assertTrue((app_dir / "electron-dist" / "preload.cjs").is_file())
-        self.assertTrue((app_dir / "third_party" / "ffmpeg" / "bin" / "ffmpeg.exe").is_file())
+        self.assertTrue((app_dir / "third_party" / "ffmpeg" / "bin" / self.ffmpeg_name).is_file())
         staged_example = json.loads(
             (app_dir / "runtime" / "config" / "library-config.example.cfg").read_text(encoding="utf-8")
         )
