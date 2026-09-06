@@ -1562,10 +1562,11 @@ type CuratedFrameMotionDTO struct {
 
 // CuratedFramesListDTO is a paginated curated frame listing.
 type CuratedFramesListDTO struct {
-	Items  []CuratedFrameItemDTO `json:"items"`
-	Total  int                   `json:"total"`
-	Limit  int                   `json:"limit"`
-	Offset int                   `json:"offset"`
+	NextCursor string                `json:"nextCursor,omitempty"`
+	Items      []CuratedFrameItemDTO `json:"items"`
+	Total      int                   `json:"total"`
+	Limit      int                   `json:"limit"`
+	Offset     int                   `json:"offset"`
 }
 
 // CreateCuratedFrameBody is the JSON body for POST /api/curated-frames (image as standard base64, no data: prefix).

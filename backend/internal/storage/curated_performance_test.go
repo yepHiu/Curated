@@ -60,3 +60,26 @@ func TestCaptureReplayRequiresSameImmutableData(t *testing.T) {
 		}
 	}
 }
+
+func TestCuratedCursorSurvivesNewerInsert(t *testing.T) {
+	s := newMigratedTestStore(t)
+	ctx := context.Background()
+	for _, id := range []string{"a", "b", "c"} {
+		insertCuratedFrameForP1Test(t, s, CuratedFrameMeta{ID: id})
+	}
+	first, err := s.QueryCuratedFrames(ctx, CuratedFrameQuery{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertCuratedFrameForP1Test(t, s, CuratedFrameMeta{ID: "d"})
+	next, err := s.QueryCuratedFrames(ctx, CuratedFrameQuery{Limit: 2, Cursor: first.NextCursor, SkipTotal: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Total != -1 || len(next.Items) != 2 || next.Items[0].ID != "b" || next.Items[1].ID != "a" {
+		t.Fatalf("unexpected cursor page: %+v", next)
+	}
+	if _, _, err := DecodeCuratedFrameCursor("invalid"); err == nil {
+		t.Fatal("invalid cursor accepted")
+	}
+}

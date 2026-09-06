@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -272,21 +273,38 @@ func (s *SQLiteStore) GetCuratedFrameMotion(ctx context.Context, frameID string)
 
 // CuratedFrameQuery holds filter and pagination parameters for curated frame search.
 type CuratedFrameQuery struct {
-	Query   string
-	Actor   string
-	MovieID string
-	Tag     string
-	Tags    []string
-	Limit   int
-	Offset  int
+	Cursor    string
+	SkipTotal bool
+	Query     string
+	Actor     string
+	MovieID   string
+	Tag       string
+	Tags      []string
+	Limit     int
+	Offset    int
 }
 
 // CuratedFramePage holds a paginated query result of curated frame metadata.
 type CuratedFramePage struct {
-	Items  []CuratedFrameMeta
-	Total  int
-	Limit  int
-	Offset int
+	NextCursor string
+	Items      []CuratedFrameMeta
+	Total      int
+	Limit      int
+	Offset     int
+}
+
+func DecodeCuratedFrameCursor(cursor string) (string, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	var values []string
+	if err != nil || len(raw) > 2048 || json.Unmarshal(raw, &values) != nil || len(values) != 2 || values[0] == "" || values[1] == "" {
+		return "", "", fmt.Errorf("invalid curated frame cursor")
+	}
+	return values[0], values[1], nil
+}
+
+func encodeCuratedFrameCursor(frame CuratedFrameMeta) string {
+	raw, _ := json.Marshal([]string{frame.CapturedAt, frame.ID})
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 // CuratedFrameFacet holds a named aggregation bucket and its count for curated frame facets.
@@ -363,9 +381,25 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	}
 	where, args := buildCuratedFrameWhere(q)
 
-	var total int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM curated_frames`+where, args...).Scan(&total); err != nil {
-		return CuratedFramePage{}, err
+	total := -1
+	if !q.SkipTotal {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM curated_frames`+where, args...).Scan(&total); err != nil {
+			return CuratedFramePage{}, err
+		}
+	}
+	if q.Cursor != "" {
+		at, id, err := DecodeCuratedFrameCursor(q.Cursor)
+		if err != nil {
+			return CuratedFramePage{}, err
+		}
+		if where == "" {
+			where = " WHERE "
+		} else {
+			where += " AND "
+		}
+		where += "(captured_at, id) < (?, ?)"
+		args = append(args, at, id)
+		offset = 0
 	}
 
 	pageArgs := append(append([]any{}, args...), limit, offset)
@@ -399,7 +433,11 @@ func (s *SQLiteStore) QueryCuratedFrames(ctx context.Context, q CuratedFrameQuer
 	if err := s.loadCuratedFrameMotions(ctx, out); err != nil {
 		return CuratedFramePage{}, err
 	}
-	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset}, nil
+	next := ""
+	if len(out) == limit {
+		next = encodeCuratedFrameCursor(out[len(out)-1])
+	}
+	return CuratedFramePage{Items: out, Total: total, Limit: limit, Offset: offset, NextCursor: next}, nil
 }
 
 // ListCuratedFramesByCapturedAtDesc returns all curated frames ordered by capture time, newest first.

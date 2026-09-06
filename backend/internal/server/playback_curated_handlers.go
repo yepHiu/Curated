@@ -160,6 +160,12 @@ func (h *Handler) handleListCuratedFrames(w http.ResponseWriter, r *http.Request
 	}
 	ctx := r.Context()
 	q := r.URL.Query()
+	if cursor := q.Get("cursor"); cursor != "" {
+		if _, _, err := storage.DecodeCuratedFrameCursor(cursor); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid cursor")
+			return
+		}
+	}
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
 	rawTags := make([]string, 0, 8)
@@ -171,12 +177,14 @@ func (h *Handler) handleListCuratedFrames(w http.ResponseWriter, r *http.Request
 		}
 	}
 	page, err := h.store.QueryCuratedFrames(ctx, storage.CuratedFrameQuery{
-		Query:   strings.TrimSpace(q.Get("q")),
-		Actor:   strings.TrimSpace(q.Get("actor")),
-		MovieID: strings.TrimSpace(q.Get("movieId")),
-		Tags:    rawTags,
-		Limit:   limit,
-		Offset:  offset,
+		Cursor:    q.Get("cursor"),
+		SkipTotal: q.Get("skipTotal") == "true" && q.Get("cursor") != "",
+		Query:     strings.TrimSpace(q.Get("q")),
+		Actor:     strings.TrimSpace(q.Get("actor")),
+		MovieID:   strings.TrimSpace(q.Get("movieId")),
+		Tags:      rawTags,
+		Limit:     limit,
+		Offset:    offset,
 	})
 	if err != nil {
 		h.logger.Error("list curated frames", zap.Error(err))
@@ -184,10 +192,11 @@ func (h *Handler) handleListCuratedFrames(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, contracts.CuratedFramesListDTO{
-		Items:  mapCuratedFrameItems(page.Items),
-		Total:  page.Total,
-		Limit:  page.Limit,
-		Offset: page.Offset,
+		NextCursor: page.NextCursor,
+		Items:      mapCuratedFrameItems(page.Items),
+		Total:      page.Total,
+		Limit:      page.Limit,
+		Offset:     page.Offset,
 	})
 }
 

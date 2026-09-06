@@ -437,6 +437,7 @@ interface RowWithUrl {
 const rawRows = ref<CuratedFrameDbRow[]>([])
 const listWithUrls = ref<RowWithUrl[]>([])
 const totalRows = ref(0)
+let rowsNextCursor: string | undefined
 const rowsLoading = ref(false)
 const rowsLoadingMore = ref(false)
 const rowsLoadError = ref(false)
@@ -478,6 +479,7 @@ async function reloadFromDb() {
     if (version !== rowsQueryVersion) return
     rawRows.value = page.items
     totalRows.value = page.total
+    rowsNextCursor = page.nextCursor
   } catch {
     if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {
@@ -501,11 +503,15 @@ async function loadMoreRows() {
       tags: currentCuratedTagFilters(),
       limit: curatedPageLimit,
       offset: rawRows.value.length,
+      cursor: rowsNextCursor,
+      skipTotal: Boolean(rowsNextCursor),
     })
     if (version !== rowsQueryVersion) return
     const known = new Set(rawRows.value.map((row) => row.id))
     rawRows.value = [...rawRows.value, ...page.items.filter((row) => !known.has(row.id))]
-    totalRows.value = page.total
+    if (page.total >= 0) totalRows.value = page.total
+    rowsNextCursor = page.nextCursor
+    if (page.items.length === 0) totalRows.value = rawRows.value.length
   } catch {
     if (version === rowsQueryVersion) rowsLoadError.value = true
   } finally {

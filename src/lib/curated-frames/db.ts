@@ -8,8 +8,9 @@ import { buildCuratedFrameTagFacets } from "@/lib/curated-frames/tag-facets"
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 
 const DB_NAME = "jav-curated-frames"
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_FRAMES = "frames"
+const STORE_IMAGES = "images"
 const STORE_KV = "kv"
 const KV_DIRECTORY_HANDLE = "export-directory-handle"
 
@@ -19,6 +20,8 @@ export interface CuratedFrameDbRow extends CuratedFrameRecord {
 }
 
 export interface CuratedFrameListQuery {
+  cursor?: string
+  skipTotal?: boolean
   q?: string
   actor?: string
   movieId?: string
@@ -29,6 +32,7 @@ export interface CuratedFrameListQuery {
 }
 
 export interface CuratedFramePageResult {
+  nextCursor?: string
   items: CuratedFrameDbRow[]
   total: number
   limit: number
@@ -56,8 +60,22 @@ function openDb(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result)
     req.onupgradeneeded = () => {
       const db = req.result
+      const images = db.createObjectStore(STORE_IMAGES, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(STORE_FRAMES)) {
-        db.createObjectStore(STORE_FRAMES, { keyPath: "id" })
+        const frames = db.createObjectStore(STORE_FRAMES, { keyPath: "id" })
+        frames.createIndex('capturedAtId', ['capturedAt', 'id'])
+      } else {
+        const frames = req.transaction!.objectStore(STORE_FRAMES)
+        frames.createIndex('capturedAtId', ['capturedAt', 'id'])
+        const cursor = frames.openCursor()
+        cursor.onsuccess = () => {
+          const entry = cursor.result
+          if (!entry) return
+          const { imageBlob, ...metadata } = entry.value as CuratedFrameDbRow
+          if (imageBlob) images.put({ id: metadata.id, imageBlob })
+          entry.update(metadata)
+          entry.continue()
+        }
       }
       if (!db.objectStoreNames.contains(STORE_KV)) {
         db.createObjectStore(STORE_KV, { keyPath: "key" })
@@ -82,8 +100,10 @@ export async function putCuratedFrame(row: CuratedFrameDbRow): Promise<void> {
   }
   const db = await openDb()
   try {
-    const tx = db.transaction(STORE_FRAMES, "readwrite")
-    await reqToPromise(tx.objectStore(STORE_FRAMES).put(row))
+    const tx = db.transaction([STORE_FRAMES, STORE_IMAGES], "readwrite")
+    const { imageBlob, ...metadata } = row
+    tx.objectStore(STORE_IMAGES).put({ id: row.id, imageBlob })
+    await reqToPromise(tx.objectStore(STORE_FRAMES).put(metadata))
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error ?? new Error("tx failed"))
@@ -110,14 +130,24 @@ export async function listCuratedFramesPage(
       total: page.total,
       limit: page.limit,
       offset: page.offset,
+      ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
     }
   }
   const db = await openDb()
   try {
     const tx = db.transaction(STORE_FRAMES, "readonly")
     const store = tx.objectStore(STORE_FRAMES)
-    const rows = await reqToPromise(store.getAll() as IDBRequest<CuratedFrameDbRow[]>)
-    const ordered = rows.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
+    const ordered = await new Promise<CuratedFrameDbRow[]>((resolve, reject) => {
+      const rows: CuratedFrameDbRow[] = []
+      const request = store.index('capturedAtId').openCursor(null, 'prev')
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const cursor = request.result
+        if (!cursor) { resolve(rows); return }
+        rows.push(cursor.value as CuratedFrameDbRow)
+        cursor.continue()
+      }
+    })
     let filtered = ordered
     if (query.q?.trim()) {
       filtered = filterCuratedFramesByQuery(filtered, query.q)
@@ -144,8 +174,14 @@ export async function listCuratedFramesPage(
     const total = filtered.length
     const limit = query.limit && query.limit > 0 ? query.limit : total
     const offset = query.offset && query.offset > 0 ? query.offset : 0
+    const items = filtered.slice(offset, offset + limit)
+    const imageTx = db.transaction(STORE_IMAGES, 'readonly')
+    await Promise.all(items.map(async row => {
+      const image = await reqToPromise(imageTx.objectStore(STORE_IMAGES).get(row.id)) as { imageBlob?: Blob } | undefined
+      row.imageBlob = image?.imageBlob
+    }))
     return {
-      items: filtered.slice(offset, offset + limit),
+      items,
       total,
       limit,
       offset,
@@ -221,7 +257,8 @@ export async function deleteCuratedFrame(id: string): Promise<void> {
   }
   const db = await openDb()
   try {
-    const tx = db.transaction(STORE_FRAMES, "readwrite")
+    const tx = db.transaction([STORE_FRAMES, STORE_IMAGES], "readwrite")
+    tx.objectStore(STORE_IMAGES).delete(id)
     await reqToPromise(tx.objectStore(STORE_FRAMES).delete(id))
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()

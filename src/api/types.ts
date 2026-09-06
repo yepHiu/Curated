@@ -1295,6 +1295,8 @@ export interface CuratedFrameMotionDTO {
 }
 
 export interface ListCuratedFramesParams {
+  cursor?: string
+  skipTotal?: boolean
   q?: string
   actor?: string
   movieId?: string
@@ -1306,6 +1308,7 @@ export interface ListCuratedFramesParams {
 }
 
 export interface CuratedFramesListDTO {
+  nextCursor?: string
   items: CuratedFrameItemDTO[]
   total: number
   limit: number
