@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import en from "@/locales/en.json"
 import ja from "@/locales/ja.json"
 import zhCN from "@/locales/zh-CN.json"
@@ -129,7 +129,8 @@ function readLocaleKey(messages: Record<string, unknown>, key: string): unknown 
 
 describe("locale key parity", () => {
   it.each(["en", "ja"] as const)("loads %s messages on demand", async (locale) => {
-    await ensureLocaleMessages(locale)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(locales[locale]), { status:200, headers:{'Content-Type':'application/json'} }))
+    try { await ensureLocaleMessages(locale) } finally { fetchMock.mockRestore() }
     const messages = i18n.global.getLocaleMessage(locale) as Record<string, unknown>
     expect(Object.keys(messages).length).toBeGreaterThan(0)
     expect(messages.common).toBeTypeOf("object")
