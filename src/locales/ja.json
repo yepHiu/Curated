@@ -555,7 +555,10 @@
     "nextFrame": "次のフレーム",
     "stopClip": "GIF を終了",
     "clipStatusRetrying": "状態を取得できません。再試行中…",
-    "clipCancelFailed": "キャンセルに失敗しました"
+    "clipCancelFailed": "キャンセルに失敗しました",
+    "captureTooLarge": "原画像は12 MiBを超えています。ダウンロードまたはJPEG保存を選択してください",
+    "captureDownloadOriginal": "原画像をダウンロード",
+    "captureCompress": "JPEGで保存"
   },
   "stats": {
     "moviesInLibrary": "ライブラリ内作品",

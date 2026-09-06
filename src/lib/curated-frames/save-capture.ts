@@ -22,6 +22,7 @@ export type CuratedFrameCaptureCandidate = {
 
 export type SaveCuratedCaptureOptions = {
   positionSecOverride?: number
+  onPreview?: (url: string) => void
 }
 
 export function resolveCuratedCapturePositionSec(
@@ -41,7 +42,7 @@ export async function captureCuratedFrameCandidate(
 ): Promise<{ ok: true; candidate: CuratedFrameCaptureCandidate } | { ok: false; reason: string }> {
   const positionSec = resolveCuratedCapturePositionSec(video.currentTime, options.positionSecOverride)
   const capturedAt = new Date().toISOString()
-  const cap = await captureVideoFrameToPng(video)
+  const cap = await captureVideoFrameToPng(video, options.onPreview)
   if (!cap.ok) {
     return { ok: false, reason: cap.reason }
   }
@@ -75,6 +76,7 @@ export async function saveCuratedFrameCandidate(
 
   try {
     if (USE_WEB) {
+      if (candidate.blob.size > 12 * 1024 * 1024) return { ok: false, reason: i18n.global.t('curated.captureTooLarge') }
       await api.createCuratedFrameUpload({
         id: row.id,
         movieId: row.movieId,
@@ -107,7 +109,7 @@ export async function saveCuratedFrameCandidate(
 }
 
 export async function exportCuratedFrameCandidate(candidate: CuratedFrameCaptureCandidate, movie: Movie): Promise<void> {
-  const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt)
+  const filename = formatFrameFilename(movie.code, candidate.positionSec, candidate.capturedAt).replace(/\.png$/, candidate.blob.type === 'image/jpeg' ? '.jpg' : '.png')
   const mode = getCuratedFrameSaveMode()
   if (mode === "download") {
     triggerDownloadBlob(candidate.blob, filename)

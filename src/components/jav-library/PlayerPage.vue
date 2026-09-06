@@ -3057,6 +3057,7 @@ const videoPreloadMode = computed(() =>
         />
         <CaptureReceipt v-if="receiptJob && clipCapturePhase !== 'recording' && clipCapturePhase !== 'processing'"
           :job="receiptJob" :pending="captureQueue.pendingCount.value"
+          @download="captureQueue.downloadOriginal(receiptJob)" @compress="captureQueue.compressAndRetry(receiptJob)"
           @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
           @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
         <Dialog v-model:open="capturePreviewOpen">

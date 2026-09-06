@@ -555,7 +555,10 @@
     "nextFrame": "Next frame",
     "stopClip": "Finish GIF",
     "clipStatusRetrying": "Status unavailable. Retrying…",
-    "clipCancelFailed": "Could not cancel. Retry."
+    "clipCancelFailed": "Could not cancel. Retry.",
+    "captureTooLarge": "Original exceeds 12 MiB. Download it or save a JPEG copy.",
+    "captureDownloadOriginal": "Download original",
+    "captureCompress": "Save JPEG copy"
   },
   "stats": {
     "moviesInLibrary": "Movies in library",

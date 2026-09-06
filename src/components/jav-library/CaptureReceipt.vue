@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Check, AlertTriangle, X } from 'lucide-vue-next'
 import type { CaptureJob } from '@/composables/use-curated-capture-queue'
 const props = defineProps<{ job: CaptureJob; pending: number }>()
-defineEmits<{ retry: []; retryExport: []; undo: []; view: []; dismiss: [] }>()
+defineEmits<{ retry: []; retryExport: []; undo: []; view: []; dismiss: []; download: []; compress: [] }>()
 const { t } = useI18n()
 const busy = computed(() => ['capturing', 'queued', 'saving'].includes(props.job.phase))
 const time = computed(() => {
@@ -29,6 +29,8 @@ const time = computed(() => {
       <span v-if="pending > 1" class="text-xs text-muted-foreground">{{ t('curated.capturePending', { n: pending }) }}</span>
       <span v-if="job.error" class="max-w-64 text-xs text-destructive">{{ job.error }}</span>
       <div class="flex flex-wrap gap-1">
+        <Button v-if="job.phase === 'error' && job.candidate" size="sm" variant="ghost" @click="$emit('download')">{{ t('curated.captureDownloadOriginal') }}</Button>
+        <Button v-if="job.phase === 'error' && job.candidate && job.candidate.blob.size > 12 * 1024 * 1024" size="sm" variant="outline" @click="$emit('compress')">{{ t('curated.captureCompress') }}</Button>
         <Button v-if="job.phase === 'error' && job.candidate" size="sm" variant="outline" @click="$emit('retry')">{{ t('curated.captureRetry') }}</Button>
         <Button v-if="job.phase === 'export-error'" size="sm" variant="outline" :disabled="job.exporting" @click="$emit('retryExport')">{{ t('curated.captureRetryExport') }}</Button>
         <Button v-if="job.committed" size="sm" variant="ghost" :disabled="job.exporting" @click="$emit('undo')">{{ t('curated.captureUndo') }}</Button>

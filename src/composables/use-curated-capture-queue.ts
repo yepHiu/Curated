@@ -3,6 +3,8 @@ import type { Movie } from '@/domain/movie/types'
 import { captureCuratedFrameCandidate, exportCuratedFrameCandidate, saveCuratedFrameCandidate, type CuratedFrameCaptureCandidate, type SaveCuratedCaptureResult } from '@/lib/curated-frames/save-capture'
 import { deleteCuratedFrame } from '@/lib/curated-frames/db'
 import { i18n } from '@/i18n'
+import { triggerDownloadBlob } from '@/lib/curated-frames/export-file'
+import { formatFrameFilename } from '@/lib/curated-frames/capture'
 
 export interface CaptureJob {
   key: string
@@ -17,6 +19,7 @@ export interface CaptureJob {
   bytes: number
   committed: boolean
   exporting: boolean
+  originalBlob?: Blob
 }
 
 // Jobs own the movie snapshot, image and retry identity. Upload concurrency is
@@ -37,6 +40,7 @@ export function useCuratedCaptureQueue() {
     if (job.preview) URL.revokeObjectURL(job.preview)
     job.preview = ''
     job.candidate = undefined
+    job.originalBlob = undefined
     job.bytes = 0
   }
 
@@ -55,7 +59,7 @@ export function useCuratedCaptureQueue() {
       phase: 'capturing', preview: '', error: '', bytes, committed: false, exporting: false, capture: Promise.resolve(),
     })
     jobs.value.push(job)
-    job.capture = captureCuratedFrameCandidate(video, { positionSecOverride: positionSec }).then(result => {
+    job.capture = captureCuratedFrameCandidate(video, { positionSecOverride: positionSec, onPreview: url => { job.preview = url } }).then(result => {
       if (disposed || !jobs.value.includes(job)) return
       if (!result.ok) { job.phase = 'error'; job.error = result.reason; job.bytes = 0; retain(job); return }
       job.candidate = result.candidate
@@ -105,6 +109,29 @@ export function useCuratedCaptureQueue() {
     catch { job.error = i18n.global.t('curated.captureUndoFailed') }
   }
 
+  function downloadOriginal(job: CaptureJob) {
+    if (job.candidate) triggerDownloadBlob(job.originalBlob ?? job.candidate.blob, formatFrameFilename(job.movie.code, job.positionSec, job.candidate.capturedAt))
+  }
+
+  async function compressAndRetry(job: CaptureJob) {
+    if (!job.candidate || job.committed || job.candidate.blob.size <= 12 * 1024 * 1024) return
+    if (job.phase !== 'error') return
+    job.phase = 'capturing'
+    try {
+      const bitmap = await createImageBitmap(job.candidate.blob)
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d'); if (!ctx) { bitmap.close(); return }
+      ctx.drawImage(bitmap, 0, 0); bitmap.close()
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', .9))
+      canvas.width = canvas.height = 1
+      if (!blob) throw new Error('encoding failed')
+      job.originalBlob = job.candidate.blob
+      job.candidate = { ...job.candidate, blob }
+      job.bytes = blob.size + job.originalBlob.size
+      await submit(job)
+    } catch { job.phase = 'error'; job.error = i18n.global.t('curated.captureBlobFail') }
+  }
+
   onBeforeUnmount(() => {
     disposed = true
     for (const timer of expiry.values()) clearTimeout(timer)
@@ -112,5 +139,5 @@ export function useCuratedCaptureQueue() {
     for (const job of jobs.value) { if (job.preview) URL.revokeObjectURL(job.preview) }
     jobs.value = []
   })
-  return { jobs, latest, pendingCount, prepare, submit, retryExport, undo, dismiss }
+  return { jobs, latest, pendingCount, prepare, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
 }

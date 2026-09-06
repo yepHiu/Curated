@@ -555,7 +555,10 @@
     "nextFrame": "下一帧",
     "stopClip": "结束 GIF",
     "clipStatusRetrying": "状态暂不可用，正在重试…",
-    "clipCancelFailed": "取消失败，请重试"
+    "clipCancelFailed": "取消失败，请重试",
+    "captureTooLarge": "原图超过 12 MiB，可下载原图或选择 JPEG 压缩入库",
+    "captureDownloadOriginal": "下载原图",
+    "captureCompress": "JPEG 压缩入库"
   },
   "stats": {
     "moviesInLibrary": "入库影片",
