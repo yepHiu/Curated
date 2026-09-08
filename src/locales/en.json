@@ -1635,6 +1635,8 @@
     "privacyAuto": "Standard redaction",
     "privacyMinimal": "Minimal text",
     "privacyHint": "Standard mode hides file paths in remote model tool results. Minimal text also hides titles, summaries and notes in tool results. Your messages, conversation context and text explicitly sent for translation or polishing still reach the configured model.",
+    "stepLimitEnabled": "Limit tool calls per turn",
+    "stepLimitHint": "No limit by default. Enable to set a limit of 1–30 calls.",
     "stepLimit": "Tool steps per turn (1–30)",
     "writeLimit": "Confirmations per minute across all clients (1–60)",
     "retention": "Statistics and audit retention days (7–365)",

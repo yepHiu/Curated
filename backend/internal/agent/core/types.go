@@ -46,7 +46,7 @@ const (
 	SanitizeMinimal   = "minimal"
 
 	DefaultListLimit   = 50
-	DefaultStepLimit   = 15
+	DefaultStepLimit   = 0 // Unlimited unless the user opts into a limit.
 	DefaultWritePerMin = 10
 	DefaultBatchLimit  = 25
 	ReadTimeout        = 10 * time.Second

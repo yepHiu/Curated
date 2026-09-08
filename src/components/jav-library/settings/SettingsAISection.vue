@@ -51,15 +51,26 @@ const auditMinHeight = ref(0)
 let requestId = 0
 let disposed = false
 const summary = computed(() => report.value?.summary)
-const validSettings = computed(() => Number.isInteger(settings.value.stepLimit) && settings.value.stepLimit >= 1 && settings.value.stepLimit <= 30
+const validSettings = computed(() => Number.isInteger(settings.value.stepLimit) && settings.value.stepLimit >= 0 && settings.value.stepLimit <= 30
   && Number.isInteger(settings.value.writePerMinute) && settings.value.writePerMinute >= 1 && settings.value.writePerMinute <= 60
   && Number.isInteger(settings.value.retentionDays) && settings.value.retentionDays >= 7 && settings.value.retentionDays <= 365)
+
+const lastStepLimit = ref(15)
+const stepLimitEnabled = computed({
+  get: () => settings.value.stepLimit !== 0,
+  set: (enabled: boolean) => {
+    if (!enabled && Number.isInteger(settings.value.stepLimit) && settings.value.stepLimit > 0 && settings.value.stepLimit <= 30) {
+      lastStepLimit.value = settings.value.stepLimit
+    }
+    settings.value.stepLimit = enabled ? lastStepLimit.value : 0
+  },
+})
 
 const settingsAutosave = useAISettingsAutosave({
   read: () => ({ ...settings.value }),
   enabled: () => ready.value,
   valid: () => validSettings.value,
-  delay: (next, previous) => next.enabled !== previous.enabled || next.readOnly !== previous.readOnly || next.privacy !== previous.privacy ? 0 : 550,
+  delay: (next, previous) => next.enabled !== previous.enabled || next.readOnly !== previous.readOnly || next.privacy !== previous.privacy || (next.stepLimit === 0) !== (previous.stepLimit === 0) ? 0 : 550,
   save: async (value) => { applyAIGovernance(await service.saveSettings(value)) },
   onDetachedError: (detail) => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
 })
@@ -242,8 +253,13 @@ function auditLine(entry: AIAuditEntry) {
                 <Select v-model="settings.privacy" :disabled="busy"><SelectTrigger id="ai-privacy"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="auto">{{ t('aiSettings.privacyAuto') }}</SelectItem><SelectItem value="minimal">{{ t('aiSettings.privacyMinimal') }}</SelectItem></SelectGroup></SelectContent></Select>
                 <FieldDescription>{{ t('aiSettings.privacyHint') }}</FieldDescription>
               </Field>
+              <Field orientation="horizontal" class="rounded-lg border border-border/40 bg-background/30 px-3 py-2">
+                <FieldLabel for="ai-step-limit-enabled">{{ t('aiSettings.stepLimitEnabled') }}</FieldLabel>
+                <Switch id="ai-step-limit-enabled" v-model="stepLimitEnabled" :disabled="busy" aria-describedby="ai-step-limit-hint" />
+              </Field>
+              <FieldDescription id="ai-step-limit-hint">{{ t('aiSettings.stepLimitHint') }}</FieldDescription>
               <FieldGroup class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3" data-ai-limit-fields>
-                <Field><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
+                <Field v-if="stepLimitEnabled" :data-invalid="!validSettings"><FieldLabel for="ai-steps">{{ t('aiSettings.stepLimit') }}</FieldLabel><Input id="ai-steps" v-model.number="settings.stepLimit" :aria-invalid="!Number.isInteger(settings.stepLimit) || settings.stepLimit < 1 || settings.stepLimit > 30" @blur="settingsAutosave.flush()" type="number" min="1" max="30" :disabled="busy" /></Field>
                 <Field><FieldLabel for="ai-rate">{{ t('aiSettings.writeLimit') }}</FieldLabel><Input id="ai-rate" v-model.number="settings.writePerMinute" :aria-invalid="!Number.isInteger(settings.writePerMinute) || settings.writePerMinute < 1 || settings.writePerMinute > 60" @blur="settingsAutosave.flush()" type="number" min="1" max="60" :disabled="busy" /></Field>
                 <Field><FieldLabel for="ai-retention">{{ t('aiSettings.retention') }}</FieldLabel><Input id="ai-retention" v-model.number="settings.retentionDays" :aria-invalid="!Number.isInteger(settings.retentionDays) || settings.retentionDays < 7 || settings.retentionDays > 365" @blur="settingsAutosave.flush()" type="number" min="7" max="365" :disabled="busy" /></Field>
               </FieldGroup>

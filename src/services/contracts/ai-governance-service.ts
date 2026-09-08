@@ -2,13 +2,13 @@ export interface AIGovernanceSettings {
   enabled: boolean
   readOnly: boolean
   privacy: "auto" | "minimal"
-  stepLimit: number
+  stepLimit: number // 0 means unlimited.
   writePerMinute: number
   retentionDays: number
 }
 
 export const defaultAIGovernance = (): AIGovernanceSettings => ({
-  enabled: false, readOnly: false, privacy: "auto", stepLimit: 15, writePerMinute: 10, retentionDays: 30,
+  enabled: false, readOnly: false, privacy: "auto", stepLimit: 0, writePerMinute: 10, retentionDays: 30,
 })
 
 export interface AIRun {

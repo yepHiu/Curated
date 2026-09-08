@@ -4,7 +4,7 @@ type AIGovernanceDTO struct {
 	Enabled        bool   `json:"enabled"`
 	ReadOnly       bool   `json:"readOnly"`
 	Privacy        string `json:"privacy"`
-	StepLimit      int    `json:"stepLimit"`
+	StepLimit      int    `json:"stepLimit"` // 0 = unlimited; otherwise 1–30 tool calls per turn.
 	WritePerMinute int    `json:"writePerMinute"`
 	RetentionDays  int    `json:"retentionDays"`
 }

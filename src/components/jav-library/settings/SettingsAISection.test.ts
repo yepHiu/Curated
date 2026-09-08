@@ -51,6 +51,34 @@ describe("SettingsAISection", () => {
     expect(mocks.setAIProvider).not.toHaveBeenCalled()
     wrapper.unmount()
   })
+  it("defaults to unlimited and immediately saves the optional limit switch", async () => {
+    const wrapper = await setup()
+    expect(wrapper.get("#ai-step-limit-enabled").attributes("aria-checked")).toBe("false")
+    expect(wrapper.find("#ai-steps").exists()).toBe(false)
+    await wrapper.get("#ai-step-limit-enabled").trigger("click"); await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), stepLimit: 15 })
+    await wrapper.get("#ai-steps").setValue("23")
+    await wrapper.get("#ai-step-limit-enabled").trigger("click"); await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith(defaultAIGovernance())
+    expect(wrapper.find("#ai-steps").exists()).toBe(false)
+    await wrapper.get("#ai-step-limit-enabled").trigger("click"); await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), stepLimit: 23 })
+    wrapper.unmount()
+  })
+  it("preserves an existing limit and rejects invalid numeric input", async () => {
+    mocks.getSettings.mockResolvedValue({ ...defaultAIGovernance(), stepLimit: 8 })
+    const wrapper = await setup()
+    expect(wrapper.get("#ai-step-limit-enabled").attributes("aria-checked")).toBe("true")
+    expect((wrapper.get("#ai-steps").element as HTMLInputElement).value).toBe("8")
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    await wrapper.get("#ai-steps").setValue("31")
+    await vi.advanceTimersByTimeAsync(600)
+    expect(mocks.saveSettings).not.toHaveBeenCalled()
+    expect(wrapper.get("#ai-steps").attributes("aria-invalid")).toBe("true")
+    await wrapper.get("#ai-step-limit-enabled").trigger("click"); await flushPromises()
+    expect(mocks.saveSettings).toHaveBeenLastCalledWith(defaultAIGovernance())
+    wrapper.unmount()
+  })
   it("organizes governance, provider, and records into the settings card hierarchy", async () => {
     const wrapper = await setup()
     expect(wrapper.find("[data-ai-governance-card]").exists()).toBe(true)
@@ -157,6 +185,7 @@ describe("SettingsAISection", () => {
     wrapper.unmount()
   })
   it("debounces numeric changes and saves them without refreshing statistics", async () => {
+    mocks.getSettings.mockResolvedValue({ ...defaultAIGovernance(), stepLimit: 15 })
     const wrapper = await setup()
     await wrapper.get("#ai-steps").setValue("2")
     await vi.advanceTimersByTimeAsync(300)
@@ -171,6 +200,7 @@ describe("SettingsAISection", () => {
     wrapper.unmount()
   })
   it("serializes policy changes and never replaces a newer draft with an older response", async () => {
+    mocks.getSettings.mockResolvedValue({ ...defaultAIGovernance(), stepLimit: 15 })
     const wrapper = await setup()
     let finish!: (value: AIGovernanceSettings) => void
     mocks.saveSettings.mockReturnValueOnce(new Promise<AIGovernanceSettings>(resolve => { finish = resolve }))
@@ -202,6 +232,7 @@ describe("SettingsAISection", () => {
     wrapper.unmount()
   })
   it("flushes pending text edits on blur and before leaving the settings section", async () => {
+    mocks.getSettings.mockResolvedValue({ ...defaultAIGovernance(), stepLimit: 15 })
     const wrapper = await setup()
     await wrapper.get("#ai-model").setValue("first-model")
     await wrapper.get("#ai-model").trigger("blur"); await flushPromises()

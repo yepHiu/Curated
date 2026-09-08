@@ -112,7 +112,7 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 	// Human confirmation is outside the model's per-turn tool budget.
 	if !apply {
 		step := g.budget.addStep(call.SessionID)
-		if step > settings.stepLimit() {
+		if limit := settings.stepLimit(); limit > 0 && step > limit {
 			return fail(ErrRateLimited, "AI_RATE_LIMITED", "tool step limit reached"), def.Permission, ResultRejected, "AI_RATE_LIMITED"
 		}
 	}

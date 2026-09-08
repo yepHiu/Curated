@@ -71,7 +71,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			return nil
 		}
 		choice := ""
-		if steps >= stepLimit {
+		if stepLimit > 0 && steps >= stepLimit {
 			messages = append(messages, llm.ChatMessage{Role: "system", Content: prompts.StepLimitNudge()})
 			choice = "none"
 		}
@@ -127,7 +127,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			}
 			return nil
 		}
-		if steps >= stepLimit {
+		if stepLimit > 0 && steps >= stepLimit {
 			emit(contracts.AIChatSSEEvent{
 				Type: "text_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 				Delta: "\n\n已达到本轮工具步数上限，未能继续查询。",
@@ -221,7 +221,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				ToolCallID: toolCallID,
 				Content:    wrapToolContent(payload),
 			})
-			if steps >= stepLimit {
+			if stepLimit > 0 && steps >= stepLimit {
 				break
 			}
 		}
