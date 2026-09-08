@@ -288,16 +288,16 @@ GET    /api/settings                        # Get settings (includes backupDirec
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
 POST   /api/proxy/ping-google               # Test proxy: GET https://www.google.com/ (same body as ping-javbus)
-GET    /api/ai/settings                    # Global enable/read-only/privacy/limits/retention
+GET    /api/ai/settings                    # Global enable/read-only/privacy; stepLimit=0 unlimited (default), optional 1–30; existing positive limits preserved
 PATCH  /api/ai/settings                    # Persist policy, cancel active generation; PIN protected
 GET    /api/ai/usage                       # Measured usage + timing + outcome, filters/pagination
 GET    /api/ai/audit                       # Metadata-only tool activity, filters/pagination
 POST   /api/ai/cleanup                     # Expired metadata and standalone action receipts only
 POST   /api/ai/provider/test                # Bounded probe: 1024 output tokens / 30s; 200 + ok=false on failure
-POST   /api/ai/chat                         # Experimental agent SSE (thinking_delta + read tools + present_movies cards + search_provider_titles + get_source_page + confirm_required + session); PIN-protected
+POST   /api/ai/chat                         # SSE; message_done has status + reasonCode; needs_confirmation for previews, partial/tool_step_limit for opted-in limits
 GET    /api/ai/sessions                     # List persisted agent chats
 POST   /api/ai/sessions                     # Create an empty agent chat
-GET    /api/ai/sessions/{sessionId}         # 80 rows per page, ?cursor / nextCursor; result events and applied receipt state (no write tokens)
+GET    /api/ai/sessions/{sessionId}         # 80 rows/page, ?cursor; receipt-derived saved/unconfirmed history outcomes; no write authority
 DELETE /api/ai/sessions/{sessionId}         # Delete one agent chat and its apply receipts; business changes remain
 POST   /api/ai/actions/{name}               # Experimental agent L1/L2 action (polish_comment / translate_summary / translate_title / insights_narrative)
 POST   /api/ai/confirm                      # Atomic write + durable receipt; identical retry returns snapshot with replayed=true

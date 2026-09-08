@@ -40,7 +40,7 @@ Installed apps can also check and download a newer installer from Settings → A
 - Capture previews with retry/undo, source-file frames and GIF/MP4/WebM clips; see [capture guidance](docs/guide.md#curated-capture-and-inspection).
 - Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
-- A docked Agent panel and AI settings with global controls, measured token usage, timing and audit records; see the [handbook](docs/guide.md#ai-settings-and-governance).
+- A docked Agent panel and AI settings with optional tool-call limits (unlimited by default), explicit write confirmation, measured token usage, timing and audit records; see the [handbook](docs/guide.md#ai-settings-and-governance).
 - GitHub Releases update checks with in-app installer download; packaged builds ship FFmpeg and a local `hls.js` runtime.
 
 ## Quick start
