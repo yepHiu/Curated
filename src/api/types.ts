@@ -433,6 +433,7 @@ export interface AIAgentMovieCardDTO {
 
 /** Persisted result events; confirmation tokens are deliberately not stored. */
 export interface AIChatStoredEventDTO {
+  answerEvidence?: AIAnswerEvidenceDTO
   receiptId?: string
   applied?: boolean
   type: string
@@ -446,6 +447,20 @@ export interface AIChatStoredEventDTO {
   resolution?: AIEntityResolutionDTO
   outcome?: AIChatOutcomeDTO
   changes?: AIConfirmChangeDTO[]
+}
+
+/** Published record snapshots; these never grant authority to later requests. */
+export interface AIAnswerEvidenceDTO {
+  version: 1
+  items: {
+    refId: string
+    movieId?: string
+    source: "local" | "provider"
+    tool: string
+    retrievedAt: string
+    truncated?: boolean
+    fields: Record<string, unknown>
+  }[]
 }
 
 export interface AIAgentProviderTitleDTO {

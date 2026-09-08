@@ -87,7 +87,9 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 // StreamAIChat runs one experimental agent turn (E2: read tools + session persistence).
 func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emit func(contracts.AIChatSSEEvent)) (retErr error) {
 	ctx, observation, finish := a.beginAIRun(ctx, "chat", "")
-	defer func() { finish(retErr) }()
+	var firstPublishedMs *int64
+	// 聊天首字延迟按用户实际收到的已校验正文计算，而非上游草稿。
+	defer func() { observation.row.FirstTextMs = firstPublishedMs; finish(retErr) }()
 	cfg, err := normalizeAIProviderConfig(a.currentAIProviderConfig())
 	if err != nil {
 		return fmt.Errorf("%w: %v", llm.ErrInvalidConfig, err)
@@ -140,6 +142,9 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	wrapped := func(ev contracts.AIChatSSEEvent) {
 		if ev.Outcome != nil {
 			observation.row.Status = ev.Outcome.Status
+			if ev.Outcome.ReasonCode == "answer_rejected" {
+				observation.row.ErrorCode = "answer_rejected"
+			}
 		}
 		if ev.SessionID == "" {
 			ev.SessionID = session.ID
@@ -149,7 +154,12 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		}
 		switch ev.Type {
 		case "text_delta":
+			if firstPublishedMs == nil && ev.Delta != "" {
+				elapsed := time.Since(observation.started).Milliseconds()
+				firstPublishedMs = &elapsed
+			}
 			assistant.WriteString(ev.Delta)
+			// Only published text reaches storage; upstream drafts never enter this emitter.
 		case "tool_call_result", "movie_cards", "message_done", "confirm_required":
 			stored := ev
 			if stored.ConfirmToken != "" {

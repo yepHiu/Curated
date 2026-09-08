@@ -217,7 +217,8 @@
     "historyOlder": "加载更早的消息",
     "historyLoading": "正在加载…",
     "historyLoadFailed": "历史消息加载失败，请重试。",
-    "thinking": "思考中",
+    "thinking": "正在整理结果",
+    "answerEvidenceHint": "作品事实取自本轮查询的 {count} 条记录。",
     "thought": "已思考",
     "presentedMovies": "展示影片",
     "openMovie": "打开影片详情",
@@ -258,6 +259,7 @@
     },
     "outcomeSaved": "已保存",
     "outcomeReasons": {
+      "answerRejected": "部分作品信息缺少可核对的依据，未展示该草稿。",
       "toolStepLimit": "已达到你设置的工具调用上限；任务尚未完成，已有结果已保留。可提高或关闭上限后继续。",
       "confirmationRequired": "预览已就绪，尚未保存。请在确认卡片中确认写入。",
       "writeApplied": "已确认的更改已保存。",
@@ -302,6 +304,7 @@
       "tag": "标签"
     },
     "tools": {
+      "submitAnswer": "整理作品回答",
       "resolveEntities": "核对影片或演员",
       "libraryOverview": "查看资料库概况",
       "searchMovies": "搜索影片",

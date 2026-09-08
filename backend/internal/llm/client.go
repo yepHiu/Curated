@@ -56,11 +56,14 @@ type AssistantTurn struct {
 
 // TurnRequest is one chat-completions round, optionally with tools.
 type TurnRequest struct {
-	Messages   []ChatMessage
-	Tools      []ToolSpec
-	ToolChoice string
-	MaxTokens  int
-	OnThinking func(string)
+	// MaxOutputBytes bounds accumulated content + tool arguments, independently
+	// of model token settings. Zero preserves the caller's existing behavior.
+	MaxOutputBytes int
+	Messages       []ChatMessage
+	Tools          []ToolSpec
+	ToolChoice     string
+	MaxTokens      int
+	OnThinking     func(string)
 }
 
 // ClientConfig describes one OpenAI-compatible endpoint.
@@ -373,6 +376,7 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var dataLines []string
 	finished := false
+	outputBytes := 0
 
 	processEvent := func() error {
 		if len(dataLines) == 0 {
@@ -402,6 +406,16 @@ func (c *Client) StreamTurn(ctx context.Context, req TurnRequest, onDelta func(s
 			return nil
 		}
 		choice := chunk.Choices[0]
+		outputBytes += len(choice.Delta.Content)
+		for _, part := range choice.Delta.ToolCalls {
+			outputBytes += len(part.Function.Arguments) + len(part.Function.Name)
+		}
+		for _, call := range choice.Message.ToolCalls {
+			outputBytes += len(call.Function.Arguments) + len(call.Function.Name)
+		}
+		if req.MaxOutputBytes > 0 && outputBytes > req.MaxOutputBytes {
+			return fmt.Errorf("provider output exceeds byte limit")
+		}
 		if choice.FinishReason != "" {
 			finished = true
 		}

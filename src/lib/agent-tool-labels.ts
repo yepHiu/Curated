@@ -2,7 +2,8 @@
 export const AGENT_PROCESS_HIDDEN_TOOLS = new Set(["present_movies"])
 
 export const AGENT_TOOL_I18N_KEYS: Record<string, string> = {
-	resolve_entities: "agentWindow.tools.resolveEntities",
+  submit_answer: "agentWindow.tools.submitAnswer",
+  resolve_entities: "agentWindow.tools.resolveEntities",
   get_library_overview: "agentWindow.tools.libraryOverview",
   search_movies: "agentWindow.tools.searchMovies",
   get_movie_detail: "agentWindow.tools.movieDetail",

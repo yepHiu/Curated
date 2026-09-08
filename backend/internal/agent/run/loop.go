@@ -25,6 +25,7 @@ type Loop struct {
 	locale   string
 }
 
+// NewLoop 构造使用当前网关和隐私策略的单轮执行器。
 func NewLoop(gateway *core.Gateway, streamer llm.Streamer, sanitize, locale string) *Loop {
 	if sanitize == "" {
 		sanitize = core.SanitizeFull
@@ -32,6 +33,7 @@ func NewLoop(gateway *core.Gateway, streamer llm.Streamer, sanitize, locale stri
 	return &Loop{gateway: gateway, streamer: streamer, sanitize: sanitize, locale: locale}
 }
 
+// Run 执行请求隔离的查询与发布流程，所有模型正文必须先经过展示校验。
 func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []llm.ChatMessage, page *contracts.AIChatContext, emit Emitter) error {
 	if l == nil || l.gateway == nil || l.streamer == nil {
 		return fmt.Errorf("agent loop is not configured")
@@ -39,12 +41,19 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	if emit == nil {
 		emit = func(contracts.AIChatSSEEvent) {}
 	}
-	l.gateway.ResetSessionSteps(sessionID)
-	l.gateway.ResetMovieRefs(sessionID)
-	l.gateway.ResetActorRefs(sessionID)
-	l.gateway.ResetSourceURLs(sessionID)
-	seedTurnEntities(l.gateway, sessionID, page)
+	refs := core.NewAnswerRefStore()
+	ctx = core.WithAnswerRefs(ctx, refs)
+	scope := refs.Scope()
+	// 清理本次请求的临时锚点与预算，不清理同会话的其他请求。
+	defer func() {
+		l.gateway.ResetSessionSteps(scope)
+		l.gateway.ResetMovieRefs(scope)
+		l.gateway.ResetActorRefs(scope)
+		l.gateway.ResetSourceURLs(scope)
+	}()
+	seedTurnEntities(l.gateway, scope, page)
 	seq := 0
+	// 为本次流式响应分配单调事件序号。
 	nextSeq := func() int {
 		seq++
 		return seq
@@ -58,11 +67,40 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	hadFailure := false
 	hadTruncation := false
 	needsInput := false
+	repairs := 0
+	var answerEvidence *contracts.AIAnswerEvidenceDTO
+	userText := ""
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == "user" {
+			userText = history[i].Content
+			break
+		}
+	}
+	refs.SetQuery(userText)
+	// 仅发布已经校验的正文或服务端生成的固定提示。
+	emitText := func(text string) {
+		if text != "" {
+			emit(contracts.AIChatSSEEvent{Type: "text_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(), Delta: text})
+		}
+	}
+	// 将最终状态及实际展示的来源快照一同持久化。
 	emitDone := func(status, reason string, retryable bool, reasonCode string) {
 		emit(contracts.AIChatSSEEvent{
 			Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
-			Outcome: &contracts.AIChatOutcomeDTO{Status: status, Reason: reason, Retryable: retryable, ReasonCode: reasonCode},
+			Outcome:        &contracts.AIChatOutcomeDTO{Status: status, Reason: reason, Retryable: retryable, ReasonCode: reasonCode},
+			AnswerEvidence: answerEvidence,
 		})
+	}
+	// 最多允许一次修正，之后以固定说明结束且不发布被拒绝草稿。
+	reject := func() bool {
+		if repairs > 0 || (stepLimit > 0 && steps >= stepLimit) {
+			emitText(answerCopy(l.locale, "I could not verify the proposed movie answer. Retrieved source records remain available; please narrow the request or select a movie.", "未能核实拟回答的作品信息。已查到的来源记录仍可查看，请缩小范围或选择具体作品。", "回答に含まれる作品情報を確認できませんでした。取得済みの記録を確認し、条件を絞るか作品を選択してください。"))
+			emitDone("partial", "Unverified draft was not published.", false, "answer_rejected")
+			return false
+		}
+		repairs++
+		messages = append(messages, llm.ChatMessage{Role: "system", Content: "Your draft was not published. You have one correction attempt. For movie facts call submit_answer ALONE with current answerRefs and available field keys. Do not repeat codes/titles in prose. If no evidence exists, explain the retrieval limitation without naming invented works. Do not perform more retrieval or writes."})
+		return true
 	}
 
 	for {
@@ -76,7 +114,20 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			emitDone("partial", fmt.Sprintf("The configured limit of %d tool calls was reached. Completed results are preserved; the task is not finished.", stepLimit), true, "tool_step_limit")
 			return nil
 		}
-		if estimatedRequestTokens(messages, tools) > requestTokenEstimateBudget {
+		availableTools := tools
+		choice := ""
+		if repairs > 0 || (stepLimit > 0 && steps == stepLimit-1 && len(refs.All()) > 0) {
+			availableTools = nil
+			for _, spec := range tools {
+				if spec.Name == core.SubmitAnswerName {
+					availableTools = append(availableTools, spec)
+				}
+			}
+			if len(availableTools) == 0 {
+				choice = "none"
+			}
+		}
+		if estimatedRequestTokens(messages, availableTools) > requestTokenEstimateBudget {
 			status := "needs_input"
 			if steps > 0 {
 				status = "partial"
@@ -84,34 +135,31 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			emitDone(status, "The context budget was reached. Narrow the request or start a new conversation; completed results remain available.", false, "")
 			return nil
 		}
-		turn, err := l.streamer.StreamTurn(ctx, llm.TurnRequest{
-			Messages: messages,
-			Tools:    tools,
-			OnThinking: func(delta string) {
-				if delta == "" {
-					return
-				}
-				emit(contracts.AIChatSSEEvent{
-					Type: "thinking_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(), Delta: delta,
-				})
-			},
-		}, func(delta string) {
-			if delta == "" {
-				return
-			}
-			emit(contracts.AIChatSSEEvent{
-				Type: "text_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(), Delta: delta,
-			})
-		})
+		// Never publish raw thinking or partial prose, including on cancellation.
+		emit(contracts.AIChatSSEEvent{Type: "answer_progress", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
+		modelCtx, cancelModel := context.WithTimeout(ctx, 2*time.Minute)
+		turn, err := l.streamer.StreamTurn(modelCtx, llm.TurnRequest{Messages: messages, Tools: availableTools, ToolChoice: choice, MaxOutputBytes: 256 * 1024}, nil)
+		cancelModel()
+		if ctx.Err() != nil {
+			emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
+			return nil
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
 				return nil
 			}
 			emitDone("failed", "The model response could not be completed.", true, "")
-			return err
+			return fmt.Errorf("model response could not be completed")
 		}
 		if len(turn.ToolCalls) == 0 {
+			if proseNeedsReferences(turn.Content, refs) {
+				if reject() {
+					continue
+				}
+				return nil
+			}
+			emitText(turn.Content)
 			if strings.TrimSpace(turn.Content) == "" {
 				emitDone("failed", "The model returned no answer.", true, "")
 			} else if needsInput {
@@ -128,7 +176,24 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			return nil
 		}
 
-		assistant := llm.ChatMessage{Role: "assistant", Content: turn.Content, ToolCalls: turn.ToolCalls}
+		invalidBatch := false
+		for _, call := range turn.ToolCalls {
+			if (call.Name() == core.SubmitAnswerName && len(turn.ToolCalls) != 1) || (repairs > 0 && call.Name() != core.SubmitAnswerName) {
+				invalidBatch = true
+			}
+		}
+		if invalidBatch {
+			if reject() {
+				continue
+			}
+			return nil
+		}
+		for i := range turn.ToolCalls {
+			if turn.ToolCalls[i].ID == "" {
+				turn.ToolCalls[i].ID = fmt.Sprintf("call_%d_%d", steps, i)
+			}
+		}
+		assistant := llm.ChatMessage{Role: "assistant", ToolCalls: turn.ToolCalls}
 		messages = append(messages, assistant)
 		for _, call := range turn.ToolCalls {
 			steps++
@@ -141,18 +206,24 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				ToolCallID: toolCallID, Name: call.Name(),
 			})
 			token, args := extractConfirmToken(nonzeroJSON(call.Args()))
-			result := l.gateway.Invoke(ctx, core.Call{
-				Name:       call.Name(),
-				Args:       args,
-				SessionID:  sessionID,
-				Channel:    core.ChannelChat,
-				ConfirmTok: token,
-				Sanitize:   l.sanitize,
-			})
+			result := core.Result{}
+			def, _ := l.gateway.Registry().Get(call.Name())
+			if def.Permission == core.PermissionWritePreview && writeHasUnsupportedCodes(args, refs, userText) {
+				result = rejectedAnswerResult()
+			} else {
+				result = l.gateway.Invoke(ctx, core.Call{
+					Name:       call.Name(),
+					Args:       args,
+					SessionID:  sessionID,
+					Channel:    core.ChannelChat,
+					ConfirmTok: token,
+					Sanitize:   l.sanitize,
+				})
+			}
 			if result.OK {
-				l.gateway.RememberMovieRefs(sessionID, core.ExtractMovieRefs(result))
-				l.gateway.RememberActorNames(sessionID, core.ExtractActorNames(result))
-				l.gateway.RememberSourceURLs(sessionID, core.ExtractSourceURLs(result))
+				l.gateway.RememberMovieRefs(scope, core.ExtractMovieRefs(result))
+				l.gateway.RememberActorNames(scope, core.ExtractActorNames(result))
+				l.gateway.RememberSourceURLs(scope, core.ExtractSourceURLs(result))
 			}
 			if !result.OK {
 				hadFailure = true
@@ -165,30 +236,69 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				if resolution.Status == "matched" {
 					for _, candidate := range resolution.Candidates {
 						if candidate.MovieID != "" {
-							l.gateway.RememberMovieRefs(sessionID, []core.MovieRef{{ID: candidate.MovieID, Title: candidate.Title, Code: candidate.Code}})
+							l.gateway.RememberMovieRefs(scope, []core.MovieRef{{ID: candidate.MovieID, Title: candidate.Title, Code: candidate.Code}})
 						}
 						if candidate.ActorName != "" {
-							l.gateway.RememberActorNames(sessionID, []string{candidate.ActorName})
+							l.gateway.RememberActorNames(scope, []string{candidate.ActorName})
 						}
 					}
 				} else {
 					needsInput = true
 				}
 			}
-			summary := toolSummary(call.Name(), result)
+			summary := "Retrieved records are available."
+			if !result.OK {
+				summary = "The tool could not complete this request."
+			}
+			if result.ConfirmToken != "" {
+				summary = "A draft is waiting for confirmation."
+			}
 			ok := result.OK
 			movies := presentMovieCards(call.Name(), result)
+			if len(movies) > 0 {
+				publication := &core.AnswerSubmission{}
+				for _, movie := range movies {
+					if ref, ok := refs.LocalMovie(movie.MovieID); ok {
+						publication.Items = append(publication.Items, core.AnswerItem{Ref: ref})
+					}
+				}
+				_, movies, answerEvidence = renderAnswer(publication, l.locale)
+			}
 			providerRows := providerTitleRows(call.Name(), result)
+			toolEvidence := evidenceForTool(call.Name(), result)
+			if call.Name() == core.SubmitAnswerName {
+				toolEvidence = nil
+			} // May contain multiple sources; use the final per-record snapshot.
 			emit(contracts.AIChatSSEEvent{
 				Type: "tool_call_result", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 				ToolCallID: toolCallID, Name: call.Name(), OK: &ok, Summary: summary, Truncated: result.Truncated,
-				Movies: movies, ProviderRows: providerRows, Resolution: resolution, Evidence: evidenceForTool(call.Name(), result),
+				Movies: movies, ProviderRows: providerRows, Resolution: resolution, Evidence: toolEvidence,
 			})
 			if len(movies) > 0 {
 				emit(contracts.AIChatSSEEvent{
 					Type: "movie_cards", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 					ToolCallID: toolCallID, Name: call.Name(), Movies: movies,
 				})
+			}
+			if result.Answer != nil && result.OK && call.Name() == core.SubmitAnswerName {
+				text, cards, snapshot := renderAnswer(result.Answer, l.locale)
+				answerEvidence = snapshot
+				emitText(text)
+				if len(cards) > 0 {
+					emit(contracts.AIChatSSEEvent{Type: "movie_cards", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(), Name: call.Name(), ToolCallID: toolCallID, Movies: cards})
+				}
+				status := "completed"
+				if result.Answer.Query != "" {
+					status = "needs_input"
+				}
+				if hadFailure || hadTruncation {
+					status = "partial"
+				}
+				if needsInput {
+					status = "needs_input"
+				}
+				emitDone(status, "", false, "")
+				return nil
 			}
 			if result.ConfirmToken != "" {
 				confirmArgs := result.ConfirmArgs
@@ -213,6 +323,16 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				ToolCallID: toolCallID,
 				Content:    wrapToolContent(payload),
 			})
+			if call.Name() == core.SubmitAnswerName || (result.Error != nil && result.Error.Code == "AI_ANSWER_REJECTED") {
+				if len(turn.ToolCalls) > 1 {
+					emitDone("partial", "A proposed answer could not be verified.", false, "answer_rejected")
+					return nil
+				}
+				if !reject() {
+					return nil
+				}
+				break
+			}
 			if stepLimit > 0 && steps >= stepLimit {
 				break
 			}

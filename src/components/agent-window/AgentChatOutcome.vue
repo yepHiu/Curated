@@ -7,6 +7,7 @@ const props = defineProps<{ outcome: AIChatOutcomeDTO }>()
 const { t } = useI18n()
 
 const reasonKeys: Record<string, string> = {
+  answer_rejected: "agentWindow.outcomeReasons.answerRejected",
   tool_step_limit: "agentWindow.outcomeReasons.toolStepLimit",
   confirmation_required: "agentWindow.outcomeReasons.confirmationRequired",
   write_applied: "agentWindow.outcomeReasons.writeApplied",

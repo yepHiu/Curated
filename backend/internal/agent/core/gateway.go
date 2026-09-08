@@ -111,7 +111,11 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 
 	// Human confirmation is outside the model's per-turn tool budget.
 	if !apply {
-		step := g.budget.addStep(call.SessionID)
+		stepKey := call.SessionID
+		if refs := AnswerRefsFromContext(ctx); refs != nil {
+			stepKey = refs.Scope()
+		}
+		step := g.budget.addStep(stepKey)
 		if limit := settings.stepLimit(); limit > 0 && step > limit {
 			return fail(ErrRateLimited, "AI_RATE_LIMITED", "tool step limit reached"), def.Permission, ResultRejected, "AI_RATE_LIMITED"
 		}
@@ -141,7 +145,12 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 	if apply && def.Apply != nil {
 		handler = def.Apply
 	}
-	raw, err := handler(callCtx, call)
+	handlerCall := call
+	if refs := AnswerRefsFromContext(ctx); refs != nil && def.Permission == PermissionRead {
+		// Read anchors use a request scope; audit and confirmation keep the real session.
+		handlerCall.SessionID = refs.Scope()
+	}
+	raw, err := handler(callCtx, handlerCall)
 	if err != nil {
 		return fail(err, "AI_CHAT_FAILED", err.Error()), def.Permission, ResultError, "AI_CHAT_FAILED"
 	}

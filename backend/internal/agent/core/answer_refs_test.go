@@ -7,10 +7,12 @@ import (
 	"testing"
 )
 
+// answerResult 构造查询工具的合成记录封装，用于引用测试。
 func answerResult(row map[string]any) Result {
 	return Result{OK: true, Data: map[string]any{"source": map[string]any{"items": []any{row}}}}
 }
 
+// TestAnswerRefsIsolationAndImmutableSources 验证 Answer Refs Isolation And Immutable Sources 的行为与失败边界，使用隔离测试数据。
 func TestAnswerRefsIsolationAndImmutableSources(t *testing.T) {
 	a, b := NewAnswerRefStore(), NewAnswerRefStore()
 	row := map[string]any{"id": "m1", "code": "TEST-101", "title": "Local", "actors": []string{"Actor"}, "runtimeMinutes": 0}
@@ -42,6 +44,7 @@ func TestAnswerRefsIsolationAndImmutableSources(t *testing.T) {
 	}
 }
 
+// TestAnswerRefsRejectUntrustedEnvelopes 验证 Answer Refs Reject Untrusted Envelopes 的行为与失败边界，使用隔离测试数据。
 func TestAnswerRefsRejectUntrustedEnvelopes(t *testing.T) {
 	s := NewAnswerRefStore()
 	r := answerResult(map[string]any{"id": "m1", "code": "TEST-101"})
@@ -64,8 +67,10 @@ func TestAnswerRefsRejectUntrustedEnvelopes(t *testing.T) {
 	}
 }
 
+// TestGatewayCapturesBeforeMinimalProjection 验证 Gateway Captures Before Minimal Projection 的行为与失败边界，使用隔离测试数据。
 func TestGatewayCapturesBeforeMinimalProjection(t *testing.T) {
 	reg := NewRegistry()
+	// 消费当前请求的可信记录，拒绝模型自行填入的事实。
 	_ = reg.Register(ToolDefinition{Name: "search_movies", Permission: PermissionRead, ParamsSchema: Schema{Type: "object"}, Handler: func(context.Context, Call) (Result, error) {
 		return answerResult(map[string]any{"id": "m1", "code": "TEST-101", "title": "PRIVATE_TITLE"}), nil
 	}})

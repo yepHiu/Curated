@@ -100,6 +100,9 @@ defineExpose({
             @open="emit('openMovie', $event)"
           />
         </div>
+      <p v-if="entry.answerEvidence?.items.length" class="text-xs text-muted-foreground" data-agent-answer-evidence>
+        {{ t('agentWindow.answerEvidenceHint', { count: entry.answerEvidence.items.length }) }}
+      </p>
       </div>
       <AgentChatConfirm
         v-else-if="entry.kind === 'confirm'"

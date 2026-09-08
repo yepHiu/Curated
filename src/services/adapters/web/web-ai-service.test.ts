@@ -12,6 +12,40 @@ function response(events: unknown[]) {
 }
 
 describe("AI transport termination", () => {
+  it("delivers server progress and published evidence while suppressing raw thinking", async () => {
+    const answerEvidence = { version: 1, items: [{ refId: "r1", source: "local", tool: "search_movies", retrievedAt: "2026-09-09T00:00:00Z", fields: { code: "TEST-101" } }] }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([
+      { type: "answer_progress" }, { type: "thinking_delta", delta: "FAKE-999" },
+      { type: "text_delta", delta: "Published record" },
+      { type: "message_done", outcome: { status: "completed" }, answerEvidence },
+    ])))
+    const onThinking = vi.fn(), onAnswerProgress = vi.fn(), onAnswerEvidence = vi.fn(), onDelta = vi.fn()
+    await webAIService.streamChat(input, { onThinking, onAnswerProgress, onAnswerEvidence, onDelta })
+    expect(onThinking).not.toHaveBeenCalled()
+    expect(onAnswerProgress).toHaveBeenCalledOnce()
+    expect(onAnswerEvidence).toHaveBeenCalledWith(answerEvidence)
+    expect(onDelta).toHaveBeenCalledExactlyOnceWith("Published record")
+  })
+
+  it("accepts SSE heartbeats across a long buffered answer without a false idle timeout", async () => {
+    vi.useFakeTimers()
+    let controller!: ReadableStreamDefaultController<Uint8Array>
+    const stream = new ReadableStream<Uint8Array>({ start(c) { controller = c } })
+    const encoder = new TextEncoder()
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream)))
+    const onDelta = vi.fn()
+    const pending = webAIService.streamChat(input, { onDelta })
+    for (let i = 0; i < 8; i++) {
+      await vi.advanceTimersByTimeAsync(15_000)
+      controller.enqueue(encoder.encode(": keep-alive\n\n"))
+      await vi.advanceTimersByTimeAsync(0)
+    }
+    controller.enqueue(encoder.encode('data: {"type":"text_delta","delta":"checked"}\n\ndata: {"type":"message_done"}\n\n'))
+    controller.close()
+    await pending
+    expect(onDelta).toHaveBeenCalledExactlyOnceWith("checked")
+    expect(vi.getTimerCount()).toBe(0)
+  })
   it("preserves partial text and reports an EOF without a terminal event", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([{ type: "text_delta", delta: "partial" }])))
     const onDelta = vi.fn()

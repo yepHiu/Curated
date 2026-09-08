@@ -32,6 +32,7 @@ function requestDeadline(parent: AbortSignal | undefined, milliseconds: number) 
 }
 
 interface SSEEventPayload {
+  answerEvidence?: import("@/api/types").AIAnswerEvidenceDTO
   type?: string
   delta?: string
   code?: string
@@ -121,8 +122,8 @@ async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHan
       case "text_delta":
         if (payload.delta) handlers.onDelta(payload.delta)
         break
-      case "thinking_delta":
-        if (payload.delta) handlers.onThinking?.(payload.delta)
+      case "answer_progress":
+        handlers.onAnswerProgress?.()
         break
       case "tool_call_started":
         handlers.onToolStart?.({
@@ -148,6 +149,7 @@ async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHan
         break
       case "message_done":
         completed = true
+        if (payload.answerEvidence) handlers.onAnswerEvidence?.(payload.answerEvidence)
         if (payload.outcome) handlers.onOutcome?.(payload.outcome)
         break
       case "movie_cards":

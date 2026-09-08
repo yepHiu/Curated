@@ -5,6 +5,13 @@ import type { AIChatStoredMessageDTO } from "@/api/types"
 const base = { id: "reply", sessionId: "s1", role: "assistant", seq: 2, createdAt: "", content: "partial answer" }
 
 describe("persisted AI turns", () => {
+  it("restores the published source snapshot without granting a new reference", () => {
+    const answerEvidence = { version: 1 as const, items: [{ refId: "expired", source: "provider" as const, tool: "search_provider_titles", retrievedAt: "2026-09-09T00:00:00Z", fields: { code: "TEST-101" } }] }
+    const entries = restoreChatHistory([{ ...base, events: [{ type: "message_done", outcome: { status: "completed" }, answerEvidence }] }])
+    expect(entries.find(e => e.kind === "assistant")).toMatchObject({ answerEvidence })
+    expect(entries.some(e => e.kind === "confirm")).toBe(false)
+    expect(restoreChatHistory([base]).find(e => e.kind === "assistant")).toMatchObject({ answerEvidence: undefined })
+  })
   it("restores committed confirmations without granting write authority", () => {
     const entries = restoreChatHistory([{ ...base, events: [
       { type: "confirm_required", name: "save_movie_comment", receiptId: "hash", applied: true },

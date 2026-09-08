@@ -8,17 +8,22 @@ import (
 	"curated-backend/internal/agent/core"
 )
 
+// RegisterPresentTools 注册结构化终结回答与兼容卡片工具。
 func RegisterPresentTools(reg *core.Registry, refs *core.MovieRefStore) error {
+	if err := reg.Register(core.SubmitAnswerTool()); err != nil {
+		return err
+	}
 	if err := reg.Register(presentMovies(refs)); err != nil {
 		return err
 	}
 	return nil
 }
 
+// presentMovies 从本轮本地读取快照生成卡片，忽略模型自由推荐理由。
 func presentMovies(refs *core.MovieRefStore) core.ToolDefinition {
 	itemSchema := object(map[string]core.Schema{
 		"movieId": strField("Movie id from search_movies, get_movie_detail, or get_watch_history in this turn"),
-		"reason":  {Type: "string", Description: "One-line reason using retrieved fields only", MaxLength: 200},
+		"reason":  {Type: "string", Description: "Deprecated; not displayed. Use submit_answer with reasonFacts for recorded facts.", MaxLength: 200},
 	}, "movieId")
 	schema := object(map[string]core.Schema{
 		"items": {
@@ -32,14 +37,15 @@ func presentMovies(refs *core.MovieRefStore) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name: core.PresentMoviesName,
 		Description: "Show up to 6 movie cards in the chat UI. Call this when recommending or pointing at specific titles. " +
-			"movieId must come from search_movies, get_movie_detail, get_watch_history, or in-library search_provider_titles rows in this turn. " +
-			"Never invent IDs. Off-library provider titles have no movieId. Optional reason is one sentence citing retrieved fields (actors, runtime, tags, rating).",
+			"movieId needs a local read from search_movies, get_movie_detail or get_watch_history in this request; page IDs and provider rows alone are insufficient. " +
+			"Never invent IDs. Off-library provider titles have no movieId. Prefer submit_answer to finish recommendations with server-rendered facts. reason is deprecated and is not displayed.",
 		ParamsSchema: schema,
 		Permission:   core.PermissionRead,
 		Domain:       core.DomainPresent,
+		// 先验证实体锚点，再从请求内本地快照填入字段，不复用来源站字段。
 		Handler: func(ctx context.Context, call core.Call) (core.Result, error) {
 			args := decodeArgs(call.Args)
-			requested, ids := presentMovieItems(args["items"])
+			_, ids := presentMovieItems(args["items"])
 			if len(ids) == 0 {
 				return core.Result{OK: false, Error: &core.ToolError{
 					Code:    "AI_TOOL_INVALID_ARGS",
@@ -55,6 +61,16 @@ func presentMovies(refs *core.MovieRefStore) core.ToolDefinition {
 			}
 			cards := make([]map[string]any, 0, len(found))
 			for _, ref := range found {
+				if store := core.AnswerRefsFromContext(ctx); store != nil {
+					snapshot, ok := store.LocalMovie(ref.ID)
+					if !ok {
+						return core.Result{Error: &core.ToolError{Code: "AI_ANSWER_REJECTED", Message: "Read local movie details before presenting a card."}}, nil
+					}
+					card := snapshot.Fields
+					card["id"], card["movieId"] = snapshot.MovieID, snapshot.MovieID
+					cards = append(cards, card)
+					continue
+				}
 				card := map[string]any{
 					"id":       ref.ID,
 					"movieId":  ref.ID,
@@ -63,9 +79,6 @@ func presentMovies(refs *core.MovieRefStore) core.ToolDefinition {
 					"actors":   ref.Actors,
 					"coverUrl": ref.CoverURL,
 					"thumbUrl": ref.ThumbURL,
-				}
-				if reason := requested[ref.ID]; reason != "" {
-					card["reason"] = reason
 				}
 				cards = append(cards, card)
 			}

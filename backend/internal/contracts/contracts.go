@@ -1186,30 +1186,47 @@ type AIToolApplyDTO struct {
 }
 
 // AIChatSSEEvent is one server-sent event on POST /api/ai/chat.
+// AIAnswerEvidenceDTO snapshots published facts, not reusable tool authority.
+type AIAnswerEvidenceDTO struct {
+	Version int                       `json:"version"`
+	Items   []AIAnswerEvidenceItemDTO `json:"items"`
+}
+
+type AIAnswerEvidenceItemDTO struct {
+	RefID       string         `json:"refId"`
+	MovieID     string         `json:"movieId,omitempty"`
+	Source      string         `json:"source"`
+	Tool        string         `json:"tool"`
+	RetrievedAt string         `json:"retrievedAt"`
+	Truncated   bool           `json:"truncated,omitempty"`
+	Fields      map[string]any `json:"fields"`
+}
+
 type AIChatSSEEvent struct {
-	ReceiptID    string                    `json:"receiptId,omitempty"`
-	Applied      bool                      `json:"applied,omitempty"`
-	Type         string                    `json:"type"`
-	SessionID    string                    `json:"sessionId,omitempty"`
-	MessageID    string                    `json:"messageId,omitempty"`
-	Seq          int                       `json:"seq,omitempty"`
-	Delta        string                    `json:"delta,omitempty"`
-	ToolCallID   string                    `json:"toolCallId,omitempty"`
-	Name         string                    `json:"name,omitempty"`
-	OK           *bool                     `json:"ok,omitempty"`
-	Summary      string                    `json:"summary,omitempty"`
-	Truncated    bool                      `json:"truncated,omitempty"`
-	Movies       []AIAgentMovieCardDTO     `json:"movies,omitempty"`
-	ProviderRows []AIAgentProviderTitleDTO `json:"providerRows,omitempty"`
-	Resolution   *AIEntityResolutionDTO    `json:"resolution,omitempty"`
-	Evidence     *AIEvidenceDTO            `json:"evidence,omitempty"`
-	Outcome      *AIChatOutcomeDTO         `json:"outcome,omitempty"`
-	ConfirmToken string                    `json:"confirmToken,omitempty"`
-	ExpiresAt    string                    `json:"expiresAt,omitempty"`
-	Changes      []AIConfirmChangeDTO      `json:"changes,omitempty"`
-	Arguments    json.RawMessage           `json:"arguments,omitempty"`
-	Code         string                    `json:"code,omitempty"`
-	Message      string                    `json:"message,omitempty"`
+	AnswerEvidence *AIAnswerEvidenceDTO      `json:"answerEvidence,omitempty"`
+	ReceiptID      string                    `json:"receiptId,omitempty"`
+	Applied        bool                      `json:"applied,omitempty"`
+	Type           string                    `json:"type"`
+	SessionID      string                    `json:"sessionId,omitempty"`
+	MessageID      string                    `json:"messageId,omitempty"`
+	Seq            int                       `json:"seq,omitempty"`
+	Delta          string                    `json:"delta,omitempty"`
+	ToolCallID     string                    `json:"toolCallId,omitempty"`
+	Name           string                    `json:"name,omitempty"`
+	OK             *bool                     `json:"ok,omitempty"`
+	Summary        string                    `json:"summary,omitempty"`
+	Truncated      bool                      `json:"truncated,omitempty"`
+	Movies         []AIAgentMovieCardDTO     `json:"movies,omitempty"`
+	ProviderRows   []AIAgentProviderTitleDTO `json:"providerRows,omitempty"`
+	Resolution     *AIEntityResolutionDTO    `json:"resolution,omitempty"`
+	Evidence       *AIEvidenceDTO            `json:"evidence,omitempty"`
+	Outcome        *AIChatOutcomeDTO         `json:"outcome,omitempty"`
+	ConfirmToken   string                    `json:"confirmToken,omitempty"`
+	ExpiresAt      string                    `json:"expiresAt,omitempty"`
+	Changes        []AIConfirmChangeDTO      `json:"changes,omitempty"`
+	Arguments      json.RawMessage           `json:"arguments,omitempty"`
+	Code           string                    `json:"code,omitempty"`
+	Message        string                    `json:"message,omitempty"`
 }
 
 // PatchSettingsRequest is the body for PATCH /api/settings (partial update).

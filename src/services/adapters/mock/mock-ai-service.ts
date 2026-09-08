@@ -107,7 +107,7 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
 
   const tool = fakeToolFor(lastUser.content)
   if (tool) {
-    handlers.onThinking?.("先从资料库核对一下。")
+    handlers.onAnswerProgress?.()
     await sleep(MOCK_CHUNK_DELAY_MS, handlers.signal)
     const toolCallId = nextId("call_")
     handlers.onToolStart?.({ toolCallId, name: tool.name })

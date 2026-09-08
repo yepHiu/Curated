@@ -213,7 +213,8 @@
     "toolRunningNamed": "{name}中",
     "toolOk": "照会済み",
     "toolFailed": "照会失敗",
-    "thinking": "考え中",
+    "thinking": "結果を整理中",
+    "answerEvidenceHint": "作品情報は今回取得した {count} 件の記録に基づきます。",
     "thought": "考え済み",
     "presentedMovies": "作品を表示",
     "openMovie": "作品の詳細を開く",
@@ -254,6 +255,7 @@
     },
     "outcomeSaved": "保存済み",
     "outcomeReasons": {
+      "answerRejected": "一部の作品情報を確認できなかったため、下書きは表示されませんでした。",
       "toolStepLimit": "設定したツール呼び出し上限に達しました。タスクは未完了ですが、取得済みの結果は保持されています。上限を増やすか無効にして続行してください。",
       "confirmationRequired": "プレビューの準備ができましたが、まだ保存されていません。確認カードで変更を確定してください。",
       "writeApplied": "確認した変更を保存しました。",
@@ -302,6 +304,7 @@
       "tag": "タグ"
     },
     "tools": {
+      "submitAnswer": "作品の回答を整理",
       "resolveEntities": "作品または俳優を照合",
       "libraryOverview": "ライブラリ概要",
       "searchMovies": "作品を検索",

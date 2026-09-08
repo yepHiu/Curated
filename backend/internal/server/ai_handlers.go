@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"curated-backend/internal/agent/core"
@@ -69,7 +71,7 @@ func (h *Handler) handleAIProviderTest(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAIChat streams one agent turn as SSE events:
-// message_start -> (thinking_delta | text_delta | tool_call_started | tool_call_result | movie_cards)* -> message_done,
+// message_start -> (answer_progress | checked text_delta | tool_call_started | tool_call_result | movie_cards)* -> message_done,
 // where tool_call_result can carry evidence, provider rows, or entity resolution
 // and message_done always carries an explicit outcome when produced by the loop,
 // or a terminal error event.
@@ -110,13 +112,30 @@ func (h *Handler) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	err := h.aiChatProvider.StreamAIChat(r.Context(), req, func(ev contracts.AIChatSSEEvent) {
+	err := streamAIEvents(r.Context(), 15*time.Second, func(ctx context.Context, emit func(contracts.AIChatSSEEvent)) error {
+		// 运行应用层生产者，将响应写入交给单一消费者。
+		return h.aiChatProvider.StreamAIChat(ctx, req, emit)
+	}, func(ev contracts.AIChatSSEEvent) error {
+		// 串行写入事件并立即刷新，写入失败会取消生产者。
 		if strings.TrimSpace(ev.Type) == "" {
-			return
+			return nil
 		}
-		_ = writeSSEJSON(w, ev.Type, ev)
+		if err := writeSSEJSON(w, ev.Type, ev); err != nil {
+			return err
+		}
 		flusher.Flush()
+		return nil
+	}, func() error {
+		// 注释心跳仅保持下游连接，不重置模型生成期限。
+		if _, err := io.WriteString(w, ": keep-alive\n\n"); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
 	})
+	if r.Context().Err() != nil {
+		return
+	}
 	if err != nil {
 		code := contracts.ErrorCodeAIChatFailed
 		var toolErr *core.ToolError

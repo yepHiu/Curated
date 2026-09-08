@@ -227,6 +227,35 @@ describe("AgentWindow", () => {
     expect(wrapper.find("[data-agent-thinking]").text()).toContain("先找未看")
   })
 
+  // 验证缓冲期间展示服务端进度，发布后显示来源记录数量。
+  it("shows server progress and evidence after a checked answer", async () => {
+    let handlers!: AIChatStreamHandlers
+    let finish!: () => void
+    // 保持请求打开，分别检查发布前与发布后的界面状态。
+    streamChatMock.mockImplementation((_input: unknown, callbacks: AIChatStreamHandlers) => {
+      handlers = callbacks
+      // 测试显式控制模型完成时机。
+      return new Promise<void>((resolve) => { finish = resolve })
+    })
+    const wrapper = mountWindow()
+    await flushPromises()
+    await wrapper.find("[data-agent-window-input]").setValue("查询作品")
+    await wrapper.find("[data-agent-window-send]").trigger("click")
+    await flushPromises()
+    handlers.onAnswerProgress?.()
+    await flushPromises()
+    expect(wrapper.find("[data-agent-process]").text()).toContain("agentWindow.thinking")
+    expect(wrapper.find("[data-agent-thinking]").exists()).toBe(false)
+    expect(wrapper.find("[data-agent-answer-evidence]").exists()).toBe(false)
+    handlers.onDelta("本地记录：TEST-101")
+    handlers.onAnswerEvidence?.({ version: 1, items: [{ refId: "r1", source: "local", tool: "search_movies", retrievedAt: "2026-09-09T00:00:00Z", fields: { code: "TEST-101" } }] })
+    handlers.onOutcome?.({ status: "completed" })
+    finish()
+    await flushPromises()
+    expect(wrapper.find("[data-agent-answer-evidence]").text()).toContain("agentWindow.answerEvidenceHint")
+    expect(wrapper.text()).toContain("TEST-101")
+  })
+
   it("keeps thinking mounted between streamed tool, reasoning and answer events", async () => {
     let handlers!: AIChatStreamHandlers
     let finish!: () => void

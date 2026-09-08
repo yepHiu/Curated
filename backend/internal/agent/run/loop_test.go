@@ -248,7 +248,7 @@ func TestLoopPresentMoviesEmitsCardsAfterSearch(t *testing.T) {
 			cards = ev.Movies
 		}
 	}
-	if len(cards) != 1 || cards[0].MovieID != "m1" || cards[0].Reason != "轻松短片" {
+	if len(cards) != 1 || cards[0].MovieID != "m1" || cards[0].Reason != "" {
 		t.Fatalf("movie_cards = %+v events=%+v", cards, events)
 	}
 }
@@ -309,6 +309,7 @@ func TestLoopSeedsSelectedContextEntities(t *testing.T) {
 		t.Fatal(err)
 	}
 	streamer := &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "detail", Function: llm.ToolCallFunction{Name: "get_movie_detail", Arguments: `{"movieId":"m1"}`}}}},
 		{ToolCalls: []llm.ToolCall{{
 			ID:       "call_present",
 			Function: llm.ToolCallFunction{Name: core.PresentMoviesName, Arguments: `{"items":[{"movieId":"m1","reason":"selected"}]}`},
@@ -486,7 +487,7 @@ func (s thinkingStreamer) StreamTurn(_ context.Context, req llm.TurnRequest, onD
 	return llm.AssistantTurn{Content: s.content}, nil
 }
 
-func TestLoopEmitsThinkingDelta(t *testing.T) {
+func TestLoopDoesNotPublishRawThinking(t *testing.T) {
 	t.Parallel()
 	reg := core.NewRegistry()
 	gateway := core.NewGateway(reg, nil, nil, nil)
@@ -498,7 +499,7 @@ func TestLoopEmitsThinkingDelta(t *testing.T) {
 			thinking += ev.Delta
 		}
 	}
-	if thinking != "先查未看" {
+	if thinking != "" {
 		t.Fatalf("thinking_delta = %q events=%+v", thinking, events)
 	}
 }

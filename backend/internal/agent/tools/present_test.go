@@ -59,7 +59,7 @@ func TestPresentMoviesRequiresSeenIDs(t *testing.T) {
 		t.Fatalf("present after search = %+v", shown)
 	}
 	raw, _ := json.Marshal(shown.Data)
-	if !strings.Contains(string(raw), "ABC-123") || !strings.Contains(string(raw), "轻松短片") {
+	if !strings.Contains(string(raw), "ABC-123") || strings.Contains(string(raw), "轻松短片") {
 		t.Fatalf("missing projection: %s", raw)
 	}
 }

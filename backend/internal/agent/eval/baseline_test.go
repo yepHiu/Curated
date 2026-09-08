@@ -76,7 +76,11 @@ func evalSelectedLocalMovie(ctx context.Context) error {
 	if err := tools.RegisterPresentTools(registry, gateway.MovieRefs()); err != nil {
 		return err
 	}
+	_ = registry.Register(core.ToolDefinition{Name: "get_movie_detail", Permission: core.PermissionRead, ParamsSchema: evalObjectSchema(), Handler: func(context.Context, core.Call) (core.Result, error) {
+		return core.Result{OK: true, Data: map[string]any{"source": map[string]any{"id": "m1", "code": "TEST-101", "title": "Synthetic local record"}}}, nil
+	}})
 	loop := run.NewLoop(gateway, &llm.ScriptedStreamer{Turns: []llm.AssistantTurn{
+		{ToolCalls: []llm.ToolCall{{ID: "detail", Function: llm.ToolCallFunction{Name: "get_movie_detail", Arguments: `{}`}}}},
 		{ToolCalls: []llm.ToolCall{{ID: "present", Function: llm.ToolCallFunction{Name: core.PresentMoviesName, Arguments: `{"items":[{"movieId":"m1","reason":"explicit local selection"}]}`}}}},
 		{Content: "I showed the selected local title."},
 	}}, core.SanitizeFull, "en")
@@ -157,7 +161,7 @@ func evalReadFailureStaysVisible(ctx context.Context) error {
 	var failed bool
 	var text strings.Builder
 	err := loop.Run(ctx, "ses_eval", "msg_eval", []llm.ChatMessage{{Role: "user", Content: "check catalog"}}, nil, func(event contracts.AIChatSSEEvent) {
-		if event.Type == "tool_call_result" && event.OK != nil && !*event.OK && strings.Contains(event.Summary, "catalog unavailable") {
+		if event.Type == "tool_call_result" && event.OK != nil && !*event.OK && event.Evidence != nil && event.Evidence.Failed {
 			failed = true
 		}
 		if event.Type == "text_delta" {

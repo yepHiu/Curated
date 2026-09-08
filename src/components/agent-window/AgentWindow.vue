@@ -507,6 +507,18 @@ async function send(selected?: AIEntityCandidateDTO) {
           current.thinkingActive = true
           void scrollListToEnd()
         },
+        /** 显示服务端处理状态，不接收模型原始思考文本。 */
+        onAnswerProgress() {
+          if (seq !== streamSeq || controller.signal.aborted) return
+          const current = findProcessFor(assistantId)
+          if (current) current.thinkingActive = true
+        },
+        /** 仅将本请求发布的事实快照附到对应回答，避免异步结果串入其他轮次。 */
+        onAnswerEvidence(evidence) {
+          if (seq !== streamSeq || controller.signal.aborted) return
+          const current = entries.value.find((entry) => entry.id === assistantId)
+          if (current?.kind === "assistant") current.answerEvidence = evidence
+        },
         onDelta(delta) {
           if (seq !== streamSeq || controller.signal.aborted) return
           const process = findProcessFor(assistantId)

@@ -60,7 +60,7 @@ func TestSystemPromptUsesExternalTemplate(t *testing.T) {
 	if strings.Contains(systemPromptTemplate, "Visible page context") {
 		t.Fatal("request-scoped context must remain outside the static prompt asset")
 	}
-	if Version != "agent-system-v2" {
+	if Version != "agent-system-v3" {
 		t.Fatalf("version = %q", Version)
 	}
 }

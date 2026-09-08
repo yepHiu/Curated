@@ -25,6 +25,7 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
       }
     } else if (message.role === "assistant") {
       const trailing: AgentChatEntry[] = []
+      let answerEvidence: import("@/api/types").AIAnswerEvidenceDTO | undefined
       for (const [index, event] of (message.events ?? []).entries()) {
         const id = `${message.id}-event-${index}`
         if (event.movies?.length) movies = event.movies
@@ -35,6 +36,7 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
           })
           if (event.resolution && event.resolution.status !== "matched") trailing.push({ id, kind: "resolution", resolution: event.resolution })
         } else if (event.type === "message_done" && event.outcome) {
+          answerEvidence = event.answerEvidence
           trailing.push({ id, kind: "outcome", outcome: event.outcome })
         } else if (event.type === "confirm_required") {
           trailing.push({ id, kind: "confirm", name: event.name || "", changes: event.changes ?? [],
@@ -42,7 +44,7 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
         }
       }
       flush(message.id)
-      if (message.content || movies.length) entries.push({ id: message.id, kind: "assistant", content: message.content, movies })
+      if (message.content || movies.length) entries.push({ id: message.id, kind: "assistant", content: message.content, movies, answerEvidence })
       movies = []
       entries.push(...trailing)
     }

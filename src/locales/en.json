@@ -213,7 +213,8 @@
     "toolRunningNamed": "{name}",
     "toolOk": "Looked up",
     "toolFailed": "Lookup failed",
-    "thinking": "Thinking",
+    "thinking": "Preparing results",
+    "answerEvidenceHint": "Movie facts come from {count} records retrieved for this answer.",
     "thought": "Thought",
     "presentedMovies": "Showing titles",
     "openMovie": "Open movie details",
@@ -254,6 +255,7 @@
     },
     "outcomeSaved": "Saved",
     "outcomeReasons": {
+      "answerRejected": "Some movie facts could not be verified. The draft was not shown.",
       "toolStepLimit": "Your tool-call limit was reached. The task is unfinished and completed results are preserved. Raise or disable the limit to continue.",
       "confirmationRequired": "The preview is ready but has not been saved. Confirm the changes in the confirmation card.",
       "writeApplied": "The confirmed changes were saved.",
@@ -302,6 +304,7 @@
       "tag": "Tags"
     },
     "tools": {
+      "submitAnswer": "Prepare movie answer",
       "resolveEntities": "Resolve title or actor",
       "libraryOverview": "Library overview",
       "searchMovies": "Search titles",

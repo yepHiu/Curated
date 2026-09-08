@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -70,6 +71,17 @@ func TestStreamChatAccumulatesDeltasAndIgnoresHeartbeats(t *testing.T) {
 	}
 	if full != "你好，世界" {
 		t.Fatalf("full = %q, want 你好，世界", full)
+	}
+}
+
+func TestStreamTurnBoundsAccumulatedOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"123456\"}}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+	_, err := NewClient(ClientConfig{BaseURL: server.URL, Model: "fixture"}, server.Client()).StreamTurn(context.Background(), TurnRequest{MaxOutputBytes: 5}, nil)
+	if err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatal(err)
 	}
 }
 
