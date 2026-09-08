@@ -201,6 +201,9 @@ func TestConcurrentSameSessionCannotUseOtherRunsReference(t *testing.T) {
 // TestWriteDraftRejectsNewCodesButKeepsUserText 验证 Write Draft Rejects New Codes But Keeps User Text 的行为与失败边界，使用隔离测试数据。
 func TestWriteDraftRejectsNewCodesButKeepsUserText(t *testing.T) {
 	refs := core.NewAnswerRefStore()
+	if writeHasUnsupportedCodes(json.RawMessage(`{"movieId":"syn-001","body":"My note"}`), refs, "save My note to the selected movie") {
+		t.Fatal("local foreign key was mistaken for invented prose")
+	}
 	if !writeHasUnsupportedCodes(json.RawMessage(`{"body":"Try FAKE-999"}`), refs, "save a note") {
 		t.Fatal("fabricated draft accepted")
 	}

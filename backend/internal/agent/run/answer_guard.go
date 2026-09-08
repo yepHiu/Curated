@@ -93,7 +93,12 @@ func writeHasUnsupportedCodes(args json.RawMessage, refs *core.AnswerRefStore, u
 				}
 			}
 		case map[string]any:
-			for _, child := range value {
+			for key, child := range value {
+				// A local foreign key may itself look like a catalog code. The
+				// write handler validates its target; it is not generated prose.
+				if key == "movieId" {
+					continue
+				}
 				if unsupported(child) {
 					return true
 				}
