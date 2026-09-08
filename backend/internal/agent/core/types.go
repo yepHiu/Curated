@@ -107,15 +107,16 @@ func (e *ToolError) Error() string { return e.Message }
 
 // Result is the unified tool envelope.
 type Result struct {
-	Preconditions []Change   `json:"-"`
-	OK            bool       `json:"ok"`
-	Data          any        `json:"data,omitempty"`
-	Error         *ToolError `json:"error,omitempty"`
-	Truncated     bool       `json:"truncated,omitempty"`
-	NextCursor    string     `json:"nextCursor,omitempty"`
-	Changes       []Change   `json:"changes,omitempty"`
-	ConfirmToken  string     `json:"confirmToken,omitempty"`
-	ExpiresAt     string     `json:"expiresAt,omitempty"`
+	AnswerRefs    []AnswerRefHint `json:"answerRefs,omitempty"`
+	Preconditions []Change        `json:"-"`
+	OK            bool            `json:"ok"`
+	Data          any             `json:"data,omitempty"`
+	Error         *ToolError      `json:"error,omitempty"`
+	Truncated     bool            `json:"truncated,omitempty"`
+	NextCursor    string          `json:"nextCursor,omitempty"`
+	Changes       []Change        `json:"changes,omitempty"`
+	ConfirmToken  string          `json:"confirmToken,omitempty"`
+	ExpiresAt     string          `json:"expiresAt,omitempty"`
 	// ConfirmArgs is the JSON hashed into the preview token. Not sent to the model.
 	ConfirmArgs json.RawMessage `json:"-"`
 }

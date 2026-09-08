@@ -165,10 +165,13 @@ func (g *Gateway) invoke(ctx context.Context, call Call) (Result, string, string
 		g.budget.addWrite(writeBudgetKey, g.now())
 	}
 
-	raw.Data = Project(raw.Data, call.Sanitize)
 	if !raw.OK && raw.Error == nil {
 		raw.OK = true
 	}
+	if refs := AnswerRefsFromContext(ctx); refs != nil && def.Permission == PermissionRead {
+		raw.AnswerRefs = refs.Capture(call.Name, raw)
+	}
+	raw.Data = Project(raw.Data, call.Sanitize)
 	kind := ResultOK
 	if apply {
 		kind = ResultConfirmed
