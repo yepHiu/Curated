@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { useMediaQuery } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import {
@@ -53,6 +54,7 @@ import {
 } from "@/components/ui/select"
 import LibraryFacetPickerPanel from "@/components/jav-library/LibraryFacetPickerPanel.vue"
 import LibraryTagFilterControl from "@/components/jav-library/LibraryTagFilterControl.vue"
+import SavedViewCreateForm from "@/components/jav-library/SavedViewCreateForm.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
 import {
   aggregateMetadataTagCounts,
@@ -93,7 +95,10 @@ const busy = ref(false)
 const savedViewsMenuOpen = ref(false)
 const createPanelOpen = ref(false)
 const createNameDraft = ref("")
-const createNameInputRef = ref<{ $el?: HTMLElement } | null>(null)
+const createFormRef = ref<InstanceType<typeof SavedViewCreateForm> | null>(null)
+const savedViewsTriggerRef = ref<{ $el?: HTMLElement } | null>(null)
+const canShowCreateSubmenu = useMediaQuery("(min-width: 640px)")
+const createDialogOpen = ref(false)
 const renameDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
 const renameTarget = ref<SavedViewDTO | null>(null)
@@ -484,11 +489,7 @@ const activeFilterChips = computed(() => {
 })
 
 function focusCreateNameInput() {
-  const input = createNameInputRef.value?.$el
-  if (input instanceof HTMLInputElement) {
-    input.focus()
-    input.select()
-  }
+  createFormRef.value?.focus()
 }
 
 function onCreatePanelOpenAutoFocus(event: Event) {
@@ -506,6 +507,32 @@ watch(createPanelOpen, (open) => {
   })
 })
 
+function openCreateDialog() {
+  createNameDraft.value = ""
+  savedViewsMenuOpen.value = false
+  createDialogOpen.value = true
+}
+
+function closeCreate() {
+  createPanelOpen.value = false
+  createDialogOpen.value = false
+  savedViewsMenuOpen.value = false
+}
+
+function restoreSavedViewsFocus(event: Event) {
+  event.preventDefault()
+  savedViewsTriggerRef.value?.$el?.focus()
+}
+
+// Preserve a draft if the viewport changes while the user is naming a bookmark.
+watch(canShowCreateSubmenu, (wide) => {
+  if (!wide && createPanelOpen.value) {
+    createPanelOpen.value = false
+    savedViewsMenuOpen.value = false
+    createDialogOpen.value = true
+  }
+})
+
 function openRenameDialog(item: SavedViewDTO) {
   renameTarget.value = item
   nameDraft.value = item.name
@@ -520,8 +547,7 @@ async function submitCreate() {
   try {
     await libraryService.createSavedView(createNameDraft.value, currentFilters.value)
     pushAppToast(t("library.savedViewCreated"), { variant: "success" })
-    createPanelOpen.value = false
-    savedViewsMenuOpen.value = false
+    closeCreate()
   } catch (error) {
     pushAppToast(errorMessage(error), { variant: "destructive" })
   } finally {
@@ -943,6 +969,7 @@ function filterSummary(filters: SavedViewFiltersV1): string {
           type="button"
           variant="outline"
           data-library-saved-views-toggle
+          ref="savedViewsTriggerRef"
           class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8"
           :aria-label="t('library.savedViews')"
         >
@@ -954,9 +981,10 @@ function filterSummary(filters: SavedViewFiltersV1): string {
         align="end"
         class="w-64 rounded-2xl border-border/70"
         data-library-saved-views-menu
+        @close-auto-focus="createDialogOpen && $event.preventDefault()"
       >
         <DropdownMenuGroup>
-          <DropdownMenuSub v-model:open="createPanelOpen">
+          <DropdownMenuSub v-if="canShowCreateSubmenu" v-model:open="createPanelOpen">
             <DropdownMenuSubTrigger
               :disabled="savedViews.length >= 50 || busy"
               data-library-saved-view-create-trigger
@@ -967,40 +995,32 @@ function filterSummary(filters: SavedViewFiltersV1): string {
               </span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent
-              class="w-64 overflow-visible rounded-2xl border-border/70 p-3"
+              class="w-64 overflow-visible rounded-2xl border-border/70 p-4"
               data-library-saved-view-create-panel
-              :align-offset="-4"
+              :side-offset="13"
+              :align-offset="-5"
               :align-flip="false"
               @openAutoFocus="onCreatePanelOpenAutoFocus"
             >
-              <form class="flex flex-col gap-3" @submit.prevent="submitCreate" @keydown.stop>
-                <label class="flex flex-col gap-2 text-sm font-medium text-foreground">
-                  {{ t("library.savedViewName") }}
-                  <Input
-                    ref="createNameInputRef"
-                    v-model="createNameDraft"
-                    maxlength="40"
-                    autocomplete="off"
-                    data-library-saved-view-create-name
-                    :placeholder="t('library.savedViewNamePlaceholder')"
-                    :disabled="busy"
-                    @pointerdown.stop
-                  />
-                </label>
-                <div class="flex justify-end">
-                  <Button
-                    type="submit"
-                    class="min-h-8 rounded-full px-4"
-                    :disabled="busy || !createNameDraft.trim()"
-                    @click="submitCreate"
-                  >
-                    <LoaderCircle v-if="busy" data-icon="inline-start" class="animate-spin" aria-hidden="true" />
-                    {{ t("library.savedViewSave") }}
-                  </Button>
-                </div>
-              </form>
+              <SavedViewCreateForm
+                ref="createFormRef"
+                v-model="createNameDraft"
+                :busy="busy"
+                @submit="submitCreate"
+                @cancel="closeCreate"
+              />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          <DropdownMenuItem
+            v-else
+            class="min-h-11"
+            :disabled="savedViews.length >= 50 || busy"
+            data-library-saved-view-create-trigger
+            @select="openCreateDialog"
+          >
+            <Save aria-hidden="true" />
+            {{ t("library.savedViewSaveCurrent") }}
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuLabel v-if="savedViews.length === 0" class="font-normal text-muted-foreground">
@@ -1053,6 +1073,32 @@ function filterSummary(filters: SavedViewFiltersV1): string {
       <slot />
     </div>
   </div>
+
+  <Dialog v-model:open="createDialogOpen">
+    <DialogContent
+      class="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl p-4 sm:max-w-sm"
+      data-library-saved-view-create-dialog
+      :aria-describedby="undefined"
+      :show-close-button="false"
+      @close-auto-focus="restoreSavedViewsFocus"
+    >
+      <DialogHeader class="flex-row items-center justify-between gap-2 text-left">
+        <DialogTitle>{{ t("library.savedViewSaveCurrent") }}</DialogTitle>
+        <DialogClose as-child>
+          <Button type="button" variant="ghost" size="icon" class="size-11 shrink-0 rounded-full" :aria-label="t('common.cancel')">
+            <X aria-hidden="true" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <SavedViewCreateForm
+        v-if="createDialogOpen"
+        v-model="createNameDraft"
+        :busy="busy"
+        @submit="submitCreate"
+        @cancel="closeCreate"
+      />
+    </DialogContent>
+  </Dialog>
 
   <Dialog v-model:open="renameDialogOpen">
     <DialogContent class="sm:max-w-md">

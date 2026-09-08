@@ -2,6 +2,15 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import LibrarySavedViewsControls from "./LibrarySavedViewsControls.vue"
 
+const viewportMock = vi.hoisted(() => ({ wide: true }))
+vi.mock("@vueuse/core", async (importOriginal) => {
+  const { ref } = await import("vue")
+  return {
+    ...await importOriginal<typeof import("@vueuse/core")>(),
+    useMediaQuery: () => ref(viewportMock.wide),
+  }
+})
+
 const routeMock = vi.hoisted(() => ({
   name: "library",
   path: "/library",
@@ -145,6 +154,7 @@ function buttonByText(wrapper: ReturnType<typeof mountControls>, text: string) {
 }
 
 beforeEach(() => {
+  viewportMock.wide = true
   routeMock.query = {
     q: "Mina",
     playState: "unwatched",
@@ -181,7 +191,7 @@ describe("LibrarySavedViewsControls", () => {
     expect(wrapper.text()).not.toContain("library.savedViewCreateTitle")
 
     await wrapper.get("[data-library-saved-view-create-name]").setValue("Mina 4K")
-    await buttonByText(wrapper, "library.savedViewSave").trigger("click")
+    await wrapper.get("[data-library-saved-view-create-panel] form").trigger("submit")
     await flushPromises()
 
     expect(serviceMock.createSavedView).toHaveBeenCalledWith(
@@ -212,6 +222,38 @@ describe("LibrarySavedViewsControls", () => {
         userRating: "5",
       },
     })
+  })
+
+  it("keeps the draft after a failed save and prevents duplicate submissions", async () => {
+    let rejectSave: (reason: Error) => void = () => {}
+    serviceMock.createSavedView.mockImplementation(() => new Promise((_, reject) => {
+      rejectSave = reject
+    }))
+    const wrapper = mountControls()
+    const form = wrapper.get("[data-library-saved-view-create-panel] form")
+    await form.trigger("submit")
+    expect(serviceMock.createSavedView).not.toHaveBeenCalled()
+    await wrapper.get("[data-library-saved-view-create-name]").setValue("Retry bookmark")
+    await form.trigger("submit")
+    await form.trigger("submit")
+    expect(serviceMock.createSavedView).toHaveBeenCalledTimes(1)
+    expect(buttonByText(wrapper, "library.savedViewSave").attributes("disabled")).toBeDefined()
+    rejectSave(new Error("Save failed"))
+    await flushPromises()
+    expect((wrapper.get("[data-library-saved-view-create-name]").element as HTMLInputElement).value).toBe("Retry bookmark")
+    expect(buttonByText(wrapper, "library.savedViewSave").attributes("disabled")).toBeUndefined()
+  })
+
+  it("opens a standalone form on narrow screens and closes it with Escape", async () => {
+    viewportMock.wide = false
+    const wrapper = mountControls()
+    expect(wrapper.find("[data-library-saved-view-create-panel]").exists()).toBe(false)
+    await wrapper.get("[data-library-saved-view-create-trigger]").trigger("select")
+    const input = wrapper.get("[data-library-saved-view-create-name]")
+    await input.setValue("Mobile bookmark")
+    await input.trigger("keydown", { key: "Escape" })
+    expect(wrapper.find("[data-library-saved-view-create-name]").exists()).toBe(false)
+    expect(serviceMock.createSavedView).not.toHaveBeenCalled()
   })
 
   it("applies a Saved View when its menu option is double-clicked", async () => {
