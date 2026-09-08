@@ -115,9 +115,11 @@
 
 - 一级菜单相对触发器：`sideOffset: 4`（`DropdownMenuContent` / `PopoverContent` 默认）。
 - 二级菜单相对父菜单：`sideOffset: 8`（`DropdownMenuSubContent` 默认），避免两个 `rounded-2xl` 面板重叠。
-- 与父菜单并列的伴随面板（例如书签命名）必须与父菜单顶边对齐：父菜单 `p-1` 时使用 `align-offset: -4`，并关闭 `align-flip`。
+- 与父菜单并列的伴随面板（例如书签命名）必须与父菜单外边缘保持 8px 间距并顶边对齐。定位锚点是菜单项而非父面板：父菜单 `p-1 border` 时，书签命名使用 `side-offset: 13`（8 + 4 + 1）、`align-offset: -5`，并关闭 `align-flip`；不得只检查 prop 数值而忽略实际面板边界。
 - 指向单个菜单项的操作子菜单仍对齐该行，但同样保持 8px 水平间距。
 - 二级短表单的主按钮为右对齐胶囊按钮（`rounded-full`），按文案宽度收缩，不要做成全宽。
+- 书签命名表单沿用 `p-4`、`FieldGroup` / `Field` / `FieldLabel` 与有边界的 `Input`；桌面保留紧凑按钮。低于 640px 时关闭父菜单，使用独立 `Dialog`，保存与关闭按钮至少 44px，避免两个固定宽度浮层互相覆盖。
+- 输入聚焦后，Tab 可到保存按钮、Enter 提交、Esc 关闭并回到书签入口；保存失败保留输入，进行中禁用重复提交。不能用表单的 `keydown.stop` 吞掉 Esc 而不提供退出行为。
 
 当前参考实现：`src/components/jav-library/LibrarySavedViewsControls.vue`。
 
