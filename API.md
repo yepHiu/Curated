@@ -2602,7 +2602,7 @@ Body：
 }
 ```
 
-成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `thinking_delta` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
+成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `answer_progress` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
 
 说明：
 
@@ -2610,10 +2610,13 @@ Body：
 - 每次模型调用前，对 messages 与工具 schema 的 JSON UTF-8 字节数做保守 token 估算，上限 65536。达到预算且未执行工具时返回 `needs_input`，已有工具结果时返回 `partial`，保留已完成结果并停止进一步调用。不切断工具 JSON；预算是本地估算，不是 Provider usage 或上下文窗口的精确测量，尚无自动摘要。
 - 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
 - `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
-- 支持 `reasoning_content` 的 OpenAI 兼容 provider 会额外发出 `thinking_delta`；思考内容不入库，刷新后过程条只保留折叠的查库步骤。
-- 单轮工具步数默认 15，触顶后强制收尾并在文本中说明。
+- 不再发送模型原始 `thinking_delta`。模型调用前发送 `answer_progress`（无正文），经发布校验后才发送 `text_delta`；取消/断流不发送未核实草稿。服务端每 15 秒发送 SSE 注释心跳；单次模型调用另有 2 分钟期限及 256 KiB 正文/工具参数累积上限。旧客户端忽略新增事件仍可展示最终正文。
+- `submit_answer` 为内部只读终结工具，不新增 HTTP 端点。接收 `{items:[{refId,fields?,reasonFacts?}]}`（1–6 条本次查询引用），禁止传入自定义番号、标题、演员等字段值；后端从同一来源快照填入事实。也支持 `{queryRef:"user_input"}` 单独引用用户原文并标注未核实，不产生作品身份。
+- 普通正文中的可识别番号/作品链接/已知作品标题必须改用引用；无效草稿最多修正一次，仍失败返回 `partial`、`reasonCode:"answer_rejected"`。正则检测不代表任意自然语言全量事实验证，独立 Action 不受这条发布链路约束。
+- `message_done` 可含 `answerEvidence:{version:1,items:[{refId,movieId?,source,tool,retrievedAt,truncated?,fields}]}`；`source` 为 local/provider，`fields` 保存展示事实及来源信息，复用 `events_json` 持久化。引用只在当前请求有效，历史快照只供追溯，下一轮需重新读取。聊天 `FirstTextMs` 为首个发布正文的耗时。
+- 单轮工具步数默认不限（0）；用户设置正上限后触顶返回 `partial/tool_step_limit`，不再调用模型。修正不绕过步骤和上下文预算。
 - provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回。
-- 推荐或点名具体影片时，模型应调用 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知 ID 被拒绝，不会出卡。库外源站作品（`search_provider_titles` 且 `inLibrary=false`）没有 `movieId`，不能用于 `present_movies`。
+- 推荐或点名具体影片优先调用 `submit_answer`。兼容 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知或本轮未读取本地资料的 ID 被拒绝，不会出卡；自由文本 `reason` 不再显示。库外源站作品（`search_provider_titles` 且 `inLibrary=false`）没有 `movieId`，不能用于 `present_movies`。
 - `get_movie_detail` / `get_actor_profile` 在已刮削时带 `homepage`；影片另有 `metadataRating`、`metadataProvider`。
 - `search_provider_titles` 只接受本轮已见的 `actorName` 和/或 `movieId`（含页面 context / `@` 引用），禁止自由文本 `query`。底层走已配置刮削源站检索并对账本地番号；失败留在工具结果内。
 - `get_source_page` 只接受本轮工具结果里出现过的 https `homepage` / `externalLinks`；拒绝非 https、私网与允许名单外跳转；抽出可见文本约 32KiB。
