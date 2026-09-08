@@ -36,3 +36,10 @@ func TestAIReportFiltersRejectInvalidQueries(t *testing.T) {
 		t.Fatalf("query %+v %v", q, err)
 	}
 }
+
+func TestAIReportAcceptsAwaitingConfirmation(t *testing.T) {
+	q, err := parseAIReportQuery(httptest.NewRequest("GET", "/api/ai/usage?status=needs_confirmation", nil), false)
+	if err != nil || q.Status != "needs_confirmation" {
+		t.Fatalf("query = %+v, %v", q, err)
+	}
+}

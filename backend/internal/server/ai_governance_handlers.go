@@ -67,7 +67,7 @@ func parseAIReportQuery(r *http.Request, audit bool) (contracts.AIReportQuery, e
 	default:
 		return q, fmt.Errorf("invalid channel")
 	}
-	allowed := map[string]bool{"": true, "completed": true, "failed": true, "partial": true, "cancelled": true, "needs_input": true}
+	allowed := map[string]bool{"": true, "completed": true, "failed": true, "partial": true, "cancelled": true, "needs_input": true, "needs_confirmation": true}
 	if audit {
 		allowed = map[string]bool{"": true, "failed": true, "ok": true, "error": true, "previewed": true, "confirmed": true, "rejected": true}
 	}

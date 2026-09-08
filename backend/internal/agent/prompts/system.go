@@ -127,7 +127,3 @@ func clipRunes(value string, max int) string {
 	}
 	return string([]rune(value)[:max])
 }
-
-func StepLimitNudge() string {
-	return "You have reached the tool-step limit. Do not call more tools. Summarize what you already learned and what you could not finish."
-}

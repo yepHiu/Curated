@@ -11,6 +11,7 @@ import AgentMarkdown from "./AgentMarkdown.vue"
 import AgentChatResolution from "./AgentChatResolution.vue"
 import AgentChatOutcome from "./AgentChatOutcome.vue"
 import type { AgentChatEntry } from "./types"
+import { confirmationOutcome } from "./confirmation-outcome"
 
 defineProps<{
   entries: AgentChatEntry[]
@@ -113,7 +114,7 @@ defineExpose({
         :selected="entry.selected"
         @select="emit('selectEntity', entry.id, $event)"
       />
-      <AgentChatOutcome v-else-if="entry.kind === 'outcome'" :outcome="entry.outcome" />
+      <AgentChatOutcome v-else-if="entry.kind === 'outcome'" :outcome="confirmationOutcome(entries, index, entry.outcome)" />
     </template>
 
     <div

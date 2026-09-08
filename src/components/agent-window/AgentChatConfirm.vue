@@ -173,7 +173,7 @@ function asText(value: unknown) {
       {{ copy.discardedLabel }}
     </p>
     <p v-else-if="props.entry.error" class="text-sm text-destructive">{{ props.entry.error }}</p>
-    <div v-else class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+    <div v-if="props.entry.status === 'pending' || props.entry.status === 'applying'" class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
       <Button
         type="button"
         variant="outline"

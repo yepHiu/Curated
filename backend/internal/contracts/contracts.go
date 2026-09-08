@@ -1132,9 +1132,10 @@ type AIEvidenceDTO struct {
 
 // AIChatOutcomeDTO is the explicit terminal state of one streamed turn.
 type AIChatOutcomeDTO struct {
-	Status    string `json:"status"` // completed | partial | needs_input | cancelled | failed
-	Reason    string `json:"reason,omitempty"`
-	Retryable bool   `json:"retryable,omitempty"`
+	ReasonCode string `json:"reasonCode,omitempty"` // Stable reason for localized status feedback.
+	Status     string `json:"status"`               // completed | partial | needs_input | needs_confirmation | cancelled | failed
+	Reason     string `json:"reason,omitempty"`
+	Retryable  bool   `json:"retryable,omitempty"`
 }
 
 // AIConfirmChangeDTO is one field-level diff row on a write preview.

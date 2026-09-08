@@ -487,7 +487,8 @@ export interface AIEvidenceDTO {
 }
 
 export interface AIChatOutcomeDTO {
-  status: "completed" | "partial" | "needs_input" | "cancelled" | "failed"
+  status: "completed" | "partial" | "needs_input" | "needs_confirmation" | "cancelled" | "failed"
+  reasonCode?: string
   reason?: string
   retryable?: boolean
 }

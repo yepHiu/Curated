@@ -463,6 +463,7 @@ describe("AgentWindow", () => {
       async (
         _input: unknown,
         handlers: {
+          onOutcome?: (outcome: import("@/api/types").AIChatOutcomeDTO) => void
           onConfirmRequired?: (event: {
             name: string
             confirmToken: string
@@ -482,6 +483,7 @@ describe("AgentWindow", () => {
           arguments: { name: "未看完", filters: { schemaVersion: 1, playState: "unwatched" } },
           sessionId: "ses_1",
         })
+        handlers.onOutcome?.({ status: "needs_confirmation", reasonCode: "confirmation_required" })
       },
     )
     const wrapper = mountWindow()
@@ -491,6 +493,13 @@ describe("AgentWindow", () => {
     await flushPromises()
 
     expect(wrapper.find("[data-agent-confirm-card]").exists()).toBe(true)
+    expect(wrapper.get("[data-agent-outcome]").text()).toContain("agentWindow.outcome.needs_confirmation")
+    confirmToolMock.mockRejectedValueOnce(new Error("save failed"))
+    await wrapper.find("[data-agent-confirm-apply]").trigger("click")
+    await flushPromises()
+    expect(wrapper.get("[data-agent-confirm-card]").text()).toContain("save failed")
+    expect(wrapper.get("[data-agent-outcome]").text()).toContain("agentWindow.outcome.needs_confirmation")
+    expect(refreshSavedViewsMock).not.toHaveBeenCalled()
     await wrapper.find("[data-agent-confirm-apply]").trigger("click")
     await flushPromises()
 
@@ -501,6 +510,8 @@ describe("AgentWindow", () => {
       confirmToken: "cfm_1",
     })
     expect(refreshSavedViewsMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.get("[data-agent-outcome]").text()).toContain("agentWindow.outcomeSaved")
+    expect(wrapper.get("[data-agent-outcome]").text()).not.toContain("agentWindow.outcome.needs_confirmation")
   })
 
   it("keeps the chrome header in the content column and brands the sidebar", () => {

@@ -247,9 +247,18 @@
     "outcome": {
       "completed": "完了",
       "partial": "一部完了",
+      "needs_confirmation": "確認待ち",
       "needs_input": "選択または追加情報が必要です",
       "cancelled": "キャンセルしました",
       "failed": "未完了"
+    },
+    "outcomeSaved": "保存済み",
+    "outcomeReasons": {
+      "toolStepLimit": "設定したツール呼び出し上限に達しました。タスクは未完了ですが、取得済みの結果は保持されています。上限を増やすか無効にして続行してください。",
+      "confirmationRequired": "プレビューの準備ができましたが、まだ保存されていません。確認カードで変更を確定してください。",
+      "writeApplied": "確認した変更を保存しました。",
+      "confirmationUnavailable": "この履歴のプレビューは確認できず、保存成功の記録もありません。新しいプレビューを依頼してください。",
+      "confirmationDiscarded": "プレビューを破棄しました。変更は保存されていません。"
     },
     "outcomeRetryable": "ネットワークまたは提供元を確認してから再試行できます。",
     "confirmTitle": "書き込みを確認",
@@ -1689,6 +1698,7 @@
       "failed": "失敗",
       "partial": "一部完了",
       "cancelled": "キャンセル",
+      "needs_confirmation": "確認待ち",
       "needs_input": "入力待ち"
     },
     "auditResults": {

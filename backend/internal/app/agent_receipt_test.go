@@ -47,9 +47,14 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 				t.Fatalf("preview: %+v", preview)
 			}
 			key := storage.NewAIApplyReceiptKey(preview.ConfirmToken, session.ID, tool, core.HashArgs(preview.ConfirmArgs))
-			_, err = store.AppendAIChatMessage(ctx, session.ID, "assistant", "preview", "", "", contracts.AIChatSSEEvent{Type: "confirm_required", Name: tool, ReceiptID: key.TokenHash})
+			_, err = store.AppendAIChatMessage(ctx, session.ID, "assistant", "preview", "", "", contracts.AIChatSSEEvent{Type: "confirm_required", Name: tool, ReceiptID: key.TokenHash},
+				contracts.AIChatSSEEvent{Type: "message_done", Outcome: &contracts.AIChatOutcomeDTO{Status: "needs_confirmation", ReasonCode: "confirmation_required"}})
 			if err != nil {
 				t.Fatal(err)
+			}
+			pending, err := a.GetAIChatSession(ctx, session.ID)
+			if err != nil || pending.Messages[0].Events[1].Outcome.ReasonCode != "confirmation_unavailable" {
+				t.Fatalf("unconfirmed historical preview should need a new request: %+v %v", pending, err)
 			}
 			req := contracts.AIToolApplyRequest{Name: tool, SessionID: session.ID, Arguments: encoded, ConfirmToken: preview.ConfirmToken}
 			var results [2]contracts.AIToolApplyDTO
@@ -117,6 +122,9 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			detail, err := restarted.GetAIChatSession(ctx, session.ID)
 			if err != nil || !detail.Messages[0].Events[0].Applied {
 				t.Fatalf("history receipt missing: %+v %v", detail, err)
+			}
+			if outcome := detail.Messages[0].Events[1].Outcome; outcome.Status != "completed" || outcome.ReasonCode != "write_applied" {
+				t.Fatalf("confirmed history outcome = %+v", outcome)
 			}
 			drift := req
 			drift.SessionID = "another-session"

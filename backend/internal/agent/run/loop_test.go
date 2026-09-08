@@ -112,25 +112,18 @@ func TestLoopStopsAtStepLimit(t *testing.T) {
 	if hits.Load() != 3 {
 		t.Fatalf("handler hits = %d, want 3", hits.Load())
 	}
-	joined := ""
 	var done bool
 	var outcome *contracts.AIChatOutcomeDTO
 	for _, ev := range events {
-		if ev.Type == "text_delta" {
-			joined += ev.Delta
-		}
 		if ev.Type == "message_done" {
 			done = true
 			outcome = ev.Outcome
 		}
 	}
-	if !strings.Contains(joined, "步数上限") {
-		t.Fatalf("missing step-limit report: %q events=%+v", joined, events)
-	}
 	if !done {
 		t.Fatalf("missing message_done")
 	}
-	if outcome == nil || outcome.Status != "partial" {
+	if outcome == nil || outcome.Status != "partial" || outcome.ReasonCode != "tool_step_limit" {
 		t.Fatalf("step limit outcome = %+v", outcome)
 	}
 }
@@ -388,6 +381,9 @@ func TestLoopEmitsConfirmRequiredAndStops(t *testing.T) {
 	}
 	if write.writes != 0 {
 		t.Fatal("preview wrote")
+	}
+	if outcome := events[len(events)-1].Outcome; outcome == nil || outcome.Status != "needs_confirmation" || outcome.ReasonCode != "confirmation_required" {
+		t.Fatalf("preview outcome = %+v", outcome)
 	}
 }
 

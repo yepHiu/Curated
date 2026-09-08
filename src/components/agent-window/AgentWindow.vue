@@ -401,12 +401,13 @@ async function applyConfirm(entryId: string) {
   entry.status = "applying"
   entry.error = undefined
   try {
-    await aiService.confirmTool({
+    const result = await aiService.confirmTool({
       sessionId: entry.sessionId,
       name: entry.name,
       arguments: entry.arguments,
       confirmToken: entry.confirmToken,
     })
+    if (!result.ok) throw new AIServiceError(t("agentWindow.errorFallback"))
     entry.status = "applied"
     if (entry.name === "create_saved_view") {
       try {

@@ -58,35 +58,35 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	hadFailure := false
 	hadTruncation := false
 	needsInput := false
-	emitDone := func(status, reason string, retryable bool) {
+	emitDone := func(status, reason string, retryable bool, reasonCode string) {
 		emit(contracts.AIChatSSEEvent{
 			Type: "message_done", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
-			Outcome: &contracts.AIChatOutcomeDTO{Status: status, Reason: reason, Retryable: retryable},
+			Outcome: &contracts.AIChatOutcomeDTO{Status: status, Reason: reason, Retryable: retryable, ReasonCode: reasonCode},
 		})
 	}
 
 	for {
 		if ctx.Err() != nil {
-			emitDone("cancelled", "The user cancelled this request before it finished.", false)
+			emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
 			return nil
 		}
-		choice := ""
 		if stepLimit > 0 && steps >= stepLimit {
-			messages = append(messages, llm.ChatMessage{Role: "system", Content: prompts.StepLimitNudge()})
-			choice = "none"
+			// End before another model call: the last batch may contain unexecuted
+			// calls, which must not be sent back as an incomplete tool conversation.
+			emitDone("partial", fmt.Sprintf("The configured limit of %d tool calls was reached. Completed results are preserved; the task is not finished.", stepLimit), true, "tool_step_limit")
+			return nil
 		}
 		if estimatedRequestTokens(messages, tools) > requestTokenEstimateBudget {
 			status := "needs_input"
 			if steps > 0 {
 				status = "partial"
 			}
-			emitDone(status, "The context budget was reached. Narrow the request or start a new conversation; completed results remain available.", false)
+			emitDone(status, "The context budget was reached. Narrow the request or start a new conversation; completed results remain available.", false, "")
 			return nil
 		}
 		turn, err := l.streamer.StreamTurn(ctx, llm.TurnRequest{
-			Messages:   messages,
-			Tools:      tools,
-			ToolChoice: choice,
+			Messages: messages,
+			Tools:    tools,
 			OnThinking: func(delta string) {
 				if delta == "" {
 					return
@@ -105,34 +105,26 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 		})
 		if err != nil {
 			if ctx.Err() != nil {
-				emitDone("cancelled", "The user cancelled this request before it finished.", false)
+				emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
 				return nil
 			}
-			emitDone("failed", "The model response could not be completed.", true)
+			emitDone("failed", "The model response could not be completed.", true, "")
 			return err
 		}
 		if len(turn.ToolCalls) == 0 {
 			if strings.TrimSpace(turn.Content) == "" {
-				emitDone("failed", "The model returned no answer.", true)
+				emitDone("failed", "The model returned no answer.", true, "")
 			} else if needsInput {
-				emitDone("needs_input", "A local entity needs the user's selection or a more specific name.", false)
+				emitDone("needs_input", "A local entity needs the user's selection or a more specific name.", false, "")
 			} else if hadFailure || hadTruncation {
 				reason := "Some requested evidence could not be fully retrieved."
 				if hadFailure {
 					reason = "One or more retrievals failed; the answer contains only confirmed results."
 				}
-				emitDone("partial", reason, hadFailure)
+				emitDone("partial", reason, hadFailure, "")
 			} else {
-				emitDone("completed", "", false)
+				emitDone("completed", "", false, "")
 			}
-			return nil
-		}
-		if stepLimit > 0 && steps >= stepLimit {
-			emit(contracts.AIChatSSEEvent{
-				Type: "text_delta", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
-				Delta: "\n\n已达到本轮工具步数上限，未能继续查询。",
-			})
-			emitDone("partial", "The tool-step limit was reached before the lookup could finish.", true)
 			return nil
 		}
 
@@ -212,7 +204,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 					Summary:   summary,
 					OK:        &ok,
 				})
-				emitDone("completed", "A write preview is waiting for UI confirmation.", false)
+				emitDone("needs_confirmation", "A write preview is ready. Confirm it to save the changes.", false, "confirmation_required")
 				return nil
 			}
 			payload, _ := json.Marshal(result)

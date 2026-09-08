@@ -271,6 +271,7 @@ func (a *App) GetAIChatSession(ctx context.Context, id string, cursor ...string)
 	if err := a.store.RestoreAIReceiptStates(ctx, id, messages); err != nil {
 		return contracts.AIChatSessionDetailDTO{}, err
 	}
+	projectAIConfirmationOutcomes(messages)
 	return contracts.AIChatSessionDetailDTO{AIChatSessionDTO: session, Messages: messages, NextCursor: nextCursor}, nil
 }
 

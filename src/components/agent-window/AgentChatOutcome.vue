@@ -6,21 +6,33 @@ import type { AIChatOutcomeDTO } from "@/api/types"
 const props = defineProps<{ outcome: AIChatOutcomeDTO }>()
 const { t } = useI18n()
 
-const label = computed(() => t(`agentWindow.outcome.${props.outcome.status}`))
+const reasonKeys: Record<string, string> = {
+  tool_step_limit: "agentWindow.outcomeReasons.toolStepLimit",
+  confirmation_required: "agentWindow.outcomeReasons.confirmationRequired",
+  write_applied: "agentWindow.outcomeReasons.writeApplied",
+  confirmation_unavailable: "agentWindow.outcomeReasons.confirmationUnavailable",
+  confirmation_discarded: "agentWindow.outcomeReasons.confirmationDiscarded",
+}
+const label = computed(() => t(props.outcome.reasonCode === "write_applied" ? "agentWindow.outcomeSaved" : `agentWindow.outcome.${props.outcome.status}`))
+const reason = computed(() => {
+  const key = reasonKeys[props.outcome.reasonCode ?? ""]
+  return key ? t(key) : props.outcome.reason
+})
 
 const tone = computed(() => ({
   completed: "border-border/70 bg-muted/35",
-  partial: "border-amber-500/35 bg-amber-500/8",
-  needs_input: "border-amber-500/35 bg-amber-500/8",
+  partial: "border-warning/35 bg-warning/10",
+  needs_input: "border-warning/35 bg-warning/10",
+  needs_confirmation: "border-info/35 bg-info/10",
   cancelled: "border-border/70 bg-muted/35",
   failed: "border-destructive/35 bg-destructive/10",
 }[props.outcome.status]))
 </script>
 
 <template>
-  <section class="rounded-xl border px-3 py-2 text-xs" :class="tone" data-agent-outcome>
+  <section class="rounded-xl border px-3 py-2 text-xs" :class="tone" data-agent-outcome role="status" aria-live="polite">
     <p class="font-medium text-foreground">{{ label }}</p>
-    <p v-if="outcome.reason" class="mt-1 leading-relaxed text-muted-foreground">{{ outcome.reason }}</p>
-    <p v-if="outcome.retryable" class="mt-1 text-muted-foreground">{{ t("agentWindow.outcomeRetryable") }}</p>
+    <p v-if="reason" class="mt-1 leading-relaxed text-muted-foreground">{{ reason }}</p>
+    <p v-if="outcome.retryable && outcome.reasonCode !== 'tool_step_limit'" class="mt-1 text-muted-foreground">{{ t("agentWindow.outcomeRetryable") }}</p>
   </section>
 </template>

@@ -251,9 +251,18 @@
     "outcome": {
       "completed": "已完成",
       "partial": "部分完成",
+      "needs_confirmation": "待确认",
       "needs_input": "需要你选择或补充",
       "cancelled": "已取消",
       "failed": "未完成"
+    },
+    "outcomeSaved": "已保存",
+    "outcomeReasons": {
+      "toolStepLimit": "已达到你设置的工具调用上限；任务尚未完成，已有结果已保留。可提高或关闭上限后继续。",
+      "confirmationRequired": "预览已就绪，尚未保存。请在确认卡片中确认写入。",
+      "writeApplied": "已确认的更改已保存。",
+      "confirmationUnavailable": "这条历史预览无法继续确认，且没有成功保存回执。请重新请求生成预览。",
+      "confirmationDiscarded": "已放弃本次预览，没有保存更改。"
     },
     "outcomeRetryable": "可在确认网络或数据源后重试。",
     "confirmTitle": "确认写入",
@@ -1689,6 +1698,7 @@
       "failed": "失败",
       "partial": "部分完成",
       "cancelled": "已取消",
+      "needs_confirmation": "待确认",
       "needs_input": "需要输入"
     },
     "auditResults": {

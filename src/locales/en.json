@@ -247,9 +247,18 @@
     "outcome": {
       "completed": "Completed",
       "partial": "Partially completed",
+      "needs_confirmation": "Awaiting confirmation",
       "needs_input": "Your selection or input is needed",
       "cancelled": "Cancelled",
       "failed": "Not completed"
+    },
+    "outcomeSaved": "Saved",
+    "outcomeReasons": {
+      "toolStepLimit": "Your tool-call limit was reached. The task is unfinished and completed results are preserved. Raise or disable the limit to continue.",
+      "confirmationRequired": "The preview is ready but has not been saved. Confirm the changes in the confirmation card.",
+      "writeApplied": "The confirmed changes were saved.",
+      "confirmationUnavailable": "This historical preview cannot be confirmed and has no successful save receipt. Request a new preview.",
+      "confirmationDiscarded": "The preview was discarded. No changes were saved."
     },
     "outcomeRetryable": "Retry after checking the network or source.",
     "confirmTitle": "Confirm write",
@@ -1687,6 +1696,7 @@
       "failed": "Failed",
       "partial": "Partial",
       "cancelled": "Cancelled",
+      "needs_confirmation": "Awaiting confirmation",
       "needs_input": "Needs input"
     },
     "auditResults": {
