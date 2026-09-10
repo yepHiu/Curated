@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import ImportTargetPath from "./ImportTargetPath.vue"
 import { FilePlus2, FolderInput, UploadCloud, X } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { LibraryPathStorageStatusDTO, MovieImportUploadProgress, ImportMovieCodeCheckItemDTO } from "@/api/types"
@@ -412,20 +413,10 @@ async function submitImport() {
       </DialogHeader>
 
       <div class="flex flex-col gap-4">
-        <div class="rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5 text-sm">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-muted-foreground">{{ t("import.targetPath") }}</span>
-            <span
-              v-if="targetLibraryPath"
-              class="max-w-full truncate font-mono text-xs text-foreground"
-            >
-              {{ targetLibraryPath.path }}
-            </span>
-            <span v-else class="text-xs text-destructive">
-              {{ t("import.noDefaultPath") }}
-            </span>
-          </div>
-        </div>
+        <ImportTargetPath
+          :path="targetLibraryPath?.path"
+          :empty-message="t('import.noDefaultPath')"
+        />
 
         <p
           v-if="targetStorageUnavailableMessage"

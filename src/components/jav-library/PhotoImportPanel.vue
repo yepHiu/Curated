@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import ImportTargetPath from "./ImportTargetPath.vue"
 import { FileArchive, UploadCloud, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -69,11 +70,11 @@ async function submit() {
 
 <template>
   <div data-photo-import-panel class="flex min-w-0 flex-col gap-4">
-    <div class="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-muted/25 px-3 py-2.5 text-sm">
-      <span class="text-muted-foreground">{{ t("import.photoTargetPath") }}</span>
-      <span v-if="target" class="truncate font-mono text-xs" :title="target.path">{{ target.path }}</span>
-      <span v-else class="text-xs text-destructive">{{ t("import.photoNoDefaultPath") }}</span>
-    </div>
+    <ImportTargetPath
+      :path="target?.path"
+      :empty-message="t('import.photoNoDefaultPath')"
+    />
+
     <div class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center"
       :class="dragActive ? 'border-primary bg-primary/10' : 'border-border bg-muted/20'"
       @dragover.prevent="dragActive = !busy" @dragleave.prevent="dragActive = false" @drop.prevent="dropFiles">

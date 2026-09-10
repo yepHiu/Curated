@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import ImportTargetPath from "./ImportTargetPath.vue"
 import { BookOpen, FileArchive, UploadCloud, X } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { ComicImportUploadProgress, LibraryPathStorageStatusDTO } from "@/api/types"
@@ -263,20 +264,10 @@ async function submitImport() {
       </DialogHeader>
 
       <div class="flex min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
-        <div class="rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5 text-sm">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-muted-foreground">{{ t("import.comicTargetPath") }}</span>
-            <span
-              v-if="targetLibraryPath"
-              class="max-w-full truncate font-mono text-xs text-foreground"
-            >
-              {{ targetLibraryPath.path }}
-            </span>
-            <span v-else class="text-xs text-destructive">
-              {{ t("import.comicNoDefaultPath") }}
-            </span>
-          </div>
-        </div>
+        <ImportTargetPath
+          :path="targetLibraryPath?.path"
+          :empty-message="t('import.comicNoDefaultPath')"
+        />
 
         <p
           v-if="targetStorageUnavailableMessage"
