@@ -122,7 +122,7 @@ func getMovieDetail(q LibraryQuery) core.ToolDefinition {
 func getLibraryOverview(q LibraryQuery) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name:         "get_library_overview",
-		Description:  "Library capacity, path count, trash count, curated frame count, and storage status. Use this first to orient before searching.",
+		Description:  "Movie-library capacity, movie path count, movie trash count, curated movie frame count, and movie storage status. These counts cover movies only, not all media libraries. Use this first to orient before searching.",
 		ParamsSchema: object(nil),
 		Permission:   core.PermissionRead,
 		Domain:       core.DomainQuery,

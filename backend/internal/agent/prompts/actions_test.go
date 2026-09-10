@@ -42,7 +42,7 @@ func TestTranslateTitlePromptUsesLocale(t *testing.T) {
 func TestInsightsNarrativePromptGroundsInJSON(t *testing.T) {
 	t.Parallel()
 	got := InsightsNarrativePrompt("zh-CN", `{"watchedSeconds":3600}`)
-	for _, want := range []string{"<source>", "watchedSeconds", "full-per-entity", "zh-CN"} {
+	for _, want := range []string{"<source>", "watchedSeconds", "full-per-entity", "zh-CN", "covers movie viewing only", "Do not mention those excluded libraries"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q:\n%s", want, got)
 		}

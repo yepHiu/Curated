@@ -105,7 +105,9 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
     createdAt: nowIso(),
   })
 
-  const tool = fakeToolFor(lastUser.content)
+  // Mock 不把图片库请求伪装成影片检索、推荐或洞察结果。
+  const outsideMovieScope = /漫画|寫真|写真|コミック|写真集|\b(?:comics?|manga|photo[ -]?books?)\b/i.test(lastUser.content)
+  const tool = outsideMovieScope ? null : fakeToolFor(lastUser.content)
   if (tool) {
     handlers.onAnswerProgress?.()
     await sleep(MOCK_CHUNK_DELAY_MS, handlers.signal)
@@ -148,9 +150,11 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
     }
   }
 
-  const reply = tool
-    ? `[Mock Agent] 已用 ${tool.name} 查库（假数据）：${tool.summary}。连接真实后端后会返回资料库数字。`
-    : `[Mock Agent] 收到：「${lastUser.content.slice(0, 120)}」。当前为 Mock 模式假流式回复。`
+  const reply = outsideMovieScope
+    ? "[Mock Agent] 当前 Agent 仅支持影片相关数据；该请求不在支持范围内。"
+    : tool
+      ? `[Mock Agent] 已用 ${tool.name} 查库（假数据）：${tool.summary}。连接真实后端后会返回资料库数字。`
+      : `[Mock Agent] 收到：「${lastUser.content.slice(0, 120)}」。当前为 Mock 模式假流式回复。`
   const chunks = reply.match(/[\s\S]{1,3}/g) ?? [reply]
   try {
     let full = ""

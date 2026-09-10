@@ -1,6 +1,12 @@
 import type { RouteLocationNormalizedLoaded } from "vue-router"
 import type { AIChatActiveFiltersDTO, AIChatContextDTO } from "@/api/types"
 
+/** Beta 图片库不属于 Agent 的页面上下文或筛选范围。 */
+function isExcludedMediaRoute(route: RouteLocationNormalizedLoaded): boolean {
+  return ["comics", "comic-detail", "comic-reader", "photos", "photo-detail", "photo-viewer"].includes(String(route.name ?? ""))
+    || /^\/(?:comics|photos)(?:\/|$)/.test(route.path ?? "")
+}
+
 function routeQueryString(route: RouteLocationNormalizedLoaded, key: string) {
   const value = route.query[key]
   return typeof value === "string" ? value.trim() : ""
@@ -8,6 +14,7 @@ function routeQueryString(route: RouteLocationNormalizedLoaded, key: string) {
 
 /** A small allowlist, not a serialization of all URL state. */
 export function agentActiveFilters(route: RouteLocationNormalizedLoaded): AIChatActiveFiltersDTO | undefined {
+  if (isExcludedMediaRoute(route)) return undefined
   const query = routeQueryString(route, "q")
   const tag = routeQueryString(route, "tag")
   const actor = routeQueryString(route, "actor")
@@ -28,6 +35,7 @@ export function agentActiveFilters(route: RouteLocationNormalizedLoaded): AIChat
 
 /** Build optional page context for the experimental agent from the current route. */
 export function agentPageContext(route: RouteLocationNormalizedLoaded): AIChatContextDTO | undefined {
+  if (isExcludedMediaRoute(route)) return undefined
   const context: AIChatContextDTO = {}
   const name = typeof route.name === "string" ? route.name : ""
   if (name) {

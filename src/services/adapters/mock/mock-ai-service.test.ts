@@ -27,6 +27,20 @@ describe("mockAIService.streamChat", () => {
     ).rejects.toThrow(/user/)
   })
 
+  it.each(["推荐漫画库里的内容", "统计写真库", "search photo books", "recommend manga"])("does not fabricate movie conclusions for %s", async (content) => {
+    const tools = vi.fn()
+    const cards = vi.fn()
+    const deltas: string[] = []
+    const promise = mockAIService.streamChat({ messages: [{ role: "user", content }] }, {
+      onDelta: (delta) => deltas.push(delta), onToolStart: tools, onMovieCards: cards,
+    })
+    await vi.advanceTimersByTimeAsync(10_000)
+    await promise
+    expect(tools).not.toHaveBeenCalled()
+    expect(cards).not.toHaveBeenCalled()
+    expect(deltas.join("")).toContain("仅支持影片相关数据")
+  })
+
   it("emits a fake tool card for a library question", async () => {
     const tools: string[] = []
     const promise = mockAIService.streamChat(

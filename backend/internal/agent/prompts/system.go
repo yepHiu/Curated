@@ -6,10 +6,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"curated-backend/internal/agent/core"
 	"curated-backend/internal/contracts"
 )
 
-const Version = "agent-system-v3"
+const Version = "agent-system-v4"
 const maxMentions = 8
 const maxMentionLabelRunes = 80
 
@@ -22,6 +23,7 @@ var systemPromptTemplate string
 
 // SystemPrompt is the versioned base + safety instructions for the experimental agent.
 func SystemPrompt(locale string, page *contracts.AIChatContext) string {
+	page = core.MoviePageContext(page)
 	var b strings.Builder
 	b.WriteString(strings.TrimSpace(systemPromptTemplate))
 	b.WriteString("\n\n")

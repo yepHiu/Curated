@@ -22,6 +22,9 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 	for _, want := range []string{
 		"# Curated Agent",
 		"## Role and completion",
+		"## Movie-only scope",
+		"even when their Beta switches are enabled",
+		"never describe movie statistics as covering all media libraries",
 		"## Trust boundary and entity resolution",
 		"## Evidence and retrieval",
 		"## Completion and recovery",
@@ -52,6 +55,13 @@ func TestSystemPromptGoldenGuards(t *testing.T) {
 	}
 }
 
+func TestSystemPromptOmitsExcludedPageData(t *testing.T) {
+	got := SystemPrompt("zh-CN", &contracts.AIChatContext{Route: "photo-detail", MovieID: "private-book-id", Query: "private-book-title"})
+	if strings.Contains(got, "private-book") || strings.Contains(got, "Visible page context") {
+		t.Fatal("book context reached model prompt")
+	}
+}
+
 func TestSystemPromptUsesExternalTemplate(t *testing.T) {
 	t.Parallel()
 	if !strings.Contains(systemPromptTemplate, "# Curated Agent") {
@@ -60,7 +70,7 @@ func TestSystemPromptUsesExternalTemplate(t *testing.T) {
 	if strings.Contains(systemPromptTemplate, "Visible page context") {
 		t.Fatal("request-scoped context must remain outside the static prompt asset")
 	}
-	if Version != "agent-system-v3" {
+	if Version != "agent-system-v4" {
 		t.Fatalf("version = %q", Version)
 	}
 }

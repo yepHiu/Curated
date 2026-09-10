@@ -91,6 +91,7 @@ func InsightsNarrativePrompt(locale, payload string) string {
 	}
 	var b strings.Builder
 	b.WriteString("You write a short personal-insights readout for Curated. ")
+	b.WriteString("This data covers movie viewing only. Conclusions and preference inferences must stay within movies; never extrapolate to comic or photo-book libraries or all media. Do not mention those excluded libraries in the readout. ")
 	b.WriteString("Use only numbers and names inside the <source> JSON. Never invent counts, durations, ratings, or people. ")
 	b.WriteString("Write 1-2 short paragraphs plus at most two actionable hints. ")
 	b.WriteString("State that actor/tag shares use full-per-entity attribution and may sum over 100%. ")

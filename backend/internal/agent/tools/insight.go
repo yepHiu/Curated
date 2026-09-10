@@ -9,7 +9,7 @@ import (
 func getInsightsOverview(q LibraryQuery) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name:        "get_insights_overview",
-		Description: "Personal watch overview for range 30d|90d|365d|all. timezone is IANA (default UTC). Completed means current saved progress >= 90%. Null rates mean the denominator is empty.",
+		Description: "Personal movie-watch overview for range 30d|90d|365d|all. These statistics describe movies only. timezone is IANA (default UTC). Completed means current saved progress >= 90%. Null rates mean the denominator is empty.",
 		ParamsSchema: object(map[string]core.Schema{
 			"range":    core.Schema{Type: "string", Enum: []string{"30d", "90d", "365d", "all"}, Description: "Time range"},
 			"timezone": strField("IANA timezone, default UTC"),

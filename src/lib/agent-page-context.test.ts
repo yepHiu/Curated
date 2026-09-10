@@ -27,6 +27,12 @@ it("projects only the allowlisted library filters into context v1", () => {
 })
 
 describe("agentPageContext", () => {
+  it.each(["comics", "comic-detail", "comic-reader", "photos", "photo-detail", "photo-viewer"])("excludes %s selections and filters", (name) => {
+    const current = route({ name, params: { id: "private-book", actorName: "private-author" }, query: { q: "private-title", tag: "private-tag", actor: "private-person" } })
+    expect(agentPageContext(current)).toBeUndefined()
+    expect(agentActiveFilters(current)).toBeUndefined()
+  })
+
   it("captures movie and actor from dedicated routes", () => {
     expect(agentPageContext(route({ name: "detail", params: { id: "m1" } }))).toEqual({
       route: "detail",

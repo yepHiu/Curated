@@ -51,6 +51,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 		l.gateway.ResetActorRefs(scope)
 		l.gateway.ResetSourceURLs(scope)
 	}()
+	page = core.MoviePageContext(page)
 	seedTurnEntities(l.gateway, scope, page)
 	seq := 0
 	// 为本次流式响应分配单调事件序号。
@@ -556,6 +557,7 @@ func confirmChanges(changes []core.Change) []contracts.AIConfirmChangeDTO {
 }
 
 func seedTurnEntities(gateway *core.Gateway, sessionID string, page *contracts.AIChatContext) {
+	page = core.MoviePageContext(page)
 	if gateway == nil || page == nil {
 		return
 	}

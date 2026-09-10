@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"curated-backend/internal/agent/core"
+	"curated-backend/internal/contracts"
 )
 
 func getWatchHistory(q LibraryQuery) core.ToolDefinition {
@@ -93,7 +94,7 @@ func getCuratedFramesStats(q LibraryQuery) core.ToolDefinition {
 func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name:        "get_task_status",
-		Description: "Look up a background task by taskId (scan, scrape, import). Do not poll in a loop; report once and finish.",
+		Description: "Look up a movie-library background task by taskId (scan, scrape, import). Only movie-related tasks are available. Do not poll in a loop; report once and finish.",
 		ParamsSchema: object(map[string]core.Schema{
 			"taskId": strField("Task id"),
 		}, "taskId"),
@@ -102,7 +103,7 @@ func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 		Handler: func(ctx context.Context, call core.Call) (core.Result, error) {
 			args := decodeArgs(call.Args)
 			task, ok := q.GetTask(ctx, strArg(args, "taskId"))
-			if !ok {
+			if !ok || !isMovieTask(task.Type) {
 				return core.Result{OK: false, Error: &core.ToolError{Code: "AI_TOOL_INVALID_ARGS", Message: "task not found"}}, nil
 			}
 			return core.Result{OK: true, Data: wrapSource(map[string]any{
@@ -113,5 +114,16 @@ func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 				"message":  task.Message,
 			})}, nil
 		},
+	}
+}
+
+// isMovieTask prevents generic task reads from exposing Beta library jobs or future domains.
+func isMovieTask(kind string) bool {
+	switch kind {
+	case "scan.library", "scrape.movie", "scrape.actor", "movie_clip_gif", "movie_clip_mp4", "movie_clip_webm",
+		contracts.TaskTypeImportMovies, contracts.TaskTypeLibraryHealthRepair, contracts.TaskTypeLibraryHealthCleanup:
+		return true
+	default:
+		return false
 	}
 }
