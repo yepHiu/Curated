@@ -132,7 +132,7 @@ function onBatchCheckboxChange() {
         class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
       >
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
-          <CardTitle class="line-clamp-2 text-[13px] leading-snug">{{ comic.title }}</CardTitle>
+          <CardTitle class="truncate text-[13px] leading-snug">{{ comic.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
             {{ t("comics.pageCount", { count: comic.pageCount }) }} <template v-if="comic.currentPageIndex > 0">· {{ progressLabel }}</template>
           </CardDescription>
