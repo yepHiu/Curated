@@ -199,9 +199,6 @@ function browseByTag(tag: string) {
                 {{ tag }}
               </button>
             </Badge>
-            <span v-if="!photo.tags.length" class="text-sm text-muted-foreground">
-              {{ t("photos.noTags") }}
-            </span>
             <Button
               v-if="!tagInputOpen"
               type="button"
