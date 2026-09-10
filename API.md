@@ -3520,7 +3520,7 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
 | GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |
 | GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/image` | Page image |
-| GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/thumbnail` | Thumbnail; photos currently return original image |
+| GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/thumbnail` | Thumbnail; photos return a JPEG with longest side <=420px and private ETag revalidation |
 | GET / PUT / DELETE | `/api/library/comics/books/{id}/progress` | Comic reading progress |
 | GET / PUT | `/api/library/comics/books/{id}/preferences` | Comic reading preferences |
 | GET | `/api/library/comics/cache/status` | Independent comic cache usage |
@@ -3531,3 +3531,9 @@ Photo per-book progress/preferences APIs and concrete cache cleanup are not impl
 ### Photo archive upload (2026-09-11)
 
 `POST /api/import/photos` accepts multipart `files` (ZIP/CBZ) and optional `totalBytes`; uses the configured `defaultPhotoImportLibraryPathId`, returns HTTP 202 with an `import.photos` TaskDTO after copying, and reports `completedFiles`, `failedFiles`, `errorItems`, and `scanTaskId` when scanning starts. A 202 response can contain `failed` or `partial_failed`; callers must inspect status. Missing target returns `PHOTO_IMPORT_TARGET_MISSING`, disabled Beta returns `PHOTO_LIBRARY_DISABLED`, and conflicts report `PHOTO_IMPORT_CONFLICT`. Files are copied within the configured photo root and existing archives are never overwritten. Agent tools do not expose photo import tasks.
+
+### Book page previews (2026-09-11)
+
+Photo `/thumbnail` now derives a <=420px JPEG instead of returning the original image. The independent process LRU holds at most 32 MiB of thumbnails; source archive size/mtime invalidate entries, and a matching `If-None-Match` returns 304 after access checks. Generation is serialized, with 32 MiB source-byte and 24M source-pixel bounds. Invalid/oversized preview sources return 422 `PHOTO_ARCHIVE_READ_FAILED`; `/image` still serves original bytes. No new API or persistent photo cache table writes are introduced. `photoCache.maxBytes` continues to reserve a future disk-cache policy.
+
+The frontend preview grid replaces batches instead of accumulating an entire book: two adaptive rows, 4–20 tiles, viewport-based image loading and page-number navigation. Photo edit/delete/reveal controls are hidden because those operations have no implemented service endpoints.

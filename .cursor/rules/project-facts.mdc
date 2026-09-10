@@ -271,3 +271,9 @@ alwaysApply: true
 
 - `ImportMenu.vue` provides one Add media dialog with always-visible movie Tab and independently Beta-gated comic/photo Tabs. Existing movie resumable uploads and catalog checks remain embedded; switching Tabs retains selections and uploads block switching/closing.
 - Photo ZIP/CBZ uploads use `POST /api/import/photos`, `defaultPhotoImportLibraryPathId`, root-confined temporary files and no-overwrite publication. The terminal import task exposes `scanTaskId`; photo scan completion reloads only photos. Partial failures remain visible. Agent task tools exclude `import.photos`.
+
+## 2026-09-11 book browsing UI and previews
+
+- Comic/photo library toolbars use sort menus, result counts, search-clear controls and loading/empty/error states. Detail uses existing shell back navigation, cover-to-reader action, prominent resume action and collapsible source location. Photo management items without implemented APIs are not exposed.
+- Shared presentation in `components/jav-library/books` accepts page metadata only; movie/comic/photo services remain independent. Page previews render two rows based on container width (4–20 nodes), replace the batch on navigation, support page lookup/open, and defer image src until near the viewport. Thumbnails preserve the whole image and failures can retry.
+- `GET /api/library/photos/books/{id}/pages/{index}/thumbnail` now returns a JPEG with longest side <=420 px via `internal/photothumb`. Process memory LRU is capped at 32 MiB, generation is serialized, source image bytes are limited to 32 MiB / 24M pixels before decoding. Archive path/entry/size/mtime form the revision key. Private ETag revalidation supports 304 and requires the Beta gate. Full image endpoint is unchanged; disk cache settings and manual photo cache cleanup remain reserved.

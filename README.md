@@ -88,6 +88,8 @@ icon/       Brand source assets (wordmark / appicon / mark)
 
 ## Notes
 
+- Comic/photo browsing uses adaptive, lazy page previews with full-book page navigation; photos now have bounded cached thumbnails. See [the guide](docs/guide.md#漫画与写真浏览2026-09-11).
+
 - Add media combines movie, comic and photo import in one dialog. Comic/photo Tabs appear only with their independent Beta switches enabled in Experimental settings; see [the guide](docs/guide.md#添加媒体2026-09-11).
 
 - Current phase is web-first with a minimal Electron shell. Deeper IPC, mpv, and broad native bridges remain target-direction work.

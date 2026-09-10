@@ -508,12 +508,14 @@
     </tbody>
   </table>
 
+  <h3>漫画 / 写真浏览与预览（2026-09-11）</h3>
+  <p>库页沿用影片库菜单式排序、加载与空态；详情强化封面、主操作与元数据。预览按容器宽度展示两行（4–20 张），切批替换节点，接近视口才加载缩略图，支持页码定位和原图浏览。照片未实现的管理操作不显示。领域服务与 AI 影片边界不变。</p>
   <h3>添加媒体（2026-09-11）</h3>
   <p>顶栏通过一个弹窗提供影片、漫画、写真 Tab；两个图片库 Tab 分别受 Beta 开关控制，默认仅显示影片。切换保留选择，上传中锁定切换与关闭。写真通过 <code>POST /api/import/photos</code> 上传到默认写真目录，禁止覆盖与越界写入，再启动独立扫描。AI 范围保持影片。</p>
   <h3>漫画与写真 Beta（2026-09-10）</h3>
   <p><strong>AI Agent 边界：</strong>漫画与写真不进入 Agent 的查询、操作、推荐或分析结论。页面上下文在前后端排除，任务工具只返回影片任务；个人洞察与聊天的统计和结论只针对影片，开启 Beta 不扩大 AI 范围。</p>
   <p>设置 → 实验性功能提供两个默认关闭的开关；启用后才显示该库的路径、阅读/浏览、监听和缓存设置。停用隐藏入口与配置、停止独立 watcher，保留索引与源包。Web 配置通过 <code>PATCH /api/settings</code> 持久化，启用允许无路径，扫描必须有已配置路径。</p>
-  <p>独立 <code>comic/photo</code> 领域、Web/Mock 服务、HTTP 端点和 SQLite 表。迁移为 0046–0048；漫画实现 ZIP/CBZ 扫描导入、阅读进度与偏好、收藏评分标签和缓存清理。写真实现 ZIP/CBZ 导入、扫描、详情与浏览，缩略图暂用原图；独立写真缓存清理和单册进度 API 尚未实现。</p>
+  <p>独立 <code>comic/photo</code> 领域、Web/Mock 服务、HTTP 端点和 SQLite 表。迁移为 0046–0048；漫画实现 ZIP/CBZ 扫描导入、阅读进度与偏好、收藏评分标签和缓存清理。写真实现 ZIP/CBZ 导入、扫描、详情与浏览，缩略图由独立 <code>photothumb</code> 生成 420px JPEG，采用 32 MiB 内存 LRU 与 ETag 校验；独立写真缓存清理和单册进度 API 尚未实现。</p>
   <h3>6.1 Homepage daily recommendations</h3>
   <p>Homepage recommendation freshness uses <code>homepage_daily_recommendations</code> as the same-day display cache and <code>homepage_recommendation_states</code> as per-movie memory. Generation version <code>v8</code> stores both the compatibility <code>recommendationMovieIds</code> and same-order <code>recommendations</code> items in <code>recommendation_items_json</code>; each item contains a movie ID, persisted truthful reason codes, and optional feedback effects. v8 also shares canonical Unicode actor identity normalization with alias lookup and merge behavior. The renderer localizes reason codes instead of reconstructing or inventing Web API reasons.</p>
   <p>Migrations <code>0033</code> and <code>0034</code> add explicit <code>homepage_recommendation_feedback</code> and explanation items. <code>GET/POST /api/homepage/recommendations/feedback</code> and <code>DELETE /api/homepage/recommendations/feedback/{feedbackId}</code> manage the active set. <code>not_interested</code> and active <code>snooze</code> remove a movie from candidates; <code>less</code> multiplies actor/studio/tag weight by <code>0.35</code> per match while retaining a <code>0.1</code> exploration floor. Targets must belong to the active source movie, repeated submissions are idempotent, snooze is bounded to 1～365 days, expired rows are ignored/cleaned, and the active set is capped at 500.</p>
