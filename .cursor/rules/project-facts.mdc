@@ -225,14 +225,14 @@ alwaysApply: true
 - Photo library is an optional module beside movies and comics. The frontend hides photo navigation until `photoLibraryEnabled=true`.
 - Photo, comic, and movie domains are intentionally independent. Do not store photo books in comic tables, do not expose photo behavior through `/api/library/comics`, and do not route photo UI through `useComicLibraryService()` or movie `useLibraryService()`.
 - Backend persistence uses separate settings plus independent SQLite tables/repositories: `photo_library_paths`, `photo_books`, `photo_pages`, `photo_tags`, `photo_book_tags`, `photo_viewing_progress`, `photo_viewing_preferences`, and `photo_cache_entries`.
-- Backend routes: `GET/POST/PATCH/DELETE /api/library/photos/paths`; `POST /api/library/photos/scans` (optional `paths` body restricts scans to configured photo roots); `GET /api/library/photos`; `GET /api/library/photos/{photoId}`; and page image/thumbnail routes under `/api/library/photos/books/{photoId}/...`. `GET/PATCH /api/settings` also returns and persists photo fields: `photoLibraryEnabled`, `autoPhotoLibraryWatch`, `defaultPhotoImportLibraryPathId`, `photoViewer`, `photoCache`, and `photoLibraryPaths`.
+- Backend routes: `POST /api/import/photos`; `GET/POST/PATCH/DELETE /api/library/photos/paths`; `POST /api/library/photos/scans` (optional `paths` body restricts scans to configured photo roots); `GET /api/library/photos`; `GET /api/library/photos/{photoId}`; and page image/thumbnail routes under `/api/library/photos/books/{photoId}/...`. `GET/PATCH /api/settings` also returns and persists photo fields: `photoLibraryEnabled`, `autoPhotoLibraryWatch`, `defaultPhotoImportLibraryPathId`, `photoViewer`, `photoCache`, and `photoLibraryPaths`.
 - Settings keys in `config/library-config.cfg`: `photoLibraryEnabled` (default `false`), `autoPhotoLibraryWatch` (default `true`), `defaultPhotoImportLibraryPathId`, `photoViewer` (`mode`, `fit`, `direction`; default `page` / `contain` / `ltr`), and `photoCache` (`maxBytes`, default 5368709120).
 - Frontend routes: `/photos`, `/photos/:id`, and `/photos/:id/view/:pageIndex?` guarded by photo enabled state. Service boundary is `usePhotoLibraryService()` with independent web/mock adapters and `src/domain/photo` types.
 - Current frontend slice includes settings UI aligned with comic settings, path CRUD/manual scan UI, optional sidebar entry, routes, shell search integration, and Web API photo wall/detail/viewer loading via independent photo endpoints.
 - Photo archives support `.zip` and `.cbz`; page images use the same supported image extensions as comics. The first naturally sorted image is the cover.
 - Photo auto watch is independent from movie and comic watchers. When `libraryWatchEnabled` permits fsnotify, `photoLibraryEnabled=true`, and `autoPhotoLibraryWatch=true`, `backend/internal/photowatch` watches `photo_library_paths` for `.zip` / `.cbz` create/write/rename events and queues App-owned `scan.photos` tasks with `metadata.trigger="fsnotify"`.
-- Task type: `scan.photos`. Photo error codes use the `PHOTO_*` prefix.
-- MVP exclusions: photo import upload, metadata scraping/OCR, `.rar`, `.cbr`, `.7z`, persistent progress/preference endpoints beyond the current tables, and photo cache status/cleanup endpoints.
+- Task types: `scan.photos`, `import.photos`. Photo error codes use the `PHOTO_*` prefix.
+- MVP exclusions: metadata scraping/OCR, `.rar`, `.cbr`, `.7z`, persistent progress/preference endpoints beyond the current tables, and photo cache status/cleanup endpoints.
 
 ## 2026-05 PIN App Lock
 
@@ -266,3 +266,8 @@ alwaysApply: true
 - 当前 Agent 只处理影片及其演员、元数据、播放历史、个人洞察和萃取帧。漫画库 / 写真库不属于 Agent 范围，Beta 开关不扩大 AI 权限；不得查询、修改、推荐、分析或对这两个库形成结论。
 - 前端 `agent-page-context.ts` 不采集六种漫画/写真路由的页面、筛选及实体信息；服务端 `core.MoviePageContext` 在 prompt 与实体引用初始化前丢弃这些页面载荷，兼容旧客户端。Agent 查询接口仍仅使用影片领域；`get_task_status` 采用影片任务类型白名单，未知/图片库任务不返回任务内容。
 - `agent-system-v4` 明确影片范围、混合请求只处理影片部分、不得将影片统计泛化为所有媒体；独立 Insights narrative 同样仅基于影片。Mock 图片库请求不触发假工具或影片推荐卡。
+
+## 2026-09-11 unified media import
+
+- `ImportMenu.vue` provides one Add media dialog with always-visible movie Tab and independently Beta-gated comic/photo Tabs. Existing movie resumable uploads and catalog checks remain embedded; switching Tabs retains selections and uploads block switching/closing.
+- Photo ZIP/CBZ uploads use `POST /api/import/photos`, `defaultPhotoImportLibraryPathId`, root-confined temporary files and no-overwrite publication. The terminal import task exposes `scanTaskId`; photo scan completion reloads only photos. Partial failures remain visible. Agent task tools exclude `import.photos`.

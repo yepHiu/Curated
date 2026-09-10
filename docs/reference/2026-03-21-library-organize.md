@@ -29,7 +29,7 @@ The optional photo book module uses separate keys in `config/library-config.cfg`
 |------|---------|---------|
 | `photoLibraryEnabled` | `false` | Enables photo routes and frontend photo navigation. When false, photo entry points stay hidden. |
 | `autoPhotoLibraryWatch` | `true` | Enables independent fsnotify-driven photo scans when `photoLibraryEnabled=true` and the global `libraryWatchEnabled` gate permits watchers. `photowatch` listens to configured photo roots for `.zip` / `.cbz` changes and queues `scan.photos`. |
-| `defaultPhotoImportLibraryPathId` | empty | Photo library path id reserved for future photo imports. |
+| `defaultPhotoImportLibraryPathId` | empty | Photo library path id used by `POST /api/import/photos`. |
 | `photoViewer` | `{ "mode": "page", "fit": "contain", "direction": "ltr" }` | Global photo viewer defaults. `mode` is `page` or `scroll`; `fit` is `contain` or `width`; `direction` is `ltr` or `rtl`. |
 | `photoCache` | `{ "maxBytes": 5368709120 }` | Separate photo cache limit. The cache endpoints and concrete cache cleanup are pending the photo content/backend slice. |
 
@@ -59,7 +59,7 @@ Photo library current slice:
 | `autoLibraryWatch` | 默认 **`true`**。为 **`true`** 且主配置允许目录监听时，库根下新文件经 **fsnotify** 防抖后会触发与 **`POST /api/scans`** 同类的扫描链（任务元数据常带 `trigger: fsnotify`），并可能对新增条目排队刮削。为 **`false`** 时**不**因监听排队扫描；**手动扫描、周期 `autoScanIntervalSeconds` 全库扫描**不受影响。由设置页「自动刮削元数据」或 `PATCH /api/settings` 的 `autoLibraryWatch` 更新。 |
 | `autoComicLibraryWatch` | 默认 **`true`**。为 **`true`** 且漫画库已启用、主配置允许目录监听时，漫画存储路径下新增或变更的 `.zip` / `.cbz` 会经独立漫画 watcher 防抖后触发 `scan.comics`（任务元数据常带 `trigger: fsnotify`）。为 **`false`** 时不因监听排队漫画扫描；手动漫画扫描与漫画导入后的扫描不受影响。 |
 | `autoPhotoLibraryWatch` | 默认 **`true`**。为 **`true`** 且写真库已启用、主配置允许目录监听时，独立写真 watcher 会监听写真存储路径下新增或变更的 `.zip` / `.cbz`，并经防抖后触发 `scan.photos`。 |
-| `photoLibraryEnabled` / `defaultPhotoImportLibraryPathId` / `photoViewer` / `photoCache` | 写真库开关、未来默认导入目标、浏览器默认设置和缓存上限；由设置页「实验性功能 → 写真库 Beta」或 `PATCH /api/settings` 更新。写真路径列表来自独立 SQLite 表 `photo_library_paths`。 |
+| `photoLibraryEnabled` / `defaultPhotoImportLibraryPathId` / `photoViewer` / `photoCache` | 写真库开关、默认导入目标、浏览器默认设置和缓存上限；由设置页「实验性功能 → 写真库 Beta」或 `PATCH /api/settings` 更新。写真路径列表来自独立 SQLite 表 `photo_library_paths`。 |
 | `launchAtLogin` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；在支持的 Windows 运行时中会同步当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 项，命令行为 `curated(.exe) -mode tray -autostart`。Windows 登录触发的这次启动会**静默进入托盘**，只拉起本地服务与托盘图标，**不会自动打开浏览器页面**。 |
 | `autoDownloadUpdates` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；开启后，启动阶段的后台更新检查若发现较新的 installer，会自动下载并完成 SHA256 校验；安装仍须用户在 Settings -> About 显式确认，不会自动静默安装。 |
 | `logDir` | 后端启动后按日向该目录轮转写日志文件（与主配置 `logDir` 同源字段，由本文件合并覆盖）。空或省略表示使用默认目录，而不是关闭文件日志：**release** 默认 `LOCALAPPDATA\Curated\logs`，**dev** 默认 `backend/runtime/logs`。由设置页 **通用** 或 `PATCH /api/settings` 的 `backendLog` 更新；**重启后端**后 Zap 才按新目录/级别落盘。 |
@@ -101,4 +101,4 @@ Photo library current slice:
 
 两个库均在「设置 → 实验性功能」提供默认关闭的独立开关。启用后才显示对应路径、自动扫描、阅读/浏览和缓存设置；允许先开启再添加路径。关闭后保留 `library-config.cfg` 设置、SQLite 路径和索引、源文件，但隐藏入口和配置并停止相应 watcher。手动扫描仍要求该库启用且已配置路径。
 
-Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真缓存上限目前仅保存为预留配置，缩略图使用原图，尚无独立缓存清理；默认写真导入路径也为后续导入保留。新表迁移为 0046 / 0047 / 0048。
+Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真缓存上限目前仅保存为预留配置，缩略图使用原图，尚无独立缓存清理；默认写真导入路径由「添加媒体 → 添加写真」使用，上传 ZIP/CBZ 后排队独立写真扫描。新表迁移为 0046 / 0047 / 0048。
