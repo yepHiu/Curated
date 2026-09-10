@@ -109,7 +109,44 @@ function readLocaleKey(messages: Record<string, unknown>, key: string): unknown 
   return cursor
 }
 
+function collectLocaleStrings(
+  value: unknown,
+  path: string[] = [],
+): Array<{ path: string; value: string }> {
+  if (typeof value === "string") {
+    return [{ path: path.join("."), value }]
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return []
+  }
+  return Object.entries(value).flatMap(([key, nested]) =>
+    collectLocaleStrings(nested, [...path, key]),
+  )
+}
+
 describe("locale key parity", () => {
+  it("uses the concise Chinese movie library sidebar label", () => {
+    expect(readLocaleKey(zhCN, "nav.library")).toBe("影片")
+  })
+
+  it.each([
+    ["zh-CN", zhCN],
+    ["ja", ja],
+  ] as const)("%s photo library copy does not contain replacement question marks", (_locale, messages) => {
+    const photoCopy = [
+      ...collectLocaleStrings(readLocaleKey(messages, "photos"), ["photos"]),
+      ...collectLocaleStrings(readLocaleKey(messages, "settings"), ["settings"]).filter(({ path }) =>
+        path.startsWith("settings.photo"),
+      ),
+    ]
+
+    const broken = photoCopy
+      .filter(({ value }) => /\?/.test(value))
+      .map(({ path, value }) => `${path}: ${value}`)
+
+    expect(broken).toEqual([])
+  })
+
   it.each(Object.entries(locales))("%s has curated tag filter and saving keys", (_locale, messages) => {
     const missing = requiredLocaleKeys.filter((key) => {
       const value = readLocaleKey(messages, key)

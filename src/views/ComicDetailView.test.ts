@@ -23,6 +23,7 @@ function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
 }
 
 const routeState = vi.hoisted(() => ({
+  fullPath: "/comics/comic-1",
   params: { id: "comic-1" as string | undefined },
 }))
 
@@ -104,6 +105,7 @@ declare global {
 
 describe("ComicDetailView", () => {
   beforeEach(() => {
+    routeState.fullPath = "/comics/comic-1"
     routeState.params = { id: "comic-1" }
     serviceState.comic = makeComic()
     serviceMocks.loadComicDetail.mockReset()
@@ -174,6 +176,7 @@ describe("ComicDetailView", () => {
     expect(routerPushMock).toHaveBeenCalledWith({
       name: "comic-reader",
       params: { id: "comic-1", pageIndex: "2" },
+      query: { returnTo: "/comics/comic-1" },
     })
   })
 })

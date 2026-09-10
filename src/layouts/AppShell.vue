@@ -125,17 +125,38 @@ const currentMovieId = computed(
 )
 const isLibraryRoute = computed(() => isLibraryBrowseRoute(route))
 const isHomeRoute = computed(() => route.name === "home")
+const isActorsRoute = computed(() => route.name === "actors")
+const isComicsRoute = computed(() => route.name === "comics")
+const isPhotosRoute = computed(() => route.name === "photos")
 /** 回收站不显示资料库顶栏搜索；首页也显示搜索框 */
 const showLibraryBrowseSearch = computed(
-  () => (isLibraryRoute.value && resolveLibraryMode(route) !== "trash") || isHomeRoute.value,
+  () =>
+    (isLibraryRoute.value && resolveLibraryMode(route) !== "trash") ||
+    isComicsRoute.value ||
+    isPhotosRoute.value ||
+    isHomeRoute.value,
+)
+const showLibrarySearchSuggestions = computed(
+  () => showLibraryBrowseSearch.value && !isComicsRoute.value && !isPhotosRoute.value,
+)
+const libraryBrowseSearchPlaceholder = computed(() =>
+  isComicsRoute.value
+    ? t("comics.searchPlaceholder")
+    : isPhotosRoute.value
+      ? t("photos.searchPlaceholder")
+      : t("shell.searchLibraryPlaceholder"),
 )
 /** 资料库搜索建议导航目标：首页时跳资料库，否则留在当前路由 */
 const librarySearchTargetRoute = computed(() =>
   isHomeRoute.value ? "library" : (route.name ?? "library"),
 )
-const isActorsRoute = computed(() => route.name === "actors")
 const isPrimaryBrowseRoute = computed(
-  () => isHomeRoute.value || isLibraryRoute.value || isActorsRoute.value,
+  () =>
+    isHomeRoute.value ||
+    isLibraryRoute.value ||
+    isActorsRoute.value ||
+    isComicsRoute.value ||
+    isPhotosRoute.value,
 )
 const hasDetailBackIntentOnPrimaryRoute = computed(
   () =>
@@ -145,9 +166,18 @@ const hasDetailBackIntentOnPrimaryRoute = computed(
 )
 const isCuratedFramesRoute = computed(() => route.name === "curated-frames")
 const useFlushWorkspaceFrame = computed(() =>
-  ["home", "library", "favorites", "tags", "trash", "history", "curated-frames", "player"].includes(
-    String(route.name ?? ""),
-  ),
+  [
+    "home",
+    "library",
+    "favorites",
+    "tags",
+    "trash",
+    "history",
+    "curated-frames",
+    "player",
+    "comics",
+    "photos",
+  ].includes(String(route.name ?? "")),
 )
 
 const showHeaderBack = computed(
@@ -295,8 +325,8 @@ watch(searchDraft, (v) => {
   }
 })
 
-watch(isLibraryRoute, (lib) => {
-  if (!lib) {
+watch(showLibrarySearchSuggestions, (show) => {
+  if (!show) {
     librarySuggestionsOpen.value = false
   }
 })
@@ -306,6 +336,9 @@ onClickOutside(librarySearchRootRef, () => {
 })
 
 function onLibrarySearchFocus() {
+  if (!showLibrarySearchSuggestions.value) {
+    return
+  }
   debouncedSuggestNeedle.value = searchDraft.value
   if (searchDraft.value.trim()) {
     librarySuggestionsOpen.value = true
@@ -313,6 +346,9 @@ function onLibrarySearchFocus() {
 }
 
 function onLibrarySearchInput() {
+  if (!showLibrarySearchSuggestions.value) {
+    return
+  }
   if (searchDraft.value.trim()) {
     librarySuggestionsOpen.value = true
   }
@@ -368,7 +404,7 @@ function applyLibrarySuggestRow(row: Extract<LibrarySuggestRow, { rowType: "item
 }
 
 function onLibrarySearchKeydown(e: KeyboardEvent) {
-  if (!librarySuggestionsOpen.value || !searchDraft.value.trim()) {
+  if (!showLibrarySearchSuggestions.value || !librarySuggestionsOpen.value || !searchDraft.value.trim()) {
     return
   }
   const n = librarySuggestItemCount.value
@@ -447,6 +483,13 @@ watch(
     () => route.query.studio,
   ],
   () => {
+    if (isComicsRoute.value || isPhotosRoute.value) {
+      const next = getLibrarySearchQuery(route.query)
+      if (next !== searchDraft.value) {
+        searchDraft.value = next
+      }
+      return
+    }
     if (!isLibraryRoute.value) {
       return
     }
@@ -710,10 +753,12 @@ function clearActorsSearch() {
                   v-model="searchDraft"
                   class="h-10 rounded-2xl border-border/70 bg-background/70 pl-10 transition-[border-color,background-color,box-shadow] hover:border-primary/60 hover:bg-background/85 hover:ring-1 hover:ring-primary/30"
                   :class="searchDraft.trim() ? 'pr-10' : ''"
-                  :placeholder="t('shell.searchLibraryPlaceholder')"
+                  :placeholder="libraryBrowseSearchPlaceholder"
                   autocomplete="off"
                   role="combobox"
-                  :aria-expanded="librarySuggestionsOpen && !!searchDraft.trim()"
+                  :aria-expanded="
+                    showLibrarySearchSuggestions && librarySuggestionsOpen && !!searchDraft.trim()
+                  "
                   :aria-activedescendant="
                     librarySuggestHighlightIndex >= 0
                       ? `library-search-suggest-${librarySuggestHighlightIndex}`
@@ -737,7 +782,7 @@ function clearActorsSearch() {
                   <X class="size-4" />
                 </Button>
                 <div
-                  v-show="librarySuggestionsOpen && searchDraft.trim()"
+                  v-show="showLibrarySearchSuggestions && librarySuggestionsOpen && searchDraft.trim()"
                   id="library-search-suggest-list"
                   class="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-lg shadow-black/15"
                   role="listbox"

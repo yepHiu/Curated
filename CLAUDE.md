@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Comic Library MVP:** Curated also has an optional comic library module. It is hidden until `comicLibraryEnabled=true` and is intentionally independent from movies: separate SQLite tables, repositories, scanner/import APIs, frontend service contract/adapters, tags, progress, reader preferences, and cache. Do not model comics as `Movie`, do not add comic fields to movie tables, and do not route comic behavior through `/api/library/movies`.
 
+**Photo Library MVP:** Curated is adding an optional photo book library module beside movies and comics. It is hidden until `photoLibraryEnabled=true` and must stay independent from both existing domains: use photo tables, photo settings, photo routes, photo service adapters, `photoscanner`, `photowatch`, and `/api/library/photos/*` instead of comic tables or `/api/library/comics`. The current implemented slice includes settings persistence, photo path CRUD/manual scan APIs, independent auto-watch scans, photo book/page indexing, page image serving, routes, settings/path UI, and Web API photo wall/detail/viewer loading. Photo import upload, cache cleanup/status, and explicit progress/preference APIs remain later slices.
+
 **Public docs rule:** Root `README.md` is the English primary README, `README.zh-CN.md` and `README.ja-JP.md` are full translations, and root `API.md` is the single public API reference. Do not rebuild the full API table inside the README.
 
 ## Tech Stack
@@ -117,9 +119,15 @@ Library-specific settings are persisted to `config/library-config.cfg` (JSON) an
 - **`metadataMovieStrategy`** - Higher-level provider scheduling strategy (`auto-global` | `auto-cn-friendly` | `custom-chain` | `specified`)
 - **`defaultImportLibraryPathId`** - Library path id used as the target for top-bar movie imports; persisted by Settings -> Video storage and consumed by `POST /api/import/movies` and resumable upload endpoints under `/api/import/movies/uploads`
 - **`comicLibraryEnabled`** - Enables the optional comic module and frontend navigation entry (default: `false`)
+- **`autoComicLibraryWatch`** - Enables independent fsnotify-driven comic auto scans when the comic module and global watch gate are both enabled (default: `true`)
 - **`defaultComicImportLibraryPathId`** - Comic library path id used as the target for `POST /api/import/comics`
 - **`comicReader`** - Global comic reader defaults: `mode` (`page` | `scroll`), `fit` (`contain` | `width`), `direction` (`ltr` | `rtl`)
 - **`comicCache`** - Comic cache settings; default `maxBytes` is 2147483648, negative values mean unlimited
+- **`photoLibraryEnabled`** - Enables the optional photo book module and frontend navigation entry (default: `false`)
+- **`autoPhotoLibraryWatch`** - Enables independent fsnotify-driven photo scans when the photo module and global watch gate are both enabled (default: `true`)
+- **`defaultPhotoImportLibraryPathId`** - Photo library path id reserved as the target for future photo imports
+- **`photoViewer`** - Global photo viewer defaults: `mode` (`page` | `scroll`), `fit` (`contain` | `width`), `direction` (`ltr` | `rtl`)
+- **`photoCache`** - Photo cache settings; default `maxBytes` is 5368709120
 - **`logDir`** / **`logFilePrefix`** / **`logMaxAgeDays`** / **`logLevel`** - Backend Zap log file output (merged into the same fields as the main `-config` JSON); empty **`logDir`** means "use the default log directory" instead of disabling file logging: dev builds default to **`backend/runtime/logs`**, while release builds default to **`LOCALAPPDATA\\Curated\\logs`**. **`PATCH /api/settings`** field **`backendLog`** updates **`logDir`** / **`logMaxAgeDays`** / **`logLevel`** from the settings UI (omits **`logFilePrefix`** so manual `library-config.cfg` or the default `curated-dev` in dev / `curated` in release applies); **restart the backend** for new log directory/level to apply to file sinks
 - **`proxy`** - Outbound HTTP proxy for the Curated backend (Metatube scraping, asset downloads); persisted here and applied as process `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` via `backend/internal/proxyenv` so `http.ProxyFromEnvironment` picks it up
 
@@ -156,10 +164,11 @@ src/
 - Mock data and types are in `src/lib/jav-library.ts`
 - Service layer with adapter pattern for backend communication
 - State management defaults to composables plus the service layer; Pinia may be introduced later through a small, bounded service/new feature, not a broad upfront migration
-- Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `comics`, `comics/:id`, `comics/:id/read`, `settings`, `lock`
+- Routes: `library`, `favorites`, `recent`, `tags`, `actors`, `history`, `detail/:id`, `player/:id`, `comics`, `comics/:id`, `comics/:id/read`, `photos`, `photos/:id`, `photos/:id/view`, `settings`, `lock`
 - PIN App Lock: Web API mode can enable a backend-enforced PIN gate. `src/services/auth-lock-service.ts` owns auth status including `pinLength`, `src/services/auth-idle-lock-service.ts` keeps regular sessions alive on user activity and redirects after idle expiry, `/lock` renders the keyboard-first lock screen with the configured number of PIN cells, and the route guard redirects locked pages to `/lock?redirect=...`.
 - Playback progress: dual storage (backend SQLite in Web API mode, `localStorage` in Mock mode)
 - Comic frontend state goes through `useComicLibraryService()` and `src/services/contracts/comic-library-service.ts`; comic views/components must not import movie service types or `Movie` models.
+- Photo frontend state goes through `usePhotoLibraryService()` and `src/services/contracts/photo-library-service.ts`; photo views/components must not import comic service types or route through comic APIs.
 - Daily watch-time: Settings -> Overview statistics use player-reported watch-time deltas; Web API mode stores per-day/per-movie aggregates in SQLite, Mock mode stores them in `localStorage`
 - History page: `src/views/HistoryView.vue` displays watch history grouped by date
 - Virtual scrolling: uses `vue-virtual-scroller` for large poster grids
@@ -258,7 +267,7 @@ GET    /api/library/comics/paths            # List comic library roots
 POST   /api/library/comics/paths            # Add comic library root
 PATCH  /api/library/comics/paths/{id}       # Rename comic library root
 DELETE /api/library/comics/paths/{id}       # Remove comic library root from Curated only
-POST   /api/library/comics/scans            # Start comic scan task
+POST   /api/library/comics/scans            # Start comic scan task; optional body paths restrict to configured comic roots
 GET    /api/library/comics/cache/status     # Comic cache usage and max size
 POST   /api/library/comics/cache/cleanup    # Remove comic cache entries/files, never source archives
 GET    /api/library/comics                  # List comic books (q, tag, favorite, readStatus, limit, offset)
@@ -274,6 +283,16 @@ PUT    /api/library/comics/books/{comicId}/progress # Save comic reading progres
 DELETE /api/library/comics/books/{comicId}/progress # Clear comic reading progress
 GET    /api/library/comics/books/{comicId}/preferences # Get per-book reader preferences
 PUT    /api/library/comics/books/{comicId}/preferences # Save per-book reader preferences
+GET    /api/library/photos/paths            # List photo library roots
+POST   /api/library/photos/paths            # Add photo library root
+PATCH  /api/library/photos/paths/{id}       # Rename photo library root
+DELETE /api/library/photos/paths/{id}       # Remove photo library root from Curated only
+POST   /api/library/photos/scans            # Start photo scan task; optional body paths restrict to configured photo roots
+GET    /api/library/photos                  # List photo books (q, tag, favorite, limit, offset)
+GET    /api/library/photos/{photoId}        # Get photo book detail with page previews
+GET    /api/library/photos/books/{photoId}/pages # List photo pages
+GET    /api/library/photos/books/{photoId}/pages/{pageIndex}/image # Serve page image from archive
+GET    /api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail # Serve page thumbnail (currently aliases image)
 GET    /api/settings                        # Get settings (includes autoDownloadUpdates / launchAtLogin / launchAtLoginSupported)
 PATCH  /api/settings                        # Partial update (persisted to config/library-config.cfg)
 POST   /api/proxy/ping-javbus               # Test proxy: GET https://www.javbus.com/ (body.proxy optional = use form draft; omit = use persisted proxy)
@@ -301,7 +320,7 @@ POST   /api/providers/ping                  # Ping a single provider
 POST   /api/providers/ping-all              # Ping all providers
 ```
 
-**Async Task Pattern:** Long-running operations (movie scan/import, comic scan/import, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this. Comic task types are `scan.comics`, `import.comics`, and `comic.cache.cleanup`.
+**Async Task Pattern:** Long-running operations (movie scan/import, comic scan/import, photo scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this. Comic task types are `scan.comics`, `import.comics`, and `comic.cache.cleanup`; photo scan tasks use `scan.photos`.
 
 **PIN App Lock:** PIN lock is disabled by default. When enabled, all protected `/api/*` routes are guarded by backend middleware and return `423 AUTH_LOCKED` without a valid `curated_auth` HTTP-only cookie. PIN values are stored in SQLite only as Argon2id salted hashes; the non-secret PIN length is stored separately and returned as `pinLength` so `/lock` can render the correct number of keyboard-entry cells. Regular unlock sessions use `sessionTtlMinutes` as an idle-lock delay: protected API use and frontend activity refresh `/api/auth/status`, extending `sessionExpiresAt` instead of locking on a fixed countdown. Unlock can also use `{ "trustedForever": true }`, which leaves `sessionExpiresAt` empty and survives backend restart-lock cleanup until the current device is explicitly locked or the session is revoked. `/api/health`, `/api/auth/status`, `/api/auth/setup-pin`, `/api/auth/unlock`, and `/api/auth/lock` remain public so the lock UI can render and recover; `POST /api/auth/change-pin` is protected and additionally verifies the current PIN.
 
@@ -389,6 +408,7 @@ Backend uses stable error codes (see `backend/internal/contracts/contracts.go`):
 - `SETTINGS_*` - Configuration errors
 - `CURATED_*` - Curated frames errors
 - `COMIC_*` - Optional comic library, archive, import, and cache errors
+- `PHOTO_*` - Optional photo book library, archive, scan, and page errors
 - `PROVIDER_*` - Provider health check errors
 
 ### Database Migrations
@@ -400,7 +420,7 @@ Migrations are in `backend/internal/storage/migrations/` and run automatically o
 All long-running operations (scan, scrape, asset download) are modeled as background tasks:
 
 - **Task lifecycle:** `pending` → `running` → `completed` | `partial_failed` | `failed` | `cancelled`
-- **Task types:** `scan.library`, `import.movies`, `scrape.movie`, `scrape.actor`, `scan.comics`, `import.comics`, `comic.cache.cleanup`
+- **Task types:** `scan.library`, `import.movies`, `scrape.movie`, `scrape.actor`, `scan.comics`, `import.comics`, `comic.cache.cleanup`, `scan.photos`
 - **SSE events:** `GET /api/events` streams non-blocking `task.updated` snapshots; frontend task tracking and library-watch toasts consume it in Web API mode
 - **Polling fallback:** Frontend still polls `GET /api/tasks/{taskId}` for progress updates when SSE is unavailable
 - **Recent tasks:** `GET /api/tasks/recent` returns recently completed tasks for UI toast notifications
@@ -454,8 +474,21 @@ Comic library MVP behavior:
 - Detail MVP fields are title, tags, rating, and favorite. Author/series can be represented as tags until explicit metadata fields are introduced.
 - Reader supports page/scroll mode, contain/width fit, LTR/RTL keyboard navigation, persisted per-book progress/preferences, and temporary current+previous/current+next stitching. Stitching is session-only and not persisted.
 - `POST /api/import/comics` copies archives into `defaultComicImportLibraryPathId`, does not delete source archives, does not overwrite conflicts, and starts `scan.comics`.
+- Independent comic auto watch uses `autoComicLibraryWatch` plus `backend/internal/comicwatch` to listen to `comic_library_paths` for `.zip` / `.cbz` create/write/rename events and queue `scan.comics` with `metadata.trigger="fsnotify"`.
 - Comic cache is separate from movie assets/cache. Cleanup removes only comic cache entries/files under the comic cache root and must not delete `.zip` or `.cbz` source archives.
-- MVP exclusions: metadata scraping, OCR, `.rar`, `.cbr`, `.7z`, auto watch, persistent double-page layout, gamepad reader controls, and cross-device sync beyond the local Web API SQLite state.
+- MVP exclusions: metadata scraping, OCR, `.rar`, `.cbr`, `.7z`, persistent double-page layout, gamepad reader controls, and cross-device sync beyond the local Web API SQLite state.
+
+### Photo Library
+
+Photo library MVP behavior:
+
+- Optional module; the sidebar/app entry is hidden until `photoLibraryEnabled=true`.
+- The domain is independent from comics and movies. Do not put photo books in comic tables, do not expose them through `/api/library/comics`, and do not share comic tags/progress/preferences/cache.
+- Backend storage is independent: `photo_library_paths`, `photo_books`, `photo_pages`, `photo_tags`, `photo_book_tags`, `photo_viewing_progress`, `photo_viewing_preferences`, and `photo_cache_entries`.
+- Current backend API slice includes `GET/POST/PATCH/DELETE /api/library/photos/paths`, `POST /api/library/photos/scans`, `GET /api/library/photos`, `GET /api/library/photos/{photoId}`, page list/image/thumbnail routes under `/api/library/photos/books/{photoId}/...`, and photo fields on `GET/PATCH /api/settings`.
+- Current frontend slice includes routes `/photos`, `/photos/:id`, `/photos/:id/view/:pageIndex?`, independent web/mock service adapters, settings/path UI aligned with comics, and Web API photo wall/detail/viewer loading using movie/comic grid sizing patterns.
+- Independent photo auto watch uses `autoPhotoLibraryWatch` plus `backend/internal/photowatch` to listen to `photo_library_paths` for `.zip` / `.cbz` create/write/rename events and queue `scan.photos` with `metadata.trigger="fsnotify"`. Do not wire it to comicwatch or `scan.comics`.
+- Pending slices: photo import upload, patch/delete/reveal APIs, explicit progress/preferences endpoints, and photo cache status/cleanup endpoints.
 
 ### Curated Frames
 
@@ -530,7 +563,7 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Settings -> About now includes packaged-app update status, a manual update-check action, in-app latest `.exe` installer download with SHA256 verification, explicit installer launch when ready, and a release-page fallback link; Settings -> General adds persisted `autoDownloadUpdates` for opt-in startup background download-and-verify behavior; when an update is available, the sidebar shows a lightweight `New` badge (expanded) or dot (compact) that links to `Settings -> About`, while the `Curated` brand text/icon links to the home page
 - In development only, `src/layouts/AppShell.vue` mounts a fixed bottom overlay `DevPerformanceBar.vue`. It does not participate in page layout and aggregates frontend runtime sampling, request stats from `src/api/http-client.ts`, backend health, and `GET /api/dev/performance`.
 - Auto-scan loop runs in background when backend starts
-- Library organization (`organizeLibrary`), directory-watch-driven auto scan (`autoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), background installer auto-download (`autoDownloadUpdates`), default movie import target (`defaultImportLibraryPathId`), comic enable/default import/reader/cache settings (`comicLibraryEnabled`, `defaultComicImportLibraryPathId`, `comicReader`, `comicCache`), Windows login autostart (`launchAtLogin`), and curated-frame export format (`curatedFrameExportFormat`, default `jpg`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
+- Library organization (`organizeLibrary`), movie directory-watch-driven auto scan (`autoLibraryWatch`), comic directory-watch-driven auto scan (`autoComicLibraryWatch`), photo directory-watch-driven auto scan (`autoPhotoLibraryWatch`), scan/import-time missing actor profile scraping (`autoActorProfileScrape`), background installer auto-download (`autoDownloadUpdates`), default movie import target (`defaultImportLibraryPathId`), comic enable/default import/reader/cache settings (`comicLibraryEnabled`, `defaultComicImportLibraryPathId`, `comicReader`, `comicCache`), photo enable/default import/viewer/cache settings (`photoLibraryEnabled`, `defaultPhotoImportLibraryPathId`, `photoViewer`, `photoCache`), Windows login autostart (`launchAtLogin`), and curated-frame export format (`curatedFrameExportFormat`, default `jpg`) can be toggled via `PATCH /api/settings` (persisted in `config/library-config.cfg`)
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)

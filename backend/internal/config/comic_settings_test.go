@@ -13,6 +13,9 @@ func TestDefaultComicSettings(t *testing.T) {
 	if cfg.ComicLibraryEnabled {
 		t.Fatal("comic library should be disabled by default")
 	}
+	if !cfg.AutoComicLibraryWatch {
+		t.Fatal("comic auto watch should be enabled by default")
+	}
 	if got, want := cfg.ComicReader.Mode, "page"; got != want {
 		t.Fatalf("ComicReader.Mode = %q, want %q", got, want)
 	}
@@ -33,6 +36,7 @@ func TestMergeLibrarySettingsFile_ComicSettings(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "library-config.cfg")
 	raw := `{
   "comicLibraryEnabled": true,
+  "autoComicLibraryWatch": false,
   "defaultComicImportLibraryPathId": " comic-lib-main ",
   "comicReader": {
     "mode": "scroll",
@@ -54,6 +58,9 @@ func TestMergeLibrarySettingsFile_ComicSettings(t *testing.T) {
 
 	if !cfg.ComicLibraryEnabled {
 		t.Fatal("expected comicLibraryEnabled true from library-config.cfg")
+	}
+	if cfg.AutoComicLibraryWatch {
+		t.Fatal("expected autoComicLibraryWatch false from library-config.cfg")
 	}
 	if got, want := cfg.DefaultComicImportLibraryPathID, "comic-lib-main"; got != want {
 		t.Fatalf("DefaultComicImportLibraryPathID = %q, want %q", got, want)
@@ -82,6 +89,7 @@ func TestWriteLibrarySettingsMerge_ComicSettingsPreservesUnknownKeys(t *testing.
 
 	if err := WriteLibrarySettingsMerge(path, func(m map[string]any) error {
 		m["comicLibraryEnabled"] = true
+		m["autoComicLibraryWatch"] = false
 		m["defaultComicImportLibraryPathId"] = "comic-lib-2"
 		m["comicReader"] = map[string]any{
 			"mode":      "page",
@@ -102,6 +110,9 @@ func TestWriteLibrarySettingsMerge_ComicSettingsPreservesUnknownKeys(t *testing.
 	}
 	if !cfg.ComicLibraryEnabled {
 		t.Fatal("expected comic library enabled after write merge")
+	}
+	if cfg.AutoComicLibraryWatch {
+		t.Fatal("expected comic auto watch disabled after write merge")
 	}
 	if got, want := cfg.DefaultComicImportLibraryPathID, "comic-lib-2"; got != want {
 		t.Fatalf("DefaultComicImportLibraryPathID = %q, want %q", got, want)

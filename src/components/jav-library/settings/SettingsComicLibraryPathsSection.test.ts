@@ -10,14 +10,32 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("lucide-vue-next", () => ({
   FolderArchive: { name: "FolderArchive", template: "<span />" },
+  MoreVertical: { name: "MoreVertical", template: "<span />" },
+  RefreshCw: { name: "RefreshCw", template: "<span />" },
   Trash2: { name: "Trash2", template: "<span />" },
 }))
 
 vi.mock("@/components/ui/button", () => ({
   Button: {
     name: "Button",
+    props: ["disabled", "ariaLabel"],
     emits: ["click"],
-    template: "<button @click=\"$emit('click', $event)\"><slot /></button>",
+    template:
+      "<button v-bind='$attrs' :disabled='disabled' :aria-label='ariaLabel' @click=\"$emit('click', $event)\"><slot /></button>",
+  },
+}))
+
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: { name: "DropdownMenu", template: "<div><slot /></div>" },
+  DropdownMenuContent: { name: "DropdownMenuContent", template: "<div><slot /></div>" },
+  DropdownMenuGroup: { name: "DropdownMenuGroup", template: "<div><slot /></div>" },
+  DropdownMenuTrigger: { name: "DropdownMenuTrigger", template: "<div><slot /></div>" },
+  DropdownMenuItem: {
+    name: "DropdownMenuItem",
+    props: ["disabled", "variant"],
+    emits: ["click"],
+    template:
+      "<button v-bind='$attrs' :disabled='disabled' :data-variant='variant' @click=\"$emit('click', $event)\"><slot /></button>",
   },
 }))
 
@@ -100,6 +118,7 @@ const baseProps = {
   addBusy: false,
   canSaveNewPath: false,
   defaultSaving: false,
+  scanPathBusy: null,
   dialogContentClass: "dialog-content",
 }
 
@@ -124,11 +143,12 @@ describe("SettingsComicLibraryPathsSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.comicDefaultImportPath")
-    expect(wrapper.text()).toContain("Main comics 路 D:/Comics")
+    expect(wrapper.text()).toContain("Main comics · D:/Comics")
+    expect(wrapper.text()).not.toContain("Main comics 路 D:/Comics")
     expect(wrapper.text()).toContain("E:/Inbox/Comics")
   })
 
-  it("forwards add dialog, default selection, and remove events", async () => {
+  it("forwards add dialog, default selection, scan, and remove events", async () => {
     const wrapper = mount(SettingsComicLibraryPathsSection, {
       props: baseProps,
     })
@@ -140,6 +160,7 @@ describe("SettingsComicLibraryPathsSection", () => {
     await wrapper.get("[data-clear-error]").trigger("click")
     await wrapper.get("[data-browse]").trigger("click")
     await wrapper.get("[data-submit]").trigger("click")
+    await wrapper.get("[data-scan-comic-path='comic-path-a']").trigger("click")
     await wrapper.get("[data-remove-comic-path='comic-path-a']").trigger("click")
 
     expect(wrapper.emitted("changeDefaultImportPath")).toEqual([["comic-path-b"]])
@@ -149,6 +170,17 @@ describe("SettingsComicLibraryPathsSection", () => {
     expect(wrapper.emitted("clearError")).toHaveLength(1)
     expect(wrapper.emitted("browse")).toHaveLength(1)
     expect(wrapper.emitted("submit")).toHaveLength(1)
+    expect(wrapper.emitted("scanPath")).toEqual([[comicPath]])
     expect(wrapper.emitted("removePath")).toEqual([["comic-path-a"]])
+  })
+
+  it("uses the more-actions menu instead of a visible remove button for comic paths", () => {
+    const wrapper = mount(SettingsComicLibraryPathsSection, {
+      props: baseProps,
+    })
+
+    expect(wrapper.find('button[aria-label="settings.moreActions"]').exists()).toBe(true)
+    expect(wrapper.find("[data-scan-comic-path='comic-path-a']").exists()).toBe(true)
+    expect(wrapper.find("[data-remove-comic-path='comic-path-a']").exists()).toBe(true)
   })
 })

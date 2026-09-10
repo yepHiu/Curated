@@ -7,9 +7,11 @@ import SettingsComicLibrarySection from "./SettingsComicLibrarySection.vue"
 type MockFunction = ReturnType<typeof vi.fn>
 type TestComicService = ComicLibraryService & {
   setComicLibraryEnabled: MockFunction
+  setAutoComicLibraryWatch: MockFunction
   patchComicReader: MockFunction
   patchComicCache: MockFunction
   cleanupComicCache: MockFunction
+  scanComics: MockFunction
 }
 
 const mockState = vi.hoisted<{
@@ -31,7 +33,9 @@ vi.mock("lucide-vue-next", () => ({
   FolderOpen: { name: "FolderOpen", template: "<span />" },
   FolderPlus: { name: "FolderPlus", template: "<span />" },
   FolderArchive: { name: "FolderArchive", template: "<span />" },
+  MoreVertical: { name: "MoreVertical", template: "<span />" },
   PanelsTopLeft: { name: "PanelsTopLeft", template: "<span />" },
+  RefreshCw: { name: "RefreshCw", template: "<span />" },
   Trash2: { name: "Trash2", template: "<span />" },
 }))
 
@@ -54,9 +58,24 @@ vi.mock("@/components/ui/card", () => ({
 vi.mock("@/components/ui/button", () => ({
   Button: {
     name: "Button",
-    props: ["disabled", "variant", "size"],
+    props: ["disabled", "variant", "size", "ariaLabel"],
     emits: ["click"],
-    template: "<button :disabled='disabled' @click=\"$emit('click', $event)\"><slot /></button>",
+    template:
+      "<button v-bind='$attrs' :disabled='disabled' :aria-label='ariaLabel' @click=\"$emit('click', $event)\"><slot /></button>",
+  },
+}))
+
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: { name: "DropdownMenu", template: "<div><slot /></div>" },
+  DropdownMenuContent: { name: "DropdownMenuContent", template: "<div><slot /></div>" },
+  DropdownMenuGroup: { name: "DropdownMenuGroup", template: "<div><slot /></div>" },
+  DropdownMenuTrigger: { name: "DropdownMenuTrigger", template: "<div><slot /></div>" },
+  DropdownMenuItem: {
+    name: "DropdownMenuItem",
+    props: ["disabled", "variant"],
+    emits: ["click"],
+    template:
+      "<button v-bind='$attrs' :disabled='disabled' :data-variant='variant' @click=\"$emit('click', $event)\"><slot /></button>",
   },
 }))
 
@@ -121,6 +140,7 @@ function createComicServiceMock(
     comicsLoaded: computed(() => true),
     loadError: computed(() => null),
     comicLibraryEnabled: computed(() => false),
+    autoComicLibraryWatch: computed(() => true),
     comicLibraryPaths: computed(() => []),
     defaultComicImportLibraryPathId: computed(() => ""),
     comicReader: computed(() => ({
@@ -133,6 +153,7 @@ function createComicServiceMock(
     })),
     refreshSettings: vi.fn().mockResolvedValue(undefined),
     setComicLibraryEnabled: vi.fn().mockResolvedValue(undefined),
+    setAutoComicLibraryWatch: vi.fn().mockResolvedValue(undefined),
     addComicLibraryPath: vi.fn().mockResolvedValue(null),
     updateComicLibraryPathTitle: vi.fn().mockResolvedValue(undefined),
     removeComicLibraryPath: vi.fn().mockResolvedValue(undefined),
@@ -192,6 +213,7 @@ describe("SettingsComicLibrarySection", () => {
   it("renders path, reader, and cache sections when enabled", () => {
     mockState.comicService = createComicServiceMock({
       comicLibraryEnabled: computed(() => true),
+      autoComicLibraryWatch: computed(() => true),
       comicLibraryPaths: computed(() => [
         {
           id: "comic-path-1",
@@ -205,9 +227,30 @@ describe("SettingsComicLibrarySection", () => {
     const wrapper = mount(SettingsComicLibrarySection)
 
     expect(wrapper.find("[data-comic-paths]").exists()).toBe(true)
+    expect(wrapper.find("[data-comic-auto-watch]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-reader]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-cache]").exists()).toBe(true)
     expect(wrapper.text()).toContain("settings.comicDefaultImportPath")
+  })
+
+  it("toggles automatic comic library watching independently", async () => {
+    mockState.comicService = createComicServiceMock({
+      comicLibraryEnabled: computed(() => true),
+      autoComicLibraryWatch: computed(() => false),
+      comicLibraryPaths: computed(() => [
+        {
+          id: "comic-path-1",
+          path: "D:/Comics",
+          title: "Comics",
+        },
+      ]),
+    })
+    const wrapper = mount(SettingsComicLibrarySection)
+
+    await wrapper.get("[data-comic-auto-watch-switch]").trigger("click")
+
+    expect(mockState.comicService?.setAutoComicLibraryWatch).toHaveBeenCalledWith(true)
+    expect(mockState.comicService?.setComicLibraryEnabled).not.toHaveBeenCalled()
   })
 
   it("disables comic library without deleting comic data or cache", async () => {
@@ -248,5 +291,23 @@ describe("SettingsComicLibrarySection", () => {
     expect(wrapper.text()).toContain("settings.comicCachePreset5gb")
     expect(wrapper.text()).toContain("settings.comicCachePreset10gb")
     expect(wrapper.text()).toContain("settings.comicCachePresetUnlimited")
+  })
+
+  it("starts a manual comic scan for the selected comic storage path", async () => {
+    mockState.comicService = createComicServiceMock({
+      comicLibraryEnabled: computed(() => true),
+      comicLibraryPaths: computed(() => [
+        {
+          id: "comic-path-1",
+          path: "D:/Comics",
+          title: "Comics",
+        },
+      ]),
+    })
+    const wrapper = mount(SettingsComicLibrarySection)
+
+    await wrapper.get("[data-scan-comic-path='comic-path-1']").trigger("click")
+
+    expect(mockState.comicService?.scanComics).toHaveBeenCalledWith(["D:/Comics"])
   })
 })

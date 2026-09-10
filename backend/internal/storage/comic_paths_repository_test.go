@@ -56,3 +56,28 @@ func TestComicLibraryPathsRepository(t *testing.T) {
 		t.Fatalf("delete missing error = %v, want ErrComicLibraryPathNotFound", err)
 	}
 }
+
+func TestListComicLibraryPathStrings(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	root := t.TempDir()
+	store := newComicRepositoryTestStore(t, root)
+
+	first := filepath.Join(root, "a")
+	second := filepath.Join(root, "b")
+	if _, err := store.AddComicLibraryPath(ctx, second, "Second"); err != nil {
+		t.Fatalf("add second comic path: %v", err)
+	}
+	if _, err := store.AddComicLibraryPath(ctx, first, "First"); err != nil {
+		t.Fatalf("add first comic path: %v", err)
+	}
+
+	got, err := store.ListComicLibraryPathStrings(ctx)
+	if err != nil {
+		t.Fatalf("list comic path strings: %v", err)
+	}
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("path strings = %#v, want [%q %q]", got, first, second)
+	}
+}

@@ -56,6 +56,11 @@ type ComicScanStarter interface {
 	StartComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO) (contracts.TaskDTO, error)
 }
 
+// PhotoScanStarter starts an async photo library scan task and returns its task descriptor.
+type PhotoScanStarter interface {
+	StartPhotoScan(ctx context.Context, paths []contracts.PhotoLibraryPathDTO) (contracts.TaskDTO, error)
+}
+
 // MovieMetadataRefresher starts an async single-movie metadata rescrape and returns the scrape task.
 type MovieMetadataRefresher interface {
 	StartMovieMetadataRefresh(ctx context.Context, movieID string) (contracts.TaskDTO, error)
@@ -151,12 +156,28 @@ type DefaultImportLibraryPathController interface {
 type ComicSettingsController interface {
 	ComicLibraryEnabled() bool
 	SetComicLibraryEnabled(v bool) error
+	AutoComicLibraryWatch() bool
+	SetAutoComicLibraryWatch(v bool) error
 	DefaultComicImportLibraryPathID() string
 	SetDefaultComicImportLibraryPathID(id string) error
 	ComicReaderSettings() contracts.ComicReaderSettingsDTO
 	SetComicReaderSettings(v contracts.ComicReaderSettingsDTO) error
 	ComicCacheSettings() contracts.ComicCacheSettingsDTO
 	SetComicCacheSettings(v contracts.ComicCacheSettingsDTO) error
+}
+
+// PhotoSettingsController exposes and updates optional photo book library settings.
+type PhotoSettingsController interface {
+	PhotoLibraryEnabled() bool
+	SetPhotoLibraryEnabled(v bool) error
+	AutoPhotoLibraryWatch() bool
+	SetAutoPhotoLibraryWatch(v bool) error
+	DefaultPhotoImportLibraryPathID() string
+	SetDefaultPhotoImportLibraryPathID(id string) error
+	PhotoViewerSettings() contracts.PhotoViewerSettingsDTO
+	SetPhotoViewerSettings(v contracts.PhotoViewerSettingsDTO) error
+	PhotoCacheSettings() contracts.PhotoCacheSettingsDTO
+	SetPhotoCacheSettings(v contracts.PhotoCacheSettingsDTO) error
 }
 
 // LibraryPathStorageStatusProvider checks whether configured library paths' backing storage is available.
@@ -169,6 +190,16 @@ type LibraryPathStorageStatusProvider interface {
 // LibraryWatchReloader rebuilds fsnotify watches after library roots change.
 type LibraryWatchReloader interface {
 	ReloadLibraryWatches(ctx context.Context) error
+}
+
+// ComicLibraryWatchReloader rebuilds comic fsnotify watches after comic roots change.
+type ComicLibraryWatchReloader interface {
+	ReloadComicLibraryWatches(ctx context.Context) error
+}
+
+// PhotoLibraryWatchReloader rebuilds photo fsnotify watches after photo roots change.
+type PhotoLibraryWatchReloader interface {
+	ReloadPhotoLibraryWatches(ctx context.Context) error
 }
 
 // DevPerformanceProvider returns a development-only CPU and runtime performance summary.
@@ -214,6 +245,7 @@ type Handler struct {
 	tasks                       *tasks.Manager
 	scanStarter                 ScanStarter
 	comicScanStarter            ComicScanStarter
+	photoScanStarter            PhotoScanStarter
 	organizeLibraryCtl          OrganizeLibraryController
 	autoLibraryWatchCtl         AutoLibraryWatchController
 	autoActorProfileScrapeCtl   AutoActorProfileScrapeController
@@ -222,6 +254,7 @@ type Handler struct {
 	curatedFrameExportFormatCtl CuratedFrameExportFormatController
 	defaultImportLibraryPathCtl DefaultImportLibraryPathController
 	comicSettingsCtl            ComicSettingsController
+	photoSettingsCtl            PhotoSettingsController
 	libraryPathStorageStatus    LibraryPathStorageStatusProvider
 	metadataScrapeCtl           MetadataScrapeSettings
 	providerHealthChecker       ProviderHealthChecker
@@ -231,6 +264,8 @@ type Handler struct {
 	movieMetadataRefresher      MovieMetadataRefresher
 	actorProfileRefresher       ActorProfileRefresher
 	libraryWatchReloader        LibraryWatchReloader
+	comicLibraryWatchReloader   ComicLibraryWatchReloader
+	photoLibraryWatchReloader   PhotoLibraryWatchReloader
 	devPerformanceProvider      DevPerformanceProvider
 	playbackResolver            PlaybackResolver
 	nativePlaybackLauncher      NativePlaybackLauncher
@@ -248,6 +283,7 @@ type Deps struct {
 	Tasks                            *tasks.Manager
 	ScanStarter                      ScanStarter
 	ComicScanStarter                 ComicScanStarter
+	PhotoScanStarter                 PhotoScanStarter
 	OrganizeLibraryCtl               OrganizeLibraryController
 	AutoLibraryWatchCtl              AutoLibraryWatchController
 	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
@@ -256,6 +292,7 @@ type Deps struct {
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
 	ComicSettingsCtl                 ComicSettingsController
+	PhotoSettingsCtl                 PhotoSettingsController
 	LibraryPathStorageStatusProvider LibraryPathStorageStatusProvider
 	MetadataScrapeCtl                MetadataScrapeSettings
 	ProviderHealthChecker            ProviderHealthChecker
@@ -265,6 +302,8 @@ type Deps struct {
 	MovieMetadataRefresher           MovieMetadataRefresher
 	ActorProfileRefresher            ActorProfileRefresher
 	LibraryWatchReloader             LibraryWatchReloader
+	ComicLibraryWatchReloader        ComicLibraryWatchReloader
+	PhotoLibraryWatchReloader        PhotoLibraryWatchReloader
 	DevPerformanceProvider           DevPerformanceProvider
 	PlaybackResolver                 PlaybackResolver
 	NativePlaybackLauncher           NativePlaybackLauncher
@@ -286,6 +325,7 @@ func NewHandler(deps Deps) *Handler {
 		tasks:                       deps.Tasks,
 		scanStarter:                 deps.ScanStarter,
 		comicScanStarter:            deps.ComicScanStarter,
+		photoScanStarter:            deps.PhotoScanStarter,
 		organizeLibraryCtl:          deps.OrganizeLibraryCtl,
 		autoLibraryWatchCtl:         deps.AutoLibraryWatchCtl,
 		autoActorProfileScrapeCtl:   deps.AutoActorProfileScrapeCtl,
@@ -294,6 +334,7 @@ func NewHandler(deps Deps) *Handler {
 		curatedFrameExportFormatCtl: deps.CuratedFrameExportFormatCtl,
 		defaultImportLibraryPathCtl: deps.DefaultImportLibraryPathCtl,
 		comicSettingsCtl:            deps.ComicSettingsCtl,
+		photoSettingsCtl:            deps.PhotoSettingsCtl,
 		libraryPathStorageStatus:    deps.LibraryPathStorageStatusProvider,
 		metadataScrapeCtl:           deps.MetadataScrapeCtl,
 		providerHealthChecker:       deps.ProviderHealthChecker,
@@ -303,6 +344,8 @@ func NewHandler(deps Deps) *Handler {
 		movieMetadataRefresher:      deps.MovieMetadataRefresher,
 		actorProfileRefresher:       deps.ActorProfileRefresher,
 		libraryWatchReloader:        deps.LibraryWatchReloader,
+		comicLibraryWatchReloader:   deps.ComicLibraryWatchReloader,
+		photoLibraryWatchReloader:   deps.PhotoLibraryWatchReloader,
 		devPerformanceProvider:      deps.DevPerformanceProvider,
 		playbackResolver:            deps.PlaybackResolver,
 		nativePlaybackLauncher:      deps.NativePlaybackLauncher,
@@ -383,6 +426,16 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/comics/paths", h.handleAddComicLibraryPath)
 	mux.HandleFunc("PATCH /api/library/comics/paths/{id}", h.handlePatchComicLibraryPath)
 	mux.HandleFunc("DELETE /api/library/comics/paths/{id}", h.handleDeleteComicLibraryPath)
+	mux.HandleFunc("GET /api/library/photos/paths", h.handleListPhotoLibraryPaths)
+	mux.HandleFunc("POST /api/library/photos/paths", h.handleAddPhotoLibraryPath)
+	mux.HandleFunc("PATCH /api/library/photos/paths/{id}", h.handlePatchPhotoLibraryPath)
+	mux.HandleFunc("DELETE /api/library/photos/paths/{id}", h.handleDeletePhotoLibraryPath)
+	mux.HandleFunc("POST /api/library/photos/scans", h.handleStartPhotoScan)
+	mux.HandleFunc("GET /api/library/photos", h.handleListPhotos)
+	mux.HandleFunc("GET /api/library/photos/{photoId}", h.handleGetPhoto)
+	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages", h.handleListPhotoPages)
+	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages/{pageIndex}/image", h.handleGetPhotoPageImage)
+	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail", h.handleGetPhotoPageThumbnail)
 	mux.HandleFunc("POST /api/library/comics/scans", h.handleStartComicScan)
 	mux.HandleFunc("GET /api/library/comics/cache/status", h.handleGetComicCacheStatus)
 	mux.HandleFunc("POST /api/library/comics/cache/cleanup", h.handleCleanupComicCache)
@@ -1584,6 +1637,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 	if err != nil {
 		return contracts.SettingsDTO{}, err
 	}
+	photoLibraryPaths, err := h.store.ListPhotoLibraryPaths(ctx)
+	if err != nil {
+		return contracts.SettingsDTO{}, err
+	}
 	org := h.cfg.OrganizeLibrary
 	if h.organizeLibraryCtl != nil {
 		org = h.organizeLibraryCtl.OrganizeLibrary()
@@ -1615,23 +1672,44 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		defaultImportLibraryPathID = strings.TrimSpace(h.defaultImportLibraryPathCtl.DefaultImportLibraryPathID())
 	}
 	comicLibraryEnabled := h.cfg.ComicLibraryEnabled
+	autoComicLibraryWatch := h.cfg.AutoComicLibraryWatch
 	defaultComicImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultComicImportLibraryPathID)
 	comicReader := comicReaderSettingsDTOFromConfig(h.cfg.ComicReader)
 	comicCache := comicCacheSettingsDTOFromConfig(h.cfg.ComicCache)
 	if h.comicSettingsCtl != nil {
 		comicLibraryEnabled = h.comicSettingsCtl.ComicLibraryEnabled()
+		autoComicLibraryWatch = h.comicSettingsCtl.AutoComicLibraryWatch()
 		defaultComicImportLibraryPathID = strings.TrimSpace(h.comicSettingsCtl.DefaultComicImportLibraryPathID())
 		comicReader = normalizeComicReaderSettingsDTO(h.comicSettingsCtl.ComicReaderSettings())
 		comicCache = normalizeComicCacheSettingsDTO(h.comicSettingsCtl.ComicCacheSettings())
+	}
+	photoLibraryEnabled := h.cfg.PhotoLibraryEnabled
+	autoPhotoLibraryWatch := h.cfg.AutoPhotoLibraryWatch
+	defaultPhotoImportLibraryPathID := strings.TrimSpace(h.cfg.DefaultPhotoImportLibraryPathID)
+	photoViewer := photoViewerSettingsDTOFromConfig(h.cfg.PhotoViewer)
+	photoCache := photoCacheSettingsDTOFromConfig(h.cfg.PhotoCache)
+	if h.photoSettingsCtl != nil {
+		photoLibraryEnabled = h.photoSettingsCtl.PhotoLibraryEnabled()
+		autoPhotoLibraryWatch = h.photoSettingsCtl.AutoPhotoLibraryWatch()
+		defaultPhotoImportLibraryPathID = strings.TrimSpace(h.photoSettingsCtl.DefaultPhotoImportLibraryPathID())
+		photoViewer = normalizePhotoViewerSettingsDTO(h.photoSettingsCtl.PhotoViewerSettings())
+		photoCache = normalizePhotoCacheSettingsDTO(h.photoSettingsCtl.PhotoCacheSettings())
 	}
 	dto := contracts.SettingsDTO{
 		LibraryPaths:                    libraryPaths,
 		DefaultImportLibraryPathID:      defaultImportLibraryPathID,
 		ComicLibraryEnabled:             comicLibraryEnabled,
+		AutoComicLibraryWatch:           autoComicLibraryWatch,
 		ComicLibraryPaths:               comicLibraryPaths,
 		DefaultComicImportLibraryPathID: defaultComicImportLibraryPathID,
 		ComicReader:                     comicReader,
 		ComicCache:                      comicCache,
+		PhotoLibraryEnabled:             photoLibraryEnabled,
+		AutoPhotoLibraryWatch:           autoPhotoLibraryWatch,
+		PhotoLibraryPaths:               photoLibraryPaths,
+		DefaultPhotoImportLibraryPathID: defaultPhotoImportLibraryPathID,
+		PhotoViewer:                     photoViewer,
+		PhotoCache:                      photoCache,
 		Player: contracts.PlayerSettingsDTO{
 			HardwareDecode:      h.cfg.Player.HardwareDecode,
 			NativePlayerEnabled: h.cfg.Player.NativePlayerEnabled,
@@ -1805,6 +1883,32 @@ func normalizeComicCacheSettingsDTO(v contracts.ComicCacheSettingsDTO) contracts
 	return comicCacheSettingsDTOFromConfig(config.ComicCacheConfig{MaxBytes: v.MaxBytes})
 }
 
+func photoViewerSettingsDTOFromConfig(v config.PhotoViewerConfig) contracts.PhotoViewerSettingsDTO {
+	n := config.NormalizePhotoViewerConfig(v)
+	return contracts.PhotoViewerSettingsDTO{
+		Mode:      n.Mode,
+		Fit:       n.Fit,
+		Direction: n.Direction,
+	}
+}
+
+func photoCacheSettingsDTOFromConfig(v config.PhotoCacheConfig) contracts.PhotoCacheSettingsDTO {
+	n := config.NormalizePhotoCacheConfig(v)
+	return contracts.PhotoCacheSettingsDTO{MaxBytes: n.MaxBytes}
+}
+
+func normalizePhotoViewerSettingsDTO(v contracts.PhotoViewerSettingsDTO) contracts.PhotoViewerSettingsDTO {
+	return photoViewerSettingsDTOFromConfig(config.PhotoViewerConfig{
+		Mode:      v.Mode,
+		Fit:       v.Fit,
+		Direction: v.Direction,
+	})
+}
+
+func normalizePhotoCacheSettingsDTO(v contracts.PhotoCacheSettingsDTO) contracts.PhotoCacheSettingsDTO {
+	return photoCacheSettingsDTOFromConfig(config.PhotoCacheConfig{MaxBytes: v.MaxBytes})
+}
+
 func (h *Handler) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	dto, err := h.buildSettingsDTO(r.Context())
 	if err != nil {
@@ -1822,7 +1926,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.comicSettingsCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.defaultImportLibraryPathCtl == nil && h.comicSettingsCtl == nil && h.photoSettingsCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -1836,12 +1940,12 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.ComicLibraryEnabled == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.DefaultImportLibraryPathID == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
 
-	ops := make([]settingsPatchOperation, 0, 17)
+	ops := make([]settingsPatchOperation, 0, 22)
 
 	if body.OrganizeLibrary != nil {
 		if h.organizeLibraryCtl == nil {
@@ -2030,6 +2134,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if body.AutoComicLibraryWatch != nil {
+		if h.comicSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
+			return
+		}
+		prev := h.comicSettingsCtl.AutoComicLibraryWatch()
+		target := *body.AutoComicLibraryWatch
+		ops = append(ops, settingsPatchOperation{
+			name:     "autoComicLibraryWatch",
+			apply:    func() error { return h.comicSettingsCtl.SetAutoComicLibraryWatch(target) },
+			rollback: func() error { return h.comicSettingsCtl.SetAutoComicLibraryWatch(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save comic library settings"),
+			},
+		})
+	}
+
 	if body.DefaultComicImportLibraryPathID != nil {
 		if h.comicSettingsCtl == nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "comic library settings not available")
@@ -2092,6 +2215,128 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "comicCache",
 			apply:    func() error { return h.comicSettingsCtl.SetComicCacheSettings(target) },
 			rollback: func() error { return h.comicSettingsCtl.SetComicCacheSettings(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	if body.PhotoLibraryEnabled != nil {
+		if h.photoSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "photo library settings not available")
+			return
+		}
+		prev := h.photoSettingsCtl.PhotoLibraryEnabled()
+		target := *body.PhotoLibraryEnabled
+		if target {
+			paths, err := h.store.ListPhotoLibraryPaths(r.Context())
+			if err != nil {
+				if h.logger != nil {
+					h.logger.Warn("validate photo library paths failed", zap.Error(err))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to validate photo library paths")
+				return
+			}
+			if len(paths) == 0 {
+				writeAppError(w, http.StatusBadRequest, contracts.ErrorCodePhotoPathNotConfigured, "photo library requires at least one photo path")
+				return
+			}
+		}
+		ops = append(ops, settingsPatchOperation{
+			name:     "photoLibraryEnabled",
+			apply:    func() error { return h.photoSettingsCtl.SetPhotoLibraryEnabled(target) },
+			rollback: func() error { return h.photoSettingsCtl.SetPhotoLibraryEnabled(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save photo library settings"),
+			},
+		})
+	}
+
+	if body.AutoPhotoLibraryWatch != nil {
+		if h.photoSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "photo library settings not available")
+			return
+		}
+		prev := h.photoSettingsCtl.AutoPhotoLibraryWatch()
+		target := *body.AutoPhotoLibraryWatch
+		ops = append(ops, settingsPatchOperation{
+			name:     "autoPhotoLibraryWatch",
+			apply:    func() error { return h.photoSettingsCtl.SetAutoPhotoLibraryWatch(target) },
+			rollback: func() error { return h.photoSettingsCtl.SetAutoPhotoLibraryWatch(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save photo library settings"),
+			},
+		})
+	}
+
+	if body.DefaultPhotoImportLibraryPathID != nil {
+		if h.photoSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "photo library settings not available")
+			return
+		}
+		prev := h.photoSettingsCtl.DefaultPhotoImportLibraryPathID()
+		target := strings.TrimSpace(*body.DefaultPhotoImportLibraryPathID)
+		if target != "" {
+			if _, err := h.store.GetPhotoLibraryPath(r.Context(), target); err != nil {
+				if errors.Is(err, storage.ErrPhotoLibraryPathNotFound) {
+					writeAppError(w, http.StatusNotFound, contracts.ErrorCodePhotoPathNotFound, "photo library path not found")
+					return
+				}
+				if h.logger != nil {
+					h.logger.Warn("validate default photo import library path failed", zap.Error(err))
+				}
+				writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to validate default photo import library path")
+				return
+			}
+		}
+		ops = append(ops, settingsPatchOperation{
+			name:     "defaultPhotoImportLibraryPathId",
+			apply:    func() error { return h.photoSettingsCtl.SetDefaultPhotoImportLibraryPathID(target) },
+			rollback: func() error { return h.photoSettingsCtl.SetDefaultPhotoImportLibraryPathID(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save photo library settings"),
+			},
+		})
+	}
+
+	if body.PhotoViewer != nil {
+		if h.photoSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "photo library settings not available")
+			return
+		}
+		prev := normalizePhotoViewerSettingsDTO(h.photoSettingsCtl.PhotoViewerSettings())
+		target := normalizePhotoViewerSettingsDTO(*body.PhotoViewer)
+		ops = append(ops, settingsPatchOperation{
+			name:     "photoViewer",
+			apply:    func() error { return h.photoSettingsCtl.SetPhotoViewerSettings(target) },
+			rollback: func() error { return h.photoSettingsCtl.SetPhotoViewerSettings(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusBadRequest,
+				code:    contracts.ErrorCodeBadRequest,
+				message: func(err error) string { return err.Error() },
+			},
+		})
+	}
+
+	if body.PhotoCache != nil {
+		if h.photoSettingsCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "photo library settings not available")
+			return
+		}
+		prev := normalizePhotoCacheSettingsDTO(h.photoSettingsCtl.PhotoCacheSettings())
+		target := normalizePhotoCacheSettingsDTO(*body.PhotoCache)
+		ops = append(ops, settingsPatchOperation{
+			name:     "photoCache",
+			apply:    func() error { return h.photoSettingsCtl.SetPhotoCacheSettings(target) },
+			rollback: func() error { return h.photoSettingsCtl.SetPhotoCacheSettings(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusBadRequest,
 				code:    contracts.ErrorCodeBadRequest,
@@ -3030,6 +3275,24 @@ func (h *Handler) reloadLibraryWatchIfAny(ctx context.Context) {
 	}
 	if err := h.libraryWatchReloader.ReloadLibraryWatches(ctx); err != nil && h.logger != nil {
 		h.logger.Warn("library watch reload failed", zap.Error(err))
+	}
+}
+
+func (h *Handler) reloadComicLibraryWatchIfAny(ctx context.Context) {
+	if h.comicLibraryWatchReloader == nil {
+		return
+	}
+	if err := h.comicLibraryWatchReloader.ReloadComicLibraryWatches(ctx); err != nil && h.logger != nil {
+		h.logger.Warn("comic library watch reload failed", zap.Error(err))
+	}
+}
+
+func (h *Handler) reloadPhotoLibraryWatchIfAny(ctx context.Context) {
+	if h.photoLibraryWatchReloader == nil {
+		return
+	}
+	if err := h.photoLibraryWatchReloader.ReloadPhotoLibraryWatches(ctx); err != nil && h.logger != nil {
+		h.logger.Warn("photo library watch reload failed", zap.Error(err))
 	}
 }
 

@@ -51,6 +51,7 @@ import {
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
 import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
 import SettingsComicLibrarySection from "@/components/jav-library/settings/SettingsComicLibrarySection.vue"
+import SettingsPhotoLibrarySection from "@/components/jav-library/settings/SettingsPhotoLibrarySection.vue"
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
@@ -2137,7 +2138,22 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navComics')"
     >
     <h2 class="sr-only">{{ t("settings.navComics") }}</h2>
-      <SettingsComicLibrarySection />
+    <SettingsComicLibrarySection />
+    </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('photos')"
+      value="photos"
+      class="mt-0 min-w-0 flex-1 outline-none"
+    >
+    <section
+      id="settings-section-photos"
+      class="space-y-6"
+      :aria-label="t('settings.navPhotos')"
+    >
+    <h2 class="sr-only">{{ t("settings.navPhotos") }}</h2>
+      <SettingsPhotoLibrarySection />
     </section>
     </TabsContent>
 

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import ComicDetailPanel from "@/components/jav-library/comics/ComicDetailPanel.vue"
 import ComicPagePreviewGrid from "@/components/jav-library/comics/ComicPagePreviewGrid.vue"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
+import { buildComicReaderRouteFromSource } from "@/lib/navigation-intent"
 import { useComicLibraryService } from "@/services/comic-library-service"
 
 const { t } = useI18n()
@@ -89,9 +90,15 @@ async function revealSource(comicId: string) {
 function openReader(pageIndex: number) {
   const id = detailComic.value?.id
   if (!id) return
+  void router.push(buildComicReaderRouteFromSource(id, pageIndex, route.fullPath))
+}
+
+function browseByTag(payload: { tag: string }) {
+  const q = payload.tag.trim()
+  if (!q) return
   void router.push({
-    name: "comic-reader",
-    params: { id, pageIndex: String(Math.max(0, pageIndex)) },
+    name: "comics",
+    query: { q },
   })
 }
 </script>
@@ -122,6 +129,7 @@ function openReader(pageIndex: number) {
           @start-reading="openReader"
           @delete-comic="deleteComic"
           @reveal-source="revealSource"
+          @browse-by-tag="browseByTag"
         />
 
         <ComicPagePreviewGrid

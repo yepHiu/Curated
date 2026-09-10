@@ -28,6 +28,7 @@ The product name is **Curated**. The repository folder and npm package may still
 ## Highlights
 
 - **Optional comic library** - Independent `.zip` / `.cbz` comic library with separate storage, import, scanning, poster grid, detail page, reader preferences, progress, and cache.
+- **Optional photo book library** - Independent `.zip` / `.cbz` photo book library with separate settings, storage paths, scanner, watcher, service adapters, routes, wall/detail views, and archive image serving.
 - **Local-first** — Vue 3 SPA frontend + Go HTTP API backend + SQLite persistence.
 - **Dual-mode development** — Real API mode (full backend) and mock mode (fast UI iteration) behind the same service layer.
 - **Comprehensive library management** — Virtualized poster grid, favorites, ratings, tags, actor profiles, trash/restore, movie comments, and multi-root library paths with fsnotify-based auto-scan.
@@ -136,9 +137,20 @@ The Electron shell builds `backend/runtime/curated-dev.exe`, compiles `electron-
 - Keeps comics independent from movies with separate SQLite tables, library paths, APIs, service adapters, tags, progress, preferences, and cache.
 - Uses natural page ordering across archive directories and treats the first sorted image as the cover.
 - Comic import copies archives into `defaultComicImportLibraryPathId`, never deletes source archives, never overwrites conflicts, and starts `scan.comics`.
+- Comic auto watch uses an independent watcher and `autoComicLibraryWatch`; when enabled it scans newly added or changed `.zip` / `.cbz` files under comic storage paths without scanning movie paths.
 - Comic detail MVP includes title, tags, rating, favorite state, and page previews; author or series can be represented as tags.
 - Reader supports page or scroll mode, contain or width fit, LTR/RTL keyboard navigation, persisted progress/preferences, and session-only current+previous/current+next page stitching.
 - MVP exclusions: metadata scraping, OCR, `.rar` / `.cbr` / `.7z`, source archive deletion, and persistent double-page layout.
+
+### Photo Books
+
+- Optional photo book module; the app entry is hidden until enabled in Settings -> Photos.
+- The domain is independent from movies and comics: separate settings, `photo_*` tables, scanner/watcher packages, frontend service adapters, routes, and UI copy.
+- Current backend slice implements persisted photo settings, `GET/POST/PATCH/DELETE /api/library/photos/paths`, manual scans through `POST /api/library/photos/scans`, photo book list/detail APIs, and archive page image/thumbnail serving.
+- Photo auto watch uses an independent watcher and `autoPhotoLibraryWatch`; when enabled it scans newly added or changed `.zip` / `.cbz` files under photo storage paths without scanning movie or comic paths.
+- Current frontend slice implements the optional sidebar entry, `/photos` routes, settings/path/manual scan UI aligned with comics, and Web API photo wall/detail/viewer loading aligned with movie/comic grid sizing.
+- Photo import upload, patch/delete/reveal operations, explicit progress/preferences endpoints, and cache status/cleanup endpoints remain later slices.
+- Photo viewer language uses `Browse`/`浏览` semantics rather than comic `Read`/`阅读` copy.
 
 ### Playback
 
@@ -249,9 +261,15 @@ Common library-level settings include:
 - `metadataMovieStrategy`
 - `defaultImportLibraryPathId`
 - `comicLibraryEnabled`
+- `autoComicLibraryWatch`
 - `defaultComicImportLibraryPathId`
 - `comicReader`
 - `comicCache`
+- `photoLibraryEnabled`
+- `autoPhotoLibraryWatch`
+- `defaultPhotoImportLibraryPathId`
+- `photoViewer`
+- `photoCache`
 - `autoLibraryWatch`
 - `autoActorProfileScrape`
 - `autoDownloadUpdates`
@@ -266,13 +284,15 @@ Release builds default to port `:8081` unless overridden by config. The bundled 
 
 ## API
 
-Curated exposes a Go HTTP API for authentication/PIN App Lock, movie library, optional comic library, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
+Curated exposes a Go HTTP API for authentication/PIN App Lock, movie library, optional comic library, optional photo book scanning/path/content browsing, playback, actor, settings, connected-client visibility, storage presence, and curated-frame workflows.
 
 See [API.md](API.md) for the full endpoint reference.
 
 Movie import uses browser upload via `POST /api/import/movies` for drag/drop, file selection, and folder selection. Large uploads use resumable session endpoints under `/api/import/movies/uploads`, staging bytes under the target library root before commit. Imports use `defaultImportLibraryPathId` as the target and report progress through `import.movies` tasks.
 
-Comic import uses browser upload via `POST /api/import/comics` for `.zip` / `.cbz` archives. Imports use `defaultComicImportLibraryPathId` as the target, copy archives without deleting source files, and report progress through `import.comics` plus follow-up `scan.comics` tasks.
+Comic import uses browser upload via `POST /api/import/comics` for `.zip` / `.cbz` archives. Imports use `defaultComicImportLibraryPathId` as the target, copy archives without deleting source files, and report progress through `import.comics` plus follow-up `scan.comics` tasks. Manual comic scans use `POST /api/library/comics/scans` and can pass optional `{ "paths": ["..."] }` to scan selected configured comic roots only.
+
+Photo book settings are returned by `GET /api/settings` and updated through `PATCH /api/settings`. Photo storage paths use `GET/POST/PATCH/DELETE /api/library/photos/paths`; adding a path can return an initial `scan.photos` task. Manual scans use `POST /api/library/photos/scans` with optional `{ "paths": ["..."] }`, and Web API clients can browse scanned photo books through `GET /api/library/photos`, `GET /api/library/photos/{photoId}`, and page image/thumbnail routes under `/api/library/photos/books/{photoId}/...`. Photo import upload and cache cleanup/status endpoints are still later slices.
 
 Backend events are available at `GET /api/events` as an authenticated `text/event-stream`. The current stream publishes `task.updated` snapshots for long-running tasks and is consumed by the frontend task tracker and library-watch notifications; `/api/tasks/{taskId}` and `/api/tasks/recent` remain polling fallbacks.
 

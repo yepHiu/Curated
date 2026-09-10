@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { FolderArchive, Trash2 } from "lucide-vue-next"
+import { FolderArchive } from "lucide-vue-next"
 import type { ComicLibrarySetting } from "@/domain/comic/types"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -11,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import SettingsComicLibraryPathActions from "@/components/jav-library/settings/SettingsComicLibraryPathActions.vue"
 import SettingsLibraryPathAddDialog from "@/components/jav-library/settings/SettingsLibraryPathAddDialog.vue"
 
 const props = defineProps<{
@@ -25,6 +25,7 @@ const props = defineProps<{
   addBusy: boolean
   canSaveNewPath: boolean
   defaultSaving: boolean
+  scanPathBusy: string | null
   dialogContentClass: string
 }>()
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   clearError: []
   browse: []
   submit: []
+  scanPath: [path: ComicLibrarySetting]
   removePath: [id: string]
   changeDefaultImportPath: [id: string]
 }>()
@@ -58,7 +60,7 @@ function defaultImportPathTriggerLabel(path: ComicLibrarySetting): string {
   if (!title || title === path.path) {
     return path.path
   }
-  return `${title} 路 ${path.path}`
+  return `${title} · ${path.path}`
 }
 
 function onDefaultChange(value: unknown) {
@@ -143,18 +145,12 @@ function onDefaultChange(value: unknown) {
           <p class="truncate text-sm font-medium text-foreground">{{ path.title || path.path }}</p>
           <p class="break-all text-sm text-muted-foreground">{{ path.path }}</p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          class="h-8 shrink-0 rounded-lg px-2"
-          :aria-label="t('settings.comicLibraryPathRemove')"
-          :data-remove-comic-path="path.id"
-          @click="emit('removePath', path.id)"
-        >
-          <Trash2 data-icon="inline-start" aria-hidden="true" />
-          {{ t("settings.comicLibraryPathRemove") }}
-        </Button>
+        <SettingsComicLibraryPathActions
+          :path="path"
+          :scan-busy="props.scanPathBusy === path.path"
+          @scan="emit('scanPath', $event)"
+          @remove="emit('removePath', $event)"
+        />
       </div>
     </div>
     <p v-else class="text-xs leading-relaxed text-muted-foreground sm:text-sm">

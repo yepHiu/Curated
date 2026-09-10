@@ -307,6 +307,88 @@ export interface ComicCacheSettingsDTO {
   maxBytes: number
 }
 
+export interface PhotoLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+export interface AddPhotoLibraryPathBody {
+  path: string
+  title?: string
+}
+
+export interface AddPhotoLibraryPathResultDTO extends PhotoLibraryPathDTO {
+  scanTask?: TaskDTO
+}
+
+export interface UpdatePhotoLibraryPathBody {
+  title: string
+}
+
+export interface PhotoBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastViewedAt?: string
+  completedAt?: string
+}
+
+export interface PhotoBooksPageDTO {
+  items: PhotoBookListItemDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ListPhotoBooksParams {
+  q?: string
+  tag?: string
+  favorite?: boolean
+  limit?: number
+  offset?: number
+}
+
+export interface PhotoPageDTO {
+  photoId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+export interface PhotoBookDetailDTO extends PhotoBookListItemDTO {
+  pages: PhotoPageDTO[]
+}
+
+export type PhotoViewerMode = "page" | "scroll"
+export type PhotoFitMode = "contain" | "width"
+export type PhotoViewingDirection = "ltr" | "rtl"
+
+export interface PhotoViewerSettingsDTO {
+  mode: PhotoViewerMode
+  fit: PhotoFitMode
+  direction: PhotoViewingDirection
+}
+
+export interface PhotoCacheSettingsDTO {
+  maxBytes: number
+}
+
 export interface ComicCacheStatusDTO {
   maxBytes: number
   usedBytes: number
@@ -400,10 +482,17 @@ export interface SettingsDTO {
   /** Library path id used as the target for top-bar movie imports. Empty or missing means not configured. */
   defaultImportLibraryPathId?: string
   comicLibraryEnabled: boolean
+  autoComicLibraryWatch: boolean
   comicLibraryPaths: ComicLibraryPathDTO[]
   defaultComicImportLibraryPathId?: string
   comicReader: ComicReaderSettingsDTO
   comicCache: ComicCacheSettingsDTO
+  photoLibraryEnabled: boolean
+  autoPhotoLibraryWatch: boolean
+  photoLibraryPaths: PhotoLibraryPathDTO[]
+  defaultPhotoImportLibraryPathId?: string
+  photoViewer: PhotoViewerSettingsDTO
+  photoCache: PhotoCacheSettingsDTO
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
@@ -469,12 +558,21 @@ export interface ProxyJavBusPingResponse {
 
 export interface PatchComicSettingsBody {
   comicLibraryEnabled?: boolean
+  autoComicLibraryWatch?: boolean
   defaultComicImportLibraryPathId?: string
   comicReader?: ComicReaderSettingsDTO
   comicCache?: ComicCacheSettingsDTO
 }
 
-export interface PatchSettingsBody extends PatchComicSettingsBody {
+export interface PatchPhotoSettingsBody {
+  photoLibraryEnabled?: boolean
+  autoPhotoLibraryWatch?: boolean
+  defaultPhotoImportLibraryPathId?: string
+  photoViewer?: PhotoViewerSettingsDTO
+  photoCache?: PhotoCacheSettingsDTO
+}
+
+export interface PatchSettingsBody extends PatchComicSettingsBody, PatchPhotoSettingsBody {
   organizeLibrary?: boolean
   autoLibraryWatch?: boolean
   autoActorProfileScrape?: boolean

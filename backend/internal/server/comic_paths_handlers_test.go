@@ -19,6 +19,7 @@ import (
 
 type stubComicSettingsCtl struct {
 	enabled       bool
+	autoWatch     bool
 	defaultPathID string
 	reader        contracts.ComicReaderSettingsDTO
 	cache         contracts.ComicCacheSettingsDTO
@@ -30,6 +31,15 @@ func (s *stubComicSettingsCtl) ComicLibraryEnabled() bool {
 
 func (s *stubComicSettingsCtl) SetComicLibraryEnabled(v bool) error {
 	s.enabled = v
+	return nil
+}
+
+func (s *stubComicSettingsCtl) AutoComicLibraryWatch() bool {
+	return s.autoWatch
+}
+
+func (s *stubComicSettingsCtl) SetAutoComicLibraryWatch(v bool) error {
+	s.autoWatch = v
 	return nil
 }
 
@@ -60,6 +70,15 @@ func (s *stubComicSettingsCtl) SetComicCacheSettings(v contracts.ComicCacheSetti
 	return nil
 }
 
+type recordingComicWatchReloader struct {
+	calls int
+}
+
+func (r *recordingComicWatchReloader) ReloadComicLibraryWatches(context.Context) error {
+	r.calls++
+	return nil
+}
+
 func TestHandleGetSettings_ComicFieldsFromControllerAndPaths(t *testing.T) {
 	t.Parallel()
 
@@ -76,6 +95,7 @@ func TestHandleGetSettings_ComicFieldsFromControllerAndPaths(t *testing.T) {
 
 	ctl := &stubComicSettingsCtl{
 		enabled:       true,
+		autoWatch:     true,
 		defaultPathID: comicPath.ID,
 		reader: contracts.ComicReaderSettingsDTO{
 			Mode:      "scroll",
@@ -107,6 +127,9 @@ func TestHandleGetSettings_ComicFieldsFromControllerAndPaths(t *testing.T) {
 	}
 	if !dto.ComicLibraryEnabled {
 		t.Fatal("expected comicLibraryEnabled from controller")
+	}
+	if !dto.AutoComicLibraryWatch {
+		t.Fatal("expected autoComicLibraryWatch from controller")
 	}
 	if len(dto.ComicLibraryPaths) != 1 || dto.ComicLibraryPaths[0].ID != comicPath.ID {
 		t.Fatalf("comicLibraryPaths = %#v, want path %q", dto.ComicLibraryPaths, comicPath.ID)
@@ -169,10 +192,12 @@ func TestHandleAddComicLibraryPath_CreatesPath(t *testing.T) {
 	if err := os.MkdirAll(comicRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	reloader := &recordingComicWatchReloader{}
 	h := NewHandler(Deps{
-		Cfg:    config.Default(),
-		Logger: zap.NewNop(),
-		Store:  store,
+		Cfg:                       config.Default(),
+		Logger:                    zap.NewNop(),
+		Store:                     store,
+		ComicLibraryWatchReloader: reloader,
 	})
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
@@ -201,6 +226,50 @@ func TestHandleAddComicLibraryPath_CreatesPath(t *testing.T) {
 	}
 	if len(paths) != 1 || paths[0].ID != dto.ID {
 		t.Fatalf("stored comic paths = %#v, want created %q", paths, dto.ID)
+	}
+	if reloader.calls != 1 {
+		t.Fatalf("comic watch reload calls = %d, want 1", reloader.calls)
+	}
+}
+
+func TestHandleDeleteComicLibraryPath_ReloadsComicWatcher(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	store := newImportTestStore(t, root)
+	comicRoot := filepath.Join(root, "comics")
+	if err := os.MkdirAll(comicRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	comicPath, err := store.AddComicLibraryPath(context.Background(), comicRoot, "Comics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reloader := &recordingComicWatchReloader{}
+	h := NewHandler(Deps{
+		Cfg:                       config.Default(),
+		Logger:                    zap.NewNop(),
+		Store:                     store,
+		ComicLibraryWatchReloader: reloader,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodDelete, srv.URL+"/api/library/comics/paths/"+comicPath.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body=%s", resp.StatusCode, string(b))
+	}
+	if reloader.calls != 1 {
+		t.Fatalf("comic watch reload calls = %d, want 1", reloader.calls)
 	}
 }
 
@@ -268,7 +337,7 @@ func TestHandlePatchSettings_ComicSettings(t *testing.T) {
 	srv := httptest.NewServer(h.Routes())
 	t.Cleanup(srv.Close)
 
-	body := `{"comicLibraryEnabled":true,"defaultComicImportLibraryPathId":"` + comicPath.ID + `","comicReader":{"mode":"scroll","fit":"width","direction":"rtl"},"comicCache":{"maxBytes":1073741824}}`
+	body := `{"comicLibraryEnabled":true,"autoComicLibraryWatch":false,"defaultComicImportLibraryPathId":"` + comicPath.ID + `","comicReader":{"mode":"scroll","fit":"width","direction":"rtl"},"comicCache":{"maxBytes":1073741824}}`
 	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/settings", bytes.NewBufferString(body))
 	if err != nil {
 		t.Fatal(err)
@@ -289,6 +358,9 @@ func TestHandlePatchSettings_ComicSettings(t *testing.T) {
 	}
 	if !ctl.enabled || !dto.ComicLibraryEnabled {
 		t.Fatalf("comicLibraryEnabled not saved: ctl=%v dto=%v", ctl.enabled, dto.ComicLibraryEnabled)
+	}
+	if ctl.autoWatch || dto.AutoComicLibraryWatch {
+		t.Fatalf("autoComicLibraryWatch not saved: ctl=%v dto=%v", ctl.autoWatch, dto.AutoComicLibraryWatch)
 	}
 	if ctl.defaultPathID != comicPath.ID || dto.DefaultComicImportLibraryPathID != comicPath.ID {
 		t.Fatalf("default comic path not saved: ctl=%q dto=%q", ctl.defaultPathID, dto.DefaultComicImportLibraryPathID)

@@ -2,8 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -25,6 +28,15 @@ func (h *Handler) handleStartComicScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var request contracts.StartScanRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
 	paths, err := h.store.ListComicLibraryPaths(r.Context())
 	if err != nil {
 		if h.logger != nil {
@@ -38,7 +50,36 @@ func (h *Handler) handleStartComicScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.startComicScan(r.Context(), paths)
+	scanPaths := paths
+	if len(request.Paths) > 0 {
+		requestedPaths := make(map[string]struct{}, len(request.Paths))
+		for _, raw := range request.Paths {
+			cleaned := cleanComicScanPath(raw)
+			if cleaned != "" {
+				requestedPaths[cleaned] = struct{}{}
+			}
+		}
+		if len(requestedPaths) == 0 {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "comic scan path is required")
+			return
+		}
+
+		scanPaths = make([]contracts.ComicLibraryPathDTO, 0, len(requestedPaths))
+		for _, path := range paths {
+			cleaned := cleanComicScanPath(path.Path)
+			if _, ok := requestedPaths[cleaned]; !ok {
+				continue
+			}
+			scanPaths = append(scanPaths, path)
+			delete(requestedPaths, cleaned)
+		}
+		if len(requestedPaths) > 0 {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeComicPathNotFound, "unknown comic library path")
+			return
+		}
+	}
+
+	task, err := h.startComicScan(r.Context(), scanPaths)
 	if err != nil {
 		if h.logger != nil {
 			h.logger.Warn("start comic scan failed", zap.Error(err))
@@ -48,6 +89,18 @@ func (h *Handler) handleStartComicScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusAccepted, task)
+}
+
+func cleanComicScanPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+	cleaned := filepath.Clean(trimmed)
+	if cleaned == "." {
+		return ""
+	}
+	return cleaned
 }
 
 func (h *Handler) startComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO) (contracts.TaskDTO, error) {

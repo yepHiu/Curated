@@ -81,6 +81,7 @@ function comicSeed(
 loadMockComicPrefs()
 
 const comicLibraryEnabledMock = ref(false)
+const autoComicLibraryWatchMock = ref(true)
 const comicLibraryPathsMock = ref<ComicLibrarySetting[]>([])
 const comicLibraryPathStorageStatusesMock = ref<LibraryPathStorageStatusDTO[]>([])
 const defaultComicImportLibraryPathIdMock = ref("")
@@ -204,6 +205,7 @@ export const mockComicLibraryService: ComicLibraryService = {
   comicsLoaded: computed(() => true),
   loadError: computed(() => null),
   comicLibraryEnabled: computed(() => comicLibraryEnabledMock.value),
+  autoComicLibraryWatch: computed(() => autoComicLibraryWatchMock.value),
   comicLibraryPaths: computed(() => comicLibraryPathsMock.value),
   comicLibraryPathStorageStatuses: computed(() => comicLibraryPathStorageStatusesMock.value),
   defaultComicImportLibraryPathId: computed(() => defaultComicImportLibraryPathIdMock.value),
@@ -254,6 +256,10 @@ export const mockComicLibraryService: ComicLibraryService = {
       )
     }
     comicLibraryEnabledMock.value = value
+  },
+
+  async setAutoComicLibraryWatch(value: boolean) {
+    autoComicLibraryWatchMock.value = value
   },
 
   async addComicLibraryPath(path: string, title?: string): Promise<TaskDTO | null> {
@@ -339,7 +345,8 @@ export const mockComicLibraryService: ComicLibraryService = {
     throw mockHttpError(501, "MOCK_COMIC_REVEAL_NOT_SUPPORTED")
   },
 
-  async scanComics(): Promise<TaskDTO | null> {
+  async scanComics(paths?: string[]): Promise<TaskDTO | null> {
+    void paths
     throw mockHttpError(501, "MOCK_COMIC_SCAN_NOT_SUPPORTED")
   },
 

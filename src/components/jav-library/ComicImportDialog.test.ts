@@ -109,6 +109,32 @@ describe("ComicImportDialog", () => {
     expect(wrapper.text()).toContain("import.comicSkippedUnsupported")
   })
 
+  it("keeps long selected comic archive names inside the dialog bounds", async () => {
+    const wrapper = mount(ComicImportDialog)
+    const longName = `${"あらくれた者たち".repeat(18)} [中国翻訳] [DL版].zip`
+    const file = new File(["zip"], longName, { type: "application/zip" })
+    const input = wrapper.get<HTMLInputElement>("[data-comic-import-file-input]")
+    Object.defineProperty(input.element, "files", {
+      value: [file],
+      configurable: true,
+    })
+
+    await input.trigger("change")
+
+    const row = wrapper.get("[data-comic-import-file-row]")
+    const name = wrapper.get("[data-comic-import-file-name]")
+    const actions = wrapper.get("[data-comic-import-file-actions]")
+
+    expect(row.classes()).toEqual(
+      expect.arrayContaining(["w-full", "max-w-full", "min-w-0", "overflow-hidden"]),
+    )
+    expect(name.classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "basis-0", "flex-1", "truncate", "overflow-hidden"]),
+    )
+    expect(name.attributes("title")).toBe(longName)
+    expect(actions.classes()).toContain("shrink-0")
+  })
+
   it("disables submit without a default comic import path", () => {
     serviceState.defaultComicImportLibraryPathId = ""
     serviceState.comicLibraryPaths = []

@@ -253,4 +253,66 @@ describe("navigation intent helpers", () => {
       to: { name: "home" },
     })
   })
+
+  it("resolves comic detail back links to the comic library", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-detail",
+        query: {},
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: { name: "comics" },
+    })
+  })
+
+  it("resolves comic reader back links to their recorded source route", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/comics/comic-1",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backDetail",
+      to: "/comics/comic-1",
+    })
+
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/comics?q=artist&sort=fileName",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: "/comics?q=artist&sort=fileName",
+    })
+
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/settings?section=comics",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backPrevious",
+      to: "/settings?section=comics",
+    })
+  })
+
+  it("falls back from direct comic reader links to the comic library", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {},
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: { name: "comics" },
+    })
+  })
 })

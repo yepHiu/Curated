@@ -48,6 +48,11 @@ describe("ComicPagePreviewGrid", () => {
 
     const previews = wrapper.findAll("[data-comic-page-preview]")
     expect(previews).toHaveLength(12)
+    expect(wrapper.text()).not.toContain("comics.previewPage")
+    expect(previews[0]!.element.children[0]?.tagName).toBe("IMG")
+    expect(previews[0]!.classes()).not.toEqual(
+      expect.arrayContaining(["border", "bg-card/70", "p-1.5"]),
+    )
 
     await previews[5]!.trigger("click")
 

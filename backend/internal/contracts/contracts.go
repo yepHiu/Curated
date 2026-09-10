@@ -514,10 +514,17 @@ type SettingsDTO struct {
 	LibraryPaths                    []LibraryPathDTO       `json:"libraryPaths"`
 	DefaultImportLibraryPathID      string                 `json:"defaultImportLibraryPathId,omitempty"`
 	ComicLibraryEnabled             bool                   `json:"comicLibraryEnabled"`
+	AutoComicLibraryWatch           bool                   `json:"autoComicLibraryWatch"`
 	ComicLibraryPaths               []ComicLibraryPathDTO  `json:"comicLibraryPaths"`
 	DefaultComicImportLibraryPathID string                 `json:"defaultComicImportLibraryPathId,omitempty"`
 	ComicReader                     ComicReaderSettingsDTO `json:"comicReader"`
 	ComicCache                      ComicCacheSettingsDTO  `json:"comicCache"`
+	PhotoLibraryEnabled             bool                   `json:"photoLibraryEnabled"`
+	AutoPhotoLibraryWatch           bool                   `json:"autoPhotoLibraryWatch"`
+	PhotoLibraryPaths               []PhotoLibraryPathDTO  `json:"photoLibraryPaths"`
+	DefaultPhotoImportLibraryPathID string                 `json:"defaultPhotoImportLibraryPathId,omitempty"`
+	PhotoViewer                     PhotoViewerSettingsDTO `json:"photoViewer"`
+	PhotoCache                      PhotoCacheSettingsDTO  `json:"photoCache"`
 	Player                          PlayerSettingsDTO      `json:"player"`
 	OrganizeLibrary                 bool                   `json:"organizeLibrary"`
 	// AutoLibraryWatch: when true, directory watching may queue debounced scans for new files under library roots (library-config.cfg).
@@ -594,9 +601,15 @@ type PatchSettingsRequest struct {
 	CuratedFrameExportFormat        *string                 `json:"curatedFrameExportFormat,omitempty"`
 	DefaultImportLibraryPathID      *string                 `json:"defaultImportLibraryPathId,omitempty"`
 	ComicLibraryEnabled             *bool                   `json:"comicLibraryEnabled,omitempty"`
+	AutoComicLibraryWatch           *bool                   `json:"autoComicLibraryWatch,omitempty"`
 	DefaultComicImportLibraryPathID *string                 `json:"defaultComicImportLibraryPathId,omitempty"`
 	ComicReader                     *ComicReaderSettingsDTO `json:"comicReader,omitempty"`
 	ComicCache                      *ComicCacheSettingsDTO  `json:"comicCache,omitempty"`
+	PhotoLibraryEnabled             *bool                   `json:"photoLibraryEnabled,omitempty"`
+	AutoPhotoLibraryWatch           *bool                   `json:"autoPhotoLibraryWatch,omitempty"`
+	DefaultPhotoImportLibraryPathID *string                 `json:"defaultPhotoImportLibraryPathId,omitempty"`
+	PhotoViewer                     *PhotoViewerSettingsDTO `json:"photoViewer,omitempty"`
+	PhotoCache                      *PhotoCacheSettingsDTO  `json:"photoCache,omitempty"`
 	Player                          *PatchPlayerSettingsDTO `json:"player,omitempty"`
 	MetadataMovieProvider           *string                 `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain: ordered list of providers to try in sequence; nil = no change; empty = clear (auto mode).
@@ -953,6 +966,7 @@ const (
 
 	TaskTypeImportMovies      = "import.movies"
 	TaskTypeScanComics        = "scan.comics"
+	TaskTypeScanPhotos        = "scan.photos"
 	TaskTypeImportComics      = "import.comics"
 	TaskTypeComicCacheCleanup = "comic.cache.cleanup"
 
@@ -992,6 +1006,15 @@ const (
 	ErrorCodeComicImportTargetMissing = "COMIC_IMPORT_TARGET_MISSING"
 	ErrorCodeComicImportConflict      = "COMIC_IMPORT_CONFLICT"
 	ErrorCodeComicCacheCleanupFailed  = "COMIC_CACHE_CLEANUP_FAILED"
+
+	ErrorCodePhotoPathNotConfigured = "PHOTO_PATH_NOT_CONFIGURED"
+	ErrorCodePhotoPathNotFound      = "PHOTO_PATH_NOT_FOUND"
+	ErrorCodePhotoLibraryDisabled   = "PHOTO_LIBRARY_DISABLED"
+	ErrorCodePhotoArchiveUnsupported = "PHOTO_ARCHIVE_UNSUPPORTED"
+	ErrorCodePhotoArchiveEmpty       = "PHOTO_ARCHIVE_EMPTY"
+	ErrorCodePhotoArchiveReadFailed  = "PHOTO_ARCHIVE_READ_FAILED"
+	ErrorCodePhotoBookNotFound       = "PHOTO_BOOK_NOT_FOUND"
+	ErrorCodePhotoPageNotFound       = "PHOTO_PAGE_NOT_FOUND"
 
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"

@@ -8,6 +8,7 @@ import {
   subscribeBackendEvents,
   type BackendEventSubscription,
 } from "@/lib/backend-events"
+import { useComicLibraryService } from "@/services/comic-library-service"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
@@ -55,9 +56,14 @@ function isTerminalStatus(s: TaskDTO["status"]): boolean {
   )
 }
 
-function isFsnotifyScan(task: TaskDTO): boolean {
+function isMovieFsnotifyScan(task: TaskDTO): boolean {
   const tr = task.metadata?.trigger
   return task.type === "scan.library" && tr === "fsnotify"
+}
+
+function isComicFsnotifyScan(task: TaskDTO): boolean {
+  const tr = task.metadata?.trigger
+  return task.type === "scan.comics" && tr === "fsnotify"
 }
 
 function parentScanId(task: TaskDTO): string {
@@ -133,6 +139,7 @@ function taskFinishedAfterSessionStart(task: TaskDTO): boolean {
 export function useLibraryWatchToasts() {
   const { t } = useI18n()
   const libraryService = useLibraryService()
+  const comicService = useComicLibraryService()
   let timer: ReturnType<typeof setInterval> | null = null
   const seenToastIds = readSeenToastIds()
   const fsnotifyScanParents = new Set<string>()
@@ -170,6 +177,31 @@ export function useLibraryWatchToasts() {
     })
   }
 
+  function comicLibraryWatchScanToastMessage(task: TaskDTO): string {
+    const hasScanCounters =
+      taskHasMetadata(task, "filesDiscovered") ||
+      taskHasMetadata(task, "imported") ||
+      taskHasMetadata(task, "updated") ||
+      taskHasMetadata(task, "skipped")
+    if (!hasScanCounters) {
+      return t("toasts.comicLibraryWatchScanDone", { message: task.message ?? "" })
+    }
+
+    const discovered = taskMetaNumber(task, "filesDiscovered")
+    const imported = taskMetaNumber(task, "imported")
+    const updated = taskMetaNumber(task, "updated")
+    const skipped = taskMetaNumber(task, "skipped")
+    if (imported + updated === 0) {
+      return t("toasts.comicLibraryWatchScanDoneNoChanges", { discovered, skipped })
+    }
+    return t("toasts.comicLibraryWatchScanDoneWithChanges", {
+      discovered,
+      imported,
+      updated,
+      skipped,
+    })
+  }
+
   function rememberChangedFsnotifyScan(task: TaskDTO) {
     if (!fsnotifyScanChanged(task)) return
     const key = scanPathsKey(task)
@@ -196,14 +228,15 @@ export function useLibraryWatchToasts() {
 
   function processTasks(tasks: TaskDTO[]) {
     for (const task of tasks) {
-      if (isTerminalStatus(task.status) && isFsnotifyScan(task)) {
+      if (isTerminalStatus(task.status) && isMovieFsnotifyScan(task)) {
         rememberChangedFsnotifyScan(task)
       }
     }
 
     let needsMovieReload = false
+    let needsComicReload = false
     for (const task of tasks) {
-      if (!isTerminalStatus(task.status) || !isFsnotifyScan(task)) {
+      if (!isTerminalStatus(task.status) || !isMovieFsnotifyScan(task)) {
         continue
       }
       fsnotifyScanParents.add(task.taskId)
@@ -217,6 +250,25 @@ export function useLibraryWatchToasts() {
       markToastSeen(task.taskId)
       needsMovieReload = true
       pushAppToast(libraryWatchScanToastMessage(task), {
+        variant: taskTerminalToastVariant(task.status),
+        notification: {
+          type: "scan",
+          title: t("notificationCenter.titles.scanDone"),
+          source: { taskId: task.taskId },
+        },
+      })
+    }
+
+    for (const task of tasks) {
+      if (!isTerminalStatus(task.status) || !isComicFsnotifyScan(task)) {
+        continue
+      }
+      if (seenToastIds.has(task.taskId)) {
+        continue
+      }
+      markToastSeen(task.taskId)
+      needsComicReload = true
+      pushAppToast(comicLibraryWatchScanToastMessage(task), {
         variant: taskTerminalToastVariant(task.status),
         notification: {
           type: "scan",
@@ -264,6 +316,9 @@ export function useLibraryWatchToasts() {
 
     if (needsMovieReload) {
       void libraryService.reloadMoviesFromApi()
+    }
+    if (needsComicReload) {
+      void comicService.reloadComicsFromApi()
     }
 
     for (const task of tasks) {

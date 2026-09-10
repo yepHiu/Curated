@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import type { ComicBook, ComicReaderSettings } from "@/domain/comic/types"
-import type { ComicReadingPreferencesDTO, ComicReadingProgressDTO } from "@/api/types"
+import type {
+  ComicReadingPreferencesDTO,
+  ComicReadingProgressDTO,
+  PutComicReadingPreferencesBody,
+} from "@/api/types"
 import {
   clampComicPageIndex,
   clearTemporaryStitch,
@@ -13,7 +17,6 @@ import {
   type TemporaryStitch,
 } from "@/lib/comic-reader-controls"
 import ComicReaderChrome from "@/components/jav-library/comics/ComicReaderChrome.vue"
-import ComicReaderSettingsMenu from "@/components/jav-library/comics/ComicReaderSettingsMenu.vue"
 
 const PROGRESS_SAVE_DELAY_MS = 300
 
@@ -23,6 +26,10 @@ const props = withDefaults(
     readerDefaults: ComicReaderSettings
     initialPageIndex?: number
     loadPreferences?: (comicId: string) => Promise<ComicReadingPreferencesDTO | null | undefined>
+    savePreferences?: (
+      comicId: string,
+      prefs: PutComicReadingPreferencesBody,
+    ) => Promise<ComicReadingPreferencesDTO | unknown>
     saveProgress?: (
       comicId: string,
       pageIndex: number,
@@ -32,6 +39,7 @@ const props = withDefaults(
   {
     initialPageIndex: 0,
     loadPreferences: undefined,
+    savePreferences: undefined,
     saveProgress: undefined,
   },
 )
@@ -39,6 +47,7 @@ const props = withDefaults(
 const pageIndex = ref(clampComicPageIndex(props.initialPageIndex, props.comic.pageCount))
 const preferences = ref<ComicReaderSettings>(resolveComicReaderPreferences(props.readerDefaults))
 const stitch = ref<TemporaryStitch | undefined>(getTemporaryStitch(props.comic.id))
+const chromeVisible = ref(true)
 let progressTimer: ReturnType<typeof setTimeout> | undefined
 
 const pages = computed(() => props.comic.pages ?? [])
@@ -54,11 +63,60 @@ const visiblePageIndexes = computed(() => {
 })
 
 const readerSurfaceClass = computed(() => {
-  const fit = preferences.value.fit === "width" ? "w-full max-w-5xl" : "max-h-full max-w-full"
-  return preferences.value.mode === "scroll"
-    ? `${fit} mx-auto`
-    : `${fit} mx-auto`
+  if (preferences.value.mode === "page") {
+    return "h-full w-full max-h-full max-w-full"
+  }
+  const fit =
+    preferences.value.fit === "width"
+      ? "h-auto w-full max-w-5xl"
+      : "h-auto max-w-full"
+  return `${fit} mx-auto`
 })
+
+const readerScrollportClass = computed(() =>
+  preferences.value.mode === "scroll"
+    ? "overflow-auto px-3 py-6"
+    : "flex h-full w-full items-center justify-center overflow-hidden p-0",
+)
+
+const readerPageTrackClass = computed(() =>
+  preferences.value.mode === "scroll"
+    ? "flex-col"
+    : "h-full max-h-full min-h-0 w-full max-w-full items-center justify-center",
+)
+
+const readerPageTrackGapClass = computed(() => (stitch.value ? "gap-0" : "gap-3"))
+
+const readerFigureClass = computed(() =>
+  preferences.value.mode === "scroll"
+    ? "flex flex-col"
+    : "grid h-full max-h-full min-h-0 w-full flex-1 place-items-center",
+)
+
+const readerImageFrameClass = computed(() =>
+  preferences.value.mode === "scroll"
+    ? "flex min-w-0 items-center justify-center"
+    : "flex h-full max-h-full min-h-0 w-full max-w-full items-center justify-center",
+)
+
+const readerImageClass = computed(() =>
+  preferences.value.mode === "scroll"
+    ? "block rounded-lg bg-muted object-contain shadow-xl shadow-black/10"
+    : "block object-contain",
+)
+
+function readerImagePositionClass(displayIndex: number) {
+  if (!stitch.value || preferences.value.mode !== "page") {
+    return "object-center"
+  }
+  return displayIndex === 0 ? "object-right" : "object-left"
+}
+
+const readerChromeOverlayClass = computed(() =>
+  chromeVisible.value
+    ? "translate-y-0 opacity-100"
+    : "pointer-events-none translate-y-3 opacity-0",
+)
 
 function clearProgressTimer() {
   if (progressTimer !== undefined) {
@@ -101,6 +159,20 @@ function stitchWith(offset: -1 | 1) {
   setTemporaryStitch(props.comic.id, next)
 }
 
+function toggleReaderMode() {
+  clearStitch()
+  const next = {
+    ...preferences.value,
+    mode: preferences.value.mode === "page" ? "scroll" : "page",
+  } satisfies ComicReaderSettings
+  preferences.value = next
+  void props.savePreferences?.(props.comic.id, next)
+}
+
+function toggleChrome() {
+  chromeVisible.value = !chromeVisible.value
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) {
     return
@@ -138,7 +210,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground">
+  <div
+    data-reader-root
+    class="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground"
+  >
     <div class="sr-only" aria-live="polite">
       <span data-reader-page-index>{{ pageIndex }}</span>
       <span data-reader-direction>{{ preferences.direction }}</span>
@@ -147,51 +222,70 @@ onUnmounted(() => {
     </div>
 
     <div
-      class="min-h-0 flex-1 overflow-auto"
-      :class="preferences.mode === 'scroll' ? 'px-3 py-6' : 'flex items-center justify-center px-3 py-6'"
+      data-reader-surface
+      class="relative h-full min-h-0 min-w-0 flex-1"
+      @click="toggleChrome"
     >
       <div
-        class="flex gap-3"
-        :class="preferences.mode === 'scroll' ? 'flex-col' : 'items-center justify-center'"
+        data-reader-scrollport
+        class="min-h-0 flex-1"
+        :class="readerScrollportClass"
       >
-        <figure
-          v-for="idx in visiblePageIndexes"
-          :key="idx"
-          data-reader-visible-page
-          class="flex min-w-0 flex-col items-center gap-2"
+        <div
+          data-reader-page-track
+          class="flex"
+          :class="[readerPageTrackClass, readerPageTrackGapClass]"
         >
-          <img
-            v-if="pages[idx]?.imageUrl || pages[idx]?.thumbUrl"
-            :src="pages[idx]?.imageUrl || pages[idx]?.thumbUrl"
-            :alt="`${props.comic.title} ${idx + 1}`"
-            class="block rounded-lg bg-muted object-contain shadow-xl shadow-black/10"
-            :class="readerSurfaceClass"
+          <figure
+            v-for="(idx, displayIndex) in visiblePageIndexes"
+            :key="idx"
+            data-reader-visible-page
+            class="min-w-0 items-center gap-2"
+            :class="readerFigureClass"
           >
-          <div
-            v-else
-            class="flex aspect-[2/3] w-64 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-          >
-            {{ idx + 1 }}
-          </div>
-          <figcaption class="text-xs tabular-nums text-muted-foreground">
-            {{ idx + 1 }}
-          </figcaption>
-        </figure>
+            <span
+              data-reader-image-frame
+              :class="readerImageFrameClass"
+            >
+              <img
+                v-if="pages[idx]?.imageUrl || pages[idx]?.thumbUrl"
+                data-reader-page-image
+                :src="pages[idx]?.imageUrl || pages[idx]?.thumbUrl"
+                :alt="`${props.comic.title} ${idx + 1}`"
+                :class="[readerImageClass, readerSurfaceClass, readerImagePositionClass(displayIndex)]"
+              >
+              <div
+                v-else
+                class="flex aspect-[2/3] w-64 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+              >
+                {{ idx + 1 }}
+              </div>
+            </span>
+          </figure>
+        </div>
       </div>
-    </div>
 
-    <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-2 px-3">
-      <ComicReaderSettingsMenu :preferences="preferences" />
-      <ComicReaderChrome
-        :page-index="pageIndex"
-        :page-count="props.comic.pageCount"
-        :stitched="Boolean(stitch)"
-        @previous="moveBy(-1)"
-        @next="moveBy(1)"
-        @stitch-previous="stitchWith(-1)"
-        @stitch-next="stitchWith(1)"
-        @clear-stitch="clearStitch"
-      />
+      <div
+        data-reader-chrome-overlay
+        :data-reader-chrome-visible="chromeVisible ? 'true' : 'false'"
+        class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex flex-col items-center gap-2 px-3 transition duration-200 ease-out"
+        :class="readerChromeOverlayClass"
+      >
+        <div class="pointer-events-auto" @click.stop>
+          <ComicReaderChrome
+            :page-index="pageIndex"
+            :page-count="props.comic.pageCount"
+            :mode="preferences.mode"
+            :stitched="Boolean(stitch)"
+            @previous="moveBy(-1)"
+            @next="moveBy(1)"
+            @toggle-mode="toggleReaderMode"
+            @stitch-previous="stitchWith(-1)"
+            @stitch-next="stitchWith(1)"
+            @clear-stitch="clearStitch"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>

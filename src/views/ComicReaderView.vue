@@ -58,6 +58,7 @@ watch(
       :reader-defaults="comicService.comicReader.value"
       :initial-page-index="clampComicPageIndex(initialPageIndex, comic.pageCount)"
       :load-preferences="comicService.getComicPreferences"
+      :save-preferences="comicService.saveComicPreferences"
       :save-progress="comicService.saveComicProgress"
     />
     <div

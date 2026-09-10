@@ -52,7 +52,7 @@ function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
 }
 
 describe("ComicCard", () => {
-  it("shows title, page count, rating, favorite, and read progress", () => {
+  it("shows title, page count, rating, and read progress without source or favorite controls", () => {
     const wrapper = mount(ComicCard, {
       props: {
         comic: makeComic(),
@@ -63,7 +63,8 @@ describe("ComicCard", () => {
     expect(wrapper.text()).toContain("24")
     expect(wrapper.text()).toContain("4.5")
     expect(wrapper.text()).toContain("6 / 24")
-    expect(wrapper.get("[data-comic-favorite]").attributes("data-comic-favorite")).toBe("true")
+    expect(wrapper.text()).not.toContain("glass-city.cbz")
+    expect(wrapper.find("[data-comic-favorite]").exists()).toBe(false)
   })
 
   it("uses the same compact poster-first layout tokens as movie cards", () => {
@@ -87,5 +88,22 @@ describe("ComicCard", () => {
       ]),
     )
     expect(wrapper.text()).not.toContain("comics.startReading")
+  })
+
+  it("toggles batch selection instead of opening details in batch mode", async () => {
+    const wrapper = mount(ComicCard, {
+      props: {
+        comic: makeComic(),
+        batchMode: true,
+        batchChecked: true,
+      },
+    })
+
+    expect(wrapper.get("[data-comic-batch-checkbox]").attributes("checked")).toBeDefined()
+
+    await wrapper.get("[data-comic-card-open]").trigger("click")
+
+    expect(wrapper.emitted("openDetails")).toBeUndefined()
+    expect(wrapper.emitted("toggleBatchSelect")).toEqual([["comic-card-1"]])
   })
 })

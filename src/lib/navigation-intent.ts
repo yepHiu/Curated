@@ -19,6 +19,41 @@ function isNavigationBackTarget(value: unknown): value is NavigationBackTarget {
   return typeof value === "string" && navigationBackTargets.includes(value as NavigationBackTarget)
 }
 
+function getFirstQueryString(value: LocationQuery[string]): string | undefined {
+  if (typeof value === "string") {
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === "string")
+  }
+  return undefined
+}
+
+function normalizeInternalReturnPath(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined
+  }
+  const trimmed = value.trim()
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return undefined
+  }
+  return trimmed
+}
+
+function getComicReaderReturnTo(query: LocationQuery): string | undefined {
+  return normalizeInternalReturnPath(getFirstQueryString(query.returnTo))
+}
+
+function getComicReaderReturnLabelKey(returnTo: string): string {
+  if (/^\/comics\/[^/?#]+(?:[?#]|$)/.test(returnTo) && !/\/read(?:\/|[?#]|$)/.test(returnTo)) {
+    return "shell.backDetail"
+  }
+  if (/^\/comics(?:[/?#]|$)/.test(returnTo)) {
+    return "shell.backComics"
+  }
+  return "shell.backPrevious"
+}
+
 function formatResumeSecondsForRoute(resumeSec: number): string {
   const normalized = Math.max(0, resumeSec)
   return String(Number(normalized.toFixed(3)))
@@ -162,10 +197,44 @@ export function buildPlayerRouteFromCuratedFrameIntent(
   }
 }
 
+export function buildComicReaderRouteFromSource(
+  comicId: string,
+  pageIndex: number,
+  sourceFullPath: string,
+): RouteLocationRaw {
+  const returnTo = normalizeInternalReturnPath(sourceFullPath)
+  return {
+    name: "comic-reader",
+    params: { id: comicId, pageIndex: String(Math.max(0, Math.floor(pageIndex))) },
+    query: returnTo ? { returnTo } : undefined,
+  }
+}
+
 export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,
 ): { to: RouteLocationRaw; labelKey: string } {
+  if (route.name === "comic-reader") {
+    const returnTo = getComicReaderReturnTo(route.query)
+    if (returnTo) {
+      return {
+        to: returnTo,
+        labelKey: getComicReaderReturnLabelKey(returnTo),
+      }
+    }
+    return {
+      to: { name: "comics" },
+      labelKey: "shell.backComics",
+    }
+  }
+
+  if (route.name === "comic-detail") {
+    return {
+      to: { name: "comics" },
+      labelKey: "shell.backComics",
+    }
+  }
+
   if (route.name === "player" && currentMovieId) {
     const backTarget = getNavigationBackTarget(route.query)
     if (backTarget === "history") {

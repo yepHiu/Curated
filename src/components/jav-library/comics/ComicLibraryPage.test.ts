@@ -13,8 +13,10 @@ vi.mock("vue-i18n", () => ({
 vi.mock("./VirtualComicGrid.vue", () => ({
   default: {
     name: "VirtualComicGrid",
-    props: ["comics"],
-    template: "<div data-virtual-comic-grid><article v-for='comic in comics' :key='comic.id'>{{ comic.title }}</article></div>",
+    props: ["comics", "batchMode", "batchSelectedIds"],
+    emits: ["toggleBatchSelect"],
+    template:
+      "<div data-virtual-comic-grid :data-batch-mode=\"batchMode ? 'true' : 'false'\" :data-selected=\"(batchSelectedIds || []).join(',')\"><button v-for='comic in comics' :key='comic.id' data-comic-select @click=\"$emit('toggleBatchSelect', comic.id)\">{{ comic.title }}</button></div>",
   },
 }))
 
@@ -40,7 +42,7 @@ describe("ComicLibraryPage", () => {
     const wrapper = mount(ComicLibraryPage, {
       props: {
         comics: [makeComic("comic-1", "Glass City Notebook")],
-        activeFilter: "all",
+        activeSort: "addedAt",
       },
     })
 
@@ -56,11 +58,93 @@ describe("ComicLibraryPage", () => {
           makeComic("comic-1", "Glass City Notebook"),
           makeComic("comic-2", "Rain Garden"),
         ],
-        activeFilter: "all",
+        activeSort: "addedAt",
       },
     })
 
     expect(wrapper.text()).toContain("Glass City Notebook")
     expect(wrapper.text()).toContain("Rain Garden")
+  })
+
+  it("keeps content toolbar aligned with movie tabs and leaves search to the shell", () => {
+    const wrapper = mount(ComicLibraryPage, {
+      props: {
+        comics: [makeComic("comic-1", "Glass City Notebook")],
+        activeSort: "addedAt",
+        searchQuery: "rain",
+      },
+    })
+
+    expect(wrapper.get("[data-comic-library-toolbar]").classes()).toEqual(
+      expect.arrayContaining(["flex-wrap", "items-center", "justify-between", "pb-1"]),
+    )
+    expect(wrapper.find("[data-comic-sort-tabs]").exists()).toBe(true)
+    expect(wrapper.find("[data-comic-library-toolbar] input").exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("comics.searchPlaceholder")
+    expect(wrapper.text()).toContain("comics.sortByAdded")
+    expect(wrapper.text()).toContain("comics.sortByFileName")
+    expect(wrapper.text()).toContain("comics.sortByFavorite")
+    expect(wrapper.text()).not.toContain("comics.filterUnread")
+    expect(wrapper.text()).not.toContain("comics.filterReading")
+    expect(wrapper.text()).not.toContain("comics.filterRead")
+  })
+
+  it("uses the same scroll gutter as the movie grid area", () => {
+    const wrapper = mount(ComicLibraryPage, {
+      props: {
+        comics: [makeComic("comic-1", "Glass City Notebook")],
+        activeSort: "addedAt",
+      },
+    })
+
+    expect(wrapper.get("[data-comic-grid-scroll]").classes()).toEqual(
+      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto", "pr-2"]),
+    )
+  })
+
+  it("emits the selected comic sort when a sort tab is clicked", async () => {
+    const wrapper = mount(ComicLibraryPage, {
+      props: {
+        comics: [makeComic("comic-1", "Glass City Notebook")],
+        activeSort: "addedAt",
+      },
+    })
+
+    await wrapper.get('[data-comic-sort-option="fileName"]').trigger("click")
+
+    expect(wrapper.emitted("update:sort")?.[0]).toEqual(["fileName"])
+  })
+
+  it("renders movie-style batch management controls for the comic wall", async () => {
+    const wrapper = mount(ComicLibraryPage, {
+      props: {
+        comics: [makeComic("comic-1", "Glass City Notebook")],
+        activeSort: "addedAt",
+      },
+    })
+
+    expect(wrapper.text()).toContain("comics.batchManage")
+
+    await wrapper.get("[data-comic-enter-batch]").trigger("click")
+
+    expect(wrapper.emitted("enterBatchMode")).toHaveLength(1)
+
+    await wrapper.setProps({
+      batchMode: true,
+      batchSelectedIds: ["comic-1"],
+    })
+
+    expect(wrapper.text()).toContain("comics.batchSelectVisible")
+    expect(wrapper.text()).toContain("comics.batchExitToolbar")
+    expect(wrapper.get("[data-virtual-comic-grid]").attributes("data-batch-mode")).toBe("true")
+    expect(wrapper.get("[data-virtual-comic-grid]").attributes("data-selected")).toBe("comic-1")
+
+    await wrapper.get("[data-comic-select-visible]").trigger("click")
+    await wrapper.get("[data-comic-exit-batch]").trigger("click")
+    await wrapper.get("[data-comic-select]").trigger("click")
+
+    expect(wrapper.emitted("selectAllVisibleInBatch")).toHaveLength(1)
+    expect(wrapper.emitted("exitBatchMode")).toHaveLength(1)
+    expect(wrapper.emitted("toggleBatchSelect")).toEqual([["comic-1"]])
   })
 })

@@ -73,6 +73,7 @@ func (h *Handler) handleAddComicLibraryPath(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	h.reloadComicLibraryWatchIfAny(r.Context())
 	writeJSON(w, http.StatusCreated, contracts.AddComicLibraryPathResponse{ComicLibraryPathDTO: dto})
 }
 
@@ -139,5 +140,6 @@ func (h *Handler) handleDeleteComicLibraryPath(w http.ResponseWriter, r *http.Re
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete comic library path")
 		return
 	}
+	h.reloadComicLibraryWatchIfAny(r.Context())
 	w.WriteHeader(http.StatusNoContent)
 }

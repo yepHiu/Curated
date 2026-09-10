@@ -61,6 +61,21 @@ describe("comicApi", () => {
     expect(post).toHaveBeenCalledWith("/library/comics/scans", {})
   })
 
+  it("can restrict comic scans to selected comic library paths", async () => {
+    const task = {
+      taskId: "scan-comics-path-1",
+      type: "scan.comics",
+      status: "running",
+      createdAt: "2026-06-28T00:00:00Z",
+      progress: 0,
+    }
+    const post = vi.spyOn(httpClient, "post").mockResolvedValueOnce(task)
+
+    await expect(comicApi.startComicScan({ paths: ["D:/Comics"] })).resolves.toEqual(task)
+
+    expect(post).toHaveBeenCalledWith("/library/comics/scans", { paths: ["D:/Comics"] })
+  })
+
   it("lists and patches comics through independent comic collection endpoints", async () => {
     const page = { items: [], total: 0, limit: 50, offset: 0 }
     const list = vi.spyOn(httpClient, "get").mockResolvedValueOnce(page)

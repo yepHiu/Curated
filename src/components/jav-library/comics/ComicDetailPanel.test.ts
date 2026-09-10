@@ -136,10 +136,11 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).toContain("Original Title")
     expect(wrapper.text()).toContain("author:alpha")
     expect(wrapper.text()).toContain("series:rain")
+    expect(wrapper.text()).not.toContain("original.cbz")
     expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
       "https://example.com/detail-cover.jpg",
     )
-    expect(wrapper.get("[data-comic-detail-rating-card]").text()).toContain("3")
+    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(false)
     expect(wrapper.find("[data-comic-more-actions]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-edit-action]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-reveal-source]").exists()).toBe(true)
@@ -152,6 +153,21 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.find("[data-comic-save]").exists()).toBe(false)
   })
 
+  it("omits the cover metadata card with rating, progress, and favorite state", () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic({ rating: null, pageCount: 32, currentPageIndex: 0 }),
+      },
+    })
+
+    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("comics.detailRatingLabel")
+    expect(wrapper.text()).not.toContain("comics.noRating")
+    expect(wrapper.text()).not.toContain("comics.pageCount")
+    expect(wrapper.text()).not.toContain("comics.favoriteOff")
+    expect(wrapper.text()).not.toContain("1 / 32")
+  })
+
   it("omits source metadata from the visible detail body", () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
@@ -162,6 +178,61 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).not.toContain("comics.sourceFile")
     expect(wrapper.text()).not.toContain("comics.sourceLocation")
     expect(wrapper.text()).not.toContain("D:/Comics/original.cbz")
+    expect(wrapper.text()).not.toContain("original.cbz")
+  })
+
+  it("renders the detail cover without fixed-ratio cropping so wide and tall pages can adapt", () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic({ coverUrl: "https://example.com/wide-cover.jpg" }),
+      },
+    })
+
+    const frame = wrapper.get("[data-comic-detail-cover-frame]")
+    const cover = wrapper.get("[data-comic-detail-cover]")
+
+    expect(frame.classes()).toEqual(
+      expect.arrayContaining(["w-fit", "max-w-full", "max-h-[min(56vh,24rem)]"]),
+    )
+    expect(frame.classes()).not.toContain("aspect-[358/537]")
+    expect(cover.classes()).toEqual(
+      expect.arrayContaining([
+        "block",
+        "h-auto",
+        "w-auto",
+        "max-h-[min(56vh,24rem)]",
+        "max-w-full",
+        "object-contain",
+      ]),
+    )
+    expect(cover.classes()).not.toEqual(
+      expect.arrayContaining(["absolute", "inset-0", "h-full", "w-full", "object-cover"]),
+    )
+  })
+
+  it("edits comic tags inline like detail tag chips", async () => {
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic(),
+      },
+    })
+
+    await wrapper.get("[data-comic-add-tag]").trigger("click")
+    await wrapper.get("[data-comic-new-tag-input]").setValue("volume:1")
+    await wrapper.get("[data-comic-add-tag]").trigger("click")
+
+    let patchCall = wrapper.emitted("patch")?.[0]
+    expect(patchCall?.[0]).toEqual({
+      tags: ["author:alpha", "series:rain", "volume:1"],
+    })
+    expect(typeof patchCall?.[1]).toBe("function")
+
+    await wrapper.get("[data-comic-remove-tag='author:alpha']").trigger("click")
+    patchCall = wrapper.emitted("patch")?.[1]
+    expect(patchCall?.[0]).toEqual({
+      tags: ["series:rain"],
+    })
+    expect(typeof patchCall?.[1]).toBe("function")
   })
 
   it("opens the edit dialog from the more menu and forwards edited fields", async () => {
@@ -206,7 +277,7 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.emitted("deleteComic")?.[0]).toEqual(["comic-detail-1"])
   })
 
-  it("uses the shared detail shell with the narrower media column", () => {
+  it("uses a left-aligned detail shell with the cover and title top-aligned", () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic(),
@@ -218,15 +289,40 @@ describe("ComicDetailPanel", () => {
     )
     expect(wrapper.get("[data-comic-detail-content]").classes()).toEqual(
       expect.arrayContaining([
-        "lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]",
-        "xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]",
+        "relative",
+        "items-start",
+        "justify-items-start",
+        "lg:justify-start",
+        "lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]",
       ]),
     )
+    expect(wrapper.get("[data-comic-detail-content]").classes()).not.toContain("items-center")
+    expect(wrapper.get("[data-comic-detail-content]").classes()).not.toContain("lg:justify-center")
+    expect(wrapper.get("[data-comic-detail-content]").classes()).not.toContain("pr-14")
+    expect(wrapper.get("[data-comic-detail-content]").classes()).not.toContain("sm:pr-16")
+    expect(wrapper.get("[data-comic-more-actions-zone]").classes()).toEqual(
+      expect.arrayContaining(["absolute", "right-4", "top-4", "sm:right-6", "sm:top-6"]),
+    )
+    expect(
+      wrapper.get("[data-comic-detail-info-column]").find("[data-comic-more-actions]").exists(),
+    ).toBe(false)
     expect(wrapper.get("[data-comic-detail-media-column]").classes()).toEqual(
       expect.arrayContaining([
-        "lg:max-w-[min(100%,24rem)]",
-        "xl:max-w-[min(100%,28rem)]",
+        "lg:max-w-[min(100%,18rem)]",
+        "xl:max-w-[min(100%,20rem)]",
       ]),
     )
+    expect(wrapper.get("[data-comic-detail-media-column]").classes()).not.toContain("lg:mx-auto")
+    expect(wrapper.get("[data-comic-detail-cover-frame]").classes()).not.toContain("mx-auto")
+    expect(wrapper.get("[data-comic-detail-info-column]").classes()).toEqual(
+      expect.arrayContaining(["justify-start", "gap-4"])
+    )
+    expect(wrapper.get("[data-comic-detail-info-column]").classes()).not.toContain("justify-center")
+    expect(wrapper.get("[data-comic-detail-info-column]").classes()).not.toContain("lg:py-2")
+    expect(wrapper.get("[data-comic-detail-title]").classes()).toEqual(
+      expect.arrayContaining(["pr-12", "text-xl", "sm:pr-14", "sm:text-2xl"]),
+    )
+    expect(wrapper.get("[data-comic-detail-title]").classes()).not.toContain("sm:text-3xl")
   })
 })

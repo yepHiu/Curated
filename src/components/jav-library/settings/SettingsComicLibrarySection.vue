@@ -4,7 +4,11 @@ import { useI18n } from "vue-i18n"
 import { BookOpen } from "lucide-vue-next"
 import { HttpClientError } from "@/api/http-client"
 import type { ComicCacheStatusDTO } from "@/api/types"
-import type { ComicCacheSettings, ComicReaderSettings } from "@/domain/comic/types"
+import type {
+  ComicCacheSettings,
+  ComicLibrarySetting,
+  ComicReaderSettings,
+} from "@/domain/comic/types"
 import { isAbsoluteLibraryPath } from "@/lib/path-validation"
 import { pickLibraryDirectory } from "@/lib/pick-directory"
 import { useComicLibraryService } from "@/services/comic-library-service"
@@ -16,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
 import SettingsComicCacheSection from "./SettingsComicCacheSection.vue"
 import SettingsComicLibraryPathsSection from "./SettingsComicLibraryPathsSection.vue"
 import SettingsComicReaderSection from "./SettingsComicReaderSection.vue"
@@ -24,6 +29,7 @@ const { t } = useI18n()
 const comicService = useComicLibraryService()
 
 const comicLibraryEnabled = computed(() => comicService.comicLibraryEnabled.value)
+const autoComicLibraryWatch = computed(() => comicService.autoComicLibraryWatch.value)
 const comicLibraryPaths = computed(() => comicService.comicLibraryPaths.value)
 const defaultComicImportLibraryPathId = computed(
   () => comicService.defaultComicImportLibraryPathId.value,
@@ -32,12 +38,15 @@ const comicReader = computed(() => comicService.comicReader.value)
 const comicCache = computed(() => comicService.comicCache.value)
 
 const enableBusy = ref(false)
+const autoWatchBusy = ref(false)
 const pathBusy = ref(false)
+const pathScanBusy = ref<string | null>(null)
 const defaultPathBusy = ref(false)
 const readerBusy = ref(false)
 const cacheBusy = ref(false)
 const cacheCleanupBusy = ref(false)
 const enableError = ref("")
+const autoWatchError = ref("")
 const pathError = ref("")
 const readerError = ref("")
 const cacheError = ref("")
@@ -115,6 +124,18 @@ async function disableComicLibrary() {
   }
 }
 
+async function changeAutoComicLibraryWatch(value: boolean) {
+  autoWatchError.value = ""
+  try {
+    autoWatchBusy.value = true
+    await comicService.setAutoComicLibraryWatch(value)
+  } catch (err) {
+    autoWatchError.value = errorMessage(err)
+  } finally {
+    autoWatchBusy.value = false
+  }
+}
+
 function clearPathAddError() {
   pathError.value = ""
 }
@@ -177,6 +198,20 @@ async function removeComicPath(id: string) {
     pathError.value = errorMessage(err)
   } finally {
     pathBusy.value = false
+  }
+}
+
+async function scanComicPath(path: ComicLibrarySetting) {
+  pathError.value = ""
+  const target = path.path.trim()
+  if (!target) return
+  try {
+    pathScanBusy.value = target
+    await comicService.scanComics([target])
+  } catch (err) {
+    pathError.value = errorMessage(err)
+  } finally {
+    pathScanBusy.value = null
   }
 }
 
@@ -315,16 +350,48 @@ async function cleanupCache() {
           :add-busy="pathBusy"
           :can-save-new-path="canSaveNewPath"
           :default-saving="defaultPathBusy"
+          :scan-path-busy="pathScanBusy"
           :path-add-error="pathError"
           dialog-content-class="rounded-3xl border-border/50 sm:max-w-md"
           @clear-error="clearPathAddError"
           @browse="browseForDirectory"
           @submit="submitAddPath"
+          @scan-path="scanComicPath"
           @remove-path="removeComicPath"
           @change-default-import-path="changeDefaultPath"
         />
 
         <template v-if="comicLibraryEnabled">
+          <div
+            data-comic-auto-watch
+            class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+            :aria-busy="autoWatchBusy"
+          >
+            <div class="flex min-w-0 flex-col gap-1">
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.comicAutoWatchTitle") }}
+              </p>
+              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {{ t("settings.comicAutoWatchDesc") }}
+              </p>
+              <p
+                v-if="autoWatchBusy"
+                class="text-xs text-muted-foreground motion-safe:animate-pulse"
+              >
+                {{ t("settings.comicAutoWatchSyncing") }}
+              </p>
+            </div>
+            <Switch
+              data-comic-auto-watch-switch
+              class="motion-safe:transition-colors motion-safe:duration-200"
+              :model-value="autoComicLibraryWatch"
+              :disabled="autoWatchBusy"
+              :aria-label="t('settings.comicAutoWatchTitle')"
+              @update:model-value="changeAutoComicLibraryWatch"
+            />
+          </div>
+          <p v-if="autoWatchError" class="text-sm text-destructive">{{ autoWatchError }}</p>
+
           <SettingsComicReaderSection
             :reader="comicReader"
             :saving="readerBusy"

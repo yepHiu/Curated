@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { BookOpen, Heart, Star } from "lucide-vue-next"
+import { BookOpen, Star } from "lucide-vue-next"
 import type { ComicBook } from "@/domain/comic/types"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -10,17 +10,26 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card"
-import { Toggle } from "@/components/ui/toggle"
 
-const props = defineProps<{
-  comic: ComicBook
-  selected?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    comic: ComicBook
+    selected?: boolean
+    batchMode?: boolean
+    batchChecked?: boolean
+  }>(),
+  {
+    selected: false,
+    batchMode: false,
+    batchChecked: false,
+  },
+)
 
 const emit = defineEmits<{
   openDetails: [comicId: string]
   openReader: [comicId: string, pageIndex: number]
   toggleFavorite: [payload: { comicId: string; nextValue: boolean }]
+  toggleBatchSelect: [comicId: string]
 }>()
 
 const { t } = useI18n()
@@ -43,11 +52,16 @@ const ratingLabel = computed(() =>
 const visibleTags = computed(() => props.comic.tags.slice(0, 3))
 const hiddenTagCount = computed(() => Math.max(0, props.comic.tags.length - visibleTags.value.length))
 
-function toggleFavorite() {
-  emit("toggleFavorite", {
-    comicId: props.comic.id,
-    nextValue: !props.comic.isFavorite,
-  })
+function handleOpenDetails() {
+  if (props.batchMode) {
+    emit("toggleBatchSelect", props.comic.id)
+    return
+  }
+  emit("openDetails", props.comic.id)
+}
+
+function onBatchCheckboxChange() {
+  emit("toggleBatchSelect", props.comic.id)
 }
 </script>
 
@@ -56,18 +70,34 @@ function toggleFavorite() {
     data-comic-card
     :data-comic-card-id="comic.id"
     class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
-    :class="props.selected ? 'border-primary/55 shadow-lg shadow-primary/10 ring-2 ring-primary/25' : ''"
+    :class="props.selected || props.batchChecked ? 'border-primary/55 shadow-lg shadow-primary/10 ring-2 ring-primary/25' : ''"
   >
     <button
       type="button"
+      data-comic-card-open
       class="flex w-full flex-col text-left focus-visible:outline-none"
-      @click="emit('openDetails', comic.id)"
+      @click="handleOpenDetails"
     >
       <div class="p-[var(--movie-card-padding)] pb-0">
         <div
           data-comic-poster
           class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/40 aspect-[358/537]"
         >
+          <label
+            v-if="props.batchMode"
+            class="absolute top-2 right-2 z-[4] flex cursor-pointer items-center justify-center rounded-md border border-border/45 bg-background/25 p-1.5 shadow-sm backdrop-blur-md backdrop-saturate-150 dark:border-white/20 dark:bg-black/30"
+            @click.stop
+          >
+            <input
+              type="checkbox"
+              data-comic-batch-checkbox
+              class="size-4 cursor-pointer rounded accent-primary"
+              :checked="props.batchChecked"
+              :aria-label="t('comics.batchCardToggleAria')"
+              @change="onBatchCheckboxChange"
+            >
+          </label>
+
           <img
             v-if="coverSrc"
             :src="coverSrc"
@@ -88,25 +118,6 @@ function toggleFavorite() {
             class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/50 via-transparent to-black/25"
             aria-hidden="true"
           />
-
-          <Badge
-            class="relative z-[2] m-[var(--movie-card-padding)] h-5 max-w-[calc(100%-1.25rem)] truncate rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
-          >
-            {{ comic.sourceFileName }}
-          </Badge>
-
-          <Toggle
-            :pressed="props.comic.isFavorite"
-            variant="outline"
-            size="sm"
-            class="absolute right-2.5 bottom-2.5 z-[2] rounded-full border-border/60 bg-background/80 px-0 shadow-sm backdrop-blur hover:bg-background/90 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            :data-comic-favorite="String(comic.isFavorite)"
-            :aria-label="t('comics.favorite')"
-            @update:pressed="toggleFavorite"
-            @click.stop
-          >
-            <Heart />
-          </Toggle>
 
           <div class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50" aria-hidden="true">
             <div class="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progressPercent}%` }" />

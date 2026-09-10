@@ -1,11 +1,17 @@
 import { createRouter, createWebHashHistory, type LocationQuery } from "vue-router"
 import { authLockService, isAuthLockEnabled } from "@/services/auth-lock-service"
 import { useComicLibraryService } from "@/services/comic-library-service"
+import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const comicRouteNames = new Set(["comics", "comic-detail", "comic-reader"])
+const photoRouteNames = new Set(["photos", "photo-detail", "photo-viewer"])
 
 function isComicRoute(name: unknown): boolean {
   return typeof name === "string" && comicRouteNames.has(name)
+}
+
+function isPhotoRoute(name: unknown): boolean {
+  return typeof name === "string" && photoRouteNames.has(name)
 }
 
 async function guardComicRouteIfNeeded(name: unknown) {
@@ -27,6 +33,35 @@ async function guardComicRouteIfNeeded(name: unknown) {
     }
   }
   return true
+}
+
+async function guardPhotoRouteIfNeeded(name: unknown) {
+  if (!isPhotoRoute(name)) {
+    return true
+  }
+  const photoService = usePhotoLibraryService()
+  try {
+    await photoService.refreshSettings()
+  } catch (error) {
+    console.warn("[router] photo settings refresh failed", error)
+  }
+  if (!photoService.photoLibraryEnabled.value) {
+    return {
+      name: "settings",
+      query: {
+        section: "photos",
+      },
+    }
+  }
+  return true
+}
+
+async function guardOptionalMediaRouteIfNeeded(name: unknown) {
+  const comicGuard = await guardComicRouteIfNeeded(name)
+  if (comicGuard !== true) {
+    return comicGuard
+  }
+  return await guardPhotoRouteIfNeeded(name)
 }
 
 const router = createRouter({
@@ -98,6 +133,21 @@ const router = createRouter({
           component: () => import("@/views/ComicReaderView.vue"),
         },
         {
+          path: "photos",
+          name: "photos",
+          component: () => import("@/views/PhotosView.vue"),
+        },
+        {
+          path: "photos/:id",
+          name: "photo-detail",
+          component: () => import("@/views/PhotoDetailView.vue"),
+        },
+        {
+          path: "photos/:id/view/:pageIndex?",
+          name: "photo-viewer",
+          component: () => import("@/views/PhotoViewerView.vue"),
+        },
+        {
           path: "history",
           name: "history",
           component: () => import("@/views/HistoryView.vue"),
@@ -134,7 +184,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (!isAuthLockEnabled() || to.name === "lock") {
-    return await guardComicRouteIfNeeded(to.name)
+    return await guardOptionalMediaRouteIfNeeded(to.name)
   }
   try {
     const status = await authLockService.refreshStatus()
@@ -149,7 +199,7 @@ router.beforeEach(async (to) => {
   } catch (error) {
     console.warn("[router] auth status check failed", error)
   }
-  return await guardComicRouteIfNeeded(to.name)
+  return await guardOptionalMediaRouteIfNeeded(to.name)
 })
 
 export default router

@@ -248,15 +248,17 @@ async function submitImport() {
       </Button>
     </DialogTrigger>
 
-    <DialogContent class="rounded-3xl border-border/50 sm:max-w-2xl">
-      <DialogHeader>
+    <DialogContent
+      class="w-[min(calc(100vw-2rem),42rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden rounded-3xl border-border/50 sm:max-w-2xl"
+    >
+      <DialogHeader class="min-w-0">
         <DialogTitle>{{ t("import.comicDialogTitle") }}</DialogTitle>
         <DialogDescription>
           {{ t("import.comicDialogDescription") }}
         </DialogDescription>
       </DialogHeader>
 
-      <div class="flex flex-col gap-4">
+      <div class="flex min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
         <div class="rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5 text-sm">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-muted-foreground">{{ t("import.comicTargetPath") }}</span>
@@ -306,24 +308,34 @@ async function submitImport() {
           >
         </div>
 
-        <div v-if="selectedFiles.length" class="flex flex-col gap-2">
-          <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
+        <div v-if="selectedFiles.length" class="flex min-w-0 max-w-full flex-col gap-2 overflow-hidden">
+          <div class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span class="min-w-0 truncate">
               {{ t("import.comicSelectedSummary", { count: selectedFiles.length, size: formatBytes(selectedTotalBytes) }) }}
             </span>
             <Button type="button" variant="ghost" size="sm" @click="clearSelection">
               {{ t("import.clear") }}
             </Button>
           </div>
-          <div class="max-h-40 overflow-y-auto rounded-xl border border-border/70">
+          <div class="max-h-40 min-w-0 max-w-full overflow-y-auto overflow-x-hidden rounded-xl border border-border/70">
             <div
               v-for="(file, index) in selectedFiles"
               :key="`${relativePathForFile(file)}-${file.size}`"
-              class="flex items-center justify-between gap-3 border-b border-border/50 px-3 py-2 text-sm last:border-b-0"
+              data-comic-import-file-row
+              class="flex w-full max-w-full min-w-0 items-center gap-3 overflow-hidden border-b border-border/50 px-3 py-2 text-sm last:border-b-0"
             >
-              <span class="min-w-0 truncate font-mono text-xs">{{ relativePathForFile(file) }}</span>
-              <div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                <span>{{ formatBytes(file.size) }}</span>
+              <span
+                data-comic-import-file-name
+                class="min-w-0 basis-0 flex-1 overflow-hidden truncate font-mono text-xs"
+                :title="relativePathForFile(file)"
+              >
+                {{ relativePathForFile(file) }}
+              </span>
+              <div
+                data-comic-import-file-actions
+                class="flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground"
+              >
+                <span class="whitespace-nowrap">{{ formatBytes(file.size) }}</span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -359,8 +371,8 @@ async function submitImport() {
         </p>
       </div>
 
-      <DialogFooter class="gap-2 sm:justify-between">
-        <p class="text-xs text-muted-foreground">
+      <DialogFooter class="min-w-0 gap-2 sm:justify-between">
+        <p class="min-w-0 text-xs text-muted-foreground">
           {{ t("import.comicFooterHint") }}
         </p>
         <Button

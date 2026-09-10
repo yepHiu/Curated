@@ -7,6 +7,7 @@ import {
   Clapperboard,
   History,
   House,
+  Images,
   LibraryBig,
   Play,
   RefreshCw,
@@ -30,6 +31,7 @@ import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
 import { useComicLibraryService } from "@/services/comic-library-service"
+import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const props = withDefaults(
   defineProps<{
@@ -60,6 +62,7 @@ interface SidebarNavSection {
 const { t, locale } = useI18n()
 const route = useRoute()
 const comicService = useComicLibraryService()
+const photoService = usePhotoLibraryService()
 const {
   useWebApi: backendUseWebApi,
   status: backendStatus,
@@ -77,9 +80,13 @@ onMounted(() => {
   void Promise.resolve(comicService.refreshSettings()).catch((error) => {
     console.warn("[sidebar] comic settings refresh failed", error)
   })
+  void Promise.resolve(photoService.refreshSettings()).catch((error) => {
+    console.warn("[sidebar] photo settings refresh failed", error)
+  })
 })
 
 const comicLibraryEnabled = computed(() => comicService.comicLibraryEnabled.value)
+const photoLibraryEnabled = computed(() => photoService.photoLibraryEnabled.value)
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -148,6 +155,9 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
   if (comicLibraryEnabled.value) {
     browse.push({ label: t("nav.comics"), page: "comics", icon: BookOpen })
   }
+  if (photoLibraryEnabled.value) {
+    browse.push({ label: t("nav.photos"), page: "photos", icon: Images })
+  }
 
   browse.push(
     { label: t("nav.actors"), page: "actors", icon: Users },
@@ -180,6 +190,9 @@ const sidebarSections = computed((): SidebarNavSection[] => [
 const isActive = (page: AppPage) => {
   if (page === "comics") {
     return ["comics", "comic-detail", "comic-reader"].includes(String(route.name ?? ""))
+  }
+  if (page === "photos") {
+    return ["photos", "photo-detail", "photo-viewer"].includes(String(route.name ?? ""))
   }
   return route.name === page
 }
@@ -265,6 +278,9 @@ const getNavigationTarget = (page: AppPage) => {
   }
   if (page === "comics") {
     return { name: "comics" }
+  }
+  if (page === "photos") {
+    return { name: "photos" }
   }
   return buildBrowseRouteTarget(page as LibraryMode, route.query)
 }

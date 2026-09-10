@@ -327,6 +327,7 @@
         <li><code>/detail/:id</code> → <span class="path">views/DetailView.vue</span></li>
         <li><code>/player/:id?</code> → <span class="path">views/PlayerView.vue</span></li>
         <li><code>/settings</code> → <span class="path">views/SettingsView.vue</span></li>
+        <li><code>/photos</code>, <code>/photos/:id</code>, <code>/photos/:id/view/:pageIndex?</code> → optional photo book library routes hidden until <code>photoLibraryEnabled=true</code>; Web API mode loads scanned photo books/pages through independent photo endpoints while Mock mode provides sample photo books.</li>
         <li><code>/lock</code> - PIN App Lock screen using <span class="path">views/LockView.vue</span>; the router and idle-lock monitor redirect locked Web API sessions here with a <code>redirect</code> query.</li>
       </ul>
     </li>
@@ -374,7 +375,7 @@
   <p><span class="path">backend/cmd/curated/main.go</span> 流程概要：</p>
   <ol>
     <li>解析 <code>-config</code>、<code>-mode</code>（<code>http</code> / <code>stdio</code> / <code>both</code>）。</li>
-    <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>metadataMovieStrategy</code>、<code>defaultImportLibraryPathId</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code> 等）。</li>
+    <li><code>config.Load</code> 加载主配置，再 <code>MergeLibrarySettingsFile</code> 合并 <span class="path">config/library-config.cfg</span>（<code>organizeLibrary</code>、<code>metadataMovieProvider</code>、<code>metadataMovieStrategy</code>、<code>defaultImportLibraryPathId</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code>、<code>comicLibraryEnabled</code>、<code>photoLibraryEnabled</code> 等）。</li>
     <li>打开 SQLite：<code>storage.NewSQLiteStore(cfg.DatabasePath)</code>，执行 <code>Migrate</code>，必要时 <code>SeedLibraryPathsIfEmpty</code>。</li>
     <li><code>app.New</code> 组装扫描器、刮削、任务管理器、资源缓存与 <code>internal/storagehealth</code> 存储在线检测器等；启动自动扫描循环 <code>StartAutoScanLoop</code>；若主配置允许目录监听且 <code>autoLibraryWatch</code> 为真，则 <code>EnsureLibraryWatchRunning</code> 启动 <code>internal/librarywatch</code>（fsnotify + 防抖后入队扫描）。若 <code>autoActorProfileScrape</code> 为真，则影片元数据刮削成功后会继续为仍缺头像与简介的演员自动排队 <code>scrape.actor</code>。</li>
     <li><code>http</code> 模式下 <code>server.ListenAndServe</code> 挂载 <code>backendApp.HTTPHandler()</code>。</li>
@@ -402,7 +403,7 @@
     <li><code>GET .../stream</code> — 视频文件流（<code>http.ServeContent</code>，支持 Range）。</li>
     <li><code>POST .../scrape</code> — 触发单部影片元数据重刮。</li>
     <li><code>DELETE .../{movieId}</code> — 删除影片记录及相关缓存策略由存储层实现。</li>
-    <li><code>GET/PATCH /api/settings</code> — 设置 DTO（含 <code>organizeLibrary</code>、<code>defaultImportLibraryPathId</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code>、<code>metadataMovieStrategy</code>、元数据源等）。</li>
+    <li><code>GET/PATCH /api/settings</code> — 设置 DTO（含 <code>organizeLibrary</code>、<code>defaultImportLibraryPathId</code>、<code>autoLibraryWatch</code>、<code>autoActorProfileScrape</code>、<code>metadataMovieStrategy</code>、漫画设置、写真设置、元数据源等）。</li>
     <li><code>GET /api/library/actors/{name}/asset/avatar</code> — 演员头像同源缓存资源；演员资料刮削成功后会异步下载头像到本地缓存。</li>
     <li><code>GET /api/curated-frames</code> — 萃取帧分页查询；支持 <code>q</code>、<code>actor</code>、<code>movieId</code>、<code>tag</code>、<code>limit</code>、<code>offset</code>，响应带 <code>total</code>/<code>limit</code>/<code>offset</code>。</li>
     <li><code>GET /api/curated-frames/stats</code>、<code>GET /api/curated-frames/tags</code>、<code>GET /api/curated-frames/actors</code> — 提供萃取帧总数与标签/演员 facet 聚合，前端不再依赖全量列表自行计数。</li>
@@ -477,6 +478,7 @@
       <tr><td>观看历史 / 续播 / 本机播放器拉起</td><td><code>HistoryView</code>、<code>PlaybackHistoryCard</code>、<code>playback-progress-storage.ts</code>、<code>PlayerPage.vue</code>、<code>native-player-launch.ts</code></td><td>直放 / HLS 会话；支持 <code>/api/playback/sessions/recent</code> 与 <code>/api/playback/sessions/{id}</code> 观测会话状态；后端 <code>native-play</code> 仅保留为旧链路</td></tr>
       <tr><td>任务事件流</td><td><code>src/lib/backend-events.ts</code>、<code>use-scan-task-tracker.ts</code>、<code>use-library-watch-toasts.ts</code></td><td><code>GET /api/events</code> SSE；<code>tasks.Manager</code> 发布 <code>task.updated</code>，轮询端点保留为 fallback</td></tr>
       <tr><td>每日观看时间统计</td><td><code>SettingsWatchTimeHeatmap.vue</code>、<code>watch-time-heatmap.ts</code>、<code>playback-watch-time-tracker.ts</code></td><td><code>GET/POST /api/playback/watch-time/daily</code>；按 <code>day_key + movie_id</code> 聚合，设置概览固定展示 91 天摘要指标</td></tr>
+      <tr><td>写真库 MVP</td><td><code>src/domain/photo</code>、<code>usePhotoLibraryService()</code>、<code>PhotosView</code> / <code>PhotoDetailView</code> / <code>PhotoViewerView</code>、Settings 写真库区块；Web API 写真墙/详情/浏览器已接入写真端点</td><td><code>photo_library_paths</code>、<code>photo_books</code>、<code>photo_pages</code>、<code>photo_tags</code> 等独立表；<code>POST /api/library/photos/scans</code>、<code>GET /api/library/photos</code>、详情与页面图片端点；<code>photowatch</code> 自动扫描</td></tr>
       <tr><td>已连接客户端可见性</td><td><code>SettingsConnectedClientsSection.vue</code>、<code>use-connected-clients.ts</code>、服务层 <code>listConnectedClients()</code>；设置概览中位于观看时间统计下方，仅 Overview 激活时轮询</td><td><code>backend/internal/clienttracker</code> + <code>GET /api/connected-clients</code>；进程内存追踪、普通浏览器按 IP + User-Agent 去重，Curated Desktop 使用 <code>X-Curated-Client</code> marker 显示为桌面客户端并与 Chrome 分开，同时使用 OS header 修正 Windows 11 显示；最多 50 条、不返回 MAC</td></tr>
     </tbody>
   </table>
@@ -493,13 +495,24 @@
     <thead><tr><th>Layer</th><th>Comic implementation</th><th>Independence rule</th></tr></thead>
     <tbody>
       <tr><td>Storage</td><td><code>comic_library_paths</code>, <code>comic_books</code>, <code>comic_pages</code>, <code>comic_tags</code>, <code>comic_book_tags</code>, <code>comic_reading_progress</code>, <code>comic_reading_preferences</code>, <code>comic_cache_entries</code></td><td>No generic shared media table and no movie table extension.</td></tr>
-      <tr><td>Backend services</td><td><code>comicarchive</code>, <code>comicscanner</code>, <code>comiccache</code>, comic repositories, and handlers under <code>/api/library/comics</code> plus <code>/api/import/comics</code></td><td>Shared infrastructure is limited to tasks, settings merge patterns, HTTP helpers, and storage probing conventions.</td></tr>
+      <tr><td>Backend services</td><td><code>comicarchive</code>, <code>comicscanner</code>, <code>comicwatch</code>, <code>comiccache</code>, comic repositories, and handlers under <code>/api/library/comics</code> plus <code>/api/import/comics</code></td><td>Shared infrastructure is limited to tasks, settings merge patterns, HTTP helpers, fsnotify patterns, and storage probing conventions.</td></tr>
       <tr><td>Frontend</td><td><code>src/domain/comic</code>, <code>useComicLibraryService()</code>, independent web/mock adapters, <code>ComicsView</code>, <code>ComicDetailView</code>, and <code>ComicReaderView</code></td><td>Comic UI must not import movie models or route comic behavior through <code>useLibraryService()</code>.</td></tr>
       <tr><td>Reader</td><td>Page/scroll mode, contain/width fit, LTR/RTL keyboard navigation, persisted progress/preferences, and session-only current+previous/current+next stitching</td><td>Temporary stitching is reader session state and is not persisted as metadata.</td></tr>
-      <tr><td>Import/cache</td><td><code>.zip</code> / <code>.cbz</code> import into <code>defaultComicImportLibraryPathId</code>, separate comic thumbnail cache, and cache status/cleanup endpoints</td><td>Import and cache cleanup never delete source archives and never overwrite conflicts.</td></tr>
+      <tr><td>Import/watch/cache</td><td><code>.zip</code> / <code>.cbz</code> import into <code>defaultComicImportLibraryPathId</code>, manual scans via <code>POST /api/library/comics/scans</code> with optional configured <code>paths</code>, independent auto watch via <code>autoComicLibraryWatch</code>, separate comic thumbnail cache, and cache status/cleanup endpoints</td><td>Import and cache cleanup never delete source archives, manual/watch-triggered scans index existing archives in comic roots, and movie paths are not scanned.</td></tr>
     </tbody>
   </table>
-  <p>Archive support is limited to <code>.zip</code> and <code>.cbz</code>; page images support <code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.webp</code>, and <code>.gif</code>. The first naturally sorted image is the cover. Metadata scraping, OCR, <code>.rar</code>, <code>.cbr</code>, <code>.7z</code>, auto watch, and persistent double-page layout are outside the MVP.</p>
+  <p>Archive support is limited to <code>.zip</code> and <code>.cbz</code>; page images support <code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.webp</code>, and <code>.gif</code>. The first naturally sorted image is the cover. Metadata scraping, OCR, <code>.rar</code>, <code>.cbr</code>, <code>.7z</code>, and persistent double-page layout are outside the MVP.</p>
+
+  <h3>6.3 Photo Library MVP</h3>
+  <p>The photo book library is an optional module beside movies and comics. The frontend hides photo navigation until <code>photoLibraryEnabled=true</code>. Photo books must not be stored in comic tables or exposed through <code>/api/library/comics</code>; all public boundaries use photo naming, routes, settings, and service adapters.</p>
+  <table>
+    <thead><tr><th>Layer</th><th>Current photo implementation</th><th>Pending work</th></tr></thead>
+    <tbody>
+      <tr><td>Storage/settings</td><td><code>photo_library_paths</code>, <code>photo_books</code>, <code>photo_pages</code>, <code>photo_tags</code>, <code>photo_book_tags</code>, <code>photo_viewing_progress</code>, <code>photo_viewing_preferences</code>, and <code>photo_cache_entries</code> plus <code>photoLibraryEnabled</code>, <code>autoPhotoLibraryWatch</code>, <code>defaultPhotoImportLibraryPathId</code>, <code>photoViewer</code>, and <code>photoCache</code> in <code>config/library-config.cfg</code></td><td>Patch/delete/reveal APIs, explicit progress/preference endpoints, and cache status/cleanup behavior remain later slices.</td></tr>
+      <tr><td>Backend API</td><td><code>GET/POST/PATCH/DELETE /api/library/photos/paths</code>, <code>POST /api/library/photos/scans</code>, <code>GET /api/library/photos</code>, <code>GET /api/library/photos/{photoId}</code>, and page list/image/thumbnail routes under <code>/api/library/photos/books/{photoId}/...</code>. <code>photowatch</code> queues <code>scan.photos</code> when enabled.</td><td>Photo import upload and dedicated thumbnail/cache cleanup endpoints.</td></tr>
+      <tr><td>Frontend</td><td><code>src/domain/photo</code>, <code>usePhotoLibraryService()</code>, independent web/mock adapters, routes <code>/photos</code>, <code>/photos/:id</code>, <code>/photos/:id/view/:pageIndex?</code>, settings/path/manual scan UI aligned with comics, and Web API photo wall/detail/viewer data using movie/comic grid sizing variables.</td><td>Future editing/reveal/progress/cache UI once backend endpoints exist.</td></tr>
+    </tbody>
+  </table>
 
   <h2 id="dev">7. 本地开发与联调</h2>
   <ul>

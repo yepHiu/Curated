@@ -16,6 +16,7 @@ import type {
   PutComicProgressBody,
   PutComicReadingPreferencesBody,
   SettingsDTO,
+  StartScanBody,
   TaskDTO,
   UpdateComicLibraryPathBody,
 } from "./types"
@@ -74,8 +75,8 @@ export const comicApi = {
     return httpClient.delete(`/library/comics/paths/${encodeURIComponent(id)}`)
   },
 
-  startComicScan(): Promise<TaskDTO> {
-    return httpClient.post<TaskDTO>("/library/comics/scans", {})
+  startComicScan(body?: StartScanBody): Promise<TaskDTO> {
+    return httpClient.post<TaskDTO>("/library/comics/scans", body ?? {})
   },
 
   importComics(files: File[], options?: ComicImportApiOptions): Promise<TaskDTO> {

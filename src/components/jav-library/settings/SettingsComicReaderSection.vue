@@ -59,13 +59,23 @@ function onDirection(value: unknown) {
       </p>
     </div>
 
-    <div class="grid gap-3 md:grid-cols-3">
-      <label class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted-foreground">
+    <div data-comic-reader-settings-list class="flex flex-col gap-2">
+      <label
+        data-comic-reader-setting-row="mode"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+      >
+        <span
+          data-comic-reader-setting-label
+          class="min-w-0 text-sm font-medium text-muted-foreground"
+        >
           {{ t("settings.comicReaderMode") }}
         </span>
         <Select :model-value="props.reader.mode" :disabled="saving" @update:model-value="onMode">
-          <SelectTrigger size="sm" class="h-9 w-full rounded-xl border-border/50">
+          <SelectTrigger
+            data-comic-reader-setting-trigger
+            size="sm"
+            class="h-9 w-full min-w-0 rounded-xl border-border/50"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent class="rounded-xl border-border/50">
@@ -75,12 +85,22 @@ function onDirection(value: unknown) {
         </Select>
       </label>
 
-      <label class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted-foreground">
+      <label
+        data-comic-reader-setting-row="fit"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+      >
+        <span
+          data-comic-reader-setting-label
+          class="min-w-0 text-sm font-medium text-muted-foreground"
+        >
           {{ t("settings.comicReaderFit") }}
         </span>
         <Select :model-value="props.reader.fit" :disabled="saving" @update:model-value="onFit">
-          <SelectTrigger size="sm" class="h-9 w-full rounded-xl border-border/50">
+          <SelectTrigger
+            data-comic-reader-setting-trigger
+            size="sm"
+            class="h-9 w-full min-w-0 rounded-xl border-border/50"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent class="rounded-xl border-border/50">
@@ -90,8 +110,14 @@ function onDirection(value: unknown) {
         </Select>
       </label>
 
-      <label class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted-foreground">
+      <label
+        data-comic-reader-setting-row="direction"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+      >
+        <span
+          data-comic-reader-setting-label
+          class="min-w-0 text-sm font-medium text-muted-foreground"
+        >
           {{ t("settings.comicReaderDirection") }}
         </span>
         <Select
@@ -99,7 +125,11 @@ function onDirection(value: unknown) {
           :disabled="saving"
           @update:model-value="onDirection"
         >
-          <SelectTrigger size="sm" class="h-9 w-full rounded-xl border-border/50">
+          <SelectTrigger
+            data-comic-reader-setting-trigger
+            size="sm"
+            class="h-9 w-full min-w-0 rounded-xl border-border/50"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent class="rounded-xl border-border/50">

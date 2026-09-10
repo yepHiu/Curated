@@ -96,6 +96,7 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
   return {
     libraryPaths: [],
     comicLibraryEnabled: true,
+    autoComicLibraryWatch: true,
     comicLibraryPaths: [
       {
         id: "comic-path-1",
@@ -112,6 +113,17 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
     },
     comicCache: {
       maxBytes: 2 * 1024 * 1024 * 1024,
+    },
+    photoLibraryEnabled: false,
+    autoPhotoLibraryWatch: true,
+    photoLibraryPaths: [],
+    photoViewer: {
+      mode: "page",
+      fit: "contain",
+      direction: "ltr",
+    },
+    photoCache: {
+      maxBytes: 5 * 1024 * 1024 * 1024,
     },
     player: {
       hardwareDecode: true,
@@ -247,6 +259,7 @@ describe("webComicLibraryService", () => {
     await webComicLibraryService.refreshSettings()
 
     expect(webComicLibraryService.comicLibraryEnabled.value).toBe(true)
+    expect(webComicLibraryService.autoComicLibraryWatch.value).toBe(true)
     expect(webComicLibraryService.comicLibraryPaths.value).toEqual([
       {
         id: "comic-path-1",
@@ -257,6 +270,21 @@ describe("webComicLibraryService", () => {
     ])
     expect(webComicLibraryService.defaultComicImportLibraryPathId.value).toBe("comic-path-1")
     expect(webComicLibraryService.comicReader.value.direction).toBe("rtl")
+  })
+
+  it("patches automatic comic library watch through the comic settings facade", async () => {
+    comicApiMocks.patchComicSettings.mockResolvedValueOnce(
+      settingsDto({ autoComicLibraryWatch: false }),
+    )
+
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+    await webComicLibraryService.setAutoComicLibraryWatch(false)
+
+    expect(comicApiMocks.patchComicSettings).toHaveBeenCalledWith({
+      autoComicLibraryWatch: false,
+    })
+    expect(webComicLibraryService.autoComicLibraryWatch.value).toBe(false)
+    expect(movieApiMocks.listMovies).not.toHaveBeenCalled()
   })
 
   it("imports comics through the comic import endpoint", async () => {
@@ -278,5 +306,22 @@ describe("webComicLibraryService", () => {
     expect(movieApiMocks.listMovies).not.toHaveBeenCalled()
     expect(movieApiMocks.getMovie).not.toHaveBeenCalled()
     expect(movieApiMocks.patchMovie).not.toHaveBeenCalled()
+  })
+
+  it("starts selected-path comic scans through the independent comic scan endpoint", async () => {
+    comicApiMocks.startComicScan.mockResolvedValueOnce({
+      taskId: "scan-comics-path-1",
+      type: "scan.comics",
+      status: "running",
+      createdAt: "2026-06-28T00:00:00Z",
+      progress: 0,
+    })
+
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+    const task = await webComicLibraryService.scanComics(["D:/Comics"])
+
+    expect(comicApiMocks.startComicScan).toHaveBeenCalledWith({ paths: ["D:/Comics"] })
+    expect(task?.taskId).toBe("scan-comics-path-1")
+    expect(movieApiMocks.listMovies).not.toHaveBeenCalled()
   })
 })

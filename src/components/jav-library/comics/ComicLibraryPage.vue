@@ -1,76 +1,131 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import type { ComicBook, ComicReadStatus } from "@/domain/comic/types"
+import { CheckSquare, ListChecks, X } from "lucide-vue-next"
+import type { ComicBook } from "@/domain/comic/types"
+import type { ComicLibrarySortValue } from "@/lib/comic-sort"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import VirtualComicGrid from "@/components/jav-library/comics/VirtualComicGrid.vue"
-
-export type ComicLibraryFilterValue = "all" | "favorite" | ComicReadStatus
 
 const props = withDefaults(
   defineProps<{
     comics: readonly ComicBook[]
-    activeFilter: ComicLibraryFilterValue
+    activeSort: ComicLibrarySortValue
     searchQuery?: string
     loadError?: string
+    batchMode?: boolean
+    batchSelectedIds?: readonly string[]
   }>(),
   {
     searchQuery: "",
     loadError: "",
+    batchMode: false,
+    batchSelectedIds: () => [],
   },
 )
 
 const emit = defineEmits<{
   updateSearch: [value: string]
-  updateActiveFilter: [value: ComicLibraryFilterValue]
+  "update:sort": [value: ComicLibrarySortValue]
   openDetails: [comicId: string]
   openReader: [comicId: string, pageIndex: number]
   toggleFavorite: [payload: { comicId: string; nextValue: boolean }]
+  enterBatchMode: []
+  exitBatchMode: []
+  selectAllVisibleInBatch: []
+  toggleBatchSelect: [comicId: string]
 }>()
 
 const { t } = useI18n()
+const batchModeOn = computed(() => props.batchMode === true)
 
-function onFilterChange(value: string | number) {
-  emit("updateActiveFilter", String(value) as ComicLibraryFilterValue)
+const sortOptions: { value: ComicLibrarySortValue; labelKey: string }[] = [
+  { value: "addedAt", labelKey: "comics.sortByAdded" },
+  { value: "fileName", labelKey: "comics.sortByFileName" },
+  { value: "favorite", labelKey: "comics.sortByFavorite" },
+]
+
+function sortOptionState(value: ComicLibrarySortValue): "active" | "inactive" {
+  return props.activeSort === value ? "active" : "inactive"
+}
+
+function sortOptionClasses(value: ComicLibrarySortValue): string {
+  const base =
+    "inline-flex h-9 items-center justify-center rounded-xl border border-transparent px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+  if (props.activeSort === value) {
+    return `${base} bg-background text-foreground shadow-sm`
+  }
+  return `${base} text-muted-foreground hover:text-foreground`
 }
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 min-w-0 flex-col gap-5">
-    <header class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-end justify-end gap-3">
-        <Input
-          class="h-10 w-full max-w-sm rounded-2xl"
-          :model-value="props.searchQuery"
-          :placeholder="t('comics.searchPlaceholder')"
-          @update:model-value="emit('updateSearch', String($event))"
-        />
+  <div class="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-5 lg:gap-6">
+    <header
+      data-comic-library-toolbar
+      class="flex flex-wrap items-center justify-between gap-3 pb-1"
+    >
+      <div
+        data-comic-sort-tabs
+        class="inline-flex h-auto w-fit max-w-full flex-wrap items-center justify-center rounded-2xl bg-muted/60 p-1"
+        role="tablist"
+        aria-label="Comic sort"
+      >
+        <button
+          v-for="option in sortOptions"
+          :key="option.value"
+          type="button"
+          role="tab"
+          :aria-selected="props.activeSort === option.value"
+          :data-state="sortOptionState(option.value)"
+          :data-comic-sort-option="option.value"
+          :class="sortOptionClasses(option.value)"
+          @click="emit('update:sort', option.value)"
+        >
+          {{ t(option.labelKey) }}
+        </button>
       </div>
 
-      <Tabs
-        :model-value="props.activeFilter"
-        class="min-w-0"
-        @update:model-value="onFilterChange"
-      >
-        <TabsList class="h-auto w-fit max-w-full flex-wrap rounded-2xl bg-muted/60 p-1">
-          <TabsTrigger value="all" class="rounded-xl px-4 py-2">
-            {{ t("comics.filterAll") }}
-          </TabsTrigger>
-          <TabsTrigger value="favorite" class="rounded-xl px-4 py-2">
-            {{ t("comics.filterFavorite") }}
-          </TabsTrigger>
-          <TabsTrigger value="unread" class="rounded-xl px-4 py-2">
-            {{ t("comics.filterUnread") }}
-          </TabsTrigger>
-          <TabsTrigger value="reading" class="rounded-xl px-4 py-2">
-            {{ t("comics.filterReading") }}
-          </TabsTrigger>
-          <TabsTrigger value="read" class="rounded-xl px-4 py-2">
-            {{ t("comics.filterRead") }}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <template v-if="!batchModeOn">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="shrink-0 gap-1.5 rounded-xl"
+            data-comic-enter-batch
+            @click="emit('enterBatchMode')"
+          >
+            <ListChecks class="size-4 opacity-80" aria-hidden="true" />
+            {{ t("comics.batchManage") }}
+          </Button>
+        </template>
+        <template v-else>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="shrink-0 gap-1.5 rounded-xl"
+            data-comic-select-visible
+            :disabled="props.comics.length === 0"
+            @click="emit('selectAllVisibleInBatch')"
+          >
+            <CheckSquare class="size-4 opacity-80" aria-hidden="true" />
+            {{ t("comics.batchSelectVisible") }}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="shrink-0 gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            data-comic-exit-batch
+            @click="emit('exitBatchMode')"
+          >
+            <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
+            {{ t("comics.batchExitToolbar") }}
+          </Button>
+        </template>
+      </div>
     </header>
 
     <p
@@ -82,12 +137,19 @@ function onFilterChange(value: string | number) {
       {{ props.loadError }}
     </p>
 
-    <div v-if="props.comics.length" class="min-h-0 flex-1 overflow-y-auto pr-1">
+    <div
+      v-if="props.comics.length"
+      data-comic-grid-scroll
+      class="min-h-0 flex-1 overflow-y-auto pr-2"
+    >
       <VirtualComicGrid
         :comics="props.comics"
+        :batch-mode="batchModeOn"
+        :batch-selected-ids="props.batchSelectedIds"
         @open-details="emit('openDetails', $event)"
         @open-reader="(comicId, pageIndex) => emit('openReader', comicId, pageIndex)"
         @toggle-favorite="emit('toggleFavorite', $event)"
+        @toggle-batch-select="emit('toggleBatchSelect', $event)"
       />
     </div>
 

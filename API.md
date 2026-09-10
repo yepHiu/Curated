@@ -4,6 +4,10 @@
 
 Comic-specific error codes: `COMIC_LIBRARY_DISABLED`, `COMIC_PATH_NOT_CONFIGURED`, `COMIC_PATH_NOT_FOUND`, `COMIC_ARCHIVE_UNSUPPORTED`, `COMIC_ARCHIVE_EMPTY`, `COMIC_ARCHIVE_READ_FAILED`, `COMIC_BOOK_NOT_FOUND`, `COMIC_PAGE_NOT_FOUND`, `COMIC_IMPORT_TARGET_MISSING`, `COMIC_IMPORT_CONFLICT`, `COMIC_CACHE_CLEANUP_FAILED`.
 
+> Photo library note: the optional photo book module is intentionally separate from movies and comics. It uses `/api/library/photos/*`, separate DTOs, separate tables, independent scanning/watch logic, and it is hidden by the frontend until `photoLibraryEnabled=true`.
+
+Photo-specific error codes currently include: `PHOTO_LIBRARY_DISABLED`, `PHOTO_PATH_NOT_CONFIGURED`, `PHOTO_PATH_NOT_FOUND`, `PHOTO_ARCHIVE_UNSUPPORTED`, `PHOTO_ARCHIVE_EMPTY`, `PHOTO_ARCHIVE_READ_FAILED`, `PHOTO_BOOK_NOT_FOUND`, `PHOTO_PAGE_NOT_FOUND`.
+
 本文档是 Curated 仓库的公开 HTTP API 指南，用于当前 Web 前端、后续 Android App、局域网客户端以及其他衍生项目对接同一个 Go 后端。
 
 本文只描述当前 Go HTTP 后端已经实现的接口，不引入新 API 行为。
@@ -16,7 +20,7 @@ Comic-specific error codes: `COMIC_LIBRARY_DISABLED`, `COMIC_PATH_NOT_CONFIGURED
 - 当前前端调用封装：`src/api/endpoints.ts`
 - 当前前端类型：`src/api/types.ts`
 
-最后核对日期：2026-06-07。
+最后核对日期：2026-07-05。
 
 ## 1. 快速接入
 
@@ -1405,6 +1409,12 @@ Body：
 | `metadataMovieStrategy` | `auto-global`、`auto-cn-friendly`、`custom-chain`、`specified` |
 | `proxy` | 出站代理设置 |
 | `backendLog` | 后端日志设置 |
+| `photoLibraryEnabled` | 是否启用可选写真库 |
+| `autoPhotoLibraryWatch` | 写真库独立自动监听扫描开关 |
+| `photoLibraryPaths` | 已配置写真库根路径 |
+| `defaultPhotoImportLibraryPathId` | 未来写真导入默认目标路径 ID |
+| `photoViewer` | 写真浏览器默认设置 |
+| `photoCache` | 写真缓存设置 |
 
 #### `PATCH /api/settings`
 
@@ -1424,6 +1434,17 @@ Body 示例：
   },
   "comicCache": {
     "maxBytes": 2147483648
+  },
+  "photoLibraryEnabled": true,
+  "autoPhotoLibraryWatch": true,
+  "defaultPhotoImportLibraryPathId": "photo-library-path-id",
+  "photoViewer": {
+    "mode": "page",
+    "fit": "contain",
+    "direction": "ltr"
+  },
+  "photoCache": {
+    "maxBytes": 5368709120
   },
   "curatedFrameExportFormat": "jpg",
   "autoLibraryWatch": true,
@@ -1831,6 +1852,90 @@ Archive page support:
 - The first naturally sorted image is the cover.
 - Natural sort respects directory hierarchy and filename numeric order.
 - Metadata scraping, OCR, `.rar`, `.cbr`, and `.7z` are outside the MVP.
+
+### 4.12B Photo Library Settings and Paths
+
+The photo book library is optional and independent from movies and comics. Clients should first read `GET /api/settings`; if `photoLibraryEnabled` is false, hide photo navigation and do not call photo library UI flows.
+
+Current public photo API scope is settings, configured roots, manual scans, auto-watch indexing, list/detail browsing, and archive page image serving. Photo import upload, patch/delete/reveal operations, explicit progress/preference endpoints, and cache status/cleanup endpoints are later slices.
+
+#### Settings fields
+
+`SettingsDTO` includes:
+
+| Field | Meaning |
+| --- | --- |
+| `photoLibraryEnabled` | Enables the photo book module and frontend entry points |
+| `autoPhotoLibraryWatch` | Independent fsnotify auto-scan gate; when enabled with `photoLibraryEnabled=true`, `photowatch` queues `scan.photos` for changed `.zip` / `.cbz` files under configured photo roots |
+| `photoLibraryPaths` | Independent photo book roots stored in `photo_library_paths` |
+| `defaultPhotoImportLibraryPathId` | Future target root for photo imports |
+| `photoViewer` | Global defaults: `mode` (`page`/`scroll`), `fit` (`contain`/`width`), `direction` (`ltr`/`rtl`) |
+| `photoCache` | Photo cache settings; default `maxBytes` is 5368709120 |
+
+#### Photo paths
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `GET` | `/api/library/photos/paths` | `PhotoLibraryPathDTO[]` |
+| `POST` | `/api/library/photos/paths` | `AddPhotoLibraryPathResponse` |
+| `PATCH` | `/api/library/photos/paths/{id}` | `PhotoLibraryPathDTO` |
+| `DELETE` | `/api/library/photos/paths/{id}` | `204` |
+
+`POST /api/library/photos/paths` accepts:
+
+```json
+{
+  "path": "D:\\Photos",
+  "title": "Photos"
+}
+```
+
+Behavior:
+
+- Path must be absolute.
+- Duplicate normalized paths are rejected with `409 COMMON_CONFLICT`.
+- Updating or deleting a missing path returns `404 PHOTO_PATH_NOT_FOUND`.
+- Enabling `photoLibraryEnabled=true` requires at least one configured photo path; otherwise `PATCH /api/settings` returns `400 PHOTO_PATH_NOT_CONFIGURED`.
+- Adding a path reloads independent photo watches and may return `scanTask` when the initial scan is started.
+- Path changes never touch movie or comic watchers.
+
+#### Photo scans and content
+
+| Method | Path | Response |
+| --- | --- | --- |
+| `POST` | `/api/library/photos/scans` | `202 TaskDTO` |
+| `GET` | `/api/library/photos` | `PhotoBooksPageDTO` |
+| `GET` | `/api/library/photos/{photoId}` | `PhotoBookDetailDTO` |
+| `GET` | `/api/library/photos/books/{photoId}/pages` | `PhotoPageDTO[]` |
+| `GET` | `/api/library/photos/books/{photoId}/pages/{pageIndex}/image` | image bytes |
+| `GET` | `/api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail` | image bytes |
+
+`POST /api/library/photos/scans` accepts the same optional path restriction shape as library/comic scans:
+
+```json
+{
+  "paths": ["D:\\Photos"]
+}
+```
+
+Behavior:
+
+- `paths` must match configured photo roots after cleaning; unknown roots return `400 PHOTO_PATH_NOT_FOUND`.
+- When no photo roots exist, the endpoint returns `400 PHOTO_PATH_NOT_CONFIGURED`.
+- When the photo module is disabled, photo routes return `400 PHOTO_LIBRARY_DISABLED`.
+- A running photo scan returns `409 COMMON_CONFLICT`.
+- Scan task type is `scan.photos`; task metadata includes `filesDiscovered`, `imported`, `updated`, `skipped`, and `errorItems`.
+
+`GET /api/library/photos` query parameters:
+
+| Query | Meaning |
+| --- | --- |
+| `q` | Substring search against photo book title/source fields |
+| `tag` | Filter by photo tag |
+| `favorite` | `true` / `false` favorite filter |
+| `limit` / `offset` | Pagination |
+
+List and detail DTOs include same-origin `coverUrl`, `imageUrl`, and `thumbUrl` values. Thumbnail currently serves the page image path while dedicated photo thumbnail caching remains a later slice.
 
 ### 4.13 Scans / Tasks
 
@@ -2292,6 +2397,12 @@ interface SettingsDTO {
   defaultComicImportLibraryPathId?: string
   comicReader: ComicReaderSettingsDTO
   comicCache: ComicCacheSettingsDTO
+  photoLibraryEnabled: boolean
+  autoPhotoLibraryWatch: boolean
+  photoLibraryPaths: PhotoLibraryPathDTO[]
+  defaultPhotoImportLibraryPathId?: string
+  photoViewer: PhotoViewerSettingsDTO
+  photoCache: PhotoCacheSettingsDTO
   player: PlayerSettingsDTO
   organizeLibrary: boolean
   autoLibraryWatch: boolean
@@ -2465,6 +2576,71 @@ interface ComicReadingPreferencesDTO {
 }
 ```
 
+### 5.8B Photo DTOs
+
+```ts
+interface PhotoLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+interface AddPhotoLibraryPathResponse extends PhotoLibraryPathDTO {
+  scanTask?: TaskDTO
+}
+
+interface PhotoBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastViewedAt?: string
+  completedAt?: string
+}
+
+interface PhotoBookDetailDTO extends PhotoBookListItemDTO {
+  pages: PhotoPageDTO[]
+}
+
+interface PhotoBooksPageDTO {
+  items: PhotoBookListItemDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+interface PhotoPageDTO {
+  photoId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+interface PhotoViewerSettingsDTO {
+  mode: "page" | "scroll"
+  fit: "contain" | "width"
+  direction: "ltr" | "rtl"
+}
+
+interface PhotoCacheSettingsDTO {
+  maxBytes: number
+}
+```
+
 ### 5.9 `CuratedFrameItemDTO`
 
 ```ts
@@ -2572,6 +2748,16 @@ interface ActorProfileDTO {
 | `PATCH` | `/api/library/comics/paths/{id}` | `ComicLibraryPathDTO` |
 | `DELETE` | `/api/library/comics/paths/{id}` | `204` |
 | `POST` | `/api/library/comics/scans` | `TaskDTO` |
+| `GET` | `/api/library/photos/paths` | `PhotoLibraryPathDTO[]` |
+| `POST` | `/api/library/photos/paths` | `AddPhotoLibraryPathResponse` |
+| `PATCH` | `/api/library/photos/paths/{id}` | `PhotoLibraryPathDTO` |
+| `DELETE` | `/api/library/photos/paths/{id}` | `204` |
+| `POST` | `/api/library/photos/scans` | `TaskDTO` |
+| `GET` | `/api/library/photos` | `PhotoBooksPageDTO` |
+| `GET` | `/api/library/photos/{photoId}` | `PhotoBookDetailDTO` |
+| `GET` | `/api/library/photos/books/{photoId}/pages` | `PhotoPageDTO[]` |
+| `GET` | `/api/library/photos/books/{photoId}/pages/{pageIndex}/image` | image |
+| `GET` | `/api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail` | image |
 | `GET` | `/api/library/comics/cache/status` | `ComicCacheStatusDTO` |
 | `POST` | `/api/library/comics/cache/cleanup` | `ComicCacheStatusDTO` |
 | `GET` | `/api/library/comics` | `ComicBooksPageDTO` |

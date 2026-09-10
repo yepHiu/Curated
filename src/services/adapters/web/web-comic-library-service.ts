@@ -30,6 +30,7 @@ const comicsState: Ref<ComicBook[]> = shallowRef([])
 const comicsLoadedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const comicLibraryEnabledState = ref(false)
+const autoComicLibraryWatchState = ref(true)
 const comicLibraryPathsState = ref<ComicLibrarySetting[]>([])
 const comicLibraryPathStorageStatusesState: Ref<LibraryPathStorageStatusDTO[]> = ref([])
 const defaultComicImportLibraryPathIdState = ref("")
@@ -101,6 +102,7 @@ function mapComicDetail(dto: ComicBookDetailDTO): ComicBook {
 
 function applySettingsFromDTO(settings: SettingsDTO) {
   comicLibraryEnabledState.value = Boolean(settings.comicLibraryEnabled)
+  autoComicLibraryWatchState.value = settings.autoComicLibraryWatch ?? true
   comicLibraryPathsState.value = (settings.comicLibraryPaths ?? []).map(mapComicLibraryPath)
   defaultComicImportLibraryPathIdState.value =
     settings.defaultComicImportLibraryPathId?.trim() ?? ""
@@ -199,6 +201,7 @@ function createWebComicLibraryService(): ComicLibraryService {
     comicsLoaded: computed(() => comicsLoadedState.value),
     loadError: computed(() => loadErrorState.value),
     comicLibraryEnabled: computed(() => comicLibraryEnabledState.value),
+    autoComicLibraryWatch: computed(() => autoComicLibraryWatchState.value),
     comicLibraryPaths: computed(() => comicLibraryPathsState.value),
     comicLibraryPathStorageStatuses: computed(() => comicLibraryPathStorageStatusesState.value),
     defaultComicImportLibraryPathId: computed(() => defaultComicImportLibraryPathIdState.value),
@@ -225,6 +228,12 @@ function createWebComicLibraryService(): ComicLibraryService {
     async setComicLibraryEnabled(value: boolean) {
       comicLibraryEnabledState.value = value
       const settings = await comicApi.patchComicSettings({ comicLibraryEnabled: value })
+      applySettingsFromDTO(settings)
+    },
+
+    async setAutoComicLibraryWatch(value: boolean) {
+      autoComicLibraryWatchState.value = value
+      const settings = await comicApi.patchComicSettings({ autoComicLibraryWatch: value })
       applySettingsFromDTO(settings)
     },
 
@@ -337,8 +346,9 @@ function createWebComicLibraryService(): ComicLibraryService {
       await comicApi.revealComicSource(id)
     },
 
-    async scanComics(): Promise<TaskDTO | null> {
-      return await comicApi.startComicScan()
+    async scanComics(paths?: string[]): Promise<TaskDTO | null> {
+      const selected = paths?.map((path) => path.trim()).filter(Boolean) ?? []
+      return await comicApi.startComicScan(selected.length > 0 ? { paths: selected } : undefined)
     },
 
     async importComics(files, options): Promise<TaskDTO | null> {

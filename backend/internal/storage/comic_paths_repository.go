@@ -79,6 +79,21 @@ func (s *SQLiteStore) ListComicLibraryPaths(ctx context.Context) ([]contracts.Co
 	return out, rows.Err()
 }
 
+// ListComicLibraryPathStrings returns comic path strings only, in the same order as ListComicLibraryPaths.
+func (s *SQLiteStore) ListComicLibraryPathStrings(ctx context.Context) ([]string, error) {
+	dtos, err := s.ListComicLibraryPaths(ctx)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(dtos))
+	for _, d := range dtos {
+		if strings.TrimSpace(d.Path) != "" {
+			paths = append(paths, d.Path)
+		}
+	}
+	return paths, nil
+}
+
 func (s *SQLiteStore) GetComicLibraryPath(ctx context.Context, id string) (contracts.ComicLibraryPathDTO, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
