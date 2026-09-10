@@ -73,3 +73,7 @@ alwaysApply: true
 - UI 分层与设计令牌：`ui-component-spec.mdc`
 - Vue 前端约束：`vue-frontend-standards.mdc`、`jav-library-frontend-patterns.mdc`
 - Go / 合约 / 文档同步：`backend-go-standards.mdc`、`backend-api-contracts.mdc`、`docs-sync.mdc`
+
+## 漫画 / 写真 Beta（2026-09-10）
+
+真实试用需 `VITE_USE_WEB_API=true` 并运行新版后端。进入「设置 → 实验性功能」，分别启用漫画库或写真库 Beta，再添加该库的绝对路径并通过路径「更多操作」扫描 ZIP/CBZ。关闭只隐藏入口和配置、停止该库监听，保留已有数据。Mock 开关仅当前会话有效。

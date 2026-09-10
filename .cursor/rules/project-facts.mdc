@@ -203,6 +203,37 @@ alwaysApply: true
 - **2026-08 导入链路治理（M1/M2 已落地）**：顶栏"添加影片"触发按钮弱化为 `variant="ghost"` + muted 样式。视频扩展名白名单统一为单一事实来源 **`contracts.SupportedVideoExtensions`（15 种：mp4/m4v/mkv/avi/mov/wmv/webm/ts/m2ts/flv/mpeg/mpg/ogv/rmvb/iso）**，`internal/scanner`、`internal/librarywatch` 与导入校验共用；此前 scanner/watcher 只认 5 种导致导入 `.iso`/`.rmvb` 等文件后永不被收录的静默失败已修复，前端镜像列表在 `MovieImportDialog.vue`。两条导入路径新增磁盘空间预检：multipart 在解析 `totalBytes` 后、session create 在创建暂存文件前，剩余空间不足（含 512MB 安全余量）直接 `400 IMPORT_NOT_ENOUGH_SPACE`；探测实现抽到共享包 **`internal/diskutil`**（backup preflight 同步改用）。上传会话 DTO（create/GET/PUT chunk 响应）每个文件新增 **`chunks`** 数组（`index/offset/size`，按 index 升序），为前端精确跳块续传（M3）铺路。实施计划见 `docs/plan/2026-08-17-movie-import-improvement-implementation-plan.md`。
 - **2026-08 前端断点续传（M3 已落地）**：Web 模式下大文件导入把会话指纹写入 **localStorage `curated-movie-import-uploads-v1`**（`src/lib/movie-import-upload-ledger.ts`；24h TTL、终态/404 自动清理、损坏载荷自愈）。服务层新增 **`listResumableMovieImports()`** 与 **`abandonMovieImportUpload()`**（Web 走 `GET/DELETE /api/import/movies/uploads/{id}` 并对账账本；Mock 恒空/无操作），`importMovies` options 新增 **`resumeUploadId`**。"添加影片"对话框打开时展示"可继续的上传"（文件数/大小/已接收百分比/剩余有效期，放弃需两次点击确认）；重新选择的文件与会话指纹（`relativePath+size+lastModified` 精确集合）完全匹配时提交自动切续传：GET 会话状态 → 按服务端 `chunks` 明细跳过已传分片 → 进度从 `bytesReceived` 起算 → commit。续传前校验本地文件 size 与分片布局与会话一致，不一致报错引导新建导入；浏览器刷新后仍需重新选择文件（浏览器安全模型，Chromium 免重选见 M3.5 未实施）。
 
+## 2026-06 Comic Library MVP
+
+- Comic library is an optional module. The frontend hides comic navigation and comic import entry points until `comicLibraryEnabled=true`.
+- Comic and movie domains are intentionally independent. Do not store comics in movie tables, do not model comics as `Movie`, and do not route comic behavior through `/api/library/movies` or `useLibraryService()`.
+- Backend persistence uses separate SQLite tables and repositories: `comic_library_paths`, `comic_books`, `comic_pages`, `comic_tags`, `comic_book_tags`, `comic_reading_progress`, `comic_reading_preferences`, and `comic_cache_entries`.
+- Backend routes: `POST /api/import/comics`; `GET/POST/PATCH/DELETE /api/library/comics/paths`; `POST /api/library/comics/scans` (optional `paths` body restricts scans to configured comic roots); `GET /api/library/comics/cache/status`; `POST /api/library/comics/cache/cleanup`; `GET/PATCH/DELETE /api/library/comics/{comicId}`; `POST /api/library/comics/books/{comicId}/reveal`; page image/thumbnail, progress, and preference routes under `/api/library/comics/books/{comicId}/...`.
+- Settings keys in `config/library-config.cfg`: `comicLibraryEnabled`, `autoComicLibraryWatch` (default `true`), `defaultComicImportLibraryPathId`, `comicReader` (`mode`, `fit`, `direction`), and `comicCache` (`maxBytes`, default 2147483648, negative means unlimited).
+- Frontend routes: `/comics`, `/comics/:id`, and `/comics/:id/read/:page?` guarded by comic enabled state. Service boundary is `useComicLibraryService()` with independent web/mock adapters and `src/domain/comic` types.
+- Archive support is `.zip` and `.cbz` only. Page images are `.jpg`, `.jpeg`, `.png`, `.webp`, and `.gif`. The first naturally sorted image is the cover, and natural sort respects directory hierarchy plus numeric filename order.
+- Comic import copies archives into `defaultComicImportLibraryPathId`, never deletes source archives, never overwrites conflicts, and starts `scan.comics` after successful copy.
+- Comic auto watch is independent from movie auto watch. When `libraryWatchEnabled` permits fsnotify, `comicLibraryEnabled=true`, and `autoComicLibraryWatch=true`, `backend/internal/comicwatch` watches `comic_library_paths` for `.zip` / `.cbz` create/write/rename events and queues App-owned `scan.comics` tasks with `metadata.trigger="fsnotify"`.
+- Detail MVP fields are title, tags, rating, and favorite. Author/series can be represented as tags until explicit metadata fields exist.
+- Reader supports page/scroll mode, contain/width fit, LTR/RTL keyboard navigation, persisted reading progress/preferences, and session-only current+previous/current+next stitching.
+- Comic cache is separate from movie assets/cache. Cache cleanup deletes only comic cache entries/files inside the comic cache root and must not delete source `.zip` / `.cbz` archives.
+- Task types: `scan.comics`, `import.comics`, and `comic.cache.cleanup`. Comic error codes use the `COMIC_*` prefix.
+- MVP exclusions: metadata scraping, OCR, `.rar`, `.cbr`, `.7z`, persistent double-page layout, gamepad reader controls, and cross-device sync beyond local Web API SQLite state.
+
+## 2026-07 Photo Library MVP
+
+- Photo library is an optional module beside movies and comics. The frontend hides photo navigation until `photoLibraryEnabled=true`.
+- Photo, comic, and movie domains are intentionally independent. Do not store photo books in comic tables, do not expose photo behavior through `/api/library/comics`, and do not route photo UI through `useComicLibraryService()` or movie `useLibraryService()`.
+- Backend persistence uses separate settings plus independent SQLite tables/repositories: `photo_library_paths`, `photo_books`, `photo_pages`, `photo_tags`, `photo_book_tags`, `photo_viewing_progress`, `photo_viewing_preferences`, and `photo_cache_entries`.
+- Backend routes: `GET/POST/PATCH/DELETE /api/library/photos/paths`; `POST /api/library/photos/scans` (optional `paths` body restricts scans to configured photo roots); `GET /api/library/photos`; `GET /api/library/photos/{photoId}`; and page image/thumbnail routes under `/api/library/photos/books/{photoId}/...`. `GET/PATCH /api/settings` also returns and persists photo fields: `photoLibraryEnabled`, `autoPhotoLibraryWatch`, `defaultPhotoImportLibraryPathId`, `photoViewer`, `photoCache`, and `photoLibraryPaths`.
+- Settings keys in `config/library-config.cfg`: `photoLibraryEnabled` (default `false`), `autoPhotoLibraryWatch` (default `true`), `defaultPhotoImportLibraryPathId`, `photoViewer` (`mode`, `fit`, `direction`; default `page` / `contain` / `ltr`), and `photoCache` (`maxBytes`, default 5368709120).
+- Frontend routes: `/photos`, `/photos/:id`, and `/photos/:id/view/:pageIndex?` guarded by photo enabled state. Service boundary is `usePhotoLibraryService()` with independent web/mock adapters and `src/domain/photo` types.
+- Current frontend slice includes settings UI aligned with comic settings, path CRUD/manual scan UI, optional sidebar entry, routes, shell search integration, and Web API photo wall/detail/viewer loading via independent photo endpoints.
+- Photo archives support `.zip` and `.cbz`; page images use the same supported image extensions as comics. The first naturally sorted image is the cover.
+- Photo auto watch is independent from movie and comic watchers. When `libraryWatchEnabled` permits fsnotify, `photoLibraryEnabled=true`, and `autoPhotoLibraryWatch=true`, `backend/internal/photowatch` watches `photo_library_paths` for `.zip` / `.cbz` create/write/rename events and queues App-owned `scan.photos` tasks with `metadata.trigger="fsnotify"`.
+- Task type: `scan.photos`. Photo error codes use the `PHOTO_*` prefix.
+- MVP exclusions: photo import upload, metadata scraping/OCR, `.rar`, `.cbr`, `.7z`, persistent progress/preference endpoints beyond the current tables, and photo cache status/cleanup endpoints.
+
 ## 2026-05 PIN App Lock
 
 - PIN App Lock is the first privacy-lock slice for Curated, not a full multi-user permission system. It is disabled by default and is active only in Web API mode (`VITE_USE_WEB_API=true`).
@@ -221,3 +252,11 @@ alwaysApply: true
 - For regular browsers, CORS only allows same-origin, loopback development origins, and exact main-config `corsAllowedOrigins`; arbitrary credentialed Origin reflection and wildcard responses are rejected with `403 COMMON_FORBIDDEN`. Request Host is also checked against loopback / explicit LAN policy to mitigate DNS rebinding. Allowed responses advertise `Accept-CH: Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version`; when those headers are present, `backend/internal/clienttracker` maps Windows platform version 13+ to `Windows 11`. The UI suppresses ambiguous `Windows 10.0` legacy UA display.
 - The client-tracker key includes the marker, so Curated Desktop and a normal Chrome tab from the same IP with the same Chromium User-Agent remain separate connected-client rows.
 - CORS allows desktop marker, desktop OS, Client Hints, and resumable upload headers.
+
+## 2026-09-10 Media library Beta on master
+
+- REQ-0046 / REQ-0047 authorize the former comic/photo worktree as Beta. Settings → Experimental contains two independent default-off switches. Only an enabled library shows its path, reader/viewer, watch and cache configuration; neither has a standalone settings navigation item. Legacy `section=comics/photos` links normalize to `experimental`.
+- `PATCH /api/settings` permits enabling before adding paths; scans still require configured valid paths. Closing a Beta hides its navigation/configuration, blocks content/scanning endpoints and stops its watcher without deleting settings, indexes, progress or source archives. Web settings persist to `config/library-config.cfg`; Mock enable flags are session-only.
+- Migrations are `0046_comic_library.sql`, `0047_photo_library.sql`, `0048_photo_books.sql`; existing experimental tables use idempotent creation. No runtime databases are copied from the old worktree.
+- Photo Beta supports ZIP/CBZ scanning, list/detail and page viewing only. Photo import, per-book progress/preferences APIs and concrete photo cache cleanup are not implemented. Thumbnails currently serve the original image; photo cache limits are reserved persisted settings.
+- Production builds extract pinyin-pro pure dictionaries into a hashed same-origin JSON asset via `vite.pinyin-data.ts`, retaining the existing match algorithm and bundle budgets. See `docs/plan/2026-09-10-comic-photo-beta-integration.md` for integration evidence.

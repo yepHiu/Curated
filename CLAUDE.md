@@ -566,3 +566,27 @@ When viewing library with `actor=` query param and `VITE_USE_WEB_API=true`, the 
 - Async tasks (scan, scrape): use `useScanTaskTracker()` composable to poll task status
 - Task / provider diagnostics now carry machine-readable failure categories (`errorCategory`) for mainland-network troubleshooting
 - i18n locale files are in `src/locales/` (en.json, ja.json, zh-CN.json)
+
+## Comic and photo library Beta
+
+Both libraries default off. `GET/PATCH /api/settings` reads/persists independent `comicLibraryEnabled`, `photoLibraryEnabled`, `autoComicLibraryWatch`, `autoPhotoLibraryWatch`, `comicReader`, `photoViewer`, `comicCache`, `photoCache`, and default import path ids. GET also includes `comicLibraryPaths` and `photoLibraryPaths`. Enabling requires no path; scanning requires an enabled library and configured roots. Existing PIN middleware applies. Disabled content/scan calls return a structured `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED` error (HTTP 400); settings/path management remain available.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET / POST | `/api/library/comics/paths`, `/api/library/photos/paths` | List or add independent roots |
+| PATCH / DELETE | `/api/library/comics/paths/{id}`, `/api/library/photos/paths/{id}` | Update or remove a root |
+| POST | `/api/library/comics/scans`, `/api/library/photos/scans` | Queue ZIP/CBZ scan; optional `paths` restricts to configured roots |
+| POST | `/api/import/comics` | Copy uploaded archives to default comic root; preserve source and reject overwrite |
+| GET | `/api/library/comics`, `/api/library/photos` | List books |
+| GET | `/api/library/comics/{id}`, `/api/library/photos/{id}` | Book detail |
+| PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete operation |
+| POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
+| GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |
+| GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/image` | Page image |
+| GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/thumbnail` | Thumbnail; photos currently return original image |
+| GET / PUT / DELETE | `/api/library/comics/books/{id}/progress` | Comic reading progress |
+| GET / PUT | `/api/library/comics/books/{id}/preferences` | Comic reading preferences |
+| GET | `/api/library/comics/cache/status` | Independent comic cache usage |
+| POST | `/api/library/comics/cache/cleanup` | Delete derived comic cache only |
+
+Photo import, per-book progress/preferences APIs and concrete cache cleanup are not implemented. `photoCache.maxBytes` and default photo import target are reserved settings. Closing Beta preserves settings, indexes and archives and stops its watcher. UI configuration exists only under Settings → Experimental and only while that library is enabled.

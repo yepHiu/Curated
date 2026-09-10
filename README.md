@@ -34,6 +34,7 @@ Installed apps can also check and download a newer installer from Settings → A
 
 ## Highlights
 
+- Optional comic and photo library **Beta**, disabled by default under Settings → Experimental. Enable each library to reveal its configuration; see [Beta guidance](docs/guide.md#comic-and-photo-library-beta).
 - Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.

@@ -343,3 +343,16 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 - `docs/film-scanner/` is reference/experimental material, not the production module tree.
 - `docs/review/` holds one-off audits; they are snapshots, not living specs.
 - Cursor/agent rules in `.cursor/rules/` are operational memory for agents; this handbook is the human-readable map of the same project.
+
+## Comic and photo library Beta
+
+漫画库与写真库现以 Beta 合入主线。真实试用时设置 `VITE_USE_WEB_API=true`，运行新版后端及前端，进入 **设置 → 实验性功能**：
+
+1. 开启「漫画库 Beta」或「写真库 Beta」。两个开关独立，初始默认关闭。
+2. 开启后才显示该库的配置。添加绝对存储路径，通过路径「更多操作 → 扫描漫画 / 扫描写真」扫描 `.zip` / `.cbz`。
+3. 从侧栏「漫画 / 写真」打开详情与阅读器。漫画支持导入、阅读进度/偏好、收藏评分标签及独立缓存清理；写真目前支持扫描和浏览。
+4. 关闭开关会隐藏该库入口与配置、停止目录监听，保留源包、索引和已保存设置。再次开启可继续使用。
+
+开关及路径在 Web 模式下刷新或重启后保留；Mock 开关仅当前会话有效。写真暂未实现导入、单册进度/偏好 API 或独立缓存清理，缩略图当前读取原图，缓存上限为预留设置。支持 ZIP/CBZ，不支持 RAR/CBR/7z。
+
+旧实验 worktree 和数据保留，合并不会搬移其运行数据库或真实媒体。迁移使用 `0046_comic_library.sql`、`0047_photo_library.sql`、`0048_photo_books.sql`。详情见 [Beta 整合与验收记录](plan/2026-09-10-comic-photo-beta-integration.md)、[配置说明](reference/2026-03-21-library-organize.md) 与 [API](../API.md#comic-and-photo-library-beta)。
