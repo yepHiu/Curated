@@ -826,9 +826,9 @@
     "previewRange": "{start}–{end} / {total} ページ",
     "previousBatch": "前へ",
     "nextBatch": "次へ",
-    "pageNumber": "ページ番号",
-    "locatePage": "移動",
-    "openPage": "開く",
+    "previewPagination": "画像プレビューのページ切り替え",
+    "batchNumber": "第 {batch} グループ",
+    "moreBatches": "その他のグループ",
     "retryImage": "画像を読み込めませんでした。再試行"
   },
   "import": {

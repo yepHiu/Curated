@@ -2,9 +2,9 @@
 import { computed, ref, watch } from "vue"
 import { useElementSize } from "@vueuse/core"
 import { useI18n } from "vue-i18n"
-import { ChevronLeft, ChevronRight } from "lucide-vue-next"
+import { ChevronLeft, ChevronRight, Ellipsis } from "lucide-vue-next"
+import { PaginationRoot, PaginationList, PaginationListItem, PaginationEllipsis, PaginationPrev, PaginationNext } from "reka-ui"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { previewColumns, previewStart } from "@/lib/book-preview"
 import BookPreviewTile from "./BookPreviewTile.vue"
 const props = defineProps<{ bookId: string; pages: readonly { index: number; thumbUrl?: string; imageUrl?: string }[]; total: number; kind: "comics" | "photos" }>()
@@ -15,20 +15,12 @@ const { width } = useElementSize(container)
 const columns = computed(() => previewColumns(width.value))
 const size = computed(() => columns.value * 2)
 const anchor = ref(0)
-const jump = ref<string | number>(1)
-watch(() => props.bookId, () => { anchor.value = 0; jump.value = 1 }, { immediate: true })
+watch(() => props.bookId, () => { anchor.value = 0 }, { immediate: true })
 const start = computed(() => previewStart(anchor.value, size.value, props.pages.length))
 const pages = computed(() => props.pages.slice(start.value, start.value + size.value))
-const end = computed(() => Math.min(props.pages.length, start.value + size.value))
-const jumpValid = computed(() => Number.isInteger(Number(jump.value)) && Number(jump.value) >= 1 && Number(jump.value) <= props.total)
-function move(delta: number) {
-  anchor.value = previewStart(start.value + delta * size.value, size.value, props.pages.length)
-  jump.value = (props.pages[anchor.value]?.index ?? 0) + 1
-}
-function locate() {
-  if (!jumpValid.value) return
-  const position = props.pages.findIndex(page => page.index === Number(jump.value) - 1)
-  if (position >= 0) anchor.value = position
+const currentBatch = computed(() => Math.floor(start.value / size.value) + 1)
+function selectBatch(batch: number) {
+  anchor.value = previewStart((batch - 1) * size.value, size.value, props.pages.length)
 }
 </script>
 <template>
@@ -39,21 +31,45 @@ function locate() {
     </div>
     <div v-if="pages.length" data-book-preview-grid class="grid gap-3" :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }">
       <BookPreviewTile v-for="page in pages" :key="`${bookId}:${page.index}`" :src="page.thumbUrl || page.imageUrl"
-        :label="t(`${kind}.previewPageAlt`, { page: page.index + 1 })" :page-number="page.index + 1" :current="page.index === Number(jump) - 1" :retry-label="t('bookBrowser.retryImage')"
+        :label="t(`${kind}.previewPageAlt`, { page: page.index + 1 })" :page-number="page.index + 1" :retry-label="t('bookBrowser.retryImage')"
         :data-comic-page-preview="kind === 'comics' ? '' : undefined" :data-photo-page-preview="kind === 'photos' ? '' : undefined"
         @open="emit('open', page.index)" />
     </div>
     <p v-else class="py-6 text-sm text-muted-foreground">{{ t(`${kind}.previewEmpty`) }}</p>
-    <div v-if="pages.length" class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <Button data-preview-previous variant="outline" class="min-h-11 rounded-full" :disabled="start === 0" :aria-label="t('bookBrowser.previousBatch')" @click="move(-1)"><ChevronLeft data-icon="inline-start" />{{ t('bookBrowser.previousBatch') }}</Button>
-        <Button data-preview-next variant="outline" class="min-h-11 rounded-full" :disabled="end >= props.pages.length" :aria-label="t('bookBrowser.nextBatch')" @click="move(1)">{{ t('bookBrowser.nextBatch') }}<ChevronRight data-icon="inline-end" /></Button>
-      </div>
-      <form class="flex min-w-0 items-center gap-2" @submit.prevent="locate">
-        <Input v-model="jump" data-preview-jump type="number" min="1" :max="total" step="1" class="min-h-11 w-20" :aria-label="t('bookBrowser.pageNumber')" />
-        <Button type="submit" variant="outline" class="min-h-11 rounded-full" :disabled="!jumpValid">{{ t('bookBrowser.locatePage') }}</Button>
-        <Button type="button" variant="ghost" class="min-h-11 rounded-full" :disabled="!jumpValid" @click="emit('open', Number(jump) - 1)">{{ t('bookBrowser.openPage') }}</Button>
-      </form>
-    </div>
+    <PaginationRoot
+      v-if="pages.length"
+      :page="currentBatch"
+      :items-per-page="size"
+      :total="props.pages.length"
+      :sibling-count="width < 480 ? 0 : 1"
+      show-edges
+      :aria-label="t('bookBrowser.previewPagination')"
+      class="flex flex-wrap items-center justify-center gap-2"
+      @update:page="selectBatch"
+    >
+      <PaginationPrev as-child :aria-label="t('bookBrowser.previousBatch')">
+        <Button data-preview-previous variant="outline" class="min-h-11 rounded-full">
+          <ChevronLeft data-icon="inline-start" aria-hidden="true" />{{ t('bookBrowser.previousBatch') }}
+        </Button>
+      </PaginationPrev>
+      <PaginationList v-slot="{ items }" class="order-last flex w-full flex-wrap items-center justify-center gap-1 sm:order-none sm:w-auto">
+        <template v-for="(item, index) in items" :key="item.type === 'page' ? item.value : `ellipsis-${index}`">
+          <PaginationListItem v-if="item.type === 'page'" :value="item.value" as-child :aria-label="t('bookBrowser.batchNumber', { batch: item.value })">
+            <Button :data-preview-batch="item.value" :variant="item.value === currentBatch ? 'default' : 'outline'" class="min-h-11 min-w-11 rounded-full px-3 tabular-nums">
+              {{ item.value }}
+            </Button>
+          </PaginationListItem>
+          <PaginationEllipsis v-else class="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
+            <Ellipsis class="size-4" aria-hidden="true" />
+            <span class="sr-only">{{ t('bookBrowser.moreBatches') }}</span>
+          </PaginationEllipsis>
+        </template>
+      </PaginationList>
+      <PaginationNext as-child :aria-label="t('bookBrowser.nextBatch')">
+        <Button data-preview-next variant="outline" class="min-h-11 rounded-full">
+          {{ t('bookBrowser.nextBatch') }}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
+      </PaginationNext>
+    </PaginationRoot>
   </section>
 </template>

@@ -826,9 +826,9 @@
     "previewRange": "Pages {start}–{end} of {total}",
     "previousBatch": "Previous",
     "nextBatch": "Next",
-    "pageNumber": "Page number",
-    "locatePage": "Locate",
-    "openPage": "Open page",
+    "previewPagination": "Image preview pagination",
+    "batchNumber": "Batch {batch}",
+    "moreBatches": "More batches",
     "retryImage": "Image failed to load. Retry"
   },
   "import": {

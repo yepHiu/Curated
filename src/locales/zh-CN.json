@@ -826,9 +826,9 @@
     "previewRange": "第 {start}–{end} 页 · 共 {total} 页",
     "previousBatch": "上一批",
     "nextBatch": "下一批",
-    "pageNumber": "页码",
-    "locatePage": "定位",
-    "openPage": "打开此页",
+    "previewPagination": "图片预览分页",
+    "batchNumber": "第 {batch} 批",
+    "moreBatches": "更多批次",
     "retryImage": "图片加载失败，点击重试"
   },
   "import": {
