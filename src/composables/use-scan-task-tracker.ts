@@ -12,6 +12,7 @@ import {
   subscribeBackendEvents,
   type BackendEventSubscription,
 } from "@/lib/backend-events"
+import { useComicLibraryService } from "@/services/comic-library-service"
 import { useLibraryService } from "@/services/library-service"
 
 function isFsnotifyLibraryScan(task: TaskDTO): boolean {
@@ -33,6 +34,7 @@ function taskMetaNumber(task: TaskDTO, key: string): number {
 const POLL_MS = 500
 
 const libraryService = useLibraryService()
+const comicLibraryService = useComicLibraryService()
 
 const activeTask = shallowRef<TaskDTO | null>(null)
 const pollError = ref<string | null>(null)
@@ -104,6 +106,13 @@ function libraryScanNotificationSource(taskId: string) {
   return {
     taskId,
     route: "/settings?section=library",
+  }
+}
+
+function comicTaskNotificationSource(taskId: string) {
+  return {
+    taskId,
+    route: "/settings?section=experimental",
   }
 }
 
@@ -225,6 +234,27 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
       )
     }
     void libraryService.reloadMoviesFromApi()
+  } else if (t.type === "scan.comics") {
+    const msg = t.message ?? ""
+    const tr = i18n.global.t
+    pushAppToast(
+      t.status === "completed"
+        ? tr("toasts.manualComicScanDone", { message: msg })
+        : tr("toasts.manualComicScanFailed", { message: msg }),
+      {
+        variant: taskTerminalToastVariant(t.status),
+        notification: {
+          messageId: t.status === "completed" ? "MSG-0020" : "MSG-0013",
+          type: "scan",
+          title:
+            t.status === "completed"
+              ? tr("notificationCenter.titles.scanDone")
+              : tr("notificationCenter.titles.scanFailed"),
+          source: comicTaskNotificationSource(t.taskId),
+        },
+      },
+    )
+    void comicLibraryService.reloadComicsFromApi()
   } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
     pushAppToast(movieScrapeToastMessage(t), movieScrapeToastOptions(t))
     trackedLoadingToastId = null
@@ -278,6 +308,56 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
       )
     }
     void libraryService.reloadMoviesFromApi()
+  } else if (t.type === "import.comics") {
+    const tr = i18n.global.t
+    if (t.status === "completed") {
+      pushAppToast(
+        tr("toasts.comicImportDone", {
+          completed: taskMetaNumber(t, "completedFiles"),
+        }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          notification: {
+            messageId: "MSG-0023",
+            type: "system",
+            title: tr("notificationCenter.titles.importDone"),
+            source: comicTaskNotificationSource(t.taskId),
+          },
+        },
+      )
+    } else if (t.status === "partial_failed") {
+      pushAppToast(
+        tr("toasts.comicImportPartial", {
+          completed: taskMetaNumber(t, "completedFiles"),
+          failed: taskMetaNumber(t, "failedFiles"),
+        }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          durationMs: 6500,
+          notification: {
+            messageId: "MSG-0012",
+            type: "system",
+            title: tr("notificationCenter.titles.importFailed"),
+            source: comicTaskNotificationSource(t.taskId),
+          },
+        },
+      )
+    } else if (t.status === "failed") {
+      pushAppToast(
+        tr("toasts.comicImportFailed", { message: t.errorMessage ?? t.message ?? "" }),
+        {
+          variant: taskTerminalToastVariant(t.status),
+          durationMs: 6500,
+          notification: {
+            messageId: "MSG-0011",
+            type: "system",
+            title: tr("notificationCenter.titles.importFailed"),
+            source: comicTaskNotificationSource(t.taskId),
+          },
+        },
+      )
+    }
+    void comicLibraryService.reloadComicsFromApi()
   }
   scheduleTerminalDismiss(dismissTaskId)
 }

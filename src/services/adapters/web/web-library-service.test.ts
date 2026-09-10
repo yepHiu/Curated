@@ -67,6 +67,28 @@ function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
   return {
     libraryPaths: [],
     backupDirectory: "",
+    comicLibraryEnabled: false,
+    autoComicLibraryWatch: true,
+    comicLibraryPaths: [],
+    comicReader: {
+      mode: "page",
+      fit: "contain",
+      direction: "ltr",
+    },
+    comicCache: {
+      maxBytes: 2 * 1024 * 1024 * 1024,
+    },
+    photoLibraryEnabled: false,
+    autoPhotoLibraryWatch: true,
+    photoLibraryPaths: [],
+    photoViewer: {
+      mode: "page",
+      fit: "contain",
+      direction: "ltr",
+    },
+    photoCache: {
+      maxBytes: 5 * 1024 * 1024 * 1024,
+    },
     player: {
       hardwareDecode: true,
       hardwareEncoder: "auto",

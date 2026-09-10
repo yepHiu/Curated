@@ -127,6 +127,21 @@ function readLocaleKey(messages: Record<string, unknown>, key: string): unknown 
   return cursor
 }
 
+function collectLocaleStrings(
+  value: unknown,
+  path: string[] = [],
+): Array<{ path: string; value: string }> {
+  if (typeof value === "string") {
+    return [{ path: path.join("."), value }]
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return []
+  }
+  return Object.entries(value).flatMap(([key, nested]) =>
+    collectLocaleStrings(nested, [...path, key]),
+  )
+}
+
 describe("locale key parity", () => {
   it.each(["en", "ja"] as const)("loads %s messages on demand", async (locale) => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(locales[locale]), { status:200, headers:{'Content-Type':'application/json'} }))
@@ -134,6 +149,28 @@ describe("locale key parity", () => {
     const messages = i18n.global.getLocaleMessage(locale) as Record<string, unknown>
     expect(Object.keys(messages).length).toBeGreaterThan(0)
     expect(messages.common).toBeTypeOf("object")
+  })
+
+  it("uses the concise Chinese movie library sidebar label", () => {
+    expect(readLocaleKey(zhCN, "nav.library")).toBe("影片")
+  })
+
+  it.each([
+    ["zh-CN", zhCN],
+    ["ja", ja],
+  ] as const)("%s photo library copy does not contain replacement question marks", (_locale, messages) => {
+    const photoCopy = [
+      ...collectLocaleStrings(readLocaleKey(messages, "photos"), ["photos"]),
+      ...collectLocaleStrings(readLocaleKey(messages, "settings"), ["settings"]).filter(({ path }) =>
+        path.startsWith("settings.photo"),
+      ),
+    ]
+
+    const broken = photoCopy
+      .filter(({ value }) => /\?/.test(value))
+      .map(({ path, value }) => `${path}: ${value}`)
+
+    expect(broken).toEqual([])
   })
 
   it.each(Object.entries(locales))("%s has curated tag filter and saving keys", (_locale, messages) => {

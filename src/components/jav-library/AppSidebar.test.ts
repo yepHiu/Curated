@@ -26,6 +26,10 @@ const routeState = ref({
   query: {} as Record<string, unknown>,
 })
 const activePlaybackSessionState = ref<unknown>(null)
+const comicLibraryEnabled = ref(false)
+const refreshComicSettings = vi.fn()
+const photoLibraryEnabled = ref(false)
+const refreshPhotoSettings = vi.fn()
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -47,6 +51,20 @@ vi.mock("@/services/library-service", () => ({
   useLibraryService: () => ({
     movies: computed(() => movies.value),
     trashedMovies: computed(() => trashedMovies.value),
+  }),
+}))
+
+vi.mock("@/services/comic-library-service", () => ({
+  useComicLibraryService: () => ({
+    comicLibraryEnabled: computed(() => comicLibraryEnabled.value),
+    refreshSettings: refreshComicSettings,
+  }),
+}))
+
+vi.mock("@/services/photo-library-service", () => ({
+  usePhotoLibraryService: () => ({
+    photoLibraryEnabled: computed(() => photoLibraryEnabled.value),
+    refreshSettings: refreshPhotoSettings,
   }),
 }))
 
@@ -110,6 +128,10 @@ function setActivePlaybackSession() {
 }
 
 beforeEach(() => {
+  comicLibraryEnabled.value = false
+  photoLibraryEnabled.value = false
+  refreshComicSettings.mockReset()
+  refreshPhotoSettings.mockReset()
   routeState.value = {
     name: "home",
     params: {},
@@ -155,6 +177,50 @@ describe("AppSidebar", () => {
     const brandLink = wrapper.get("[data-sidebar-brand-link]")
     expect(brandLink.classes()).toContain("justify-center")
     expect(brandLink.classes()).toContain("gap-0")
+  })
+
+  it("hides the comic entry when the comic library is disabled", async () => {
+    comicLibraryEnabled.value = false
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("nav.comics")
+  })
+
+  it("shows the comic entry when the comic library is enabled", async () => {
+    comicLibraryEnabled.value = true
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const comicLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.comics"))
+
+    expect(comicLink?.attributes("data-to")).toContain('"name":"comics"')
+  })
+
+  it("hides the photo entry when the photo library is disabled", async () => {
+    photoLibraryEnabled.value = false
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("nav.photos")
+  })
+
+  it("shows the photo entry when the photo library is enabled", async () => {
+    photoLibraryEnabled.value = true
+
+    const wrapper = mount(AppSidebar, { props: { compact: false } })
+    await flushPromises()
+
+    const photoLink = wrapper
+      .findAll("[data-sidebar-nav-link]")
+      .find((link) => link.text().includes("nav.photos"))
+
+    expect(photoLink?.attributes("data-to")).toContain('"name":"photos"')
   })
 
   it("shows an expanded continue playback card above backend status", async () => {

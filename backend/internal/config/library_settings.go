@@ -105,6 +105,68 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.BackupDirectory = s
 	}
+	if v, ok := m["comicLibraryEnabled"]; ok {
+		b, err := parseJSONBool(v, "comicLibraryEnabled")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.ComicLibraryEnabled = b
+	}
+	if v, ok := m["autoComicLibraryWatch"]; ok {
+		b, err := parseJSONBool(v, "autoComicLibraryWatch")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.AutoComicLibraryWatch = b
+	}
+	if v, ok := m["defaultComicImportLibraryPathId"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: defaultComicImportLibraryPathId: %w", path, err)
+		}
+		cfg.DefaultComicImportLibraryPathID = s
+	}
+	if v, ok := m["comicReader"]; ok {
+		if err := parseComicReaderConfig(v, &cfg.ComicReader); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
+	if v, ok := m["comicCache"]; ok {
+		if err := parseComicCacheConfig(v, &cfg.ComicCache); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
+	if v, ok := m["photoLibraryEnabled"]; ok {
+		b, err := parseJSONBool(v, "photoLibraryEnabled")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.PhotoLibraryEnabled = b
+	}
+	if v, ok := m["autoPhotoLibraryWatch"]; ok {
+		b, err := parseJSONBool(v, "autoPhotoLibraryWatch")
+		if err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+		cfg.AutoPhotoLibraryWatch = b
+	}
+	if v, ok := m["defaultPhotoImportLibraryPathId"]; ok {
+		s, err := parseJSONStringTrim(v)
+		if err != nil {
+			return fmt.Errorf("library settings %q: defaultPhotoImportLibraryPathId: %w", path, err)
+		}
+		cfg.DefaultPhotoImportLibraryPathID = s
+	}
+	if v, ok := m["photoViewer"]; ok {
+		if err := parsePhotoViewerConfig(v, &cfg.PhotoViewer); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
+	if v, ok := m["photoCache"]; ok {
+		if err := parsePhotoCacheConfig(v, &cfg.PhotoCache); err != nil {
+			return fmt.Errorf("library settings %q: %w", path, err)
+		}
+	}
 	if v, ok := m["metadataMovieProvider"]; ok {
 		s, err := parseJSONStringTrim(v)
 		if err != nil {

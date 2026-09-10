@@ -418,4 +418,77 @@ describe("navigation intent helpers", () => {
       to: { name: "home" },
     })
   })
+
+  it.each([
+    ["photo-detail", undefined, { name: "photos" }, "shell.backPhotos"],
+    ["photo-viewer", undefined, { name: "photos" }, "shell.backPhotos"],
+    ["photo-viewer", "/photos/photo-1", "/photos/photo-1", "shell.backDetail"],
+    ["photo-viewer", "/photos?q=sample", "/photos?q=sample", "shell.backPhotos"],
+    ["photo-viewer", "https://example.com", { name: "photos" }, "shell.backPhotos"],
+    ["photo-viewer", "//example.com", { name: "photos" }, "shell.backPhotos"],
+  ])("keeps %s return navigation in the photo flow (%s)", (name, returnTo, to, labelKey) => {
+    expect(resolveNavigationBackLink({ name, query: returnTo ? { returnTo } : {} })).toEqual({ to, labelKey })
+  })
+
+  it("resolves comic detail back links to the comic library", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-detail",
+        query: {},
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: { name: "comics" },
+    })
+  })
+
+  it("resolves comic reader back links to their recorded source route", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/comics/comic-1",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backDetail",
+      to: "/comics/comic-1",
+    })
+
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/comics?q=artist&sort=fileName",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: "/comics?q=artist&sort=fileName",
+    })
+
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {
+          returnTo: "/settings?section=comics",
+        },
+      }),
+    ).toEqual({
+      labelKey: "shell.backPrevious",
+      to: "/settings?section=comics",
+    })
+  })
+
+  it("falls back from direct comic reader links to the comic library", () => {
+    expect(
+      resolveNavigationBackLink({
+        name: "comic-reader",
+        query: {},
+      }),
+    ).toEqual({
+      labelKey: "shell.backComics",
+      to: { name: "comics" },
+    })
+  })
 })

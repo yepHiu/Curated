@@ -71,7 +71,11 @@ vi.mock("@/components/ui/button", () => ({
 
 vi.mock("@/components/ui/card", () => ({
   Card: { name: "Card", template: "<div><slot /></div>" },
-  CardContent: { name: "CardContent", template: "<div><slot /></div>" },
+  CardContent: {
+    name: "CardContent",
+    props: ["class"],
+    template: '<div data-card-content :class="$props.class"><slot /></div>',
+  },
   CardDescription: { name: "CardDescription", template: "<div><slot /></div>" },
   CardTitle: { name: "CardTitle", template: "<div><slot /></div>" },
 }))

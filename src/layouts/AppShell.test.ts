@@ -110,6 +110,10 @@ vi.mock("@/components/jav-library/MovieImportDialog.vue", () => ({
   default: { name: "MovieImportDialog", template: "<button data-movie-import>import.trigger</button>" },
 }))
 
+vi.mock("@/components/jav-library/ImportMenu.vue", () => ({
+  default: { name: "ImportMenu", template: "<div data-import-menu />" },
+}))
+
 vi.mock("@/components/ui/sonner", () => ({
   Toaster: { name: "Toaster", template: "<div />" },
 }))
@@ -119,7 +123,13 @@ vi.mock("@/components/ui/button", () => ({
 }))
 
 vi.mock("@/components/ui/input", () => ({
-  Input: { name: "Input", template: "<input />" },
+  Input: {
+    name: "Input",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template:
+      "<input :value=\"modelValue\" @input=\"$emit('update:modelValue', $event.target.value)\" />",
+  },
 }))
 
 vi.mock("@/components/ui/scroll-area", () => ({
@@ -174,10 +184,10 @@ describe("AppShell library search route sync", () => {
     expect(wrapper.find('[data-show-collapse-toggle="true"]').exists()).toBe(false)
   })
 
-  it("renders the movie import entry near the header actions", () => {
+  it("renders the import menu near the header actions", () => {
     const wrapper = shallowMount(AppShell)
 
-    expect(wrapper.findComponent({ name: "MovieImportDialog" }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: "ImportMenu" }).exists()).toBe(true)
   })
 
   it("shows a detail back link on primary browse drill-down routes", () => {
@@ -208,6 +218,50 @@ describe("AppShell library search route sync", () => {
     )
   })
 
+  it("does not show the global back-to-library link on the comic library root", () => {
+    routerMocks.route.fullPath = "/comics"
+    routerMocks.route.name = "comics"
+    routerMocks.route.path = "/comics"
+    routerMocks.route.query = {}
+
+    const wrapper = mount(AppShell)
+
+    expect(wrapper.text()).not.toContain("shell.backLibrary")
+    expect(wrapper.find('a[data-to*="\\"name\\":\\"library\\""]').exists()).toBe(false)
+  })
+
+  it("returns from comic detail pages to the comic library", () => {
+    routerMocks.route.fullPath = "/comics/comic-1"
+    routerMocks.route.name = "comic-detail"
+    routerMocks.route.params = { id: "comic-1" }
+    routerMocks.route.path = "/comics/comic-1"
+    routerMocks.route.query = {}
+
+    const wrapper = mount(AppShell)
+
+    expect(wrapper.text()).toContain("shell.backComics")
+    expect(JSON.parse(wrapper.get("a[data-to]").attributes("data-to") ?? "{}")).toEqual({
+      name: "comics",
+    })
+  })
+
+  it("returns from comic reader pages to the recorded source route", () => {
+    routerMocks.route.fullPath =
+      "/comics/comic-1/read/3?returnTo=%2Fcomics%2Fcomic-1"
+    routerMocks.route.name = "comic-reader"
+    routerMocks.route.params = { id: "comic-1", pageIndex: "3" }
+    routerMocks.route.path = "/comics/comic-1/read/3"
+    routerMocks.route.query = { returnTo: "/comics/comic-1" }
+
+    const wrapper = mount(AppShell)
+
+    expect(wrapper.text()).toContain("shell.backDetail")
+    expect(wrapper.text()).not.toContain("shell.backLibrary")
+    expect(JSON.parse(wrapper.get("a[data-to]").attributes("data-to") ?? "{}")).toBe(
+      "/comics/comic-1",
+    )
+  })
+
   it("uses the tightened desktop sidebar grid transition", () => {
     const wrapper = shallowMount(AppShell)
     const split = wrapper.get('[data-shell-layout="split"]')
@@ -229,14 +283,48 @@ describe("AppShell library search route sync", () => {
     expect(headerClasses).not.toContain("min-h-[4.5rem]")
   })
 
-  it("does not wrap batch-toolbar routes in the global workspace padding", () => {
-    routerMocks.route.name = "library"
+  it.each(["library", "comics", "photos"])(
+    "does not wrap %s routes in the global workspace padding",
+    (routeName) => {
+      routerMocks.route.name = routeName
+      routerMocks.route.path = `/${routeName}`
+      routerMocks.route.fullPath = `/${routeName}`
+      routerMocks.route.query = {}
+
+      const wrapper = shallowMount(AppShell)
+
+      const contentFrame = wrapper.get("[data-router-view-frame]")
+      const contentFrameClasses = contentFrame.classes().join(" ")
+
+      expect(contentFrameClasses).not.toContain("px-[var(--app-page-px)]")
+      expect(contentFrameClasses).not.toContain("py-[var(--app-page-py)]")
+    },
+  )
+
+  it("uses the shell search for the comic library route", () => {
+    routerMocks.route.fullPath = "/comics?q=rain"
+    routerMocks.route.name = "comics"
+    routerMocks.route.path = "/comics"
+    routerMocks.route.query = { q: "rain" }
+
     const wrapper = shallowMount(AppShell)
 
-    const contentFrame = wrapper.get("[data-router-view-frame]")
+    const searchInput = wrapper.get('[placeholder="comics.searchPlaceholder"]')
 
-    expect(contentFrame.classes().join(" ")).not.toContain("px-4")
-    expect(contentFrame.classes().join(" ")).not.toContain("py-4")
+    expect(searchInput.attributes("modelvalue")).toBe("rain")
+  })
+
+  it("uses the shell search for the photo library route", () => {
+    routerMocks.route.fullPath = "/photos?q=beach"
+    routerMocks.route.name = "photos"
+    routerMocks.route.path = "/photos"
+    routerMocks.route.query = { q: "beach" }
+
+    const wrapper = shallowMount(AppShell)
+
+    const searchInput = wrapper.get('[placeholder="photos.searchPlaceholder"]')
+
+    expect(searchInput.attributes("modelvalue")).toBe("beach")
   })
 
   it("treats actor detail as an owned page with actor-library back navigation", () => {

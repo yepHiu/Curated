@@ -220,6 +220,16 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 			_ = logger.Sync()
 			return nil, fmt.Errorf("init library fsnotify watcher: %w", err)
 		}
+		if err := backendApp.EnsureComicLibraryWatchRunning(); err != nil {
+			_ = store.Close()
+			_ = logger.Sync()
+			return nil, fmt.Errorf("init comic library fsnotify watcher: %w", err)
+		}
+		if err := backendApp.EnsurePhotoLibraryWatchRunning(); err != nil {
+			_ = store.Close()
+			_ = logger.Sync()
+			return nil, fmt.Errorf("init photo library fsnotify watcher: %w", err)
+		}
 	}
 
 	return &bootstrap{

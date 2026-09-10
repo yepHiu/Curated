@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import {
+  BookOpen,
   Clapperboard,
   ChartNoAxesColumnIncreasing,
   History,
   House,
+  Images,
   LibraryBig,
   Play,
   RefreshCw,
@@ -26,6 +28,8 @@ import { useActivePlaybackSession } from "@/composables/use-active-playback-sess
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
+import { useComicLibraryService } from "@/services/comic-library-service"
+import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const props = withDefaults(
   defineProps<{
@@ -55,6 +59,8 @@ interface SidebarNavSection {
 
 const { t, locale } = useI18n()
 const route = useRoute()
+const comicService = useComicLibraryService()
+const photoService = usePhotoLibraryService()
 const {
   useWebApi: backendUseWebApi,
   status: backendStatus,
@@ -66,6 +72,18 @@ const {
   activePlaybackSession,
   dismissActivePlaybackSession,
 } = useActivePlaybackSession()
+
+onMounted(() => {
+  void Promise.resolve(comicService.refreshSettings()).catch((error) => {
+    console.warn("[sidebar] comic settings refresh failed", error)
+  })
+  void Promise.resolve(photoService.refreshSettings()).catch((error) => {
+    console.warn("[sidebar] photo settings refresh failed", error)
+  })
+})
+
+const comicLibraryEnabled = computed(() => comicService.comicLibraryEnabled.value)
+const photoLibraryEnabled = computed(() => photoService.photoLibraryEnabled.value)
 
 const backendStatusText = computed(() => {
   void locale.value
@@ -126,14 +144,25 @@ const backendCompactTitle = computed(() => {
 
 const sidebarNavGroups = computed((): SidebarNavGroups => {
   void locale.value
+  const browse: NavigationItem[] = [
+    { label: t("nav.home"), page: "home", icon: House },
+    { label: t("nav.library"), page: "library", icon: LibraryBig },
+  ]
+
+  if (comicLibraryEnabled.value) {
+    browse.push({ label: t("nav.comics"), page: "comics", icon: BookOpen })
+  }
+  if (photoLibraryEnabled.value) {
+    browse.push({ label: t("nav.photos"), page: "photos", icon: Images })
+  }
+
+  browse.push(
+    { label: t("nav.actors"), page: "actors", icon: Users },
+    { label: t("nav.trash"), page: "trash", icon: Trash2 },
+  )
 
   return {
-    browse: [
-      { label: t("nav.home"), page: "home", icon: House },
-      { label: t("nav.library"), page: "library", icon: LibraryBig },
-      { label: t("nav.actors"), page: "actors", icon: Users },
-      { label: t("nav.trash"), page: "trash", icon: Trash2 },
-    ],
+    browse,
     yours: [
       { label: t("nav.insights"), page: "insights", icon: ChartNoAxesColumnIncreasing },
       { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
@@ -158,6 +187,12 @@ const sidebarSections = computed((): SidebarNavSection[] => [
 const isActive = (page: AppPage) => {
   if (page === "actors") {
     return route.name === "actors" || route.name === "actor-detail"
+  }
+  if (page === "comics") {
+    return ["comics", "comic-detail", "comic-reader"].includes(String(route.name ?? ""))
+  }
+  if (page === "photos") {
+    return ["photos", "photo-detail", "photo-viewer"].includes(String(route.name ?? ""))
   }
   return route.name === page
 }
@@ -228,6 +263,12 @@ const getNavigationTarget = (page: AppPage) => {
   }
   if (page === "actors") {
     return { name: "actors" }
+  }
+  if (page === "comics") {
+    return { name: "comics" }
+  }
+  if (page === "photos") {
+    return { name: "photos" }
   }
   return buildBrowseRouteTarget(page as LibraryMode, route.query)
 }

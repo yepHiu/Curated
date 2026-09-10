@@ -239,6 +239,213 @@ export interface CheckLibraryPathStorageStatusBody {
   libraryPathIds?: string[]
 }
 
+export interface ComicLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+export interface AddComicLibraryPathBody {
+  path: string
+  title?: string
+}
+
+export type AddComicLibraryPathResultDTO = ComicLibraryPathDTO
+
+export interface UpdateComicLibraryPathBody {
+  title: string
+}
+
+export type ComicReadStatus = "unread" | "reading" | "read"
+
+export interface ComicBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  readStatus: ComicReadStatus | string
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastReadAt?: string
+  completedAt?: string
+}
+
+export interface ComicBooksPageDTO {
+  items: ComicBookListItemDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ListComicBooksParams {
+  q?: string
+  tag?: string
+  favorite?: boolean
+  readStatus?: string
+  limit?: number
+  offset?: number
+}
+
+export interface ComicPageDTO {
+  comicId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+export interface ComicBookDetailDTO extends ComicBookListItemDTO {
+  pages: ComicPageDTO[]
+}
+
+export type ComicReaderMode = "page" | "scroll"
+export type ComicFitMode = "contain" | "width"
+export type ComicReadingDirection = "ltr" | "rtl"
+
+export interface ComicReaderSettingsDTO {
+  mode: ComicReaderMode
+  fit: ComicFitMode
+  direction: ComicReadingDirection
+}
+
+export interface ComicCacheSettingsDTO {
+  maxBytes: number
+}
+
+export interface PhotoLibraryPathDTO {
+  id: string
+  path: string
+  title: string
+  firstLibraryScanPending?: boolean
+}
+
+export interface AddPhotoLibraryPathBody {
+  path: string
+  title?: string
+}
+
+export interface AddPhotoLibraryPathResultDTO extends PhotoLibraryPathDTO {
+  scanTask?: TaskDTO
+}
+
+export interface UpdatePhotoLibraryPathBody {
+  title: string
+}
+
+export interface PhotoBookListItemDTO {
+  id: string
+  title: string
+  tags: string[]
+  rating?: number | null
+  isFavorite: boolean
+  pageCount: number
+  currentPageIndex: number
+  coverUrl?: string
+  sourceFileName: string
+  location: string
+  addedAt: string
+  updatedAt: string
+  lastViewedAt?: string
+  completedAt?: string
+}
+
+export interface PhotoBooksPageDTO {
+  items: PhotoBookListItemDTO[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ListPhotoBooksParams {
+  q?: string
+  tag?: string
+  favorite?: boolean
+  limit?: number
+  offset?: number
+}
+
+export interface PhotoPageDTO {
+  photoId: string
+  index: number
+  entryPath: string
+  fileName: string
+  imageExt?: string
+  width?: number
+  height?: number
+  imageUrl?: string
+  thumbUrl?: string
+}
+
+export interface PhotoBookDetailDTO extends PhotoBookListItemDTO {
+  pages: PhotoPageDTO[]
+}
+
+export type PhotoViewerMode = "page" | "scroll"
+export type PhotoFitMode = "contain" | "width"
+export type PhotoViewingDirection = "ltr" | "rtl"
+
+export interface PhotoViewerSettingsDTO {
+  mode: PhotoViewerMode
+  fit: PhotoFitMode
+  direction: PhotoViewingDirection
+}
+
+export interface PhotoCacheSettingsDTO {
+  maxBytes: number
+}
+
+export interface ComicCacheStatusDTO {
+  maxBytes: number
+  usedBytes: number
+  entryCount: number
+}
+
+export interface ComicReadingProgressDTO {
+  comicId: string
+  pageIndex: number
+  completed: boolean
+  updatedAt: string
+}
+
+export interface ComicReadingPreferencesDTO {
+  comicId?: string
+  mode: ComicReaderMode
+  fit: ComicFitMode
+  direction: ComicReadingDirection
+  updatedAt?: string
+}
+
+export interface PatchComicBookBody {
+  title?: string
+  tags?: string[]
+  favorite?: boolean
+  ratingSet?: boolean
+  ratingClear?: boolean
+  rating?: number
+}
+
+export interface PutComicProgressBody {
+  pageIndex: number
+  completed: boolean
+}
+
+export interface PutComicReadingPreferencesBody {
+  mode?: ComicReaderMode
+  fit?: ComicFitMode
+  direction?: ComicReadingDirection
+}
+
 export type HardwareEncoderPreference =
   | "auto"
   | "amf"
@@ -293,6 +500,18 @@ export interface SettingsDTO {
   defaultImportLibraryPathId?: string
   /** Remembered directory for newly generated backup package filenames. Empty means not configured. */
   backupDirectory: string
+  comicLibraryEnabled: boolean
+  autoComicLibraryWatch: boolean
+  comicLibraryPaths: ComicLibraryPathDTO[]
+  defaultComicImportLibraryPathId?: string
+  comicReader: ComicReaderSettingsDTO
+  comicCache: ComicCacheSettingsDTO
+  photoLibraryEnabled: boolean
+  autoPhotoLibraryWatch: boolean
+  photoLibraryPaths: PhotoLibraryPathDTO[]
+  defaultPhotoImportLibraryPathId?: string
+  photoViewer: PhotoViewerSettingsDTO
+  photoCache: PhotoCacheSettingsDTO
   player: PlayerSettingsDTO
   /** 扫描后整理为 番号/番号.ext 并写入 NFO/资产到番号目录 */
   organizeLibrary: boolean
@@ -728,7 +947,23 @@ export interface ProxyJavBusPingResponse {
   message?: string
 }
 
-export interface PatchSettingsBody {
+export interface PatchComicSettingsBody {
+  comicLibraryEnabled?: boolean
+  autoComicLibraryWatch?: boolean
+  defaultComicImportLibraryPathId?: string
+  comicReader?: ComicReaderSettingsDTO
+  comicCache?: ComicCacheSettingsDTO
+}
+
+export interface PatchPhotoSettingsBody {
+  photoLibraryEnabled?: boolean
+  autoPhotoLibraryWatch?: boolean
+  defaultPhotoImportLibraryPathId?: string
+  photoViewer?: PhotoViewerSettingsDTO
+  photoCache?: PhotoCacheSettingsDTO
+}
+
+export interface PatchSettingsBody extends PatchComicSettingsBody, PatchPhotoSettingsBody {
   organizeLibrary?: boolean
   autoLibraryWatch?: boolean
   autoActorProfileScrape?: boolean
@@ -776,6 +1011,12 @@ export interface RecentTasksDTO {
 }
 
 export interface MovieImportUploadProgress {
+  loaded: number
+  total: number
+  percent: number
+}
+
+export interface ComicImportUploadProgress {
   loaded: number
   total: number
   percent: number

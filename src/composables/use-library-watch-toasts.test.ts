@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getRecentTasks: vi.fn(),
   pushAppToast: vi.fn(),
   reloadMoviesFromApi: vi.fn(),
+  reloadComicsFromApi: vi.fn(),
   bumpMovieImageVersion: vi.fn(),
   subscribeBackendEvents: vi.fn(),
 }))
@@ -41,6 +42,12 @@ vi.mock("@/services/library-service", () => ({
   }),
 }))
 
+vi.mock("@/services/comic-library-service", () => ({
+  useComicLibraryService: () => ({
+    reloadComicsFromApi: mocks.reloadComicsFromApi,
+  }),
+}))
+
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string, params?: Record<string, unknown>) =>
@@ -68,6 +75,30 @@ function makeFsnotifyScanTask(overrides: Partial<TaskDTO> = {}): TaskDTO {
     finishedAt: "2026-05-02T00:00:02.000Z",
     progress: 100,
     message: "Scan finished: 24 discovered, 0 imported, 0 updated, 24 skipped",
+    ...overrides,
+    metadata,
+  }
+}
+
+function makeComicFsnotifyScanTask(overrides: Partial<TaskDTO> = {}): TaskDTO {
+  const metadata = {
+    trigger: "fsnotify",
+    paths: ["D:/Comics"],
+    filesDiscovered: 3,
+    imported: 1,
+    updated: 0,
+    skipped: 2,
+    ...(overrides.metadata ?? {}),
+  }
+  return {
+    taskId: "scan-comics-1",
+    type: "scan.comics",
+    status: "completed",
+    createdAt: "2026-06-28T00:00:00.000Z",
+    startedAt: "2026-06-28T00:00:01.000Z",
+    finishedAt: "2026-06-28T00:00:02.000Z",
+    progress: 100,
+    message: "Comic scan complete",
     ...overrides,
     metadata,
   }
@@ -163,6 +194,23 @@ describe("useLibraryWatchToasts", () => {
       expect.anything(),
     )
     expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("reloads comics when a comic fsnotify scan completes", async () => {
+    vi.useFakeTimers()
+    mocks.getRecentTasks.mockResolvedValueOnce({ tasks: [makeComicFsnotifyScanTask()] })
+
+    const wrapper = await mountLibraryWatchHarness()
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.comicLibraryWatchScanDoneWithChanges",
+      expect.objectContaining({ variant: "success" }),
+    )
+    expect(mocks.reloadComicsFromApi).toHaveBeenCalledTimes(1)
+    expect(mocks.reloadMoviesFromApi).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

@@ -140,6 +140,7 @@ test("locked startup defers protected hydration until a successful unlock", asyn
     allApiRequests.push(`${request.method()} ${apiPath(request.url())}`)
 
     if (
+      path === "/api/settings" ||
       path === "/api/library/movies" ||
       path === "/api/library/saved-views" ||
       path === "/api/playback/progress" ||
@@ -181,6 +182,10 @@ test("locked startup defers protected hydration until a successful unlock", asyn
       return
     }
 
+    if (path === "/api/settings") {
+      await route.fulfill({ json: { libraryPaths: [], comicLibraryEnabled: false, photoLibraryEnabled: false } })
+      return
+    }
     if (path === "/api/library/movies") {
       await route.fulfill({ json: { items: [], limit: 500, offset: 0, total: 0 } })
       return
@@ -238,12 +243,13 @@ test("locked startup defers protected hydration until a successful unlock", asyn
   await expect(page).toHaveURL(/#\/library$/)
 
   await expect
-    .poll(() => protectedRequests.map((request) => request.path).sort())
+    .poll(() => [...new Set(protectedRequests.map((request) => request.path))].sort())
     .toEqual([
       "/api/library/played-movies",
       "/api/library/movies?limit=500&offset=0",
       "/api/library/saved-views",
       "/api/playback/progress",
+      "/api/settings",
     ].sort())
   expect(protectedRequests.every((request) => request.unlocked)).toBe(true)
   expect(unknownApiRequests).toEqual([])

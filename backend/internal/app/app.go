@@ -25,6 +25,8 @@ import (
 
 	"curated-backend/internal/appupdate"
 	"curated-backend/internal/assets"
+	"curated-backend/internal/comicscanner"
+	"curated-backend/internal/comicwatch"
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
@@ -33,6 +35,8 @@ import (
 	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/librarywatch"
 	"curated-backend/internal/nativeplayer"
+	"curated-backend/internal/photoscanner"
+	"curated-backend/internal/photowatch"
 	"curated-backend/internal/playback"
 	"curated-backend/internal/proxyenv"
 	"curated-backend/internal/scanner"
@@ -94,6 +98,28 @@ type App struct {
 	// backupDirectory is the remembered destination for timestamped backup packages.
 	backupDirectory   string
 	backupDirectoryMu sync.RWMutex
+	// comicLibraryEnabled gates the optional, independent comic library domain.
+	comicLibraryEnabled   bool
+	comicLibraryEnabledMu sync.RWMutex
+	// autoComicLibraryWatch gates fsnotify-driven comic scan enqueue; persisted to library-config.cfg.
+	autoComicLibraryWatch   bool
+	autoComicLibraryWatchMu sync.RWMutex
+	// defaultComicImportLibraryPathID controls where top-bar comic imports are copied.
+	defaultComicImportLibraryPathID   string
+	defaultComicImportLibraryPathIDMu sync.RWMutex
+	// comicSettingsMu protects cfg.ComicReader and cfg.ComicCache.
+	comicSettingsMu sync.RWMutex
+	// photoLibraryEnabled gates the optional, independent photo book library domain.
+	photoLibraryEnabled   bool
+	photoLibraryEnabledMu sync.RWMutex
+	// autoPhotoLibraryWatch gates future fsnotify-driven photo scan enqueue; persisted to library-config.cfg.
+	autoPhotoLibraryWatch   bool
+	autoPhotoLibraryWatchMu sync.RWMutex
+	// defaultPhotoImportLibraryPathID controls where top-bar photo imports are copied.
+	defaultPhotoImportLibraryPathID   string
+	defaultPhotoImportLibraryPathIDMu sync.RWMutex
+	// photoSettingsMu protects cfg.PhotoViewer and cfg.PhotoCache.
+	photoSettingsMu sync.RWMutex
 	// autoActorProfileScrapePending dedupes auto-enqueued actor scrapes while they are in flight.
 	autoActorProfileScrapePending   map[string]struct{}
 	autoActorProfileScrapeAttempted map[string]time.Time
@@ -122,13 +148,29 @@ type App struct {
 	scrapeMovieMu       sync.Mutex
 	scrapeMovieInflight map[string]string
 
-	watchScanMu      sync.Mutex
-	watchScanPending map[string]struct{}
-	watchScanDrainMu sync.Mutex
-	libWatchMu       sync.Mutex
-	libWatch         *librarywatch.Watcher
-	watchLoopCancel  context.CancelFunc
-	watchLoopSession uint64 // bumped on each Start/Stop; goroutine clears cancel only if still current
+	watchScanMu           sync.Mutex
+	watchScanPending      map[string]struct{}
+	watchScanDrainMu      sync.Mutex
+	comicScanning         atomic.Bool
+	comicWatchScanMu      sync.Mutex
+	comicWatchScanPending map[string]struct{}
+	comicWatchScanDrainMu sync.Mutex
+	photoScanning         atomic.Bool
+	photoWatchScanMu      sync.Mutex
+	photoWatchScanPending map[string]struct{}
+	photoWatchScanDrainMu sync.Mutex
+	libWatchMu            sync.Mutex
+	libWatch              *librarywatch.Watcher
+	watchLoopCancel       context.CancelFunc
+	watchLoopSession      uint64 // bumped on each Start/Stop; goroutine clears cancel only if still current
+	comicWatchMu          sync.Mutex
+	comicWatch            *comicwatch.Watcher
+	comicWatchLoopCancel  context.CancelFunc
+	comicWatchLoopSession uint64
+	photoWatchMu          sync.Mutex
+	photoWatch            *photowatch.Watcher
+	photoWatchLoopCancel  context.CancelFunc
+	photoWatchLoopSession uint64
 }
 
 // New 构造并返回可运行的后端 App（依赖注入入口），由 cmd/curated 在加载配置、合并 library-config.cfg、
@@ -198,11 +240,19 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoActorProfileScrapePending:   make(map[string]struct{}),
 		autoActorProfileScrapeAttempted: make(map[string]time.Time),
 		scrapeMovieInflight:             make(map[string]string),
+		comicLibraryEnabled:             cfg.ComicLibraryEnabled,
+		autoComicLibraryWatch:           cfg.AutoComicLibraryWatch,
+		defaultComicImportLibraryPathID: strings.TrimSpace(cfg.DefaultComicImportLibraryPathID),
+		photoLibraryEnabled:             cfg.PhotoLibraryEnabled,
+		autoPhotoLibraryWatch:           cfg.AutoPhotoLibraryWatch,
+		defaultPhotoImportLibraryPathID: strings.TrimSpace(cfg.DefaultPhotoImportLibraryPathID),
 		metadataMovieProviderChain:      cfg.MetadataMovieProviderChain,
 		librarySettingsPath:             strings.TrimSpace(librarySettingsPath),
 		appCtx:                          ctx,
 		scrapeSem:                       make(chan struct{}, scrapeConc),
 		watchScanPending:                make(map[string]struct{}),
+		comicWatchScanPending:           make(map[string]struct{}),
+		photoWatchScanPending:           make(map[string]struct{}),
 	}
 	app.appUpdate.SetCacheDir(cfg.CacheDir)
 	app.appUpdate.SetTaskManager(app.tasks)
@@ -218,12 +268,14 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 	return app, nil
 }
 
-// Close drains in-flight scrape goroutines and stops the library watch loop.
+// Close drains in-flight scrape goroutines and stops library watch loops.
 func (a *App) Close() {
 	if a == nil {
 		return
 	}
 	a.StopLibraryWatchLoop()
+	a.StopComicLibraryWatchLoop()
+	a.StopPhotoLibraryWatchLoop()
 	if a.streams != nil {
 		a.streams.Close()
 	}
@@ -249,6 +301,28 @@ func (a *App) ReloadLibraryWatches(ctx context.Context) error {
 	a.libWatchMu.Unlock()
 	if w == nil {
 		return nil
+	}
+	return w.Reload(ctx)
+}
+
+// ReloadComicLibraryWatches re-reads comic roots from the database and rebuilds comic directory watches.
+func (a *App) ReloadComicLibraryWatches(ctx context.Context) error {
+	a.comicWatchMu.Lock()
+	w := a.comicWatch
+	a.comicWatchMu.Unlock()
+	if w == nil {
+		return a.EnsureComicLibraryWatchRunning()
+	}
+	return w.Reload(ctx)
+}
+
+// ReloadPhotoLibraryWatches re-reads photo roots from the database and rebuilds photo directory watches.
+func (a *App) ReloadPhotoLibraryWatches(ctx context.Context) error {
+	a.photoWatchMu.Lock()
+	w := a.photoWatch
+	a.photoWatchMu.Unlock()
+	if w == nil {
+		return a.EnsurePhotoLibraryWatchRunning()
 	}
 	return w.Reload(ctx)
 }
@@ -309,6 +383,220 @@ func (a *App) tryDrainWatchScanQueue() {
 }
 
 // OrganizeLibrary returns whether scan/scrape should move files and write NFO/assets into 番号 folders.
+// EnqueueComicLibraryWatchScanRoots queues comic roots for a debounced fsnotify-driven scan.
+func (a *App) EnqueueComicLibraryWatchScanRoots(roots []string) {
+	if !a.ComicLibraryEnabled() || !a.AutoComicLibraryWatch() {
+		return
+	}
+	if len(roots) == 0 {
+		return
+	}
+	a.comicWatchScanMu.Lock()
+	if a.comicWatchScanPending == nil {
+		a.comicWatchScanPending = make(map[string]struct{})
+	}
+	for _, r := range roots {
+		r = filepath.Clean(strings.TrimSpace(r))
+		if r != "" {
+			a.comicWatchScanPending[r] = struct{}{}
+		}
+	}
+	a.comicWatchScanMu.Unlock()
+	go a.tryDrainComicWatchScanQueue()
+}
+
+func (a *App) tryDrainComicWatchScanQueue() {
+	a.comicWatchScanDrainMu.Lock()
+	defer a.comicWatchScanDrainMu.Unlock()
+
+	a.comicWatchScanMu.Lock()
+	if len(a.comicWatchScanPending) == 0 {
+		a.comicWatchScanMu.Unlock()
+		return
+	}
+	roots := make([]string, 0, len(a.comicWatchScanPending))
+	for r := range a.comicWatchScanPending {
+		roots = append(roots, r)
+	}
+	slices.Sort(roots)
+	a.comicWatchScanPending = make(map[string]struct{})
+	a.comicWatchScanMu.Unlock()
+
+	if !a.ComicLibraryEnabled() || !a.AutoComicLibraryWatch() {
+		return
+	}
+	if a.store == nil {
+		if a.logger != nil {
+			a.logger.Warn("comic watch: scan store is not available")
+		}
+		return
+	}
+
+	ctx := a.appCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	allPaths, err := a.store.ListComicLibraryPaths(ctx)
+	if err != nil {
+		if a.logger != nil {
+			a.logger.Warn("comic watch: list comic paths failed", zap.Error(err))
+		}
+		a.requeueComicWatchScanRoots(roots)
+		return
+	}
+
+	pendingRoots := make(map[string]struct{}, len(roots))
+	for _, root := range roots {
+		pendingRoots[filepath.Clean(root)] = struct{}{}
+	}
+	scanPaths := make([]contracts.ComicLibraryPathDTO, 0, len(allPaths))
+	for _, p := range allPaths {
+		cleanPath := filepath.Clean(strings.TrimSpace(p.Path))
+		if _, ok := pendingRoots[cleanPath]; ok {
+			scanPaths = append(scanPaths, p)
+		}
+	}
+	if len(scanPaths) == 0 {
+		return
+	}
+
+	_, err = a.startComicScan(ctx, scanPaths, map[string]any{
+		"trigger": "fsnotify",
+		"paths":   roots,
+	})
+	if err != nil {
+		if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+			a.requeueComicWatchScanRoots(roots)
+			return
+		}
+		if a.logger != nil {
+			a.logger.Warn("comic watch: failed to start scan", zap.Error(err))
+		}
+		a.requeueComicWatchScanRoots(roots)
+	}
+}
+
+func (a *App) requeueComicWatchScanRoots(roots []string) {
+	a.comicWatchScanMu.Lock()
+	if a.comicWatchScanPending == nil {
+		a.comicWatchScanPending = make(map[string]struct{})
+	}
+	for _, root := range roots {
+		root = filepath.Clean(strings.TrimSpace(root))
+		if root != "" {
+			a.comicWatchScanPending[root] = struct{}{}
+		}
+	}
+	a.comicWatchScanMu.Unlock()
+}
+
+// EnqueuePhotoLibraryWatchScanRoots queues photo roots for a debounced fsnotify-driven scan.
+func (a *App) EnqueuePhotoLibraryWatchScanRoots(roots []string) {
+	if !a.PhotoLibraryEnabled() || !a.AutoPhotoLibraryWatch() {
+		return
+	}
+	if len(roots) == 0 {
+		return
+	}
+	a.photoWatchScanMu.Lock()
+	if a.photoWatchScanPending == nil {
+		a.photoWatchScanPending = make(map[string]struct{})
+	}
+	for _, r := range roots {
+		r = filepath.Clean(strings.TrimSpace(r))
+		if r != "" {
+			a.photoWatchScanPending[r] = struct{}{}
+		}
+	}
+	a.photoWatchScanMu.Unlock()
+	go a.tryDrainPhotoWatchScanQueue()
+}
+
+func (a *App) tryDrainPhotoWatchScanQueue() {
+	a.photoWatchScanDrainMu.Lock()
+	defer a.photoWatchScanDrainMu.Unlock()
+
+	a.photoWatchScanMu.Lock()
+	if len(a.photoWatchScanPending) == 0 {
+		a.photoWatchScanMu.Unlock()
+		return
+	}
+	roots := make([]string, 0, len(a.photoWatchScanPending))
+	for r := range a.photoWatchScanPending {
+		roots = append(roots, r)
+	}
+	slices.Sort(roots)
+	a.photoWatchScanPending = make(map[string]struct{})
+	a.photoWatchScanMu.Unlock()
+
+	if !a.PhotoLibraryEnabled() || !a.AutoPhotoLibraryWatch() {
+		return
+	}
+	if a.store == nil {
+		if a.logger != nil {
+			a.logger.Warn("photo watch: scan store is not available")
+		}
+		return
+	}
+
+	ctx := a.appCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	allPaths, err := a.store.ListPhotoLibraryPaths(ctx)
+	if err != nil {
+		if a.logger != nil {
+			a.logger.Warn("photo watch: list photo paths failed", zap.Error(err))
+		}
+		a.requeuePhotoWatchScanRoots(roots)
+		return
+	}
+
+	pendingRoots := make(map[string]struct{}, len(roots))
+	for _, root := range roots {
+		pendingRoots[filepath.Clean(root)] = struct{}{}
+	}
+	scanPaths := make([]contracts.PhotoLibraryPathDTO, 0, len(allPaths))
+	for _, p := range allPaths {
+		cleanPath := filepath.Clean(strings.TrimSpace(p.Path))
+		if _, ok := pendingRoots[cleanPath]; ok {
+			scanPaths = append(scanPaths, p)
+		}
+	}
+	if len(scanPaths) == 0 {
+		return
+	}
+
+	_, err = a.startPhotoScan(ctx, scanPaths, map[string]any{
+		"trigger": "fsnotify",
+		"paths":   roots,
+	})
+	if err != nil {
+		if errors.Is(err, contracts.ErrScanAlreadyRunning) {
+			a.requeuePhotoWatchScanRoots(roots)
+			return
+		}
+		if a.logger != nil {
+			a.logger.Warn("photo watch: failed to start scan", zap.Error(err))
+		}
+		a.requeuePhotoWatchScanRoots(roots)
+	}
+}
+
+func (a *App) requeuePhotoWatchScanRoots(roots []string) {
+	a.photoWatchScanMu.Lock()
+	if a.photoWatchScanPending == nil {
+		a.photoWatchScanPending = make(map[string]struct{})
+	}
+	for _, root := range roots {
+		root = filepath.Clean(strings.TrimSpace(root))
+		if root != "" {
+			a.photoWatchScanPending[root] = struct{}{}
+		}
+	}
+	a.photoWatchScanMu.Unlock()
+}
+
 func (a *App) OrganizeLibrary() bool {
 	a.organizeMu.RLock()
 	defer a.organizeMu.RUnlock()
@@ -395,6 +683,41 @@ func (a *App) BackupDirectory() string {
 	a.backupDirectoryMu.RLock()
 	defer a.backupDirectoryMu.RUnlock()
 	return strings.TrimSpace(a.backupDirectory)
+}
+
+// ComicLibraryEnabled reports whether the optional comic library domain is enabled.
+func (a *App) ComicLibraryEnabled() bool {
+	a.comicLibraryEnabledMu.RLock()
+	defer a.comicLibraryEnabledMu.RUnlock()
+	return a.comicLibraryEnabled
+}
+
+// AutoComicLibraryWatch reports whether directory watching may queue comic scans for new archives under comic roots.
+func (a *App) AutoComicLibraryWatch() bool {
+	a.autoComicLibraryWatchMu.RLock()
+	defer a.autoComicLibraryWatchMu.RUnlock()
+	return a.autoComicLibraryWatch
+}
+
+// DefaultComicImportLibraryPathID returns the configured comic_library_paths row id used by comic import.
+func (a *App) DefaultComicImportLibraryPathID() string {
+	a.defaultComicImportLibraryPathIDMu.RLock()
+	defer a.defaultComicImportLibraryPathIDMu.RUnlock()
+	return strings.TrimSpace(a.defaultComicImportLibraryPathID)
+}
+
+// ComicReaderSettings returns global default comic reader preferences exposed to Settings UI.
+func (a *App) ComicReaderSettings() contracts.ComicReaderSettingsDTO {
+	a.comicSettingsMu.RLock()
+	defer a.comicSettingsMu.RUnlock()
+	return comicReaderSettingsDTOFromConfig(a.cfg.ComicReader)
+}
+
+// ComicCacheSettings returns comic cache governance settings exposed to Settings UI.
+func (a *App) ComicCacheSettings() contracts.ComicCacheSettingsDTO {
+	a.comicSettingsMu.RLock()
+	defer a.comicSettingsMu.RUnlock()
+	return comicCacheSettingsDTOFromConfig(a.cfg.ComicCache)
 }
 
 // SetAutoLibraryWatch persists autoLibraryWatch to library-config.cfg, updates in-memory state, and starts/stops the watcher loop when yaml allows watching.
@@ -584,6 +907,297 @@ func (a *App) SetBackupDirectory(directory string) error {
 	return nil
 }
 
+// SetComicLibraryEnabled persists the optional comic library gate.
+func (a *App) SetComicLibraryEnabled(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicLibraryEnabled"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicLibraryEnabledMu.Lock()
+	a.comicLibraryEnabled = v
+	a.cfg.ComicLibraryEnabled = v
+	a.comicLibraryEnabledMu.Unlock()
+	if v && a.cfg.LibraryWatchOn() && a.AutoComicLibraryWatch() {
+		return a.EnsureComicLibraryWatchRunning()
+	}
+	a.StopComicLibraryWatchLoop()
+	return nil
+}
+
+// SetAutoComicLibraryWatch persists the comic fsnotify auto scan gate.
+func (a *App) SetAutoComicLibraryWatch(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["autoComicLibraryWatch"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.autoComicLibraryWatchMu.Lock()
+	a.autoComicLibraryWatch = v
+	a.cfg.AutoComicLibraryWatch = v
+	a.autoComicLibraryWatchMu.Unlock()
+	if v && a.cfg.LibraryWatchOn() && a.ComicLibraryEnabled() {
+		return a.EnsureComicLibraryWatchRunning()
+	}
+	a.StopComicLibraryWatchLoop()
+	return nil
+}
+
+// SetDefaultComicImportLibraryPathID persists the default comic import destination path id.
+func (a *App) SetDefaultComicImportLibraryPathID(id string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	id = strings.TrimSpace(id)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["defaultComicImportLibraryPathId"] = id
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.defaultComicImportLibraryPathIDMu.Lock()
+	a.defaultComicImportLibraryPathID = id
+	a.cfg.DefaultComicImportLibraryPathID = id
+	a.defaultComicImportLibraryPathIDMu.Unlock()
+	return nil
+}
+
+// SetComicReaderSettings persists global default comic reader preferences.
+func (a *App) SetComicReaderSettings(v contracts.ComicReaderSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeComicReaderConfig(config.ComicReaderConfig{
+		Mode:      v.Mode,
+		Fit:       v.Fit,
+		Direction: v.Direction,
+	})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicReader"] = map[string]any{
+			"mode":      next.Mode,
+			"fit":       next.Fit,
+			"direction": next.Direction,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicSettingsMu.Lock()
+	a.cfg.ComicReader = next
+	a.comicSettingsMu.Unlock()
+	return nil
+}
+
+// SetComicCacheSettings persists comic cache governance settings.
+func (a *App) SetComicCacheSettings(v contracts.ComicCacheSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizeComicCacheConfig(config.ComicCacheConfig{MaxBytes: v.MaxBytes})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["comicCache"] = map[string]any{
+			"maxBytes": next.MaxBytes,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.comicSettingsMu.Lock()
+	a.cfg.ComicCache = next
+	a.comicSettingsMu.Unlock()
+	return nil
+}
+
+func comicReaderSettingsDTOFromConfig(v config.ComicReaderConfig) contracts.ComicReaderSettingsDTO {
+	n := config.NormalizeComicReaderConfig(v)
+	return contracts.ComicReaderSettingsDTO{
+		Mode:      n.Mode,
+		Fit:       n.Fit,
+		Direction: n.Direction,
+	}
+}
+
+func comicCacheSettingsDTOFromConfig(v config.ComicCacheConfig) contracts.ComicCacheSettingsDTO {
+	n := config.NormalizeComicCacheConfig(v)
+	return contracts.ComicCacheSettingsDTO{MaxBytes: n.MaxBytes}
+}
+
+// PhotoLibraryEnabled reports whether the optional photo book library domain is enabled.
+func (a *App) PhotoLibraryEnabled() bool {
+	a.photoLibraryEnabledMu.RLock()
+	defer a.photoLibraryEnabledMu.RUnlock()
+	return a.photoLibraryEnabled
+}
+
+// AutoPhotoLibraryWatch reports whether future directory watching may queue photo scans.
+func (a *App) AutoPhotoLibraryWatch() bool {
+	a.autoPhotoLibraryWatchMu.RLock()
+	defer a.autoPhotoLibraryWatchMu.RUnlock()
+	return a.autoPhotoLibraryWatch
+}
+
+// DefaultPhotoImportLibraryPathID returns the configured photo_library_paths row id used by photo import.
+func (a *App) DefaultPhotoImportLibraryPathID() string {
+	a.defaultPhotoImportLibraryPathIDMu.RLock()
+	defer a.defaultPhotoImportLibraryPathIDMu.RUnlock()
+	return strings.TrimSpace(a.defaultPhotoImportLibraryPathID)
+}
+
+// PhotoViewerSettings returns global default photo book viewer preferences exposed to Settings UI.
+func (a *App) PhotoViewerSettings() contracts.PhotoViewerSettingsDTO {
+	a.photoSettingsMu.RLock()
+	defer a.photoSettingsMu.RUnlock()
+	return photoViewerSettingsDTOFromConfig(a.cfg.PhotoViewer)
+}
+
+// PhotoCacheSettings returns photo book cache governance settings exposed to Settings UI.
+func (a *App) PhotoCacheSettings() contracts.PhotoCacheSettingsDTO {
+	a.photoSettingsMu.RLock()
+	defer a.photoSettingsMu.RUnlock()
+	return photoCacheSettingsDTOFromConfig(a.cfg.PhotoCache)
+}
+
+// SetPhotoLibraryEnabled persists the optional photo book library gate.
+func (a *App) SetPhotoLibraryEnabled(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["photoLibraryEnabled"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.photoLibraryEnabledMu.Lock()
+	a.photoLibraryEnabled = v
+	a.cfg.PhotoLibraryEnabled = v
+	a.photoLibraryEnabledMu.Unlock()
+	if v && a.cfg.LibraryWatchOn() && a.AutoPhotoLibraryWatch() {
+		return a.EnsurePhotoLibraryWatchRunning()
+	}
+	a.StopPhotoLibraryWatchLoop()
+	return nil
+}
+
+// SetAutoPhotoLibraryWatch persists the photo fsnotify auto scan gate.
+func (a *App) SetAutoPhotoLibraryWatch(v bool) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["autoPhotoLibraryWatch"] = v
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.autoPhotoLibraryWatchMu.Lock()
+	a.autoPhotoLibraryWatch = v
+	a.cfg.AutoPhotoLibraryWatch = v
+	a.autoPhotoLibraryWatchMu.Unlock()
+	if v && a.cfg.LibraryWatchOn() && a.PhotoLibraryEnabled() {
+		return a.EnsurePhotoLibraryWatchRunning()
+	}
+	a.StopPhotoLibraryWatchLoop()
+	return nil
+}
+
+// SetDefaultPhotoImportLibraryPathID persists the default photo import destination path id.
+func (a *App) SetDefaultPhotoImportLibraryPathID(id string) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	id = strings.TrimSpace(id)
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["defaultPhotoImportLibraryPathId"] = id
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.defaultPhotoImportLibraryPathIDMu.Lock()
+	a.defaultPhotoImportLibraryPathID = id
+	a.cfg.DefaultPhotoImportLibraryPathID = id
+	a.defaultPhotoImportLibraryPathIDMu.Unlock()
+	return nil
+}
+
+// SetPhotoViewerSettings persists global default photo book viewer preferences.
+func (a *App) SetPhotoViewerSettings(v contracts.PhotoViewerSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizePhotoViewerConfig(config.PhotoViewerConfig{
+		Mode:      v.Mode,
+		Fit:       v.Fit,
+		Direction: v.Direction,
+	})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["photoViewer"] = map[string]any{
+			"mode":      next.Mode,
+			"fit":       next.Fit,
+			"direction": next.Direction,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.photoSettingsMu.Lock()
+	a.cfg.PhotoViewer = next
+	a.photoSettingsMu.Unlock()
+	return nil
+}
+
+// SetPhotoCacheSettings persists photo book cache governance settings.
+func (a *App) SetPhotoCacheSettings(v contracts.PhotoCacheSettingsDTO) error {
+	path := a.librarySettingsPath
+	if path == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	next := config.NormalizePhotoCacheConfig(config.PhotoCacheConfig{MaxBytes: v.MaxBytes})
+	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
+		m["photoCache"] = map[string]any{
+			"maxBytes": next.MaxBytes,
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	a.photoSettingsMu.Lock()
+	a.cfg.PhotoCache = next
+	a.photoSettingsMu.Unlock()
+	return nil
+}
+
+func photoViewerSettingsDTOFromConfig(v config.PhotoViewerConfig) contracts.PhotoViewerSettingsDTO {
+	n := config.NormalizePhotoViewerConfig(v)
+	return contracts.PhotoViewerSettingsDTO{
+		Mode:      n.Mode,
+		Fit:       n.Fit,
+		Direction: n.Direction,
+	}
+}
+
+func photoCacheSettingsDTOFromConfig(v config.PhotoCacheConfig) contracts.PhotoCacheSettingsDTO {
+	n := config.NormalizePhotoCacheConfig(v)
+	return contracts.PhotoCacheSettingsDTO{MaxBytes: n.MaxBytes}
+}
+
 // ListLibraryPathStorageStatus checks every configured library path's backing storage.
 func (a *App) ListLibraryPathStorageStatus(ctx context.Context) (contracts.LibraryPathStorageStatusListDTO, error) {
 	return a.CheckLibraryPathStorageStatus(ctx, nil)
@@ -715,6 +1329,142 @@ func (a *App) StopLibraryWatchLoop() {
 	a.watchLoopCancel = nil
 	a.watchLoopSession++
 	a.libWatchMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// EnsureComicLibraryWatchRunning starts the comic fsnotify Run loop when all comic watch gates are open.
+func (a *App) EnsureComicLibraryWatchRunning() error {
+	if !a.cfg.LibraryWatchOn() {
+		return nil
+	}
+	if !a.ComicLibraryEnabled() || !a.AutoComicLibraryWatch() {
+		return nil
+	}
+	if a.store == nil {
+		return nil
+	}
+	a.comicWatchMu.Lock()
+	if a.comicWatchLoopCancel != nil {
+		a.comicWatchMu.Unlock()
+		return nil
+	}
+	if a.comicWatch == nil {
+		cw, err := comicwatch.New(comicwatch.Options{
+			Enabled:  true,
+			Debounce: a.cfg.LibraryWatchDebounce(),
+			Logger:   a.logger,
+			Lister:   a.store,
+			Queue:    a,
+		})
+		if err != nil {
+			a.comicWatchMu.Unlock()
+			return err
+		}
+		a.comicWatch = cw
+	}
+	w := a.comicWatch
+	a.comicWatchLoopSession++
+	sess := a.comicWatchLoopSession
+	baseCtx := a.appCtx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	watchCtx, cancel := context.WithCancel(baseCtx)
+	a.comicWatchLoopCancel = cancel
+	a.comicWatchMu.Unlock()
+
+	go func(sess uint64) {
+		err := w.Run(watchCtx)
+		a.comicWatchMu.Lock()
+		if a.comicWatchLoopSession == sess {
+			a.comicWatchLoopCancel = nil
+		}
+		a.comicWatchMu.Unlock()
+		if err != nil && !errors.Is(err, context.Canceled) && a.logger != nil {
+			a.logger.Warn("comic fsnotify watcher exited", zap.Error(err))
+		}
+	}(sess)
+
+	return nil
+}
+
+// StopComicLibraryWatchLoop cancels the active comic fsnotify Run context.
+func (a *App) StopComicLibraryWatchLoop() {
+	a.comicWatchMu.Lock()
+	cancel := a.comicWatchLoopCancel
+	a.comicWatchLoopCancel = nil
+	a.comicWatchLoopSession++
+	a.comicWatchMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// EnsurePhotoLibraryWatchRunning starts the photo fsnotify Run loop when all photo watch gates are open.
+func (a *App) EnsurePhotoLibraryWatchRunning() error {
+	if !a.cfg.LibraryWatchOn() {
+		return nil
+	}
+	if !a.PhotoLibraryEnabled() || !a.AutoPhotoLibraryWatch() {
+		return nil
+	}
+	if a.store == nil {
+		return nil
+	}
+	a.photoWatchMu.Lock()
+	if a.photoWatchLoopCancel != nil {
+		a.photoWatchMu.Unlock()
+		return nil
+	}
+	if a.photoWatch == nil {
+		pw, err := photowatch.New(photowatch.Options{
+			Enabled:  true,
+			Debounce: a.cfg.LibraryWatchDebounce(),
+			Logger:   a.logger,
+			Lister:   a.store,
+			Queue:    a,
+		})
+		if err != nil {
+			a.photoWatchMu.Unlock()
+			return err
+		}
+		a.photoWatch = pw
+	}
+	w := a.photoWatch
+	a.photoWatchLoopSession++
+	sess := a.photoWatchLoopSession
+	baseCtx := a.appCtx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	watchCtx, cancel := context.WithCancel(baseCtx)
+	a.photoWatchLoopCancel = cancel
+	a.photoWatchMu.Unlock()
+
+	go func(sess uint64) {
+		err := w.Run(watchCtx)
+		a.photoWatchMu.Lock()
+		if a.photoWatchLoopSession == sess {
+			a.photoWatchLoopCancel = nil
+		}
+		a.photoWatchMu.Unlock()
+		if err != nil && !errors.Is(err, context.Canceled) && a.logger != nil {
+			a.logger.Warn("photo fsnotify watcher exited", zap.Error(err))
+		}
+	}(sess)
+
+	return nil
+}
+
+// StopPhotoLibraryWatchLoop cancels the active photo fsnotify Run context.
+func (a *App) StopPhotoLibraryWatchLoop() {
+	a.photoWatchMu.Lock()
+	cancel := a.photoWatchLoopCancel
+	a.photoWatchLoopCancel = nil
+	a.photoWatchLoopSession++
+	a.photoWatchMu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
@@ -1307,18 +2057,30 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 
 		p := a.Proxy()
 		settings := contracts.SettingsDTO{
-			LibraryPaths:               libraryPaths,
-			DefaultImportLibraryPathID: a.DefaultImportLibraryPathID(),
-			Player:                     a.PlayerSettings(),
-			OrganizeLibrary:            a.OrganizeLibrary(),
-			AutoLibraryWatch:           a.AutoLibraryWatch(),
-			AutoActorProfileScrape:     a.AutoActorProfileScrape(),
-			AutoDownloadUpdates:        a.AutoDownloadUpdates(),
-			CuratedFrameExportFormat:   a.CuratedFrameExportFormat(),
-			MetadataMovieProvider:      a.MetadataMovieProvider(),
-			MetadataMovieProviders:     a.ListMetadataMovieProviders(),
-			MetadataMovieProviderChain: a.MetadataMovieProviderChain(),
-			MetadataMovieScrapeMode:    a.MetadataMovieScrapeMode(),
+			LibraryPaths:                    libraryPaths,
+			DefaultImportLibraryPathID:      a.DefaultImportLibraryPathID(),
+			ComicLibraryEnabled:             a.ComicLibraryEnabled(),
+			AutoComicLibraryWatch:           a.AutoComicLibraryWatch(),
+			ComicLibraryPaths:               []contracts.ComicLibraryPathDTO{},
+			DefaultComicImportLibraryPathID: a.DefaultComicImportLibraryPathID(),
+			ComicReader:                     a.ComicReaderSettings(),
+			ComicCache:                      a.ComicCacheSettings(),
+			PhotoLibraryEnabled:             a.PhotoLibraryEnabled(),
+			AutoPhotoLibraryWatch:           a.AutoPhotoLibraryWatch(),
+			PhotoLibraryPaths:               []contracts.PhotoLibraryPathDTO{},
+			DefaultPhotoImportLibraryPathID: a.DefaultPhotoImportLibraryPathID(),
+			PhotoViewer:                     a.PhotoViewerSettings(),
+			PhotoCache:                      a.PhotoCacheSettings(),
+			Player:                          a.PlayerSettings(),
+			OrganizeLibrary:                 a.OrganizeLibrary(),
+			AutoLibraryWatch:                a.AutoLibraryWatch(),
+			AutoActorProfileScrape:          a.AutoActorProfileScrape(),
+			AutoDownloadUpdates:             a.AutoDownloadUpdates(),
+			CuratedFrameExportFormat:        a.CuratedFrameExportFormat(),
+			MetadataMovieProvider:           a.MetadataMovieProvider(),
+			MetadataMovieProviders:          a.ListMetadataMovieProviders(),
+			MetadataMovieProviderChain:      a.MetadataMovieProviderChain(),
+			MetadataMovieScrapeMode:         a.MetadataMovieScrapeMode(),
 			Proxy: contracts.ProxySettingsDTO{
 				Enabled:  p.Enabled,
 				URL:      p.URL,
@@ -2819,6 +3581,184 @@ func (a *App) startLibraryScan(ctx context.Context, output io.Writer, paths []st
 	return task, nil
 }
 
+// StartComicScan starts an async comic library scan task through the App-owned task manager.
+func (a *App) StartComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO) (contracts.TaskDTO, error) {
+	return a.startComicScan(ctx, paths, nil)
+}
+
+func (a *App) startComicScan(ctx context.Context, paths []contracts.ComicLibraryPathDTO, extraMeta map[string]any) (contracts.TaskDTO, error) {
+	if a.tasks == nil {
+		return contracts.TaskDTO{}, errors.New("comic scan task manager is not available")
+	}
+	if a.store == nil {
+		return contracts.TaskDTO{}, errors.New("comic scan store is not available")
+	}
+	if !a.comicScanning.CompareAndSwap(false, true) {
+		return contracts.TaskDTO{}, contracts.ErrScanAlreadyRunning
+	}
+	meta := map[string]any{
+		"libraryPathCount": len(paths),
+	}
+	for k, v := range extraMeta {
+		meta[k] = v
+	}
+	task := a.tasks.Create(contracts.TaskTypeScanComics, meta)
+	task = a.tasks.Start(task.TaskID, "Scanning comics")
+	a.saveTaskSnapshot(ctx, task)
+
+	scanPaths := append([]contracts.ComicLibraryPathDTO(nil), paths...)
+	go func() {
+		defer func() {
+			a.comicScanning.Store(false)
+			a.tryDrainComicWatchScanQueue()
+		}()
+		a.runComicScanTask(a.appCtx, task.TaskID, scanPaths)
+	}()
+
+	return task, nil
+}
+
+func (a *App) runComicScanTask(ctx context.Context, taskID string, paths []contracts.ComicLibraryPathDTO) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	summary, err := comicscanner.NewService(a.store).Scan(ctx, paths)
+	if err != nil {
+		task := a.tasks.Fail(taskID, contracts.ErrorCodeComicArchiveReadFailed, err.Error())
+		a.saveTaskSnapshot(ctx, task)
+		return
+	}
+	metadata := comicScanSummaryMetadata(summary)
+	if len(summary.Errors) > 0 {
+		task := a.tasks.PartialFail(taskID, contracts.ErrorCodeComicArchiveReadFailed, "comic scan completed with errors", metadata)
+		a.saveTaskSnapshot(ctx, task)
+		return
+	}
+	task := a.tasks.ProgressWithMetadata(taskID, 100, "Comic scan complete", metadata)
+	task = a.tasks.Complete(taskID, "Comic scan complete")
+	if task.Metadata == nil {
+		task.Metadata = metadata
+	} else {
+		for k, v := range metadata {
+			task.Metadata[k] = v
+		}
+	}
+	a.saveTaskSnapshot(ctx, task)
+}
+
+func (a *App) saveTaskSnapshot(ctx context.Context, task contracts.TaskDTO) {
+	if a == nil || a.store == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := a.store.SaveTask(ctx, task); err != nil && a.logger != nil {
+		a.logger.Warn("save task snapshot failed", zap.Error(err), zap.String("taskId", task.TaskID))
+	}
+}
+
+func comicScanSummaryMetadata(summary comicscanner.Summary) map[string]any {
+	errorItems := make([]map[string]any, 0, len(summary.Errors))
+	for _, item := range summary.Errors {
+		errorItems = append(errorItems, map[string]any{
+			"path":      item.Path,
+			"errorCode": item.ErrorCode,
+			"message":   item.Message,
+		})
+	}
+	return map[string]any{
+		"filesDiscovered": summary.FilesDiscovered,
+		"imported":        summary.Imported,
+		"updated":         summary.Updated,
+		"skipped":         summary.Skipped,
+		"errorItems":      errorItems,
+	}
+}
+
+// StartPhotoScan starts an async photo library scan task through the App-owned task manager.
+func (a *App) StartPhotoScan(ctx context.Context, paths []contracts.PhotoLibraryPathDTO) (contracts.TaskDTO, error) {
+	return a.startPhotoScan(ctx, paths, nil)
+}
+
+func (a *App) startPhotoScan(ctx context.Context, paths []contracts.PhotoLibraryPathDTO, extraMeta map[string]any) (contracts.TaskDTO, error) {
+	if a.tasks == nil {
+		return contracts.TaskDTO{}, errors.New("photo scan task manager is not available")
+	}
+	if a.store == nil {
+		return contracts.TaskDTO{}, errors.New("photo scan store is not available")
+	}
+	if !a.photoScanning.CompareAndSwap(false, true) {
+		return contracts.TaskDTO{}, contracts.ErrScanAlreadyRunning
+	}
+	meta := map[string]any{
+		"libraryPathCount": len(paths),
+	}
+	for k, v := range extraMeta {
+		meta[k] = v
+	}
+	task := a.tasks.Create(contracts.TaskTypeScanPhotos, meta)
+	task = a.tasks.Start(task.TaskID, "Scanning photo books")
+	a.saveTaskSnapshot(ctx, task)
+
+	scanPaths := append([]contracts.PhotoLibraryPathDTO(nil), paths...)
+	go func() {
+		defer func() {
+			a.photoScanning.Store(false)
+			a.tryDrainPhotoWatchScanQueue()
+		}()
+		a.runPhotoScanTask(a.appCtx, task.TaskID, scanPaths)
+	}()
+
+	return task, nil
+}
+
+func (a *App) runPhotoScanTask(ctx context.Context, taskID string, paths []contracts.PhotoLibraryPathDTO) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	summary, err := photoscanner.NewService(a.store).Scan(ctx, paths)
+	if err != nil {
+		task := a.tasks.Fail(taskID, contracts.ErrorCodePhotoArchiveReadFailed, err.Error())
+		a.saveTaskSnapshot(ctx, task)
+		return
+	}
+	metadata := photoScanSummaryMetadata(summary)
+	if len(summary.Errors) > 0 {
+		task := a.tasks.PartialFail(taskID, contracts.ErrorCodePhotoArchiveReadFailed, "photo scan completed with errors", metadata)
+		a.saveTaskSnapshot(ctx, task)
+		return
+	}
+	task := a.tasks.ProgressWithMetadata(taskID, 100, "Photo scan complete", metadata)
+	task = a.tasks.Complete(taskID, "Photo scan complete")
+	if task.Metadata == nil {
+		task.Metadata = metadata
+	} else {
+		for k, v := range metadata {
+			task.Metadata[k] = v
+		}
+	}
+	a.saveTaskSnapshot(ctx, task)
+}
+
+func photoScanSummaryMetadata(summary photoscanner.Summary) map[string]any {
+	errorItems := make([]map[string]any, 0, len(summary.Errors))
+	for _, item := range summary.Errors {
+		errorItems = append(errorItems, map[string]any{
+			"path":      item.Path,
+			"errorCode": item.ErrorCode,
+			"message":   item.Message,
+		})
+	}
+	return map[string]any{
+		"filesDiscovered": summary.FilesDiscovered,
+		"imported":        summary.Imported,
+		"updated":         summary.Updated,
+		"skipped":         summary.Skipped,
+		"errorItems":      errorItems,
+	}
+}
+
 // HTTPHandler builds the HTTP request multiplexer for the web API server.
 func (a *App) HTTPHandler() http.Handler {
 	a.httpHandlerOnce.Do(func() {
@@ -2858,6 +3798,12 @@ func (a *App) HTTPHandler() http.Handler {
 			AppUpdateProvider:                a,
 			BackupProvider:                   a,
 			LibraryPathStorageStatusProvider: a,
+			ComicScanStarter:                 a,
+			PhotoScanStarter:                 a,
+			ComicSettingsCtl:                 a,
+			PhotoSettingsCtl:                 a,
+			ComicLibraryWatchReloader:        a,
+			PhotoLibraryWatchReloader:        a,
 		}).Routes()
 		a.httpHandler = webui.WrapHandler(apiHandler)
 	})

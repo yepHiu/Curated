@@ -149,6 +149,12 @@ vi.mock("@/components/jav-library/settings/SettingsAboutSection.vue", () => ({
 vi.mock("@/components/jav-library/settings/SettingsCuratedSection.vue", () => ({
   default: { name: "SettingsCuratedSection", template: "<section />" },
 }))
+vi.mock("@/components/jav-library/settings/SettingsComicLibrarySection.vue", () => ({
+  default: { name: "SettingsComicLibrarySection", template: "<section data-comic-settings />" },
+}))
+vi.mock("@/components/jav-library/settings/SettingsPhotoLibrarySection.vue", () => ({
+  default: { name: "SettingsPhotoLibrarySection", template: "<section data-photo-settings />" },
+}))
 vi.mock("@/components/jav-library/settings/SettingsGeneralSection.vue", () => ({
   default: { name: "SettingsGeneralSection", template: "<section />" },
 }))
@@ -263,6 +269,18 @@ describe("SettingsPage movie CSV export", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.libraryService = createLibraryServiceMock()
+  })
+
+  it("keeps comic settings inside experimental features", async () => {
+    const wrapper = await mountSettingsPage()
+
+    expect(wrapper.text()).not.toContain("settings.navComics")
+  })
+
+  it("keeps photo settings inside experimental features", async () => {
+    const wrapper = await mountSettingsPage()
+
+    expect(wrapper.text()).not.toContain("settings.navPhotos")
   })
 
   it("downloads a CSV and shows a success toast when the storage section requests export", async () => {

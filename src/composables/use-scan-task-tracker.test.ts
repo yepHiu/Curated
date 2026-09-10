@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
   pushAppToast: vi.fn(),
   reloadMoviesFromApi: vi.fn(),
+  reloadComicsFromApi: vi.fn(),
   subscribeBackendEvents: vi.fn(),
 }))
 
@@ -41,6 +42,12 @@ vi.mock("@/services/library-service", () => ({
   }),
 }))
 
+vi.mock("@/services/comic-library-service", () => ({
+  useComicLibraryService: () => ({
+    reloadComicsFromApi: mocks.reloadComicsFromApi,
+  }),
+}))
+
 vi.mock("@/lib/backend-events", () => ({
   subscribeBackendEvents: mocks.subscribeBackendEvents,
 }))
@@ -65,6 +72,36 @@ function makeImportTask(status: TaskDTO["status"]): TaskDTO {
     metadata: {
       completedFiles: 2,
       failedFiles: 0,
+    },
+  }
+}
+
+function makeComicScanTask(status: TaskDTO["status"]): TaskDTO {
+  return {
+    ...makeTask(status),
+    taskId: "comic-scan-1",
+    type: "scan.comics",
+    progress: status === "completed" ? 100 : 40,
+    message: "Comic scan complete",
+    metadata: {
+      filesDiscovered: 3,
+      imported: 2,
+      updated: 1,
+      skipped: 0,
+    },
+  }
+}
+
+function makeComicImportTask(status: TaskDTO["status"]): TaskDTO {
+  return {
+    ...makeTask(status),
+    taskId: "comic-import-1",
+    type: "import.comics",
+    progress: 100,
+    message: "Comic import completed",
+    metadata: {
+      completedFiles: 2,
+      failedFiles: status === "partial_failed" ? 1 : 0,
     },
   }
 }
@@ -215,6 +252,70 @@ describe("useScanTaskTracker", () => {
       }),
     )
     expect(mocks.reloadMoviesFromApi).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it("toasts and reloads comics when comic scan completes without refreshing movies", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeComicScanTask("completed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("comic-scan-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualComicScanDone",
+      expect.objectContaining({
+        variant: "success",
+        notification: expect.objectContaining({
+          type: "scan",
+          title: "notificationCenter.titles.scanDone",
+          source: { taskId: "comic-scan-1", route: "/settings?section=experimental" },
+        }),
+      }),
+    )
+    expect(mocks.reloadComicsFromApi).toHaveBeenCalledTimes(1)
+    expect(mocks.reloadMoviesFromApi).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it("toasts and reloads comics when comic import partially completes without refreshing movies", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce(makeComicImportTask("partial_failed"))
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("comic-import-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.comicImportPartial",
+      expect.objectContaining({
+        variant: "warning",
+        notification: expect.objectContaining({
+          type: "system",
+          title: "notificationCenter.titles.importFailed",
+          source: { taskId: "comic-import-1", route: "/settings?section=experimental" },
+        }),
+      }),
+    )
+    expect(mocks.reloadComicsFromApi).toHaveBeenCalledTimes(1)
+    expect(mocks.reloadMoviesFromApi).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

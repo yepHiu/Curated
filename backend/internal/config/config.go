@@ -51,6 +51,26 @@ type Config struct {
 	DefaultImportLibraryPathID string `json:"defaultImportLibraryPathId,omitempty"`
 	// BackupDirectory is the remembered destination directory for timestamped backup packages. Persisted in library-config.cfg.
 	BackupDirectory string `json:"backupDirectory,omitempty"`
+	// ComicLibraryEnabled gates the optional, independent comic library domain.
+	ComicLibraryEnabled bool `json:"comicLibraryEnabled,omitempty"`
+	// AutoComicLibraryWatch: when true (default), fsnotify on comic library roots may queue debounced comic scans. Persisted in library-config.cfg.
+	AutoComicLibraryWatch bool `json:"autoComicLibraryWatch,omitempty"`
+	// DefaultComicImportLibraryPathID is the comic_library_paths row id used by comic import. Empty means not configured.
+	DefaultComicImportLibraryPathID string `json:"defaultComicImportLibraryPathId,omitempty"`
+	// ComicReader stores global default comic reader preferences.
+	ComicReader ComicReaderConfig `json:"comicReader,omitempty"`
+	// ComicCache stores comic thumbnail/page cache limits.
+	ComicCache ComicCacheConfig `json:"comicCache,omitempty"`
+	// PhotoLibraryEnabled gates the optional, independent photo book library domain.
+	PhotoLibraryEnabled bool `json:"photoLibraryEnabled,omitempty"`
+	// AutoPhotoLibraryWatch: when true (default), fsnotify on photo library roots may queue debounced photo scans. Persisted in library-config.cfg.
+	AutoPhotoLibraryWatch bool `json:"autoPhotoLibraryWatch,omitempty"`
+	// DefaultPhotoImportLibraryPathID is the photo_library_paths row id used by photo import. Empty means not configured.
+	DefaultPhotoImportLibraryPathID string `json:"defaultPhotoImportLibraryPathId,omitempty"`
+	// PhotoViewer stores global default photo book viewer preferences.
+	PhotoViewer PhotoViewerConfig `json:"photoViewer,omitempty"`
+	// PhotoCache stores photo book thumbnail/page cache limits.
+	PhotoCache PhotoCacheConfig `json:"photoCache,omitempty"`
 	// MetadataMovieProvider is the Metatube movie provider name for scrapes; empty = auto (SearchMovieAll). Usually set via library-config.cfg merge, not main config.yaml.
 	MetadataMovieProvider string `json:"metadataMovieProvider,omitempty"`
 	// MetadataMovieProviderChain is an ordered list of providers to try in sequence; empty = auto. Takes precedence over MetadataMovieProvider when non-empty.
@@ -221,6 +241,14 @@ func Default() Config {
 		LaunchAtLogin:            false,
 		CuratedFrameExportFormat: "jpg",
 		CuratedFrameExportMode:   "raw",
+		ComicLibraryEnabled:      false,
+		AutoComicLibraryWatch:    true,
+		ComicReader:              DefaultComicReaderConfig(),
+		ComicCache:               DefaultComicCacheConfig(),
+		PhotoLibraryEnabled:      false,
+		AutoPhotoLibraryWatch:    true,
+		PhotoViewer:              DefaultPhotoViewerConfig(),
+		PhotoCache:               DefaultPhotoCacheConfig(),
 	}
 }
 
@@ -270,6 +298,10 @@ func Load(path string) (Config, error) {
 	}
 	cfg.CuratedFrameExportFormat = NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat)
 	cfg.CuratedFrameExportMode = NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode)
+	cfg.ComicReader = NormalizeComicReaderConfig(cfg.ComicReader)
+	cfg.ComicCache = NormalizeComicCacheConfig(cfg.ComicCache)
+	cfg.PhotoViewer = NormalizePhotoViewerConfig(cfg.PhotoViewer)
+	cfg.PhotoCache = NormalizePhotoCacheConfig(cfg.PhotoCache)
 	if cfg.Tasks.ScanTimeoutSeconds <= 0 {
 		cfg.Tasks.ScanTimeoutSeconds = 600
 	}

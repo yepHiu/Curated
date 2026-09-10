@@ -29,6 +29,41 @@ function getDetailBackTarget(query: LocationQuery): DetailBackTarget | undefined
   return isDetailBackTarget(query.detailBack) ? query.detailBack : undefined
 }
 
+function getFirstQueryString(value: LocationQuery[string]): string | undefined {
+  if (typeof value === "string") {
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === "string")
+  }
+  return undefined
+}
+
+function normalizeInternalReturnPath(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined
+  }
+  const trimmed = value.trim()
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return undefined
+  }
+  return trimmed
+}
+
+function getComicReaderReturnTo(query: LocationQuery): string | undefined {
+  return normalizeInternalReturnPath(getFirstQueryString(query.returnTo))
+}
+
+function getComicReaderReturnLabelKey(returnTo: string): string {
+  if (/^\/comics\/[^/?#]+(?:[?#]|$)/.test(returnTo) && !/\/read(?:\/|[?#]|$)/.test(returnTo)) {
+    return "shell.backDetail"
+  }
+  if (/^\/comics(?:[/?#]|$)/.test(returnTo)) {
+    return "shell.backComics"
+  }
+  return "shell.backPrevious"
+}
+
 function formatResumeSecondsForRoute(resumeSec: number): string {
   const normalized = Math.max(0, resumeSec)
   return String(Number(normalized.toFixed(3)))
@@ -279,6 +314,19 @@ export function buildPlayerRouteFromCuratedFrameIntent(
   }
 }
 
+export function buildComicReaderRouteFromSource(
+  comicId: string,
+  pageIndex: number,
+  sourceFullPath: string,
+): RouteLocationRaw {
+  const returnTo = normalizeInternalReturnPath(sourceFullPath)
+  return {
+    name: "comic-reader",
+    params: { id: comicId, pageIndex: String(Math.max(0, Math.floor(pageIndex))) },
+    query: returnTo ? { returnTo } : undefined,
+  }
+}
+
 export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,
@@ -298,6 +346,43 @@ export function resolveNavigationBackLink(
     return {
       to: { name: "actors" },
       labelKey: "shell.backActors",
+    }
+  }
+
+  // 写真浏览返回进入时的站内来源；直接打开则回到写真库。
+  if (route.name === "photo-viewer") {
+    const returnTo = normalizeInternalReturnPath(getFirstQueryString(route.query.returnTo))
+    if (returnTo) {
+      const isDetail = /^\/photos\/[^/?#]+(?:[?#]|$)/.test(returnTo) && !/\/view(?:\/|[?#]|$)/.test(returnTo)
+      return {
+        to: returnTo,
+        labelKey: isDetail ? "shell.backDetail" : /^\/photos(?:[/?#]|$)/.test(returnTo) ? "shell.backPhotos" : "shell.backPrevious",
+      }
+    }
+    return { to: { name: "photos" }, labelKey: "shell.backPhotos" }
+  }
+  if (route.name === "photo-detail") {
+    return { to: { name: "photos" }, labelKey: "shell.backPhotos" }
+  }
+
+  if (route.name === "comic-reader") {
+    const returnTo = getComicReaderReturnTo(route.query)
+    if (returnTo) {
+      return {
+        to: returnTo,
+        labelKey: getComicReaderReturnLabelKey(returnTo),
+      }
+    }
+    return {
+      to: { name: "comics" },
+      labelKey: "shell.backComics",
+    }
+  }
+
+  if (route.name === "comic-detail") {
+    return {
+      to: { name: "comics" },
+      labelKey: "shell.backComics",
     }
   }
 

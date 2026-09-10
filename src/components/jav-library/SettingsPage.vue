@@ -146,6 +146,10 @@ function scrollSettingsRootToTop() {
 function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
   const raw = route.query.section
   const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined
+  if (s === "comics" || s === "photos") {
+    router.replace({ query: { ...route.query, section: "experimental" } }).catch(() => {})
+    return "experimental"
+  }
   if (s === "libraryBehavior") {
     router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
     return "library"
@@ -2166,6 +2170,8 @@ async function runMetadataRefreshForSelected() {
       />
     </section>
     </TabsContent>
+
+
 
     <TabsContent
       v-if="shouldRenderSettingsSection('metadata')"
