@@ -62,7 +62,7 @@ function onDirection(value: unknown) {
     <div data-photo-viewer-settings-list class="flex flex-col gap-2">
       <label
         data-photo-viewer-setting-row="mode"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span class="min-w-0 text-sm font-medium text-muted-foreground">
           {{ t("settings.photoViewerMode") }}
@@ -80,7 +80,7 @@ function onDirection(value: unknown) {
 
       <label
         data-photo-viewer-setting-row="fit"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span class="min-w-0 text-sm font-medium text-muted-foreground">
           {{ t("settings.photoViewerFit") }}
@@ -98,7 +98,7 @@ function onDirection(value: unknown) {
 
       <label
         data-photo-viewer-setting-row="direction"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span class="min-w-0 text-sm font-medium text-muted-foreground">
           {{ t("settings.photoViewerDirection") }}

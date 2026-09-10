@@ -62,7 +62,7 @@ function onDirection(value: unknown) {
     <div data-comic-reader-settings-list class="flex flex-col gap-2">
       <label
         data-comic-reader-setting-row="mode"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span
           data-comic-reader-setting-label
@@ -87,7 +87,7 @@ function onDirection(value: unknown) {
 
       <label
         data-comic-reader-setting-row="fit"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span
           data-comic-reader-setting-label
@@ -112,7 +112,7 @@ function onDirection(value: unknown) {
 
       <label
         data-comic-reader-setting-row="direction"
-        class="grid grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)] items-center gap-3"
+        class="grid grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)] items-center gap-3"
       >
         <span
           data-comic-reader-setting-label

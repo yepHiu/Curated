@@ -65,7 +65,7 @@ describe("SettingsComicReaderSection", () => {
       expect(row.classes()).toEqual(
         expect.arrayContaining([
           "grid",
-          "grid-cols-[minmax(4rem,1fr)_minmax(10rem,14rem)]",
+          "grid-cols-[minmax(4rem,1fr)_minmax(8rem,10rem)]",
           "items-center",
         ]),
       )
