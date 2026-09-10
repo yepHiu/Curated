@@ -68,6 +68,19 @@ const photosState = ref<PhotoBook[]>([
   photoSeed("mock-photo-3", "Quiet Window", ["soft-light", "set:window"], 42, 2),
 ])
 
+const photoTagsStorageKey = "curated-mock-photo-tags"
+try {
+  const saved: unknown = JSON.parse(localStorage.getItem(photoTagsStorageKey) ?? "{}")
+  if (saved && typeof saved === "object") {
+    for (const photo of photosState.value) {
+      const tags: unknown = (saved as Record<string, unknown>)[photo.id]
+      if (Array.isArray(tags) && tags.length <= 64 && tags.every(tag => typeof tag === "string" && [...tag].length <= 64)) {
+        photo.tags = [...new Set(tags.map(tag => tag.trim()).filter(Boolean))]
+      }
+    }
+  }
+} catch { /* Missing or invalid local preferences leave the sample tags intact. */ }
+
 export const mockPhotoLibraryService: PhotoLibraryService = {
   /** Mock acknowledges an upload without copying files to the local filesystem. */
   async importPhotos(files, options) {
@@ -140,6 +153,17 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
     const id = photoId.trim()
     if (!id) return undefined
     return photosState.value.find((photo) => photo.id === id)
+  },
+  async replacePhotoTags(photoId: string, raw: string[]) {
+    const photo = photosState.value.find(item => item.id === photoId.trim())
+    if (!photo) throw new Error("Photo not found")
+    if (raw.length > 64 || raw.some(tag => [...tag.trim()].length > 64)) throw new Error("Invalid photo tags")
+    const tags = [...new Set(raw.map(tag => tag.trim()).filter(Boolean))]
+    const saved = Object.fromEntries(photosState.value.map(item => [item.id, item.id === photo.id ? tags : item.tags]))
+    localStorage.setItem(photoTagsStorageKey, JSON.stringify(saved))
+    const updated = { ...photo, tags, updatedAt: new Date().toISOString() }
+    photosState.value = photosState.value.map(item => item.id === photo.id ? updated : item)
+    return updated
   },
   async scanPhotos() {
     return null

@@ -10,6 +10,7 @@ const photoApiMocks = vi.hoisted(() => ({
   startPhotoScan: vi.fn(),
   listPhotos: vi.fn(),
   getPhoto: vi.fn(),
+  replacePhotoTags: vi.fn(),
   importPhotos: vi.fn(),
 }))
 
@@ -80,6 +81,16 @@ beforeEach(() => {
 })
 
 describe("webPhotoLibraryService", () => {
+  it("updates the shared photo cache only after tags save successfully", async () => {
+    const { webPhotoLibraryService: service } = await import('./web-photo-library-service')
+    photoApiMocks.replacePhotoTags.mockResolvedValueOnce({ id: 'photo-1', title: 'Photo', tags: ['landscape'], pages: [] })
+    const saved = await service.replacePhotoTags(' photo-1 ', ['landscape'])
+    expect(photoApiMocks.replacePhotoTags).toHaveBeenCalledWith('photo-1', ['landscape'])
+    expect(service.getPhotoById('photo-1')).toEqual(saved)
+    photoApiMocks.replacePhotoTags.mockRejectedValueOnce(new Error('Save failed'))
+    await expect(service.replacePhotoTags('photo-1', ['new'])).rejects.toThrow('Save failed')
+    expect(service.getPhotoById('photo-1')!.tags).toEqual(['landscape'])
+  })
   it("rejects disabled photo uploads and delegates enabled ones", async () => {
     const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
     photoApiMocks.getSettings.mockResolvedValueOnce(settingsDto())

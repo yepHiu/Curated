@@ -66,6 +66,18 @@ function browseByTag(payload: { tag: string }) {
     query: { q },
   })
 }
+
+async function addTag(tag: string, done: (error?: unknown) => void) {
+  const previous = detailPhoto.value
+  if (!previous) { done(new Error(t("photos.detailNotFound"))); return }
+  try {
+    const updated = await photoService.replacePhotoTags(previous.id, [...new Set([...previous.tags, tag])])
+    if (detailPhoto.value === previous) detailPhoto.value = updated
+    done()
+  } catch (error) {
+    done(error)
+  }
+}
 </script>
 
 <template>
@@ -86,7 +98,9 @@ function browseByTag(payload: { tag: string }) {
         </p>
 
         <PhotoDetailPanel
+          :key="detailPhoto.id"
           :photo="detailPhoto"
+          @add-tag="addTag"
           @start-browsing="openViewer"
           @browse-by-tag="browseByTag"
         />

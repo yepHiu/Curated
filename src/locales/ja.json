@@ -2014,6 +2014,7 @@
     "detailTagsLabel": "タグ",
     "noTags": "タグはまだありません。",
     "startBrowsing": "読む",
+    "detailSaveError": "写真集のタグを保存できませんでした。",
     "moreActions": "その他の操作",
     "editPhoto": "写真集を編集",
     "revealPhotoSource": "ファイルマネージャーで表示",

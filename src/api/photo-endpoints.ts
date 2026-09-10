@@ -78,4 +78,8 @@ export const photoApi = {
   getPhoto(id: string): Promise<PhotoBookDetailDTO> {
     return httpClient.get<PhotoBookDetailDTO>(`/library/photos/${encodeURIComponent(id)}`)
   },
+
+  replacePhotoTags(id: string, tags: string[]): Promise<PhotoBookDetailDTO> {
+    return httpClient.patch<PhotoBookDetailDTO>(`/library/photos/books/${encodeURIComponent(id)}/tags`, { tags })
+  },
 }

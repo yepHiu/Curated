@@ -30,6 +30,7 @@ export interface PhotoLibraryService {
   reloadPhotosFromApi(params?: PhotoListParams): Promise<void>
   getPhotoById(photoId?: string): PhotoBook | undefined
   loadPhotoDetail(photoId: string): Promise<PhotoBook | undefined>
+  replacePhotoTags(photoId: string, tags: string[]): Promise<PhotoBook>
   scanPhotos(paths?: string[]): Promise<TaskDTO | null>
   importPhotos(files: File[], options?: { onUploadProgress?: (progress: PhotoImportUploadProgress) => void }): Promise<TaskDTO | null>
 }

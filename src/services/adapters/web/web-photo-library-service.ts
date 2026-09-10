@@ -232,6 +232,12 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
       }
     },
 
+    async replacePhotoTags(photoId: string, tags: string[]) {
+      const detail = mapPhotoDetail(await photoApi.replacePhotoTags(photoId.trim(), tags))
+      mergePhotoIntoCache(detail)
+      return detail
+    },
+
     async scanPhotos(paths?: string[]): Promise<TaskDTO | null> {
       const selected = paths?.map((path) => path.trim()).filter(Boolean) ?? []
       return await photoApi.startPhotoScan(selected.length > 0 ? { paths: selected } : undefined)

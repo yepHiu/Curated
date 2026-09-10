@@ -2014,6 +2014,7 @@
     "detailTagsLabel": "Tags",
     "noTags": "No tags yet.",
     "startBrowsing": "Read",
+    "detailSaveError": "Unable to save photo tags.",
     "moreActions": "More actions",
     "editPhoto": "Edit photo book",
     "revealPhotoSource": "Reveal in file manager",

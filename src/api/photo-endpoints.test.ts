@@ -7,6 +7,11 @@ afterEach(() => {
 })
 
 describe("photoApi", () => {
+  it("saves tags through the dedicated photo book endpoint", async () => {
+    const patch = vi.spyOn(httpClient, "patch").mockResolvedValueOnce({ tags: ['portrait'] })
+    await photoApi.replacePhotoTags('photo/1', ['portrait'])
+    expect(patch).toHaveBeenCalledWith('/library/photos/books/photo%2F1/tags', { tags: ['portrait'] })
+  })
   it("uploads archives only to the photo import endpoint with progress", async () => {
     const upload = vi.spyOn(httpClient, "postFormWithProgress").mockResolvedValueOnce({ taskId: "photo-import" })
     const file = new File(["zip"], "Photo.zip")

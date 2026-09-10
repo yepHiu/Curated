@@ -50,6 +50,7 @@ const serviceMocks = vi.hoisted(() => ({
   reloadPhotosFromApi: vi.fn(),
   getPhotoById: vi.fn(),
   loadPhotoDetail: vi.fn(),
+  replacePhotoTags: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -73,6 +74,7 @@ vi.mock("@/services/photo-library-service", () => ({
     reloadPhotosFromApi: serviceMocks.reloadPhotosFromApi,
     getPhotoById: serviceMocks.getPhotoById,
     loadPhotoDetail: serviceMocks.loadPhotoDetail,
+    replacePhotoTags: serviceMocks.replacePhotoTags,
   }),
 }))
 
@@ -105,6 +107,17 @@ vi.mock("@/components/jav-library/photos/PhotoPagePreviewGrid.vue", () => ({
 }))
 
 describe("PhotoDetailView", () => {
+  it("saves tags through the photo service and updates detail state", async () => {
+    serviceMocks.replacePhotoTags.mockResolvedValueOnce(makePhoto({ tags: ['portrait', 'landscape'] }))
+    const wrapper = mount(PhotoDetailView)
+    await flushPromises()
+    const done = vi.fn()
+    wrapper.findComponent({ name: 'PhotoDetailPanel' }).vm.$emit('addTag', 'landscape', done)
+    await flushPromises()
+    expect(serviceMocks.replacePhotoTags).toHaveBeenCalledWith('photo-1', ['portrait', 'landscape'])
+    expect(wrapper.findComponent({ name: 'PhotoDetailPanel' }).props('photo').tags).toEqual(['portrait', 'landscape'])
+    expect(done).toHaveBeenCalledWith()
+  })
   beforeEach(() => {
     routerMocks.push.mockReset()
     routerMocks.route.fullPath = "/photos/photo-1"
