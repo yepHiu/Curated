@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import type { PhotoBook } from "@/domain/photo/types"
 import PhotoDetailPanel from "./PhotoDetailPanel.vue"
+import BookMediaInfoDialog from "../books/BookMediaInfoDialog.vue"
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -132,13 +133,21 @@ describe("PhotoDetailPanel", () => {
     expect(wrapper.get("[data-photo-detail-cover]").attributes("src")).toBe(
       "https://example.com/photo-cover.jpg",
     )
-    expect(wrapper.text()).toContain("summer-frame.cbz")
-    expect(wrapper.text()).toContain("D:/Photos/summer-frame.cbz")
+    expect(wrapper.text()).not.toContain("summer-frame.cbz")
+    expect(wrapper.text()).not.toContain("D:/Photos/summer-frame.cbz")
   })
 
   it("only offers supported photo browsing actions", async () => {
     const wrapper = mount(PhotoDetailPanel, { props: { photo: makePhoto() } })
-    expect(wrapper.find("[data-photo-more-actions]").exists()).toBe(false)
+    expect(wrapper.find("[data-photo-more-actions]").exists()).toBe(true)
+    expect(wrapper.find("[data-photo-edit-action]").exists()).toBe(false)
+    const dialog = wrapper.getComponent(BookMediaInfoDialog)
+    expect(dialog.props("open")).toBe(false)
+    await wrapper.get("[data-photo-media-info]").trigger("click")
+    expect(dialog.props("open")).toBe(true)
+    expect(dialog.props("book").location).toBe("D:/Photos/summer-frame.cbz")
+    await wrapper.setProps({photo: makePhoto({id: "another-photo"})})
+    expect(dialog.props("open")).toBe(false)
     await wrapper.get("[data-photo-start-browsing]").trigger("click")
     expect(wrapper.emitted("startBrowsing")?.[0]).toEqual([2])
   })

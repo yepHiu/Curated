@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   BookOpen,
   Images,
+  Info,
+  MoreVertical,
   Star,
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
+import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +19,7 @@ import {
   CardContent,
   CardTitle,
 } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 
 const props = defineProps<{
@@ -30,6 +34,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const mediaInfoOpen = ref(false)
+watch(() => props.photo.id, () => { mediaInfoOpen.value = false })
 
 function addTag(tag: string, done: (error?: unknown) => void) {
   emit("addTag", tag, done)
@@ -128,7 +134,7 @@ function browseByTag(tag: string) {
           </Button>
         </div>
 
-        <BookDetailFacts :page-count="photo.pageCount" :file-name="photo.sourceFileName" :location="photo.location" :added-at="photo.addedAt" />
+        <BookDetailFacts :page-count="photo.pageCount" :added-at="photo.addedAt" />
 
         <div data-photo-detail-tags class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("photos.detailTagsLabel") }}</p>
@@ -162,6 +168,24 @@ function browseByTag(tag: string) {
 
       </div>
 
+      <div data-photo-more-actions-zone class="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button type="button" variant="ghost" size="icon" class="shrink-0 rounded-xl" :disabled="busy" data-photo-more-actions :aria-label="t('photos.moreActions')">
+              <MoreVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="min-w-[11rem]">
+            <DropdownMenuGroup>
+              <DropdownMenuItem data-photo-media-info @click="mediaInfoOpen = true">
+                <Info aria-hidden="true" />
+                {{ t("bookBrowser.mediaInfo") }}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <BookMediaInfoDialog v-model:open="mediaInfoOpen" :book="photo" />
     </CardContent>
   </Card>
 </template>

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n"
 import {
   BookOpen,
   FolderOpen,
+  Info,
   MoreVertical,
   Pencil,
   Trash2,
@@ -12,6 +13,7 @@ import {
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
+import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -45,6 +47,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const editOpen = ref(false)
+const mediaInfoOpen = ref(false)
 const deleteConfirmOpen = ref(false)
 const tagError = ref("")
 
@@ -55,6 +58,7 @@ watch(
   () => props.comic.id,
   () => {
     editOpen.value = false
+    mediaInfoOpen.value = false
     deleteConfirmOpen.value = false
     tagError.value = ""
   },
@@ -168,7 +172,7 @@ function confirmDeleteComic() {
           </Button>
         </div>
 
-        <BookDetailFacts :page-count="comic.pageCount" :file-name="comic.sourceFileName" :location="comic.location" :added-at="comic.addedAt" />
+        <BookDetailFacts :page-count="comic.pageCount" :added-at="comic.addedAt" />
 
         <div data-comic-detail-tags class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("comics.detailTagsLabel") }}</p>
@@ -225,7 +229,7 @@ function confirmDeleteComic() {
               type="button"
               variant="ghost"
               size="icon"
-              class="min-h-11 min-w-11 shrink-0 rounded-full" :disabled="busy"
+              class="shrink-0 rounded-xl" :disabled="busy"
               data-comic-more-actions
               :aria-label="t('comics.moreActions')"
             >
@@ -234,6 +238,10 @@ function confirmDeleteComic() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="min-w-[11rem]">
             <DropdownMenuGroup>
+              <DropdownMenuItem data-comic-media-info @click="mediaInfoOpen = true">
+                <Info aria-hidden="true" />
+                {{ t("bookBrowser.mediaInfo") }}
+              </DropdownMenuItem>
               <DropdownMenuItem data-comic-edit-action @click="editOpen = true">
                 <Pencil class="size-4 shrink-0" aria-hidden="true" />
                 {{ t("comics.editComic") }}
@@ -259,6 +267,8 @@ function confirmDeleteComic() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <BookMediaInfoDialog v-model:open="mediaInfoOpen" :book="comic" />
 
       <ComicEditDialog
         v-model:open="editOpen"

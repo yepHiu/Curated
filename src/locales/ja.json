@@ -814,6 +814,9 @@
     "discovered": "検出"
   },
   "bookBrowser": {
+    "mediaInfo": "メディア情報",
+    "fileFormat": "ファイル形式",
+    "updatedAt": "更新日時",
     "bookCount": "全 {count} 冊",
     "noResults": "一致する項目がありません",
     "noResultsHint": "別のキーワードを試すか、検索を解除してください。",

@@ -814,6 +814,9 @@
     "discovered": "已发现"
   },
   "bookBrowser": {
+    "mediaInfo": "媒体信息",
+    "fileFormat": "文件格式",
+    "updatedAt": "更新时间",
     "bookCount": "共 {count} 册",
     "noResults": "没有找到匹配的内容",
     "noResultsHint": "试试其他关键词，或清除搜索条件。",

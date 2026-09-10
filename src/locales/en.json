@@ -814,6 +814,9 @@
     "discovered": "Discovered"
   },
   "bookBrowser": {
+    "mediaInfo": "Media information",
+    "fileFormat": "File format",
+    "updatedAt": "Updated",
     "bookCount": "{count} books",
     "noResults": "No matching books",
     "noResultsHint": "Try another search or clear the current search.",

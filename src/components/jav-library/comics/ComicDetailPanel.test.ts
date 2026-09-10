@@ -136,7 +136,7 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).toContain("Original Title")
     expect(wrapper.text()).toContain("author:alpha")
     expect(wrapper.text()).toContain("series:rain")
-    expect(wrapper.text()).toContain("original.cbz")
+    expect(wrapper.text()).not.toContain("original.cbz")
     expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
       "https://example.com/detail-cover.jpg",
     )
@@ -168,17 +168,24 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).not.toContain("1 / 32")
   })
 
-  it("shows source metadata in the detail body", () => {
+  it("shows source metadata only in media information and closes it when switching books", async () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic(),
       },
     })
 
-    expect(wrapper.text()).not.toContain("comics.sourceFile")
-    expect(wrapper.text()).not.toContain("comics.sourceLocation")
-    expect(wrapper.text()).toContain("D:/Comics/original.cbz")
-    expect(wrapper.text()).toContain("original.cbz")
+    expect(wrapper.text()).not.toContain("D:/Comics/original.cbz")
+    expect(wrapper.text()).not.toContain("bookBrowser.sourceFile")
+    expect(wrapper.text()).toContain("bookBrowser.pages")
+    await wrapper.get("[data-comic-media-info]").trigger("click")
+    const dialog = wrapper.get("[data-book-media-info]")
+    expect(dialog.text()).toContain("D:/Comics/original.cbz")
+    expect(dialog.text()).toContain("original.cbz")
+    expect(dialog.text()).toContain("CBZ")
+    expect(dialog.text()).toContain("bookBrowser.updatedAt")
+    await wrapper.setProps({comic: makeComic({id: "another-comic"})})
+    expect(wrapper.find("[data-book-media-info]").exists()).toBe(false)
   })
 
   it("renders the detail cover without fixed-ratio cropping so wide and tall pages can adapt", () => {
