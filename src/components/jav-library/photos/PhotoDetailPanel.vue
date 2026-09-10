@@ -2,7 +2,7 @@
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
-  Eye,
+  BookOpen,
   Images,
   Star,
 } from "lucide-vue-next"
@@ -117,7 +117,7 @@ function browseByTag(tag: string) {
             :disabled="busy || photo.pageCount === 0"
             @click="emit('startBrowsing', photo.currentPageIndex)"
           >
-            <Eye data-icon="inline-start" />
+            <BookOpen data-icon="inline-start" aria-hidden="true" />
             {{ photo.currentPageIndex > 0 ? t('bookBrowser.continueAt', { page: Math.min(photo.pageCount, photo.currentPageIndex + 1) }) : t("photos.startBrowsing") }}
           </Button>
         </div>
