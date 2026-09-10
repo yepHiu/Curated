@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { onClickOutside } from "@vueuse/core"
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   BookOpen,
   FolderOpen,
   MoreVertical,
   Pencil,
-  Plus,
   Trash2,
   X,
 } from "lucide-vue-next"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
+import DetailTagAddControl from "../DetailTagAddControl.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,25 +46,17 @@ const { t } = useI18n()
 
 const editOpen = ref(false)
 const deleteConfirmOpen = ref(false)
-const tagDraft = ref("")
 const tagError = ref("")
-const tagInputOpen = ref(false)
-const tagInputRef = ref<HTMLInputElement | null>(null)
-const tagInlineZoneRef = ref<HTMLElement | null>(null)
 
 const coverSrc = computed(() => props.comic.coverUrl ?? props.comic.pages?.[0]?.thumbUrl ?? "")
 const canRevealSource = computed(() => Boolean(props.comic.location.trim()))
-const maxComicTags = 64
-const maxComicTagRunes = 64
 
 watch(
   () => props.comic.id,
   () => {
     editOpen.value = false
     deleteConfirmOpen.value = false
-    tagDraft.value = ""
     tagError.value = ""
-    tagInputOpen.value = false
   },
 )
 
@@ -84,61 +75,10 @@ function patchComicTags(tags: string[]) {
   })
 }
 
-function cancelTagInput() {
-  tagInputOpen.value = false
-  tagDraft.value = ""
+function addTag(tag: string, done: (error?: unknown) => void) {
   tagError.value = ""
+  emit("patch", { tags: [...props.comic.tags, tag] }, done)
 }
-
-async function onTagAddButtonClick() {
-  tagError.value = ""
-  if (!tagInputOpen.value) {
-    tagInputOpen.value = true
-    await nextTick()
-    tagInputRef.value?.focus()
-    return
-  }
-  addTag()
-}
-
-function addTagWithValue(raw: string) {
-  tagError.value = ""
-  const tagText = raw.trim()
-  if (!tagText) return
-  if ([...tagText].length > maxComicTagRunes) {
-    tagError.value = t("curated.tagMaxRunes", { n: maxComicTagRunes })
-    return
-  }
-  if (props.comic.tags.includes(tagText)) {
-    tagDraft.value = ""
-    return
-  }
-  if (props.comic.tags.length >= maxComicTags) {
-    tagError.value = t("curated.tagMaxCount", { n: maxComicTags })
-    return
-  }
-  patchComicTags([...props.comic.tags, tagText])
-  tagDraft.value = ""
-}
-
-function addTag() {
-  addTagWithValue(tagDraft.value)
-}
-
-function onTagInputKeydown(event: KeyboardEvent) {
-  if (event.key === "Enter") {
-    event.preventDefault()
-    addTag()
-  } else if (event.key === "Escape") {
-    event.preventDefault()
-    cancelTagInput()
-  }
-}
-
-onClickOutside(tagInlineZoneRef, () => {
-  if (!tagInputOpen.value) return
-  cancelTagInput()
-})
 
 function removeTag(tag: string) {
   patchComicTags(props.comic.tags.filter((item) => item !== tag))
@@ -261,52 +201,13 @@ function confirmDeleteComic() {
               </span>
             </Badge>
 
-            <div
-              ref="tagInlineZoneRef"
-              class="flex max-w-full flex-wrap items-center gap-2"
-            >
-              <Button
-                type="button"
-                variant="secondary"
-                class="h-[29px] shrink-0 rounded-2xl px-3 py-0 text-xs leading-none"
-                data-comic-add-tag
-                :disabled="props.busy"
-                @click="onTagAddButtonClick"
-              >
-                <Plus class="size-3.5 shrink-0" data-icon="inline-start" />
-                {{ t("common.add") }}
-              </Button>
-              <div
-                v-if="tagInputOpen"
-                class="relative max-w-full min-w-[min(100%,12rem)]"
-              >
-                <div
-                  class="flex h-9 w-full items-center gap-0.5 rounded-2xl border border-border/80 bg-background/80 pl-3 pr-0.5 shadow-sm"
-                >
-                  <input
-                    ref="tagInputRef"
-                    v-model="tagDraft"
-                    data-comic-new-tag-input
-                    type="text"
-                    maxlength="64"
-                    autocomplete="off"
-                    :placeholder="t('detailPanel.newTagPlaceholder')"
-                    class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0"
-                    @keydown="onTagInputKeydown"
-                  >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    :aria-label="t('detailPanel.ariaCancelTagInput')"
-                    @click="cancelTagInput"
-                  >
-                    <X class="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <DetailTagAddControl
+              :key="comic.id"
+              :tags="comic.tags"
+              :disabled="busy"
+              :save-error-message="t('comics.detailSaveError')"
+              @add="addTag"
+            />
           </div>
           <p v-if="tagError" class="text-sm text-destructive">{{ tagError }}</p>
         </div>

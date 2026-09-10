@@ -217,9 +217,9 @@ describe("ComicDetailPanel", () => {
       },
     })
 
-    await wrapper.get("[data-comic-add-tag]").trigger("click")
-    await wrapper.get("[data-comic-new-tag-input]").setValue("volume:1")
-    await wrapper.get("[data-comic-add-tag]").trigger("click")
+    await wrapper.get("[data-detail-add-tag]").trigger("click")
+    await wrapper.get("[data-detail-new-tag-input]").setValue("volume:1")
+    await wrapper.get("[data-detail-add-tag]").trigger("click")
 
     let patchCall = wrapper.emitted("patch")?.[0]
     expect(patchCall?.[0]).toEqual({

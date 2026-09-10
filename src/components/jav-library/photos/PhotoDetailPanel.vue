@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue"
+import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   BookOpen,
   Images,
-  Plus,
   Star,
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
+import DetailTagAddControl from "../DetailTagAddControl.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Card,
   CardContent,
@@ -32,57 +31,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const tagDraft = ref("")
-const tagInputOpen = ref(false)
-const tagSaving = ref(false)
-const tagError = ref("")
-const tagInput = ref<InstanceType<typeof Input> | null>(null)
-
-async function openTagInput() {
-  tagInputOpen.value = true
-  await nextTick()
-  tagInput.value?.$el?.focus()
-}
-
-function cancelTagInput() {
-  if (tagSaving.value) return
-  tagInputOpen.value = false
-  tagDraft.value = ""
-  tagError.value = ""
-}
-
-function addTag() {
-  if (tagSaving.value || props.busy) return
-  const tag = tagDraft.value.trim()
-  tagError.value = ""
-  if (!tag) return
-  if ([...tag].length > 64) {
-    tagError.value = t("curated.tagMaxRunes", { n: 64 })
-    return
-  }
-  if (props.photo.tags.includes(tag)) {
-    cancelTagInput()
-    return
-  }
-  if (props.photo.tags.length >= 64) {
-    tagError.value = t("curated.tagMaxCount", { n: 64 })
-    return
-  }
-  tagSaving.value = true
-  emit("addTag", tag, (error?: unknown) => {
-    tagSaving.value = false
-    if (error) {
-      tagError.value = error instanceof Error && error.message ? error.message : t("photos.detailSaveError")
-      return
-    }
-    cancelTagInput()
-  })
-}
-
-function onTagKeydown(event: KeyboardEvent) {
-  if (event.isComposing) return
-  if (event.key === "Enter") { event.preventDefault(); addTag() }
-  if (event.key === "Escape") { event.preventDefault(); cancelTagInput() }
+function addTag(tag: string, done: (error?: unknown) => void) {
+  emit("addTag", tag, done)
 }
 
 const coverSrc = computed(() => props.photo.coverUrl ?? props.photo.pages?.[0]?.thumbUrl ?? "")
@@ -199,40 +149,14 @@ function browseByTag(tag: string) {
                 {{ tag }}
               </button>
             </Badge>
-            <Button
-              v-if="!tagInputOpen"
-              type="button"
-              variant="secondary"
-              class="min-h-11 rounded-full px-3 sm:min-h-8"
-              data-photo-add-tag
+            <DetailTagAddControl
+              :key="photo.id"
+              :tags="photo.tags"
               :disabled="busy"
-              @click="openTagInput"
-            >
-              <Plus data-icon="inline-start" aria-hidden="true" />
-              {{ t("common.add") }}
-            </Button>
-            <div v-else class="flex max-w-full flex-wrap items-center gap-2" :aria-busy="tagSaving">
-              <Input
-                ref="tagInput"
-                v-model="tagDraft"
-                data-photo-new-tag-input
-                class="w-44 max-w-full rounded-xl"
-                :disabled="tagSaving"
-                :placeholder="t('detailPanel.newTagPlaceholder')"
-                :aria-label="t('detailPanel.newTagPlaceholder')"
-                :aria-invalid="Boolean(tagError)"
-                autocomplete="off"
-                @keydown="onTagKeydown"
-              />
-              <Button type="button" variant="secondary" class="min-h-11 rounded-full sm:min-h-8" data-photo-save-tag :disabled="tagSaving || busy || !tagDraft.trim()" @click="addTag">
-                {{ tagSaving ? t('common.saving') : t('common.add') }}
-              </Button>
-              <Button type="button" variant="ghost" class="min-h-11 rounded-full sm:min-h-8" :disabled="tagSaving" @click="cancelTagInput">
-                {{ t('common.cancel') }}
-              </Button>
-            </div>
+              :save-error-message="t('photos.detailSaveError')"
+              @add="addTag"
+            />
           </div>
-          <p v-if="tagError" role="alert" class="text-sm text-destructive">{{ tagError }}</p>
         </div>
 
 

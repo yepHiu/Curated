@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { useFocusWithin, onClickOutside } from "@vueuse/core"
-import { computed, nextTick, ref, useId, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   AlertTriangle,
@@ -8,7 +7,6 @@ import {
   MoreVertical,
   Pencil,
   PlayCircle,
-  Plus,
   RefreshCw,
   Star,
   Trash2,
@@ -41,8 +39,7 @@ import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
 import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { getMovieImageVersion } from "@/lib/image-version"
-import { useUserTagSuggestKeyboard } from "@/composables/use-user-tag-suggest-keyboard"
-import { filterUserTagSuggestions } from "@/lib/user-tag-suggestions"
+import DetailTagAddControl from "./DetailTagAddControl.vue"
 
 const { t } = useI18n()
 
@@ -85,35 +82,6 @@ const javdbSearchUrl = computed(
 )
 
 const movieEditOpen = ref(false)
-const newUserTagDraft = ref("")
-const userTagFormError = ref("")
-/** 是否展开「添加标签」内联输入（与标签同一行） */
-const userTagInputOpen = ref(false)
-const newUserTagInputRef = ref<HTMLInputElement | null>(null)
-/** 「添加」+ 内联输入条，用于点击外部时收起（避免仅输入框 ref 把「添加」算作外部） */
-const userTagInlineZoneRef = ref<HTMLElement | null>(null)
-const userTagSuggestRootRef = ref<HTMLElement | null>(null)
-const userTagSuggestListRef = ref<HTMLElement | null>(null)
-const tagSuggestDomId = useId()
-const { focused: userTagSuggestRowFocused } = useFocusWithin(userTagSuggestRootRef)
-
-const filteredUserTagSuggestions = computed(() =>
-  filterUserTagSuggestions(
-    props.userTagSuggestions,
-    newUserTagDraft.value,
-    new Set(props.movie.userTags),
-    { limit: 10 },
-  ),
-)
-
-const showUserTagSuggestions = computed(
-  () =>
-    userTagInputOpen.value &&
-    userTagSuggestRowFocused.value &&
-    newUserTagDraft.value.trim() !== "" &&
-    filteredUserTagSuggestions.value.length > 0,
-)
-
 const emit = defineEmits<{
   openPlayer: [movieId: string]
   /** 用户评分：null 表示清除本地评分，恢复为站点评分 */
@@ -141,9 +109,6 @@ const emit = defineEmits<{
 watch(
   () => props.movie.id,
   () => {
-    newUserTagDraft.value = ""
-    userTagFormError.value = ""
-    userTagInputOpen.value = false
     movieEditOpen.value = false
   },
 )
@@ -197,73 +162,10 @@ const posterSrc = computed(() => props.movie.coverUrl || props.movie.thumbUrl ||
 /** 图片版本号 - 用于强制刷新重新搜刮后的海报 */
 const imageVersion = computed(() => getMovieImageVersion(props.movie.id))
 
-const maxUserTags = 64
-const maxUserTagRunes = 64
-
-function cancelUserTagInput() {
-  userTagInputOpen.value = false
-  newUserTagDraft.value = ""
-  userTagFormError.value = ""
+function addUserTag(tag: string, done: (error?: unknown) => void) {
+  emit("updateUserTags", { movieId: props.movie.id, tags: [...props.movie.userTags, tag] })
+  done()
 }
-
-async function onUserTagAddButtonClick() {
-  userTagFormError.value = ""
-  if (!userTagInputOpen.value) {
-    userTagInputOpen.value = true
-    await nextTick()
-    newUserTagInputRef.value?.focus()
-    return
-  }
-  const t = newUserTagDraft.value.trim()
-  if (!t) {
-    return
-  }
-  addUserTag()
-}
-
-function addUserTagWithValue(raw: string) {
-  userTagFormError.value = ""
-  const tagText = raw.trim()
-  if (!tagText) {
-    return
-  }
-  if ([...tagText].length > maxUserTagRunes) {
-    userTagFormError.value = t("curated.tagMaxRunes", { n: maxUserTagRunes })
-    return
-  }
-  if (props.movie.userTags.includes(tagText)) {
-    newUserTagDraft.value = ""
-    return
-  }
-  if (props.movie.userTags.length >= maxUserTags) {
-    userTagFormError.value = t("curated.tagMaxCount", { n: maxUserTags })
-    return
-  }
-  emit("updateUserTags", {
-    movieId: props.movie.id,
-    tags: [...props.movie.userTags, tagText],
-  })
-  newUserTagDraft.value = ""
-}
-
-function addUserTag() {
-  addUserTagWithValue(newUserTagDraft.value)
-}
-
-const { highlightIndex, onTagSuggestKeydown } = useUserTagSuggestKeyboard({
-  showSuggestions: showUserTagSuggestions,
-  suggestions: filteredUserTagSuggestions,
-  listRootRef: userTagSuggestListRef,
-  commitTag: (tag) => addUserTagWithValue(tag),
-  commitDraft: () => addUserTag(),
-})
-
-onClickOutside(userTagInlineZoneRef, () => {
-  if (!userTagInputOpen.value) {
-    return
-  }
-  cancelUserTagInput()
-})
 
 function removeUserTag(tag: string) {
   emit("updateUserTags", {
@@ -301,10 +203,6 @@ function removeMetadataTag(tag: string) {
     movieId: props.movie.id,
     tags: props.movie.tags.filter((x) => x !== tag),
   })
-}
-
-function pickUserTagSuggestion(tag: string) {
-  addUserTagWithValue(tag)
 }
 </script>
 
@@ -656,83 +554,15 @@ function pickUserTagSuggestion(tag: string) {
               </span>
             </Badge>
 
-            <div
+            <DetailTagAddControl
               v-if="!isTrashed"
-              ref="userTagInlineZoneRef"
-              class="flex max-w-full flex-wrap items-center gap-2"
-            >
-              <Button
-                type="button"
-                variant="secondary"
-                class="h-[29px] shrink-0 rounded-2xl px-3 py-0 text-xs leading-none"
-                @click="onUserTagAddButtonClick"
-              >
-                <Plus class="size-3.5 shrink-0" data-icon="inline-start" />
-                {{ t("common.add") }}
-              </Button>
-              <div
-                v-if="userTagInputOpen"
-                ref="userTagSuggestRootRef"
-                class="relative max-w-full min-w-[min(100%,12rem)]"
-              >
-                <div
-                  class="flex h-9 w-full items-center gap-0.5 rounded-2xl border border-border/80 bg-background/80 pl-3 pr-0.5 shadow-sm"
-                >
-                  <input
-                    ref="newUserTagInputRef"
-                    v-model="newUserTagDraft"
-                    type="text"
-                    maxlength="64"
-                    autocomplete="off"
-                    role="combobox"
-                    :aria-expanded="showUserTagSuggestions"
-                    :aria-activedescendant="
-                      highlightIndex >= 0 ? `${tagSuggestDomId}-opt-${highlightIndex}` : undefined
-                    "
-                    aria-autocomplete="list"
-                    :aria-controls="showUserTagSuggestions ? `${tagSuggestDomId}-list` : undefined"
-                    :placeholder="t('detailPanel.newTagPlaceholder')"
-                    class="placeholder:text-muted-foreground h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none outline-none focus-visible:ring-0"
-                    @keydown="onTagSuggestKeydown"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="size-8 shrink-0 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    :aria-label="t('detailPanel.ariaCancelTagInput')"
-                    @click="cancelUserTagInput"
-                  >
-                    <X class="size-4" />
-                  </Button>
-                </div>
-                <ul
-                  v-if="showUserTagSuggestions"
-                  :id="`${tagSuggestDomId}-list`"
-                  ref="userTagSuggestListRef"
-                  class="absolute top-full left-0 z-50 mt-1 max-h-60 w-full min-w-[min(100%,12rem)] overflow-y-auto rounded-2xl border border-border/80 bg-popover/98 py-1 text-popover-foreground shadow-lg backdrop-blur-sm"
-                  role="listbox"
-                  :aria-label="t('detailPanel.tagSuggestAria')"
-                >
-                  <li v-for="(s, si) in filteredUserTagSuggestions" :key="s">
-                    <button
-                      :id="`${tagSuggestDomId}-opt-${si}`"
-                      type="button"
-                      role="option"
-                      :data-tag-suggest-idx="si"
-                      class="w-full truncate px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                      :class="highlightIndex === si ? 'bg-muted' : ''"
-                      :aria-selected="highlightIndex === si"
-                      @mousedown.prevent="pickUserTagSuggestion(s)"
-                    >
-                      {{ s }}
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            </div>
+              :key="movie.id"
+              :tags="movie.userTags"
+              :suggestions="userTagSuggestions"
+              :save-error-message="t('detail.errUserTags')"
+              @add="addUserTag"
+            />
           </div>
-          <p v-if="userTagFormError" class="text-sm text-destructive">{{ userTagFormError }}</p>
         </div>
 
         <Separator />
