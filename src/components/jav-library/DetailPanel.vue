@@ -207,7 +207,7 @@ function removeMetadataTag(tag: string) {
 </script>
 
 <template>
-  <Card class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10">
+  <Card class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 py-0 shadow-xl shadow-black/10">
     <CardContent
       class="grid w-full min-w-0 gap-6 overflow-x-hidden p-5 sm:p-6"
       :class="
