@@ -580,6 +580,7 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/import/photos` | Upload ZIP/CBZ to default photo root; Beta required; preserve source; no overwrite; queue photo scan |
 | GET | `/api/library/comics`, `/api/library/photos` | List books |
 | GET | `/api/library/comics/{id}`, `/api/library/photos/{id}` | Book detail |
+| PATCH | `/api/library/photos/books/{id}/tags` | Replace photo tags with `{ tags: string[] }`; returns updated detail, requires photo Beta |
 | PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete operation |
 | POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
 | GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |

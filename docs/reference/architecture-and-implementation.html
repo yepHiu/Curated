@@ -513,6 +513,7 @@
   <h3>添加媒体（2026-09-11）</h3>
   <p>顶栏通过一个弹窗提供影片、漫画、写真 Tab；两个图片库 Tab 分别受 Beta 开关控制，默认仅显示影片。切换保留选择，上传中锁定切换与关闭。写真通过 <code>POST /api/import/photos</code> 上传到默认写真目录，禁止覆盖与越界写入，再启动独立扫描。AI 范围保持影片。</p>
   <h3>漫画与写真 Beta（2026-09-10）</h3>
+  <p>写真详情标签可通过「添加」保存；<code>PATCH /api/library/photos/books/{id}/tags</code> 接收完整标签数组，事务更新独立写真标签表并返回详情。最多 64 个标签，每项最多 64 Unicode 字符，受写真 Beta 开关限制。前端同步写真缓存，Mock 使用独立 localStorage；不向 AI Agent 暴露写真标签。</p>
   <p><strong>AI Agent 边界：</strong>漫画与写真不进入 Agent 的查询、操作、推荐或分析结论。页面上下文在前后端排除，任务工具只返回影片任务；个人洞察与聊天的统计和结论只针对影片，开启 Beta 不扩大 AI 范围。</p>
   <p>设置 → 实验性功能提供两个默认关闭的开关；启用后才显示该库的路径、阅读/浏览、监听和缓存设置。停用隐藏入口与配置、停止独立 watcher，保留索引与源包。Web 配置通过 <code>PATCH /api/settings</code> 持久化，启用允许无路径，扫描必须有已配置路径。</p>
   <p>独立 <code>comic/photo</code> 领域、Web/Mock 服务、HTTP 端点和 SQLite 表。迁移为 0046–0048；漫画实现 ZIP/CBZ 扫描导入、阅读进度与偏好、收藏评分标签和缓存清理。写真实现 ZIP/CBZ 导入、扫描、详情与浏览，缩略图由独立 <code>photothumb</code> 生成 420px JPEG，采用 32 MiB 内存 LRU 与 ETag 校验；独立写真缓存清理和单册进度 API 尚未实现。</p>
