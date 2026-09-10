@@ -4,11 +4,12 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { bundleBudgetPlugin } from './vite.bundle-budget.ts'
+import { pinyinDataPlugin } from './vite.pinyin-data.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), bundleBudgetPlugin()],
+  plugins: [vue(), tailwindcss(), pinyinDataPlugin(), bundleBudgetPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -17,6 +18,12 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 525,
     rollupOptions: {
+      treeshake: {
+        /** 未被所选服务模式引用的 Mock 适配器不应执行初始化或进入生产包。 */
+        moduleSideEffects(id) {
+          return !id.replaceAll('\\', '/').includes('/services/adapters/mock/')
+        },
+      },
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return

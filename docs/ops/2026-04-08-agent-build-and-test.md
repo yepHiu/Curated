@@ -212,3 +212,7 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 - `pnpm release:publish` 是整机发布推荐入口，它只分配一次版本号，再复用到便携包、安装包、manifest 与 `docs/ops/package-build-history.csv` 打包台账。
 - 发布打包会把 FFmpeg 运行时放入 `resources/app/third_party/ffmpeg/bin/`：优先使用 `backend/third_party/ffmpeg/bin/`，否则从 Scoop 或 PATH 发现真实二进制；`scoop/shims` 下的 shim 不会被复制，找不到真实运行时时打包失败。
 - 未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留。准备重新打包、同版本重打、清理 release 目录或整理产物时，也不能主动删除既有 installer / portable 包。
+
+## Production pinyin dictionary asset
+
+`vite.pinyin-data.ts` extracts the five pure dictionary literals from the locked `pinyin-pro` ESM source into a content-hashed JSON asset. The optional pinyin chunk fetches it from the same origin before initializing its existing synchronous matching exports. Deploy the complete `dist` directory, including JSON assets. A changed upstream dictionary format fails the build; a missing runtime asset rejects the import explicitly. This reduces executable JavaScript, not total dictionary data. Existing JS budgets stay unchanged. `src/lib/pinyin-data-build.test.ts` checks extraction and rejects executable literals; real production-browser matching was checked during the media Beta integration.
