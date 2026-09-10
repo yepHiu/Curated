@@ -50,7 +50,7 @@ describe("PhotoLibraryPage", () => {
     )
     expect(wrapper.find("[data-photo-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("photos.searchPlaceholder")
-    expect(wrapper.text()).toContain("photos.sortByAdded")
+    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("library.savedViewSort")
   })
 
   it("renders photo books in the photo wall", () => {

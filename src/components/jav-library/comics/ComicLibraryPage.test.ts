@@ -81,7 +81,7 @@ describe("ComicLibraryPage", () => {
     expect(wrapper.find("[data-book-sort-trigger]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("comics.searchPlaceholder")
-    expect(wrapper.text()).toContain("comics.sortByAdded")
+    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("library.savedViewSort")
     expect(wrapper.text()).not.toContain("comics.filterUnread")
     expect(wrapper.text()).not.toContain("comics.filterReading")
     expect(wrapper.text()).not.toContain("comics.filterRead")
