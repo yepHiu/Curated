@@ -40,7 +40,7 @@ function finishImport() { busy.value = false; open.value = false }
   <div data-import-menu>
     <Dialog :open="open" @update:open="updateOpen">
       <DialogTrigger as-child>
-        <Button data-import-trigger type="button" variant="ghost" class="min-h-11 rounded-full" :aria-label="t('import.mediaTrigger')">
+        <Button data-import-trigger type="button" variant="ghost" class="min-h-11 rounded-full lg:min-h-9" :aria-label="t('import.mediaTrigger')">
           <FilePlus2 data-icon="inline-start" />{{ t("import.mediaTrigger") }}
         </Button>
       </DialogTrigger>

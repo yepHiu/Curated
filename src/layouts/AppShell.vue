@@ -748,10 +748,10 @@ function clearActorsSearch() {
         <section
           class="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background/95"
         >
-          <!-- min-h 与中间栏 h-10 搜索框 + 上下 py-4 对齐，避免仅「返回」时顶栏变矮（如观看历史） -->
+          <!-- 桌面由共享顶栏高度控制并垂直居中，避免控件高度加 padding 和边框撑低分隔线。 -->
           <div
             data-shell-header
-            class="flex min-h-[var(--app-header-min-height)] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-[var(--app-header-px)] py-[var(--app-header-py)] sm:px-[var(--app-header-px-sm)] lg:px-[var(--app-header-px-lg)] lg:py-[var(--app-header-py-lg)]"
+            class="flex min-h-[var(--app-header-min-height)] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-[var(--app-header-px)] py-[var(--app-header-py)] sm:px-[var(--app-header-px-sm)] lg:px-[var(--app-header-px-lg)] lg:py-0"
           >
             <div class="flex flex-wrap items-center gap-2">
               <Button
