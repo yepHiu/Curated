@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
-import { Bot, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
+import { MessagesSquare, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import AppSidebar from "@/components/jav-library/AppSidebar.vue"
 import ImportMenu from "@/components/jav-library/ImportMenu.vue"
@@ -953,7 +953,7 @@ function clearActorsSearch() {
                 :aria-pressed="agentWindowOpen ? 'true' : 'false'"
                 @click="toggleAgentWindow"
               >
-                <Bot class="size-5" aria-hidden="true" />
+                <MessagesSquare class="size-5" aria-hidden="true" />
               </Button>
               <NotificationCenter />
               <Button
