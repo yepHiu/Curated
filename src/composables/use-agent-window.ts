@@ -43,8 +43,9 @@ function persistCurrent() {
 
 const { enabled } = useExperimentalAgent()
 watch(enabled, (value) => {
-  open.value = value
-})
+  // Loading/enabling AI makes the entry available; only user intent opens it.
+  if (!value) open.value = false
+}, { flush: "sync" })
 
 export function useAgentWindow() {
   const isMobileViewport = useMediaQuery("(max-width: 1023px)")
