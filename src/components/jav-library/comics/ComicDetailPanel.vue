@@ -218,7 +218,7 @@ function confirmDeleteComic() {
         <div class="flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            class="min-h-11 rounded-full px-8"
+            class="min-h-11 rounded-full lg:min-h-9"
             data-comic-start-reading
             :disabled="busy || comic.pageCount === 0"
             @click="emit('startReading', comic.currentPageIndex)"

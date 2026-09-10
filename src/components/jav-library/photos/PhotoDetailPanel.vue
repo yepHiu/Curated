@@ -168,7 +168,7 @@ function browseByTag(tag: string) {
         <div class="flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            class="min-h-11 rounded-full px-8"
+            class="min-h-11 rounded-full lg:min-h-9"
             data-photo-start-browsing
             :disabled="busy || photo.pageCount === 0"
             @click="emit('startBrowsing', photo.currentPageIndex)"
