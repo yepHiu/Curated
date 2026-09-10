@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"mime"
@@ -8,11 +9,13 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/photoarchive"
+	"curated-backend/internal/photothumb"
 	"curated-backend/internal/storage"
 )
 
@@ -121,8 +124,25 @@ func (h *Handler) handleGetPhotoPageImage(w http.ResponseWriter, r *http.Request
 	_, _ = io.Copy(w, body)
 }
 
+var photoThumbnails = photothumb.New()
+
 func (h *Handler) handleGetPhotoPageThumbnail(w http.ResponseWriter, r *http.Request) {
-	h.handleGetPhotoPageImage(w, r)
+	if !h.requirePhotoLibraryEnabled(w) {
+		return
+	}
+	detail, page, ok := h.loadPhotoPageForRequest(w, r)
+	if !ok {
+		return
+	}
+	body, etag, err := photoThumbnails.Get(r.Context(), detail.Location, page.EntryPath)
+	if err != nil {
+		writeAppError(w, http.StatusUnprocessableEntity, contracts.ErrorCodePhotoArchiveReadFailed, "failed to create photo thumbnail")
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.Header().Set("ETag", etag)
+	http.ServeContent(w, r, "preview.jpg", time.Time{}, bytes.NewReader(body))
 }
 
 func (h *Handler) requirePhotoLibraryEnabled(w http.ResponseWriter) bool {
