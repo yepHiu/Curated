@@ -315,8 +315,8 @@
         <h1>项目现在在哪里，下一步去哪里。</h1>
         <p class="lede">这是面向协作的静态项目看板：已交付、正在推进、尚未排期的方向，以及当前 Git 与 worktree 的真实快照被放在同一处对照。</p>
         <div class="snapshot-row" aria-label="快照元信息">
-          <span class="pill info">采集于 2026-09-10 20:53（UTC+08:00）</span>
-          <span class="pill ok">45 条 PRD 需求</span>
+          <span class="pill info">采集于 2026-09-10 23:16（UTC+08:00）</span>
+          <span class="pill ok">47 条 PRD 需求</span>
           <span class="pill warn">采集时有 4 个已修改文件、4 个未跟踪文档</span>
         </div>
       </div>
@@ -344,11 +344,11 @@
           <p>唯一状态源为 <code>docs/prd/requirements.csv</code>；“有计划文档”本身不等于已经批准或正在实施。</p>
         </div>
         <div class="metric-grid" aria-label="需求状态计数">
-          <article class="metric verified"><span class="label">已验证</span><strong class="value">16</strong><p class="note">验收证据齐全（35.6%）</p></article>
-          <article class="metric implemented"><span class="label">已实现</span><strong class="value">11</strong><p class="note">已有实现，仍待完整验收（24.4%）</p></article>
-          <article class="metric progress"><span class="label">进行中</span><strong class="value">11</strong><p class="note">已进入工程实现（24.4%）</p></article>
-          <article class="metric idea"><span class="label">想法池</span><strong class="value">6</strong><p class="note">未进入排期或实现（13.3%）</p></article>
-          <article class="metric specified"><span class="label">已定义</span><strong class="value">1</strong><p class="note">流程台账自身的启动项（2.2%）</p></article>
+          <article class="metric verified"><span class="label">已验证</span><strong class="value">18</strong><p class="note">验收证据齐全（38.3%）</p></article>
+          <article class="metric implemented"><span class="label">已实现</span><strong class="value">11</strong><p class="note">已有实现，仍待完整验收（23.4%）</p></article>
+          <article class="metric progress"><span class="label">进行中</span><strong class="value">11</strong><p class="note">已进入工程实现（23.4%）</p></article>
+          <article class="metric idea"><span class="label">想法池</span><strong class="value">6</strong><p class="note">未进入排期或实现（12.8%）</p></article>
+          <article class="metric specified"><span class="label">已定义</span><strong class="value">1</strong><p class="note">流程台账自身的启动项（2.1%）</p></article>
         </div>
       </section>
 
@@ -358,7 +358,7 @@
             <p class="section-kicker">Now</p>
             <h2 id="doing-heading">当前正在做</h2>
           </div>
-          <p>11 个需求正处于 <code>in_progress</code>。AI 设置与治理已转为 implemented / 90%；近期提交集中在 Agent 作品事实发布与确认状态，刮削治理和消息中心仍在进行中。</p>
+          <p>11 个需求正处于 <code>in_progress</code>。漫画 / 写真 Beta 已合入主线，对应 REQ-0046 / REQ-0047 已验证；AI 设置与治理为 implemented / 90%，刮削治理和消息中心仍在进行中。</p>
         </div>
         <div class="two-column">
           <article class="panel">
@@ -404,7 +404,7 @@
             <p class="section-kicker">Delivered</p>
             <h2 id="delivered-heading">已经具备的产品底座</h2>
           </div>
-          <p>以下为代码和项目事实明确记录的当前能力，不把目标架构当作已经完成。</p>
+          <p>以下为代码和项目事实明确记录的当前能力。9 月 10 日新增漫画与写真 Beta：设置 → 实验性功能分别开启，开启后才显示各自配置。</p>
         </div>
         <div class="two-column">
           <article class="panel">
@@ -433,22 +433,23 @@
       <section id="validation" aria-labelledby="validation-heading">
         <div class="section-head">
           <div><p class="section-kicker">Validation</p><h2 id="validation-heading">已有验证与剩余缺口</h2></div>
-          <p>以 9 月 9 日最新验收记录为主，保留相关历史证据；本次看板更新未重新执行业务测试，单项通过不等于完整发布门禁通过。</p>
+          <p>以 9 月 10 日媒体 Beta 整合验收及 9 月 9 日 Agent 记录为依据。主线整合已执行前后端测试与合成媒体浏览器验收；仍保留完整产品验收的边界。</p>
         </div>
         <div class="two-column">
           <article class="panel">
             <div class="panel-header"><p class="table-label">已有证据</p><h3>Agent 与播放可靠性</h3></div>
             <div class="panel-body"><ul class="compact-list">
               <li><strong>真实模型：</strong>9 月 9 日作品引用合成验证通过：2 次调用 / 8249 tokens，覆盖查询、结构化提交与历史快照；9 月 5 日另有 22 个不同合成场景通过记录。均使用临时 SQLite，未挂载真实资料库或源站工具。</li>
-              <li><strong>前端：</strong>9 月 9 日全量 Vitest 220 文件 / 1024 用例通过，后续 AgentWindow 定向 27 用例通过；typecheck、lint 与 build 均通过，构建预算未放宽。</li>
-              <li><strong>后端：</strong>9 月 9 日 Go 全量测试与 vet 通过，覆盖引用隔离、输出校验、确认及历史持久化；此前真实 FFmpeg 合成测试验证暂停 / 恢复与同片双会话独立读取。</li>
-              <li><strong>状态口径：</strong>PRD 为 16 项已验证、11 项已实现、11 项进行中、6 项想法、1 项已定义；保留台账状态和人工进度，不将其汇总为产品完成率。</li>
+              <li><strong>前端：</strong>9 月 10 日全量 Vitest 259 文件 / 1200 用例通过，后续新增拼音提取与写真返回导航测试通过；typecheck、lint 与 build 均通过，构建预算未放宽。</li>
+              <li><strong>后端与 Beta：</strong>9 月 10 日 Go 全量测试与 vet 通过；独立临时 SQLite 和两份合成 CBZ 验证开关显隐、路径扫描、详情翻页、关闭访问限制及重启保留。漫画阅读进度保留，写真目前提供扫描与浏览。</li>
+              <li><strong>状态口径：</strong>PRD 为 18 项已验证、11 项已实现、11 项进行中、6 项想法、1 项已定义；保留台账状态和人工进度，不将其汇总为产品完成率。</li>
             </ul></div>
           </article>
           <aside class="panel">
             <div class="panel-header"><p class="table-label">尚未全绿</p><h3>发布门禁与完整验收</h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>浏览器 e2e：</strong>9 月 9 日串行运行 4 通过 / 1 失败：Personal Insights 页面加载超时，单独复跑仍失败；旧移动端定位已在后续提交修正。</li>
+              <li><strong>浏览器 e2e：</strong>9 月 10 日串行运行 5 / 5 通过，包含 Personal Insights、PIN 启动、Mock 边界、375px 与备份。此前 Personal Insights 超时在本次复验未重现。</li>
+              <li><strong>写真 Beta：</strong>仅支持 ZIP/CBZ 扫描、详情与浏览；缩略图当前读取原图，缓存上限为预留配置。写真导入、单册进度 / 偏好 API 与独立缓存清理尚未实现。</li>
               <li><strong>Agent R1：</strong>演员别名、完整源站结果、多轮候选交互、三语言及移动端焦点 / 取消仍缺完整验收。用量治理与独立 Action 回执到期清理已有实现。</li>
               <li><strong>事实发布边界：</strong>作品字段来自同一来源快照，但不能保证源站元数据或任意自然语言事实绝对正确；独立翻译 / 润色 Action 不在本轮回答校验保证内。</li>
               <li><strong>播放边界：</strong>真实影片画质、LAN / GPU 基准和完整浏览器媒体验收待补；Go race 受本机工具链阻塞。缓存字节配额、按需 VOD、音频单独转码尚未实现。</li>
@@ -486,7 +487,7 @@
             </div>
             <div class="callout" style="margin-top:0.75rem">
               <h3>当前主计划之外的产品方向</h3>
-              <p>计划状态规则明确：容器、WebDAV、漫画库、Android 与 metadata sidecar 尚未进入 PRD，不并行实施；SMB 资料库目前只有未跟踪需求文档。SFW 合规产品已决定另建项目。下方漫画/照片 worktree 是独立实验工作区，不等于主计划已批准。</p>
+              <p>容器、WebDAV、Android 与 metadata sidecar 尚未进入 PRD，不并行实施；SMB 资料库目前只有未跟踪需求文档。SFW 合规产品已决定另建项目。漫画 / 写真已获准作为默认关闭的 Beta 合入 master，旧实验 worktree 原样保留。</p>
             </div>
           </div>
         </div>
@@ -505,8 +506,8 @@
           <article class="panel">
             <div class="panel-header"><p class="table-label">当前 checkout</p><h3><code>master</code></h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>HEAD：</strong><code>30dccba2</code> · <span lang="en">docs(agent): document referenced answers and verification results</span></li>
-              <li><strong>上游：</strong><code>origin/master</code>；采集时相对已缓存上游领先 9 个提交、落后 0 个。当前 checkout 就是本地 master。</li>
+              <li><strong>HEAD：</strong><code>145c5241</code> · <span lang="en">docs: record comic and photo Beta scope and verification</span></li>
+              <li><strong>上游：</strong><code>origin/master</code>；采集时相对已缓存上游领先 35 个提交、落后 0 个（含合入的源分支历史）。当前 checkout 就是本地 master，尚未 push。</li>
               <li><strong>远程：</strong><code>origin</code> 指向 <code>git@github.com:yepHiu/Curated.git</code>。</li>
               <li><strong>生产版本源：</strong><code>scripts/release/version.json</code> 当前为 <strong>1.5.5</strong>；9 月 6 日发布记录已提交。</li>
             </ul></div>
@@ -516,7 +517,7 @@
             <div class="panel-body"><ul class="compact-list">
               <li><strong>已跟踪文件（4）：</strong><code>.cursor/rules/project-standards.mdc</code>，以及 <code>docs/plan/</code> 下的首页详情侧栏优化、Agent milestone、VLC 播放优化三份文档；暂存区为空。</li>
               <li><strong>未跟踪文档（4）：</strong><code>docs/plan/</code> 下的 <code>2026-09-05-curated-figma-project-design.md</code>、<code>2026-09-06-agent-icon-options.md</code>、<code>2026-09-06-remaining-requirements-review.md</code>、<code>2026-09-06-smb-library-requirements.md</code>。</li>
-              <li><strong>分支整合：</strong><code>agent-enhance</code> 已于 9 月 6 日合入 master；原分支仍保留，指向 <code>9c845a59</code>。</li>
+              <li><strong>分支整合：</strong><code>agent-enhance</code> 于 9 月 6 日合入；9 月 10 日 <code>codex/comic-photo-beta</code> 已 fast-forward 到 master。源快照 <code>b1108e02</code> 保存旧实验 worktree 内容，原工作区和分支保留。</li>
               <li><strong>说明：</strong>以上均为本次编辑前的用户工作区状态；文档存在不代表已批准进入 PRD，旧盘点结论以最新台账和实施记录为准。</li>
             </ul></div>
           </aside>
@@ -527,21 +528,22 @@
             <caption>已注册 worktree（含当时的工作区脏净状态）</caption>
             <thead><tr><th scope="col">位置</th><th scope="col">分支 / HEAD</th><th scope="col">最新提交</th><th scope="col">状态</th><th scope="col">工作内容判断</th></tr></thead>
             <tbody>
-              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>master</code><br /><code>30dccba2</code></td><td>2026-09-09<br />作品引用回答与验收文档</td><td><span class="state dirty">4 个修改 / 4 个未跟踪</span></td><td>近期提交：Agent 作品事实发布、可选步数上限与确认状态。</td></tr>
+              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>master</code><br /><code>145c5241</code></td><td>2026-09-10<br />漫画 / 写真 Beta 范围与验收记录</td><td><span class="state dirty">4 个修改 / 4 个未跟踪</span></td><td>Beta 已合入；用户原有未提交文档保持原样。</td></tr>
               <tr><td><strong>Codex worktree #4115</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\4115\jav-shadcn</code></td><td><code>detached</code><br /><code>e2666ad2</code></td><td>2026-05-13<br />release 1.4.5 准备</td><td><span class="state detached">干净，游离 HEAD</span></td><td>旧发布快照；未绑定本地分支。</td></tr>
-              <tr><td><strong>漫画库 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\comic-library-mvp\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">70 个修改 / 61 个未跟踪</span></td><td>漫画与照片资料库的并行实验，尚不属于当前 PRD 主执行流。</td></tr>
+              <tr><td><strong>漫画库 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\comic-library-mvp\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">70 个修改 / 61 个未跟踪</span></td><td>源内容已保存快照并作为 Beta 整合；原工作文件与暂存区保持原样。</td></tr>
+              <tr><td><strong>Beta 整合 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\curated-media-beta\jav-shadcn</code></td><td><code>codex/comic-photo-beta</code><br /><code>145c5241</code></td><td>2026-09-10<br />Beta 验收与文档</td><td><span class="state">干净</span></td><td>已合入 master；保留独立验收日志与合成测试数据。</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="section-head" style="margin-top:2rem; margin-bottom:0.75rem"><div><p class="section-kicker">Recent branch history</p><h2 style="font-size:1.35rem">当前 master 的最新提交</h2></div></div>
         <div class="commit-list" aria-label="当前分支近期提交">
+          <div class="commit"><span class="hash">145c5241</span><span class="date">2026-09-10</span><span class="subject">docs: record comic and photo Beta scope and verification</span></div>
+          <div class="commit"><span class="hash">28f6c9f8</span><span class="date">2026-09-10</span><span class="subject">build: load pinyin dictionaries as data within existing JS budgets</span></div>
+          <div class="commit"><span class="hash">b31e7a35</span><span class="date">2026-09-10</span><span class="subject">feat(media): merge comic and photo libraries behind experimental Beta switches</span></div>
+          <div class="commit"><span class="hash">4e186743</span><span class="date">2026-09-10</span><span class="subject">docs: refresh project dashboard for September 10</span></div>
           <div class="commit"><span class="hash">30dccba2</span><span class="date">2026-09-09</span><span class="subject">docs(agent): document referenced answers and verification results</span></div>
           <div class="commit"><span class="hash">1592f556</span><span class="date">2026-09-09</span><span class="subject">fix(agent): distinguish write target IDs from generated catalog claims</span></div>
-          <div class="commit"><span class="hash">fa95050b</span><span class="date">2026-09-09</span><span class="subject">feat(agent): validate and render referenced movie answers before publication</span></div>
-          <div class="commit"><span class="hash">e028cb62</span><span class="date">2026-09-09</span><span class="subject">docs(agent): document optional limits and confirmation states</span></div>
-          <div class="commit"><span class="hash">9826e005</span><span class="date">2026-09-09</span><span class="subject">fix(agent): distinguish execution limits and confirmation outcomes</span></div>
-          <div class="commit"><span class="hash">ec933dab</span><span class="date">2026-09-09</span><span class="subject">feat(agent): capture request-scoped answer references</span></div>
         </div>
       </section>
 
@@ -554,14 +556,15 @@
           <p>如果代码、PRD 或 Git 状态发生变化，应以这些原始来源为准并重新生成快照。</p>
         </div>
         <div class="source-grid">
-          <a class="source-link" href="docs/prd/requirements.csv"><strong>PRD 需求台账</strong><span><code>docs/prd/requirements.csv</code><br />45 条需求及其 status、进度、验收与关联文档。</span></a>
+          <a class="source-link" href="docs/prd/requirements.csv"><strong>PRD 需求台账</strong><span><code>docs/prd/requirements.csv</code><br />47 条需求及其 status、进度、验收与关联文档。</span></a>
+          <a class="source-link" href="docs/plan/2026-09-10-comic-photo-beta-integration.md"><strong>漫画 / 写真 Beta 验收</strong><span>默认关闭开关、配置显隐、独立迁移、合成媒体浏览与重启持久化；含当前写真能力边界。</span></a>
           <a class="source-link" href="docs/plan/README.md"><strong>计划状态规则</strong><span><code>docs/plan/README.md</code><br />区分 research / proposed / approved / in-progress / verified，说明当前主计划。</span></a>
           <a class="source-link" href=".cursor/rules/project-facts.mdc"><strong>当前实现事实</strong><span><code>.cursor/rules/project-facts.mdc</code><br />前后端、Electron、播放、Agent 与已实现能力。</span></a>
           <a class="source-link" href=".cursor/rules/architecture-boundaries.mdc"><strong>架构边界</strong><span><code>.cursor/rules/architecture-boundaries.mdc</code><br />当前 Electron/HTTP 形态与仍属目标的原生能力。</span></a>
           <a class="source-link" href="docs/plan/2026-08-19-agent-milestone-plan.md"><strong>Agent 实施与验收</strong><span>§14–16：历史 / 回执、正式治理、作品引用发布与 9 月 9 日验收；§17 上下文管理仍为待确认方案。含采集时未提交补充。</span></a>
           <a class="source-link" href="docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md"><strong>播放链路修复记录</strong><span>2026-09-06：F1–F10 修复与真实 FFmpeg 验证；其旧构建 / e2e 结论以 Agent §16.6 后续记录为准。</span></a>
           <a class="source-link" href="scripts/release/version.json"><strong>生产版本源</strong><span>当前版本 1.5.5；发布历史另见 docs/ops/package-build-history.csv，本次未重新查询远端发布。</span></a>
-          <a class="source-link" href=".cursor/skills/curated-project-dashboard/scripts/collect-dashboard-snapshot.ps1"><strong>只读 Git / 台账采集器</strong><span>采集需求、分支、HEAD、版本及 3 个 worktree；上游差异和当前 master 日志另用本地 Git 命令核对，未 fetch。</span></a>
+          <a class="source-link" href=".cursor/skills/curated-project-dashboard/scripts/collect-dashboard-snapshot.ps1"><strong>只读 Git / 台账采集器</strong><span>采集需求、分支、HEAD、版本及 4 个 worktree；上游差异和当前 master 主线日志另用本地 Git 命令核对，未 fetch。</span></a>
         </div>
       </section>
     </main>
