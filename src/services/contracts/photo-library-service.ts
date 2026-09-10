@@ -1,5 +1,5 @@
 import type { ComputedRef } from "vue"
-import type { TaskDTO } from "@/api/types"
+import type { PhotoImportUploadProgress, TaskDTO } from "@/api/types"
 import type {
   PhotoCacheSettings,
   PhotoBook,
@@ -31,4 +31,5 @@ export interface PhotoLibraryService {
   getPhotoById(photoId?: string): PhotoBook | undefined
   loadPhotoDetail(photoId: string): Promise<PhotoBook | undefined>
   scanPhotos(paths?: string[]): Promise<TaskDTO | null>
+  importPhotos(files: File[], options?: { onUploadProgress?: (progress: PhotoImportUploadProgress) => void }): Promise<TaskDTO | null>
 }

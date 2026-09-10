@@ -7,6 +7,7 @@ import type {
   PhotoBookDetailDTO,
   PhotoBooksPageDTO,
   PhotoLibraryPathDTO,
+  PhotoImportUploadProgress,
   SettingsDTO,
   StartScanBody,
   TaskDTO,
@@ -27,6 +28,15 @@ function photoListParamsToQuery(
 }
 
 export const photoApi = {
+  /** Upload archives to the independent default photo root. */
+  importPhotos(files: File[], options?: { onUploadProgress?: (progress: PhotoImportUploadProgress) => void }): Promise<TaskDTO> {
+    const form = new FormData()
+    form.set("totalBytes", String(files.reduce((sum, file) => sum + file.size, 0)))
+    for (const file of files) {
+      form.append("files", file, file.name)
+    }
+    return httpClient.postFormWithProgress<TaskDTO>("/import/photos", form, { onUploadProgress: options?.onUploadProgress })
+  },
   getSettings(): Promise<SettingsDTO> {
     return httpClient.get<SettingsDTO>("/settings")
   },

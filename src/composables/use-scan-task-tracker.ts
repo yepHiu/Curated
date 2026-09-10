@@ -13,6 +13,7 @@ import {
   type BackendEventSubscription,
 } from "@/lib/backend-events"
 import { useComicLibraryService } from "@/services/comic-library-service"
+import { usePhotoLibraryService } from "@/services/photo-library-service"
 import { useLibraryService } from "@/services/library-service"
 
 function isFsnotifyLibraryScan(task: TaskDTO): boolean {
@@ -35,6 +36,7 @@ const POLL_MS = 500
 
 const libraryService = useLibraryService()
 const comicLibraryService = useComicLibraryService()
+const photoLibraryService = usePhotoLibraryService()
 
 const activeTask = shallowRef<TaskDTO | null>(null)
 const pollError = ref<string | null>(null)
@@ -234,13 +236,14 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
       )
     }
     void libraryService.reloadMoviesFromApi()
-  } else if (t.type === "scan.comics") {
+  } else if (t.type === "scan.comics" || t.type === "scan.photos") {
+    const photo = t.type === "scan.photos"
     const msg = t.message ?? ""
     const tr = i18n.global.t
     pushAppToast(
       t.status === "completed"
-        ? tr("toasts.manualComicScanDone", { message: msg })
-        : tr("toasts.manualComicScanFailed", { message: msg }),
+        ? tr(photo ? "toasts.manualPhotoScanDone" : "toasts.manualComicScanDone", { message: msg })
+        : tr(photo ? "toasts.manualPhotoScanFailed" : "toasts.manualComicScanFailed", { message: msg }),
       {
         variant: taskTerminalToastVariant(t.status),
         notification: {
@@ -254,7 +257,8 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
         },
       },
     )
-    void comicLibraryService.reloadComicsFromApi()
+    if (photo) void photoLibraryService.reloadPhotosFromApi()
+    else void comicLibraryService.reloadComicsFromApi()
   } else if (t.type === "scrape.movie" && trackedTaskOptions.value.notifyMovieScrape) {
     pushAppToast(movieScrapeToastMessage(t), movieScrapeToastOptions(t))
     trackedLoadingToastId = null

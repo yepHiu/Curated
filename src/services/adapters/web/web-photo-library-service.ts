@@ -112,6 +112,10 @@ function applySettingsFromDTO(settings: SettingsDTO) {
 
 function createWebPhotoLibraryService(): PhotoLibraryService {
   return {
+    async importPhotos(files, options) {
+      if (!photoLibraryEnabledState.value) throw new Error("Photo library is disabled")
+      return photoApi.importPhotos(files, options)
+    },
     photos: computed(() => photosState.value),
     photosLoaded: computed(() => photosLoadedState.value),
     loadError: computed(() => loadErrorState.value),

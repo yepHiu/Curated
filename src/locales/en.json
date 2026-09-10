@@ -172,6 +172,8 @@
     "comicLibraryWatchScanDone": "Comic library watch: scan finished — {message}",
     "comicLibraryWatchScanDoneWithChanges": "Comic library watch: found {discovered} archives, imported {imported}, updated {updated}, skipped {skipped}.",
     "comicLibraryWatchScanDoneNoChanges": "Comic library watch: scan complete, found {discovered} archives, no new comics.",
+    "manualPhotoScanDone": "Photo scan completed: {message}",
+    "manualPhotoScanFailed": "Photo scan failed: {message}",
     "manualComicScanDone": "Comic scan finished — {message}",
     "manualComicScanFailed": "Comic scan ended without full success — {message}",
     "comicImportDone": "Comic import complete: {completed} archives copied.",
@@ -812,6 +814,19 @@
     "discovered": "Discovered"
   },
   "import": {
+    "mediaTrigger": "Add media",
+    "mediaDescription": "Choose a media type and import files.",
+    "mediaType": "Media type",
+    "photoTrigger": "Add photos",
+    "photoTargetPath": "Photo import target",
+    "photoNoDefaultPath": "Set a default import path in Experimental → Photo library first.",
+    "photoDropTitle": "Drop photo archives here",
+    "photoDropHint": "ZIP / CBZ supported. Select multiple files at once.",
+    "photoChooseFiles": "Choose photo archives",
+    "photoSkippedUnsupported": "Skipped {count} unsupported files.",
+    "photoFooterHint": "Copies to the photo library, keeps originals, and never replaces existing files.",
+    "photoSubmit": "Start import",
+    "photoResultError": "Copied {completed}; failed {failed}. {message}",
     "trigger": "Add movies",
     "dialogTitle": "Import movies",
     "dialogDescription": "Choose files or drop movies here. Curated copies them into the default movie storage path from Settings.",
@@ -1572,7 +1587,7 @@
     "photoLibraryPathDialogDesc": "Enter an absolute photo root; you can pick a folder from the system directory picker. Examples:",
     "photoLibraryPathRemove": "Remove",
     "photoDefaultImportPath": "Default photo import path",
-    "photoDefaultImportPathDesc": "Reserved for future photo imports. Add a path and scan it in this Beta.",
+    "photoDefaultImportPathDesc": "New photo imports use this path, independently of movies and comics.",
     "photoDefaultImportPathNone": "Choose default path"
   },
   "lock": {

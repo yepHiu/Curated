@@ -69,6 +69,14 @@ const photosState = ref<PhotoBook[]>([
 ])
 
 export const mockPhotoLibraryService: PhotoLibraryService = {
+  /** Mock acknowledges an upload without copying files to the local filesystem. */
+  async importPhotos(files, options) {
+    if (!photoLibraryEnabled.value) throw new Error("Photo library is disabled")
+    if (!defaultPhotoImportLibraryPathId.value) throw new Error("Default photo path is not configured")
+    const total = files.reduce((sum, file) => sum + file.size, 0)
+    options?.onUploadProgress?.({ loaded: total, total, percent: 100 })
+    return null
+  },
   photos: computed(() => photosState.value),
   photosLoaded: computed(() => true),
   loadError: computed(() => null),

@@ -172,6 +172,8 @@
     "comicLibraryWatchScanDone": "漫画库监听：扫描完成 — {message}",
     "comicLibraryWatchScanDoneWithChanges": "漫画库监听：已发现 {discovered} 个压缩包，新入库 {imported} 本，更新 {updated} 本，跳过 {skipped} 个。",
     "comicLibraryWatchScanDoneNoChanges": "漫画库监听：扫描完成，发现 {discovered} 个压缩包，未发现可入库的新漫画。",
+    "manualPhotoScanDone": "写真扫描完成：{message}",
+    "manualPhotoScanFailed": "写真扫描失败：{message}",
     "manualComicScanDone": "漫画扫描完成 - {message}",
     "manualComicScanFailed": "漫画扫描结束（未完全成功）- {message}",
     "comicImportDone": "漫画导入完成：已复制 {completed} 个压缩包。",
@@ -812,6 +814,19 @@
     "discovered": "已发现"
   },
   "import": {
+    "mediaTrigger": "添加媒体",
+    "mediaDescription": "选择媒体类型并导入文件。",
+    "mediaType": "媒体类型",
+    "photoTrigger": "添加写真",
+    "photoTargetPath": "目标写真路径",
+    "photoNoDefaultPath": "请先在「实验性功能 → 写真库」设置默认导入路径。",
+    "photoDropTitle": "将写真压缩包拖到这里",
+    "photoDropHint": "支持 ZIP / CBZ，可一次选择多个文件。",
+    "photoChooseFiles": "选择写真文件",
+    "photoSkippedUnsupported": "已跳过 {count} 个不支持的文件。",
+    "photoFooterHint": "复制到写真库，保留原文件；重名文件不会覆盖。",
+    "photoSubmit": "开始导入",
+    "photoResultError": "已复制 {completed} 个，失败 {failed} 个。{message}",
     "trigger": "添加影片",
     "dialogTitle": "导入影片",
     "dialogDescription": "选择文件或拖拽影片到这里，Curated 会复制到设置中的默认影片存储路径。",
@@ -1572,7 +1587,7 @@
     "photoLibraryPathDialogDesc": "输入一个绝对写真根目录；也可以使用系统目录选择器选择文件夹。示例：",
     "photoLibraryPathRemove": "移除",
     "photoDefaultImportPath": "默认写真导入路径",
-    "photoDefaultImportPathDesc": "为后续写真导入预留默认路径；当前请添加路径后扫描。",
+    "photoDefaultImportPathDesc": "新写真导入使用此路径。与影片和漫画路径相互独立。",
     "photoDefaultImportPathNone": "选择默认路径"
   },
   "lock": {

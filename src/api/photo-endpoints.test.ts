@@ -7,6 +7,17 @@ afterEach(() => {
 })
 
 describe("photoApi", () => {
+  it("uploads archives only to the photo import endpoint with progress", async () => {
+    const upload = vi.spyOn(httpClient, "postFormWithProgress").mockResolvedValueOnce({ taskId: "photo-import" })
+    const file = new File(["zip"], "Photo.zip")
+    const onUploadProgress = vi.fn()
+    await photoApi.importPhotos([file], { onUploadProgress })
+    expect(upload).toHaveBeenCalledWith("/import/photos", expect.any(FormData), { onUploadProgress })
+    const form = upload.mock.calls[0]![1] as FormData
+    expect(form.get("totalBytes")).toBe("3")
+    expect((form.getAll("files")[0] as File).name).toBe("Photo.zip")
+  })
+
   it("adds photo library paths through the photo path endpoint", async () => {
     const result = {
       id: "photo-library-1",

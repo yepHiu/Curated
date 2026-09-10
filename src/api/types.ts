@@ -1022,6 +1022,12 @@ export interface ComicImportUploadProgress {
   percent: number
 }
 
+export interface PhotoImportUploadProgress {
+  loaded: number
+  total: number
+  percent: number
+}
+
 export interface MovieImportUploadFileManifest {
   relativePath: string
   size: number

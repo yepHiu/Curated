@@ -172,6 +172,8 @@
     "comicLibraryWatchScanDone": "コミック監視：スキャン完了 — {message}",
     "comicLibraryWatchScanDoneWithChanges": "コミック監視：{discovered} 件のアーカイブを検出、新規 {imported} 件、更新 {updated} 件、スキップ {skipped} 件。",
     "comicLibraryWatchScanDoneNoChanges": "コミック監視：スキャン完了。{discovered} 件のアーカイブを検出しましたが、新規コミックはありません。",
+    "manualPhotoScanDone": "写真スキャンが完了しました：{message}",
+    "manualPhotoScanFailed": "写真スキャンに失敗しました：{message}",
     "manualComicScanDone": "コミックスキャン完了 - {message}",
     "manualComicScanFailed": "コミックスキャン終了（未完了）- {message}",
     "comicImportDone": "コミックのインポートが完了しました：{completed} 件のアーカイブをコピーしました。",
@@ -812,6 +814,19 @@
     "discovered": "検出"
   },
   "import": {
+    "mediaTrigger": "メディアを追加",
+    "mediaDescription": "メディアの種類を選んでファイルを取り込みます。",
+    "mediaType": "メディアの種類",
+    "photoTrigger": "写真を追加",
+    "photoTargetPath": "写真の取り込み先",
+    "photoNoDefaultPath": "「実験的機能 → 写真ライブラリ」で既定の取り込み先を設定してください。",
+    "photoDropTitle": "写真アーカイブをここにドロップ",
+    "photoDropHint": "ZIP / CBZ に対応。複数ファイルを選択できます。",
+    "photoChooseFiles": "写真ファイルを選択",
+    "photoSkippedUnsupported": "{count} 件の非対応ファイルをスキップしました。",
+    "photoFooterHint": "元ファイルを保持して写真ライブラリへコピーします。同名ファイルは上書きしません。",
+    "photoSubmit": "取り込み開始",
+    "photoResultError": "{completed} 件コピー、{failed} 件失敗。{message}",
     "trigger": "動画を追加",
     "dialogTitle": "動画をインポート",
     "dialogDescription": "ファイルを選択するか動画をここにドロップすると、Curated が設定済みの既定保存先へコピーします。",
@@ -1572,7 +1587,7 @@
     "photoLibraryPathDialogDesc": "絶対パスの写真ルートを入力してください。システムのフォルダ選択も使えます。例：",
     "photoLibraryPathRemove": "削除",
     "photoDefaultImportPath": "既定の写真インポート先",
-    "photoDefaultImportPathDesc": "今後の写真インポート用の既定パスです。現在はパスを追加してスキャンしてください。",
+    "photoDefaultImportPathDesc": "写真の取り込み先です。動画・コミックのパスとは独立しています。",
     "photoDefaultImportPathNone": "既定パスを選択"
   },
   "lock": {

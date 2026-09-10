@@ -23,12 +23,15 @@ const { t } = useI18n()
 const comicService = useComicLibraryService()
 const taskTracker = useScanTaskTracker()
 
-const open = ref(false)
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const emit = defineEmits<{ busy: [value: boolean]; completed: [] }>()
+const open = defineModel<boolean>("open", { default: false })
 const selectedFiles = ref<File[]>([])
 const skippedCount = ref(0)
 const importError = ref("")
 const dragActive = ref(false)
 const busy = ref(false)
+watch(busy, (value) => emit("busy", value), { flush: "sync" })
 const uploadProgress = ref<ComicImportUploadProgress | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -82,7 +85,7 @@ watch(open, (next) => {
       console.warn("[comic-import] comic settings refresh failed", error)
     })
   }
-})
+}, { immediate: true })
 
 function fileExtension(name: string): string {
   const idx = name.lastIndexOf(".")
@@ -190,6 +193,7 @@ async function submitImport() {
     }
     pushAppToast(t("import.queuedToast"), { variant: "success", durationMs: 2600 })
     clearSelection()
+    emit("completed")
     open.value = false
   } catch (err) {
     importError.value = errorMessage(err)
@@ -201,8 +205,8 @@ async function submitImport() {
 </script>
 
 <template>
-  <Dialog v-model:open="open">
-    <DialogTrigger as-child>
+  <component :is="props.embedded ? 'div' : Dialog" v-model:open="open">
+    <DialogTrigger v-if="!props.embedded" as-child>
       <Button
         data-comic-import-trigger
         type="button"
@@ -248,10 +252,10 @@ async function submitImport() {
       </Button>
     </DialogTrigger>
 
-    <DialogContent
-      class="w-[min(calc(100vw-2rem),42rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden rounded-3xl border-border/50 sm:max-w-2xl"
+    <component :is="props.embedded ? 'div' : DialogContent"
+      :class="props.embedded ? 'flex min-w-0 flex-col gap-4' : 'w-[min(calc(100vw-2rem),42rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden rounded-3xl border-border/50 sm:max-w-2xl'"
     >
-      <DialogHeader class="min-w-0">
+      <DialogHeader v-if="!props.embedded" class="min-w-0">
         <DialogTitle>{{ t("import.comicDialogTitle") }}</DialogTitle>
         <DialogDescription>
           {{ t("import.comicDialogDescription") }}
@@ -384,6 +388,6 @@ async function submitImport() {
           {{ busy ? t("import.importing") : t("import.comicSubmit") }}
         </Button>
       </DialogFooter>
-    </DialogContent>
-  </Dialog>
+    </component>
+  </component>
 </template>

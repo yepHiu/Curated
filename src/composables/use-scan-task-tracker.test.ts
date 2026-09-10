@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   pushAppToast: vi.fn(),
   reloadMoviesFromApi: vi.fn(),
   reloadComicsFromApi: vi.fn(),
+  reloadPhotosFromApi: vi.fn(),
   subscribeBackendEvents: vi.fn(),
 }))
 
@@ -46,6 +47,10 @@ vi.mock("@/services/comic-library-service", () => ({
   useComicLibraryService: () => ({
     reloadComicsFromApi: mocks.reloadComicsFromApi,
   }),
+}))
+
+vi.mock("@/services/photo-library-service", () => ({
+  usePhotoLibraryService: () => ({ reloadPhotosFromApi: mocks.reloadPhotosFromApi }),
 }))
 
 vi.mock("@/lib/backend-events", () => ({
@@ -283,6 +288,38 @@ describe("useScanTaskTracker", () => {
       }),
     )
     expect(mocks.reloadComicsFromApi).toHaveBeenCalledTimes(1)
+    expect(mocks.reloadMoviesFromApi).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it("toasts and reloads photos when photo scan completes without refreshing movies", async () => {
+    vi.useFakeTimers()
+    mocks.getTaskStatus.mockResolvedValueOnce({ ...makeTask("completed"), taskId: "photo-scan-1", type: "scan.photos" })
+
+    const Harness = defineComponent({
+      setup() {
+        const tracker = useScanTaskTracker()
+        tracker.start("photo-scan-1")
+        return () => null
+      },
+    })
+
+    const wrapper = mount(Harness)
+    await flushPromises()
+
+    expect(mocks.pushAppToast).toHaveBeenCalledWith(
+      "toasts.manualPhotoScanDone",
+      expect.objectContaining({
+        variant: "success",
+        notification: expect.objectContaining({
+          type: "scan",
+          title: "notificationCenter.titles.scanDone",
+          source: { taskId: "photo-scan-1", route: "/settings?section=experimental" },
+        }),
+      }),
+    )
+    expect(mocks.reloadPhotosFromApi).toHaveBeenCalledTimes(1)
     expect(mocks.reloadMoviesFromApi).not.toHaveBeenCalled()
 
     wrapper.unmount()

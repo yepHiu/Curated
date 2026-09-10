@@ -1,118 +1,63 @@
 import { flushPromises, mount } from "@vue/test-utils"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ref } from "vue"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import ImportMenu from "./ImportMenu.vue"
 
-const comicServiceState = vi.hoisted(() => ({
-  comicLibraryEnabled: false,
-  comicLibraryPaths: [
-    { id: "comic-path-a", path: "D:/Comics", title: "Comics" },
-  ],
-  defaultComicImportLibraryPathId: "comic-path-a",
-  refreshSettings: vi.fn(),
-}))
+const state = vi.hoisted(() => ({ comic: undefined as unknown, photo: undefined as unknown, refresh: vi.fn() }))
+vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock("@/services/comic-library-service", () => ({ useComicLibraryService: () => ({ comicLibraryEnabled: state.comic, refreshSettings: state.refresh }) }))
+vi.mock("@/services/photo-library-service", () => ({ usePhotoLibraryService: () => ({ photoLibraryEnabled: state.photo, refreshSettings: state.refresh }) }))
+vi.mock("./MovieImportDialog.vue", () => ({ __esModule: true, default: { name: "MovieImportDialog", props: ["open", "embedded"], emits: ["busy", "completed"], template: '<input data-movie-files />' } }))
+vi.mock("./ComicImportDialog.vue", () => ({ __esModule: true, default: { name: "ComicImportDialog", props: ["open", "embedded"], emits: ["busy", "completed"], template: '<input data-comic-files />' } }))
+vi.mock("./PhotoImportPanel.vue", () => ({ __esModule: true, default: { name: "PhotoImportPanel", props: ["active"], emits: ["busy", "completed"], template: '<input data-photo-files />' } }))
 
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string, values?: Record<string, unknown>) =>
-      values ? `${key}:${JSON.stringify(values)}` : key,
-  }),
-}))
+const wrappers: ReturnType<typeof mount>[] = []
+beforeEach(() => { state.comic = ref(false); state.photo = ref(false); state.refresh.mockResolvedValue(undefined) })
+afterEach(() => { wrappers.forEach(wrapper => wrapper.unmount()); wrappers.length = 0; document.body.innerHTML = "" })
+async function openMenu(comic: boolean, photo: boolean) {
+  (state.comic as ReturnType<typeof ref>).value = comic
+  ;(state.photo as ReturnType<typeof ref>).value = photo
+  const wrapper = mount(ImportMenu, { attachTo: document.body })
+  wrappers.push(wrapper)
+  await wrapper.get("[data-import-trigger]").trigger("click")
+  await flushPromises()
+  return wrapper
+}
 
-vi.mock("lucide-vue-next", () => ({
-  BookOpen: { name: "BookOpen", template: "<span />" },
-  FileArchive: { name: "FileArchive", template: "<span />" },
-  UploadCloud: { name: "UploadCloud", template: "<span />" },
-  X: { name: "X", template: "<span />" },
-}))
-
-vi.mock("./MovieImportDialog.vue", () => ({
-  default: { name: "MovieImportDialog", template: "<div data-import-menu-movie />" },
-}))
-
-vi.mock("./ComicImportDialog.vue", () => ({
-  default: { name: "ComicImportDialog", template: "<div data-import-menu-comic />" },
-}))
-
-vi.mock("@/services/comic-library-service", () => ({
-  useComicLibraryService: () => ({
-    comicLibraryEnabled: {
-      get value() {
-        return comicServiceState.comicLibraryEnabled
-      },
-    },
-    comicLibraryPaths: {
-      get value() {
-        return comicServiceState.comicLibraryPaths
-      },
-    },
-    defaultComicImportLibraryPathId: {
-      get value() {
-        return comicServiceState.defaultComicImportLibraryPathId
-      },
-    },
-    refreshSettings: comicServiceState.refreshSettings,
-  }),
-}))
-
-vi.mock("@/components/ui/dialog", () => ({
-  Dialog: { name: "Dialog", template: "<div><slot /></div>" },
-  DialogTrigger: { name: "DialogTrigger", template: "<div><slot /></div>" },
-  DialogContent: { name: "DialogContent", template: "<section><slot /></section>" },
-  DialogDescription: { name: "DialogDescription", template: "<p><slot /></p>" },
-  DialogFooter: { name: "DialogFooter", template: "<footer><slot /></footer>" },
-  DialogHeader: { name: "DialogHeader", template: "<header><slot /></header>" },
-  DialogTitle: { name: "DialogTitle", template: "<h2><slot /></h2>" },
-}))
-
-vi.mock("@/components/ui/button", () => ({
-  Button: {
-    name: "Button",
-    props: ["disabled"],
-    template: "<button :disabled='disabled'><slot /></button>",
-  },
-}))
-
-beforeEach(() => {
-  comicServiceState.comicLibraryEnabled = false
-  comicServiceState.comicLibraryPaths = [
-    { id: "comic-path-a", path: "D:/Comics", title: "Comics" },
-  ]
-  comicServiceState.defaultComicImportLibraryPathId = "comic-path-a"
-  comicServiceState.refreshSettings.mockReset()
-})
-
-describe("ImportMenu", () => {
-  it("contains only the movie import entry when comics are disabled", async () => {
-    comicServiceState.comicLibraryEnabled = false
-
-    const wrapper = mount(ImportMenu, {
-      global: {
-        stubs: {
-          MovieImportDialog: { template: "<div data-import-menu-movie />" },
-          ComicImportDialog: { template: "<div data-import-menu-comic />" },
-        },
-      },
-    })
-    await flushPromises()
-
-    expect(wrapper.find("[data-import-menu-movie]").exists()).toBe(true)
-    expect(wrapper.find("[data-import-menu-comic]").exists()).toBe(false)
+describe("unified media import", () => {
+  it.each([[false, false], [true, false], [false, true], [true, true]])("shows only enabled tabs: comic=%s photo=%s", async (comic, photo) => {
+    const wrapper = await openMenu(comic, photo)
+    expect(wrapper.get("[data-import-trigger]").text()).toBe("import.mediaTrigger")
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]')).map(tab => tab.textContent)
+    expect(tabs).toEqual(["import.trigger", ...(comic ? ["import.comicTrigger"] : []), ...(photo ? ["import.photoTrigger"] : [])])
+    expect(document.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe("import.trigger")
   })
 
-  it("contains movie and comic import entries when comics are enabled", async () => {
-    comicServiceState.comicLibraryEnabled = true
-
-    const wrapper = mount(ImportMenu, {
-      global: {
-        stubs: {
-          MovieImportDialog: { template: "<div data-import-menu-movie />" },
-          ComicImportDialog: { template: "<div data-import-menu-comic />" },
-        },
-      },
-    })
+  it("preserves panel state on switching and returns to movies when a gate closes", async () => {
+    await openMenu(true, true)
+    const photoTab = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(tab => tab.textContent === "import.photoTrigger")!
+    photoTab.click(); await flushPromises()
+    const input = document.querySelector<HTMLInputElement>("[data-photo-files]")!
+    input.value = "selected archive"
+    document.querySelector<HTMLButtonElement>('[role="tab"]')!.click(); await flushPromises()
+    photoTab.click(); await flushPromises()
+    expect(document.querySelector<HTMLInputElement>("[data-photo-files]")!.value).toBe("selected archive")
+    ;(state.photo as ReturnType<typeof ref>).value = false
     await flushPromises()
+    expect(document.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe("import.trigger")
+    expect(document.querySelector('[data-photo-files]')).toBeNull()
+  })
 
-    expect(wrapper.find("[data-import-menu-movie]").exists()).toBe(true)
-    expect(wrapper.find("[data-import-menu-comic]").exists()).toBe(true)
+  it("blocks tab changes and closing during an upload, then closes on completion", async () => {
+    const wrapper = await openMenu(true, true)
+    const movie = wrapper.findComponent({ name: "MovieImportDialog" })
+    movie.vm.$emit("busy", true); await flushPromises()
+    expect(Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]')).every(tab => tab.disabled)).toBe(true)
+    wrapper.findComponent({ name: "Dialog" }).vm.$emit("update:open", false)
+    await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    movie.vm.$emit("completed"); await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })

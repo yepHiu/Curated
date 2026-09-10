@@ -26,10 +26,13 @@ const { t } = useI18n()
 const libraryService = useLibraryService()
 const taskTracker = useScanTaskTracker()
 
-const open = ref(false)
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const emit = defineEmits<{ busy: [value: boolean]; completed: [] }>()
+const open = defineModel<boolean>("open", { default: false })
 const selectedFiles = ref<File[]>([])
 const dragActive = ref(false)
 const busy = ref(false)
+watch(busy, (value) => emit("busy", value), { flush: "sync" })
 const resumableSessions = ref<ResumableMovieImportSession[]>([])
 const abandonConfirmId = ref("")
 const abandonBusyId = ref("")
@@ -121,7 +124,7 @@ watch(open, (next) => {
     })
     void refreshResumableSessions()
   }
-})
+}, { immediate: true })
 
 async function refreshResumableSessions() {
   try {
@@ -339,6 +342,7 @@ async function submitImport() {
     }
     pushAppToast(t("import.queuedToast"), { variant: "success", durationMs: 2600 })
     clearSelection()
+    emit("completed")
     open.value = false
   } catch (err) {
     importError.value = errorMessage(err)
@@ -352,8 +356,8 @@ async function submitImport() {
 </script>
 
 <template>
-  <Dialog v-model:open="open">
-    <DialogTrigger as-child>
+  <component :is="props.embedded ? 'div' : Dialog" v-model:open="open">
+    <DialogTrigger v-if="!props.embedded" as-child>
       <Button
         data-import-trigger
         type="button"
@@ -399,8 +403,8 @@ async function submitImport() {
       </Button>
     </DialogTrigger>
 
-    <DialogContent class="rounded-3xl border-border/50 sm:max-w-2xl">
-      <DialogHeader>
+    <component :is="props.embedded ? 'div' : DialogContent" :class="props.embedded ? 'flex min-w-0 flex-col gap-4' : 'rounded-3xl border-border/50 sm:max-w-2xl'">
+      <DialogHeader v-if="!props.embedded">
         <DialogTitle>{{ t("import.dialogTitle") }}</DialogTitle>
         <DialogDescription>
           {{ t("import.dialogDescription") }}
@@ -600,6 +604,6 @@ async function submitImport() {
           {{ busy ? t("import.importing") : t("import.submit") }}
         </Button>
       </DialogFooter>
-    </DialogContent>
-  </Dialog>
+    </component>
+  </component>
 </template>

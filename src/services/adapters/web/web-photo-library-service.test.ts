@@ -10,6 +10,7 @@ const photoApiMocks = vi.hoisted(() => ({
   startPhotoScan: vi.fn(),
   listPhotos: vi.fn(),
   getPhoto: vi.fn(),
+  importPhotos: vi.fn(),
 }))
 
 vi.mock("@/api/photo-endpoints", () => ({
@@ -79,6 +80,21 @@ beforeEach(() => {
 })
 
 describe("webPhotoLibraryService", () => {
+  it("rejects disabled photo uploads and delegates enabled ones", async () => {
+    const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+    photoApiMocks.getSettings.mockResolvedValueOnce(settingsDto())
+    await service.refreshSettings()
+    const files = [new File(["zip"], "photos.zip")]
+    await expect(service.importPhotos(files)).rejects.toThrow()
+    expect(photoApiMocks.importPhotos).not.toHaveBeenCalled()
+    photoApiMocks.getSettings.mockResolvedValueOnce(settingsDto({photoLibraryEnabled: true}))
+    await service.refreshSettings()
+    photoApiMocks.importPhotos.mockResolvedValueOnce({ taskId: "photo-import" })
+    const options = { onUploadProgress: vi.fn() }
+    await expect(service.importPhotos(files, options)).resolves.toEqual({taskId: "photo-import"})
+    expect(photoApiMocks.importPhotos).toHaveBeenCalledWith(files, options)
+  })
+
   it("loads photo settings from independent photo fields in settings", async () => {
     photoApiMocks.getSettings.mockResolvedValueOnce(
       settingsDto({
