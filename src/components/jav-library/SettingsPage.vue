@@ -2355,7 +2355,7 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navExperimental')"
     >
     <h2 class="sr-only">{{ t("settings.navExperimental") }}</h2>
-      <SettingsExperimentalSection :use-web-api="useWebApi" />
+      <SettingsExperimentalSection />
     </section>
     </TabsContent>
 
