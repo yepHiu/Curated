@@ -293,8 +293,8 @@ describe("ComicDetailPanel", () => {
         "items-start",
         "justify-items-start",
         "lg:justify-start",
-        "lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]",
-        "xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]",
+        "lg:grid-cols-[fit-content(18rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[fit-content(20rem)_minmax(0,1fr)]",
       ]),
     )
     expect(wrapper.get("[data-comic-detail-content]").classes()).not.toContain("items-center")
@@ -309,8 +309,8 @@ describe("ComicDetailPanel", () => {
     ).toBe(false)
     expect(wrapper.get("[data-comic-detail-media-column]").classes()).toEqual(
       expect.arrayContaining([
-        "lg:max-w-[min(100%,18rem)]",
-        "xl:max-w-[min(100%,20rem)]",
+        "w-fit",
+        "max-w-full",
       ]),
     )
     expect(wrapper.get("[data-comic-detail-media-column]").classes()).not.toContain("lg:mx-auto")

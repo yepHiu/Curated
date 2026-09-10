@@ -110,7 +110,7 @@ function browseByTag(payload: { tag: string }) {
 </script>
 
 <template>
-  <div class="h-full min-w-0 w-full overflow-y-auto px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]">
+  <div class="h-full min-w-0 w-full overflow-y-auto pr-2">
     <h1 class="sr-only">{{ detailComic?.title || t('nav.comics') }}</h1>
     <div v-if="detailLoading" role="status" :aria-label="t('comics.detailLoading')" class="grid gap-6 rounded-3xl border border-border/70 p-6 sm:grid-cols-[14rem_1fr]">
       <Skeleton class="aspect-[2/3] rounded-2xl" /><div class="flex flex-col gap-4"><Skeleton class="h-10 w-3/4" /><Skeleton class="h-40 w-full" /><Skeleton class="h-11 w-36 rounded-full" /></div>

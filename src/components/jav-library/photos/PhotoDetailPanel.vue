@@ -105,18 +105,18 @@ function browseByTag(tag: string) {
   >
     <CardContent
       data-photo-detail-content
-      class="relative grid w-full min-w-0 items-start justify-items-start gap-6 overflow-x-hidden p-5 sm:p-6 lg:justify-start sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]"
+      class="relative grid w-full min-w-0 items-start justify-items-start gap-6 overflow-x-hidden p-5 sm:p-6 lg:justify-start sm:grid-cols-[fit-content(14rem)_minmax(0,1fr)] lg:grid-cols-[fit-content(18rem)_minmax(0,1fr)] xl:grid-cols-[fit-content(20rem)_minmax(0,1fr)]"
     >
       <div
         data-photo-detail-media-column
-        class="w-full min-w-0 max-w-full overflow-hidden lg:max-w-[min(100%,18rem)] xl:max-w-[min(100%,20rem)]"
+        class="w-fit min-w-0 max-w-full overflow-hidden"
       >
         <div
           data-photo-detail-cover-frame
           class="overflow-hidden rounded-[1.5rem] border border-border/60 bg-muted/40"
           :class="coverSrc
             ? 'relative isolate flex w-fit max-h-[min(56vh,24rem)] max-w-full'
-            : 'relative isolate flex aspect-[358/537] w-full'"
+            : 'relative isolate flex aspect-[358/537] w-56 max-w-full lg:w-72 xl:w-80'"
         >
           <button type="button" class="absolute inset-0 z-[2] rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="t('photos.startBrowsing')" :disabled="busy || photo.pageCount === 0" @click="emit('startBrowsing', 0)" />
           <img

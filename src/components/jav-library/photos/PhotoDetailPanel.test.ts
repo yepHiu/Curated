@@ -156,8 +156,8 @@ describe("PhotoDetailPanel", () => {
         "items-start",
         "justify-items-start",
         "lg:justify-start",
-        "lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]",
-        "xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]",
+        "lg:grid-cols-[fit-content(18rem)_minmax(0,1fr)]",
+        "xl:grid-cols-[fit-content(20rem)_minmax(0,1fr)]",
       ]),
     )
     expect(wrapper.get("[data-photo-detail-cover]").classes()).toEqual(
