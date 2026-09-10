@@ -578,6 +578,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/library/photos/scans", h.handleStartPhotoScan)
 	mux.HandleFunc("GET /api/library/photos", h.handleListPhotos)
 	mux.HandleFunc("GET /api/library/photos/{photoId}", h.handleGetPhoto)
+	mux.HandleFunc("PATCH /api/library/photos/books/{photoId}/tags", h.handleReplacePhotoTags)
 	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages", h.handleListPhotoPages)
 	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages/{pageIndex}/image", h.handleGetPhotoPageImage)
 	mux.HandleFunc("GET /api/library/photos/books/{photoId}/pages/{pageIndex}/thumbnail", h.handleGetPhotoPageThumbnail)

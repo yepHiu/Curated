@@ -1,5 +1,10 @@
 package contracts
 
+// ReplacePhotoTagsRequest replaces the complete user-managed photo tag list.
+type ReplacePhotoTagsRequest struct {
+	Tags *[]string `json:"tags"`
+}
+
 type PhotoLibraryPathDTO struct {
 	ID                      string `json:"id"`
 	Path                    string `json:"path"`

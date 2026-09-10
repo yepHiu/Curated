@@ -5,6 +5,25 @@ import (
 	"database/sql"
 )
 
+func (s *SQLiteStore) ReplacePhotoTags(ctx context.Context, photoID string, raw []string) error {
+	tags, err := NormalizeUserTagsForPatch(raw)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := replacePhotoTagsTx(ctx, tx, photoID, tags); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE photo_books SET updated_at = ? WHERE id = ?`, nowUTC(), photoID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func replacePhotoTagsTx(ctx context.Context, tx *sql.Tx, photoID string, tags []string) error {
 	var exists string
 	if err := tx.QueryRowContext(ctx, `SELECT id FROM photo_books WHERE id = ?`, photoID).Scan(&exists); err != nil {
