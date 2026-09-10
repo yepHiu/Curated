@@ -65,6 +65,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/comic-library-service", () => ({
   useComicLibraryService: () => ({
     comics: computed(() => serviceState.comics),
+    comicsLoaded: computed(() => true),
     loadError: computed(() => serviceState.loadError),
     refreshSettings: serviceMocks.refreshSettings,
     reloadComicsFromApi: serviceMocks.reloadComicsFromApi,

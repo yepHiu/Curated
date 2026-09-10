@@ -60,6 +60,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/photo-library-service", () => ({
   usePhotoLibraryService: () => ({
     photos: computed(() => serviceState.photos),
+    photosLoaded: computed(() => true),
     loadError: computed(() => serviceState.loadError),
     refreshSettings: serviceMocks.refreshSettings,
     reloadPhotosFromApi: serviceMocks.reloadPhotosFromApi,
