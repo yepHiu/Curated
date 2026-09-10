@@ -31,7 +31,7 @@ const progressLabel = computed(() => {
   return `${page} / ${props.photo.pageCount}`
 })
 const progressPercent = computed(() => {
-  if (props.photo.pageCount <= 0) return 0
+  if (props.photo.pageCount <= 0 || props.photo.currentPageIndex === 0) return 0
   return Math.min(100, Math.max(0, ((props.photo.currentPageIndex + 1) / props.photo.pageCount) * 100))
 })
 const ratingLabel = computed(() =>
@@ -54,7 +54,8 @@ function openDetails() {
     <button
       type="button"
       data-photo-card-open
-      class="flex w-full flex-col text-left focus-visible:outline-none"
+      :aria-label="photo.title"
+      class="flex w-full flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       @click="openDetails"
       @dblclick.stop="emit('openViewer', photo.id, photo.currentPageIndex)"
     >
@@ -68,6 +69,7 @@ function openDetails() {
             :src="coverSrc"
             :alt="photo.title"
             class="absolute inset-0 z-[1] h-full w-full object-cover"
+            decoding="async"
             loading="lazy"
           >
           <div
@@ -95,9 +97,9 @@ function openDetails() {
         class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
       >
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
-          <CardTitle class="truncate text-[13px]">{{ photo.title }}</CardTitle>
+          <CardTitle class="line-clamp-2 text-[13px] leading-snug">{{ photo.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
-            {{ t("photos.pageCount", { count: photo.pageCount }) }} · {{ progressLabel }}
+            {{ t("photos.pageCount", { count: photo.pageCount }) }} <template v-if="photo.currentPageIndex > 0">· {{ progressLabel }}</template>
           </CardDescription>
         </div>
 

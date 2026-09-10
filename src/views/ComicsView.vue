@@ -40,13 +40,14 @@ const batchOperationBusy = ref(false)
 const batchSelectedIdsList = computed(() => [...batchSelectedIds.value])
 const batchSelectedCount = computed(() => batchSelectedIds.value.size)
 
-onMounted(() => {
+function reloadLibrary() {
   void Promise.resolve(comicService.refreshSettings())
     .then(() => comicService.reloadComicsFromApi())
     .catch((error) => {
       console.warn("[ComicsView] failed to load comics", error)
     })
-})
+}
+onMounted(reloadLibrary)
 
 function updateSearch(value: string) {
   const q = value.trim()
@@ -220,9 +221,11 @@ async function runBatchDeleteComics() {
         :comics="visibleComics"
         :active-sort="activeSort"
         :search-query="searchQuery"
+        :loading="!comicService.comicsLoaded.value"
         :load-error="comicService.loadError.value ?? ''"
         :batch-mode="batchMode"
         :batch-selected-ids="batchSelectedIdsList"
+        @retry="reloadLibrary"
         @update-search="updateSearch"
         @update:sort="updateSort"
         @open-details="openDetails"

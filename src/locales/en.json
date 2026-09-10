@@ -813,6 +813,24 @@
     "comicScanning": "Scanning comics",
     "discovered": "Discovered"
   },
+  "bookBrowser": {
+    "bookCount": "{count} books",
+    "noResults": "No matching books",
+    "noResultsHint": "Try another search or clear the current search.",
+    "pages": "Pages",
+    "addedAt": "Added",
+    "sourceFile": "Source file",
+    "location": "Location",
+    "continueAt": "Continue at page {page}",
+    "backToLibrary": "Back to library",
+    "previewRange": "Pages {start}–{end} of {total}",
+    "previousBatch": "Previous",
+    "nextBatch": "Next",
+    "pageNumber": "Page number",
+    "locatePage": "Locate",
+    "openPage": "Open page",
+    "retryImage": "Image failed to load. Retry"
+  },
   "import": {
     "mediaTrigger": "Add media",
     "mediaDescription": "Choose a media type and import files.",

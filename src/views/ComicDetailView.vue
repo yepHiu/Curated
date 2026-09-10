@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Skeleton } from "@/components/ui/skeleton"
 import { computed, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
@@ -23,20 +24,25 @@ const errorText = ref("")
 
 watch(
   () => comicId.value,
-  async (id) => {
+  async (id, _previous, onCleanup) => {
+    let stale = false
+    onCleanup(() => { stale = true })
     detailComic.value = undefined
     errorText.value = ""
     if (!id) return
     detailLoading.value = true
     try {
-      detailComic.value = await comicService.loadComicDetail(id)
+      const loaded = await comicService.loadComicDetail(id)
+      if (stale) return
+      detailComic.value = loaded
       if (!detailComic.value) {
         errorText.value = t("comics.detailNotFound")
       }
     } catch (error) {
+      if (stale) return
       errorText.value = error instanceof Error ? error.message : t("comics.detailLoadError")
     } finally {
-      detailLoading.value = false
+      if (!stale) detailLoading.value = false
     }
   },
   { immediate: true },
@@ -105,11 +111,9 @@ function browseByTag(payload: { tag: string }) {
 
 <template>
   <div class="h-full min-w-0 w-full overflow-y-auto px-[var(--app-page-px)] py-[var(--app-page-py)] sm:px-[var(--app-page-px-sm)] lg:px-[var(--app-page-px-lg)] lg:py-[var(--app-page-py-lg)] xl:px-[var(--app-page-px-xl)]">
-    <div
-      v-if="detailLoading"
-      class="rounded-xl border border-border/70 bg-card/80 p-6 text-sm text-muted-foreground"
-    >
-      {{ t("comics.detailLoading") }}
+    <h1 class="sr-only">{{ detailComic?.title || t('nav.comics') }}</h1>
+    <div v-if="detailLoading" role="status" :aria-label="t('comics.detailLoading')" class="grid gap-6 rounded-3xl border border-border/70 p-6 sm:grid-cols-[14rem_1fr]">
+      <Skeleton class="aspect-[2/3] rounded-2xl" /><div class="flex flex-col gap-4"><Skeleton class="h-10 w-3/4" /><Skeleton class="h-40 w-full" /><Skeleton class="h-11 w-36 rounded-full" /></div>
     </div>
 
     <template v-else-if="detailComic">

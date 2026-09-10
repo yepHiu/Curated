@@ -39,7 +39,7 @@ function makeComic(): ComicBook {
 }
 
 describe("ComicPagePreviewGrid", () => {
-  it("shows the first 12 pages by default and opens the reader at the clicked page", async () => {
+  it("starts with a bounded batch and opens the reader at the clicked page", async () => {
     const wrapper = mount(ComicPagePreviewGrid, {
       props: {
         comic: makeComic(),
@@ -47,15 +47,15 @@ describe("ComicPagePreviewGrid", () => {
     })
 
     const previews = wrapper.findAll("[data-comic-page-preview]")
-    expect(previews).toHaveLength(12)
+    expect(previews).toHaveLength(4)
     expect(wrapper.text()).not.toContain("comics.previewPage")
-    expect(previews[0]!.element.children[0]?.tagName).toBe("IMG")
+    expect(previews[0]!.find("img").exists()).toBe(true)
     expect(previews[0]!.classes()).not.toEqual(
       expect.arrayContaining(["border", "bg-card/70", "p-1.5"]),
     )
 
-    await previews[5]!.trigger("click")
+    await previews[2]!.trigger("click")
 
-    expect(wrapper.emitted("openReader")?.[0]).toEqual([5])
+    expect(wrapper.emitted("openReader")?.[0]).toEqual([2])
   })
 })

@@ -46,7 +46,7 @@ function makePhoto(): PhotoBook {
 }
 
 describe("PhotoPagePreviewGrid", () => {
-  it("renders image-only preview tiles without visible page labels", async () => {
+  it("renders numbered preview tiles and opens the selected page", async () => {
     const wrapper = mount(PhotoPagePreviewGrid, {
       props: {
         photo: makePhoto(),
@@ -56,8 +56,8 @@ describe("PhotoPagePreviewGrid", () => {
     const previews = wrapper.findAll("[data-photo-page-preview]")
 
     expect(previews).toHaveLength(2)
-    expect(previews[0]?.text()).toBe("")
-    expect(previews[1]?.text()).toBe("")
+    expect(previews[0]?.text()).toBe("1")
+    expect(previews[1]?.text()).toBe("2")
     expect(wrapper.text()).not.toContain("第 1 页")
     expect(wrapper.text()).not.toContain("Page 1")
     expect(wrapper.get("[data-photo-page-preview] img").attributes("src")).toBe(

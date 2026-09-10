@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import type { ComicBook } from "@/domain/comic/types"
 import ComicLibraryPage from "./ComicLibraryPage.vue"
@@ -46,9 +46,9 @@ describe("ComicLibraryPage", () => {
       },
     })
 
-    expect(wrapper.text()).not.toContain("comics.title")
+    expect(wrapper.text()).toContain("nav.comics")
     expect(wrapper.text()).not.toContain("comics.subtitle")
-    expect(wrapper.find("h1").exists()).toBe(false)
+    expect(wrapper.find("h1").exists()).toBe(true)
   })
 
   it("renders sample comics in the comic wall", () => {
@@ -78,12 +78,10 @@ describe("ComicLibraryPage", () => {
     expect(wrapper.get("[data-comic-library-toolbar]").classes()).toEqual(
       expect.arrayContaining(["flex-wrap", "items-center", "justify-between", "pb-1"]),
     )
-    expect(wrapper.find("[data-comic-sort-tabs]").exists()).toBe(true)
+    expect(wrapper.find("[data-book-sort-trigger]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("comics.searchPlaceholder")
     expect(wrapper.text()).toContain("comics.sortByAdded")
-    expect(wrapper.text()).toContain("comics.sortByFileName")
-    expect(wrapper.text()).toContain("comics.sortByFavorite")
     expect(wrapper.text()).not.toContain("comics.filterUnread")
     expect(wrapper.text()).not.toContain("comics.filterReading")
     expect(wrapper.text()).not.toContain("comics.filterRead")
@@ -110,7 +108,8 @@ describe("ComicLibraryPage", () => {
       },
     })
 
-    await wrapper.get('[data-comic-sort-option="fileName"]').trigger("click")
+    wrapper.findComponent({ name: "BookLibraryToolbar" }).vm.$emit("sort", "fileName")
+    await flushPromises()
 
     expect(wrapper.emitted("update:sort")?.[0]).toEqual(["fileName"])
   })

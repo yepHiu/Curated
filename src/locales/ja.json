@@ -813,6 +813,24 @@
     "comicScanning": "コミックをスキャン中",
     "discovered": "検出"
   },
+  "bookBrowser": {
+    "bookCount": "全 {count} 冊",
+    "noResults": "一致する項目がありません",
+    "noResultsHint": "別のキーワードを試すか、検索を解除してください。",
+    "pages": "ページ数",
+    "addedAt": "追加日",
+    "sourceFile": "元ファイル",
+    "location": "保存場所",
+    "continueAt": "{page} ページから再開",
+    "backToLibrary": "ライブラリに戻る",
+    "previewRange": "{start}–{end} / {total} ページ",
+    "previousBatch": "前へ",
+    "nextBatch": "次へ",
+    "pageNumber": "ページ番号",
+    "locatePage": "移動",
+    "openPage": "開く",
+    "retryImage": "画像を読み込めませんでした。再試行"
+  },
   "import": {
     "mediaTrigger": "メディアを追加",
     "mediaDescription": "メディアの種類を選んでファイルを取り込みます。",

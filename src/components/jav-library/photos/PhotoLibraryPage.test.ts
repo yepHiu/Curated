@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import type { PhotoBook } from "@/domain/photo/types"
 import PhotoLibraryPage from "./PhotoLibraryPage.vue"
@@ -44,15 +44,13 @@ describe("PhotoLibraryPage", () => {
       },
     })
 
-    expect(wrapper.find("h1").exists()).toBe(false)
+    expect(wrapper.find("h1").exists()).toBe(true)
     expect(wrapper.get("[data-photo-library-toolbar]").classes()).toEqual(
       expect.arrayContaining(["flex-wrap", "items-center", "justify-between", "pb-1"]),
     )
     expect(wrapper.find("[data-photo-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("photos.searchPlaceholder")
     expect(wrapper.text()).toContain("photos.sortByAdded")
-    expect(wrapper.text()).toContain("photos.sortByFileName")
-    expect(wrapper.text()).toContain("photos.sortByFavorite")
   })
 
   it("renders photo books in the photo wall", () => {
@@ -78,7 +76,8 @@ describe("PhotoLibraryPage", () => {
       },
     })
 
-    await wrapper.get('[data-photo-sort-option="fileName"]').trigger("click")
+    wrapper.findComponent({ name: "BookLibraryToolbar" }).vm.$emit("sort", "fileName")
+    await flushPromises()
 
     expect(wrapper.emitted("update:sort")?.[0]).toEqual(["fileName"])
   })

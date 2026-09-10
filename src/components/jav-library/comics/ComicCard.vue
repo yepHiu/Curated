@@ -43,7 +43,7 @@ const progressLabel = computed(() => {
   return `${page} / ${props.comic.pageCount}`
 })
 const progressPercent = computed(() => {
-  if (props.comic.pageCount <= 0) return 0
+  if (props.comic.pageCount <= 0 || props.comic.currentPageIndex === 0) return 0
   return Math.min(100, Math.max(0, ((props.comic.currentPageIndex + 1) / props.comic.pageCount) * 100))
 })
 const ratingLabel = computed(() =>
@@ -75,7 +75,8 @@ function onBatchCheckboxChange() {
     <button
       type="button"
       data-comic-card-open
-      class="flex w-full flex-col text-left focus-visible:outline-none"
+      :aria-label="comic.title"
+      class="flex w-full flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       @click="handleOpenDetails"
     >
       <div class="p-[var(--movie-card-padding)] pb-0">
@@ -103,6 +104,7 @@ function onBatchCheckboxChange() {
             :src="coverSrc"
             :alt="comic.title"
             class="absolute inset-0 z-[1] h-full w-full object-cover"
+            decoding="async"
             loading="lazy"
           >
           <div
@@ -130,9 +132,9 @@ function onBatchCheckboxChange() {
         class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
       >
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
-          <CardTitle class="truncate text-[13px]">{{ comic.title }}</CardTitle>
+          <CardTitle class="line-clamp-2 text-[13px] leading-snug">{{ comic.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
-            {{ t("comics.pageCount", { count: comic.pageCount }) }} · {{ progressLabel }}
+            {{ t("comics.pageCount", { count: comic.pageCount }) }} <template v-if="comic.currentPageIndex > 0">· {{ progressLabel }}</template>
           </CardDescription>
         </div>
 

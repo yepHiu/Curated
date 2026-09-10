@@ -136,7 +136,7 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).toContain("Original Title")
     expect(wrapper.text()).toContain("author:alpha")
     expect(wrapper.text()).toContain("series:rain")
-    expect(wrapper.text()).not.toContain("original.cbz")
+    expect(wrapper.text()).toContain("original.cbz")
     expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
       "https://example.com/detail-cover.jpg",
     )
@@ -168,7 +168,7 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.text()).not.toContain("1 / 32")
   })
 
-  it("omits source metadata from the visible detail body", () => {
+  it("shows source metadata in the detail body", () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic(),
@@ -177,8 +177,8 @@ describe("ComicDetailPanel", () => {
 
     expect(wrapper.text()).not.toContain("comics.sourceFile")
     expect(wrapper.text()).not.toContain("comics.sourceLocation")
-    expect(wrapper.text()).not.toContain("D:/Comics/original.cbz")
-    expect(wrapper.text()).not.toContain("original.cbz")
+    expect(wrapper.text()).toContain("D:/Comics/original.cbz")
+    expect(wrapper.text()).toContain("original.cbz")
   })
 
   it("renders the detail cover without fixed-ratio cropping so wide and tall pages can adapt", () => {
@@ -321,8 +321,8 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.get("[data-comic-detail-info-column]").classes()).not.toContain("justify-center")
     expect(wrapper.get("[data-comic-detail-info-column]").classes()).not.toContain("lg:py-2")
     expect(wrapper.get("[data-comic-detail-title]").classes()).toEqual(
-      expect.arrayContaining(["pr-12", "text-xl", "sm:pr-14", "sm:text-2xl"]),
+      expect.arrayContaining(["pr-12", "text-2xl", "sm:pr-14", "sm:text-3xl"]),
     )
-    expect(wrapper.get("[data-comic-detail-title]").classes()).not.toContain("sm:text-3xl")
+    expect(wrapper.get("[data-comic-detail-title]").classes()).toContain("sm:text-3xl")
   })
 })

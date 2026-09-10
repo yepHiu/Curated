@@ -91,35 +91,19 @@ describe("PhotoDetailPanel", () => {
     expect(wrapper.text()).toContain("outdoor")
     expect(wrapper.text()).toContain("photos.detailRatingLabel")
     expect(wrapper.text()).toContain("4.5")
-    expect(wrapper.text()).toContain("photos.startBrowsing")
+    expect(wrapper.text()).toContain("bookBrowser.continueAt")
     expect(wrapper.get("[data-photo-detail-cover]").attributes("src")).toBe(
       "https://example.com/photo-cover.jpg",
     )
-    expect(wrapper.text()).not.toContain("summer-frame.cbz")
-    expect(wrapper.text()).not.toContain("D:/Photos/summer-frame.cbz")
+    expect(wrapper.text()).toContain("summer-frame.cbz")
+    expect(wrapper.text()).toContain("D:/Photos/summer-frame.cbz")
   })
 
-  it("keeps edit, reveal, and delete actions inside the more menu", async () => {
-    const wrapper = mount(PhotoDetailPanel, {
-      props: {
-        photo: makePhoto(),
-      },
-    })
-
-    expect(wrapper.find("[data-photo-more-actions]").exists()).toBe(true)
-    expect(wrapper.find("[data-photo-edit-action]").exists()).toBe(true)
-    expect(wrapper.find("[data-photo-reveal-source]").exists()).toBe(true)
-    expect(wrapper.find("[data-photo-delete-action]").exists()).toBe(true)
-
+  it("only offers supported photo browsing actions", async () => {
+    const wrapper = mount(PhotoDetailPanel, { props: { photo: makePhoto() } })
+    expect(wrapper.find("[data-photo-more-actions]").exists()).toBe(false)
     await wrapper.get("[data-photo-start-browsing]").trigger("click")
-    await wrapper.get("[data-photo-edit-action]").trigger("click")
-    await wrapper.get("[data-photo-reveal-source]").trigger("click")
-    await wrapper.get("[data-photo-delete-action]").trigger("click")
-
     expect(wrapper.emitted("startBrowsing")?.[0]).toEqual([2])
-    expect(wrapper.emitted("editPhoto")?.[0]).toEqual(["photo-detail-1"])
-    expect(wrapper.emitted("revealSource")?.[0]).toEqual(["photo-detail-1"])
-    expect(wrapper.emitted("deletePhoto")?.[0]).toEqual(["photo-detail-1"])
   })
 
   it("uses the same left-aligned cover and top-aligned title structure as comic detail", () => {
@@ -138,9 +122,6 @@ describe("PhotoDetailPanel", () => {
         "lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)]",
         "xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]",
       ]),
-    )
-    expect(wrapper.get("[data-photo-more-actions-zone]").classes()).toEqual(
-      expect.arrayContaining(["absolute", "right-4", "top-4", "sm:right-6", "sm:top-6"]),
     )
     expect(wrapper.get("[data-photo-detail-cover]").classes()).toEqual(
       expect.arrayContaining([

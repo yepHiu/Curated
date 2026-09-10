@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-vue-next"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
+import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -162,11 +163,11 @@ function confirmDeleteComic() {
 <template>
   <Card
     data-comic-detail-panel
-    class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10"
+    class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 py-0 shadow-xl shadow-black/10"
   >
     <CardContent
       data-comic-detail-content
-      class="relative grid w-full min-w-0 items-start justify-items-start gap-5 overflow-x-hidden p-5 sm:p-6 lg:justify-start lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]"
+      class="relative grid w-full min-w-0 items-start justify-items-start gap-6 overflow-x-hidden p-5 sm:p-6 lg:justify-start sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]"
     >
       <div
         data-comic-detail-media-column
@@ -179,12 +180,14 @@ function confirmDeleteComic() {
             ? 'relative isolate flex w-fit max-h-[min(56vh,24rem)] max-w-full'
             : 'relative isolate flex aspect-[358/537] w-full'"
         >
+          <button type="button" class="absolute inset-0 z-[2] rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="t('comics.startReading')" :disabled="busy || comic.pageCount === 0" @click="emit('startReading', 0)" />
           <img
             v-if="coverSrc"
             data-comic-detail-cover
             :src="coverSrc"
             :alt="comic.title"
             class="relative z-0 block h-auto max-h-[min(56vh,24rem)] w-auto max-w-full object-contain"
+            decoding="async"
             loading="eager"
             fetchpriority="high"
           >
@@ -207,10 +210,25 @@ function confirmDeleteComic() {
         class="flex min-w-0 max-w-full flex-col justify-start gap-4"
       >
         <div class="min-w-0 max-w-full">
-          <CardTitle data-comic-detail-title class="break-words pr-12 text-xl sm:pr-14 sm:text-2xl">
+          <CardTitle data-comic-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ comic.title }}
           </CardTitle>
         </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            class="min-h-11 rounded-full px-8"
+            data-comic-start-reading
+            :disabled="busy || comic.pageCount === 0"
+            @click="emit('startReading', comic.currentPageIndex)"
+          >
+            <BookOpen data-icon="inline-start" />
+            {{ comic.currentPageIndex > 0 ? t('bookBrowser.continueAt', { page: Math.min(comic.pageCount, comic.currentPageIndex + 1) }) : t("comics.startReading") }}
+          </Button>
+        </div>
+
+        <BookDetailFacts :page-count="comic.pageCount" :file-name="comic.sourceFileName" :location="comic.location" :added-at="comic.addedAt" />
 
         <div data-comic-detail-tags class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("comics.detailTagsLabel") }}</p>
@@ -293,17 +311,7 @@ function confirmDeleteComic() {
           <p v-if="tagError" class="text-sm text-destructive">{{ tagError }}</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            class="rounded-full px-8"
-            data-comic-start-reading
-            @click="emit('startReading', comic.currentPageIndex)"
-          >
-            <BookOpen data-icon="inline-start" />
-            {{ t("comics.startReading") }}
-          </Button>
-        </div>
+
       </div>
 
       <div
@@ -316,7 +324,7 @@ function confirmDeleteComic() {
               type="button"
               variant="ghost"
               size="icon"
-              class="shrink-0 rounded-xl"
+              class="min-h-11 min-w-11 shrink-0 rounded-full" :disabled="busy"
               data-comic-more-actions
               :aria-label="t('comics.moreActions')"
             >

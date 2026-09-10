@@ -3,14 +3,11 @@ import { computed } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   Eye,
-  FolderOpen,
   Images,
-  MoreVertical,
-  Pencil,
   Star,
-  Trash2,
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
+import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,13 +15,7 @@ import {
   CardContent,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
 
 const props = defineProps<{
   photo: PhotoBook
@@ -33,16 +24,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   startBrowsing: [pageIndex: number]
-  editPhoto: [photoId: string]
-  deletePhoto: [photoId: string]
-  revealSource: [photoId: string]
   browseByTag: [payload: { tag: string }]
 }>()
 
 const { t } = useI18n()
 
 const coverSrc = computed(() => props.photo.coverUrl ?? props.photo.pages?.[0]?.thumbUrl ?? "")
-const canRevealSource = computed(() => Boolean(props.photo.location.trim()))
 const ratingLabel = computed(() =>
   props.photo.rating == null ? t("photos.noRating") : String(props.photo.rating),
 )
@@ -53,20 +40,16 @@ function browseByTag(tag: string) {
   emit("browseByTag", { tag: value })
 }
 
-function revealSource() {
-  if (!canRevealSource.value) return
-  emit("revealSource", props.photo.id)
-}
 </script>
 
 <template>
   <Card
     data-photo-detail-panel
-    class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 shadow-xl shadow-black/10"
+    class="min-w-0 w-full rounded-3xl border-border/70 bg-card/85 py-0 shadow-xl shadow-black/10"
   >
     <CardContent
       data-photo-detail-content
-      class="relative grid w-full min-w-0 items-start justify-items-start gap-5 overflow-x-hidden p-5 sm:p-6 lg:justify-start lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]"
+      class="relative grid w-full min-w-0 items-start justify-items-start gap-6 overflow-x-hidden p-5 sm:p-6 lg:justify-start sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:grid-cols-[minmax(12rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(13rem,20rem)_minmax(0,1fr)]"
     >
       <div
         data-photo-detail-media-column
@@ -79,12 +62,14 @@ function revealSource() {
             ? 'relative isolate flex w-fit max-h-[min(56vh,24rem)] max-w-full'
             : 'relative isolate flex aspect-[358/537] w-full'"
         >
+          <button type="button" class="absolute inset-0 z-[2] rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="t('photos.startBrowsing')" :disabled="busy || photo.pageCount === 0" @click="emit('startBrowsing', 0)" />
           <img
             v-if="coverSrc"
             data-photo-detail-cover
             :src="coverSrc"
             :alt="photo.title"
             class="relative z-0 block h-auto max-h-[min(56vh,24rem)] w-auto max-w-full object-contain"
+            decoding="async"
             loading="eager"
             fetchpriority="high"
           >
@@ -108,12 +93,12 @@ function revealSource() {
         class="flex min-w-0 max-w-full flex-col justify-start gap-4"
       >
         <div class="min-w-0 max-w-full">
-          <CardTitle data-photo-detail-title class="break-words pr-12 text-xl sm:pr-14 sm:text-2xl">
+          <CardTitle data-photo-detail-title class="break-words pr-12 text-2xl leading-snug sm:pr-14 sm:text-3xl">
             {{ photo.title }}
           </CardTitle>
         </div>
 
-        <div data-photo-detail-rating class="flex flex-wrap items-center gap-2">
+        <div v-if="photo.rating != null" data-photo-detail-rating class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-medium">{{ t("photos.detailRatingLabel") }}</span>
           <Badge
             variant="outline"
@@ -123,6 +108,21 @@ function revealSource() {
             {{ ratingLabel }}
           </Badge>
         </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            class="min-h-11 rounded-full px-8"
+            data-photo-start-browsing
+            :disabled="busy || photo.pageCount === 0"
+            @click="emit('startBrowsing', photo.currentPageIndex)"
+          >
+            <Eye data-icon="inline-start" />
+            {{ photo.currentPageIndex > 0 ? t('bookBrowser.continueAt', { page: Math.min(photo.pageCount, photo.currentPageIndex + 1) }) : t("photos.startBrowsing") }}
+          </Button>
+        </div>
+
+        <BookDetailFacts :page-count="photo.pageCount" :file-name="photo.sourceFileName" :location="photo.location" :added-at="photo.addedAt" />
 
         <div data-photo-detail-tags class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("photos.detailTagsLabel") }}</p>
@@ -149,64 +149,9 @@ function revealSource() {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            class="rounded-full px-8"
-            data-photo-start-browsing
-            :disabled="busy"
-            @click="emit('startBrowsing', photo.currentPageIndex)"
-          >
-            <Eye data-icon="inline-start" />
-            {{ t("photos.startBrowsing") }}
-          </Button>
-        </div>
+
       </div>
 
-      <div
-        data-photo-more-actions-zone
-        class="absolute right-4 top-4 sm:right-6 sm:top-6"
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="shrink-0 rounded-xl"
-              data-photo-more-actions
-              :aria-label="t('photos.moreActions')"
-            >
-              <MoreVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="min-w-[11rem]">
-            <DropdownMenuGroup>
-              <DropdownMenuItem data-photo-edit-action @click="emit('editPhoto', photo.id)">
-                <Pencil class="size-4 shrink-0" aria-hidden="true" />
-                {{ t("photos.editPhoto") }}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                data-photo-reveal-source
-                :disabled="!canRevealSource"
-                :title="!canRevealSource ? t('photos.revealPhotoNoPath') : undefined"
-                @click="revealSource"
-              >
-                <FolderOpen class="size-4 shrink-0" aria-hidden="true" />
-                {{ t("photos.revealPhotoSource") }}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                data-photo-delete-action
-                variant="destructive"
-                @click="emit('deletePhoto', photo.id)"
-              >
-                <Trash2 class="size-4 shrink-0" aria-hidden="true" />
-                {{ t("photos.deletePhoto") }}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </CardContent>
   </Card>
 </template>

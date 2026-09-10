@@ -813,6 +813,24 @@
     "comicScanning": "正在扫描漫画",
     "discovered": "已发现"
   },
+  "bookBrowser": {
+    "bookCount": "共 {count} 册",
+    "noResults": "没有找到匹配的内容",
+    "noResultsHint": "试试其他关键词，或清除搜索条件。",
+    "pages": "页数",
+    "addedAt": "添加时间",
+    "sourceFile": "源文件",
+    "location": "存储位置",
+    "continueAt": "从第 {page} 页继续",
+    "backToLibrary": "返回资料库",
+    "previewRange": "第 {start}–{end} 页 · 共 {total} 页",
+    "previousBatch": "上一批",
+    "nextBatch": "下一批",
+    "pageNumber": "页码",
+    "locatePage": "定位",
+    "openPage": "打开此页",
+    "retryImage": "图片加载失败，点击重试"
+  },
   "import": {
     "mediaTrigger": "添加媒体",
     "mediaDescription": "选择媒体类型并导入文件。",

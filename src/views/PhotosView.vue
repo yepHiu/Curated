@@ -29,13 +29,14 @@ const visiblePhotos = computed(() =>
   ),
 )
 
-onMounted(() => {
+function reloadLibrary() {
   void Promise.resolve(photoService.refreshSettings())
     .then(() => photoService.reloadPhotosFromApi())
     .catch((error) => {
       console.warn("[PhotosView] failed to load photos", error)
     })
-})
+}
+onMounted(reloadLibrary)
 
 function updateSearch(value: string) {
   const q = value.trim()
@@ -81,7 +82,9 @@ function openViewer(photoId: string, pageIndex: number) {
         :photos="visiblePhotos"
         :active-sort="activeSort"
         :search-query="searchQuery"
+        :loading="!photoService.photosLoaded.value"
         :load-error="photoService.loadError.value ?? ''"
+        @retry="reloadLibrary"
         @update-search="updateSearch"
         @update:sort="updateSort"
         @open-details="openDetails"
