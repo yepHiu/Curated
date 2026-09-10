@@ -509,6 +509,7 @@
   </table>
 
   <h3>漫画与写真 Beta（2026-09-10）</h3>
+  <p><strong>AI Agent 边界：</strong>漫画与写真不进入 Agent 的查询、操作、推荐或分析结论。页面上下文在前后端排除，任务工具只返回影片任务；个人洞察与聊天的统计和结论只针对影片，开启 Beta 不扩大 AI 范围。</p>
   <p>设置 → 实验性功能提供两个默认关闭的开关；启用后才显示该库的路径、阅读/浏览、监听和缓存设置。停用隐藏入口与配置、停止独立 watcher，保留索引与源包。Web 配置通过 <code>PATCH /api/settings</code> 持久化，启用允许无路径，扫描必须有已配置路径。</p>
   <p>独立 <code>comic/photo</code> 领域、Web/Mock 服务、HTTP 端点和 SQLite 表。迁移为 0046–0048；漫画实现 ZIP/CBZ 扫描导入、阅读进度与偏好、收藏评分标签和缓存清理。写真实现 ZIP/CBZ 扫描、详情与浏览，缩略图暂用原图；独立写真缓存清理、导入和单册进度 API 尚未实现。</p>
   <h3>6.1 Homepage daily recommendations</h3>

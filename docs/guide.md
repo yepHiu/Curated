@@ -356,3 +356,7 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 开关及路径在 Web 模式下刷新或重启后保留；Mock 开关仅当前会话有效。写真暂未实现导入、单册进度/偏好 API 或独立缓存清理，缩略图当前读取原图，缓存上限为预留设置。支持 ZIP/CBZ，不支持 RAR/CBR/7z。
 
 旧实验 worktree 和数据保留，合并不会搬移其运行数据库或真实媒体。迁移使用 `0046_comic_library.sql`、`0047_photo_library.sql`、`0048_photo_books.sql`。详情见 [Beta 整合与验收记录](plan/2026-09-10-comic-photo-beta-integration.md)、[配置说明](reference/2026-03-21-library-organize.md) 与 [API](../API.md#comic-and-photo-library-beta)。
+
+### AI Agent scope for media Beta
+
+漫画库和写真库独立于 AI Agent。即使启用 Beta，Agent 的查询、操作、推荐和分析结论仍只覆盖影片及其相关数据，个人洞察也只统计影片观看。在图片库页面打开 Agent 不会附带该库页面的搜索、筛选或内容。询问图片库时，Agent 应简短说明当前只支持影片相关数据，不据影片数据推断图片库内容。

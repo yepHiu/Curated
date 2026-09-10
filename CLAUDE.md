@@ -590,3 +590,7 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/library/comics/cache/cleanup` | Delete derived comic cache only |
 
 Photo import, per-book progress/preferences APIs and concrete cache cleanup are not implemented. `photoCache.maxBytes` and default photo import target are reserved settings. Closing Beta preserves settings, indexes and archives and stops its watcher. UI configuration exists only under Settings → Experimental and only while that library is enabled.
+
+### Agent domain boundary
+
+AI Agent remains movie-only when comic/photo Beta is enabled. It must not access, operate on or draw conclusions about either book library. Page context and entity seeding exclude comic/photo routes, `get_task_status` accepts only movie-related task types, and chat / Insights narrative prompts limit all aggregates and conclusions to movie data. See `docs/plan/2026-09-10-comic-photo-beta-integration.md`.

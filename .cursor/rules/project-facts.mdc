@@ -260,3 +260,9 @@ alwaysApply: true
 - Migrations are `0046_comic_library.sql`, `0047_photo_library.sql`, `0048_photo_books.sql`; existing experimental tables use idempotent creation. No runtime databases are copied from the old worktree.
 - Photo Beta supports ZIP/CBZ scanning, list/detail and page viewing only. Photo import, per-book progress/preferences APIs and concrete photo cache cleanup are not implemented. Thumbnails currently serve the original image; photo cache limits are reserved persisted settings.
 - Production builds extract pinyin-pro pure dictionaries into a hashed same-origin JSON asset via `vite.pinyin-data.ts`, retaining the existing match algorithm and bundle budgets. See `docs/plan/2026-09-10-comic-photo-beta-integration.md` for integration evidence.
+
+## AI Agent 与图片库隔离（2026-09-10）
+
+- 当前 Agent 只处理影片及其演员、元数据、播放历史、个人洞察和萃取帧。漫画库 / 写真库不属于 Agent 范围，Beta 开关不扩大 AI 权限；不得查询、修改、推荐、分析或对这两个库形成结论。
+- 前端 `agent-page-context.ts` 不采集六种漫画/写真路由的页面、筛选及实体信息；服务端 `core.MoviePageContext` 在 prompt 与实体引用初始化前丢弃这些页面载荷，兼容旧客户端。Agent 查询接口仍仅使用影片领域；`get_task_status` 采用影片任务类型白名单，未知/图片库任务不返回任务内容。
+- `agent-system-v4` 明确影片范围、混合请求只处理影片部分、不得将影片统计泛化为所有媒体；独立 Insights narrative 同样仅基于影片。Mock 图片库请求不触发假工具或影片推荐卡。
