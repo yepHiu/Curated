@@ -29,7 +29,7 @@ function selectBatch(batch: number) {
       <h2 class="text-lg font-semibold">{{ t(`${kind}.previewTitle`) }}</h2>
       <p class="text-xs tabular-nums text-muted-foreground" aria-live="polite">{{ t('bookBrowser.previewRange', { start: pages.length ? pages[0]!.index + 1 : 0, end: pages.length ? pages[pages.length - 1]!.index + 1 : 0, total }) }}</p>
     </div>
-    <div v-if="pages.length" data-book-preview-grid class="grid gap-3" :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }">
+    <div v-if="pages.length" data-book-preview-grid class="flex min-w-0 flex-wrap items-start gap-3">
       <BookPreviewTile v-for="page in pages" :key="`${bookId}:${page.index}`" :src="page.thumbUrl || page.imageUrl"
         :label="t(`${kind}.previewPageAlt`, { page: page.index + 1 })" :page-number="page.index + 1" :retry-label="t('bookBrowser.retryImage')"
         :data-comic-page-preview="kind === 'comics' ? '' : undefined" :data-photo-page-preview="kind === 'photos' ? '' : undefined"

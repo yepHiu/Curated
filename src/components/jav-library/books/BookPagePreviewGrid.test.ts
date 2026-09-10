@@ -8,7 +8,7 @@ vi.mock("vue-i18n", () => ({useI18n: () => ({t: (key: string) => key})}))
 const pages = Array.from({length: 1000}, (_, index) => ({index, thumbUrl: `/thumb/${index}`}))
 beforeEach(() => { width.value = 792 })
 describe("adaptive book previews", () => {
-  it("sizes two rows to container width and bounds DOM even for a thousand pages", async () => {
+  it("sizes batch capacity to container width and bounds DOM even for a thousand pages", async () => {
     const wrapper = mount(BookPagePreviewGrid, {props: {bookId: "a", pages, total: 1000, kind: "photos"}})
     expect(wrapper.findAll('[data-book-preview-tile]')).toHaveLength(12)
     width.value = 300; await flushPromises()

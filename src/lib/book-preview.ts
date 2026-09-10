@@ -1,4 +1,4 @@
-/** Two rows sized to the actual content width; DOM and decoded images stay bounded. */
+/** Estimate batch capacity from content width; image proportions determine wrapping. */
 export function previewColumns(width: number): number {
   return Math.max(2, Math.min(10, Math.floor((Math.max(0, width) + 12) / 132)))
 }
