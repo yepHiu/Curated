@@ -558,6 +558,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/import/movies/uploads/{uploadId}/files/{fileId}/chunks/{chunkIndex}", h.handlePutMovieImportUploadChunk)
 	mux.HandleFunc("POST /api/import/movies/uploads/{uploadId}/commit", h.handleCommitMovieImportUpload)
 	mux.HandleFunc("POST /api/import/comics", h.handleImportComics)
+	mux.HandleFunc("POST /api/import/photos", h.handleImportPhotos)
 	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
 	mux.HandleFunc("GET /api/library/paths/storage-status", h.handleGetLibraryPathStorageStatus)
 	mux.HandleFunc("POST /api/library/paths/storage-status/check", h.handleCheckLibraryPathStorageStatus)
