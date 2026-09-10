@@ -157,7 +157,7 @@ function onDefaultChange(value: unknown) {
       {{ t("settings.photoLibraryPathsEmpty") }}
     </p>
 
-    <div class="flex flex-wrap justify-start gap-2 pt-1">
+    <div class="flex flex-wrap justify-end gap-2 pt-1">
       <SettingsLibraryPathAddDialog
         :open="props.addPathDialogOpen"
         :new-path="props.newPath"
