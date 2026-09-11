@@ -315,9 +315,9 @@
         <h1>项目现在在哪里，下一步去哪里。</h1>
         <p class="lede">这是面向协作的静态项目看板：已交付、正在推进、尚未排期的方向，以及当前 Git 与 worktree 的真实快照被放在同一处对照。</p>
         <div class="snapshot-row" aria-label="快照元信息">
-          <span class="pill info">采集于 2026-09-10 23:16（UTC+08:00）</span>
-          <span class="pill ok">47 条 PRD 需求</span>
-          <span class="pill warn">采集时有 4 个已修改文件、4 个未跟踪文档</span>
+          <span class="pill info">采集于 2026-09-11 20:20（UTC+08:00）</span>
+          <span class="pill ok">49 条 PRD 需求</span>
+          <span class="pill warn">采集时有 26 个已修改文件、4 个未跟踪文档</span>
         </div>
       </div>
     </header>
@@ -344,11 +344,11 @@
           <p>唯一状态源为 <code>docs/prd/requirements.csv</code>；“有计划文档”本身不等于已经批准或正在实施。</p>
         </div>
         <div class="metric-grid" aria-label="需求状态计数">
-          <article class="metric verified"><span class="label">已验证</span><strong class="value">18</strong><p class="note">验收证据齐全（38.3%）</p></article>
-          <article class="metric implemented"><span class="label">已实现</span><strong class="value">11</strong><p class="note">已有实现，仍待完整验收（23.4%）</p></article>
-          <article class="metric progress"><span class="label">进行中</span><strong class="value">11</strong><p class="note">已进入工程实现（23.4%）</p></article>
-          <article class="metric idea"><span class="label">想法池</span><strong class="value">6</strong><p class="note">未进入排期或实现（12.8%）</p></article>
-          <article class="metric specified"><span class="label">已定义</span><strong class="value">1</strong><p class="note">流程台账自身的启动项（2.1%）</p></article>
+          <article class="metric verified"><span class="label">已验证</span><strong class="value">20</strong><p class="note">验收证据齐全（40.8%）</p></article>
+          <article class="metric implemented"><span class="label">已实现</span><strong class="value">11</strong><p class="note">已有实现，仍待完整验收（22.4%）</p></article>
+          <article class="metric progress"><span class="label">进行中</span><strong class="value">11</strong><p class="note">已进入工程实现（22.4%）</p></article>
+          <article class="metric idea"><span class="label">想法池</span><strong class="value">6</strong><p class="note">未进入排期或实现（12.2%）</p></article>
+          <article class="metric specified"><span class="label">已定义</span><strong class="value">1</strong><p class="note">流程台账自身的启动项（2.0%）</p></article>
         </div>
       </section>
 
@@ -358,7 +358,7 @@
             <p class="section-kicker">Now</p>
             <h2 id="doing-heading">当前正在做</h2>
           </div>
-          <p>11 个需求正处于 <code>in_progress</code>。漫画 / 写真 Beta 已合入主线，对应 REQ-0046 / REQ-0047 已验证；AI 设置与治理为 implemented / 90%，刮削治理和消息中心仍在进行中。</p>
+          <p>11 个需求正处于 <code>in_progress</code>。REQ-0048 / REQ-0049 已于 9 月 11 日验证；漫画 / 写真 Beta（REQ-0046 / REQ-0047）此前已验证。AI 设置与治理为 implemented / 90%，刮削治理和消息中心仍在进行中。</p>
         </div>
         <div class="two-column">
           <article class="panel">
@@ -374,13 +374,13 @@
           </article>
 
           <aside class="panel">
-            <div class="panel-header"><p class="table-label">近期实现 · 9 月 6–9 日</p><h3>作品事实发布与 AI 治理已落地</h3></div>
+            <div class="panel-header"><p class="table-label">近期实现 · 9 月 11 日</p><h3>统一添加媒体与图书浏览已验证</h3></div>
             <div class="panel-body">
               <ul class="compact-list">
-                <li><strong>作品回答：</strong>Prompt v3 与 <code>submit_answer</code> 使用本轮引用，由服务端填充同一来源的作品字段；正文校验后发布，历史保留来源快照，过程显示“正在整理结果”。</li>
-                <li><strong>结束与确认：</strong>工具步数默认不限；达到可选上限返回部分完成。写预览明确等待确认，成功后显示“已保存”，历史依持久化回执恢复结果。</li>
-                <li><strong>正式 AI 设置：</strong>Provider 与治理自动保存；后端执行启用 / 只读权限，提供真实 usage、耗时、失败统计、审计及到期清理。全局默认关闭。</li>
-                <li><strong>面板与交互：</strong>Agent 已改为内容区右侧可调宽面板；窄屏占用内容区，关闭恢复原页面。书签创建的布局、键盘和移动端行为已修正。</li>
+                <li><strong>添加媒体（REQ-0048）：</strong>单一对话框含影片 Tab，以及受独立 Beta 门控的漫画 / 写真 Tab；切换保留选择，上传中锁定切换与关闭；写真 ZIP/CBZ 复制后扫描，不覆盖冲突。</li>
+                <li><strong>图书浏览（REQ-0049）：</strong>漫画 / 写真工具栏与详情层级对齐影片库；预览改为两行自适应批次（4–20 张）、编号分页与近视口加载；写真缩略图最长边 ≤420px，进程 LRU 有界。</li>
+                <li><strong>详情补充：</strong>来源信息收入共享「媒体信息」对话框；写真详情支持独立标签 PATCH；Agent 仍仅处理影片域。</li>
+                <li><strong>仍进行中的 Agent 切片：</strong>作品事实发布、正式 AI 治理、右侧 Agent 面板等已有大量实现，完整验收仍待补（见下方切片表）。</li>
               </ul>
             </div>
           </aside>
@@ -404,7 +404,7 @@
             <p class="section-kicker">Delivered</p>
             <h2 id="delivered-heading">已经具备的产品底座</h2>
           </div>
-          <p>以下为代码和项目事实明确记录的当前能力。9 月 10 日新增漫画与写真 Beta：设置 → 实验性功能分别开启，开启后才显示各自配置。</p>
+          <p>以下为代码和项目事实明确记录的当前能力。漫画 / 写真为默认关闭的 Beta；9 月 11 日已验证统一「添加媒体」与图书浏览 / 自适应预览。</p>
         </div>
         <div class="two-column">
           <article class="panel">
@@ -413,7 +413,8 @@
               <li><strong>资料库主链路：</strong>扫描、元数据刮削、任务系统、SQLite 应用库与 REST API 已落地。</li>
               <li><strong>长期数据安全：</strong>备份 / 校验 / 恢复、路径迁移、Library Health 与有限修复队列均已验证。</li>
               <li><strong>浏览与个性化：</strong>保存视图、强筛选、每日推荐和显式负反馈、演员别名合并、个人洞察均已实现。</li>
-              <li><strong>导入稳健性：</strong>支持大文件可续传、重启恢复、空间预检、番号相似度检查与扫描 UNIQUE 中断保护。</li>
+              <li><strong>导入稳健性：</strong>影片大文件可续传、重启恢复、空间预检、番号相似度检查与扫描 UNIQUE 中断保护；统一添加媒体对话框覆盖影片与 Beta 门控的漫画 / 写真导入。</li>
+              <li><strong>漫画 / 写真 Beta：</strong>REQ-0046～0049 已验证；设置 → 实验性功能分别开启；独立路径 / 扫描 / 浏览，写真标签可编辑，Agent 仍电影片域。</li>
               <li><strong>AI 治理：</strong>REQ-0039 为 implemented / 90%；正式 AI 分区、工具结果隐私投影、用量 / 审计查询与到期清理已实现，完整验收仍待补。</li>
               <li><strong>萃取帧：</strong>有界截图队列与可重放回执、游标分页、4K 编码优化、源帧提取与原像素检查、相似帧人工审查及紧凑视频片段导出已落地。</li>
             </ul></div>
@@ -433,26 +434,26 @@
       <section id="validation" aria-labelledby="validation-heading">
         <div class="section-head">
           <div><p class="section-kicker">Validation</p><h2 id="validation-heading">已有验证与剩余缺口</h2></div>
-          <p>以 9 月 10 日媒体 Beta 整合验收及 9 月 9 日 Agent 记录为依据。主线整合已执行前后端测试与合成媒体浏览器验收；仍保留完整产品验收的边界。</p>
+          <p>以 9 月 11 日 REQ-0048 / REQ-0049 验收、9 月 10 日媒体 Beta 整合及 9 月 9 日 Agent 记录为依据。台账已验证项增至 20；完整产品验收边界仍保留。</p>
         </div>
         <div class="two-column">
           <article class="panel">
-            <div class="panel-header"><p class="table-label">已有证据</p><h3>Agent 与播放可靠性</h3></div>
+            <div class="panel-header"><p class="table-label">已有证据</p><h3>图书库与 Agent / 播放</h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>真实模型：</strong>9 月 9 日作品引用合成验证通过：2 次调用 / 8249 tokens，覆盖查询、结构化提交与历史快照；9 月 5 日另有 22 个不同合成场景通过记录。均使用临时 SQLite，未挂载真实资料库或源站工具。</li>
-              <li><strong>前端：</strong>9 月 10 日全量 Vitest 259 文件 / 1200 用例通过，后续新增拼音提取与写真返回导航测试通过；typecheck、lint 与 build 均通过，构建预算未放宽。</li>
-              <li><strong>后端与 Beta：</strong>9 月 10 日 Go 全量测试与 vet 通过；独立临时 SQLite 和两份合成 CBZ 验证开关显隐、路径扫描、详情翻页、关闭访问限制及重启保留。漫画阅读进度保留，写真目前提供扫描与浏览。</li>
-              <li><strong>状态口径：</strong>PRD 为 18 项已验证、11 项已实现、11 项进行中、6 项想法、1 项已定义；保留台账状态和人工进度，不将其汇总为产品完成率。</li>
+              <li><strong>添加媒体 / 图书 UI：</strong>REQ-0048 含定向 Vitest、Go 服务与 Agent 域测试、串行 e2e 与合成 CBZ 上传校验；REQ-0049 含 69 项相关 Vitest、有界缩略图 Go 测试与 80 页隔离浏览器 QA。</li>
+              <li><strong>真实模型：</strong>9 月 9 日作品引用合成验证通过：2 次调用 / 8249 tokens；9 月 5 日另有 22 个合成场景通过记录。均使用临时 SQLite，未挂载真实资料库或源站工具。</li>
+              <li><strong>Beta 基线：</strong>9 月 10 日前后端全量测试与合成 CBZ 验证开关、路径扫描、关闭限制与重启保留；漫画阅读进度保留。</li>
+              <li><strong>状态口径：</strong>PRD 为 20 项已验证、11 项已实现、11 项进行中、6 项想法、1 项已定义；不汇总为产品完成率。</li>
             </ul></div>
           </article>
           <aside class="panel">
             <div class="panel-header"><p class="table-label">尚未全绿</p><h3>发布门禁与完整验收</h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>浏览器 e2e：</strong>9 月 10 日串行运行 5 / 5 通过，包含 Personal Insights、PIN 启动、Mock 边界、375px 与备份。此前 Personal Insights 超时在本次复验未重现。</li>
-              <li><strong>写真 Beta：</strong>仅支持 ZIP/CBZ 扫描、详情与浏览；缩略图当前读取原图，缓存上限为预留配置。写真导入、单册进度 / 偏好 API 与独立缓存清理尚未实现。</li>
+              <li><strong>写真仍缺：</strong>单册进度 / 偏好 API、磁盘缓存清理与完整缩放套件；磁盘缓存上限仍为预留配置。无对应 API 的管理项已在 UI 隐藏。</li>
               <li><strong>Agent R1：</strong>演员别名、完整源站结果、多轮候选交互、三语言及移动端焦点 / 取消仍缺完整验收。用量治理与独立 Action 回执到期清理已有实现。</li>
               <li><strong>事实发布边界：</strong>作品字段来自同一来源快照，但不能保证源站元数据或任意自然语言事实绝对正确；独立翻译 / 润色 Action 不在本轮回答校验保证内。</li>
               <li><strong>播放边界：</strong>真实影片画质、LAN / GPU 基准和完整浏览器媒体验收待补；Go race 受本机工具链阻塞。缓存字节配额、按需 VOD、音频单独转码尚未实现。</li>
+              <li><strong>工作区脏状态：</strong>采集时主工作区另有 Agent / 播放探测 / UI 等未提交改动，不计入已验证交付。</li>
             </ul></div>
           </aside>
         </div>
@@ -487,7 +488,7 @@
             </div>
             <div class="callout" style="margin-top:0.75rem">
               <h3>当前主计划之外的产品方向</h3>
-              <p>容器、WebDAV、Android 与 metadata sidecar 尚未进入 PRD，不并行实施；SMB 资料库目前只有未跟踪需求文档。SFW 合规产品已决定另建项目。漫画 / 写真已获准作为默认关闭的 Beta 合入 master，旧实验 worktree 原样保留。</p>
+              <p>容器、WebDAV、Android 与 metadata sidecar 尚未进入 PRD，不并行实施；SMB 资料库目前只有未跟踪需求文档。SFW 合规产品已决定另建项目。漫画 / 写真 Beta 与统一添加媒体 / 图书浏览已在 master 验证；旧实验 worktree 原样保留。</p>
             </div>
           </div>
         </div>
@@ -506,19 +507,19 @@
           <article class="panel">
             <div class="panel-header"><p class="table-label">当前 checkout</p><h3><code>master</code></h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>HEAD：</strong><code>145c5241</code> · <span lang="en">docs: record comic and photo Beta scope and verification</span></li>
-              <li><strong>上游：</strong><code>origin/master</code>；采集时相对已缓存上游领先 35 个提交、落后 0 个（含合入的源分支历史）。当前 checkout 就是本地 master，尚未 push。</li>
+              <li><strong>HEAD：</strong><code>ae6c2e5b</code> · <span lang="en">docs(books): document media information menu and dialog</span></li>
+              <li><strong>上游：</strong><code>origin/master</code>；采集时相对已缓存上游领先 75 个提交、落后 0 个。当前 checkout 就是本地 master，尚未 push。</li>
               <li><strong>远程：</strong><code>origin</code> 指向 <code>git@github.com:yepHiu/Curated.git</code>。</li>
-              <li><strong>生产版本源：</strong><code>scripts/release/version.json</code> 当前为 <strong>1.5.5</strong>；9 月 6 日发布记录已提交。</li>
+              <li><strong>生产版本源：</strong><code>scripts/release/version.json</code> 当前为 <strong>1.5.5</strong>。</li>
             </ul></div>
           </article>
           <aside class="panel">
             <div class="panel-header"><p class="table-label">未提交状态</p><h3>主工作区：需保留，不自动清理</h3></div>
             <div class="panel-body"><ul class="compact-list">
-              <li><strong>已跟踪文件（4）：</strong><code>.cursor/rules/project-standards.mdc</code>，以及 <code>docs/plan/</code> 下的首页详情侧栏优化、Agent milestone、VLC 播放优化三份文档；暂存区为空。</li>
-              <li><strong>未跟踪文档（4）：</strong><code>docs/plan/</code> 下的 <code>2026-09-05-curated-figma-project-design.md</code>、<code>2026-09-06-agent-icon-options.md</code>、<code>2026-09-06-remaining-requirements-review.md</code>、<code>2026-09-06-smb-library-requirements.md</code>。</li>
-              <li><strong>分支整合：</strong><code>agent-enhance</code> 于 9 月 6 日合入；9 月 10 日 <code>codex/comic-photo-beta</code> 已 fast-forward 到 master。源快照 <code>b1108e02</code> 保存旧实验 worktree 内容，原工作区和分支保留。</li>
-              <li><strong>说明：</strong>以上均为本次编辑前的用户工作区状态；文档存在不代表已批准进入 PRD，旧盘点结论以最新台账和实施记录为准。</li>
+              <li><strong>已跟踪文件（26）：</strong>含 Agent 提示词 / 工具与确认 UI、播放决策与 media probe 缓存、萃取帧 / Saved Views / AppShell、以及 <code>requirements.csv</code>、<code>CLAUDE.md</code>、若干 plan 文档；暂存区为空。</li>
+              <li><strong>未跟踪文档（4）：</strong><code>docs/plan/</code> 下的 Figma 设计、Agent 图标选项、剩余需求盘点、SMB 资料库需求。</li>
+              <li><strong>分支整合：</strong><code>agent-enhance</code> 于 9 月 6 日合入；9 月 10 日 <code>codex/comic-photo-beta</code> 已 fast-forward 到 master；9 月 11 日图书导入 / 浏览切片已在 master 落成。</li>
+              <li><strong>说明：</strong>以上均为本次编辑前的用户工作区状态；文档存在不代表已批准进入 PRD，脏改动不计入已验证交付。</li>
             </ul></div>
           </aside>
         </div>
@@ -528,22 +529,28 @@
             <caption>已注册 worktree（含当时的工作区脏净状态）</caption>
             <thead><tr><th scope="col">位置</th><th scope="col">分支 / HEAD</th><th scope="col">最新提交</th><th scope="col">状态</th><th scope="col">工作内容判断</th></tr></thead>
             <tbody>
-              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>master</code><br /><code>145c5241</code></td><td>2026-09-10<br />漫画 / 写真 Beta 范围与验收记录</td><td><span class="state dirty">4 个修改 / 4 个未跟踪</span></td><td>Beta 已合入；用户原有未提交文档保持原样。</td></tr>
+              <tr><td><strong>主工作区</strong><br /><code>C:\Users\wujiahui\code\jav-lib\jav-shadcn</code></td><td><code>master</code><br /><code>ae6c2e5b</code></td><td>2026-09-11<br />图书媒体信息菜单与对话框文档</td><td><span class="state dirty">26 个修改 / 4 个未跟踪</span></td><td>REQ-0048 / 0049 已合入；用户未提交 Agent / 播放 / UI 改动保持原样。</td></tr>
               <tr><td><strong>Codex worktree #4115</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\4115\jav-shadcn</code></td><td><code>detached</code><br /><code>e2666ad2</code></td><td>2026-05-13<br />release 1.4.5 准备</td><td><span class="state detached">干净，游离 HEAD</span></td><td>旧发布快照；未绑定本地分支。</td></tr>
               <tr><td><strong>漫画库 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\comic-library-mvp\jav-shadcn</code></td><td><code>codex/comic-library-mvp</code><br /><code>4f524c0f</code></td><td>2026-06-28<br />漫画设置路径流程修正</td><td><span class="state dirty">70 个修改 / 61 个未跟踪</span></td><td>源内容已保存快照并作为 Beta 整合；原工作文件与暂存区保持原样。</td></tr>
-              <tr><td><strong>Beta 整合 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\curated-media-beta\jav-shadcn</code></td><td><code>codex/comic-photo-beta</code><br /><code>145c5241</code></td><td>2026-09-10<br />Beta 验收与文档</td><td><span class="state">干净</span></td><td>已合入 master；保留独立验收日志与合成测试数据。</td></tr>
+              <tr><td><strong>Beta 整合 worktree</strong><br /><code>C:\Users\wujiahui\.codex\worktrees\curated-media-beta\jav-shadcn</code></td><td><code>codex/comic-photo-beta</code><br /><code>145c5241</code></td><td>2026-09-10<br />Beta 验收与文档</td><td><span class="state clean">干净</span></td><td>已合入 master；保留独立验收日志与合成测试数据。</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="section-head" style="margin-top:2rem; margin-bottom:0.75rem"><div><p class="section-kicker">Recent branch history</p><h2 style="font-size:1.35rem">当前 master 的最新提交</h2></div></div>
         <div class="commit-list" aria-label="当前分支近期提交">
-          <div class="commit"><span class="hash">145c5241</span><span class="date">2026-09-10</span><span class="subject">docs: record comic and photo Beta scope and verification</span></div>
-          <div class="commit"><span class="hash">28f6c9f8</span><span class="date">2026-09-10</span><span class="subject">build: load pinyin dictionaries as data within existing JS budgets</span></div>
-          <div class="commit"><span class="hash">b31e7a35</span><span class="date">2026-09-10</span><span class="subject">feat(media): merge comic and photo libraries behind experimental Beta switches</span></div>
-          <div class="commit"><span class="hash">4e186743</span><span class="date">2026-09-10</span><span class="subject">docs: refresh project dashboard for September 10</span></div>
-          <div class="commit"><span class="hash">30dccba2</span><span class="date">2026-09-09</span><span class="subject">docs(agent): document referenced answers and verification results</span></div>
-          <div class="commit"><span class="hash">1592f556</span><span class="date">2026-09-09</span><span class="subject">fix(agent): distinguish write target IDs from generated catalog claims</span></div>
+          <div class="commit"><span class="hash">ae6c2e5b</span><span class="date">2026-09-11</span><span class="subject">docs(books): document media information menu and dialog</span></div>
+          <div class="commit"><span class="hash">10fe707c</span><span class="date">2026-09-11</span><span class="subject">feat(books): move source details into media information dialog</span></div>
+          <div class="commit"><span class="hash">dfec0382</span><span class="date">2026-09-11</span><span class="subject">docs(books): document adaptive preview proportions</span></div>
+          <div class="commit"><span class="hash">f9472323</span><span class="date">2026-09-11</span><span class="subject">fix(books): adapt preview cards to natural image proportions</span></div>
+          <div class="commit"><span class="hash">5f2de76c</span><span class="date">2026-09-11</span><span class="subject">docs(detail): record movie card spacing verification</span></div>
+          <div class="commit"><span class="hash">2af16efe</span><span class="date">2026-09-11</span><span class="subject">fix(detail): remove duplicate movie card vertical padding</span></div>
+          <div class="commit"><span class="hash">11ddf3bb</span><span class="date">2026-09-11</span><span class="subject">docs(import): record target directory UI verification</span></div>
+          <div class="commit"><span class="hash">37879a86</span><span class="date">2026-09-11</span><span class="subject">fix(import): unify media target directory display</span></div>
+          <div class="commit"><span class="hash">bc2c3ea6</span><span class="date">2026-09-11</span><span class="subject">docs(books): record shared tag control verification</span></div>
+          <div class="commit"><span class="hash">a0c88202</span><span class="date">2026-09-11</span><span class="subject">refactor(tags): reuse movie tag add control across media details</span></div>
+          <div class="commit"><span class="hash">5da02b00</span><span class="date">2026-09-11</span><span class="subject">docs(books): record detail spacing alignment checks</span></div>
+          <div class="commit"><span class="hash">439ac70d</span><span class="date">2026-09-11</span><span class="subject">fix(books): align detail gutters and cover spacing with movies</span></div>
         </div>
       </section>
 
@@ -556,21 +563,23 @@
           <p>如果代码、PRD 或 Git 状态发生变化，应以这些原始来源为准并重新生成快照。</p>
         </div>
         <div class="source-grid">
-          <a class="source-link" href="docs/prd/requirements.csv"><strong>PRD 需求台账</strong><span><code>docs/prd/requirements.csv</code><br />47 条需求及其 status、进度、验收与关联文档。</span></a>
-          <a class="source-link" href="docs/plan/2026-09-10-comic-photo-beta-integration.md"><strong>漫画 / 写真 Beta 验收</strong><span>默认关闭开关、配置显隐、独立迁移、合成媒体浏览与重启持久化；含当前写真能力边界。</span></a>
+          <a class="source-link" href="docs/prd/requirements.csv"><strong>PRD 需求台账</strong><span><code>docs/prd/requirements.csv</code><br />49 条需求及其 status、进度、验收与关联文档。</span></a>
+          <a class="source-link" href="docs/plan/2026-09-11-add-media-tabs.md"><strong>统一添加媒体</strong><span>REQ-0048：门控 Tab、写真 ZIP/CBZ 导入与合成上传验收。</span></a>
+          <a class="source-link" href="docs/plan/2026-09-11-book-library-ui-preview.md"><strong>图书浏览与预览</strong><span>REQ-0049：自适应预览批次、有界写真缩略图与隔离浏览器 QA。</span></a>
+          <a class="source-link" href="docs/plan/2026-09-10-comic-photo-beta-integration.md"><strong>漫画 / 写真 Beta 验收</strong><span>默认关闭开关、配置显隐、独立迁移与重启持久化。</span></a>
           <a class="source-link" href="docs/plan/README.md"><strong>计划状态规则</strong><span><code>docs/plan/README.md</code><br />区分 research / proposed / approved / in-progress / verified，说明当前主计划。</span></a>
-          <a class="source-link" href=".cursor/rules/project-facts.mdc"><strong>当前实现事实</strong><span><code>.cursor/rules/project-facts.mdc</code><br />前后端、Electron、播放、Agent 与已实现能力。</span></a>
+          <a class="source-link" href=".cursor/rules/project-facts.mdc"><strong>当前实现事实</strong><span><code>.cursor/rules/project-facts.mdc</code><br />前后端、Electron、播放、Agent、图书库与已实现能力。</span></a>
           <a class="source-link" href=".cursor/rules/architecture-boundaries.mdc"><strong>架构边界</strong><span><code>.cursor/rules/architecture-boundaries.mdc</code><br />当前 Electron/HTTP 形态与仍属目标的原生能力。</span></a>
-          <a class="source-link" href="docs/plan/2026-08-19-agent-milestone-plan.md"><strong>Agent 实施与验收</strong><span>§14–16：历史 / 回执、正式治理、作品引用发布与 9 月 9 日验收；§17 上下文管理仍为待确认方案。含采集时未提交补充。</span></a>
-          <a class="source-link" href="docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md"><strong>播放链路修复记录</strong><span>2026-09-06：F1–F10 修复与真实 FFmpeg 验证；其旧构建 / e2e 结论以 Agent §16.6 后续记录为准。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-19-agent-milestone-plan.md"><strong>Agent 实施与验收</strong><span>§14–16：历史 / 回执、正式治理、作品引用发布；§17 上下文管理仍为待确认方案。</span></a>
+          <a class="source-link" href="docs/plan/2026-08-16-playback-pipeline-capability-and-performance-audit.md"><strong>播放链路修复记录</strong><span>2026-09-06：F1–F10 修复与真实 FFmpeg 验证；其旧构建 / e2e 结论以后续记录为准。</span></a>
           <a class="source-link" href="scripts/release/version.json"><strong>生产版本源</strong><span>当前版本 1.5.5；发布历史另见 docs/ops/package-build-history.csv，本次未重新查询远端发布。</span></a>
-          <a class="source-link" href=".cursor/skills/curated-project-dashboard/scripts/collect-dashboard-snapshot.ps1"><strong>只读 Git / 台账采集器</strong><span>采集需求、分支、HEAD、版本及 4 个 worktree；上游差异和当前 master 主线日志另用本地 Git 命令核对，未 fetch。</span></a>
+          <a class="source-link" href=".cursor/skills/curated-project-dashboard/scripts/collect-dashboard-snapshot.ps1"><strong>只读 Git / 台账采集器</strong><span>采集需求、分支、HEAD、版本及 4 个 worktree；上游差异与 master 日志另用本地 Git 核对，未 fetch。</span></a>
         </div>
       </section>
     </main>
 
     <footer>
-      <div class="shell">Curated 项目概览看板 · 静态文档快照 · 更新日期 2026-09-10。请勿将本页替代 <code>requirements.csv</code>、源码或 Git 的实时状态。</div>
+      <div class="shell">Curated 项目概览看板 · 静态文档快照 · 更新日期 2026-09-11。请勿将本页替代 <code>requirements.csv</code>、源码或 Git 的实时状态。</div>
     </footer>
   </body>
 </html>
