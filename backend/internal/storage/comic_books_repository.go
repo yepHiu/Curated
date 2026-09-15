@@ -9,9 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"curated-backend/internal/contracts"
 )
+
+const comicDisplayTitleSQL = `COALESCE(NULLIF(TRIM(cb.user_title), ''), cb.title)`
 
 var ErrComicBookNotFound = errors.New("comic book not found")
 
@@ -87,7 +90,7 @@ func (s *SQLiteStore) GetComicBookDetail(ctx context.Context, id string) (contra
 	var favoriteInt int
 	var rating sql.NullFloat64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT cb.id, cb.title, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
+		`SELECT cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
 		        cb.user_rating, cb.read_status, cb.added_at, cb.updated_at, cb.last_read_at, cb.completed_at,
 		        COALESCE(crp.current_page_index, 0)
 		   FROM comic_books cb
@@ -166,7 +169,7 @@ func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComi
 	listArgs := append([]any{}, args...)
 	listArgs = append(listArgs, limit, offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT cb.id, cb.title, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
+		`SELECT cb.id, `+comicDisplayTitleSQL+`, cb.source_file_name, cb.location, cb.page_count, cb.is_favorite,
 		        cb.user_rating, cb.read_status, cb.added_at, cb.updated_at, cb.last_read_at, cb.completed_at,
 		        COALESCE(crp.current_page_index, 0)
 		   FROM comic_books cb
@@ -216,12 +219,16 @@ func (s *SQLiteStore) ListComicBooks(ctx context.Context, req contracts.ListComi
 	if err := rows.Close(); err != nil {
 		return contracts.ComicBooksPageDTO{}, err
 	}
+	ids := make([]string, len(items))
 	for i := range items {
-		tags, err := s.listComicTags(ctx, items[i].ID)
-		if err != nil {
-			return contracts.ComicBooksPageDTO{}, err
-		}
-		items[i].Tags = tags
+		ids[i] = items[i].ID
+	}
+	tagsByID, err := s.listComicTagsByIDs(ctx, ids)
+	if err != nil {
+		return contracts.ComicBooksPageDTO{}, err
+	}
+	for i := range items {
+		items[i].Tags = tagsByID[items[i].ID]
 	}
 	return contracts.ComicBooksPageDTO{Items: items, Total: total, Limit: limit, Offset: offset}, nil
 }
@@ -231,10 +238,10 @@ func comicBookWhere(req contracts.ListComicBooksRequest) (string, []any) {
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"
-		clauses = append(clauses, `(LOWER(cb.title) LIKE ? OR LOWER(cb.source_file_name) LIKE ? OR LOWER(cb.location) LIKE ? OR EXISTS (
+		clauses = append(clauses, `(LOWER(`+comicDisplayTitleSQL+`) LIKE ? OR LOWER(cb.title) LIKE ? OR LOWER(cb.source_file_name) LIKE ? OR LOWER(cb.location) LIKE ? OR EXISTS (
 			SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND LOWER(cbt.tag) LIKE ?
 		))`)
-		args = append(args, like, like, like, like)
+		args = append(args, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
 		clauses = append(clauses, `EXISTS (SELECT 1 FROM comic_book_tags cbt WHERE cbt.comic_id = cb.id AND cbt.tag = ?)`)
@@ -269,6 +276,20 @@ func (s *SQLiteStore) PatchComicBook(ctx context.Context, comicID string, patch 
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if patch.ExpectedTitle != nil {
+		var current string
+		err := tx.QueryRowContext(ctx, `SELECT `+comicDisplayTitleSQL+` FROM comic_books cb WHERE cb.id = ?`, comicID).Scan(&current)
+		if errors.Is(err, sql.ErrNoRows) {
+			return contracts.ComicBookDetailDTO{}, ErrComicBookNotFound
+		}
+		if err != nil {
+			return contracts.ComicBookDetailDTO{}, err
+		}
+		if current != *patch.ExpectedTitle {
+			return contracts.ComicBookDetailDTO{}, ErrAIWriteConflict
+		}
+	}
+
 	if patch.Tags != nil {
 		normalized, err := NormalizeUserTagsForPatch(*patch.Tags)
 		if err != nil {
@@ -286,7 +307,10 @@ func (s *SQLiteStore) PatchComicBook(ctx context.Context, comicID string, patch 
 		if title == "" {
 			return contracts.ComicBookDetailDTO{}, fmt.Errorf("title is required")
 		}
-		sets = append(sets, "title = ?")
+		if utf8.RuneCountInString(title) > contracts.MaxBookTitleRunes {
+			return contracts.ComicBookDetailDTO{}, fmt.Errorf("title too long")
+		}
+		sets = append(sets, "user_title = ?")
 		args = append(args, title)
 	}
 	if patch.Favorite != nil {
@@ -349,6 +373,7 @@ func (s *SQLiteStore) DeleteComicBookIndex(ctx context.Context, comicID string) 
 		`DELETE FROM comic_book_tags WHERE comic_id = ?`,
 		`DELETE FROM comic_reading_progress WHERE comic_id = ?`,
 		`DELETE FROM comic_reading_preferences WHERE comic_id = ?`,
+		`DELETE FROM comic_book_comments WHERE comic_id = ?`,
 		`DELETE FROM comic_cache_entries WHERE comic_id = ?`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt, comicID); err != nil {

@@ -28,6 +28,8 @@ const comicApiMocks = vi.hoisted(() => ({
   deleteComicProgress: vi.fn(),
   getComicPreferences: vi.fn(),
   putComicPreferences: vi.fn(),
+  getComicComment: vi.fn(),
+  putComicComment: vi.fn(),
   getComicCacheStatus: vi.fn(),
   cleanupComicCache: vi.fn(),
 }))
@@ -217,6 +219,21 @@ describe("webComicLibraryService", () => {
     expect(movieApiMocks.patchMovie).not.toHaveBeenCalled()
   })
 
+  it("clears a comic rating by sending ratingSet and ratingClear together", async () => {
+    // Go 仓储只有 ratingSet 时才处理 user_rating，清除必须同时带上。
+    comicApiMocks.listComics.mockResolvedValueOnce(comicsPage([comicListItem("comic-1")]))
+    comicApiMocks.patchComic.mockResolvedValueOnce(
+      comicDetail("comic-1", { rating: undefined }),
+    )
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+    await webComicLibraryService.reloadComicsFromApi()
+    await webComicLibraryService.patchComic("comic-1", { rating: null })
+    expect(comicApiMocks.patchComic).toHaveBeenCalledWith("comic-1", {
+      ratingSet: true,
+      ratingClear: true,
+    })
+  })
+
   it("syncs progress and reading preferences through comic book subresource endpoints", async () => {
     const progress: ComicReadingProgressDTO = {
       comicId: "comic-1",
@@ -253,6 +270,23 @@ describe("webComicLibraryService", () => {
       fit: "width",
       direction: "rtl",
     })
+  })
+
+  it("reads and saves comic comments through the comic book endpoint", async () => {
+    comicApiMocks.getComicComment.mockResolvedValueOnce({ body: "note", updatedAt: "t" })
+    comicApiMocks.putComicComment.mockResolvedValueOnce({ body: "saved", updatedAt: "t2" })
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+
+    await expect(webComicLibraryService.getComicComment(" comic-1 ")).resolves.toEqual({
+      body: "note",
+      updatedAt: "t",
+    })
+    await expect(webComicLibraryService.putComicComment(" comic-1 ", { body: "saved" })).resolves.toEqual({
+      body: "saved",
+      updatedAt: "t2",
+    })
+    expect(comicApiMocks.getComicComment).toHaveBeenCalledWith("comic-1")
+    expect(comicApiMocks.putComicComment).toHaveBeenCalledWith("comic-1", { body: "saved" })
   })
 
   it("loads comic settings through the comic settings facade", async () => {
@@ -326,5 +360,17 @@ describe("webComicLibraryService", () => {
     expect(comicApiMocks.startComicScan).toHaveBeenCalledWith({ paths: ["D:/Comics"] })
     expect(task?.taskId).toBe("scan-comics-path-1")
     expect(movieApiMocks.listMovies).not.toHaveBeenCalled()
+  })
+
+  it("skips settings and list requests when the comic library is already warm", async () => {
+    comicApiMocks.getSettings.mockResolvedValue(settingsDto())
+    comicApiMocks.listComics.mockResolvedValue(comicsPage([comicListItem("comic-1")]))
+
+    const { webComicLibraryService } = await import("./web-comic-library-service")
+    await webComicLibraryService.ensureComicsLoaded()
+    await webComicLibraryService.ensureComicsLoaded()
+
+    expect(comicApiMocks.getSettings).toHaveBeenCalledTimes(1)
+    expect(comicApiMocks.listComics).toHaveBeenCalledTimes(1)
   })
 })

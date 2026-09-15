@@ -1,10 +1,11 @@
 import type { ComputedRef } from "vue"
-import type { PhotoImportUploadProgress, TaskDTO } from "@/api/types"
+import type { PhotoImportUploadProgress, BookCommentDTO, PutBookCommentBody, TaskDTO } from "@/api/types"
 import type {
   PhotoCacheSettings,
   PhotoBook,
   PhotoListParams,
   PhotoLibrarySetting,
+  PhotoPatch,
   PhotoViewerSettings,
 } from "@/domain/photo/types"
 
@@ -19,6 +20,8 @@ export interface PhotoLibraryService {
   photoViewer: ComputedRef<PhotoViewerSettings>
   photoCache: ComputedRef<PhotoCacheSettings>
   refreshSettings(): Promise<void>
+  /** 首次进入补齐设置与全量列表；已加载则跳过。扫描/导入终态仍应调用 reloadPhotosFromApi。 */
+  ensurePhotosLoaded(): Promise<void>
   setPhotoLibraryEnabled(value: boolean): Promise<void>
   setAutoPhotoLibraryWatch(value: boolean): Promise<void>
   addPhotoLibraryPath(path: string, title?: string): Promise<TaskDTO | null>
@@ -31,6 +34,12 @@ export interface PhotoLibraryService {
   getPhotoById(photoId?: string): PhotoBook | undefined
   loadPhotoDetail(photoId: string): Promise<PhotoBook | undefined>
   replacePhotoTags(photoId: string, tags: string[]): Promise<PhotoBook>
+  /** Web：PATCH /library/photos/{id}；Mock：内存 + localStorage */
+  patchPhoto(photoId: string, patch: PhotoPatch): Promise<PhotoBook>
+  /** Web：GET /library/photos/books/{id}/comment；Mock：localStorage */
+  getPhotoComment(photoId: string): Promise<BookCommentDTO>
+  /** Web：PUT /library/photos/books/{id}/comment；Mock：localStorage */
+  putPhotoComment(photoId: string, body: PutBookCommentBody): Promise<BookCommentDTO>
   scanPhotos(paths?: string[]): Promise<TaskDTO | null>
   importPhotos(files: File[], options?: { onUploadProgress?: (progress: PhotoImportUploadProgress) => void }): Promise<TaskDTO | null>
 }

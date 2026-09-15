@@ -435,6 +435,14 @@ export interface PatchComicBookBody {
   rating?: number
 }
 
+/** 写真展示标题与本地评分 PATCH body；清除评分时同时带 ratingSet 与 ratingClear。 */
+export interface PatchPhotoBookBody {
+  title?: string
+  ratingSet?: boolean
+  ratingClear?: boolean
+  rating?: number
+}
+
 export interface PutComicProgressBody {
   pageIndex: number
   completed: boolean
@@ -444,6 +452,22 @@ export interface PutComicReadingPreferencesBody {
   mode?: ComicReaderMode
   fit?: ComicFitMode
   direction?: ComicReadingDirection
+}
+
+/** 与后端 contracts.MaxBookTitleRunes 一致 */
+export const MAX_BOOK_TITLE_RUNES = 500
+
+/** 与后端 contracts.MaxBookCommentRunes 一致 */
+export const MAX_BOOK_COMMENT_RUNES = 10000
+
+/** GET/PUT 漫画或写真详情个人备注（每本一条可覆盖） */
+export interface BookCommentDTO {
+  body: string
+  updatedAt: string
+}
+
+export interface PutBookCommentBody {
+  body: string
 }
 
 export type HardwareEncoderPreference =
@@ -584,7 +608,7 @@ export interface AIChatMessageDTO {
 }
 
 export interface AIChatMentionDTO {
-  kind: "movie" | "actor" | "tag"
+  kind: "movie" | "actor" | "tag" | "comic" | "photo"
   id: string
   label: string
 }
@@ -596,6 +620,8 @@ export interface AIChatActiveFiltersDTO {
   actor?: string
   playState?: "all" | "unwatched" | "in-progress" | "completed"
   runtime?: "short" | "standard" | "long"
+  favorite?: boolean
+  readStatus?: "unread" | "reading" | "read"
 }
 
 export interface AIChatContextDTO {
@@ -603,12 +629,16 @@ export interface AIChatContextDTO {
   contextVersion?: 1
   route?: string
   movieId?: string
+  comicId?: string
+  photoId?: string
   actorName?: string
   query?: string
   mentions?: AIChatMentionDTO[]
   selectedMovieIds?: string[]
   /** Actor public list rows use canonical names, not a stable actor ID. */
   selectedActors?: string[]
+  selectedComicIds?: string[]
+  selectedPhotoIds?: string[]
   activeFilters?: AIChatActiveFiltersDTO
 }
 
@@ -650,6 +680,15 @@ export interface AIAgentMovieCardDTO {
   reason?: string
 }
 
+export interface AIAgentBookCardDTO {
+  kind: "comic" | "photo"
+  comicId?: string
+  photoId?: string
+  title?: string
+  coverUrl?: string
+  tags?: string[]
+}
+
 /** Persisted result events; confirmation tokens are deliberately not stored. */
 export interface AIChatStoredEventDTO {
   answerEvidence?: AIAnswerEvidenceDTO
@@ -661,6 +700,7 @@ export interface AIChatStoredEventDTO {
   ok?: boolean
   summary?: string
   movies?: AIAgentMovieCardDTO[]
+  books?: AIAgentBookCardDTO[]
   providerRows?: AIAgentProviderTitleDTO[]
   evidence?: AIEvidenceDTO
   resolution?: AIEntityResolutionDTO
@@ -735,6 +775,8 @@ export interface AIConfirmChangeDTO {
 
 export interface AIActionRequestBody {
   movieId?: string
+  comicId?: string
+  photoId?: string
   body?: string
   locale?: string
   targetLocale?: string

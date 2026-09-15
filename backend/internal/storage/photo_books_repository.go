@@ -9,9 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"curated-backend/internal/contracts"
 )
+
+const photoDisplayTitleSQL = `COALESCE(NULLIF(TRIM(pb.user_title), ''), pb.title)`
 
 var ErrPhotoBookNotFound = errors.New("photo book not found")
 
@@ -87,7 +90,7 @@ func (s *SQLiteStore) GetPhotoBookDetail(ctx context.Context, id string) (contra
 	var favoriteInt int
 	var rating sql.NullFloat64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT pb.id, pb.title, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
+		`SELECT pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
 		        pb.user_rating, pb.added_at, pb.updated_at, pb.last_viewed_at, pb.completed_at,
 		        COALESCE(pvp.current_page_index, 0)
 		   FROM photo_books pb
@@ -165,7 +168,7 @@ func (s *SQLiteStore) ListPhotoBooks(ctx context.Context, req contracts.ListPhot
 	listArgs := append([]any{}, args...)
 	listArgs = append(listArgs, limit, offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT pb.id, pb.title, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
+		`SELECT pb.id, `+photoDisplayTitleSQL+`, pb.source_file_name, pb.location, pb.page_count, pb.is_favorite,
 		        pb.user_rating, pb.added_at, pb.updated_at, pb.last_viewed_at, pb.completed_at,
 		        COALESCE(pvp.current_page_index, 0)
 		   FROM photo_books pb
@@ -214,12 +217,16 @@ func (s *SQLiteStore) ListPhotoBooks(ctx context.Context, req contracts.ListPhot
 	if err := rows.Close(); err != nil {
 		return contracts.PhotoBooksPageDTO{}, err
 	}
+	ids := make([]string, len(items))
 	for i := range items {
-		tags, err := s.listPhotoTags(ctx, items[i].ID)
-		if err != nil {
-			return contracts.PhotoBooksPageDTO{}, err
-		}
-		items[i].Tags = tags
+		ids[i] = items[i].ID
+	}
+	tagsByID, err := s.listPhotoTagsByIDs(ctx, ids)
+	if err != nil {
+		return contracts.PhotoBooksPageDTO{}, err
+	}
+	for i := range items {
+		items[i].Tags = tagsByID[items[i].ID]
 	}
 	return contracts.PhotoBooksPageDTO{Items: items, Total: total, Limit: limit, Offset: offset}, nil
 }
@@ -229,10 +236,10 @@ func photoBookWhere(req contracts.ListPhotoBooksRequest) (string, []any) {
 	var args []any
 	if q := strings.TrimSpace(req.Query); q != "" {
 		like := "%" + strings.ToLower(q) + "%"
-		clauses = append(clauses, `(LOWER(pb.title) LIKE ? OR LOWER(pb.source_file_name) LIKE ? OR LOWER(pb.location) LIKE ? OR EXISTS (
+		clauses = append(clauses, `(LOWER(`+photoDisplayTitleSQL+`) LIKE ? OR LOWER(pb.title) LIKE ? OR LOWER(pb.source_file_name) LIKE ? OR LOWER(pb.location) LIKE ? OR EXISTS (
 			SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND LOWER(pbt.tag) LIKE ?
 		))`)
-		args = append(args, like, like, like, like)
+		args = append(args, like, like, like, like, like)
 	}
 	if tag := strings.TrimSpace(req.Tag); tag != "" {
 		clauses = append(clauses, `EXISTS (SELECT 1 FROM photo_book_tags pbt WHERE pbt.photo_id = pb.id AND pbt.tag = ?)`)
@@ -250,4 +257,84 @@ func photoBookWhere(req contracts.ListPhotoBooksRequest) (string, []any) {
 		return "", args
 	}
 	return "WHERE " + strings.Join(clauses, " AND "), args
+}
+
+// PatchPhotoBook updates writable photo-book fields such as the display title overlay and local rating.
+func (s *SQLiteStore) PatchPhotoBook(ctx context.Context, photoID string, patch contracts.PatchPhotoBookRequest) (contracts.PhotoBookDetailDTO, error) {
+	photoID = strings.TrimSpace(photoID)
+	if photoID == "" {
+		return contracts.PhotoBookDetailDTO{}, ErrPhotoBookNotFound
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return contracts.PhotoBookDetailDTO{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if patch.ExpectedTitle != nil {
+		var current string
+		err := tx.QueryRowContext(ctx, `SELECT `+photoDisplayTitleSQL+` FROM photo_books pb WHERE pb.id = ?`, photoID).Scan(&current)
+		if errors.Is(err, sql.ErrNoRows) {
+			return contracts.PhotoBookDetailDTO{}, ErrPhotoBookNotFound
+		}
+		if err != nil {
+			return contracts.PhotoBookDetailDTO{}, err
+		}
+		if current != *patch.ExpectedTitle {
+			return contracts.PhotoBookDetailDTO{}, ErrAIWriteConflict
+		}
+	}
+
+	var sets []string
+	var args []any
+	if patch.Title != nil {
+		title := strings.TrimSpace(*patch.Title)
+		if title == "" {
+			return contracts.PhotoBookDetailDTO{}, fmt.Errorf("title is required")
+		}
+		if utf8.RuneCountInString(title) > contracts.MaxBookTitleRunes {
+			return contracts.PhotoBookDetailDTO{}, fmt.Errorf("title too long")
+		}
+		sets = append(sets, "user_title = ?")
+		args = append(args, title)
+	}
+	if patch.RatingSet {
+		if patch.RatingClear || patch.Rating == nil {
+			sets = append(sets, "user_rating = NULL")
+		} else {
+			if *patch.Rating < 0 || *patch.Rating > 5 {
+				return contracts.PhotoBookDetailDTO{}, fmt.Errorf("photo rating must be between 0 and 5")
+			}
+			sets = append(sets, "user_rating = ?")
+			args = append(args, *patch.Rating)
+		}
+	}
+	if len(sets) > 0 {
+		sets = append(sets, "updated_at = ?")
+		args = append(args, nowUTC(), photoID)
+		res, err := tx.ExecContext(ctx, `UPDATE photo_books SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+		if err != nil {
+			return contracts.PhotoBookDetailDTO{}, err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return contracts.PhotoBookDetailDTO{}, err
+		}
+		if n == 0 {
+			return contracts.PhotoBookDetailDTO{}, ErrPhotoBookNotFound
+		}
+	} else if patch.ExpectedTitle == nil {
+		var exists string
+		err := tx.QueryRowContext(ctx, `SELECT id FROM photo_books WHERE id = ?`, photoID).Scan(&exists)
+		if errors.Is(err, sql.ErrNoRows) {
+			return contracts.PhotoBookDetailDTO{}, ErrPhotoBookNotFound
+		}
+		if err != nil {
+			return contracts.PhotoBookDetailDTO{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return contracts.PhotoBookDetailDTO{}, err
+	}
+	return s.GetPhotoBookDetail(ctx, photoID)
 }

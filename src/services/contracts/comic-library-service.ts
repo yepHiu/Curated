@@ -5,6 +5,8 @@ import type {
   LibraryPathStorageStatusDTO,
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
+  BookCommentDTO,
+  PutBookCommentBody,
   PutComicReadingPreferencesBody,
   TaskDTO,
 } from "@/api/types"
@@ -29,6 +31,8 @@ export interface ComicLibraryService {
   comicReader: ComputedRef<ComicReaderSettings>
   comicCache: ComputedRef<ComicCacheSettings>
   refreshSettings(): Promise<void>
+  /** 首次进入补齐设置与全量列表；已加载则跳过。扫描/导入终态仍应调用 reloadComicsFromApi。 */
+  ensureComicsLoaded(): Promise<void>
   checkComicLibraryPathStorageStatus(libraryPathIds?: string[]): Promise<void>
   setComicLibraryEnabled(value: boolean): Promise<void>
   setAutoComicLibraryWatch(value: boolean): Promise<void>
@@ -61,6 +65,10 @@ export interface ComicLibraryService {
     comicId: string,
     prefs: PutComicReadingPreferencesBody,
   ): Promise<ComicReadingPreferencesDTO>
+  /** Web：GET /library/comics/books/{id}/comment；Mock：localStorage */
+  getComicComment(comicId: string): Promise<BookCommentDTO>
+  /** Web：PUT /library/comics/books/{id}/comment；Mock：localStorage */
+  putComicComment(comicId: string, body: PutBookCommentBody): Promise<BookCommentDTO>
   getComicCacheStatus(): Promise<ComicCacheStatusDTO>
   cleanupComicCache(): Promise<ComicCacheStatusDTO>
 }

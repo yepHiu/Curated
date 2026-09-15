@@ -124,6 +124,117 @@ func TestComicBookRepositories(t *testing.T) {
 	}
 }
 
+// TestListComicBooksFillsTagsInBatch 确认列表一次带回多本标签。
+func TestListComicBooksFillsTagsInBatch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	root := t.TempDir()
+	store := newComicRepositoryTestStore(t, root)
+	path, err := store.AddComicLibraryPath(ctx, filepath.Join(root, "comics"), "Comics")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := store.UpsertComicBook(ctx, ComicBookUpsert{
+		LibraryPathID:  path.ID,
+		Location:       filepath.Join(root, "comics", "A.cbz"),
+		SourceFileName: "A.cbz",
+		Title:          "Alpha",
+		FileSize:       1,
+		FileModifiedAt: "2026-09-11T00:00:00Z",
+		PageCount:      1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.UpsertComicBook(ctx, ComicBookUpsert{
+		LibraryPathID:  path.ID,
+		Location:       filepath.Join(root, "comics", "B.cbz"),
+		SourceFileName: "B.cbz",
+		Title:          "Beta",
+		FileSize:       1,
+		FileModifiedAt: "2026-09-11T00:00:00Z",
+		PageCount:      1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstTags := []string{"color", "作者:alice"}
+	if _, err := store.PatchComicBook(ctx, first.ID, contracts.PatchComicBookRequest{Tags: &firstTags}); err != nil {
+		t.Fatal(err)
+	}
+	secondTags := []string{"mono"}
+	if _, err := store.PatchComicBook(ctx, second.ID, contracts.PatchComicBookRequest{Tags: &secondTags}); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := store.ListComicBooks(ctx, contracts.ListComicBooksRequest{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 2 || len(page.Items) != 2 {
+		t.Fatalf("list = %+v, want two books", page)
+	}
+	byID := map[string][]string{}
+	for _, item := range page.Items {
+		byID[item.ID] = item.Tags
+	}
+	if len(byID[first.ID]) != 2 || byID[first.ID][0] != "color" || byID[first.ID][1] != "作者:alice" {
+		t.Fatalf("first tags = %#v", byID[first.ID])
+	}
+	if len(byID[second.ID]) != 1 || byID[second.ID][0] != "mono" {
+		t.Fatalf("second tags = %#v", byID[second.ID])
+	}
+}
+
+// TestComicDisplayTitleSurvivesRescan 确认 user_title 覆盖在重扫更新来源标题后仍保留。
+func TestComicDisplayTitleSurvivesRescan(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	root := t.TempDir()
+	store := newComicRepositoryTestStore(t, root)
+	location := filepath.Join(root, "comics", "Sample 01.cbz")
+	book, err := store.UpsertComicBook(ctx, ComicBookUpsert{
+		Location:       location,
+		SourceFileName: "Sample 01.cbz",
+		Title:          "Sample 01",
+		PageCount:      1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	patched, err := store.PatchComicBook(ctx, book.ID, contracts.PatchComicBookRequest{Title: stringPtr("展示标题")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if patched.Title != "展示标题" {
+		t.Fatalf("patched title = %q", patched.Title)
+	}
+	rescanned, err := store.UpsertComicBook(ctx, ComicBookUpsert{
+		Location:       location,
+		SourceFileName: "Sample 01.cbz",
+		Title:          "Renamed From File",
+		PageCount:      1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rescanned.ID != book.ID || rescanned.Title != "展示标题" {
+		t.Fatalf("rescanned = %+v, want overlay kept", rescanned)
+	}
+	page, err := store.ListComicBooks(ctx, contracts.ListComicBooksRequest{Query: "展示", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Items[0].Title != "展示标题" {
+		t.Fatalf("search overlay = %+v", page)
+	}
+	if _, err := store.PatchComicBook(ctx, book.ID, contracts.PatchComicBookRequest{Title: stringPtr("")}); err == nil {
+		t.Fatal("expected empty title to fail")
+	}
+}
+
 func newComicRepositoryTestStore(t *testing.T, root string) *SQLiteStore {
 	t.Helper()
 

@@ -161,6 +161,9 @@ function createPhotoServiceMock(
     patchPhotoViewer: vi.fn().mockResolvedValue(undefined),
     patchPhotoCache: vi.fn().mockResolvedValue(undefined),
     loadPhotoDetail: vi.fn().mockResolvedValue(undefined),
+    getPhotoComment: vi.fn(),
+    putPhotoComment: vi.fn(),
+    patchPhoto: vi.fn().mockResolvedValue(undefined),
     scanPhotos: vi.fn().mockResolvedValue(null),
     ...overrides,
   } as TestPhotoService

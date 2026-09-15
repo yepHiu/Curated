@@ -54,3 +54,9 @@ export interface PhotoViewerSettings {
 export interface PhotoCacheSettings {
   maxBytes: number
 }
+
+/** 写真本地评分与展示标题补丁；`rating: null` 表示清除为未评。 */
+export interface PhotoPatch {
+  title?: string
+  rating?: number | null
+}

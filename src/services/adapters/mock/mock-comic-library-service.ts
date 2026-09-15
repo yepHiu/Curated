@@ -5,6 +5,7 @@ import type {
   LibraryPathStorageStatusDTO,
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
+  PutBookCommentBody,
   PutComicReadingPreferencesBody,
   TaskDTO,
 } from "@/api/types"
@@ -22,6 +23,12 @@ import {
   upsertMockComicPrefs,
 } from "@/lib/mock-comic-prefs-storage"
 import type { ComicLibraryService } from "@/services/contracts/comic-library-service"
+import {
+  MOCK_COMIC_COMMENTS_KEY,
+  getLocalBookComment,
+  putLocalBookComment,
+  removeLocalBookComment,
+} from "@/lib/book-comment-local-storage"
 
 function mockHttpError(status: number, code: string, message = code): HttpClientError {
   return new HttpClientError(status, {
@@ -164,6 +171,7 @@ function patchComicInMemory(comicId: string, patch: ComicPatch): ComicBook | und
     favorite: next.isFavorite,
     rating: next.rating,
     tags: next.tags,
+    title: next.title,
   })
   return next
 }
@@ -215,6 +223,9 @@ export const mockComicLibraryService: ComicLibraryService = {
   async refreshSettings() {
     // Mock settings are local state only.
   },
+
+  /** Mock 列表已在内存中，暖页短路无需请求。 */
+  async ensureComicsLoaded() {},
 
   async checkComicLibraryPathStorageStatus(libraryPathIds?: string[]) {
     const selected = new Set(libraryPathIds?.map((id) => id.trim()).filter(Boolean) ?? [])
@@ -332,6 +343,7 @@ export const mockComicLibraryService: ComicLibraryService = {
   async deleteComic(comicId: string) {
     const id = comicId.trim()
     comicsState.value = comicsState.value.filter((comic) => comic.id !== id)
+    removeLocalBookComment(MOCK_COMIC_COMMENTS_KEY, id)
   },
 
   async revealComicSource() {
@@ -384,27 +396,35 @@ export const mockComicLibraryService: ComicLibraryService = {
       throw mockHttpError(404, "MOCK_COMIC_NOT_FOUND", "comic not found")
     }
     const merged = {
-      ...comicReaderMock.value,
-      ...preferencesForComic(comic.id),
-      ...prefs,
-      comicId: undefined,
-      updatedAt: nowISO(),
+      mode: prefs.mode ?? preferencesForComic(comic.id).mode,
+      fit: prefs.fit ?? preferencesForComic(comic.id).fit,
+      direction: prefs.direction ?? preferencesForComic(comic.id).direction,
     }
     upsertMockComicPrefs(comic.id, {
       preferences: {
-        mode: merged.mode,
-        fit: merged.fit,
-        direction: merged.direction,
-        updatedAt: merged.updatedAt,
+        ...merged,
+        updatedAt: nowISO(),
       },
     })
-    return {
-      comicId: comic.id,
-      mode: merged.mode,
-      fit: merged.fit,
-      direction: merged.direction,
-      updatedAt: merged.updatedAt,
+    return preferencesForComic(comic.id)
+  },
+
+  /** Mock 读取一本漫画的本地备注。 */
+  async getComicComment(comicId: string) {
+    const comic = this.getComicById(comicId)
+    if (!comic) {
+      throw mockHttpError(404, "MOCK_COMIC_NOT_FOUND", "comic not found")
     }
+    return getLocalBookComment(MOCK_COMIC_COMMENTS_KEY, comic.id)
+  },
+
+  /** Mock 覆盖保存一本漫画的本地备注。 */
+  async putComicComment(comicId: string, body: PutBookCommentBody) {
+    const comic = this.getComicById(comicId)
+    if (!comic) {
+      throw mockHttpError(404, "MOCK_COMIC_NOT_FOUND", "comic not found")
+    }
+    return putLocalBookComment(MOCK_COMIC_COMMENTS_KEY, comic.id, body.body.trim())
   },
 
   async getComicCacheStatus(): Promise<ComicCacheStatusDTO> {

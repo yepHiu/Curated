@@ -442,6 +442,12 @@ type ActorMergeAuditListDTO struct {
 // MaxMovieCommentRunes is the maximum length (Unicode scalars) for PUT /library/movies/{id}/comment body.
 const MaxMovieCommentRunes = 10000
 
+// MaxBookCommentRunes is the Unicode scalar limit for comic and photo personal notes.
+const MaxBookCommentRunes = MaxMovieCommentRunes
+
+// MaxBookTitleRunes is the Unicode scalar limit for comic and photo display titles.
+const MaxBookTitleRunes = 500
+
 // MovieCommentDTO is returned by GET /api/library/movies/{movieId}/comment (empty body when none saved).
 type MovieCommentDTO struct {
 	Body      string `json:"body"`
@@ -1029,11 +1035,15 @@ type AIChatContext struct {
 	ContextVersion   int                  `json:"contextVersion,omitempty"`
 	Route            string               `json:"route,omitempty"`
 	MovieID          string               `json:"movieId,omitempty"`
+	ComicID          string               `json:"comicId,omitempty"`
+	PhotoID          string               `json:"photoId,omitempty"`
 	ActorName        string               `json:"actorName,omitempty"`
 	Query            string               `json:"query,omitempty"`
 	Mentions         []AIChatMention      `json:"mentions,omitempty"`
 	SelectedMovieIDs []string             `json:"selectedMovieIds,omitempty"`
 	SelectedActors   []string             `json:"selectedActors,omitempty"`
+	SelectedComicIDs []string             `json:"selectedComicIds,omitempty"`
+	SelectedPhotoIDs []string             `json:"selectedPhotoIds,omitempty"`
 	ActiveFilters    *AIChatActiveFilters `json:"activeFilters,omitempty"`
 }
 
@@ -1048,11 +1058,13 @@ type AIChatMention struct {
 // view that can be shown to the model as one-turn context. It is not a saved
 // view and must not gain navigation-only fields.
 type AIChatActiveFilters struct {
-	Query     string `json:"query,omitempty"`
-	Tag       string `json:"tag,omitempty"`
-	Actor     string `json:"actor,omitempty"`
-	PlayState string `json:"playState,omitempty"`
-	Runtime   string `json:"runtime,omitempty"`
+	Query      string `json:"query,omitempty"`
+	Tag        string `json:"tag,omitempty"`
+	Actor      string `json:"actor,omitempty"`
+	PlayState  string `json:"playState,omitempty"`
+	Runtime    string `json:"runtime,omitempty"`
+	Favorite   *bool  `json:"favorite,omitempty"`
+	ReadStatus string `json:"readStatus,omitempty"`
 }
 
 // AIChatSessionDTO is one persisted agent conversation.
@@ -1094,6 +1106,16 @@ type AIAgentMovieCardDTO struct {
 	CoverURL string   `json:"coverUrl,omitempty"`
 	ThumbURL string   `json:"thumbUrl,omitempty"`
 	Reason   string   `json:"reason,omitempty"`
+}
+
+// AIAgentBookCardDTO is a chat-ui projection of a comic or photo book already retrieved this turn.
+type AIAgentBookCardDTO struct {
+	Kind     string   `json:"kind"`
+	ComicID  string   `json:"comicId,omitempty"`
+	PhotoID  string   `json:"photoId,omitempty"`
+	Title    string   `json:"title,omitempty"`
+	CoverURL string   `json:"coverUrl,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
 }
 
 // AIAgentProviderTitleDTO is a provider-search row reconciled against the
@@ -1160,6 +1182,8 @@ type AIConfirmChangeDTO struct {
 // AIActionRequest is the body for POST /api/ai/actions/{name}.
 type AIActionRequest struct {
 	MovieID      string `json:"movieId,omitempty"`
+	ComicID      string `json:"comicId,omitempty"`
+	PhotoID      string `json:"photoId,omitempty"`
 	Body         string `json:"body,omitempty"`
 	Locale       string `json:"locale,omitempty"`
 	TargetLocale string `json:"targetLocale,omitempty"`
@@ -1229,6 +1253,7 @@ type AIChatSSEEvent struct {
 	Summary        string                    `json:"summary,omitempty"`
 	Truncated      bool                      `json:"truncated,omitempty"`
 	Movies         []AIAgentMovieCardDTO     `json:"movies,omitempty"`
+	Books          []AIAgentBookCardDTO      `json:"books,omitempty"`
 	ProviderRows   []AIAgentProviderTitleDTO `json:"providerRows,omitempty"`
 	Resolution     *AIEntityResolutionDTO    `json:"resolution,omitempty"`
 	Evidence       *AIEvidenceDTO            `json:"evidence,omitempty"`

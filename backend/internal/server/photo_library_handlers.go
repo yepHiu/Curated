@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime"
@@ -69,6 +70,37 @@ func (h *Handler) handleGetPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	detail, ok := h.loadPhotoDetailForRequest(w, r)
 	if !ok {
+		return
+	}
+	h.enrichPhotoDetailURLs(&detail)
+	writeJSON(w, http.StatusOK, detail)
+}
+
+// handlePatchPhoto updates writable photo-book fields such as the display title overlay and local rating.
+func (h *Handler) handlePatchPhoto(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
+		return
+	}
+	if !h.requirePhotoLibraryEnabled(w) {
+		return
+	}
+	photoID := strings.TrimSpace(r.PathValue("photoId"))
+	var body contracts.PatchPhotoBookRequest
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+	detail, err := h.store.PatchPhotoBook(r.Context(), photoID, body)
+	if err != nil {
+		if errors.Is(err, storage.ErrPhotoBookNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodePhotoBookNotFound, "photo not found")
+			return
+		}
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, err.Error())
 		return
 	}
 	h.enrichPhotoDetailURLs(&detail)

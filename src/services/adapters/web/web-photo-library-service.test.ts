@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { SettingsDTO } from "@/api/types"
+import type { PhotoBookListItemDTO, SettingsDTO } from "@/api/types"
 
 const photoApiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -11,12 +11,34 @@ const photoApiMocks = vi.hoisted(() => ({
   listPhotos: vi.fn(),
   getPhoto: vi.fn(),
   replacePhotoTags: vi.fn(),
+  patchPhoto: vi.fn(),
+  getPhotoComment: vi.fn(),
+  putPhotoComment: vi.fn(),
   importPhotos: vi.fn(),
 }))
 
 vi.mock("@/api/photo-endpoints", () => ({
   photoApi: photoApiMocks,
 }))
+
+/** 构造写真列表 DTO，供分页与暖页测试复用。 */
+function photoListItem(id: string, overrides: Partial<PhotoBookListItemDTO> = {}): PhotoBookListItemDTO {
+  return {
+    id,
+    title: `Photo ${id}`,
+    tags: [],
+    rating: null,
+    isFavorite: false,
+    pageCount: 1,
+    currentPageIndex: 0,
+    coverUrl: `/api/library/photos/books/${id}/pages/0/thumbnail`,
+    sourceFileName: `${id}.cbz`,
+    location: `D:/Photos/${id}.cbz`,
+    addedAt: "2026-07-05",
+    updatedAt: "2026-07-05T00:00:00Z",
+    ...overrides,
+  }
+}
 
 function settingsDto(overrides: Partial<SettingsDTO> = {}): SettingsDTO {
   return {
@@ -90,6 +112,63 @@ describe("webPhotoLibraryService", () => {
     photoApiMocks.replacePhotoTags.mockRejectedValueOnce(new Error('Save failed'))
     await expect(service.replacePhotoTags('photo-1', ['new'])).rejects.toThrow('Save failed')
     expect(service.getPhotoById('photo-1')!.tags).toEqual(['landscape'])
+  })
+
+  it("reads and saves photo comments through the photo book endpoint", async () => {
+    const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+    photoApiMocks.getPhotoComment.mockResolvedValueOnce({ body: "note", updatedAt: "t" })
+    photoApiMocks.putPhotoComment.mockResolvedValueOnce({ body: "saved", updatedAt: "t2" })
+    await expect(service.getPhotoComment(" photo-1 ")).resolves.toEqual({ body: "note", updatedAt: "t" })
+    await expect(service.putPhotoComment(" photo-1 ", { body: "saved" })).resolves.toEqual({
+      body: "saved",
+      updatedAt: "t2",
+    })
+    expect(photoApiMocks.getPhotoComment).toHaveBeenCalledWith("photo-1")
+    expect(photoApiMocks.putPhotoComment).toHaveBeenCalledWith("photo-1", { body: "saved" })
+  })
+
+  it("patches a photo rating through the photo book endpoint and updates the cache", async () => {
+    const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+    photoApiMocks.listPhotos.mockResolvedValueOnce({
+      items: [photoListItem("photo-1")],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+    await service.reloadPhotosFromApi()
+    photoApiMocks.patchPhoto.mockResolvedValueOnce({
+      ...photoListItem("photo-1", { rating: 3.5 }),
+      pages: [],
+    })
+    await expect(service.patchPhoto(" photo-1 ", { rating: 3.5 })).resolves.toMatchObject({
+      id: "photo-1",
+      rating: 3.5,
+    })
+    expect(photoApiMocks.patchPhoto).toHaveBeenCalledWith("photo-1", {
+      ratingSet: true,
+      rating: 3.5,
+    })
+    expect(service.getPhotoById("photo-1")?.rating).toBe(3.5)
+    photoApiMocks.patchPhoto.mockResolvedValueOnce({
+      ...photoListItem("photo-1", { title: "展示写真" }),
+      pages: [],
+    })
+    await expect(service.patchPhoto("photo-1", { title: "展示写真" })).resolves.toMatchObject({
+      id: "photo-1",
+      title: "展示写真",
+    })
+    expect(photoApiMocks.patchPhoto).toHaveBeenLastCalledWith("photo-1", {
+      title: "展示写真",
+    })
+    photoApiMocks.patchPhoto.mockResolvedValueOnce({
+      ...photoListItem("photo-1", { rating: null }),
+      pages: [],
+    })
+    await service.patchPhoto("photo-1", { rating: null })
+    expect(photoApiMocks.patchPhoto).toHaveBeenLastCalledWith("photo-1", {
+      ratingSet: true,
+      ratingClear: true,
+    })
   })
   it("rejects disabled photo uploads and delegates enabled ones", async () => {
     const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
@@ -240,7 +319,7 @@ describe("webPhotoLibraryService", () => {
     const { webPhotoLibraryService } = await import("./web-photo-library-service")
     await webPhotoLibraryService.reloadPhotosFromApi({ q: "Photo", limit: 50 })
 
-    expect(photoApiMocks.listPhotos).toHaveBeenCalledWith({ q: "Photo", limit: 50 })
+    expect(photoApiMocks.listPhotos).toHaveBeenCalledWith({ q: "Photo", limit: 50, offset: 0 })
     expect(webPhotoLibraryService.photos.value).toEqual([
       {
         id: "photo-1",
@@ -305,5 +384,48 @@ describe("webPhotoLibraryService", () => {
       direction: "rtl",
     })
     expect(webPhotoLibraryService.photoCache.value).toEqual({ maxBytes: 2048 })
+  })
+
+  it("pages through the full photo list when reload is called without an explicit limit", async () => {
+    const firstPage = Array.from({ length: 500 }, (_, index) => photoListItem(`photo-${index + 1}`))
+    const secondPage = Array.from({ length: 100 }, (_, index) => photoListItem(`photo-${index + 501}`))
+    photoApiMocks.listPhotos
+      .mockResolvedValueOnce({
+        items: firstPage,
+        total: 600,
+        limit: 500,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        items: secondPage,
+        total: 600,
+        limit: 500,
+        offset: 500,
+      })
+
+    const { webPhotoLibraryService } = await import("./web-photo-library-service")
+    await webPhotoLibraryService.reloadPhotosFromApi()
+
+    expect(photoApiMocks.listPhotos).toHaveBeenCalledTimes(2)
+    expect(photoApiMocks.listPhotos).toHaveBeenNthCalledWith(1, { limit: 500, offset: 0 })
+    expect(photoApiMocks.listPhotos).toHaveBeenNthCalledWith(2, { limit: 500, offset: 500 })
+    expect(webPhotoLibraryService.photos.value).toHaveLength(600)
+  })
+
+  it("skips settings and list requests when the photo library is already warm", async () => {
+    photoApiMocks.getSettings.mockResolvedValue(settingsDto())
+    photoApiMocks.listPhotos.mockResolvedValue({
+      items: [photoListItem("photo-1")],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    })
+
+    const { webPhotoLibraryService } = await import("./web-photo-library-service")
+    await webPhotoLibraryService.ensurePhotosLoaded()
+    await webPhotoLibraryService.ensurePhotosLoaded()
+
+    expect(photoApiMocks.getSettings).toHaveBeenCalledTimes(1)
+    expect(photoApiMocks.listPhotos).toHaveBeenCalledTimes(1)
   })
 })

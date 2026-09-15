@@ -172,6 +172,8 @@ function createComicServiceMock(
     resetComicProgress: vi.fn(),
     getComicPreferences: vi.fn(),
     saveComicPreferences: vi.fn(),
+    getComicComment: vi.fn(),
+    putComicComment: vi.fn(),
     getComicCacheStatus: vi.fn().mockResolvedValue({
       maxBytes: 2 * 1024 * 1024 * 1024,
       usedBytes: 0,

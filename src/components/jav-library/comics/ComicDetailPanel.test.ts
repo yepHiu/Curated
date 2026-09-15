@@ -5,9 +5,14 @@ import ComicDetailPanel from "./ComicDetailPanel.vue"
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
+    locale: { value: "zh-CN" },
     t: (key: string, values?: Record<string, unknown>) =>
       values ? `${key}:${JSON.stringify(values)}` : key,
   }),
+}))
+
+vi.mock("@/services/ai-service", () => ({
+  useAIService: () => ({ runAction: vi.fn(), confirmTool: vi.fn() }),
 }))
 
 vi.mock("@/components/ui/badge", () => ({
@@ -107,6 +112,16 @@ vi.mock("@/components/ui/input", () => ({
   },
 }))
 
+vi.mock("@/components/jav-library/books/BookRatingCard.vue", () => ({
+  default: {
+    name: "BookRatingCard",
+    props: ["rating", "disabled"],
+    emits: ["commit"],
+    template:
+      '<section data-comic-detail-rating-card data-book-rating-card><button data-commit-rating type="button" @click="$emit(\'commit\', 3.5)" /><button data-clear-rating type="button" @click="$emit(\'commit\', null)" /></section>',
+  },
+}))
+
 function makeComic(overrides: Partial<ComicBook> = {}): ComicBook {
   return {
     id: "comic-detail-1",
@@ -140,7 +155,13 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.get("[data-comic-detail-cover]").attributes("src")).toBe(
       "https://example.com/detail-cover.jpg",
     )
-    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(true)
+    expect(
+      wrapper.get("[data-comic-detail-info-column]").find("[data-comic-detail-rating-card]").exists(),
+    ).toBe(true)
+    expect(
+      wrapper.get("[data-comic-detail-media-column]").find("[data-comic-detail-rating-card]").exists(),
+    ).toBe(false)
     expect(wrapper.find("[data-comic-more-actions]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-edit-action]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-reveal-source]").exists()).toBe(true)
@@ -153,14 +174,28 @@ describe("ComicDetailPanel", () => {
     expect(wrapper.find("[data-comic-save]").exists()).toBe(false)
   })
 
-  it("omits the cover metadata card with rating, progress, and favorite state", () => {
+  it("emits a comic patch when the rating card commits or clears a score", async () => {
+    // 标签下方的评分卡把半星和清除都走通用 patch。
+    const wrapper = mount(ComicDetailPanel, {
+      props: {
+        comic: makeComic({ rating: 3 }),
+      },
+    })
+    await wrapper.get("[data-commit-rating]").trigger("click")
+    await wrapper.get("[data-clear-rating]").trigger("click")
+    const patches = wrapper.emitted("patch") ?? []
+    expect(patches[0]?.[0]).toEqual({ rating: 3.5 })
+    expect(patches[1]?.[0]).toEqual({ rating: null })
+  })
+
+  it("omits the cover metadata card with progress and favorite state", () => {
     const wrapper = mount(ComicDetailPanel, {
       props: {
         comic: makeComic({ rating: null, pageCount: 32, currentPageIndex: 0 }),
       },
     })
 
-    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-detail-rating-card]").exists()).toBe(true)
     expect(wrapper.text()).not.toContain("comics.detailRatingLabel")
     expect(wrapper.text()).not.toContain("comics.noRating")
     expect(wrapper.text()).not.toContain("comics.pageCount")
@@ -331,5 +366,17 @@ describe("ComicDetailPanel", () => {
       expect.arrayContaining(["pr-12", "text-2xl", "sm:pr-14", "sm:text-3xl"]),
     )
     expect(wrapper.get("[data-comic-detail-title]").classes()).toContain("sm:text-3xl")
+    // 评分卡跟在标签后面，不跟在封面下面。
+    const info = wrapper.get("[data-comic-detail-info-column]")
+    const rating = info.get("[data-comic-detail-rating-card]")
+    expect(
+      wrapper.get("[data-comic-detail-media-column]").find("[data-comic-detail-rating-card]").exists(),
+    ).toBe(false)
+    expect(
+      Boolean(
+        info.get("[data-comic-detail-tags]").element.compareDocumentPosition(rating.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true)
   })
 })

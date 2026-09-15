@@ -113,15 +113,19 @@ describe("comicApi", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ comicId: "comic-1", pageIndex: 1, completed: false })
       .mockResolvedValueOnce({ comicId: "comic-1", mode: "scroll", fit: "width", direction: "rtl" })
+      .mockResolvedValueOnce({ body: "note", updatedAt: "t" })
     put
       .mockResolvedValueOnce({ comicId: "comic-1", pageIndex: 2, completed: false })
       .mockResolvedValueOnce({ comicId: "comic-1", mode: "page", fit: "contain", direction: "rtl" })
+      .mockResolvedValueOnce({ body: "note", updatedAt: "t2" })
 
     await comicApi.listComicPages("comic-1")
     await comicApi.getComicProgress("comic-1")
     await comicApi.putComicProgress("comic-1", { pageIndex: 2, completed: false })
     await comicApi.getComicPreferences("comic-1")
     await comicApi.putComicPreferences("comic-1", { mode: "page", fit: "contain", direction: "rtl" })
+    await comicApi.getComicComment("comic-1")
+    await comicApi.putComicComment("comic-1", { body: "note" })
 
     expect(get).toHaveBeenNthCalledWith(1, "/library/comics/books/comic-1/pages")
     expect(get).toHaveBeenNthCalledWith(2, "/library/comics/books/comic-1/progress")
@@ -134,6 +138,10 @@ describe("comicApi", () => {
       mode: "page",
       fit: "contain",
       direction: "rtl",
+    })
+    expect(get).toHaveBeenNthCalledWith(4, "/library/comics/books/comic-1/comment")
+    expect(put).toHaveBeenNthCalledWith(3, "/library/comics/books/comic-1/comment", {
+      body: "note",
     })
   })
 

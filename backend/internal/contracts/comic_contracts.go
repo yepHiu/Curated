@@ -94,6 +94,8 @@ type PatchComicBookRequest struct {
 	RatingSet   bool      `json:"ratingSet,omitempty"`
 	RatingClear bool      `json:"ratingClear,omitempty"`
 	Rating      *float64  `json:"rating,omitempty"`
+	// ExpectedTitle is the display title observed in an Agent preview; HTTP clients omit it.
+	ExpectedTitle *string `json:"-"`
 }
 
 type PutComicProgressRequest struct {
@@ -120,6 +122,17 @@ type ComicReadingPreferencesDTO struct {
 	Fit       string `json:"fit"`
 	Direction string `json:"direction"`
 	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+// ComicCommentDTO is the personal note for one comic book.
+type ComicCommentDTO struct {
+	Body      string `json:"body"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// PutComicCommentRequest is the JSON body for PUT /api/library/comics/books/{comicId}/comment.
+type PutComicCommentRequest struct {
+	Body string `json:"body"`
 }
 
 type ComicCacheEntryDTO struct {

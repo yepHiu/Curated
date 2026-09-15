@@ -2,12 +2,15 @@ import { httpClient } from "./http-client"
 import type {
   AddPhotoLibraryPathBody,
   AddPhotoLibraryPathResultDTO,
+  BookCommentDTO,
   ListPhotoBooksParams,
   PatchPhotoSettingsBody,
   PhotoBookDetailDTO,
   PhotoBooksPageDTO,
   PhotoLibraryPathDTO,
   PhotoImportUploadProgress,
+  PatchPhotoBookBody,
+  PutBookCommentBody,
   SettingsDTO,
   StartScanBody,
   TaskDTO,
@@ -79,7 +82,27 @@ export const photoApi = {
     return httpClient.get<PhotoBookDetailDTO>(`/library/photos/${encodeURIComponent(id)}`)
   },
 
+  /** 更新一本写真的可写字段，目前用于本地评分。 */
+  patchPhoto(id: string, body: PatchPhotoBookBody): Promise<PhotoBookDetailDTO> {
+    return httpClient.patch<PhotoBookDetailDTO>(`/library/photos/${encodeURIComponent(id)}`, body)
+  },
+
   replacePhotoTags(id: string, tags: string[]): Promise<PhotoBookDetailDTO> {
     return httpClient.patch<PhotoBookDetailDTO>(`/library/photos/books/${encodeURIComponent(id)}/tags`, { tags })
+  },
+
+  /** 读取一本写真的个人备注；尚未保存时返回空正文。 */
+  getPhotoComment(id: string): Promise<BookCommentDTO> {
+    return httpClient.get<BookCommentDTO>(
+      `/library/photos/books/${encodeURIComponent(id)}/comment`,
+    )
+  },
+
+  /** 覆盖保存一本写真的个人备注。 */
+  putPhotoComment(id: string, body: PutBookCommentBody): Promise<BookCommentDTO> {
+    return httpClient.put<BookCommentDTO>(
+      `/library/photos/books/${encodeURIComponent(id)}/comment`,
+      body,
+    )
   },
 }

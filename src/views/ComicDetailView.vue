@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import ComicDetailPanel from "@/components/jav-library/comics/ComicDetailPanel.vue"
 import ComicPagePreviewGrid from "@/components/jav-library/comics/ComicPagePreviewGrid.vue"
+import BookCommentSection from "@/components/jav-library/books/BookCommentSection.vue"
 import type { ComicBook, ComicPatch } from "@/domain/comic/types"
 import { buildComicReaderRouteFromSource } from "@/lib/navigation-intent"
 import { useComicLibraryService } from "@/services/comic-library-service"
@@ -48,6 +49,7 @@ watch(
   { immediate: true },
 )
 
+/** 把详情面板的元数据补丁写入当前漫画，含本地评分。 */
 async function patchComic(patch: ComicPatch, done?: (err?: unknown) => void) {
   const id = detailComic.value?.id
   if (!id) return
@@ -64,6 +66,20 @@ async function patchComic(patch: ComicPatch, done?: (err?: unknown) => void) {
     done?.(error)
   } finally {
     patchBusy.value = false
+  }
+}
+
+/** 翻译确认后重新读取当前漫画，避免草稿覆盖后续写入。 */
+async function reloadComic() {
+  const id = detailComic.value?.id
+  if (!id) return
+  try {
+    const loaded = await comicService.loadComicDetail(id)
+    if (loaded && detailComic.value?.id === loaded.id) {
+      detailComic.value = loaded
+    }
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("comics.detailLoadError")
   }
 }
 
@@ -99,12 +115,13 @@ function openReader(pageIndex: number) {
   void router.push(buildComicReaderRouteFromSource(id, pageIndex, route.fullPath))
 }
 
+/** 详情标签走精确 tag=，避免把标签字面量当成墙面子串搜索。 */
 function browseByTag(payload: { tag: string }) {
-  const q = payload.tag.trim()
-  if (!q) return
+  const tag = payload.tag.trim()
+  if (!tag) return
   void router.push({
     name: "comics",
-    query: { q },
+    query: { tag },
   })
 }
 </script>
@@ -134,11 +151,17 @@ function browseByTag(payload: { tag: string }) {
           @delete-comic="deleteComic"
           @reveal-source="revealSource"
           @browse-by-tag="browseByTag"
+          @reload="reloadComic"
         />
 
         <ComicPagePreviewGrid
           :comic="detailComic"
           @open-reader="openReader"
+        />
+
+        <BookCommentSection
+          kind="comics"
+          :entity-id="detailComic.id"
         />
       </div>
     </template>

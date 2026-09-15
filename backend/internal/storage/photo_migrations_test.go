@@ -15,6 +15,8 @@ func TestPhotoLibraryMigrationCreatesTables(t *testing.T) {
 	assertPhotoTableExists(t, store.db, "photo_books")
 	assertPhotoTableExists(t, store.db, "photo_pages")
 	assertPhotoTableExists(t, store.db, "photo_book_tags")
+	assertPhotoTableExists(t, store.db, "photo_book_comments")
+	assertPhotoColumnExists(t, store.db, "photo_books", "user_title")
 }
 
 func openPhotoMigrationTestStore(t *testing.T) *SQLiteStore {
@@ -46,4 +48,27 @@ func assertPhotoTableExists(t *testing.T, db *sql.DB, table string) {
 	if name != table {
 		t.Fatalf("sqlite_master returned table %q, want %q", name, table)
 	}
+}
+
+// assertPhotoColumnExists 确认迁移后指定写真表列存在。
+func assertPhotoColumnExists(t *testing.T, db *sql.DB, table, column string) {
+	t.Helper()
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		t.Fatalf("pragma table_info %s: %v", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info: %v", err)
+		}
+		if name == column {
+			return
+		}
+	}
+	t.Fatalf("column %s.%s should exist after migrations", table, column)
 }

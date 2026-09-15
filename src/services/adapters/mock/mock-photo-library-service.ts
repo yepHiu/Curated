@@ -1,12 +1,18 @@
 import { computed, ref } from "vue"
-import type { TaskDTO } from "@/api/types"
+import type { PutBookCommentBody, TaskDTO } from "@/api/types"
 import type { PhotoLibraryService } from "@/services/contracts/photo-library-service"
 import type {
   PhotoCacheSettings,
   PhotoBook,
   PhotoLibrarySetting,
+  PhotoPatch,
   PhotoViewerSettings,
 } from "@/domain/photo/types"
+import {
+  MOCK_PHOTO_COMMENTS_KEY,
+  getLocalBookComment,
+  putLocalBookComment,
+} from "@/lib/book-comment-local-storage"
 
 function samplePages(photoId: string, count: number) {
   return Array.from({ length: count }, (_, index) => {
@@ -81,6 +87,61 @@ try {
   }
 } catch { /* Missing or invalid local preferences leave the sample tags intact. */ }
 
+const photoRatingsStorageKey = "curated-mock-photo-ratings-v1"
+const photoTitlesStorageKey = "curated-mock-photo-titles-v1"
+
+/** 从 localStorage 读出写真评分覆盖。 */
+function readMockPhotoRatings(): Record<string, number | null> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(photoRatingsStorageKey) ?? "{}")
+    if (!saved || typeof saved !== "object") return {}
+    const out: Record<string, number | null> = {}
+    for (const [id, value] of Object.entries(saved as Record<string, unknown>)) {
+      if (value === null) {
+        out[id] = null
+        continue
+      }
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 5) {
+        out[id] = value
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+const savedRatings = readMockPhotoRatings()
+for (const photo of photosState.value) {
+  if (Object.prototype.hasOwnProperty.call(savedRatings, photo.id)) {
+    photo.rating = savedRatings[photo.id] ?? null
+  }
+}
+
+/** 从 localStorage 读出写真展示标题覆盖。 */
+function readMockPhotoTitles(): Record<string, string> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(photoTitlesStorageKey) ?? "{}")
+    if (!saved || typeof saved !== "object") return {}
+    const out: Record<string, string> = {}
+    for (const [id, value] of Object.entries(saved as Record<string, unknown>)) {
+      if (typeof value === "string" && value.trim()) {
+        out[id] = value.trim()
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+const savedTitles = readMockPhotoTitles()
+for (const photo of photosState.value) {
+  if (savedTitles[photo.id]) {
+    photo.title = savedTitles[photo.id]
+  }
+}
+
 export const mockPhotoLibraryService: PhotoLibraryService = {
   /** Mock acknowledges an upload without copying files to the local filesystem. */
   async importPhotos(files, options) {
@@ -100,6 +161,8 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
   photoViewer: computed(() => photoViewer.value),
   photoCache: computed(() => photoCache.value),
   async refreshSettings() {},
+  /** Mock 列表已在内存中，暖页短路无需请求。 */
+  async ensurePhotosLoaded() {},
   async setPhotoLibraryEnabled(value: boolean) {
     photoLibraryEnabled.value = value
   },
@@ -164,6 +227,46 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
     const updated = { ...photo, tags, updatedAt: new Date().toISOString() }
     photosState.value = photosState.value.map(item => item.id === photo.id ? updated : item)
     return updated
+  },
+  /** Mock 更新一本写真的本地评分或展示标题并写入 localStorage。 */
+  async patchPhoto(photoId: string, patch: PhotoPatch) {
+    const photo = photosState.value.find((item) => item.id === photoId.trim())
+    if (!photo) throw new Error("Photo not found")
+    if (patch.title !== undefined && !patch.title.trim()) {
+      throw new Error("title is required")
+    }
+    if (patch.rating !== undefined && patch.rating !== null && (patch.rating < 0 || patch.rating > 5)) {
+      throw new Error("Photo rating must be between 0 and 5")
+    }
+    const rating = patch.rating !== undefined ? patch.rating : photo.rating
+    const title = patch.title !== undefined ? patch.title.trim() : photo.title
+    const updated = { ...photo, title, rating, updatedAt: new Date().toISOString() }
+    photosState.value = photosState.value.map((item) => (item.id === photo.id ? updated : item))
+    const saved = readMockPhotoRatings()
+    if (rating === null) {
+      saved[photo.id] = null
+    } else if (typeof rating === "number") {
+      saved[photo.id] = rating
+    }
+    localStorage.setItem(photoRatingsStorageKey, JSON.stringify(saved))
+    if (patch.title !== undefined) {
+      const titles = readMockPhotoTitles()
+      titles[photo.id] = title
+      localStorage.setItem(photoTitlesStorageKey, JSON.stringify(titles))
+    }
+    return updated
+  },
+  /** Mock 读取一本写真的本地备注。 */
+  async getPhotoComment(photoId: string) {
+    const photo = this.getPhotoById(photoId)
+    if (!photo) throw new Error("Photo not found")
+    return getLocalBookComment(MOCK_PHOTO_COMMENTS_KEY, photo.id)
+  },
+  /** Mock 覆盖保存一本写真的本地备注。 */
+  async putPhotoComment(photoId: string, body: PutBookCommentBody) {
+    const photo = this.getPhotoById(photoId)
+    if (!photo) throw new Error("Photo not found")
+    return putLocalBookComment(MOCK_PHOTO_COMMENTS_KEY, photo.id, body.body.trim())
   },
   async scanPhotos() {
     return null

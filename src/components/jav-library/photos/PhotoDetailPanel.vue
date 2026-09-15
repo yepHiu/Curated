@@ -6,12 +6,12 @@ import {
   Images,
   Info,
   MoreVertical,
-  Star,
 } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import DetailTagAddControl from "../DetailTagAddControl.vue"
 import BookDetailFacts from "@/components/jav-library/books/BookDetailFacts.vue"
 import BookMediaInfoDialog from "@/components/jav-library/books/BookMediaInfoDialog.vue"
+import BookRatingCard from "@/components/jav-library/books/BookRatingCard.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,21 +31,33 @@ const emit = defineEmits<{
   startBrowsing: [pageIndex: number]
   browseByTag: [payload: { tag: string }]
   addTag: [tag: string, done: (error?: unknown) => void]
+  updateRating: [value: number | null]
+  saveTitle: [title: string, done: (err?: unknown) => void]
+  reload: []
 }>()
 
 const { t } = useI18n()
 const mediaInfoOpen = ref(false)
 watch(() => props.photo.id, () => { mediaInfoOpen.value = false })
 
+/** 把详情页新增标签交给写真详情页写入。 */
 function addTag(tag: string, done: (error?: unknown) => void) {
   emit("addTag", tag, done)
 }
 
 const coverSrc = computed(() => props.photo.coverUrl ?? props.photo.pages?.[0]?.thumbUrl ?? "")
-const ratingLabel = computed(() =>
-  props.photo.rating == null ? t("photos.noRating") : String(props.photo.rating),
-)
 
+/** 把详情评分卡的选择交给写真详情页写入。 */
+function commitRating(value: number | null) {
+  emit("updateRating", value)
+}
+
+/** 把媒体信息弹窗里的展示标题交给详情页写入。 */
+function saveMediaTitle(title: string, done: (err?: unknown) => void) {
+  emit("saveTitle", title, done)
+}
+
+/** 点击标签后按精确标签回到写真库。 */
 function browseByTag(tag: string) {
   const value = tag.trim()
   if (!value) return
@@ -110,17 +122,6 @@ function browseByTag(tag: string) {
           </CardTitle>
         </div>
 
-        <div v-if="photo.rating != null" data-photo-detail-rating class="flex flex-wrap items-center gap-2">
-          <span class="text-sm font-medium">{{ t("photos.detailRatingLabel") }}</span>
-          <Badge
-            variant="outline"
-            class="inline-flex h-7 items-center gap-1 rounded-full border-primary/40 px-2 text-xs text-primary"
-          >
-            <Star class="size-3.5 fill-current" aria-hidden="true" />
-            {{ ratingLabel }}
-          </Badge>
-        </div>
-
         <div class="flex flex-wrap items-center gap-3">
           <Button
             type="button"
@@ -165,7 +166,12 @@ function browseByTag(tag: string) {
           </div>
         </div>
 
-
+        <BookRatingCard
+          data-photo-detail-rating
+          :rating="photo.rating"
+          :disabled="busy"
+          @commit="commitRating"
+        />
       </div>
 
       <div data-photo-more-actions-zone class="absolute right-4 top-4 sm:right-6 sm:top-6">
@@ -185,7 +191,15 @@ function browseByTag(tag: string) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <BookMediaInfoDialog v-model:open="mediaInfoOpen" :book="photo" />
+      <BookMediaInfoDialog
+        v-model:open="mediaInfoOpen"
+        kind="photos"
+        :entity-id="photo.id"
+        :book="photo"
+        :busy="busy"
+        @save-title="saveMediaTitle"
+        @applied="emit('reload')"
+      />
     </CardContent>
   </Card>
 </template>

@@ -67,7 +67,7 @@ vi.mock("@/components/jav-library/comics/ComicDetailPanel.vue", () => ({
   default: {
     name: "ComicDetailPanel",
     props: ["comic", "busy"],
-    emits: ["patch", "startReading", "deleteComic", "revealSource"],
+    emits: ["patch", "startReading", "deleteComic", "revealSource", "browseByTag"],
     methods: {
       markPatchDone(err: unknown) {
         globalThis.__comicPatchDone = err ?? null
@@ -79,7 +79,12 @@ vi.mock("@/components/jav-library/comics/ComicDetailPanel.vue", () => ({
           data-comic-patch
           @click="$emit('patch', { title: 'Edited Comic' }, markPatchDone)"
         />
+        <button
+          data-comic-patch-rating
+          @click="$emit('patch', { rating: 3.5 })"
+        />
         <button data-comic-start-reading @click="$emit('startReading', comic.currentPageIndex)" />
+        <button data-comic-browse-tag @click="$emit('browseByTag', { tag: comic.tags[0] })" />
         <button data-comic-delete @click="$emit('deleteComic', comic.id)" />
         <button data-comic-reveal @click="$emit('revealSource', comic.id)" />
       </section>
@@ -93,6 +98,14 @@ vi.mock("@/components/jav-library/comics/ComicPagePreviewGrid.vue", () => ({
     props: ["comic"],
     emits: ["openReader"],
     template: "<section data-comic-preview-stub />",
+  },
+}))
+
+vi.mock("@/components/jav-library/books/BookCommentSection.vue", () => ({
+  default: {
+    name: "BookCommentSection",
+    props: ["kind", "entityId"],
+    template: '<section data-book-comment-section :data-kind="kind" :data-entity-id="entityId" />',
   },
 }))
 
@@ -129,6 +142,12 @@ describe("ComicDetailView", () => {
     expect(wrapper.get("[data-comic-detail-panel-stub]").attributes("data-comic-id")).toBe(
       "comic-1",
     )
+    expect(wrapper.get("[data-book-comment-section]").attributes("data-kind")).toBe("comics")
+    expect(wrapper.get("[data-book-comment-section]").attributes("data-entity-id")).toBe("comic-1")
+    // 备注卡片必须排在页面预览之后。
+    expect(
+      wrapper.html().indexOf("data-comic-preview-stub"),
+    ).toBeLessThan(wrapper.html().indexOf("data-book-comment-section"))
   })
 
   it("patches comic metadata and reports callback success to the edit dialog", async () => {
@@ -142,6 +161,20 @@ describe("ComicDetailView", () => {
       title: "Edited Comic",
     } satisfies ComicPatch)
     expect(globalThis.__comicPatchDone).toBeNull()
+  })
+
+  it("saves a local comic rating through the comic service", async () => {
+    // 详情评分卡经通用 patch 通道写入本地分。
+    serviceMocks.patchComic.mockResolvedValueOnce(makeComic({ rating: 3.5 }))
+    const wrapper = mount(ComicDetailView)
+    await flushPromises()
+
+    await wrapper.get("[data-comic-patch-rating]").trigger("click")
+    await flushPromises()
+
+    expect(serviceMocks.patchComic).toHaveBeenCalledWith("comic-1", {
+      rating: 3.5,
+    } satisfies ComicPatch)
   })
 
   it("deletes a comic and replaces the route with the comic library", async () => {
@@ -165,6 +198,18 @@ describe("ComicDetailView", () => {
 
     expect(serviceMocks.revealComicSource).toHaveBeenCalledWith("comic-1")
     expect(wrapper.get('[role="alert"]').text()).toContain("reveal failed")
+  })
+
+  it("opens the comic wall filtered by the exact tag", async () => {
+    const wrapper = mount(ComicDetailView)
+    await flushPromises()
+
+    await wrapper.get("[data-comic-browse-tag]").trigger("click")
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "comics",
+      query: { tag: "author:alpha" },
+    })
   })
 
   it("opens the reader from the current page", async () => {

@@ -1,9 +1,11 @@
 import { computed, ref, shallowRef, type Ref } from "vue"
 import { photoApi } from "@/api/photo-endpoints"
 import type {
+  PatchPhotoBookBody,
   PhotoBookDetailDTO,
   PhotoBookListItemDTO,
   PhotoLibraryPathDTO,
+  PutBookCommentBody,
   SettingsDTO,
   TaskDTO,
 } from "@/api/types"
@@ -13,12 +15,16 @@ import type {
   PhotoListParams,
   PhotoLibrarySetting,
   PhotoPage,
+  PhotoPatch,
   PhotoViewerSettings,
 } from "@/domain/photo/types"
 import type { PhotoLibraryService } from "@/services/contracts/photo-library-service"
 
 const photosState: Ref<PhotoBook[]> = shallowRef([])
+const LIST_BATCH_SIZE = 500
+
 const photosLoadedState = ref(false)
+const photoSettingsHydratedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const photoLibraryEnabledState = ref(false)
 const autoPhotoLibraryWatchState = ref(true)
@@ -94,6 +100,24 @@ function formatLoadError(err: unknown, fallback: string): string {
   return fallback
 }
 
+/** 把前端写真补丁转成 PATCH body，清除评分时同时带 ratingSet。 */
+function photoPatchToBody(patch: PhotoPatch): PatchPhotoBookBody {
+  const body: PatchPhotoBookBody = {}
+  if (patch.title !== undefined) {
+    body.title = patch.title
+  }
+  if (patch.rating !== undefined) {
+    body.ratingSet = true
+    if (patch.rating === null) {
+      body.ratingClear = true
+    } else {
+      body.rating = patch.rating
+    }
+  }
+  return body
+}
+
+/** 把设置 DTO 写入写真库前端状态，并标记设置已hydrate。 */
 function applySettingsFromDTO(settings: SettingsDTO) {
   photoLibraryEnabledState.value = Boolean(settings.photoLibraryEnabled)
   autoPhotoLibraryWatchState.value = settings.autoPhotoLibraryWatch ?? true
@@ -108,10 +132,43 @@ function applySettingsFromDTO(settings: SettingsDTO) {
   photoCacheState.value = {
     maxBytes: Number(settings.photoCache?.maxBytes ?? 5 * 1024 * 1024 * 1024),
   }
+  photoSettingsHydratedState.value = true
+}
+
+/** 按 500 本一批拉完写真列表；调用方显式传 limit 时只拉一页。 */
+async function fetchPagedPhotos(params: PhotoListParams = {}): Promise<PhotoBook[]> {
+  const first = await photoApi.listPhotos({
+    ...params,
+    limit: params.limit ?? LIST_BATCH_SIZE,
+    offset: params.offset ?? 0,
+  })
+  const all = first.items.map(mapPhotoListItem)
+  photosState.value = all
+  photosLoadedState.value = true
+  loadErrorState.value = null
+
+  if (params.limit !== undefined) {
+    return all
+  }
+
+  let offset = all.length
+  while (offset < first.total) {
+    const page = await photoApi.listPhotos({
+      ...params,
+      limit: LIST_BATCH_SIZE,
+      offset,
+    })
+    const batch = page.items.map(mapPhotoListItem)
+    if (batch.length === 0) break
+    all.push(...batch)
+    photosState.value = [...all]
+    offset += batch.length
+  }
+  return all
 }
 
 function createWebPhotoLibraryService(): PhotoLibraryService {
-  return {
+  const impl: PhotoLibraryService = {
     async importPhotos(files, options) {
       if (!photoLibraryEnabledState.value) throw new Error("Photo library is disabled")
       return photoApi.importPhotos(files, options)
@@ -200,10 +257,21 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
       applySettingsFromDTO(settings)
     },
 
+    /** 设置未hydrate时先拉设置；列表已完整则跳过，否则全量分页。 */
+    async ensurePhotosLoaded() {
+      if (!photoSettingsHydratedState.value) {
+        await impl.refreshSettings()
+      }
+      if (photosLoadedState.value) {
+        return
+      }
+      await impl.reloadPhotosFromApi()
+    },
+
+    /** 强制全量（或带 limit 的单页）重拉写真列表。 */
     async reloadPhotosFromApi(params?: PhotoListParams) {
       try {
-        const page = await photoApi.listPhotos(params)
-        photosState.value = page.items.map(mapPhotoListItem)
+        photosState.value = await fetchPagedPhotos(params)
         photosLoadedState.value = true
         loadErrorState.value = null
       } catch (err) {
@@ -238,11 +306,30 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
       return detail
     },
 
+    /** 通过写真 API 更新本地评分并回写缓存。 */
+    async patchPhoto(photoId: string, patch: PhotoPatch) {
+      const detail = mapPhotoDetail(await photoApi.patchPhoto(photoId.trim(), photoPatchToBody(patch)))
+      mergePhotoIntoCache(detail)
+      return detail
+    },
+
+    /** 通过写真 API 读取个人备注。 */
+    async getPhotoComment(photoId: string) {
+      return await photoApi.getPhotoComment(photoId.trim())
+    },
+
+    /** 通过写真 API 覆盖保存个人备注。 */
+    async putPhotoComment(photoId: string, body: PutBookCommentBody) {
+      return await photoApi.putPhotoComment(photoId.trim(), body)
+    },
+
     async scanPhotos(paths?: string[]): Promise<TaskDTO | null> {
       const selected = paths?.map((path) => path.trim()).filter(Boolean) ?? []
       return await photoApi.startPhotoScan(selected.length > 0 ? { paths: selected } : undefined)
     },
   }
+
+  return impl
 }
 
 export const webPhotoLibraryService = createWebPhotoLibraryService()

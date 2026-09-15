@@ -10,9 +10,11 @@ import type {
   ComicPageDTO,
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
+  BookCommentDTO,
   ListComicBooksParams,
   PatchComicBookBody,
   PatchComicSettingsBody,
+  PutBookCommentBody,
   PutComicProgressBody,
   PutComicReadingPreferencesBody,
   SettingsDTO,
@@ -156,6 +158,21 @@ export const comicApi = {
   ): Promise<ComicReadingPreferencesDTO> {
     return httpClient.put<ComicReadingPreferencesDTO>(
       `/library/comics/books/${encodeURIComponent(id)}/preferences`,
+      body,
+    )
+  },
+
+  /** 读取一本漫画的个人备注；尚未保存时返回空正文。 */
+  getComicComment(id: string): Promise<BookCommentDTO> {
+    return httpClient.get<BookCommentDTO>(
+      `/library/comics/books/${encodeURIComponent(id)}/comment`,
+    )
+  },
+
+  /** 覆盖保存一本漫画的个人备注。 */
+  putComicComment(id: string, body: PutBookCommentBody): Promise<BookCommentDTO> {
+    return httpClient.put<BookCommentDTO>(
+      `/library/comics/books/${encodeURIComponent(id)}/comment`,
       body,
     )
   },

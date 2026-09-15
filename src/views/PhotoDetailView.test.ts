@@ -51,6 +51,7 @@ const serviceMocks = vi.hoisted(() => ({
   getPhotoById: vi.fn(),
   loadPhotoDetail: vi.fn(),
   replacePhotoTags: vi.fn(),
+  patchPhoto: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -75,6 +76,7 @@ vi.mock("@/services/photo-library-service", () => ({
     getPhotoById: serviceMocks.getPhotoById,
     loadPhotoDetail: serviceMocks.loadPhotoDetail,
     replacePhotoTags: serviceMocks.replacePhotoTags,
+    patchPhoto: serviceMocks.patchPhoto,
   }),
 }))
 
@@ -106,18 +108,15 @@ vi.mock("@/components/jav-library/photos/PhotoPagePreviewGrid.vue", () => ({
   },
 }))
 
+vi.mock("@/components/jav-library/books/BookCommentSection.vue", () => ({
+  default: {
+    name: "BookCommentSection",
+    props: ["kind", "entityId"],
+    template: '<section data-book-comment-section :data-kind="kind" :data-entity-id="entityId" />',
+  },
+}))
+
 describe("PhotoDetailView", () => {
-  it("saves tags through the photo service and updates detail state", async () => {
-    serviceMocks.replacePhotoTags.mockResolvedValueOnce(makePhoto({ tags: ['portrait', 'landscape'] }))
-    const wrapper = mount(PhotoDetailView)
-    await flushPromises()
-    const done = vi.fn()
-    wrapper.findComponent({ name: 'PhotoDetailPanel' }).vm.$emit('addTag', 'landscape', done)
-    await flushPromises()
-    expect(serviceMocks.replacePhotoTags).toHaveBeenCalledWith('photo-1', ['portrait', 'landscape'])
-    expect(wrapper.findComponent({ name: 'PhotoDetailPanel' }).props('photo').tags).toEqual(['portrait', 'landscape'])
-    expect(done).toHaveBeenCalledWith()
-  })
   beforeEach(() => {
     routerMocks.push.mockReset()
     routerMocks.route.fullPath = "/photos/photo-1"
@@ -135,6 +134,51 @@ describe("PhotoDetailView", () => {
     serviceMocks.loadPhotoDetail.mockImplementation(async (id: string) =>
       id === serviceState.photo?.id ? serviceState.photo : undefined,
     )
+    serviceMocks.replacePhotoTags.mockReset()
+    serviceMocks.patchPhoto.mockReset()
+    serviceMocks.patchPhoto.mockImplementation(async (_id: string, patch: { rating?: number | null; title?: string }) => {
+      // 把评分或标题补丁应用到当前详情夹具，供视图回写断言。
+      serviceState.photo = makePhoto({
+        ...serviceState.photo,
+        rating: patch.rating !== undefined ? patch.rating : serviceState.photo?.rating ?? null,
+        title: patch.title !== undefined ? patch.title : serviceState.photo?.title ?? "Summer Frame",
+      })
+      return serviceState.photo
+    })
+  })
+
+  it("saves tags through the photo service and updates detail state", async () => {
+    serviceMocks.replacePhotoTags.mockResolvedValueOnce(makePhoto({ tags: ['portrait', 'landscape'] }))
+    const wrapper = mount(PhotoDetailView)
+    await flushPromises()
+    const done = vi.fn()
+    wrapper.findComponent({ name: 'PhotoDetailPanel' }).vm.$emit('addTag', 'landscape', done)
+    await flushPromises()
+    expect(serviceMocks.replacePhotoTags).toHaveBeenCalledWith('photo-1', ['portrait', 'landscape'])
+    expect(wrapper.findComponent({ name: 'PhotoDetailPanel' }).props('photo').tags).toEqual(['portrait', 'landscape'])
+    expect(done).toHaveBeenCalledWith()
+  })
+
+  it("saves a local photo rating through the photo service", async () => {
+    // 详情评分卡经独立 patchPhoto 写入本地分。
+    const wrapper = mount(PhotoDetailView)
+    await flushPromises()
+    wrapper.findComponent({ name: "PhotoDetailPanel" }).vm.$emit("updateRating", 3.5)
+    await flushPromises()
+    expect(serviceMocks.patchPhoto).toHaveBeenCalledWith("photo-1", { rating: 3.5 })
+    expect(wrapper.findComponent({ name: "PhotoDetailPanel" }).props("photo").rating).toBe(3.5)
+  })
+
+  it("saves a photo display title through the photo service", async () => {
+    serviceMocks.patchPhoto.mockResolvedValueOnce(makePhoto({ title: "展示写真" }))
+    const wrapper = mount(PhotoDetailView)
+    await flushPromises()
+    const done = vi.fn()
+    wrapper.findComponent({ name: "PhotoDetailPanel" }).vm.$emit("saveTitle", "展示写真", done)
+    await flushPromises()
+    expect(serviceMocks.patchPhoto).toHaveBeenCalledWith("photo-1", { title: "展示写真" })
+    expect(wrapper.findComponent({ name: "PhotoDetailPanel" }).props("photo").title).toBe("展示写真")
+    expect(done).toHaveBeenCalledWith()
   })
 
   it("loads a photo book into the detail panel and preview grid", async () => {
@@ -147,6 +191,12 @@ describe("PhotoDetailView", () => {
     expect(serviceMocks.getPhotoById).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain("Summer Frame")
     expect(wrapper.find("[data-photo-page-preview-grid]").exists()).toBe(true)
+    expect(wrapper.get("[data-book-comment-section]").attributes("data-kind")).toBe("photos")
+    expect(wrapper.get("[data-book-comment-section]").attributes("data-entity-id")).toBe("photo-1")
+    // 备注卡片必须排在页面预览之后。
+    expect(
+      wrapper.html().indexOf("data-photo-page-preview-grid"),
+    ).toBeLessThan(wrapper.html().indexOf("data-book-comment-section"))
   })
 
   it("opens the viewer from the browse button and page preview with return intent", async () => {
@@ -176,7 +226,7 @@ describe("PhotoDetailView", () => {
 
     expect(routerMocks.push).toHaveBeenCalledWith({
       name: "photos",
-      query: { q: "portrait" },
+      query: { tag: "portrait" },
     })
   })
 })

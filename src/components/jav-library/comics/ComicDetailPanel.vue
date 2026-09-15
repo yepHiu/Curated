@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import ComicDeleteConfirmDialog from "./ComicDeleteConfirmDialog.vue"
 import ComicEditDialog from "./ComicEditDialog.vue"
+import BookRatingCard from "@/components/jav-library/books/BookRatingCard.vue"
 
 const props = defineProps<{
   comic: ComicBook
@@ -42,6 +43,7 @@ const emit = defineEmits<{
   deleteComic: [comicId: string]
   revealSource: [comicId: string]
   browseByTag: [payload: { tag: string }]
+  reload: []
 }>()
 
 const { t } = useI18n()
@@ -64,13 +66,21 @@ watch(
   },
 )
 
+/** 把漫画编辑弹窗的补丁交给详情页写入。 */
 function patchComicFromEdit(patch: ComicPatch, done: (err?: unknown) => void) {
   emit("patch", patch, done)
 }
 
+/** 把媒体信息弹窗里的展示标题交给详情页写入。 */
+function saveMediaTitle(title: string, done: (err?: unknown) => void) {
+  emit("patch", { title }, done)
+}
+
+/** 把标签补丁交给详情页写入。 */
 function patchComicTags(tags: string[]) {
   tagError.value = ""
   emit("patch", { tags }, (err?: unknown) => {
+    // 标签保存失败时在详情页就地提示。
     if (!err) return
     tagError.value =
       err instanceof Error && err.message.trim()
@@ -101,6 +111,11 @@ function revealSource() {
 
 function confirmDeleteComic() {
   emit("deleteComic", props.comic.id)
+}
+
+/** 把详情评分卡的选择写入当前漫画。 */
+function commitRating(value: number | null) {
+  emit("patch", { rating: value }, () => {})
 }
 </script>
 
@@ -216,7 +231,12 @@ function confirmDeleteComic() {
           <p v-if="tagError" class="text-sm text-destructive">{{ tagError }}</p>
         </div>
 
-
+        <BookRatingCard
+          data-comic-detail-rating-card
+          :rating="comic.rating ?? null"
+          :disabled="busy"
+          @commit="commitRating"
+        />
       </div>
 
       <div
@@ -268,7 +288,15 @@ function confirmDeleteComic() {
         </DropdownMenu>
       </div>
 
-      <BookMediaInfoDialog v-model:open="mediaInfoOpen" :book="comic" />
+      <BookMediaInfoDialog
+        v-model:open="mediaInfoOpen"
+        kind="comics"
+        :entity-id="comic.id"
+        :book="comic"
+        :busy="busy"
+        @save-title="saveMediaTitle"
+        @applied="emit('reload')"
+      />
 
       <ComicEditDialog
         v-model:open="editOpen"

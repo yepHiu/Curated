@@ -12,6 +12,23 @@ describe("photoApi", () => {
     await photoApi.replacePhotoTags('photo/1', ['portrait'])
     expect(patch).toHaveBeenCalledWith('/library/photos/books/photo%2F1/tags', { tags: ['portrait'] })
   })
+
+  it("patches a photo rating through the photo book endpoint", async () => {
+    const patch = vi.spyOn(httpClient, "patch").mockResolvedValueOnce({ rating: 3.5 })
+    await photoApi.patchPhoto("photo/1", { ratingSet: true, rating: 3.5 })
+    expect(patch).toHaveBeenCalledWith("/library/photos/photo%2F1", {
+      ratingSet: true,
+      rating: 3.5,
+    })
+  })
+
+  it("patches a photo display title through the photo book endpoint", async () => {
+    const patch = vi.spyOn(httpClient, "patch").mockResolvedValueOnce({ title: "展示写真" })
+    await photoApi.patchPhoto("photo/1", { title: "展示写真" })
+    expect(patch).toHaveBeenCalledWith("/library/photos/photo%2F1", {
+      title: "展示写真",
+    })
+  })
   it("uploads archives only to the photo import endpoint with progress", async () => {
     const upload = vi.spyOn(httpClient, "postFormWithProgress").mockResolvedValueOnce({ taskId: "photo-import" })
     const file = new File(["zip"], "Photo.zip")
@@ -144,5 +161,19 @@ describe("photoApi", () => {
       offset: undefined,
     })
     expect(get).toHaveBeenNthCalledWith(2, "/library/photos/photo-1")
+  })
+
+  it("reads and saves photo comments through the photo book endpoint", async () => {
+    const get = vi.spyOn(httpClient, "get").mockResolvedValueOnce({ body: "note", updatedAt: "t" })
+    const put = vi.spyOn(httpClient, "put").mockResolvedValueOnce({ body: "saved", updatedAt: "t2" })
+
+    await expect(photoApi.getPhotoComment("photo/1")).resolves.toEqual({ body: "note", updatedAt: "t" })
+    await expect(photoApi.putPhotoComment("photo/1", { body: "saved" })).resolves.toEqual({
+      body: "saved",
+      updatedAt: "t2",
+    })
+
+    expect(get).toHaveBeenCalledWith("/library/photos/books/photo%2F1/comment")
+    expect(put).toHaveBeenCalledWith("/library/photos/books/photo%2F1/comment", { body: "saved" })
   })
 })

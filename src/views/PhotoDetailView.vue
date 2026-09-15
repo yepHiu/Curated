@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import { useI18n } from "vue-i18n"
 import PhotoDetailPanel from "@/components/jav-library/photos/PhotoDetailPanel.vue"
 import PhotoPagePreviewGrid from "@/components/jav-library/photos/PhotoPagePreviewGrid.vue"
+import BookCommentSection from "@/components/jav-library/books/BookCommentSection.vue"
 import type { PhotoBook } from "@/domain/photo/types"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
 
@@ -19,6 +20,7 @@ const photoId = computed(() =>
 
 const detailPhoto = shallowRef<PhotoBook | undefined>()
 const detailLoading = ref(false)
+const patchBusy = ref(false)
 const errorText = ref("")
 
 watch(
@@ -58,12 +60,13 @@ function openViewer(pageIndex: number) {
   })
 }
 
+/** 详情标签走精确 tag=，避免把标签字面量当成墙面子串搜索。 */
 function browseByTag(payload: { tag: string }) {
-  const q = payload.tag.trim()
-  if (!q) return
+  const tag = payload.tag.trim()
+  if (!tag) return
   void router.push({
     name: "photos",
-    query: { q },
+    query: { tag },
   })
 }
 
@@ -76,6 +79,61 @@ async function addTag(tag: string, done: (error?: unknown) => void) {
     done()
   } catch (error) {
     done(error)
+  }
+}
+
+/** 把详情评分卡的选择写入当前写真。 */
+async function updateRating(value: number | null) {
+  const previous = detailPhoto.value
+  if (!previous) return
+  patchBusy.value = true
+  errorText.value = ""
+  try {
+    const updated = await photoService.patchPhoto(previous.id, { rating: value })
+    if (detailPhoto.value?.id === updated.id) {
+      detailPhoto.value = updated
+    }
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("photos.detailSaveError")
+  } finally {
+    patchBusy.value = false
+  }
+}
+
+/** 把媒体信息弹窗的展示标题写入当前写真。 */
+async function savePhotoTitle(title: string, done: (err?: unknown) => void) {
+  const previous = detailPhoto.value
+  if (!previous) {
+    done(new Error(t("photos.detailNotFound")))
+    return
+  }
+  patchBusy.value = true
+  errorText.value = ""
+  try {
+    const updated = await photoService.patchPhoto(previous.id, { title })
+    if (detailPhoto.value?.id === updated.id) {
+      detailPhoto.value = updated
+    }
+    done()
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("photos.detailSaveError")
+    done(error)
+  } finally {
+    patchBusy.value = false
+  }
+}
+
+/** 翻译确认后重新读取当前写真，避免草稿覆盖后续写入。 */
+async function reloadPhoto() {
+  const id = detailPhoto.value?.id
+  if (!id) return
+  try {
+    const loaded = await photoService.loadPhotoDetail(id)
+    if (loaded && detailPhoto.value?.id === loaded.id) {
+      detailPhoto.value = loaded
+    }
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : t("photos.detailLoadError")
   }
 }
 </script>
@@ -100,14 +158,23 @@ async function addTag(tag: string, done: (error?: unknown) => void) {
         <PhotoDetailPanel
           :key="detailPhoto.id"
           :photo="detailPhoto"
+          :busy="patchBusy"
           @add-tag="addTag"
           @start-browsing="openViewer"
           @browse-by-tag="browseByTag"
+          @update-rating="updateRating"
+          @save-title="savePhotoTitle"
+          @reload="reloadPhoto"
         />
 
         <PhotoPagePreviewGrid
           :photo="detailPhoto"
           @open-viewer="openViewer"
+        />
+
+        <BookCommentSection
+          kind="photos"
+          :entity-id="detailPhoto.id"
         />
       </div>
     </template>

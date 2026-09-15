@@ -6,9 +6,14 @@ import BookMediaInfoDialog from "../books/BookMediaInfoDialog.vue"
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
+    locale: { value: "zh-CN" },
     t: (key: string, values?: Record<string, unknown>) =>
       values ? `${key}:${JSON.stringify(values)}` : key,
   }),
+}))
+
+vi.mock("@/services/ai-service", () => ({
+  useAIService: () => ({ runAction: vi.fn(), confirmTool: vi.fn() }),
 }))
 
 vi.mock("@/components/ui/badge", () => ({
@@ -59,6 +64,16 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
       '<button v-bind="$attrs" type="button" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
   },
   DropdownMenuTrigger: { name: "DropdownMenuTrigger", template: "<div><slot /></div>" },
+}))
+
+vi.mock("@/components/jav-library/books/BookRatingCard.vue", () => ({
+  default: {
+    name: "BookRatingCard",
+    props: ["rating", "disabled"],
+    emits: ["commit"],
+    template:
+      '<section data-photo-detail-rating data-book-rating-card><button data-commit-rating type="button" @click="$emit(\'commit\', 3.5)" /></section>',
+  },
 }))
 
 function makePhoto(overrides: Partial<PhotoBook> = {}): PhotoBook {
@@ -127,14 +142,26 @@ describe("PhotoDetailPanel", () => {
     expect(wrapper.text()).toContain("Summer Frame")
     expect(wrapper.text()).toContain("portrait")
     expect(wrapper.text()).toContain("outdoor")
-    expect(wrapper.text()).toContain("photos.detailRatingLabel")
-    expect(wrapper.text()).toContain("4.5")
+    expect(wrapper.find("[data-photo-detail-rating]").exists()).toBe(true)
+    expect(
+      wrapper.get("[data-photo-detail-info-column]").find("[data-photo-detail-rating]").exists(),
+    ).toBe(true)
+    expect(
+      wrapper.get("[data-photo-detail-media-column]").find("[data-photo-detail-rating]").exists(),
+    ).toBe(false)
     expect(wrapper.text()).toContain("bookBrowser.continueAt")
     expect(wrapper.get("[data-photo-detail-cover]").attributes("src")).toBe(
       "https://example.com/photo-cover.jpg",
     )
     expect(wrapper.text()).not.toContain("summer-frame.cbz")
     expect(wrapper.text()).not.toContain("D:/Photos/summer-frame.cbz")
+  })
+
+  it("emits a photo rating update from the rating card", async () => {
+    // 标签下方的评分卡把半星选择交给详情页写入。
+    const wrapper = mount(PhotoDetailPanel, { props: { photo: makePhoto() } })
+    await wrapper.get("[data-commit-rating]").trigger("click")
+    expect(wrapper.emitted("updateRating")).toEqual([[3.5]])
   })
 
   it("only offers supported photo browsing actions", async () => {
@@ -179,5 +206,17 @@ describe("PhotoDetailPanel", () => {
         "object-contain",
       ]),
     )
+    // 评分卡跟在标签后面，不跟在封面下面。
+    const info = wrapper.get("[data-photo-detail-info-column]")
+    const rating = info.get("[data-photo-detail-rating]")
+    expect(
+      wrapper.get("[data-photo-detail-media-column]").find("[data-photo-detail-rating]").exists(),
+    ).toBe(false)
+    expect(
+      Boolean(
+        info.get("[data-photo-detail-tags]").element.compareDocumentPosition(rating.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true)
   })
 })

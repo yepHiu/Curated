@@ -217,6 +217,7 @@ function removeMetadataTag(tag: string) {
       "
     >
       <div
+        data-detail-media-column
         class="w-full min-w-0 max-w-full overflow-hidden"
         :class="
           props.compact
@@ -269,51 +270,12 @@ function removeMetadataTag(tag: string) {
             </Badge>
           </div>
         </div>
-
-        <div class="mt-3 rounded-2xl border border-border/70 bg-background/50 p-3">
-          <p class="text-xs text-muted-foreground">{{ t("detailPanel.rating") }}</p>
-          <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
-            <Star class="size-4 shrink-0 text-primary" aria-hidden="true" />
-            <span>{{ t("detailPanel.combined", { n: movie.rating.toFixed(1) }) }}</span>
-            <span
-              v-if="siteRatingLabel !== null"
-              class="text-xs font-normal text-muted-foreground"
-            >
-              {{ t("detailPanel.siteDot", { n: siteRatingLabel }) }}
-            </span>
-            <span
-              v-if="hasUserRatingOverride"
-              class="text-[0.65rem] font-normal text-primary/90"
-            >
-              {{ t("detailPanel.usingLocalRating") }}
-            </span>
-          </p>
-          <template v-if="!isTrashed">
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
-              <MovieRatingStars
-                :model-value="starDisplayValue"
-                @commit="commitUserRatingFromStars"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class="h-7 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
-                :disabled="!hasUserRatingOverride"
-                @click="clearUserRating"
-              >
-                {{ t("detailPanel.clearLocalRating") }}
-              </Button>
-            </div>
-          </template>
-          <p v-else class="mt-2 text-xs text-muted-foreground">
-            {{ t("detailPanel.ratingLockedInTrash") }}
-          </p>
-        </div>
       </div>
 
-      <div class="flex min-w-0 max-w-full flex-col gap-5">
+      <div
+        data-detail-info-column
+        class="flex min-w-0 max-w-full flex-col gap-5"
+      >
         <div
           v-if="isTrashed"
           class="flex gap-3 rounded-2xl border border-border/70 border-l-[3px] border-l-amber-600/45 bg-muted/25 px-4 py-3 text-sm font-medium leading-relaxed text-foreground dark:border-l-amber-500/40 dark:bg-muted/20"
@@ -563,6 +525,51 @@ function removeMetadataTag(tag: string) {
               @add="addUserTag"
             />
           </div>
+        </div>
+
+        <div
+          data-detail-rating-card
+          class="w-[250px] max-w-full rounded-2xl border border-border/70 bg-background/50 p-3"
+        >
+          <p class="text-xs text-muted-foreground">{{ t("detailPanel.rating") }}</p>
+          <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+            <Star class="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>{{ t("detailPanel.combined", { n: movie.rating.toFixed(1) }) }}</span>
+            <span
+              v-if="siteRatingLabel !== null"
+              class="text-xs font-normal text-muted-foreground"
+            >
+              {{ t("detailPanel.siteDot", { n: siteRatingLabel }) }}
+            </span>
+            <span
+              v-if="hasUserRatingOverride"
+              class="text-[0.65rem] font-normal text-primary/90"
+            >
+              {{ t("detailPanel.usingLocalRating") }}
+            </span>
+          </p>
+          <template v-if="!isTrashed">
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
+              <MovieRatingStars
+                :model-value="starDisplayValue"
+                @commit="commitUserRatingFromStars"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="h-7 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                :disabled="!hasUserRatingOverride"
+                @click="clearUserRating"
+              >
+                {{ t("detailPanel.clearLocalRating") }}
+              </Button>
+            </div>
+          </template>
+          <p v-else class="mt-2 text-xs text-muted-foreground">
+            {{ t("detailPanel.ratingLockedInTrash") }}
+          </p>
         </div>
 
         <Separator />

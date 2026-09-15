@@ -10,6 +10,7 @@ import type {
   ComicReadingPreferencesDTO,
   ComicReadingProgressDTO,
   PatchComicBookBody,
+  PutBookCommentBody,
   PutComicReadingPreferencesBody,
   SettingsDTO,
   TaskDTO,
@@ -28,6 +29,7 @@ const LIST_BATCH_SIZE = 500
 
 const comicsState: Ref<ComicBook[]> = shallowRef([])
 const comicsLoadedState = ref(false)
+const comicSettingsHydratedState = ref(false)
 const loadErrorState = ref<string | null>(null)
 const comicLibraryEnabledState = ref(false)
 const autoComicLibraryWatchState = ref(true)
@@ -100,6 +102,7 @@ function mapComicDetail(dto: ComicBookDetailDTO): ComicBook {
   }
 }
 
+/** 把设置 DTO 写入漫画库前端状态，并标记设置已hydrate。 */
 function applySettingsFromDTO(settings: SettingsDTO) {
   comicLibraryEnabledState.value = Boolean(settings.comicLibraryEnabled)
   autoComicLibraryWatchState.value = settings.autoComicLibraryWatch ?? true
@@ -114,6 +117,7 @@ function applySettingsFromDTO(settings: SettingsDTO) {
   comicCacheState.value = {
     maxBytes: Number(settings.comicCache?.maxBytes ?? 2 * 1024 * 1024 * 1024),
   }
+  comicSettingsHydratedState.value = true
 }
 
 function mergeComicIntoCache(comic: ComicBook) {
@@ -142,6 +146,7 @@ function applyProgressToCache(progress: ComicReadingProgressDTO) {
   })
 }
 
+/** 把前端漫画补丁转成 PATCH body；清除评分时同时带 ratingSet。 */
 function patchToBody(patch: ComicPatch): PatchComicBookBody {
   const body: PatchComicBookBody = {}
   if (patch.title !== undefined) {
@@ -154,16 +159,17 @@ function patchToBody(patch: ComicPatch): PatchComicBookBody {
     body.favorite = patch.favorite
   }
   if (patch.rating !== undefined) {
+    body.ratingSet = true
     if (patch.rating === null) {
       body.ratingClear = true
     } else {
-      body.ratingSet = true
       body.rating = patch.rating
     }
   }
   return body
 }
 
+/** 按 500 本一批拉完漫画列表；调用方显式传 limit 时只拉一页。 */
 async function fetchPagedComics(params: ComicListParams = {}): Promise<ComicBook[]> {
   const first = await comicApi.listComics({
     ...params,
@@ -294,6 +300,18 @@ function createWebComicLibraryService(): ComicLibraryService {
       applySettingsFromDTO(settings)
     },
 
+    /** 设置未hydrate时先拉设置；列表已完整则跳过，否则全量分页。 */
+    async ensureComicsLoaded() {
+      if (!comicSettingsHydratedState.value) {
+        await impl.refreshSettings()
+      }
+      if (comicsLoadedState.value) {
+        return
+      }
+      await impl.reloadComicsFromApi()
+    },
+
+    /** 强制全量（或带 limit 的单页）重拉漫画列表。 */
     async reloadComicsFromApi(params?: ComicListParams) {
       try {
         comicsState.value = await fetchPagedComics(params)
@@ -395,6 +413,16 @@ function createWebComicLibraryService(): ComicLibraryService {
       prefs: PutComicReadingPreferencesBody,
     ): Promise<ComicReadingPreferencesDTO> {
       return await comicApi.putComicPreferences(comicId.trim(), prefs)
+    },
+
+    /** 通过漫画 API 读取个人备注。 */
+    async getComicComment(comicId: string) {
+      return await comicApi.getComicComment(comicId.trim())
+    },
+
+    /** 通过漫画 API 覆盖保存个人备注。 */
+    async putComicComment(comicId: string, body: PutBookCommentBody) {
+      return await comicApi.putComicComment(comicId.trim(), body)
     },
 
     async getComicCacheStatus(): Promise<ComicCacheStatusDTO> {

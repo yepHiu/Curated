@@ -70,6 +70,22 @@ describe("mockComicLibraryService", () => {
     })
   })
 
+  it("stores comic comments in an isolated localStorage key", async () => {
+    const { MOCK_COMIC_COMMENTS_KEY } = await import("@/lib/book-comment-local-storage")
+    const { mockComicLibraryService } = await freshMockComicService()
+    const comicId = mockComicLibraryService.comics.value[0]?.id
+    expect(comicId).toBeTruthy()
+    if (!comicId) return
+
+    await mockComicLibraryService.putComicComment(comicId, { body: "  comic note  " })
+    expect(localStorage.getItem(MOCK_COMIC_COMMENTS_KEY)).toContain("comic note")
+
+    const { mockComicLibraryService: reloadedService } = await freshMockComicService()
+    await expect(reloadedService.getComicComment(comicId)).resolves.toMatchObject({
+      body: "comic note",
+    })
+  })
+
   it("rejects real scan and file reveal actions in mock mode", async () => {
     const { mockComicLibraryService } = await freshMockComicService()
 

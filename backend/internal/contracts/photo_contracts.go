@@ -84,3 +84,24 @@ type PhotoViewerSettingsDTO struct {
 type PhotoCacheSettingsDTO struct {
 	MaxBytes int64 `json:"maxBytes"`
 }
+
+// PhotoCommentDTO is the personal note for one photo book.
+type PhotoCommentDTO struct {
+	Body      string `json:"body"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// PutPhotoCommentRequest is the JSON body for PUT /api/library/photos/books/{photoId}/comment.
+type PutPhotoCommentRequest struct {
+	Body string `json:"body"`
+}
+
+// PatchPhotoBookRequest updates writable photo-book fields. Rating uses the same set/clear flags as comics.
+type PatchPhotoBookRequest struct {
+	Title       *string  `json:"title,omitempty"`
+	RatingSet   bool     `json:"ratingSet,omitempty"`
+	RatingClear bool     `json:"ratingClear,omitempty"`
+	Rating      *float64 `json:"rating,omitempty"`
+	// ExpectedTitle is the display title observed in an Agent preview; HTTP clients omit it.
+	ExpectedTitle *string `json:"-"`
+}

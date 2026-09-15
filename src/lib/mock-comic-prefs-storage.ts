@@ -12,6 +12,7 @@ export interface MockComicPrefs {
   favorite?: boolean
   rating?: number | null
   tags?: string[]
+  title?: string
   progress?: MockComicProgress
   preferences?: ComicReaderSettings & { updatedAt: string }
 }
@@ -68,6 +69,9 @@ export function upsertMockComicPrefs(comicId: string, patch: MockComicPrefs) {
   if (Array.isArray(patch.tags)) {
     merged.tags = [...patch.tags]
   }
+  if (typeof patch.title === "string") {
+    merged.title = patch.title
+  }
   if (patch.progress) {
     merged.progress = { ...patch.progress }
   }
@@ -92,6 +96,9 @@ export function mergeMockComicPrefsIntoBook(book: ComicBook): ComicBook {
   }
   if (Array.isArray(prefs.tags)) {
     next.tags = [...prefs.tags]
+  }
+  if (typeof prefs.title === "string" && prefs.title.trim()) {
+    next.title = prefs.title
   }
   if (prefs.progress) {
     next = {

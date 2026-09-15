@@ -5,6 +5,8 @@ import { Star } from "lucide-vue-next"
 const props = defineProps<{
   /** 当前分 0–5，步进 0.5（用于高亮） */
   modelValue: number
+  /** 忙碌或只读时禁用半星按钮 */
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,15 +16,19 @@ const emit = defineEmits<{
 const stars = [1, 2, 3, 4, 5] as const
 const { t } = useI18n()
 
+/** 整星是否点亮。 */
 function starFilled(s: number) {
   return props.modelValue >= s
 }
 
+/** 是否显示该星的半星状态。 */
 function starHalf(s: number) {
   return props.modelValue >= s - 0.5 && props.modelValue < s
 }
 
+/** 按左半/右半提交 0.5 步进分数。 */
 function pick(s: number, side: "left" | "right") {
+  if (props.disabled) return
   const v = side === "left" ? s - 0.5 : s
   emit("commit", v)
 }
@@ -44,6 +50,7 @@ function pick(s: number, side: "left" | "right") {
         type="button"
         class="absolute inset-y-0 left-0 z-[2] w-1/2 cursor-pointer rounded-l-sm border-0 bg-transparent p-0 outline-none ring-offset-background hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('rating.score', { s: s - 0.5 })"
+        :disabled="disabled"
         @click="pick(s, 'left')"
       />
       <!-- 右半：s -->
@@ -51,6 +58,7 @@ function pick(s: number, side: "left" | "right") {
         type="button"
         class="absolute inset-y-0 right-0 z-[2] w-1/2 cursor-pointer rounded-r-sm border-0 bg-transparent p-0 outline-none ring-offset-background hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="t('rating.score', { s })"
+        :disabled="disabled"
         @click="pick(s, 'right')"
       />
 

@@ -178,6 +178,25 @@ describe("DetailPanel", () => {
     expect(wrapper.find("[data-metadata-provider]").exists()).toBe(false)
   })
 
+  it("places the compact rating card below tags in the info column", () => {
+    // 评分卡跟在我的标签后面，固定 250px 宽，不再贴在封面列。
+    const wrapper = mount(DetailPanel, {
+      props: {
+        movie: makeMovie({ userTags: ["mine"] }),
+      },
+    })
+    const info = wrapper.get("[data-detail-info-column]")
+    const rating = info.get("[data-detail-rating-card]")
+    expect(
+      wrapper.get("[data-detail-media-column]").find("[data-detail-rating-card]").exists(),
+    ).toBe(false)
+    expect(rating.classes()).toEqual(expect.arrayContaining(["w-[250px]", "max-w-full"]))
+    const infoHtml = info.html()
+    expect(infoHtml.indexOf("detailPanel.myTags")).toBeLessThan(
+      infoHtml.indexOf("data-detail-rating-card"),
+    )
+  })
+
   it("emits user rating updates from the rating stars", async () => {
     const wrapper = mount(DetailPanel, {
       props: {
