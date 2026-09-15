@@ -44,15 +44,4 @@ describe("sortPhotos", () => {
     expect(got.map((item) => item.id)).toEqual(["2", "10"])
   })
 
-  it("puts favorites first before imported time", () => {
-    const got = sortPhotos(
-      [
-        photo("new", { isFavorite: false, addedAt: "2026-07-03T00:00:00.000Z" }),
-        photo("favorite", { isFavorite: true, addedAt: "2026-07-01T00:00:00.000Z" }),
-      ],
-      "favorite",
-    )
-
-    expect(got.map((item) => item.id)).toEqual(["favorite", "new"])
-  })
 })

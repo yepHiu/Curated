@@ -17,11 +17,15 @@ const props = withDefaults(
     selected?: boolean
     batchMode?: boolean
     batchChecked?: boolean
+    posterLoading?: "lazy" | "eager"
+    posterFetchPriority?: "high" | "low" | "auto"
   }>(),
   {
     selected: false,
     batchMode: false,
     batchChecked: false,
+    posterLoading: "lazy",
+    posterFetchPriority: "auto",
   },
 )
 
@@ -42,6 +46,7 @@ const progressLabel = computed(() => {
   const page = Math.min(props.comic.pageCount, Math.max(1, props.comic.currentPageIndex + 1))
   return `${page} / ${props.comic.pageCount}`
 })
+/** 已开始阅读时返回 0–100 的封面进度；未开始为 0，封面不画进度条。 */
 const progressPercent = computed(() => {
   if (props.comic.pageCount <= 0 || props.comic.currentPageIndex === 0) return 0
   return Math.min(100, Math.max(0, ((props.comic.currentPageIndex + 1) / props.comic.pageCount) * 100))
@@ -52,6 +57,7 @@ const ratingLabel = computed(() =>
 const visibleTags = computed(() => props.comic.tags.slice(0, 3))
 const hiddenTagCount = computed(() => Math.max(0, props.comic.tags.length - visibleTags.value.length))
 
+/** 批量模式下改勾选当前卡片，否则打开详情。 */
 function handleOpenDetails() {
   if (props.batchMode) {
     emit("toggleBatchSelect", props.comic.id)
@@ -60,6 +66,7 @@ function handleOpenDetails() {
   emit("openDetails", props.comic.id)
 }
 
+/** 把复选框变化转成批量选中事件，并阻止冒泡到整卡点击。 */
 function onBatchCheckboxChange() {
   emit("toggleBatchSelect", props.comic.id)
 }
@@ -69,8 +76,12 @@ function onBatchCheckboxChange() {
   <Card
     data-comic-card
     :data-comic-card-id="comic.id"
-    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
-    :class="props.selected || props.batchChecked ? 'border-primary/55 shadow-lg shadow-primary/10 ring-2 ring-primary/25' : ''"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none"
+    :class="
+      props.selected || props.batchChecked
+        ? 'border-2 border-primary shadow-lg shadow-primary/20'
+        : 'border border-border/70 hover:border-primary/25 hover:shadow-lg'
+    "
   >
     <button
       type="button"
@@ -82,7 +93,7 @@ function onBatchCheckboxChange() {
       <div class="p-[var(--movie-card-padding)] pb-0">
         <div
           data-comic-poster
-          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/40 aspect-[358/537]"
+          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/30 aspect-[358/537]"
         >
           <label
             v-if="props.batchMode"
@@ -105,7 +116,8 @@ function onBatchCheckboxChange() {
             :alt="comic.title"
             class="absolute inset-0 z-[1] h-full w-full object-cover"
             decoding="async"
-            loading="lazy"
+            :loading="props.posterLoading"
+            :fetch-priority="props.posterFetchPriority"
           >
           <div
             v-else
@@ -121,7 +133,12 @@ function onBatchCheckboxChange() {
             aria-hidden="true"
           />
 
-          <div class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50" aria-hidden="true">
+          <div
+            v-if="progressPercent > 0"
+            data-comic-progress
+            class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50"
+            aria-hidden="true"
+          >
             <div class="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progressPercent}%` }" />
           </div>
         </div>
@@ -132,7 +149,7 @@ function onBatchCheckboxChange() {
         class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
       >
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
-          <CardTitle class="truncate text-[13px] leading-snug">{{ comic.title }}</CardTitle>
+          <CardTitle class="truncate text-[13px]">{{ comic.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
             {{ t("comics.pageCount", { count: comic.pageCount }) }} <template v-if="comic.currentPageIndex > 0">· {{ progressLabel }}</template>
           </CardDescription>

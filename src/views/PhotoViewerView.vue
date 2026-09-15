@@ -3,12 +3,14 @@ import { computed, ref, shallowRef, watch } from "vue"
 import { useRoute } from "vue-router"
 import { useI18n } from "vue-i18n"
 import PhotoViewer from "@/components/jav-library/photos/PhotoViewer.vue"
-import type { PhotoBook } from "@/domain/photo/types"
+import type { PhotoBook, PhotoViewerSettings } from "@/domain/photo/types"
+import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const route = useRoute()
 const { t } = useI18n()
 const photoService = usePhotoLibraryService()
+const backIntent = computed(() => resolveNavigationBackLink(route))
 
 const photoId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
@@ -25,6 +27,11 @@ const initialPageIndex = computed(() => {
   const raw = pageIndex.value
   return Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0
 })
+
+/** 把查看器里改过的模式/适配/方向写回全局写真默认设置。 */
+function saveViewerPreferences(prefs: PhotoViewerSettings) {
+  return photoService.patchPhotoViewer(prefs)
+}
 
 watch(
   () => photoId.value,
@@ -62,6 +69,9 @@ watch(
       :photo="photo"
       :viewer-defaults="photoService.photoViewer.value"
       :initial-page-index="initialPageIndex"
+      :save-preferences="saveViewerPreferences"
+      :back-to="backIntent.to"
+      :back-label="t(backIntent.labelKey)"
     />
     <div
       v-else

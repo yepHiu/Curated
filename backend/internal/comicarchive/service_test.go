@@ -96,8 +96,21 @@ func TestOpenPageReadsSelectedImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read page body: %v", err)
 	}
-	if string(data) != "second" || entry.EntryPath != "002.png" || entry.Index != 1 {
+	if string(data) != "second" || entry.EntryPath != "002.png" || entry.FileName != "002.png" {
 		t.Fatalf("OpenPage body=%q entry=%+v, want second page", string(data), entry)
+	}
+}
+
+// TestOpenPageMissingEntry 确认按条目打开时缺失页仍返回 ErrPageNotFound。
+func TestOpenPageMissingEntry(t *testing.T) {
+	t.Parallel()
+
+	archivePath := makeComicZip(t, "missing.zip", map[string]string{
+		"001.jpg": "first",
+	})
+	_, _, err := OpenPage(context.Background(), archivePath, "002.png")
+	if !errors.Is(err, ErrPageNotFound) {
+		t.Fatalf("OpenPage missing error = %v, want ErrPageNotFound", err)
 	}
 }
 

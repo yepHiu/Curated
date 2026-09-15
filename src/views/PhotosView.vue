@@ -2,67 +2,87 @@
 import { computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import PhotoLibraryPage from "@/components/jav-library/photos/PhotoLibraryPage.vue"
+import {
+  isLegacyFavoriteSort,
+  parsePhotoLibraryBrowse,
+  patchBookLibraryQuery,
+  photoLibraryHasConstraints,
+  type BookLibrarySortValue,
+} from "@/lib/book-library-query"
 import { filterPhotos } from "@/lib/photo-search"
-import { sortPhotos, type PhotoLibrarySortValue } from "@/lib/photo-sort"
+import { sortPhotos } from "@/lib/photo-sort"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const route = useRoute()
 const router = useRouter()
 const photoService = usePhotoLibraryService()
 
-const searchQuery = computed(() =>
-  typeof route.query.q === "string" ? route.query.q : "",
-)
-const activeSort = computed<PhotoLibrarySortValue>(() => {
-  const raw = typeof route.query.sort === "string" ? route.query.sort : "addedAt"
-  if (["fileName", "favorite"].includes(raw)) {
-    return raw as PhotoLibrarySortValue
-  }
-  return "addedAt"
-})
+const browse = computed(() => parsePhotoLibraryBrowse(route.query))
+const searchQuery = computed(() => browse.value.q)
+const activeSort = computed(() => browse.value.sort)
 const visiblePhotos = computed(() =>
   sortPhotos(
     filterPhotos(photoService.photos.value, {
-      q: searchQuery.value,
+      q: browse.value.q,
+      tag: browse.value.tag,
     }),
-    activeSort.value,
+    browse.value.sort,
   ),
 )
+const hasConstraints = computed(() => photoLibraryHasConstraints(browse.value))
 
+/** 用规范化 query 替换当前写真墙地址，保留精确标签等约束。 */
+function replaceBrowseQuery(patch: Parameters<typeof patchBookLibraryQuery>[1]) {
+  void router.replace({
+    name: "photos",
+    query: patchBookLibraryQuery(route.query, patch),
+  })
+}
+
+/** 进页只补齐尚未加载的设置与列表，扫描/导入仍走强制 reload。 */
+function hydrateLibrary() {
+  if (isLegacyFavoriteSort(route.query)) {
+    replaceBrowseQuery({ sort: "addedAt" })
+  }
+  void photoService.ensurePhotosLoaded().catch((error) => {
+    console.warn("[PhotosView] failed to load photos", error)
+  })
+}
+
+/** 加载失败重试时强制重拉列表。 */
 function reloadLibrary() {
-  void Promise.resolve(photoService.refreshSettings())
-    .then(() => photoService.reloadPhotosFromApi())
-    .catch((error) => {
-      console.warn("[PhotosView] failed to load photos", error)
-    })
+  void photoService.reloadPhotosFromApi().catch((error) => {
+    console.warn("[PhotosView] failed to reload photos", error)
+  })
 }
-onMounted(reloadLibrary)
+onMounted(hydrateLibrary)
 
+/** 更新壳层投影下来的自由文本搜索。 */
 function updateSearch(value: string) {
-  const q = value.trim()
-  void router.replace({
-    name: "photos",
-    query: {
-      ...route.query,
-      q: q || undefined,
-    },
-  })
+  replaceBrowseQuery({ q: value })
 }
 
-function updateSort(value: PhotoLibrarySortValue) {
-  void router.replace({
-    name: "photos",
-    query: {
-      ...route.query,
-      sort: value === "addedAt" ? undefined : value,
-    },
-  })
+/** 只改排序。 */
+function updateSort(value: BookLibrarySortValue) {
+  replaceBrowseQuery({ sort: value })
 }
 
+/** 清除精确标签筛选。 */
+function clearTag() {
+  replaceBrowseQuery({ tag: "" })
+}
+
+/** 清空搜索和标签，保留当前排序。 */
+function clearFilters() {
+  replaceBrowseQuery({ q: "", tag: "" })
+}
+
+/** 打开写真集详情。 */
 function openDetails(photoId: string) {
   void router.push({ name: "photo-detail", params: { id: photoId } })
 }
 
+/** 带着当前墙面地址进入查看器，便于返回。 */
 function openViewer(photoId: string, pageIndex: number) {
   void router.push({
     name: "photo-viewer",
@@ -82,10 +102,14 @@ function openViewer(photoId: string, pageIndex: number) {
         :photos="visiblePhotos"
         :active-sort="activeSort"
         :search-query="searchQuery"
+        :tag="browse.tag"
+        :has-constraints="hasConstraints"
         :loading="!photoService.photosLoaded.value"
         :load-error="photoService.loadError.value ?? ''"
         @retry="reloadLibrary"
         @update-search="updateSearch"
+        @clear-tag="clearTag"
+        @clear-filters="clearFilters"
         @update:sort="updateSort"
         @open-details="openDetails"
         @open-viewer="openViewer"

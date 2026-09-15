@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { Heart, HeartOff, Tag, Trash2, X } from "lucide-vue-next"
+import { Heart, HeartOff, Tag, Trash2 } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,9 +20,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  exit: []
   clearSelection: []
-  selectAllVisible: []
   addFavorite: []
   removeFavorite: []
   addTag: [tag: string]
@@ -36,12 +34,14 @@ const deleteConfirmOpen = ref(false)
 const tagDraft = ref("")
 const tagError = ref("")
 
+/** 打开批量追加标签对话框并清空上次草稿。 */
 function openTagDialog() {
   tagDraft.value = ""
   tagError.value = ""
   tagDialogOpen.value = true
 }
 
+/** 校验标签后交给父级写入所选漫画。 */
 function submitTagDialog() {
   const tag = tagDraft.value.trim()
   if (!tag) {
@@ -52,6 +52,7 @@ function submitTagDialog() {
   emit("addTag", tag)
 }
 
+/** 确认后删除所选漫画索引。 */
 function confirmDelete() {
   deleteConfirmOpen.value = false
   emit("deleteComics")
@@ -80,17 +81,6 @@ function confirmDelete() {
           @click="emit('clearSelection')"
         >
           {{ t("comics.batchClearSelection") }}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="h-8 rounded-lg px-2"
-          data-comic-batch-select-visible
-          :disabled="operationBusy"
-          @click="emit('selectAllVisible')"
-        >
-          {{ t("comics.batchSelectVisible") }}
         </Button>
       </div>
 
@@ -142,18 +132,6 @@ function confirmDelete() {
         >
           <Trash2 class="size-4" />
           {{ t("comics.batchDelete") }}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="gap-1.5 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-40"
-          data-comic-batch-exit
-          :disabled="operationBusy"
-          @click="emit('exit')"
-        >
-          <X class="size-4 shrink-0 opacity-80" aria-hidden="true" />
-          {{ t("comics.batchExit") }}
         </Button>
       </div>
     </div>

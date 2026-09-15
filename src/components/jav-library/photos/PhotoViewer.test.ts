@@ -111,4 +111,31 @@ describe("PhotoViewer", () => {
     expect(wrapper.find("figcaption").exists()).toBe(false)
     expect(wrapper.get("[data-photo-viewer-visible-page]").text()).toBe("")
   })
+
+  it("prefetches the current and next original page images", async () => {
+    const created: { src: string }[] = []
+    class FakeImage {
+      decoding = ""
+      src = ""
+      constructor() {
+        created.push(this)
+      }
+    }
+    vi.stubGlobal("Image", FakeImage)
+
+    const wrapper = mount(PhotoViewer, {
+      props: {
+        photo: makePhoto(),
+        viewerDefaults: defaults,
+      },
+    })
+    await flushPromises()
+
+    expect(created.map((image) => image.src)).toEqual([
+      "https://example.com/photo-page-1.jpg",
+      "https://example.com/photo-page-2.jpg",
+    ])
+    wrapper.unmount()
+    vi.unstubAllGlobals()
+  })
 })

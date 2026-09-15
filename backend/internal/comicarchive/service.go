@@ -89,37 +89,43 @@ func ListPages(ctx context.Context, archivePath string) ([]PageEntry, error) {
 	return pages, nil
 }
 
+// OpenPage 按清理后的 ZIP 条目名打开一页图片，不再先枚举全书。
 func OpenPage(ctx context.Context, archivePath string, entryPath string) (io.ReadCloser, PageEntry, error) {
-	pages, err := ListPages(ctx, archivePath)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return nil, PageEntry{}, err
 	}
-	entryPath = path.Clean(strings.TrimSpace(entryPath))
-	var selected PageEntry
-	found := false
-	for _, page := range pages {
-		if page.EntryPath == entryPath {
-			selected = page
-			found = true
-			break
-		}
+	if !IsSupportedArchivePath(archivePath) {
+		return nil, PageEntry{}, fmt.Errorf("%w: %s", ErrUnsupportedArchive, archivePath)
 	}
-	if !found {
+	wanted := path.Clean(strings.TrimSpace(entryPath))
+	if wanted == "" || wanted == "." || !IsSupportedImageEntry(wanted) {
 		return nil, PageEntry{}, fmt.Errorf("%w: %s", ErrPageNotFound, entryPath)
 	}
-
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return nil, PageEntry{}, err
 	}
 	for _, file := range reader.File {
-		if path.Clean(file.Name) != selected.EntryPath {
+		if err := ctx.Err(); err != nil {
+			_ = reader.Close()
+			return nil, PageEntry{}, err
+		}
+		if file.FileInfo().IsDir() || !IsSupportedImageEntry(file.Name) {
+			continue
+		}
+		if path.Clean(file.Name) != wanted {
 			continue
 		}
 		body, err := file.Open()
 		if err != nil {
 			_ = reader.Close()
 			return nil, PageEntry{}, err
+		}
+		selected := PageEntry{
+			EntryPath: wanted,
+			FileName:  path.Base(file.Name),
+			ImageExt:  strings.ToLower(path.Ext(file.Name)),
+			SizeBytes: int64(file.UncompressedSize64),
 		}
 		return &archivePageReadCloser{ReadCloser: body, archive: reader}, selected, nil
 	}

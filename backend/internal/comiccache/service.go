@@ -1,6 +1,7 @@
 package comiccache
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -10,6 +11,7 @@ import (
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +25,13 @@ import (
 )
 
 const thumbnailMaxSide = 420
+const maxSourceBytes = 32 << 20
+const maxPixels = 24_000_000
+
+var (
+	ErrSourceTooLarge           = errors.New("comic thumbnail source exceeds limit")
+	ErrSourceDimensionsTooLarge = errors.New("comic thumbnail dimensions exceed limit")
+)
 
 type Store interface {
 	SaveComicCacheEntry(context.Context, storage.ComicCacheEntryInput) error
@@ -43,6 +52,7 @@ type File struct {
 	SizeBytes   int64
 }
 
+// NewService 创建漫画缩略图磁盘缓存；maxBytes < 0 表示不限制占用。
 func NewService(root string, maxBytes int64, store Store) *Service {
 	root = strings.TrimSpace(root)
 	if root == "" {
@@ -51,6 +61,7 @@ func NewService(root string, maxBytes int64, store Store) *Service {
 	return &Service{root: filepath.Clean(root), maxBytes: maxBytes, store: store}
 }
 
+// GetOrCreateThumbnail 命中磁盘 JPEG 则刷新访问时间；未命中则解码并在超过 maxBytes 时淘汰最久未访问条目。
 func (s *Service) GetOrCreateThumbnail(ctx context.Context, comic contracts.ComicBookDetailDTO, page contracts.ComicPageDTO) (File, error) {
 	if s == nil || s.store == nil {
 		return File{}, errors.New("comic cache service not configured")
@@ -71,7 +82,7 @@ func (s *Service) GetOrCreateThumbnail(ctx context.Context, comic contracts.Comi
 	}
 	defer body.Close()
 
-	img, _, err := image.Decode(body)
+	img, err := decodeThumbnailSource(body)
 	if err != nil {
 		return File{}, err
 	}
@@ -112,6 +123,9 @@ func (s *Service) GetOrCreateThumbnail(ctx context.Context, comic contracts.Comi
 	}); err != nil {
 		return File{}, err
 	}
+	if err := s.evictIfOverBudget(ctx, cacheKey); err != nil {
+		return File{}, err
+	}
 	return File{Path: targetPath, ContentType: "image/jpeg", SizeBytes: info.Size()}, nil
 }
 
@@ -147,6 +161,62 @@ func (s *Service) Cleanup(ctx context.Context) (contracts.ComicCacheStatusDTO, e
 		}
 	}
 	return s.Status(ctx)
+}
+
+// evictIfOverBudget 按 last_accessed_at 从旧到新删除缓存，直到占用不超过 maxBytes；跳过刚写入的 keepKey。
+func (s *Service) evictIfOverBudget(ctx context.Context, keepKey string) error {
+	if s.maxBytes < 0 {
+		return nil
+	}
+	entries, err := s.store.ListComicCacheEntries(ctx, 10000)
+	if err != nil {
+		return err
+	}
+	var used int64
+	for _, entry := range entries {
+		used += entry.SizeBytes
+	}
+	for _, entry := range entries {
+		if used <= s.maxBytes {
+			return nil
+		}
+		if entry.CacheKey == keepKey {
+			continue
+		}
+		if s.isInsideRoot(entry.Path) {
+			if err := os.Remove(entry.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+		if err := s.store.DeleteComicCacheEntry(ctx, entry.CacheKey); err != nil {
+			return err
+		}
+		used -= entry.SizeBytes
+	}
+	return nil
+}
+
+// decodeThumbnailSource 限制源字节和像素，过大拒绝而不回退原图。
+func decodeThumbnailSource(r io.Reader) (image.Image, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxSourceBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxSourceBytes {
+		return nil, ErrSourceTooLarge
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if config.Width <= 0 || config.Height <= 0 || int64(config.Width)*int64(config.Height) > maxPixels {
+		return nil, ErrSourceDimensionsTooLarge
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
 }
 
 func (s *Service) isInsideRoot(path string) bool {

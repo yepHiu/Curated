@@ -90,6 +90,22 @@ describe("ComicCard", () => {
     expect(wrapper.text()).not.toContain("comics.startReading")
   })
 
+  it("hides the poster progress bar until reading has started", () => {
+    const unread = mount(ComicCard, {
+      props: {
+        comic: makeComic({ currentPageIndex: 0, readStatus: "unread" }),
+      },
+    })
+    const reading = mount(ComicCard, {
+      props: {
+        comic: makeComic({ currentPageIndex: 5, readStatus: "reading" }),
+      },
+    })
+
+    expect(unread.find("[data-comic-progress]").exists()).toBe(false)
+    expect(reading.find("[data-comic-progress]").exists()).toBe(true)
+  })
+
   it("toggles batch selection instead of opening details in batch mode", async () => {
     const wrapper = mount(ComicCard, {
       props: {

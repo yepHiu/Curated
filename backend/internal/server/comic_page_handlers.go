@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"curated-backend/internal/comicarchive"
+	"curated-backend/internal/comiccache"
 	"curated-backend/internal/contracts"
 )
 
@@ -64,6 +65,7 @@ func (h *Handler) handleGetComicPageImage(w http.ResponseWriter, r *http.Request
 	_, _ = io.Copy(w, body)
 }
 
+// handleGetComicPageThumbnail 返回封面 JPEG；源图过大时 422，不回退原图。
 func (h *Handler) handleGetComicPageThumbnail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
@@ -78,6 +80,10 @@ func (h *Handler) handleGetComicPageThumbnail(w http.ResponseWriter, r *http.Req
 	}
 	file, err := h.comicCacheService().GetOrCreateThumbnail(r.Context(), detail, page)
 	if err != nil {
+		if errors.Is(err, comiccache.ErrSourceTooLarge) || errors.Is(err, comiccache.ErrSourceDimensionsTooLarge) {
+			writeAppError(w, http.StatusUnprocessableEntity, contracts.ErrorCodeComicArchiveReadFailed, "comic thumbnail source is too large")
+			return
+		}
 		if h.logger != nil {
 			h.logger.Warn("create comic thumbnail failed", zap.Error(err), zap.String("comicId", detail.ID), zap.Int("page", page.Index))
 		}

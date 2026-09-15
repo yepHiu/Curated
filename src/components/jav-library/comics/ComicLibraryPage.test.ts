@@ -75,16 +75,15 @@ describe("ComicLibraryPage", () => {
       },
     })
 
-    expect(wrapper.get("[data-comic-library-toolbar]").classes()).toEqual(
-      expect.arrayContaining(["flex-wrap", "items-center", "justify-between", "pb-1"]),
-    )
+    expect(wrapper.get("[data-comic-library-toolbar]").classes()).toContain("justify-end")
+    expect(wrapper.get("[data-comic-library-toolbar]").classes()).not.toContain("justify-between")
+    expect(wrapper.get("[data-comic-library-toolbar]").classes()).not.toContain("pb-1")
     expect(wrapper.find("[data-book-sort-trigger]").exists()).toBe(true)
+    expect(wrapper.find("[data-book-filter-trigger]").exists()).toBe(true)
     expect(wrapper.find("[data-comic-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("comics.searchPlaceholder")
-    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("library.savedViewSort")
-    expect(wrapper.text()).not.toContain("comics.filterUnread")
-    expect(wrapper.text()).not.toContain("comics.filterReading")
-    expect(wrapper.text()).not.toContain("comics.filterRead")
+    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("comics.sortByAdded")
+    expect(wrapper.get("[data-book-filter-chip=\"q\"]").text()).toContain("rain")
   })
 
   it("uses the same scroll gutter as the movie grid area", () => {
@@ -96,8 +95,10 @@ describe("ComicLibraryPage", () => {
     })
 
     expect(wrapper.get("[data-comic-grid-scroll]").classes()).toEqual(
-      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto", "pr-2"]),
+      expect.arrayContaining(["min-h-0", "flex-1"]),
     )
+    expect(wrapper.get("[data-comic-grid-scroll]").classes()).not.toContain("overflow-y-auto")
+    expect(wrapper.get("[data-comic-grid-scroll]").classes()).not.toContain("pr-2")
   })
 
   it("emits the selected comic sort when a sort tab is clicked", async () => {
@@ -137,6 +138,9 @@ describe("ComicLibraryPage", () => {
     expect(wrapper.text()).toContain("comics.batchExitToolbar")
     expect(wrapper.get("[data-virtual-comic-grid]").attributes("data-batch-mode")).toBe("true")
     expect(wrapper.get("[data-virtual-comic-grid]").attributes("data-selected")).toBe("comic-1")
+    expect(wrapper.find("[data-book-sort-trigger]").exists()).toBe(false)
+    expect(wrapper.find("[data-book-filter-trigger]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("bookBrowser.selectedCount")
 
     await wrapper.get("[data-comic-select-visible]").trigger("click")
     await wrapper.get("[data-comic-exit-batch]").trigger("click")

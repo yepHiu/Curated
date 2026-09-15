@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue"
-import { ChevronLeft, ChevronRight, Eye, ScrollText } from "lucide-vue-next"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
+import { RouterLink, type RouteLocationRaw } from "vue-router"
 import type { PhotoBook, PhotoViewerSettings } from "@/domain/photo/types"
+import { collectAdjacentBookPageUrls, prefetchBookPageUrls } from "@/lib/book-page-prefetch"
+import BookReaderChrome from "@/components/jav-library/books/BookReaderChrome.vue"
 import { Button } from "@/components/ui/button"
 
 const props = withDefaults(
@@ -10,20 +12,28 @@ const props = withDefaults(
     photo: PhotoBook
     viewerDefaults: PhotoViewerSettings
     initialPageIndex?: number
+    savePreferences?: (prefs: PhotoViewerSettings) => Promise<unknown>
+    backTo?: RouteLocationRaw | string
+    backLabel?: string
   }>(),
   {
     initialPageIndex: 0,
+    savePreferences: undefined,
+    backTo: undefined,
+    backLabel: "",
   },
 )
 
 const { t } = useI18n()
 
+/** 把页码限制在写真集的合法范围内。 */
 function clampPageIndex(raw: number, pageCount: number) {
   if (pageCount <= 0) return 0
   if (!Number.isFinite(raw)) return 0
   return Math.min(pageCount - 1, Math.max(0, Math.floor(raw)))
 }
 
+/** 规范化查看器模式、适配和方向，忽略未知值。 */
 function normalizeViewerSettings(settings: PhotoViewerSettings): PhotoViewerSettings {
   return {
     mode: settings.mode === "scroll" ? "scroll" : "page",
@@ -39,6 +49,15 @@ const chromeVisible = ref(true)
 const pages = computed(() => props.photo.pages ?? [])
 const currentPage = computed(() => pages.value[pageIndex.value])
 const currentPageSrc = computed(() => currentPage.value?.imageUrl || currentPage.value?.thumbUrl || "")
+const leftTurnStep = computed(() => (preferences.value.direction === "rtl" ? 1 : -1))
+const rightTurnStep = computed(() => -leftTurnStep.value)
+const leftTurnLabel = computed(() =>
+  leftTurnStep.value < 0 ? t("photos.viewerPrevious") : t("photos.viewerNext"),
+)
+const rightTurnLabel = computed(() =>
+  rightTurnStep.value < 0 ? t("photos.viewerPrevious") : t("photos.viewerNext"),
+)
+const showPageTurnZones = computed(() => preferences.value.mode === "page")
 
 const viewerSurfaceClass = computed(() => {
   if (preferences.value.mode === "page") {
@@ -87,12 +106,7 @@ const chromeOverlayClass = computed(() =>
     : "pointer-events-none translate-y-3 opacity-0",
 )
 
-const nextModeLabel = computed(() =>
-  preferences.value.mode === "page"
-    ? t("settings.photoViewerModeScroll")
-    : t("settings.photoViewerModePage"),
-)
-
+/** 翻到相邻图片。 */
 function moveBy(step: number) {
   if (step === 0) return
   const next = clampPageIndex(pageIndex.value + step, props.photo.pageCount)
@@ -100,17 +114,33 @@ function moveBy(step: number) {
   pageIndex.value = next
 }
 
-function toggleViewerMode() {
-  preferences.value = {
-    ...preferences.value,
-    mode: preferences.value.mode === "page" ? "scroll" : "page",
-  }
+/** 把查看偏好写回调用方，至少覆盖本次会话的全局默认。 */
+function applyPreferences(next: PhotoViewerSettings) {
+  preferences.value = next
+  void props.savePreferences?.(next)
 }
 
+/** 从设置菜单写入浏览模式。 */
+function updateMode(mode: PhotoViewerSettings["mode"]) {
+  applyPreferences({ ...preferences.value, mode })
+}
+
+/** 从设置菜单写入适配方式。 */
+function updateFit(fit: PhotoViewerSettings["fit"]) {
+  applyPreferences({ ...preferences.value, fit })
+}
+
+/** 从设置菜单写入浏览方向。 */
+function updateDirection(direction: PhotoViewerSettings["direction"]) {
+  applyPreferences({ ...preferences.value, direction })
+}
+
+/** 点击画面中央时显示或隐藏浏览控件。 */
 function toggleChrome() {
   chromeVisible.value = !chromeVisible.value
 }
 
+/** 把键盘按键映射成翻页步长。 */
 function keyStep(key: string) {
   if (key === " " || key === "Spacebar" || key === "PageDown") return 1
   if (key === "PageUp") return -1
@@ -119,6 +149,7 @@ function keyStep(key: string) {
   return 0
 }
 
+/** 方向键与空格翻页；输入框内不拦截。 */
 function onKeydown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) {
     return
@@ -140,8 +171,21 @@ onMounted(() => {
   window.addEventListener("keydown", onKeydown)
 })
 
+let cancelPrefetch: (() => void) | undefined
+
+/** 预取当前页 ±1 的原图，离开查看器时取消。 */
+function syncAdjacentPagePrefetch() {
+  cancelPrefetch?.()
+  cancelPrefetch = prefetchBookPageUrls(
+    collectAdjacentBookPageUrls(pages.value, [pageIndex.value]),
+  )
+}
+
+watch([pages, pageIndex], syncAdjacentPagePrefetch, { immediate: true })
+
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown)
+  cancelPrefetch?.()
 })
 </script>
 
@@ -199,6 +243,44 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <button
+        v-if="showPageTurnZones"
+        type="button"
+        data-photo-viewer-turn-previous
+        class="absolute inset-y-0 left-0 z-10 w-[18%] cursor-pointer bg-transparent"
+        :aria-label="leftTurnLabel"
+        @click.stop="moveBy(leftTurnStep)"
+      />
+      <button
+        v-if="showPageTurnZones"
+        type="button"
+        data-photo-viewer-turn-next
+        class="absolute inset-y-0 right-0 z-10 w-[18%] cursor-pointer bg-transparent"
+        :aria-label="rightTurnLabel"
+        @click.stop="moveBy(rightTurnStep)"
+      />
+
+      <div
+        data-photo-viewer-hud-top
+        class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 py-3 transition duration-200 ease-out"
+        :class="chromeVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-3 opacity-0'"
+        @click.stop
+      >
+        <Button
+          v-if="backTo"
+          as-child
+          variant="secondary"
+          class="pointer-events-auto min-h-11 shrink-0 rounded-full sm:min-h-8"
+        >
+          <RouterLink :to="backTo">
+            {{ backLabel || t("shell.backPrevious") }}
+          </RouterLink>
+        </Button>
+        <h1 data-photo-viewer-title class="min-w-0 truncate text-sm font-medium text-foreground/90">
+          {{ photo.title }}
+        </h1>
+      </div>
+
       <div
         data-photo-viewer-chrome-overlay
         :data-photo-viewer-chrome-visible="chromeVisible ? 'true' : 'false'"
@@ -206,54 +288,20 @@ onUnmounted(() => {
         :class="chromeOverlayClass"
       >
         <div class="pointer-events-auto" @click.stop>
-          <div
-            data-photo-viewer-chrome
-            class="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-xl border border-border/70 bg-background/90 p-2 shadow-lg shadow-black/10 backdrop-blur"
-          >
-            <span class="sr-only">{{ t("photos.viewerBrowse") }}</span>
-            <Button
-              data-photo-viewer-previous
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="rounded-lg"
-              :aria-label="t('photos.viewerPrevious')"
-              :title="t('photos.viewerPrevious')"
-              @click="moveBy(-1)"
-            >
-              <ChevronLeft />
-            </Button>
-            <span class="px-2 text-sm tabular-nums text-muted-foreground">
-              {{ pageIndex + 1 }} / {{ photo.pageCount }}
-            </span>
-            <Button
-              data-photo-viewer-next
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="rounded-lg"
-              :aria-label="t('photos.viewerNext')"
-              :title="t('photos.viewerNext')"
-              @click="moveBy(1)"
-            >
-              <ChevronRight />
-            </Button>
-            <span class="mx-1 h-6 w-px bg-border" aria-hidden="true" />
-            <Button
-              data-photo-viewer-mode-toggle
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="rounded-lg"
-              :aria-label="`${t('photos.viewerMode')}: ${nextModeLabel}`"
-              :aria-pressed="preferences.mode === 'scroll'"
-              :title="`${t('photos.viewerMode')}: ${nextModeLabel}`"
-              @click="toggleViewerMode"
-            >
-              <ScrollText v-if="preferences.mode === 'page'" />
-              <Eye v-else />
-            </Button>
-          </div>
+          <span class="sr-only">{{ t("photos.viewerBrowse") }}</span>
+          <BookReaderChrome
+            kind="photos"
+            :page-index="pageIndex"
+            :page-count="photo.pageCount"
+            :mode="preferences.mode"
+            :fit="preferences.fit"
+            :direction="preferences.direction"
+            @previous="moveBy(-1)"
+            @next="moveBy(1)"
+            @update:mode="updateMode"
+            @update:fit="updateFit"
+            @update:direction="updateDirection"
+          />
         </div>
       </div>
     </div>

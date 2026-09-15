@@ -40,6 +40,7 @@ const serviceState = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   refreshSettings: vi.fn(),
   reloadPhotosFromApi: vi.fn(),
+  ensurePhotosLoaded: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -64,6 +65,7 @@ vi.mock("@/services/photo-library-service", () => ({
     loadError: computed(() => serviceState.loadError),
     refreshSettings: serviceMocks.refreshSettings,
     reloadPhotosFromApi: serviceMocks.reloadPhotosFromApi,
+    ensurePhotosLoaded: serviceMocks.ensurePhotosLoaded,
   }),
 }))
 
@@ -98,14 +100,17 @@ describe("PhotosView", () => {
     serviceMocks.refreshSettings.mockResolvedValue(undefined)
     serviceMocks.reloadPhotosFromApi.mockReset()
     serviceMocks.reloadPhotosFromApi.mockResolvedValue(undefined)
+    serviceMocks.ensurePhotosLoaded.mockReset()
+    serviceMocks.ensurePhotosLoaded.mockResolvedValue(undefined)
   })
 
-  it("loads photo settings and mock photo books into the photo wall", async () => {
+  it("hydrates the photo wall through ensurePhotosLoaded instead of forcing a reload", async () => {
     const wrapper = mount(PhotosView)
     await flushPromises()
 
-    expect(serviceMocks.refreshSettings).toHaveBeenCalled()
-    expect(serviceMocks.reloadPhotosFromApi).toHaveBeenCalled()
+    expect(serviceMocks.ensurePhotosLoaded).toHaveBeenCalled()
+    expect(serviceMocks.refreshSettings).not.toHaveBeenCalled()
+    expect(serviceMocks.reloadPhotosFromApi).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain("Summer Frame")
     expect(wrapper.text()).toContain("Night Portrait")
   })

@@ -11,9 +11,17 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-const props = defineProps<{
-  photo: PhotoBook
-}>()
+const props = withDefaults(
+  defineProps<{
+    photo: PhotoBook
+    posterLoading?: "lazy" | "eager"
+    posterFetchPriority?: "high" | "low" | "auto"
+  }>(),
+  {
+    posterLoading: "lazy",
+    posterFetchPriority: "auto",
+  },
+)
 
 const emit = defineEmits<{
   openDetails: [photoId: string]
@@ -30,6 +38,7 @@ const progressLabel = computed(() => {
   const page = Math.min(props.photo.pageCount, Math.max(1, props.photo.currentPageIndex + 1))
   return `${page} / ${props.photo.pageCount}`
 })
+/** 已开始浏览时返回 0–100 的封面进度；未开始为 0，封面不画进度条。 */
 const progressPercent = computed(() => {
   if (props.photo.pageCount <= 0 || props.photo.currentPageIndex === 0) return 0
   return Math.min(100, Math.max(0, ((props.photo.currentPageIndex + 1) / props.photo.pageCount) * 100))
@@ -40,6 +49,7 @@ const ratingLabel = computed(() =>
 const visibleTags = computed(() => props.photo.tags.slice(0, 3))
 const hiddenTagCount = computed(() => Math.max(0, props.photo.tags.length - visibleTags.value.length))
 
+/** 单击封面或正文打开写真详情。 */
 function openDetails() {
   emit("openDetails", props.photo.id)
 }
@@ -49,7 +59,7 @@ function openDetails() {
   <Card
     data-photo-card
     :data-photo-card-id="photo.id"
-    class="group gap-0 overflow-hidden rounded-[1.2rem] border-border/70 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:border-primary/25 hover:shadow-lg motion-reduce:transition-none"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none border border-border/70 hover:border-primary/25 hover:shadow-lg"
   >
     <button
       type="button"
@@ -62,7 +72,7 @@ function openDetails() {
       <div class="p-[var(--movie-card-padding)] pb-0">
         <div
           data-photo-poster
-          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/40 aspect-[358/537]"
+          class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/30 aspect-[358/537]"
         >
           <img
             v-if="coverSrc"
@@ -70,7 +80,8 @@ function openDetails() {
             :alt="photo.title"
             class="absolute inset-0 z-[1] h-full w-full object-cover"
             decoding="async"
-            loading="lazy"
+            :loading="props.posterLoading"
+            :fetch-priority="props.posterFetchPriority"
           >
           <div
             v-else
@@ -86,7 +97,12 @@ function openDetails() {
             aria-hidden="true"
           />
 
-          <div class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50" aria-hidden="true">
+          <div
+            v-if="progressPercent > 0"
+            data-photo-progress
+            class="absolute right-0 bottom-0 left-0 z-[2] h-1 bg-black/50"
+            aria-hidden="true"
+          >
             <div class="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" :style="{ width: `${progressPercent}%` }" />
           </div>
         </div>
@@ -97,7 +113,7 @@ function openDetails() {
         class="flex min-h-[var(--movie-card-body-min-height)] flex-col justify-between gap-[var(--movie-card-body-gap)] p-[var(--movie-card-padding)]"
       >
         <div class="flex min-h-0 min-w-0 flex-col justify-start gap-0.5">
-          <CardTitle class="truncate text-[13px] leading-snug">{{ photo.title }}</CardTitle>
+          <CardTitle class="truncate text-[13px]">{{ photo.title }}</CardTitle>
           <CardDescription class="truncate text-[11px]">
             {{ t("photos.pageCount", { count: photo.pageCount }) }} <template v-if="photo.currentPageIndex > 0">· {{ progressLabel }}</template>
           </CardDescription>

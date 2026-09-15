@@ -245,7 +245,7 @@ describe("AppShell library search route sync", () => {
     })
   })
 
-  it("returns from comic reader pages to the recorded source route", () => {
+  it("returns from comic reader pages with a flush workspace and no shell header", () => {
     routerMocks.route.fullPath =
       "/comics/comic-1/read/3?returnTo=%2Fcomics%2Fcomic-1"
     routerMocks.route.name = "comic-reader"
@@ -254,12 +254,11 @@ describe("AppShell library search route sync", () => {
     routerMocks.route.query = { returnTo: "/comics/comic-1" }
 
     const wrapper = mount(AppShell)
+    const contentFrame = wrapper.get("[data-router-view-frame]")
 
-    expect(wrapper.text()).toContain("shell.backDetail")
-    expect(wrapper.text()).not.toContain("shell.backLibrary")
-    expect(JSON.parse(wrapper.get("a[data-to]").attributes("data-to") ?? "{}")).toBe(
-      "/comics/comic-1",
-    )
+    expect(wrapper.find("[data-shell-header]").exists()).toBe(false)
+    expect(contentFrame.classes().join(" ")).not.toContain("px-[var(--app-page-px)]")
+    expect(contentFrame.classes().join(" ")).not.toContain("py-[var(--app-page-py)]")
   })
 
   it("uses the tightened desktop sidebar grid transition", () => {
@@ -283,7 +282,7 @@ describe("AppShell library search route sync", () => {
     expect(headerClasses).not.toContain("min-h-[4.5rem]")
   })
 
-  it.each(["library", "comics", "photos"])(
+  it.each(["library", "comics", "photos", "comic-reader", "photo-viewer"])(
     "does not wrap %s routes in the global workspace padding",
     (routeName) => {
       routerMocks.route.name = routeName

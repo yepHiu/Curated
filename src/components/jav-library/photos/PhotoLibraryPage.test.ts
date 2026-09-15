@@ -45,12 +45,12 @@ describe("PhotoLibraryPage", () => {
     })
 
     expect(wrapper.find("h1").exists()).toBe(true)
-    expect(wrapper.get("[data-photo-library-toolbar]").classes()).toEqual(
-      expect.arrayContaining(["flex-wrap", "items-center", "justify-between", "pb-1"]),
-    )
+    expect(wrapper.get("[data-photo-library-toolbar]").classes()).toContain("justify-end")
+    expect(wrapper.get("[data-photo-library-toolbar]").classes()).not.toContain("justify-between")
+    expect(wrapper.get("[data-photo-library-toolbar]").classes()).not.toContain("pb-1")
     expect(wrapper.find("[data-photo-library-toolbar] input").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("photos.searchPlaceholder")
-    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("library.savedViewSort")
+    expect(wrapper.get("[data-book-sort-trigger]").text()).toBe("photos.sortByAdded")
   })
 
   it("renders photo books in the photo wall", () => {

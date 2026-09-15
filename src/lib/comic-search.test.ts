@@ -35,6 +35,15 @@ describe("comic search", () => {
     expect(filterComics(comics, { q: "hidden shelf" }).map((comic) => comic.id)).toEqual(["path"])
   })
 
+  it("requires an exact tag match and does not treat substring title hits as tags", () => {
+    const list = [
+      makeComic({ id: "exact", tags: ["作者:青井"] }),
+      makeComic({ id: "title-hit", title: "作者:青井笔记", tags: ["monochrome"] }),
+    ]
+
+    expect(filterComics(list, { tag: "作者:青井" }).map((comic) => comic.id)).toEqual(["exact"])
+  })
+
   it("filters all, favorite, unread, reading, and read comics", () => {
     const list = [
       makeComic({ id: "favorite", isFavorite: true, readStatus: "reading" }),

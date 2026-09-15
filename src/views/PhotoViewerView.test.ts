@@ -21,7 +21,10 @@ function makePhoto(): PhotoBook {
 }
 
 const routeMock = vi.hoisted(() => ({
+  name: "photo-viewer" as const,
   params: { id: "photo-1", pageIndex: "4" } as Record<string, string>,
+  query: {} as Record<string, string>,
+  fullPath: "/photos/photo-1/view/4",
 }))
 
 const serviceState = vi.hoisted(() => ({
@@ -38,6 +41,7 @@ const serviceMocks = vi.hoisted(() => ({
   reloadPhotosFromApi: vi.fn(),
   getPhotoById: vi.fn(),
   loadPhotoDetail: vi.fn(),
+  patchPhotoViewer: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -58,6 +62,7 @@ vi.mock("@/services/photo-library-service", () => ({
     reloadPhotosFromApi: serviceMocks.reloadPhotosFromApi,
     getPhotoById: serviceMocks.getPhotoById,
     loadPhotoDetail: serviceMocks.loadPhotoDetail,
+    patchPhotoViewer: serviceMocks.patchPhotoViewer,
   }),
 }))
 
@@ -86,6 +91,8 @@ describe("PhotoViewerView", () => {
     serviceMocks.loadPhotoDetail.mockImplementation(async (id: string) =>
       id === serviceState.photo?.id ? serviceState.photo : undefined,
     )
+    serviceMocks.patchPhotoViewer.mockReset()
+    serviceMocks.patchPhotoViewer.mockResolvedValue(undefined)
   })
 
   it("loads the routed photo book into the photo viewer", async () => {

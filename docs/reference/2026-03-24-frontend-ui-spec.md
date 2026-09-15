@@ -123,6 +123,10 @@
 
 当前参考实现：`src/components/jav-library/LibrarySavedViewsControls.vue`。
 
+### 7.3 阅读器底栏 HUD 菜单
+
+漫画 / 写真阅读器底栏的设置菜单是播放/阅读面的局部例外：必须停在整条工具栏上方，与工具栏外缘保持 8px 间距，不得覆盖底栏。定位锚点是底栏卡片（`data-book-reader-chrome`），而不是设置按钮本身；`side="top"`、`sideOffset: 8`，并关闭 `sideFlip`，避免空间不足时翻到工具栏下方。普通页面一级菜单仍使用默认 `sideOffset: 4`。
+
 ## 8. 维护要求
 
 - 修改全局主题令牌、基础组件默认样式或关键业务组件视觉结构后，应同步更新本文件。

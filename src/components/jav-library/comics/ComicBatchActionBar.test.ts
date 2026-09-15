@@ -78,15 +78,13 @@ describe("ComicBatchActionBar", () => {
 
     await wrapper.get("[data-comic-batch-add-favorite]").trigger("click")
     await wrapper.get("[data-comic-batch-remove-favorite]").trigger("click")
-    await wrapper.get("[data-comic-batch-select-visible]").trigger("click")
     await wrapper.get("[data-comic-batch-clear-selection]").trigger("click")
-    await wrapper.get("[data-comic-batch-exit]").trigger("click")
 
     expect(wrapper.emitted("addFavorite")).toHaveLength(1)
     expect(wrapper.emitted("removeFavorite")).toHaveLength(1)
-    expect(wrapper.emitted("selectAllVisible")).toHaveLength(1)
     expect(wrapper.emitted("clearSelection")).toHaveLength(1)
-    expect(wrapper.emitted("exit")).toHaveLength(1)
+    expect(wrapper.find("[data-comic-batch-select-visible]").exists()).toBe(false)
+    expect(wrapper.find("[data-comic-batch-exit]").exists()).toBe(false)
   })
 
   it("submits tags and confirms deletion from the comic batch toolbar", async () => {

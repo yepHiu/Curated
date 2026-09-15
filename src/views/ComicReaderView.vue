@@ -5,11 +5,13 @@ import { useRoute } from "vue-router"
 import ComicReader from "@/components/jav-library/comics/ComicReader.vue"
 import type { ComicBook } from "@/domain/comic/types"
 import { clampComicPageIndex } from "@/lib/comic-reader-controls"
+import { resolveNavigationBackLink } from "@/lib/navigation-intent"
 import { useComicLibraryService } from "@/services/comic-library-service"
 
 const { t } = useI18n()
 const route = useRoute()
 const comicService = useComicLibraryService()
+const backIntent = computed(() => resolveNavigationBackLink(route))
 
 const comicId = computed(() =>
   typeof route.params.id === "string" ? route.params.id : undefined,
@@ -24,6 +26,7 @@ const loadError = ref("")
 
 watch(
   () => comicId.value,
+  /** 路由漫画变化时加载详情；离开时丢弃过期结果。 */
   async (id) => {
     comic.value = undefined
     loadError.value = ""
@@ -60,6 +63,8 @@ watch(
       :load-preferences="comicService.getComicPreferences"
       :save-preferences="comicService.saveComicPreferences"
       :save-progress="comicService.saveComicProgress"
+      :back-to="backIntent.to"
+      :back-label="t(backIntent.labelKey)"
     />
     <div
       v-else

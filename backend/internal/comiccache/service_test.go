@@ -4,9 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -82,6 +84,91 @@ func TestComicCacheServiceCreatesStatusAndCleansOnlyCacheFiles(t *testing.T) {
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Fatalf("source archive must not be deleted: %v", err)
 	}
+}
+
+// TestComicCacheEvictsOldestWhenOverMaxBytes 写入超过 maxBytes 后删除最久未访问封面。
+func TestComicCacheEvictsOldestWhenOverMaxBytes(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	root := t.TempDir()
+	store := newComicCacheServiceTestStore(t, root)
+	comicRoot := filepath.Join(root, "comics")
+	if err := os.MkdirAll(comicRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archivePath := filepath.Join(comicRoot, "Book Two.cbz")
+	if err := writeComicZipBytes(archivePath, map[string][]byte{
+		"001.png": tinyPNG(t),
+		"002.png": tinyPNG(t),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	path, err := store.AddComicLibraryPath(ctx, comicRoot, "Comics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := comicscanner.NewService(store).Scan(ctx, []contracts.ComicLibraryPathDTO{path}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := store.ListComicBooks(ctx, contracts.ListComicBooksRequest{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, err := store.GetComicBookDetail(ctx, page.Items[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Pages) < 2 {
+		t.Fatalf("need two pages, got %#v", detail.Pages)
+	}
+
+	cacheRoot := filepath.Join(root, "cache")
+	warm := NewService(cacheRoot, 2*1024*1024*1024, store)
+	first, err := warm.GetOrCreateThumbnail(ctx, detail, detail.Pages[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	limited := NewService(cacheRoot, first.SizeBytes, store)
+	second, err := limited.GetOrCreateThumbnail(ctx, detail, detail.Pages[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(first.Path); !os.IsNotExist(err) {
+		t.Fatalf("oldest thumbnail should be evicted, stat err=%v", err)
+	}
+	if _, err := os.Stat(second.Path); err != nil {
+		t.Fatalf("newest thumbnail must remain: %v", err)
+	}
+}
+
+// TestDecodeThumbnailSourceRejectsOversizeBytes 源字节超过 32MiB 时拒绝解码。
+func TestDecodeThumbnailSourceRejectsOversizeBytes(t *testing.T) {
+	t.Parallel()
+
+	_, err := decodeThumbnailSource(&repeatReader{n: maxSourceBytes + 2})
+	if !errors.Is(err, ErrSourceTooLarge) {
+		t.Fatalf("err = %v, want ErrSourceTooLarge", err)
+	}
+}
+
+type repeatReader struct {
+	n int
+}
+
+// Read 产出固定字节直到达到预定长度，用于超限源闸门测试。
+func (r *repeatReader) Read(p []byte) (int, error) {
+	if r.n <= 0 {
+		return 0, io.EOF
+	}
+	if len(p) > r.n {
+		p = p[:r.n]
+	}
+	for i := range p {
+		p[i] = 1
+	}
+	r.n -= len(p)
+	return len(p), nil
 }
 
 func newComicCacheServiceTestStore(t *testing.T, root string) *storage.SQLiteStore {

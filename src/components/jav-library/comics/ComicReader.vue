@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
+import { RouterLink, type RouteLocationRaw } from "vue-router"
 import type { ComicBook, ComicReaderSettings } from "@/domain/comic/types"
 import type {
   ComicReadingPreferencesDTO,
@@ -16,7 +18,9 @@ import {
   setTemporaryStitch,
   type TemporaryStitch,
 } from "@/lib/comic-reader-controls"
-import ComicReaderChrome from "@/components/jav-library/comics/ComicReaderChrome.vue"
+import { collectAdjacentBookPageUrls, prefetchBookPageUrls } from "@/lib/book-page-prefetch"
+import BookReaderChrome from "@/components/jav-library/books/BookReaderChrome.vue"
+import { Button } from "@/components/ui/button"
 
 const PROGRESS_SAVE_DELAY_MS = 300
 
@@ -35,15 +39,20 @@ const props = withDefaults(
       pageIndex: number,
       completed: boolean,
     ) => Promise<ComicReadingProgressDTO | unknown>
+    backTo?: RouteLocationRaw | string
+    backLabel?: string
   }>(),
   {
     initialPageIndex: 0,
     loadPreferences: undefined,
     savePreferences: undefined,
     saveProgress: undefined,
+    backTo: undefined,
+    backLabel: "",
   },
 )
 
+const { t } = useI18n()
 const pageIndex = ref(clampComicPageIndex(props.initialPageIndex, props.comic.pageCount))
 const preferences = ref<ComicReaderSettings>(resolveComicReaderPreferences(props.readerDefaults))
 const stitch = ref<TemporaryStitch | undefined>(getTemporaryStitch(props.comic.id))
@@ -105,6 +114,7 @@ const readerImageClass = computed(() =>
     : "block object-contain",
 )
 
+/** 拼页时把两页图像贴向中间接缝。 */
 function readerImagePositionClass(displayIndex: number) {
   if (!stitch.value || preferences.value.mode !== "page") {
     return "object-center"
@@ -118,6 +128,17 @@ const readerChromeOverlayClass = computed(() =>
     : "pointer-events-none translate-y-3 opacity-0",
 )
 
+const leftTurnStep = computed(() => (preferences.value.direction === "rtl" ? 1 : -1))
+const rightTurnStep = computed(() => -leftTurnStep.value)
+const leftTurnLabel = computed(() =>
+  leftTurnStep.value < 0 ? t("comics.readerPrevious") : t("comics.readerNext"),
+)
+const rightTurnLabel = computed(() =>
+  rightTurnStep.value < 0 ? t("comics.readerPrevious") : t("comics.readerNext"),
+)
+const showPageTurnZones = computed(() => preferences.value.mode === "page")
+
+/** 取消尚未写出的进度保存定时器。 */
 function clearProgressTimer() {
   if (progressTimer !== undefined) {
     clearTimeout(progressTimer)
@@ -125,6 +146,7 @@ function clearProgressTimer() {
   }
 }
 
+/** 把当前页进度节流写入资料库。 */
 function scheduleProgressSave() {
   if (!props.saveProgress) return
   clearProgressTimer()
@@ -135,11 +157,13 @@ function scheduleProgressSave() {
   }, PROGRESS_SAVE_DELAY_MS)
 }
 
+/** 清除本次会话的临时拼页。 */
 function clearStitch() {
   stitch.value = undefined
   clearTemporaryStitch(props.comic.id)
 }
 
+/** 按步长翻页并取消拼页。 */
 function moveBy(step: number) {
   if (step === 0) return
   clearStitch()
@@ -148,6 +172,7 @@ function moveBy(step: number) {
   pageIndex.value = next
 }
 
+/** 把当前页与相邻页临时拼在一起，仅当前会话有效。 */
 function stitchWith(offset: -1 | 1) {
   const adjacent = clampComicPageIndex(pageIndex.value + offset, props.comic.pageCount)
   if (adjacent === pageIndex.value) return
@@ -159,20 +184,36 @@ function stitchWith(offset: -1 | 1) {
   setTemporaryStitch(props.comic.id, next)
 }
 
-function toggleReaderMode() {
-  clearStitch()
-  const next = {
-    ...preferences.value,
-    mode: preferences.value.mode === "page" ? "scroll" : "page",
-  } satisfies ComicReaderSettings
+/** 把阅读偏好写回当前漫画并在切模式时拆掉拼页。 */
+function applyPreferences(next: ComicReaderSettings) {
+  if (next.mode !== preferences.value.mode) {
+    clearStitch()
+  }
   preferences.value = next
   void props.savePreferences?.(props.comic.id, next)
 }
 
+/** 从设置菜单写入阅读模式。 */
+function updateMode(mode: ComicReaderSettings["mode"]) {
+  applyPreferences({ ...preferences.value, mode })
+}
+
+/** 从设置菜单写入适配方式。 */
+function updateFit(fit: ComicReaderSettings["fit"]) {
+  applyPreferences({ ...preferences.value, fit })
+}
+
+/** 从设置菜单写入阅读方向。 */
+function updateDirection(direction: ComicReaderSettings["direction"]) {
+  applyPreferences({ ...preferences.value, direction })
+}
+
+/** 点击画面中央时显示或隐藏阅读控件。 */
 function toggleChrome() {
   chromeVisible.value = !chromeVisible.value
 }
 
+/** 方向键与空格翻页；输入框内不拦截。 */
 function onKeydown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) {
     return
@@ -194,6 +235,18 @@ watch(pageIndex, () => {
   scheduleProgressSave()
 })
 
+let cancelPrefetch: (() => void) | undefined
+
+/** 预取当前可见页 ±1 的原图，stitch 时以可见页为中心。 */
+function syncAdjacentPagePrefetch() {
+  cancelPrefetch?.()
+  cancelPrefetch = prefetchBookPageUrls(
+    collectAdjacentBookPageUrls(pages.value, visiblePageIndexes.value),
+  )
+}
+
+watch([pages, visiblePageIndexes], syncAdjacentPagePrefetch, { immediate: true })
+
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown)
   if (props.loadPreferences) {
@@ -206,6 +259,7 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown)
   clearProgressTimer()
   clearStitch()
+  cancelPrefetch?.()
 })
 </script>
 
@@ -265,6 +319,45 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <button
+        v-if="showPageTurnZones"
+        type="button"
+        data-reader-turn-previous
+        class="absolute inset-y-0 left-0 z-10 w-[18%] cursor-pointer bg-transparent"
+        :aria-label="leftTurnLabel"
+        @click.stop="moveBy(leftTurnStep)"
+      />
+      <button
+        v-if="showPageTurnZones"
+        type="button"
+        data-reader-turn-next
+        class="absolute inset-y-0 right-0 z-10 w-[18%] cursor-pointer bg-transparent"
+        :aria-label="rightTurnLabel"
+        @click.stop="moveBy(rightTurnStep)"
+      />
+
+      <div
+        data-reader-hud-top
+        :data-reader-chrome-visible="chromeVisible ? 'true' : 'false'"
+        class="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 py-3 transition duration-200 ease-out"
+        :class="chromeVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-3 opacity-0'"
+        @click.stop
+      >
+        <Button
+          v-if="backTo"
+          as-child
+          variant="secondary"
+          class="pointer-events-auto min-h-11 shrink-0 rounded-full sm:min-h-8"
+        >
+          <RouterLink :to="backTo">
+            {{ backLabel || t("shell.backPrevious") }}
+          </RouterLink>
+        </Button>
+        <h1 data-reader-title class="min-w-0 truncate text-sm font-medium text-foreground/90">
+          {{ comic.title }}
+        </h1>
+      </div>
+
       <div
         data-reader-chrome-overlay
         :data-reader-chrome-visible="chromeVisible ? 'true' : 'false'"
@@ -272,14 +365,20 @@ onUnmounted(() => {
         :class="readerChromeOverlayClass"
       >
         <div class="pointer-events-auto" @click.stop>
-          <ComicReaderChrome
+          <BookReaderChrome
+            kind="comics"
             :page-index="pageIndex"
             :page-count="props.comic.pageCount"
             :mode="preferences.mode"
+            :fit="preferences.fit"
+            :direction="preferences.direction"
+            :show-stitch="true"
             :stitched="Boolean(stitch)"
             @previous="moveBy(-1)"
             @next="moveBy(1)"
-            @toggle-mode="toggleReaderMode"
+            @update:mode="updateMode"
+            @update:fit="updateFit"
+            @update:direction="updateDirection"
             @stitch-previous="stitchWith(-1)"
             @stitch-next="stitchWith(1)"
             @clear-stitch="clearStitch"

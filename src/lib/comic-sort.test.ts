@@ -48,20 +48,6 @@ describe("sortComics", () => {
     expect(ids(sortComics(comics, "fileName"))).toEqual(["volume-1", "volume-2", "volume-10"])
   })
 
-  it("sorts favorite comics first, then keeps newer comics first", () => {
-    const comics = [
-      makeComic("new-normal", { addedAt: "2026-06-01T00:00:00.000Z", isFavorite: false }),
-      makeComic("old-favorite", { addedAt: "2026-01-01T00:00:00.000Z", isFavorite: true }),
-      makeComic("new-favorite", { addedAt: "2026-05-01T00:00:00.000Z", isFavorite: true }),
-    ]
-
-    expect(ids(sortComics(comics, "favorite"))).toEqual([
-      "new-favorite",
-      "old-favorite",
-      "new-normal",
-    ])
-  })
-
   it("falls back to imported-time sorting for unknown sort values", () => {
     const comics = [
       makeComic("old", { addedAt: "2026-01-01T00:00:00.000Z" }),

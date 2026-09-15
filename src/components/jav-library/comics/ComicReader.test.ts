@@ -11,17 +11,26 @@ vi.mock("vue-i18n", () => ({
   }),
 }))
 
-vi.mock("./ComicReaderChrome.vue", () => ({
+vi.mock("@/components/jav-library/books/BookReaderChrome.vue", () => ({
   default: {
-    name: "ComicReaderChrome",
-    props: ["pageIndex", "pageCount", "mode", "stitched"],
-    emits: ["previous", "next", "toggleMode", "stitchPrevious", "stitchNext", "clearStitch"],
+    name: "BookReaderChrome",
+    props: ["kind", "pageIndex", "pageCount", "mode", "fit", "direction", "showStitch", "stitched"],
+    emits: [
+      "previous",
+      "next",
+      "update:mode",
+      "update:fit",
+      "update:direction",
+      "stitchPrevious",
+      "stitchNext",
+      "clearStitch",
+    ],
     template: `
       <div data-reader-chrome>
         <span data-reader-chrome-mode>{{ mode }}</span>
         <button data-reader-prev @click="$emit('previous')" />
         <button data-reader-next @click="$emit('next')" />
-        <button data-reader-toggle-mode @click="$emit('toggleMode')" />
+        <button data-reader-toggle-mode @click="$emit('update:mode', mode === 'page' ? 'scroll' : 'page')" />
         <button data-reader-stitch-prev @click="$emit('stitchPrevious')" />
         <button data-reader-stitch-next @click="$emit('stitchNext')" />
         <button data-reader-clear-stitch @click="$emit('clearStitch')" />
@@ -30,8 +39,8 @@ vi.mock("./ComicReaderChrome.vue", () => ({
   },
 }))
 
-vi.mock("./ComicReaderSettingsMenu.vue", () => ({
-  default: { name: "ComicReaderSettingsMenu", template: "<div data-reader-settings />" },
+vi.mock("@/components/jav-library/books/BookReaderSettingsMenu.vue", () => ({
+  default: { name: "BookReaderSettingsMenu", template: "<div data-reader-settings />" },
 }))
 
 function pages(comicId: string): ComicPage[] {
@@ -335,5 +344,32 @@ describe("ComicReader", () => {
     await vi.advanceTimersByTimeAsync(350)
 
     expect(saveProgress).toHaveBeenCalledWith("reader-comic", 3, true)
+  })
+
+  it("prefetches the current and next original page images", async () => {
+    const created: { src: string }[] = []
+    class FakeImage {
+      decoding = ""
+      src = ""
+      constructor() {
+        created.push(this)
+      }
+    }
+    vi.stubGlobal("Image", FakeImage)
+
+    const wrapper = mount(ComicReader, {
+      props: {
+        comic: makeComic(),
+        readerDefaults: defaults,
+      },
+    })
+    await flushPromises()
+
+    expect(created.map((image) => image.src)).toEqual([
+      "https://example.com/page-1.jpg",
+      "https://example.com/page-2.jpg",
+    ])
+    wrapper.unmount()
+    vi.unstubAllGlobals()
   })
 })

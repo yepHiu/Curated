@@ -19,6 +19,7 @@ import {
   librarySearchSuggestionsHasAny,
 } from "@/lib/library-search-suggestions"
 import { resolveNavigationBackLink } from "@/lib/navigation-intent"
+import { patchBookLibraryQuery } from "@/lib/book-library-query"
 import {
   ACTORS_SEARCH_QUERY_KEY,
   getActorsSearchQuery,
@@ -137,6 +138,9 @@ const isHomeRoute = computed(() => route.name === "home")
 const isActorsRoute = computed(() => route.name === "actors")
 const isComicsRoute = computed(() => route.name === "comics")
 const isPhotosRoute = computed(() => route.name === "photos")
+const isBookReaderRoute = computed(
+  () => route.name === "comic-reader" || route.name === "photo-viewer",
+)
 /** 回收站不显示资料库顶栏搜索；首页也显示搜索框 */
 const showLibraryBrowseSearch = computed(
   () =>
@@ -188,6 +192,8 @@ const useFlushWorkspaceFrame = computed(() =>
     "player",
     "comics",
     "photos",
+    "comic-reader",
+    "photo-viewer",
   ].includes(String(route.name ?? "")),
 )
 
@@ -535,6 +541,16 @@ watchDebounced(
     }
     const normalized = value.trim()
     const currentQ = getLibrarySearchQuery(route.query).trim()
+    if (isComicsRoute.value || isPhotosRoute.value) {
+      if (normalized === currentQ) {
+        return
+      }
+      void router.replace({
+        name: librarySearchTargetRoute.value,
+        query: patchBookLibraryQuery(route.query, { q: normalized }),
+      })
+      return
+    }
     const currentTagFilters = getLibraryTagExactFilters(route.query)
     const currentTag = currentTagFilters.length === 1 ? currentTagFilters[0]! : ""
     const hasTagFilter = currentTagFilters.length > 0
@@ -614,6 +630,13 @@ function clearLibrarySearch() {
   }
   // 首页清除搜索仅清空输入框，留在首页
   if (isHomeRoute.value) {
+    return
+  }
+  if (isComicsRoute.value || isPhotosRoute.value) {
+    void router.replace({
+      name: route.name ?? "comics",
+      query: patchBookLibraryQuery(route.query, { q: "" }),
+    })
     return
   }
   void router.replace({
@@ -750,6 +773,7 @@ function clearActorsSearch() {
         >
           <!-- 桌面由共享顶栏高度控制并垂直居中，避免控件高度加 padding 和边框撑低分隔线。 -->
           <div
+            v-if="!isBookReaderRoute"
             data-shell-header
             class="flex min-h-[var(--app-header-min-height)] flex-wrap items-center justify-between gap-3 border-b border-border/60 px-[var(--app-header-px)] py-[var(--app-header-py)] sm:px-[var(--app-header-px-sm)] lg:px-[var(--app-header-px-lg)] lg:py-0"
           >

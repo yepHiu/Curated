@@ -111,6 +111,10 @@ alwaysApply: false
 
 参考：`LibrarySavedViewsControls` 的书签菜单与「保存当前视图为书签」命名面板。
 
+## 阅读器底栏 HUD 菜单（MUST）
+
+漫画 / 写真阅读器底栏的设置菜单必须出现在**整条工具栏上方**，与工具栏外缘保持 **8px** 间距，不得覆盖底栏。以底栏卡片为定位锚点（`data-book-reader-chrome`），`side="top"`、`sideOffset: 8`，并关闭 `sideFlip`，避免空间不足时翻到工具栏下方。这是播放/阅读面的局部例外，不改变普通页面一级菜单默认 `sideOffset: 4`。
+
 ## 变更同步
 
 修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/reference/2026-03-24-frontend-ui-spec.md`** 与本文件相关条目。

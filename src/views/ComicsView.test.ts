@@ -41,6 +41,7 @@ const serviceState = vi.hoisted(() => ({
 const serviceMocks = vi.hoisted(() => ({
   refreshSettings: vi.fn(),
   reloadComicsFromApi: vi.fn(),
+  ensureComicsLoaded: vi.fn(),
   patchComic: vi.fn<(comicId: string, patch: ComicPatch) => Promise<ComicBook | undefined>>(),
   deleteComic: vi.fn<(comicId: string) => Promise<void>>(),
 }))
@@ -69,6 +70,7 @@ vi.mock("@/services/comic-library-service", () => ({
     loadError: computed(() => serviceState.loadError),
     refreshSettings: serviceMocks.refreshSettings,
     reloadComicsFromApi: serviceMocks.reloadComicsFromApi,
+    ensureComicsLoaded: serviceMocks.ensureComicsLoaded,
     patchComic: serviceMocks.patchComic,
     deleteComic: serviceMocks.deleteComic,
   }),
@@ -164,6 +166,8 @@ describe("ComicsView batch management", () => {
     serviceMocks.refreshSettings.mockResolvedValue(undefined)
     serviceMocks.reloadComicsFromApi.mockReset()
     serviceMocks.reloadComicsFromApi.mockResolvedValue(undefined)
+    serviceMocks.ensureComicsLoaded.mockReset()
+    serviceMocks.ensureComicsLoaded.mockResolvedValue(undefined)
     serviceMocks.patchComic.mockReset()
     serviceMocks.patchComic.mockImplementation(async (comicId, patch) => {
       const comic = serviceState.comics.find((item) => item.id === comicId)
@@ -239,10 +243,26 @@ describe("ComicsView batch management", () => {
     })
   })
 
+  it("filters by exact tag instead of treating the tag as a title substring", async () => {
+    serviceState.comics = [
+      makeComic({ id: "tagged", tags: ["作者:青井"] }),
+      makeComic({ id: "title-only", title: "作者:青井笔记", tags: [] }),
+    ]
+    routerMocks.route.query = { tag: "作者:青井" }
+    const wrapper = mount(ComicsView)
+    await flushPromises()
+
+    expect(wrapper.find('[data-select-comic="tagged"]').exists()).toBe(true)
+    expect(wrapper.find('[data-select-comic="title-only"]').exists()).toBe(false)
+  })
+
   it("uses the same overflow-hidden page content frame as the movie library", async () => {
     const wrapper = mount(ComicsView)
     await flushPromises()
 
+    expect(serviceMocks.ensureComicsLoaded).toHaveBeenCalled()
+    expect(serviceMocks.refreshSettings).not.toHaveBeenCalled()
+    expect(serviceMocks.reloadComicsFromApi).not.toHaveBeenCalled()
     expect(wrapper.get("[data-comics-view-content]").classes()).toEqual(
       expect.arrayContaining([
         "flex",

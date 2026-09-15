@@ -3,6 +3,27 @@ import { describe, expect, it, vi } from "vitest"
 import type { ComicBook } from "@/domain/comic/types"
 import VirtualComicGrid from "./VirtualComicGrid.vue"
 
+vi.mock("@vueuse/core", () => ({
+  useResizeObserver: vi.fn(),
+  useMediaQuery: vi.fn(() => ({ value: false, __v_isRef: true })),
+}))
+
+vi.mock("vue-virtual-scroller", () => ({
+  DynamicScroller: {
+    props: ["items"],
+    template: `
+      <div data-dynamic-scroller data-comic-grid-scroller class="h-full min-h-0 overflow-y-auto pr-2">
+        <template v-for="(item, index) in ((items || []).length <= 4 ? items : (items || []).slice(0, 2))" :key="item.id ?? index">
+          <slot :item="item" :index="index" :active="true" />
+        </template>
+      </div>
+    `,
+  },
+  DynamicScrollerItem: {
+    template: "<div data-dynamic-scroller-item><slot /></div>",
+  },
+}))
+
 vi.mock("@/components/jav-library/comics/ComicCard.vue", () => ({
   default: {
     name: "ComicCard",
@@ -13,6 +34,7 @@ vi.mock("@/components/jav-library/comics/ComicCard.vue", () => ({
   },
 }))
 
+/** 构造墙测用漫画条目。 */
 function makeComic(id: string): ComicBook {
   return {
     id,
@@ -63,6 +85,18 @@ describe("VirtualComicGrid", () => {
     expect(cardFrame.attributes("style")).toContain("max-width: min(100%, var(--movie-card-max-width))")
   })
 
+  it("uses the same inner scroll gutter as the movie poster scroller", () => {
+    const wrapper = mount(VirtualComicGrid, {
+      props: {
+        comics: [makeComic("c1")],
+      },
+    })
+
+    expect(wrapper.get("[data-comic-grid-scroller]").classes()).toEqual(
+      expect.arrayContaining(["h-full", "min-h-0", "overflow-y-auto", "pr-2"]),
+    )
+  })
+
   it("passes batch selection state into comic cards and forwards toggles", async () => {
     const wrapper = mount(VirtualComicGrid, {
       props: {
@@ -80,5 +114,15 @@ describe("VirtualComicGrid", () => {
     await cards[0]!.trigger("click")
 
     expect(wrapper.emitted("toggleBatchSelect")).toEqual([["c1"]])
+  })
+
+  it("keeps the active card DOM far smaller than a 300-book list", () => {
+    const comics = Array.from({ length: 300 }, (_, index) => makeComic(`c${index + 1}`))
+    const wrapper = mount(VirtualComicGrid, {
+      props: { comics },
+    })
+
+    expect(wrapper.findAll("[data-comic-card]").length).toBeLessThan(80)
+    expect(wrapper.findAll("[data-comic-card]").length).toBeGreaterThan(0)
   })
 })
