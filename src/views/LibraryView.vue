@@ -38,7 +38,7 @@ import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
 import { getProgress, playbackProgressRevision } from "@/lib/playback-progress-storage"
 import { hasPlayedMovie, playedMovieCount } from "@/lib/played-movies-storage"
 import { buildUserTagSuggestionPool } from "@/lib/user-tag-suggestions"
-import { compareMoviesByLibrarySort } from "@/lib/movie-sort"
+import { compareAddedAtDesc, compareMoviesByLibrarySort } from "@/lib/movie-sort"
 import { useLibraryService } from "@/services/library-service"
 
 const USE_WEB_API = import.meta.env.VITE_USE_WEB_API === "true"
@@ -651,7 +651,7 @@ const queryFilteredMovies = computed(() => {
     list = raw
       .filter((movie) => isMovieRecentlyAdded(movie.addedAt))
       .slice()
-      .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
+      .sort((left, right) => compareAddedAtDesc(left.addedAt, right.addedAt))
   } else {
     list = [...raw]
   }

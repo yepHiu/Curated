@@ -333,3 +333,85 @@ func TestListActiveMovieCodeIndexSkipsTrash(t *testing.T) {
 		t.Fatalf("index = %+v", index)
 	}
 }
+
+// TestListMovies_AddedSortUsesIngestionTimeNotCode 确认同日入库按 created_at 新到旧，而不是按番号 id。
+func TestListMovies_AddedSortUsesIngestionTimeNotCode(t *testing.T) {
+	t.Parallel()
+
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "added-sort.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+
+	insert := func(id, addedAt, createdAt string) {
+		t.Helper()
+		// 插入同日、不同入库时刻的影片，番号顺序与时刻相反。
+		if _, err := store.db.ExecContext(ctx, `
+			INSERT INTO movies (
+				id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+				added_at, location, resolution, year, created_at, updated_at
+			) VALUES (?, ?, ?, '', '', 0, 0, 0, ?, ?, '1080p', 0, ?, ?)`,
+			id, id, strings.ToUpper(id), addedAt, filepath.Join(t.TempDir(), id+".mp4"), createdAt, createdAt,
+		); err != nil {
+			t.Fatalf("insert %s: %v", id, err)
+		}
+	}
+	insert("zzz-999", "2026-09-15", "2026-09-15T18:00:00Z")
+	insert("aaa-001", "2026-09-15", "2026-09-15T10:00:00Z")
+
+	page, err := store.ListMovies(ctx, contracts.ListMoviesRequest{Limit: 10})
+	if err != nil {
+		t.Fatalf("list movies: %v", err)
+	}
+	if len(page.Items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(page.Items))
+	}
+	if page.Items[0].ID != "zzz-999" || page.Items[1].ID != "aaa-001" {
+		t.Fatalf("order = %s, %s; want later ingestion first, not catalog-code order", page.Items[0].ID, page.Items[1].ID)
+	}
+}
+
+// TestMovieAddedAtTimestampMigrationPromotesDateOnlyValues 把日期-only added_at 提升为 created_at 时刻。
+func TestMovieAddedAtTimestampMigrationPromotesDateOnlyValues(t *testing.T) {
+	t.Parallel()
+
+	store, err := NewSQLiteStore(filepath.Join(t.TempDir(), "added-at-migrate.db"))
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	defer func() { _ = store.Close() }()
+	ctx := context.Background()
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("failed to migrate store: %v", err)
+	}
+	if _, err := store.db.ExecContext(ctx, `DELETE FROM schema_migrations WHERE name = '0051_movie_added_at_timestamp.sql'`); err != nil {
+		t.Fatalf("rewind migration: %v", err)
+	}
+	if _, err := store.db.ExecContext(ctx, `
+		INSERT INTO movies (
+			id, title, code, studio, summary, runtime_minutes, rating, is_favorite,
+			added_at, location, resolution, year, created_at, updated_at
+		) VALUES (
+			'late-code', 'Late', 'AAA-001', '', '', 0, 0, 0,
+			'2026-09-15', ?, '1080p', 0, '2026-09-15 18:00:00', '2026-09-15 18:00:00'
+		)`, filepath.Join(t.TempDir(), "late.mp4")); err != nil {
+		t.Fatalf("insert date-only movie: %v", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("re-apply migration: %v", err)
+	}
+
+	var addedAt string
+	if err := store.db.QueryRowContext(ctx, `SELECT added_at FROM movies WHERE id = 'late-code'`).Scan(&addedAt); err != nil {
+		t.Fatalf("read added_at: %v", err)
+	}
+	if addedAt != "2026-09-15T18:00:00Z" {
+		t.Fatalf("added_at = %q, want RFC3339 created_at", addedAt)
+	}
+}
+

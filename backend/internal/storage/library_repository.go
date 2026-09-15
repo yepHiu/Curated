@@ -55,7 +55,7 @@ func (s *SQLiteStore) ListMovies(ctx context.Context, request contracts.ListMovi
 	}
 
 	args = append(args, limit, offset)
-	orderBy := "ORDER BY m.added_at DESC, m.id ASC"
+	orderBy := "ORDER BY m.added_at DESC, m.created_at DESC"
 	if strings.EqualFold(strings.TrimSpace(request.Mode), "trash") {
 		orderBy = "ORDER BY m.trashed_at DESC, m.id ASC"
 	}

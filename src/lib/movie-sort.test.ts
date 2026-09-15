@@ -66,4 +66,21 @@ describe("movie-sort", () => {
       "empty",
     ])
   })
+
+  it("sorts by added time without using catalog-code id", () => {
+    // 同一天应按入库时刻排序；日期相同且无法区分时刻时保持原次序，不用番号。
+    const later = movie("aaa-001", { code: "AAA-001", addedAt: "2026-09-15T18:00:00Z" })
+    const earlier = movie("zzz-999", { code: "ZZZ-999", addedAt: "2026-09-15T10:00:00Z" })
+    expect(
+      [earlier, later].sort((left, right) => compareMoviesByLibrarySort(left, right, "added")).map((item) => item.id),
+    ).toEqual(["aaa-001", "zzz-999"])
+
+    const sameDayLaterId = movie("zzz-999", { code: "ZZZ-999", addedAt: "2026-09-15" })
+    const sameDayEarlierId = movie("aaa-001", { code: "AAA-001", addedAt: "2026-09-15" })
+    expect(
+      [sameDayLaterId, sameDayEarlierId]
+        .sort((left, right) => compareMoviesByLibrarySort(left, right, "added"))
+        .map((item) => item.id),
+    ).toEqual(["zzz-999", "aaa-001"])
+  })
 })

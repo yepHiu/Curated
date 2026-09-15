@@ -63,6 +63,7 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 		filtered = append(filtered, movie)
 	}
 
+	// 按入库时间新到旧；相同时间保持稳定次序，不用番号/id。
 	slices.SortFunc(filtered, func(a, b contracts.MovieDetailDTO) int {
 		switch {
 		case a.AddedAt > b.AddedAt:
@@ -70,7 +71,7 @@ func (s *Service) ListMovies(request contracts.ListMoviesRequest) contracts.Movi
 		case a.AddedAt < b.AddedAt:
 			return 1
 		default:
-			return strings.Compare(a.ID, b.ID)
+			return 0
 		}
 	})
 
@@ -145,7 +146,7 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			movie.Title = result.Number
 			movie.Location = result.Path
 			if movie.AddedAt == "" {
-				movie.AddedAt = time.Now().UTC().Format("2006-01-02")
+				movie.AddedAt = time.Now().UTC().Format(time.RFC3339)
 			}
 			if movie.Resolution == "" {
 				movie.Resolution = strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), ".")
@@ -167,7 +168,7 @@ func (s *Service) UpsertScannedMovie(result contracts.ScanFileResultDTO) {
 			RuntimeMinutes: 0,
 			Rating:         0,
 			IsFavorite:     false,
-			AddedAt:        time.Now().UTC().Format("2006-01-02"),
+			AddedAt:        time.Now().UTC().Format(time.RFC3339),
 			Location:       result.Path,
 			Resolution:     strings.TrimPrefix(strings.ToLower(filepath.Ext(result.Path)), "."),
 			Year:           0,

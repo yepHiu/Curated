@@ -11,7 +11,7 @@ import {
 import { filterMoviesBySavedView } from "@/lib/library-saved-view-filter"
 import { isMovieRecentlyAdded } from "@/lib/library-stats"
 import { movieSearchHaystack } from "@/lib/movie-search"
-import { compareMoviesByLibrarySort } from "@/lib/movie-sort"
+import { compareAddedAtDesc, compareMoviesByLibrarySort } from "@/lib/movie-sort"
 import { getProgress, type PlaybackProgressEntry } from "@/lib/playback-progress-storage"
 
 export const PLAYER_PLAYLIST_WINDOW_RADIUS = 10
@@ -109,7 +109,7 @@ export function listLibraryQueueMovies(input: {
     list = raw
       .filter((movie) => isMovieRecentlyAdded(movie.addedAt))
       .slice()
-      .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
+      .sort((left, right) => compareAddedAtDesc(left.addedAt, right.addedAt))
   } else {
     list = [...raw]
   }

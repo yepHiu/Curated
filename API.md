@@ -903,7 +903,8 @@ Query：
 说明：
 
 - 普通列表默认排除回收站；`mode=trash` 只返回回收站。
-- 普通列表按 `addedAt DESC, id ASC`；回收站按 `trashedAt DESC, id ASC`。
+- 普通列表按入库时刻新到旧（`addedAt`，相同时用内部 `created_at`，不用番号 `id`）；回收站按 `trashedAt DESC, id ASC`。
+- 新入库影片的 `addedAt` 为 RFC3339 UTC 时刻；升级会把仅有日期的历史 `addedAt` 回填为当时的 `created_at`。
 - `rating` 是有效评分：用户评分优先，否则使用元数据评分。
 - `userRating` 仅在存在用户本地评分时返回，供 Saved Views 等功能区分用户信号与刮削评分。
 - `tags` 是元数据 / NFO 标签；`userTags` 是本地用户标签。

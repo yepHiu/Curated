@@ -407,7 +407,7 @@
     <li><code>POST /api/library/health/scan</code>、<code>POST /api/library/health/repairs</code>、<code>GET /api/library/health/repairs/{repairId}</code>、<code>POST /api/library/health/actions</code> — 只读健康报告、持久化有界元数据修复队列和确认式审计清理；执行前重新验证精确 finding，离线存储只做根级报告，重启中断明确落盘。</li>
     <li><code>GET/POST /api/library/saved-views</code>、<code>PATCH/DELETE /api/library/saved-views/{savedViewId}</code>、<code>PUT /api/library/saved-views/order</code> — 有序、版本化 Saved Views；最多 50 项、名称规范化唯一、严格筛选 schema、事务化写入与完整重排。</li>
     <li><code>GET /api/insights/overview</code>、<code>GET /api/insights/breakdown</code> — 30/90/365/all 本地日历范围的有界个人观看聚合；breakdown 默认 10、最大 25，原始历史不出后端。</li>
-    <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>tag</code>、<code>actor</code>、<code>studio</code>、<code>playState</code>、<code>userRating</code>、<code>resolution</code>、<code>addedAfter</code>、<code>limit</code>、<code>offset</code>）；<code>recent</code> 为最近 30 天，未知 mode 返回 400。</li>
+    <li><code>GET /api/library/movies</code> — 分页列表（query：<code>mode</code>、<code>q</code>、<code>tag</code>、<code>actor</code>、<code>studio</code>、<code>playState</code>、<code>userRating</code>、<code>resolution</code>、<code>addedAfter</code>、<code>limit</code>、<code>offset</code>）；默认按入库时刻新到旧而不按番号；<code>recent</code> 为最近 30 天，未知 mode 返回 400。</li>
     <li><code>GET /api/library/movies/{movieId}</code> — 详情。</li>
     <li><code>PATCH /api/library/movies/{movieId}</code> — 更新收藏与用户评分（JSON 字段见下文）。</li>
     <li><code>GET .../stream</code> — 视频文件流（<code>http.ServeContent</code>，支持 Range）。</li>

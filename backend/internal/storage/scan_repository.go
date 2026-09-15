@@ -125,7 +125,7 @@ func (s *SQLiteStore) PersistScanMovie(ctx context.Context, result contracts.Sca
 	case errors.Is(queryErr, sql.ErrNoRows):
 		movieID := moviecode.NormalizeForStorageID(result.Number)
 		now := nowUTC()
-		addedAt := time.Now().UTC().Format("2006-01-02")
+		addedAt := now
 
 		_, err = tx.ExecContext(
 			ctx,
@@ -232,10 +232,12 @@ func lookupScanMovie(ctx context.Context, tx *sql.Tx, where string, arg string) 
 	return row, err
 }
 
+// movieRowIsTrashed 判断影片行是否已进入回收站。
 func movieRowIsTrashed(trashedAt string) bool {
 	return strings.TrimSpace(trashedAt) != ""
 }
 
+// nowUTC 返回当前 UTC 时刻的 RFC3339 文本，供入库时间与审计字段共用。
 func nowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)
 }

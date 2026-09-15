@@ -20,9 +20,19 @@ export const librarySortKeys = [
   "year",
 ] as const satisfies readonly LibrarySortKey[]
 
-/** 按入库时间（addedAt）新到旧。 */
+/** 比较入库时间，新到旧；可解析为时间时按时刻，否则按字符串。不使用番号或 id。 */
+export function compareAddedAtDesc(left: string, right: string): number {
+  const leftMs = Date.parse(left)
+  const rightMs = Date.parse(right)
+  if (!Number.isNaN(leftMs) && !Number.isNaN(rightMs) && leftMs !== rightMs) {
+    return rightMs - leftMs
+  }
+  return right.localeCompare(left)
+}
+
+/** 按入库时间（addedAt）新到旧；相同时保持稳定次序，不用番号。 */
 export function compareByAddedAtDesc(left: Movie, right: Movie): number {
-  return right.addedAt.localeCompare(left.addedAt) || left.id.localeCompare(right.id)
+  return compareAddedAtDesc(left.addedAt, right.addedAt)
 }
 
 /** 按有效评分（0–5）高到低；同分再以入库时间新到旧。 */

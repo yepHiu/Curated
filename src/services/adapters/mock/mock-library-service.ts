@@ -664,6 +664,7 @@ const movieSeeds: Omit<Movie, "id" | "code" | "location" | "addedAt">[] = [
 const codePrefixes = ["MKB", "SLD", "NVA", "HZK", "PRM", "LVS", "KTR", "AMR", "VLT", "NOA"]
 const storagePools = ["D:/Media/JAV/Main", "E:/Vault/JAV/New", "F:/Offline/Collections"]
 
+/** 用种子与序号拼出一部演示影片；入库时刻带秒偏移，避免同一天再按番号排序。 */
 const buildMovie = (index: number): Movie => {
   const seed = movieSeeds[index % movieSeeds.length]
   const prefix = codePrefixes[index % codePrefixes.length]
@@ -686,7 +687,7 @@ const buildMovie = (index: number): Movie => {
     metadataRating: rating,
     userRating: undefined,
     isFavorite: index % 4 === 0 ? true : seed.isFavorite,
-    addedAt: `2026-${month}-${day}`,
+    addedAt: new Date(Date.UTC(2026, Number(month) - 1, Number(day), 0, 0, index)).toISOString(),
     location: `${storage}/${prefix}-${serial}.${index % 2 === 0 ? "mkv" : "mp4"}`,
     year: seed.year + yearOffset,
     releaseDate: `${seed.year + yearOffset}-${month}-${day}`,
