@@ -561,3 +561,100 @@ d4eafec1 docs: record experimental agent E1 endpoints, facts, and requirement pr
 94183f61 test: make movie import upload ledger dates relative to now
 4ffd9888 docs: add agent charter, user PRD, and E1-E4 milestone plan
 79b8ebb9 chore(release): publish Curated 1.5.4",versionSource=auto-patch; BuildStamp=20260906.154156; portable=versionSource=explicit; installer=versionSource=explicit
+2026-09-16,1.5.6,712a9fe4,master,release:publish,release/portable/Curated-1.5.6-windows-x64.zip; release/installer/Curated-Setup-1.5.6.exe; release/manifest/release.json,成功,wujiahui,"712a9fe4 fix(library): sort added movies by ingestion time, not catalog codes
+e5dd8c1c docs(shell): record desktop sidebar animation performance review
+39a1934c docs(playback): note Electron libmpv integration options
+369fa98d docs: add Figma, SMB, Agent icon, and requirements review plans
+dfc868b8 docs: sync API and facts for book notes, ratings, titles, and Agent
+938317cb docs(agent): record comic and photo library Agent scope
+6811993f docs(books): record notes, ratings, and display-title plans
+7986f45f feat(agent): enable comic and photo library tools when Beta is on
+507c2afd feat(books): add notes, ratings, and editable display titles
+df3800d1 docs(books): record browse filters, reader HUD, and wall performance
+0e72e690 feat(books): add library filters, shared reader chrome, and wall paging
+a511c2f7 feat(security): disable PIN from settings when LAN is off
+d3090ebe fix(ai): sync governance when the app mounts
+a4756ace docs(rules): require a comment on every function
+c11a668e docs: refresh project dashboard for September 11
+ae6c2e5b docs(books): document media information menu and dialog
+10fe707c feat(books): move source details into media information dialog
+dfec0382 docs(books): document adaptive preview proportions
+f9472323 fix(books): adapt preview cards to natural image proportions
+5f2de76c docs(detail): record movie card spacing verification
+2af16efe fix(detail): remove duplicate movie card vertical padding
+11ddf3bb docs(import): record target directory UI verification
+37879a86 fix(import): unify media target directory display
+bc2c3ea6 docs(books): record shared tag control verification
+a0c88202 refactor(tags): reuse movie tag add control across media details
+5da02b00 docs(books): record detail spacing alignment checks
+439ac70d fix(books): align detail gutters and cover spacing with movies
+cb91ffbe fix(agent): keep chat closed when AI settings load
+27085b28 style(agent): use a double chat bubble entry icon
+03ca75ed fix(shell): restore header alignment with the sidebar brand
+690c348f fix(books): use compact desktop reading buttons
+81749970 docs(books): describe numbered preview pagination
+e2ffcf42 feat(books): replace preview page input with numbered pagination
+095f942f fix(photos): hide empty tag placeholder in details
+f0ae71c7 docs(photos): document detail tag editing and persistence
+cb77562f feat(photos): add persistent tags from photo details
+e6c5d4f0 feat(photos): persist tags through a gated photo endpoint
+929d07d8 fix(photos): use an open book icon for reading
+7ecad51f fix(photos): label the open action as read
+7e381477 fix(settings): narrow reader default option controls
+51719c12 fix(settings): align book library add path buttons to the right
+50deea59 test(libraries): include loaded state in book view service mocks
+03cfc7d3 fix(libraries): match book sort controls to movie library UI
+d2abf570 docs(libraries): update card title display behavior
+76670766 fix(libraries): truncate comic and photo card titles to one line
+0be36962 docs(libraries): record adaptive preview behavior and validation
+bc5e9a07 feat(libraries): align book browsing UI and adaptive previews
+6dead3c0 perf(photos): generate bounded cached page thumbnails
+01b351b5 docs(import): document unified media import and verification
+6c20262c feat(import): unify media uploads in gated tabs
+e32d46a4 feat(photos): support isolated archive imports
+7dd35d4d fix(settings): remove AI card from experimental features
+4da7bd89 docs: record movie-only Agent boundary for media Beta
+ee713c7b fix(agent): exclude comic and photo libraries from AI scope
+25e2d623 docs: refresh dashboard after media Beta integration
+145c5241 docs: record comic and photo Beta scope and verification
+28f6c9f8 build: load pinyin dictionaries as data within existing JS budgets
+b31e7a35 feat(media): merge comic and photo libraries behind experimental Beta switches
+b1108e02 feat(media): preserve comic refinements and photo library beta implementation
+4e186743 docs: refresh project dashboard for September 10
+30dccba2 docs(agent): document referenced answers and verification results
+1592f556 fix(agent): distinguish write target IDs from generated catalog claims
+fa95050b feat(agent): validate and render referenced movie answers before publication
+e028cb62 docs(agent): document optional limits and confirmation states
+9826e005 fix(agent): distinguish execution limits and confirmation outcomes
+ec933dab feat(agent): capture request-scoped answer references
+5677a26c feat(agent): make tool-step limits opt-in
+b2e6e7a8 docs(ui): clarify bookmark panel spacing and mobile behavior
+288e6db7 fix(library): align bookmark creation UI and keyboard behavior
+a4fc33a0 test(release): use platform FFmpeg fixture names
+519fe911 fix(build): track required Electron preload copy script
+b63a1043 ci: build frontend with production Web API mode
+a4fb8fe6 test(app): drain actor scrape tasks before closing stores
+55580d6d test(playback): assert platform-specific encoder candidates
+3f64f437 test(backup): use portable absolute library paths
+26d3d346 chore(release): record published Curated 1.5.5
+4f524c0f fix(frontend): align comic settings path add flow
+37e71f7b fix(frontend): hide comic detail source metadata
+6ee0e6aa fix(frontend): simplify comic library header
+5667b123 fix(frontend): align comic detail actions and poster sizing
+79a4d00b docs: record comic detail action design
+e48d1ed4 fix(frontend): align comic layouts with movie views
+6af8a538 docs: document comic library MVP
+980282b8 fix(frontend): satisfy comic lint checks
+3a2268b1 feat(frontend): track comic tasks
+f96f9890 feat: add comic import flow
+0bd0b06e feat(frontend): add comic reader
+93108047 feat(frontend): add comic library and detail pages
+0aa7f581 feat(frontend): add comic navigation shell
+efc9a9a2 feat(frontend): add comic settings
+f0ab7f49 feat(frontend): add comic service boundary
+1787304f feat(backend): add comic library APIs
+033f9299 feat: expose comic settings and scan APIs
+c9ba0bf7 feat(backend): add comic scanner
+14c975a1 feat(backend): add comic archive reader
+b62647da feat(backend): add comic repositories
+ab814699 feat(backend): add comic schema and settings",versionSource=auto-patch; BuildStamp=20260915.161823; portable=versionSource=explicit; installer=versionSource=explicit
