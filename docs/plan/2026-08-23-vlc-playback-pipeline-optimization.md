@@ -393,3 +393,31 @@ Go + FFmpeg + 浏览器 HLS，栈和内容域最像。HLS 大修在 [#2322](http
 **不要：** 把 Jellyfin/Stash/Kyoo 当依赖嵌进来；不要用 VLC sout；不要为了「成熟」换 video.js/dash.js。
 
 **可以：** 读 Gocoder 的 Go 实现当批次 4 的蓝图（GPL/许可证需再核 `transcoder/` 目录许可后再决定是借鉴还是 submodule）；FFmpeg 参数与会话状态机用 MIT/Apache 思路在 `backend/internal/playback` 重写。
+
+## 10. 2026-09-09 Electron 集成 libmpv 可行性补充
+
+状态：技术建议，尚未实现或完成原型验证。当前 `electron/preload.cjs` 仅暴露目录选择；现有 Electron 壳与 Web 播放器不等于已嵌入 libmpv。
+
+Electron 可以通过原生桥接集成 libmpv。libmpv 是 C API 播放库，不能直接作为 Vue 组件或替换 Chromium 的 `<video>` 解码器。控制桥接与视频画面合成是两项独立工作。
+
+| 路线 | 实际集成内容 | 适用范围与主要限制 |
+| --- | --- | --- |
+| mpv 独立进程 + JSON IPC | Electron 管理 mpv 进程并同步播放状态；可另行验证 `--wid` 窗口嵌入 | 初步验证原生播放较快；不是直接链接 libmpv，内嵌仍有平台和层级问题 |
+| libmpv + 原生窗口 | 原生 addon 或独立 helper 加载 libmpv，以 `wid` 指向受管理的原生窗口 | Windows 可先验证子 HWND；不能把任意 DOM 元素当窗口句柄，也不能默认 HTML 控件能覆盖原生画面 |
+| libmpv Render API + 自定义合成 | 原生侧维护图形上下文与渲染生命周期，再完成与 Electron 的画面合成 | 更适合深度定制，但 libmpv 的纹理不能直接交给页面 WebGL；GPU 共享、跨进程同步、平台差异需要单独设计验证 |
+
+建议先在 Windows 做有界原型：Electron 主进程管理独立原生播放 helper，helper 加载 libmpv 并拥有播放窗口与渲染线程；Vue 经窄化 preload IPC 发送播放、暂停、seek、音量和轨道选择，订阅状态及错误。独立 helper 有利于隔离原生崩溃，但不会自动解决视频嵌入与合成问题。仅需原生播放能力时，也可先用 mpv 独立进程验证控制契约。
+
+原型优先验证现有产品交互：视频上方的进度条、菜单、萃取帧 HUD 能否正确显示，窗口移动/缩放、跨屏 DPI、全屏与焦点是否稳定；再评估是否采用 Render API 深度合成。不能仅凭“能播放”判断可以替换现有 PlayerPage。
+
+业务层通过统一播放接口选择 Web 或原生实现，前端保持浏览器可用。Go 继续负责资料库、媒体访问授权和持久化；本机可访问文件可以直读，远程后端媒体应通过受控 HTTP 访问，不能把远程机器的本地路径当客户端路径。原生请求需要正确传递现有媒体认证，不能假设自动继承 Chromium Cookie。
+
+原生直解可减少因 Chromium 编解码限制产生的转码，并提供字幕、音轨和播放控制能力；硬解、HDR、seek 性能仍取决于构建、驱动、文件索引和显示链路，不能承诺任意影片无卡顿。截图/萃取帧需要新增原生实现，现有从 HTMLVideoElement 读取 canvas 的路径无法原样复用；浏览器与 LAN 客户端继续保留 direct/HLS。
+
+许可修正：前文将 libmpv 简称为 LGPL 不够准确。mpv 默认整体为 GPLv2+，符合条件且排除 GPL 代码的构建可为 LGPLv2.1+；`-Dgpl=false` 本身不是许可合规保证。分发应核对实际 libmpv 二进制、FFmpeg 依赖与对应分发义务，不能仅凭 DLL 名称判断许可。
+
+官方依据（2026-09-09 核对）：
+
+- [libmpv Client API 与窗口嵌入说明](https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h)：推荐 Render API，同时说明 `wid` 更简单但存在问题。
+- [libmpv Render API](https://github.com/mpv-player/mpv/blob/master/include/mpv/render.h)：支持 OpenGL 和软件渲染，并规定线程与上下文要求。
+- [mpv 许可与构建条件](https://github.com/mpv-player/mpv/blob/master/Copyright)。
