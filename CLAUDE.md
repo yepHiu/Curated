@@ -211,7 +211,7 @@ POST   /api/auth/setup-pin                  # Create or replace the app PIN; sto
 POST   /api/auth/unlock                     # Verify PIN and issue HTTP-only curated_auth cookie; trustedForever creates a non-expiring trusted-device session
 POST   /api/auth/change-pin                 # Change the PIN after an unlocked session verifies the current PIN
 POST   /api/auth/lock                       # Revoke the current auth session and clear curated_auth
-PATCH  /api/auth/settings                   # Update non-secret PIN lock settings; requires an unlocked session
+PATCH  /api/auth/settings                   # Update non-secret PIN lock settings; pinEnabled=false disables PIN unless LAN non-loopback still requires it
 GET    /api/auth/sessions                   # List active trusted-forever sessions by safe public ID (never exposes bearer tokens)
 DELETE /api/auth/sessions/{publicId}        # Revoke one trusted-forever session
 POST   /api/auth/sessions/revoke-others     # Revoke all trusted-forever sessions except the current session
@@ -334,7 +334,7 @@ POST   /api/providers/ping-all              # Ping all providers
 
 **Async Task Pattern:** Long-running operations (scan, movie scrape, actor scrape) return a task ID. Poll `GET /api/tasks/{taskId}` for progress. Frontend uses `useScanTaskTracker()` composable for this.
 
-**PIN App Lock:** PIN lock is disabled by default. When enabled, all protected `/api/*` routes are guarded by backend middleware and return `423 AUTH_LOCKED` without a valid `curated_auth` HTTP-only cookie. PIN values are stored in SQLite only as Argon2id salted hashes; the non-secret PIN length is stored separately and returned as `pinLength` so `/lock` can render the correct number of keyboard-entry cells. Curated now uses one global PIN policy for local and LAN clients; the old `lanRequiresPin` status field remains fixed at `true` only for compatibility and is no longer writable or shown as a switch. Regular unlock sessions use `sessionTtlMinutes` as an idle-lock delay: protected API use and frontend activity refresh `/api/auth/status`, extending `sessionExpiresAt` instead of locking on a fixed countdown. Unlock can also use `{ "trustedForever": true }`, which leaves `sessionExpiresAt` empty and survives backend restart-lock cleanup until the current device is explicitly locked or the session is revoked. Trusted sessions have a separate random `public_id`, allowing list/revoke APIs and a Settings -> Security device/session manager without exposing the bearer token stored in the HTTP-only cookie; the UI marks the current device and confirms single/other-device revocation. `/api/health`, `/api/auth/status`, `/api/auth/setup-pin`, `/api/auth/unlock`, and `/api/auth/lock` remain public so the lock UI can render and recover; `POST /api/auth/change-pin` is protected and additionally verifies the current PIN. Invalid setup/unlock attempts are limited by source IP and hashed client key: after five consecutive failures the backend applies exponential backoff and returns `429 AUTH_RATE_LIMITED` with `Retry-After` plus `details.retryAfterSeconds`; successful setup/unlock clears the counters.
+**PIN App Lock:** PIN lock is disabled by default. When enabled, all protected `/api/*` routes are guarded by backend middleware and return `423 AUTH_LOCKED` without a valid `curated_auth` HTTP-only cookie. PIN values are stored in SQLite only as Argon2id salted hashes; the non-secret PIN length is stored separately and returned as `pinLength` so `/lock` can render the correct number of keyboard-entry cells. Curated now uses one global PIN policy for local and LAN clients; the old `lanRequiresPin` status field remains fixed at `true` only for compatibility and is no longer writable or shown as a switch. Settings -> Security can turn PIN off through `PATCH /api/auth/settings` with `pinEnabled: false`, which clears the stored hash and revokes all sessions; a later enable must use `POST /api/auth/setup-pin`. Non-loopback LAN listeners cannot disable PIN and return `400 AUTH_PIN_REQUIRED_FOR_LAN`. Regular unlock sessions use `sessionTtlMinutes` as an idle-lock delay: protected API use and frontend activity refresh `/api/auth/status`, extending `sessionExpiresAt` instead of locking on a fixed countdown. Unlock can also use `{ "trustedForever": true }`, which leaves `sessionExpiresAt` empty and survives backend restart-lock cleanup until the current device is explicitly locked or the session is revoked. Trusted sessions have a separate random `public_id`, allowing list/revoke APIs and a Settings -> Security device/session manager without exposing the bearer token stored in the HTTP-only cookie; the UI marks the current device and confirms single/other-device revocation. `/api/health`, `/api/auth/status`, `/api/auth/setup-pin`, `/api/auth/unlock`, and `/api/auth/lock` remain public so the lock UI can render and recover; `POST /api/auth/change-pin` is protected and additionally verifies the current PIN. Invalid setup/unlock attempts are limited by source IP and hashed client key: after five consecutive failures the backend applies exponential backoff and returns `429 AUTH_RATE_LIMITED` with `Retry-After` plus `details.retryAfterSeconds`; successful setup/unlock clears the counters.
 
 **Library directory watch (fsnotify):** When the main config allows it (`libraryWatchEnabled`, default on) and **`autoLibraryWatch`** is true (default, persisted in `library-config.cfg`), the backend watches library roots for new files and, after debounce, queues a scan with `trigger: fsnotify`. Turning **`autoLibraryWatch`** off stops the watch loop and ignores watch-driven enqueue; manual or interval full scans are unchanged. When **`autoActorProfileScrape`** is true, successful movie metadata scrapes also enqueue `scrape.actor` tasks for actors that still lack both avatar and summary, and a bounded background sweep backfills the same missing-profile actors after startup and every 15 minutes (batch of 50, 24-hour failed-attempt cooldown).
 
@@ -489,6 +489,28 @@ User comments/notes per movie:
 - **Web API mode:** Stored in backend via `GET/PUT /api/library/movies/{id}/comment` (table `library_movie_comments`)
 - **Mock mode:** Stored in `localStorage` (key: `jav-library-movie-comment-v1`)
 
+### Comic and photo comments
+
+The same notes card (Chinese title 我的评论) also appears on comic and photo detail pages. Reads and writes stay on the independent comic/photo services; Agent can polish and preview-write these notes when the matching library Beta is enabled.
+
+- **Web API mode:** `GET/PUT /api/library/comics/books/{id}/comment` (`comic_book_comments`) and `GET/PUT /api/library/photos/books/{id}/comment` (`photo_book_comments`)
+- **Mock mode:** `curated-mock-comic-comments-v1` and `curated-mock-photo-comments-v1`
+
+### Comic and photo ratings
+
+Movie, comic, and photo detail pages place the rating card below tags in the info column at 250px. There is no site score on books, only a local 0–5 half-star rating.
+
+- **Web API mode:** Comics reuse `PATCH /api/library/comics/{id}`; photos use `PATCH /api/library/photos/{id}` (`comic_books.user_rating` / `photo_books.user_rating`)
+- **Mock mode:** Comic prefs stay in `curated-comic-prefs-v1`; photo ratings use `curated-mock-photo-ratings-v1`
+
+### Comic and photo display titles
+
+Media info on comic and photo detail pages can edit the display title. List/detail `title` prefers `user_title` over the scanned filename title. Scan updates the source `title` and does not clear the overlay (migration `0050`). Empty titles are rejected; the limit is 500 Unicode scalars.
+
+- **Web API mode:** Comics keep `PATCH /api/library/comics/{id}` `title`; photos add the same field on `PATCH /api/library/photos/{id}`
+- **Mock mode:** Comic titles stay in `curated-comic-prefs-v1`; photo titles use `curated-mock-photo-titles-v1`
+- Agent `translate_title` accepts `movieId` XOR `comicId` XOR `photoId`; confirmation writes `update_comic_title` / `update_photo_title`
+
 ### Curated Frames
 
 Frame extraction and management:
@@ -580,8 +602,10 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/import/photos` | Upload ZIP/CBZ to default photo root; Beta required; preserve source; no overwrite; queue photo scan |
 | GET | `/api/library/comics`, `/api/library/photos` | List books |
 | GET | `/api/library/comics/{id}`, `/api/library/photos/{id}` | Book detail |
+| PATCH | `/api/library/photos/{id}` | Photo display title (`title`) and local rating (`ratingSet` / `ratingClear` / `rating` 0–5) |
 | PATCH | `/api/library/photos/books/{id}/tags` | Replace photo tags with `{ tags: string[] }`; returns updated detail, requires photo Beta |
-| PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete operation |
+| GET / PUT | `/api/library/comics/books/{id}/comment`, `/api/library/photos/books/{id}/comment` | Per-book personal notes (`{ body, updatedAt }`); empty body when none saved; 10000 Unicode scalars; Beta required |
+| PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete; `title` writes the display overlay |
 | POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
 | GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |
 | GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/image` | Page image |
@@ -595,11 +619,11 @@ Photo per-book progress/preferences APIs and concrete cache cleanup are not impl
 
 ### Agent domain boundary
 
-AI Agent remains movie-only when comic/photo Beta is enabled. It must not access, operate on or draw conclusions about either book library. Page context and entity seeding exclude comic/photo routes, `get_task_status` accepts only movie-related task types, and chat / Insights narrative prompts limit all aggregates and conclusions to movie data. See `docs/plan/2026-09-10-comic-photo-beta-integration.md`.
+When comic or photo Beta is enabled, Agent can search, present, polish notes, and translate display titles for that library. Page context is collected on the six book routes, `@` mentions include loaded books, `get_task_status` can read the matching scan/import/cache tasks, and chat cards use `present_comics` / `present_photos` plus SSE `book_cards`. Insights, Saved Views, provider/source-page tools, curated frames, summary translation, and ratings remain movie-only. Disabled libraries return `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`. See `docs/plan/2026-09-12-comic-photo-agent.md` and `docs/plan/2026-09-14-comic-photo-title-edit.md`.
 
 ### Photo archive upload (2026-09-11)
 
-`POST /api/import/photos` accepts multipart `files` (ZIP/CBZ) and optional `totalBytes`; uses the configured `defaultPhotoImportLibraryPathId`, returns HTTP 202 with an `import.photos` TaskDTO after copying, and reports `completedFiles`, `failedFiles`, `errorItems`, and `scanTaskId` when scanning starts. A 202 response can contain `failed` or `partial_failed`; callers must inspect status. Missing target returns `PHOTO_IMPORT_TARGET_MISSING`, disabled Beta returns `PHOTO_LIBRARY_DISABLED`, and conflicts report `PHOTO_IMPORT_CONFLICT`. Files are copied within the configured photo root and existing archives are never overwritten. Agent tools do not expose photo import tasks.
+`POST /api/import/photos` accepts multipart `files` (ZIP/CBZ) and optional `totalBytes`; uses the configured `defaultPhotoImportLibraryPathId`, returns HTTP 202 with an `import.photos` TaskDTO after copying, and reports `completedFiles`, `failedFiles`, `errorItems`, and `scanTaskId` when scanning starts. A 202 response can contain `failed` or `partial_failed`; callers must inspect status. Missing target returns `PHOTO_IMPORT_TARGET_MISSING`, disabled Beta returns `PHOTO_LIBRARY_DISABLED`, and conflicts report `PHOTO_IMPORT_CONFLICT`. Files are copied within the configured photo root and existing archives are never overwritten. Agent tools do not expose a dedicated photo-import write action; `get_task_status` can read `import.photos` when photo Beta is enabled.
 
 ### Book page previews (2026-09-11)
 

@@ -185,7 +185,7 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Actors | Browse, profile, tags, links, avatar cache, scrape, canonical aliases, audited merge |
 | Curated frames | Queued captures with preview/retry/undo, source-file frames, cursor browsing, visual similarity review, JPG/WebP/PNG/ZIP export and GIF/MP4/WebM motion |
 | Homepage / insights | Daily recommendations with reason codes and local feedback; Personal Insights ranges and actor/studio/tag breakdowns |
-| Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock |
+| Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings disable PIN |
 | Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
@@ -355,11 +355,11 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 
 开关及路径在 Web 模式下刷新或重启后保留；Mock 开关仅当前会话有效。写真暂未实现单册进度/偏好 API 或独立缓存清理，缩略图使用最长边 420px 的 JPEG，进程内缓存最多 32 MiB；设置中的磁盘缓存上限仍为预留项。支持 ZIP/CBZ，不支持 RAR/CBR/7z。
 
-旧实验 worktree 和数据保留，合并不会搬移其运行数据库或真实媒体。迁移使用 `0046_comic_library.sql`、`0047_photo_library.sql`、`0048_photo_books.sql`。详情见 [Beta 整合与验收记录](plan/2026-09-10-comic-photo-beta-integration.md)、[配置说明](reference/2026-03-21-library-organize.md) 与 [API](../API.md#comic-and-photo-library-beta)。
+旧实验 worktree 和数据保留，合并不会搬移其运行数据库或真实媒体。迁移使用 `0046_comic_library.sql`、`0047_photo_library.sql`、`0048_photo_books.sql`、`0049_comic_photo_comments.sql`。详情见 [Beta 整合与验收记录](plan/2026-09-10-comic-photo-beta-integration.md)、[配置说明](reference/2026-03-21-library-organize.md) 与 [API](../API.md#comic-and-photo-library-beta)。
 
 ### AI Agent scope for media Beta
 
-漫画库和写真库独立于 AI Agent。即使启用 Beta，Agent 的查询、操作、推荐和分析结论仍只覆盖影片及其相关数据，个人洞察也只统计影片观看。在图片库页面打开 Agent 不会附带该库页面的搜索、筛选或内容。询问图片库时，Agent 应简短说明当前只支持影片相关数据，不据影片数据推断图片库内容。
+漫画库或写真库启用后，Agent 可以查询、展示该库内容，并预览/润色个人笔记。未启用的库仍在范围外。个人洞察、Saved Views、源站检索、萃取帧和评分写工具仍只服务影片，不能把影片统计说成全部媒体。在漫画/写真页面打开 Agent 会附带该页的图册与筛选上下文。详见 [漫画 / 写真接入 Agent](plan/2026-09-12-comic-photo-agent.md)。
 
 ## 添加媒体（2026-09-11）
 
@@ -369,10 +369,18 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 
 ## 漫画与写真浏览（2026-09-11）
 
-写真详情页的标签区提供「添加」：输入后点击添加或按 Enter 保存，Esc 取消；保存失败会保留草稿。标签去除首尾空白并去重，最多 64 个，每个最多 64 个 Unicode 字符。Web 模式保存到独立写真 SQLite 表，刷新后仍保留；Mock 模式保存在 `curated-mock-photo-tags` localStorage。保存后同步更新写真库缓存，便于按标签搜索；Agent 不访问这些标签。
+写真详情页的标签区提供「添加」：输入后点击添加或按 Enter 保存，Esc 取消；保存失败会保留草稿。标签去除首尾空白并去重，最多 64 个，每个最多 64 个 Unicode 字符。Web 模式保存到独立写真 SQLite 表，刷新后仍保留；Mock 模式保存在 `curated-mock-photo-tags` localStorage。保存后同步更新写真库缓存，便于按标签搜索；Agent 没有写真标签写工具。
 
-库页工具栏显示册数，排序通过右侧菜单选择；搜索条件可直接清除，加载失败可以重新加载。详情封面可直接打开第一页；主按钮显示阅读或从上次页码继续，主区保留页数和添加日期。漫画和写真均可通过右上角三点菜单的“媒体信息”查看源文件名、完整存储位置、文件格式、页数、添加时间及更新时间；长文件名和路径在弹窗内换行展示。漫画保留编辑、打开文件位置、删除操作；写真不显示尚未接通的这些操作。
+库页工具栏显示册数，排序通过右侧菜单选择；搜索条件可直接清除，加载失败可以重新加载。漫画墙和写真墙用与影片墙相同的分块虚拟滚动，封面按焦点块决定 eager/lazy。Web 模式会把列表按 500 本一批拉完，因此写真不会停在默认的 100 本。再次进入已加载的漫画/写真页不会重复拉列表；扫描、导入或目录监听完成后仍会刷新。详情封面可直接打开第一页；主按钮显示阅读或从上次页码继续，主区保留页数和添加日期。漫画和写真均可通过右上角三点菜单的“媒体信息”查看源文件名、完整存储位置、文件格式、页数、添加时间及更新时间，并在同一弹窗里修改展示标题；Agent 开启时可预览翻译。路径与页数保持只读。扫描会更新来源文件名标题，但不会清掉已保存的展示标题。漫画保留编辑、打开文件位置、删除操作；写真不显示尚未接通的这些操作。
 
 图片预览参考影片详情，以图片实际比例决定卡片宽度并自动换行，卡片不再固定为 2:3。每批数量根据实际容器宽度调整，窄屏通常 4 张，桌面自动增加，最多 20 张。使用「上一批 / 下一批」及数字分页查看全书；数字代表预览批次，当前批次高亮，批次较多时显示省略号并保留首末批入口。点击缩略图进入对应页阅读；不再显示页码输入框、定位或打开此页按钮。横图保留完整画面。每批替换旧节点，只加载接近可见区域的图片，失败时点击重试。
 
-写真预览与封面现在使用缩略图，阅读器仍读取原图。过大的或不可解码的图片可能无法生成预览，但不会自动改为下载大原图；可通过主阅读按钮进入阅读器查看原图。
+写真预览与封面现在使用缩略图，阅读器仍读取原图。过大的或不可解码的图片可能无法生成预览，但不会自动改为下载大原图；可通过主阅读按钮进入阅读器查看原图。漫画封面缓存会按设置的 `maxBytes` 淘汰最久未访问的缩略图；阅读器和写真查看器会预取当前页前后各一页原图。
+
+## 漫画与写真个人评论（2026-09-12）
+
+漫画详情和写真详情在页面预览下方提供与影片页相同的「我的评论」卡片：自动保存，最多 10000 个字符。Web 模式分别写入 `comic_book_comments` / `photo_book_comments`；Mock 模式分别保存在 `curated-mock-comic-comments-v1` 与 `curated-mock-photo-comments-v1`。删除漫画时备注一并清除。AI Agent 仍不能读取、修改或润色这两类备注。
+
+## 漫画与写真本地评分（2026-09-12）
+
+影片、漫画、写真详情都把评分卡放在信息列标签下方，固定 250px 宽。漫画和写真复用同一张本地评分卡：半星步进、综合分、清除；封面比例不固定，所以不放在封面列。只有本地用户分，没有站点分。漫画走已有 `PATCH /api/library/comics/{id}`；写真走 `PATCH /api/library/photos/{id}`。Mock 写真评分保存在 `curated-mock-photo-ratings-v1`。AI Agent 不能读写这两类评分。

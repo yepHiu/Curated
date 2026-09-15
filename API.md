@@ -130,6 +130,7 @@ HTTP API 成功时直接返回 DTO 本体，不包 `{ "ok": true, "data": ... }`
 | `COMMON_CONFLICT` | 当前状态不允许该操作 |
 | `AUTH_LOCKED` | 应用已锁定，需要先解锁 |
 | `AUTH_INVALID_PIN` | PIN 校验失败 |
+| `AUTH_PIN_REQUIRED_FOR_LAN` | 非 loopback 的局域网监听开启时不能关闭 PIN |
 | `IMPORT_TARGET_NOT_CONFIGURED` | 未配置默认导入库路径 |
 | `IMPORT_TARGET_UNAVAILABLE` | 默认导入库路径不可用 |
 | `IMPORT_CONFLICT` | 导入目标文件已存在 |
@@ -552,21 +553,28 @@ Body：
 
 #### `PATCH /api/auth/settings`
 
-用途：更新非秘密安全设置。
+用途：更新非秘密安全设置。`pinEnabled: false` 关闭 PIN 锁：清空已存哈希，并撤销全部解锁会话。
+
+认证：需要已解锁会话。
 
 Body：
 
 ```json
 {
-  "pinEnabled": true,
+  "pinEnabled": false,
   "sessionTtlMinutes": 60,
   "lockOnRestart": true
 }
 ```
 
-所有字段可选；只发送要修改的字段。
+所有字段可选；只发送要修改的字段。重新启用 PIN 必须走 `POST /api/auth/setup-pin`，不能只把 `pinEnabled` 设为 `true`。
 
 成功：`200 AuthStatusDTO`
+
+错误：
+
+- `400 AUTH_PIN_REQUIRED_FOR_LAN`：主配置 `lanEnabled=true` 且 `httpAddr` 不是 loopback 时不能关闭 PIN。
+- `400 COMMON_BAD_REQUEST`：JSON 无效，或尚未保存 PIN 哈希就尝试把 `pinEnabled` 设为 `true`。
 
 #### `GET /api/auth/sessions`
 
@@ -2590,10 +2598,14 @@ Body：
     "contextVersion": 1,
     "route": "detail",
     "movieId": "…",
+    "comicId": "…",
+    "photoId": "…",
     "query": "",
     "selectedMovieIds": ["…"],
     "selectedActors": ["Canonical actor name"],
-    "activeFilters": { "query": "…", "tag": "…", "actor": "…", "playState": "unwatched", "runtime": "short" },
+    "selectedComicIds": ["…"],
+    "selectedPhotoIds": ["…"],
+    "activeFilters": { "query": "…", "tag": "…", "actor": "…", "playState": "unwatched", "runtime": "short", "favorite": true, "readStatus": "reading" },
     "mentions": [{ "kind": "movie", "id": "…", "label": "Hello" }]
   },
   "messages": [
@@ -2602,14 +2614,14 @@ Body：
 }
 ```
 
-成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `answer_progress` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
+成功：`200 text/event-stream`。事件为 `message_start`（含 `sessionId`/`messageId`）→ 若干 `answer_progress` / `text_delta` / `tool_call_started` / `tool_call_result` / `movie_cards` / `book_cards` / `confirm_required` → `message_done`。失败时以 `error` 事件结束（`AI_PROVIDER_UNAVAILABLE` / `AI_CHAT_FAILED` / `COMMON_NOT_FOUND`）。
 
 说明：
 
 - 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后读取最近 80 条 user/assistant 候选记录（工具记录不占额度），模型循环最终保留最多 24 条且历史正文预算约 24 KiB。本次输入不会被静默截断；省略较早历史时注入范围说明。
 - 每次模型调用前，对 messages 与工具 schema 的 JSON UTF-8 字节数做保守 token 估算，上限 65536。达到预算且未执行工具时返回 `needs_input`，已有工具结果时返回 `partial`，保留已完成结果并停止进一步调用。不切断工具 JSON；预算是本地估算，不是 Provider usage 或上下文窗口的精确测量，尚无自动摘要。
-- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 ID 必须在应用层确认存在，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `actor` / `tag`），最多 8 条。
-- `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）与 `runtime`（`short` / `standard` / `long`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。
+- 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors`、`selectedComicIds`、`selectedPhotoIds` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 / 漫画 / 写真 ID 必须在应用层确认存在且对应库已启用，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `comic` / `photo` / `actor` / `tag`），最多 8 条。
+- `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）、`runtime`（`short` / `standard` / `long`）、漫画 `favorite` 与 `readStatus`（`unread` / `reading` / `read`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。书库路由只投影书 ID 与书筛选，不会把图册 ID 当作 `movieId`。
 - 不再发送模型原始 `thinking_delta`。模型调用前发送 `answer_progress`（无正文），经发布校验后才发送 `text_delta`；取消/断流不发送未核实草稿。服务端每 15 秒发送 SSE 注释心跳；单次模型调用另有 2 分钟期限及 256 KiB 正文/工具参数累积上限。旧客户端忽略新增事件仍可展示最终正文。
 - `submit_answer` 为内部只读终结工具，不新增 HTTP 端点。接收 `{items:[{refId,fields?,reasonFacts?}]}`（1–6 条本次查询引用），禁止传入自定义番号、标题、演员等字段值；后端从同一来源快照填入事实。也支持 `{queryRef:"user_input"}` 单独引用用户原文并标注未核实，不产生作品身份。
 - 普通正文中的可识别番号/作品链接/已知作品标题必须改用引用；无效草稿最多修正一次，仍失败返回 `partial`、`reasonCode:"answer_rejected"`。正则检测不代表任意自然语言全量事实验证，独立 Action 不受这条发布链路约束。
@@ -2617,10 +2629,11 @@ Body：
 - 单轮工具步数默认不限（0）；用户设置正上限后触顶返回 `partial/tool_step_limit`，不再调用模型。修正不绕过步骤和上下文预算。
 - provider 未配置（缺 `baseUrl`/`model`）时以 `AI_PROVIDER_UNAVAILABLE` 的 `error` 事件返回。
 - 推荐或点名具体影片优先调用 `submit_answer`。兼容 UI 投影工具 `present_movies`（最多 6 个已在本轮检索到的 `movieId`）。成功后额外发出 `movie_cards`（`movies: [{ movieId, title, code, actors, coverUrl, thumbUrl, reason }]`），前端在助手回复下渲染可点击横条卡片。未知或本轮未读取本地资料的 ID 被拒绝，不会出卡；自由文本 `reason` 不再显示。库外源站作品（`search_provider_titles` 且 `inLibrary=false`）没有 `movieId`，不能用于 `present_movies`。
+- 漫画 / 写真在对应 Beta 启用时使用独立工具：`search_comics` / `get_comic_detail` / `present_comics`，以及 `search_photos` / `get_photo_detail` / `present_photos`。呈现成功后额外发出 `book_cards`（`books: [{ kind, comicId?, photoId?, title, coverUrl, tags }]`，最多 6 张）。书卡不包含存储路径。本轮未读取过标题或封面的 ID 被拒绝；不能把书 ID 交给 `present_movies` 或 `submit_answer`。库关闭时返回 `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`。
 - `get_movie_detail` / `get_actor_profile` 在已刮削时带 `homepage`；影片另有 `metadataRating`、`metadataProvider`。
 - `search_provider_titles` 只接受本轮已见的 `actorName` 和/或 `movieId`（含页面 context / `@` 引用），禁止自由文本 `query`。底层走已配置刮削源站检索并对账本地番号；失败留在工具结果内。
 - `get_source_page` 只接受本轮工具结果里出现过的 https `homepage` / `externalLinks`；拒绝非 https、私网与允许名单外跳转；抽出可见文本约 32KiB。
-- 写工具 `save_movie_comment` / `update_movie_display_overrides` / `create_saved_view` 只产生 preview。成功后额外发出 `confirm_required`（`changes` / `confirmToken` / `expiresAt` / `arguments`）并结束本轮；真正写入走 `POST /api/ai/confirm`，chat 通道的模型不能自行 apply。
+- 写工具 `save_movie_comment` / `save_comic_comment` / `save_photo_comment` / `update_movie_display_overrides` / `update_comic_title` / `update_photo_title` / `create_saved_view` 只产生 preview。成功后额外发出 `confirm_required`（`changes` / `confirmToken` / `expiresAt` / `arguments`）并结束本轮；真正写入走 `POST /api/ai/confirm`，chat 通道的模型不能自行 apply。冲突返回 `409 AI_WRITE_CONFLICT`。
 
 #### `POST /api/ai/actions/{name}`
 
@@ -2628,9 +2641,9 @@ Body：
 
 后端总期限为 2 分钟；Web 适配同样提供 2 分钟超时和可取消 signal。聊天流式请求由 Web 适配在连续 90 秒无数据时取消，并将缺失 `message_done` 的 EOF 视为中断；客户端保留部分回复，不自动重放确认写入。
 
-- `polish_comment`：笔记润色，经 `save_movie_comment` preview。模型自识别原文语言并同语言润色。Body：`{ "movieId", "body?" }`。
+- `polish_comment`：笔记润色，经 `save_movie_comment` / `save_comic_comment` / `save_photo_comment` preview。模型自识别原文语言并同语言润色。Body 三选一：`{ "movieId", "body?" }`、`{ "comicId", "body?" }` 或 `{ "photoId", "body?" }`。对应库未启用时返回 `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`。
 - `translate_summary`：把当前展示简介翻译到界面语言，经 `update_movie_display_overrides` 写入 `userSummary`，永不改刮削列，也不改标题。Body：`{ "movieId", "body?", "locale?" }`。
-- `translate_title`：翻译当前展示标题到界面语言，写入 `userTitle`，不改简介。Body：`{ "movieId", "body?", "locale?" }`。
+- `translate_title`：翻译当前展示标题到界面语言，不改简介。影片走 `update_movie_display_overrides` 写 `userTitle`；漫画 / 写真走 `update_comic_title` / `update_photo_title` 写独立 `user_title`。Body 三选一：`{ "movieId", "body?", "locale?" }`、`{ "comicId", "body?", "locale?" }` 或 `{ "photoId", "body?", "locale?" }`。对应书库未启用时返回 `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`。`translate_summary` 仍只服务影片。
 - `insights_narrative`：只读解读，无确认卡。后端先调 insights 聚合再生成文本。Body：`{ "range?", "timezone?", "locale?" }`。
 
 成功：`200 AIActionPreviewDTO`。写类含 `confirmToken`（无改动时 `noop: true`）。`insights_narrative` 只返回 `proposedText` 且 `noop: true`。未配 provider 为 `400 AI_PROVIDER_UNAVAILABLE`。未知 name 为 `404`。
@@ -3425,6 +3438,10 @@ interface ActorMergeValuesSummaryDTO {
 | `POST` | `/api/library/movies/{movieId}/reveal` | `204` |
 | `GET` | `/api/library/movies/{movieId}/comment` | `MovieCommentDTO` |
 | `PUT` | `/api/library/movies/{movieId}/comment` | `MovieCommentDTO` |
+| `GET` | `/api/library/comics/books/{comicId}/comment` | `ComicCommentDTO` |
+| `PUT` | `/api/library/comics/books/{comicId}/comment` | `ComicCommentDTO` |
+| `GET` | `/api/library/photos/books/{photoId}/comment` | `PhotoCommentDTO` |
+| `PUT` | `/api/library/photos/books/{photoId}/comment` | `PhotoCommentDTO` |
 | `GET` | `/api/library/movies/{movieId}` | `MovieDetailDTO` |
 | `PATCH` | `/api/library/movies/{movieId}` | `MovieDetailDTO` |
 | `POST` | `/api/library/movies/{movieId}/restore` | `204` |
@@ -3475,7 +3492,7 @@ interface ActorMergeValuesSummaryDTO {
 | `GET` | `/api/ai/audit` | `AIAuditPageDTO` |
 | `POST` | `/api/ai/cleanup` | `AICleanupDTO` |
 | `POST` | `/api/ai/provider/test` | `AIProviderTestResponse` |
-| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`tool_call_started`/`tool_call_result`/`movie_cards`/`confirm_required`/`message_done`/`error`） |
+| `POST` | `/api/ai/chat` | SSE（`message_start`/`text_delta`/`tool_call_started`/`tool_call_result`/`movie_cards`/`book_cards`/`confirm_required`/`message_done`/`error`） |
 | `GET` | `/api/ai/sessions` | `AIChatSessionListDTO` |
 | `POST` | `/api/ai/sessions` | `AIChatSessionDTO` |
 | `GET` | `/api/ai/sessions/{sessionId}` | `AIChatSessionDetailDTO` |
@@ -3516,17 +3533,53 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/import/photos` | Upload ZIP/CBZ to default photo root; Beta required; preserve source; no overwrite; queue photo scan |
 | GET | `/api/library/comics`, `/api/library/photos` | List books |
 | GET | `/api/library/comics/{id}`, `/api/library/photos/{id}` | Book detail |
-| PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete operation |
+| PATCH | `/api/library/photos/{id}` | Photo display title (`title`) and local rating (`ratingSet` / `ratingClear` / `rating` 0–5) |
+| PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete; `title` writes the display overlay |
 | POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
 | GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |
 | GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/image` | Page image |
 | GET | `/api/library/{comics|photos}/books/{id}/pages/{index}/thumbnail` | Thumbnail; photos return a JPEG with longest side <=420px and private ETag revalidation |
 | GET / PUT / DELETE | `/api/library/comics/books/{id}/progress` | Comic reading progress |
 | GET / PUT | `/api/library/comics/books/{id}/preferences` | Comic reading preferences |
+| GET / PUT | `/api/library/comics/books/{id}/comment`, `/api/library/photos/books/{id}/comment` | Per-book personal notes (`{ body, updatedAt }`); empty body when none saved; 10000 Unicode scalars; Beta required |
 | GET | `/api/library/comics/cache/status` | Independent comic cache usage |
 | POST | `/api/library/comics/cache/cleanup` | Delete derived comic cache only |
 
 Photo per-book progress/preferences APIs and concrete cache cleanup are not implemented. `photoCache.maxBytes` remains reserved. The default photo import target is used by the Add media photo Tab. Closing Beta preserves settings, indexes and archives and stops its watcher. UI configuration exists only under Settings → Experimental and only while that library is enabled.
+
+### Book comments
+
+`GET/PUT /api/library/comics/books/{comicId}/comment` and `GET/PUT /api/library/photos/books/{photoId}/comment` store one personal note per book. They are independent of `library_movie_comments` and require the matching Beta flag.
+
+Success: `200 ComicCommentDTO` or `200 PhotoCommentDTO`
+
+```json
+{
+  "body": "备注正文",
+  "updatedAt": "2026-09-12T12:00:00Z"
+}
+```
+
+No saved note returns empty `body` and empty `updatedAt`. PUT trims the body and accepts at most 10000 Unicode scalars. Disabled Beta returns `400 COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`. Missing books return `404 COMIC_BOOK_NOT_FOUND` / `PHOTO_BOOK_NOT_FOUND`. Over-length bodies return `400 COMMON_BAD_REQUEST`. Deleting a comic or photo book also deletes its note.
+
+### Book ratings
+
+Movie, comic, and photo detail pages place the rating card below tags in the info column at 250px. Cover aspect ratios vary, so book rating cards stay out of the cover column. There is no site/metadata score on books, only a local 0–5 half-star rating.
+
+- Comics: `PATCH /api/library/comics/{comicId}` with `ratingSet` / `ratingClear` / `rating`
+- Photos: `PATCH /api/library/photos/{photoId}` with the same fields
+- Disabled Beta returns `400 COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`
+- Missing books return `404 COMIC_BOOK_NOT_FOUND` / `PHOTO_BOOK_NOT_FOUND`
+- Out-of-range ratings return `400 COMMON_BAD_REQUEST`
+
+### Book display titles
+
+List and detail `title` is the display overlay: `COALESCE(NULLIF(TRIM(user_title), ''), title)`. Scan still updates the source filename `title` and does not clear `user_title` (migration `0050_comic_photo_user_title.sql`).
+
+- Comics: existing `PATCH /api/library/comics/{comicId}` `title` writes `user_title`
+- Photos: `PATCH /api/library/photos/{photoId}` accepts the same `title`
+- Empty titles are rejected; the limit is 500 Unicode scalars (`COMMON_BAD_REQUEST`)
+- Agent `translate_title` accepts `movieId` XOR `comicId` XOR `photoId`; confirmation writes the overlay via `update_comic_title` / `update_photo_title`
 
 ### Photo archive upload (2026-09-11)
 
