@@ -198,6 +198,7 @@ func (h *Handler) handleLockPIN(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, dto)
 }
 
+// handlePatchAuthSettings 更新 PIN 锁的非密钥设置；pinEnabled=false 会关闭 PIN 并清空会话。
 func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "security storage is not available")
@@ -208,8 +209,8 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
 		return
 	}
-	if body.PINEnabled != nil && !*body.PINEnabled && h.cfg.LANEnabled && !config.HTTPAddrIsLoopback(h.cfg.HttpAddr) {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "PIN cannot be disabled while LAN mode is enabled")
+	if body.PINEnabled != nil && !*body.PINEnabled && pinDisableBlockedByLAN(h.cfg) {
+		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeAuthPINRequiredForLAN, "PIN cannot be disabled while LAN mode is enabled")
 		return
 	}
 	settings, err := h.store.PatchAppSecuritySettings(r.Context(), storage.AppSecuritySettingsPatch{
@@ -218,7 +219,16 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 		LockOnRestart:     body.LockOnRestart,
 	})
 	if err != nil {
+		if errors.Is(err, storage.ErrPINSecretMissing) {
+			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "set a PIN before enabling PIN lock")
+			return
+		}
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to update auth settings")
+		return
+	}
+	if body.PINEnabled != nil && !*body.PINEnabled {
+		clearAuthCookie(w)
+		writeJSON(w, http.StatusOK, authStatusFromSettings(settings, nil))
 		return
 	}
 	session, _, err := h.authSessionFromRequest(r)
@@ -227,6 +237,11 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, authStatusFromSettings(settings, &session))
+}
+
+// pinDisableBlockedByLAN 判断非 loopback 的局域网监听是否仍要求保留 PIN。
+func pinDisableBlockedByLAN(cfg config.Config) bool {
+	return cfg.LANEnabled && !config.HTTPAddrIsLoopback(cfg.HttpAddr)
 }
 
 func (h *Handler) authStatusForRequest(r *http.Request) (contracts.AuthStatusDTO, error) {

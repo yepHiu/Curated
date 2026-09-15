@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -326,5 +327,66 @@ func TestSecurityStartupPolicyKeepsTrustedForeverSessions(t *testing.T) {
 		t.Fatalf("GetValidAuthSession(trusted) error = %v", err)
 	} else if !ok {
 		t.Fatal("trusted forever session should survive startup lock")
+	}
+}
+
+// TestSecurityDisablePINClearsSecretAndRevokesSessions 确认关闭 PIN 会清空哈希并撤销会话。
+func TestSecurityDisablePINClearsSecretAndRevokesSessions(t *testing.T) {
+	t.Parallel()
+
+	store := newSecurityTestStore(t)
+	if err := store.SetAppPIN(context.Background(), "1234"); err != nil {
+		t.Fatalf("SetAppPIN() error = %v", err)
+	}
+	now := time.Now().UTC()
+	session, err := store.CreateAuthSession(context.Background(), CreateAuthSessionInput{
+		ClientKey:      "disable-client",
+		TrustedForever: true,
+		Now:            now,
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthSession() error = %v", err)
+	}
+
+	disabled := false
+	settings, err := store.PatchAppSecuritySettings(context.Background(), AppSecuritySettingsPatch{
+		PINEnabled: &disabled,
+	})
+	if err != nil {
+		t.Fatalf("PatchAppSecuritySettings() error = %v", err)
+	}
+	if settings.PINEnabled {
+		t.Fatal("PINEnabled = true, want false after disable")
+	}
+	if settings.PINHash != "" || settings.PINSalt != "" || settings.PINKDF != "" || settings.PINLength != 0 {
+		t.Fatalf("expected cleared PIN secret, got %+v", settings)
+	}
+
+	if _, ok, err := store.GetValidAuthSession(context.Background(), session.ID, now.Add(time.Minute)); err != nil {
+		t.Fatalf("GetValidAuthSession() error = %v", err)
+	} else if ok {
+		t.Fatal("session should be revoked when PIN is disabled")
+	}
+
+	ok, err := store.VerifyAppPIN(context.Background(), "1234")
+	if err != nil {
+		t.Fatalf("VerifyAppPIN() error = %v", err)
+	}
+	if ok {
+		t.Fatal("VerifyAppPIN() = true, want false after disable")
+	}
+}
+
+// TestSecurityCannotEnablePINWithoutSecret 确认没有已存哈希时不能只把 pinEnabled 设为 true。
+func TestSecurityCannotEnablePINWithoutSecret(t *testing.T) {
+	t.Parallel()
+
+	store := newSecurityTestStore(t)
+	enabled := true
+	_, err := store.PatchAppSecuritySettings(context.Background(), AppSecuritySettingsPatch{
+		PINEnabled: &enabled,
+	})
+	if !errors.Is(err, ErrPINSecretMissing) {
+		t.Fatalf("PatchAppSecuritySettings() error = %v, want ErrPINSecretMissing", err)
 	}
 }

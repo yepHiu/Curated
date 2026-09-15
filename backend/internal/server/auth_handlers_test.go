@@ -313,6 +313,7 @@ func TestAuthMiddlewareLocksSensitiveAPIUntilUnlocked(t *testing.T) {
 	}
 }
 
+// TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled 确认非 loopback 局域网监听下不能关闭 PIN。
 func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
 	t.Parallel()
 
@@ -363,8 +364,8 @@ func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
 		t.Fatalf("disable PIN status = %d, want 400", resp.StatusCode)
 	}
 	appErr := decodeAuthJSON[contracts.AppError](t, resp)
-	if appErr.Code != contracts.ErrorCodeBadRequest {
-		t.Fatalf("disable PIN error code = %q, want %q", appErr.Code, contracts.ErrorCodeBadRequest)
+	if appErr.Code != contracts.ErrorCodeAuthPINRequiredForLAN {
+		t.Fatalf("disable PIN error code = %q, want %q", appErr.Code, contracts.ErrorCodeAuthPINRequiredForLAN)
 	}
 
 	settings, err := store.GetAppSecuritySettings(context.Background())
@@ -484,6 +485,64 @@ func TestAuthBackoffGrowsExponentiallyAndCaps(t *testing.T) {
 	}
 	if got := authBackoffForFailures(100); got != authBackoffMaximum {
 		t.Fatalf("capped backoff = %s, want %s", got, authBackoffMaximum)
+	}
+}
+
+// TestAuthSettingsCanDisablePINOnLoopback 确认默认本机监听下可以关闭 PIN 锁。
+func TestAuthSettingsCanDisablePINOnLoopback(t *testing.T) {
+	t.Parallel()
+	srv, store := newAuthTestServer(t)
+
+	setupResp := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/setup-pin", map[string]any{
+		"pin":        "123456",
+		"confirmPin": "123456",
+	})
+	if setupResp.StatusCode != http.StatusOK {
+		t.Fatalf("setup status = %d, want 200", setupResp.StatusCode)
+	}
+	cookie := findAuthCookie(setupResp.Cookies())
+	_ = setupResp.Body.Close()
+	if cookie == nil {
+		t.Fatal("expected auth cookie after setup")
+	}
+
+	payload := bytes.NewBufferString(`{"pinEnabled":false}`)
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/auth/settings", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("disable PIN status = %d, want 200", resp.StatusCode)
+	}
+	dto := decodeAuthJSON[contracts.AuthStatusDTO](t, resp)
+	if dto.PINEnabled {
+		t.Fatal("PINEnabled = true, want false after disable")
+	}
+	if !dto.Unlocked || !dto.SetupRequired || dto.PINLength != 0 {
+		t.Fatalf("disable status = %+v, want unlocked setup-required with no PIN length", dto)
+	}
+
+	settings, err := store.GetAppSecuritySettings(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.PINEnabled || settings.PINHash != "" || settings.PINLength != 0 {
+		t.Fatalf("stored settings = %+v, want disabled with cleared secret", settings)
+	}
+
+	statusResp, err := http.Get(srv.URL + "/api/auth/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := decodeAuthJSON[contracts.AuthStatusDTO](t, statusResp)
+	if status.PINEnabled || !status.Unlocked {
+		t.Fatalf("status after disable = %+v, want PIN off and unlocked", status)
 	}
 }
 

@@ -1836,9 +1836,10 @@ const (
 	ErrorCodePersonalInsightsInvalidDimension     = "INSIGHTS_INVALID_DIMENSION"
 	ErrorCodePersonalInsightsInvalidLimit         = "INSIGHTS_INVALID_LIMIT"
 
-	ErrorCodeAuthLocked      = "AUTH_LOCKED"
-	ErrorCodeAuthInvalidPIN  = "AUTH_INVALID_PIN"
-	ErrorCodeAuthRateLimited = "AUTH_RATE_LIMITED"
+	ErrorCodeAuthLocked            = "AUTH_LOCKED"
+	ErrorCodeAuthInvalidPIN        = "AUTH_INVALID_PIN"
+	ErrorCodeAuthRateLimited       = "AUTH_RATE_LIMITED"
+	ErrorCodeAuthPINRequiredForLAN = "AUTH_PIN_REQUIRED_FOR_LAN"
 
 	ErrorCodeImportSourceUnavailable   = "IMPORT_SOURCE_UNAVAILABLE"
 	ErrorCodeImportTargetNotConfigured = "IMPORT_TARGET_NOT_CONFIGURED"

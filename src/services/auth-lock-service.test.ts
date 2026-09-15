@@ -98,4 +98,33 @@ describe("authLockService", () => {
     expect(api.revokeTrustedAuthSession).toHaveBeenCalledWith("public-session-id")
     expect(authLockService.trustedSessions.value).toEqual([])
   })
+
+  /** 关闭 PIN 成功后清空本地受信任会话列表。 */
+  it("clears trusted sessions after PIN is disabled", async () => {
+    const session = {
+      publicId: "public-session-id",
+      userAgent: "Test Browser",
+      ip: "127.0.0.1",
+      createdAt: "2026-07-19T10:00:00Z",
+      lastSeenAt: "2026-07-19T11:00:00Z",
+      trustedForever: true,
+      current: false,
+    }
+    vi.mocked(api.listTrustedAuthSessions).mockResolvedValueOnce({ items: [session] })
+    await authLockService.listTrustedSessions()
+
+    vi.mocked(api.patchAuthSettings).mockResolvedValueOnce({
+      ...lockedStatus,
+      pinEnabled: false,
+      unlocked: true,
+      setupRequired: true,
+      pinLength: 0,
+    })
+
+    await expect(authLockService.patchSettings({ pinEnabled: false })).resolves.toMatchObject({
+      pinEnabled: false,
+    })
+    expect(api.patchAuthSettings).toHaveBeenCalledWith({ pinEnabled: false })
+    expect(authLockService.trustedSessions.value).toEqual([])
+  })
 })

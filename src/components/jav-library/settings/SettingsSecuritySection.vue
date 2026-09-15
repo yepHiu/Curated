@@ -46,6 +46,7 @@ const setupBusy = ref(false)
 const changeBusy = ref(false)
 const setupDialogOpen = ref(false)
 const changeDialogOpen = ref(false)
+const disableDialogOpen = ref(false)
 const settingsBusy = ref(false)
 const lockBusy = ref(false)
 const trustedSessionsLoading = ref(false)
@@ -60,11 +61,13 @@ const trustedSessions = computed(() => authLockService.trustedSessions.value)
 const otherTrustedSessionCount = computed(() => trustedSessions.value.filter((session) => !session.current).length)
 const authEnabled = computed(() => isAuthLockEnabled())
 const sessionTTLValue = computed(() => String(status.value.sessionTtlMinutes || 60))
+/** 启用 PIN 表单是否可以提交。 */
 const canSetupPIN = computed(() =>
   /^\d{4,8}$/.test(pinDraft.value.trim()) &&
   pinDraft.value.trim() === confirmPinDraft.value.trim() &&
   !setupBusy.value,
 )
+/** 修改 PIN 表单是否可以提交。 */
 const canChangePIN = computed(() =>
   /^\d{4,8}$/.test(currentPinDraft.value.trim()) &&
   /^\d{4,8}$/.test(newPinDraft.value.trim()) &&
@@ -72,6 +75,7 @@ const canChangePIN = computed(() =>
   !changeBusy.value,
 )
 
+/** 进入设置安全分区时刷新 PIN 状态和受信任会话。 */
 onMounted(async () => {
   if (authEnabled.value) {
     await refreshAuthStatus()
@@ -81,23 +85,30 @@ onMounted(async () => {
   }
 })
 
+/** 关闭启用 PIN 对话框时清草稿。 */
 watch(setupDialogOpen, (open) => {
   if (!open) {
     resetSetupDrafts()
   }
 })
 
+/** 关闭修改 PIN 对话框时清草稿。 */
 watch(changeDialogOpen, (open) => {
   if (!open) {
     resetChangeDrafts()
   }
 })
 
+/** 只保留最多 8 位数字，供 PIN 输入框使用。 */
 function normalizePIN(value: string | number): string {
   return String(value).replace(/\D/g, "").slice(0, 8)
 }
 
+/** 把安全设置请求错误转成页面可见文案。 */
 function formatAuthError(error: unknown): string {
+  if (error instanceof HttpClientError && error.apiError?.code === "AUTH_PIN_REQUIRED_FOR_LAN") {
+    return t("settings.securityDisablePinLanBlocked")
+  }
   if (error instanceof HttpClientError && error.apiError?.message) {
     return error.apiError.message
   }
@@ -107,17 +118,20 @@ function formatAuthError(error: unknown): string {
   return t("settings.securitySaveFailed")
 }
 
+/** 清空启用 PIN 对话框草稿。 */
 function resetSetupDrafts() {
   pinDraft.value = ""
   confirmPinDraft.value = ""
 }
 
+/** 清空修改 PIN 对话框草稿。 */
 function resetChangeDrafts() {
   currentPinDraft.value = ""
   newPinDraft.value = ""
   confirmNewPinDraft.value = ""
 }
 
+/** 打开启用 PIN 对话框。 */
 function openSetupDialog() {
   errorText.value = ""
   successText.value = ""
@@ -125,6 +139,7 @@ function openSetupDialog() {
   setupDialogOpen.value = true
 }
 
+/** 打开修改 PIN 对话框。 */
 function openChangeDialog() {
   errorText.value = ""
   successText.value = ""
@@ -132,20 +147,53 @@ function openChangeDialog() {
   changeDialogOpen.value = true
 }
 
+/** 关闭启用 PIN 对话框。 */
 function closeSetupDialog() {
   errorText.value = ""
   setupDialogOpen.value = false
 }
 
+/** 关闭修改 PIN 对话框。 */
 function closeChangeDialog() {
   errorText.value = ""
   changeDialogOpen.value = false
 }
 
+/** 打开关闭 PIN 确认框。 */
+function openDisableDialog() {
+  errorText.value = ""
+  successText.value = ""
+  disableDialogOpen.value = true
+}
+
+/** 收起关闭 PIN 确认框。 */
+function closeDisableDialog() {
+  errorText.value = ""
+  disableDialogOpen.value = false
+}
+
+/** 在已解锁会话下关闭 PIN 锁。 */
+async function disablePIN() {
+  errorText.value = ""
+  successText.value = ""
+  try {
+    settingsBusy.value = true
+    await authLockService.patchSettings({ pinEnabled: false })
+    disableDialogOpen.value = false
+    successText.value = t("settings.securityDisablePinSaved")
+  } catch (error) {
+    errorText.value = formatAuthError(error)
+  } finally {
+    settingsBusy.value = false
+  }
+}
+
+/** 保存重启后是否锁定普通会话。 */
 function onLockOnRestartChange(value: boolean) {
   void patchAuthSettings({ lockOnRestart: value })
 }
 
+/** 刷新当前 PIN 锁状态。 */
 async function refreshAuthStatus() {
   try {
     await authLockService.refreshStatus()
@@ -154,6 +202,7 @@ async function refreshAuthStatus() {
   }
 }
 
+/** 提交启用 PIN 表单。 */
 async function setupPIN() {
   errorText.value = ""
   successText.value = ""
@@ -182,6 +231,7 @@ async function setupPIN() {
   }
 }
 
+/** 提交修改 PIN 表单。 */
 async function changePIN() {
   errorText.value = ""
   successText.value = ""
@@ -209,6 +259,7 @@ async function changePIN() {
   }
 }
 
+/** 保存非密钥安全设置。 */
 async function patchAuthSettings(patch: Parameters<typeof authLockService.patchSettings>[0]) {
   errorText.value = ""
   successText.value = ""
@@ -223,6 +274,7 @@ async function patchAuthSettings(patch: Parameters<typeof authLockService.patchS
   }
 }
 
+/** 保存无操作后锁定时长。 */
 async function onSessionTTLChange(value: unknown) {
   const ttl = Number(value)
   if (!Number.isFinite(ttl) || ttl <= 0 || ttl === status.value.sessionTtlMinutes) {
@@ -231,6 +283,7 @@ async function onSessionTTLChange(value: unknown) {
   await patchAuthSettings({ sessionTtlMinutes: ttl })
 }
 
+/** 立即锁定当前浏览器会话。 */
 async function lockNow() {
   errorText.value = ""
   successText.value = ""
@@ -245,6 +298,7 @@ async function lockNow() {
   }
 }
 
+/** 刷新永久信任会话列表。 */
 async function refreshTrustedSessions() {
   if (!authEnabled.value || !status.value.pinEnabled) {
     return
@@ -259,6 +313,7 @@ async function refreshTrustedSessions() {
   }
 }
 
+/** 把会话时间格式化成本地可读文本。 */
 function formatSessionTime(value: string): string {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
@@ -270,16 +325,19 @@ function formatSessionTime(value: string): string {
   }).format(parsed)
 }
 
+/** 打开撤销单个受信任会话的确认框。 */
 function requestTrustedSessionRevoke(session: AuthSessionDTO) {
   trustedSessionAction.value = { kind: "one", session }
   trustedSessionDialogOpen.value = true
 }
 
+/** 打开撤销其他受信任设备的确认框。 */
 function requestOtherTrustedSessionsRevoke() {
   trustedSessionAction.value = { kind: "others" }
   trustedSessionDialogOpen.value = true
 }
 
+/** 确认撤销所选受信任会话。 */
 async function confirmTrustedSessionRevoke() {
   const action = trustedSessionAction.value
   if (!action) {
@@ -330,49 +388,54 @@ async function confirmTrustedSessionRevoke() {
           data-security-block
           class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
         >
-          <div class="flex flex-col gap-1">
-            <p class="text-sm font-semibold text-foreground">
-              {{ t("settings.securitySetupTitle") }}
-            </p>
-            <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              {{ status.pinEnabled ? t("settings.securityEnabledHint") : t("settings.securitySetupHint") }}
-            </p>
-          </div>
-
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p
-              v-if="status.pinEnabled"
-              class="text-sm text-muted-foreground"
-            >
-              {{ t("settings.securityPinEnabled") }}
-            </p>
-            <p
-              v-else
-              class="text-sm text-muted-foreground"
-            >
-              {{ t("settings.securitySetupHint") }}
-            </p>
-            <Button
+            <div class="flex min-w-0 flex-col gap-1">
+              <p class="text-sm font-semibold text-foreground">
+                {{ t("settings.securitySetupTitle") }}
+              </p>
+              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {{ status.pinEnabled ? t("settings.securityEnabledHint") : t("settings.securitySetupHint") }}
+              </p>
+            </div>
+            <div
               v-if="!status.pinEnabled"
-              data-setup-pin-trigger
-              type="button"
-              class="shrink-0 rounded-xl"
-              :disabled="!authEnabled"
-              @click="openSetupDialog"
+              class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center"
             >
-              {{ t("settings.securityEnablePin") }}
-            </Button>
-            <Button
+              <Button
+                data-setup-pin-trigger
+                type="button"
+                class="shrink-0 rounded-xl"
+                :disabled="!authEnabled"
+                @click="openSetupDialog"
+              >
+                {{ t("settings.securityEnablePin") }}
+              </Button>
+            </div>
+            <div
               v-else
-              data-change-pin-trigger
-              type="button"
-              variant="outline"
-              class="shrink-0 rounded-xl"
-              :disabled="!authEnabled"
-              @click="openChangeDialog"
+              class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center"
             >
-              {{ t("settings.securityChangePin") }}
-            </Button>
+              <Button
+                data-change-pin-trigger
+                type="button"
+                variant="outline"
+                class="shrink-0 rounded-xl"
+                :disabled="!authEnabled"
+                @click="openChangeDialog"
+              >
+                {{ t("settings.securityChangePin") }}
+              </Button>
+              <Button
+                data-disable-pin-trigger
+                type="button"
+                variant="outline"
+                class="shrink-0 rounded-xl"
+                :disabled="!authEnabled || settingsBusy"
+                @click="openDisableDialog"
+              >
+                {{ t("settings.securityDisablePin") }}
+              </Button>
+            </div>
           </div>
 
           <Dialog v-model:open="setupDialogOpen">
@@ -488,6 +551,38 @@ async function confirmTrustedSessionRevoke() {
                   </Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog v-model:open="disableDialogOpen">
+            <DialogContent class="rounded-2xl border-border/70 sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{{ t("settings.securityDisablePinTitle") }}</DialogTitle>
+                <DialogDescription class="text-pretty">
+                  {{ t("settings.securityDisablePinHint") }}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter class="gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  class="rounded-xl"
+                  :disabled="settingsBusy"
+                  @click="closeDisableDialog"
+                >
+                  {{ t("common.cancel") }}
+                </Button>
+                <Button
+                  data-confirm-disable-pin
+                  type="button"
+                  variant="destructive"
+                  class="rounded-xl"
+                  :disabled="!authEnabled || settingsBusy"
+                  @click="disablePIN"
+                >
+                  {{ settingsBusy ? t("settings.securitySaving") : t("settings.securityDisablePinConfirm") }}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 

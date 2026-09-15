@@ -18,7 +18,7 @@
 - Latest product decision is included: after one successful PIN unlock, a user may choose `trustedForever` for the current device. That session has no `expires_at`, receives a long-lived cookie, and survives restart-lock cleanup until the user locks that device or the session is later revoked.
 - Lock screen UX has been revised to match Curated/shadcn-vue settings surfaces: no background photo, no library artwork, no numeric keypad, only PIN cells plus keyboard input, submit, forgotten-PIN help, and the trusted-device checkbox.
 - Settings -> Security is the MVP configuration entry for initial PIN setup, PIN change, idle lock delay, LAN PIN policy, backend restart lock policy, and immediate lock. Initial setup and PIN change are entered through buttons that open shadcn-vue dialogs, keeping the settings page itself compact.
-- Current MVP includes changing an existing PIN after verifying the current PIN. Disabling PIN, automated PIN recovery key, failed-attempt rate limiting, and connected-client session revocation remain follow-up slices.
+- Current MVP includes changing an existing PIN after verifying the current PIN, and disabling PIN from Settings -> Security after confirmation. Automated PIN recovery key remains a follow-up slice. Failed-attempt rate limiting and connected-client session revocation are implemented.
 
 ## Decisions
 

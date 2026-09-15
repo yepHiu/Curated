@@ -75,8 +75,13 @@ export const authLockService = {
     return status
   },
 
+  /** 更新非密钥安全设置；关闭 PIN 时清空本地受信任会话列表。 */
   async patchSettings(body: PatchAuthSettingsBody): Promise<AuthStatusDTO> {
-    return setStatus(await api.patchAuthSettings(body))
+    const status = setStatus(await api.patchAuthSettings(body))
+    if (!status.pinEnabled) {
+      trustedSessionsState.value = []
+    }
+    return status
   },
 
   async listTrustedSessions(): Promise<AuthSessionDTO[]> {

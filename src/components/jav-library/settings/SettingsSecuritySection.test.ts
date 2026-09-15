@@ -188,6 +188,7 @@ describe("SettingsSecuritySection", () => {
     expect(wrapper.text()).toContain("settings.securityLockNow")
     expect(wrapper.text()).toContain("settings.securityLanPolicyTitle")
     expect(wrapper.text()).not.toContain("settings.securityLanRequiresPin")
+    expect(wrapper.text().split("settings.securitySetupHint")).toHaveLength(2)
     expect(wrapper.find("[data-setup-pin-trigger]").exists()).toBe(true)
     expect(wrapper.findAll("input[type='password']")).toHaveLength(0)
   })
@@ -295,5 +296,33 @@ describe("SettingsSecuritySection", () => {
 
     expect(authMock.revokeTrustedSession).toHaveBeenCalledWith("other-public")
     expect(wrapper.text()).toContain("settings.securityTrustedSessionsRevoked")
+  })
+
+  /** 关闭 PIN 前先弹出确认框，确认后调用 patchSettings。 */
+  it("confirms before disabling PIN lock", async () => {
+    authMock.status.value = {
+      ...authMock.status.value,
+      pinEnabled: true,
+      setupRequired: false,
+      pinLength: 4,
+    }
+    authMock.patchSettings.mockResolvedValueOnce({
+      ...authMock.status.value,
+      pinEnabled: false,
+      setupRequired: true,
+      pinLength: 0,
+    })
+    const wrapper = mount(SettingsSecuritySection)
+
+    expect(wrapper.find("[data-disable-pin-trigger]").exists()).toBe(true)
+    expect(wrapper.find("[data-confirm-disable-pin]").exists()).toBe(false)
+
+    await wrapper.get("[data-disable-pin-trigger]").trigger("click")
+    expect(wrapper.find("[data-confirm-disable-pin]").exists()).toBe(true)
+
+    await wrapper.get("[data-confirm-disable-pin]").trigger("click")
+
+    expect(authMock.patchSettings).toHaveBeenCalledWith({ pinEnabled: false })
+    expect(wrapper.text()).toContain("settings.securityDisablePinSaved")
   })
 })

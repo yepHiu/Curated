@@ -14,6 +14,9 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// ErrPINSecretMissing 表示尚未保存 PIN 哈希，不能只把 pinEnabled 设为 true。
+var ErrPINSecretMissing = errors.New("pin secret is not configured")
+
 const (
 	defaultSessionTTLMinutes = 60
 	pinSaltBytes             = 16
@@ -180,7 +183,8 @@ func (s *SQLiteStore) VerifyAppPIN(ctx context.Context, pin string) (bool, error
 	return ok, nil
 }
 
-// PatchAppSecuritySettings partially updates app-lock settings that are not the PIN secret.
+// PatchAppSecuritySettings 部分更新 PIN 锁的非密钥设置。
+// 关闭 PIN 时会同时清空哈希并撤销全部会话，之后必须重新 setup 才能启用。
 func (s *SQLiteStore) PatchAppSecuritySettings(ctx context.Context, patch AppSecuritySettingsPatch) (AppSecuritySettings, error) {
 	current, err := s.GetAppSecuritySettings(ctx)
 	if err != nil {
@@ -189,6 +193,9 @@ func (s *SQLiteStore) PatchAppSecuritySettings(ctx context.Context, patch AppSec
 	pinEnabled := current.PINEnabled
 	if patch.PINEnabled != nil {
 		pinEnabled = *patch.PINEnabled
+	}
+	if pinEnabled && (current.PINHash == "" || current.PINSalt == "") {
+		return AppSecuritySettings{}, ErrPINSecretMissing
 	}
 	ttl := current.SessionTTLMinutes
 	if patch.SessionTTLMinutes != nil {
@@ -199,23 +206,53 @@ func (s *SQLiteStore) PatchAppSecuritySettings(ctx context.Context, patch AppSec
 		lockOnRestart = *patch.LockOnRestart
 	}
 
-	_, err = s.db.ExecContext(ctx, `
-		UPDATE app_security_settings
-		SET
-			pin_enabled = ?,
-			session_ttl_minutes = ?,
-			lan_requires_pin = ?,
-			lock_on_restart = ?,
-			updated_at = ?
-		WHERE id = 1
-	`,
-		boolToInt(pinEnabled),
-		ttl,
-		1,
-		boolToInt(lockOnRestart),
-		nowRFC3339(time.Now()),
-	)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return AppSecuritySettings{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	disablingPIN := current.PINEnabled && !pinEnabled
+	if disablingPIN {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE app_security_settings
+			SET
+				pin_enabled = 0,
+				pin_hash = '',
+				pin_salt = '',
+				pin_kdf = '',
+				pin_length = 0,
+				session_ttl_minutes = ?,
+				lan_requires_pin = 1,
+				lock_on_restart = ?,
+				updated_at = ?
+			WHERE id = 1
+		`, ttl, boolToInt(lockOnRestart), nowRFC3339(time.Now()))
+	} else {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE app_security_settings
+			SET
+				pin_enabled = ?,
+				session_ttl_minutes = ?,
+				lan_requires_pin = 1,
+				lock_on_restart = ?,
+				updated_at = ?
+			WHERE id = 1
+		`, boolToInt(pinEnabled), ttl, boolToInt(lockOnRestart), nowRFC3339(time.Now()))
+	}
+	if err != nil {
+		return AppSecuritySettings{}, err
+	}
+	if disablingPIN {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE auth_sessions
+			SET revoked_at = ?
+			WHERE revoked_at = ''
+		`, nowRFC333Nanos(time.Now().UTC())); err != nil {
+			return AppSecuritySettings{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return AppSecuritySettings{}, err
 	}
 	return s.GetAppSecuritySettings(ctx)
@@ -363,7 +400,7 @@ func (s *SQLiteStore) GetValidAuthSession(ctx context.Context, id string, now ti
 	return session, true, nil
 }
 
-// RevokeAuthSession marks a session as revoked.
+// RevokeAuthSession 将指定会话标记为已撤销。
 func (s *SQLiteStore) RevokeAuthSession(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE auth_sessions

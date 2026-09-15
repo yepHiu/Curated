@@ -213,7 +213,7 @@ PIN 锁可以和 LAN 开关分阶段组合：
   - `POST /api/auth/unlock`
   - `POST /api/auth/lock`
   - `POST /api/auth/change-pin`
-- Settings -> Security 接入设置 PIN、修改 PIN、无操作后锁定时长；设置 PIN 和修改 PIN 均通过入口按钮打开 Dialog。关闭 PIN 作为后续切片。
+- Settings -> Security 接入设置 PIN、修改 PIN、关闭 PIN、无操作后锁定时长；设置 PIN、修改 PIN 和关闭 PIN 均通过入口按钮打开 Dialog。
 
 ### Slice 3：敏感 API 中间件保护
 
