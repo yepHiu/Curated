@@ -1,6 +1,6 @@
 import type { Movie } from "@/domain/movie/types"
 
-export type AgentMentionKind = "movie" | "actor" | "tag"
+export type AgentMentionKind = "movie" | "actor" | "tag" | "comic" | "photo"
 
 export interface AgentMention {
   kind: AgentMentionKind
@@ -91,4 +91,44 @@ export function searchTagMentions(movies: readonly Movie[], query: string, limit
     }
   }
   return tags.map((label) => ({ kind: "tag", id: label, label }))
+}
+
+/** 从已加载漫画列表生成 @ 提及候选项。 */
+export function searchComicMentions(
+  comics: readonly { id: string; title?: string; tags?: string[] }[],
+  query: string,
+  limit = 6,
+): AgentMention[] {
+  const q = query.trim().toLowerCase()
+  const hits = comics.filter((comic) => {
+    if (!comic.id.trim()) return false
+    if (!q) return true
+    const haystack = [comic.title ?? "", ...(comic.tags ?? [])].join(" ").toLowerCase()
+    return haystack.includes(q)
+  })
+  return hits.slice(0, limit).map((comic) => ({
+    kind: "comic",
+    id: comic.id,
+    label: comic.title?.trim() || comic.id,
+  }))
+}
+
+/** 从已加载写真列表生成 @ 提及候选项。 */
+export function searchPhotoMentions(
+  photos: readonly { id: string; title?: string; tags?: string[] }[],
+  query: string,
+  limit = 6,
+): AgentMention[] {
+  const q = query.trim().toLowerCase()
+  const hits = photos.filter((photo) => {
+    if (!photo.id.trim()) return false
+    if (!q) return true
+    const haystack = [photo.title ?? "", ...(photo.tags ?? [])].join(" ").toLowerCase()
+    return haystack.includes(q)
+  })
+  return hits.slice(0, limit).map((photo) => ({
+    kind: "photo",
+    id: photo.id,
+    label: photo.title?.trim() || photo.id,
+  }))
 }

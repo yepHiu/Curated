@@ -382,7 +382,7 @@ func normalizeAIChatContext(page *contracts.AIChatContext) error {
 	if page.ContextVersion < 0 || page.ContextVersion > aiChatContextVersion {
 		return fmt.Errorf("unsupported contextVersion")
 	}
-	usesV1Fields := len(page.SelectedMovieIDs) > 0 || len(page.SelectedActors) > 0 || page.ActiveFilters != nil
+	usesV1Fields := len(page.SelectedMovieIDs) > 0 || len(page.SelectedActors) > 0 || len(page.SelectedComicIDs) > 0 || len(page.SelectedPhotoIDs) > 0 || page.ActiveFilters != nil
 	if usesV1Fields && page.ContextVersion != aiChatContextVersion {
 		return fmt.Errorf("contextVersion 1 is required for selected entities or activeFilters")
 	}
@@ -390,6 +390,12 @@ func normalizeAIChatContext(page *contracts.AIChatContext) error {
 		return err
 	}
 	if err := normalizeAIChatContextString(&page.MovieID, 128, "context.movieId"); err != nil {
+		return err
+	}
+	if err := normalizeAIChatContextString(&page.ComicID, 128, "context.comicId"); err != nil {
+		return err
+	}
+	if err := normalizeAIChatContextString(&page.PhotoID, 128, "context.photoId"); err != nil {
 		return err
 	}
 	if err := normalizeAIChatContextString(&page.ActorName, 160, "context.actorName"); err != nil {
@@ -404,7 +410,7 @@ func normalizeAIChatContext(page *contracts.AIChatContext) error {
 	for i := range page.Mentions {
 		mention := &page.Mentions[i]
 		mention.Kind = strings.ToLower(strings.TrimSpace(mention.Kind))
-		if mention.Kind != "movie" && mention.Kind != "actor" && mention.Kind != "tag" {
+		if mention.Kind != "movie" && mention.Kind != "actor" && mention.Kind != "tag" && mention.Kind != "comic" && mention.Kind != "photo" {
 			return fmt.Errorf("context.mentions[%d].kind is invalid", i)
 		}
 		if err := normalizeAIChatContextString(&mention.ID, 160, fmt.Sprintf("context.mentions[%d].id", i)); err != nil {
@@ -424,6 +430,12 @@ func normalizeAIChatContext(page *contracts.AIChatContext) error {
 	if page.SelectedActors, err = normalizeAIChatContextRefs(page.SelectedActors, 160, "context.selectedActors"); err != nil {
 		return err
 	}
+	if page.SelectedComicIDs, err = normalizeAIChatContextRefs(page.SelectedComicIDs, 128, "context.selectedComicIds"); err != nil {
+		return err
+	}
+	if page.SelectedPhotoIDs, err = normalizeAIChatContextRefs(page.SelectedPhotoIDs, 128, "context.selectedPhotoIds"); err != nil {
+		return err
+	}
 	if filters := page.ActiveFilters; filters != nil {
 		if err := normalizeAIChatContextString(&filters.Query, aiChatMaxContextRunes, "context.activeFilters.query"); err != nil {
 			return err
@@ -440,13 +452,19 @@ func normalizeAIChatContext(page *contracts.AIChatContext) error {
 		if err := normalizeAIChatContextString(&filters.Runtime, 32, "context.activeFilters.runtime"); err != nil {
 			return err
 		}
+		if err := normalizeAIChatContextString(&filters.ReadStatus, 32, "context.activeFilters.readStatus"); err != nil {
+			return err
+		}
 		if filters.PlayState != "" && filters.PlayState != "all" && filters.PlayState != "unwatched" && filters.PlayState != "in-progress" && filters.PlayState != "completed" {
 			return fmt.Errorf("context.activeFilters.playState is invalid")
 		}
 		if filters.Runtime != "" && filters.Runtime != "short" && filters.Runtime != "standard" && filters.Runtime != "long" {
 			return fmt.Errorf("context.activeFilters.runtime is invalid")
 		}
-		if filters.Query == "" && filters.Tag == "" && filters.Actor == "" && filters.PlayState == "" && filters.Runtime == "" {
+		if filters.ReadStatus != "" && filters.ReadStatus != "unread" && filters.ReadStatus != "reading" && filters.ReadStatus != "read" {
+			return fmt.Errorf("context.activeFilters.readStatus is invalid")
+		}
+		if filters.Query == "" && filters.Tag == "" && filters.Actor == "" && filters.PlayState == "" && filters.Runtime == "" && filters.Favorite == nil && filters.ReadStatus == "" {
 			page.ActiveFilters = nil
 		}
 	}

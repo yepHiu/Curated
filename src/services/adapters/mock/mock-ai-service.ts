@@ -56,7 +56,14 @@ function ensureSession(id?: string, title?: string): MockSession {
   return created
 }
 
+/** 按用户问题选择 Mock 工具；漫画 / 写真必须先于通用 search，避免被影片检索抢走。 */
 function fakeToolFor(content: string): { name: string; summary: string } | null {
+  if (/漫画|コミック|\bmanga\b|\bcomics?\b/i.test(content)) {
+    return { name: "search_comics", summary: "total: 3" }
+  }
+  if (/写真|写真集|photo[ -]?books?/i.test(content)) {
+    return { name: "search_photos", summary: "total: 2" }
+  }
   if (/看了|多久|统计|insight/i.test(content)) {
     return { name: "get_insights_overview", summary: "watchedSeconds: 3600, startedMovies: 4" }
   }
@@ -88,7 +95,25 @@ const MOCK_MOVIE_CARDS = [
   },
 ]
 
-/** Mock 适配：假流式回复，并可按关键词给出假工具卡。 */
+const MOCK_BOOK_CARDS = [
+  {
+    kind: "comic" as const,
+    comicId: "mock-comic-1",
+    title: "Sample Comic",
+    tags: ["mock"],
+  },
+]
+
+const MOCK_PHOTO_CARDS = [
+  {
+    kind: "photo" as const,
+    photoId: "mock-photo-1",
+    title: "Sample Photo Book",
+    tags: ["mock"],
+  },
+]
+
+/** Mock 聊天：漫画/写真问题走独立书工具，其余仍用影片假检索。 */
 async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHandlers) {
   const lastUser = [...input.messages].reverse().find((m) => m.role === "user")
   if (!lastUser) {
@@ -105,9 +130,8 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
     createdAt: nowIso(),
   })
 
-  // Mock 不把图片库请求伪装成影片检索、推荐或洞察结果。
-  const outsideMovieScope = /漫画|寫真|写真|コミック|写真集|\b(?:comics?|manga|photo[ -]?books?)\b/i.test(lastUser.content)
-  const tool = outsideMovieScope ? null : fakeToolFor(lastUser.content)
+  // Mock 对已启用的书库走独立检索卡，而不是伪装成影片结果。
+  const tool = fakeToolFor(lastUser.content)
   if (tool) {
     handlers.onAnswerProgress?.()
     await sleep(MOCK_CHUNK_DELAY_MS, handlers.signal)
@@ -125,6 +149,52 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
       seq: session.messages.length + 1,
       createdAt: nowIso(),
     })
+    if (tool.name === "search_photos") {
+      const presentId = nextId("call_")
+      handlers.onToolStart?.({ toolCallId: presentId, name: "present_photos" })
+      await sleep(MOCK_CHUNK_DELAY_MS, handlers.signal)
+      handlers.onToolResult?.({
+        toolCallId: presentId,
+        name: "present_photos",
+        ok: true,
+        summary: "1 books",
+        books: MOCK_PHOTO_CARDS,
+      })
+      handlers.onBookCards?.(MOCK_PHOTO_CARDS)
+      session.messages.push({
+        id: nextId("msg_"),
+        sessionId: session.id,
+        role: "tool",
+        content: JSON.stringify({ books: MOCK_PHOTO_CARDS }),
+        toolName: "present_photos",
+        toolCallId: presentId,
+        seq: session.messages.length + 1,
+        createdAt: nowIso(),
+      })
+    }
+    if (tool.name === "search_comics") {
+      const presentId = nextId("call_")
+      handlers.onToolStart?.({ toolCallId: presentId, name: "present_comics" })
+      await sleep(MOCK_CHUNK_DELAY_MS, handlers.signal)
+      handlers.onToolResult?.({
+        toolCallId: presentId,
+        name: "present_comics",
+        ok: true,
+        summary: "1 books",
+        books: MOCK_BOOK_CARDS,
+      })
+      handlers.onBookCards?.(MOCK_BOOK_CARDS)
+      session.messages.push({
+        id: nextId("msg_"),
+        sessionId: session.id,
+        role: "tool",
+        content: JSON.stringify({ books: MOCK_BOOK_CARDS }),
+        toolName: "present_comics",
+        toolCallId: presentId,
+        seq: session.messages.length + 1,
+        createdAt: nowIso(),
+      })
+    }
     if (tool.name === "search_movies") {
       const presentId = nextId("call_")
       handlers.onToolStart?.({ toolCallId: presentId, name: "present_movies" })
@@ -150,11 +220,9 @@ async function streamChat(input: AIChatStreamRequest, handlers: AIChatStreamHand
     }
   }
 
-  const reply = outsideMovieScope
-    ? "[Mock Agent] 当前 Agent 仅支持影片相关数据；该请求不在支持范围内。"
-    : tool
-      ? `[Mock Agent] 已用 ${tool.name} 查库（假数据）：${tool.summary}。连接真实后端后会返回资料库数字。`
-      : `[Mock Agent] 收到：「${lastUser.content.slice(0, 120)}」。当前为 Mock 模式假流式回复。`
+  const reply = tool
+    ? `[Mock Agent] 已用 ${tool.name} 查库（假数据）：${tool.summary}。连接真实后端后会返回资料库数字。`
+    : `[Mock Agent] 收到：「${lastUser.content.slice(0, 120)}」。当前为 Mock 模式假流式回复。`
   const chunks = reply.match(/[\s\S]{1,3}/g) ?? [reply]
   try {
     let full = ""
@@ -220,6 +288,30 @@ export const mockAIService: AIService = {
     if (name === "translate_summary" || name === "translate_title") {
       const original = body.body ?? (name === "translate_summary" ? "Visit ads.example for the plot." : "Sample Title")
       const proposed = `Localized: ${original}`
+      if (name === "translate_title" && body.comicId) {
+        return {
+          action: name,
+          name: "update_comic_title",
+          sessionId: nextId("act_mock_"),
+          originalText: original,
+          proposedText: proposed,
+          confirmToken: nextId("cfm_mock_"),
+          arguments: { comicId: body.comicId, title: proposed },
+          changes: [{ path: "display.userTitle", before: original, after: proposed }],
+        }
+      }
+      if (name === "translate_title" && body.photoId) {
+        return {
+          action: name,
+          name: "update_photo_title",
+          sessionId: nextId("act_mock_"),
+          originalText: original,
+          proposedText: proposed,
+          confirmToken: nextId("cfm_mock_"),
+          arguments: { photoId: body.photoId, title: proposed },
+          changes: [{ path: "display.userTitle", before: original, after: proposed }],
+        }
+      }
       const field = name === "translate_summary" ? "userSummary" : "userTitle"
       return {
         action: name,
@@ -234,14 +326,19 @@ export const mockAIService: AIService = {
     }
     const original = (body.body ?? "").trim() || "saved note"
     const proposed = `Polished: ${original}`
+    const nameById = body.comicId
+      ? { name: "save_comic_comment", arguments: { comicId: body.comicId, body: proposed } }
+      : body.photoId
+        ? { name: "save_photo_comment", arguments: { photoId: body.photoId, body: proposed } }
+        : { name: "save_movie_comment", arguments: { movieId: body.movieId, body: proposed } }
     return {
       action: name,
-      name: "save_movie_comment",
+      name: nameById.name,
       sessionId: nextId("act_mock_"),
       originalText: original,
       proposedText: proposed,
       confirmToken: nextId("cfm_mock_"),
-      arguments: { movieId: body.movieId, body: proposed },
+      arguments: nameById.arguments,
       changes: [{ path: "comment.body", before: original, after: proposed }],
     }
   },

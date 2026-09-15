@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router"
 import { useI18n } from "vue-i18n"
 import { Button } from "@/components/ui/button"
 import AgentChatMovieCard from "./AgentChatMovieCard.vue"
+import AgentChatBookCard from "./AgentChatBookCard.vue"
 import AgentChatProcess from "./AgentChatProcess.vue"
 import AgentChatConfirm from "./AgentChatConfirm.vue"
 import AgentMarkdown from "./AgentMarkdown.vue"
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   loadOlder: []
   close: []
   openMovie: [movieId: string]
+  openBook: [book: import("@/api/types").AIAgentBookCardDTO]
   applyConfirm: [id: string]
   discardConfirm: [id: string]
   selectEntity: [entryId: string, candidate: import("@/api/types").AIEntityCandidateDTO]
@@ -88,7 +90,7 @@ defineExpose({
       <div v-else-if="entry.kind === 'assistant'" class="space-y-3 text-sm text-foreground" data-agent-entry="assistant">
         <AgentMarkdown v-if="entry.content" :source="entry.content" />
         <Loader2
-          v-else-if="!entry.movies?.length && entries[index - 1]?.kind !== 'process'"
+          v-else-if="!entry.movies?.length && !entry.books?.length && entries[index - 1]?.kind !== 'process'"
           class="size-4 text-muted-foreground motion-safe:animate-spin"
           aria-hidden="true"
         />
@@ -98,6 +100,14 @@ defineExpose({
             :key="movie.movieId"
             :movie="movie"
             @open="emit('openMovie', $event)"
+          />
+        </div>
+        <div v-if="entry.kind === 'assistant' && entry.books?.length" class="space-y-2" data-agent-book-slate>
+          <AgentChatBookCard
+            v-for="book in entry.books"
+            :key="`${book.kind}:${book.comicId || book.photoId}`"
+            :book="book"
+            @open="emit('openBook', $event)"
           />
         </div>
       <p v-if="entry.answerEvidence?.items.length" class="text-xs text-muted-foreground" data-agent-answer-evidence>

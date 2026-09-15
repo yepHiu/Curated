@@ -27,18 +27,28 @@ describe("mockAIService.streamChat", () => {
     ).rejects.toThrow(/user/)
   })
 
-  it.each(["推荐漫画库里的内容", "统计写真库", "search photo books", "recommend manga"])("does not fabricate movie conclusions for %s", async (content) => {
-    const tools = vi.fn()
-    const cards = vi.fn()
-    const deltas: string[] = []
+  it.each([
+    { content: "推荐漫画库里的内容", tool: "search_comics", present: "present_comics", kind: "comic", idKey: "comicId", cardId: "mock-comic-1" },
+    { content: "search photo books", tool: "search_photos", present: "present_photos", kind: "photo", idKey: "photoId", cardId: "mock-photo-1" },
+    { content: "recommend manga", tool: "search_comics", present: "present_comics", kind: "comic", idKey: "comicId", cardId: "mock-comic-1" },
+  ])("emits book tools and cards for $content", async ({ content, tool, present, kind, idKey, cardId }) => {
+    const tools: string[] = []
+    const movieCards = vi.fn()
+    const bookCards = vi.fn()
     const promise = mockAIService.streamChat({ messages: [{ role: "user", content }] }, {
-      onDelta: (delta) => deltas.push(delta), onToolStart: tools, onMovieCards: cards,
+      onDelta: () => {},
+      onToolStart: (event) => tools.push(event.name),
+      onMovieCards: movieCards,
+      onBookCards: bookCards,
     })
     await vi.advanceTimersByTimeAsync(10_000)
     await promise
-    expect(tools).not.toHaveBeenCalled()
-    expect(cards).not.toHaveBeenCalled()
-    expect(deltas.join("")).toContain("仅支持影片相关数据")
+    expect(tools).toContain(tool)
+    expect(tools).toContain(present)
+    expect(movieCards).not.toHaveBeenCalled()
+    expect(bookCards).toHaveBeenCalledWith([
+      expect.objectContaining({ kind, [idKey]: cardId }),
+    ])
   })
 
   it("emits a fake tool card for a library question", async () => {
@@ -122,6 +132,13 @@ describe("mockAIService.streamChat", () => {
     expect(preview.name).toBe("update_movie_display_overrides")
     expect(preview.proposedText).toContain("Localized")
     expect(preview.arguments).toMatchObject({ userSummary: expect.any(String) })
+  })
+
+  it("returns a fake comic title translation preview", async () => {
+    const preview = await mockAIService.runAction("translate_title", { comicId: "comic-1", body: "旧标题" })
+    expect(preview.name).toBe("update_comic_title")
+    expect(preview.arguments).toMatchObject({ comicId: "comic-1", title: expect.any(String) })
+    expect(preview.changes?.[0]).toMatchObject({ path: "display.userTitle" })
   })
 
   it("returns a fake insights narrative without a confirm token", async () => {

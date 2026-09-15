@@ -94,7 +94,7 @@ func getCuratedFramesStats(q LibraryQuery) core.ToolDefinition {
 func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 	return core.ToolDefinition{
 		Name:        "get_task_status",
-		Description: "Look up a movie-library background task by taskId (scan, scrape, import). Only movie-related tasks are available. Do not poll in a loop; report once and finish.",
+		Description: "Look up a background task by taskId. Movie scan/scrape/import tasks are always available. Comic or photo scan/import tasks are available only when that library Beta is enabled. Do not poll in a loop; report once and finish.",
 		ParamsSchema: object(map[string]core.Schema{
 			"taskId": strField("Task id"),
 		}, "taskId"),
@@ -103,7 +103,7 @@ func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 		Handler: func(ctx context.Context, call core.Call) (core.Result, error) {
 			args := decodeArgs(call.Args)
 			task, ok := q.GetTask(ctx, strArg(args, "taskId"))
-			if !ok || !isMovieTask(task.Type) {
+			if !ok || !isAgentVisibleTask(q, task.Type) {
 				return core.Result{OK: false, Error: &core.ToolError{Code: "AI_TOOL_INVALID_ARGS", Message: "task not found"}}, nil
 			}
 			return core.Result{OK: true, Data: wrapSource(map[string]any{
@@ -117,12 +117,31 @@ func getTaskStatus(q LibraryQuery) core.ToolDefinition {
 	}
 }
 
-// isMovieTask prevents generic task reads from exposing Beta library jobs or future domains.
+// isMovieTask reports movie-library background jobs that Agent may always read.
 func isMovieTask(kind string) bool {
 	switch kind {
 	case "scan.library", "scrape.movie", "scrape.actor", "movie_clip_gif", "movie_clip_mp4", "movie_clip_webm",
 		contracts.TaskTypeImportMovies, contracts.TaskTypeLibraryHealthRepair, contracts.TaskTypeLibraryHealthCleanup:
 		return true
+	default:
+		return false
+	}
+}
+
+// isAgentVisibleTask allows movie tasks always, and book-library tasks only while that Beta is enabled.
+func isAgentVisibleTask(q LibraryQuery, kind string) bool {
+	if isMovieTask(kind) {
+		return true
+	}
+	books, ok := q.(BookLibraryQuery)
+	if !ok {
+		return false
+	}
+	switch kind {
+	case contracts.TaskTypeScanComics, contracts.TaskTypeImportComics, contracts.TaskTypeComicCacheCleanup:
+		return books.ComicLibraryEnabled()
+	case contracts.TaskTypeScanPhotos, contracts.TaskTypeImportPhotos:
+		return books.PhotoLibraryEnabled()
 	default:
 		return false
 	}

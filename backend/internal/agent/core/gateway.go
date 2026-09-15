@@ -26,6 +26,7 @@ type Gateway struct {
 	settings   func() Settings
 	budget     *budgetTracker
 	movieRefs  *MovieRefStore
+	bookRefs   *BookRefStore
 	actorRefs  *ActorRefStore
 	sourceURLs *SourceURLStore
 	now        func() time.Time
@@ -45,6 +46,7 @@ func NewGateway(registry *Registry, confirm *ConfirmStore, audit AuditSink, sett
 		settings:   settings,
 		budget:     newBudgetTracker(),
 		movieRefs:  NewMovieRefStore(),
+		bookRefs:   NewBookRefStore(),
 		actorRefs:  NewActorRefStore(),
 		sourceURLs: NewSourceURLStore(),
 		now:        time.Now,
@@ -242,6 +244,30 @@ func (g *Gateway) ResetMovieRefs(sessionID string) {
 		return
 	}
 	g.movieRefs.Reset(sessionID)
+}
+
+// BookRefs 返回本轮漫画/写真引用库，供 present 工具校验。
+func (g *Gateway) BookRefs() *BookRefStore {
+	if g == nil {
+		return nil
+	}
+	return g.bookRefs
+}
+
+// RememberBookRefs 把本轮搜索/详情读到的书记录进独立引用库。
+func (g *Gateway) RememberBookRefs(sessionID string, refs []BookRef) {
+	if g == nil || g.bookRefs == nil {
+		return
+	}
+	g.bookRefs.Remember(sessionID, refs)
+}
+
+// ResetBookRefs 清空本轮书引用，避免跨轮授信。
+func (g *Gateway) ResetBookRefs(sessionID string) {
+	if g == nil || g.bookRefs == nil {
+		return
+	}
+	g.bookRefs.Reset(sessionID)
 }
 
 func (g *Gateway) ActorRefs() *ActorRefStore {

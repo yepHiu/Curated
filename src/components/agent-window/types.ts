@@ -9,7 +9,7 @@ export type AgentProcessTool = {
 
 export type AgentChatEntry =
   | { id: string; kind: "user"; content: string }
-  | { id: string; kind: "assistant"; content: string; movies?: import("@/api/types").AIAgentMovieCardDTO[]; answerEvidence?: import("@/api/types").AIAnswerEvidenceDTO }
+  | { id: string; kind: "assistant"; content: string; movies?: import("@/api/types").AIAgentMovieCardDTO[]; books?: import("@/api/types").AIAgentBookCardDTO[]; answerEvidence?: import("@/api/types").AIAnswerEvidenceDTO }
   | {
       id: string
       kind: "process"

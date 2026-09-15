@@ -49,13 +49,30 @@ func (a *App) AgentLibraryOverview(ctx context.Context) (map[string]any, error) 
 			pathRows = append(pathRows, map[string]any{"id": path.ID, "title": path.Title})
 		}
 	}
-	return map[string]any{
-		"movieCount":        movies.Total,
-		"trashCount":        trash.Total,
-		"curatedFrameCount": frames,
-		"libraryPathCount":  len(paths),
-		"libraryPaths":      pathRows,
-	}, nil
+	overview := map[string]any{
+		"movieCount":          movies.Total,
+		"trashCount":          trash.Total,
+		"curatedFrameCount":   frames,
+		"libraryPathCount":    len(paths),
+		"libraryPaths":        pathRows,
+		"comicLibraryEnabled": a.ComicLibraryEnabled(),
+		"photoLibraryEnabled": a.PhotoLibraryEnabled(),
+	}
+	if a.ComicLibraryEnabled() {
+		comics, err := a.store.ListComicBooks(ctx, contracts.ListComicBooksRequest{Limit: 1})
+		if err != nil {
+			return nil, err
+		}
+		overview["comicCount"] = comics.Total
+	}
+	if a.PhotoLibraryEnabled() {
+		photos, err := a.store.ListPhotoBooks(ctx, contracts.ListPhotoBooksRequest{Limit: 1})
+		if err != nil {
+			return nil, err
+		}
+		overview["photoCount"] = photos.Total
+	}
+	return overview, nil
 }
 
 func (a *App) ListMovies(ctx context.Context, req contracts.ListMoviesRequest) (contracts.MoviesPageDTO, error) {
@@ -225,4 +242,98 @@ func (a *App) FindLibraryMoviesByCodes(ctx context.Context, codes []string) (map
 		return map[string]contracts.MovieListItemDTO{}, nil
 	}
 	return a.store.FindActiveMoviesByCodes(ctx, codes)
+}
+
+// ListComicBooks lists comics for Agent search after the comic Beta gate.
+func (a *App) ListComicBooks(ctx context.Context, req contracts.ListComicBooksRequest) (contracts.ComicBooksPageDTO, error) {
+	if !a.ComicLibraryEnabled() {
+		return contracts.ComicBooksPageDTO{}, tools.ErrComicLibraryDisabled
+	}
+	return a.store.ListComicBooks(ctx, req)
+}
+
+// GetComicBookDetail returns one comic for Agent after the comic Beta gate.
+func (a *App) GetComicBookDetail(ctx context.Context, comicID string) (contracts.ComicBookDetailDTO, error) {
+	if !a.ComicLibraryEnabled() {
+		return contracts.ComicBookDetailDTO{}, tools.ErrComicLibraryDisabled
+	}
+	return a.store.GetComicBookDetail(ctx, comicID)
+}
+
+// GetComicComment returns the personal note for one comic.
+func (a *App) GetComicComment(ctx context.Context, comicID string) (contracts.ComicCommentDTO, error) {
+	if !a.ComicLibraryEnabled() {
+		return contracts.ComicCommentDTO{}, tools.ErrComicLibraryDisabled
+	}
+	return a.store.GetComicComment(ctx, comicID)
+}
+
+// UpsertComicComment writes a comic note after comparing the previewed previous body.
+func (a *App) UpsertComicComment(ctx context.Context, comicID, body string, expected ...string) (contracts.ComicCommentDTO, error) {
+	if !a.ComicLibraryEnabled() {
+		return contracts.ComicCommentDTO{}, tools.ErrComicLibraryDisabled
+	}
+	current, err := a.store.GetComicComment(ctx, comicID)
+	if err != nil {
+		return contracts.ComicCommentDTO{}, err
+	}
+	if len(expected) > 0 && current.Body != expected[0] {
+		return contracts.ComicCommentDTO{}, storage.ErrAIWriteConflict
+	}
+	return a.store.UpsertComicComment(ctx, comicID, body)
+}
+
+// ListPhotoBooks lists photo books for Agent search after the photo Beta gate.
+func (a *App) ListPhotoBooks(ctx context.Context, req contracts.ListPhotoBooksRequest) (contracts.PhotoBooksPageDTO, error) {
+	if !a.PhotoLibraryEnabled() {
+		return contracts.PhotoBooksPageDTO{}, tools.ErrPhotoLibraryDisabled
+	}
+	return a.store.ListPhotoBooks(ctx, req)
+}
+
+// GetPhotoBookDetail returns one photo book for Agent after the photo Beta gate.
+func (a *App) GetPhotoBookDetail(ctx context.Context, photoID string) (contracts.PhotoBookDetailDTO, error) {
+	if !a.PhotoLibraryEnabled() {
+		return contracts.PhotoBookDetailDTO{}, tools.ErrPhotoLibraryDisabled
+	}
+	return a.store.GetPhotoBookDetail(ctx, photoID)
+}
+
+// GetPhotoComment returns the personal note for one photo book.
+func (a *App) GetPhotoComment(ctx context.Context, photoID string) (contracts.PhotoCommentDTO, error) {
+	if !a.PhotoLibraryEnabled() {
+		return contracts.PhotoCommentDTO{}, tools.ErrPhotoLibraryDisabled
+	}
+	return a.store.GetPhotoComment(ctx, photoID)
+}
+
+// UpsertPhotoComment writes a photo note after comparing the previewed previous body.
+func (a *App) UpsertPhotoComment(ctx context.Context, photoID, body string, expected ...string) (contracts.PhotoCommentDTO, error) {
+	if !a.PhotoLibraryEnabled() {
+		return contracts.PhotoCommentDTO{}, tools.ErrPhotoLibraryDisabled
+	}
+	current, err := a.store.GetPhotoComment(ctx, photoID)
+	if err != nil {
+		return contracts.PhotoCommentDTO{}, err
+	}
+	if len(expected) > 0 && current.Body != expected[0] {
+		return contracts.PhotoCommentDTO{}, storage.ErrAIWriteConflict
+	}
+	return a.store.UpsertPhotoComment(ctx, photoID, body)
+}
+
+// PatchComicBook updates comic fields for Agent title writes after the comic Beta gate.
+func (a *App) PatchComicBook(ctx context.Context, comicID string, patch contracts.PatchComicBookRequest) (contracts.ComicBookDetailDTO, error) {
+	if !a.ComicLibraryEnabled() {
+		return contracts.ComicBookDetailDTO{}, tools.ErrComicLibraryDisabled
+	}
+	return a.store.PatchComicBook(ctx, comicID, patch)
+}
+
+// PatchPhotoBook updates photo fields for Agent title writes after the photo Beta gate.
+func (a *App) PatchPhotoBook(ctx context.Context, photoID string, patch contracts.PatchPhotoBookRequest) (contracts.PhotoBookDetailDTO, error) {
+	if !a.PhotoLibraryEnabled() {
+		return contracts.PhotoBookDetailDTO{}, tools.ErrPhotoLibraryDisabled
+	}
+	return a.store.PatchPhotoBook(ctx, photoID, patch)
 }

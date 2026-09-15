@@ -68,6 +68,20 @@ vi.mock("@/services/library-service", () => ({
   }),
 }))
 
+vi.mock("@/services/comic-library-service", () => ({
+  useComicLibraryService: () => ({
+    comicLibraryEnabled: { value: false },
+    comics: { value: [] },
+  }),
+}))
+
+vi.mock("@/services/photo-library-service", () => ({
+  usePhotoLibraryService: () => ({
+    photoLibraryEnabled: { value: false },
+    photos: { value: [] },
+  }),
+}))
+
 function mountWindow() {
   return mount(AgentWindow, {
     global: {

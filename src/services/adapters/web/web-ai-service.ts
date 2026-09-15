@@ -44,6 +44,7 @@ interface SSEEventPayload {
   summary?: string
   truncated?: boolean
   movies?: import("@/api/types").AIAgentMovieCardDTO[]
+  books?: import("@/api/types").AIAgentBookCardDTO[]
   providerRows?: import("@/api/types").AIAgentProviderTitleDTO[]
   confirmToken?: string
   expiresAt?: string
@@ -139,12 +140,16 @@ async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHan
           summary: payload.summary,
           truncated: payload.truncated,
           movies: payload.movies,
+          books: payload.books,
           providerRows: payload.providerRows,
           evidence: payload.evidence,
           resolution: payload.resolution,
         })
         if (payload.movies?.length) {
           handlers.onMovieCards?.(payload.movies)
+        }
+        if (payload.books?.length) {
+          handlers.onBookCards?.(payload.books)
         }
         break
       case "message_done":
@@ -155,6 +160,11 @@ async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHan
       case "movie_cards":
         if (payload.movies?.length) {
           handlers.onMovieCards?.(payload.movies)
+        }
+        break
+      case "book_cards":
+        if (payload.books?.length) {
+          handlers.onBookCards?.(payload.books)
         }
         break
       case "confirm_required":

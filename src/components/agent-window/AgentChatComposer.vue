@@ -9,12 +9,16 @@ import {
   mentionQueryAtCursor,
   mentionsStillInText,
   searchActorMentions,
+  searchComicMentions,
   searchMovieMentions,
+  searchPhotoMentions,
   searchTagMentions,
   type AgentMention,
   type AgentMentionKind,
 } from "@/lib/agent-mentions"
 import { useLibraryService } from "@/services/library-service"
+import { useComicLibraryService } from "@/services/comic-library-service"
+import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 defineOptions({ name: "AgentChatComposer" })
 
@@ -45,6 +49,8 @@ const actorHits = ref<AgentMention[]>([])
 const syncingMention = ref(false)
 const { t } = useI18n()
 const library = useLibraryService()
+const comics = useComicLibraryService()
+const photos = usePhotoLibraryService()
 
 const catalog = computed(() => {
   const movies = library.movies
@@ -52,10 +58,32 @@ const catalog = computed(() => {
   const value = movies && "value" in movies ? movies.value : []
   return Array.isArray(value) ? value : []
 })
+/** 已启用漫画库时，用当前已加载列表生成 @ 漫画候选项。 */
+const comicCatalog = computed(() => {
+  if (!comics.comicLibraryEnabled.value) return []
+  const list = comics.comics
+  if (Array.isArray(list)) return list
+  const value = list && "value" in list ? list.value : []
+  return Array.isArray(value) ? value : []
+})
+/** 已启用写真库时，用当前已加载列表生成 @ 写真候选项。 */
+const photoCatalog = computed(() => {
+  if (!photos.photoLibraryEnabled.value) return []
+  const list = photos.photos
+  if (Array.isArray(list)) return list
+  const value = list && "value" in list ? list.value : []
+  return Array.isArray(value) ? value : []
+})
 const mentionQuery = computed(() => mentionQueryAtCursor(draft.value, cursor.value))
 const pickerLimit = computed(() => mentionPickerLimit(mentionQuery.value?.query ?? ""))
 const movieHits = computed(() =>
   searchMovieMentions(catalog.value, mentionQuery.value?.query ?? "", pickerLimit.value),
+)
+const comicHits = computed(() =>
+  searchComicMentions(comicCatalog.value, mentionQuery.value?.query ?? "", pickerLimit.value),
+)
+const photoHits = computed(() =>
+  searchPhotoMentions(photoCatalog.value, mentionQuery.value?.query ?? "", pickerLimit.value),
 )
 const tagHits = computed(() =>
   searchTagMentions(catalog.value, mentionQuery.value?.query ?? "", pickerLimit.value),
@@ -64,6 +92,8 @@ const tagHits = computed(() =>
 const groups = computed(() => {
   const next: { kind: AgentMentionKind; items: AgentMention[] }[] = []
   if (movieHits.value.length) next.push({ kind: "movie", items: movieHits.value })
+  if (comicHits.value.length) next.push({ kind: "comic", items: comicHits.value })
+  if (photoHits.value.length) next.push({ kind: "photo", items: photoHits.value })
   if (actorHits.value.length) next.push({ kind: "actor", items: actorHits.value })
   if (tagHits.value.length) next.push({ kind: "tag", items: tagHits.value })
   return next

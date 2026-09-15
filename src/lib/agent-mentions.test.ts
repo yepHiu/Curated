@@ -5,7 +5,9 @@ import {
   mentionPickerLimit,
   mentionQueryAtCursor,
   searchActorMentions,
+  searchComicMentions,
   searchMovieMentions,
+  searchPhotoMentions,
   searchTagMentions,
 } from "./agent-mentions"
 
@@ -55,5 +57,10 @@ describe("agent mentions", () => {
     expect(searchMovieMentions(movies, "abc").map((item) => item.id)).toEqual(["m1"])
     expect(searchTagMentions(movies, "短").map((item) => item.label)).toEqual(["短片"])
     expect(searchActorMentions([{ name: "Ada" }, { name: "Bea" }], "ad").map((item) => item.id)).toEqual(["Ada"])
+  })
+
+  it("filters loaded comics and photo books for mentions", () => {
+    expect(searchComicMentions([{ id: "c1", title: "Summer", tags: ["恋爱"] }, { id: "c2", title: "Other" }], "summer").map((item) => item.id)).toEqual(["c1"])
+    expect(searchPhotoMentions([{ id: "p1", title: "Studio Book" }, { id: "p2", title: "Other" }], "studio").map((item) => item.kind)).toEqual(["photo"])
   })
 })

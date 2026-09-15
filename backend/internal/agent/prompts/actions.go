@@ -35,7 +35,7 @@ func KnownAction(name string) bool {
 
 func CommentActionPrompt(body string) string {
 	var b strings.Builder
-	b.WriteString("You rewrite a user's private movie note for Curated. ")
+	b.WriteString("You rewrite a user's private library note for Curated. ")
 	b.WriteString("Return only the rewritten note text. No title, no quotes, no markdown fences. ")
 	b.WriteString("Do not invent facts, titles, actors, scores, or plot that the source note does not contain. ")
 	b.WriteString("Detect the language of the source note yourself and keep the rewrite in that same language. ")

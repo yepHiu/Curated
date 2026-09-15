@@ -48,6 +48,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	defer func() {
 		l.gateway.ResetSessionSteps(scope)
 		l.gateway.ResetMovieRefs(scope)
+		l.gateway.ResetBookRefs(scope)
 		l.gateway.ResetActorRefs(scope)
 		l.gateway.ResetSourceURLs(scope)
 	}()
@@ -222,9 +223,13 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				})
 			}
 			if result.OK {
-				l.gateway.RememberMovieRefs(scope, core.ExtractMovieRefs(result))
-				l.gateway.RememberActorNames(scope, core.ExtractActorNames(result))
-				l.gateway.RememberSourceURLs(scope, core.ExtractSourceURLs(result))
+				if isBookLibraryTool(call.Name()) {
+					l.gateway.RememberBookRefs(scope, core.ExtractBookRefs(result))
+				} else {
+					l.gateway.RememberMovieRefs(scope, core.ExtractMovieRefs(result))
+					l.gateway.RememberActorNames(scope, core.ExtractActorNames(result))
+					l.gateway.RememberSourceURLs(scope, core.ExtractSourceURLs(result))
+				}
 			}
 			if !result.OK {
 				hadFailure = true
@@ -256,6 +261,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			}
 			ok := result.OK
 			movies := presentMovieCards(call.Name(), result)
+			books := presentBookCards(call.Name(), result)
 			if len(movies) > 0 {
 				publication := &core.AnswerSubmission{}
 				for _, movie := range movies {
@@ -273,12 +279,18 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			emit(contracts.AIChatSSEEvent{
 				Type: "tool_call_result", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 				ToolCallID: toolCallID, Name: call.Name(), OK: &ok, Summary: summary, Truncated: result.Truncated,
-				Movies: movies, ProviderRows: providerRows, Resolution: resolution, Evidence: toolEvidence,
+				Movies: movies, Books: books, ProviderRows: providerRows, Resolution: resolution, Evidence: toolEvidence,
 			})
 			if len(movies) > 0 {
 				emit(contracts.AIChatSSEEvent{
 					Type: "movie_cards", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
 					ToolCallID: toolCallID, Name: call.Name(), Movies: movies,
+				})
+			}
+			if len(books) > 0 {
+				emit(contracts.AIChatSSEEvent{
+					Type: "book_cards", SessionID: sessionID, MessageID: messageID, Seq: nextSeq(),
+					ToolCallID: toolCallID, Name: call.Name(), Books: books,
 				})
 			}
 			if result.Answer != nil && result.OK && call.Name() == core.SubmitAnswerName {
@@ -541,6 +553,43 @@ func presentMovieCards(name string, result core.Result) []contracts.AIAgentMovie
 	return out
 }
 
+func presentBookCards(name string, result core.Result) []contracts.AIAgentBookCardDTO {
+	if (name != core.PresentComicsName && name != core.PresentPhotosName) || !result.OK {
+		return nil
+	}
+	refs := core.ExtractBookRefs(result)
+	if len(refs) == 0 {
+		return nil
+	}
+	out := make([]contracts.AIAgentBookCardDTO, 0, len(refs))
+	for _, ref := range refs {
+		card := contracts.AIAgentBookCardDTO{
+			Kind:     ref.Kind,
+			Title:    ref.Title,
+			CoverURL: ref.CoverURL,
+			Tags:     ref.Tags,
+		}
+		if ref.Kind == "comic" {
+			card.ComicID = ref.ID
+		} else {
+			card.PhotoID = ref.ID
+		}
+		out = append(out, card)
+	}
+	return out
+}
+
+func isBookLibraryTool(name string) bool {
+	switch name {
+	case "search_comics", "get_comic_detail", core.PresentComicsName, core.SaveComicCommentName,
+		"search_photos", "get_photo_detail", core.PresentPhotosName, core.SavePhotoCommentName,
+		core.UpdateComicTitleName, core.UpdatePhotoTitleName:
+		return true
+	default:
+		return false
+	}
+}
+
 func confirmChanges(changes []core.Change) []contracts.AIConfirmChangeDTO {
 	if len(changes) == 0 {
 		return nil
@@ -573,6 +622,22 @@ func seedTurnEntities(gateway *core.Gateway, sessionID string, page *contracts.A
 		}
 	}
 	gateway.RememberActorNames(sessionID, page.SelectedActors)
+	if id := strings.TrimSpace(page.ComicID); id != "" {
+		gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "comic", ID: id}})
+	}
+	if id := strings.TrimSpace(page.PhotoID); id != "" {
+		gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "photo", ID: id}})
+	}
+	for _, rawID := range page.SelectedComicIDs {
+		if id := strings.TrimSpace(rawID); id != "" {
+			gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "comic", ID: id}})
+		}
+	}
+	for _, rawID := range page.SelectedPhotoIDs {
+		if id := strings.TrimSpace(rawID); id != "" {
+			gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "photo", ID: id}})
+		}
+	}
 	for _, mention := range page.Mentions {
 		kind := strings.ToLower(strings.TrimSpace(mention.Kind))
 		switch kind {
@@ -589,6 +654,14 @@ func seedTurnEntities(gateway *core.Gateway, sessionID string, page *contracts.A
 				names = append(names, id)
 			}
 			gateway.RememberActorNames(sessionID, names)
+		case "comic":
+			if id := strings.TrimSpace(mention.ID); id != "" {
+				gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "comic", ID: id, Title: strings.TrimSpace(mention.Label)}})
+			}
+		case "photo":
+			if id := strings.TrimSpace(mention.ID); id != "" {
+				gateway.RememberBookRefs(sessionID, []core.BookRef{{Kind: "photo", ID: id, Title: strings.TrimSpace(mention.Label)}})
+			}
 		}
 	}
 }

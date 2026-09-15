@@ -10,7 +10,7 @@ import (
 	"curated-backend/internal/contracts"
 )
 
-const Version = "agent-system-v4"
+const Version = "agent-system-v6"
 const maxMentions = 8
 const maxMentionLabelRunes = 80
 
@@ -42,6 +42,12 @@ func SystemPrompt(locale string, page *contracts.AIChatContext) string {
 		if page.MovieID != "" {
 			parts = append(parts, "movieId="+page.MovieID)
 		}
+		if page.ComicID != "" {
+			parts = append(parts, "comicId="+page.ComicID)
+		}
+		if page.PhotoID != "" {
+			parts = append(parts, "photoId="+page.PhotoID)
+		}
 		if page.ActorName != "" {
 			parts = append(parts, "actor="+page.ActorName)
 		}
@@ -53,6 +59,12 @@ func SystemPrompt(locale string, page *contracts.AIChatContext) string {
 		}
 		if len(page.SelectedActors) > 0 {
 			parts = append(parts, "selectedActors="+strings.Join(page.SelectedActors, ","))
+		}
+		if len(page.SelectedComicIDs) > 0 {
+			parts = append(parts, "selectedComicIds="+strings.Join(page.SelectedComicIDs, ","))
+		}
+		if len(page.SelectedPhotoIDs) > 0 {
+			parts = append(parts, "selectedPhotoIds="+strings.Join(page.SelectedPhotoIDs, ","))
 		}
 		if len(parts) > 0 {
 			b.WriteString("\n\n## Visible page context\n\nThe user can clear this context. Use it only to resolve words like 这部/这个演员: ")
@@ -85,6 +97,16 @@ func writeActiveFilters(b *strings.Builder, filters *contracts.AIChatActiveFilte
 	if filters.Runtime != "" {
 		parts = append(parts, "runtime="+filters.Runtime)
 	}
+	if filters.Favorite != nil {
+		if *filters.Favorite {
+			parts = append(parts, "favorite=true")
+		} else {
+			parts = append(parts, "favorite=false")
+		}
+	}
+	if filters.ReadStatus != "" {
+		parts = append(parts, "readStatus="+filters.ReadStatus)
+	}
 	if len(parts) == 0 {
 		return
 	}
@@ -101,7 +123,7 @@ func writeMentions(b *strings.Builder, mentions []contracts.AIChatMention) {
 	var lines []string
 	for _, mention := range mentions {
 		kind := strings.ToLower(strings.TrimSpace(mention.Kind))
-		if kind != "movie" && kind != "actor" && kind != "tag" {
+		if kind != "movie" && kind != "actor" && kind != "tag" && kind != "comic" && kind != "photo" {
 			continue
 		}
 		id := strings.TrimSpace(mention.ID)

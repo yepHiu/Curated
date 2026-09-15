@@ -101,6 +101,18 @@ func intArg(args map[string]any, key string, fallback int) int {
 	return fallback
 }
 
+func boolPtrArg(args map[string]any, key string) *bool {
+	v, ok := args[key]
+	if !ok || v == nil {
+		return nil
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return nil
+	}
+	return &b
+}
+
 func floatPtrArg(args map[string]any, key string) *float64 {
 	v, ok := args[key]
 	if !ok || v == nil {

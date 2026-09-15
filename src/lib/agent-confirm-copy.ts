@@ -113,7 +113,7 @@ export function agentConfirmCopy(source: AgentConfirmSource, t: AgentConfirmTran
       showRawChanges: false,
     }
   }
-  if (source.name === "save_movie_comment") {
+  if (source.name === "save_movie_comment" || source.name === "save_comic_comment" || source.name === "save_photo_comment") {
     const paragraphs = commentCopy(source, t)
     return {
       title: t("agentWindow.confirmTitleComment"),
@@ -124,7 +124,7 @@ export function agentConfirmCopy(source: AgentConfirmSource, t: AgentConfirmTran
       showRawChanges: paragraphs.length === 0,
     }
   }
-  if (source.name === "update_movie_display_overrides") {
+  if (source.name === "update_movie_display_overrides" || source.name === "update_comic_title" || source.name === "update_photo_title") {
     const paragraphs = displayCopy(source, t)
     return {
       title: t("agentWindow.confirmTitleDisplay"),

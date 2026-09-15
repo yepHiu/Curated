@@ -20,14 +20,21 @@ const (
 	DomainTask       = "task"
 
 	PresentMoviesName               = "present_movies"
+	PresentComicsName               = "present_comics"
+	PresentPhotosName               = "present_photos"
 	PresentMoviesMaxItems           = 6
+	PresentBooksMaxItems            = 6
 	SearchProviderTitlesName        = "search_provider_titles"
 	GetSourcePageName               = "get_source_page"
 	ProviderSearchDefaultLimit      = 15
 	ProviderSearchMaxLimit          = 25
 	MaxSourcePageBytes              = 32 * 1024
 	SaveMovieCommentName            = "save_movie_comment"
+	SaveComicCommentName            = "save_comic_comment"
+	SavePhotoCommentName            = "save_photo_comment"
 	UpdateMovieDisplayOverridesName = "update_movie_display_overrides"
+	UpdateComicTitleName            = "update_comic_title"
+	UpdatePhotoTitleName            = "update_photo_title"
 	CreateSavedViewName             = "create_saved_view"
 	MaxMovieSummaryBytes            = 120_000
 

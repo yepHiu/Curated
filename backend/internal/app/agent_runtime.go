@@ -66,6 +66,9 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 		if err := tools.RegisterQueryTools(reg, a); err != nil && a.logger != nil {
 			a.logger.Warn("register agent query tools failed")
 		}
+		if err := tools.RegisterBookQueryTools(reg, a); err != nil && a.logger != nil {
+			a.logger.Warn("register agent book query tools failed")
+		}
 		gw := core.NewGateway(reg, core.NewConfirmStore(), agentAuditSink{store: a.store}, func() core.Settings {
 			cfg := a.AIGovernanceSettings()
 			return core.Settings{Disabled: !cfg.Enabled, ReadOnly: cfg.ReadOnly, GlobalWriteLimit: true, StepLimit: cfg.StepLimit, WritePerMinute: cfg.WritePerMinute}
@@ -73,11 +76,17 @@ func (a *App) ensureAgentGateway() *core.Gateway {
 		if err := tools.RegisterPresentTools(reg, gw.MovieRefs()); err != nil && a.logger != nil {
 			a.logger.Warn("register agent present tools failed")
 		}
+		if err := tools.RegisterBookPresentTools(reg, gw.BookRefs()); err != nil && a.logger != nil {
+			a.logger.Warn("register agent book present tools failed")
+		}
 		if err := tools.RegisterProviderTools(reg, a, a, a, gw.MovieRefs(), gw.ActorRefs(), gw.SourceURLs()); err != nil && a.logger != nil {
 			a.logger.Warn("register agent provider tools failed")
 		}
 		if err := tools.RegisterWriteTools(reg, a); err != nil && a.logger != nil {
 			a.logger.Warn("register agent write tools failed")
+		}
+		if err := tools.RegisterBookWriteTools(reg, a); err != nil && a.logger != nil {
+			a.logger.Warn("register agent book write tools failed")
 		}
 		a.agentRT.gateway = gw
 	})
@@ -215,6 +224,8 @@ func (a *App) projectAIChatContext(ctx context.Context, input *contracts.AIChatC
 	page.Mentions = append([]contracts.AIChatMention(nil), input.Mentions...)
 	page.SelectedMovieIDs = nil
 	page.SelectedActors = nil
+	page.SelectedComicIDs = nil
+	page.SelectedPhotoIDs = nil
 	if input.ActiveFilters != nil {
 		filters := *input.ActiveFilters
 		page.ActiveFilters = &filters
@@ -234,6 +245,20 @@ func (a *App) projectAIChatContext(ctx context.Context, input *contracts.AIChatC
 			continue
 		}
 		page.SelectedActors = append(page.SelectedActors, profile.Name)
+	}
+	if a.ComicLibraryEnabled() {
+		for _, id := range input.SelectedComicIDs {
+			if _, err := a.store.GetComicBookDetail(ctx, id); err == nil {
+				page.SelectedComicIDs = append(page.SelectedComicIDs, id)
+			}
+		}
+	}
+	if a.PhotoLibraryEnabled() {
+		for _, id := range input.SelectedPhotoIDs {
+			if _, err := a.store.GetPhotoBookDetail(ctx, id); err == nil {
+				page.SelectedPhotoIDs = append(page.SelectedPhotoIDs, id)
+			}
+		}
 	}
 	return &page
 }

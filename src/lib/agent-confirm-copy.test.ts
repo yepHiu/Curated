@@ -34,6 +34,20 @@ describe("agentConfirmCopy", () => {
     expect(copy.paragraphs.join(" ")).not.toContain("confirmBefore")
   })
 
+  it("describes a comic display title change as a display-field confirmation", () => {
+    const copy = agentConfirmCopy(
+      {
+        name: "update_comic_title",
+        arguments: { comicId: "c1", title: "展示标题" },
+        changes: [{ path: "display.userTitle", before: "旧标题", after: "展示标题" }],
+      },
+      t,
+    )
+    expect(copy.title).toBe("agentWindow.confirmTitleDisplay")
+    expect(copy.paragraphs).toEqual(['agentWindow.confirmDisplayTitle:{"after":"展示标题"}'])
+    expect(copy.showRawChanges).toBe(false)
+  })
+
   it("describes a new comment without a current-vs-next grid", () => {
     const copy = agentConfirmCopy(
       {

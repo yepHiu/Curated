@@ -66,28 +66,78 @@ func (a *App) RunAIAction(ctx context.Context, name string, req contracts.AIActi
 
 func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
 	movieID := strings.TrimSpace(req.MovieID)
-	if movieID == "" {
-		return contracts.AIActionPreviewDTO{}, fmt.Errorf("movieId is required")
+	comicID := strings.TrimSpace(req.ComicID)
+	photoID := strings.TrimSpace(req.PhotoID)
+	filled := 0
+	if movieID != "" {
+		filled++
 	}
-	exists, err := a.MovieExists(ctx, movieID)
-	if err != nil {
-		return contracts.AIActionPreviewDTO{}, err
+	if comicID != "" {
+		filled++
 	}
-	if !exists {
-		return contracts.AIActionPreviewDTO{}, fmt.Errorf("movie not found")
+	if photoID != "" {
+		filled++
 	}
+	if filled != 1 {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("movieId, comicId, or photoId is required")
+	}
+
 	original := strings.TrimSpace(req.Body)
-	if original == "" {
-		current, err := a.GetMovieComment(ctx, movieID)
+	toolName := core.SaveMovieCommentName
+	argKey := "movieId"
+	entityID := movieID
+	limit := contracts.MaxMovieCommentRunes
+	switch {
+	case movieID != "":
+		exists, err := a.MovieExists(ctx, movieID)
 		if err != nil {
 			return contracts.AIActionPreviewDTO{}, err
 		}
-		original = current.Body
+		if !exists {
+			return contracts.AIActionPreviewDTO{}, fmt.Errorf("movie not found")
+		}
+		if original == "" {
+			current, err := a.GetMovieComment(ctx, movieID)
+			if err != nil {
+				return contracts.AIActionPreviewDTO{}, err
+			}
+			original = current.Body
+		}
+	case comicID != "":
+		toolName = core.SaveComicCommentName
+		argKey = "comicId"
+		entityID = comicID
+		limit = contracts.MaxBookCommentRunes
+		if _, err := a.GetComicBookDetail(ctx, comicID); err != nil {
+			return contracts.AIActionPreviewDTO{}, err
+		}
+		if original == "" {
+			current, err := a.GetComicComment(ctx, comicID)
+			if err != nil {
+				return contracts.AIActionPreviewDTO{}, err
+			}
+			original = current.Body
+		}
+	default:
+		toolName = core.SavePhotoCommentName
+		argKey = "photoId"
+		entityID = photoID
+		limit = contracts.MaxBookCommentRunes
+		if _, err := a.GetPhotoBookDetail(ctx, photoID); err != nil {
+			return contracts.AIActionPreviewDTO{}, err
+		}
+		if original == "" {
+			current, err := a.GetPhotoComment(ctx, photoID)
+			if err != nil {
+				return contracts.AIActionPreviewDTO{}, err
+			}
+			original = current.Body
+		}
 	}
 	if original == "" {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("comment is empty")
 	}
-	if utf8.RuneCountInString(original) > contracts.MaxMovieCommentRunes {
+	if utf8.RuneCountInString(original) > limit {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("comment body too long")
 	}
 	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
@@ -101,18 +151,18 @@ func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, 
 	if proposed == "" {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("provider returned empty text")
 	}
-	if utf8.RuneCountInString(proposed) > contracts.MaxMovieCommentRunes {
+	if utf8.RuneCountInString(proposed) > limit {
 		runes := []rune(proposed)
-		proposed = string(runes[:contracts.MaxMovieCommentRunes])
+		proposed = string(runes[:limit])
 	}
 
-	args, err := json.Marshal(map[string]string{"movieId": movieID, "body": proposed})
+	args, err := json.Marshal(map[string]string{argKey: entityID, "body": proposed})
 	if err != nil {
 		return contracts.AIActionPreviewDTO{}, err
 	}
 	sessionID := newAgentID("act_")
 	result := a.ensureAgentGateway().Invoke(ctx, core.Call{
-		Name:      core.SaveMovieCommentName,
+		Name:      toolName,
 		Args:      args,
 		SessionID: sessionID,
 		Channel:   core.ChannelAction,
@@ -123,7 +173,7 @@ func (a *App) runCommentAction(ctx context.Context, completer commentCompleter, 
 	}
 	preview := contracts.AIActionPreviewDTO{
 		Action:       name,
-		Name:         core.SaveMovieCommentName,
+		Name:         toolName,
 		SessionID:    sessionID,
 		OriginalText: original,
 		ProposedText: proposed,
@@ -249,7 +299,38 @@ func confirmChangeDTOs(changes []core.Change) []contracts.AIConfirmChangeDTO {
 	return out
 }
 
+// runDisplayAction 把翻译 Action 分到影片简介/标题或书库展示标题。
 func (a *App) runDisplayAction(ctx context.Context, completer commentCompleter, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
+	if name == prompts.ActionTranslateSummary {
+		return a.runMovieDisplayAction(ctx, completer, name, req)
+	}
+	if name != prompts.ActionTranslateTitle {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("unknown action")
+	}
+	movieID := strings.TrimSpace(req.MovieID)
+	comicID := strings.TrimSpace(req.ComicID)
+	photoID := strings.TrimSpace(req.PhotoID)
+	filled := 0
+	if movieID != "" {
+		filled++
+	}
+	if comicID != "" {
+		filled++
+	}
+	if photoID != "" {
+		filled++
+	}
+	if filled != 1 {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("movieId, comicId, or photoId is required")
+	}
+	if movieID != "" {
+		return a.runMovieDisplayAction(ctx, completer, name, req)
+	}
+	return a.runBookTitleAction(ctx, completer, req, comicID, photoID)
+}
+
+// runMovieDisplayAction 为影片标题或简介生成翻译预览，不改刮削列。
+func (a *App) runMovieDisplayAction(ctx context.Context, completer commentCompleter, name string, req contracts.AIActionRequest) (contracts.AIActionPreviewDTO, error) {
 	movieID := strings.TrimSpace(req.MovieID)
 	if movieID == "" {
 		return contracts.AIActionPreviewDTO{}, fmt.Errorf("movieId is required")
@@ -326,6 +407,81 @@ func (a *App) runDisplayAction(ctx context.Context, completer commentCompleter, 
 	return contracts.AIActionPreviewDTO{
 		Action:       name,
 		Name:         core.UpdateMovieDisplayOverridesName,
+		SessionID:    sessionID,
+		OriginalText: original,
+		ProposedText: proposed,
+		Changes:      confirmChangeDTOs(result.Changes),
+		ConfirmToken: result.ConfirmToken,
+		ExpiresAt:    result.ExpiresAt,
+		Arguments:    args,
+		Noop:         result.ConfirmToken == "",
+	}, nil
+}
+
+// runBookTitleAction 为漫画或写真展示标题生成翻译预览，写入独立 user_title。
+func (a *App) runBookTitleAction(ctx context.Context, completer commentCompleter, req contracts.AIActionRequest, comicID, photoID string) (contracts.AIActionPreviewDTO, error) {
+	locale := strings.TrimSpace(req.TargetLocale)
+	if locale == "" {
+		locale = strings.TrimSpace(req.Locale)
+	}
+	draft := strings.TrimSpace(req.Body)
+	original := draft
+	toolName := core.UpdateComicTitleName
+	idField := "comicId"
+	entityID := comicID
+	if photoID != "" {
+		toolName = core.UpdatePhotoTitleName
+		idField = "photoId"
+		entityID = photoID
+		detail, err := a.GetPhotoBookDetail(ctx, photoID)
+		if err != nil {
+			return contracts.AIActionPreviewDTO{}, err
+		}
+		if original == "" {
+			original = strings.TrimSpace(detail.Title)
+		}
+	} else {
+		detail, err := a.GetComicBookDetail(ctx, comicID)
+		if err != nil {
+			return contracts.AIActionPreviewDTO{}, err
+		}
+		if original == "" {
+			original = strings.TrimSpace(detail.Title)
+		}
+	}
+	if original == "" {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("title is empty")
+	}
+	proposed, err := completer.Complete(ctx, []llm.ChatMessage{
+		{Role: "system", Content: prompts.TranslateTitlePrompt(original, locale)},
+		{Role: "user", Content: prompts.FormatPlainUser("Title", original)},
+	}, 0)
+	if err != nil {
+		return contracts.AIActionPreviewDTO{}, err
+	}
+	proposed = strings.TrimSpace(sanitizeActionText(proposed))
+	if proposed == "" {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("provider returned empty text")
+	}
+	argsMap := map[string]string{idField: entityID, "title": proposed}
+	args, err := json.Marshal(argsMap)
+	if err != nil {
+		return contracts.AIActionPreviewDTO{}, err
+	}
+	sessionID := newAgentID("act_")
+	result := a.ensureAgentGateway().Invoke(ctx, core.Call{
+		Name:      toolName,
+		Args:      args,
+		SessionID: sessionID,
+		Channel:   core.ChannelAction,
+		Sanitize:  core.SanitizeFull,
+	})
+	if result.Error != nil {
+		return contracts.AIActionPreviewDTO{}, fmt.Errorf("%s", result.Error.Message)
+	}
+	return contracts.AIActionPreviewDTO{
+		Action:       prompts.ActionTranslateTitle,
+		Name:         toolName,
 		SessionID:    sessionID,
 		OriginalText: original,
 		ProposedText: proposed,

@@ -27,10 +27,28 @@ it("projects only the allowlisted library filters into context v1", () => {
 })
 
 describe("agentPageContext", () => {
-  it.each(["comics", "comic-detail", "comic-reader", "photos", "photo-detail", "photo-viewer"])("excludes %s selections and filters", (name) => {
-    const current = route({ name, params: { id: "private-book", actorName: "private-author" }, query: { q: "private-title", tag: "private-tag", actor: "private-person" } })
-    expect(agentPageContext(current)).toBeUndefined()
-    expect(agentActiveFilters(current)).toBeUndefined()
+  it("captures comic routes without movie or actor anchors", () => {
+    const current = route({
+      name: "comic-detail",
+      params: { id: "comic-1", actorName: "private-author" },
+      query: { q: "hello", tag: "fav", actor: "private-person", favorite: "1", readStatus: "reading" },
+    })
+    expect(agentPageContext(current)).toEqual({
+      contextVersion: 1,
+      route: "comic-detail",
+      comicId: "comic-1",
+      query: "hello",
+      activeFilters: { query: "hello", tag: "fav", favorite: true, readStatus: "reading" },
+    })
+    expect(agentPageContext(current)?.movieId).toBeUndefined()
+    expect(agentPageContext(current)?.actorName).toBeUndefined()
+  })
+
+  it("captures photo routes without movie anchors", () => {
+    expect(agentPageContext(route({ name: "photo-detail", params: { id: "photo-1" } }))).toEqual({
+      route: "photo-detail",
+      photoId: "photo-1",
+    })
   })
 
   it("captures movie and actor from dedicated routes", () => {

@@ -2,6 +2,7 @@ import type {
   AIActionPreviewDTO,
   AIActionRequestBody,
   AIAgentMovieCardDTO,
+  AIAgentBookCardDTO,
   AIAgentProviderTitleDTO,
   AIChatContextDTO,
   AIChatMessageDTO,
@@ -30,6 +31,7 @@ export interface AIChatToolEvent {
   summary?: string
   truncated?: boolean
   movies?: AIAgentMovieCardDTO[]
+  books?: AIAgentBookCardDTO[]
   providerRows?: AIAgentProviderTitleDTO[]
   evidence?: AIEvidenceDTO
   resolution?: AIEntityResolutionDTO
@@ -53,6 +55,7 @@ export interface AIChatStreamHandlers {
   onToolStart?(event: AIChatToolEvent): void
   onToolResult?(event: AIChatToolEvent): void
   onMovieCards?(movies: AIAgentMovieCardDTO[]): void
+  onBookCards?(books: AIAgentBookCardDTO[]): void
   onConfirmRequired?(event: AIChatConfirmEvent): void
   onSession?(sessionId: string): void
   onThinking?(delta: string): void

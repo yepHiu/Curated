@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router"
 import { onKeyStroke, useElementSize } from "@vueuse/core"
 import { PanelLeft, Plus, X } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
-import type { AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIChatStoredMessageDTO, AIEntityCandidateDTO } from "@/api/types"
+import type { AIAgentBookCardDTO, AIAgentMovieCardDTO, AIChatContextDTO, AIChatMessageDTO, AIChatSessionDTO, AIChatStoredMessageDTO, AIEntityCandidateDTO } from "@/api/types"
 import { agentPageContext } from "@/lib/agent-page-context"
 import { restoreChatHistory } from "./restore-history"
 import { isAgentProcessTool } from "@/lib/agent-tool-labels"
@@ -284,10 +284,19 @@ async function deleteChat(id: string) {
   }
 }
 
+/** 把本轮 present_movies 卡片挂到对应助手气泡。 */
 function attachMovies(assistantId: string, movies: AIAgentMovieCardDTO[]) {
   const current = entries.value.find((entry) => entry.id === assistantId)
   if (current?.kind === "assistant") {
     current.movies = movies
+  }
+}
+
+/** 把本轮 present_comics / present_photos 卡片挂到对应助手气泡。 */
+function attachBooks(assistantId: string, books: AIAgentBookCardDTO[]) {
+  const current = entries.value.find((entry) => entry.id === assistantId)
+  if (current?.kind === "assistant") {
+    current.books = books
   }
 }
 
@@ -317,6 +326,8 @@ function chatContextFrom(text: string, active: AgentMention[], omitted: readonly
   const omittedKeys = new Set(omitted)
   if (omittedKeys.has("route")) delete page.route
   if (omittedKeys.has("movie")) delete page.movieId
+  if (omittedKeys.has("comic")) delete page.comicId
+  if (omittedKeys.has("photo")) delete page.photoId
   if (omittedKeys.has("actor")) delete page.actorName
   if (page.activeFilters) {
     const filters = { ...page.activeFilters }
@@ -328,6 +339,8 @@ function chatContextFrom(text: string, active: AgentMention[], omitted: readonly
     if (omittedKeys.has("filter:actor")) delete filters.actor
     if (omittedKeys.has("filter:playState")) delete filters.playState
     if (omittedKeys.has("filter:runtime")) delete filters.runtime
+    if (omittedKeys.has("filter:favorite")) delete filters.favorite
+    if (omittedKeys.has("filter:readStatus")) delete filters.readStatus
     page.activeFilters = Object.keys(filters).length > 0 ? filters : undefined
   }
   const kept = mentionsStillInText(active, text).slice(0, 8)
@@ -338,10 +351,14 @@ function chatContextFrom(text: string, active: AgentMention[], omitted: readonly
       label: item.label,
     }))
     const movieIds = kept.filter((item) => item.kind === "movie").map((item) => item.id)
+    const comicIds = kept.filter((item) => item.kind === "comic").map((item) => item.id)
+    const photoIds = kept.filter((item) => item.kind === "photo").map((item) => item.id)
     const actors = kept.filter((item) => item.kind === "actor").map((item) => item.id || item.label)
     if (movieIds.length > 0) page.selectedMovieIds = [...new Set(movieIds)]
+    if (comicIds.length > 0) page.selectedComicIds = [...new Set(comicIds)]
+    if (photoIds.length > 0) page.selectedPhotoIds = [...new Set(photoIds)]
     if (actors.length > 0) page.selectedActors = [...new Set(actors)]
-    if (page.selectedMovieIds?.length || page.selectedActors?.length) page.contextVersion = 1
+    if (page.selectedMovieIds?.length || page.selectedActors?.length || page.selectedComicIds?.length || page.selectedPhotoIds?.length) page.contextVersion = 1
   }
   if (selected?.kind === "movie" && selected.movieId) {
     page.selectedMovieIds = [...new Set([...(page.selectedMovieIds ?? []), selected.movieId])]
@@ -351,7 +368,7 @@ function chatContextFrom(text: string, active: AgentMention[], omitted: readonly
     page.selectedActors = [...new Set([...(page.selectedActors ?? []), selected.actorName])]
     page.contextVersion = 1
   }
-  if (!page.activeFilters && !page.selectedMovieIds?.length && !page.selectedActors?.length) {
+  if (!page.activeFilters && !page.selectedMovieIds?.length && !page.selectedActors?.length && !page.selectedComicIds?.length && !page.selectedPhotoIds?.length) {
     delete page.contextVersion
   }
   return Object.keys(page).length > 0 ? page : undefined
@@ -365,12 +382,16 @@ const contextChips = computed<AgentContextChip[]>(() => {
   const chips: AgentContextChip[] = []
   if (page.route) chips.push({ key: "route", label: t("agentWindow.contextRoute", { route: page.route }) })
   if (page.movieId) chips.push({ key: "movie", label: t("agentWindow.contextMovie", { id: page.movieId }) })
+  if (page.comicId) chips.push({ key: "comic", label: t("agentWindow.contextComic", { id: page.comicId }) })
+  if (page.photoId) chips.push({ key: "photo", label: t("agentWindow.contextPhoto", { id: page.photoId }) })
   if (page.actorName) chips.push({ key: "actor", label: t("agentWindow.contextActor", { name: page.actorName }) })
   if (page.activeFilters?.query) chips.push({ key: "filter:query", label: t("agentWindow.contextQuery", { value: page.activeFilters.query }) })
   if (page.activeFilters?.tag) chips.push({ key: "filter:tag", label: t("agentWindow.contextTag", { value: page.activeFilters.tag }) })
   if (page.activeFilters?.actor) chips.push({ key: "filter:actor", label: t("agentWindow.contextFilterActor", { value: page.activeFilters.actor }) })
   if (page.activeFilters?.playState) chips.push({ key: "filter:playState", label: t("agentWindow.contextPlayState", { value: page.activeFilters.playState }) })
   if (page.activeFilters?.runtime) chips.push({ key: "filter:runtime", label: t("agentWindow.contextRuntime", { value: page.activeFilters.runtime }) })
+  if (page.activeFilters?.favorite != null) chips.push({ key: "filter:favorite", label: t("agentWindow.contextFavorite", { value: page.activeFilters.favorite }) })
+  if (page.activeFilters?.readStatus) chips.push({ key: "filter:readStatus", label: t("agentWindow.contextReadStatus", { value: page.activeFilters.readStatus }) })
   return chips
 })
 
@@ -388,11 +409,24 @@ function removeAssistantTurn(assistantId: string) {
   }
 }
 
+/** 打开影片详情；窄屏先收起 Agent 面板。 */
 function openMovieDetail(movieId: string) {
   const id = movieId.trim()
   if (!id) return
   if (isMobileViewport.value) close()
   void router.push({ name: "detail", params: { id } })
+}
+
+/** 按书卡 kind 打开漫画或写真详情，不走影片详情路由。 */
+function openBookDetail(book: AIAgentBookCardDTO) {
+  if (isMobileViewport.value) close()
+  if (book.kind === "comic" && book.comicId) {
+    void router.push({ name: "comic-detail", params: { id: book.comicId } })
+    return
+  }
+  if (book.kind === "photo" && book.photoId) {
+    void router.push({ name: "photo-detail", params: { id: book.photoId } })
+  }
 }
 
 async function applyConfirm(entryId: string) {
@@ -554,6 +588,9 @@ async function send(selected?: AIEntityCandidateDTO) {
           if (event.movies?.length) {
             attachMovies(assistantId, event.movies)
           }
+          if (event.books?.length) {
+            attachBooks(assistantId, event.books)
+          }
           if (event.resolution && event.resolution.status !== "matched") {
             entries.value.push({ id: nextEntryId("resolution"), kind: "resolution", resolution: event.resolution })
           }
@@ -562,6 +599,11 @@ async function send(selected?: AIEntityCandidateDTO) {
         onMovieCards(movies) {
           if (seq !== streamSeq || controller.signal.aborted) return
           attachMovies(assistantId, movies)
+          void scrollListToEnd()
+        },
+        onBookCards(books) {
+          if (seq !== streamSeq || controller.signal.aborted) return
+          attachBooks(assistantId, books)
           void scrollListToEnd()
         },
         onConfirmRequired(event) {
@@ -606,7 +648,7 @@ async function send(selected?: AIEntityCandidateDTO) {
       for (const tool of findProcessFor(assistantId)?.tools ?? []) tool.pending = false
       collapseProcess(assistantId)
       const current = entries.value.find((entry) => entry.id === assistantId)
-      if (current?.kind === "assistant" && !current.content && !current.movies?.length) {
+      if (current?.kind === "assistant" && !current.content && !current.movies?.length && !current.books?.length) {
         removeAssistantTurn(assistantId)
       }
       void scrollListToEnd()
@@ -742,6 +784,7 @@ onBeforeUnmount(() => stopResizing?.())
             :wide="chatWide"
             @close="close"
             @open-movie="openMovieDetail"
+            @open-book="openBookDetail"
             @apply-confirm="applyConfirm"
             @discard-confirm="discardConfirm"
             @select-entity="selectEntity"

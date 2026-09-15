@@ -36,4 +36,16 @@ describe("persisted AI turns", () => {
     expect(entries[0]).toMatchObject({ kind: "process", tools: [{ pending: false }] })
     if (entries[0]?.kind === "process") expect(entries[0].tools[0]?.ok).toBeUndefined()
   })
+
+  it("restores comic and photo cards without treating them as movie cards", () => {
+    const entries = restoreChatHistory([
+      { ...base, role: "tool", toolName: "present_comics", content: JSON.stringify({ books: [{ kind: "comic", comicId: "c1", title: "Summer" }] }) },
+      { ...base, id: "reply-2", content: "here", events: [{ type: "message_done", outcome: { status: "completed" } }] },
+    ])
+    const assistant = entries.find((entry) => entry.kind === "assistant")
+    expect(assistant).toMatchObject({
+      books: [{ kind: "comic", comicId: "c1", title: "Summer" }],
+    })
+    if (assistant?.kind === "assistant") expect(assistant.movies).toBeUndefined()
+  })
 })
