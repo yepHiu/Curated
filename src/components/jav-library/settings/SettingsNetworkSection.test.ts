@@ -1,6 +1,19 @@
+import { computed } from "vue"
 import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsNetworkSection from "./SettingsNetworkSection.vue"
+
+const {
+  lanEnabledState,
+  lanListeningState,
+  lanAccessUrlsState,
+  setLANEnabled,
+} = vi.hoisted(() => ({
+  lanEnabledState: { value: false },
+  lanListeningState: { value: false },
+  lanAccessUrlsState: { value: [] as string[] },
+  setLANEnabled: vi.fn(),
+}))
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -12,6 +25,22 @@ vi.mock("lucide-vue-next", () => ({
   ChevronDown: { name: "ChevronDown", template: "<span />" },
   Globe: { name: "Globe", template: "<span />" },
   Loader2: { name: "Loader2", template: "<span />" },
+  Network: { name: "Network", template: "<span />" },
+}))
+
+vi.mock("@/composables/use-settings-scroll-preserve", () => ({
+  useSettingsScrollPreserve: () => ({
+    withPreservedScroll: async <T>(fn: () => Promise<T> | T) => await fn(),
+  }),
+}))
+
+vi.mock("@/services/library-service", () => ({
+  useLibraryService: () => ({
+    lanEnabled: computed(() => lanEnabledState.value),
+    lanListening: computed(() => lanListeningState.value),
+    lanAccessUrls: computed(() => lanAccessUrlsState.value),
+    setLANEnabled,
+  }),
 }))
 
 vi.mock("@/components/ui/button", () => ({
@@ -84,6 +113,13 @@ const baseProps = {
 }
 
 describe("SettingsNetworkSection", () => {
+  beforeEach(() => {
+    lanEnabledState.value = false
+    lanListeningState.value = false
+    lanAccessUrlsState.value = []
+    setLANEnabled.mockReset()
+  })
+
   it("renders proxy form and web api ping actions", () => {
     const wrapper = mount(SettingsNetworkSection, {
       props: {
@@ -108,7 +144,7 @@ describe("SettingsNetworkSection", () => {
       props: baseProps,
     })
 
-    await wrapper.get(".switch-stub").trigger("click")
+    await wrapper.get("[data-proxy-enabled]").trigger("click")
     wrapper.getComponent({ name: "Select" }).vm.$emit("update:modelValue", "socks5")
     await wrapper.get("[data-proxy-host]").setValue("10.0.0.1")
     await wrapper.get("[data-proxy-port]").setValue("7897")
@@ -144,7 +180,36 @@ describe("SettingsNetworkSection", () => {
     })
 
     expect(wrapper.text()).toContain("settings.proxyMockHint")
+    expect(wrapper.text()).toContain("settings.lanAccessMockHint")
+    expect(wrapper.get("[data-lan-access-switch]").attributes("disabled")).toBeDefined()
     expect(wrapper.find("[data-proxy-javbus]").exists()).toBe(false)
     expect(wrapper.find("[data-proxy-google]").exists()).toBe(false)
+  })
+
+  it("saves LAN access without requiring PIN", async () => {
+    setLANEnabled.mockResolvedValue(undefined)
+    const wrapper = mount(SettingsNetworkSection, {
+      props: baseProps,
+    })
+
+    expect(wrapper.text()).toContain("settings.lanAccessTitle")
+    expect(wrapper.text()).not.toContain("settings.lanAccessPinRequired")
+    expect(wrapper.find("[data-lan-access-open-security]").exists()).toBe(false)
+    expect(wrapper.get("[data-lan-access-switch]").attributes("disabled")).toBeUndefined()
+
+    await wrapper.get("[data-lan-access-switch]").trigger("click")
+    expect(setLANEnabled).toHaveBeenCalledWith(true)
+  })
+
+  it("shows a full-quit hint when LAN access is saved but not yet listening", () => {
+    lanEnabledState.value = true
+    lanListeningState.value = false
+    lanAccessUrlsState.value = ["http://192.168.1.8:8080"]
+    const wrapper = mount(SettingsNetworkSection, {
+      props: baseProps,
+    })
+
+    expect(wrapper.text()).toContain("settings.lanAccessRestartHint")
+    expect(wrapper.text()).toContain("http://192.168.1.8:8080")
   })
 })

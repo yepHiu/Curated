@@ -548,6 +548,12 @@ export interface SettingsDTO {
   autoDownloadUpdates: boolean
   launchAtLogin: boolean
   launchAtLoginSupported: boolean
+  /** 是否允许局域网设备访问本机 HTTP 服务；改监听需完全退出后重新打开 */
+  lanEnabled: boolean
+  /** 当前进程是否已经绑定非 loopback 地址 */
+  lanListening: boolean
+  /** 可供局域网设备打开的 http://私网IPv4:端口 候选 */
+  lanAccessUrls: string[]
   curatedFrameExportFormat: CuratedFrameExportFormat
   curatedFrameExportMode: CuratedFrameExportMode
   /** 空字符串表示自动（全源加权）；非空为 Metatube 影片源注册名 */
@@ -1011,6 +1017,7 @@ export interface PatchSettingsBody extends PatchComicSettingsBody, PatchPhotoSet
   autoActorProfileScrape?: boolean
   autoDownloadUpdates?: boolean
   launchAtLogin?: boolean
+  lanEnabled?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
   curatedFrameExportMode?: CuratedFrameExportMode
   defaultImportLibraryPathId?: string

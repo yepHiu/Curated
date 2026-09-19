@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { ChevronDown, Globe, Loader2 } from "lucide-vue-next"
+import { ChevronDown, Globe, Loader2, Network } from "lucide-vue-next"
+import { HttpClientError } from "@/api/http-client"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -18,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { useSettingsScrollPreserve } from "@/composables/use-settings-scroll-preserve"
+import { useLibraryService } from "@/services/library-service"
 
 type ProxyScheme = "http" | "socks5"
 
@@ -28,7 +32,7 @@ type ProxyStatusMessage = {
 
 const PROXY_SCHEME_OPTIONS: readonly ProxyScheme[] = ["http", "socks5"]
 
-defineProps<{
+const props = defineProps<{
   useWebApi: boolean
   proxyEnabled: boolean
   proxyScheme: ProxyScheme
@@ -58,35 +62,81 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const libraryService = useLibraryService()
+const { withPreservedScroll } = useSettingsScrollPreserve()
+const lanSaving = ref(false)
+const lanError = ref("")
 
+const lanEnabled = computed(() => libraryService.lanEnabled.value)
+const lanListening = computed(() => libraryService.lanListening.value)
+const lanAccessUrls = computed(() => libraryService.lanAccessUrls.value)
+const lanSwitchDisabled = computed(() => !props.useWebApi || lanSaving.value)
+
+/** 把局域网开关的保存错误转成卡片内文案。 */
+function formatLanError(error: unknown): string {
+  if (error instanceof HttpClientError && error.apiError?.message) {
+    return error.apiError.message
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return t("settings.errSaveTitle")
+}
+
+/** 保存局域网访问偏好；改绑需完全退出后重新打开。 */
+async function onLanEnabledChange(next: boolean) {
+  if (next === lanEnabled.value) {
+    return
+  }
+  lanError.value = ""
+  try {
+    await withPreservedScroll(async () => {
+      lanSaving.value = true
+      try {
+        await libraryService.setLANEnabled(next)
+      } finally {
+        lanSaving.value = false
+      }
+    })
+  } catch (error) {
+    lanError.value = formatLanError(error)
+  }
+}
+
+/** 代理协议下拉的本地化标签。 */
 function proxySchemeLabel(value: ProxyScheme): string {
   return value === "socks5" ? t("settings.proxySchemeSocks5") : t("settings.proxySchemeHttp")
 }
 
+/** 更新代理协议草稿。 */
 function updateProxyScheme(value: unknown) {
   if (value === "http" || value === "socks5") {
     emit("update:proxyScheme", value)
   }
 }
 
+/** 更新代理主机草稿。 */
 function updateProxyHost(value: unknown) {
   if (typeof value === "string") {
     emit("update:proxyHost", value)
   }
 }
 
+/** 更新代理端口草稿。 */
 function updateProxyPort(value: unknown) {
   if (typeof value === "string") {
     emit("update:proxyPort", value)
   }
 }
 
+/** 更新代理用户名草稿。 */
 function updateProxyUsername(value: unknown) {
   if (typeof value === "string") {
     emit("update:proxyUsername", value)
   }
 }
 
+/** 更新代理密码草稿。 */
 function updateProxyPassword(value: unknown) {
   if (typeof value === "string") {
     emit("update:proxyPassword", value)
@@ -96,6 +146,66 @@ function updateProxyPassword(value: unknown) {
 
 <template>
   <div class="flex w-full flex-col gap-6">
+    <div class="break-inside-avoid">
+      <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+        <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
+          <span
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Network class="size-[1.15rem]" />
+          </span>
+          <CardTitle class="min-w-0 text-lg tracking-tight">
+            {{ t("settings.lanAccessTitle") }}
+          </CardTitle>
+        </CardHeader>
+        <CardContent class="flex flex-col gap-3 pt-0">
+          <p
+            v-if="!useWebApi"
+            class="rounded-xl border border-border/60 bg-muted/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground sm:text-sm"
+          >
+            {{ t("settings.lanAccessMockHint") }}
+          </p>
+          <div
+            class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 shadow-sm shadow-black/5"
+            :aria-busy="lanSaving"
+          >
+            <div class="min-w-0 flex-1 space-y-1">
+              <p class="text-sm font-semibold text-foreground">{{ t("settings.lanAccessSwitch") }}</p>
+              <p
+                v-if="lanSaving"
+                class="text-xs text-muted-foreground motion-safe:animate-pulse"
+              >
+                {{ t("common.saving") }}
+              </p>
+            </div>
+            <Switch
+              class="motion-safe:transition-colors motion-safe:duration-200"
+              data-lan-access-switch
+              :model-value="lanEnabled"
+              :disabled="lanSwitchDisabled"
+              :aria-label="t('settings.lanAccessSwitch')"
+              @update:model-value="onLanEnabledChange"
+            />
+          </div>
+          <p
+            v-if="useWebApi && lanEnabled && !lanListening"
+            class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
+          >
+            {{ t("settings.lanAccessRestartHint") }}
+          </p>
+          <ul
+            v-if="useWebApi && lanEnabled && lanAccessUrls.length > 0"
+            class="space-y-1 rounded-lg border border-border/50 bg-muted/5 p-4 font-mono text-xs text-foreground sm:text-sm"
+          >
+            <li v-for="url in lanAccessUrls" :key="url">{{ url }}</li>
+          </ul>
+          <p v-if="lanError" class="text-sm text-destructive">
+            {{ lanError }}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
     <div class="break-inside-avoid">
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
@@ -133,6 +243,7 @@ function updateProxyPassword(value: unknown) {
             </div>
             <Switch
               class="motion-safe:transition-colors motion-safe:duration-200"
+              data-proxy-enabled
               :model-value="proxyEnabled"
               :disabled="proxySaving"
               @update:model-value="emit('update:proxyEnabled', $event)"

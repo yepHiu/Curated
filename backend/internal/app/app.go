@@ -86,6 +86,9 @@ type App struct {
 	// launchAtLogin persists whether Curated should register Windows login autostart via the current-user Run key.
 	launchAtLogin   bool
 	launchAtLoginMu sync.RWMutex
+	// lanEnabled persists whether the HTTP server should bind for LAN clients after the next process start.
+	lanEnabled   bool
+	lanEnabledMu sync.RWMutex
 	// curatedFrameExportFormat controls curated-frame export output format via Settings.
 	curatedFrameExportFormat   string
 	curatedFrameExportFormatMu sync.RWMutex
@@ -233,6 +236,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoActorProfileScrape:          cfg.AutoActorProfileScrape,
 		autoDownloadUpdates:             cfg.AutoDownloadUpdates,
 		launchAtLogin:                   cfg.LaunchAtLogin,
+		lanEnabled:                      cfg.LANEnabled,
 		curatedFrameExportFormat:        config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		curatedFrameExportMode:          config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
 		defaultImportLibraryPathID:      strings.TrimSpace(cfg.DefaultImportLibraryPathID),
@@ -2076,6 +2080,9 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			AutoLibraryWatch:                a.AutoLibraryWatch(),
 			AutoActorProfileScrape:          a.AutoActorProfileScrape(),
 			AutoDownloadUpdates:             a.AutoDownloadUpdates(),
+			LANEnabled:                      a.LANEnabled(),
+			LANListening:                    a.LANListening(),
+			LANAccessURLs:                   a.LANAccessURLs(),
 			CuratedFrameExportFormat:        a.CuratedFrameExportFormat(),
 			MetadataMovieProvider:           a.MetadataMovieProvider(),
 			MetadataMovieProviders:          a.ListMetadataMovieProviders(),
@@ -3774,6 +3781,7 @@ func (a *App) HTTPHandler() http.Handler {
 			AutoActorProfileScrapeCtl:        a,
 			AutoDownloadUpdatesCtl:           a,
 			LaunchAtLoginCtl:                 a,
+			LANAccessCtl:                     a,
 			CuratedFrameExportFormatCtl:      a,
 			CuratedFrameExportModeCtl:        a,
 			DefaultImportLibraryPathCtl:      a,

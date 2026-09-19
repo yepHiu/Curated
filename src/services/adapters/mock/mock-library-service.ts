@@ -112,6 +112,9 @@ const autoActorProfileScrapeMock = ref(false)
 const autoDownloadUpdatesMock = ref(false)
 const launchAtLoginMock = ref(false)
 const launchAtLoginSupportedMock = ref(false)
+const lanEnabledMock = ref(false)
+const lanListeningMock = ref(false)
+const lanAccessUrlsMock = ref<string[]>([])
 const curatedFrameExportFormatMock = ref<CuratedFrameExportFormat>("jpg")
 const curatedFrameExportModeMock = ref<CuratedFrameExportMode>(getCuratedFrameExportMode())
 const metadataMovieProviderMock = ref("")
@@ -1167,6 +1170,9 @@ export const mockLibraryService: LibraryService = {
   autoDownloadUpdates: computed(() => autoDownloadUpdatesMock.value),
   launchAtLogin: computed(() => launchAtLoginMock.value),
   launchAtLoginSupported: computed(() => launchAtLoginSupportedMock.value),
+  lanEnabled: computed(() => lanEnabledMock.value),
+  lanListening: computed(() => lanListeningMock.value),
+  lanAccessUrls: computed(() => lanAccessUrlsMock.value),
   curatedFrameExportFormat: computed(() => curatedFrameExportFormatMock.value),
   curatedFrameExportMode: computed(() => curatedFrameExportModeMock.value),
   metadataMovieProvider: computed(() => metadataMovieProviderMock.value),
@@ -1665,6 +1671,12 @@ export const mockLibraryService: LibraryService = {
 
   async setLaunchAtLogin(value: boolean) {
     launchAtLoginMock.value = value
+  },
+
+  /** Mock 没有真实 HTTP 监听，只保留开关状态且永不报告已在局域网监听。 */
+  async setLANEnabled(value: boolean) {
+    lanEnabledMock.value = value
+    lanListeningMock.value = false
   },
 
   async setCuratedFrameExportFormat(format: CuratedFrameExportFormat) {

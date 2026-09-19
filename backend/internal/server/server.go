@@ -160,6 +160,14 @@ type LaunchAtLoginController interface {
 	SetLaunchAtLogin(v bool) error
 }
 
+// LANAccessController exposes the persisted LAN HTTP exposure preference and current bind state.
+type LANAccessController interface {
+	LANEnabled() bool
+	LANListening() bool
+	LANAccessURLs() []string
+	SetLANEnabled(v bool) error
+}
+
 // CuratedFrameExportFormatController exposes and updates the export format preference for curated frames.
 type CuratedFrameExportFormatController interface {
 	CuratedFrameExportFormat() string
@@ -307,6 +315,7 @@ type Handler struct {
 	autoActorProfileScrapeCtl      AutoActorProfileScrapeController
 	autoDownloadUpdatesCtl         AutoDownloadUpdatesController
 	launchAtLoginCtl               LaunchAtLoginController
+	lanAccessCtl                   LANAccessController
 	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
 	curatedFrameExportModeCtl      CuratedFrameExportModeController
 	defaultImportLibraryPathCtl    DefaultImportLibraryPathController
@@ -362,6 +371,7 @@ type Deps struct {
 	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
 	AutoDownloadUpdatesCtl           AutoDownloadUpdatesController
 	LaunchAtLoginCtl                 LaunchAtLoginController
+	LANAccessCtl                     LANAccessController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	CuratedFrameExportModeCtl        CuratedFrameExportModeController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
@@ -438,6 +448,7 @@ func NewHandler(deps Deps) *Handler {
 		autoActorProfileScrapeCtl:      deps.AutoActorProfileScrapeCtl,
 		autoDownloadUpdatesCtl:         deps.AutoDownloadUpdatesCtl,
 		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
+		lanAccessCtl:                   deps.LANAccessCtl,
 		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
 		curatedFrameExportModeCtl:      deps.CuratedFrameExportModeCtl,
 		defaultImportLibraryPathCtl:    deps.DefaultImportLibraryPathCtl,
@@ -1940,6 +1951,20 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		launchAtLogin = h.launchAtLoginCtl.LaunchAtLogin()
 		launchAtLoginSupported = h.launchAtLoginCtl.LaunchAtLoginSupported()
 	}
+	lanEnabled := h.cfg.LANEnabled
+	lanListening := !config.HTTPAddrIsLoopback(h.cfg.HttpAddr)
+	lanAccessURLs := config.LANAccessURLs(h.cfg.HttpAddr)
+	if lanAccessURLs == nil {
+		lanAccessURLs = []string{}
+	}
+	if h.lanAccessCtl != nil {
+		lanEnabled = h.lanAccessCtl.LANEnabled()
+		lanListening = h.lanAccessCtl.LANListening()
+		lanAccessURLs = h.lanAccessCtl.LANAccessURLs()
+		if lanAccessURLs == nil {
+			lanAccessURLs = []string{}
+		}
+	}
 	curatedFrameExportFormat := config.NormalizeCuratedFrameExportFormat(h.cfg.CuratedFrameExportFormat)
 	if h.curatedFrameExportFormatCtl != nil {
 		curatedFrameExportFormat = config.NormalizeCuratedFrameExportFormat(h.curatedFrameExportFormatCtl.CuratedFrameExportFormat())
@@ -2013,6 +2038,9 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		AutoDownloadUpdates:      autoDownloadUpdates,
 		LaunchAtLogin:            launchAtLogin,
 		LaunchAtLoginSupported:   launchAtLoginSupported,
+		LANEnabled:               lanEnabled,
+		LANListening:             lanListening,
+		LANAccessURLs:            lanAccessURLs,
 		CuratedFrameExportFormat: curatedFrameExportFormat,
 		CuratedFrameExportMode:   curatedFrameExportMode,
 		MetadataMovieProviders:   []string{},
@@ -2220,7 +2248,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil && h.comicSettingsCtl == nil && h.photoSettingsCtl == nil {
+	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.lanAccessCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil && h.comicSettingsCtl == nil && h.photoSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -2234,7 +2262,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
+	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2332,6 +2360,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "launchAtLogin",
 			apply:    func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(target) },
 			rollback: func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.LANEnabled != nil {
+		if h.lanAccessCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "LAN access settings not available")
+			return
+		}
+		prev := h.lanAccessCtl.LANEnabled()
+		target := *body.LANEnabled
+		ops = append(ops, settingsPatchOperation{
+			name:     "lanEnabled",
+			apply:    func() error { return h.lanAccessCtl.SetLANEnabled(target) },
+			rollback: func() error { return h.lanAccessCtl.SetLANEnabled(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,

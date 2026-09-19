@@ -82,6 +82,9 @@ const autoActorProfileScrapeState = ref(false)
 const autoDownloadUpdatesState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
+const lanEnabledState = ref(false)
+const lanListeningState = ref(false)
+const lanAccessUrlsState = ref<string[]>([])
 const curatedFrameExportFormatState = ref<CuratedFrameExportFormat>("jpg")
 const curatedFrameExportModeState = ref<CuratedFrameExportMode>("raw")
 const metadataMovieProviderState = ref("")
@@ -116,6 +119,7 @@ let autoLibraryWatchSaveSeq = 0
 let autoActorProfileScrapeSaveSeq = 0
 let autoDownloadUpdatesSaveSeq = 0
 let launchAtLoginSaveSeq = 0
+let lanEnabledSaveSeq = 0
 let curatedFrameExportFormatSaveSeq = 0
 let curatedFrameExportModeSaveSeq = 0
 let defaultImportLibraryPathSaveSeq = 0
@@ -389,6 +393,9 @@ async function refreshLibraryPathsFromApi() {
     autoDownloadUpdatesState.value = Boolean(settings.autoDownloadUpdates)
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
+    lanEnabledState.value = Boolean(settings.lanEnabled)
+    lanListeningState.value = Boolean(settings.lanListening)
+    lanAccessUrlsState.value = Array.isArray(settings.lanAccessUrls) ? [...settings.lanAccessUrls] : []
     curatedFrameExportFormatState.value = settings.curatedFrameExportFormat ?? "jpg"
     curatedFrameExportModeState.value = settings.curatedFrameExportMode ?? "raw"
     applyPlayerSettingsFromDTO(settings)
@@ -436,6 +443,9 @@ function createWebLibraryService(): LibraryService {
     autoDownloadUpdates: computed(() => autoDownloadUpdatesState.value),
     launchAtLogin: computed(() => launchAtLoginState.value),
     launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
+    lanEnabled: computed(() => lanEnabledState.value),
+    lanListening: computed(() => lanListeningState.value),
+    lanAccessUrls: computed(() => lanAccessUrlsState.value),
     curatedFrameExportFormat: computed(() => curatedFrameExportFormatState.value),
     curatedFrameExportMode: computed(() => curatedFrameExportModeState.value),
     metadataMovieProvider: computed(() => metadataMovieProviderState.value),
@@ -791,6 +801,29 @@ function createWebLibraryService(): LibraryService {
         }
       } catch (err) {
         if (seq === launchAtLoginSaveSeq) {
+          try {
+            await refreshLibraryPathsFromApi()
+          } catch {
+            // ignore
+          }
+        }
+        throw err
+      }
+    },
+
+    /** 保存局域网访问偏好；改绑 HTTP 监听需完全退出后重新打开。 */
+    async setLANEnabled(value: boolean) {
+      const seq = ++lanEnabledSaveSeq
+      lanEnabledState.value = value
+      try {
+        const next = await api.patchSettings({ lanEnabled: value })
+        if (seq === lanEnabledSaveSeq) {
+          lanEnabledState.value = Boolean(next.lanEnabled)
+          lanListeningState.value = Boolean(next.lanListening)
+          lanAccessUrlsState.value = Array.isArray(next.lanAccessUrls) ? [...next.lanAccessUrls] : []
+        }
+      } catch (err) {
+        if (seq === lanEnabledSaveSeq) {
           try {
             await refreshLibraryPathsFromApi()
           } catch {

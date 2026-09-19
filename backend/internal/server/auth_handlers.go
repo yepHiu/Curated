@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/storage"
 )
@@ -209,10 +208,6 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
 		return
 	}
-	if body.PINEnabled != nil && !*body.PINEnabled && pinDisableBlockedByLAN(h.cfg) {
-		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeAuthPINRequiredForLAN, "PIN cannot be disabled while LAN mode is enabled")
-		return
-	}
 	settings, err := h.store.PatchAppSecuritySettings(r.Context(), storage.AppSecuritySettingsPatch{
 		PINEnabled:        body.PINEnabled,
 		SessionTTLMinutes: body.SessionTTLMinutes,
@@ -237,11 +232,6 @@ func (h *Handler) handlePatchAuthSettings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, authStatusFromSettings(settings, &session))
-}
-
-// pinDisableBlockedByLAN 判断非 loopback 的局域网监听是否仍要求保留 PIN。
-func pinDisableBlockedByLAN(cfg config.Config) bool {
-	return cfg.LANEnabled && !config.HTTPAddrIsLoopback(cfg.HttpAddr)
 }
 
 func (h *Handler) authStatusForRequest(r *http.Request) (contracts.AuthStatusDTO, error) {

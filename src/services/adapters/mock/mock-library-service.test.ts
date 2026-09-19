@@ -155,6 +155,16 @@ describe("mockLibraryService", () => {
     expect(mockLibraryService.launchAtLoginSupported.value).toBe(false)
   })
 
+  it("tracks LAN access preference in mock state without reporting a live listener", async () => {
+    expect(mockLibraryService.lanEnabled.value).toBe(false)
+    expect(mockLibraryService.lanListening.value).toBe(false)
+
+    await mockLibraryService.setLANEnabled(true)
+
+    expect(mockLibraryService.lanEnabled.value).toBe(true)
+    expect(mockLibraryService.lanListening.value).toBe(false)
+  })
+
   it("defaults curated-frame export format to jpg and allows switching formats", async () => {
     expect(mockLibraryService.curatedFrameExportFormat.value).toBe("jpg")
 

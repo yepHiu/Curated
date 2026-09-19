@@ -175,6 +175,22 @@ func TestMergeLibrarySettingsFile_LaunchAtLoginTrue(t *testing.T) {
 	}
 }
 
+func TestMergeLibrarySettingsFile_LANEnabledTrue(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "library-config.cfg")
+	if err := os.WriteFile(path, []byte(`{"lanEnabled": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Default()
+	if err := MergeLibrarySettingsFile(&cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.LANEnabled {
+		t.Fatal("expected lanEnabled true from file")
+	}
+}
+
 func TestMergeLibrarySettingsFile_ExplicitFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

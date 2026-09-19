@@ -50,6 +50,7 @@ func (h *Handler) withRequestSecurity(next http.Handler) http.Handler {
 	})
 }
 
+// browserOriginAllowed 允许同源、loopback 开发 Origin，以及主配置精确列出的跨域入口。
 func browserOriginAllowed(origin string, r *http.Request, cfg config.Config) bool {
 	parsed, normalized, ok := parseBrowserOrigin(origin)
 	if !ok {
@@ -70,6 +71,7 @@ func browserOriginAllowed(origin string, r *http.Request, cfg config.Config) boo
 	return false
 }
 
+// requestHostAllowed 校验请求 Host 是否可以访问当前监听；LAN 偏好未改绑前仍按 loopback 拒绝私网 Host。
 func requestHostAllowed(requestHost string, cfg config.Config) bool {
 	// Unit handlers without a runtime config retain their existing test behavior. Production
 	// always receives a normalized non-empty HttpAddr from config.Load.
@@ -83,7 +85,8 @@ func requestHostAllowed(requestHost string, cfg config.Config) bool {
 	if originHostIsLoopback(host) {
 		return true
 	}
-	if !cfg.LANEnabled {
+	// Host 策略跟当前真实监听走：仅保存 lanEnabled 偏好、仍绑 loopback 时不放宽私网 Host。
+	if !cfg.LANEnabled || config.HTTPAddrIsLoopback(cfg.HttpAddr) {
 		return false
 	}
 

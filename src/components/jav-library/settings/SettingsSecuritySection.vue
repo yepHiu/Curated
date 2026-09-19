@@ -106,9 +106,6 @@ function normalizePIN(value: string | number): string {
 
 /** 把安全设置请求错误转成页面可见文案。 */
 function formatAuthError(error: unknown): string {
-  if (error instanceof HttpClientError && error.apiError?.code === "AUTH_PIN_REQUIRED_FOR_LAN") {
-    return t("settings.securityDisablePinLanBlocked")
-  }
   if (error instanceof HttpClientError && error.apiError?.message) {
     return error.apiError.message
   }

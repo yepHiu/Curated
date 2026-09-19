@@ -139,6 +139,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	if err := config.MergeLibrarySettingsFile(&cfg, librarySettingsPath); err != nil {
 		return nil, fmt.Errorf("merge library settings file: %w", err)
 	}
+	cfg.HttpAddr = cfg.ResolveListenAddr()
 
 	logger, err := logging.New(cfg.LogLevel, logging.FileSink{
 		LogDir:     cfg.LogDir,
@@ -158,6 +159,7 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 		zap.String("buildStamp", version.Stamp()),
 		zap.String("channel", version.Channel),
 		zap.String("httpAddr", cfg.HttpAddr),
+		zap.Bool("lanEnabled", cfg.LANEnabled),
 		zap.String("databasePath", cfg.DatabasePath),
 		zap.Int("libraryPathsConfigured", len(cfg.LibraryPaths)),
 		zap.Bool("libraryWatchEnabled", cfg.LibraryWatchOn()),
@@ -249,12 +251,9 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	}, nil
 }
 
+// runHTTP 校验当前监听策略后启动 HTTP 服务。
 func runHTTP(ctx context.Context, boot *bootstrap) error {
-	securitySettings, err := boot.store.GetAppSecuritySettings(ctx)
-	if err != nil {
-		return fmt.Errorf("read HTTP exposure security settings: %w", err)
-	}
-	if err := boot.cfg.ValidateHTTPExposure(securitySettings.PINEnabled); err != nil {
+	if err := boot.cfg.ValidateHTTPExposure(); err != nil {
 		return err
 	}
 	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, serverListeningReporter())

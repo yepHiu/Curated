@@ -33,6 +33,7 @@ _SAFE_RELEASE_LIBRARY_CONFIG_EXAMPLE: dict[str, object] = {
     "autoActorProfileScrape": False,
     "autoDownloadUpdates": False,
     "launchAtLogin": False,
+    "lanEnabled": False,
     "curatedFrameExportFormat": "jpg",
     "backupDirectory": "",
     "proxy": {"enabled": False},

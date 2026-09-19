@@ -313,8 +313,8 @@ func TestAuthMiddlewareLocksSensitiveAPIUntilUnlocked(t *testing.T) {
 	}
 }
 
-// TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled 确认非 loopback 局域网监听下不能关闭 PIN。
-func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
+// TestAuthSettingsCanDisablePINWhileLANModeIsEnabled 确认非 loopback 监听下仍可关闭 PIN。
+func TestAuthSettingsCanDisablePINWhileLANModeIsEnabled(t *testing.T) {
 	t.Parallel()
 
 	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "lan-auth.db"))
@@ -360,20 +360,79 @@ func TestAuthSettingsCannotDisablePINWhileLANModeIsEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("disable PIN status = %d, want 400", resp.StatusCode)
-	}
-	appErr := decodeAuthJSON[contracts.AppError](t, resp)
-	if appErr.Code != contracts.ErrorCodeAuthPINRequiredForLAN {
-		t.Fatalf("disable PIN error code = %q, want %q", appErr.Code, contracts.ErrorCodeAuthPINRequiredForLAN)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("disable PIN status = %d, want 200", resp.StatusCode)
 	}
 
 	settings, err := store.GetAppSecuritySettings(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !settings.PINEnabled {
-		t.Fatal("PIN was disabled while LAN mode remained enabled")
+	if settings.PINEnabled {
+		t.Fatal("expected PIN to be disabled while LAN mode remained enabled")
+	}
+}
+
+// TestAuthSettingsCanDisablePINWhenLANPreferenceSaved 确认已保存 LAN 偏好但尚未改绑时也可以关闭 PIN。
+func TestAuthSettingsCanDisablePINWhenLANPreferenceSaved(t *testing.T) {
+	t.Parallel()
+
+	store, err := storage.NewSQLiteStore(filepath.Join(t.TempDir(), "lan-pref-auth.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(Deps{
+		Cfg: config.Config{
+			HttpAddr:   "127.0.0.1:8081",
+			LANEnabled: false,
+		},
+		LANAccessCtl: &stubLANAccessCtl{enabled: true},
+		Logger:       zap.NewNop(),
+		Store:        store,
+	})
+	srv := httptest.NewServer(h.Routes())
+	t.Cleanup(srv.Close)
+
+	setupResp := postAuthJSON(t, http.DefaultClient, srv.URL+"/api/auth/setup-pin", map[string]any{
+		"pin":        "123456",
+		"confirmPin": "123456",
+	})
+	if setupResp.StatusCode != http.StatusOK {
+		t.Fatalf("setup status = %d, want 200", setupResp.StatusCode)
+	}
+	_ = setupResp.Body.Close()
+	cookie := findAuthCookie(setupResp.Cookies())
+	if cookie == nil {
+		t.Fatal("expected auth cookie after setup")
+	}
+
+	payload := bytes.NewBufferString(`{"pinEnabled":false}`)
+	req, err := http.NewRequest(http.MethodPatch, srv.URL+"/api/auth/settings", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("disable PIN status = %d, want 200", resp.StatusCode)
+	}
+
+	settings, err := store.GetAppSecuritySettings(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.PINEnabled {
+		t.Fatal("expected PIN to be disabled while LAN preference remained saved")
 	}
 }
 

@@ -925,7 +925,13 @@ type SettingsDTO struct {
 	// LaunchAtLogin: when true, Curated registers a current-user login autostart entry and starts silently in tray mode.
 	LaunchAtLogin bool `json:"launchAtLogin"`
 	// LaunchAtLoginSupported reports whether the current runtime can safely manage OS login autostart.
-	LaunchAtLoginSupported   bool     `json:"launchAtLoginSupported"`
+	LaunchAtLoginSupported bool `json:"launchAtLoginSupported"`
+	// LANEnabled is the persisted preference to bind the HTTP server for LAN clients.
+	LANEnabled bool `json:"lanEnabled"`
+	// LANListening reports whether the current process is already bound to a non-loopback address.
+	LANListening bool `json:"lanListening"`
+	// LANAccessURLs lists private IPv4 http://host:port candidates for the current listen port.
+	LANAccessURLs            []string `json:"lanAccessUrls"`
 	CuratedFrameExportFormat string   `json:"curatedFrameExportFormat"`
 	CuratedFrameExportMode   string   `json:"curatedFrameExportMode"`
 	MetadataMovieProvider    string   `json:"metadataMovieProvider"`
@@ -1273,6 +1279,7 @@ type PatchSettingsRequest struct {
 	AutoActorProfileScrape          *bool                   `json:"autoActorProfileScrape,omitempty"`
 	AutoDownloadUpdates             *bool                   `json:"autoDownloadUpdates,omitempty"`
 	LaunchAtLogin                   *bool                   `json:"launchAtLogin,omitempty"`
+	LANEnabled                      *bool                   `json:"lanEnabled,omitempty"`
 	CuratedFrameExportFormat        *string                 `json:"curatedFrameExportFormat,omitempty"`
 	CuratedFrameExportMode          *string                 `json:"curatedFrameExportMode,omitempty"`
 	DefaultImportLibraryPathID      *string                 `json:"defaultImportLibraryPathId,omitempty"`
@@ -1861,9 +1868,10 @@ const (
 	ErrorCodePersonalInsightsInvalidDimension     = "INSIGHTS_INVALID_DIMENSION"
 	ErrorCodePersonalInsightsInvalidLimit         = "INSIGHTS_INVALID_LIMIT"
 
-	ErrorCodeAuthLocked            = "AUTH_LOCKED"
-	ErrorCodeAuthInvalidPIN        = "AUTH_INVALID_PIN"
-	ErrorCodeAuthRateLimited       = "AUTH_RATE_LIMITED"
+	ErrorCodeAuthLocked      = "AUTH_LOCKED"
+	ErrorCodeAuthInvalidPIN  = "AUTH_INVALID_PIN"
+	ErrorCodeAuthRateLimited = "AUTH_RATE_LIMITED"
+	// ErrorCodeAuthPINRequiredForLAN is retained for compatibility and is no longer returned.
 	ErrorCodeAuthPINRequiredForLAN = "AUTH_PIN_REQUIRED_FOR_LAN"
 
 	ErrorCodeImportSourceUnavailable   = "IMPORT_SOURCE_UNAVAILABLE"

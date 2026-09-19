@@ -91,6 +91,22 @@ func TestRequestSecurityAllowsExplicitCrossOrigin(t *testing.T) {
 	}
 }
 
+// TestRequestSecurityRejectsLANHostWhileLoopbackBound 确认仅保存 LAN 偏好、仍绑 loopback 时拒绝私网 Host。
+func TestRequestSecurityRejectsLANHostWhileLoopbackBound(t *testing.T) {
+	t.Parallel()
+
+	h := NewHandler(Deps{Cfg: config.Config{HttpAddr: "127.0.0.1:8080", LANEnabled: true}, Logger: zap.NewNop()})
+	req := httptest.NewRequest(http.MethodGet, "http://192.168.1.25:8080/api/health", nil)
+	rr := httptest.NewRecorder()
+
+	h.Routes().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rr.Code)
+	}
+	assertAppErrorCode(t, rr, contracts.ErrorCodeForbidden)
+}
+
 func TestRequestSecurityRejectsDNSRebindingHost(t *testing.T) {
 	t.Parallel()
 

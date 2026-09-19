@@ -115,6 +115,14 @@ export interface LibraryService {
   launchAtLogin: ComputedRef<boolean>
   launchAtLoginSupported: ComputedRef<boolean>
   setLaunchAtLogin(value: boolean): Promise<void>
+  /** 是否允许局域网设备访问本机 HTTP 服务 */
+  lanEnabled: ComputedRef<boolean>
+  /** 当前进程是否已经绑定非 loopback 地址 */
+  lanListening: ComputedRef<boolean>
+  /** 可供局域网打开的 http://私网IPv4:端口 候选 */
+  lanAccessUrls: ComputedRef<readonly string[]>
+  /** 保存局域网访问偏好；改绑需完全退出后重新打开 */
+  setLANEnabled(value: boolean): Promise<void>
   curatedFrameExportFormat: ComputedRef<CuratedFrameExportFormat>
   setCuratedFrameExportFormat(format: CuratedFrameExportFormat): Promise<void>
   curatedFrameExportMode: ComputedRef<CuratedFrameExportMode>
