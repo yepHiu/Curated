@@ -61,6 +61,7 @@ Photo library current slice:
 | `autoPhotoLibraryWatch` | 默认 **`true`**。为 **`true`** 且写真库已启用、主配置允许目录监听时，独立写真 watcher 会监听写真存储路径下新增或变更的 `.zip` / `.cbz`，并经防抖后触发 `scan.photos`。 |
 | `photoLibraryEnabled` / `defaultPhotoImportLibraryPathId` / `photoViewer` / `photoCache` | 写真库开关、默认导入目标、浏览器默认设置和缓存上限；由设置页「实验性功能 → 写真库 Beta」或 `PATCH /api/settings` 更新。写真路径列表来自独立 SQLite 表 `photo_library_paths`。 |
 | `launchAtLogin` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；在支持的 Windows 运行时中会同步当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 项，命令行为 `curated(.exe) -mode tray -autostart`。Windows 登录触发的这次启动会**静默进入托盘**，只拉起本地服务与托盘图标，**不会自动打开浏览器页面**。 |
+| `lanEnabled` | 默认 **`false`**。由设置页「网络」或 `PATCH /api/settings` 更新。为 **`true`** 时启动会把 loopback/`0.0.0.0` 监听改成 `0.0.0.0:<port>`；关闭时强制绑回 `127.0.0.1:<port>`。不要求应用 PIN。改绑需**完全退出** Curated 后重新打开，只关窗口不够。 |
 | `autoDownloadUpdates` | 默认 **`false`**。由设置页「通用」或 `PATCH /api/settings` 更新；开启后，启动阶段的后台更新检查若发现较新的 installer，会自动下载并完成 SHA256 校验；安装仍须用户在 Settings -> About 显式确认，不会自动静默安装。 |
 | `logDir` | 后端启动后按日向该目录轮转写日志文件（与主配置 `logDir` 同源字段，由本文件合并覆盖）。空或省略表示使用默认目录，而不是关闭文件日志：**release** 默认 `LOCALAPPDATA\Curated\logs`，**dev** 默认 `backend/runtime/logs`。由设置页 **通用** 或 `PATCH /api/settings` 的 `backendLog` 更新；**重启后端**后 Zap 才按新目录/级别落盘。 |
 | `logFilePrefix` | 日志文件名前缀，默认行为见 `internal/logging`（省略或空则使用 `curated`）。设置页不写入该键，需手写本文件或主配置。 |

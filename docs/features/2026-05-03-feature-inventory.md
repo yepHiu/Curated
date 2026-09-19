@@ -382,7 +382,7 @@ This document catalogs features implemented in the current **Electron desktop sh
 
 | Feature | Status | Notes |
 |---|---|---|
-| Loopback-safe defaults | Shipped | Development and release listeners default to `127.0.0.1`; non-loopback requires explicit `lanEnabled` and an initialized PIN |
+| Loopback-safe defaults | Shipped | Development and release listeners default to `127.0.0.1`; Settings → Network persists `lanEnabled` without a PIN, and the next full restart binds `0.0.0.0`. A non-loopback main-config `httpAddr` still requires `lanEnabled` |
 | Origin and Host validation | Shipped | Credentialed browser access is restricted to same-origin, loopback development origins, and exact configured origins |
 | PIN App Lock | Shipped | Argon2id PIN hash, HTTP-only `curated_auth` cookie, router lock screen, and protected `/api/*` middleware |
 | PIN attempt throttling | Shipped | Repeated setup/unlock failures trigger exponential backoff and `429 AUTH_RATE_LIMITED` with `Retry-After` |

@@ -130,7 +130,7 @@ HTTP API 成功时直接返回 DTO 本体，不包 `{ "ok": true, "data": ... }`
 | `COMMON_CONFLICT` | 当前状态不允许该操作 |
 | `AUTH_LOCKED` | 应用已锁定，需要先解锁 |
 | `AUTH_INVALID_PIN` | PIN 校验失败 |
-| `AUTH_PIN_REQUIRED_FOR_LAN` | 非 loopback 的局域网监听开启时不能关闭 PIN |
+| `AUTH_PIN_REQUIRED_FOR_LAN` | 保留兼容，当前不再返回；局域网访问与 PIN 互相独立 |
 | `IMPORT_TARGET_NOT_CONFIGURED` | 未配置默认导入库路径 |
 | `IMPORT_TARGET_UNAVAILABLE` | 默认导入库路径不可用 |
 | `IMPORT_CONFLICT` | 导入目标文件已存在 |
@@ -573,7 +573,7 @@ Body：
 
 错误：
 
-- `400 AUTH_PIN_REQUIRED_FOR_LAN`：主配置 `lanEnabled=true` 且 `httpAddr` 不是 loopback 时不能关闭 PIN。
+- `400 AUTH_PIN_INVALID`：当前 PIN 不正确。
 - `400 COMMON_BAD_REQUEST`：JSON 无效，或尚未保存 PIN 哈希就尝试把 `pinEnabled` 设为 `true`。
 
 #### `GET /api/auth/sessions`
@@ -1719,6 +1719,9 @@ Body：
 | `autoDownloadUpdates` | 启动更新检查后是否自动下载 |
 | `launchAtLogin` | 桌面端是否登录自启 |
 | `launchAtLoginSupported` | 当前运行时是否支持登录自启 |
+| `lanEnabled` | 是否允许局域网访问；改监听需完全退出后重新打开 |
+| `lanListening` | 当前进程是否已经绑定非 loopback 地址 |
+| `lanAccessUrls` | 本机私网 IPv4 的 `http://host:port` 候选 |
 | `curatedFrameExportFormat` | `jpg`、`webp`、`png` |
 | `metadataMovieProvider` | 单一影片元数据 provider |
 | `metadataMovieProviders` | 当前可用 provider 列表 |
@@ -1740,6 +1743,7 @@ Body 示例：
   "backupDirectory": "D:\\CuratedBackups",
   "curatedFrameExportFormat": "jpg",
   "autoLibraryWatch": true,
+  "lanEnabled": false,
   "player": {
     "hardwareDecode": true,
     "hardwareEncoder": "auto",
@@ -1776,6 +1780,7 @@ Body 示例：
 - `curatedFrameExportFormat` 必须是 `jpg`、`webp`、`png`。
 - `defaultImportLibraryPathId` 非空时必须存在。
 - `backupDirectory` 非空时必须是后端机器上的绝对路径；发送空字符串可清除记忆目录。
+- `lanEnabled` 改绑 HTTP 监听需完全退出后重新打开；PIN 不是开启局域网访问的前置条件。
 - `metadataMovieProvider` 和 `metadataMovieProviderChain` 中的 provider 必须在 `metadataMovieProviders` 中。
 - `metadataMovieScrapeMode` 必须是 `auto`、`specified`、`chain`。
 - `metadataMovieStrategy` 必须是 `auto-global`、`auto-cn-friendly`、`custom-chain`、`specified`。
@@ -3207,6 +3212,9 @@ interface SettingsDTO {
   autoDownloadUpdates: boolean
   launchAtLogin: boolean
   launchAtLoginSupported: boolean
+  lanEnabled: boolean
+  lanListening: boolean
+  lanAccessUrls: string[]
   curatedFrameExportFormat: "jpg" | "webp" | "png"
   metadataMovieProvider: string
   metadataMovieProviders: string[]

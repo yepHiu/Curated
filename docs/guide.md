@@ -159,6 +159,7 @@ Common keys:
 - `autoActorProfileScrape`
 - `autoDownloadUpdates`
 - `launchAtLogin`
+- `lanEnabled` (Settings → Network; PIN optional; full quit to rebind)
 - `curatedFrameExportFormat` (`jpg` / `webp` / `png`)
 - `curatedFrameExportMode` (`raw` / `watermarked`)
 - `proxy`
@@ -166,7 +167,7 @@ Common keys:
 
 Empty `logDir` means “use the default log directory”, not “disable file logging”: release uses `LOCALAPPDATA\Curated\logs`, development uses `backend/runtime/logs`.
 
-Development and release builds default to loopback `127.0.0.1:8080` and `127.0.0.1:8081`. A non-loopback `httpAddr` also requires `"lanEnabled": true` and an initialized application PIN. CORS allows same-origin, loopback development origins, and exact `corsAllowedOrigins`.
+Development and release builds default to loopback `127.0.0.1:8080` and `127.0.0.1:8081`. Settings → Network can persist `"lanEnabled": true` in `library-config.cfg`; the next full restart binds `0.0.0.0` on the same port. A non-loopback `httpAddr` in the main runtime JSON still requires `"lanEnabled": true`. PIN lock is independent of LAN access. CORS allows same-origin, loopback development origins, and exact `corsAllowedOrigins`.
 
 Library organization details: [docs/reference/2026-03-21-library-organize.md](reference/2026-03-21-library-organize.md).
 
@@ -185,7 +186,7 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Actors | Browse, profile, tags, links, avatar cache, scrape, canonical aliases, audited merge |
 | Curated frames | Queued captures with preview/retry/undo, source-file frames, cursor browsing, visual similarity review, JPG/WebP/PNG/ZIP export and GIF/MP4/WebM motion |
 | Homepage / insights | Daily recommendations with reason codes and local feedback; Personal Insights ranges and actor/studio/tag breakdowns |
-| Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings disable PIN |
+| Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings LAN access toggle |
 | Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
 
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
