@@ -21,6 +21,61 @@ type stubBookQuery struct {
 	photoNote    contracts.PhotoCommentDTO
 }
 
+func TestBookDetailPrivacyProjection(t *testing.T) {
+	t.Parallel()
+	query := stubBookQuery{
+		comicEnabled: true,
+		photoEnabled: true,
+		comic: contracts.ComicBookDetailDTO{
+			ComicBookListItemDTO: contracts.ComicBookListItemDTO{
+				ID: "comic-1", Title: "Private title", SourceFileName: "Private title.cbz", PageCount: 12, CurrentPageIndex: 3,
+			},
+		},
+		photo: contracts.PhotoBookDetailDTO{
+			PhotoBookListItemDTO: contracts.PhotoBookListItemDTO{
+				ID: "photo-1", Title: "Private title", SourceFileName: "Private title.zip", PageCount: 12, CurrentPageIndex: 3,
+			},
+		},
+	}
+	for _, kind := range []string{"comic", "photo"} {
+		for _, level := range []string{core.SanitizeFull, core.SanitizeSanitized, core.SanitizeMinimal} {
+			t.Run(kind+"/"+level, func(t *testing.T) {
+				reg := core.NewRegistry()
+				if err := RegisterBookQueryTools(reg, query); err != nil {
+					t.Fatal(err)
+				}
+				args, err := json.Marshal(map[string]string{kind + "Id": kind + "-1"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				result := core.NewGateway(reg, nil, nil, nil).Invoke(context.Background(), core.Call{
+					Name: "get_" + kind + "_detail", Args: args, Sanitize: level,
+				})
+				if !result.OK {
+					t.Fatalf("detail failed: %+v", result)
+				}
+				raw, err := json.Marshal(result.Data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var data map[string]any
+				if err := json.Unmarshal(raw, &data); err != nil {
+					t.Fatal(err)
+				}
+				source := data["source"].(map[string]any)
+				_, hasFileName := source["sourceFileName"]
+				_, hasTitle := source["title"]
+				if hasFileName != (level == core.SanitizeFull) || hasTitle != (level != core.SanitizeMinimal) {
+					t.Fatalf("unexpected privacy projection: %s", raw)
+				}
+				if source[kind+"Id"] != kind+"-1" || source["pageCount"] != float64(12) || source["currentPageIndex"] != float64(3) {
+					t.Fatalf("safe book fields lost: %s", raw)
+				}
+			})
+		}
+	}
+}
+
 func (s stubBookQuery) ComicLibraryEnabled() bool { return s.comicEnabled }
 func (s stubBookQuery) PhotoLibraryEnabled() bool { return s.photoEnabled }
 func (s stubBookQuery) ListComicBooks(context.Context, contracts.ListComicBooksRequest) (contracts.ComicBooksPageDTO, error) {
@@ -208,4 +263,3 @@ func TestUpdateComicTitlePreviewDoesNotWrite(t *testing.T) {
 		t.Fatalf("apply = %+v writes=%d title=%q", applied, write.comicWrites, write.comic.Title)
 	}
 }
-

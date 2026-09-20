@@ -11,6 +11,7 @@ var filesystemKeys = map[string]struct{}{
 	"path":               {},
 	"localPath":          {},
 	"fileName":           {},
+	"sourceFileName":     {},
 	"avatarLocalUrl":     {},
 	"downloadedFilePath": {},
 	"rootPath":           {},
