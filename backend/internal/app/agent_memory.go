@@ -13,8 +13,13 @@ import (
 
 // prepareAIHistory keeps the visible transcript immutable and advances a
 // separate checkpoint only after successful summarization and persistence.
-func (a *App) prepareAIHistory(ctx context.Context, sessionID string, streamer llm.Streamer, emit func(contracts.AIChatSSEEvent)) ([]llm.ChatMessage, error) {
-	rows, err := a.store.ListAIChatContext(ctx, sessionID, 80)
+func (a *App) prepareAIHistory(ctx context.Context, sessionID string, streamer llm.Streamer, emit func(contracts.AIChatSSEEvent), contextWindow ...int) ([]llm.ChatMessage, error) {
+	windowTokens := 0
+	if len(contextWindow) > 0 {
+		windowTokens = contextWindow[0]
+	}
+	budget := run.BudgetForContext(windowTokens)
+	rows, err := a.store.ListAIChatContext(ctx, sessionID, 200)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +35,7 @@ func (a *App) prepareAIHistory(ctx context.Context, sessionID string, streamer l
 	if len(history) == 0 {
 		return nil, nil
 	}
-	window := run.RecentHistory(history)
+	window := run.RecentHistory(history, windowTokens)
 	boundary := seqs[len(history)-len(window)]
 	through, summary, err := a.store.AIContextCheckpoint(ctx, sessionID)
 	if err != nil {
@@ -67,20 +72,20 @@ func (a *App) prepareAIHistory(ctx context.Context, sessionID string, streamer l
 			previousJSON, _ := json.Marshal(summary)
 			for {
 				raw, _ := json.Marshal(message)
-				if len(raw)+len(previousJSON)+128 <= run.MemoryInputBytes || len(message.Content) <= 256 {
+				if len(raw)+len(previousJSON)+128 <= budget.SummaryInput || len(message.Content) <= 256 {
 					break
 				}
 				message.Content = run.MemoryExcerpt(message.Content, len(message.Content)/2)
 			}
 			candidate := append(append([]llm.ChatMessage(nil), batch...), message)
 			raw, _ := json.Marshal(candidate)
-			if len(raw)+len(previousJSON)+128 > run.MemoryInputBytes && len(batch) > 0 {
+			if len(raw)+len(previousJSON)+128 > budget.SummaryInput && len(batch) > 0 {
 				break
 			}
 			batch = candidate
 			lastSeq = row.Seq
 		}
-		next, err := run.SummarizeMemory(compactCtx, streamer, summary, batch)
+		next, err := run.SummarizeMemory(compactCtx, streamer, summary, batch, windowTokens)
 		if err != nil {
 			limited = true
 			break

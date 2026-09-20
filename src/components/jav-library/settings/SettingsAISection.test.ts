@@ -4,6 +4,7 @@ import { ref } from "vue"
 import type { AIProviderSettingsDTO } from "@/api/types"
 import { defaultAIGovernance, type AIGovernanceSettings, type AIReport, type AIPage, type AIAuditEntry } from "@/services/contracts/ai-governance-service"
 import SettingsAISection from "./SettingsAISection.vue"
+import { Select } from "@/components/ui/select"
 import { applyAIGovernance, useExperimentalAgent } from "@/lib/experimental-agent"
 
 const mocks = vi.hoisted(() => ({ getSettings: vi.fn(), saveSettings: vi.fn(), getUsage: vi.fn(), getAudit: vi.fn(), cleanup: vi.fn(), setAIProvider: vi.fn(), testAIProvider: vi.fn() }))
@@ -40,6 +41,32 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 describe("SettingsAISection", () => {
+  it("hydrates capacity and applies a preset without changing model or credentials", async () => {
+    providerState.value = { kind: "openai-compatible", baseUrl: "https://example.com/v1", apiKey: "secret", model: "custom-alias", contextWindow: 128000 }
+    const wrapper = await setup()
+    expect((wrapper.get("#ai-context-window").element as HTMLInputElement).value).toBe("128000")
+    expect(mocks.setAIProvider).not.toHaveBeenCalled()
+    const preset = wrapper.findAllComponents(Select).find(component => component.props("modelValue") === "custom")!
+    preset.vm.$emit("update:modelValue", "minimax-m2.7")
+    await vi.advanceTimersByTimeAsync(550)
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "https://example.com/v1", apiKey: "secret", model: "custom-alias", contextWindow: 204800 })
+    await wrapper.get("#ai-context-window").setValue("150000")
+    await wrapper.get("#ai-context-window").trigger("blur"); await flushPromises()
+    expect(preset.props("modelValue")).toBe("custom")
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith(expect.objectContaining({ contextWindow: 150000, model: "custom-alias" }))
+    wrapper.unmount()
+  })
+  it.each(["", "-1", "32767", "65536.5", "2097153"])("rejects invalid context capacity %s without saving or testing", async (value) => {
+    const wrapper = await setup()
+    await wrapper.get("#ai-context-window").setValue(value)
+    await vi.advanceTimersByTimeAsync(550)
+    await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
+    expect(mocks.setAIProvider).not.toHaveBeenCalled()
+    expect(mocks.testAIProvider).not.toHaveBeenCalled()
+    expect(wrapper.get("#ai-context-window").attributes("aria-invalid")).toBe("true")
+    expect(wrapper.get("[data-ai-provider-save-status]").text()).toContain("aiSettings.contextNotSaved")
+    wrapper.unmount()
+  })
   it("keeps provider configuration available while AI is disabled and shows unknown usage", async () => {
     const wrapper = await setup()
     expect(wrapper.find("#ai-base").exists()).toBe(true)
@@ -223,7 +250,7 @@ describe("SettingsAISection", () => {
     await wrapper.get("#ai-base").setValue("http://localhost:11434/v1")
     await wrapper.get("#ai-model").setValue("local-model")
     await vi.advanceTimersByTimeAsync(550)
-    expect(mocks.setAIProvider).toHaveBeenCalledExactlyOnceWith({ baseUrl: "http://localhost:11434/v1", model: "local-model", apiKey: "" })
+    expect(mocks.setAIProvider).toHaveBeenCalledExactlyOnceWith({ baseUrl: "http://localhost:11434/v1", model: "local-model", apiKey: "", contextWindow: 65536 })
     expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("local-model")
     expect(wrapper.get("[data-ai-provider-save-status]").text()).toContain("offline")
     await wrapper.get("[data-ai-provider-retry]").trigger("click"); await flushPromises()
@@ -236,12 +263,12 @@ describe("SettingsAISection", () => {
     const wrapper = await setup()
     await wrapper.get("#ai-model").setValue("first-model")
     await wrapper.get("#ai-model").trigger("blur"); await flushPromises()
-    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "first-model", apiKey: "" })
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "first-model", apiKey: "", contextWindow: 65536 })
     await wrapper.get("#ai-model").setValue("latest-model")
     await wrapper.get("#ai-steps").setValue("22")
     wrapper.unmount()
     await flushPromises()
-    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "" })
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "", contextWindow: 65536 })
     expect(mocks.saveSettings).toHaveBeenLastCalledWith({ ...defaultAIGovernance(), stepLimit: 22 })
   })
   it("protects newer provider input from the service's optimistic updates and rollback", async () => {
@@ -259,7 +286,7 @@ describe("SettingsAISection", () => {
     rejectSave(new Error("offline")); await flushPromises()
     expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("latest-model")
     await wrapper.get("[data-ai-provider-retry]").trigger("click"); await flushPromises()
-    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "" })
+    expect(mocks.setAIProvider).toHaveBeenLastCalledWith({ baseUrl: "", model: "latest-model", apiKey: "", contextWindow: 65536 })
     expect((wrapper.get("#ai-model").element as HTMLInputElement).value).toBe("latest-model")
     wrapper.unmount()
   })
@@ -268,7 +295,7 @@ describe("SettingsAISection", () => {
     await wrapper.get("#ai-model").setValue("local-model")
     await wrapper.get("[data-ai-provider-test]").trigger("click"); await flushPromises()
     expect(mocks.setAIProvider).toHaveBeenCalledOnce()
-    expect(mocks.testAIProvider).toHaveBeenCalledWith({ kind: "openai-compatible", baseUrl: "", apiKey: "", model: "local-model" })
+    expect(mocks.testAIProvider).toHaveBeenCalledWith({ kind: "openai-compatible", baseUrl: "", apiKey: "", model: "local-model", contextWindow: 65536 })
     expect(mocks.setAIProvider.mock.invocationCallOrder[0]).toBeLessThan(mocks.testAIProvider.mock.invocationCallOrder[0]!)
     wrapper.unmount()
   })

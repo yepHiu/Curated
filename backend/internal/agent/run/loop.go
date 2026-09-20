@@ -19,11 +19,15 @@ const maxRecentMessages = 24
 type Emitter func(contracts.AIChatSSEEvent)
 
 type Loop struct {
-	gateway  *core.Gateway
-	streamer llm.Streamer
-	sanitize string
-	locale   string
+	contextWindow int
+	gateway       *core.Gateway
+	streamer      llm.Streamer
+	sanitize      string
+	locale        string
 }
+
+// WithContextWindow sets the configured total token capacity for this run.
+func (l *Loop) WithContextWindow(tokens int) *Loop { l.contextWindow = tokens; return l }
 
 // NewLoop 构造使用当前网关和隐私策略的单轮执行器。
 func NewLoop(gateway *core.Gateway, streamer llm.Streamer, sanitize, locale string) *Loop {
@@ -62,7 +66,8 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	}
 	emit(contracts.AIChatSSEEvent{Type: "message_start", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
 
-	messages := buildMessages(history, page, l.locale)
+	budget := BudgetForContext(l.contextWindow)
+	messages := buildMessagesWithBudget(history, page, l.locale, budget)
 	tools := l.toolSpecs()
 	steps := 0
 	stepLimit := l.gateway.StepLimit()
@@ -130,7 +135,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				choice = "none"
 			}
 		}
-		if estimatedRequestTokens(messages, availableTools) > requestTokenEstimateBudget*3/4 {
+		if estimatedRequestBytes(messages, availableTools) > budget.Trigger {
 			emit(contracts.AIChatSSEEvent{Type: "context_status", Seq: nextSeq(), Context: &contracts.AIContextStatusDTO{Phase: "compacting"}})
 			compacted, changed, degraded := l.compactWorkingContext(ctx, messages, availableTools)
 			if changed {
@@ -145,7 +150,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 		if ctx.Err() != nil {
 			continue
 		}
-		if estimatedRequestTokens(messages, availableTools) > requestTokenEstimateBudget {
+		if estimatedRequestBytes(messages, availableTools) > budget.Input {
 			status := "needs_input"
 			if steps > 0 {
 				status = "partial"
@@ -156,7 +161,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 		// Never publish raw thinking or partial prose, including on cancellation.
 		emit(contracts.AIChatSSEEvent{Type: "answer_progress", SessionID: sessionID, MessageID: messageID, Seq: nextSeq()})
 		modelCtx, cancelModel := context.WithTimeout(ctx, 2*time.Minute)
-		turn, err := l.streamer.StreamTurn(modelCtx, llm.TurnRequest{Messages: messages, Tools: availableTools, ToolChoice: choice, MaxOutputBytes: 256 * 1024}, nil)
+		turn, err := l.streamer.StreamTurn(modelCtx, llm.TurnRequest{Messages: messages, Tools: availableTools, ToolChoice: choice, MaxTokens: budget.Output, MaxOutputBytes: 256 * 1024}, nil)
 		cancelModel()
 		if ctx.Err() != nil {
 			emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
@@ -504,13 +509,17 @@ func (l *Loop) toolSpecs() []llm.ToolSpec {
 }
 
 func buildMessages(history []llm.ChatMessage, page *contracts.AIChatContext, locale string) []llm.ChatMessage {
+	return buildMessagesWithBudget(history, page, locale, ContextBudget{History: historyTextBudget, Messages: maxRecentMessages})
+}
+
+func buildMessagesWithBudget(history []llm.ChatMessage, page *contracts.AIChatContext, locale string, budget ContextBudget) []llm.ChatMessage {
 	var memory *llm.ChatMessage
 	if len(history) > 0 && strings.HasPrefix(history[0].Content, memoryLabel) && history[0].Role == "assistant" {
 		m := history[0]
 		memory = &m
 		history = history[1:]
 	}
-	trimmed, omitted := boundedHistory(history)
+	trimmed, omitted := boundedHistoryWithBudget(history, budget.History, budget.Messages)
 	out := make([]llm.ChatMessage, 0, len(trimmed)+1)
 	out = append(out, llm.ChatMessage{Role: "system", Content: prompts.SystemPrompt(locale, page)})
 	if memory != nil {

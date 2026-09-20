@@ -150,7 +150,7 @@ func TestChatMemoryLifecycleKeepsSingleStartAndPrivateSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 60; i++ {
 		if _, err := a.store.AppendAIChatMessage(ctx, session.ID, "user", fmt.Sprintf("old question %d", i), "", ""); err != nil {
 			t.Fatal(err)
 		}
@@ -160,17 +160,24 @@ func TestChatMemoryLifecycleKeepsSingleStartAndPrivateSummary(t *testing.T) {
 		var body struct {
 			ToolChoice string            `json:"tool_choice"`
 			Messages   []llm.ChatMessage `json:"messages"`
+			MaxTokens  int               `json:"max_tokens"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Error(err)
 			return
 		}
 		content := "Continued the task."
+		if body.MaxTokens != 32768 {
+			t.Errorf("configured output reserve not passed to provider: %d", body.MaxTokens)
+		}
 		if body.ToolChoice == "none" {
 			summaryCalls++
 			content = "PRIVATE_CHECKPOINT: goal and remaining work"
 		} else {
 			answerCalls++
+			if len(body.Messages) <= 26 {
+				t.Error("configured history still uses the default 24-message window")
+			}
 			if len(body.Messages) < 2 || !strings.Contains(body.Messages[1].Content, "PRIVATE_CHECKPOINT") {
 				t.Error("checkpoint missing from task request")
 			}
@@ -179,7 +186,7 @@ func TestChatMemoryLifecycleKeepsSingleStartAndPrivateSummary(t *testing.T) {
 		fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", payload)
 	}))
 	defer server.Close()
-	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "synthetic"}
+	a.cfg.AIProvider = config.AIProviderConfig{BaseURL: server.URL, Model: "synthetic", ContextWindow: 131072}
 	var events []contracts.AIChatSSEEvent
 	err = a.StreamAIChat(ctx, contracts.AIChatRequest{SessionID: session.ID, Messages: []contracts.AIChatMessage{{Role: "user", Content: "continue"}}}, func(ev contracts.AIChatSSEEvent) { events = append(events, ev) })
 	if err != nil {

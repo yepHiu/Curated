@@ -138,6 +138,7 @@ function readAIProviderMock(): import("@/api/types").AIProviderSettingsDTO {
         baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
         apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
         model: typeof parsed.model === "string" ? parsed.model : "",
+        contextWindow: parsed.contextWindow,
       }
     }
   } catch {
@@ -1195,6 +1196,7 @@ export const mockLibraryService: LibraryService = {
       ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
       ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey } : {}),
       ...(patch.model !== undefined ? { model: patch.model } : {}),
+      ...(patch.contextWindow !== undefined ? { contextWindow: patch.contextWindow } : {}),
     }
     aiProviderMock.value = next
     persistAIProviderMock(next)

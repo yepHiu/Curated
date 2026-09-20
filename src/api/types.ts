@@ -583,6 +583,8 @@ export interface ProxySettingsDTO {
 
 /** 实验：Agent LLM provider 配置（OpenAI 兼容）；baseUrl/model 为空表示未配置 */
 export interface AIProviderSettingsDTO {
+  /** Total model window in tokens; absent on older servers. */
+  contextWindow?: number
   kind: string
   baseUrl: string
   apiKey?: string
@@ -591,6 +593,7 @@ export interface AIProviderSettingsDTO {
 
 /** 实验：Agent provider 局部更新；未发送字段保持不变，空字符串清除 */
 export interface PatchAIProviderBody {
+  contextWindow?: number
   baseUrl?: string
   apiKey?: string
   model?: string

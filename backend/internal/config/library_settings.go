@@ -550,6 +550,16 @@ func parseAIProviderConfig(v any, cfg *AIProviderConfig) error {
 	if !ok {
 		return fmt.Errorf("aiProvider: expected object, got %T", v)
 	}
+	if value, ok := m["contextWindow"]; ok {
+		window, err := parseJSONIntNonNegative(value, "aiProvider.contextWindow")
+		if err != nil {
+			return err
+		}
+		if !ValidAIContextWindow(window) {
+			return fmt.Errorf("aiProvider.contextWindow must be between %d and %d tokens", MinAIContextWindow, MaxAIContextWindow)
+		}
+		cfg.ContextWindow = window
+	}
 	if kind, ok := m["kind"]; ok {
 		s, err := parseJSONStringTrim(kind)
 		if err != nil {

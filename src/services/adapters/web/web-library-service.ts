@@ -485,6 +485,7 @@ function createWebLibraryService(): LibraryService {
         ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
         ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey } : {}),
         ...(patch.model !== undefined ? { model: patch.model } : {}),
+        ...(patch.contextWindow !== undefined ? { contextWindow: patch.contextWindow } : {}),
       }
       try {
         const next = await api.patchSettings({ aiProvider: patch })

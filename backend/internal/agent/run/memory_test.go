@@ -28,7 +28,7 @@ func TestCompactionContinuesAfterLargeToolResult(t *testing.T) {
 	streamer := memoryStreamer(func(ctx context.Context, req llm.TurnRequest) (llm.AssistantTurn, error) {
 		if req.ToolChoice == "none" {
 			summaries++
-			if len(req.Tools) != 0 || estimatedRequestTokens(req.Messages, nil) > 32*1024 {
+			if len(req.Tools) != 0 || estimatedRequestBytes(req.Messages, nil) > 32*1024 {
 				t.Fatal("unbounded or executable summary")
 			}
 			return llm.AssistantTurn{Content: "Goal: explain results. Completed: large_read. Next: answer."}, nil
@@ -37,7 +37,7 @@ func TestCompactionContinuesAfterLargeToolResult(t *testing.T) {
 		if calls == 1 {
 			return llm.AssistantTurn{ToolCalls: []llm.ToolCall{{ID: "large", Function: llm.ToolCallFunction{Name: "large_read", Arguments: `{}`}}}}, nil
 		}
-		if estimatedRequestTokens(req.Messages, req.Tools) > requestTokenEstimateBudget {
+		if estimatedRequestBytes(req.Messages, req.Tools) > (64 * 1024) {
 			t.Fatal("request still over budget")
 		}
 		if req.Messages[len(req.Messages)-1].Content != "explain results" {
@@ -72,7 +72,7 @@ func TestCompactionFailureFallbackAndCancellation(t *testing.T) {
 		return llm.AssistantTurn{}, errors.New("offline")
 	})}
 	out, changed, degraded := loop.compactWorkingContext(context.Background(), messages, nil)
-	if !changed || !degraded || out[len(out)-1].Content != "latest" || estimatedRequestTokens(out, nil) > 16*1024 {
+	if !changed || !degraded || out[len(out)-1].Content != "latest" || estimatedRequestBytes(out, nil) > 16*1024 {
 		t.Fatal("fallback failed")
 	}
 	ctx, cancel := context.WithCancel(context.Background())

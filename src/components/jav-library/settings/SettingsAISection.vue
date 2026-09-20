@@ -17,6 +17,7 @@ import { applyAIGovernance } from "@/lib/experimental-agent"
 import { AGENT_TOOL_I18N_KEYS } from "@/lib/agent-tool-labels"
 import { useAISettingsAutosave } from "@/composables/use-ai-settings-autosave"
 import { pushAppToast } from "@/composables/use-app-toast"
+import { AI_CONTEXT_PRESETS, DEFAULT_AI_CONTEXT_WINDOW, MIN_AI_CONTEXT_WINDOW, MAX_AI_CONTEXT_WINDOW, validAIContextWindow } from "@/lib/ai-context-presets"
 
 defineProps<{ useWebApi: boolean }>()
 const { t, locale } = useI18n()
@@ -30,6 +31,18 @@ const message = ref("")
 const baseUrl = ref("")
 const apiKey = ref("")
 const model = ref("")
+const contextWindow = ref<number | string>(DEFAULT_AI_CONTEXT_WINDOW)
+const contextPreset = ref("custom")
+const selectedContextPreset = computed(() => AI_CONTEXT_PRESETS.find(preset => preset.id === contextPreset.value))
+const validContext = computed(() => validAIContextWindow(Number(contextWindow.value)))
+function applyContextPreset(value: unknown) {
+  const preset = AI_CONTEXT_PRESETS.find(item => item.id === value)
+  contextPreset.value = preset?.id ?? "custom"
+  if (preset) contextWindow.value = preset.tokens
+}
+watch(contextWindow, value => {
+  if (selectedContextPreset.value?.tokens !== Number(value)) contextPreset.value = "custom"
+})
 const testingProvider = ref(false)
 const providerTestResult = ref<{ ok: boolean; text: string } | null>(null)
 const days = ref("30")
@@ -75,9 +88,9 @@ const settingsAutosave = useAISettingsAutosave({
   onDetachedError: (detail) => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
 })
 const providerAutosave = useAISettingsAutosave({
-  read: () => ({ baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() }),
+  read: () => ({ baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim(), contextWindow: Number(contextWindow.value) }),
   enabled: () => ready.value,
-  valid: () => true,
+  valid: () => validContext.value,
   save: (value) => library.setAIProvider(value),
   onDetachedError: (detail) => pushAppToast(t("aiSettings.autoSaveFailed", { message: detail }), { variant: "destructive" }),
 })
@@ -85,13 +98,15 @@ const providerAutosave = useAISettingsAutosave({
 function syncProvider() {
   if (ready.value && (providerAutosave.dirty.value || providerAutosave.saving.value)) return
   const provider = library.aiProvider.value
-  providerAutosave.initialize({ baseUrl: provider.baseUrl.trim(), apiKey: provider.apiKey ?? "", model: provider.model.trim() })
+  const capacity = provider.contextWindow || DEFAULT_AI_CONTEXT_WINDOW
+  providerAutosave.initialize({ baseUrl: provider.baseUrl.trim(), apiKey: provider.apiKey ?? "", model: provider.model.trim(), contextWindow: capacity })
   baseUrl.value = provider.baseUrl
   apiKey.value = provider.apiKey ?? ""
   model.value = provider.model
+  contextWindow.value = capacity
 }
 watch(() => library.aiProvider.value, syncProvider)
-watch([baseUrl, apiKey, model], () => { providerTestResult.value = null })
+watch([baseUrl, apiKey, model, contextWindow], () => { providerTestResult.value = null })
 async function initialize() {
   error.value = ""
   try {
@@ -145,7 +160,7 @@ async function testProvider() {
   providerTestResult.value = null
   try {
     if (!await providerAutosave.flush() || disposed) return
-    const result = await library.testAIProvider({ kind: "openai-compatible", baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim() })
+    const result = await library.testAIProvider({ kind: "openai-compatible", baseUrl: baseUrl.value.trim(), apiKey: apiKey.value, model: model.value.trim(), contextWindow: Number(contextWindow.value) })
     await refresh()
     if (disposed) return
     providerTestResult.value = result.ok
@@ -287,10 +302,30 @@ function auditLine(entry: AIAuditEntry) {
               <Field class="md:col-span-2"><FieldLabel for="ai-base">{{ t('settings.experimentalBaseUrl') }}</FieldLabel><Input id="ai-base" v-model="baseUrl" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
               <Field><FieldLabel for="ai-key">{{ t('settings.experimentalApiKey') }}</FieldLabel><Input id="ai-key" v-model="apiKey" @blur="providerAutosave.flush()" type="password" autocomplete="new-password" :disabled="busy" /></Field>
               <Field><FieldLabel for="ai-model">{{ t('settings.experimentalModel') }}</FieldLabel><Input id="ai-model" v-model="model" @blur="providerAutosave.flush()" autocomplete="off" :disabled="busy" /></Field>
+              <Field :data-invalid="!validContext || undefined">
+                <FieldLabel for="ai-context-window">{{ t('aiSettings.contextWindow') }}</FieldLabel>
+                <Input id="ai-context-window" v-model="contextWindow" type="number" inputmode="numeric" :min="MIN_AI_CONTEXT_WINDOW" :max="MAX_AI_CONTEXT_WINDOW" :step="1" :disabled="busy" :aria-invalid="!validContext" :aria-describedby="validContext ? 'ai-context-help' : 'ai-context-help ai-context-validation'" @blur="providerAutosave.flush()" />
+              </Field>
+              <Field>
+                <FieldLabel for="ai-context-preset">{{ t('aiSettings.contextPreset') }}</FieldLabel>
+                <Select :model-value="contextPreset" :disabled="busy" @update:model-value="applyContextPreset">
+                  <SelectTrigger id="ai-context-preset"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectGroup>
+                    <SelectItem value="custom">{{ t('aiSettings.contextCustom') }}</SelectItem>
+                    <SelectItem v-for="preset in AI_CONTEXT_PRESETS" :key="preset.id" :value="preset.id">{{ preset.label }} · {{ preset.tokens.toLocaleString(locale) }}</SelectItem>
+                  </SelectGroup></SelectContent>
+                </Select>
+              </Field>
+              <FieldDescription id="ai-context-help" class="md:col-span-2">
+                {{ t('aiSettings.contextHint') }}
+                <a v-if="selectedContextPreset" :href="selectedContextPreset.source" target="_blank" rel="noopener noreferrer" class="underline underline-offset-4">{{ t('aiSettings.contextSource') }}</a>
+              </FieldDescription>
+              <p v-if="!validContext" id="ai-context-validation" role="alert" class="text-sm text-destructive md:col-span-2">{{ t('aiSettings.contextInvalid', { min: MIN_AI_CONTEXT_WINDOW.toLocaleString(locale), max: MAX_AI_CONTEXT_WINDOW.toLocaleString(locale) }) }}</p>
             </FieldGroup>
           </section>
           <div class="flex min-h-8 min-w-0 flex-wrap items-center gap-2 text-xs" data-ai-provider-save-status>
-            <template v-if="providerAutosave.error.value">
+            <p v-if="!validContext" role="status" class="text-destructive">{{ t('aiSettings.contextNotSaved') }}</p>
+            <template v-else-if="providerAutosave.error.value">
               <p role="alert" class="break-words text-destructive">{{ t('aiSettings.autoSaveFailed', { message: providerAutosave.error.value }) }}</p>
               <Button variant="outline" size="sm" data-ai-provider-retry @click="providerAutosave.flush()">{{ t('aiSettings.retry') }}</Button>
             </template>

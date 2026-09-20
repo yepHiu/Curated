@@ -1871,6 +1871,13 @@
     "coverViewerAria": "{code} のポスターをビューアで開く"
   },
   "aiSettings": {
+    "contextCustom": "カスタム容量",
+    "contextHint": "プロバイダーがこのモデルに提供する文脈の総容量を入力してください。プリセットは容量のみを入力し、変更も可能です。回答用の領域を確保し、古い文脈を自動整理します。",
+    "contextInvalid": "{min} から {max} までの整数を入力してください。",
+    "contextNotSaved": "文脈の容量が無効です。モデル設定は保存されていません。",
+    "contextPreset": "モデル容量の参考プリセット",
+    "contextSource": "公式の容量情報",
+    "contextWindow": "コンテキストウィンドウ（tokens）",
     "title": "AI",
     "governance": "ガバナンス",
     "policy": "アクセスポリシー",

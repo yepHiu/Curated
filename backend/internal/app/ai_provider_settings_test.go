@@ -25,16 +25,21 @@ func TestAIProviderSettingsPatchPersistsAndReloads(t *testing.T) {
 		logger:              zap.NewNop(),
 		librarySettingsPath: settingsPath,
 	}
+	window := 204800
 
 	if err := a.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{
-		BaseURL: stringPtrForAI("  http://127.0.0.1:11434/v1  "),
-		APIKey:  stringPtrForAI("secret"),
-		Model:   stringPtrForAI("  qwen3  "),
+		ContextWindow: &window,
+		BaseURL:       stringPtrForAI("  http://127.0.0.1:11434/v1  "),
+		APIKey:        stringPtrForAI("secret"),
+		Model:         stringPtrForAI("  qwen3  "),
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	got := a.AIProviderSettings()
+	if got.ContextWindow != window {
+		t.Fatalf("context window = %d", got.ContextWindow)
+	}
 	if got.Kind != config.AIProviderKindOpenAICompatible {
 		t.Fatalf("Kind = %q, want %q", got.Kind, config.AIProviderKindOpenAICompatible)
 	}
@@ -55,6 +60,15 @@ func TestAIProviderSettingsPatchPersistsAndReloads(t *testing.T) {
 	if reloaded.AIProvider.BaseURL != "http://127.0.0.1:11434/v1" || reloaded.AIProvider.Model != "qwen3" {
 		t.Fatalf("reloaded AIProvider = %+v", reloaded.AIProvider)
 	}
+	if reloaded.AIProvider.ContextWindow != window {
+		t.Fatalf("persisted context = %d", reloaded.AIProvider.ContextWindow)
+	}
+	if err := a.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{Model: stringPtrForAI("other-model")}); err != nil {
+		t.Fatal(err)
+	}
+	if a.AIProviderSettings().ContextWindow != window {
+		t.Fatal("partial update reset context window")
+	}
 
 	// Clearing: explicit empty baseUrl/model clears the config.
 	if err := a.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{
@@ -74,6 +88,17 @@ func TestAIProviderSettingsPatchRejectsInvalidValues(t *testing.T) {
 	a := &App{
 		cfg:                 config.Default(),
 		librarySettingsPath: filepath.Join(t.TempDir(), "library-config.cfg"),
+	}
+	if a.AIProviderSettings().ContextWindow != config.DefaultAIContextWindow {
+		t.Fatal("missing legacy default")
+	}
+	for _, window := range []int{-1, 0, 32767, 2097153} {
+		if err := a.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{ContextWindow: &window}); err == nil {
+			t.Fatalf("accepted context %d", window)
+		}
+		if a.AIProviderSettings().ContextWindow != config.DefaultAIContextWindow {
+			t.Fatal("invalid patch changed configuration")
+		}
 	}
 	if err := a.SetAIProviderSettingsPatch(contracts.PatchAIProviderSettings{
 		BaseURL: stringPtrForAI("not-a-url"),

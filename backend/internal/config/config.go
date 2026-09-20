@@ -169,6 +169,8 @@ const AIProviderKindOpenAICompatible = "openai-compatible"
 // AIProviderConfig configures the experimental AI agent provider. All fields may be
 // empty, which means "not configured" (agent UI degrades to setup guidance).
 type AIProviderConfig struct {
+	// ContextWindow is the provider's total model window in tokens; zero uses the default.
+	ContextWindow int `json:"contextWindow,omitempty"`
 	// Kind selects the provider protocol; empty normalizes to openai-compatible.
 	Kind string `json:"kind,omitempty"`
 	// BaseURL is the OpenAI-compatible API root, e.g. http://127.0.0.1:11434/v1.
@@ -177,6 +179,21 @@ type AIProviderConfig struct {
 	APIKey string `json:"apiKey,omitempty"`
 	// Model is the chat completions model name, e.g. qwen3 or gpt-4o-mini.
 	Model string `json:"model,omitempty"`
+}
+
+const DefaultAIContextWindow = 65536
+const MinAIContextWindow = 32768
+const MaxAIContextWindow = 2097152
+
+func EffectiveAIContextWindow(value int) int {
+	if value == 0 {
+		return DefaultAIContextWindow
+	}
+	return value
+}
+
+func ValidAIContextWindow(value int) bool {
+	return value == 0 || (value >= MinAIContextWindow && value <= MaxAIContextWindow)
 }
 
 // NormalizeAIProviderKind returns the canonical provider kind for cfg.

@@ -1871,6 +1871,13 @@
     "coverViewerAria": "在查看器中打开 {code} 海报大图"
   },
   "aiSettings": {
+    "contextCustom": "自定义容量",
+    "contextHint": "填写服务商为当前模型开放的上下文总量。预设只填入容量，可继续修改；系统会预留回答空间并自动整理较早内容。",
+    "contextInvalid": "请输入 {min} 到 {max} 之间的整数。",
+    "contextNotSaved": "上下文容量无效，模型配置尚未保存。",
+    "contextPreset": "参考模型预设",
+    "contextSource": "官方容量说明",
+    "contextWindow": "上下文窗口（tokens）",
     "title": "AI",
     "governance": "治理策略",
     "policy": "访问策略",

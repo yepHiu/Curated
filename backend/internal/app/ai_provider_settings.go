@@ -44,6 +44,12 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 	a.aiProviderMu.Lock()
 	defer a.aiProviderMu.Unlock()
 	target := a.cfg.AIProvider
+	if p.ContextWindow != nil {
+		if *p.ContextWindow < config.MinAIContextWindow || *p.ContextWindow > config.MaxAIContextWindow {
+			return fmt.Errorf("aiProvider.contextWindow must be an integer between %d and %d tokens", config.MinAIContextWindow, config.MaxAIContextWindow)
+		}
+		target.ContextWindow = *p.ContextWindow
+	}
 	if p.Kind != nil {
 		target.Kind = *p.Kind
 	}
@@ -63,9 +69,10 @@ func (a *App) SetAIProviderSettingsPatch(p contracts.PatchAIProviderSettings) er
 
 	if err := config.WriteLibrarySettingsMerge(path, func(m map[string]any) error {
 		provider := map[string]any{
-			"kind":    normalized.Kind,
-			"baseUrl": normalized.BaseURL,
-			"model":   normalized.Model,
+			"contextWindow": normalized.ContextWindow,
+			"kind":          normalized.Kind,
+			"baseUrl":       normalized.BaseURL,
+			"model":         normalized.Model,
 		}
 		if normalized.APIKey != "" {
 			provider["apiKey"] = normalized.APIKey
@@ -95,10 +102,11 @@ func (a *App) TestAIProvider(ctx context.Context, override *contracts.AIProvider
 	cfg := a.currentAIProviderConfig()
 	if override != nil {
 		cfg = config.AIProviderConfig{
-			Kind:    override.Kind,
-			BaseURL: override.BaseURL,
-			APIKey:  override.APIKey,
-			Model:   override.Model,
+			ContextWindow: override.ContextWindow,
+			Kind:          override.Kind,
+			BaseURL:       override.BaseURL,
+			APIKey:        override.APIKey,
+			Model:         override.Model,
 		}
 	}
 	observation.row.Model = cfg.Model
@@ -144,16 +152,20 @@ func (a *App) currentProxyConfig() config.ProxyConfig {
 
 func aiProviderSettingsDTOFromConfig(cfg config.AIProviderConfig) contracts.AIProviderSettingsDTO {
 	return contracts.AIProviderSettingsDTO{
-		Kind:    config.NormalizeAIProviderKind(cfg.Kind),
-		BaseURL: strings.TrimSpace(cfg.BaseURL),
-		APIKey:  cfg.APIKey,
-		Model:   strings.TrimSpace(cfg.Model),
+		ContextWindow: config.EffectiveAIContextWindow(cfg.ContextWindow),
+		Kind:          config.NormalizeAIProviderKind(cfg.Kind),
+		BaseURL:       strings.TrimSpace(cfg.BaseURL),
+		APIKey:        cfg.APIKey,
+		Model:         strings.TrimSpace(cfg.Model),
 	}
 }
 
 // normalizeAIProviderConfig trims and validates a provider config; empty baseUrl
 // plus empty model stays valid ("not configured"), anything half-configured fails.
 func normalizeAIProviderConfig(cfg config.AIProviderConfig) (config.AIProviderConfig, error) {
+	if !config.ValidAIContextWindow(cfg.ContextWindow) {
+		return config.AIProviderConfig{}, fmt.Errorf("aiProvider.contextWindow must be between %d and %d tokens", config.MinAIContextWindow, config.MaxAIContextWindow)
+	}
 	kind := config.NormalizeAIProviderKind(cfg.Kind)
 	if !config.ValidAIProviderKind(kind) {
 		return config.AIProviderConfig{}, fmt.Errorf("unsupported aiProvider kind %q", cfg.Kind)
@@ -170,10 +182,11 @@ func normalizeAIProviderConfig(cfg config.AIProviderConfig) (config.AIProviderCo
 		return config.AIProviderConfig{}, fmt.Errorf("aiProvider.baseUrl is required when model is set")
 	}
 	return config.AIProviderConfig{
-		Kind:    kind,
-		BaseURL: baseURL,
-		APIKey:  cfg.APIKey,
-		Model:   model,
+		ContextWindow: config.EffectiveAIContextWindow(cfg.ContextWindow),
+		Kind:          kind,
+		BaseURL:       baseURL,
+		APIKey:        cfg.APIKey,
+		Model:         model,
 	}, nil
 }
 

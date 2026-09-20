@@ -1871,6 +1871,13 @@
     "coverViewerAria": "Open {code} poster in viewer"
   },
   "aiSettings": {
+    "contextCustom": "Custom capacity",
+    "contextHint": "Enter the total context capacity your provider enables for this model. Presets fill capacity only and remain editable. Space is reserved for replies, with older context compacted automatically.",
+    "contextInvalid": "Enter a whole number between {min} and {max}.",
+    "contextNotSaved": "Invalid context capacity. Model settings have not been saved.",
+    "contextPreset": "Reference model preset",
+    "contextSource": "Official capacity reference",
+    "contextWindow": "Context window (tokens)",
     "title": "AI",
     "governance": "Governance",
     "policy": "Access policy",

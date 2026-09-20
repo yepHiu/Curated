@@ -146,7 +146,7 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	}
 
 	messageID := newAgentID("msg_")
-	loop := run.NewLoop(a.ensureAgentGateway(), streamer, a.aiProjection(cfg.BaseURL), strings.TrimSpace(req.Locale))
+	loop := run.NewLoop(a.ensureAgentGateway(), streamer, a.aiProjection(cfg.BaseURL), strings.TrimSpace(req.Locale)).WithContextWindow(cfg.ContextWindow)
 	var assistant strings.Builder
 	var events []contracts.AIChatSSEEvent
 	streamSeq := 0
@@ -200,7 +200,7 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 	}
 	history := requestHistoryWithoutSystem(req.Messages)
 	if a.store != nil {
-		prepared, err := a.prepareAIHistory(ctx, session.ID, streamer, wrapped)
+		prepared, err := a.prepareAIHistory(ctx, session.ID, streamer, wrapped, cfg.ContextWindow)
 		if err != nil {
 			return errors.Join(err, a.persistAIChatTurn(ctx, session.ID, "", events))
 		}

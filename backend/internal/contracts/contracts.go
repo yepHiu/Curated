@@ -993,18 +993,20 @@ type ProxyJavBusPingResponse struct {
 // AIProviderSettingsDTO mirrors config.AIProviderConfig for the Settings experimental section.
 // All fields may be empty, meaning the agent provider is not configured yet.
 type AIProviderSettingsDTO struct {
-	Kind    string `json:"kind"`
-	BaseURL string `json:"baseUrl"`
-	APIKey  string `json:"apiKey,omitempty"`
-	Model   string `json:"model"`
+	ContextWindow int    `json:"contextWindow"`
+	Kind          string `json:"kind"`
+	BaseURL       string `json:"baseUrl"`
+	APIKey        string `json:"apiKey,omitempty"`
+	Model         string `json:"model"`
 }
 
 // PatchAIProviderSettings is the partial update for aiProvider; nil pointer = leave unchanged.
 type PatchAIProviderSettings struct {
-	Kind    *string `json:"kind,omitempty"`
-	BaseURL *string `json:"baseUrl,omitempty"`
-	APIKey  *string `json:"apiKey,omitempty"`
-	Model   *string `json:"model,omitempty"`
+	ContextWindow *int    `json:"contextWindow,omitempty"`
+	Kind          *string `json:"kind,omitempty"`
+	BaseURL       *string `json:"baseUrl,omitempty"`
+	APIKey        *string `json:"apiKey,omitempty"`
+	Model         *string `json:"model,omitempty"`
 }
 
 // AIProviderTestRequest is the body for POST /api/ai/provider/test. When Provider
