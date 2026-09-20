@@ -273,14 +273,7 @@ func (a *App) UpsertComicComment(ctx context.Context, comicID, body string, expe
 	if !a.ComicLibraryEnabled() {
 		return contracts.ComicCommentDTO{}, tools.ErrComicLibraryDisabled
 	}
-	current, err := a.store.GetComicComment(ctx, comicID)
-	if err != nil {
-		return contracts.ComicCommentDTO{}, err
-	}
-	if len(expected) > 0 && current.Body != expected[0] {
-		return contracts.ComicCommentDTO{}, storage.ErrAIWriteConflict
-	}
-	return a.store.UpsertComicComment(ctx, comicID, body)
+	return a.store.UpsertComicComment(ctx, comicID, body, expected...)
 }
 
 // ListPhotoBooks lists photo books for Agent search after the photo Beta gate.
@@ -312,14 +305,7 @@ func (a *App) UpsertPhotoComment(ctx context.Context, photoID, body string, expe
 	if !a.PhotoLibraryEnabled() {
 		return contracts.PhotoCommentDTO{}, tools.ErrPhotoLibraryDisabled
 	}
-	current, err := a.store.GetPhotoComment(ctx, photoID)
-	if err != nil {
-		return contracts.PhotoCommentDTO{}, err
-	}
-	if len(expected) > 0 && current.Body != expected[0] {
-		return contracts.PhotoCommentDTO{}, storage.ErrAIWriteConflict
-	}
-	return a.store.UpsertPhotoComment(ctx, photoID, body)
+	return a.store.UpsertPhotoComment(ctx, photoID, body, expected...)
 }
 
 // PatchComicBook updates comic fields for Agent title writes after the comic Beta gate.

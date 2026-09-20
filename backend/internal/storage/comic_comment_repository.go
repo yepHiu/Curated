@@ -34,7 +34,7 @@ func (s *SQLiteStore) GetComicComment(ctx context.Context, comicID string) (cont
 }
 
 // UpsertComicComment replaces the note for an existing comic book after trimming and rune-length checks.
-func (s *SQLiteStore) UpsertComicComment(ctx context.Context, comicID string, body string) (contracts.ComicCommentDTO, error) {
+func (s *SQLiteStore) UpsertComicComment(ctx context.Context, comicID string, body string, expected ...string) (contracts.ComicCommentDTO, error) {
 	comicID = strings.TrimSpace(comicID)
 	if comicID == "" {
 		return contracts.ComicCommentDTO{}, ErrComicBookNotFound
@@ -58,6 +58,16 @@ func (s *SQLiteStore) UpsertComicComment(ctx context.Context, comicID string, bo
 		return contracts.ComicCommentDTO{}, err
 	}
 
+	if len(expected) > 0 {
+		var before string
+		err := tx.QueryRowContext(ctx, `SELECT body FROM comic_book_comments WHERE comic_id = ?`, comicID).Scan(&before)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return contracts.ComicCommentDTO{}, err
+		}
+		if before != expected[0] {
+			return contracts.ComicCommentDTO{}, ErrAIWriteConflict
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO comic_book_comments (comic_id, body, updated_at) VALUES (?, ?, ?)

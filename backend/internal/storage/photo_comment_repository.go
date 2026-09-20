@@ -31,7 +31,7 @@ func (s *SQLiteStore) GetPhotoComment(ctx context.Context, photoID string) (cont
 }
 
 // UpsertPhotoComment replaces the note for an existing photo book after trimming and rune-length checks.
-func (s *SQLiteStore) UpsertPhotoComment(ctx context.Context, photoID string, body string) (contracts.PhotoCommentDTO, error) {
+func (s *SQLiteStore) UpsertPhotoComment(ctx context.Context, photoID string, body string, expected ...string) (contracts.PhotoCommentDTO, error) {
 	photoID = strings.TrimSpace(photoID)
 	if photoID == "" {
 		return contracts.PhotoCommentDTO{}, ErrPhotoBookNotFound
@@ -55,6 +55,16 @@ func (s *SQLiteStore) UpsertPhotoComment(ctx context.Context, photoID string, bo
 		return contracts.PhotoCommentDTO{}, err
 	}
 
+	if len(expected) > 0 {
+		var before string
+		err := tx.QueryRowContext(ctx, `SELECT body FROM photo_book_comments WHERE photo_id = ?`, photoID).Scan(&before)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return contracts.PhotoCommentDTO{}, err
+		}
+		if before != expected[0] {
+			return contracts.PhotoCommentDTO{}, ErrAIWriteConflict
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO photo_book_comments (photo_id, body, updated_at) VALUES (?, ?, ?)
