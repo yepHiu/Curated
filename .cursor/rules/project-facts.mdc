@@ -3,6 +3,13 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-09-21 Agent 上下文连续性
+
+- 当前提示词 `agent-system-v7`。聊天保留近期最多 24 条/约 24 KiB，另加迁移 `0052_ai_context_checkpoints.sql` 的持久摘要；从检查点位置向前分批回填旧对话，原聊天消息不变，删除会话级联删除摘要。同会话聊天串行，不同会话独立，等待可取消。
+- 单轮 JSON 字节估算超过 48 KiB 时整理，64 KiB 仍为硬边界（不是实际 token 数）；保留最新输入/系统规则与近期完整工具批次。供应商明确上下文溢出只恢复一次；不可压缩时 `context_input_too_large`，缩短当前输入后仍在原会话续聊。
+- SSE `context_status` / `context.phase=compacting|ready|limited` 复用 events_json 持久化与 AgentChatProcess 三语反馈；摘要不发给 UI、不提升旧引用/写权限。摘要请求使用现有 provider，单次最多 45 秒、历史准备最多 60 秒，摘要失败不推进持久位置。
+- 无新增配置/HTTP 端点；后台运行、断线自动接续、按模型 token 窗口校准与工具全文归档尚未实现。研究、实现与验收见 `docs/plan/2026-09-21-agent-context-continuity.md`。
+
 ## 2026-09-09 Agent 作品事实发布约束
 
 - `agent-system-v3`：新增只读 `submit_answer`，只接收本请求 `answerRefs` 和字段名；Go 从同一来源快照生成番号、标题、演员等事实、卡片与三语来源说明。查询原文只能经 `queryRef: user_input` 显示为未核实，不授予作品身份。

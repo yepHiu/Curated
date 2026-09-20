@@ -620,6 +620,8 @@ Photo per-book progress/preferences APIs and concrete cache cleanup are not impl
 
 ### Agent domain boundary
 
+Agent context continuity (2026-09-21): `POST /api/ai/chat` additionally emits `context_status` with `context.phase=compacting|ready|limited`, under one `message_start` and monotonic sequence. Migration 0052 stores independent session checkpoints; original messages stay intact, session deletion cascades to checkpoints. Recent history is combined with incrementally summarized older goals; same-session chat requests are serialized. Working context compacts proactively at 48 KiB of the existing 64 KiB JSON-byte estimate; explicit provider context overflow has one recovery retry. Irreducible input returns `context_input_too_large` and can continue in the same session. `agent-system-v7` treats summaries as untrusted history without granting fact references or write authority. No new endpoint or library-config field. See `docs/plan/2026-09-21-agent-context-continuity.md` for limits and deferred run recovery.
+
 When comic or photo Beta is enabled, Agent can search, present, polish notes, and translate display titles for that library. Page context is collected on the six book routes, `@` mentions include loaded books, `get_task_status` can read the matching scan/import/cache tasks, and chat cards use `present_comics` / `present_photos` plus SSE `book_cards`. Insights, Saved Views, provider/source-page tools, curated frames, summary translation, and ratings remain movie-only. Disabled libraries return `COMIC_LIBRARY_DISABLED` / `PHOTO_LIBRARY_DISABLED`. See `docs/plan/2026-09-12-comic-photo-agent.md` and `docs/plan/2026-09-14-comic-photo-title-edit.md`.
 
 ### Photo archive upload (2026-09-11)
