@@ -21,6 +21,7 @@ const failed = computed(() => props.entry.tools.some((item) => item.ok === false
 const busy = computed(() => props.entry.thinkingActive || Boolean(pendingTool.value))
 
 const headline = computed(() => {
+  if (props.entry.contextPhase === "compacting" && props.entry.thinkingActive) return t("agentWindow.contextMemory")
   if (pendingTool.value) {
     return t("agentWindow.toolRunningNamed", { name: t(agentToolI18nKey(pendingTool.value.name)) })
   }
@@ -36,6 +37,7 @@ const headline = computed(() => {
   if (visibleTools.value.length > 0) {
     return t("agentWindow.toolOk")
   }
+  if (props.entry.contextPhase) return t("agentWindow.contextMemory")
   return t("agentWindow.thought")
 })
 </script>
@@ -62,6 +64,9 @@ const headline = computed(() => {
       />
       <span class="min-w-0 truncate font-medium">{{ headline }}</span>
     </button>
+    <p v-if="entry.contextPhase" class="px-1 py-1 leading-relaxed" role="status" aria-live="polite" data-agent-context-status>
+      {{ t(entry.contextPhase === 'compacting' && entry.thinkingActive ? 'agentWindow.contextCompacting' : entry.contextPhase === 'ready' ? 'agentWindow.contextReady' : 'agentWindow.contextLimited') }}
+    </p>
     <div
       v-if="entry.open"
       class="mt-1 space-y-1.5 px-1 pb-1"

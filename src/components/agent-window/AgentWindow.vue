@@ -314,8 +314,9 @@ function collapseProcess(assistantId: string) {
   const process = findProcessFor(assistantId)
   if (!process) return
   process.thinkingActive = false
+  if (process.contextPhase === "compacting") process.contextPhase = "limited"
   process.open = false
-  if (!process.thinking.trim() && process.tools.length === 0) {
+  if (!process.thinking.trim() && process.tools.length === 0 && !process.contextPhase) {
     const index = entries.value.findIndex((entry) => entry.id === process.id)
     if (index >= 0) removeEntryAt(index)
   }
@@ -542,6 +543,14 @@ async function send(selected?: AIEntityCandidateDTO) {
           void scrollListToEnd()
         },
         /** 显示服务端处理状态，不接收模型原始思考文本。 */
+        onContextStatus(status) {
+          if (seq !== streamSeq || controller.signal.aborted) return
+          const current = findProcessFor(assistantId)
+          if (current) {
+            current.contextPhase = status.phase
+            current.thinkingActive = true
+          }
+        },
         onAnswerProgress() {
           if (seq !== streamSeq || controller.signal.aborted) return
           const current = findProcessFor(assistantId)

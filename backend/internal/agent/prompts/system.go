@@ -10,7 +10,7 @@ import (
 	"curated-backend/internal/contracts"
 )
 
-const Version = "agent-system-v6"
+const Version = "agent-system-v7"
 const maxMentions = 8
 const maxMentionLabelRunes = 80
 

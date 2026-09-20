@@ -70,6 +70,7 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 	hadTruncation := false
 	needsInput := false
 	repairs := 0
+	overflowRetries := 0
 	var answerEvidence *contracts.AIAnswerEvidenceDTO
 	userText := ""
 	for i := len(history) - 1; i >= 0; i-- {
@@ -129,12 +130,27 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 				choice = "none"
 			}
 		}
+		if estimatedRequestTokens(messages, availableTools) > requestTokenEstimateBudget*3/4 {
+			emit(contracts.AIChatSSEEvent{Type: "context_status", Seq: nextSeq(), Context: &contracts.AIContextStatusDTO{Phase: "compacting"}})
+			compacted, changed, degraded := l.compactWorkingContext(ctx, messages, availableTools)
+			if changed {
+				messages = compacted
+			}
+			phase := "ready"
+			if degraded || !changed {
+				phase = "limited"
+			}
+			emit(contracts.AIChatSSEEvent{Type: "context_status", Seq: nextSeq(), Context: &contracts.AIContextStatusDTO{Phase: phase}})
+		}
+		if ctx.Err() != nil {
+			continue
+		}
 		if estimatedRequestTokens(messages, availableTools) > requestTokenEstimateBudget {
 			status := "needs_input"
 			if steps > 0 {
 				status = "partial"
 			}
-			emitDone(status, "The context budget was reached. Narrow the request or start a new conversation; completed results remain available.", false, "")
+			emitDone(status, "The current input and required context remain too large after compaction. Shorten this request and continue in the same conversation; saved history is preserved.", false, "context_input_too_large")
 			return nil
 		}
 		// Never publish raw thinking or partial prose, including on cancellation.
@@ -147,8 +163,30 @@ func (l *Loop) Run(ctx context.Context, sessionID, messageID string, history []l
 			return nil
 		}
 		if err != nil {
+			if llm.IsContextOverflow(err) && overflowRetries < 1 {
+				overflowRetries++
+				emit(contracts.AIChatSSEEvent{Type: "context_status", Seq: nextSeq(), Context: &contracts.AIContextStatusDTO{Phase: "compacting"}})
+				compacted, changed, degraded := l.compactWorkingContext(ctx, messages, availableTools)
+				phase := "ready"
+				if degraded || !changed {
+					phase = "limited"
+				}
+				emit(contracts.AIChatSSEEvent{Type: "context_status", Seq: nextSeq(), Context: &contracts.AIContextStatusDTO{Phase: phase}})
+				if changed {
+					messages = compacted
+					continue
+				}
+			}
 			if ctx.Err() != nil {
 				emitDone("cancelled", "The user cancelled this request before it finished.", false, "")
+				return nil
+			}
+			if llm.IsContextOverflow(err) {
+				status := "needs_input"
+				if steps > 0 {
+					status = "partial"
+				}
+				emitDone(status, "The provider's context limit was reached after recovery. Shorten the current request and continue in this conversation.", false, "context_input_too_large")
 				return nil
 			}
 			emitDone("failed", "The model response could not be completed.", true, "")
@@ -466,9 +504,18 @@ func (l *Loop) toolSpecs() []llm.ToolSpec {
 }
 
 func buildMessages(history []llm.ChatMessage, page *contracts.AIChatContext, locale string) []llm.ChatMessage {
+	var memory *llm.ChatMessage
+	if len(history) > 0 && strings.HasPrefix(history[0].Content, memoryLabel) && history[0].Role == "assistant" {
+		m := history[0]
+		memory = &m
+		history = history[1:]
+	}
 	trimmed, omitted := boundedHistory(history)
 	out := make([]llm.ChatMessage, 0, len(trimmed)+1)
 	out = append(out, llm.ChatMessage{Role: "system", Content: prompts.SystemPrompt(locale, page)})
+	if memory != nil {
+		out = append(out, *memory)
+	}
 	if omitted {
 		out[0].Content += "\nEarlier conversation messages were omitted to fit the context budget. Do not assume missing facts or permissions; ask for clarification when needed."
 	}

@@ -10,10 +10,12 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
   let movies: AIAgentMovieCardDTO[] = []
   let books: AIAgentBookCardDTO[] = []
   let tools: AgentProcessTool[] = []
+  let contextPhase: import("@/api/types").AIContextStatusDTO["phase"] | undefined
   /** 把尚未挂到助手气泡上的过程工具冲刷成一条 process 条目。 */
   const flush = (id: string) => {
-    if (tools.length) entries.push({ id: `${id}-process`, kind: "process", tools, thinking: "", thinkingActive: false, open: false })
+    if (tools.length || contextPhase) entries.push({ id: `${id}-process`, kind: "process", tools, contextPhase: contextPhase === "compacting" ? "limited" : contextPhase, thinking: "", thinkingActive: false, open: false })
     tools = []
+    contextPhase = undefined
   }
   /** 把尚未挂到助手气泡上的影片卡或书卡冲刷成一条 assistant 条目。 */
   const flushCards = (id: string) => {
@@ -44,7 +46,9 @@ export function restoreChatHistory(messages: AIChatStoredMessageDTO[]): AgentCha
         const id = `${message.id}-event-${index}`
         if (event.movies?.length) movies = event.movies
         if (event.books?.length) books = event.books
-        if (event.type === "tool_call_result") {
+        if (event.type === "context_status" && event.context) {
+          contextPhase = event.context.phase
+        } else if (event.type === "tool_call_result") {
           if (isAgentProcessTool(event.name || "")) tools.push({
             toolCallId: event.toolCallId || id, name: event.name || "tool", pending: false,
             ok: event.ok, evidence: event.evidence, providerRows: event.providerRows,

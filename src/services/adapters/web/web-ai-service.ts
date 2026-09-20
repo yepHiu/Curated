@@ -32,6 +32,7 @@ function requestDeadline(parent: AbortSignal | undefined, milliseconds: number) 
 }
 
 interface SSEEventPayload {
+  context?: import("@/api/types").AIContextStatusDTO
   answerEvidence?: import("@/api/types").AIAnswerEvidenceDTO
   type?: string
   delta?: string
@@ -120,6 +121,9 @@ async function consumeChat(input: AIChatStreamRequest, handlers: AIChatStreamHan
       handlers.onSession?.(payload.sessionId)
     }
     switch (payload.type) {
+      case "context_status":
+        if (payload.context && ["compacting", "ready", "limited"].includes(payload.context.phase)) handlers.onContextStatus?.(payload.context)
+        break
       case "text_delta":
         if (payload.delta) handlers.onDelta(payload.delta)
         break

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,21 @@ type HTTPError struct {
 }
 
 func (e *HTTPError) Error() string { return e.Detail }
+
+// IsContextOverflow deliberately excludes auth, rate limits and generic 400s.
+func IsContextOverflow(err error) bool {
+	var e *HTTPError
+	if !errors.As(err, &e) || (e.Status != 400 && e.Status != 413 && e.Status != 422) {
+		return false
+	}
+	text := strings.ToLower(e.Detail)
+	for _, marker := range []string{"context_length_exceeded", "maximum context length", "context window", "prompt is too long", "too many input tokens"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
 
 // ErrorCategory never includes provider response bodies, prompts or URLs.
 func ErrorCategory(err error) string {

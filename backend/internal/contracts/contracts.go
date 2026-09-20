@@ -1244,7 +1244,13 @@ type AIAnswerEvidenceItemDTO struct {
 	Fields      map[string]any `json:"fields"`
 }
 
+// AIContextStatusDTO exposes lifecycle only, never private checkpoint text.
+type AIContextStatusDTO struct {
+	Phase string `json:"phase"` // compacting | ready | limited
+}
+
 type AIChatSSEEvent struct {
+	Context        *AIContextStatusDTO       `json:"context,omitempty"`
 	AnswerEvidence *AIAnswerEvidenceDTO      `json:"answerEvidence,omitempty"`
 	ReceiptID      string                    `json:"receiptId,omitempty"`
 	Applied        bool                      `json:"applied,omitempty"`

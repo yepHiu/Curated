@@ -248,6 +248,24 @@ describe("AgentWindow session request ownership", () => {
     } finally { wrapper.unmount() }
   })
 
+  it("retains memory status after the answer completes", async () => {
+    streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
+      handlers.onContextStatus?.({ phase: "compacting" })
+      handlers.onContextStatus?.({ phase: "ready" })
+      handlers.onDelta("continued answer")
+      handlers.onOutcome?.({ status: "completed" })
+    })
+    const wrapper = mountWindow()
+    try {
+      await flushPromises()
+      await wrapper.find("[data-agent-window-input]").setValue("continue the task")
+      await wrapper.find("[data-agent-window-send]").trigger("click")
+      await flushPromises()
+      const entries = wrapper.findComponent({ name: "AgentChatThread" }).props("entries") as { kind: string; contextPhase?: string; thinkingActive?: boolean }[]
+      expect(entries.find(entry => entry.kind === "process")).toMatchObject({ contextPhase: "ready", thinkingActive: false })
+    } finally { wrapper.unmount() }
+  })
+
   it.each(["needs_input", "partial", "error"])("removes empty answer but retains evidence after %s", async (status) => {
     streamChatMock.mockImplementation(async (_input: AIChatStreamRequest, handlers: AIChatStreamHandlers) => {
       handlers.onToolStart?.({ name: "search_movies", toolCallId: "read" })

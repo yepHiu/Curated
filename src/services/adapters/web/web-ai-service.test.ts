@@ -12,6 +12,20 @@ function response(events: unknown[]) {
 }
 
 describe("AI transport termination", () => {
+  it("delivers compaction lifecycle without treating it as completion", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([
+      { type: "context_status", context: { phase: "compacting" } },
+      { type: "context_status", context: { phase: "unknown" } },
+      { type: "context_status", context: { phase: "ready" } },
+      { type: "text_delta", delta: "continued answer" },
+      { type: "message_done", outcome: { status: "completed" } },
+    ])))
+    const onContextStatus = vi.fn(), onDelta = vi.fn(), onOutcome = vi.fn()
+    await webAIService.streamChat(input, { onContextStatus, onDelta, onOutcome })
+    expect(onContextStatus.mock.calls).toEqual([[{ phase: "compacting" }], [{ phase: "ready" }]])
+    expect(onDelta).toHaveBeenCalledWith("continued answer")
+    expect(onOutcome).toHaveBeenCalledTimes(1)
+  })
   it("delivers server progress and published evidence while suppressing raw thinking", async () => {
     const answerEvidence = { version: 1, items: [{ refId: "r1", source: "local", tool: "search_movies", retrievedAt: "2026-09-09T00:00:00Z", fields: { code: "TEST-101" } }] }
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([

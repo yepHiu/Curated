@@ -695,8 +695,14 @@ export interface AIAgentBookCardDTO {
   tags?: string[]
 }
 
+/** Public lifecycle metadata; private checkpoint text stays on the server. */
+export interface AIContextStatusDTO {
+  phase: "compacting" | "ready" | "limited"
+}
+
 /** Persisted result events; confirmation tokens are deliberately not stored. */
 export interface AIChatStoredEventDTO {
+  context?: AIContextStatusDTO
   answerEvidence?: AIAnswerEvidenceDTO
   receiptId?: string
   applied?: boolean

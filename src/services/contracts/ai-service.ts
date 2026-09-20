@@ -48,6 +48,7 @@ export interface AIChatConfirmEvent {
 }
 
 export interface AIChatStreamHandlers {
+  onContextStatus?(status: import("@/api/types").AIContextStatusDTO): void
   /** Server-authored progress; no model thinking text. */
   onAnswerProgress?(): void
   onAnswerEvidence?(evidence: import("@/api/types").AIAnswerEvidenceDTO): void

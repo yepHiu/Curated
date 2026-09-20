@@ -15,6 +15,7 @@ export type AgentChatEntry =
       kind: "process"
       thinking: string
       thinkingActive: boolean
+      contextPhase?: import("@/api/types").AIContextStatusDTO["phase"]
       tools: AgentProcessTool[]
       open: boolean
     }

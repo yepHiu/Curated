@@ -5,6 +5,12 @@ import type { AIChatStoredMessageDTO } from "@/api/types"
 const base = { id: "reply", sessionId: "s1", role: "assistant", seq: 2, createdAt: "", content: "partial answer" }
 
 describe("persisted AI turns", () => {
+  it.each(["ready", "limited", "compacting"] as const)("restores %s memory status without a permanent spinner", (phase) => {
+    const entries = restoreChatHistory([{ ...base, events: [{ type: "context_status", context: { phase } }] }])
+    expect(entries.find(e => e.kind === "process")).toMatchObject({
+      thinkingActive: false, contextPhase: phase === "compacting" ? "limited" : phase,
+    })
+  })
   it("restores the published source snapshot without granting a new reference", () => {
     const answerEvidence = { version: 1 as const, items: [{ refId: "expired", source: "provider" as const, tool: "search_provider_titles", retrievedAt: "2026-09-09T00:00:00Z", fields: { code: "TEST-101" } }] }
     const entries = restoreChatHistory([{ ...base, events: [{ type: "message_done", outcome: { status: "completed" }, answerEvidence }] }])

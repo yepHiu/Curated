@@ -25,6 +25,7 @@ import (
 type agentRuntime struct {
 	runsMu     sync.Mutex
 	activeRuns map[string]context.CancelFunc
+	chatGates  map[string]*aiChatGate
 	applyMu    sync.Mutex
 	once       sync.Once
 	gateway    *core.Gateway
@@ -126,6 +127,11 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		return err
 	}
 	observation.row.SessionID = session.ID
+	release, err := a.acquireAIChat(ctx, session.ID)
+	if err != nil {
+		return err
+	}
+	defer release()
 	lastUser := lastAIChatUser(req.Messages)
 	if lastUser == nil {
 		return fmt.Errorf("messages must include at least one user message")
@@ -139,16 +145,25 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		}
 	}
 
-	history, err := a.llmHistoryForSession(ctx, session.ID)
-	if err != nil || len(history) == 0 {
-		history = requestHistoryWithoutSystem(req.Messages)
-	}
-
 	messageID := newAgentID("msg_")
 	loop := run.NewLoop(a.ensureAgentGateway(), streamer, a.aiProjection(cfg.BaseURL), strings.TrimSpace(req.Locale))
 	var assistant strings.Builder
 	var events []contracts.AIChatSSEEvent
+	streamSeq := 0
 	wrapped := func(ev contracts.AIChatSSEEvent) {
+		// Preparation may compact before the execution loop starts. Keep one
+		// message_start and one monotonic sequence across both lifecycle stages.
+		if streamSeq == 0 {
+			streamSeq++
+			if emit != nil {
+				emit(contracts.AIChatSSEEvent{Type: "message_start", SessionID: session.ID, MessageID: messageID, Seq: streamSeq})
+			}
+		}
+		if ev.Type == "message_start" {
+			return
+		}
+		streamSeq++
+		ev.Seq = streamSeq
 		if ev.Outcome != nil {
 			observation.row.Status = ev.Outcome.Status
 			if ev.Outcome.ReasonCode == "answer_rejected" {
@@ -169,7 +184,7 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 			}
 			assistant.WriteString(ev.Delta)
 			// Only published text reaches storage; upstream drafts never enter this emitter.
-		case "tool_call_result", "movie_cards", "message_done", "confirm_required":
+		case "tool_call_result", "movie_cards", "message_done", "confirm_required", "context_status":
 			stored := ev
 			if stored.ConfirmToken != "" {
 				stored.ReceiptID = storage.NewAIApplyReceiptKey(stored.ConfirmToken, session.ID, stored.Name, "").TokenHash
@@ -181,6 +196,16 @@ func (a *App) StreamAIChat(ctx context.Context, req contracts.AIChatRequest, emi
 		}
 		if emit != nil {
 			emit(ev)
+		}
+	}
+	history := requestHistoryWithoutSystem(req.Messages)
+	if a.store != nil {
+		prepared, err := a.prepareAIHistory(ctx, session.ID, streamer, wrapped)
+		if err != nil {
+			return errors.Join(err, a.persistAIChatTurn(ctx, session.ID, "", events))
+		}
+		if len(prepared) > 0 {
+			history = prepared
 		}
 	}
 	page := a.projectAIChatContext(ctx, req.Context)
