@@ -8,8 +8,8 @@
 | --- | --- |
 | Surface and job | 设置 → 网络。用户任务是决定本机 HTTP 服务是否对局域网设备开放。 |
 | Existing precedent | 通用页的开关（`launchAtLogin`）+ 网络页代理卡片。 |
-| Hierarchy and density | 网络分区第一张卡「局域网访问」，其下才是出站代理。开关是主操作；地址列表与重启提示是开启后的次要状态。 |
-| State matrix | Web：开关可直接保存；已保存但当前仍绑 loopback 时提示完全退出后生效；已监听时展示局域网 URL。Mock：不可用。错误就地显示，不新增 Toast。 |
+| Hierarchy and density | 网络分区第一张卡「局域网访问」，其下才是出站代理。开关是主操作；地址列表与重启提示是次要状态，重启提示覆盖开启和关闭。 |
+| State matrix | Web：开关可直接保存；偏好与当前监听不一致时提示完全退出后生效，包括关闭但当前仍在局域网监听；开启时展示局域网 URL。Mock：不可用。错误就地显示，不新增 Toast。 |
 | System impact | 本地设置卡片 + `library-config.cfg` 键 + Settings DTO。不新增 UI 基元或 token。 |
 
 ## 当前事实
@@ -33,3 +33,5 @@
 ## 实施状态
 
 2026-09-20 已落地：设置 → 网络开关写入 `library-config.cfg` 的 `lanEnabled`；`GET/PATCH /api/settings` 返回偏好、当前是否非 loopback 监听、私网 IPv4 URL。不要求 PIN，也不因局域网访问禁止关闭 PIN；改绑需完全退出。Host 校验跟当前真实监听走。
+
+2026-09-21 Review 修复：重启提示条件统一为 Web API 模式下 `lanEnabled !== lanListening`，补齐关闭后仍在监听的提示；组件回归测试覆盖偏好 / 监听的四种组合与 Mock 隐藏提示。
