@@ -189,7 +189,7 @@ function updateProxyPassword(value: unknown) {
             />
           </div>
           <p
-            v-if="useWebApi && lanEnabled && !lanListening"
+            v-if="useWebApi && lanEnabled !== lanListening"
             class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
           >
             {{ t("settings.lanAccessRestartHint") }}

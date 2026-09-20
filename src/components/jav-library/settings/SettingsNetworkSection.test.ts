@@ -201,6 +201,33 @@ describe("SettingsNetworkSection", () => {
     expect(setLANEnabled).toHaveBeenCalledWith(true)
   })
 
+  it.each([
+    { enabled: true, listening: false, restartRequired: true },
+    { enabled: false, listening: true, restartRequired: true },
+    { enabled: true, listening: true, restartRequired: false },
+    { enabled: false, listening: false, restartRequired: false },
+  ])("shows restart hint=$restartRequired for LAN enabled=$enabled, listening=$listening", ({
+    enabled,
+    listening,
+    restartRequired,
+  }) => {
+    lanEnabledState.value = enabled
+    lanListeningState.value = listening
+    const wrapper = mount(SettingsNetworkSection, { props: baseProps })
+
+    expect(wrapper.text().includes("settings.lanAccessRestartHint")).toBe(restartRequired)
+  })
+
+  it("hides the restart hint in Mock mode even if LAN states differ", () => {
+    lanEnabledState.value = false
+    lanListeningState.value = true
+    const wrapper = mount(SettingsNetworkSection, {
+      props: { ...baseProps, useWebApi: false },
+    })
+
+    expect(wrapper.text()).not.toContain("settings.lanAccessRestartHint")
+  })
+
   it("shows a full-quit hint when LAN access is saved but not yet listening", () => {
     lanEnabledState.value = true
     lanListeningState.value = false
