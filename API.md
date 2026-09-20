@@ -2528,7 +2528,7 @@ Body 可选：
 
 ### 4.15b Experimental Agent（实验性）
 
-实验性 Agent（见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`）经 `GET/PATCH /api/settings` 读写。云端 provider 默认对工具结果做路径脱敏。聊天中的写工具只产生预览，应用修改需要用户通过确认接口明确提交。
+实验性 Agent（见 `docs/plan/2026-08-18-agent-charter.md` 与 `docs/plan/2026-08-19-agent-milestone-plan.md`）。端点都在 PIN 中间件保护内；`library-config.cfg` 的 `aiProvider` 对象（`kind`/`baseUrl`/`apiKey`/`model`/`contextWindow`）经 `GET/PATCH /api/settings` 读写。contextWindow 表示服务商开放的总上下文 tokens，GET 总会返回有效值（缺省为 65536）；PATCH 可省略以保留现值，传入时必须为 32768–2097152 的整数，0/负数/越界/小数/字符串无效。旧配置文件省略或 0 使用默认。示例：`{"aiProvider":{"contextWindow":204800}}`，保存后从下一次聊天快照生效，不改变正在执行的请求。云端 provider 默认对工具结果做路径脱敏。聊天中的写工具只产生预览，应用修改需要用户通过确认接口明确提交。
 
 #### AI 设置与治理（2026-09-06）
 
@@ -2624,9 +2624,9 @@ Body：
 
 说明：
 
-- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后读取最近 80 条 user/assistant 候选记录（工具记录不占额度），模型循环最终保留最多 24 条且历史正文预算约 24 KiB。本次输入不会被静默截断；省略较早历史时注入范围说明。
-- 模型近期窗口之外的消息使用迁移 0052 的会话检查点增量总结；摘要最多 6 KiB、输入数据最多 24 KiB，原始历史不变。摘要调用最多 45 秒，历史准备总计最多 60 秒；失败不推进检查点。同一会话的聊天请求串行，等待可取消。
-- 每次任务模型调用前，以 messages 与工具 schema 的 JSON UTF-8 字节数估算请求大小；超过 48 KiB 时自动整理，64 KiB 是硬边界。最新输入与系统规则原样保留，近期工具批次完整配对；明确的 provider 上下文超限可恢复一次。仍超限时返回 `needs_input` 或已有结果的 `partial`，`reasonCode=context_input_too_large`，提示缩短当前输入并继续同会话。估算不是真实 token/Provider usage。
+- 消息数上限 50 条、单条 64K runes、总量 256K runes，且必须包含至少一条 `user` 消息，否则 `400 COMMON_BAD_REQUEST`。续聊客户端只需提交本次用户消息；服务端保存该输入后读取最近 200 条 user/assistant 候选记录（工具记录不占额度）。近期消息数为 min(200, floor(24 × W / 65536))，正文预算为输入预算的一半；默认最多 24 条、约 22.4 KiB。本次输入不会被静默截断；省略较早历史时注入范围说明。
+- 模型近期窗口之外的消息使用迁移 0052 的会话检查点增量总结；摘要最多 6 KiB、输入数据最多 min(24576, I−2048) 字节，原始历史不变。摘要调用最多 45 秒，历史准备总计最多 60 秒；失败不推进检查点。同一会话的聊天请求串行，等待可取消。
+- 每次任务模型调用前，以 messages 与工具 schema 的 JSON UTF-8 字节数估算请求大小；设 W 为 aiProvider.contextWindow：输出预留 O=min(32768, floor(W/4))，输入预算 I=W−O−floor(W/20)，超过 floor(I×0.8) 时自动整理，I 为硬边界。聊天与摘要请求设置 max_tokens=O；独立 Action 与连通测试保持各自限制。最新输入与系统规则原样保留，近期工具批次完整配对；明确的 provider 上下文超限可恢复一次。仍超限时返回 `needs_input` 或已有结果的 `partial`，`reasonCode=context_input_too_large`，提示缩短当前输入并继续同会话。估算不是真实 token/Provider usage。
 - 新增 `context_status` 事件：`context:{phase:"compacting"|"ready"|"limited"}`。与其他事件共享单个 message_start、单调 seq；状态保存于 events_json，摘要正文不通过 SSE 公开。旧客户端可忽略此事件。检查点不授予新事实引用或写入权限。
 - 省略 `sessionId` 时后端创建会话；省略 `context` 时不注入页面指代。旧 `context`（v0）保持兼容；`contextVersion: 1` 才允许 `selectedMovieIds`、`selectedActors`、`selectedComicIds`、`selectedPhotoIds` 与 `activeFilters`。选择项各最多 8 条、去重并限制长度；影片 / 漫画 / 写真 ID 必须在应用层确认存在且对应库已启用，演员名称会解析为本地规范名，未解析项不会成为本轮工具锚点。`context.mentions` 为 composer `@` 引用（`movie` / `comic` / `photo` / `actor` / `tag`），最多 8 条。
 - `activeFilters` 是单次、allowlist 的页面筛选投影，只支持 `query`、`tag`、`actor`、`playState`（`all` / `unwatched` / `in-progress` / `completed`）、`runtime`（`short` / `standard` / `long`）、漫画 `favorite` 与 `readStatus`（`unread` / `reading` / `read`）；它不保存为会话记忆，也不会直接执行底层查询。未知 JSON 字段由标准 JSON 解码忽略；不支持的版本、超量或非法枚举返回 `400 COMMON_BAD_REQUEST`。书库路由只投影书 ID 与书筛选，不会把图册 ID 当作 `movieId`。

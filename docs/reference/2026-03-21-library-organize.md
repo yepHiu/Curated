@@ -50,7 +50,7 @@ Photo library current slice:
 
 | 字段 | 说明 |
 |------|------|
-| `aiProvider` | OpenAI 兼容模型的 kind/baseUrl/apiKey/model；经 `GET/PATCH /api/settings` 保存，密钥不进入发布样例。 |
+| `aiProvider` | OpenAI 兼容模型的 kind/baseUrl/apiKey/model/contextWindow；contextWindow 为总上下文 tokens，省略或旧配置 0 默认 65536，界面与 PATCH 接受 32768–2097152 整数，下一聊天请求生效；经 `GET/PATCH /api/settings` 保存，密钥不进入发布样例。 |
 | `aiGovernance` | 正式 Settings → AI；`GET/PATCH /api/ai/settings` 保存 enabled（默认 false）、readOnly（默认 false）、privacy（auto/minimal）、stepLimit（默认 0 表示不限，用户可开启 1–30 次上限；已有正数保留）、writePerMinute（1–60，默认 10，全局）、retentionDays（7–365，默认 30）。保存策略停止生成；不自动迁移浏览器启用状态。 |
 | `organizeLibrary` | 默认 **`true`**（若文件不存在或省略该字段，启动时也按 `true` 处理）。`true`/`false` 由前端 **Settings → 整理入库** 通过 `PATCH /api/settings` 更新，成功后**原子写回**本文件。 |
 | `metadataMovieProvider` | 影片 Metatube 源；空字符串表示自动。由设置页或 `PATCH /api/settings` 更新。 |
