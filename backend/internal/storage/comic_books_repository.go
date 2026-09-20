@@ -352,6 +352,12 @@ func (s *SQLiteStore) PatchComicBook(ctx context.Context, comicID string, patch 
 			return contracts.ComicBookDetailDTO{}, err
 		}
 	}
+	if patch.Title != nil {
+		// Store only the title written by this confirmation, within its transaction.
+		if err := saveAIApplyReceiptTx(ctx, tx, map[string]any{"id": comicID, "title": strings.TrimSpace(*patch.Title)}); err != nil {
+			return contracts.ComicBookDetailDTO{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return contracts.ComicBookDetailDTO{}, err
 	}

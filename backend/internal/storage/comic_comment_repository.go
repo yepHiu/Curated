@@ -77,6 +77,9 @@ func (s *SQLiteStore) UpsertComicComment(ctx context.Context, comicID string, bo
 	if err != nil {
 		return contracts.ComicCommentDTO{}, err
 	}
+	if err := saveAIApplyReceiptTx(ctx, tx, contracts.ComicCommentDTO{Body: body, UpdatedAt: now}); err != nil {
+		return contracts.ComicCommentDTO{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return contracts.ComicCommentDTO{}, err
 	}

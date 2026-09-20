@@ -74,6 +74,9 @@ func (s *SQLiteStore) UpsertPhotoComment(ctx context.Context, photoID string, bo
 	if err != nil {
 		return contracts.PhotoCommentDTO{}, err
 	}
+	if err := saveAIApplyReceiptTx(ctx, tx, contracts.PhotoCommentDTO{Body: body, UpdatedAt: now}); err != nil {
+		return contracts.PhotoCommentDTO{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return contracts.PhotoCommentDTO{}, err
 	}

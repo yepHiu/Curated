@@ -13,7 +13,8 @@ import (
 )
 
 func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
-	for _, tool := range []string{core.SaveMovieCommentName, core.UpdateMovieDisplayOverridesName, core.CreateSavedViewName} {
+	for _, tool := range []string{core.SaveMovieCommentName, core.UpdateMovieDisplayOverridesName, core.CreateSavedViewName,
+		"save_comic_comment", "save_photo_comment", "update_comic_title", "update_photo_title"} {
 		t.Run(tool, func(t *testing.T) {
 			ctx := context.Background()
 			path := filepath.Join(t.TempDir(), "receipts.db")
@@ -36,8 +37,12 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			if tool == core.CreateSavedViewName {
 				args = map[string]any{"name": "AI view", "filters": map[string]any{"schemaVersion": 1, "mode": "library"}}
 			}
+			bookArgs, bookWrite, bookRead := bookReceiptFixture(t, ctx, store, tool)
+			if bookArgs != nil {
+				args = bookArgs
+			}
 			encoded, _ := json.Marshal(args)
-			a := &App{store: store, cfg: enabledAITestConfig()}
+			a := &App{store: store, cfg: enabledAITestConfig(), comicLibraryEnabled: true, photoLibraryEnabled: true}
 			session, err := store.CreateAIChatSession(ctx, "receipt test")
 			if err != nil {
 				t.Fatal(err)
@@ -78,6 +83,15 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			if string(first) != string(second) {
 				t.Fatal("duplicate confirmations disagree")
 			}
+			if bookWrite != nil {
+				value, err := bookRead(store)
+				if err != nil || value != "AI value" {
+					t.Fatalf("confirmed book value = %q: %v", value, err)
+				}
+				if err := bookWrite(store, "later manual value"); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if tool == core.SaveMovieCommentName {
 				if _, err := store.UpsertMovieComment(ctx, movie.MovieID, "later manual note"); err != nil {
 					t.Fatal(err)
@@ -95,7 +109,7 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			restarted := &App{store: store, cfg: enabledAITestConfig()}
+			restarted := &App{store: store, cfg: enabledAITestConfig(), comicLibraryEnabled: true, photoLibraryEnabled: true}
 			replay, err := restarted.ApplyAITool(ctx, req)
 			if err != nil {
 				t.Fatal(err)
@@ -106,6 +120,12 @@ func TestAIReceiptSurvivesRestartAndDoesNotRepeatWrite(t *testing.T) {
 			replayed, _ := json.Marshal(replay.Data)
 			if string(first) != string(replayed) {
 				t.Fatal("receipt changed after restart")
+			}
+			if bookRead != nil {
+				value, err := bookRead(store)
+				if err != nil || value != "later manual value" {
+					t.Fatalf("receipt replay rewrote book value: %q %v", value, err)
+				}
 			}
 			if tool == core.SaveMovieCommentName {
 				note, err := store.GetMovieComment(ctx, movie.MovieID)

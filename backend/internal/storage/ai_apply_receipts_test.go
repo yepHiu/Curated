@@ -9,6 +9,98 @@ import (
 	"curated-backend/internal/contracts"
 )
 
+func TestPhotoAIReceiptFailureRollsBackBusinessWrite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := newComicRepositoryTestStore(t, t.TempDir())
+	book, err := s.UpsertPhotoBook(ctx, PhotoBookUpsert{
+		Location: filepath.Join(t.TempDir(), "book.cbz"), Title: "Original title", PageCount: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := s.UpsertPhotoComment(ctx, book.ID, "Original note")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `CREATE TRIGGER fail_receipt BEFORE INSERT ON ai_apply_receipts BEGIN SELECT RAISE(ABORT,'receipt unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range []string{"save_photo_comment", "update_photo_title"} {
+		t.Run(tool, func(t *testing.T) {
+			key := NewAIApplyReceiptKey("token", "session", tool, "hash")
+			applyCtx := WithAIApplyReceipt(ctx, key)
+			var err error
+			if tool == "save_photo_comment" {
+				_, err = s.UpsertPhotoComment(applyCtx, book.ID, "AI note", before.Body)
+			} else {
+				title := "AI title"
+				_, err = s.PatchPhotoBook(applyCtx, book.ID, contracts.PatchPhotoBookRequest{Title: &title, ExpectedTitle: &book.Title})
+			}
+			if err == nil {
+				t.Fatal("receipt failure ignored")
+			}
+			note, err := s.GetPhotoComment(ctx, book.ID)
+			if err != nil || note != before {
+				t.Fatalf("note did not roll back: %+v %v", note, err)
+			}
+			detail, err := s.GetPhotoBookDetail(ctx, book.ID)
+			if err != nil || detail.Title != book.Title {
+				t.Fatalf("title did not roll back: %+v %v", detail, err)
+			}
+			if _, found, err := s.GetAIApplyReceipt(ctx, key); err != nil || found {
+				t.Fatalf("receipt for failed write: %v %v", found, err)
+			}
+		})
+	}
+}
+
+func TestComicAIReceiptFailureRollsBackBusinessWrite(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := newComicRepositoryTestStore(t, t.TempDir())
+	book, err := s.UpsertComicBook(ctx, ComicBookUpsert{
+		Location: filepath.Join(t.TempDir(), "book.cbz"), Title: "Original title", PageCount: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := s.UpsertComicComment(ctx, book.ID, "Original note")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `CREATE TRIGGER fail_receipt BEFORE INSERT ON ai_apply_receipts BEGIN SELECT RAISE(ABORT,'receipt unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range []string{"save_comic_comment", "update_comic_title"} {
+		t.Run(tool, func(t *testing.T) {
+			key := NewAIApplyReceiptKey("token", "session", tool, "hash")
+			applyCtx := WithAIApplyReceipt(ctx, key)
+			var err error
+			if tool == "save_comic_comment" {
+				_, err = s.UpsertComicComment(applyCtx, book.ID, "AI note", before.Body)
+			} else {
+				title := "AI title"
+				_, err = s.PatchComicBook(applyCtx, book.ID, contracts.PatchComicBookRequest{Title: &title, ExpectedTitle: &book.Title})
+			}
+			if err == nil {
+				t.Fatal("receipt failure ignored")
+			}
+			note, err := s.GetComicComment(ctx, book.ID)
+			if err != nil || note != before {
+				t.Fatalf("note did not roll back: %+v %v", note, err)
+			}
+			detail, err := s.GetComicBookDetail(ctx, book.ID)
+			if err != nil || detail.Title != book.Title {
+				t.Fatalf("title did not roll back: %+v %v", detail, err)
+			}
+			if _, found, err := s.GetAIApplyReceipt(ctx, key); err != nil || found {
+				t.Fatalf("receipt for failed write: %v %v", found, err)
+			}
+		})
+	}
+}
+
 func TestAIReceiptFailureRollsBackBusinessWrite(t *testing.T) {
 	s, err := NewSQLiteStore(filepath.Join(t.TempDir(), "atomic.db"))
 	if err != nil {
