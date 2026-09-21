@@ -138,6 +138,8 @@ type App struct {
 	metadataMovieProviderChain []string // ordered list of providers to try in sequence
 	librarySettingsPath        string   // JSON file under config/ (organizeLibrary, future keys)
 
+	wishlistCancel  context.CancelFunc
+	wishlistDone    chan struct{}
 	appCtx          context.Context
 	writeMu         sync.Mutex
 	scanning        atomic.Bool
@@ -269,6 +271,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		}
 	}
 
+	app.startWishlistWorker()
 	return app, nil
 }
 
@@ -276,6 +279,10 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 func (a *App) Close() {
 	if a == nil {
 		return
+	}
+	if a.wishlistCancel != nil {
+		a.wishlistCancel()
+		<-a.wishlistDone
 	}
 	a.StopLibraryWatchLoop()
 	a.StopComicLibraryWatchLoop()

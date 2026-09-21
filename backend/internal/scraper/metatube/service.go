@@ -22,6 +22,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/datatypes"
 
+	"curated-backend/internal/library/moviecode"
 	"curated-backend/internal/scraper"
 )
 
@@ -432,7 +433,7 @@ func effectivePosterURLs(info *model.MovieInfo, result *model.MovieSearchResult)
 }
 
 // fetchMovieInfo fetches detailed movie info from a search result.
-func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, result *model.MovieSearchResult) (scraper.Metadata, error) {
+func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, result *model.MovieSearchResult, exact ...bool) (scraper.Metadata, error) {
 	pid, err := providerid.New(result.Provider, result.ID)
 	if err != nil {
 		return scraper.Metadata{}, fmt.Errorf("invalid provider result for %s: provider=%s id=%s: %w", number, result.Provider, result.ID, err)
@@ -449,6 +450,13 @@ func (s *Service) fetchMovieInfo(ctx context.Context, movieID, number string, re
 		return scraper.Metadata{}, fmt.Errorf("get movie info failed for %s (provider=%s): %w", number, result.Provider, err)
 	}
 
+	if len(exact) > 0 && exact[0] {
+		_, wanted, e1 := moviecode.WishlistIdentity(number)
+		_, actual, e2 := moviecode.WishlistIdentity(info.Number)
+		if e1 != nil || e2 != nil || wanted != actual {
+			return scraper.Metadata{}, fmt.Errorf("WISHLIST_IDENTITY_MISMATCH")
+		}
+	}
 	coverURL, thumbURL := effectivePosterURLs(info, result)
 	s.logger.Info("metadata fetched",
 		zap.String("number", number),
