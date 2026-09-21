@@ -332,6 +332,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Project overview dashboard](../project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
+| [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Code-only plugin submission, server-side scraping, persistent images, seven implementation stages, and acceptance criteria; proposed, not implemented |
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
 | [Agent user-facing PRD](plan/2026-08-19-agent-user-prd.md) | Initial user-side Agent requirements (REQ-0029 through REQ-0043) |
