@@ -23,6 +23,8 @@ func (a *App) startWishlistWorker() {
 	a.wishlistDone = make(chan struct{})
 	go func() { // 独立生命周期持续消费持久队列，不依赖插件或 HTTP 连接。
 		defer close(a.wishlistDone)
+		lastReconcile := time.Time{}
+		lastCleanup := time.Time{}
 		timer := time.NewTicker(2 * time.Second)
 		defer timer.Stop()
 		for {
@@ -30,6 +32,14 @@ func (a *App) startWishlistWorker() {
 			case <-ctx.Done():
 				return
 			case <-timer.C:
+				if time.Since(lastCleanup) > time.Hour {
+					a.collectWishlistAssets(ctx)
+					lastCleanup = time.Now()
+				}
+				if time.Since(lastReconcile) > time.Minute {
+					a.reconcileWishlistLibrary(ctx)
+					lastReconcile = time.Now()
+				}
 				item, attempt, e := a.store.ClaimWishlistJob(ctx)
 				if errors.Is(e, sql.ErrNoRows) {
 					continue

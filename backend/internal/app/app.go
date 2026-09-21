@@ -2398,6 +2398,10 @@ func (a *App) enqueueScrape(parentCtx context.Context, output io.Writer, result 
 			return
 		}
 		defer a.releaseScrapeSlot()
+		// 先复用愿望资料，命中后不再重复请求整个刮削链。
+		if a.reuseWishlistForMovie(parentCtx, r.MovieID) {
+			return
+		}
 		a.runScrape(parentCtx, output, r, parent)
 	}(result, parentScanTaskID)
 }
