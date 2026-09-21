@@ -491,11 +491,6 @@ async function retryCapture(job: CaptureJob) {
   const result = await captureQueue.submit(job)
   if (result.ok && props.movie.id === job.movie.id) appendCuratedFrameMarker(result)
 }
-async function undoCapture(job: CaptureJob) {
-  const id = job.candidate?.id
-  await captureQueue.undo(job)
-  if (!captureQueue.jobs.value.includes(job)) frameMarkers.value = frameMarkers.value.filter(marker => marker.id !== id)
-}
 
 /** 进度条萃取帧标记：进入播放器按片加载；播放中新萃取实时追加 */
 const frameMarkers = ref<FrameMarkerInput[]>([])
@@ -3103,7 +3098,7 @@ const videoPreloadMode = computed(() =>
           :saved-count="captureQueue.savedCount.value"
           @download="captureQueue.downloadOriginal(receiptJob)" @compress="captureQueue.compressAndRetry(receiptJob)"
           @retry="retryCapture(receiptJob)" @retry-export="captureQueue.retryExport(receiptJob)"
-          @undo="undoCapture(receiptJob)" @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
+          @view="viewCapture(receiptJob)" @dismiss="captureQueue.dismiss(receiptJob)" />
         <Dialog v-model:open="capturePreviewOpen">
           <DialogContent :portal-to="surfaceRef ?? undefined" class="max-w-[95vw] sm:max-w-[90vw]">
             <DialogTitle>{{ t('curated.captureView') }}</DialogTitle>

@@ -1,7 +1,6 @@
 import { computed, onBeforeUnmount, ref, shallowReactive } from 'vue'
 import type { Movie } from '@/domain/movie/types'
 import { captureCuratedFrameCandidate, exportCuratedFrameCandidate, saveCuratedFrameCandidate, type CuratedFrameCaptureCandidate, type SaveCuratedCaptureResult } from '@/lib/curated-frames/save-capture'
-import { deleteCuratedFrame } from '@/lib/curated-frames/db'
 import { i18n } from '@/i18n'
 import { triggerDownloadBlob } from '@/lib/curated-frames/export-file'
 import { formatFrameFilename } from '@/lib/curated-frames/capture'
@@ -126,12 +125,6 @@ export function useCuratedCaptureQueue() {
     return job
   }
 
-  async function undo(job: CaptureJob) {
-    if (!job.committed || !job.candidate || job.exporting) return
-    try { await deleteCuratedFrame(job.candidate.id); dismiss(job) }
-    catch { job.error = i18n.global.t('curated.captureUndoFailed') }
-  }
-
   function downloadOriginal(job: CaptureJob) {
     if (job.candidate) triggerDownloadBlob(job.originalBlob ?? job.candidate.blob, formatFrameFilename(job.movie.code, job.positionSec, job.candidate.capturedAt))
   }
@@ -162,5 +155,5 @@ export function useCuratedCaptureQueue() {
     for (const job of jobs.value) { if (job.preview) URL.revokeObjectURL(job.preview) }
     jobs.value = []
   })
-  return { jobs, latest, pendingCount, savedCount, prepare, prepareSource, submit, retryExport, undo, dismiss, downloadOriginal, compressAndRetry }
+  return { jobs, latest, pendingCount, savedCount, prepare, prepareSource, submit, retryExport, dismiss, downloadOriginal, compressAndRetry }
 }
