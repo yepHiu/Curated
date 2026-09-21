@@ -60,6 +60,25 @@ func TestWishlistLibraryReuse(t *testing.T) {
 	if !a.reuseWishlistForMovie(ctx, movie.MovieID) {
 		t.Fatal("replay failed")
 	}
+	// 复制目录暂时不可写时仍复用已保存资料，不启动整片网络刮削。
+	if e = os.Remove(files[0].Path); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Remove(filepath.Dir(files[0].Path)); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(filepath.Dir(files[0].Path), []byte("blocked directory"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if !a.reuseWishlistForMovie(ctx, movie.MovieID) {
+		t.Fatal("partial reuse triggered network fallback")
+	}
+	if e = os.Remove(filepath.Dir(files[0].Path)); e != nil {
+		t.Fatal(e)
+	}
+	if !a.reuseWishlistForMovie(ctx, movie.MovieID) {
+		t.Fatal("copy recovery failed")
+	}
 	if e = s.DeleteWishlist(ctx, id); e != nil {
 		t.Fatal(e)
 	}

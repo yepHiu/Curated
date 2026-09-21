@@ -39,7 +39,6 @@ func (a *App) reuseWishlistForMovie(ctx context.Context, movieID string) bool {
 	if a.OrganizeLibrary() && movie.Location != "" {
 		dest = filepath.Dir(movie.Location)
 	}
-	successful := true
 	for _, file := range files {
 		exists := false
 		for _, existing := range current {
@@ -53,15 +52,13 @@ func (a *App) reuseWishlistForMovie(ctx context.Context, movieID string) bool {
 		}
 		target, e := copyWishlistAsset(root, dest, file)
 		if e != nil {
-			successful = false
 			continue
 		}
-		if e = a.store.RegisterWishlistMovieAsset(ctx, movieID, file, target); e != nil {
-			successful = false
-		}
+		// 登记失败由周期复制再次尝试，不能触发整片重复联网刮削。
+		_ = a.store.RegisterWishlistMovieAsset(ctx, movieID, file, target)
 	}
 	// 资料已复用但图像不全仍跳过整片重复刮削，愿望后台刷新和周期复制补偿图片。
-	return successful && len(files) > 0
+	return true
 }
 
 // copyWishlistAsset 校验内容哈希后复制到影片受管理目录，不移动愿望原件。
