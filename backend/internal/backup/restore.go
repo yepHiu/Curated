@@ -70,6 +70,10 @@ func Restore(ctx context.Context, options RestoreOptions) (RestoreResult, error)
 		defer func() { _ = os.Remove(configTemp) }()
 	}
 
+	// 不可变资产先发布；数据库替换失败时旧数据库和它的资产仍保持不变。
+	if err := restoreWishlistAssets(archiveFiles, manifest, preflight.TargetDatabase); err != nil {
+		return result, err
+	}
 	now := time.Now
 	if options.Now != nil {
 		now = options.Now

@@ -228,6 +228,9 @@ func (s *SQLiteStore) PatchWishlist(ctx context.Context, id string, p contracts.
 		if err != nil {
 			return err
 		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM wishlist_assets WHERE item_id=?`, id); err != nil {
+			return err
+		}
 		if _, err = tx.ExecContext(ctx, `DELETE FROM wishlist_movie_links WHERE item_id=?`, id); err != nil {
 			return err
 		}

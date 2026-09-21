@@ -135,6 +135,9 @@ func Verify(ctx context.Context, backupPath string) (Verification, error) {
 	integrity, integrityErr := backupStore.CheckIntegrity(ctx)
 	result.DatabaseIntegrity = integrity
 	migrations, migrationsErr := backupStore.AppliedMigrations(ctx)
+	if err := verifyWishlistReferences(ctx, backupStore, manifest); err != nil {
+		result.Errors = append(result.Errors, err.Error())
+	}
 	closeErr := backupStore.Close()
 	if integrityErr != nil {
 		result.Errors = append(result.Errors, integrityErr.Error())
@@ -181,7 +184,7 @@ func validateManifest(result *Verification, manifest Manifest, archiveFiles map[
 	if manifest.Format != FormatName {
 		result.Errors = append(result.Errors, fmt.Sprintf("unsupported backup format %q", manifest.Format))
 	}
-	if manifest.FormatVersion != FormatVersion {
+	if manifest.FormatVersion != 1 && manifest.FormatVersion != FormatVersion {
 		result.Errors = append(result.Errors, fmt.Sprintf("unsupported backup format version %d", manifest.FormatVersion))
 	}
 	if manifest.CreatedAt.IsZero() {
@@ -213,6 +216,10 @@ func validateManifest(result *Verification, manifest Manifest, archiveFiles map[
 			databaseCount++
 			if entry.Path != DatabaseArchivePath {
 				result.Errors = append(result.Errors, "database entry path is not canonical")
+			}
+		case "wishlist-asset":
+			if manifest.FormatVersion < 2 || !manifest.Scope.WishlistAssetsIncluded || !strings.HasPrefix(entry.Path, wishlistArchivePrefix) {
+				result.Errors = append(result.Errors, "invalid wishlist asset scope or path")
 			}
 		case "library-config":
 			configCount++

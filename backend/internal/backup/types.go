@@ -14,7 +14,7 @@ var ErrDestinationExists = errors.New("backup destination already exists")
 
 const (
 	FormatName               = "curated-backup"
-	FormatVersion            = 1
+	FormatVersion            = 2
 	ManifestPath             = "manifest.json"
 	DatabaseArchivePath      = "database/curated.db"
 	LibraryConfigArchivePath = "config/library-config.cfg"
@@ -22,10 +22,11 @@ const (
 
 // Scope records intentionally included and excluded data classes.
 type Scope struct {
-	DatabaseIncluded      bool `json:"databaseIncluded"`
-	LibraryConfigIncluded bool `json:"libraryConfigIncluded"`
-	UserAssetsIncluded    bool `json:"userAssetsIncluded"`
-	MediaFilesIncluded    bool `json:"mediaFilesIncluded"`
+	WishlistAssetsIncluded bool `json:"wishlistAssetsIncluded,omitempty"`
+	DatabaseIncluded       bool `json:"databaseIncluded"`
+	LibraryConfigIncluded  bool `json:"libraryConfigIncluded"`
+	UserAssetsIncluded     bool `json:"userAssetsIncluded"`
+	MediaFilesIncluded     bool `json:"mediaFilesIncluded"`
 }
 
 // FileEntry authenticates one file stored in the package.

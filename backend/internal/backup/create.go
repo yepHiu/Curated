@@ -23,6 +23,15 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 	if options.Store == nil {
 		return manifest, errors.New("backup store is required")
 	}
+	assetLock, err := options.Store.LockWishlistAssets()
+	if err != nil {
+		return manifest, fmt.Errorf("lock wishlist backup assets: %w", err)
+	}
+	defer assetLock.Release()
+	assetRoot, err := options.Store.WishlistAssetRoot()
+	if err != nil {
+		return manifest, err
+	}
 	destination := strings.TrimSpace(options.DestinationPath)
 	if destination == "" {
 		return manifest, errors.New("backup destination path is required")
@@ -62,6 +71,11 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 		_ = backupStore.Close()
 		return manifest, fmt.Errorf("backup snapshot integrity check: %w", err)
 	}
+	assetEntries, assetSources, assetErr := wishlistBackupSources(ctx, backupStore, assetRoot)
+	if assetErr != nil {
+		_ = backupStore.Close()
+		return manifest, assetErr
+	}
 	migrations, err := backupStore.AppliedMigrations(ctx)
 	closeErr := backupStore.Close()
 	if err != nil {
@@ -77,6 +91,10 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 	}
 	files := []FileEntry{databaseEntry}
 	archiveSources := map[string]string{DatabaseArchivePath: databasePath}
+	files = append(files, assetEntries...)
+	for path, source := range assetSources {
+		archiveSources[path] = source
+	}
 
 	configIncluded := false
 	configPath := strings.TrimSpace(options.LibraryConfigPath)
@@ -126,10 +144,11 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 		AppVersion:    strings.TrimSpace(options.AppVersion),
 		AppChannel:    strings.TrimSpace(options.AppChannel),
 		Scope: Scope{
-			DatabaseIncluded:      true,
-			LibraryConfigIncluded: configIncluded,
-			UserAssetsIncluded:    false,
-			MediaFilesIncluded:    false,
+			DatabaseIncluded:       true,
+			LibraryConfigIncluded:  configIncluded,
+			WishlistAssetsIncluded: true,
+			UserAssetsIncluded:     false,
+			MediaFilesIncluded:     false,
 		},
 		SchemaMigrations: migrations,
 		Files:            files,
@@ -173,6 +192,10 @@ func Create(ctx context.Context, options CreateOptions) (Manifest, error) {
 	}
 	if err := tempFile.Close(); err != nil {
 		return Manifest{}, fmt.Errorf("close backup package: %w", err)
+	}
+	verification, err := Verify(ctx, tempPath)
+	if err != nil || !verification.Valid {
+		return Manifest{}, fmt.Errorf("verify completed package: %v %v", err, verification.Errors)
 	}
 	if err := commitPackageWithoutOverwrite(tempPath, absDestination, os.Link); err != nil {
 		return Manifest{}, err
