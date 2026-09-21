@@ -294,7 +294,12 @@ func (s *SQLiteStore) RefreshWishlist(ctx context.Context, id string) error {
 
 // ReconcileWishlist 根据统一规范键补关联；只读影片身份，不因离线盘删关联。
 func (s *SQLiteStore) ReconcileWishlist(ctx context.Context) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,code FROM movies WHERE COALESCE(trashed_at,'')=''`)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(ctx, `SELECT id,code FROM movies WHERE COALESCE(trashed_at,'')=''`)
 	if err != nil {
 		return err
 	}
@@ -315,11 +320,10 @@ func (s *SQLiteStore) ReconcileWishlist(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
+	// 同一事务重建自动匹配，番号修正或新增歧义不会留下过期关联。
+	if _, err = tx.ExecContext(ctx, `DELETE FROM wishlist_movie_links WHERE manual=0`); err != nil {
 		return err
 	}
-	defer tx.Rollback()
 	for key, ids := range matches {
 		if len(ids) != 1 {
 			continue
@@ -337,7 +341,7 @@ func (s *SQLiteStore) SetWishlistLink(ctx context.Context, id, movieID string, e
 	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM movies WHERE id=? AND COALESCE(trashed_at,'')=''`, movieID).Scan(&found); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO wishlist_movie_links(item_id,movie_id,excluded) VALUES(?,?,?) ON CONFLICT(item_id,movie_id) DO UPDATE SET excluded=excluded.excluded`, id, movieID, excluded)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO wishlist_movie_links(item_id,movie_id,excluded,manual) VALUES(?,?,?,1) ON CONFLICT(item_id,movie_id) DO UPDATE SET excluded=excluded.excluded,manual=1`, id, movieID, excluded)
 	return err
 }
 

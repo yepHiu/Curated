@@ -10,6 +10,47 @@ import (
 	"testing"
 )
 
+// TestWishlistReconcileIdentityChanges 验证自动关联随番号变化撤销，人工选择保持。
+func TestWishlistReconcileIdentityChanges(t *testing.T) {
+	s := newSavedViewTestStore(t)
+	ctx := context.Background()
+	id, _, err := s.AddWishlist(ctx, "SSIS-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	movie, err := s.PersistScanMovie(ctx, contracts.ScanFileResultDTO{Number: "SSIS-001", Path: filepath.Join(t.TempDir(), "movie.mp4")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// assertLinks 同时检查详情的有效关联和默认墙状态。
+	assertLinks := func(count int) {
+		t.Helper()
+		if err := s.ReconcileWishlist(ctx); err != nil {
+			t.Fatal(err)
+		}
+		item, err := s.GetWishlist(ctx, id)
+		if err != nil || len(item.MovieIDs) != count {
+			t.Fatalf("links: %+v %v", item, err)
+		}
+	}
+	assertLinks(1)
+	if _, err = s.db.ExecContext(ctx, `UPDATE movies SET code='SSIS-002' WHERE id=?`, movie.MovieID); err != nil {
+		t.Fatal(err)
+	}
+	assertLinks(0)
+	if err = s.SetWishlistLink(ctx, id, movie.MovieID, false); err != nil {
+		t.Fatal(err)
+	}
+	assertLinks(1)
+	if err = s.SetWishlistLink(ctx, id, movie.MovieID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.ExecContext(ctx, `UPDATE movies SET code='SSIS-001' WHERE id=?`, movie.MovieID); err != nil {
+		t.Fatal(err)
+	}
+	assertLinks(0)
+}
+
 // TestWishlistDurabilityAndGeneration 验证并发幂等、重开数据库与迟到任务隔离。
 func TestWishlistDurabilityAndGeneration(t *testing.T) {
 	ctx := context.Background()
