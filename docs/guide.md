@@ -332,7 +332,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Project overview dashboard](../project-overview-dashboard.html) | Static snapshot of current delivery, active requirements, Git branches, and worktrees |
 | [PRD workflow](prd/README.md) | How to add or update requirements |
 | [Plan status rules](plan/README.md) | How to read `docs/plan/` |
-| [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Code-only plugin submission, server-side scraping, persistent images, seven implementation stages, and acceptance criteria; proposed, not implemented |
+| [Wishlist design and implementation plan](plan/2026-09-22-wishlist.md) | Implemented code-only intake, server enrichment, persistent images, import reuse and backup; includes local verification evidence and remaining live-site acceptance |
 | [September code review and fixes](plan/2026-09-05-project-code-review.md) | Installer lifetime, Agent proxy/session isolation, frame stepping, and regression evidence |
 | [Agent charter](plan/2026-08-18-agent-charter.md) | Constitutional rules for all Agent/AI features (principles, architecture, tool registry, roadmap) |
 | [Agent user-facing PRD](plan/2026-08-19-agent-user-prd.md) | Initial user-side Agent requirements (REQ-0029 through REQ-0043) |
@@ -392,3 +392,19 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 ## 漫画与写真本地评分（2026-09-12）
 
 影片、漫画、写真详情都把评分卡放在信息列标签下方，固定 250px 宽。漫画和写真复用同一张本地评分卡：半星步进、综合分、清除；封面比例不固定，所以不放在封面列。只有本地用户分，没有站点分。漫画走已有 `PATCH /api/library/comics/{id}`；写真走 `PATCH /api/library/photos/{id}`。Mock 写真评分保存在 `curated-mock-photo-ratings-v1`。AI Agent 不能读写这两类评分。
+
+## Wishlist
+
+The browser plugin sends only a catalog code. Curated saves the request immediately, then uses the configured metadata provider and proxy to fetch metadata and images in the background. No local video or library path is required.
+
+1. Restart Curated with the updated backend and frontend. Development requires `VITE_USE_WEB_API=true`; Mock mode does not support plugin intake.
+2. On the computer running Curated, open **Settings → Network → Connect browser plugin**. Create a wishlist token and copy the value shown once.
+3. Reload the extension from `C:/Users/wujiahui/code/curated-plugin/dist` in Chrome. In its settings, set the Curated server address and wishlist token. Development commonly uses port 8080; packaged builds commonly use 8081. Use the actual running address.
+4. Click **加入愿望单** on a supported JAVDB or jable page. If extraction is unavailable, enter the code in the extension popup. The token authorizes wishlist submission only.
+5. Open **Wishlist** in the sidebar. The default view shows pending imports; details allow notes, corrected codes, completion/restore, retry and removal. Completed items do not count as watched movies. Repeated submissions preserve completion.
+
+Later imports are linked by a unique normalized catalog identity, disappear from the pending view and remain in **In library**. Saved metadata and images are reused before automatic scraping. A periodic background reconciliation recovers delayed changes; unavailable sources or ambiguous matches stay visible for correction. Manual library-link confirmation/exclusion is available through the API; a selection UI is not yet included.
+
+Wishlist images live at `<actual database parent>/assets/wishlist`, outside disposable cache. With the default Windows release layout this is `%LOCALAPPDATA%/Curated/data/assets/wishlist`; development defaults to `backend/runtime/assets/wishlist`. Database references are relative. Move this directory together with the database when manually relocating data. New format-v2 backups include wishlist images and accept older format-v1 packages; video files and other user assets still require separate backup. Restore uses the existing offline restore workflow.
+
+The implementation and local test evidence are recorded in the [wishlist plan](plan/2026-09-22-wishlist.md#14-实施结果2026-09-22). Actual live-site extension integration remains to be verified; synthetic fixtures are not live-site evidence.

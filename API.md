@@ -3601,3 +3601,37 @@ List and detail `title` is the display overlay: `COALESCE(NULLIF(TRIM(user_title
 Photo `/thumbnail` now derives a <=420px JPEG instead of returning the original image. The independent process LRU holds at most 32 MiB of thumbnails; source archive size/mtime invalidate entries, and a matching `If-None-Match` returns 304 after access checks. Generation is serialized, with 32 MiB source-byte and 24M source-pixel bounds. Invalid/oversized preview sources return 422 `PHOTO_ARCHIVE_READ_FAILED`; `/image` still serves original bytes. No new API or persistent photo cache table writes are introduced. `photoCache.maxBytes` continues to reserve a future disk-cache policy.
 
 The frontend preview grid replaces batches instead of accumulating an entire book: two adaptive rows, 4–20 tiles, viewport-based image loading and page-number navigation. Photo edit/delete/reveal controls are hidden because those operations have no implemented service endpoints.
+
+## Wishlist integration
+
+### External intake
+
+`POST /api/integrations/wishlist/items` accepts a dedicated wishlist Bearer token. The only body field is `code`:
+
+```http
+POST /api/integrations/wishlist/items
+Authorization: Bearer <wishlist-token>
+Content-Type: application/json
+
+{"code":"SSIS-001"}
+```
+
+A durable insert returns `201 {"id":"...","result":"created"}`. Duplicate and already-linked entries return 200 with result `existing` or `in_library`. Success means accepted, not that scraping has finished. Unknown fields/invalid codes are 400, invalid or revoked tokens 401, and more than 60 submissions per token per minute 429. Retry is idempotent. Re-adding does not undo user completion.
+
+### Application routes
+
+These use the ordinary application session rather than the intake token:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/wishlist/items` | `status`, `q`, `cursor`, `limit`; returns `items`, `total`, `pendingCount`, `nextCursor` |
+| GET | `/api/wishlist/items/{id}` | Metadata, enrichment state, assets, note, completion and linked movie IDs |
+| PATCH | `/api/wishlist/items/{id}` | Required `version`, optional `code`, `note`, `completed`; conflict 409 |
+| DELETE | `/api/wishlist/items/{id}` | Removes wish only; 204 |
+| POST | `/api/wishlist/items/{id}/refresh` | Merge/enqueue enrichment; 202 |
+| PUT | `/api/wishlist/items/{id}/library-links` | `{ "movieId": "...", "excluded": false }`; manual confirmation or exclusion, 204 |
+| GET | `/api/wishlist/items/{id}/assets/{assetId}` | Local image; `thumbnail=1` for derivative |
+| GET/POST | `/api/integrations/wishlist/tokens` | Loopback-only list/create, create body `{ "name": "Curated Plugin", "origin": "" }` |
+| DELETE | `/api/integrations/wishlist/tokens/{tokenId}` | Loopback-only revocation |
+
+Token creation returns plaintext once; listing excludes both plaintext and hash. An optional origin binds the credential to a browser extension origin. Only the intake route permits extension origins; the token grants no general library or settings access.

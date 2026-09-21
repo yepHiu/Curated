@@ -315,3 +315,12 @@ alwaysApply: true
 - Web comic/photo adapters page `GET /api/library/comics` and `GET /api/library/photos` in batches of 500 until `total`. Explicit `limit` still loads one page. Entering `/comics` or `/photos` calls `ensureComicsLoaded` / `ensurePhotosLoaded`; a warm list skips reload. Scan, import, and directory-watch completion still force `reload*FromApi`.
 - `ListComicBooks` / `ListPhotoBooks` fill tags with one `IN (...)` query per page. `comicarchive.OpenPage` / `photoarchive.OpenPage` open a cleaned ZIP entry directly and no longer call `ListPages` first.
 - Comic thumbnail cache evicts oldest `last_accessed_at` files after write when `maxBytes >= 0`. Decode rejects 32 MiB / 24M-pixel sources with HTTP 422 `COMIC_ARCHIVE_READ_FAILED`. Comic reader and photo viewer prefetch current±1 original `imageUrl` via hidden `Image()` and cancel on unmount.
+
+## 2026-09-22 愿望单
+
+- 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links/tokens；外部 `POST /api/integrations/wishlist/items` 严格仅收 code，专用哈希令牌，仅写入愿望权限、60/min。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
+- 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。令牌 GET/POST `/api/integrations/wishlist/tokens`、DELETE `/{tokenId}`，管理限本机 loopback 且受现有应用鉴权保护。
+- App 独立持久 worker，Metatube 实际番号精确校验，后台补全与受控图片下载；数据库父目录 `assets/wishlist` 保存哈希原件/缩略图，不属于 cache。自动导入前复用、周期对账/复制，自动关联重建保留人工确认/排除。
+- `/wishlist`、`/wishlist/:id` 和网络设置凭证面板；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
+- 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
+- Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/jable 按钮及 popup 手动番号，local 服务器绑定凭证。真实站点全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §14。

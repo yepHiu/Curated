@@ -633,3 +633,15 @@ When comic or photo Beta is enabled, Agent can search, present, polish notes, an
 Photo `/thumbnail` now derives a <=420px JPEG instead of returning the original image. The independent process LRU holds at most 32 MiB of thumbnails; source archive size/mtime invalidate entries, and a matching `If-None-Match` returns 304 after access checks. Generation is serialized, with 32 MiB source-byte and 24M source-pixel bounds. Invalid/oversized preview sources return 422 `PHOTO_ARCHIVE_READ_FAILED`; `/image` still serves original bytes. No new API or persistent photo cache table writes are introduced. `photoCache.maxBytes` continues to reserve a future disk-cache policy.
 
 The frontend preview grid replaces batches instead of accumulating an entire book: two adaptive rows, 4–20 tiles, viewport-based image loading and numbered batch pagination with ellipses. Exact image-page input/locate controls are removed; clicking a thumbnail opens that image. Photo edit/delete/reveal controls are hidden because those operations have no implemented service endpoints.
+
+## Wishlist HTTP API (2026-09-22)
+
+- `POST /api/integrations/wishlist/items`: dedicated Bearer token; strict `{ "code": "SSIS-001" }`; 201 created / 200 existing or in_library. No metadata, image URLs, site cookies or file paths in plugin payload.
+- `GET /api/wishlist/items`: status=pending|in_library|completed|all, q, cursor, limit (1–60); returns items/total/pendingCount/nextCursor.
+- `GET/PATCH/DELETE /api/wishlist/items/{id}`: independent details; version-checked note/code/completed patch; removal does not delete movies.
+- `POST /api/wishlist/items/{id}/refresh`: enqueue/merge enrichment, 202.
+- `PUT /api/wishlist/items/{id}/library-links`: `{movieId, excluded}` manual confirmation/exclusion; protected application session.
+- `GET /api/wishlist/items/{id}/assets/{assetId}?thumbnail=1`: current local image, protected application route.
+- `GET/POST /api/integrations/wishlist/tokens`, `DELETE /api/integrations/wishlist/tokens/{tokenId}`: loopback-only application management; creation accepts name and optional extension origin, returns plaintext token once.
+
+Migrations 0053/0054 and `internal/app/wishlist*.go` implement durable enrichment and import reuse. Images persist beside SQLite at assets/wishlist and are included in format-v2 backup. Web routes are `/wishlist` and `/wishlist/:id`; Mock uses separate localStorage. See docs/guide.md#Wishlist and docs/plan/2026-09-22-wishlist.md for setup, verification and live-site acceptance limitations.
