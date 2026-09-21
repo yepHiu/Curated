@@ -1253,7 +1253,7 @@
     "autoActorProfileScrapeHint": "开启后，会自动为仍然缺少头像和简介的演员排队资料刮削：影片元数据刮削成功后立即补刮，并在后台分批补齐资料库里已有的空资料演员。现有演员页里的按需自动刮削仍然保留。",
     "autoActorProfileScrapeSyncing": "正在同步演员刮削设置…",
     "backupCardTitle": "备份与恢复",
-    "backupCardDesc": "创建一致数据库备份包、验证校验和与 SQLite 完整性，或在离线恢复前评估备份是否可用。",
+    "backupCardDesc": "备份数据库、配置和愿望单图片，验证校验和与 SQLite 完整性，或评估离线恢复。影片文件及其他用户资产需另行备份。",
     "backupAvailable": "Web API 已就绪",
     "backupWebRequired": "需要 Web API",
     "backupDirectoryLabel": "备份目录",

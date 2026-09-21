@@ -1265,7 +1265,7 @@
     "autoActorProfileScrapeHint": "When enabled, Curated automatically queues profile scrapes for actors that still have neither avatar nor summary. Successful movie scrapes enqueue those actors immediately, and a background sweep backfills existing library actors in small batches. Lazy actor-page scraping stays available.",
     "autoActorProfileScrapeSyncing": "Syncing actor scrape setting…",
     "backupCardTitle": "Backup and recovery",
-    "backupCardDesc": "Create a consistent database package, verify checksums and SQLite integrity, or assess a package before an offline restore.",
+    "backupCardDesc": "Back up the database, configuration and wishlist images, verify checksums and SQLite integrity, or assess an offline restore. Back up media files and other user assets separately.",
     "backupAvailable": "Web API ready",
     "backupWebRequired": "Web API required",
     "backupDirectoryLabel": "Backup directory",

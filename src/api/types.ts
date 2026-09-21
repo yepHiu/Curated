@@ -839,6 +839,7 @@ export interface BackupScopeDTO {
   databaseIncluded: boolean
   libraryConfigIncluded: boolean
   userAssetsIncluded: boolean
+  wishlistAssetsIncluded?: boolean
   mediaFilesIncluded: boolean
 }
 

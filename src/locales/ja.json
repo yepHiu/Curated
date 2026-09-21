@@ -1253,7 +1253,7 @@
     "autoActorProfileScrapeHint": "有効にすると、画像と概要の両方が欠けている俳優のプロフィールスクレイプを自動でキューします。作品メタデータ取得後にすぐ補完し、既存ライブラリの空プロフィールもバックグラウンドで少量ずつ補完します。俳優ページ側の遅延スクレイプもそのまま使えます。",
     "autoActorProfileScrapeSyncing": "俳優スクレイプ設定を同期中…",
     "backupCardTitle": "バックアップと復元",
-    "backupCardDesc": "一貫したデータベースパッケージを作成し、チェックサムと SQLite 整合性を検証、またはオフライン復元前に評価します。",
+    "backupCardDesc": "データベース、設定、ウィッシュリスト画像をバックアップし、チェックサムと SQLite 整合性を検証します。動画ファイルとその他のユーザー資産は別途バックアップしてください。",
     "backupAvailable": "Web API 準備完了",
     "backupWebRequired": "Web API が必要",
     "backupDirectoryLabel": "バックアップ先フォルダー",
