@@ -140,6 +140,7 @@ test("locked startup defers protected hydration until a successful unlock", asyn
     allApiRequests.push(`${request.method()} ${apiPath(request.url())}`)
 
     if (
+      path === "/api/wishlist/items" ||
       path === "/api/settings" ||
       path === "/api/library/movies" ||
       path === "/api/library/saved-views" ||
@@ -184,6 +185,15 @@ test("locked startup defers protected hydration until a successful unlock", asyn
 
     if (path === "/api/settings") {
       await route.fulfill({ json: { libraryPaths: [], comicLibraryEnabled: false, photoLibraryEnabled: false } })
+      return
+    }
+    // 侧栏愿望计数与现有 AI 治理启动读取均使用受保护接口。
+    if (path === "/api/wishlist/items") {
+      await route.fulfill({ json: { items: [], total: 0, pendingCount: 0 } })
+      return
+    }
+    if (path === "/api/ai/settings") {
+      await route.fulfill({ json: { enabled: false } })
       return
     }
     if (path === "/api/library/movies") {
@@ -245,6 +255,7 @@ test("locked startup defers protected hydration until a successful unlock", asyn
   await expect
     .poll(() => [...new Set(protectedRequests.map((request) => request.path))].sort())
     .toEqual([
+      "/api/wishlist/items?status=pending&limit=1",
       "/api/library/played-movies",
       "/api/library/movies?limit=500&offset=0",
       "/api/library/saved-views",
@@ -315,6 +326,15 @@ test("maintenance backup flow creates verifies and preflights without online res
           lockOnRestart: true,
         },
       })
+      return
+    }
+    // 侧栏愿望计数与现有 AI 治理启动读取均使用受保护接口。
+    if (path === "/api/wishlist/items") {
+      await route.fulfill({ json: { items: [], total: 0, pendingCount: 0 } })
+      return
+    }
+    if (path === "/api/ai/settings") {
+      await route.fulfill({ json: { enabled: false } })
       return
     }
     if (path === "/api/library/movies") {
