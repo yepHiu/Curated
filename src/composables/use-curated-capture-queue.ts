@@ -49,7 +49,7 @@ export function useCuratedCaptureQueue() {
   function retain(job: CaptureJob) {
     if (disposed) return
     clearTimeout(expiry.get(job))
-    expiry.set(job, setTimeout(() => dismiss(job), job.phase === 'saved' ? 12_000 : 180_000))
+    expiry.set(job, setTimeout(() => dismiss(job), job.phase === 'saved' ? 4_500 : 180_000))
   }
 
   function prepare(video: HTMLVideoElement, movie: Movie, positionSec: number): CaptureJob | undefined {
