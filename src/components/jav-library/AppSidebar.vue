@@ -164,6 +164,7 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
   return {
     browse,
     yours: [
+      { label: t("wishlist.title"), page: "wishlist", icon: LibraryBig },
       { label: t("nav.insights"), page: "insights", icon: ChartNoAxesColumnIncreasing },
       { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
       { label: t("nav.history"), page: "history", icon: History },
@@ -185,6 +186,7 @@ const sidebarSections = computed((): SidebarNavSection[] => [
 ])
 
 const isActive = (page: AppPage) => {
+  if (page === "wishlist") return String(route.name).startsWith("wishlist")
   if (page === "actors") {
     return route.name === "actors" || route.name === "actor-detail"
   }
@@ -246,6 +248,7 @@ const activePlaybackCompactTitle = computed(() => {
 })
 
 const getNavigationTarget = (page: AppPage) => {
+  if (page === "wishlist") return { name: "wishlist" }
   if (page === "home") {
     return { name: "home" }
   }

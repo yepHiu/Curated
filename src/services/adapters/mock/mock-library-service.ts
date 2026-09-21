@@ -1,3 +1,4 @@
+import { mockWishlistService } from "./mock-wishlist-service"
 import { computed, ref, watch } from "vue"
 import type {
   ActorListItemDTO,
@@ -1143,6 +1144,7 @@ function applyMockPatchMovie(movieId: string, body: PatchMovieBody): Movie | und
 }
 
 export const mockLibraryService: LibraryService = {
+  wishlist: mockWishlistService,
   supportsSourceFrame: false,
   movies: computed(() => moviesState.value.filter((m) => !m.trashedAt?.trim())),
   moviesLoaded: computed(() => true),

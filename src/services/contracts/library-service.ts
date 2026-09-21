@@ -1,3 +1,4 @@
+import type { WishlistServiceContract } from "./wishlist-service"
 import type { ComputedRef } from "vue"
 import type {
   ActorListItemDTO,
@@ -73,6 +74,7 @@ export interface ResumableMovieImportSession {
 }
 
 export interface LibraryService {
+  wishlist: WishlistServiceContract
   supportsSourceFrame: boolean
   movies: ComputedRef<readonly Movie[]>
   /** 电影主列表首轮加载是否已完成；true 代表拿到过一次明确结果，不代表一定有数据。 */

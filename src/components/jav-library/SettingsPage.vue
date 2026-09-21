@@ -61,6 +61,8 @@ import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGe
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
+/** 愿望单插件凭证只在设置面加载。 */
+const SettingsWishlistSection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsWishlistSection.vue"))
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 /** 实验性功能区懒加载，避免 SettingsView chunk 超出首屏预算（bundle budget 硬门） */
 const SettingsExperimentalSection = defineAsyncComponent(
@@ -2244,6 +2246,7 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navNetwork')"
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
+      <SettingsWishlistSection />
       <SettingsNetworkSection
         v-model:proxy-enabled="proxyEnabledDraft"
         v-model:proxy-scheme="proxySchemeDraft"

@@ -1,3 +1,4 @@
+import { webWishlistService } from "./web-wishlist-service"
 import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import { applyAIGovernance } from "@/lib/experimental-agent"
 import type {
@@ -423,6 +424,7 @@ async function refreshLibraryPathStorageStatusesFromApi() {
 
 function createWebLibraryService(): LibraryService {
   const impl: LibraryService = {
+    wishlist: webWishlistService,
     supportsSourceFrame: true,
     movies: computed(() => moviesState.value),
     moviesLoaded: computed(() => moviesLoadedState.value),

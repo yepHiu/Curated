@@ -1,4 +1,6 @@
 export type AppPage =
+  | "wishlist"
+  | "wishlist-detail"
   | "home"
   | "library"
   | "favorites"

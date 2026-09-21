@@ -87,6 +87,18 @@ const router = createRouter({
           component: () => import("@/views/LibraryView.vue"),
         },
         {
+          path: "wishlist",
+          name: "wishlist",
+          // 独立页面按路由加载，避免增加首屏负担。
+          component: () => import("@/views/WishlistView.vue"),
+        },
+        {
+          path: "wishlist/:id",
+          name: "wishlist-detail",
+          // 没有本地视频的条目也有可直接访问的详情。
+          component: () => import("@/views/WishlistDetailView.vue"),
+        },
+        {
           path: "favorites",
           name: "favorites",
           component: () => import("@/views/LibraryView.vue"),
