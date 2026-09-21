@@ -31,7 +31,7 @@ func (h *Handler) withRequestSecurity(next http.Handler) http.Handler {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if origin != "" {
 			w.Header().Add("Vary", "Origin")
-			if !browserOriginAllowed(origin, r, h.cfg) {
+			if !browserOriginAllowed(origin, r, h.cfg) && !(r.URL.Path == wishlistIntakePath && (r.Method == http.MethodPost || r.Method == http.MethodOptions) && wishlistExtensionOrigin(origin)) {
 				writeAppError(w, http.StatusForbidden, contracts.ErrorCodeForbidden, "browser origin is not allowed")
 				return
 			}

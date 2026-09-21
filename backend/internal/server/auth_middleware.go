@@ -14,6 +14,11 @@ func (h *Handler) withAuthLock(next http.Handler) http.Handler {
 			return
 		}
 
+		// 专用提交入口由自身 bearer 校验保护，不授予其他 API 权限。
+		if r.Method == http.MethodPost && r.URL.Path == wishlistIntakePath {
+			next.ServeHTTP(w, r)
+			return
+		}
 		settings, err := h.store.GetAppSecuritySettings(r.Context())
 		if err != nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to read auth settings")

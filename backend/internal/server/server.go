@@ -487,6 +487,7 @@ func NewHandler(deps Deps) *Handler {
 // Routes builds the HTTP mux with all registered API routes, access logging, and CORS.
 func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
+	h.registerWishlistRoutes(mux)
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/auth/status", h.handleAuthStatus)
