@@ -324,3 +324,8 @@ alwaysApply: true
 - `/wishlist`、`/wishlist/:id` 和网络设置凭证面板；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
 - 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
 - Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/jable 按钮及 popup 手动番号，local 服务器绑定凭证。真实站点全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §14。
+
+## 2026-09-23 插件开发构建
+
+- 仓库外 Curated Plugin 已提供 `npm run dev` 监听 / `npm run build:dev` 单次开发构建：输出 `dist-dev`、名称 Curated Plugin Dev、默认后端 127.0.0.1:8080。
+- 生产 `npm run build` 保持 `dist` / 8081。设置与愿望凭证按模式隔离，原生产键兼容。Chrome 需重新加载扩展及目标网页，watch 不负责浏览器热重载。见愿望单实施计划 §15。

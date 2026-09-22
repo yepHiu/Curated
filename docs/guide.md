@@ -408,3 +408,9 @@ Later imports are linked by a unique normalized catalog identity, disappear from
 Wishlist images live at `<actual database parent>/assets/wishlist`, outside disposable cache. With the default Windows release layout this is `%LOCALAPPDATA%/Curated/data/assets/wishlist`; development defaults to `backend/runtime/assets/wishlist`. Database references are relative. Move this directory together with the database when manually relocating data. New format-v2 backups include wishlist images and accept older format-v1 packages; video files and other user assets still require separate backup. Restore uses the existing offline restore workflow.
 
 The implementation and local test evidence are recorded in the [wishlist plan](plan/2026-09-22-wishlist.md#14-实施结果2026-09-22). Actual live-site extension integration remains to be verified; synthetic fixtures are not live-site evidence.
+
+### Browser plugin development mode
+
+From `C:/Users/wujiahui/code/curated-plugin`, run `npm run dev` for a watch build or `npm run build:dev` for a single build. Load **dist-dev** in Chrome: the extension is named **Curated Plugin Dev** and defaults to the running development API at **http://127.0.0.1:8080**. `npm run build` still produces **dist**, defaulting to port **8081**. The two modes keep separate settings and wishlist credentials. Configure a token from the development backend for wishlist intake.
+
+After a rebuild, reload the Dev extension in Chrome and refresh the source website. Keep only the intended version enabled on that website to avoid duplicate injected buttons. Plugin watch logs started by the agent are under `.workspace/dev-logs/plugin.out.log` and `plugin.err.log`.
