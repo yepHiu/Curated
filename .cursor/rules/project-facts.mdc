@@ -318,16 +318,16 @@ alwaysApply: true
 
 ## 2026-09-22 愿望单
 
-- 2026-09-23 UI 对齐影片库共享网格/卡片密度，筛选改为胶囊下拉菜单；侧栏愿望单不显示计数、不轮询计数。主列表仅显示红/绿圆点 + 离线/在线的小胶囊，无连接按钮。详情直接复用 DetailPage/DetailPanel（只读资料模式，隐藏本地影片操作与评论），不添加愿望专用表单/操作区；顶部共用返回入口保留筛选。客户端追踪将 `X-Curated-Client: Curated-Plugin` 单独标为 `Curated Plugin`，前台每 15 秒读取既有 connected-clients 接口，5 分钟内有请求显示在线；无持续心跳或凭证有效性保证，失败与 Mock 显示离线。不新增 API。
+- 2026-09-23 UI 对齐影片库共享网格/卡片密度，筛选改为胶囊下拉菜单；侧栏愿望单不显示计数、不轮询计数。主列表仅显示红/绿圆点 + 离线/在线的小胶囊，无连接按钮。详情直接复用 DetailPage/DetailPanel（只读资料模式，隐藏本地影片操作与评论），不添加愿望专用表单/操作区；顶部共用返回入口保留筛选。客户端追踪将 `X-Curated-Client: Curated-Plugin` 单独标为 `Curated Plugin`，前台每 15 秒读取既有 connected-clients 接口，5 分钟内有请求显示在线；无持续心跳保证，失败与 Mock 显示离线；关闭插件联动时显示灰点与“联动已关闭”并停止状态轮询。不新增 API。
 
-- 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links/tokens；外部 `POST /api/integrations/wishlist/items` 严格仅收 code，专用哈希令牌，仅写入愿望权限、60/min。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
-- 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。令牌 GET/POST `/api/integrations/wishlist/tokens`、DELETE `/{tokenId}`，管理限本机 loopback 且受现有应用鉴权保护。
+- 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links；旧 tokens 表保留为历史迁移结构，无运行时读写。外部 `POST /api/integrations/wishlist/items` 严格仅收 code，无需凭证，按来源 IP 限速 60/min，受 browserPluginEnabled 开关控制。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
+- 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。旧令牌管理端点已移除。GET/PATCH `/api/settings` 新增 browserPluginEnabled，默认 false，library-config.cfg 持久化、即时生效；关闭拒绝愿望单接入和标记为 Curated-Plugin 或扩展 Origin 的 API 请求（403 BROWSER_PLUGIN_DISABLED）。
 - App 独立持久 worker，Metatube 实际番号精确校验，后台补全与受控图片下载；数据库父目录 `assets/wishlist` 保存哈希原件/缩略图，不属于 cache。自动导入前复用、周期对账/复制，自动关联重建保留人工确认/排除。
-- `/wishlist`、`/wishlist/:id` 和网络设置凭证面板；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
+- `/wishlist`、`/wishlist/:id` 和网络设置插件联动开关；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
 - 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
-- Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/jable 按钮及 popup 手动番号，local 服务器绑定凭证。真实站点全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §14。
+- Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/jable 按钮及 popup 手动番号，无需凭证，关闭联动时提示到 Curated 网络设置开启。真实站点全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §14。
 
 ## 2026-09-23 插件开发者选项
 
 - 按用户修正，Curated Plugin 仅一个版本、名称及 dist 输出。`npm run dev` 监听与 `npm run build` 压缩构建共用同一设置，不再有 dist-dev/Curated Plugin Dev 或构建期服务器区分。
-- 设置页「开发者模式」开启可自定义默认服务端（建议开发后端 8080），关闭使用本机 8081；保存后生效并保留自定义地址。原自定义地址兼容、凭证按服务器绑定。Chrome 源码更新后仍需重新加载扩展与网页。见愿望单实施计划 §15。
+- 设置页「开发者模式」开启可自定义默认服务端（建议开发后端 8080），关闭使用本机 8081；保存后生效并保留自定义地址。原自定义地址兼容，不再存取插件凭证。Chrome 源码更新后仍需重新加载扩展与网页。见愿望单实施计划 §15。

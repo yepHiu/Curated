@@ -105,3 +105,7 @@ Photo library current slice:
 Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真缓存上限目前仅保存为预留配置，缩略图由独立有界内存缓存生成 420px JPEG，尚无磁盘缓存清理；默认写真导入路径由「添加媒体 → 添加写真」使用，上传 ZIP/CBZ 后排队独立写真扫描。新表迁移为 0046 / 0047 / 0048。
 
 2026-09-11：写真缩略图内存 LRU 上限固定为 32 MiB，不使用 `photoCache.maxBytes`（该项为未来磁盘缓存配置）；进程重启释放缓存，再访问时按需生成。
+
+## 浏览器插件联动（2026-09-23）
+
+`library-config.cfg` 的 `browserPluginEnabled` 默认为 `false`，在设置 → 网络修改，经 GET/PATCH `/api/settings` 读写。保存后立即控制插件请求，无需重启。开启后无需凭证提交愿望单；关闭保留已有条目并返回 `403 BROWSER_PLUGIN_DISABLED`。该偏好与 `lanEnabled` 独立，不改变 HTTP 监听地址。

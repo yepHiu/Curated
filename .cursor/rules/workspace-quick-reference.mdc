@@ -42,6 +42,7 @@ alwaysApply: true
   - `autoActorProfileScrape`
   - `autoDownloadUpdates`
   - `launchAtLogin`
+  - `browserPluginEnabled`（设置 → 网络 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证）
   - `lanEnabled`（设置 → 网络；不要求 PIN，改监听要完全退出）
   - `backupDirectory`
   - `proxy`

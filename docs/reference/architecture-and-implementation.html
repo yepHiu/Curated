@@ -542,10 +542,10 @@
   </footer>
   <!-- 2026-08 GIF clip capture: POST /api/library/movies/{movieId}/clips creates a bounded 0.4–6s FFmpeg GIF task; GET /api/tasks/{taskId}/artifact serves the completed cache artifact. Source video paths are validated against configured library roots and artifacts expire after 24 hours. -->
   <h2 id="wishlist">愿望单：2026-09-22 实现</h2>
-  <p>插件仅提交番号，Curated 以独立 SQLite 条目与持久队列查询资料并保存图片。迁移 0053/0054 保存条目、工作、资产、影片关联和专用令牌；worker 在后台补全并周期对账。自动导入先复用已保存资料和图片，唯一身份关联从默认待入库墙隐藏；人工完成不写观看状态。</p>
+  <p>插件仅提交番号，Curated 以独立 SQLite 条目与持久队列查询资料并保存图片。迁移 0053/0054 保存条目、工作、资产和影片关联；历史令牌表不再使用。worker 在后台补全并周期对账。自动导入先复用已保存资料和图片，唯一身份关联从默认待入库墙隐藏；人工完成不写观看状态。</p>
   <table><thead><tr><th>模块</th><th>实现与边界</th></tr></thead><tbody>
-    <tr><td>接入</td><td>POST /api/integrations/wishlist/items；严格 code 字段，专用 Bearer 令牌、限速和扩展来源控制。普通 API 权限不变。</td></tr>
-    <tr><td>UI</td><td>/wishlist、/wishlist/:id；轻量海报墙、详情、状态筛选、备注和完成恢复；网络设置管理令牌。独立 Web/Mock adapter。</td></tr>
+    <tr><td>接入</td><td>POST /api/integrations/wishlist/items；严格 code 字段，无需凭证；browserPluginEnabled 默认关闭，开启后按来源 IP 限速 60/min。关闭拒绝接入和已标识的插件 API 请求；普通 API 沿用 PIN/Origin 规则。</td></tr>
+    <tr><td>UI</td><td>/wishlist、/wishlist/:id；共享影片海报网格、只读资料详情、状态筛选；网络设置提供即时生效且持久化的插件联动开关。独立 Web/Mock adapter。</td></tr>
     <tr><td>资源</td><td>数据库父目录 assets/wishlist，哈希原件与缩略图；影片入库复制资源，删除愿望不删除影片文件。</td></tr>
     <tr><td>备份</td><td>格式 v2 包含愿望资产，兼容 v1；恢复先增量写不可变文件再交换 DB/配置，备份和回收共享维护锁。</td></tr>
     <tr><td>验证边界</td><td>本地 Go、前端、浏览器回归和插件合成测试通过。真实站点扩展全链路待验收；人工关联选择 UI、逐图错误展示和通用任务中心投影尚未实现。</td></tr>
