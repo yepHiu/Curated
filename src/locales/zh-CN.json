@@ -1,5 +1,13 @@
 {
   "wishlist": {
+    "pluginStatus": {
+      "checking": "浏览器插件 · 检测中",
+      "connected": "浏览器插件 · 已连接",
+      "disconnected": "浏览器插件 · 未检测到连接",
+      "unknown": "浏览器插件 · 状态未知",
+      "unavailable": "浏览器插件 · 演示模式"
+    },
+    "pluginStatusHint": "根据最近 5 分钟内的插件请求判断连接状态。",
     "title": "愿望单",
     "awaiting": "等待补齐资料",
     "connect": "连接浏览器插件",
