@@ -318,7 +318,7 @@ alwaysApply: true
 
 ## 2026-09-22 愿望单
 
-- 2026-09-23 UI 对齐影片库共享网格/卡片密度，筛选改为胶囊下拉菜单；主页面仅显示插件状态，无连接按钮。现有客户端追踪将 `X-Curated-Client: Curated-Plugin` 单独标为 `Curated Plugin`；前台每 15 秒读取既有 connected-clients 接口，5 分钟内有请求显示已连接（近期活动，无持久在线或凭证有效性保证），失败显示未知、Mock 显示演示模式。需要重启更新后的后端；不新增 API。
+- 2026-09-23 UI 对齐影片库共享网格/卡片密度，筛选改为胶囊下拉菜单；侧栏愿望单不显示计数、不轮询计数。主列表仅显示红/绿圆点 + 离线/在线的小胶囊，无连接按钮。详情直接复用 DetailPage/DetailPanel（只读资料模式，隐藏本地影片操作与评论），不添加愿望专用表单/操作区；顶部共用返回入口保留筛选。客户端追踪将 `X-Curated-Client: Curated-Plugin` 单独标为 `Curated Plugin`，前台每 15 秒读取既有 connected-clients 接口，5 分钟内有请求显示在线；无持续心跳或凭证有效性保证，失败与 Mock 显示离线。不新增 API。
 
 - 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links/tokens；外部 `POST /api/integrations/wishlist/items` 严格仅收 code，专用哈希令牌，仅写入愿望权限、60/min。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
 - 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。令牌 GET/POST `/api/integrations/wishlist/tokens`、DELETE `/{tokenId}`，管理限本机 loopback 且受现有应用鉴权保护。
