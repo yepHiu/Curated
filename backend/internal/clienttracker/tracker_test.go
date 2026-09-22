@@ -15,6 +15,33 @@ func requestFrom(remoteAddr string, userAgent string) *http.Request {
 	return req
 }
 
+func TestTrackerSeparatesPluginFromBrowserAndDesktop(t *testing.T) {
+	tracker := New()
+	ua := "Mozilla/5.0 Chrome/132.0.0.0"
+	tracker.Record(requestFrom("127.0.0.1:50001", ua))
+	plugin := requestFrom("127.0.0.1:50002", ua)
+	plugin.Header.Set("X-Curated-Client", "Curated-Plugin")
+	plugin.Header.Set("X-Curated-Client-Version", "1.0.0")
+	tracker.Record(plugin)
+	tracker.Record(plugin)
+	desktop := requestFrom("127.0.0.1:50003", ua)
+	desktop.Header.Set("X-Curated-Client", "desktop-electron")
+	tracker.Record(desktop)
+	clients := tracker.Snapshot()
+	if len(clients) != 3 {
+		t.Fatalf("client count = %d, want separate browser, plugin and desktop", len(clients))
+	}
+	for _, client := range clients {
+		if client.Browser == "Curated Plugin" {
+			if client.BrowserVersion != "1.0.0" || client.RequestCount != 2 {
+				t.Fatalf("unexpected plugin snapshot: %+v", client)
+			}
+			return
+		}
+	}
+	t.Fatal("plugin snapshot missing")
+}
+
 func TestTrackerDeduplicatesByIPAndUserAgent(t *testing.T) {
 	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	now := base

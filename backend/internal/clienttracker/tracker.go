@@ -138,6 +138,11 @@ func (t *Tracker) Record(r *http.Request) {
 		if parsed.DeviceType == DeviceTypeUnknown {
 			parsed.DeviceType = DeviceTypeDesktop
 		}
+	} else if strings.EqualFold(strings.TrimSpace(r.Header.Get(curatedDesktopClientHeader)), "Curated-Plugin") {
+		// Keep extension traffic separate from ordinary tabs sharing the same browser.
+		clientIdentity = "Curated-Plugin\x00" + userAgent
+		parsed.Browser = "Curated Plugin"
+		parsed.BrowserVersion = strings.TrimSpace(r.Header.Get(curatedDesktopClientVersionHeader))
 	}
 	key := clientKey(ip, clientIdentity)
 	accessKind := AccessKindRemote
