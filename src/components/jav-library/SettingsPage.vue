@@ -291,7 +291,26 @@ let proxyDraftSyncDepth = 0
 let proxyAutoVerifySeq = 0
 
 const proxyOutboundPingBusy = computed(
-  () => proxyJavbusBusy.value || proxyGoogleBusy.value,
+  () => proxyJavbusBusy.value || proxyGoogleBusy.value || proxyAutoVerifyBusy.value,
+)
+
+/** 测试结果在对应按钮中短暂显示；重试或离开页面时清理旧计时器。 */
+function resetProxyResultAfterDelay(result: Ref<string>, busy: Ref<boolean>, ok: Ref<boolean | null>) {
+  watch([result, busy], ([text, pending], _previous, onCleanup) => {
+    if (!text || pending) return
+    const timer = setTimeout(() => {
+      result.value = ""
+      ok.value = null
+    }, 3000)
+    onCleanup(() => clearTimeout(timer))
+  })
+}
+
+resetProxyResultAfterDelay(proxyJavbusResult, proxyJavbusBusy, proxyJavbusResultOk)
+resetProxyResultAfterDelay(
+  proxyGoogleResult,
+  computed(() => proxyGoogleBusy.value || proxyAutoVerifyBusy.value),
+  proxyGoogleResultOk,
 )
 
 /** 代理用户名/密码折叠；有已保存认证信息时默认展开 */
@@ -424,31 +443,27 @@ watch(
   },
 )
 
-const proxyStatusMessage = computed(() => {
+const proxyJavbusStatusMessage = computed(() => {
   if (proxyJavbusResult.value && proxyJavbusResultOk.value !== null) {
     return {
       text: proxyJavbusResult.value,
       className: proxyJavbusResultOk.value ? statusTextClass("success") : statusTextClass("danger"),
     }
   }
+  return null
+})
+
+const proxyGoogleStatusMessage = computed(() => {
   if (proxyGoogleResult.value && proxyGoogleResultOk.value !== null) {
     return {
       text: proxyGoogleResult.value,
       className: proxyGoogleResultOk.value ? statusTextClass("success") : statusTextClass("danger"),
     }
   }
-  if (useWebApi && proxyAutoVerifyBusy.value) {
-    return {
-      text: t("settings.proxyPingGoogleTesting"),
-      className: "text-xs text-muted-foreground motion-safe:animate-pulse",
-    }
-  }
-  if (useWebApi && proxySaving.value) {
-    return {
-      text: t("settings.proxySyncing"),
-      className: "text-xs text-muted-foreground motion-safe:animate-pulse",
-    }
-  }
+  return null
+})
+
+const proxyStatusMessage = computed(() => {
   if (proxyError.value) {
     return {
       text: proxyError.value,
@@ -2259,7 +2274,9 @@ async function runMetadataRefreshForSelected() {
         :proxy-saving="proxySaving"
         :proxy-outbound-ping-busy="proxyOutboundPingBusy"
         :proxy-javbus-busy="proxyJavbusBusy"
-        :proxy-google-busy="proxyGoogleBusy"
+        :proxy-google-busy="proxyGoogleBusy || proxyAutoVerifyBusy"
+        :proxy-javbus-status-message="proxyJavbusStatusMessage"
+        :proxy-google-status-message="proxyGoogleStatusMessage"
         :proxy-status-message="proxyStatusMessage"
         @save-proxy="saveProxySettings"
         @test-proxy-javbus="testProxyJavbus"

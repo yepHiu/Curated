@@ -109,6 +109,8 @@ const baseProps = {
   proxyOutboundPingBusy: false,
   proxyJavbusBusy: false,
   proxyGoogleBusy: false,
+  proxyJavbusStatusMessage: null,
+  proxyGoogleStatusMessage: null,
   proxyStatusMessage: null,
 }
 

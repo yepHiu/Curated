@@ -45,6 +45,8 @@ const props = defineProps<{
   proxyOutboundPingBusy: boolean
   proxyJavbusBusy: boolean
   proxyGoogleBusy: boolean
+  proxyJavbusStatusMessage: ProxyStatusMessage
+  proxyGoogleStatusMessage: ProxyStatusMessage
   proxyStatusMessage: ProxyStatusMessage
 }>()
 
@@ -357,43 +359,55 @@ function updateProxyPassword(value: unknown) {
               v-if="useWebApi"
               type="button"
               variant="outline"
-              class="rounded-full"
+              class="max-w-full rounded-full"
               :disabled="proxySaving || proxyOutboundPingBusy"
               :aria-busy="proxyJavbusBusy"
+              :title="proxyJavbusStatusMessage?.text"
+              aria-live="polite"
+              aria-atomic="true"
               data-proxy-javbus
               @click="emit('testProxyJavbus')"
             >
               <Loader2
                 v-if="proxyJavbusBusy"
-                class="mr-2 size-4 motion-safe:animate-spin"
+                class="motion-safe:animate-spin"
+                data-icon="inline-start"
                 aria-hidden="true"
               />
-              {{
-                proxyJavbusBusy
-                  ? t("settings.proxyPingJavbusTesting")
-                  : t("settings.proxyPingJavbus")
-              }}
+              <span class="truncate" :class="!proxyJavbusBusy && proxyJavbusStatusMessage?.className">
+                {{
+                  proxyJavbusBusy
+                    ? t("settings.proxyPingJavbusTesting")
+                    : proxyJavbusStatusMessage?.text || t("settings.proxyPingJavbus")
+                }}
+              </span>
             </Button>
             <Button
               v-if="useWebApi"
               type="button"
               variant="outline"
-              class="rounded-full"
+              class="max-w-full rounded-full"
               :disabled="proxySaving || proxyOutboundPingBusy"
               :aria-busy="proxyGoogleBusy"
+              :title="proxyGoogleStatusMessage?.text"
+              aria-live="polite"
+              aria-atomic="true"
               data-proxy-google
               @click="emit('testProxyGoogle')"
             >
               <Loader2
                 v-if="proxyGoogleBusy"
-                class="mr-2 size-4 motion-safe:animate-spin"
+                class="motion-safe:animate-spin"
+                data-icon="inline-start"
                 aria-hidden="true"
               />
-              {{
-                proxyGoogleBusy
-                  ? t("settings.proxyPingGoogleTesting")
-                  : t("settings.proxyPingGoogle")
-              }}
+              <span class="truncate" :class="!proxyGoogleBusy && proxyGoogleStatusMessage?.className">
+                {{
+                  proxyGoogleBusy
+                    ? t("settings.proxyPingGoogleTesting")
+                    : proxyGoogleStatusMessage?.text || t("settings.proxyPingGoogle")
+                }}
+              </span>
             </Button>
             <Button
               type="button"
@@ -406,10 +420,12 @@ function updateProxyPassword(value: unknown) {
             </Button>
           </div>
           <p
-            class="min-h-5 text-sm transition-colors"
-            :class="proxyStatusMessage?.className ?? 'text-transparent'"
+            v-if="proxyStatusMessage"
+            role="alert"
+            class="text-sm transition-colors"
+            :class="proxyStatusMessage.className"
           >
-            {{ proxyStatusMessage?.text ?? " " }}
+            {{ proxyStatusMessage.text }}
           </p>
         </CardContent>
       </Card>
