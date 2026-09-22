@@ -1,13 +1,18 @@
 {
   "wishlist": {
     "pluginStatus": {
+      "disabled": "联动已关闭",
       "online": "在线",
       "offline": "离线"
     },
     "pluginStatusLabel": "浏览器插件",
     "title": "愿望单",
     "awaiting": "等待补齐资料",
-    "connect": "连接浏览器插件",
+    "connect": "浏览器插件联动",
+    "pluginEnabled": "允许浏览器插件联动",
+    "pluginHint": "允许插件查询资料库、将影片加入愿望单。",
+    "pluginEnabledHint": "关闭后停止接收插件请求，已有愿望单会保留。保存后立即生效。",
+    "pluginSaveError": "保存失败，请重试。",
     "filter": "愿望状态",
     "search": "搜索番号、标题或演员",
     "loadFailed": "愿望单加载失败",
@@ -31,11 +36,6 @@
     "remove": "移除愿望",
     "removeHint": "删除此愿望及其图片引用，不会删除资料库中的影片。",
     "cancel": "取消",
-    "tokenHint": "生成凭证后，将它粘贴到 Curated Plugin 的设置中。凭证允许在应用锁定时加入愿望单，可随时撤销。",
-    "tokenError": "凭证管理失败，请在运行 Curated 的电脑上打开并解锁应用后重试。",
-    "createToken": "生成插件凭证",
-    "tokenOnce": "仅显示一次，请复制到插件设置",
-    "revoke": "撤销凭证",
     "filters": {
       "pending": "待入库",
       "in_library": "已入库",

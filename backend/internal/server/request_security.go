@@ -46,6 +46,10 @@ func (h *Handler) withRequestSecurity(next http.Handler) http.Handler {
 			return
 		}
 
+		if isAPIPath(r.URL.Path) && (r.URL.Path == wishlistIntakePath || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Curated-Client")), "Curated-Plugin") || wishlistExtensionOrigin(origin)) && !h.browserPluginEnabled() {
+			writeAppError(w, http.StatusForbidden, "BROWSER_PLUGIN_DISABLED", "browser plugin integration is disabled")
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -74,10 +74,17 @@ func wishlistError(w http.ResponseWriter, e error) {
 
 // handleAddWishlist 仅接收番号并在持久提交后返回，不等待刮削。
 func (h *Handler) handleAddWishlist(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if h.store == nil || !h.store.ValidateWishlistToken(r.Context(), token, r.Header.Get("Origin")) {
-		writeAppError(w, 401, "WISHLIST_UNAUTHORIZED", "invalid integration token")
+	if !h.browserPluginEnabled() {
+		writeAppError(w, http.StatusForbidden, "BROWSER_PLUGIN_DISABLED", "browser plugin integration is disabled")
 		return
+	}
+	if h.store == nil {
+		writeAppError(w, 503, "COMMON_UNAVAILABLE", "wishlist unavailable")
+		return
+	}
+	client, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		client = r.RemoteAddr
 	}
 	wishlistRates.Lock()
 	now := time.Now()
@@ -86,12 +93,12 @@ func (h *Handler) handleAddWishlist(w http.ResponseWriter, r *http.Request) {
 			delete(wishlistRates.entries, key)
 		}
 	}
-	entry := wishlistRates.entries[token]
+	entry := wishlistRates.entries[client]
 	if entry.at.IsZero() {
 		entry.at = now
 	}
 	entry.count++
-	wishlistRates.entries[token] = entry
+	wishlistRates.entries[client] = entry
 	wishlistRates.Unlock()
 	if entry.count > 60 {
 		w.Header().Set("Retry-After", "60")
@@ -212,54 +219,6 @@ func (h *Handler) handleWishlistLink(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-// handleWishlistTokens 仅本机应用可管理凭证，现有 PIN 中间件仍生效。
-func (h *Handler) handleWishlistTokens(w http.ResponseWriter, r *http.Request) {
-	host, _, e := net.SplitHostPort(r.RemoteAddr)
-	if e != nil {
-		host = r.RemoteAddr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil || !ip.IsLoopback() {
-		writeAppError(w, 403, "COMMON_FORBIDDEN", "manage integration tokens from this computer")
-		return
-	}
-	switch r.Method {
-	case "GET":
-		items, e := h.store.ListWishlistTokens(r.Context())
-		if e != nil {
-			wishlistError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]any{"items": items})
-	case "POST":
-		var p struct {
-			Name   string `json:"name"`
-			Origin string `json:"origin"`
-		}
-		if e := decodeWishlistJSON(w, r, &p); e != nil {
-			writeAppError(w, 400, "WISHLIST_INVALID_INPUT", "invalid token request")
-			return
-		}
-		if p.Origin != "" && !wishlistExtensionOrigin(p.Origin) {
-			writeAppError(w, 400, "WISHLIST_INVALID_INPUT", "invalid extension origin")
-			return
-		}
-		item, e := h.store.CreateWishlistToken(r.Context(), p.Name, p.Origin)
-		if e != nil {
-			wishlistError(w, e)
-			return
-		}
-		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, 201, item)
-	case "DELETE":
-		if e := h.store.DeleteWishlistToken(r.Context(), r.PathValue("tokenId")); e != nil {
-			wishlistError(w, e)
-			return
-		}
-		w.WriteHeader(204)
-	}
-}
-
 // handleWishlistAsset 仅根据当前条目资产引用提供文件，拒绝跨根路径。
 func (h *Handler) handleWishlistAsset(w http.ResponseWriter, r *http.Request) {
 	files, e := h.store.WishlistAssetFiles(r.Context(), r.PathValue("id"))
@@ -303,7 +262,12 @@ func (h *Handler) registerWishlistRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/wishlist/items/{id}/refresh", h.handleWishlistRefresh)
 	mux.HandleFunc("PUT /api/wishlist/items/{id}/library-links", h.handleWishlistLink)
 	mux.HandleFunc("GET /api/wishlist/items/{id}/assets/{assetId}", h.handleWishlistAsset)
-	mux.HandleFunc("GET /api/integrations/wishlist/tokens", h.handleWishlistTokens)
-	mux.HandleFunc("POST /api/integrations/wishlist/tokens", h.handleWishlistTokens)
-	mux.HandleFunc("DELETE /api/integrations/wishlist/tokens/{tokenId}", h.handleWishlistTokens)
+}
+
+// browserPluginEnabled uses the live preference when a controller is available.
+func (h *Handler) browserPluginEnabled() bool {
+	if h.browserPluginCtl != nil {
+		return h.browserPluginCtl.BrowserPluginEnabled()
+	}
+	return h.cfg.BrowserPluginEnabled
 }

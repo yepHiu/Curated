@@ -170,17 +170,4 @@ func TestWishlistCompletionTokensAndPaging(t *testing.T) {
 	if _, e = s.ListWishlist(ctx, "pending", "", page.NextCursor, 1); e == nil {
 		t.Fatal("cursor accepted wrong filter")
 	}
-	token, e := s.CreateWishlistToken(ctx, "test", "")
-	if e != nil {
-		t.Fatal(e)
-	}
-	if !s.ValidateWishlistToken(ctx, token.Token, "") {
-		t.Fatal("token rejected")
-	}
-	if e = s.DeleteWishlistToken(ctx, token.ID); e != nil {
-		t.Fatal(e)
-	}
-	if s.ValidateWishlistToken(ctx, token.Token, "") {
-		t.Fatal("revoked token accepted")
-	}
 }

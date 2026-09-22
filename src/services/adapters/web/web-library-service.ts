@@ -83,6 +83,7 @@ const autoActorProfileScrapeState = ref(false)
 const autoDownloadUpdatesState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
+const browserPluginEnabledState = ref(false)
 const lanEnabledState = ref(false)
 const lanListeningState = ref(false)
 const lanAccessUrlsState = ref<string[]>([])
@@ -394,6 +395,7 @@ async function refreshLibraryPathsFromApi() {
     autoDownloadUpdatesState.value = Boolean(settings.autoDownloadUpdates)
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
+    browserPluginEnabledState.value = Boolean(settings.browserPluginEnabled)
     lanEnabledState.value = Boolean(settings.lanEnabled)
     lanListeningState.value = Boolean(settings.lanListening)
     lanAccessUrlsState.value = Array.isArray(settings.lanAccessUrls) ? [...settings.lanAccessUrls] : []
@@ -445,6 +447,17 @@ function createWebLibraryService(): LibraryService {
     autoDownloadUpdates: computed(() => autoDownloadUpdatesState.value),
     launchAtLogin: computed(() => launchAtLoginState.value),
     launchAtLoginSupported: computed(() => launchAtLoginSupportedState.value),
+    browserPluginEnabled: computed(() => browserPluginEnabledState.value),
+    /** 愿望单直达时读取已保存的联动状态。 */
+    async refreshBrowserPluginEnabled() {
+      const settings = await api.getSettings()
+      browserPluginEnabledState.value = Boolean(settings.browserPluginEnabled)
+    },
+    /** 保存插件联动开关，成功后同步界面。 */
+    async setBrowserPluginEnabled(value: boolean) {
+      const next = await api.patchSettings({ browserPluginEnabled: value })
+      browserPluginEnabledState.value = Boolean(next.browserPluginEnabled)
+    },
     lanEnabled: computed(() => lanEnabledState.value),
     lanListening: computed(() => lanListeningState.value),
     lanAccessUrls: computed(() => lanAccessUrlsState.value),

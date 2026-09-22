@@ -7,7 +7,7 @@ function read(): WishlistItem[] { try { return JSON.parse(localStorage.getItem(k
 function write(items: WishlistItem[]) { localStorage.setItem(key, JSON.stringify(items)) }
 /** 查找条目，不存在时与真实模式一样失败。 */
 function get(id: string) { const item = read().find((value) => { /* 匹配唯一 ID。 */ return value.id === id }); if (!item) throw new Error("Not found"); return item }
-/** Mock 只演示管理，不模拟真实扩展凭证。 */
+/** Mock 只演示管理，不接收真实插件请求。 */
 export const mockWishlistService: WishlistServiceContract = {
   integrationsAvailable: false,
   /** 按筛选分页演示愿望列表。 */
@@ -20,12 +20,6 @@ export const mockWishlistService: WishlistServiceContract = {
   async remove(id) { write(read().filter((item) => { /* 保留其他记录。 */ return item.id !== id })) },
   /** Mock 不启动网络刮削。 */
   async refresh() { throw new Error("Web API required") },
-  /** 不创建虚假凭证。 */
-  async tokens() { return [] },
-  /** 告知需要真实后端。 */
-  async createToken() { throw new Error("Web API required") },
-  /** Mock 没有凭证。 */
-  async revokeToken() {},
   /** 只允许应用提供的本地图像。 */
   assetUrl(path) { return path.startsWith("/") && !path.startsWith("//") ? path : "" },
 }

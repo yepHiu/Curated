@@ -118,6 +118,9 @@ export interface LibraryService {
   launchAtLoginSupported: ComputedRef<boolean>
   setLaunchAtLogin(value: boolean): Promise<void>
   /** 是否允许局域网设备访问本机 HTTP 服务 */
+  browserPluginEnabled: ComputedRef<boolean>
+  setBrowserPluginEnabled(value: boolean): Promise<void>
+  refreshBrowserPluginEnabled(): Promise<void>
   lanEnabled: ComputedRef<boolean>
   /** 当前进程是否已经绑定非 loopback 地址 */
   lanListening: ComputedRef<boolean>

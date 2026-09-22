@@ -1390,3 +1390,20 @@ describe("webLibraryService playback prefetch", () => {
     }
   })
 })
+
+
+describe("browser plugin integration preference", () => {
+  it("hydrates the saved value and keeps it when saving fails", async () => {
+    apiMocks.getSettings.mockResolvedValue(settingsDto({ browserPluginEnabled: true }))
+    const { webLibraryService } = await import("./web-library-service")
+    await webLibraryService.refreshBrowserPluginEnabled()
+    expect(webLibraryService.browserPluginEnabled.value).toBe(true)
+    apiMocks.patchSettings.mockRejectedValueOnce(new Error("save failed"))
+    await expect(webLibraryService.setBrowserPluginEnabled(false)).rejects.toThrow("save failed")
+    expect(webLibraryService.browserPluginEnabled.value).toBe(true)
+    apiMocks.patchSettings.mockResolvedValueOnce(settingsDto({ browserPluginEnabled: false }))
+    await webLibraryService.setBrowserPluginEnabled(false)
+    expect(apiMocks.patchSettings).toHaveBeenLastCalledWith({ browserPluginEnabled: false })
+    expect(webLibraryService.browserPluginEnabled.value).toBe(false)
+  })
+})

@@ -14,7 +14,7 @@ func (h *Handler) withAuthLock(next http.Handler) http.Handler {
 			return
 		}
 
-		// 专用提交入口由自身 bearer 校验保护，不授予其他 API 权限。
+		// 愿望单提交入口受插件联动开关控制，不授予其他 API 权限。
 		if r.Method == http.MethodPost && r.URL.Path == wishlistIntakePath {
 			next.ServeHTTP(w, r)
 			return

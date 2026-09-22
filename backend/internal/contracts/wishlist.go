@@ -54,12 +54,3 @@ type WishlistPatch struct {
 	Note      *string `json:"note,omitempty"`
 	Completed *bool   `json:"completed,omitempty"`
 }
-
-// WishlistTokenDTO 列表只返回凭证描述，创建时才携带一次性明文。
-type WishlistTokenDTO struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"createdAt"`
-	Token     string `json:"token,omitempty"`
-	Origin    string `json:"origin"`
-}

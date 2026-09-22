@@ -160,6 +160,12 @@ type LaunchAtLoginController interface {
 	SetLaunchAtLogin(v bool) error
 }
 
+// BrowserPluginController controls browser plugin integration at runtime.
+type BrowserPluginController interface {
+	BrowserPluginEnabled() bool
+	SetBrowserPluginEnabled(bool) error
+}
+
 // LANAccessController exposes the persisted LAN HTTP exposure preference and current bind state.
 type LANAccessController interface {
 	LANEnabled() bool
@@ -316,6 +322,7 @@ type Handler struct {
 	autoDownloadUpdatesCtl         AutoDownloadUpdatesController
 	launchAtLoginCtl               LaunchAtLoginController
 	lanAccessCtl                   LANAccessController
+	browserPluginCtl               BrowserPluginController
 	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
 	curatedFrameExportModeCtl      CuratedFrameExportModeController
 	defaultImportLibraryPathCtl    DefaultImportLibraryPathController
@@ -372,6 +379,7 @@ type Deps struct {
 	AutoDownloadUpdatesCtl           AutoDownloadUpdatesController
 	LaunchAtLoginCtl                 LaunchAtLoginController
 	LANAccessCtl                     LANAccessController
+	BrowserPluginCtl                 BrowserPluginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
 	CuratedFrameExportModeCtl        CuratedFrameExportModeController
 	DefaultImportLibraryPathCtl      DefaultImportLibraryPathController
@@ -449,6 +457,7 @@ func NewHandler(deps Deps) *Handler {
 		autoDownloadUpdatesCtl:         deps.AutoDownloadUpdatesCtl,
 		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
 		lanAccessCtl:                   deps.LANAccessCtl,
+		browserPluginCtl:               deps.BrowserPluginCtl,
 		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
 		curatedFrameExportModeCtl:      deps.CuratedFrameExportModeCtl,
 		defaultImportLibraryPathCtl:    deps.DefaultImportLibraryPathCtl,
@@ -2040,6 +2049,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		LaunchAtLogin:            launchAtLogin,
 		LaunchAtLoginSupported:   launchAtLoginSupported,
 		LANEnabled:               lanEnabled,
+		BrowserPluginEnabled:     h.browserPluginEnabled(),
 		LANListening:             lanListening,
 		LANAccessURLs:            lanAccessURLs,
 		CuratedFrameExportFormat: curatedFrameExportFormat,
@@ -2249,7 +2259,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
-	if h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.lanAccessCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil && h.comicSettingsCtl == nil && h.photoSettingsCtl == nil {
+	if h.browserPluginCtl == nil && h.organizeLibraryCtl == nil && h.metadataScrapeCtl == nil && h.autoLibraryWatchCtl == nil && h.autoActorProfileScrapeCtl == nil && h.autoDownloadUpdatesCtl == nil && h.launchAtLoginCtl == nil && h.lanAccessCtl == nil && h.curatedFrameExportFormatCtl == nil && h.curatedFrameExportModeCtl == nil && h.defaultImportLibraryPathCtl == nil && h.backupDirectoryCtl == nil && h.proxyCtl == nil && h.backendLogCtl == nil && h.playerSettingsCtl == nil && h.aiSettingsCtl == nil && h.comicSettingsCtl == nil && h.photoSettingsCtl == nil {
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "settings runtime not available")
 		return
 	}
@@ -2263,7 +2273,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
+	if body.BrowserPluginEnabled == nil && body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2361,6 +2371,25 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 			name:     "launchAtLogin",
 			apply:    func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(target) },
 			rollback: func() error { return h.launchAtLoginCtl.SetLaunchAtLogin(prev) },
+			failure: settingsPatchFailure{
+				status:  http.StatusInternalServerError,
+				code:    contracts.ErrorCodeInternal,
+				message: fixedSettingsPatchMessage("failed to save library settings"),
+			},
+		})
+	}
+
+	if body.BrowserPluginEnabled != nil {
+		if h.browserPluginCtl == nil {
+			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "browser plugin settings not available")
+			return
+		}
+		prev := h.browserPluginCtl.BrowserPluginEnabled()
+		target := *body.BrowserPluginEnabled
+		ops = append(ops, settingsPatchOperation{
+			name:     "browserPluginEnabled",
+			apply:    func() error { return h.browserPluginCtl.SetBrowserPluginEnabled(target) },
+			rollback: func() error { return h.browserPluginCtl.SetBrowserPluginEnabled(prev) },
 			failure: settingsPatchFailure{
 				status:  http.StatusInternalServerError,
 				code:    contracts.ErrorCodeInternal,

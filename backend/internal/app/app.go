@@ -86,7 +86,10 @@ type App struct {
 	// launchAtLogin persists whether Curated should register Windows login autostart via the current-user Run key.
 	launchAtLogin   bool
 	launchAtLoginMu sync.RWMutex
-	// lanEnabled persists whether the HTTP server should bind for LAN clients after the next process start.
+	// browserPluginEnabled controls plugin integration without a restart.
+	browserPluginEnabled bool
+	browserPluginMu      sync.RWMutex
+	// lanEnabled changes the HTTP bind after the next process start.
 	lanEnabled   bool
 	lanEnabledMu sync.RWMutex
 	// curatedFrameExportFormat controls curated-frame export output format via Settings.
@@ -239,6 +242,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoDownloadUpdates:             cfg.AutoDownloadUpdates,
 		launchAtLogin:                   cfg.LaunchAtLogin,
 		lanEnabled:                      cfg.LANEnabled,
+		browserPluginEnabled:            cfg.BrowserPluginEnabled,
 		curatedFrameExportFormat:        config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		curatedFrameExportMode:          config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
 		defaultImportLibraryPathID:      strings.TrimSpace(cfg.DefaultImportLibraryPathID),
@@ -2088,6 +2092,7 @@ func (a *App) handleCommand(ctx context.Context, output io.Writer, command contr
 			AutoActorProfileScrape:          a.AutoActorProfileScrape(),
 			AutoDownloadUpdates:             a.AutoDownloadUpdates(),
 			LANEnabled:                      a.LANEnabled(),
+			BrowserPluginEnabled:            a.BrowserPluginEnabled(),
 			LANListening:                    a.LANListening(),
 			LANAccessURLs:                   a.LANAccessURLs(),
 			CuratedFrameExportFormat:        a.CuratedFrameExportFormat(),
@@ -3793,6 +3798,7 @@ func (a *App) HTTPHandler() http.Handler {
 			AutoDownloadUpdatesCtl:           a,
 			LaunchAtLoginCtl:                 a,
 			LANAccessCtl:                     a,
+			BrowserPluginCtl:                 a,
 			CuratedFrameExportFormatCtl:      a,
 			CuratedFrameExportModeCtl:        a,
 			DefaultImportLibraryPathCtl:      a,

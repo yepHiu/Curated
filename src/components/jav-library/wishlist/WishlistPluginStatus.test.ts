@@ -3,13 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import WishlistPluginStatus from "./WishlistPluginStatus.vue"
 
 const service = vi.hoisted(() => ({
+  browserPluginEnabled: { value: true },
   wishlist: { integrationsAvailable: true },
+  refreshBrowserPluginEnabled: vi.fn().mockResolvedValue(undefined),
   listConnectedClients: vi.fn(),
 }))
 vi.mock("@/services/library-service", () => ({ useLibraryService: () => service }))
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
 afterEach(() => {
+  service.browserPluginEnabled.value = true
   service.wishlist.integrationsAvailable = true
   vi.clearAllMocks()
   vi.useRealTimers()
@@ -40,6 +43,15 @@ describe("wishlist plugin connection status", () => {
     wrapper.unmount()
     await vi.advanceTimersByTimeAsync(15_000)
     expect(service.listConnectedClients).toHaveBeenCalledTimes(3)
+  })
+
+  it("shows disabled and stops checking plugin activity when integration is off", async () => {
+    service.browserPluginEnabled.value = false
+    const wrapper = mount(WishlistPluginStatus)
+    await flushPromises()
+    expect(wrapper.text()).toContain("pluginStatus.disabled")
+    expect(service.listConnectedClients).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it("does not request or imply a real connection in Mock mode", async () => {

@@ -1,13 +1,18 @@
 {
   "wishlist": {
     "pluginStatus": {
+      "disabled": "Integration off",
       "online": "Online",
       "offline": "Offline"
     },
     "pluginStatusLabel": "Browser plugin",
     "title": "Wishlist",
     "awaiting": "Waiting for metadata",
-    "connect": "Connect browser plugin",
+    "connect": "Browser plugin integration",
+    "pluginEnabled": "Enable browser plugin integration",
+    "pluginHint": "Let the plugin check your library and add titles to your wishlist.",
+    "pluginEnabledHint": "Turning this off stops plugin requests and keeps your existing wishlist. Changes apply immediately.",
+    "pluginSaveError": "Could not save. Please try again.",
     "filter": "Wishlist status",
     "search": "Search code, title or actor",
     "loadFailed": "Could not load wishlist",
@@ -31,11 +36,6 @@
     "remove": "Remove wish",
     "removeHint": "Remove this wish and its image references. Library movies are kept.",
     "cancel": "Cancel",
-    "tokenHint": "Create a token and paste it into Curated Plugin settings. It permits adding wishes while the app is locked and can be revoked.",
-    "tokenError": "Open and unlock Curated on its host computer to manage tokens.",
-    "createToken": "Create plugin token",
-    "tokenOnce": "Shown once. Copy into plugin settings.",
-    "revoke": "Revoke token",
     "filters": {
       "pending": "Pending",
       "in_library": "In library",

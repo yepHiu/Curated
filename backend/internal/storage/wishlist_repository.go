@@ -2,15 +2,12 @@ package storage
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"curated-backend/internal/contracts"
@@ -342,56 +339,6 @@ func (s *SQLiteStore) SetWishlistLink(ctx context.Context, id, movieID string, e
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO wishlist_movie_links(item_id,movie_id,excluded,manual) VALUES(?,?,?,1) ON CONFLICT(item_id,movie_id) DO UPDATE SET excluded=excluded.excluded,manual=1`, id, movieID, excluded)
-	return err
-}
-
-// wishlistTokenHash 将高熵凭证转换为不可恢复的数据库索引。
-func wishlistTokenHash(token string) string {
-	h := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(h[:])
-}
-
-// CreateWishlistToken 创建仅提交番号的凭证，明文只出现在本次回执。
-func (s *SQLiteStore) CreateWishlistToken(ctx context.Context, name, origin string) (contracts.WishlistTokenDTO, error) {
-	item := contracts.WishlistTokenDTO{ID: uuid.NewString(), Name: strings.TrimSpace(name), CreatedAt: nowUTC(), Token: uuid.NewString() + uuid.NewString(), Origin: origin}
-	if item.Name == "" || len([]rune(item.Name)) > 80 {
-		return item, errors.New("invalid token name")
-	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO wishlist_tokens(id,name,hash,created_at,origin) VALUES(?,?,?,?,?)`, item.ID, item.Name, wishlistTokenHash(item.Token), item.CreatedAt, origin)
-	return item, err
-}
-
-// ValidateWishlistToken 同时校验凭证及可选的扩展来源绑定。
-func (s *SQLiteStore) ValidateWishlistToken(ctx context.Context, token, origin string) bool {
-	if len(token) != 72 {
-		return false
-	}
-	var expected string
-	err := s.db.QueryRowContext(ctx, `SELECT origin FROM wishlist_tokens WHERE hash=?`, wishlistTokenHash(token)).Scan(&expected)
-	return err == nil && (origin == "" || expected == "" || expected == origin)
-}
-
-// ListWishlistTokens 返回不含明文或哈希的凭证描述。
-func (s *SQLiteStore) ListWishlistTokens(ctx context.Context) ([]contracts.WishlistTokenDTO, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,created_at,origin FROM wishlist_tokens ORDER BY created_at DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []contracts.WishlistTokenDTO{}
-	for rows.Next() {
-		var item contracts.WishlistTokenDTO
-		if err = rows.Scan(&item.ID, &item.Name, &item.CreatedAt, &item.Origin); err != nil {
-			return nil, err
-		}
-		out = append(out, item)
-	}
-	return out, rows.Err()
-}
-
-// DeleteWishlistToken 撤销凭证，后续提交立即失效。
-func (s *SQLiteStore) DeleteWishlistToken(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM wishlist_tokens WHERE id=?`, id)
 	return err
 }
 

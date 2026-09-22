@@ -1,13 +1,18 @@
 {
   "wishlist": {
     "pluginStatus": {
+      "disabled": "連携オフ",
       "online": "オンライン",
       "offline": "オフライン"
     },
     "pluginStatusLabel": "ブラウザ拡張",
     "title": "ウィッシュリスト",
     "awaiting": "作品情報を取得待ち",
-    "connect": "ブラウザ拡張を接続",
+    "connect": "ブラウザープラグイン連携",
+    "pluginEnabled": "ブラウザープラグイン連携を許可",
+    "pluginHint": "プラグインからライブラリの照会とウィッシュリストへの追加ができます。",
+    "pluginEnabledHint": "オフにするとプラグインからのリクエストを停止します。既存のウィッシュリストは保持され、変更はすぐに反映されます。",
+    "pluginSaveError": "保存できませんでした。もう一度お試しください。",
     "filter": "リストの状態",
     "search": "品番・タイトル・出演者を検索",
     "loadFailed": "リストを読み込めませんでした",
@@ -31,11 +36,6 @@
     "remove": "リストから削除",
     "removeHint": "この項目と画像の参照を削除します。ライブラリの動画は削除されません。",
     "cancel": "キャンセル",
-    "tokenHint": "トークンを生成して拡張機能の設定に貼り付けてください。ロック中も追加でき、いつでも無効にできます。",
-    "tokenError": "Curated を実行している端末でロックを解除して再試行してください。",
-    "createToken": "トークンを生成",
-    "tokenOnce": "一度だけ表示されます。拡張機能にコピーしてください。",
-    "revoke": "無効にする",
     "filters": {
       "pending": "未登録",
       "in_library": "登録済み",

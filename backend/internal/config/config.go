@@ -24,7 +24,8 @@ type Config struct {
 	HttpAddr      string `json:"httpAddr"`
 	// LANEnabled must be explicitly enabled before a non-loopback HTTP address is accepted.
 	// LAN startup additionally requires an initialized application PIN.
-	LANEnabled bool `json:"lanEnabled,omitempty"`
+	LANEnabled           bool `json:"lanEnabled,omitempty"`
+	BrowserPluginEnabled bool `json:"browserPluginEnabled"`
 	// CORSAllowedOrigins contains exact additional browser origins allowed to read credentialed API responses.
 	// Same-origin and loopback development origins are allowed automatically.
 	CORSAllowedOrigins []string `json:"corsAllowedOrigins,omitempty"`

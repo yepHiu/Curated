@@ -61,7 +61,7 @@ import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGe
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
-/** 愿望单插件凭证只在设置面加载。 */
+/** 浏览器插件联动设置按需加载。 */
 const SettingsWishlistSection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsWishlistSection.vue"))
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 /** 实验性功能区懒加载，避免 SettingsView chunk 超出首屏预算（bundle budget 硬门） */
