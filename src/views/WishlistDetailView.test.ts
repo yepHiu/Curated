@@ -10,7 +10,7 @@ vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 describe("wishlist shared movie details", () => {
   it("passes wishlist metadata and protected images to the existing detail page", async () => {
     service.get.mockResolvedValue({
-      id: "wish-1", code: "TEST-001", createdAt: "2026-09-23", enrichmentState: "ready",
+      sourceUrl: "https://javdb.com/v/test", id: "wish-1", code: "TEST-001", createdAt: "2026-09-23", enrichmentState: "ready",
       metadata: { title: "Wishlist title", summary: "Summary", actors: ["Actor"], tags: ["Tag"], studio: "Studio", releaseDate: "2026-01-02", runtimeMinutes: 90, provider: "Provider" },
       assets: [
         { role: "preview_image", url: "/preview", thumbnailUrl: "/preview-thumb" },
@@ -18,12 +18,13 @@ describe("wishlist shared movie details", () => {
       ],
     })
     const wrapper = mount(WishlistDetailView, {
-      global: { stubs: { DetailPage: { name: "DetailPage", props: { movie: Object, readOnly: Boolean }, template: '<div data-shared-detail />' } } },
+      global: { stubs: { DetailPage: { name: "DetailPage", props: { movie: Object, readOnly: Boolean, sourceUrl: String }, template: '<div data-shared-detail />' } } },
     })
     await flushPromises()
     const detail = wrapper.getComponent({ name: "DetailPage" })
     expect(service.get).toHaveBeenCalledWith("wish-1")
     expect(detail.props("readOnly")).toBe(true)
+    expect(detail.props("sourceUrl")).toBe("https://javdb.com/v/test")
     expect(detail.props("movie")).toMatchObject({
       id: "wish-1", title: "Wishlist title", actors: ["Actor"], tags: ["Tag"],
       coverUrl: "/protected/cover", thumbUrl: "/protected/cover-thumb",

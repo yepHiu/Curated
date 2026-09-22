@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"curated-backend/internal/contracts"
@@ -18,7 +20,14 @@ import (
 var ErrWishlistConflict = errors.New("WISHLIST_VERSION_CONFLICT")
 
 // AddWishlist 原子保存番号与待处理工作，重试不会重新激活或重刮已有条目。
-func (s *SQLiteStore) AddWishlist(ctx context.Context, raw string) (string, bool, error) {
+func (s *SQLiteStore) AddWishlist(ctx context.Context, raw, sourceURL string) (string, bool, error) {
+	sourceURL = strings.TrimSpace(sourceURL)
+	if sourceURL != "" {
+		u, err := url.Parse(sourceURL)
+		if err != nil || len(sourceURL) > 4096 || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil {
+			return "", false, errors.New("invalid sourceUrl: expected an HTTP(S) page URL without credentials (max 4096 bytes)")
+		}
+	}
 	code, key, err := moviecode.WishlistIdentity(raw)
 	if err != nil {
 		return "", false, err
@@ -30,13 +39,17 @@ func (s *SQLiteStore) AddWishlist(ctx context.Context, raw string) (string, bool
 	defer tx.Rollback()
 	id := uuid.NewString()
 	now := nowUTC()
-	result, err := tx.ExecContext(ctx, `INSERT INTO wishlist_items(id,code,identity_key,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(identity_key) DO NOTHING`, id, code, key, now, now)
+	result, err := tx.ExecContext(ctx, `INSERT INTO wishlist_items(id,code,identity_key,source_url,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(identity_key) DO NOTHING`, id, code, key, sourceURL, now, now)
 	if err != nil {
 		return "", false, err
 	}
 	count, _ := result.RowsAffected()
 	if count == 0 {
 		err = tx.QueryRowContext(ctx, `SELECT id FROM wishlist_items WHERE identity_key=?`, key).Scan(&id)
+		// 重复加入只补齐旧条目缺失的来源，不覆盖首次来源或重新刮削。
+		if err == nil && sourceURL != "" {
+			_, err = tx.ExecContext(ctx, `UPDATE wishlist_items SET source_url=?,version=version+1,updated_at=? WHERE id=? AND source_url=''`, sourceURL, now, id)
+		}
 	} else {
 		_, err = tx.ExecContext(ctx, `INSERT INTO wishlist_jobs(item_id,generation) VALUES(?,1)`, id)
 	}
@@ -46,13 +59,13 @@ func (s *SQLiteStore) AddWishlist(ctx context.Context, raw string) (string, bool
 	return id, count == 1, tx.Commit()
 }
 
-const wishlistSelect = `SELECT w.id,w.code,w.metadata_json,w.note,w.completed,w.state,w.error,w.version,w.generation,w.created_at,w.updated_at FROM wishlist_items w`
+const wishlistSelect = `SELECT w.id,w.code,w.metadata_json,w.note,w.completed,w.state,w.error,w.version,w.generation,w.created_at,w.updated_at,w.source_url FROM wishlist_items w`
 
 // scanWishlist 解码共享条目投影，空集合始终返回数组。
 func scanWishlist(row interface{ Scan(...any) error }) (contracts.WishlistItemDTO, error) {
 	item := contracts.WishlistItemDTO{MovieIDs: []string{}, Assets: []contracts.WishlistAssetDTO{}}
 	var metadata string
-	err := row.Scan(&item.ID, &item.Code, &metadata, &item.Note, &item.Completed, &item.EnrichmentState, &item.Error, &item.Version, &item.Generation, &item.CreatedAt, &item.UpdatedAt)
+	err := row.Scan(&item.ID, &item.Code, &metadata, &item.Note, &item.Completed, &item.EnrichmentState, &item.Error, &item.Version, &item.Generation, &item.CreatedAt, &item.UpdatedAt, &item.SourceURL)
 	if err != nil {
 		return item, err
 	}

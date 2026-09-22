@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -47,12 +48,22 @@ func TestWishlistIntakeScope(t *testing.T) {
 	}
 	var first map[string]string
 	json.Unmarshal(w.Body.Bytes(), &first)
-	w = request("POST", wishlistIntakePath, `{"code":"ssis001"}`)
+	w = request("POST", wishlistIntakePath, `{"code":"ssis001","sourceUrl":"https://javdb.com/v/test"}`)
 	if w.Code != 200 {
 		t.Fatalf("repeat %d", w.Code)
 	}
 	var next map[string]string
 	json.Unmarshal(w.Body.Bytes(), &next)
+	item, err := s.GetWishlist(ctx, first["id"])
+	if err != nil || item.SourceURL != "https://javdb.com/v/test" {
+		t.Fatalf("source: %+v %v", item, err)
+	}
+	for _, source := range []string{"javascript:alert(1)", "file:///tmp/movie", "/relative", "https://user:pass@javdb.com/v/test", "https://", strings.Repeat("a", 4097)} {
+		body, _ := json.Marshal(map[string]string{"code": "SSIS-002", "sourceUrl": source})
+		if invalid := request("POST", wishlistIntakePath, string(body)); invalid.Code != 400 {
+			t.Fatalf("invalid source accepted: %s (%d)", source, invalid.Code)
+		}
+	}
 	if first["id"] != next["id"] {
 		t.Fatal("duplicate")
 	}

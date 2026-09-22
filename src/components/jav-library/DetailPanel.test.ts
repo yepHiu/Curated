@@ -137,6 +137,23 @@ vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
 }))
 
 describe("DetailPanel", () => {
+  it("shows a named source link directly after the metadata provider", () => {
+    const sourceUrl = "https://javdb.com/v/test"
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie({ metadataProvider: "JavBus" }), readOnly: true, sourceUrl } })
+    const link = wrapper.get("[data-source-page-link]")
+    expect(link.text()).toBe("JAVDB")
+    expect(link.attributes("href")).toBe(sourceUrl)
+    expect(link.attributes("target")).toBe("_blank")
+    expect(link.attributes("rel")).toBe("noopener noreferrer")
+    expect(wrapper.get("[data-metadata-provider]").element.nextElementSibling?.querySelector("a")).toBe(link.element)
+    expect(wrapper.text()).not.toContain(sourceUrl)
+  })
+
+  it.each([undefined, "", "javascript:alert(1)"])("hides unavailable or unsafe source %s", (sourceUrl) => {
+    const wrapper = mount(DetailPanel, { props: { movie: makeMovie(), sourceUrl } })
+    expect(wrapper.find("[data-source-page-link]").exists()).toBe(false)
+  })
+
   it("keeps metadata browsing while hiding local movie operations in read-only mode", () => {
     const wrapper = mount(DetailPanel, {
       props: { movie: makeMovie({ rating: 0 }), readOnly: true },

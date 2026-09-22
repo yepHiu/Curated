@@ -72,7 +72,7 @@ func wishlistError(w http.ResponseWriter, e error) {
 	writeAppError(w, status, code, message)
 }
 
-// handleAddWishlist 仅接收番号并在持久提交后返回，不等待刮削。
+// handleAddWishlist 接收番号和可选来源网页，在持久提交后返回，不等待刮削。
 func (h *Handler) handleAddWishlist(w http.ResponseWriter, r *http.Request) {
 	if !h.browserPluginEnabled() {
 		writeAppError(w, http.StatusForbidden, "BROWSER_PLUGIN_DISABLED", "browser plugin integration is disabled")
@@ -106,13 +106,14 @@ func (h *Handler) handleAddWishlist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Code string `json:"code"`
+		Code      string `json:"code"`
+		SourceURL string `json:"sourceUrl"`
 	}
 	if e := decodeWishlistJSON(w, r, &body); e != nil {
-		writeAppError(w, 400, "WISHLIST_INVALID_INPUT", "expected an object containing only code")
+		writeAppError(w, 400, "WISHLIST_INVALID_INPUT", "expected code and optional sourceUrl")
 		return
 	}
-	id, created, e := h.store.AddWishlist(r.Context(), body.Code)
+	id, created, e := h.store.AddWishlist(r.Context(), body.Code, body.SourceURL)
 	if e != nil {
 		wishlistError(w, e)
 		return

@@ -25,6 +25,7 @@ type WishlistAssetDTO struct {
 type WishlistItemDTO struct {
 	ID              string             `json:"id"`
 	Code            string             `json:"code"`
+	SourceURL       string             `json:"sourceUrl"`
 	Metadata        WishlistMetadata   `json:"metadata"`
 	Note            string             `json:"note"`
 	Completed       bool               `json:"completed"`

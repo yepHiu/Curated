@@ -26,7 +26,7 @@ func TestWishlistLibraryReuse(t *testing.T) {
 	if e = s.Migrate(ctx); e != nil {
 		t.Fatal(e)
 	}
-	id, _, _ := s.AddWishlist(ctx, "SSIS-001")
+	id, _, _ := s.AddWishlist(ctx, "SSIS-001", "")
 	if e = s.SaveWishlistMetadata(ctx, id, 1, contracts.WishlistMetadata{Title: "Saved title", Actors: []string{"Actor"}, Provider: "test"}); e != nil {
 		t.Fatal(e)
 	}

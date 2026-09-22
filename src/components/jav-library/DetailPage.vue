@@ -37,6 +37,7 @@ const props = withDefaults(
     metadataRefreshBusy?: boolean
     /** Metadata-only entries share the detail layout without local movie actions. */
     readOnly?: boolean
+    sourceUrl?: string
   }>(),
   { metadataRefreshBusy: false, userTagSuggestions: () => [], readOnly: false },
 )
@@ -180,6 +181,7 @@ function openPosterInViewer() {
     <DetailPanel
       :movie="movie"
       :read-only="props.readOnly"
+      :source-url="props.sourceUrl"
       :show-actions="!props.readOnly"
       :user-tag-suggestions="props.userTagSuggestions"
       :metadata-refresh-busy="props.metadataRefreshBusy"

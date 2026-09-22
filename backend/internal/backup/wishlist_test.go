@@ -24,7 +24,7 @@ func TestWishlistBackupRestore(t *testing.T) {
 	if e = s.Migrate(ctx); e != nil {
 		t.Fatal(e)
 	}
-	id, _, e := s.AddWishlist(ctx, "SSIS-001")
+	id, _, e := s.AddWishlist(ctx, "SSIS-001", "")
 	if e != nil {
 		t.Fatal(e)
 	}

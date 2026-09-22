@@ -102,6 +102,7 @@ onBeforeUnmount(() => {
     <DetailPage
       v-else-if="movie"
       :movie="movie"
+      :source-url="item?.sourceUrl"
       :related-movies="[]"
       read-only
       @browse-by-tag="browseByTag"

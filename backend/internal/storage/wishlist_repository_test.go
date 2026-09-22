@@ -14,7 +14,7 @@ import (
 func TestWishlistReconcileIdentityChanges(t *testing.T) {
 	s := newSavedViewTestStore(t)
 	ctx := context.Background()
-	id, _, err := s.AddWishlist(ctx, "SSIS-001")
+	id, _, err := s.AddWishlist(ctx, "SSIS-001", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestWishlistDurabilityAndGeneration(t *testing.T) {
 		wg.Add(1)
 		go func() { // 并发模拟不同站点重复提交同一作品。
 			defer wg.Done()
-			id, _, err := s.AddWishlist(ctx, "ssis_001")
+			id, _, err := s.AddWishlist(ctx, "ssis_001", "https://javdb.com/v/test")
 			if err != nil {
 				t.Error(err)
 			}
@@ -93,7 +93,7 @@ func TestWishlistDurabilityAndGeneration(t *testing.T) {
 	}
 	defer s.Close()
 	item, e := s.GetWishlist(ctx, id)
-	if e != nil || item.Code != "SSIS-001" {
+	if e != nil || item.Code != "SSIS-001" || item.SourceURL != "https://javdb.com/v/test" {
 		t.Fatalf("reopen: %+v %v", item, e)
 	}
 	job, attempt, e := s.ClaimWishlistJob(ctx)
@@ -137,7 +137,7 @@ func TestWishlistDurabilityAndGeneration(t *testing.T) {
 func TestWishlistCompletionTokensAndPaging(t *testing.T) {
 	s := newSavedViewTestStore(t)
 	ctx := context.Background()
-	id, _, e := s.AddWishlist(ctx, "SSIS001")
+	id, _, e := s.AddWishlist(ctx, "SSIS001", "")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -145,7 +145,7 @@ func TestWishlistCompletionTokensAndPaging(t *testing.T) {
 	if e = s.PatchWishlist(ctx, id, contracts.WishlistPatch{Version: 1, Completed: &done}); e != nil {
 		t.Fatal(e)
 	}
-	same, created, e := s.AddWishlist(ctx, "SSIS-001")
+	same, created, e := s.AddWishlist(ctx, "SSIS-001", "")
 	if e != nil || created || same != id {
 		t.Fatal("repeat changed identity")
 	}
@@ -156,7 +156,7 @@ func TestWishlistCompletionTokensAndPaging(t *testing.T) {
 	if e = s.PatchWishlist(ctx, id, contracts.WishlistPatch{Version: 1, Completed: &done}); !errors.Is(e, ErrWishlistConflict) {
 		t.Fatal("stale version allowed")
 	}
-	if _, _, e = s.AddWishlist(ctx, "SSIS-002"); e != nil {
+	if _, _, e = s.AddWishlist(ctx, "SSIS-002", ""); e != nil {
 		t.Fatal(e)
 	}
 	page, e := s.ListWishlist(ctx, "all", "", "", 1)
@@ -169,5 +169,44 @@ func TestWishlistCompletionTokensAndPaging(t *testing.T) {
 	}
 	if _, e = s.ListWishlist(ctx, "pending", "", page.NextCursor, 1); e == nil {
 		t.Fatal("cursor accepted wrong filter")
+	}
+}
+
+// TestWishlistSourceBackfill ensures duplicate submissions only fill missing provenance.
+func TestWishlistSourceBackfill(t *testing.T) {
+	s := newSavedViewTestStore(t)
+	ctx := context.Background()
+	id, _, err := s.AddWishlist(ctx, "SSIS-001", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := s.GetWishlist(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := "https://javdb.com/v/test?from=list"
+	same, created, err := s.AddWishlist(ctx, "ssis001", source)
+	if err != nil || same != id || created {
+		t.Fatalf("backfill: %s %v %v", same, created, err)
+	}
+	item, err := s.GetWishlist(ctx, id)
+	if err != nil || item.SourceURL != source || item.Version != original.Version+1 {
+		t.Fatalf("backfill item: %+v %v", item, err)
+	}
+	for _, value := range []string{"", "https://jable.tv/videos/ssis-001/", source} {
+		if _, _, err := s.AddWishlist(ctx, "SSIS-001", value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SaveWishlistMetadata(ctx, id, item.Generation, contracts.WishlistMetadata{Provider: "JavBus", Homepage: "https://javbus.com/SSIS-001"}); err != nil {
+		t.Fatal(err)
+	}
+	item, err = s.GetWishlist(ctx, id)
+	if err != nil || item.SourceURL != source {
+		t.Fatalf("source overwritten: %+v %v", item, err)
+	}
+	page, err := s.ListWishlist(ctx, "all", "", "", 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].SourceURL != source {
+		t.Fatalf("list: %+v %v", page, err)
 	}
 }

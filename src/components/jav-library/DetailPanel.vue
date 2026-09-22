@@ -39,6 +39,7 @@ import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
 import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
 import { getMovieImageVersion } from "@/lib/image-version"
+import { sourcePageLink } from "@/lib/source-page-link"
 import DetailTagAddControl from "./DetailTagAddControl.vue"
 
 const { t } = useI18n()
@@ -52,6 +53,7 @@ const props = withDefaults(
     showActions?: boolean
     metadataRefreshBusy?: boolean
     readOnly?: boolean
+    sourceUrl?: string
   }>(),
   {
     userTagSuggestions: () => [],
@@ -78,6 +80,7 @@ const canRevealInFileManager = computed(
 )
 
 const metadataProvider = computed(() => props.movie.metadataProvider?.trim() ?? "")
+const sourceLink = computed(() => sourcePageLink(props.sourceUrl))
 
 const javdbSearchUrl = computed(
   () => `https://javdb.com/search?q=${encodeURIComponent(props.movie.code.trim())}&f=all`,
@@ -322,6 +325,15 @@ function removeMetadataTag(tag: string) {
                 data-metadata-provider
                 :aria-label="t('detailPanel.ariaMetadataProvider', { provider: metadataProvider })"
               > · {{ metadataProvider }}</span>
+              <span v-if="sourceLink" class="ml-3 inline-block">
+                <a
+                  data-source-page-link
+                  :href="sourceLink.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >{{ sourceLink.label }}</a>
+              </span>
             </CardDescription>
           </div>
 

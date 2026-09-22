@@ -4,6 +4,7 @@ export interface WishlistMetadata {
 }
 export interface WishlistAsset { id: string; role: string; url: string; thumbnailUrl: string }
 export interface WishlistItem {
+  sourceUrl?: string
   id: string; code: string; metadata: WishlistMetadata; note: string; completed: boolean
   status: "pending" | "completed" | "in_library"
   enrichmentState: "queued" | "running" | "ready" | "partial" | "failed" | "needs_review"
