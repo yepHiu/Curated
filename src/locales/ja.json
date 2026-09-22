@@ -1,13 +1,10 @@
 {
   "wishlist": {
     "pluginStatus": {
-      "checking": "ブラウザ拡張 · 確認中",
-      "connected": "ブラウザ拡張 · 接続済み",
-      "disconnected": "ブラウザ拡張 · 接続未検出",
-      "unknown": "ブラウザ拡張 · 状態不明",
-      "unavailable": "ブラウザ拡張 · デモモード"
+      "online": "オンライン",
+      "offline": "オフライン"
     },
-    "pluginStatusHint": "過去5分以内の拡張機能からのリクエストに基づく接続状態です。",
+    "pluginStatusLabel": "ブラウザ拡張",
     "title": "ウィッシュリスト",
     "awaiting": "作品情報を取得待ち",
     "connect": "ブラウザ拡張を接続",

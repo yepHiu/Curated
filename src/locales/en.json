@@ -1,13 +1,10 @@
 {
   "wishlist": {
     "pluginStatus": {
-      "checking": "Browser plugin · Checking",
-      "connected": "Browser plugin · Connected",
-      "disconnected": "Browser plugin · No connection detected",
-      "unknown": "Browser plugin · Status unknown",
-      "unavailable": "Browser plugin · Demo mode"
+      "online": "Online",
+      "offline": "Offline"
     },
-    "pluginStatusHint": "Connection status is based on plugin requests within the last 5 minutes.",
+    "pluginStatusLabel": "Browser plugin",
     "title": "Wishlist",
     "awaiting": "Waiting for metadata",
     "connect": "Connect browser plugin",
