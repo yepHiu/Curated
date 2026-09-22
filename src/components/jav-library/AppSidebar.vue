@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from "vue"
-import { computed, onMounted, onBeforeUnmount, ref } from "vue"
+import { computed, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import {
   BookOpen,
@@ -29,7 +29,6 @@ import { useBackendHealth } from "@/composables/use-backend-health"
 import { buildBrowseRouteTarget } from "@/lib/library-query"
 import { statusDotClass } from "@/lib/ui/status-tone"
 import { useComicLibraryService } from "@/services/comic-library-service"
-import { useLibraryService } from "@/services/library-service"
 import { usePhotoLibraryService } from "@/services/photo-library-service"
 
 const props = withDefaults(
@@ -60,19 +59,6 @@ interface SidebarNavSection {
 
 const { t, locale } = useI18n()
 const route = useRoute()
-const wishlistCount = ref<number | null>(null)
-let wishlistCountTimer: ReturnType<typeof setTimeout> | undefined
-let sidebarAlive = true
-/** 后台页面暂停计数请求，侧栏只读取最小分页与聚合值。 */
-async function refreshWishlistCount() {
-  if (!sidebarAlive) return
-  if (!document.hidden) {
-    try { const service = useLibraryService().wishlist; if (service) wishlistCount.value = (await service.list({ status: "pending", limit: 1 })).pendingCount } catch { /* 后端旧版本或锁定不阻断已有导航。 */ }
-  }
-  if (sidebarAlive) wishlistCountTimer = setTimeout(refreshWishlistCount, 30000)
-}
-onMounted(refreshWishlistCount)
-onBeforeUnmount(() => { /* 关闭侧栏后停止请求。 */ sidebarAlive = false; clearTimeout(wishlistCountTimer) })
 const comicService = useComicLibraryService()
 const photoService = usePhotoLibraryService()
 const {
@@ -178,7 +164,7 @@ const sidebarNavGroups = computed((): SidebarNavGroups => {
   return {
     browse,
     yours: [
-      { label: t("wishlist.title") + (wishlistCount.value ? ` · ${wishlistCount.value}` : ""), page: "wishlist", icon: LibraryBig },
+      { label: t("wishlist.title"), page: "wishlist", icon: LibraryBig },
       { label: t("nav.insights"), page: "insights", icon: ChartNoAxesColumnIncreasing },
       { label: t("nav.curatedFrames"), page: "curated-frames", icon: Clapperboard },
       { label: t("nav.history"), page: "history", icon: History },

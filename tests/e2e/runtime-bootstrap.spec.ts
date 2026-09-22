@@ -255,7 +255,6 @@ test("locked startup defers protected hydration until a successful unlock", asyn
   await expect
     .poll(() => [...new Set(protectedRequests.map((request) => request.path))].sort())
     .toEqual([
-      "/api/wishlist/items?status=pending&limit=1",
       "/api/library/played-movies",
       "/api/library/movies?limit=500&offset=0",
       "/api/library/saved-views",
