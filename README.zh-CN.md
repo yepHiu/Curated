@@ -37,7 +37,7 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 ## 亮点
 
-- 浏览器插件联动：在“设置 → 网络”开启即可使用，无需凭证；关闭后保留已有愿望单。详见 [使用说明](docs/guide.md#wishlist)。
+- 浏览器插件联动：在“设置 → 网络”开启即可使用，无需凭证；加入愿望单时保存来源页，详情以 JAVDB 等站点名显示超链接；关闭联动后保留已有愿望单。详见 [使用说明](docs/guide.md#wishlist)。
 
 - 本地优先：Vue 3 SPA、Go HTTP API、SQLite，以及面向 Windows 的 Electron 托盘壳。
 - 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。

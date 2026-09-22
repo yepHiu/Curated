@@ -395,13 +395,13 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 
 ## Wishlist
 
-The browser plugin sends only a catalog code. Curated saves the request immediately, then uses the configured metadata provider and proxy to fetch metadata and images in the background. No local video or library path is required.
+The browser plugin sends a catalog code and, when added from a supported movie page or card, its source page URL. Curated saves the request immediately, then uses the configured metadata provider and proxy to fetch metadata and images in the background. No local video or library path is required.
 
 1. Restart Curated with the updated backend and frontend. Development requires `VITE_USE_WEB_API=true`; Mock mode does not support plugin intake.
 2. On the computer running Curated, open **Settings → Network → Browser plugin integration** and turn it on. It defaults to off, persists across restarts, and applies immediately. No token or pairing is required.
 3. Reload the extension from `C:/Users/wujiahui/code/curated-plugin/dist` in Chrome. In its settings, set the Curated server address. Development commonly uses port 8080; packaged builds commonly use 8081. Use the actual running address.
 4. Click **加入愿望单** on a supported JAVDB or jable page. If extraction is unavailable, enter the code in the extension popup. When integration is off, Curated returns `403 BROWSER_PLUGIN_DISABLED` for wishlist intake and identified plugin API requests; the plugin prompts you to enable it. Existing wishlist entries remain intact.
-5. Open **Wishlist** in the sidebar. The default view shows pending imports; details allow notes, corrected codes, completion/restore, retry and removal. Completed items do not count as watched movies. Repeated submissions preserve completion.
+5. Open **Wishlist** in the sidebar. The default view shows pending imports. Details show a site-name link such as **JAVDB** or **Jable** after the metadata provider; clicking opens that movie’s original page in a new tab. The full URL is not displayed. Older entries and manually entered codes without a source remain unchanged; add an older entry again from its source page to fill in the missing link. Repeated submissions preserve the first saved source and completion status, and metadata refreshes do not replace the source.
 
 Later imports are linked by a unique normalized catalog identity, disappear from the pending view and remain in **In library**. Saved metadata and images are reused before automatic scraping. A periodic background reconciliation recovers delayed changes; unavailable sources or ambiguous matches stay visible for correction. Manual library-link confirmation/exclusion is available through the API; a selection UI is not yet included.
 

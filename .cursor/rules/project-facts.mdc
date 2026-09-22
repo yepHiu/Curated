@@ -320,7 +320,8 @@ alwaysApply: true
 
 - 2026-09-23 UI 对齐影片库共享网格/卡片密度，筛选改为胶囊下拉菜单；侧栏愿望单不显示计数、不轮询计数。主列表仅显示红/绿圆点 + 离线/在线的小胶囊，无连接按钮。详情直接复用 DetailPage/DetailPanel（只读资料模式，隐藏本地影片操作与评论），不添加愿望专用表单/操作区；顶部共用返回入口保留筛选。客户端追踪将 `X-Curated-Client: Curated-Plugin` 单独标为 `Curated Plugin`，前台每 15 秒读取既有 connected-clients 接口，5 分钟内有请求显示在线；无持续心跳保证，失败与 Mock 显示离线；关闭插件联动时显示灰点与“联动已关闭”并停止状态轮询。不新增 API。
 
-- 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links；旧 tokens 表保留为历史迁移结构，无运行时读写。外部 `POST /api/integrations/wishlist/items` 严格仅收 code，无需凭证，按来源 IP 限速 60/min，受 browserPluginEnabled 开关控制。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
+- 迁移 0055 保存独立 source_url：首次来源保留、重复加入仅补齐空值，刮削不覆盖。详情元数据来源后显示 JAVDB/Jable 等站点名超链接；旧记录无地址不显示。插件列表传影片卡片详情地址，详情传当前 URL；手动输入番号不猜来源。
+- 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links；旧 tokens 表保留为历史迁移结构，无运行时读写。外部 `POST /api/integrations/wishlist/items` 严格接收 code 与可选 sourceUrl（HTTP(S) 页面地址，最多 4096 bytes，无账号密码），无需凭证，按来源 IP 限速 60/min，受 browserPluginEnabled 开关控制。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
 - 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。旧令牌管理端点已移除。GET/PATCH `/api/settings` 新增 browserPluginEnabled，默认 false，library-config.cfg 持久化、即时生效；关闭拒绝愿望单接入和标记为 Curated-Plugin 或扩展 Origin 的 API 请求（403 BROWSER_PLUGIN_DISABLED）。
 - App 独立持久 worker，Metatube 实际番号精确校验，后台补全与受控图片下载；数据库父目录 `assets/wishlist` 保存哈希原件/缩略图，不属于 cache。自动导入前复用、周期对账/复制，自动关联重建保留人工确认/排除。
 - `/wishlist`、`/wishlist/:id` 和网络设置插件联动开关；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。

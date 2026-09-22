@@ -636,12 +636,12 @@ The frontend preview grid replaces batches instead of accumulating an entire boo
 
 ## Wishlist HTTP API (2026-09-22)
 
-- `POST /api/integrations/wishlist/items`: no token; requires browserPluginEnabled=true; strict `{ "code": "SSIS-001" }`; 201 created / 200 existing or in_library. No metadata, image URLs, site cookies or file paths in plugin payload.
+- `POST /api/integrations/wishlist/items`: no token; requires browserPluginEnabled=true; strict `{ "code": "SSIS-001", "sourceUrl": "https://javdb.com/v/example" }` (`sourceUrl` optional, HTTP(S), no credentials, max 4096 bytes); 201 created / 200 existing or in_library. No metadata, image URLs, site cookies or file paths in plugin payload.
 - `GET /api/wishlist/items`: status=pending|in_library|completed|all, q, cursor, limit (1–60); returns items/total/pendingCount/nextCursor.
-- `GET/PATCH/DELETE /api/wishlist/items/{id}`: independent details; version-checked note/code/completed patch; removal does not delete movies.
+- `GET/PATCH/DELETE /api/wishlist/items/{id}`: independent details including sourceUrl; version-checked note/code/completed patch; removal does not delete movies.
 - `POST /api/wishlist/items/{id}/refresh`: enqueue/merge enrichment, 202.
 - `PUT /api/wishlist/items/{id}/library-links`: `{movieId, excluded}` manual confirmation/exclusion; protected application session.
 - `GET /api/wishlist/items/{id}/assets/{assetId}?thumbnail=1`: current local image, protected application route.
 - `GET/PATCH /api/settings`: `browserPluginEnabled` defaults to false, persists to library-config.cfg and applies immediately. Disabled wishlist intake and identified browser-plugin API requests return `403 BROWSER_PLUGIN_DISABLED`. Token management endpoints have been removed; ordinary API PIN/Origin rules still apply.
 
-Migrations 0053/0054 and `internal/app/wishlist*.go` implement durable enrichment and import reuse. Images persist beside SQLite at assets/wishlist and are included in format-v2 backup. Web routes are `/wishlist` and `/wishlist/:id`; Mock uses separate localStorage. See docs/guide.md#Wishlist and docs/plan/2026-09-22-wishlist.md for setup, verification and live-site acceptance limitations.
+Migration 0055 preserves the original source URL separately from scraped metadata; duplicate intake only backfills missing URLs. Details show a site-name link after the metadata provider. Migrations 0053/0054 and `internal/app/wishlist*.go` implement durable enrichment and import reuse. Images persist beside SQLite at assets/wishlist and are included in format-v2 backup. Web routes are `/wishlist` and `/wishlist/:id`; Mock uses separate localStorage. See docs/guide.md#Wishlist and docs/plan/2026-09-22-wishlist.md for setup, verification and live-site acceptance limitations.
