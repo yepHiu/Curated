@@ -325,7 +325,7 @@ alwaysApply: true
 - 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
 - Curated Plugin 仓库外目录 `C:/Users/wujiahui/code/curated-plugin` 已实现 JAVDB/jable 按钮及 popup 手动番号，local 服务器绑定凭证。真实站点全链路尚待验收；见 `docs/plan/2026-09-22-wishlist.md` §14。
 
-## 2026-09-23 插件开发构建
+## 2026-09-23 插件开发者选项
 
-- 仓库外 Curated Plugin 已提供 `npm run dev` 监听 / `npm run build:dev` 单次开发构建：输出 `dist-dev`、名称 Curated Plugin Dev、默认后端 127.0.0.1:8080。
-- 生产 `npm run build` 保持 `dist` / 8081。设置与愿望凭证按模式隔离，原生产键兼容。Chrome 需重新加载扩展及目标网页，watch 不负责浏览器热重载。见愿望单实施计划 §15。
+- 按用户修正，Curated Plugin 仅一个版本、名称及 dist 输出。`npm run dev` 监听与 `npm run build` 压缩构建共用同一设置，不再有 dist-dev/Curated Plugin Dev 或构建期服务器区分。
+- 设置页「开发者模式」开启可自定义默认服务端（建议开发后端 8080），关闭使用本机 8081；保存后生效并保留自定义地址。原自定义地址兼容、凭证按服务器绑定。Chrome 源码更新后仍需重新加载扩展与网页。见愿望单实施计划 §15。

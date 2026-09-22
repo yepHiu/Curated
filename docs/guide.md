@@ -409,8 +409,10 @@ Wishlist images live at `<actual database parent>/assets/wishlist`, outside disp
 
 The implementation and local test evidence are recorded in the [wishlist plan](plan/2026-09-22-wishlist.md#14-实施结果2026-09-22). Actual live-site extension integration remains to be verified; synthetic fixtures are not live-site evidence.
 
-### Browser plugin development mode
+### Browser plugin developer setting
 
-From `C:/Users/wujiahui/code/curated-plugin`, run `npm run dev` for a watch build or `npm run build:dev` for a single build. Load **dist-dev** in Chrome: the extension is named **Curated Plugin Dev** and defaults to the running development API at **http://127.0.0.1:8080**. `npm run build` still produces **dist**, defaulting to port **8081**. The two modes keep separate settings and wishlist credentials. Configure a token from the development backend for wishlist intake.
+The plugin has one name (**Curated Plugin**) and one output directory (**dist**). Run `npm run dev` to watch source changes or `npm run build` for a single optimized build from `C:/Users/wujiahui/code/curated-plugin`. Both commands use the same runtime settings.
 
-After a rebuild, reload the Dev extension in Chrome and refresh the source website. Keep only the intended version enabled on that website to avoid duplicate injected buttons. Plugin watch logs started by the agent are under `.workspace/dev-logs/plugin.out.log` and `plugin.err.log`.
+In plugin settings, enable **开发者模式**, enter **默认服务端地址** such as `http://127.0.0.1:8080`, and save. Disabling the switch uses local port 8081 while retaining the custom address for next time. Existing custom addresses remain valid. Wishlist tokens remain bound to the configured server; leaving the token field blank preserves the saved credential.
+
+Load `dist` in Chrome and reload the extension and source website after code changes. If a previous Dev extension was loaded from `dist-dev`, disable that old entry and use the unified directory. Watch logs are under `.workspace/dev-logs/plugin.out.log` and `plugin.err.log`.
