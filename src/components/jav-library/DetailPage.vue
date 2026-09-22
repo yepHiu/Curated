@@ -35,8 +35,10 @@ const props = withDefaults(
     // Fuzzy suggestions for user tags, including library-wide user tags and movie metadata tags.
     userTagSuggestions?: readonly string[]
     metadataRefreshBusy?: boolean
+    /** Metadata-only entries share the detail layout without local movie actions. */
+    readOnly?: boolean
   }>(),
-  { metadataRefreshBusy: false, userTagSuggestions: () => [] },
+  { metadataRefreshBusy: false, userTagSuggestions: () => [], readOnly: false },
 )
 
 const emit = defineEmits<{
@@ -177,6 +179,8 @@ function openPosterInViewer() {
   <div ref="layoutRootRef" class="flex min-w-0 w-full flex-col gap-6">
     <DetailPanel
       :movie="movie"
+      :read-only="props.readOnly"
+      :show-actions="!props.readOnly"
       :user-tag-suggestions="props.userTagSuggestions"
       :metadata-refresh-busy="props.metadataRefreshBusy"
       @open-player="emit('openPlayer', $event)"
@@ -251,7 +255,7 @@ function openPosterInViewer() {
       :movie-code="movie.code"
     />
 
-    <MovieCommentSection :movie-id="movie.id" :readonly="commentReadonly" />
+    <MovieCommentSection v-if="!props.readOnly" :movie-id="movie.id" :readonly="commentReadonly" />
 
     <div v-if="relatedMoviesForGrid.length" class="flex flex-col gap-4">
       <h3 class="text-xl font-semibold">{{ t("detailPage.relatedTitle") }}</h3>

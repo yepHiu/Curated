@@ -84,6 +84,16 @@ vi.mock("@/components/jav-library/MediaStill.vue", () => ({
 }))
 
 describe("DetailPage", () => {
+  it("reuses the gallery but never mounts movie comments for metadata-only entries", () => {
+    const wrapper = mount(DetailPage, {
+      props: { movie: makeMovie(), relatedMovies: [], readOnly: true },
+    })
+    expect(wrapper.find('[data-movie-comment-section]').exists()).toBe(false)
+    expect(wrapper.get('[data-detail-panel]').attributes('read-only')).toBe('true')
+    expect(wrapper.get('[data-detail-panel]').attributes('show-actions')).toBe('false')
+    expect(wrapper.text()).toContain('detailPage.previewGalleryTitle')
+  })
+
   it("keeps a stable fallback ratio until preview dimensions load, then adapts to the image ratio", async () => {
     const wrapper = mount(DetailPage, {
       props: {

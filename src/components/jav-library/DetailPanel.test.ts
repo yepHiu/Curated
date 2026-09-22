@@ -137,6 +137,20 @@ vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
 }))
 
 describe("DetailPanel", () => {
+  it("keeps metadata browsing while hiding local movie operations in read-only mode", () => {
+    const wrapper = mount(DetailPanel, {
+      props: { movie: makeMovie({ rating: 0 }), readOnly: true },
+    })
+    expect(wrapper.text()).toContain('Movie 1')
+    expect(wrapper.text()).toContain('detailPanel.cast')
+    expect(wrapper.findComponent({ name: 'DropdownMenu' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'MovieEditDialog' }).exists()).toBe(false)
+    expect(wrapper.find('[data-rating-stars]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('detailPanel.myTags')
+    expect(wrapper.text()).not.toContain('detailPanel.play')
+    expect(wrapper.find('[aria-label="detailPanel.ariaRemoveNfoTag"]').exists()).toBe(false)
+  })
+
   it("renders the cover code badge as an external JAVDB search link", () => {
     const wrapper = mount(DetailPanel, {
       props: {

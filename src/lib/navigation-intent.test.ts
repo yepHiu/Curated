@@ -9,6 +9,17 @@ import {
 } from "@/lib/navigation-intent"
 
 describe("navigation intent helpers", () => {
+  it("returns wishlist details to their list filters and rejects external return paths", () => {
+    expect(resolveNavigationBackLink({ name: 'wishlist-detail', query: { back: '/wishlist?status=all&q=TEST' } })).toEqual({
+      to: '/wishlist?status=all&q=TEST', labelKey: 'wishlist.back',
+    })
+    for (const back of ['https://example.com', '//example.com', '/library', '/wishlist/other']) {
+      expect(resolveNavigationBackLink({ name: 'wishlist-detail', query: { back } })).toEqual({
+        to: { name: 'wishlist' }, labelKey: 'wishlist.back',
+      })
+    }
+  })
+
   it("builds detail routes with browse context separated from return intent", () => {
     expect(
       buildDetailRouteFromBrowse(

@@ -198,8 +198,8 @@ const useFlushWorkspaceFrame = computed(() =>
 )
 
 const showHeaderBack = computed(
-  () => { /* 愿望详情提供独立返回入口，不显示误导性的资料库返回。 */
-    if (route.name === "wishlist" || route.name === "wishlist-detail") return false
+  () => {
+    if (route.name === "wishlist") return false
     return !isPrimaryBrowseRoute.value || hasDetailBackIntentOnPrimaryRoute.value
   },
 )

@@ -331,6 +331,13 @@ export function resolveNavigationBackLink(
   route: RouteLike,
   currentMovieId?: string,
 ): { to: RouteLocationRaw; labelKey: string } {
+  if (route.name === "wishlist-detail") {
+    const back = getFirstQueryString(route.query.back) ?? ""
+    return {
+      to: /^\/wishlist(?:\?|$)/.test(back) ? back : { name: "wishlist" },
+      labelKey: "wishlist.back",
+    }
+  }
   if (route.name === "actor-detail") {
     if (currentMovieId && hasExplicitBackTarget(route.query, "detail")) {
       return {

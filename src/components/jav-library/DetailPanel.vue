@@ -51,12 +51,14 @@ const props = withDefaults(
     compact?: boolean
     showActions?: boolean
     metadataRefreshBusy?: boolean
+    readOnly?: boolean
   }>(),
   {
     userTagSuggestions: () => [],
     compact: false,
     showActions: true,
     metadataRefreshBusy: false,
+    readOnly: false,
   },
 )
 
@@ -313,7 +315,8 @@ function removeMetadataTag(tag: string) {
               <template v-else>
                 <span>—</span>
               </template>
-              <span aria-hidden="true"> · {{ movie.year }} · {{ movie.resolution }}</span>
+              <span v-if="movie.year" aria-hidden="true"> · {{ movie.year }}</span>
+              <span v-if="movie.resolution" aria-hidden="true"> · {{ movie.resolution }}</span>
               <span
                 v-if="metadataProvider"
                 data-metadata-provider
@@ -322,7 +325,7 @@ function removeMetadataTag(tag: string) {
             </CardDescription>
           </div>
 
-          <DropdownMenu v-if="!isTrashed">
+          <DropdownMenu v-if="!props.readOnly && !isTrashed">
             <DropdownMenuTrigger as-child>
               <Button
                 type="button"
@@ -389,7 +392,7 @@ function removeMetadataTag(tag: string) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu v-else>
+          <DropdownMenu v-else-if="!props.readOnly">
             <DropdownMenuTrigger as-child>
               <Button
                 type="button"
@@ -417,24 +420,28 @@ function removeMetadataTag(tag: string) {
           </DropdownMenu>
 
           <MovieEditDialog
+            v-if="!props.readOnly"
             v-model:open="movieEditOpen"
             :movie="movie"
             :patch-movie-display="patchMovieDisplayFromEdit"
           />
 
           <MovieDeleteConfirmDialog
+            v-if="!props.readOnly"
             v-model:open="deleteConfirmOpen"
             variant="trash"
             @confirm="emit('deleteMovie', movie.id)"
           />
 
           <MovieDeleteConfirmDialog
+            v-if="!props.readOnly"
             v-model:open="permanentDeleteConfirmOpen"
             variant="permanent"
             @confirm="emit('deleteMoviePermanently', movie.id)"
           />
 
           <MovieMetadataRefreshConfirmDialog
+            v-if="!props.readOnly"
             v-model:open="metadataRefreshConfirmOpen"
             :movie-title="movie.title"
             @confirm="emit('refreshMetadata', movie.id)"
@@ -472,7 +479,7 @@ function removeMetadataTag(tag: string) {
                   {{ tag }}
                 </button>
                 <button
-                  v-if="!isTrashed"
+                  v-if="!props.readOnly && !isTrashed"
                   type="button"
                   class="inline-flex size-[1.375rem] shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                   :aria-label="t('detailPanel.ariaRemoveNfoTag', { tag })"
@@ -485,7 +492,7 @@ function removeMetadataTag(tag: string) {
           </div>
         </div>
 
-        <div class="flex flex-col gap-3">
+        <div v-if="!props.readOnly" class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("detailPanel.myTags") }}</p>
           <div class="flex flex-wrap items-center gap-2">
             <Badge
@@ -528,6 +535,7 @@ function removeMetadataTag(tag: string) {
         </div>
 
         <div
+          v-if="!props.readOnly || movie.rating > 0"
           data-detail-rating-card
           class="w-[250px] max-w-full rounded-2xl border border-border/70 bg-background/50 p-3"
         >
@@ -548,7 +556,7 @@ function removeMetadataTag(tag: string) {
               {{ t("detailPanel.usingLocalRating") }}
             </span>
           </p>
-          <template v-if="!isTrashed">
+          <template v-if="!props.readOnly && !isTrashed">
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <span class="text-xs text-muted-foreground">{{ t("detailPanel.myRating") }}</span>
               <MovieRatingStars
@@ -567,7 +575,7 @@ function removeMetadataTag(tag: string) {
               </Button>
             </div>
           </template>
-          <p v-else class="mt-2 text-xs text-muted-foreground">
+          <p v-else-if="isTrashed" class="mt-2 text-xs text-muted-foreground">
             {{ t("detailPanel.ratingLockedInTrash") }}
           </p>
         </div>
@@ -605,7 +613,7 @@ function removeMetadataTag(tag: string) {
           </div>
         </div>
 
-        <div v-if="props.showActions" class="flex flex-wrap items-center gap-3">
+        <div v-if="props.showActions && !props.readOnly" class="flex flex-wrap items-center gap-3">
           <Button class="rounded-full px-8" @click="emit('openPlayer', movie.id)">
             <PlayCircle data-icon="inline-start" />
             {{ t("detailPanel.play") }}
