@@ -323,7 +323,7 @@ alwaysApply: true
 - 迁移 0055 保存独立 source_url：首次来源保留、重复加入仅补齐空值，刮削不覆盖。详情元数据来源后显示 JAVDB/Jable 等站点名超链接；旧记录无地址不显示。插件列表传影片卡片详情地址，详情传当前 URL；手动输入番号不猜来源。
 - 迁移 0053/0054：独立 wishlist_items/jobs/assets/movie_links；旧 tokens 表保留为历史迁移结构，无运行时读写。外部 `POST /api/integrations/wishlist/items` 严格接收 code 与可选 sourceUrl（HTTP(S) 页面地址，最多 4096 bytes，无账号密码），无需凭证，按来源 IP 限速 60/min，受 browserPluginEnabled 开关控制。扩展跨源只允许此入口；普通业务仍走原 PIN/Origin 保护。
 - 应用端 GET 列表/详情、PATCH/DELETE 条目、POST refresh、PUT library-links、GET 本地资产，根 `/api/wishlist/items`。旧令牌管理端点已移除。GET/PATCH `/api/settings` 新增 browserPluginEnabled，默认 false，library-config.cfg 持久化、即时生效；关闭拒绝愿望单接入和标记为 Curated-Plugin 或扩展 Origin 的 API 请求（403 BROWSER_PLUGIN_DISABLED）。
-- `GET /api/wishlist/items/{id}/playback` 按需并行查询固定的 Jable、MISSAV 页面，返回 available/missing/unknown 与已验证的站点链接；8 秒超时、2 MiB 页面上限、同站 HTTPS 重定向，不接受用户提供的目标 URL。只读详情通过共享 DetailPage 插槽显示品牌化查询卡片；Mock 不请求外站。
+- `GET /api/wishlist/items/{id}/playback` 按需并行查询固定的 Jable、MISSAV 页面，返回 available/missing/blocked/unknown；403/429 或 Cloudflare challenge 为 blocked，提供固定详情页地址供手动核对，不标为已收录。8 秒超时、2 MiB 页面上限、同站 HTTPS 重定向，不接受用户提供的目标 URL。只读详情通过共享 DetailPage 插槽显示品牌化查询卡片；Mock 不请求外站。
 - App 独立持久 worker，Metatube 实际番号精确校验，后台补全与受控图片下载；数据库父目录 `assets/wishlist` 保存哈希原件/缩略图，不属于 cache。自动导入前复用、周期对账/复制，自动关联重建保留人工确认/排除。
 - `/wishlist`、`/wishlist/:id` 和网络设置插件联动开关；WishlistService Web/Mock 实现，Mock 独立 localStorage。UI 使用前台轮询，尚无任务中心/SSE 投影、人工关联选择弹窗或逐图状态 UI。
 - 备份 v2 包含 wishlist-assets，v1 可读。恢复先增量不可变图片再交换 DB/配置；跨进程维护锁保护备份与回收。非愿望资产和视频仍不打包。
