@@ -19,14 +19,11 @@ type playbackSite struct {
 	name     string
 	address  string
 	selector string
-	search   bool
 }
 
 var playbackSites = []playbackSite{
-	{"Jable", "https://jable.tv/videos/%s/", ".info-header", false},
-	{"MISSAV", "https://missav.ws/%s/", "h1", false},
-	{"123av", "https://123av.com/zh/search?keyword=%s", ".detail>a[href*='v/']", true},
-	{"Supjav", "https://supjav.com/zh/?s=%s", "h3>a[rel='bookmark'][itemprop='url']", true},
+	{"Jable", "https://jable.tv/videos/%s/", ".info-header"},
+	{"MISSAV", "https://missav.ws/%s/", "h1"},
 }
 
 type playbackResult struct {
@@ -51,33 +48,6 @@ func playbackPageResult(site playbackSite, code, pageURL string, body io.Reader)
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
 		result.Status = "unknown"
-		return result
-	}
-	if site.search {
-		if doc.Find(site.selector).Length() == 0 {
-			result.Status = "unknown"
-			return result
-		}
-		doc.Find(site.selector).EachWithBreak(func(_ int, node *goquery.Selection) bool {
-			if !playbackCodeMatches(node.Text(), code) {
-				return true
-			}
-			href, ok := node.Attr("href")
-			if !ok {
-				return true
-			}
-			base, _ := url.Parse(pageURL)
-			ref, err := url.Parse(href)
-			if err != nil {
-				return true
-			}
-			link := base.ResolveReference(ref)
-			if link.Scheme != "https" || link.Hostname() != base.Hostname() {
-				return true
-			}
-			result.Status, result.URL = "available", link.String()
-			return false
-		})
 		return result
 	}
 	if doc.Find(site.selector).Length() == 0 {
