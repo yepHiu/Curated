@@ -8,8 +8,12 @@
       "recheck": "重新查询",
       "available": "已找到",
       "missing": "未找到",
+      "blocked": "站点限制自动查询",
       "unknown": "暂时无法确认",
       "open": "打开 {site} 播放页",
+      "verify": "打开 {site} 页面手动核对",
+      "watch": "前往观看",
+      "manual": "手动查看",
       "failed": "查询失败，请稍后重试。",
       "webOnly": "连接 Curated 后端后可查询播放站点。"
     },

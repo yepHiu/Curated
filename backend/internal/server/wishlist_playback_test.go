@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -30,5 +33,21 @@ func TestPlaybackPageResult(t *testing.T) {
 				t.Fatalf("got %+v, want %s %s", got, tt.status, tt.url)
 			}
 		})
+	}
+}
+
+type playbackRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn playbackRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
+
+func TestPlaybackBlockedOffersManualLink(t *testing.T) {
+	client := &http.Client{Transport: playbackRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusForbidden, Header: http.Header{"Cf-Mitigated": {"challenge"}}, Body: io.NopCloser(strings.NewReader("challenge")), Request: request}, nil
+	})}
+	result := probePlayback(context.Background(), client, playbackSites[0], "SSIS-001")
+	if result.Status != "blocked" || result.URL != "https://jable.tv/videos/ssis-001/" {
+		t.Fatalf("got %+v", result)
 	}
 }

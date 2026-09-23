@@ -8,8 +8,12 @@
       "recheck": "Check again",
       "available": "Found",
       "missing": "Not found",
+      "blocked": "Automated check blocked",
       "unknown": "Could not confirm",
       "open": "Open {site} watch page",
+      "verify": "Open {site} to check manually",
+      "watch": "Watch",
+      "manual": "Check site",
       "failed": "Check failed. Try again later.",
       "webOnly": "Connect to the Curated backend to check watch sites."
     },

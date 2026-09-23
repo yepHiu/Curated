@@ -10,16 +10,18 @@ describe("wishlist playback card", () => {
   it("checks only on demand and links only confirmed matches", async () => {
     playback.mockResolvedValue({ results: [
       { site: "Jable", status: "available", url: "https://jable.tv/videos/ssis-001/" },
-      { site: "MISSAV", status: "unknown" },
+      { site: "MISSAV", status: "blocked", url: "https://missav.ws/ssis-001/" },
     ] })
     const wrapper = mount(WishlistPlaybackCard, { props: { itemId: "wish-1", code: "SSIS-001" } })
     expect(playback).not.toHaveBeenCalled()
     await wrapper.get("button").trigger("click")
     await flushPromises()
     expect(playback).toHaveBeenCalledWith("wish-1")
-    expect(wrapper.findAll("a")).toHaveLength(1)
-    expect(wrapper.get("a").attributes("href")).toBe("https://jable.tv/videos/ssis-001/")
-    expect(wrapper.text()).toContain("wishlist.playback.unknown")
+    expect(wrapper.findAll("a")).toHaveLength(2)
+    expect(wrapper.findAll("a")[0].attributes("href")).toBe("https://jable.tv/videos/ssis-001/")
+    expect(wrapper.findAll("a")[1].attributes("href")).toBe("https://missav.ws/ssis-001/")
+    expect(wrapper.text()).toContain("wishlist.playback.blocked")
+    expect(wrapper.text()).toContain("wishlist.playback.manual")
     wrapper.unmount()
   })
 })

@@ -28,7 +28,7 @@ var playbackSites = []playbackSite{
 
 type playbackResult struct {
 	Site   string `json:"site"`
-	Status string `json:"status"` // available, missing, or unknown
+	Status string `json:"status"` // available, missing, blocked, or unknown
 	URL    string `json:"url,omitempty"`
 }
 
@@ -74,6 +74,10 @@ func probePlayback(ctx context.Context, client *http.Client, site playbackSite, 
 		return result
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusTooManyRequests || response.Header.Get("Cf-Mitigated") == "challenge" {
+		result.Status, result.URL = "blocked", address
+		return result
+	}
 	if response.StatusCode == http.StatusNotFound {
 		result.Status = "missing"
 		return result

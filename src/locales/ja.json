@@ -8,8 +8,12 @@
       "recheck": "再確認",
       "available": "見つかりました",
       "missing": "見つかりません",
+      "blocked": "自動確認が制限されています",
       "unknown": "確認できません",
       "open": "{site} の視聴ページを開く",
+      "verify": "{site} のページを開いて手動確認",
+      "watch": "視聴する",
+      "manual": "サイトで確認",
       "failed": "確認に失敗しました。後でもう一度お試しください。",
       "webOnly": "Curated バックエンドに接続すると確認できます。"
     },
