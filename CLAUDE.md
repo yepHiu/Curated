@@ -639,6 +639,7 @@ The frontend preview grid replaces batches instead of accumulating an entire boo
 - `POST /api/integrations/wishlist/items`: no token; requires browserPluginEnabled=true; strict `{ "code": "SSIS-001", "sourceUrl": "https://javdb.com/v/example" }` (`sourceUrl` optional, HTTP(S), no credentials, max 4096 bytes); 201 created / 200 existing or in_library. No metadata, image URLs, site cookies or file paths in plugin payload.
 - `GET /api/wishlist/items`: status=pending|in_library|completed|all, q, cursor, limit (1–60); returns items/total/pendingCount/nextCursor.
 - `GET/PATCH/DELETE /api/wishlist/items/{id}`: independent details including sourceUrl; version-checked note/code/completed patch; removal does not delete movies.
+- `GET /api/wishlist/items/{id}/playback`: on-demand fixed-site availability check (Jable, MISSAV, 123av, Supjav), returning available/missing/unknown and a validated external link for confirmed matches; protected application session.
 - `POST /api/wishlist/items/{id}/refresh`: enqueue/merge enrichment, 202.
 - `PUT /api/wishlist/items/{id}/library-links`: `{movieId, excluded}` manual confirmation/exclusion; protected application session.
 - `GET /api/wishlist/items/{id}/assets/{assetId}?thumbnail=1`: current local image, protected application route.
