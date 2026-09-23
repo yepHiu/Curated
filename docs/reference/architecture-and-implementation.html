@@ -545,7 +545,7 @@
   <p>插件提交番号与可选来源网页，Curated 以独立 SQLite 条目与持久队列查询资料并保存图片。迁移 0055 独立保存来源网址，重复加入仅补齐空值且刮削不覆盖。迁移 0053/0054 保存条目、工作、资产和影片关联；历史令牌表不再使用。worker 在后台补全并周期对账。自动导入先复用已保存资料和图片，唯一身份关联从默认待入库墙隐藏；人工完成不写观看状态。</p>
   <table><thead><tr><th>模块</th><th>实现与边界</th></tr></thead><tbody>
     <tr><td>接入</td><td>POST /api/integrations/wishlist/items；严格 code 与可选 sourceUrl 字段（HTTP(S)、最多 4096 bytes、无账号密码），无需凭证；browserPluginEnabled 默认关闭，开启后按来源 IP 限速 60/min。关闭拒绝接入和已标识的插件 API 请求；普通 API 沿用 PIN/Origin 规则。</td></tr>
-    <tr><td>UI</td><td>/wishlist、/wishlist/:id；共享影片海报网格、只读资料详情、状态筛选；详情元数据来源后以 JAVDB/Jable 等站点名超链接直达原影片页面；详情另有按需查询 Jable、MISSAV、123av、Supjav 收录状态的卡片，确认找到后显示外部观看入口。网络设置提供即时生效且持久化的插件联动开关。独立 Web/Mock adapter。</td></tr>
+    <tr><td>UI</td><td>/wishlist、/wishlist/:id；共享影片海报网格、只读资料详情、状态筛选；详情元数据来源后以 JAVDB/Jable 等站点名超链接直达原影片页面；详情另有按需查询 Jable、MISSAV 收录状态的卡片，确认找到后显示外部观看入口。网络设置提供即时生效且持久化的插件联动开关。独立 Web/Mock adapter。</td></tr>
     <tr><td>播放站点查询</td><td>GET /api/wishlist/items/{id}/playback 仅接受已保存的愿望单 ID；服务端固定目标站点，8 秒超时、2 MiB HTML 上限，仅同站 HTTPS 重定向。响应区分 available/missing/unknown，不持久化查询结果，也不代理媒体流。</td></tr>
     <tr><td>资源</td><td>数据库父目录 assets/wishlist，哈希原件与缩略图；影片入库复制资源，删除愿望不删除影片文件。</td></tr>
     <tr><td>备份</td><td>格式 v2 包含愿望资产，兼容 v1；恢复先增量写不可变文件再交换 DB/配置，备份和回收共享维护锁。</td></tr>
