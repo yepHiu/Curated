@@ -31,7 +31,7 @@ async function check(itemId: string) {
 
 <template>
   <Card data-wishlist-playback class="rounded-3xl border-border/70 bg-card/85">
-    <CardHeader class="flex-row items-center justify-between gap-3">
+    <CardHeader class="flex items-center gap-2">
       <CardTitle>{{ t('wishlist.playback.title') }}</CardTitle>
       <Button variant="outline" size="icon-sm" class="size-11 rounded-full sm:size-8" :aria-label="t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check')" :title="t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check')" :disabled="busy || !service.integrationsAvailable" @click="check(itemId)">
         <LoaderCircle v-if="busy" class="animate-spin" />
