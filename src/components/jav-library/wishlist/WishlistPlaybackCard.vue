@@ -40,12 +40,12 @@ async function check(itemId: string) {
       </Button>
     </CardHeader>
     <CardContent v-if="results.length" class="flex flex-wrap gap-2" aria-live="polite">
-      <div v-for="result in results" :key="result.site" class="flex w-56 max-w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
+      <div v-for="result in results" :key="result.site" class="flex w-56 max-w-full min-w-0 flex-col items-start gap-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
         <div class="flex min-w-0 flex-col gap-1.5">
           <span class="truncate text-sm font-medium">{{ result.site }}</span>
           <Badge :variant="result.status === 'available' ? 'success' : result.status === 'blocked' ? 'warning' : 'secondary'">{{ t(`wishlist.playback.${result.status}`) }}</Badge>
         </div>
-        <Button v-if="result.url && (result.status === 'available' || result.status === 'blocked')" variant="outline" size="sm" as-child class="shrink-0 rounded-full">
+        <Button v-if="result.url && (result.status === 'available' || result.status === 'blocked')" variant="outline" size="sm" as-child class="self-end rounded-full">
           <a :href="result.url" target="_blank" rel="noopener noreferrer" :aria-label="t(result.status === 'blocked' ? 'wishlist.playback.verify' : 'wishlist.playback.open', { site: result.site })">
             {{ t(result.status === 'blocked' ? 'wishlist.playback.manual' : 'wishlist.playback.watch') }}
             <ExternalLink data-icon="inline-end" />
