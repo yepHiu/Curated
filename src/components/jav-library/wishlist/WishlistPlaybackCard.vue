@@ -45,9 +45,9 @@ async function check(itemId: string) {
           <span class="truncate text-sm font-medium">{{ result.site }}</span>
           <Badge :variant="result.status === 'available' ? 'success' : result.status === 'blocked' ? 'warning' : 'secondary'">{{ t(`wishlist.playback.${result.status}`) }}</Badge>
         </div>
-        <Button v-if="result.url && (result.status === 'available' || result.status === 'blocked')" variant="outline" size="sm" as-child class="self-end rounded-full">
+        <Button v-if="result.url && (result.status === 'available' || result.status === 'blocked')" variant="outline" :size="result.status === 'blocked' ? 'icon-sm' : 'sm'" as-child class="self-end rounded-full">
           <a :href="result.url" target="_blank" rel="noopener noreferrer" :aria-label="t(result.status === 'blocked' ? 'wishlist.playback.verify' : 'wishlist.playback.open', { site: result.site })">
-            {{ t(result.status === 'blocked' ? 'wishlist.playback.manual' : 'wishlist.playback.watch') }}
+            <template v-if="result.status === 'available'">{{ t('wishlist.playback.watch') }}</template>
             <ExternalLink data-icon="inline-end" />
           </a>
         </Button>
