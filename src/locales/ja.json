@@ -1,5 +1,18 @@
 {
   "wishlist": {
+    "playback": {
+      "title": "オンライン視聴",
+      "description": "品番 {code} の掲載状況を確認します。結果は各サイトの現在のページに基づきます。",
+      "check": "掲載を確認",
+      "checking": "確認中…",
+      "recheck": "再確認",
+      "available": "見つかりました",
+      "missing": "見つかりません",
+      "unknown": "確認できません",
+      "open": "{site} の視聴ページを開く",
+      "failed": "確認に失敗しました。後でもう一度お試しください。",
+      "webOnly": "Curated バックエンドに接続すると確認できます。"
+    },
     "pluginStatus": {
       "disabled": "連携オフ",
       "online": "オンライン",

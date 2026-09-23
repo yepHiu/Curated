@@ -258,6 +258,7 @@ func (h *Handler) registerWishlistRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST "+wishlistIntakePath, h.handleAddWishlist)
 	mux.HandleFunc("GET /api/wishlist/items", h.handleWishlistList)
 	mux.HandleFunc("GET /api/wishlist/items/{id}", h.handleWishlistItem)
+	mux.HandleFunc("GET /api/wishlist/items/{id}/playback", h.handleWishlistPlayback)
 	mux.HandleFunc("PATCH /api/wishlist/items/{id}", h.handleWishlistItem)
 	mux.HandleFunc("DELETE /api/wishlist/items/{id}", h.handleWishlistItem)
 	mux.HandleFunc("POST /api/wishlist/items/{id}/refresh", h.handleWishlistRefresh)

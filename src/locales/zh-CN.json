@@ -1,5 +1,18 @@
 {
   "wishlist": {
+    "playback": {
+      "title": "在线观看",
+      "description": "按番号 {code} 查询站点收录情况。结果来自站点当前页面。",
+      "check": "查询播放信息",
+      "checking": "正在查询…",
+      "recheck": "重新查询",
+      "available": "已找到",
+      "missing": "未找到",
+      "unknown": "暂时无法确认",
+      "open": "打开 {site} 播放页",
+      "failed": "查询失败，请稍后重试。",
+      "webOnly": "连接 Curated 后端后可查询播放站点。"
+    },
     "pluginStatus": {
       "disabled": "联动已关闭",
       "online": "在线",

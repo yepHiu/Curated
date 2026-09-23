@@ -14,6 +14,8 @@ export const webWishlistService: WishlistServiceContract = {
   remove(id) { return httpClient.delete(`${root}/${encodeURIComponent(id)}`) },
   /** 合并请求后台重试。 */
   refresh(id) { return httpClient.post(`${root}/${encodeURIComponent(id)}/refresh`) },
+  /** 按需查询固定站点，结果不写入愿望单。 */
+  playback(id) { return httpClient.get(`${root}/${encodeURIComponent(id)}/playback`) },
   /** 将受保护资产路径映射到当前后端，拒绝外部 URL。 */
   assetUrl(path) { return path.startsWith("/api/wishlist/") ? resolveApiBaseUrl(import.meta.env).replace(/\/api$/, "") + path : "" },
 }

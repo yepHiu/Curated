@@ -20,6 +20,7 @@ export const mockWishlistService: WishlistServiceContract = {
   async remove(id) { write(read().filter((item) => { /* 保留其他记录。 */ return item.id !== id })) },
   /** Mock 不启动网络刮削。 */
   async refresh() { throw new Error("Web API required") },
+  async playback() { throw new Error("Web API required") },
   /** 只允许应用提供的本地图像。 */
   assetUrl(path) { return path.startsWith("/") && !path.startsWith("//") ? path : "" },
 }

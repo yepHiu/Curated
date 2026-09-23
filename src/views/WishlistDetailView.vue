@@ -6,6 +6,7 @@ import { useLibraryService } from "@/services/library-service"
 import type { Movie } from "@/domain/movie/types"
 import type { WishlistItem } from "@/domain/wishlist/types"
 import DetailPage from "@/components/jav-library/DetailPage.vue"
+import WishlistPlaybackCard from "@/components/jav-library/wishlist/WishlistPlaybackCard.vue"
 import NotFoundState from "@/components/jav-library/NotFoundState.vue"
 
 const { t } = useI18n()
@@ -108,7 +109,11 @@ onBeforeUnmount(() => {
       @browse-by-tag="browseByTag"
       @browse-by-actor="browseByActor"
       @browse-by-studio="browseByStudio"
-    />
+    >
+      <template #after-detail-panel>
+        <WishlistPlaybackCard :key="`${item!.id}:${item!.code}`" :item-id="item!.id" :code="item!.code" />
+      </template>
+    </DetailPage>
     <NotFoundState
       v-else
       :title="t('detail.notFoundTitle')"

@@ -201,6 +201,8 @@ function openPosterInViewer() {
       @open-poster-viewer="openPosterInViewer"
     />
 
+    <slot name="after-detail-panel" />
+
     <Card class="rounded-3xl border-border/70 bg-card/85">
       <CardHeader>
         <CardTitle>{{ t("detailPage.previewGalleryTitle") }}</CardTitle>

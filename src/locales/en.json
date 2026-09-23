@@ -1,5 +1,18 @@
 {
   "wishlist": {
+    "playback": {
+      "title": "Watch online",
+      "description": "Check site availability for {code}. Results reflect the sites' current pages.",
+      "check": "Check availability",
+      "checking": "Checking…",
+      "recheck": "Check again",
+      "available": "Found",
+      "missing": "Not found",
+      "unknown": "Could not confirm",
+      "open": "Open {site} watch page",
+      "failed": "Check failed. Try again later.",
+      "webOnly": "Connect to the Curated backend to check watch sites."
+    },
     "pluginStatus": {
       "disabled": "Integration off",
       "online": "Online",

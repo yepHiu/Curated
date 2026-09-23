@@ -13,3 +13,5 @@ export interface WishlistItem {
 export interface WishlistQuery { status?: string; q?: string; cursor?: string; limit?: number }
 export interface WishlistPage { items: WishlistItem[]; total: number; pendingCount: number; nextCursor?: string }
 export interface WishlistPatch { version: number; code?: string; note?: string; completed?: boolean }
+export interface WishlistPlaybackResult { site: string; status: "available" | "missing" | "unknown"; url?: string }
+export interface WishlistPlaybackResponse { results: WishlistPlaybackResult[] }
