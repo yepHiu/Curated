@@ -2,8 +2,7 @@
   "wishlist": {
     "playback": {
       "title": "オンライン視聴",
-      "description": "品番 {code} の掲載状況を確認します。結果は各サイトの現在のページに基づきます。",
-      "check": "掲載を確認",
+      "check": "確認",
       "checking": "確認中…",
       "recheck": "再確認",
       "available": "見つかりました",

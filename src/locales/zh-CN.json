@@ -2,8 +2,7 @@
   "wishlist": {
     "playback": {
       "title": "在线观看",
-      "description": "按番号 {code} 查询站点收录情况。结果来自站点当前页面。",
-      "check": "查询播放信息",
+      "check": "查询",
       "checking": "正在查询…",
       "recheck": "重新查询",
       "available": "已找到",

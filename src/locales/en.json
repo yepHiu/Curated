@@ -2,8 +2,7 @@
   "wishlist": {
     "playback": {
       "title": "Watch online",
-      "description": "Check site availability for {code}. Results reflect the sites' current pages.",
-      "check": "Check availability",
+      "check": "Check",
       "checking": "Checking…",
       "recheck": "Check again",
       "available": "Found",

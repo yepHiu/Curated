@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
       @browse-by-studio="browseByStudio"
     >
       <template #after-detail-panel>
-        <WishlistPlaybackCard :key="`${item!.id}:${item!.code}`" :item-id="item!.id" :code="item!.code" />
+        <WishlistPlaybackCard :key="`${item!.id}:${item!.code}`" :item-id="item!.id" />
       </template>
     </DetailPage>
     <NotFoundState

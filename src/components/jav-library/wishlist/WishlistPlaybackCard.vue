@@ -6,9 +6,9 @@ import { useLibraryService } from "@/services/library-service"
 import type { WishlistPlaybackResult } from "@/domain/wishlist/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-defineProps<{ itemId: string; code: string }>()
+defineProps<{ itemId: string }>()
 const { t } = useI18n()
 const service = useLibraryService().wishlist
 const results = ref<WishlistPlaybackResult[]>([])
@@ -31,12 +31,9 @@ async function check(itemId: string) {
 
 <template>
   <Card data-wishlist-playback class="rounded-3xl border-border/70 bg-card/85">
-    <CardHeader class="gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex flex-col gap-1.5">
-        <CardTitle>{{ t('wishlist.playback.title') }}</CardTitle>
-        <CardDescription>{{ t('wishlist.playback.description', { code }) }}</CardDescription>
-      </div>
-      <Button variant="outline" class="min-h-11 rounded-full sm:min-h-9" :disabled="busy || !service.integrationsAvailable" @click="check(itemId)">
+    <CardHeader class="flex-row items-center justify-between gap-3">
+      <CardTitle>{{ t('wishlist.playback.title') }}</CardTitle>
+      <Button variant="outline" size="sm" class="rounded-full" :disabled="busy || !service.integrationsAvailable" @click="check(itemId)">
         <LoaderCircle v-if="busy" data-icon="inline-start" class="animate-spin" />
         <Search v-else data-icon="inline-start" />
         {{ t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check') }}

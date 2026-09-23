@@ -12,7 +12,7 @@ describe("wishlist playback card", () => {
       { site: "Jable", status: "available", url: "https://jable.tv/videos/ssis-001/" },
       { site: "MISSAV", status: "blocked", url: "https://missav.ws/ssis-001/" },
     ] })
-    const wrapper = mount(WishlistPlaybackCard, { props: { itemId: "wish-1", code: "SSIS-001" } })
+    const wrapper = mount(WishlistPlaybackCard, { props: { itemId: "wish-1" } })
     expect(playback).not.toHaveBeenCalled()
     await wrapper.get("button").trigger("click")
     await flushPromises()
