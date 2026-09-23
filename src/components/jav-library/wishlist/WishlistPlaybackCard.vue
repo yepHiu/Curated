@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { ExternalLink, Search, LoaderCircle } from "lucide-vue-next"
+import { ExternalLink, Search, RefreshCw, LoaderCircle } from "lucide-vue-next"
 import { useLibraryService } from "@/services/library-service"
 import type { WishlistPlaybackResult } from "@/domain/wishlist/types"
 import { Badge } from "@/components/ui/badge"
@@ -33,10 +33,10 @@ async function check(itemId: string) {
   <Card data-wishlist-playback class="rounded-3xl border-border/70 bg-card/85">
     <CardHeader class="flex-row items-center justify-between gap-3">
       <CardTitle>{{ t('wishlist.playback.title') }}</CardTitle>
-      <Button variant="outline" size="sm" class="rounded-full" :disabled="busy || !service.integrationsAvailable" @click="check(itemId)">
-        <LoaderCircle v-if="busy" data-icon="inline-start" class="animate-spin" />
-        <Search v-else data-icon="inline-start" />
-        {{ t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check') }}
+      <Button variant="outline" size="icon-sm" class="size-11 rounded-full sm:size-8" :aria-label="t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check')" :title="t(busy ? 'wishlist.playback.checking' : results.length ? 'wishlist.playback.recheck' : 'wishlist.playback.check')" :disabled="busy || !service.integrationsAvailable" @click="check(itemId)">
+        <LoaderCircle v-if="busy" class="animate-spin" />
+        <RefreshCw v-else-if="results.length" />
+        <Search v-else />
       </Button>
     </CardHeader>
     <CardContent v-if="results.length" class="flex flex-wrap gap-2" aria-live="polite">
