@@ -47,7 +47,7 @@ alwaysApply: true
 ## 2026-08 GIF Clip Capture
 
 - **2026-09-06 萃取帧优化**：截图冻结影片/时间/画面，4 个保留任务、128 MiB 接收预算、串行上传；HUD 缩略图回执支持重试、原图下载、显式 JPEG 压缩、撤销入库与独立目录导出失败。4K PNG 可用 Worker 编码并回退到已冻结 canvas。Web 创建相同 id/影片/时间/原图字节重放返回 204，冲突内容仍 409；图片上限 12 MiB / 33,177,600 像素。
-- 列表支持 `cursor/skipTotal`，续页 `total=-1` 表示沿用首屏统计，`nextCursor` 配合 `(captured_at,id)` 稳定索引（0045）；motion 按页批量查，缩略图不把原图 Scan 到 Go；原图/缩略图有 ETag。详情仅当前±1 原图，网格离屏行卸载并保留键盘入口；Mock IndexedDB v2 将图片与元数据分 store。视觉相似仅用户发起，对前 200 个已加载帧生成 dHash，最多 50 对，不自动删除。
+- 列表支持 `cursor/skipTotal`，续页 `total=-1` 表示沿用首屏统计，`nextCursor` 配合 `(captured_at,id)` 稳定索引（0045）；motion 按页批量查，缩略图不把原图 Scan 到 Go；原图/缩略图有 ETag。详情仅当前±1 原图，网格离屏行卸载并保留键盘入口；Mock IndexedDB v2 将图片与元数据分 store。萃取帧库的视觉相似检查已移除；同片时间相近提示仍保留。
 - 新增 `POST /api/library/movies/{movieId}/frame`（源文件 PNG，20 秒、32 MiB 输出，与片段共用 2 个编码槽）及 `DELETE /api/tasks/{taskId}/clip`。clips 支持 GIF/MP4/WebM，最多 8 个在途/2 个编码任务、2 分钟期限、128 MiB 输出；真实媒体时间决定区间，暂停结束、seek 取消，轮询失败退避。生产英文/日文词典按需读取哈希 JSON 资源，避免作为可执行 JS chunk 加载。
 
 - Web API clips use `POST /api/library/movies/{movieId}/clips` with bounded `startSec/endSec` (0.4–6 seconds), `format: "gif" | "mp4" | "webm"`, optional `fps` (1–20), `width` (160–960) and `curatedFrameId`. Associated artifacts persist under `curated-frame-motions` and use `GET /api/curated-frames/{id}/motion`; unassociated tasks use `GET /api/tasks/{taskId}/artifact`.
