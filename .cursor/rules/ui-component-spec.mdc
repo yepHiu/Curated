@@ -118,3 +118,7 @@ alwaysApply: false
 ## 变更同步
 
 修改 **`src/style.css`** 全局令牌或 **`components/ui`** 中共享基元默认样式时：同步更新 **`docs/reference/2026-03-24-frontend-ui-spec.md`** 与本文件相关条目。
+
+## 个人洞察（2026-09-24）
+
+`PersonalInsightsPage` 保持 AppShell 内部滚动与 Card/Progress 基元。范围选择在桌面按内容收缩，手机端为 2×2 且每项至少 44px；六项摘要桌面 3×2、手机 2 列，详细口径用可展开区块。演员、厂牌、标签各默认显示前五项，可独立展开与重试；跨实体 `full-per-entity` 的非互斥归因说明必须可见。范围切换保留旧结果时明确标注旧范围，不得把旧数据当作新范围显示。

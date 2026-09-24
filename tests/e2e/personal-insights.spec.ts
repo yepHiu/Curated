@@ -52,6 +52,12 @@ test("personal insights renders bounded local aggregates at desktop and 375px", 
   await expect(page.locator("body")).not.toContainText("NaN")
   await expect(page.locator("body")).not.toContainText("Infinity")
 
+  const desktopMetrics = await page.locator("[data-insights-metric]").all()
+  const desktopBounds = await Promise.all(desktopMetrics.map((metric) => metric.boundingBox()))
+  expect(desktopBounds[0]?.y).toBe(desktopBounds[1]?.y)
+  expect(desktopBounds[1]?.y).toBe(desktopBounds[2]?.y)
+  expect(desktopBounds[3]?.y).toBeGreaterThan(desktopBounds[0]?.y ?? 0)
+
   const ranges = page.locator("[data-insights-range-selector] label")
   await expect(ranges).toHaveCount(4)
   await ranges.nth(1).click()
@@ -66,6 +72,9 @@ test("personal insights renders bounded local aggregates at desktop and 375px", 
 
   await page.setViewportSize({ width: 375, height: 812 })
   await expect(page.locator("[data-personal-insights-page]")).toBeVisible()
+  const mobileBounds = await Promise.all(desktopMetrics.slice(0, 3).map((metric) => metric.boundingBox()))
+  expect(mobileBounds[0]?.y).toBe(mobileBounds[1]?.y)
+  expect(mobileBounds[2]?.y).toBeGreaterThan(mobileBounds[0]?.y ?? 0)
   const mobileHasHorizontalOverflow = await page.evaluate(() => {
     const root = document.documentElement
     return root.scrollWidth > root.clientWidth + 1

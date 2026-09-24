@@ -132,6 +132,36 @@ describe("PersonalInsightsPage", () => {
     expect(wrapper.text()).not.toContain("Infinity")
   })
 
+  it("shows five ranking items by default and expands one dimension at a time", async () => {
+    serviceMocks.getPersonalInsightsBreakdown.mockImplementation(
+      ({ dimension }: { dimension: PersonalInsightsDimension }) => Promise.resolve({
+        ...breakdown(dimension),
+        items: Array.from({ length: 7 }, (_, index) => ({
+          name: `${dimension} ${index + 1}`,
+          watchedSeconds: 600 - index * 60,
+          movieCount: 1,
+          shareOfTotal: (600 - index * 60) / 7200,
+        })),
+      }),
+    )
+
+    const wrapper = mount(PersonalInsightsPage)
+    await flushPromises()
+
+    const actor = wrapper.get('[data-insights-breakdown="actor"]')
+    const studio = wrapper.get('[data-insights-breakdown="studio"]')
+    expect(actor.findAll("[data-slot='progress']")).toHaveLength(5)
+    expect(studio.findAll("[data-slot='progress']")).toHaveLength(5)
+
+    await actor.get('[data-insights-expand="actor"]').trigger("click")
+    expect(actor.findAll("[data-slot='progress']")).toHaveLength(7)
+    expect(actor.get('[data-insights-expand="actor"]').attributes("aria-expanded")).toBe("true")
+    expect(studio.findAll("[data-slot='progress']")).toHaveLength(5)
+
+    await actor.get('[data-insights-expand="actor"]').trigger("click")
+    expect(actor.findAll("[data-slot='progress']")).toHaveLength(5)
+  })
+
   it("does not let a slower previous range overwrite a newer selection", async () => {
     let resolveFirst: ((value: PersonalInsightsOverviewDTO) => void) | undefined
     serviceMocks.getPersonalInsightsOverview.mockImplementation(
@@ -156,6 +186,86 @@ describe("PersonalInsightsPage", () => {
       range: "90d",
       timezone: expect.any(String),
     })
+  })
+
+  it("keeps the previous range visibly labelled until the selected range loads", async () => {
+    let resolveNext: ((value: PersonalInsightsOverviewDTO) => void) | undefined
+    serviceMocks.getPersonalInsightsOverview.mockImplementation(
+      ({ range }: { range: PersonalInsightsRange }) => range === "90d"
+        ? new Promise<PersonalInsightsOverviewDTO>((resolve) => { resolveNext = resolve })
+        : Promise.resolve(overview(range)),
+    )
+    const wrapper = mount(PersonalInsightsPage)
+    await flushPromises()
+
+    await wrapper.get('input[value="90d"]').setValue(true)
+    await flushPromises()
+    expect(wrapper.get("[data-insights-update-status]").text()).toContain("insights.showingPreviousRange")
+    expect(wrapper.get('[data-insights-metric="started"]').text()).toContain("2")
+
+    resolveNext?.(overview("90d", { startedMovies: 9, completedMovies: 3, completionRate: 1 / 3 }))
+    await flushPromises()
+    expect(wrapper.find("[data-insights-update-status]").exists()).toBe(false)
+    expect(wrapper.get('[data-insights-metric="started"]').text()).toContain("9")
+  })
+
+  it("keeps a successful overview and other rankings when one dimension fails, then retries it", async () => {
+    let actorFails = true
+    serviceMocks.getPersonalInsightsBreakdown.mockImplementation(
+      ({ dimension, range }: { dimension: PersonalInsightsDimension; range: PersonalInsightsRange }) => {
+        if (dimension === "actor" && actorFails) return Promise.reject(new Error("actor unavailable"))
+        return Promise.resolve(breakdown(dimension, range))
+      },
+    )
+    const wrapper = mount(PersonalInsightsPage)
+    await flushPromises()
+
+    expect(wrapper.findAll("[data-insights-metric]")).toHaveLength(6)
+    expect(wrapper.get('[data-insights-breakdown="studio"]').text()).toContain("studio A")
+    expect(wrapper.get('[data-insights-breakdown="actor"]').text()).toContain("insights.breakdownError")
+
+    actorFails = false
+    await wrapper.get('[data-insights-retry-breakdown="actor"]').trigger("click")
+    await flushPromises()
+    expect(wrapper.get('[data-insights-breakdown="actor"]').text()).toContain("actor A")
+    expect(wrapper.find('[data-insights-retry-breakdown="actor"]').exists()).toBe(false)
+    expect(serviceMocks.getPersonalInsightsBreakdown).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dimension: "actor", range: "30d", limit: 10 }),
+    )
+  })
+
+  it("shows a grounded fact only when enough watch data supports it", async () => {
+    serviceMocks.getPersonalInsightsOverview.mockResolvedValue(overview("30d", {
+      watchedSeconds: 7200,
+      startedMovies: 6,
+    }))
+    const wrapper = mount(PersonalInsightsPage)
+    await flushPromises()
+    expect(wrapper.get("[data-insights-fact]").text()).toContain("actor A")
+
+    serviceMocks.getPersonalInsightsOverview.mockResolvedValue(overview("90d", {
+      watchedSeconds: 600,
+      startedMovies: 2,
+    }))
+    await wrapper.get('input[value="90d"]').setValue(true)
+    await flushPromises()
+    expect(wrapper.find("[data-insights-fact]").exists()).toBe(false)
+  })
+
+  it("preserves the prior range with an explicit retry if the selected overview fails", async () => {
+    serviceMocks.getPersonalInsightsOverview.mockImplementation(
+      ({ range }: { range: PersonalInsightsRange }) => range === "90d"
+        ? Promise.reject(new Error("offline"))
+        : Promise.resolve(overview(range)),
+    )
+    const wrapper = mount(PersonalInsightsPage)
+    await flushPromises()
+
+    await wrapper.get('input[value="90d"]').setValue(true)
+    await flushPromises()
+    expect(wrapper.get("[data-insights-update-status]").text()).toContain("insights.previousRangeFailed")
+    expect(wrapper.findAll("[data-insights-metric]")).toHaveLength(6)
+    expect(wrapper.find("[data-insights-retry-overview]").exists()).toBe(true)
   })
 
   it("offers a retry after a failed aggregate request", async () => {
