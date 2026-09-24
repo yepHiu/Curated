@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Info, Loader2, Sparkles } from "lucide-vue-next"
+import { Info, Loader2, ScrollText, Sparkles } from "lucide-vue-next"
 import type { HealthDTO } from "@/api/types"
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { formatAboutBackendVersion } from "@/lib/about-version"
+import curatedLicenseUrl from "@/assets/licenses/Curated_LICENSE.txt?url&no-inline"
 import harmonySansLicenseUrl from "@/assets/fonts/HarmonyOS_Sans_SC_LICENSE.txt?url&no-inline"
 import notoSansLicenseUrl from "@/assets/fonts/NotoSans_LICENSE.txt?url"
 import notoSansJpLicenseUrl from "@/assets/fonts/NotoSansJP_LICENSE.txt?url"
@@ -43,6 +44,13 @@ function repositoryHrefFromDisplay(raw: string): string {
 const aboutRepositoryHref = computed(() =>
   repositoryHrefFromDisplay(t("settings.aboutRepositoryValue")),
 )
+
+const licenseItems = computed(() => [
+  { name: "Curated", detail: t("settings.aboutLicenseValue"), url: curatedLicenseUrl },
+  { name: "HarmonyOS Sans SC", detail: t("settings.aboutHarmonyFontNotice"), url: harmonySansLicenseUrl },
+  { name: "Noto Sans", detail: "SIL Open Font License 1.1", url: notoSansLicenseUrl },
+  { name: "Noto Sans JP", detail: "SIL Open Font License 1.1", url: notoSansJpLicenseUrl },
+])
 </script>
 
 <template>
@@ -101,16 +109,6 @@ const aboutRepositoryHref = computed(() =>
                     </dt>
                     <dd class="min-w-0 break-words text-end text-foreground/90">
                       {{ t("settings.aboutCopyrightValue") }}
-                    </dd>
-                  </div>
-                  <div
-                    class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-                  >
-                    <dt class="shrink-0 font-semibold text-foreground">
-                      {{ t("settings.aboutLicenseLabel") }}
-                    </dt>
-                    <dd class="min-w-0 text-end font-mono text-foreground/90">
-                      {{ t("settings.aboutLicenseValue") }}
                     </dd>
                   </div>
                   <div
@@ -199,16 +197,6 @@ const aboutRepositoryHref = computed(() =>
                   class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
                 >
                   <dt class="shrink-0 font-semibold text-foreground">
-                    {{ t("settings.aboutLicenseLabel") }}
-                  </dt>
-                  <dd class="min-w-0 text-end font-mono text-foreground/90">
-                    {{ t("settings.aboutLicenseValue") }}
-                  </dd>
-                </div>
-                <div
-                  class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-                >
-                  <dt class="shrink-0 font-semibold text-foreground">
                     {{ t("settings.aboutRepositoryLabel") }}
                   </dt>
                   <dd class="min-w-0 break-all text-end font-mono">
@@ -230,26 +218,6 @@ const aboutRepositoryHref = computed(() =>
               :backend-version-status="backendVersionStatus"
             />
           </template>
-          <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
-            <p class="font-semibold text-foreground">{{ t("settings.aboutFontLabel") }}</p>
-            <p class="mt-1.5">{{ t("settings.aboutFontAttribution") }}</p>
-            <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-              <a
-                v-for="fontLicense in [
-                  { url: harmonySansLicenseUrl, label: t('settings.aboutHarmonyFontLicense') },
-                  { url: notoSansLicenseUrl, label: 'Noto Sans OFL' },
-                  { url: notoSansJpLicenseUrl, label: 'Noto Sans JP OFL' },
-                ]"
-                :key="fontLicense.url"
-                :href="fontLicense.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {{ fontLicense.label }}
-              </a>
-            </div>
-          </div>
           <SettingsHomepageDevTools
             v-if="isViteDev && useWebApi"
             @refreshed="emit('refreshHealth')"
@@ -257,5 +225,43 @@ const aboutRepositoryHref = computed(() =>
         </CardContent>
       </Card>
     </div>
+    <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+      <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
+        <span
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+          aria-hidden="true"
+        >
+          <ScrollText class="size-[1.15rem]" />
+        </span>
+        <CardTitle class="min-w-0 text-lg tracking-tight">
+          {{ t("settings.aboutUsageLicensesTitle") }}
+        </CardTitle>
+      </CardHeader>
+      <CardContent class="pt-0">
+        <div class="divide-y divide-border/50 rounded-lg border border-border/50 bg-muted/5">
+          <div
+            v-for="license in licenseItems"
+            :key="license.name"
+            class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4"
+          >
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-foreground">{{ license.name }}</p>
+              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {{ license.detail }}
+              </p>
+            </div>
+            <a
+              :href="license.url"
+              :aria-label="t('settings.aboutViewLicenseFor', { name: license.name })"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="shrink-0 rounded-sm text-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {{ t("settings.aboutViewLicense") }}
+            </a>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   </div>
 </template>

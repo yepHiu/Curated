@@ -64,18 +64,16 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.emitted("refreshHealth")).toHaveLength(1)
   })
 
-  it("renders authorship and open-source license information", () => {
+  it.each([true, false])("shows the concise license section in dev=%s", (isViteDev) => {
     const wrapper = mount(SettingsAboutSection, {
-      props: baseProps,
+      props: { ...baseProps, isViteDev },
     })
 
-    expect(wrapper.text()).toContain("settings.aboutCopyrightLabel")
     expect(wrapper.text()).toContain("settings.aboutCopyrightValue")
-    expect(wrapper.text()).toContain("settings.aboutLicenseLabel")
-    expect(wrapper.text()).toContain("settings.aboutLicenseValue")
-    expect(wrapper.text()).toContain("settings.aboutRepositoryLabel")
     expect(wrapper.text()).toContain("settings.aboutRepositoryValue")
-    expect(wrapper.text()).toContain("settings.aboutFontAttribution")
-    expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain("settings.aboutUsageLicensesTitle")
+    expect(wrapper.text()).toContain("settings.aboutLicenseValue")
+    expect(wrapper.text()).toContain("settings.aboutHarmonyFontNotice")
+    expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(4)
   })
 })
