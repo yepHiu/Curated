@@ -298,11 +298,11 @@ const handleFavoriteChange = (nextValue: boolean) => {
             data-movie-card-tag
             :class="
               item.source === 'user'
-                ? 'min-w-0 max-w-[4.75rem] shrink truncate rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
-                : 'min-w-0 max-w-[4.75rem] shrink truncate rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
+                ? 'min-w-0 max-w-[4.75rem] shrink justify-start rounded-full border-primary/40 px-1.5 text-[10px] leading-tight text-primary'
+                : 'min-w-0 max-w-[4.75rem] shrink justify-start rounded-full border border-border/60 bg-secondary/70 px-1.5 text-[10px] leading-tight'
             "
           >
-            {{ item.text }}
+            <span dir="ltr" class="block min-w-0 truncate text-left">{{ item.text }}</span>
           </Badge>
           <Badge
             v-if="cardTagsDisplay.overflow > 0"
