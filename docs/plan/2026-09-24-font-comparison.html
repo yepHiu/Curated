@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curated 字体对比 · 当前 / 鸿蒙 + Noto Sans</title>
+  <style>
+    @font-face {
+      font-family: "Noto Sans Preview";
+      src: url("./assets/font-comparison/noto-sans-latin-wght-normal.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Outfit Preview";
+      src: url("./assets/font-comparison/outfit-latin-700-normal.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f1a; --surface: #141826; --soft: #1b2234;
+      --text: #f8f7fb; --muted: #a2abc2; --border: rgba(255,255,255,.12);
+      --pink: #fe628e; --scale: 1;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f4f6fc; --surface: #fff; --soft: #ebeef5;
+      --text: #0f1219; --muted: #5a6378; --border: rgba(15,18,25,.13);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); }
+    button, textarea, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
+    .current { font-family: ui-sans-serif, system-ui, sans-serif; }
+    .proposed { font-family: "Noto Sans Preview", "HarmonyOS Sans SC", ui-sans-serif, system-ui, sans-serif; }
+    .wrap { max-width: 1420px; margin: auto; padding: 42px clamp(18px,3.5vw,56px) 80px; }
+    .eyebrow { color: var(--pink); font-size: 12px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { margin: 12px 0 10px; font-size: clamp(30px,3.2vw,46px); line-height: 1.16; letter-spacing: -.035em; }
+    .intro { max-width: 760px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin: 28px 0 20px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .control { display: flex; align-items: center; gap: 11px; }
+    .control-label { color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .segmented { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+    .segmented button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 13px; }
+    .segmented button[aria-pressed="true"] { background: var(--pink); color: #250d16; font-weight: 700; }
+    .size-control input { width: 122px; accent-color: var(--pink); }
+    .size-value { min-width: 45px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .font-status { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--muted); font-size: 12px; }
+    .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #e5aa5b; }
+    .font-status[data-ready="true"] .status-dot { background: #65cfa7; }
+    .comparison, .custom-results { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+    .panel { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); }
+    .panel-head { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 10px; padding: 22px 24px 20px; border-bottom: 1px solid var(--border); }
+    .panel-kicker { margin-bottom: 7px; color: var(--pink); font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .panel h2 { margin: 0; font-size: 20px; line-height: 1.3; }
+    .panel-sub { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .panel-tag { padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .samples { padding: 2px 24px 24px; }
+    .sample { padding: 21px 0; border-bottom: 1px solid var(--border); }
+    .sample:last-child { padding-bottom: 0; border-bottom: 0; }
+    .sample-label { margin: 0 0 11px; color: var(--muted); font-family: ui-sans-serif,system-ui,sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+    .sample-title { margin: 0; font-size: calc(30px * var(--scale)); font-weight: 700; line-height: 1.35; letter-spacing: -.025em; }
+    .sample-body { max-width: 42em; margin: 0; font-size: calc(15px * var(--scale)); font-weight: 400; line-height: 1.72; }
+    .sample-mixed { margin: 0; font-size: calc(21px * var(--scale)); font-weight: 600; line-height: 1.48; }
+    .sample-numbers { margin: 0; font-size: calc(24px * var(--scale)); font-weight: 500; line-height: 1.5; font-variant-numeric: tabular-nums; }
+    .sample-english { margin: 0; font-size: calc(16px * var(--scale)); font-weight: 400; line-height: 1.6; }
+    .ui-preview { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); }
+    .ui-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
+    .ui-brand { color: var(--pink); font-family: "Outfit Preview",ui-sans-serif,system-ui,sans-serif; font-size: 19px; font-weight: 700; letter-spacing: -.03em; }
+    .ui-nav { display: flex; flex-wrap: wrap; gap: 7px; }
+    .ui-nav span { padding: 6px 9px; border-radius: 8px; color: var(--muted); font-size: 12px; }
+    .ui-nav .active { background: var(--soft); color: var(--text); font-weight: 600; }
+    .ui-card { padding: 17px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+    .ui-card h3 { margin: 0 0 5px; font-size: calc(18px * var(--scale)); line-height: 1.35; }
+    .ui-card p { margin: 0; color: var(--muted); font-size: calc(13px * var(--scale)); line-height: 1.6; }
+    .ui-metrics { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-top: 18px; }
+    .ui-metric strong { display: block; font-size: calc(22px * var(--scale)); font-weight: 650; font-variant-numeric: tabular-nums; }
+    .ui-metric span { color: var(--muted); font-size: 11px; }
+    .ui-action { margin-left: auto; padding: 9px 13px; border-radius: 9px; background: var(--pink); color: #250d16; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .custom-area { margin-top: 24px; padding: 23px 24px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+    .custom-area h2 { margin: 0 0 5px; font-size: 18px; }
+    .custom-area p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+    textarea { display: block; width: 100%; min-height: 82px; resize: vertical; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
+    .custom-results { gap: 16px; margin-top: 16px; }
+    .custom-result { min-width: 0; min-height: 90px; padding: 15px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
+    .custom-result small { display: block; margin-bottom: 10px; color: var(--muted); font-family: ui-sans-serif,system-ui,sans-serif; font-size: 11px; font-weight: 700; }
+    .custom-result div { overflow-wrap: anywhere; font-size: calc(18px * var(--scale)); line-height: 1.6; white-space: pre-wrap; }
+    .footnote { margin: 17px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    @media (max-width: 830px) { .comparison, .custom-results { grid-template-columns: 1fr; } .font-status { width: 100%; margin-left: 0; } }
+    @media (max-width: 500px) { .wrap { padding-top: 28px; } .panel-head, .samples, .custom-area { padding-left: 18px; padding-right: 18px; } .sample-title { font-size: calc(26px * var(--scale)); } .size-control { width: 100%; } .size-control input { flex: 1; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="eyebrow">Curated · Typography study</div>
+    <h1>换字体之前，先看实际效果。</h1>
+    <p class="intro">左侧还原项目当前的系统默认字体；右侧使用 HarmonyOS Sans SC 显示中文、Noto Sans 显示英文和数字。两列使用相同文案、字号、字重与布局。</p>
+    <div class="toolbar" aria-label="对比设置">
+      <div class="control"><span class="control-label">背景</span><div class="segmented" role="group" aria-label="背景主题"><button type="button" data-theme-button="dark" aria-pressed="true">深色</button><button type="button" data-theme-button="light" aria-pressed="false">浅色</button></div></div>
+      <label class="control size-control" for="font-scale"><span class="control-label">字号</span><input id="font-scale" type="range" min="85" max="125" value="100" /><span class="size-value" id="scale-value">100%</span></label>
+      <div class="font-status" id="font-status" role="status" aria-live="polite"><span class="status-dot"></span><span id="font-status-text">正在检查预览字体…</span></div>
+    </div>
+    <div class="comparison">
+      <section class="panel current" aria-labelledby="current-title">
+        <div class="panel-head"><div><div class="panel-kicker">Current · 当前</div><h2 id="current-title">系统默认字体</h2><p class="panel-sub">ui-sans-serif → system-ui → sans-serif</p></div><span class="panel-tag">项目现状</span></div>
+        <div class="samples">
+          <div class="sample"><p class="sample-label">中文标题 · 700 / 30px</p><h3 class="sample-title">每一帧，都值得被记住</h3></div>
+          <div class="sample"><p class="sample-label">中文正文 · 400 / 15px</p><p class="sample-body">在萃取帧库中整理喜欢的画面，按影片、演员和标签快速查找。精彩片段会留在本机，随时可以回看与导出。</p></div>
+          <div class="sample"><p class="sample-label">中英混排 · 600 / 21px</p><p class="sample-mixed">个人洞察 Personal Insights<br>Curated Frames · 共 167 张</p></div>
+          <div class="sample"><p class="sample-label">数字 · 500 / 24px</p><p class="sample-numbers">02:12:49&nbsp; / &nbsp;83.6%&nbsp; / &nbsp;1,248</p></div>
+          <div class="sample"><p class="sample-label">英文正文 · 400 / 16px</p><p class="sample-english">Explore your collection, revisit meaningful moments, and keep everything close at hand.</p></div>
+          <div class="sample"><p class="sample-label">放进 Curated 界面</p><div class="ui-preview"><div class="ui-top"><div class="ui-brand">Curated</div><div class="ui-nav"><span>影片</span><span class="active">萃取帧</span><span>个人洞察</span></div></div><div class="ui-card"><h3>你的观看足迹</h3><p>过去 30 天，你收藏了 12 个值得重温的片段。</p><div class="ui-metrics"><div class="ui-metric"><strong>42.8 小时</strong><span>累计观看</span></div><div class="ui-metric"><strong>76%</strong><span>完成率</span></div><span class="ui-action">查看详情</span></div></div></div></div>
+        </div>
+      </section>
+      <section class="panel proposed" aria-labelledby="proposed-title">
+        <div class="panel-head"><div><div class="panel-kicker">Proposed · 设想</div><h2 id="proposed-title">鸿蒙字体 + Noto Sans</h2><p class="panel-sub">中文 HarmonyOS Sans SC · 英文 / 数字 Noto Sans</p></div><span class="panel-tag">仅此原型</span></div>
+        <div class="samples">
+          <div class="sample"><p class="sample-label">中文标题 · 700 / 30px</p><h3 class="sample-title">每一帧，都值得被记住</h3></div>
+          <div class="sample"><p class="sample-label">中文正文 · 400 / 15px</p><p class="sample-body">在萃取帧库中整理喜欢的画面，按影片、演员和标签快速查找。精彩片段会留在本机，随时可以回看与导出。</p></div>
+          <div class="sample"><p class="sample-label">中英混排 · 600 / 21px</p><p class="sample-mixed">个人洞察 Personal Insights<br>Curated Frames · 共 167 张</p></div>
+          <div class="sample"><p class="sample-label">数字 · 500 / 24px</p><p class="sample-numbers">02:12:49&nbsp; / &nbsp;83.6%&nbsp; / &nbsp;1,248</p></div>
+          <div class="sample"><p class="sample-label">英文正文 · 400 / 16px</p><p class="sample-english">Explore your collection, revisit meaningful moments, and keep everything close at hand.</p></div>
+          <div class="sample"><p class="sample-label">放进 Curated 界面</p><div class="ui-preview"><div class="ui-top"><div class="ui-brand">Curated</div><div class="ui-nav"><span>影片</span><span class="active">萃取帧</span><span>个人洞察</span></div></div><div class="ui-card"><h3>你的观看足迹</h3><p>过去 30 天，你收藏了 12 个值得重温的片段。</p><div class="ui-metrics"><div class="ui-metric"><strong>42.8 小时</strong><span>累计观看</span></div><div class="ui-metric"><strong>76%</strong><span>完成率</span></div><span class="ui-action">查看详情</span></div></div></div></div>
+        </div>
+      </section>
+    </div>
+    <section class="custom-area" aria-labelledby="custom-title">
+      <h2 id="custom-title">用你的文案试一试</h2><p>输入一段真实的标题或说明，两侧会同步更新。</p>
+      <textarea id="custom-input" aria-label="输入自定义对比文案" spellcheck="false">萃取帧 · Curated Frames&#10;选择喜欢的画面，记录 02:12:49 那一刻。</textarea>
+      <div class="custom-results"><div class="custom-result current"><small>当前 · 系统默认</small><div class="custom-output"></div></div><div class="custom-result proposed"><small>设想 · 鸿蒙 + Noto Sans</small><div class="custom-output"></div></div></div>
+    </section>
+    <p class="footnote">这是独立 HTML 原型，没有修改 Curated 的正式字体。两侧 Curated 品牌字标均保持现有 Outfit。鸿蒙字体从本机已安装的 HarmonyOS Sans SC 读取；如果字体状态提示不可用，右侧中文会回退到系统字体。Noto Sans 预览文件随此页面本地加载。</p>
+  </main>
+  <script>
+    const root = document.documentElement;
+    document.querySelectorAll('[data-theme-button]').forEach((button) => {
+      button.addEventListener('click', () => {
+        root.dataset.theme = button.dataset.themeButton;
+        document.querySelectorAll('[data-theme-button]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      });
+    });
+    const scale = document.getElementById('font-scale');
+    scale.addEventListener('input', () => {
+      root.style.setProperty('--scale', String(Number(scale.value) / 100));
+      document.getElementById('scale-value').textContent = scale.value + '%';
+    });
+    const customInput = document.getElementById('custom-input');
+    const customOutputs = document.querySelectorAll('.custom-output');
+    function updateCustomText() { customOutputs.forEach((output) => { output.textContent = customInput.value; }); }
+    customInput.addEventListener('input', updateCustomText);
+    updateCustomText();
+    Promise.allSettled([
+      document.fonts.load('400 16px "Noto Sans Preview"', 'Curated 123'),
+      new FontFace('HarmonyOS Sans Probe', 'local("HarmonyOS Sans SC")').load(),
+    ]).then(([noto, harmony]) => {
+      const notoReady = noto.status === 'fulfilled' && noto.value.length > 0;
+      const harmonyReady = harmony.status === 'fulfilled';
+      document.getElementById('font-status').dataset.ready = String(notoReady && harmonyReady);
+      document.getElementById('font-status-text').textContent = notoReady && harmonyReady
+        ? 'Noto Sans 与鸿蒙字体已加载'
+        : '字体未完全加载：' + (notoReady ? '' : 'Noto Sans ') + (harmonyReady ? '' : '鸿蒙字体');
+    });
+  </script>
+</body>
+</html>
