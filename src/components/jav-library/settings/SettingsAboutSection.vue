@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Info, Loader2, ScrollText, Sparkles } from "lucide-vue-next"
+import { ChevronDown, Info, Loader2, ScrollText, Sparkles } from "lucide-vue-next"
 import type { HealthDTO } from "@/api/types"
 import {
   Card,
@@ -14,6 +14,7 @@ import curatedLicenseUrl from "@/assets/licenses/Curated_LICENSE.txt?url&no-inli
 import harmonySansLicenseUrl from "@/assets/fonts/HarmonyOS_Sans_SC_LICENSE.txt?url&no-inline"
 import notoSansLicenseUrl from "@/assets/fonts/NotoSans_LICENSE.txt?url"
 import notoSansJpLicenseUrl from "@/assets/fonts/NotoSansJP_LICENSE.txt?url"
+import thirdPartyNoticesUrl from "@/assets/licenses/ThirdParty_NOTICES.txt?url&no-inline"
 import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
 import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 
@@ -51,6 +52,41 @@ const licenseItems = computed(() => [
   { name: "Noto Sans", detail: "SIL Open Font License 1.1", url: notoSansLicenseUrl },
   { name: "Noto Sans JP", detail: "SIL Open Font License 1.1", url: notoSansJpLicenseUrl },
 ])
+
+const thirdPartyGroups = [
+  {
+    titleKey: "settings.aboutThirdPartyFrontend",
+    items: [
+      { name: "Vue", license: "MIT" },
+      { name: "Vue Router", license: "MIT" },
+      { name: "Vue I18n", license: "MIT" },
+      { name: "Reka UI", license: "MIT" },
+      { name: "hls.js", license: "Apache-2.0" },
+      { name: "DOMPurify", license: "Apache-2.0 OR MPL-2.0" },
+      { name: "Lucide", license: "ISC" },
+      { name: "pinyin-pro", license: "MIT" },
+    ],
+  },
+  {
+    titleKey: "settings.aboutThirdPartyBackend",
+    items: [
+      { name: "GORM", license: "MIT" },
+      { name: "go-sqlite", license: "BSD-3-Clause" },
+      { name: "fsnotify", license: "BSD-3-Clause" },
+      { name: "MetaTube SDK", license: "Apache-2.0" },
+      { name: "Zap", license: "MIT" },
+    ],
+  },
+  {
+    titleKey: "settings.aboutThirdPartyDesktop",
+    items: [
+      { name: "Electron", license: "MIT" },
+      { name: "FFmpeg", license: "GPL-3.0-or-later" },
+    ],
+  },
+]
+
+const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.items.length, 0)
 </script>
 
 <template>
@@ -261,6 +297,38 @@ const licenseItems = computed(() => [
             </a>
           </div>
         </div>
+        <details class="group mt-3 rounded-lg border border-border/50 bg-muted/5">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg p-4 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            {{ t("settings.aboutThirdPartyTitle", { count: thirdPartyCount }) }}
+            <ChevronDown class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div class="border-t border-border/50 px-4 pb-4">
+            <div v-for="group in thirdPartyGroups" :key="group.titleKey" class="pt-4">
+              <h4 class="text-sm font-semibold text-foreground">{{ t(group.titleKey) }}</h4>
+              <ul class="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
+                <li
+                  v-for="item in group.items"
+                  :key="item.name"
+                  class="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 text-xs leading-relaxed sm:text-sm"
+                >
+                  <span class="shrink-0 text-foreground">{{ item.name }}</span>
+                  <span class="shrink-0 text-muted-foreground">{{ item.license }}</span>
+                </li>
+              </ul>
+            </div>
+            <p class="mt-4 text-xs text-muted-foreground">
+              {{ t("settings.aboutFfmpegBundleNote") }}
+            </p>
+            <a
+              :href="thirdPartyNoticesUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-2 inline-block rounded-sm text-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {{ t("settings.aboutThirdPartyNoticesLink") }}
+            </a>
+          </div>
+        </details>
       </CardContent>
     </Card>
   </div>

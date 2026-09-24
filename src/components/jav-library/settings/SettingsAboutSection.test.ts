@@ -75,5 +75,11 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.text()).toContain("settings.aboutLicenseValue")
     expect(wrapper.text()).toContain("settings.aboutHarmonyFontNotice")
     expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(4)
+    expect(wrapper.get("details summary").text()).toContain("settings.aboutThirdPartyTitle")
+    expect(wrapper.findAll("details li")).toHaveLength(15)
+    expect(wrapper.text()).toContain("FFmpeg")
+    expect(wrapper.get('details a[href*="ThirdParty_NOTICES"]').text()).toBe(
+      "settings.aboutThirdPartyNoticesLink",
+    )
   })
 })
