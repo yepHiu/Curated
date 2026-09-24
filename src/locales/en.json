@@ -1835,6 +1835,8 @@
     "clipSavedToLibrary": "Recording complete, saved to Curated Frames",
     "clipExportFailed": "Clip generation failed",
     "clipExportUnavailable": "Clip capture requires Web API mode",
+    "clipExportTimedOut": "Clip generation timed out. Check Curated Frames later",
+    "clipStatusUnavailable": "Cannot check clip status. Check Curated Frames later",
     "clipExportMissingArtifact": "The clip task finished without a downloadable file",
     "clipDownload": "Download",
     "clipShare": "Share",

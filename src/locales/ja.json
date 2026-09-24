@@ -1835,6 +1835,8 @@
     "clipSavedToLibrary": "録画完了、萃取フレームライブラリに保存しました",
     "clipExportFailed": "クリップの生成に失敗しました",
     "clipExportUnavailable": "クリップにはWeb APIモードが必要です",
+    "clipExportTimedOut": "クリップ生成がタイムアウトしました。後で萃取フレームライブラリを確認してください",
+    "clipStatusUnavailable": "クリップの状態を取得できません。後で萃取フレームライブラリを確認してください",
     "clipExportMissingArtifact": "クリップタスクは完了しましたが、ダウンロード可能なファイルがありません",
     "clipDownload": "ダウンロード",
     "clipShare": "共有",

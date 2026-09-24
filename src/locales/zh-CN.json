@@ -1835,6 +1835,8 @@
     "clipSavedToLibrary": "录制完成，已保存到萃取帧库",
     "clipExportFailed": "片段生成失败",
     "clipExportUnavailable": "片段截取需要 Web API 模式",
+    "clipExportTimedOut": "片段生成超时，请稍后到萃取帧库查看",
+    "clipStatusUnavailable": "无法获取片段生成状态，请稍后到萃取帧库查看",
     "clipExportMissingArtifact": "片段任务完成，但没有可下载文件",
     "clipDownload": "下载",
     "clipShare": "分享",

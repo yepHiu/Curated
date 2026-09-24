@@ -430,6 +430,9 @@ let clipPollTimer: number | null = null
 let clipPollGeneration = 0
 let clipPollFailures = 0
 let clipFeedbackDismissTimer: number | null = null
+let clipProcessingTimer: number | null = null
+const CLIP_PROCESSING_TIMEOUT_MS = 150_000
+const CLIP_STATUS_MAX_FAILURES = 5
 let curatedShutterTimer: number | null = null
 const PLAYBACK_CLOCK_SYNC_INTERVAL_MS = 250
 let playbackClockSyncIntervalId: number | null = null
@@ -557,6 +560,13 @@ async function savePendingCuratedFrame() {
 async function submitClipExport(input: { startSec: number; endSec: number }) {
   const generation = ++clipPollGeneration
   clipPollFailures = 0
+  if (clipFeedbackDismissTimer !== null) window.clearTimeout(clipFeedbackDismissTimer)
+  if (clipProcessingTimer !== null) window.clearTimeout(clipProcessingTimer)
+  clipProcessingTimer = window.setTimeout(() => {
+    if (generation !== clipPollGeneration || playbackDisposed || clipCapture.phase.value !== "processing") return
+    clipPollGeneration++
+    failClipExport(t("player.clipExportTimedOut"))
+  }, CLIP_PROCESSING_TIMEOUT_MS)
   const movieId = pendingCaptureJob?.movie.id ?? props.movie.id
   clipExportError.value = ""
   clipExportUrl.value = ""
@@ -570,6 +580,7 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
     if (!frameResult.ok) {
       throw new Error(frameResult.reason)
     }
+    if (generation !== clipPollGeneration || playbackDisposed) return
     if (movieId === props.movie.id) appendCuratedFrameMarker(frameResult)
     const task = await libraryService.createMovieClip(movieId, {
       format: clipFormat.value,
@@ -580,15 +591,13 @@ async function submitClipExport(input: { startSec: number; endSec: number }) {
       curatedFrameId: frameResult.id,
     })
     if (generation !== clipPollGeneration || playbackDisposed) return
+    if (!task?.taskId) throw new Error(t("player.clipExportFailed"))
     clipExportTask.value = task
     clipCapture.taskId.value = task.taskId
     await pollClipExportTask(task.taskId, generation)
   } catch (err) {
     if (generation !== clipPollGeneration || playbackDisposed) return
-    clipExportError.value = err instanceof Error ? err.message : t("player.clipExportUnavailable")
-    clipCapture.phase.value = "error"
-    scheduleClipFeedbackDismiss(3600)
-    throw err
+    failClipExport(err instanceof Error ? err.message : t("player.clipExportUnavailable"))
   }
 }
 
@@ -601,15 +610,20 @@ async function pollClipExportTask(taskId: string, generation = clipPollGeneratio
     if (generation !== clipPollGeneration || playbackDisposed) return
     clipPollFailures = 0
     clipExportError.value = ""
-  } catch {
+  } catch (err) {
     if (generation !== clipPollGeneration || playbackDisposed) return
     clipPollFailures++
+    if ((err instanceof HttpClientError && !err.retryable) || clipPollFailures >= CLIP_STATUS_MAX_FAILURES) {
+      failClipExport(t("player.clipStatusUnavailable"))
+      return
+    }
     clipExportError.value = t('curated.clipStatusRetrying')
     clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), Math.min(30_000, 1000 * 2 ** Math.min(clipPollFailures, 5)))
     return
   }
   clipExportTask.value = task
   if (task.status === "completed") {
+    clearClipProcessingTimer()
     const artifactUrl = typeof task.metadata?.artifactUrl === "string" ? task.metadata.artifactUrl : ""
     clipExportUrl.value = artifactUrl
     clipCapture.phase.value = artifactUrl ? "success" : "error"
@@ -622,12 +636,24 @@ async function pollClipExportTask(taskId: string, generation = clipPollGeneratio
     return
   }
   if (["failed", "partial_failed", "cancelled"].includes(task.status)) {
-    clipExportError.value = task.errorMessage || task.message || t("player.clipExportFailed")
-    clipCapture.phase.value = "error"
-    scheduleClipFeedbackDismiss(3600)
+    failClipExport(task.errorMessage || task.message || t("player.clipExportFailed"))
     return
   }
   clipPollTimer = window.setTimeout(() => void pollClipExportTask(taskId, generation), document.visibilityState === "hidden" ? 5000 : 1000)
+}
+
+function clearClipProcessingTimer() {
+  if (clipProcessingTimer !== null) window.clearTimeout(clipProcessingTimer)
+  clipProcessingTimer = null
+}
+
+function failClipExport(message: string) {
+  if (clipPollTimer !== null) window.clearTimeout(clipPollTimer)
+  clipPollTimer = null
+  clearClipProcessingTimer()
+  clipExportError.value = message
+  clipCapture.phase.value = "error"
+  scheduleClipFeedbackDismiss(3600)
 }
 
 function scheduleClipFeedbackDismiss(delayMs: number) {
@@ -656,6 +682,7 @@ async function cancelClipExport() {
     await libraryService.cancelMovieClip(taskId)
     clipPollGeneration++
     if (clipPollTimer !== null) clearTimeout(clipPollTimer)
+    clearClipProcessingTimer()
     clipCapture.reset()
     clipExportError.value = ''
   } catch { clipExportError.value = t('curated.clipCancelFailed') }
@@ -1297,6 +1324,7 @@ watch(
     clipCapture.reset()
     if (clipPollTimer !== null) clearTimeout(clipPollTimer)
     if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
+    clearClipProcessingTimer()
     const mediaTimeSec = videoRef.value ? getAbsolutePlaybackTime(videoRef.value.currentTime) : currentTime.value
     void watchTimeTracker.reset(props.movie.id, mediaTimeSec).catch(() => {})
     autoplayConsumedForMovieId.value = null
@@ -1371,6 +1399,7 @@ onUnmounted(() => {
   stopSessionDiagnosticsPoll()
   if (clipPollTimer !== null) clearTimeout(clipPollTimer)
   if (clipFeedbackDismissTimer !== null) clearTimeout(clipFeedbackDismissTimer)
+  clearClipProcessingTimer()
   disposeCuratedCaptureFeedbackAudio()
   resetPlaybackClockSyncSample()
   clearIdleHideTimer()

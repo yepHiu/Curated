@@ -106,6 +106,25 @@ describe("captureVideoFrameToPng", () => {
     expect(canvas.height).toBe(720)
     expect(drawImage).toHaveBeenCalledTimes(1)
   })
+
+  it("releases a capture whose canvas encoder never calls back", async () => {
+    vi.useFakeTimers()
+    try {
+      const canvas = mockCanvas({ ctx: { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D })
+      const lateBlob = new Blob(["late"], { type: "image/png" })
+      let callback: BlobCallback | undefined
+      vi.mocked(canvas.toBlob).mockImplementation((cb) => { callback = cb })
+
+      const result = captureVideoFrameToPng(videoSize(1280, 720))
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      await expect(result).resolves.toEqual({ ok: false, reason: "curated.captureBlobFail" })
+      callback?.(lateBlob)
+      await expect(result).resolves.toEqual({ ok: false, reason: "curated.captureBlobFail" })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe("formatFrameFilename", () => {

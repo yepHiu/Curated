@@ -51,16 +51,24 @@ export async function captureVideoFrameToPng(video: HTMLVideoElement, onPreview?
   }
 
   return new Promise((resolve) => {
+    let settled = false
+    const timeout = window.setTimeout(() => finish({ ok: false, reason: i18n.global.t("curated.captureBlobFail") }), 15_000)
+    function finish(result: CaptureFrameResult) {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      resolve(result)
+    }
     try { canvas.toBlob(
       (blob) => {
         if (!blob) {
-          resolve({ ok: false, reason: i18n.global.t("curated.captureBlobFail") })
+          finish({ ok: false, reason: i18n.global.t("curated.captureBlobFail") })
           return
         }
-        resolve({ ok: true, blob })
+        finish({ ok: true, blob })
       },
       "image/png",
-    ) } catch { resolve({ ok: false, reason: i18n.global.t('curated.captureCors') }) }
+    ) } catch { finish({ ok: false, reason: i18n.global.t('curated.captureCors') }) }
   })
 }
 
