@@ -535,6 +535,7 @@
     "refreshRecommendations": "Refresh recommendations",
     "refreshingRecommendations": "Refreshing…",
     "sectionContinueTitle": "Continue Watching",
+    "browseLibraryNext": "Continue to Movies",
     "continueRemaining": "{minutes} min left",
     "continueUpdatedLabel": "Ready to resume",
     "recommendationAdjust": "Adjust this recommendation",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import type { CreateRecommendationFeedbackBody, RecommendationFeedbackDTO } from "@/api/types"
 import { useHomepageDailyRecommendations } from "@/composables/use-homepage-daily-recommendations"
@@ -9,6 +9,7 @@ import HomepageEmptyState from "@/components/jav-library/HomepageEmptyState.vue"
 import HomepagePortal from "@/components/jav-library/HomepagePortal.vue"
 import HomepagePortalSkeleton from "@/components/jav-library/HomepagePortalSkeleton.vue"
 import { buildHomepagePortalModel } from "@/lib/homepage-portal"
+import { openLibraryFromHomeKey } from "@/lib/home-library-navigation"
 import {
   listSortedByUpdatedDesc,
   playbackProgressRevision,
@@ -18,6 +19,9 @@ import { pushAppToast } from "@/composables/use-app-toast"
 
 const libraryService = useLibraryService()
 const router = useRouter()
+const openLibraryFromHome = inject(openLibraryFromHomeKey, () => {
+  void router.push({ name: "library" })
+})
 const { t } = useI18n()
 const homepageDailyRecommendations = useHomepageDailyRecommendations()
 const showHomepageSkeleton = computed(() => !libraryService.moviesLoaded.value)
@@ -146,6 +150,7 @@ async function deleteRecommendationFeedback(feedbackId: string) {
     :recommendation-feedback-busy="recommendationFeedbackBusy"
     @open-details="openDetails"
     @open-player="openPlayer"
+    @browse-library="openLibraryFromHome"
     @refresh-recommendations="refreshRecommendations"
     @submit-recommendation-feedback="submitRecommendationFeedback"
     @delete-recommendation-feedback="deleteRecommendationFeedback"

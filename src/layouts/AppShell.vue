@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, provide, ref, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { onClickOutside, onKeyStroke, useMediaQuery, watchDebounced } from "@vueuse/core"
 import { MessagesSquare, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, X } from "lucide-vue-next"
@@ -46,6 +46,8 @@ import { useLibraryService } from "@/services/library-service"
 import { useExperimentalAgent } from "@/lib/experimental-agent"
 import { useAgentWindow } from "@/composables/use-agent-window"
 import { useAIGovernanceSync } from "@/composables/use-ai-governance-sync"
+import { openLibraryFromHomeKey } from "@/lib/home-library-navigation"
+import { clearLibraryScrollSnapshot } from "@/composables/use-library-scroll-preserve"
 
 /** 实验性 Agent Window：懒加载，不进首屏 bundle（开关默认关闭时零成本） */
 const AgentWindowPanel = defineAsyncComponent(
@@ -68,6 +70,19 @@ const route = useRoute()
 const router = useRouter()
 const libraryService = useLibraryService()
 useAIGovernanceSync()
+
+const homeLibraryDrawerTransition = ref(false)
+provide(openLibraryFromHomeKey, () => {
+  if (route.name !== "home" || homeLibraryDrawerTransition.value) return
+
+  homeLibraryDrawerTransition.value = true
+  clearLibraryScrollSnapshot("library")
+  void router.push({ name: "library" }).then((failure) => {
+    if (failure) homeLibraryDrawerTransition.value = false
+  }).catch(() => {
+    homeLibraryDrawerTransition.value = false
+  })
+})
 
 const isDev = import.meta.env.DEV
 
@@ -1002,11 +1017,18 @@ function clearActorsSearch() {
           <div class="flex min-h-0 min-w-0 flex-1 overflow-hidden" data-agent-workspace>
             <div
               v-show="!(agentEnabled && agentWindowOpen && !isLgUp)"
-              class="flex-1"
+              class="relative flex-1"
               data-router-view-frame
               :class="routerViewFrameClass"
             >
-              <RouterView />
+              <RouterView v-slot="{ Component }">
+                <Transition
+                  :name="homeLibraryDrawerTransition ? 'home-library-drawer' : undefined"
+                  @after-enter="homeLibraryDrawerTransition = false"
+                >
+                  <component :is="Component" />
+                </Transition>
+              </RouterView>
             </div>
             <AgentWindowPanel v-if="agentEnabled" />
           </div>
@@ -1054,3 +1076,34 @@ function clearActorsSearch() {
     />
   </div>
 </template>
+
+<style>
+.home-library-drawer-enter-active {
+  z-index: 1;
+  box-shadow: 0 -1.5rem 3rem rgb(0 0 0 / 20%);
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home-library-drawer-enter-from {
+  transform: translateY(100%);
+}
+
+.home-library-drawer-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 560ms linear;
+}
+
+.home-library-drawer-leave-to {
+  opacity: 0.99;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-library-drawer-enter-active,
+  .home-library-drawer-leave-active {
+    transition-duration: 0.01ms;
+  }
+}
+</style>

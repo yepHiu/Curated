@@ -7,6 +7,10 @@ type ScrollSnapshot = {
 
 const libraryScrollSnapshots = new Map<string, ScrollSnapshot>()
 
+export function clearLibraryScrollSnapshot(key: string) {
+  libraryScrollSnapshots.delete(key.trim())
+}
+
 function captureScroll(el: HTMLElement | null): ScrollSnapshot {
   return {
     top: el?.scrollTop ?? 0,

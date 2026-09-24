@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import { useI18n } from "vue-i18n"
-import { Loader2, RefreshCw, SlidersHorizontal, Trash2 } from "lucide-vue-next"
+import { ChevronDown, Loader2, RefreshCw, SlidersHorizontal, Trash2 } from "lucide-vue-next"
 import type { CreateRecommendationFeedbackBody, RecommendationFeedbackDTO } from "@/api/types"
 import {
   TooltipContent,
@@ -35,6 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   openDetails: [movieId: string]
   openPlayer: [movieId: string]
+  browseLibrary: []
   refreshRecommendations: []
   submitRecommendationFeedback: [body: CreateRecommendationFeedbackBody]
   deleteRecommendationFeedback: [feedbackId: string]
@@ -44,6 +45,9 @@ const { t } = useI18n()
 const homeScrollRegionRef = ref<HTMLElement | null>(null)
 const feedbackDialogOpen = ref(false)
 const { persist } = useHomeScrollPreserve({ scrollElRef: homeScrollRegionRef })
+let overscrollDistance = 0
+let touchStartY = 0
+let touchStartedAtBottom = false
 
 const recommendationsRefreshLabel = computed(() =>
   props.recommendationsRefreshing
@@ -66,6 +70,43 @@ function feedbackActionLabel(item: RecommendationFeedbackDTO) {
 
 function onHomeScroll() {
   persist()
+  if (!isAtBottom()) overscrollDistance = 0
+}
+
+function isAtBottom(): boolean {
+  const el = homeScrollRegionRef.value
+  return Boolean(el && el.scrollTop + el.clientHeight >= el.scrollHeight - 2)
+}
+
+function onHomeWheel(event: WheelEvent) {
+  if (event.deltaY <= 0 || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+    overscrollDistance = 0
+    return
+  }
+  if (!isAtBottom()) {
+    overscrollDistance = 0
+    return
+  }
+
+  overscrollDistance += event.deltaY
+  if (overscrollDistance < 80) return
+
+  overscrollDistance = 0
+  emit("browseLibrary")
+}
+
+function onHomeTouchStart(event: TouchEvent) {
+  touchStartedAtBottom = isAtBottom()
+  touchStartY = event.touches[0]?.clientY ?? 0
+}
+
+function onHomeTouchMove(event: TouchEvent) {
+  if (!touchStartedAtBottom) return
+  const currentY = event.touches[0]?.clientY
+  if (currentY === undefined || touchStartY - currentY < 80) return
+
+  touchStartedAtBottom = false
+  emit("browseLibrary")
 }
 </script>
 
@@ -75,6 +116,9 @@ function onHomeScroll() {
     data-home-scroll-region
     class="h-full min-h-0 overflow-y-auto bg-background text-foreground"
     @scroll.passive="onHomeScroll"
+    @wheel.passive="onHomeWheel"
+    @touchstart.passive="onHomeTouchStart"
+    @touchmove.passive="onHomeTouchMove"
   >
     <HomeHeroCarousel
       :movies="model.heroMovies"
@@ -170,6 +214,18 @@ function onHomeScroll() {
         @open-details="emit('openDetails', $event)"
         @open-player="emit('openPlayer', $event)"
       />
+
+      <div class="flex justify-center pb-4">
+        <button
+          type="button"
+          data-home-browse-library
+          class="flex min-h-11 items-center gap-2 rounded-full px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          @click="emit('browseLibrary')"
+        >
+          {{ t("home.browseLibraryNext") }}
+          <ChevronDown class="size-4" aria-hidden="true" />
+        </button>
+      </div>
 
     </div>
   </div>
