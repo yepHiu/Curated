@@ -11,7 +11,6 @@ vi.mock("vue-i18n", () => ({
 vi.mock("lucide-vue-next", () => ({
   Languages: { name: "Languages", template: "<span />" },
   Power: { name: "Power", template: "<span />" },
-  RefreshCw: { name: "RefreshCw", template: "<span />" },
 }))
 
 vi.mock("@/components/ui/card", () => ({
@@ -48,14 +47,6 @@ vi.mock("@/components/ui/switch", () => ({
   },
 }))
 
-vi.mock("./SettingsLoggingSection.vue", () => ({
-  default: {
-    name: "SettingsLoggingSection",
-    props: ["autoSaveReady"],
-    template: "<div data-logging :data-auto-save-ready=\"String(autoSaveReady)\">logging</div>",
-  },
-}))
-
 const baseProps = {
   locale: "zh-CN",
   themePreference: "system" as const,
@@ -63,10 +54,6 @@ const baseProps = {
   launchAtLoginSaving: false,
   launchAtLoginDisabled: false,
   launchAtLoginError: "",
-  autoDownloadUpdates: false,
-  autoDownloadUpdatesSaving: false,
-  autoDownloadUpdatesError: "",
-  autoSaveReady: true,
 }
 
 describe("SettingsGeneralSection", () => {
@@ -92,7 +79,7 @@ describe("SettingsGeneralSection", () => {
     )
   })
 
-  it("renders locale, appearance, update-download, launch-at-login and logging controls", () => {
+  it("renders locale, appearance and launch-at-login controls", () => {
     const wrapper = mount(SettingsGeneralSection, {
       props: baseProps,
     })
@@ -100,15 +87,11 @@ describe("SettingsGeneralSection", () => {
     expect(wrapper.text()).toContain("settings.generalSubsectionLocaleAppearance")
     expect(wrapper.text()).toContain("settings.language")
     expect(wrapper.text()).toContain("settings.appearance")
-    expect(wrapper.text()).toContain("settings.autoDownloadUpdatesTitle")
     expect(wrapper.text()).toContain("settings.launchAtLoginTitle")
     expect(wrapper.text()).not.toContain("settings.languageHint")
     expect(wrapper.text()).not.toContain("settings.appearanceHint")
-    expect(wrapper.text()).not.toContain("settings.autoDownloadUpdatesDesc")
-    expect(wrapper.text()).not.toContain("settings.autoDownloadUpdatesHint")
     expect(wrapper.text()).not.toContain("settings.launchAtLoginDesc")
     expect(wrapper.text()).not.toContain("settings.launchAtLoginHint")
-    expect(wrapper.get("[data-logging]").attributes("data-auto-save-ready")).toBe("true")
     const selectedValues = wrapper.findAllComponents({ name: "SelectValue" })
     expect(selectedValues[0]?.text()).toBe("settings.langZh")
     expect(selectedValues[1]?.text()).toBe("settings.themeSystem")
@@ -134,11 +117,9 @@ describe("SettingsGeneralSection", () => {
     selects[1]?.vm.$emit("update:modelValue", "dark")
     const switches = wrapper.findAll(".switch-stub")
     await switches[0]?.trigger("click")
-    await switches[1]?.trigger("click")
 
     expect(wrapper.emitted("update:locale")).toEqual([["en"]])
     expect(wrapper.emitted("changeTheme")).toEqual([["dark"]])
-    expect(wrapper.emitted("changeAutoDownloadUpdates")).toEqual([[true]])
     expect(wrapper.emitted("changeLaunchAtLogin")).toEqual([[true]])
   })
 
@@ -154,19 +135,6 @@ describe("SettingsGeneralSection", () => {
 
     expect(wrapper.text()).toContain("settings.launchAtLoginSyncing")
     expect(wrapper.text()).toContain("save failed")
-    expect(wrapper.findAll(".switch-stub")[1]?.attributes("disabled")).toBeDefined()
-  })
-
-  it("renders auto-download update transient states", () => {
-    const wrapper = mount(SettingsGeneralSection, {
-      props: {
-        ...baseProps,
-        autoDownloadUpdatesSaving: true,
-        autoDownloadUpdatesError: "download save failed",
-      },
-    })
-
-    expect(wrapper.text()).toContain("settings.autoDownloadUpdatesSyncing")
-    expect(wrapper.text()).toContain("download save failed")
+    expect(wrapper.findAll(".switch-stub")[0]?.attributes("disabled")).toBeDefined()
   })
 })

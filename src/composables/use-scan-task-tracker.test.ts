@@ -283,7 +283,7 @@ describe("useScanTaskTracker", () => {
         notification: expect.objectContaining({
           type: "scan",
           title: "notificationCenter.titles.scanDone",
-          source: { taskId: "comic-scan-1", route: "/settings?section=experimental" },
+          source: { taskId: "comic-scan-1", route: "/settings?section=comics" },
         }),
       }),
     )
@@ -315,7 +315,7 @@ describe("useScanTaskTracker", () => {
         notification: expect.objectContaining({
           type: "scan",
           title: "notificationCenter.titles.scanDone",
-          source: { taskId: "photo-scan-1", route: "/settings?section=experimental" },
+          source: { taskId: "photo-scan-1", route: "/settings?section=photos" },
         }),
       }),
     )
@@ -347,7 +347,7 @@ describe("useScanTaskTracker", () => {
         notification: expect.objectContaining({
           type: "system",
           title: "notificationCenter.titles.importFailed",
-          source: { taskId: "comic-import-1", route: "/settings?section=experimental" },
+          source: { taskId: "comic-import-1", route: "/settings?section=comics" },
         }),
       }),
     )

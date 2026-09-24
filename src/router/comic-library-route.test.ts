@@ -48,7 +48,7 @@ describe("comic library routes", () => {
 
     expect(comicServiceState.refreshSettings).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe("settings")
-    expect(router.currentRoute.value.query.section).toBe("experimental")
+    expect(router.currentRoute.value.query.section).toBe("comics")
   })
 
   it("allows the comic wall route when comics are enabled", async () => {

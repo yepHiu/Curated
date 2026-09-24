@@ -16,7 +16,6 @@ import notoSansLicenseUrl from "@/assets/fonts/NotoSans_LICENSE.txt?url"
 import notoSansJpLicenseUrl from "@/assets/fonts/NotoSansJP_LICENSE.txt?url"
 import thirdPartyNoticesUrl from "@/assets/licenses/ThirdParty_NOTICES.txt?url&no-inline"
 import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
-import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 
 defineProps<{
   isViteDev: boolean
@@ -27,10 +26,6 @@ defineProps<{
   aboutHealthError: string
   backendVersionDisplay: string
   backendVersionStatus: "default" | "loading" | "error"
-}>()
-
-const emit = defineEmits<{
-  refreshHealth: []
 }>()
 
 const { t } = useI18n()
@@ -254,13 +249,10 @@ const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.
               :backend-version-status="backendVersionStatus"
             />
           </template>
-          <SettingsHomepageDevTools
-            v-if="isViteDev && useWebApi"
-            @refreshed="emit('refreshHealth')"
-          />
         </CardContent>
       </Card>
     </div>
+    <slot name="updates" />
     <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
       <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 pb-0">
         <span

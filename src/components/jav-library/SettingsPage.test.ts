@@ -271,16 +271,18 @@ describe("SettingsPage movie CSV export", () => {
     mockState.libraryService = createLibraryServiceMock()
   })
 
-  it("keeps comic settings inside experimental features", async () => {
+  it("places comic settings in the library navigation", async () => {
     const wrapper = await mountSettingsPage()
 
-    expect(wrapper.text()).not.toContain("settings.navComics")
+    expect(wrapper.text()).toContain("settings.navComics")
+    expect(wrapper.text()).toContain("settings.navGroupLibrary")
+    expect(wrapper.text()).not.toContain("settings.navExperimental")
   })
 
-  it("keeps photo settings inside experimental features", async () => {
+  it("places photo settings in the library navigation", async () => {
     const wrapper = await mountSettingsPage()
 
-    expect(wrapper.text()).not.toContain("settings.navPhotos")
+    expect(wrapper.text()).toContain("settings.navPhotos")
   })
 
   it("downloads a CSV and shows a success toast when the storage section requests export", async () => {

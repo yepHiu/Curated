@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Languages, Power, RefreshCw } from "lucide-vue-next"
+import { Languages, Power } from "lucide-vue-next"
 import {
   Card,
   CardContent,
@@ -16,27 +16,21 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import SettingsLoggingSection from "./SettingsLoggingSection.vue"
 
 type ThemePreference = "light" | "dark" | "system"
 
 const props = defineProps<{
   locale: string
   themePreference: ThemePreference
-  autoDownloadUpdates: boolean
-  autoDownloadUpdatesSaving: boolean
-  autoDownloadUpdatesError: string
   launchAtLogin: boolean
   launchAtLoginSaving: boolean
   launchAtLoginDisabled: boolean
   launchAtLoginError: string
-  autoSaveReady: boolean
 }>()
 
 const emit = defineEmits<{
   "update:locale": [value: string]
   changeTheme: [value: unknown]
-  changeAutoDownloadUpdates: [value: boolean]
   changeLaunchAtLogin: [value: boolean]
 }>()
 
@@ -134,48 +128,6 @@ function updateLocale(value: unknown) {
               class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
               aria-hidden="true"
             >
-              <RefreshCw class="size-4" />
-            </span>
-            <CardTitle class="min-w-0 text-lg tracking-tight">
-              {{ t("settings.autoDownloadUpdatesTitle") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent class="flex flex-col gap-3 pt-0">
-            <div
-              class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-              :aria-busy="autoDownloadUpdatesSaving"
-            >
-              <div class="min-w-0 space-y-1">
-                <p class="text-sm font-semibold text-foreground">
-                  {{ t("settings.autoDownloadUpdatesSwitch") }}
-                </p>
-                <p
-                  v-if="autoDownloadUpdatesSaving"
-                  class="text-xs text-muted-foreground motion-safe:animate-pulse"
-                >
-                  {{ t("settings.autoDownloadUpdatesSyncing") }}
-                </p>
-              </div>
-              <Switch
-                class="motion-safe:transition-colors motion-safe:duration-200"
-                :model-value="autoDownloadUpdates"
-                :aria-label="t('settings.autoDownloadUpdatesSwitch')"
-                @update:model-value="emit('changeAutoDownloadUpdates', $event)"
-              />
-            </div>
-            <p v-if="autoDownloadUpdatesError" class="text-sm text-destructive">
-              {{ autoDownloadUpdatesError }}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div class="break-inside-avoid">
-        <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
-          <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
-            <span
-              class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
-              aria-hidden="true"
-            >
               <Power class="size-4" />
             </span>
             <CardTitle class="min-w-0 text-lg tracking-tight">
@@ -213,6 +165,5 @@ function updateLocale(value: unknown) {
         </Card>
       </div>
     </div>
-    <SettingsLoggingSection :auto-save-ready="autoSaveReady" />
   </div>
 </template>

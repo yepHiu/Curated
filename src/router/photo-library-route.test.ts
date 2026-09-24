@@ -70,7 +70,7 @@ describe("photo library routes", () => {
 
     expect(photoServiceState.refreshSettings).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe("settings")
-    expect(router.currentRoute.value.query.section).toBe("experimental")
+    expect(router.currentRoute.value.query.section).toBe("photos")
   })
 
   it("allows the photo wall route when photos are enabled", async () => {

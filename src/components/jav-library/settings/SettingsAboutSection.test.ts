@@ -17,14 +17,6 @@ vi.mock("./SettingsAppUpdateSection.vue", () => ({
   },
 }))
 
-vi.mock("./SettingsHomepageDevTools.vue", () => ({
-  default: {
-    name: "SettingsHomepageDevTools",
-    emits: ["refreshed"],
-    template: "<button data-homepage-refresh @click=\"$emit('refreshed')\">refresh</button>",
-  },
-}))
-
 const baseProps = {
   isViteDev: true,
   useWebApi: false,
@@ -48,20 +40,18 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.text()).toContain('settings.aboutFrontendBuildDev:{"mode":"test"}')
   })
 
-  it("renders web app update status and emits refreshHealth from homepage dev tools", async () => {
+  it("renders web app update status and the update-preferences slot", () => {
     const wrapper = mount(SettingsAboutSection, {
       props: {
         ...baseProps,
         useWebApi: true,
         backendVersionDisplay: "20260501.010203",
       },
+      slots: { updates: "<div data-auto-update>Auto update</div>" },
     })
 
     expect(wrapper.get("[data-app-update]").text()).toBe("20260501.010203")
-
-    await wrapper.get("[data-homepage-refresh]").trigger("click")
-
-    expect(wrapper.emitted("refreshHealth")).toHaveLength(1)
+    expect(wrapper.get("[data-auto-update]").text()).toBe("Auto update")
   })
 
   it.each([true, false])("shows the concise license section in dev=%s", (isViteDev) => {

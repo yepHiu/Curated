@@ -63,12 +63,18 @@ import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGe
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"
 import SettingsMaintenanceSection from "@/components/jav-library/settings/SettingsMaintenanceSection.vue"
 import SettingsMetadataSection from "@/components/jav-library/settings/SettingsMetadataSection.vue"
+import SettingsConnectedClientsSection from "@/components/jav-library/settings/SettingsConnectedClientsSection.vue"
+import SettingsLoggingSection from "@/components/jav-library/settings/SettingsLoggingSection.vue"
+import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
+import SettingsAutoUpdateSection from "@/components/jav-library/settings/SettingsAutoUpdateSection.vue"
 /** 浏览器插件联动设置按需加载。 */
 const SettingsWishlistSection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsWishlistSection.vue"))
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
-/** 实验性功能区懒加载，避免 SettingsView chunk 超出首屏预算（bundle budget 硬门） */
-const SettingsExperimentalSection = defineAsyncComponent(
-  () => import("@/components/jav-library/settings/SettingsExperimentalSection.vue"),
+const SettingsComicLibrarySection = defineAsyncComponent(
+  () => import("@/components/jav-library/settings/SettingsComicLibrarySection.vue"),
+)
+const SettingsPhotoLibrarySection = defineAsyncComponent(
+  () => import("@/components/jav-library/settings/SettingsPhotoLibrarySection.vue"),
 )
 const SettingsAISection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsAISection.vue"))
 import SettingsOrganizeSection from "@/components/jav-library/settings/SettingsOrganizeSection.vue"
@@ -77,9 +83,10 @@ import SettingsPlaybackSection from "@/components/jav-library/settings/SettingsP
 import SettingsSecuritySection from "@/components/jav-library/settings/SettingsSecuritySection.vue"
 import { useLibraryService } from "@/services/library-service"
 import {
-  SETTINGS_NAV_ITEMS,
+  SETTINGS_NAV_GROUPS,
+  SETTINGS_OVERVIEW_NAV_ITEM,
   type SettingsSectionSlug,
-  isSettingsSectionSlug,
+  resolveSettingsSectionSlug,
 } from "@/lib/settings-nav"
 import {
   statusTextClass,
@@ -119,9 +126,16 @@ const route = useRoute()
 const router = useRouter()
 
 const settingsScrollElRef = inject<Ref<HTMLElement | null>>(SETTINGS_SCROLL_EL_KEY, ref(null))
-const settingsNavItems = SETTINGS_NAV_ITEMS
+const settingsNavGroups = SETTINGS_NAV_GROUPS
+const settingsOverviewNavItem = SETTINGS_OVERVIEW_NAV_ITEM
 const activeSlug = ref<SettingsSectionSlug>("overview")
 const renderedSettingsSlugs = ref<SettingsSectionSlug[]>(["overview"])
+
+function selectSettingsSection(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  const slug = resolveSettingsSectionSlug(value)
+  if (slug) activeSlug.value = slug
+}
 
 function shouldRenderSettingsSection(slug: SettingsSectionSlug): boolean {
   return renderedSettingsSlugs.value.includes(slug)
@@ -150,19 +164,11 @@ function scrollSettingsRootToTop() {
 function resolveSettingsSlugFromRoute(): SettingsSectionSlug {
   const raw = route.query.section
   const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined
-  if (s === "comics" || s === "photos") {
-    router.replace({ query: { ...route.query, section: "experimental" } }).catch(() => {})
-    return "experimental"
+  const resolved = s ? resolveSettingsSectionSlug(s) : null
+  if (resolved && resolved !== s) {
+    router.replace({ query: { ...route.query, section: resolved } }).catch(() => {})
   }
-  if (s === "libraryBehavior") {
-    router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
-    return "library"
-  }
-  if (s === "logging") {
-    router.replace({ query: { ...route.query, section: "general" } }).catch(() => {})
-    return "general"
-  }
-  if (s && isSettingsSectionSlug(s)) return s
+  if (resolved) return resolved
   return "overview"
 }
 
@@ -192,19 +198,13 @@ watch(
       }
       return
     }
-    if (s === "libraryBehavior") {
-      router.replace({ query: { ...route.query, section: "library" } }).catch(() => {})
-      if (activeSlug.value !== "library") activeSlug.value = "library"
-      return
+    const resolved = resolveSettingsSectionSlug(s)
+    if (!resolved) return
+    if (resolved !== s) {
+      router.replace({ query: { ...route.query, section: resolved } }).catch(() => {})
     }
-    if (s === "logging") {
-      router.replace({ query: { ...route.query, section: "general" } }).catch(() => {})
-      if (activeSlug.value !== "general") activeSlug.value = "general"
-      return
-    }
-    if (!isSettingsSectionSlug(s)) return
-    if (s !== activeSlug.value) {
-      activeSlug.value = s
+    if (resolved !== activeSlug.value) {
+      activeSlug.value = resolved
     }
   },
 )
@@ -213,7 +213,7 @@ const libraryService = useLibraryService()
 const scanTaskTracker = useScanTaskTracker()
 const connectedClientsState = useConnectedClients(
   libraryService,
-  computed(() => activeSlug.value === "overview"),
+  computed(() => activeSlug.value === "network"),
 )
 const { withPreservedScroll, withSyncPreservedScroll } = useSettingsScrollPreserve()
 /** Plain object services don't unwrap nested ComputedRefs in templates */
@@ -1315,9 +1315,7 @@ onMounted(async () => {
     typeof rawInit === "string" ? rawInit : Array.isArray(rawInit) ? rawInit[0] : undefined
   if (
     sInit &&
-    sInit !== "libraryBehavior" &&
-    sInit !== "logging" &&
-    !isSettingsSectionSlug(sInit)
+    !resolveSettingsSectionSlug(sInit)
   ) {
     router.replace({ query: { ...route.query, section: "overview" } }).catch(() => {})
   }
@@ -1997,39 +1995,47 @@ async function runMetadataRefreshForSelected() {
       class="w-full shrink-0 lg:max-h-[calc(100dvh-10.5rem)] lg:w-56 lg:overflow-y-auto lg:overscroll-contain lg:self-start lg:rounded-xl lg:border lg:border-border lg:bg-card lg:p-2"
       :aria-label="t('settings.navAriaLabel')"
     >
-      <p class="sr-only">{{ t("settings.navJumpTo") }}</p>
-      <div class="-mx-1 overflow-x-auto pb-2 lg:hidden">
-        <div class="flex w-max min-w-full gap-2 px-1">
-          <button
-            v-for="item in settingsNavItems"
-            :key="`mob-nav-${item.slug}`"
-            type="button"
-            :class="
-              cn(
-                'shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
-                activeSlug === item.slug
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground',
-              )
-            "
-            @click="activeSlug = item.slug"
-          >
-            {{ t(item.labelKey) }}
-          </button>
-        </div>
+      <div class="lg:hidden">
+        <label for="settings-section-select" class="mb-2 block text-xs font-medium text-muted-foreground">
+          {{ t("settings.navJumpTo") }}
+        </label>
+        <select
+          id="settings-section-select"
+          class="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :value="activeSlug"
+          @change="selectSettingsSection"
+        >
+          <option :value="settingsOverviewNavItem.slug">{{ t(settingsOverviewNavItem.labelKey) }}</option>
+          <optgroup v-for="group in settingsNavGroups" :key="group.labelKey" :label="t(group.labelKey)">
+            <option v-for="item in group.items" :key="item.slug" :value="item.slug">
+              {{ t(item.labelKey) }}{{ item.beta ? " · Beta" : "" }}
+            </option>
+          </optgroup>
+        </select>
       </div>
 
       <TabsList
         class="hidden h-auto min-h-0 w-full flex-col gap-1 border-0 bg-transparent p-0 text-muted-foreground lg:flex"
       >
         <TabsTrigger
-          v-for="item in settingsNavItems"
-          :key="`desk-${item.slug}`"
-          :value="item.slug"
+          :value="settingsOverviewNavItem.slug"
           class="h-auto w-full cursor-pointer flex-initial justify-start rounded-lg border border-transparent px-3 py-2 text-left text-sm shadow-none transition-colors duration-150 data-[state=inactive]:hover:bg-muted data-[state=inactive]:hover:text-foreground data-[state=active]:border-transparent data-[state=active]:bg-primary/10 data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
-        >
-          {{ t(item.labelKey) }}
-        </TabsTrigger>
+        >{{ t(settingsOverviewNavItem.labelKey) }}</TabsTrigger>
+        <template v-for="group in settingsNavGroups" :key="group.labelKey">
+          <div role="presentation" aria-hidden="true" class="w-full px-3 pb-1 pt-3 text-xs font-semibold text-muted-foreground">
+            {{ t(group.labelKey) }}
+          </div>
+          <TabsTrigger
+            v-for="item in group.items"
+            :key="`desk-${item.slug}`"
+            :value="item.slug"
+            :aria-label="`${t(group.labelKey)}，${t(item.labelKey)}${item.beta ? ' Beta' : ''}`"
+            class="h-auto w-full cursor-pointer flex-initial justify-start rounded-lg border border-transparent px-3 py-2 text-left text-sm shadow-none transition-colors duration-150 data-[state=inactive]:hover:bg-muted data-[state=inactive]:hover:text-foreground data-[state=active]:border-transparent data-[state=active]:bg-primary/10 data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            {{ t(item.labelKey) }}
+            <span v-if="item.beta" class="ml-auto rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Beta</span>
+          </TabsTrigger>
+        </template>
       </TabsList>
     </nav>
 
@@ -2055,14 +2061,6 @@ async function runMetadataRefreshForSelected() {
       :watch-time-summary="watchTimeSummary"
       :watch-time-loading="watchTimeLoading"
       :watch-time-error="watchTimeError"
-      :connected-clients="connectedClients"
-      :connected-clients-total="connectedClientsTotal"
-      :connected-clients-local-count="connectedClientsLocalCount"
-      :connected-clients-remote-count="connectedClientsRemoteCount"
-      :connected-clients-loading="connectedClientsLoading"
-      :connected-clients-error="connectedClientsError"
-      :connected-clients-sampled-at="connectedClientsSampledAt"
-      @refresh-connected-clients="refreshConnectedClients"
     />
     </section>
     </TabsContent>
@@ -2081,17 +2079,12 @@ async function runMetadataRefreshForSelected() {
     <SettingsGeneralSection
       :locale="locale"
       :theme-preference="themePreference"
-      :auto-download-updates="autoDownloadUpdates"
-      :auto-download-updates-saving="autoDownloadUpdatesSaving"
-      :auto-download-updates-error="autoDownloadUpdatesError"
       :launch-at-login="launchAtLogin"
       :launch-at-login-saving="launchAtLoginSaving"
       :launch-at-login-disabled="launchAtLoginDisabled"
       :launch-at-login-error="launchAtLoginError"
-      :auto-save-ready="settingsAutoSaveReady"
       @update:locale="void setLocaleFromSelect($event)"
       @change-theme="setThemeFromSelect"
-      @change-auto-download-updates="onAutoDownloadUpdatesChange"
       @change-launch-at-login="onLaunchAtLoginChange"
     />
     </section>
@@ -2284,6 +2277,16 @@ async function runMetadataRefreshForSelected() {
         @test-proxy-javbus="testProxyJavbus"
         @test-proxy-google="testProxyGoogle"
       />
+      <SettingsConnectedClientsSection
+        :clients="connectedClients"
+        :total="connectedClientsTotal"
+        :local-count="connectedClientsLocalCount"
+        :remote-count="connectedClientsRemoteCount"
+        :loading="connectedClientsLoading"
+        :error="connectedClientsError"
+        :sampled-at="connectedClientsSampledAt"
+        @refresh="refreshConnectedClients"
+      />
     </section>
     </TabsContent>
 
@@ -2352,6 +2355,11 @@ async function runMetadataRefreshForSelected() {
         :health-supported="useWebApi"
         @run-full-scan="runFullScan"
       />
+      <SettingsLoggingSection :auto-save-ready="settingsAutoSaveReady" />
+      <SettingsHomepageDevTools
+        v-if="isViteDev && useWebApi"
+        @refreshed="void loadAboutHealth()"
+      />
     </section>
     </TabsContent>
 
@@ -2367,18 +2375,25 @@ async function runMetadataRefreshForSelected() {
     </TabsContent>
 
     <TabsContent
-      v-if="shouldRenderSettingsSection('experimental')"
-      value="experimental"
+      v-if="shouldRenderSettingsSection('comics')"
+      value="comics"
       class="mt-0 min-w-0 flex-1 outline-none"
     >
-    <section
-      id="settings-section-experimental"
-      class="space-y-6"
-      :aria-label="t('settings.navExperimental')"
+      <section id="settings-section-comics" :aria-label="t('settings.navComics')">
+        <h2 class="sr-only">{{ t("settings.navComics") }}</h2>
+        <SettingsComicLibrarySection />
+      </section>
+    </TabsContent>
+
+    <TabsContent
+      v-if="shouldRenderSettingsSection('photos')"
+      value="photos"
+      class="mt-0 min-w-0 flex-1 outline-none"
     >
-    <h2 class="sr-only">{{ t("settings.navExperimental") }}</h2>
-      <SettingsExperimentalSection />
-    </section>
+      <section id="settings-section-photos" :aria-label="t('settings.navPhotos')">
+        <h2 class="sr-only">{{ t("settings.navPhotos") }}</h2>
+        <SettingsPhotoLibrarySection />
+      </section>
     </TabsContent>
 
     <TabsContent
@@ -2401,8 +2416,16 @@ async function runMetadataRefreshForSelected() {
       :about-health-error="aboutHealthError"
       :backend-version-display="aboutBackendVersionDisplay"
       :backend-version-status="aboutBackendVersionStatus"
-      @refresh-health="void loadAboutHealth()"
-    />
+    >
+      <template #updates>
+        <SettingsAutoUpdateSection
+          :enabled="autoDownloadUpdates"
+          :saving="autoDownloadUpdatesSaving"
+          :error="autoDownloadUpdatesError"
+          @change="onAutoDownloadUpdatesChange"
+        />
+      </template>
+    </SettingsAboutSection>
     </section>
     </TabsContent>
     </div>

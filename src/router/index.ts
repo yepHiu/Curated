@@ -28,7 +28,7 @@ async function guardComicRouteIfNeeded(name: unknown) {
     return {
       name: "settings",
       query: {
-        section: "experimental",
+        section: "comics",
       },
     }
   }
@@ -49,7 +49,7 @@ async function guardPhotoRouteIfNeeded(name: unknown) {
     return {
       name: "settings",
       query: {
-        section: "experimental",
+        section: "photos",
       },
     }
   }

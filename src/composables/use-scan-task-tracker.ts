@@ -114,7 +114,14 @@ function libraryScanNotificationSource(taskId: string) {
 function comicTaskNotificationSource(taskId: string) {
   return {
     taskId,
-    route: "/settings?section=experimental",
+    route: "/settings?section=comics",
+  }
+}
+
+function photoTaskNotificationSource(taskId: string) {
+  return {
+    taskId,
+    route: "/settings?section=photos",
   }
 }
 
@@ -253,7 +260,7 @@ function handleTerminalTask(t: TaskDTO, dismissTaskId = t.taskId) {
             t.status === "completed"
               ? tr("notificationCenter.titles.scanDone")
               : tr("notificationCenter.titles.scanFailed"),
-          source: comicTaskNotificationSource(t.taskId),
+          source: photo ? photoTaskNotificationSource(t.taskId) : comicTaskNotificationSource(t.taskId),
         },
       },
     )

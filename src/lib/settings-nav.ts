@@ -9,7 +9,8 @@ export type SettingsSectionSlug =
   | "curated"
   | "playback"
   | "maintenance"
-  | "experimental"
+  | "comics"
+  | "photos"
   | "ai"
   | "about"
 
@@ -17,20 +18,59 @@ export function settingsSectionDomId(slug: SettingsSectionSlug): string {
   return `settings-section-${slug}`
 }
 
-export const SETTINGS_NAV_ITEMS: { slug: SettingsSectionSlug; labelKey: string }[] = [
-  { slug: "overview", labelKey: "settings.navOverview" },
-  { slug: "general", labelKey: "settings.navGeneral" },
-  { slug: "security", labelKey: "settings.navSecurity" },
-  { slug: "library", labelKey: "settings.navLibrary" },
-  { slug: "metadata", labelKey: "settings.navMetadata" },
-  { slug: "network", labelKey: "settings.navNetwork" },
-  { slug: "curated", labelKey: "settings.navCurated" },
-  { slug: "playback", labelKey: "settings.navPlayback" },
-  { slug: "maintenance", labelKey: "settings.navMaintenance" },
-  { slug: "experimental", labelKey: "settings.navExperimental" },
-  { slug: "ai", labelKey: "aiSettings.title" },
-  { slug: "about", labelKey: "settings.navAbout" },
+type SettingsNavItem = { slug: SettingsSectionSlug; labelKey: string; beta?: boolean }
+
+export const SETTINGS_OVERVIEW_NAV_ITEM: SettingsNavItem = {
+  slug: "overview",
+  labelKey: "settings.navOverview",
+}
+
+export const SETTINGS_NAV_GROUPS: { labelKey: string; items: SettingsNavItem[] }[] = [
+  {
+    labelKey: "settings.navGroupExperience",
+    items: [
+      { slug: "general", labelKey: "settings.navGeneral" },
+      { slug: "playback", labelKey: "settings.navPlayback" },
+      { slug: "curated", labelKey: "settings.navCurated" },
+      { slug: "ai", labelKey: "settings.navAI" },
+    ],
+  },
+  {
+    labelKey: "settings.navGroupLibrary",
+    items: [
+      { slug: "library", labelKey: "settings.navLibrary" },
+      { slug: "metadata", labelKey: "settings.navMetadata" },
+      { slug: "comics", labelKey: "settings.navComics", beta: true },
+      { slug: "photos", labelKey: "settings.navPhotos", beta: true },
+    ],
+  },
+  {
+    labelKey: "settings.navGroupAccess",
+    items: [
+      { slug: "network", labelKey: "settings.navNetwork" },
+      { slug: "security", labelKey: "settings.navSecurity" },
+    ],
+  },
+  {
+    labelKey: "settings.navGroupSystem",
+    items: [
+      { slug: "maintenance", labelKey: "settings.navMaintenance" },
+      { slug: "about", labelKey: "settings.navAbout" },
+    ],
+  },
 ]
+
+export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+  SETTINGS_OVERVIEW_NAV_ITEM,
+  ...SETTINGS_NAV_GROUPS.flatMap((group) => group.items),
+]
+
+export function resolveSettingsSectionSlug(value: string): SettingsSectionSlug | null {
+  if (value === "experimental") return "comics"
+  if (value === "libraryBehavior") return "library"
+  if (value === "logging") return "maintenance"
+  return isSettingsSectionSlug(value) ? value : null
+}
 
 export function isSettingsSectionSlug(s: string): s is SettingsSectionSlug {
   return SETTINGS_NAV_ITEMS.some((item) => item.slug === s)
