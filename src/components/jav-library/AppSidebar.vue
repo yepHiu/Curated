@@ -22,7 +22,6 @@ import { RouterLink, useRoute } from "vue-router"
 import type { AppPage, LibraryMode } from "@/domain/library/types"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useActivePlaybackSession } from "@/composables/use-active-playback-session"
 import { useBackendHealth } from "@/composables/use-backend-health"
@@ -315,7 +314,7 @@ const getNavigationTarget = (page: AppPage) => {
       </div>
     </div>
 
-    <ScrollArea class="min-h-0 w-full min-w-0 flex-1">
+    <div class="app-sidebar-scroll min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
       <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5'">
         <template v-for="(section, sectionIndex) in sidebarSections" :key="section.key">
           <section
@@ -370,7 +369,7 @@ const getNavigationTarget = (page: AppPage) => {
           />
         </template>
       </div>
-    </ScrollArea>
+    </div>
 
     <Separator
       class="my-2.5 shrink-0 bg-sidebar-border/80"
@@ -537,3 +536,13 @@ const getNavigationTarget = (page: AppPage) => {
     </RouterLink>
   </aside>
 </template>
+
+<style scoped>
+.app-sidebar-scroll {
+  scrollbar-width: none;
+}
+
+.app-sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+</style>
