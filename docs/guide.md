@@ -270,7 +270,7 @@ pnpm release:publish
 
 Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
 
-The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About → Open-source project licenses links to the app's MIT license and all three font licenses.
+The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
 
 Deeper packaging writing:
 
