@@ -2,7 +2,6 @@
 import { Skeleton } from "@/components/ui/skeleton"
 
 const posterSkeletons = Array.from({ length: 6 }, (_, index) => `poster-${index}`)
-const tasteSkeletons = Array.from({ length: 3 }, (_, index) => `taste-${index}`)
 </script>
 
 <template>
@@ -70,32 +69,6 @@ const tasteSkeletons = Array.from({ length: 3 }, (_, index) => `taste-${index}`)
         </div>
       </section>
 
-      <section
-        data-homepage-skeleton-section="taste"
-        class="space-y-4"
-      >
-        <div class="space-y-2">
-          <Skeleton class="h-6 w-40" />
-          <Skeleton class="h-4 w-full max-w-xl" />
-        </div>
-
-        <div class="grid gap-3 lg:grid-cols-3">
-          <article
-            v-for="itemId in tasteSkeletons"
-            :key="itemId"
-            class="rounded-[1.6rem] border border-border/60 bg-card/65 p-4"
-          >
-            <Skeleton class="h-4 w-24" />
-            <div class="mt-4 flex flex-wrap gap-2">
-              <Skeleton
-                v-for="chip in 4"
-                :key="`${itemId}-${chip}`"
-                class="h-8 w-20 rounded-full"
-              />
-            </div>
-          </article>
-        </div>
-      </section>
     </div>
   </div>
 </template>

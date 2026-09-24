@@ -8,7 +8,6 @@ import { useRouter } from "vue-router"
 import HomepageEmptyState from "@/components/jav-library/HomepageEmptyState.vue"
 import HomepagePortal from "@/components/jav-library/HomepagePortal.vue"
 import HomepagePortalSkeleton from "@/components/jav-library/HomepagePortalSkeleton.vue"
-import type { HomepageTasteEntry } from "@/lib/homepage-portal"
 import { buildHomepagePortalModel } from "@/lib/homepage-portal"
 import {
   listSortedByUpdatedDesc,
@@ -96,24 +95,6 @@ function openPlayer(movieId: string) {
   })
 }
 
-function browseTaste(payload: { kind: HomepageTasteEntry["kind"]; label: string }) {
-  const label = payload.label.trim()
-  if (!label) return
-
-  if (payload.kind === "tag") {
-    void router.push({
-      name: "library",
-      query: { tag: label },
-    })
-    return
-  }
-
-  void router.push({
-    name: "library",
-    query: payload.kind === "actor" ? { actor: label } : { studio: label },
-  })
-}
-
 function refreshRecommendations() {
   void homepageDailyRecommendations.refreshRecommendationsOnly({
     preserveHeroMovieIds: portalModel.value.heroMovies.map((movie) => movie.id),
@@ -165,7 +146,6 @@ async function deleteRecommendationFeedback(feedbackId: string) {
     :recommendation-feedback-busy="recommendationFeedbackBusy"
     @open-details="openDetails"
     @open-player="openPlayer"
-    @browse-taste="browseTaste"
     @refresh-recommendations="refreshRecommendations"
     @submit-recommendation-feedback="submitRecommendationFeedback"
     @delete-recommendation-feedback="deleteRecommendationFeedback"

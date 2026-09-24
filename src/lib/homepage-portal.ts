@@ -19,18 +19,11 @@ export interface HomepageContinueEntry {
   updatedAt: string
 }
 
-export interface HomepageTasteEntry {
-  kind: "actor" | "tag" | "studio"
-  label: string
-  weight: number
-}
-
 export interface HomepagePortalModel {
   heroMovies: Movie[]
   recentMovies: Movie[]
   recommendations: HomepageRecommendationEntry[]
   continueWatching: HomepageContinueEntry[]
-  tasteRadar: HomepageTasteEntry[]
 }
 
 export interface BuildHomepagePortalInput {
@@ -42,7 +35,6 @@ export interface BuildHomepagePortalInput {
   recentLimit?: number
   recommendationLimit?: number
   continueLimit?: number
-  tasteLimitPerKind?: number
 }
 
 export interface HomepageDailyRecommendationsSelection {
@@ -164,20 +156,6 @@ function buildPreferenceWeights(
   return { actors, tags, studios }
 }
 
-function topEntries(
-  kind: HomepageTasteEntry["kind"],
-  map: ReadonlyMap<string, number>,
-  limit: number,
-): HomepageTasteEntry[] {
-  return [...map.entries()]
-    .sort((left, right) => {
-      if (right[1] !== left[1]) return right[1] - left[1]
-      return left[0].localeCompare(right[0])
-    })
-    .slice(0, limit)
-    .map(([label, weight]) => ({ kind, label, weight }))
-}
-
 function pickMoviesBySnapshotIds(
   ids: readonly string[],
   movieById: ReadonlyMap<string, Movie>,
@@ -292,7 +270,6 @@ export function buildHomepagePortalModel({
   recentLimit = 6,
   recommendationLimit = 6,
   continueLimit = 6,
-  tasteLimitPerKind = 3,
 }: BuildHomepagePortalInput): HomepagePortalModel {
   const activeMovies = movies.filter((movie) => !movie.trashedAt?.trim())
   const playbackByMovieId = buildPlaybackMap(playbackEntries)
@@ -385,17 +362,10 @@ export function buildHomepagePortalModel({
     })
     .slice(0, recommendationLimit)
 
-  const tasteRadar = [
-    ...topEntries("actor", preference.actors, tasteLimitPerKind),
-    ...topEntries("tag", preference.tags, tasteLimitPerKind),
-    ...topEntries("studio", preference.studios, tasteLimitPerKind),
-  ]
-
   return withHomepageDailyRecommendations({
     heroMovies,
     recentMovies,
     recommendations,
     continueWatching,
-    tasteRadar,
   }, activeMovies, dailyRecommendations)
 }

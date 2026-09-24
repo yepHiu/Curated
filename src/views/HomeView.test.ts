@@ -302,34 +302,6 @@ describe("HomeView", () => {
     }
   })
 
-  it("opens library filters from taste radar chips", async () => {
-    const wrapper = mount(HomeView)
-
-    await wrapper.get('[data-home-taste-chip-kind="actor"]').trigger("click")
-    expect(routerPushMock).toHaveBeenLastCalledWith({
-      name: "library",
-      query: {
-        actor: "Actor A",
-      },
-    })
-
-    await wrapper.get('[data-home-taste-chip-kind="tag"]').trigger("click")
-    expect(routerPushMock).toHaveBeenLastCalledWith({
-      name: "library",
-      query: {
-        tag: "tag-a",
-      },
-    })
-
-    await wrapper.get('[data-home-taste-chip-kind="studio"]').trigger("click")
-    expect(routerPushMock).toHaveBeenLastCalledWith({
-      name: "library",
-      query: {
-        studio: "Studio A",
-      },
-    })
-  })
-
   it("arms homepage restore before opening detail", async () => {
     const wrapper = mount(HomeView)
 
