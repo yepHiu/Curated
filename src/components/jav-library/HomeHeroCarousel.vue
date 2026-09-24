@@ -283,8 +283,7 @@ onBeforeUnmount(() => {
                       <div class="min-w-0 space-y-0 text-white">
                         <p
                           data-hero-slide-code
-                          :data-code="slide.movie.code"
-                          class="hero-slide-code relative w-fit max-w-full truncate border-b border-white/70 pb-1 text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
+                          class="w-fit max-w-full truncate border-b-2 border-white/70 pb-1 text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
                         >
                           {{ slide.movie.code }}
                         </p>
@@ -366,28 +365,3 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
-
-<style scoped>
-.hero-slide-code::before {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  color: var(--primary);
-  content: attr(data-code);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  clip-path: circle(0 at left bottom);
-  pointer-events: none;
-  transition: clip-path 550ms ease-out;
-}
-
-.hero-slide-code:hover::before {
-  clip-path: circle(200% at left bottom);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-slide-code::before {
-    transition: none;
-  }
-}
-</style>
