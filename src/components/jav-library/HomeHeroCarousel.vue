@@ -40,38 +40,33 @@ const displaySlides = computed(() => {
   if (movies.length === 1) {
     return [
       {
-        key: movies[0].id,
+        key: "hero-0",
         movie: movies[0],
         movieIndex: 0,
-        trackIndex: 0,
         clone: null as "head" | "tail" | null,
       },
     ]
   }
 
-  const lastIndex = movies.length - 1
   return [
-    {
-      key: `hero-head-${movies[lastIndex]!.id}`,
-      movie: movies[lastIndex]!,
-      movieIndex: lastIndex,
-      trackIndex: 0,
+    ...[movies.length - 2, movies.length - 1].map((index) => ({
+      key: `hero-head-${index}`,
+      movie: movies[index]!,
+      movieIndex: index,
       clone: "head" as const,
-    },
+    })),
     ...movies.map((movie, index) => ({
-      key: `hero-${movie.id}`,
+      key: `hero-${index}`,
       movie,
       movieIndex: index,
-      trackIndex: index + 1,
       clone: null as "head" | "tail" | null,
     })),
-    {
-      key: `hero-tail-${movies[0]!.id}`,
-      movie: movies[0]!,
-      movieIndex: 0,
-      trackIndex: movies.length + 1,
+    ...[0, 1].map((index) => ({
+      key: `hero-tail-${index}`,
+      movie: movies[index]!,
+      movieIndex: index,
       clone: "tail" as const,
-    },
+    })),
   ]
 })
 
@@ -112,7 +107,7 @@ function selectIndex(index: number) {
 }
 
 function syncTrackIndexWithActive() {
-  activeTrackIndex.value = total.value > 1 ? activeIndex.value + 1 : activeIndex.value
+  activeTrackIndex.value = total.value > 1 ? activeIndex.value + 2 : activeIndex.value
 }
 
 function queueTrackSnap(trackIndex: number) {
@@ -141,15 +136,15 @@ function setActiveMovieIndex(
   if (total.value <= 1) {
     activeTrackIndex.value = index
   } else {
-    let targetTrackIndex = index + 1
+    let targetTrackIndex = index + 2
     let snapTrackIndex: number | undefined
 
     if (currentIndex === total.value - 1 && index === 0) {
-      targetTrackIndex = total.value + 1
-      snapTrackIndex = 1
+      targetTrackIndex = total.value + 2
+      snapTrackIndex = 2
     } else if (currentIndex === 0 && index === total.value - 1) {
-      targetTrackIndex = 0
-      snapTrackIndex = total.value
+      targetTrackIndex = 1
+      snapTrackIndex = total.value + 1
     }
 
     trackTransitionEnabled.value = true

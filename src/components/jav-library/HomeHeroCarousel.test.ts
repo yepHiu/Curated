@@ -68,8 +68,8 @@ describe("HomeHeroCarousel", () => {
     expect(wrapper.get("[data-home-hero-progress-rail]").classes()).toContain("mx-auto")
     expect(wrapper.get("[data-home-hero-progress-rail]").classes()).toContain("max-w-[54rem]")
     expect(wrapper.get("[data-home-hero-track]").classes()).toContain("transition-transform")
-    expect(wrapper.find('[data-hero-slide-clone="head"]').text()).toContain("CODE-m4")
-    expect(wrapper.find('[data-hero-slide-clone="tail"]').text()).toContain("CODE-m1")
+    expect(wrapper.findAll('[data-hero-slide-clone="head"]').map((slide) => slide.find("[data-hero-slide-code]").text())).toEqual(["CODE-m3", "CODE-m4"])
+    expect(wrapper.findAll('[data-hero-slide-clone="tail"]').map((slide) => slide.find("[data-hero-slide-code]").text())).toEqual(["CODE-m1", "CODE-m2"])
     expect(wrapper.find('[data-hero-slide-state="prev"]').exists()).toBe(true)
     expect(wrapper.find('[data-hero-slide-state="active"]').exists()).toBe(true)
     expect(wrapper.find('[data-hero-slide-state="next"]').exists()).toBe(true)
@@ -92,31 +92,48 @@ describe("HomeHeroCarousel", () => {
     expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("transition-duration: 420ms")
   })
 
-  it("keeps the wrapped head slide visually aligned while snapping back from the tail clone", async () => {
+  it("keeps the next preview visible through the eighth-to-first wrap and snap", async () => {
     vi.useFakeTimers()
 
     const wrapper = mount(HomeHeroCarousel, {
       props: {
-        movies: [makeMovie("m1"), makeMovie("m2"), makeMovie("m3"), makeMovie("m4")],
-        autoplayMs: 12000,
+        movies: Array.from({ length: 8 }, (_, index) => makeMovie(`m${index + 1}`)),
+        autoplayMs: 1000,
       },
     })
 
-    await wrapper.findAll("[data-hero-progress-item]")[3]!.trigger("click")
-    await wrapper.findAll("[data-hero-progress-item]")[0]!.trigger("click")
+    const slides = wrapper.findAll("[data-home-hero-slide]")
+    expect(slides).toHaveLength(12)
+    expect(slides.slice(-3).map((slide) => slide.find("[data-hero-slide-code]").text())).toEqual(["CODE-m8", "CODE-m1", "CODE-m2"])
+
+    vi.advanceTimersByTime(7000)
+    await nextTick()
+    expect(wrapper.get('[data-hero-progress-item-active="true"]').attributes("aria-label")).toContain("8")
+
+    vi.advanceTimersByTime(1000)
     await nextTick()
 
+    expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("- 10 *")
+    expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("transition-duration: 760ms")
     const wrappedActiveSlides = wrapper
       .findAll('[data-hero-slide-state="active"]')
       .filter((slide) => slide.text().includes("CODE-m1"))
     expect(wrappedActiveSlides).toHaveLength(2)
+    expect(slides.at(-1)?.attributes("data-hero-slide-state")).toBe("next")
 
-    vi.advanceTimersByTime(740)
+    vi.advanceTimersByTime(800)
     await nextTick()
 
+    expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("- 2 *")
     const snappedActiveSlides = wrapper
       .findAll('[data-hero-slide-state="active"]')
       .filter((slide) => slide.text().includes("CODE-m1"))
     expect(snappedActiveSlides).toHaveLength(2)
+    expect(slides[3]?.attributes("data-hero-slide-state")).toBe("next")
+
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("- 3 *")
+    expect(wrapper.get('[data-hero-progress-item-active="true"]').attributes("aria-label")).toContain("2")
   })
 })
