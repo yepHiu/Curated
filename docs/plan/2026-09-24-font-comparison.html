@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Curated 字体对比 · 当前 / 鸿蒙 + Noto Sans</title>
+  <link rel="icon" type="image/png" href="/Curated-icon.png" />
+  <title>Curated 字体对比 · 中文与日语方案</title>
   <style>
     @font-face {
       font-family: "Noto Sans Preview";
@@ -17,6 +18,13 @@
       src: url("./assets/font-comparison/outfit-latin-700-normal.woff2") format("woff2");
       font-style: normal;
       font-weight: 700;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Noto Sans JP Preview";
+      src: url("./assets/font-comparison/noto-sans-jp-curated-preview.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 100 900;
       font-display: swap;
     }
     :root {
@@ -38,6 +46,8 @@
     button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
     .current { font-family: ui-sans-serif, system-ui, sans-serif; }
     .proposed { font-family: "Noto Sans Preview", "HarmonyOS Sans SC", ui-sans-serif, system-ui, sans-serif; }
+    .jp-noto { font-family: "Noto Sans Preview", "Noto Sans JP Preview", ui-sans-serif, system-ui, sans-serif; }
+    .jp-harmony { font-family: "Noto Sans Preview", "HarmonyOS Sans SC", ui-sans-serif, system-ui, sans-serif; }
     .wrap { max-width: 1420px; margin: auto; padding: 42px clamp(18px,3.5vw,56px) 80px; }
     .eyebrow { color: var(--pink); font-size: 12px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
     h1 { margin: 12px 0 10px; font-size: clamp(30px,3.2vw,46px); line-height: 1.16; letter-spacing: -.035em; }
@@ -50,10 +60,18 @@
     .segmented button[aria-pressed="true"] { background: var(--pink); color: #250d16; font-weight: 700; }
     .size-control input { width: 122px; accent-color: var(--pink); }
     .size-value { min-width: 45px; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .jump-link { color: var(--pink); font-size: 13px; font-weight: 650; text-decoration: none; }
+    .jump-link:hover { text-decoration: underline; }
+    .jump-link:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
     .font-status { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--muted); font-size: 12px; }
     .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #e5aa5b; }
     .font-status[data-ready="true"] .status-dot { background: #65cfa7; }
+    .jp-status { margin: 0 0 17px; }
+    .section-intro { max-width: 760px; margin: 35px 0 18px; }
+    .section-intro h2 { margin: 0 0 7px; font-size: clamp(23px,2.6vw,30px); line-height: 1.3; }
+    .section-intro p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
     .comparison, .custom-results { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+    .jp-comparison { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
     .panel { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); }
     .panel-head { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 10px; padding: 22px 24px 20px; border-bottom: 1px solid var(--border); }
     .panel-kicker { margin-bottom: 7px; color: var(--pink); font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
@@ -69,6 +87,9 @@
     .sample-mixed { margin: 0; font-size: calc(21px * var(--scale)); font-weight: 600; line-height: 1.48; }
     .sample-numbers { margin: 0; font-size: calc(24px * var(--scale)); font-weight: 500; line-height: 1.5; font-variant-numeric: tabular-nums; }
     .sample-english { margin: 0; font-size: calc(16px * var(--scale)); font-weight: 400; line-height: 1.6; }
+    .jp-comparison .sample-title { font-size: calc(25px * var(--scale)); }
+    .jp-comparison .sample-body { font-size: calc(14px * var(--scale)); }
+    .jp-comparison .sample-mixed { font-size: calc(17px * var(--scale)); }
     .ui-preview { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); }
     .ui-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
     .ui-brand { color: var(--pink); font-family: "Outfit Preview",ui-sans-serif,system-ui,sans-serif; font-size: 19px; font-weight: 700; letter-spacing: -.03em; }
@@ -91,6 +112,7 @@
     .custom-result small { display: block; margin-bottom: 10px; color: var(--muted); font-family: ui-sans-serif,system-ui,sans-serif; font-size: 11px; font-weight: 700; }
     .custom-result div { overflow-wrap: anywhere; font-size: calc(18px * var(--scale)); line-height: 1.6; white-space: pre-wrap; }
     .footnote { margin: 17px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    @media (max-width: 1150px) { .jp-comparison { grid-template-columns: 1fr; } }
     @media (max-width: 830px) { .comparison, .custom-results { grid-template-columns: 1fr; } .font-status { width: 100%; margin-left: 0; } }
     @media (max-width: 500px) { .wrap { padding-top: 28px; } .panel-head, .samples, .custom-area { padding-left: 18px; padding-right: 18px; } .sample-title { font-size: calc(26px * var(--scale)); } .size-control { width: 100%; } .size-control input { flex: 1; } }
   </style>
@@ -103,6 +125,7 @@
     <div class="toolbar" aria-label="对比设置">
       <div class="control"><span class="control-label">背景</span><div class="segmented" role="group" aria-label="背景主题"><button type="button" data-theme-button="dark" aria-pressed="true">深色</button><button type="button" data-theme-button="light" aria-pressed="false">浅色</button></div></div>
       <label class="control size-control" for="font-scale"><span class="control-label">字号</span><input id="font-scale" type="range" min="85" max="125" value="100" /><span class="size-value" id="scale-value">100%</span></label>
+      <a class="jump-link" href="#japanese">跳到日语对比 ↓</a>
       <div class="font-status" id="font-status" role="status" aria-live="polite"><span class="status-dot"></span><span id="font-status-text">正在检查预览字体…</span></div>
     </div>
     <div class="comparison">
@@ -129,12 +152,46 @@
         </div>
       </section>
     </div>
+    <div class="section-intro" id="japanese">
+      <h2>日语显示也需要单独决定</h2>
+      <p>下面用仓库日语文案和界面样例比较三种显示方式。Noto Sans JP 是专门的日文字形；鸿蒙列使用 HarmonyOS Sans SC，因此日文汉字可能呈现中文地区的字形。两种方案的拉丁字母与数字都用 Noto Sans。</p>
+    </div>
+    <div class="font-status jp-status" id="jp-font-status" role="status" aria-live="polite"><span class="status-dot"></span><span id="jp-font-status-text">正在检查 Noto Sans JP…</span></div>
+    <div class="jp-comparison" lang="ja">
+      <section class="panel current" aria-labelledby="jp-current-title">
+        <div class="panel-head"><div><div class="panel-kicker">Current · 現在</div><h2 id="jp-current-title">システム標準</h2><p class="panel-sub">当前项目的系统字体回退</p></div><span class="panel-tag">项目现状</span></div>
+        <div class="samples">
+          <div class="sample"><p class="sample-label">見出し · 700 / 25px</p><h3 class="sample-title">視聴履歴とお気に入り</h3></div>
+          <div class="sample"><p class="sample-label">本文 · 400 / 14px</p><p class="sample-body">この期間にはまだ視聴データがありません。作品を実際に再生すると視聴時間の蓄積が始まります。</p></div>
+          <div class="sample"><p class="sample-label">かな・漢字・英数字 · 600 / 17px</p><p class="sample-mixed">キュレートフレーム · Curated Frames<br>出演者 12 人・作品 42 件・完了率 76%</p></div>
+          <div class="sample"><p class="sample-label">UI サンプル</p><div class="ui-preview"><div class="ui-top"><div class="ui-brand">Curated</div><div class="ui-nav"><span>作品</span><span class="active">視聴統計</span><span>視聴履歴</span></div></div><div class="ui-card"><h3>視聴サマリー</h3><p>過去 30 日の視聴時間と作品の進捗を確認できます。</p><div class="ui-metrics"><div class="ui-metric"><strong>42.8 時間</strong><span>視聴時間</span></div><div class="ui-metric"><strong>76%</strong><span>完了率</span></div><span class="ui-action">詳細を見る</span></div></div></div></div>
+        </div>
+      </section>
+      <section class="panel jp-noto" aria-labelledby="jp-noto-title">
+        <div class="panel-head"><div><div class="panel-kicker">Option A · 日本語</div><h2 id="jp-noto-title">Noto Sans JP</h2><p class="panel-sub">日文字形 + 英数字 Noto Sans</p></div><span class="panel-tag">专用日文字体</span></div>
+        <div class="samples">
+          <div class="sample"><p class="sample-label">見出し · 700 / 25px</p><h3 class="sample-title">視聴履歴とお気に入り</h3></div>
+          <div class="sample"><p class="sample-label">本文 · 400 / 14px</p><p class="sample-body">この期間にはまだ視聴データがありません。作品を実際に再生すると視聴時間の蓄積が始まります。</p></div>
+          <div class="sample"><p class="sample-label">かな・漢字・英数字 · 600 / 17px</p><p class="sample-mixed">キュレートフレーム · Curated Frames<br>出演者 12 人・作品 42 件・完了率 76%</p></div>
+          <div class="sample"><p class="sample-label">UI サンプル</p><div class="ui-preview"><div class="ui-top"><div class="ui-brand">Curated</div><div class="ui-nav"><span>作品</span><span class="active">視聴統計</span><span>視聴履歴</span></div></div><div class="ui-card"><h3>視聴サマリー</h3><p>過去 30 日の視聴時間と作品の進捗を確認できます。</p><div class="ui-metrics"><div class="ui-metric"><strong>42.8 時間</strong><span>視聴時間</span></div><div class="ui-metric"><strong>76%</strong><span>完了率</span></div><span class="ui-action">詳細を見る</span></div></div></div></div>
+        </div>
+      </section>
+      <section class="panel jp-harmony" aria-labelledby="jp-harmony-title">
+        <div class="panel-head"><div><div class="panel-kicker">Option B · 日本語</div><h2 id="jp-harmony-title">HarmonyOS Sans SC</h2><p class="panel-sub">鸿蒙简体中文字形 + 英数字 Noto Sans</p></div><span class="panel-tag">跨语言统一</span></div>
+        <div class="samples">
+          <div class="sample"><p class="sample-label">見出し · 700 / 25px</p><h3 class="sample-title">視聴履歴とお気に入り</h3></div>
+          <div class="sample"><p class="sample-label">本文 · 400 / 14px</p><p class="sample-body">この期間にはまだ視聴データがありません。作品を実際に再生すると視聴時間の蓄積が始まります。</p></div>
+          <div class="sample"><p class="sample-label">かな・漢字・英数字 · 600 / 17px</p><p class="sample-mixed">キュレートフレーム · Curated Frames<br>出演者 12 人・作品 42 件・完了率 76%</p></div>
+          <div class="sample"><p class="sample-label">UI サンプル</p><div class="ui-preview"><div class="ui-top"><div class="ui-brand">Curated</div><div class="ui-nav"><span>作品</span><span class="active">視聴統計</span><span>視聴履歴</span></div></div><div class="ui-card"><h3>視聴サマリー</h3><p>過去 30 日の視聴時間と作品の進捗を確認できます。</p><div class="ui-metrics"><div class="ui-metric"><strong>42.8 時間</strong><span>視聴時間</span></div><div class="ui-metric"><strong>76%</strong><span>完了率</span></div><span class="ui-action">詳細を見る</span></div></div></div></div>
+        </div>
+      </section>
+    </div>
     <section class="custom-area" aria-labelledby="custom-title">
       <h2 id="custom-title">用你的文案试一试</h2><p>输入一段真实的标题或说明，两侧会同步更新。</p>
       <textarea id="custom-input" aria-label="输入自定义对比文案" spellcheck="false">萃取帧 · Curated Frames&#10;选择喜欢的画面，记录 02:12:49 那一刻。</textarea>
       <div class="custom-results"><div class="custom-result current"><small>当前 · 系统默认</small><div class="custom-output"></div></div><div class="custom-result proposed"><small>设想 · 鸿蒙 + Noto Sans</small><div class="custom-output"></div></div></div>
     </section>
-    <p class="footnote">这是独立 HTML 原型，没有修改 Curated 的正式字体。两侧 Curated 品牌字标均保持现有 Outfit。鸿蒙字体从本机已安装的 HarmonyOS Sans SC 读取；如果字体状态提示不可用，右侧中文会回退到系统字体。Noto Sans 预览文件随此页面本地加载。</p>
+    <p class="footnote">这是独立 HTML 原型，没有修改 Curated 的正式字体。品牌字标保持现有 Outfit。鸿蒙字体从本机已安装的 HarmonyOS Sans SC 读取；若字体不可用会回退。Noto Sans JP 预览文件只收录仓库当前日语文案和常用假名，因此上方日文样例可完整对比；自行输入未收录的日文字符时可能回退。Noto Sans 预览文件随此页面本地加载。</p>
   </main>
   <script>
     const root = document.documentElement;
@@ -157,13 +214,19 @@
     Promise.allSettled([
       document.fonts.load('400 16px "Noto Sans Preview"', 'Curated 123'),
       new FontFace('HarmonyOS Sans Probe', 'local("HarmonyOS Sans SC")').load(),
-    ]).then(([noto, harmony]) => {
+      document.fonts.load('400 16px "Noto Sans JP Preview"', '視聴履歴とお気に入り'),
+    ]).then(([noto, harmony, japanese]) => {
       const notoReady = noto.status === 'fulfilled' && noto.value.length > 0;
       const harmonyReady = harmony.status === 'fulfilled';
+      const jpReady = japanese.status === 'fulfilled' && japanese.value.length > 0;
       document.getElementById('font-status').dataset.ready = String(notoReady && harmonyReady);
       document.getElementById('font-status-text').textContent = notoReady && harmonyReady
         ? 'Noto Sans 与鸿蒙字体已加载'
         : '字体未完全加载：' + (notoReady ? '' : 'Noto Sans ') + (harmonyReady ? '' : '鸿蒙字体');
+      document.getElementById('jp-font-status').dataset.ready = String(notoReady && harmonyReady && jpReady);
+      document.getElementById('jp-font-status-text').textContent = jpReady && harmonyReady && notoReady
+        ? 'Noto Sans JP、HarmonyOS Sans SC 与 Noto Sans 已加载'
+        : '日语字体未完全加载：' + (jpReady ? '' : 'Noto Sans JP ') + (harmonyReady ? '' : 'HarmonyOS Sans SC ') + (notoReady ? '' : 'Noto Sans');
     });
   </script>
 </body>
