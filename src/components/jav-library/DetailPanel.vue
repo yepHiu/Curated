@@ -4,6 +4,8 @@ import { useI18n } from "vue-i18n"
 import {
   AlertTriangle,
   FolderOpen,
+  Languages,
+  Loader2,
   MoreVertical,
   Pencil,
   PlayCircle,
@@ -38,11 +40,15 @@ import MovieMetadataRefreshConfirmDialog from "@/components/jav-library/MovieMet
 import MovieRatingStars from "@/components/jav-library/MovieRatingStars.vue"
 import ExpandableText from "@/components/jav-library/ExpandableText.vue"
 import { formatMovieSummaryForDisplay } from "@/lib/format-movie-summary"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+import { useAIActionRequest } from "@/composables/use-ai-action-request"
+import { useAIService } from "@/services/ai-service"
+import { AIServiceError } from "@/services/contracts/ai-service"
 import { getMovieImageVersion } from "@/lib/image-version"
 import { sourcePageLink } from "@/lib/source-page-link"
 import DetailTagAddControl from "./DetailTagAddControl.vue"
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -73,6 +79,63 @@ const isTrashed = computed(() => Boolean(props.movie.trashedAt?.trim()))
 const summaryDisplay = computed(() =>
   formatMovieSummaryForDisplay(props.movie.summary ?? ""),
 )
+const { writeEnabled: agentEnabled } = useExperimentalAgent()
+const aiService = useAIService()
+const titleAction = useAIActionRequest(aiService)
+const summaryAction = useAIActionRequest(aiService)
+const translatedTitle = ref("")
+const translatedSummary = ref("")
+const titleTranslateError = ref("")
+const summaryTranslateError = ref("")
+const canTranslate = computed(() => agentEnabled.value && !props.readOnly && !isTrashed.value)
+const displayedTitle = computed(() => translatedTitle.value || props.movie.title)
+const displayedSummary = computed(() =>
+  translatedSummary.value ? formatMovieSummaryForDisplay(translatedSummary.value) : summaryDisplay.value,
+)
+
+watch([() => props.movie.id, () => props.movie.title, () => props.movie.summary, locale, canTranslate], () => {
+  titleAction.cancel()
+  summaryAction.cancel()
+  translatedTitle.value = ""
+  translatedSummary.value = ""
+  titleTranslateError.value = ""
+  summaryTranslateError.value = ""
+})
+
+async function translateField(field: "title" | "summary") {
+  if (!canTranslate.value) return
+  const translation = field === "title" ? translatedTitle : translatedSummary
+  const error = field === "title" ? titleTranslateError : summaryTranslateError
+  const action = field === "title" ? titleAction : summaryAction
+  if (action.pending.value) return
+  if (translation.value) {
+    translation.value = ""
+    return
+  }
+  const movieId = props.movie.id
+  const source = field === "title" ? props.movie.title.trim() : props.movie.summary?.trim() ?? ""
+  if (!source) return
+  error.value = ""
+  try {
+    const result = await action.run(field === "title" ? "translate_title" : "translate_summary", {
+      movieId,
+      body: source,
+      locale: locale.value,
+    })
+    if (movieId !== props.movie.id || source !== (field === "title" ? props.movie.title.trim() : props.movie.summary?.trim() ?? "") || !canTranslate.value) return
+    if (result.noop || !result.proposedText?.trim()) {
+      error.value = t(field === "title" ? "detailPanel.movieAiTranslateNoop" : "detailPanel.movieAiTranslateSummaryNoop")
+      return
+    }
+    translation.value = result.proposedText.trim()
+  } catch (err) {
+    if (err instanceof AIServiceError && err.code === "AI_CANCELLED") return
+    if (movieId !== props.movie.id || !canTranslate.value) return
+    error.value = err instanceof AIServiceError && err.code === "AI_PROVIDER_UNAVAILABLE"
+      ? t("detailPanel.movieAiUnconfigured")
+      : err instanceof Error && err.message.trim() ? err.message : t("detailPanel.movieAiError")
+  }
+}
 
 const useWebApi = import.meta.env.VITE_USE_WEB_API === "true"
 const canRevealInFileManager = computed(
@@ -302,8 +365,21 @@ function removeMetadataTag(tag: string) {
                 'break-words',
               ]"
             >
-              {{ movie.title }}
+              <span data-detail-title>{{ displayedTitle }}</span><button
+                v-if="canTranslate && movie.title.trim()"
+                data-translate-title
+                type="button"
+                class="relative -bottom-1 ml-1 inline-flex size-7 cursor-pointer items-center justify-center rounded-md align-baseline text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                :disabled="titleAction.pending.value"
+                :aria-label="t(translatedTitle ? 'detailPanel.showOriginalTitle' : 'detailPanel.translateTitleInline')"
+                :title="t(translatedTitle ? 'detailPanel.showOriginalTitle' : 'detailPanel.translateTitleInline')"
+                @click="translateField('title')"
+              >
+                <Loader2 v-if="titleAction.pending.value" class="size-3.5 animate-spin" aria-hidden="true" />
+                <Languages v-else class="size-3.5" aria-hidden="true" />
+              </button>
             </CardTitle>
+            <p v-if="titleTranslateError" class="mt-1 text-xs text-destructive" role="status">{{ titleTranslateError }}</p>
             <CardDescription class="text-sm text-muted-foreground sm:text-base">
               <template v-if="movie.studio.trim()">
                 <button
@@ -460,13 +536,32 @@ function removeMetadataTag(tag: string) {
           />
         </div>
 
-        <ExpandableText
-          v-if="summaryDisplay"
-          :text="summaryDisplay"
-          :collapsed-lines="5"
-          :expand-label="t('detailPanel.expandSummary')"
-          :collapse-label="t('detailPanel.collapseSummary')"
-        />
+        <div v-if="displayedSummary" class="min-w-0">
+          <div class="flex min-w-0 items-start gap-1">
+            <div class="min-w-0 flex-1">
+              <ExpandableText
+                :text="displayedSummary"
+                :collapsed-lines="5"
+                :expand-label="t('detailPanel.expandSummary')"
+                :collapse-label="t('detailPanel.collapseSummary')"
+              />
+            </div>
+            <button
+              v-if="canTranslate && movie.summary?.trim()"
+              data-translate-summary
+              type="button"
+              class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+              :disabled="summaryAction.pending.value"
+              :aria-label="t(translatedSummary ? 'detailPanel.showOriginalSummary' : 'detailPanel.translateSummaryInline')"
+              :title="t(translatedSummary ? 'detailPanel.showOriginalSummary' : 'detailPanel.translateSummaryInline')"
+              @click="translateField('summary')"
+            >
+              <Loader2 v-if="summaryAction.pending.value" class="size-3.5 animate-spin" aria-hidden="true" />
+              <Languages v-else class="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+          <p v-if="summaryTranslateError" class="mt-1 text-xs text-destructive" role="status">{{ summaryTranslateError }}</p>
+        </div>
 
         <div class="flex flex-col gap-3">
           <p class="text-sm font-medium">{{ t("detailPanel.metadataTags") }}</p>

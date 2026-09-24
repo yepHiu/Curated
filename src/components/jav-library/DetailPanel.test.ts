@@ -1,8 +1,15 @@
-import { mount } from "@vue/test-utils"
+import { flushPromises, mount } from "@vue/test-utils"
 import { ref } from "vue"
 import { describe, expect, it, vi } from "vitest"
 import DetailPanel from "./DetailPanel.vue"
 import type { Movie } from "@/domain/movie/types"
+import { useExperimentalAgent } from "@/lib/experimental-agent"
+
+const runAction = vi.hoisted(() => vi.fn())
+
+vi.mock("@/services/ai-service", () => ({
+  useAIService: () => ({ runAction }),
+}))
 
 function makeMovie(overrides: Partial<Movie> = {}): Movie {
   return {
@@ -37,6 +44,7 @@ function makeMovie(overrides: Partial<Movie> = {}): Movie {
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: (key: string) => key,
+    locale: ref("zh-CN"),
   }),
 }))
 
@@ -133,10 +141,75 @@ vi.mock("@/components/jav-library/MovieRatingStars.vue", () => ({
 }))
 
 vi.mock("@/components/jav-library/ExpandableText.vue", () => ({
-  default: { name: "ExpandableText", template: "<div />" },
+  default: { name: "ExpandableText", props: ["text"], template: "<div data-summary-text>{{ text }}</div>" },
 }))
 
 describe("DetailPanel", () => {
+  it("translates title and synopsis in place and can restore their originals", async () => {
+    useExperimentalAgent().setEnabled(true)
+    runAction.mockImplementation(async (name: string) => ({ proposedText: name === "translate_title" ? "译文标题" : "译文简介" }))
+    try {
+      const wrapper = mount(DetailPanel, { props: { movie: makeMovie() } })
+      await wrapper.get("[data-translate-title]").trigger("click")
+      await wrapper.get("[data-translate-summary]").trigger("click")
+      await flushPromises()
+
+      expect(runAction).toHaveBeenCalledWith("translate_title", { movieId: "movie-1", body: "Movie 1", locale: "zh-CN" }, expect.any(AbortSignal))
+      expect(runAction).toHaveBeenCalledWith("translate_summary", { movieId: "movie-1", body: "Summary", locale: "zh-CN" }, expect.any(AbortSignal))
+      expect(wrapper.get("[data-detail-title]").text()).toBe("译文标题")
+      expect(wrapper.get("[data-summary-text]").text()).toBe("译文简介")
+
+      await wrapper.get("[data-translate-title]").trigger("click")
+      await wrapper.get("[data-translate-summary]").trigger("click")
+      expect(wrapper.get("[data-detail-title]").text()).toBe("Movie 1")
+      expect(wrapper.get("[data-summary-text]").text()).toBe("Summary")
+      wrapper.unmount()
+    } finally {
+      useExperimentalAgent().setEnabled(false)
+      runAction.mockReset()
+    }
+  })
+
+  it("does not show a previous movie's late translation and handles an unchanged result", async () => {
+    useExperimentalAgent().setEnabled(true)
+    let finish!: (value: { proposedText: string }) => void
+    runAction.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+      .mockResolvedValueOnce({ noop: true })
+    try {
+      const wrapper = mount(DetailPanel, { props: { movie: makeMovie() } })
+      await wrapper.get("[data-translate-title]").trigger("click")
+      await wrapper.setProps({ movie: makeMovie({ id: "movie-2", title: "Movie 2" }) })
+      finish({ proposedText: "Old translation" })
+      await flushPromises()
+      expect(wrapper.get("[data-detail-title]").text()).toBe("Movie 2")
+
+      await wrapper.get("[data-translate-summary]").trigger("click")
+      await flushPromises()
+      expect(wrapper.get("[data-summary-text]").text()).toBe("Summary")
+      expect(wrapper.text()).toContain("detailPanel.movieAiTranslateSummaryNoop")
+      wrapper.unmount()
+    } finally {
+      useExperimentalAgent().setEnabled(false)
+      runAction.mockReset()
+    }
+  })
+
+  it("keeps the original text and shows an inline error when translation fails", async () => {
+    useExperimentalAgent().setEnabled(true)
+    runAction.mockRejectedValueOnce(new Error("Translation unavailable"))
+    try {
+      const wrapper = mount(DetailPanel, { props: { movie: makeMovie() } })
+      await wrapper.get("[data-translate-title]").trigger("click")
+      await flushPromises()
+      expect(wrapper.get("[data-detail-title]").text()).toBe("Movie 1")
+      expect(wrapper.text()).toContain("Translation unavailable")
+      wrapper.unmount()
+    } finally {
+      useExperimentalAgent().setEnabled(false)
+      runAction.mockReset()
+    }
+  })
+
   it("shows a named source link directly after the metadata provider", () => {
     const sourceUrl = "https://javdb.com/v/test"
     const wrapper = mount(DetailPanel, { props: { movie: makeMovie({ metadataProvider: "JavBus" }), readOnly: true, sourceUrl } })
@@ -163,6 +236,8 @@ describe("DetailPanel", () => {
     expect(wrapper.findComponent({ name: 'DropdownMenu' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'MovieEditDialog' }).exists()).toBe(false)
     expect(wrapper.find('[data-rating-stars]').exists()).toBe(false)
+    expect(wrapper.find('[data-translate-title]').exists()).toBe(false)
+    expect(wrapper.find('[data-translate-summary]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('detailPanel.myTags')
     expect(wrapper.text()).not.toContain('detailPanel.play')
     expect(wrapper.find('[aria-label="detailPanel.ariaRemoveNfoTag"]').exists()).toBe(false)
