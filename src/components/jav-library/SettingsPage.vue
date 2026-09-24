@@ -2022,7 +2022,7 @@ async function runMetadataRefreshForSelected() {
           class="h-auto w-full cursor-pointer flex-initial justify-start rounded-lg border border-transparent px-3 py-2 text-left text-sm shadow-none transition-colors duration-150 data-[state=inactive]:hover:bg-muted data-[state=inactive]:hover:text-foreground data-[state=active]:border-transparent data-[state=active]:bg-primary/10 data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
         >{{ t(settingsOverviewNavItem.labelKey) }}</TabsTrigger>
         <template v-for="group in settingsNavGroups" :key="group.labelKey">
-          <div role="presentation" aria-hidden="true" class="w-full px-3 pb-1 pt-3 text-xs font-semibold text-muted-foreground">
+          <div role="presentation" aria-hidden="true" class="w-full px-3 pb-1 pt-3 text-xs font-semibold text-primary">
             <span>{{ t(group.labelKey) }}</span>
             <div class="mt-2 h-px w-full bg-border/60" />
           </div>
