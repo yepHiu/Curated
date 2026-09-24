@@ -693,10 +693,6 @@
     "captureSource": "ソースフレーム",
     "sourceFrameFailed": "ソースフレームを取得できませんでした",
     "fitImage": "全体表示",
-    "visualReview": "類似画像を確認",
-    "visualReviewScope": "{n} 枚を確認。読み込み済み先頭200枚、最大50組が対象です。類似は参考情報です。削除前に確認してください。",
-    "visualReviewEmpty": "類似候補はありません",
-    "visualReviewFailed": "{n} 枚を読み込めませんでした。閉じて再試行してください。",
     "clipFormat": "動画クリップ形式",
     "captureBatchSaved": "{n} 枚を保存しました",
     "showFrameRow": "この行のキャプチャを表示"

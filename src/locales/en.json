@@ -693,10 +693,6 @@
     "captureSource": "Source frame",
     "sourceFrameFailed": "Could not extract source frame. Retry later.",
     "fitImage": "Fit image",
-    "visualReview": "Review similar images",
-    "visualReviewScope": "Checked {n}. Reviews the first 200 loaded frames, up to 50 pairs. Similarity is a hint; inspect before deleting.",
-    "visualReviewEmpty": "No visually similar candidates",
-    "visualReviewFailed": "Could not read {n} images. Close and retry.",
     "clipFormat": "Motion clip format",
     "captureBatchSaved": "Saved {n} captures",
     "showFrameRow": "Show this row of captures"
