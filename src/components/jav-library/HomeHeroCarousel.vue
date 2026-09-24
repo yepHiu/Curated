@@ -280,10 +280,10 @@ onBeforeUnmount(() => {
                       aria-hidden="true"
                     />
                     <div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 sm:p-5 lg:p-6">
-                      <div class="min-w-0 space-y-2 text-white">
+                      <div class="min-w-0 space-y-1 text-white">
                         <p
                           data-hero-slide-code
-                          class="hero-slide-code inline-block max-w-full truncate text-sm font-semibold tracking-normal text-white uppercase sm:text-base lg:text-lg"
+                          class="inline-block max-w-full truncate text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
                         >
                           {{ slide.movie.code }}
                         </p>
@@ -365,10 +365,3 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
-
-<style scoped>
-.hero-slide-code {
-  -webkit-text-stroke: 0.35px rgb(0 0 0 / 55%);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 80%), 0 2px 10px rgb(0 0 0 / 45%);
-}
-</style>
