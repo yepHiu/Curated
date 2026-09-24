@@ -308,7 +308,7 @@ onBeforeUnmount(() => {
                         </button>
                         <button
                           type="button"
-                          class="rounded-full border border-primary/60 bg-primary/75 px-4 py-2 text-sm font-medium text-primary-foreground backdrop-blur-md transition-colors hover:bg-primary/90"
+                          class="rounded-full border border-primary/70 bg-primary/35 px-4 py-2 text-sm font-medium text-white backdrop-blur-xl transition-colors hover:bg-primary/50"
                           @click.stop="emit('openPlayer', slide.movie.id)"
                         >
                           {{ t("home.heroPlayAction") }}
