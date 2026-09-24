@@ -103,6 +103,26 @@ describe("MovieCard", () => {
     expect(wrapper.get("[data-movie-favorite-toggle]").classes()).toContain("size-11")
   })
 
+  it("opens the code search separately from the card action", async () => {
+    const wrapper = mount(MovieCard, {
+      props: {
+        movie: makeMovie({ code: "ABC 123" }),
+      },
+    })
+
+    const link = wrapper.get("[data-movie-code-link]")
+    expect(link.element.tagName).toBe("A")
+    expect(link.attributes("href")).toBe("https://javdb.com/search?q=ABC%20123&f=all")
+    expect(link.attributes("target")).toBe("_blank")
+    expect(link.attributes("rel")).toBe("noopener noreferrer")
+    expect(wrapper.get("[data-movie-card-id] button").element.contains(link.element)).toBe(false)
+
+    link.element.addEventListener("click", (event) => event.preventDefault())
+    await link.trigger("click")
+    expect(wrapper.emitted("openDetails")).toBeUndefined()
+    expect(wrapper.emitted("openPlayer")).toBeUndefined()
+  })
+
   it("uses a theme border instead of a checkbox for batch selection", async () => {
     const wrapper = mount(MovieCard, {
       props: {
@@ -118,6 +138,8 @@ describe("MovieCard", () => {
     )
     const toggle = wrapper.get("[data-movie-batch-toggle]")
     expect(toggle.attributes("aria-pressed")).toBe("true")
+    expect(wrapper.get("[data-movie-code-link]").element.tagName).toBe("SPAN")
+    expect(wrapper.get("[data-movie-code-link]").attributes("href")).toBeUndefined()
     await toggle.trigger("click")
     expect(wrapper.emitted("toggleBatchSelect")).toEqual([
       [{ movieId: "movie-card-1", shiftKey: false }],

@@ -125,6 +125,9 @@ const posterSrc = computed(() => props.movie.thumbUrl || props.movie.coverUrl ||
 /** 图片版本号 - 用于强制刷新重新搜刮后的海报 */
 const imageVersion = computed(() => getMovieImageVersion(props.movie.id))
 const versionedPosterSrc = computed(() => buildVersionedImageUrl(posterSrc.value, imageVersion.value))
+const javdbSearchUrl = computed(
+  () => `https://javdb.com/search?q=${encodeURIComponent(props.movie.code.trim())}&f=all`,
+)
 
 /** 渐变叠层仅在海报解码完成后显示，避免盖住骨架屏（见 MediaStill 内 Skeleton） */
 const posterImageLoaded = ref(false)
@@ -197,7 +200,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
 
 <template>
   <Card
-    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none"
+    class="group relative gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none"
     :class="
       props.batchChecked
         ? 'border-2 border-primary shadow-lg shadow-primary/20'
@@ -237,12 +240,6 @@ const handleFavoriteChange = (nextValue: boolean) => {
             class="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/50 via-transparent to-black/25"
             aria-hidden="true"
           />
-
-          <Badge
-            class="relative z-[2] m-[var(--movie-card-padding)] h-5 w-fit rounded-full border border-border/40 bg-background/85 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm"
-          >
-            {{ movie.code }}
-          </Badge>
 
           <div
             v-if="isFullRating"
@@ -318,5 +315,19 @@ const handleFavoriteChange = (nextValue: boolean) => {
         </div>
       </CardContent>
     </button>
+    <div class="pointer-events-none absolute inset-x-0 top-0 z-[3] p-[var(--movie-card-padding)]">
+      <Badge
+        :as="props.batchMode ? 'span' : 'a'"
+        variant="outline"
+        :href="props.batchMode ? undefined : javdbSearchUrl"
+        :target="props.batchMode ? undefined : '_blank'"
+        :rel="props.batchMode ? undefined : 'noopener noreferrer'"
+        data-movie-code-link
+        class="m-[var(--movie-card-padding)] h-5 w-fit select-none truncate rounded-full border-border/40 bg-background/90 px-1.5 text-[10px] text-foreground shadow-sm backdrop-blur-sm focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        :class="props.batchMode ? 'pointer-events-none' : 'pointer-events-auto hover:bg-background/95'"
+      >
+        {{ movie.code }}
+      </Badge>
+    </div>
   </Card>
 </template>
