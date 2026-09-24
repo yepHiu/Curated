@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
                       <div class="min-w-0 space-y-0 text-white">
                         <p
                           data-hero-slide-code
-                          class="w-fit max-w-full truncate border-b-2 border-white/70 pb-1 text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
+                          class="w-fit max-w-full truncate border-b-2 border-white/70 text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
                         >
                           {{ slide.movie.code }}
                         </p>
