@@ -55,11 +55,10 @@ const rangeOptions: Array<{ value: PersonalInsightsRange; labelKey: string }> = 
 const breakdownDefinitions: Array<{
   dimension: PersonalInsightsDimension
   titleKey: string
-  descriptionKey: string
 }> = [
-  { dimension: "actor", titleKey: "insights.actorTitle", descriptionKey: "insights.actorDescription" },
-  { dimension: "studio", titleKey: "insights.studioTitle", descriptionKey: "insights.studioDescription" },
-  { dimension: "tag", titleKey: "insights.tagTitle", descriptionKey: "insights.tagDescription" },
+  { dimension: "actor", titleKey: "insights.actorTitle" },
+  { dimension: "studio", titleKey: "insights.studioTitle" },
+  { dimension: "tag", titleKey: "insights.tagTitle" },
 ]
 
 const { t, locale } = useI18n()
@@ -484,10 +483,7 @@ async function generateNarrative() {
               class="min-w-0 gap-3"
             >
               <CardHeader class="grid-cols-[minmax(0,1fr)_auto] items-start gap-2 pb-0">
-                <div class="flex min-w-0 flex-col gap-1">
-                  <CardTitle class="text-base">{{ t(definition.titleKey) }}</CardTitle>
-                  <CardDescription class="text-xs">{{ t(definition.descriptionKey) }}</CardDescription>
-                </div>
+                <CardTitle class="min-w-0 text-base">{{ t(definition.titleKey) }}</CardTitle>
                 <span v-if="breakdowns[definition.dimension]" class="shrink-0 text-xs text-muted-foreground">
                   {{ t("insights.itemCount", { count: breakdowns[definition.dimension]?.items.length ?? 0 }) }}
                 </span>
