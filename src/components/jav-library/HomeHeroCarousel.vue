@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
                       <div class="min-w-0 space-y-2 text-white">
                         <p
                           data-hero-slide-code
-                          class="inline-flex max-w-full rounded-full border border-white/20 bg-black/44 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.24em] text-white uppercase shadow-lg shadow-black/20 backdrop-blur-md"
+                          class="hero-slide-code inline-block max-w-full truncate text-sm font-semibold tracking-normal text-white uppercase sm:text-base lg:text-lg"
                         >
                           {{ slide.movie.code }}
                         </p>
@@ -365,3 +365,10 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+.hero-slide-code {
+  -webkit-text-stroke: 0.35px rgb(0 0 0 / 55%);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 80%), 0 2px 10px rgb(0 0 0 / 45%);
+}
+</style>

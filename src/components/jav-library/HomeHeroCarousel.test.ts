@@ -80,9 +80,10 @@ describe("HomeHeroCarousel", () => {
     expect(wrapper.get('[data-hero-slide-state="prev"]').classes()).toContain("brightness-75")
     expect(wrapper.get('[data-hero-slide-state="prev"]').classes()).toContain("saturate-[0.82]")
     expect(wrapper.get("[data-hero-slide-title]").classes()).toContain("truncate")
-    expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("bg-black/44")
-    expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("text-white")
-    expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("shadow-lg")
+    expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("tracking-normal")
+    expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("sm:text-base")
+    expect(wrapper.get("[data-hero-slide-code]").classes()).not.toContain("rounded-full")
+    expect(wrapper.get("[data-hero-slide-code]").classes()).not.toContain("bg-black/44")
     expect(wrapper.get('[data-hero-slide-state="active"]').text()).toContain("CODE-m1")
     expect(wrapper.get("[data-home-hero-track]").attributes("style")).toContain("transition-duration: 760ms")
 
