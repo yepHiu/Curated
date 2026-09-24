@@ -195,6 +195,8 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings LAN access toggle |
 | Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
 
+On the homepage, scroll to the end of the recent, recommendation, and continue-watching sections, then keep scrolling down to open the Movies library. The library slides up over the homepage and starts at the top; the sidebar selection follows the Movies route. The “Continue to Movies” button at the bottom provides the same action for touch and keyboard use. The former Taste Radar section is no longer shown.
+
 In the web player, **D** steps backward and **F** steps forward while pausing playback. Use the fullscreen button to toggle fullscreen. Frame duration comes from stream metadata or media-timestamp measurements; when neither is available, the player uses a 30fps estimate.
 
 ### Curated capture and inspection
