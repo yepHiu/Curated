@@ -17,3 +17,7 @@
 - HarmonyOS Sans SC 使用 Huawei 发布包中的未修改 Regular、Medium、Bold 原始 TTF，避免因字形裁剪或格式转换触及许可的“不得修改”条款。按需请求对应字重；本机已安装时优先使用本机文件。原始许可文件随资源保留，“关于”页展示字体署名及许可入口。
 - Noto Sans 与 Noto Sans JP 使用 Fontsource 的本地资源包，并随应用保留各自的 OFL 许可。拉丁字母优先使用 Noto Sans；日语界面优先使用 Noto Sans JP 的日文字形；中文界面优先使用 HarmonyOS Sans SC 的汉字。英文界面的 CJK 文本优先使用 Noto Sans JP。外部元数据可能包含与当前界面语言不同的 CJK 文本，此时按当前语言的字体顺序回退。
 - 原型 `2026-09-24-font-comparison.html` 保留，作为选择前的比较记录。它使用的日文字体子集仅服务原型，正式界面使用完整的 Fontsource 日文字形资源。
+
+## 关于页的使用许可
+
+“关于”页以独立的“使用许可”卡片列出 Curated 的 MIT 许可，以及 HarmonyOS Sans SC、Noto Sans、Noto Sans JP 的字体许可。列表只显示名称、简短署名或许可类型，完整条款通过各自的本地文件打开；鸿蒙字体条目明确说明本软件使用该字体并保留 Huawei 署名。原先分散在项目信息与字体提示中的许可内容合并到此处。

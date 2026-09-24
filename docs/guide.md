@@ -270,7 +270,7 @@ pnpm release:publish
 
 Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
 
-The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline; font attribution and all three licenses are linked from Settings → About.
+The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About → Licenses links to the app's MIT license and all three font licenses.
 
 Deeper packaging writing:
 
