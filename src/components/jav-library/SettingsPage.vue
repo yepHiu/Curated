@@ -55,7 +55,9 @@ import {
   setCuratedFrameSaveMode,
 } from "@/lib/curated-frames/settings-storage"
 import { formatCuratedCaptureKeyLabel } from "@/lib/player-shortcuts"
-import SettingsAboutSection from "@/components/jav-library/settings/SettingsAboutSection.vue"
+const SettingsAboutSection = defineAsyncComponent(
+  () => import("@/components/jav-library/settings/SettingsAboutSection.vue"),
+)
 import SettingsCuratedSection from "@/components/jav-library/settings/SettingsCuratedSection.vue"
 import SettingsGeneralSection from "@/components/jav-library/settings/SettingsGeneralSection.vue"
 import SettingsLibraryPathsSection from "@/components/jav-library/settings/SettingsLibraryPathsSection.vue"

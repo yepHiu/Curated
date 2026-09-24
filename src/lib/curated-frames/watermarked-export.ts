@@ -158,18 +158,19 @@ function drawWatermarkedFrame(
   const codeFontSize = Math.max(12, Math.round(layout.mainFontSize * 0.86))
   const metadataGap = Math.max(4, Math.round(layout.padding * 0.3))
   const metadataBlockHeight = titleFontSize + metadataGap + (code ? codeFontSize : 0)
+  const fontFamily = getComputedStyle(document.body).fontFamily
+  ctx.font = `600 ${titleFontSize}px ${fontFamily}`
   const fittedTitle = fitText(ctx, title, metadataWidth)
   const metadataTop = height + Math.max(0, Math.round((layout.bandHeight - metadataBlockHeight) / 2))
   const titleY = metadataTop + titleFontSize
   const codeY = titleY + metadataGap + codeFontSize
 
-  ctx.font = `600 ${titleFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
   ctx.textBaseline = "alphabetic"
   ctx.textAlign = "right"
   ctx.fillStyle = theme.foreground
   ctx.fillText(fittedTitle, rightX, titleY)
   if (code) {
-    ctx.font = `600 ${codeFontSize}px Outfit, ui-sans-serif, system-ui, sans-serif`
+    ctx.font = `600 ${codeFontSize}px ${fontFamily}`
     ctx.fillStyle = theme.primary
     ctx.fillText(code, rightX, codeY)
   }
@@ -245,6 +246,13 @@ export async function renderWatermarkedCuratedFrame(
     throw new Error("curated frame image has no dimensions")
   }
   const logo = await loadImageUrl(curatedTitleLogoUrl)
+  if (document.fonts?.load) {
+    const fontFamily = getComputedStyle(document.body).fontFamily
+    await document.fonts.load(
+      `600 ${buildWatermarkedBandLayout(image.naturalHeight).mainFontSize}px ${fontFamily}`,
+      `${source.row.title ?? ""}${source.row.code}`,
+    ).catch(() => [])
+  }
   const canvas = drawWatermarkedFrame(
     image,
     image.naturalWidth,

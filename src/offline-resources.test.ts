@@ -8,10 +8,8 @@ describe("offline desktop resources", () => {
     expect(html).not.toContain("fonts.gstatic.com")
   })
 
-  it("loads Outfit from local fontsource assets", () => {
-    expect(mainSource).toContain('import "@fontsource/outfit/400.css"')
-    expect(mainSource).toContain('import "@fontsource/outfit/500.css"')
-    expect(mainSource).toContain('import "@fontsource/outfit/600.css"')
-    expect(mainSource).toContain('import "@fontsource/outfit/700.css"')
+  it("loads the Noto families from local fontsource assets", () => {
+    expect(mainSource).toContain('import "@fontsource-variable/noto-sans/wght.css"')
+    expect(mainSource).toContain('import "@fontsource-variable/noto-sans-jp/wght.css"')
   })
 })

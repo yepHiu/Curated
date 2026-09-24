@@ -10,6 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { formatAboutBackendVersion } from "@/lib/about-version"
+import harmonySansLicenseUrl from "@/assets/fonts/HarmonyOS_Sans_SC_LICENSE.txt?url&no-inline"
+import notoSansLicenseUrl from "@/assets/fonts/NotoSans_LICENSE.txt?url"
+import notoSansJpLicenseUrl from "@/assets/fonts/NotoSansJP_LICENSE.txt?url"
 import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
 import SettingsHomepageDevTools from "@/components/jav-library/settings/SettingsHomepageDevTools.vue"
 
@@ -227,6 +230,26 @@ const aboutRepositoryHref = computed(() =>
               :backend-version-status="backendVersionStatus"
             />
           </template>
+          <div class="rounded-lg border border-border/50 bg-muted/5 p-4">
+            <p class="font-semibold text-foreground">{{ t("settings.aboutFontLabel") }}</p>
+            <p class="mt-1.5">{{ t("settings.aboutFontAttribution") }}</p>
+            <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+              <a
+                v-for="fontLicense in [
+                  { url: harmonySansLicenseUrl, label: t('settings.aboutHarmonyFontLicense') },
+                  { url: notoSansLicenseUrl, label: 'Noto Sans OFL' },
+                  { url: notoSansJpLicenseUrl, label: 'Noto Sans JP OFL' },
+                ]"
+                :key="fontLicense.url"
+                :href="fontLicense.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {{ fontLicense.label }}
+              </a>
+            </div>
+          </div>
           <SettingsHomepageDevTools
             v-if="isViteDev && useWebApi"
             @refreshed="emit('refreshHealth')"

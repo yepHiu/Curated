@@ -1,11 +1,43 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@font-face {
+  font-family: "Curated HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("HarmonyOS Sans SC"), url("./assets/fonts/HarmonyOS_Sans_SC_Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Curated HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local("HarmonyOS Sans SC Medium"), url("./assets/fonts/HarmonyOS_Sans_SC_Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Curated HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local("HarmonyOS Sans SC Medium"), url("./assets/fonts/HarmonyOS_Sans_SC_Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Curated HarmonyOS Sans SC";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local("HarmonyOS Sans SC Bold"), url("./assets/fonts/HarmonyOS_Sans_SC_Bold.ttf") format("truetype");
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* 侧栏 Curated 品牌字标：几何无衬线、偏克制（Outfit） */
-  --font-curated: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--app-font-stack);
+  --font-curated: "Noto Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -56,6 +88,7 @@
 }
 
 :root {
+  --app-font-stack: "Noto Sans Variable", "Curated HarmonyOS Sans SC", "Noto Sans JP Variable", ui-sans-serif, system-ui, sans-serif;
   --radius: 0.625rem;
   /* 明亮模式（默认无 html.dark 时） */
   --background: #f4f6fc;
@@ -126,6 +159,11 @@
   --movie-card-padding: 0.625rem;
   --movie-card-body-min-height: 5.25rem;
   --movie-card-body-gap: 0.375rem;
+}
+
+:root:lang(ja),
+:root:lang(en) {
+  --app-font-stack: "Noto Sans Variable", "Noto Sans JP Variable", "Curated HarmonyOS Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 1024px) and (min-resolution: 2dppx) {
@@ -269,6 +307,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--app-font-stack);
     height: 100%;
     overflow: hidden;
   }

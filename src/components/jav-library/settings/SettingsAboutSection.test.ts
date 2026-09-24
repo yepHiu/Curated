@@ -75,5 +75,7 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.text()).toContain("settings.aboutLicenseValue")
     expect(wrapper.text()).toContain("settings.aboutRepositoryLabel")
     expect(wrapper.text()).toContain("settings.aboutRepositoryValue")
+    expect(wrapper.text()).toContain("settings.aboutFontAttribution")
+    expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(3)
   })
 })
