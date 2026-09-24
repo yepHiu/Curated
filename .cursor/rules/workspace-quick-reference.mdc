@@ -42,8 +42,8 @@ alwaysApply: true
   - `autoActorProfileScrape`
   - `autoDownloadUpdates`
   - `launchAtLogin`
-  - `browserPluginEnabled`（设置 → 网络 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证）
-  - `lanEnabled`（设置 → 网络；不要求 PIN，改监听要完全退出）
+  - `browserPluginEnabled`（设置 → 网络与设备 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证）
+  - `lanEnabled`（设置 → 网络与设备；不要求 PIN，改监听要完全退出）
   - `backupDirectory`
   - `proxy`
   - `aiProvider` / `aiGovernance`（正式 Settings → AI；缺省禁用，治理经 `/api/ai/settings` 保存）
@@ -80,4 +80,4 @@ alwaysApply: true
 
 ## 漫画 / 写真 Beta（2026-09-10）
 
-真实试用需 `VITE_USE_WEB_API=true` 并运行新版后端。进入「设置 → 实验性功能」，分别启用漫画库或写真库 Beta，再添加该库的绝对路径并通过路径「更多操作」扫描 ZIP/CBZ。关闭只隐藏入口和配置、停止该库监听，保留已有数据。Mock 开关仅当前会话有效。
+真实试用需 `VITE_USE_WEB_API=true` 并运行新版后端。进入「设置 → 资料库 → 漫画库 / 写真库」，分别启用对应 Beta，再添加该库的绝对路径并通过路径「更多操作」扫描 ZIP/CBZ。关闭只隐藏内容入口和配置、停止该库监听，保留已有数据；设置入口仍可用于重新启用。Mock 开关仅当前会话有效。

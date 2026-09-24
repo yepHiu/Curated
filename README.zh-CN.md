@@ -29,15 +29,15 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
 
-- 漫画库 / 写真库 **Beta**：在「设置 → 实验性功能」分别开启，开启后才显示配置。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
+- 漫画库 / 写真库 **Beta**：在「设置 → 资料库 → 漫画库 / 写真库」分别开启，开启后才显示配置。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
 - **安装器（推荐）：** `Curated-Setup-<version>.exe`
 - **便携包：** `Curated-<version>-windows-x64.zip`
 
-已安装的应用也可以在 设置 → 关于 中检查并下载新的安装器。
+已安装的应用也可以在「设置 → 系统 → 关于与更新」中检查并下载新的安装器。
 
 ## 亮点
 
-- 浏览器插件联动：在“设置 → 网络”开启即可使用，无需凭证；加入愿望单时保存来源页，详情以 JAVDB 等站点名显示超链接；关闭联动后保留已有愿望单。详见 [使用说明](docs/guide.md#wishlist)。
+- 浏览器插件联动：在「设置 → 访问与连接 → 网络与设备」开启即可使用，无需凭证；加入愿望单时保存来源页，详情以 JAVDB 等站点名显示超链接；关闭联动后保留已有愿望单。详见 [使用说明](docs/guide.md#wishlist)。
 
 - 本地优先：Vue 3 SPA、Go HTTP API、SQLite，以及面向 Windows 的 Electron 托盘壳。
 - 双模式开发：真实 Web API 与 Mock UI 共用同一服务层。

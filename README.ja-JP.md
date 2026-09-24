@@ -29,15 +29,15 @@ Curated はローカルファーストのメディアライブラリです。Vue
 
 公式の Windows パッケージは **[GitHub Releases](https://github.com/yepHiu/Curated/releases)** にあります。[最新リリース](https://github.com/yepHiu/Curated/releases/latest) を使ってください。
 
-- コミック / 写真ライブラリ **Beta**：設定 → 実験的機能で個別に有効化すると設定を表示します。[利用ガイド](docs/guide.md#comic-and-photo-library-beta)。
+- コミック / 写真ライブラリ **Beta**：設定 → ライブラリ → 漫画ライブラリ / 写真ライブラリで個別に有効化すると設定を表示します。[利用ガイド](docs/guide.md#comic-and-photo-library-beta)。
 - **インストーラ（推奨）：** `Curated-Setup-<version>.exe`
 - **ポータブル：** `Curated-<version>-windows-x64.zip`
 
-インストール済みのアプリは、設定 → バージョン情報 から新しいインストーラを確認・ダウンロードできます。
+インストール済みのアプリは、設定 → システム → アプリ情報と更新から新しいインストーラを確認・ダウンロードできます。
 
 ## ハイライト
 
-- ブラウザープラグイン連携は「設定 → ネットワーク」で有効にできます。認証情報は不要です。追加元のページは保存され、詳細に JAVDB などのサイト名リンクで表示されます。連携をオフにしても既存のウィッシュリストは保持されます。[使い方](docs/guide.md#wishlist)。
+- ブラウザープラグイン連携は「設定 → アクセスと接続 → ネットワークと端末」で有効にできます。認証情報は不要です。追加元のページは保存され、詳細に JAVDB などのサイト名リンクで表示されます。連携をオフにしても既存のウィッシュリストは保持されます。[使い方](docs/guide.md#wishlist)。
 
 - ローカルファーストの Vue 3 SPA、Go HTTP API、SQLite、Windows 向け Electron トレイシェル。
 - デュアルモード開発：実 Web API と Mock UI を同一サービス層で利用。

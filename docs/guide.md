@@ -115,7 +115,7 @@ This builds `backend/runtime/curated-dev.exe` and `electron-dist/`, starts or re
 
 ## 3. Backup, restore, and path migration
 
-In Web API mode, Settings → Maintenance can create and verify a backup package, verify an existing package, and run restore preflight. Enter an absolute directory on the backend machine; Curated generates a UTC-timestamped filename. After a successful create, only the directory is remembered as `backupDirectory`. There is no in-app restore button.
+In Web API mode, Settings → Maintenance & backup can create and verify a backup package, verify an existing package, and run restore preflight. Enter an absolute directory on the backend machine; Curated generates a UTC-timestamped filename. After a successful create, only the directory is remembered as `backupDirectory`. There is no in-app restore button.
 
 Run maintenance from `backend/`. Add `-config path/to/config.json` when the database path comes from a custom main config.
 
@@ -165,7 +165,7 @@ Common keys:
 - `autoActorProfileScrape`
 - `autoDownloadUpdates`
 - `launchAtLogin`
-- `lanEnabled` (Settings → Network; PIN optional; full quit to rebind)
+- `lanEnabled` (Settings → Network & devices; PIN optional; full quit to rebind)
 - `curatedFrameExportFormat` (`jpg` / `webp` / `png`)
 - `curatedFrameExportMode` (`raw` / `watermarked`)
 - `proxy`
@@ -173,7 +173,7 @@ Common keys:
 
 Empty `logDir` means “use the default log directory”, not “disable file logging”: release uses `LOCALAPPDATA\Curated\logs`, development uses `backend/runtime/logs`.
 
-Development and release builds default to loopback `127.0.0.1:8080` and `127.0.0.1:8081`. Settings → Network can persist `"lanEnabled": true` in `library-config.cfg`; the next full restart binds `0.0.0.0` on the same port. A non-loopback `httpAddr` in the main runtime JSON still requires `"lanEnabled": true`. PIN lock is independent of LAN access. CORS allows same-origin, loopback development origins, and exact `corsAllowedOrigins`.
+Development and release builds default to loopback `127.0.0.1:8080` and `127.0.0.1:8081`. Settings → Network & devices can persist `"lanEnabled": true` in `library-config.cfg`; the next full restart binds `0.0.0.0` on the same port. A non-loopback `httpAddr` in the main runtime JSON still requires `"lanEnabled": true`. PIN lock is independent of LAN access. CORS allows same-origin, loopback development origins, and exact `corsAllowedOrigins`.
 
 Library organization details: [docs/reference/2026-03-21-library-organize.md](reference/2026-03-21-library-organize.md).
 
@@ -260,7 +260,7 @@ Root-directory policy:
 
 ## 8. Release and packaging
 
-Official Windows installer and portable packages are published on [GitHub Releases](https://github.com/yepHiu/Curated/releases). Prefer the [latest release](https://github.com/yepHiu/Curated/releases/latest): `Curated-Setup-<version>.exe` for normal installs, `Curated-<version>-windows-x64.zip` for a portable copy. Installed apps can check and download a newer installer from Settings → About.
+Official Windows installer and portable packages are published on [GitHub Releases](https://github.com/yepHiu/Curated/releases). Prefer the [latest release](https://github.com/yepHiu/Curated/releases/latest): `Curated-Setup-<version>.exe` for normal installs, `Curated-<version>-windows-x64.zip` for a portable copy. Installed apps can check and download a newer installer from Settings → About & updates.
 
 Recommended packaging entry:
 
@@ -270,7 +270,7 @@ pnpm release:publish
 
 Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
 
-The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
+The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About & updates → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
 
 Deeper packaging writing:
 
@@ -323,6 +323,7 @@ Use this table as the citation hub. Dated `docs/plan/*.md` files are working pap
 | [Backend notes](ops/2026-03-26-backend.md) | Historical backend notes |
 | [Backend improvement](ops/2026-03-26-backend-improvement.md) | Historical improvement notes |
 | [Settings page UI notes](ops/2026-03-31-settings-page-uiux-improvements.md) | Settings UX history |
+| [Settings information architecture](plan/2026-09-25-settings-information-architecture.md) | Current setting groups, item locations and legacy links |
 | [Package build history](ops/2026-04-02-package-build-history.md) | How packaging history is recorded |
 | [Release notes index](release-notes/README.md) | Published release bodies |
 
@@ -356,12 +357,14 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 
 ## Comic and photo library Beta
 
-漫画库与写真库现以 Beta 合入主线。真实试用时设置 `VITE_USE_WEB_API=true`，运行新版后端及前端，进入 **设置 → 实验性功能**：
+设置页导航现按「使用与功能、资料库、访问与连接、系统」分组；窄屏使用分组选择器。旧的 `?section=experimental` 链接会跳到漫画库，`?section=logging` 跳到维护与备份。已连接客户端位于「网络与设备」；自动下载更新位于「关于与更新」；日志与开发诊断位于「维护与备份」。
+
+漫画库与写真库现以 Beta 合入主线。真实试用时设置 `VITE_USE_WEB_API=true`，运行新版后端及前端，进入 **设置 → 资料库 → 漫画库 / 写真库**：
 
 1. 开启「漫画库 Beta」或「写真库 Beta」。两个开关独立，初始默认关闭。
 2. 开启后才显示该库的配置。添加绝对存储路径，通过路径「更多操作 → 扫描漫画 / 扫描写真」扫描 `.zip` / `.cbz`。
 3. 从侧栏「漫画 / 写真」打开详情与阅读器。漫画支持导入、阅读进度/偏好、收藏评分标签及独立缓存清理；写真支持 ZIP/CBZ 导入、扫描和浏览。
-4. 关闭开关会隐藏该库入口与配置、停止目录监听，保留源包、索引和已保存设置。再次开启可继续使用。
+4. 关闭开关会隐藏该库的内容入口与配置、停止目录监听，保留源包、索引和已保存设置。设置中的 Beta 入口仍可用于再次开启。
 
 开关及路径在 Web 模式下刷新或重启后保留；Mock 开关仅当前会话有效。写真暂未实现单册进度/偏好 API 或独立缓存清理，缩略图使用最长边 420px 的 JPEG，进程内缓存最多 32 MiB；设置中的磁盘缓存上限仍为预留项。支持 ZIP/CBZ，不支持 RAR/CBR/7z。
 
@@ -373,7 +376,7 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 
 ## 添加媒体（2026-09-11）
 
-点击顶栏「添加媒体」，在同一个弹窗内选择「添加影片 / 添加漫画 / 添加写真」。影片 Tab 始终显示；漫画、写真 Tab 仅在「设置 → 实验性功能」开启对应 Beta 后显示。首次打开默认选择影片。
+点击顶栏「添加媒体」，在同一个弹窗内选择「添加影片 / 添加漫画 / 添加写真」。影片 Tab 始终显示；漫画、写真 Tab 仅在「设置 → 资料库 → 漫画库 / 写真库」开启对应 Beta 后显示。首次打开默认选择影片。
 
 在各库配置中设置默认导入目录，再选择文件并开始导入。影片保留断点续传与番号重复提示；漫画和写真支持 ZIP/CBZ，复制后自动扫描各自的库。原始文件保留，重名文件不会覆盖。切换 Tab 保留已选文件；上传中暂时无法切换或关闭弹窗。写真部分失败会保留结果提示，不会显示成功并关闭。
 
@@ -400,7 +403,7 @@ Do not treat an undated or status-less plan file as approved work. Prefer the PR
 The browser plugin sends a catalog code and, when added from a supported movie page or card, its source page URL. Curated saves the request immediately, then uses the configured metadata provider and proxy to fetch metadata and images in the background. No local video or library path is required.
 
 1. Restart Curated with the updated backend and frontend. Development requires `VITE_USE_WEB_API=true`; Mock mode does not support plugin intake.
-2. On the computer running Curated, open **Settings → Network → Browser plugin integration** and turn it on. It defaults to off, persists across restarts, and applies immediately. No token or pairing is required.
+2. On the computer running Curated, open **Settings → Network & devices → Browser plugin integration** and turn it on. It defaults to off, persists across restarts, and applies immediately. No token or pairing is required.
 3. Reload the extension from `C:/Users/wujiahui/code/curated-plugin/dist` in Chrome. In its settings, set the Curated server address. Development commonly uses port 8080; packaged builds commonly use 8081. Use the actual running address.
 4. Click **加入愿望单** on a supported JAVDB or jable page. If extraction is unavailable, enter the code in the extension popup. When integration is off, Curated returns `403 BROWSER_PLUGIN_DISABLED` for wishlist intake and identified plugin API requests; the plugin prompts you to enable it. Existing wishlist entries remain intact.
 5. Open **Wishlist** in the sidebar. The default view shows pending imports. Details show a site-name link such as **JAVDB** or **Jable** after the metadata provider; clicking opens that movie’s original page in a new tab. The full URL is not displayed. Older entries and manually entered codes without a source remain unchanged; add an older entry again from its source page to fill in the missing link. Repeated submissions preserve the first saved source and completion status, and metadata refreshes do not replace the source.

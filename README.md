@@ -30,15 +30,15 @@ Official Windows packages are on **[GitHub Releases](https://github.com/yepHiu/C
 - **Installer (recommended):** `Curated-Setup-<version>.exe`
 - **Portable:** `Curated-<version>-windows-x64.zip`
 
-Installed apps can also check and download a newer installer from Settings → About.
+Installed apps can also check and download a newer installer from Settings → About & updates.
 
 ## Highlights
 
-- Optional comic and photo library **Beta**, disabled by default under Settings → Experimental. Enable each library to reveal its configuration; see [Beta guidance](docs/guide.md#comic-and-photo-library-beta).
+- Optional comic and photo library **Beta**, disabled by default under Settings → Libraries → Comic library / Photo library. Enable each library to reveal its configuration; see [Beta guidance](docs/guide.md#comic-and-photo-library-beta).
 - Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
-- A wishlist with named source-page links, on-demand watch-site availability checks, background metadata enrichment, persistent posters, library matching and browser-plugin intake controlled by a switch in Settings → Network, with no token required; see [wishlist setup](docs/guide.md#wishlist).
+- A wishlist with named source-page links, on-demand watch-site availability checks, background metadata enrichment, persistent posters, library matching and browser-plugin intake controlled by a switch in Settings → Network & devices, with no token required; see [wishlist setup](docs/guide.md#wishlist).
 - Capture previews with retry/undo, source-file frames and GIF/MP4/WebM clips; see [capture guidance](docs/guide.md#curated-capture-and-inspection).
 - Independent HLS sessions, explicit resume targets, and bounded playback recovery; see [playback guidance](docs/guide.md#playback-recovery).
 - Optional PIN App Lock, verified backups, path migration, and Library Health repairs.
@@ -91,7 +91,7 @@ icon/       Brand source assets (wordmark / appicon / mark)
 
 - Comic/photo browsing uses adaptive, lazy page previews with full-book page navigation; photos have bounded cached thumbnails and editable tags from the detail page. See [the guide](docs/guide.md#漫画与写真浏览2026-09-11).
 
-- Add media combines movie, comic and photo import in one dialog. Comic/photo Tabs appear only with their independent Beta switches enabled in Experimental settings; see [the guide](docs/guide.md#添加媒体2026-09-11).
+- Add media combines movie, comic and photo import in one dialog. Comic/photo Tabs appear only with their independent Beta switches enabled in the corresponding library settings; see [the guide](docs/guide.md#添加媒体2026-09-11).
 
 - Current phase is web-first with a minimal Electron shell. Deeper IPC, mpv, and broad native bridges remain target-direction work.
 - `docs/film-scanner/` is reference material, not the production module tree.
