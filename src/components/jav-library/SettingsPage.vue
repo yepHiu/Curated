@@ -2023,7 +2023,8 @@ async function runMetadataRefreshForSelected() {
         >{{ t(settingsOverviewNavItem.labelKey) }}</TabsTrigger>
         <template v-for="group in settingsNavGroups" :key="group.labelKey">
           <div role="presentation" aria-hidden="true" class="w-full px-3 pb-1 pt-3 text-xs font-semibold text-muted-foreground">
-            {{ t(group.labelKey) }}
+            <span>{{ t(group.labelKey) }}</span>
+            <div class="mt-2 h-px w-full bg-border/60" />
           </div>
           <TabsTrigger
             v-for="item in group.items"
