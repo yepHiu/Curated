@@ -74,6 +74,30 @@ func TestMovieClipDefaultWidth(t *testing.T) {
 	}
 }
 
+func TestMovieClipGIFLimitsInputBeforePaletteGeneration(t *testing.T) {
+	for _, format := range []string{"gif", "mp4", "webm"} {
+		args := movieClipFFmpegArgs("source.mp4", 4444.598, 4.062, format)
+		inputIndex, durationIndex := -1, -1
+		for i, arg := range args {
+			if arg == "-i" {
+				inputIndex = i
+			}
+			if arg == "-t" {
+				durationIndex = i
+			}
+		}
+		if inputIndex < 0 || durationIndex < 0 {
+			t.Fatalf("%s: missing input or duration option: %v", format, args)
+		}
+		if format == "gif" && durationIndex > inputIndex {
+			t.Fatalf("GIF input must be duration-limited before palettegen: %v", args)
+		}
+		if format != "gif" && durationIndex < inputIndex {
+			t.Fatalf("%s output duration changed: %v", format, args)
+		}
+	}
+}
+
 func TestHandleCreateMovieClipRejectsInvalidRangesBeforeStorageLookup(t *testing.T) {
 	h := &Handler{tasks: tasks.NewManager(), logger: zap.NewNop()}
 	for _, tc := range []struct {

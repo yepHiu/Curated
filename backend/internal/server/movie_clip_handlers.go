@@ -257,7 +257,7 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 	h.tasks.Start(taskID, "generating clip")
 	h.tasks.Progress(taskID, 5, "generating clip")
 
-	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-filter_threads", "1", "-ss", strconv.FormatFloat(startSec, 'f', 3, 64), "-i", sourcePath, "-t", strconv.FormatFloat(duration, 'f', 3, 64), "-an"}
+	args := movieClipFFmpegArgs(sourcePath, startSec, duration, format)
 	switch format {
 	case "gif":
 		filter += ",split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3"
@@ -273,13 +273,19 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 	if output, err := cmd.CombinedOutput(); err != nil {
 		_ = os.Remove(outputPath)
 		message := strings.TrimSpace(string(output))
+		code := "clip_ffmpeg_failed"
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			message, code = "clip encoding timed out", "clip_timeout"
+		} else if errors.Is(ctx.Err(), context.Canceled) {
+			message, code = "clip cancelled", "clip_cancelled"
+		}
 		if message == "" {
-			message = "ffmpeg failed to generate GIF"
+			message = "ffmpeg failed to generate clip"
 		}
 		if curatedFrameID != "" && h.store != nil {
 			_ = h.store.UpsertCuratedFrameMotion(context.Background(), storage.CuratedFrameMotionMeta{FrameID: curatedFrameID, Status: "error", ContentType: movieClipContentType(format), DurationSec: duration, Width: width, FPS: fps, ErrorMessage: message})
 		}
-		h.tasks.Fail(taskID, "clip_ffmpeg_failed", message)
+		h.tasks.Fail(taskID, code, message)
 		return
 	}
 	info, statErr := os.Stat(outputPath)
@@ -330,6 +336,20 @@ func (h *Handler) runMovieClipTaskContext(ctx context.Context, taskID, sourcePat
 		h.movieClipArtifacts.Store(taskID, outputPath)
 	}
 	h.tasks.Complete(taskID, "clip ready")
+}
+
+func movieClipFFmpegArgs(sourcePath string, startSec, duration float64, format string) []string {
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-filter_threads", "1", "-ss", strconv.FormatFloat(startSec, 'f', 3, 64)}
+	// palettegen emits its palette only when the input ends. An output-side -t
+	// leaves it decoding the rest of a long movie before paletteuse can emit GIF frames.
+	if format == "gif" {
+		args = append(args, "-t", strconv.FormatFloat(duration, 'f', 3, 64))
+	}
+	args = append(args, "-i", sourcePath)
+	if format != "gif" {
+		args = append(args, "-t", strconv.FormatFloat(duration, 'f', 3, 64))
+	}
+	return append(args, "-an")
 }
 
 func (h *Handler) handleGetMovieClipArtifact(w http.ResponseWriter, r *http.Request) {
