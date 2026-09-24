@@ -301,14 +301,14 @@ onBeforeUnmount(() => {
                       >
                         <button
                           type="button"
-                          class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-white/20"
+                          class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-white/20"
                           @click.stop="emit('openDetails', slide.movie.id)"
                         >
                           {{ t("home.heroDetailsAction") }}
                         </button>
                         <button
                           type="button"
-                          class="rounded-full border border-primary/70 bg-primary/35 px-4 py-2 text-sm font-medium text-white backdrop-blur-xl transition-colors hover:bg-primary/50"
+                          class="rounded-full bg-primary/35 px-4 py-2 text-sm font-medium text-white backdrop-blur-xl transition-colors hover:bg-primary/50"
                           @click.stop="emit('openPlayer', slide.movie.id)"
                         >
                           {{ t("home.heroPlayAction") }}
