@@ -131,7 +131,6 @@
     "errorDescription": "观看数据仍保留在本机。请检查后端连接后重试。",
     "retry": "重新加载",
     "summaryTitle": "观看摘要",
-    "summaryScope": "同一时间范围 · 本地数据",
     "topActorFact": "关联观看时长最多的演员是 {name}，占本期总观看时长的 {share}。",
     "watchedTime": "观看时长",
     "watchedShort": "所选期间的有效播放时长",

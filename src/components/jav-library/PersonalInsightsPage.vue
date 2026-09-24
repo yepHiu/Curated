@@ -434,12 +434,9 @@ async function generateNarrative() {
 
       <template v-else-if="overview">
         <section class="flex flex-col gap-3" aria-labelledby="insights-summary-heading">
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="insights-summary-heading" class="text-lg font-semibold tracking-tight">
-              {{ t("insights.summaryTitle") }}
-            </h2>
-            <p class="text-xs text-muted-foreground">{{ t("insights.summaryScope") }}</p>
-          </div>
+          <h2 id="insights-summary-heading" class="text-lg font-semibold tracking-tight">
+            {{ t("insights.summaryTitle") }}
+          </h2>
           <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Card
               v-for="metric in metricCards"

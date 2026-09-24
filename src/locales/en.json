@@ -131,7 +131,6 @@
     "errorDescription": "Your watch data remains on this device. Check the backend connection and try again.",
     "retry": "Try again",
     "summaryTitle": "Viewing summary",
-    "summaryScope": "Same date range · Local data",
     "topActorFact": "{name} has the most associated watch time, accounting for {share} of this period's total.",
     "watchedTime": "Watch time",
     "watchedShort": "Valid playback in this period",

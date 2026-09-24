@@ -131,7 +131,6 @@
     "errorDescription": "視聴データはこの端末に残っています。バックエンド接続を確認して再試行してください。",
     "retry": "再読み込み",
     "summaryTitle": "視聴サマリー",
-    "summaryScope": "同じ期間 · ローカルデータ",
     "topActorFact": "関連する視聴時間が最も長い出演者は {name} で、この期間の合計の {share} を占めます。",
     "watchedTime": "視聴時間",
     "watchedShort": "期間内の有効な再生時間",
