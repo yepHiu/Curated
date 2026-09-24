@@ -83,7 +83,7 @@ describe("HomeHeroCarousel", () => {
     expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("tracking-normal")
     expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("sm:text-xl")
     expect(wrapper.get("[data-hero-slide-code]").classes()).toContain("lg:text-2xl")
-    expect(wrapper.get("[data-hero-slide-code]").element.parentElement?.classList.contains("space-y-1")).toBe(true)
+    expect(wrapper.get("[data-hero-slide-code]").element.parentElement?.classList.contains("space-y-0")).toBe(true)
     expect(wrapper.get("[data-hero-slide-code]").classes()).not.toContain("rounded-full")
     expect(wrapper.get("[data-hero-slide-code]").classes()).not.toContain("bg-black/44")
     expect(wrapper.get('[data-hero-slide-state="active"]').text()).toContain("CODE-m1")

@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
                       aria-hidden="true"
                     />
                     <div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 sm:p-5 lg:p-6">
-                      <div class="min-w-0 space-y-1 text-white">
+                      <div class="min-w-0 space-y-0 text-white">
                         <p
                           data-hero-slide-code
                           class="inline-block max-w-full truncate text-lg font-semibold tracking-normal text-white uppercase sm:text-xl lg:text-2xl"
