@@ -8,7 +8,6 @@ import {
   CircleCheckBig,
   Clock3,
   Film,
-  Info,
   Play,
   RotateCw,
   Sparkles,
@@ -42,7 +41,6 @@ interface MetricCard {
   label: string
   value: string
   hint: string
-  detail: string
   icon: Component
   emphasis: boolean
 }
@@ -147,7 +145,6 @@ const metricCards = computed((): MetricCard[] => {
       label: t("insights.watchedTime"),
       value: formatDuration(value.watchedSeconds),
       hint: t("insights.watchedShort"),
-      detail: t("insights.watchedHint"),
       icon: Clock3,
       emphasis: true,
     },
@@ -156,7 +153,6 @@ const metricCards = computed((): MetricCard[] => {
       label: t("insights.startedMovies"),
       value: formatInteger(value.startedMovies),
       hint: t("insights.startedShort"),
-      detail: t("insights.startedHint"),
       icon: Play,
       emphasis: true,
     },
@@ -167,7 +163,6 @@ const metricCards = computed((): MetricCard[] => {
       hint: value.completionRate === null
         ? t("insights.noCompletionDenominator")
         : t("insights.completionRateShort"),
-      detail: t("insights.completionRateHint"),
       icon: ChartNoAxesColumnIncreasing,
       emphasis: true,
     },
@@ -176,7 +171,6 @@ const metricCards = computed((): MetricCard[] => {
       label: t("insights.completedMovies"),
       value: formatInteger(value.completedMovies),
       hint: t("insights.completedShort", { threshold: formatPercent(value.completionThreshold) }),
-      detail: t("insights.completedHint", { threshold: formatPercent(value.completionThreshold) }),
       icon: CircleCheckBig,
       emphasis: false,
     },
@@ -185,7 +179,6 @@ const metricCards = computed((): MetricCard[] => {
       label: t("insights.ratedMovies"),
       value: formatInteger(value.ratedMovies),
       hint: t("insights.ratedShort"),
-      detail: t("insights.ratedHint"),
       icon: Film,
       emphasis: false,
     },
@@ -196,7 +189,6 @@ const metricCards = computed((): MetricCard[] => {
       hint: value.averageUserRating === null
         ? t("insights.noRatingDenominator")
         : t("insights.averageRatingShort"),
-      detail: t("insights.averageRatingHint"),
       icon: Star,
       emphasis: false,
     },
@@ -333,9 +325,6 @@ async function generateNarrative() {
             <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">
               {{ t("insights.title") }}
             </h1>
-            <p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
-              {{ t("insights.subtitle") }}
-            </p>
           </div>
           <div v-if="agentEnabled" class="flex flex-wrap items-center gap-2">
             <Button
@@ -474,19 +463,6 @@ async function generateNarrative() {
           <p v-if="factualSummary" data-insights-fact class="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm leading-relaxed text-foreground">
             {{ factualSummary }}
           </p>
-          <details class="group rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-            <summary class="flex cursor-pointer list-none items-center gap-2 font-medium text-foreground focus-visible:rounded focus-visible:outline-2 focus-visible:outline-ring">
-              <Info class="size-4 text-primary" aria-hidden="true" />
-              {{ t("insights.methodTitle") }}
-              <ChevronDown class="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
-            </summary>
-            <dl class="mt-3 grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div v-for="metric in metricCards" :key="metric.key" class="flex flex-col gap-1">
-                <dt class="font-medium text-foreground">{{ metric.label }}</dt>
-                <dd class="m-0 leading-relaxed">{{ metric.detail }}</dd>
-              </div>
-            </dl>
-          </details>
         </section>
 
         <Card v-if="isEmpty" class="border-dashed">
@@ -499,20 +475,9 @@ async function generateNarrative() {
         </Card>
 
         <section class="flex flex-col gap-3" aria-labelledby="insights-breakdown-heading">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="flex max-w-3xl flex-col gap-1">
-              <h2 id="insights-breakdown-heading" class="text-lg font-semibold tracking-tight">
-                {{ t("insights.breakdownTitle") }}
-              </h2>
-              <p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {{ t("insights.attributionNote") }}
-              </p>
-            </div>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground">
-              <Info class="size-3.5" aria-hidden="true" />
-              {{ t("insights.attributionBadge") }}
-            </span>
-          </div>
+          <h2 id="insights-breakdown-heading" class="text-lg font-semibold tracking-tight">
+            {{ t("insights.breakdownTitle") }}
+          </h2>
 
           <div class="grid gap-4 lg:grid-cols-3">
             <Card
