@@ -59,7 +59,7 @@ function openDetails() {
   <Card
     data-photo-card
     :data-photo-card-id="photo.id"
-    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none border border-border/70 hover:border-primary/25 hover:shadow-lg"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] border-0 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:ring-1 hover:ring-inset hover:ring-primary/50 hover:shadow-lg motion-reduce:transition-none"
   >
     <button
       type="button"

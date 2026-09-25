@@ -80,7 +80,7 @@ function onBatchCheckboxChange() {
     :class="
       props.selected || props.batchChecked
         ? 'border-2 border-primary shadow-lg shadow-primary/20'
-        : 'border border-border/70 hover:border-primary/25 hover:shadow-lg'
+        : 'border-0 hover:ring-1 hover:ring-inset hover:ring-primary/50 hover:shadow-lg'
     "
   >
     <button
