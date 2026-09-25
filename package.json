@@ -19,7 +19,7 @@
     "bundle:baseline": "node scripts/build/update-bundle-baseline.ts",
     "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs",
     "build:electron": "pnpm build:electron:main && pnpm build:desktop-ui",
-    "dev:electron": "pnpm build:electron && electron .",
+    "dev:electron": "pnpm build:electron && node scripts/dev/start-electron.cjs",
     "preview": "vite preview",
     "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
     "release:backend": "python scripts/release/release_cli.py build-backend --version 0.0.0-local",
