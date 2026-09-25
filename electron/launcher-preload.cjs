@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron")
 contextBridge.exposeInMainWorld("curatedConnection", {
+  checkUpdate: () => ipcRenderer.invoke("curated:desktop-update"),
   discover: () => ipcRenderer.invoke("curated:discover"),
   list: () => ipcRenderer.invoke("curated:connections"),
   connect: (url) => ipcRenderer.invoke("curated:connect", url),

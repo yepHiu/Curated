@@ -459,3 +459,15 @@ Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类
 ## Server 与此设备操作边界（2026-09-25）
 
 设置 → 网络提供 SSDP 自动发现开关，`GET/PATCH /api/settings` 的 `discoveryEnabled` 持久化到 library-config.cfg，重启 Server 后应用；只影响发现，不关闭 HTTP。Desktop 关于页显示桌面版本及服务器地址并可更换服务器；更新面板明确属于 Curated Server。客户端目录选择不用于资料库/备份路径。服务器文件管理器与原生播放器接口仅接受无转发头的 loopback 请求；远端返回 403，Desktop 的外部播放器交接入口暂不提供，Web 内置播放不受影响。
+
+## 三种组件包构建（2026-09-25，Windows 安装验收未完成）
+
+`python scripts/release/release_cli.py publish --variant all` 在一次版本分配内构建 Full、Server、Desktop 三种安装包；`--variant server|desktop|full` 可单独选择。该命令只构建本地产物，不上传 Release。输出位于新的 `release/components-<version>-<stamp>/`，不覆盖已有包。Desktop 纯客户端不需要 Go/FFmpeg；Server 包含 Web UI 与 FFmpeg，不需要 Electron。完整包默认串行安装两个独立组件，复用组件安装身份和卸载入口。
+
+Windows 组件按当前用户安装至 `%LOCALAPPDATA%/Programs/Curated/Server|Desktop`；Server 数据仍在原数据根（默认 `%LOCALAPPDATA%/Curated`），独立于程序目录。Server 就绪后写入本机地址提示，Desktop 仅在无连接记录/无输入时建议该地址，不替代身份检查。自启继续为 Server 的用户登录托盘模式，不是系统服务。
+
+跨平台构建 Go 显式使用 windows/amd64；打包 Desktop 时需要 Windows Electron runtime，可用 `CURATED_ELECTRON_RUNTIME_DIR` 指向它。没有 Inno Setup 时只输出 `.iss` 和 `scripts-only` manifest，不算已生成 EXE。已组装的 payload 可通过 `package-components --version X.Y.Z --components-dir <payloads> --output-dir <installer> --variant all` 生成/编译安装器。旧 `package-installer` / `package-portable` 是历史单包低层入口，不能用于发布当前客户端拆分版本。
+
+Server 更新只接受精确命名的 Server 安装包，旧缓存中的整包或 Desktop 包会被拒绝；Desktop 本地连接页提供官方下载入口，不由远端执行客户端更新。当前仍读取既有官方 Release 接口，新三包**不得直接挂到旧客户端的 latest feed**；新旧 feed 隔离发布流程尚未落地。manifest 已标注这一限制，`publish` 不执行外部发布。
+
+当前安装器会阻止直接覆盖旧一体包，并给出备份/迁移提示；自动迁移、Windows 实机安装/升级/卸载、真实两机 SSDP 仍待完成。不要将本实现当作已通过生产发布验收。

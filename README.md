@@ -111,3 +111,5 @@ When a later large language model takes over work in this repository, add its na
 - Grok 4.6
 
 Server connection identity: `GET /api/server-info`. See [implementation plan](docs/plan/2026-09-25-desktop-server-connection-and-ssdp.md) for the ongoing Desktop/Server split.
+
+Desktop/Server split is in development: three package variants are wired; Windows installation and legacy migration are not yet validated.

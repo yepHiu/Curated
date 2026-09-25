@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, Tray, type IpcMainInvokeEvent } from "electron"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { checkDesktopUpdate } from "./updates.js"
 import { discoverServers } from "./discovery.js"
-import { ConnectionStore, connectionPartition, normalizeServerUrl, probeServer, type SavedConnection } from "./connections.js"
+import { ConnectionStore, connectionPartition, localServerSuggestion, normalizeServerUrl, probeServer, type SavedConnection } from "./connections.js"
 import { resolveAppIconPath, withCuratedDesktopVersion, withCuratedDesktopRequestHeaders } from "./desktop-shell.js"
 
 const directory = path.dirname(fileURLToPath(import.meta.url))
@@ -76,6 +77,14 @@ function requireLibrary(event: IpcMainInvokeEvent): void {
   if (!library || !current || event.sender !== library.webContents || event.senderFrame !== library.webContents.mainFrame || new URL(event.senderFrame.url).origin !== current.url) throw new Error("Unauthorized desktop request")
 }
 function registerIPC(): void {
+  ipcMain.handle("curated:desktop-update", async event => {
+    requireLauncher(event)
+    const update = await checkDesktopUpdate()
+    if (!update) return "当前发布中没有适用于此设备的 Desktop 安装包。"
+    const answer = await dialog.showMessageBox(launcher!, { message: `Curated Desktop ${update.version}`, detail: "打开官方 Desktop 安装包下载。不会更新 Server。", buttons: ["取消", "下载"], cancelId: 0 })
+    if (answer.response === 1) await shell.openExternal(update.url)
+    return `Desktop ${update.version}`
+  })
   ipcMain.handle("curated:discover", async event => {
     requireLauncher(event)
     discoveryScan?.abort()
@@ -86,7 +95,7 @@ function registerIPC(): void {
   })
   ipcMain.handle("curated:connections", event => {
     requireLauncher(event)
-    return { ...store.read(), desktopVersion: app.getVersion(), activeUrl: current?.url }
+    return { ...store.read(), desktopVersion: app.getVersion(), activeUrl: current?.url, suggestedUrl: localServerSuggestion() }
   })
   ipcMain.handle("curated:connect", async (event, value: unknown) => {
     requireLauncher(event)
@@ -137,6 +146,7 @@ async function connect(raw: string): Promise<{ ok: boolean; error?: string }> {
       partition: connectionPartition(selected), preload: path.join(directory, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false,
     } })
     const window = candidate
+    window.webContents.session.setPermissionCheckHandler(() => false)
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     window.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({ requestHeaders: new URL(details.url).origin === url ? withCuratedDesktopRequestHeaders(details.requestHeaders, app.getVersion()) : details.requestHeaders })

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { onMounted, onUnmounted, ref } from "vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 interface Connection { url: string; name: string; serverId: string }
 interface Discovered { serverId: string; name: string; version: string; urls: string[]; expiresAt: number }
 interface ConnectionAPI {
+  checkUpdate(): Promise<string>
   discover(): Promise<Discovered[]>
-  list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; desktopVersion: string }>
+  list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; suggestedUrl?: string; desktopVersion: string }>
   connect(url: string): Promise<{ ok: boolean; error?: string }>
   cancel(): Promise<void>
   forget(url: string): Promise<void>
@@ -18,9 +19,29 @@ const connections = ref<Connection[]>([])
 const busy = ref(false)
 const error = ref("")
 const version = ref("")
+const updateMessage = ref("")
+const updating = ref(false)
+async function checkUpdate() {
+  updating.value = true
+  try { updateMessage.value = await api.checkUpdate() }
+  catch (reason) { updateMessage.value = String(reason) }
+  finally { updating.value = false }
+}
 const found = ref<Discovered[]>([])
 const scanning = ref(false)
 let expiry: ReturnType<typeof setTimeout> | undefined
+let hintTimer: ReturnType<typeof setTimeout> | undefined
+let hintAttempts = 0
+let disposed = false
+async function waitForLocalHint() {
+  if (disposed || address.value || hintAttempts++ >= 15) return
+  try {
+    const state = await api.list()
+    if (state.suggestedUrl && !address.value) address.value = state.suggestedUrl
+  } catch { /* Connection errors remain visible via the main form. */ }
+  if (!disposed && !address.value) hintTimer = setTimeout(waitForLocalHint, 1000)
+}
+onUnmounted(() => { disposed = true; clearTimeout(expiry); clearTimeout(hintTimer) })
 async function discover() {
   scanning.value = true
   found.value = []
@@ -56,8 +77,9 @@ async function forget(url: string) {
 onMounted(async () => {
   try {
     const state = await refresh()
-    address.value = state.lastUrl ?? ""
+    address.value = state.lastUrl ?? state.suggestedUrl ?? ""
     void discover()
+    if (!address.value) void waitForLocalHint()
     if (state.lastUrl && !state.activeUrl) await connect(state.lastUrl)
   } catch (reason) { error.value = String(reason) }
 })
@@ -105,6 +127,9 @@ onMounted(async () => {
         </li>
       </ul>
     </section>
-    <p class="mt-auto text-xs text-muted-foreground">Desktop {{ version }}</p>
+    <div class="mt-auto flex items-center justify-between gap-3">
+      <Button variant="ghost" :disabled="updating" @click="checkUpdate">{{ updating ? '正在检查…' : '检查 Desktop 更新' }}</Button>
+      <p class="text-xs text-muted-foreground">Desktop {{ version }}</p></div>
+    <p v-if="updateMessage" role="status" class="text-sm text-muted-foreground">{{ updateMessage }}</p>
   </main>
 </template>

@@ -11,6 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts.release.release_lib.component_packaging import publish_components, package_components
+
 from scripts.release.release_lib.build_steps import (
     build_backend,
     build_electron_main,
@@ -18,7 +20,6 @@ from scripts.release.release_lib.build_steps import (
     migrate_history,
     package_installer,
     package_portable,
-    publish_release,
     set_version_base,
     show_version,
     utc_build_stamp,
@@ -71,11 +72,18 @@ def main() -> None:
     installer_parser.add_argument("--skip-history", action="store_true")
 
     publish_parser = subparsers.add_parser("publish")
+    publish_parser.add_argument("--variant", choices=["all", "full", "server", "desktop"], default="all")
     publish_parser.add_argument("--version", "--Version", dest="version")
     publish_parser.add_argument("--build-stamp", default=utc_build_stamp())
     publish_parser.add_argument("--output-dir", default="release")
     publish_parser.add_argument("--version-file", default="scripts/release/version.json")
     publish_parser.add_argument("--history-path", default="docs/ops/package-build-history.csv")
+
+    components_parser = subparsers.add_parser("package-components")
+    components_parser.add_argument("--version", required=True)
+    components_parser.add_argument("--components-dir", required=True)
+    components_parser.add_argument("--output-dir", required=True)
+    components_parser.add_argument("--variant", choices=["all", "full", "server", "desktop"], default="all")
 
     # One-off migration from the legacy Markdown ledger to CSV.
     migrate_parser = subparsers.add_parser("migrate-history")
@@ -85,6 +93,10 @@ def main() -> None:
     args = parser.parse_args()
 
     # Keep dispatch explicit so each subcommand stays easy to trace and debug.
+    if args.command == "package-components":
+        print(json.dumps(package_components(version=args.version, components_dir=args.components_dir, output_dir=args.output_dir, variant=args.variant), indent=2))
+        return
+
     if args.command == "show-version":
         print(json.dumps(show_version(args.file), ensure_ascii=False))
         return
@@ -132,7 +144,8 @@ def main() -> None:
         return
 
     if args.command == "publish":
-        publish_release(
+        publish_components(
+            variant=args.variant,
             version=args.version,
             build_stamp=args.build_stamp,
             output_dir=args.output_dir,

@@ -149,6 +149,9 @@ func (s *Service) DownloadInstaller(ctx context.Context) (contracts.AppUpdateSta
 	if strings.TrimSpace(snapshot.InstallerSHA256) == "" {
 		return contracts.AppUpdateStatusDTO{}, errors.New("installer checksum is unavailable")
 	}
+	if !isServerInstaller(snapshot.InstallerDownloadURL, snapshot.LatestVersion) {
+		return contracts.AppUpdateStatusDTO{}, errors.New("no compatible Server component installer; refresh update information")
+	}
 	if err := validateInstallerDownloadURL(snapshot.InstallerDownloadURL); err != nil {
 		return contracts.AppUpdateStatusDTO{}, err
 	}
@@ -303,6 +306,9 @@ func (s *Service) Install(ctx context.Context, req contracts.AppUpdateInstallReq
 		return snapshotToDTO(snapshot), err
 	}
 
+	if !isServerInstaller(snapshot.DownloadedFileName, snapshot.DownloadedVersion) {
+		return contracts.AppUpdateStatusDTO{}, errors.New("cached installer is not a Server component; download a compatible update")
+	}
 	mode := normalizeInstallMode(req.Mode)
 	args, err := installerArgs(mode)
 	if err != nil {
@@ -558,32 +564,20 @@ type resolvedInstallerAsset struct {
 }
 
 func resolveInstallerAsset(release latestReleaseResponse) resolvedInstallerAsset {
-	var fallback string
-	var fallbackName string
-	var fallbackSHA256 string
-	for _, asset := range release.Assets {
-		name := strings.TrimSpace(asset.Name)
-		downloadURL := strings.TrimSpace(asset.BrowserDownloadURL)
-		if downloadURL == "" {
-			continue
-		}
-
-		normalizedName := strings.ToLower(name)
-		normalizedURL := strings.ToLower(strings.Split(downloadURL, "?")[0])
-		if !strings.HasSuffix(normalizedName, ".exe") && !strings.HasSuffix(normalizedURL, ".exe") {
-			continue
-		}
-		if fallback == "" {
-			fallback = downloadURL
-			fallbackName = name
-			fallbackSHA256 = normalizeSHA256Digest(asset.Digest)
-		}
-		searchText := normalizedName + " " + normalizedURL
-		if strings.Contains(searchText, "setup") || strings.Contains(searchText, "installer") {
-			return resolvedInstallerAsset{Name: name, DownloadURL: downloadURL, SHA256: normalizeSHA256Digest(asset.Digest)}
-		}
+	// A Server may install only its exact component artifact. Never pick the
+	// first EXE: a release can also contain Desktop and Full installers.
+	versionText := strings.TrimPrefix(strings.TrimSpace(release.TagName), "v")
+	if _, _, err := normalizedSemver(versionText); err != nil {
+		return resolvedInstallerAsset{}
 	}
-	return resolvedInstallerAsset{Name: fallbackName, DownloadURL: fallback, SHA256: fallbackSHA256}
+	expected := "Curated-Server-Setup-" + versionText + "-windows-x64.exe"
+	for _, asset := range release.Assets {
+		if asset.Name != expected || strings.TrimSpace(asset.BrowserDownloadURL) == "" {
+			continue
+		}
+		return resolvedInstallerAsset{Name: asset.Name, DownloadURL: asset.BrowserDownloadURL, SHA256: normalizeSHA256Digest(asset.Digest)}
+	}
+	return resolvedInstallerAsset{}
 }
 
 func normalizedSemver(raw string) (display string, parsed semanticVersion, err error) {
@@ -800,4 +794,16 @@ func downloadProgress(downloaded int64, total int64) int {
 		return 100
 	}
 	return progress
+}
+
+func isServerInstaller(raw, releaseVersion string) bool {
+	versionText, _, err := normalizedSemver(releaseVersion)
+	if err != nil {
+		return false
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	return filepath.Base(parsed.Path) == "Curated-Server-Setup-"+versionText+"-windows-x64.exe"
 }

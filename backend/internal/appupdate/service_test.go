@@ -71,8 +71,8 @@ func TestCheckNowIncludesLatestInstallerDownloadURL(t *testing.T) {
 					"browser_download_url": "https://example.com/Curated-Portable-1.2.8.zip"
 				},
 				{
-					"name": "Curated-Setup-1.2.8.exe",
-					"browser_download_url": "https://example.com/Curated-Setup-1.2.8.exe"
+					"name": "Curated-Server-Setup-1.2.8-windows-x64.exe",
+					"browser_download_url": "https://example.com/Curated-Server-Setup-1.2.8-windows-x64.exe"
 				}
 			]
 		}`))
@@ -100,7 +100,7 @@ func TestCheckNowIncludesLatestInstallerDownloadURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CheckNow() error = %v", err)
 	}
-	if dto.InstallerDownloadURL != "https://example.com/Curated-Setup-1.2.8.exe" {
+	if dto.InstallerDownloadURL != "https://example.com/Curated-Server-Setup-1.2.8-windows-x64.exe" {
 		t.Fatalf("InstallerDownloadURL = %q", dto.InstallerDownloadURL)
 	}
 
@@ -108,7 +108,7 @@ func TestCheckNowIncludesLatestInstallerDownloadURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatus() error = %v", err)
 	}
-	if cached.InstallerDownloadURL != "https://example.com/Curated-Setup-1.2.8.exe" {
+	if cached.InstallerDownloadURL != "https://example.com/Curated-Server-Setup-1.2.8-windows-x64.exe" {
 		t.Fatalf("cached InstallerDownloadURL = %q", cached.InstallerDownloadURL)
 	}
 }
@@ -139,12 +139,12 @@ func TestDownloadInstallerVerifiesSHA256Digest(t *testing.T) {
 			"published_at": "2026-05-12T10:00:00Z",
 			"assets": [
 				{
-					"name": "Curated-Setup-1.4.5.exe",
+					"name": "Curated-Server-Setup-1.4.5-windows-x64.exe",
 					"browser_download_url": %q,
 					"digest": "sha256:%s"
 				}
 			]
-		}`, downloadServer.URL+"/Curated-Setup-1.4.5.exe", strings.ToLower(installerSHA256))))
+		}`, downloadServer.URL+"/Curated-Server-Setup-1.4.5-windows-x64.exe", strings.ToLower(installerSHA256))))
 	}))
 	t.Cleanup(releaseServer.Close)
 
@@ -181,7 +181,7 @@ func TestDownloadInstallerVerifiesSHA256Digest(t *testing.T) {
 	if !dto.InstallReady {
 		t.Fatal("expected InstallReady=true")
 	}
-	if dto.DownloadedVersion != "1.4.5" || dto.DownloadedFileName != "Curated-Setup-1.4.5.exe" {
+	if dto.DownloadedVersion != "1.4.5" || dto.DownloadedFileName != "Curated-Server-Setup-1.4.5-windows-x64.exe" {
 		t.Fatalf("download identity = version %q file %q", dto.DownloadedVersion, dto.DownloadedFileName)
 	}
 	if dto.DownloadedBytes != int64(len(installerBytes)) || dto.TotalBytes != int64(len(installerBytes)) {
@@ -216,7 +216,7 @@ func TestInstallLaunchesVerifiedInstallerWithRequestedMode(t *testing.T) {
 		t.Fatalf("Migrate() error = %v", err)
 	}
 
-	installerPath := filepath.Join(t.TempDir(), "Curated-Setup-1.4.5.exe")
+	installerPath := filepath.Join(t.TempDir(), "Curated-Server-Setup-1.4.5-windows-x64.exe")
 	if err := os.WriteFile(installerPath, []byte("installer"), 0o644); err != nil {
 		t.Fatalf("WriteFile(installer) error = %v", err)
 	}
@@ -226,7 +226,7 @@ func TestInstallLaunchesVerifiedInstallerWithRequestedMode(t *testing.T) {
 		Status:             "update-available",
 		ArtifactStatus:     "verified",
 		DownloadedVersion:  "1.4.5",
-		DownloadedFileName: "Curated-Setup-1.4.5.exe",
+		DownloadedFileName: "Curated-Server-Setup-1.4.5-windows-x64.exe",
 		DownloadedFilePath: installerPath,
 		InstallReady:       true,
 		Source:             updateSourceGitHubReleases,
@@ -331,5 +331,23 @@ func TestGetStatusRefreshesFreshLegacyTitleOnlyReleaseNotesCache(t *testing.T) {
 	}
 	if !strings.Contains(dto.ReleaseNotesSnippet, "Poster cards now preserve loaded image state") {
 		t.Fatalf("ReleaseNotesSnippet = %q", dto.ReleaseNotesSnippet)
+	}
+}
+
+func TestInstallerSelectionNeverFallsBackToOtherComponents(t *testing.T) {
+	release := latestReleaseResponse{TagName: "v2.0.0", Assets: []latestReleaseAsset{
+		{Name: "Curated-Desktop-Setup-2.0.0-windows-x64.exe", BrowserDownloadURL: "https://example.com/desktop.exe"},
+		{Name: "Curated-Full-Setup-2.0.0-windows-x64.exe", BrowserDownloadURL: "https://example.com/full.exe"},
+		{Name: "Curated-Setup-2.0.0.exe", BrowserDownloadURL: "https://example.com/legacy.exe"},
+	}}
+	if got := resolveInstallerAsset(release); got.DownloadURL != "" {
+		t.Fatal(got)
+	}
+	release.Assets = append(release.Assets, latestReleaseAsset{Name: "Curated-Server-Setup-2.0.0-windows-x64.exe", BrowserDownloadURL: "https://example.com/server.exe"})
+	if got := resolveInstallerAsset(release); got.DownloadURL != "https://example.com/server.exe" {
+		t.Fatal(got)
+	}
+	if isServerInstaller("Curated-Setup-2.0.0.exe", "2.0.0") || isServerInstaller("Curated-Desktop-Setup-2.0.0-windows-x64.exe", "2.0.0") {
+		t.Fatal("legacy or desktop installer accepted")
 	}
 }

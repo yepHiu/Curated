@@ -27,3 +27,18 @@ func TestIdentitySurvivesRestartAndIsIndependentOfLibrary(t *testing.T) {
 		t.Fatal("must not silently replace a corrupt identity")
 	}
 }
+
+func TestConnectionHintPreservesCustomPortWithoutLibraryDetails(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("LOCALAPPDATA", root)
+	if err := WriteConnectionHint("0.0.0.0:9001"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "Curated", "server-connection.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `{"url":"http://127.0.0.1:9001"}` {
+		t.Fatal(string(data))
+	}
+}

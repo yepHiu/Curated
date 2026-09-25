@@ -267,6 +267,11 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 	}
 	var stopDiscovery func()
 	ready := func(addr string) {
+		if version.Channel == "release" {
+			if err := serveridentity.WriteConnectionHint(addr); err != nil {
+				boot.logger.Warn("write local connection hint failed", zap.Error(err))
+			}
+		}
 		if report := serverListeningReporter(); report != nil {
 			report(addr)
 		}

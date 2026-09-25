@@ -73,6 +73,7 @@ def build_frontend(version: str, output_dir: str = "release/frontend") -> Path:
 
     env = os.environ.copy()
     env["VITE_APP_VERSION"] = version
+    env["VITE_USE_WEB_API"] = "true"
 
     _run(["pnpm", "typecheck"], cwd=repo_root, env=env)
     _run(["pnpm", "exec", "vite", "build", "--configLoader", "native"], cwd=repo_root, env=env)
@@ -125,6 +126,9 @@ def build_backend(
     env["GOCACHE"] = go_cache_dir
     env["GOTMPDIR"] = go_tmp_dir
     env["GOTELEMETRY"] = "off"
+    env["GOOS"] = "windows"
+    env["GOARCH"] = "amd64"
+    env["CGO_ENABLED"] = "0"
     ldflags = (
         "-H=windowsgui "
         f"-X curated-backend/internal/version.BuildStamp={build_stamp} "

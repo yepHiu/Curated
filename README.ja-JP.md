@@ -108,3 +108,5 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 - Grok 4.6
 
 Server connection identity: `GET /api/server-info`. See [implementation plan](docs/plan/2026-09-25-desktop-server-connection-and-ssdp.md) for the ongoing Desktop/Server split.
+
+Desktop/Server 分離は開発中です。3 種類のパッケージを実装中で、Windows インストールと旧版移行は未検証です。

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { networkInterfaces } from "node:os"
 
 export interface ServerInfo {
   product: "curated-server"
@@ -108,4 +109,15 @@ export class ConnectionStore {
     writeFileSync(`${this.file}.tmp`, JSON.stringify(settings, null, 2), { mode: 0o600 })
     renameSync(`${this.file}.tmp`, this.file)
   }
+}
+
+export function localServerSuggestion(localAppData = process.env.LOCALAPPDATA): string | undefined {
+  if (!localAppData) return
+  try {
+    const hint = JSON.parse(readFileSync(path.join(localAppData, "Curated", "server-connection.json"), "utf8")) as { url?: unknown }
+    if (typeof hint.url !== "string") return
+    const normalized = normalizeServerUrl(hint.url)
+    const host = new URL(normalized).hostname.replace(/^\[|\]$/g, "")
+    if (["127.0.0.1", "::1"].includes(host) || Object.values(networkInterfaces()).some(items => items?.some(item => item.address === host))) return normalized
+  } catch { /* No installed Server hint is a normal client-only startup. */ }
 }

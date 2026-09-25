@@ -41,3 +41,15 @@ describe("server connections", () => {
     expect(store.read()).toEqual({ version: 1, connections: [a] })
   })
 })
+
+it("ignores stale local hints pointing to another machine", async () => {
+  const { writeFileSync, mkdirSync } = await import("node:fs")
+  const { localServerSuggestion } = await import("./connections")
+  const dir = mkdtempSync(path.join(os.tmpdir(), "curated-hint-")); dirs.push(dir)
+  mkdirSync(path.join(dir,"Curated"))
+  const file = path.join(dir,"Curated","server-connection.json")
+  writeFileSync(file,JSON.stringify({url:"http://127.0.0.1:9001"}))
+  expect(localServerSuggestion(dir)).toBe("http://127.0.0.1:9001")
+  writeFileSync(file,JSON.stringify({url:"https://example.com"}))
+  expect(localServerSuggestion(dir)).toBeUndefined()
+})
