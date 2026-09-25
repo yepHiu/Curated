@@ -8,3 +8,5 @@ const target = path.join(targetDir, "preload.cjs")
 
 fs.mkdirSync(targetDir, { recursive: true })
 fs.copyFileSync(source, target)
+
+fs.copyFileSync(path.join(repoRoot, "electron", "launcher-preload.cjs"), path.join(targetDir, "launcher-preload.cjs"))

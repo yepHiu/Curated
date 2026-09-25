@@ -235,3 +235,7 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 ## Production pinyin dictionary asset
 
 `vite.pinyin-data.ts` extracts the five pure dictionary literals from the locked `pinyin-pro` ESM source into a content-hashed JSON asset. The optional pinyin chunk fetches it from the same origin before initializing its existing synchronous matching exports. Deploy the complete `dist` directory, including JSON assets. A changed upstream dictionary format fails the build; a missing runtime asset rejects the import explicitly. This reduces executable JavaScript, not total dictionary data. Existing JS budgets stay unchanged. `src/lib/pinyin-data-build.test.ts` checks extraction and rejects executable literals; real production-browser matching was checked during the media Beta integration.
+
+## Desktop 独立构建（2026-09-25）
+
+根目录 `pnpm build:electron` 只构建 main/preload 和本地连接页，`pnpm dev:electron` 不再启动后端。Server 需从 backend 目录独立启动并提供 Web UI。Node 需支持现有 `--configLoader native` TypeScript 配置加载；本机验证使用已安装的 Node 25。

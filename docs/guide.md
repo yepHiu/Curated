@@ -447,3 +447,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 ## 2026-09-25 Server 连接身份（拆分第一阶段）
 
 `GET /api/server-info` 是无需解锁的最小身份接口，返回 serverId、名称、版本、连接/桌面桥协议版本，不返回资料库路径或凭据。服务启动持有数据库运行锁后，在 `<databasePath>.server-id` 创建稳定安装身份；损坏时启动失败，不静默替换。身份不属于数据库备份，恢复到新安装生成新身份。主运行配置可指定 `serverName`。完整目录复制到第二台机器时，应在停止该副本后移除副本的 `.server-id` 再启动，原安装保持不动。Desktop / SSDP / 三包发行仍按实施计划推进，不能视为已经完成。
+
+## Desktop 连接管理（2026-09-25，实施中）
+
+`pnpm build:electron` 构建 Electron 与独立本地连接页，`pnpm dev:electron` 只运行客户端。需要单独运行提供 Web UI 的 Server；开发时可先构建 Web API 前端并由 Go 静态托管。Desktop 支持 HTTP/HTTPS 根地址、端口、最近连接、重连与菜单更换入口；不启动或停止 Server。地址与安装身份共同隔离 Electron 会话；服务器路径手动输入，不调用客户端目录选择。旧版 Server 可经 health 识别后受限手动连接。三种发布包、SSDP 和旧版迁移仍在实施，现阶段不应发布旧的一体包链路。

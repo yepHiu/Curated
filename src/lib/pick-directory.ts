@@ -14,6 +14,7 @@ export type PickDirectoryOutcome =
   | { status: "unsupported" }
 
 type WindowWithPickers = Window & {
+  curatedDesktop?: { serverPaths?: boolean }
   javLibrary?: {
     pickDirectory?: () => Promise<{ path: string } | null | undefined>
   }
@@ -78,6 +79,10 @@ function pickDirectoryViaFileInput(): Promise<PickDirectoryOutcome> {
 
 export async function pickLibraryDirectory(): Promise<PickDirectoryOutcome> {
   const w = window as WindowWithPickers
+
+  if (w.curatedDesktop?.serverPaths) {
+    return { status: "hint", message: t("pickDir.serverPath") }
+  }
 
   if (w.javLibrary?.pickDirectory) {
     try {

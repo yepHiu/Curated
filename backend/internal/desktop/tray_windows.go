@@ -311,7 +311,7 @@ func (t *nativeTrayRuntime) initialize() error {
 	}
 	t.menu = windows.Handle(menuHandle)
 
-	if err := t.appendMenuString(trayCommandOpenHome, "Open Curated"); err != nil {
+	if err := t.appendMenuString(trayCommandOpenHome, "Open Curated Server Web"); err != nil {
 		return err
 	}
 	if err := t.appendMenuString(trayCommandSettings, "Open Settings"); err != nil {
@@ -323,7 +323,7 @@ func (t *nativeTrayRuntime) initialize() error {
 	if err := t.appendMenuSeparator(); err != nil {
 		return err
 	}
-	if err := t.appendMenuString(trayCommandQuit, "Quit"); err != nil {
+	if err := t.appendMenuString(trayCommandQuit, "Stop Curated Server"); err != nil {
 		return err
 	}
 
@@ -347,7 +347,7 @@ func (t *nativeTrayRuntime) initialize() error {
 		Icon:            t.icon,
 	}
 	t.notifyData.Size = uint32(unsafe.Sizeof(t.notifyData))
-	copyTooltip(&t.notifyData.Tip, "Curated "+version.Display())
+	copyTooltip(&t.notifyData.Tip, "Curated Server "+version.Display())
 
 	if err := t.addNotifyIcon(); err != nil {
 		return err

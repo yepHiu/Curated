@@ -5,13 +5,13 @@ import vm from "node:vm"
 
 import { describe, expect, it } from "vitest"
 
-import { pickDirectoryChannel } from "./desktop-shell"
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 describe("Electron preload bridge", () => {
-  it("exposes only the desktop directory picker bridge", async () => {
+  it("exposes narrow server-page controls without a local filesystem picker", async () => {
     const exposed: Record<string, unknown> = {}
     const invokedChannels: string[] = []
     const code = readFileSync(path.join(__dirname, "preload.cjs"), "utf8")
@@ -37,10 +37,12 @@ describe("Electron preload bridge", () => {
       },
     })
 
-    expect(Object.keys(exposed)).toEqual(["javLibrary"])
+    expect(Object.keys(exposed)).toEqual(["curatedDesktop"])
 
-    const api = exposed.javLibrary as { pickDirectory: () => Promise<unknown> }
-    await expect(api.pickDirectory()).resolves.toEqual({ path: "D:/Media" })
-    expect(invokedChannels).toEqual([pickDirectoryChannel])
+    const api = exposed.curatedDesktop as { getInfo: () => Promise<unknown>; changeServer: () => Promise<unknown>; serverPaths: boolean }
+    expect(api.serverPaths).toBe(true)
+    await api.getInfo()
+    await api.changeServer()
+    expect(invokedChannels).toEqual(["curated:desktop-info", "curated:change-server"])
   })
 })

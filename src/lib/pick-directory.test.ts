@@ -11,11 +11,20 @@ vi.mock("@/i18n", () => ({
 
 beforeEach(() => {
   vi.resetModules()
+  delete (window as Window & { curatedDesktop?: unknown }).curatedDesktop
   delete (window as Window & { javLibrary?: unknown }).javLibrary
   delete (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker
 })
 
 describe("pickLibraryDirectory", () => {
+  it("does not open a client filesystem picker for a server directory", async () => {
+    ;(window as Window & { curatedDesktop?: unknown }).curatedDesktop = { serverPaths: true }
+    const picker = vi.fn()
+    ;(window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker = picker
+    const { pickLibraryDirectory } = await import("./pick-directory")
+    expect(await pickLibraryDirectory()).toEqual({ status: "hint", message: "pickDir.serverPath" })
+    expect(picker).not.toHaveBeenCalled()
+  })
   it("returns an absolute path from the desktop directory picker bridge", async () => {
     ;(window as Window & { javLibrary?: unknown }).javLibrary = {
       pickDirectory: vi.fn(async () => ({ path: " D:/Media " })),
