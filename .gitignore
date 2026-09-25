@@ -13,6 +13,14 @@ dist
 dist-ssr
 electron-dist/
 release/
+# Locally assembled frontend and downloaded FFmpeg runtime (keep source/docs).
+/frontend-dist/
+/backend/third_party/ffmpeg/bin/
+# Generated reports and exported scratch artifacts.
+/output/
+coverage/
+playwright-report/
+blob-report/
 scripts/
 !scripts/
 scripts/*
