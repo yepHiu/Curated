@@ -68,6 +68,15 @@ const libraryService = useLibraryService()
 const { withPreservedScroll } = useSettingsScrollPreserve()
 const lanSaving = ref(false)
 const lanError = ref("")
+const discoverySaving = ref(false)
+const discoveryEnabled = computed(() => libraryService.discoveryEnabled?.value ?? true)
+async function setDiscovery(value: boolean) {
+  discoverySaving.value = true
+  lanError.value = ""
+  try { await libraryService.setDiscoveryEnabled(value) }
+  catch (error) { lanError.value = formatLanError(error) }
+  finally { discoverySaving.value = false }
+}
 
 const lanEnabled = computed(() => libraryService.lanEnabled.value)
 const lanListening = computed(() => libraryService.lanListening.value)
@@ -189,6 +198,10 @@ function updateProxyPassword(value: unknown) {
               :aria-label="t('settings.lanAccessSwitch')"
               @update:model-value="onLanEnabledChange"
             />
+          </div>
+          <div class="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
+            <div class="space-y-1"><p class="text-sm font-semibold">{{ t('settings.discoveryTitle') }}</p><p class="text-xs text-muted-foreground">{{ t('settings.discoveryHint') }}</p></div>
+            <Switch :model-value="discoveryEnabled" :disabled="!useWebApi || discoverySaving" :aria-label="t('settings.discoveryTitle')" @update:model-value="setDiscovery" />
           </div>
           <p
             v-if="useWebApi && lanEnabled !== lanListening"

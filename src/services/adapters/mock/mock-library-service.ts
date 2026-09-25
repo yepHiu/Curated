@@ -113,6 +113,7 @@ const autoActorProfileScrapeMock = ref(false)
 const autoDownloadUpdatesMock = ref(false)
 const launchAtLoginMock = ref(false)
 const launchAtLoginSupportedMock = ref(false)
+const discoveryEnabledMock = ref(true)
 const lanEnabledMock = ref(false)
 const lanListeningMock = ref(false)
 const lanAccessUrlsMock = ref<string[]>([])
@@ -1176,6 +1177,8 @@ export const mockLibraryService: LibraryService = {
   browserPluginEnabled: computed(() => false),
   async refreshBrowserPluginEnabled() {},
   async setBrowserPluginEnabled() { throw new Error("Web API required") },
+  discoveryEnabled: computed(() => discoveryEnabledMock.value),
+  async setDiscoveryEnabled(value: boolean) { discoveryEnabledMock.value = value },
   lanEnabled: computed(() => lanEnabledMock.value),
   lanListening: computed(() => lanListeningMock.value),
   lanAccessUrls: computed(() => lanAccessUrlsMock.value),

@@ -122,6 +122,9 @@ func (h *Handler) handleDeleteComic(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleRevealComicSource(w http.ResponseWriter, r *http.Request) {
+	if !requireLocalDesktopOperation(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return

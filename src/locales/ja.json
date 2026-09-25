@@ -1026,6 +1026,9 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
+    "changeServer": "サーバーを変更",
+    "discoveryTitle": "LAN 自動検出",
+    "discoveryHint": "Desktop からこのサーバーを検出できます。LAN アクセスを有効にし、変更後に Server を再起動してください。",
     "language": "表示言語",
     "appearance": "外観",
     "themeLight": "ライト",

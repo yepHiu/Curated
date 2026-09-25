@@ -2311,7 +2311,10 @@ function formatClientError(err: unknown, fallback: string): string {
   return fallback
 }
 
+const nativeHandoffAvailable = !(window as Window & { curatedDesktop?: unknown }).curatedDesktop
+
 async function openNativePlayer() {
+  if (!nativeHandoffAvailable) return
   if (!playbackSrc.value) return
   if (libraryService.playerSettings.value.nativePlayerEnabled === false) {
     pushAppToast(t("player.nativeLaunchDisabled", { player: nativePlayerLabel.value }), {
@@ -3433,6 +3436,7 @@ const videoPreloadMode = computed(() =>
                 size="icon"
                 class="size-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20"
                 :disabled="!playbackSrc"
+                v-if="nativeHandoffAvailable"
                 :aria-label="nativePlayerLabel"
                 @click="openNativePlayer"
               >

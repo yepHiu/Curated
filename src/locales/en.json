@@ -1026,6 +1026,9 @@
     "imageOf": "Image {i}"
   },
   "settings": {
+    "changeServer": "Change server",
+    "discoveryTitle": "LAN discovery",
+    "discoveryHint": "Let Desktop discover this server. Requires LAN access; restart Server after changing.",
     "language": "Interface language",
     "appearance": "Appearance",
     "themeLight": "Light",

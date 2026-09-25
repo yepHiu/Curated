@@ -899,6 +899,7 @@ type UpdateLibraryPathRequest struct {
 
 // SettingsDTO carries all application settings exposed to the frontend.
 type SettingsDTO struct {
+	DiscoveryEnabled                bool                   `json:"discoveryEnabled"`
 	LibraryPaths                    []LibraryPathDTO       `json:"libraryPaths"`
 	DefaultImportLibraryPathID      string                 `json:"defaultImportLibraryPathId,omitempty"`
 	BackupDirectory                 string                 `json:"backupDirectory"`
@@ -1289,6 +1290,7 @@ type PatchSettingsRequest struct {
 	AutoDownloadUpdates             *bool                   `json:"autoDownloadUpdates,omitempty"`
 	LaunchAtLogin                   *bool                   `json:"launchAtLogin,omitempty"`
 	BrowserPluginEnabled            *bool                   `json:"browserPluginEnabled,omitempty"`
+	DiscoveryEnabled                *bool                   `json:"discoveryEnabled,omitempty"`
 	LANEnabled                      *bool                   `json:"lanEnabled,omitempty"`
 	CuratedFrameExportFormat        *string                 `json:"curatedFrameExportFormat,omitempty"`
 	CuratedFrameExportMode          *string                 `json:"curatedFrameExportMode,omitempty"`

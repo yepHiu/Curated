@@ -1026,6 +1026,9 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
+    "changeServer": "更换服务器",
+    "discoveryTitle": "局域网自动发现",
+    "discoveryHint": "允许 Desktop 搜索此服务器。需启用局域网访问，修改后重启 Server 生效。",
     "language": "界面语言",
     "appearance": "外观",
     "themeLight": "浅色",

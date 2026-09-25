@@ -551,6 +551,7 @@ export interface SettingsDTO {
   launchAtLoginSupported: boolean
   /** 是否允许局域网设备访问本机 HTTP 服务；改监听需完全退出后重新打开 */
   browserPluginEnabled?: boolean
+  discoveryEnabled?: boolean
   lanEnabled: boolean
   /** 当前进程是否已经绑定非 loopback 地址 */
   lanListening: boolean
@@ -1030,6 +1031,7 @@ export interface PatchSettingsBody extends PatchComicSettingsBody, PatchPhotoSet
   autoDownloadUpdates?: boolean
   launchAtLogin?: boolean
   browserPluginEnabled?: boolean
+  discoveryEnabled?: boolean
   lanEnabled?: boolean
   curatedFrameExportFormat?: CuratedFrameExportFormat
   curatedFrameExportMode?: CuratedFrameExportMode

@@ -189,6 +189,7 @@ async function handleInstallUpdate() {
 </script>
 
 <template>
+  <p class="mb-2 text-sm font-medium">Curated Server</p>
   <section
     class="rounded-xl border border-border/60 bg-background/40 p-4"
     :class="statusPanelClass(panelTone)"

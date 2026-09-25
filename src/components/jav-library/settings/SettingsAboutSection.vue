@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
 import { ChevronDown, Info, Loader2, ScrollText, Sparkles } from "lucide-vue-next"
 import type { HealthDTO } from "@/api/types"
@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { formatAboutBackendVersion } from "@/lib/about-version"
 import curatedLicenseUrl from "@/assets/licenses/Curated_LICENSE.txt?url&no-inline"
 import harmonySansLicenseUrl from "@/assets/fonts/HarmonyOS_Sans_SC_LICENSE.txt?url&no-inline"
@@ -29,6 +30,11 @@ defineProps<{
 }>()
 
 const { t } = useI18n()
+const desktop = (window as Window & { curatedDesktop?: { getInfo(): Promise<{version: string; serverUrl: string}>; changeServer(): Promise<void> } }).curatedDesktop
+const desktopInfo = ref<{version: string; serverUrl: string}>()
+onMounted(async () => {
+  if (desktop) { try { desktopInfo.value = await desktop.getInfo() } catch { /* Browser or incompatible bridge. */ } }
+})
 
 function repositoryHrefFromDisplay(raw: string): string {
   const s = raw.trim()
@@ -85,6 +91,13 @@ const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.
 </script>
 
 <template>
+  <Card v-if="desktopInfo" class="mb-6">
+    <CardHeader><CardTitle>Curated Desktop {{ desktopInfo.version }}</CardTitle></CardHeader>
+    <CardContent class="flex items-center justify-between gap-4">
+      <span class="truncate text-sm text-muted-foreground">{{ desktopInfo.serverUrl }}</span>
+      <Button type="button" variant="outline" @click="desktop?.changeServer()">{{ t('settings.changeServer') }}</Button>
+    </CardContent>
+  </Card>
   <div class="flex w-full flex-col gap-6">
     <div class="break-inside-avoid">
       <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">

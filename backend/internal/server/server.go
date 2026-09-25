@@ -167,6 +167,11 @@ type BrowserPluginController interface {
 }
 
 // LANAccessController exposes the persisted LAN HTTP exposure preference and current bind state.
+type DiscoverySettingsController interface {
+	DiscoveryEnabled() bool
+	SetDiscoveryEnabled(bool) error
+}
+
 type LANAccessController interface {
 	LANEnabled() bool
 	LANListening() bool
@@ -321,6 +326,7 @@ type Handler struct {
 	autoActorProfileScrapeCtl      AutoActorProfileScrapeController
 	autoDownloadUpdatesCtl         AutoDownloadUpdatesController
 	launchAtLoginCtl               LaunchAtLoginController
+	discoveryCtl                   DiscoverySettingsController
 	lanAccessCtl                   LANAccessController
 	browserPluginCtl               BrowserPluginController
 	curatedFrameExportFormatCtl    CuratedFrameExportFormatController
@@ -378,6 +384,7 @@ type Deps struct {
 	AutoActorProfileScrapeCtl        AutoActorProfileScrapeController
 	AutoDownloadUpdatesCtl           AutoDownloadUpdatesController
 	LaunchAtLoginCtl                 LaunchAtLoginController
+	DiscoveryCtl                     DiscoverySettingsController
 	LANAccessCtl                     LANAccessController
 	BrowserPluginCtl                 BrowserPluginController
 	CuratedFrameExportFormatCtl      CuratedFrameExportFormatController
@@ -457,6 +464,7 @@ func NewHandler(deps Deps) *Handler {
 		autoDownloadUpdatesCtl:         deps.AutoDownloadUpdatesCtl,
 		launchAtLoginCtl:               deps.LaunchAtLoginCtl,
 		lanAccessCtl:                   deps.LANAccessCtl,
+		discoveryCtl:                   deps.DiscoveryCtl,
 		browserPluginCtl:               deps.BrowserPluginCtl,
 		curatedFrameExportFormatCtl:    deps.CuratedFrameExportFormatCtl,
 		curatedFrameExportModeCtl:      deps.CuratedFrameExportModeCtl,
@@ -1198,6 +1206,9 @@ func (h *Handler) handleCreatePlaybackSession(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handler) handleLaunchNativePlayback(w http.ResponseWriter, r *http.Request) {
+	if !requireLocalDesktopOperation(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
@@ -1349,6 +1360,9 @@ func (h *Handler) handleDeletePlaybackSession(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.Request) {
+	if !requireLocalDesktopOperation(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
@@ -1394,6 +1408,9 @@ func (h *Handler) handleRevealMovieInFileManager(w http.ResponseWriter, r *http.
 }
 
 func (h *Handler) handleRevealLibraryPathInFileManager(w http.ResponseWriter, r *http.Request) {
+	if !requireLocalDesktopOperation(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
@@ -1964,6 +1981,10 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		launchAtLogin = h.launchAtLoginCtl.LaunchAtLogin()
 		launchAtLoginSupported = h.launchAtLoginCtl.LaunchAtLoginSupported()
 	}
+	discoveryEnabled := h.cfg.DiscoveryOn()
+	if h.discoveryCtl != nil {
+		discoveryEnabled = h.discoveryCtl.DiscoveryEnabled()
+	}
 	lanEnabled := h.cfg.LANEnabled
 	lanListening := !config.HTTPAddrIsLoopback(h.cfg.HttpAddr)
 	lanAccessURLs := config.LANAccessURLs(h.cfg.HttpAddr)
@@ -2052,6 +2073,7 @@ func (h *Handler) buildSettingsDTO(ctx context.Context) (contracts.SettingsDTO, 
 		LaunchAtLogin:            launchAtLogin,
 		LaunchAtLoginSupported:   launchAtLoginSupported,
 		LANEnabled:               lanEnabled,
+		DiscoveryEnabled:         discoveryEnabled,
 		BrowserPluginEnabled:     h.browserPluginEnabled(),
 		LANListening:             lanListening,
 		LANAccessURLs:            lanAccessURLs,
@@ -2276,7 +2298,7 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if body.BrowserPluginEnabled == nil && body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
+	if body.DiscoveryEnabled == nil && body.BrowserPluginEnabled == nil && body.OrganizeLibrary == nil && body.AutoLibraryWatch == nil && body.AutoActorProfileScrape == nil && body.AutoDownloadUpdates == nil && body.LaunchAtLogin == nil && body.LANEnabled == nil && body.CuratedFrameExportFormat == nil && body.CuratedFrameExportMode == nil && body.DefaultImportLibraryPathID == nil && body.BackupDirectory == nil && body.MetadataMovieProvider == nil && body.MetadataMovieProviderChain == nil && body.MetadataMovieScrapeMode == nil && body.MetadataMovieStrategy == nil && body.Proxy == nil && body.AIProvider == nil && !patchBackendLogHasChanges(body.BackendLog) && body.Player == nil && body.ComicLibraryEnabled == nil && body.AutoComicLibraryWatch == nil && body.DefaultComicImportLibraryPathID == nil && body.ComicReader == nil && body.ComicCache == nil && body.PhotoLibraryEnabled == nil && body.AutoPhotoLibraryWatch == nil && body.DefaultPhotoImportLibraryPathID == nil && body.PhotoViewer == nil && body.PhotoCache == nil {
 		writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "no supported fields to update")
 		return
 	}
@@ -2401,6 +2423,14 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if body.DiscoveryEnabled != nil {
+		if h.discoveryCtl == nil {
+			writeAppError(w, http.StatusServiceUnavailable, contracts.ErrorCodeInternal, "discovery settings unavailable")
+			return
+		}
+		prev, target := h.discoveryCtl.DiscoveryEnabled(), *body.DiscoveryEnabled
+		ops = append(ops, settingsPatchOperation{name: "discoveryEnabled", apply: func() error { return h.discoveryCtl.SetDiscoveryEnabled(target) }, rollback: func() error { return h.discoveryCtl.SetDiscoveryEnabled(prev) }, failure: settingsPatchFailure{status: http.StatusInternalServerError, code: contracts.ErrorCodeInternal, message: fixedSettingsPatchMessage("failed to save discovery settings")}})
+	}
 	if body.LANEnabled != nil {
 		if h.lanAccessCtl == nil {
 			writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "LAN access settings not available")

@@ -112,4 +112,8 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 
 ## SSDP 发现（2026-09-25，待真实两机验收）
 
-Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类型 `urn:curated:service:Library:1`，组播 `239.255.255.250:1900`，描述为 `GET /discovery/description.xml`。默认随 LAN 启用；可在主配置或 `library-config.cfg` 设置 `discoveryEnabled: false`，重启 Server 生效。Desktop 本地页可搜索、刷新和选择服务器，按 serverId 合并多网卡结果；每次扫描有界、结果按 120 秒上限过期，身份探测不携带 Cookie。公网、跨 VLAN 与 Docker bridge 不保证发现；始终支持手工连接。当前开关通过配置文件设置，设置页开关尚未接入。
+Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类型 `urn:curated:service:Library:1`，组播 `239.255.255.250:1900`，描述为 `GET /discovery/description.xml`。默认随 LAN 启用；可在主配置或 `library-config.cfg` 设置 `discoveryEnabled: false`，重启 Server 生效。Desktop 本地页可搜索、刷新和选择服务器，按 serverId 合并多网卡结果；每次扫描有界、结果按 120 秒上限过期，身份探测不携带 Cookie。公网、跨 VLAN 与 Docker bridge 不保证发现；始终支持手工连接。开关已接入网络设置页（见后文）。
+
+## Server 与此设备操作边界（2026-09-25）
+
+设置 → 网络提供 SSDP 自动发现开关，`GET/PATCH /api/settings` 的 `discoveryEnabled` 持久化到 library-config.cfg，重启 Server 后应用；只影响发现，不关闭 HTTP。Desktop 关于页显示桌面版本及服务器地址并可更换服务器；更新面板明确属于 Curated Server。客户端目录选择不用于资料库/备份路径。服务器文件管理器与原生播放器接口仅接受无转发头的 loopback 请求；远端返回 403，Desktop 的外部播放器交接入口暂不提供，Web 内置播放不受影响。

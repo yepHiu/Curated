@@ -121,6 +121,8 @@ export interface LibraryService {
   browserPluginEnabled: ComputedRef<boolean>
   setBrowserPluginEnabled(value: boolean): Promise<void>
   refreshBrowserPluginEnabled(): Promise<void>
+  discoveryEnabled: ComputedRef<boolean>
+  setDiscoveryEnabled(value: boolean): Promise<void>
   lanEnabled: ComputedRef<boolean>
   /** 当前进程是否已经绑定非 loopback 地址 */
   lanListening: ComputedRef<boolean>
