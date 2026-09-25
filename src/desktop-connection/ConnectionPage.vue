@@ -224,7 +224,7 @@ onMounted(async () => {
         </section>
         <div class="flex flex-col gap-2">
           <p v-if="updateMessage" role="status" class="max-h-16 overflow-y-auto break-words text-xs text-muted-foreground">{{ updateMessage }}</p>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
             <span class="truncate text-xs text-muted-foreground">Desktop {{ version }}</span>
             <Button variant="ghost" size="sm" class="min-h-11 rounded-full text-xs text-muted-foreground sm:min-h-8" :disabled="updating || !api" @click="checkUpdate"><RefreshCw v-if="updating" class="motion-safe:animate-spin" aria-hidden="true" />{{ updating ? t('updating') : t('update') }}</Button>
           </div>
