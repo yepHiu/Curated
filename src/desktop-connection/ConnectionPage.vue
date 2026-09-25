@@ -137,7 +137,8 @@ onMounted(async () => {
 
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-    <div class="desktop-window-heading mx-auto flex w-full max-w-xl shrink-0 items-center justify-between gap-3 px-5 pb-4 pt-6 sm:px-6" :class="{ 'desktop-window-heading-mac': api?.platform === 'darwin' }">
+    <div v-if="api?.platform === 'darwin'" class="desktop-window-controls h-11 shrink-0" aria-hidden="true" />
+    <div class="desktop-window-heading mx-auto flex w-full max-w-xl shrink-0 items-center justify-between gap-3 px-5 pb-4 sm:px-6" :class="api?.platform === 'darwin' ? 'pt-2' : 'pt-6'">
       <span class="desktop-wordmark text-xl font-semibold tracking-wide text-primary">Curated Desktop</span>
       <Button variant="ghost" size="icon" class="size-11 sm:size-8" :aria-label="resolvedMode === 'dark' ? t('light') : t('dark')" @click="toggleTheme">
         <Sun v-if="resolvedMode === 'dark'" aria-hidden="true" />

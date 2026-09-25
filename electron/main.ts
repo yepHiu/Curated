@@ -54,7 +54,7 @@ function showWindow(): void {
 function showLauncher(): void {
   if (!launcher || launcher.isDestroyed()) {
     launcher = new BrowserWindow({ width: 720, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop",
-      ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 33 } } : {}),
+      ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 16 } } : {}),
       webPreferences: {
       preload: path.join(directory, "launcher-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true,
     } })
