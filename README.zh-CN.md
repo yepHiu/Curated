@@ -29,7 +29,7 @@ Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，
 
 正式 Windows 安装包和便携包发布在 **[GitHub Releases](https://github.com/yepHiu/Curated/releases)**。请使用 [最新 Release](https://github.com/yepHiu/Curated/releases/latest)。
 
-- 漫画库 / 写真库 **Beta**：在「设置 → 资料库 → 漫画库 / 写真库」分别开启，开启后才显示配置。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
+- 漫画库 / 写真库 **Beta**：在「设置 → 资料库 → 漫画库 / 写真库」分别开启，开启后才显示配置。写真库页支持批量收藏、追加标签和删除索引。见 [试用说明](docs/guide.md#comic-and-photo-library-beta)。
 - **安装器（推荐）：** `Curated-Setup-<version>.exe`
 - **便携包：** `Curated-<version>-windows-x64.zip`
 

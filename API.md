@@ -3544,7 +3544,7 @@ Both libraries default off. `GET/PATCH /api/settings` reads/persists independent
 | POST | `/api/import/photos` | Upload ZIP/CBZ to default photo root; Beta required; preserve source; no overwrite; queue photo scan |
 | GET | `/api/library/comics`, `/api/library/photos` | List books |
 | GET | `/api/library/comics/{id}`, `/api/library/photos/{id}` | Book detail |
-| PATCH | `/api/library/photos/{id}` | Photo display title (`title`) and local rating (`ratingSet` / `ratingClear` / `rating` 0–5) |
+| PATCH / DELETE | `/api/library/photos/{id}` | Photo display title (`title`), favorite (`favorite`), local rating (`ratingSet` / `ratingClear` / `rating` 0–5), or index deletion that preserves the source archive |
 | PATCH / DELETE | `/api/library/comics/{id}` | Comic metadata update / delete; `title` writes the display overlay |
 | POST | `/api/library/comics/books/{id}/reveal` | Reveal source archive locally |
 | GET | `/api/library/comics/books/{id}/pages`, `/api/library/photos/books/{id}/pages` | Ordered page metadata |
