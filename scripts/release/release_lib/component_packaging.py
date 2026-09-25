@@ -22,12 +22,14 @@ VARIANTS = ("full", "server", "desktop")
 
 
 def validate_version(version: str) -> str:
+    """Reject nonnumeric versions before inserting values into installer scripts."""
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("A numeric major.minor.patch version is required")
     return version
 
 
 def artifact_name(variant: str, version: str) -> str:
+    """Return the exact component/platform name consumed by component updaters."""
     if variant not in VARIANTS:
         raise ValueError("Unknown package variant")
     return f"Curated-{variant.title()}-Setup-{validate_version(version)}-windows-x64.exe"
@@ -78,6 +80,7 @@ def stage_components(repo: Path, output: Path, version: str, *, server_binary: P
 
 
 def verify_payload(component: str, folder: Path) -> None:
+    """Reject incomplete payloads and resources belonging to the other component."""
     files = [p.relative_to(folder).as_posix().lower() for p in folder.rglob("*") if p.is_file()]
     if component == "server":
         if "curated.exe" not in files or "frontend-dist/index.html" not in files or any("electron" in name or name.endswith("resources.pak") for name in files):
@@ -91,6 +94,7 @@ def verify_payload(component: str, folder: Path) -> None:
 
 def generate_installers(repo: Path, components: dict[str, Path], output: Path, version: str,
                         variant: str = "all") -> list[Path]:
+    """Generate standalone scripts first, then a Full wrapper sharing their identities."""
     validate_version(version)
     if variant not in (*VARIANTS, "all"):
         raise ValueError("Unknown package variant")
@@ -114,6 +118,7 @@ def generate_installers(repo: Path, components: dict[str, Path], output: Path, v
     if variant in ("all", "full"):
         template = (repo / "scripts/release/windows/Full.iss.tpl").read_text(encoding="utf-8")
         for key, value in {"VERSION": version, "OUTPUT": str(output.resolve()), "SETUP_NAME": artifact_name("full", version)[:-4],
+                           "SERVER_APP_ID": COMPONENT_IDS["server"], "DESKTOP_APP_ID": COMPONENT_IDS["desktop"],
                            "SERVER_SETUP": artifact_name("server", version), "DESKTOP_SETUP": artifact_name("desktop", version)}.items():
             template = template.replace(f"__{key}__", value)
         script = output / "Curated-full.iss"
@@ -123,6 +128,7 @@ def generate_installers(repo: Path, components: dict[str, Path], output: Path, v
 
 
 def package_components(*, version: str, components_dir: str, output_dir: str, variant: str = "all") -> dict[str, object]:
+    """Compile staged payloads when Inno is available; never overwrite existing EXEs."""
     repo = get_repo_root()
     output = resolve_release_path(output_dir, repo)
     root = resolve_release_path(components_dir, repo)
@@ -156,6 +162,7 @@ def package_components(*, version: str, components_dir: str, output_dir: str, va
 def publish_components(*, version: str | None = None, build_stamp: str | None = None, output_dir: str = "release",
                        version_file: str = steps.DEFAULT_VERSION_FILE, history_path: str = steps.DEFAULT_HISTORY_CSV,
                        variant: str = "all") -> dict[str, object]:
+    """Allocate one version and build selected local artifacts without publishing them."""
     repo = get_repo_root()
     version_info = steps._resolve_release_version(repo, version, version_file)
     resolved_version = validate_version(str(version_info["version"]))
