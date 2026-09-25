@@ -19,6 +19,11 @@ let attempt: AbortController | undefined
 let quitting = false
 let discoveryScan: AbortController | undefined
 
+// 展示名称不应改变已使用的连接档案和 Electron 会话目录。
+const existingUserData = app.getPath("userData")
+app.setName("Curated")
+app.setPath("userData", existingUserData)
+
 // Desktop owns only its windows and discovery sockets, never Server processes.
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
