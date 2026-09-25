@@ -138,8 +138,8 @@ onMounted(async () => {
   <div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
     <header class="shrink-0 border-b border-border/60 bg-card">
       <div class="mx-auto flex h-16 w-full max-w-xl items-center justify-between gap-3 px-5 sm:px-6">
-        <div class="flex items-baseline gap-2.5">
-          <span class="font-curated text-xl font-semibold tracking-wide text-primary">Curated</span>
+        <div class="desktop-wordmark flex items-baseline gap-2.5">
+          <span class="text-xl font-semibold tracking-wide text-primary">Curated</span>
           <span class="text-xs font-medium text-muted-foreground">Desktop</span>
         </div>
         <Button variant="ghost" size="icon" class="size-11 sm:size-8" :aria-label="resolvedMode === 'dark' ? t('light') : t('dark')" @click="toggleTheme">
