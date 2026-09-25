@@ -318,6 +318,8 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 ### 连接页 UI 修正框架
 
+后续试用调整：按用户要求去除固定顶部栏与底部栏及其背景/分隔线。Outfit 同字号主题色字标、主题切换和版本/更新入口融入居中内容带，随连接卡片一起滚动；这取代下文初版固定头尾布局。
+
 用户要求试用 Outfit：仅连接页顶部「Curated Desktop」字标采用本地打包的 Outfit Variable，正文及 Server Web UI 保持现有字体；这是客户端局部试用，不修改全局 `font-curated` 规范。字体固定为 `@fontsource-variable/outfit` 5.3.0，SIL OFL 许可通过连接页的 `rel=license` 资源一同保留。
 
 用户试用后指出连接页不符合项目规范。本次按独立连接控制面修正：主任务是选择并连接 Server，参考 `LockView` 与 `SettingsMetadataSection`，使用居中内容带、共享 Card/Field/Input/Button、primary 字标及一致的字体/主题初始化。手动连接是唯一主按钮，最近连接与发现按紧凑列表排列，更新降为页脚次级操作；去掉常驻教学说明。补齐搜索中、空列表、连接中/取消、失败、当前连接和窄窗口的局部状态；采用固定头尾和内容内部滚动。只调整本地连接面，不改业务 AppShell、全局令牌或共享基元默认样式。连接页文案独立本地化，避免把 Server 业务页面打入 Desktop。检查真实 Electron 默认窗口及状态交互，不运行未经明确同意的 display-scaling 专项套件。
