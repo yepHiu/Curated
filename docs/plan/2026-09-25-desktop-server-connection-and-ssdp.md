@@ -318,6 +318,8 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 ### 连接页 UI 修正框架
 
+用户要求试用 Outfit：仅连接页顶部「Curated Desktop」字标采用本地打包的 Outfit Variable，正文及 Server Web UI 保持现有字体；这是客户端局部试用，不修改全局 `font-curated` 规范。字体固定为 `@fontsource-variable/outfit` 5.3.0，SIL OFL 许可通过连接页的 `rel=license` 资源一同保留。
+
 用户试用后指出连接页不符合项目规范。本次按独立连接控制面修正：主任务是选择并连接 Server，参考 `LockView` 与 `SettingsMetadataSection`，使用居中内容带、共享 Card/Field/Input/Button、primary 字标及一致的字体/主题初始化。手动连接是唯一主按钮，最近连接与发现按紧凑列表排列，更新降为页脚次级操作；去掉常驻教学说明。补齐搜索中、空列表、连接中/取消、失败、当前连接和窄窗口的局部状态；采用固定头尾和内容内部滚动。只调整本地连接面，不改业务 AppShell、全局令牌或共享基元默认样式。连接页文案独立本地化，避免把 Server 业务页面打入 Desktop。检查真实 Electron 默认窗口及状态交互，不运行未经明确同意的 display-scaling 专项套件。
 
 修正已落地：默认深色/本地主题切换、Noto Sans 与 Noto Sans JP 字体、Card/Field/Alert/Empty/Badge、固定头尾及内部滚动、中英日连接页词典。局域网搜索错误在本区显示，当前连接标记且禁用忘记。词典使用 vue-i18n AST 解释执行，保持连接页 CSP 禁止 unsafe-eval。类型检查、局部 lint、本地页构建、三项连接状态测试通过；macOS Electron 默认 720×740 窗口实看空态和连接失败，表单与页脚无重叠。未完成 Windows/跨 DPR/缩放矩阵。Electron 原生对话框及主进程错误仍只有中文或底层网络错误，未作为本次页面本地化完成项。
