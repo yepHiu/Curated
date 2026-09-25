@@ -106,3 +106,5 @@ icon/       品牌源文件（wordmark / appicon / mark）
 - GPT 5.5
 - GPT 5.6 Terra sol
 - Grok 4.6
+
+Server connection identity: `GET /api/server-info`. See [implementation plan](docs/plan/2026-09-25-desktop-server-connection-and-ssdp.md) for the ongoing Desktop/Server split.

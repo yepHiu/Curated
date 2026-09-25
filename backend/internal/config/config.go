@@ -13,7 +13,10 @@ import (
 
 // Config holds all application configuration merged from config.yaml and library-config.cfg.
 type Config struct {
-	LogLevel string `json:"logLevel"`
+	// ServerID is loaded under the runtime lock, never accepted from user JSON.
+	ServerID   string `json:"-"`
+	ServerName string `json:"serverName,omitempty"`
+	LogLevel   string `json:"logLevel"`
 	// LogDir stores the effective backend log directory. Empty config values are normalized
 	// to the build-specific default (dev: project runtime/logs; release: app-data logs).
 	LogDir string `json:"logDir,omitempty"`

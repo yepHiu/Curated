@@ -443,3 +443,7 @@ The plugin has one name (**Curated Plugin**) and one output directory (**dist**)
 In plugin settings, enable **开发者模式**, enter **默认服务端地址** such as `http://127.0.0.1:8080`, and save. Disabling the switch uses local port 8081 while retaining the custom address for next time. Existing custom addresses remain valid. No wishlist credential field or saved-token lookup is needed.
 
 Load `dist` in Chrome and reload the extension and source website after code changes. If a previous Dev extension was loaded from `dist-dev`, disable that old entry and use the unified directory. Watch logs are under `.workspace/dev-logs/plugin.out.log` and `plugin.err.log`.
+
+## 2026-09-25 Server 连接身份（拆分第一阶段）
+
+`GET /api/server-info` 是无需解锁的最小身份接口，返回 serverId、名称、版本、连接/桌面桥协议版本，不返回资料库路径或凭据。服务启动持有数据库运行锁后，在 `<databasePath>.server-id` 创建稳定安装身份；损坏时启动失败，不静默替换。身份不属于数据库备份，恢复到新安装生成新身份。主运行配置可指定 `serverName`。完整目录复制到第二台机器时，应在停止该副本后移除副本的 `.server-id` 再启动，原安装保持不动。Desktop / SSDP / 三包发行仍按实施计划推进，不能视为已经完成。

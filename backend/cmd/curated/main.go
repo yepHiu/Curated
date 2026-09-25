@@ -26,6 +26,7 @@ import (
 	"curated-backend/internal/maintenance"
 	"curated-backend/internal/processlock"
 	"curated-backend/internal/server"
+	"curated-backend/internal/serveridentity"
 	"curated-backend/internal/shellopen"
 	"curated-backend/internal/storage"
 	"curated-backend/internal/version"
@@ -153,6 +154,13 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 	if err != nil {
 		_ = logger.Sync()
 		return nil, fmt.Errorf("acquire database runtime lock: %w", err)
+	}
+
+	cfg.ServerID, err = serveridentity.LoadOrCreate(cfg.DatabasePath)
+	if err != nil {
+		_ = dataLock.Release()
+		_ = logger.Sync()
+		return nil, fmt.Errorf("initialize server identity: %w", err)
 	}
 
 	startupFields := []zap.Field{

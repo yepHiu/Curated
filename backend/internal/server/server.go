@@ -499,6 +499,7 @@ func (h *Handler) Routes() http.Handler {
 	h.registerWishlistRoutes(mux)
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
+	mux.HandleFunc("GET /api/server-info", h.handleServerInfo)
 	mux.HandleFunc("GET /api/auth/status", h.handleAuthStatus)
 	mux.HandleFunc("POST /api/auth/setup-pin", h.handleSetupPIN)
 	mux.HandleFunc("POST /api/auth/unlock", h.handleUnlockPIN)

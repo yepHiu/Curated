@@ -646,3 +646,7 @@ The frontend preview grid replaces batches instead of accumulating an entire boo
 - `GET/PATCH /api/settings`: `browserPluginEnabled` defaults to false, persists to library-config.cfg and applies immediately. Disabled wishlist intake and identified browser-plugin API requests return `403 BROWSER_PLUGIN_DISABLED`. Token management endpoints have been removed; ordinary API PIN/Origin rules still apply.
 
 Migration 0055 preserves the original source URL separately from scraped metadata; duplicate intake only backfills missing URLs. Details show a site-name link after the metadata provider. Migrations 0053/0054 and `internal/app/wishlist*.go` implement durable enrichment and import reuse. Images persist beside SQLite at assets/wishlist and are included in format-v2 backup. Web routes are `/wishlist` and `/wishlist/:id`; Mock uses separate localStorage. See docs/guide.md#Wishlist and docs/plan/2026-09-22-wishlist.md for setup, verification and live-site acceptance limitations.
+
+## 2026-09-25 Server 连接身份（拆分第一阶段）
+
+`GET /api/server-info` 是无需解锁的最小身份接口，返回 serverId、名称、版本、连接/桌面桥协议版本，不返回资料库路径或凭据。服务启动持有数据库运行锁后，在 `<databasePath>.server-id` 创建稳定安装身份；损坏时启动失败，不静默替换。身份不属于数据库备份，恢复到新安装生成新身份。主运行配置可指定 `serverName`。完整目录复制到第二台机器时，应在停止该副本后移除副本的 `.server-id` 再启动，原安装保持不动。Desktop / SSDP / 三包发行仍按实施计划推进，不能视为已经完成。

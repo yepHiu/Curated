@@ -552,5 +552,6 @@
     <tr><td>验证边界</td><td>本地 Go、前端、浏览器回归和插件合成测试通过。真实站点扩展全链路待验收；人工关联选择 UI、逐图错误展示和通用任务中心投影尚未实现。</td></tr>
   </tbody></table>
   <p>代码入口：backend/internal/app/wishlist*.go、storage/wishlist*.go、server/wishlist_handlers.go、internal/wishlistassets、src/views/Wishlist*.vue。详见 <a href="../plan/2026-09-22-wishlist.md">实施记录</a>及 <a href="../guide.md#wishlist">使用说明</a>。</p>
+<section><h2>Server 连接身份（2026-09-25）</h2><p>已实现 GET /api/server-info 最小公开连接合约，稳定身份保存在数据库旁的 .server-id 文件，不随数据库备份复制。Desktop 解耦、SSDP 与三包发行仍在实施中。</p></section>
 </body>
 </html>

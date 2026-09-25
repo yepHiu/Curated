@@ -109,3 +109,5 @@ When a later large language model takes over work in this repository, add its na
 - GPT 5.5
 - GPT 5.6 Terra sol
 - Grok 4.6
+
+Server connection identity: `GET /api/server-info`. See [implementation plan](docs/plan/2026-09-25-desktop-server-connection-and-ssdp.md) for the ongoing Desktop/Server split.
