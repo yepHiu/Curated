@@ -20,6 +20,7 @@ alwaysApply: true
 ## 根目录政策（阶段 1）
 
 - **主要 tracked 根目录**：`src/`、`backend/`、`docs/`、`scripts/`、`public/`、`icon/`、`.cursor/`
+- **GitHub 跟踪边界（2026-09-25）**：保留全部文档和原型、源码、测试、依赖锁、运行必需字体与许可证；`backend/frontend-dist/`、`.claude/settings.local.json`、`.agents/` 只留本机。CI 用 `git ls-files -ci --exclude-standard` 拦截被忽略却仍被跟踪的文件；取消跟踪用 `git rm --cached` 保留本地副本，不清除历史提交。详见 `docs/guide.md` 的 Repository tracking policy。
 - **固定保留在根目录的本地目录**：
   - `videos_test/`：测试素材目录，保留原位，不纳入目录重排
   - `config/`：资料库级运行配置目录，暂时继续保留在 repo root，不并入 `backend/internal/config`

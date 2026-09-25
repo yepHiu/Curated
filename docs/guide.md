@@ -6,6 +6,14 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## Repository tracking policy
+
+Git tracks application source, tests, dependency locks, CI/release scripts, required fonts and licenses, shared project rules, and **all documentation and prototypes**. Build output, runtime data, machine-specific configuration and optional local tools stay on the developer's machine. In particular, `backend/frontend-dist/`, `.claude/settings.local.json` and `.agents/` are not part of a fresh checkout. Build the frontend from source when needed; release packaging assembles its own frontend output.
+
+`.gitignore` also excludes local frontend/FFmpeg staging, coverage and Playwright reports, and scratch exports under `output/`. Existing release installers and portable archives remain local and must not be deleted during repository cleanup. CI rejects files that are both tracked and ignored; check with `git ls-files -ci --exclude-standard` (expected: no output). To stop tracking an existing local artifact, use `git rm --cached -- <file>` (or `-r` for a directory); this preserves the current local copy.
+
+This policy changes future commits, not Git history or existing GitHub uploads. Historical blobs remain until a separately agreed history cleanup. The [repository cleanup record](plan/2026-04-24-repository-structure-improvement-plan.zh-CN.md#2026-09-25github-跟踪范围精简) records the applied scope.
+
 ---
 
 ## 1. Product

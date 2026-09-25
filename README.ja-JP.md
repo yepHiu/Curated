@@ -88,6 +88,8 @@ docs/       ハンドブック、規範、製品、運用、計画、PRD
 icon/       ブランド原資料（wordmark / appicon / mark）
 ```
 
+ソース、テスト、必要な素材、すべての文書とプロトタイプを Git に保持し、ローカル生成物は[リポジトリ管理方針](docs/guide.md#repository-tracking-policy)に従います。
+
 ## 注意
 
 - 現在の段階は Web 優先 + 最小 Electron シェルです。より深い IPC、mpv、広範なネイティブ橋渡しは今後の目標です。

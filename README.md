@@ -87,6 +87,8 @@ docs/       Handbook, reference, product, ops, plan, PRD
 icon/       Brand source assets (wordmark / appicon / mark)
 ```
 
+Source, tests, required assets, and all documentation/prototypes remain in Git; local artifacts follow the [repository tracking policy](docs/guide.md#repository-tracking-policy).
+
 ## Notes
 
 - Comic/photo browsing uses adaptive, lazy page previews with full-book page navigation; photos have bounded cached thumbnails, editable tags, and library batch management. See [the guide](docs/guide.md#漫画与写真浏览2026-09-11).

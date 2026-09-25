@@ -1,5 +1,11 @@
 # Repository Structure Improvement Plan
 
+Status: proposed (the original restructuring proposal; the tracking cleanup below is a separate applied scope).
+
+## 2026-09-25: GitHub tracking cleanup
+
+All documentation and prototypes remain tracked, as explicitly requested. Only 54 already-ignored local files were removed from the Git index: 50 old `backend/frontend-dist/` build files, `.claude/settings.local.json`, and three optional `.agents/` tool files (1,472,985 bytes total). Local copies and release packages remain intact. Required application fonts, licenses, source, tests and shared project rules remain tracked. Ignore rules now cover local frontend/FFmpeg staging, scratch exports and generated reports; CI rejects tracked files matching ignore rules. See the [tracking policy](../guide.md#repository-tracking-policy) and [detailed cleanup record](2026-04-24-repository-structure-improvement-plan.zh-CN.md#2026-09-25github-跟踪范围精简). This does not rewrite history or push changes. The remaining restructuring phases below have not been approved by this cleanup.
+
 > Scope: repository directory layout review for `Curated` (`jav-shadcn` repo). This document focuses on structure, discoverability, and maintenance cost. It does not require immediate code moves unless explicitly scheduled.
 
 ## 1. Current Snapshot
