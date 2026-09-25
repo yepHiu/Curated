@@ -1,12 +1,12 @@
 # Desktop / Server 拆分、连接管理与 SSDP：需求及实施计划
 
-状态：产品边界已讨论明确；实施计划待审阅，未实施。日期：2026-09-25。第 1–9 节记录需求与设计边界，第 10 节为可执行的分阶段实施计划。
+状态：已开始实施，核心连接链路可运行；三包安装、旧版迁移与正式发布验收尚未完成。日期：2026-09-25。第 1–9 节保留需求讨论及实施前调查，第 10 节为分阶段目标，第 11 节记录实际实现、验证和剩余工作；判断当前状态以第 11 节为准。
 
 ## 1. 需求与当前事实
 
-用户希望桌面端能够独立连接其他机器上的 Curated 服务端：首次未连接时填写地址和端口，之后能够更换服务器，并增加 SSDP 自动发现。本轮仅讨论需求。
+用户希望桌面端能够独立连接其他机器上的 Curated 服务端：首次未连接时填写地址和端口，之后能够更换服务器，并增加 SSDP 自动发现。以下为开始实施前的调查快照。
 
-代码核对：
+实施前代码核对（不是当前实现）：
 
 - `electron/main.ts` 先等待 `startBackend()`，成功后才创建主窗口；启动失败会退出，因此目前没有独立于后端的连接入口。
 - `electron/backend-process.ts` 支持 `CURATED_ELECTRON_BACKEND_URL` / `CURATED_BACKEND_URL`，生产默认 `http://127.0.0.1:8081`。健康探测失败后仍会启动本机 Go 进程，这条流程不适合直接承担远程连接模式。
@@ -25,7 +25,7 @@
 
 Desktop 作为独立客户端发行，不携带 Go 服务端、服务端数据库或 FFmpeg 转码运行时。Server 发行物包含后端与 Web UI；完整包组合 Server 和 Desktop 两个独立组件，默认同时安装。服务端独立部署衔接既有容器部署规划，NAS/无桌面容器使用纯 Server 形态，不要求安装 Desktop。
 
-首次启动展示本地连接页，包含已知本机 Server（如有）、局域网发现结果及手动连接。没有本机 Server 时仍正常进入连接页，不自动安装或启动服务端。手动入口接受主机/IP 与端口，并支持完整 HTTP/HTTPS URL；生产默认端口可提示 8081，不硬编码为唯一端口。反向代理子路径支持需要单独决定，当前 URL 归一化会丢弃路径。
+首次启动展示本地连接页，包含已知本机 Server（如有）、局域网发现结果及手动连接。没有本机 Server 时仍正常进入连接页，不自动安装或启动服务端。手动入口接受主机/IP 与端口，并支持完整 HTTP/HTTPS URL；生产默认端口可提示 8081，不硬编码为唯一端口。当前实现明确拒绝反向代理子路径，不静默丢弃路径；子路径支持另列后续。
 
 选择服务器后依次检查可达性、Curated 身份、版本/能力及认证要求；需要 PIN 时进入已有解锁流程。成功后记住连接。发现一台服务器也不自动选择或自动信任。
 
@@ -54,7 +54,7 @@ SSDP 仅用于发现可连接的 Curated 服务，业务流量继续使用 HTTP/
 
 ## 5. 当前选定的架构方向
 
-用户明确倾向“Desktop 连接后加载服务器提供的 Web 界面”，后续讨论以“本地连接页 + 服务端 Web UI”为当前方向，尚未实施。这与现有生产架构接近，业务 API、图片、视频、SSE 继续同源，可以减少客户端与服务端前端版本错配。
+用户明确倾向“Desktop 连接后加载服务器提供的 Web 界面”，采用“本地连接页 + 服务端 Web UI”。该方向已经实现并完成本机真实链路验证，详见第 11 节。业务 API、图片、视频、SSE 继续同源，可以减少客户端与服务端前端版本错配。
 
 本地连接页及更换入口必须由安装包提供，不能依赖任何服务端响应。将其拥有的连接管理 IPC 与远程内容可用的桥接能力隔离，校验调用来源与导航/重定向。远程网页不应获得任意本机文件或进程能力；不能为跨域关闭 Electron 安全机制。服务端版本与桌面桥接版本仍需能力协商。
 
@@ -140,9 +140,9 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 旧版一体包迁移需要单独设计：保留数据库、媒体路径、配置、会话及现有连接体验，调整快捷方式与进程管理，不在本轮直接实施迁移或重命名。
 
-本次仅维护需求讨论文档，没有修改业务代码、运行配置或已实现架构说明，也没有执行构建与测试。
+以上为需求讨论记录；用户随后要求创建 worktree 并开始实施，执行结果见第 11 节。
 
-## 10. 实施计划（待审阅）
+## 10. 实施计划（已启动，验收目标保留）
 
 ### 10.1 本轮实施目标与范围
 
@@ -300,7 +300,7 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 验证沿用 `docs/ops/2026-04-08-agent-build-and-test.md`：开发中运行对应 Electron/Vitest/Go 包测试；阶段集成完成后执行根目录 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm test:electron`、`pnpm test:e2e`，`backend/` 下 `go test ./...` 与 `go vet ./...`；发布脚本执行 `python -m unittest scripts.release.tests.test_build_steps`，有其他脚本改动时按 CI 范围补测。生产 Web API 前端和 Electron 分别构建验证；新增本地连接页纳入独立构建及包内容检查，不改变原 Web 体积统计口径来掩盖增长。
 
-真实 Electron、Windows 安装/卸载、两机组播、媒体播放与旧版升级属于必需人工/集成验收，不能以单测通过代替。无需为本计划运行构建或测试，不运行 display-scaling 专项套件。
+真实 Electron、Windows 安装/卸载、两机组播、媒体播放与旧版升级属于必需人工/集成验收，不能以单测通过代替。实际实施已执行下述常规检查，不运行 display-scaling 专项套件。
 
 实施新增端点/配置/架构后同步 `.cursor/rules/project-facts.mdc`、`architecture-boundaries.mdc`、必要的 `workspace-quick-reference.mdc`、README 短入口及对应语言版本、`docs/guide.md`、`CLAUDE.md` API 列表和 `docs/reference/architecture-and-implementation.html`；新增 library-config 键时同步 `docs/reference/2026-03-21-library-organize.md`。本计划仅记录目标，不提前把这些事实文档改成“已实现”。
 
@@ -312,4 +312,55 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 - Windows Server 首期是否接受现有“当前用户托盘 + 登录启动”；若要求未登录常驻，则系统服务及账户迁移必须进入本期。
 - 网络范围是否先验收同机/LAN；异地 HTTPS 地址可手动输入，但公网部署能力不在本轮自动承诺。
 
-当前计划按上述较小范围的建议编排；在开始实施前根据用户反馈调整，不据此假定额外产品需求已获确认。
+当前实现沿用既有 Windows x64 发行链、用户托盘运行和同机/LAN 验收范围；这不代表已经补齐其他平台安装器、无人登录系统服务或公网部署能力。
+
+## 11. 实施记录（2026-09-25）
+
+### 11.1 工作区与里程碑状态
+
+- worktree：`/Users/wujiahui/.codex/worktrees/48a9/Curated`。
+- 分支：`codex/desktop-server-split`；原工作目录未用于本次实施。
+- 修改按行为切片提交，未 push、上传安装包或发布 Release；原有安装包及无关工作区修改保留。
+
+| 节点 | 当前结果 | 未通过的验收 |
+|---|---|---|
+| M1：身份、独立运行、手动连接 | 已实现；真实 Electron 加载独立 Go Server 的生产 Web 页面，桥接与设置读取正常；退出 Desktop 后 Server 仍可访问 | 干净 Windows Desktop-only 安装及完整 A/B 认证、断网恢复矩阵尚未实测 |
+| M2：操作归属与 SSDP | 代码已实现；协议解析、候选校验、开关持久化、远端宿主操作限制已有测试 | 真实两机组播、多网卡/防火墙、远程媒体/HLS/上传与任务矩阵尚未实测 |
+| M3：组件构建、更新、迁移 | 已实现两个 payload、三种安装模板、组件包精确选择和本机地址提示；Windows Server 交叉编译通过 | 未生成并验收 Windows 三包 EXE；旧一体包自动迁移与新旧更新源隔离尚未实现，不能发布 |
+
+### 11.2 已交付的行为
+
+1. Server 安装身份持久化在 `<databasePath>.server-id`，不进入数据库备份；提供不含目录/凭据的公开 `/api/server-info`。身份损坏会明确失败，不静默创建新身份。
+2. Desktop 先打开随包连接页，支持 HTTP/HTTPS 根地址、自定义端口、最近连接、自动重连、取消、忘记和菜单更换；业务页加载成功后才保存。身份改变需确认，Cookie/cache/localStorage 按地址和身份隔离。客户端构建及生产包不含 Go/FFmpeg，生命周期不管理 Server。
+3. 本地连接管理与远程业务桥分离；IPC 校验窗口、顶层 frame 与来源。业务窗口 sandbox/contextIsolation 开启、Node 关闭，跨来源导航受限。资料库与备份目录按 Server 路径输入，远程宿主文件管理器/原生播放请求返回 403；Desktop 原生播放器入口暂禁用。
+4. Server 在 LAN 和发现开关启用后发布 IPv4 SSDP；Desktop 有界扫描并用 server-info 验证候选，按 ID 去重、按期限清理。网络设置支持 `discoveryEnabled`，重启 Server 后生效；手动连接不依赖发现。描述 XML 已提供；当前客户端直接验证 server-info，不额外解析 XML。
+5. Full 使用与独立安装包相同的组件安装器和固定身份，默认安装两者；程序安装与资料库目录分离。Full 启动组件读取登记的实际安装路径，兼容已有自定义目录。Desktop 不覆盖已有连接记录，仅对首次连接提供本机 Server 地址建议。
+6. Server 更新只选精确命名的 Server 包，并拒绝旧整包/Desktop 缓存；Desktop 本地页只打开匹配的官方 Desktop 下载地址。构建 manifest 标记组件、平台、架构、版本和 SHA-256。没有 Inno 编译器时返回 `scripts-only`，不会报告 EXE 已完成。
+
+### 11.3 验证证据与限制
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm typecheck`、`pnpm lint` | 最终复核通过 |
+| 前端 Vitest | 282 个文件、1385 项通过；后续关于/网络/更新/i18n 相关测试 30 项通过，播放器加载测试 16 项单独通过 |
+| Electron 单元测试 | 7 个文件、38 项通过 |
+| 浏览器运行时 E2E | 5 项通过；未运行 display-scaling 套件 |
+| Web API 生产构建、Electron/本地页构建 | 通过 |
+| `backend/` 下 `go test ./...`、`go vet ./...` | 最终全量通过；早期一次异步漫画测试临时目录清理失败，最终全量重跑通过 |
+| 组件打包/构建/版本/历史 Python 测试 | 最终 19 项通过，包括 Full 复用安装身份及登记路径 |
+| Windows Go release 交叉编译 | `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags release ... ./cmd/curated` 通过；不等价于 Windows 运行验收 |
+| 真实 Electron 与独立 Go Server | 临时数据库 + 已构建 Web UI：身份、页面、设置、桥接、更换入口和退出 Desktop 后 Server 存活通过；临时 Server 已停止 |
+
+本机工具适配：Node 25 通过 `/opt/homebrew/bin` 运行仓库 native TS 配置；前端测试设置 `NODE_OPTIONS=--no-experimental-webstorage`，避免实验性 Node localStorage 干扰 jsdom。Python 使用 `/opt/homebrew/bin/python3`，未为旧版系统工具改业务代码。
+
+日志与截图保留在忽略目录 `.workspace/`：`go-final.log`、`go-vet-final.log`、`typecheck-final.log`、`lint-final.log`、`frontend-tests.log`、`e2e.log`、`release-final.log`、`desktop-real-server.png` 与 `desktop-real-launcher.png`。真实连接测试使用独立临时数据和 Electron userData，没有访问原资料库。
+
+### 11.4 剩余工作与明确边界
+
+1. **发布阻断：旧更新源隔离。** 新版仍读取现有 GitHub latest Release，旧客户端会猜选第一个 EXE。必须先实现并验证旧 feed 保留兼容资产、新组件 feed 独立的发布路径；当前 manifest 警示和精确包选择不能替代它。三包不得直接发布到旧 latest feed。
+2. **发布阻断：旧一体包迁移。** 当前安装器发现旧 AppId 会阻止安装；尚无自动备份、停止旧托管链、迁移自启/快捷方式与卸载注册的完整流程。需在 Windows 测试数据上实现并演练，不能把阻止覆盖描述为迁移完成。
+3. **Windows 三包验收。** 当前 macOS 环境没有 Inno Setup/Windows 实机，未生成可交付的三包 EXE。需覆盖干净安装、独立包转 Full、自定义目录、已有更高版本、部分失败、运行中升级、分别卸载及数据保留。
+4. **真实两机验收。** 补齐 SSDP 多播、防火墙、同名/多网卡/地址变化及手动兜底；同时验证远端认证、媒体/HLS、上传、SSE 和切换后隔离。当前真实链路使用本机独立进程，不能替代这项验收。
+5. **体验与恢复仍需补齐。** 连接页及 Electron 原生提示目前只有中文；业务设置新增文案已有中英日。当前恢复覆盖页面加载失败/渲染崩溃与始终可用的更换菜单，尚无持续连接心跳和断线状态提示。Desktop 独立开机启动设置未新增，Server 保留当前用户托盘/登录启动，未实现系统服务。
+
+已提交切片：`be714bc5`（身份）、`9469d004`（Desktop）、`1c59d6e8`（SSDP）、`99243dcc`（设置与操作边界）、`e5ef1087`（组件构建/更新）、`fa3de08a`（安装后启动路径）。计划初始提交为 `4e65f450`。当前适合继续开发验证，不能作为 M3 完成或生产发布依据。

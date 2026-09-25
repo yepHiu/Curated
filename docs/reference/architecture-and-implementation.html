@@ -302,9 +302,9 @@
   </figure>
 
   <h2 id="overview">1. 总览</h2>
-  <p><strong>Curated</strong> 是<strong>本地优先的影片资料库</strong>：<strong>Vue 3 + TypeScript + Vite</strong> 作为 Web 前端，<strong>Go</strong> 守护进程（<code>curated-backend</code>，入口 <code>cmd/curated</code>）提供 HTTP API、SQLite 持久化、目录扫描、Metatube 刮削、资源缓存与库路径存储在线检测。当前仍以浏览器 + 本地后端为主，同时已有 <code>electron/</code> 最小桌面壳层：Electron 主进程启动或复用 Go HTTP 后端，等待 <code>/api/health</code> 后在开发态启动或复用 <code>http://127.0.0.1:5173</code> 的 Vite 前端并加载 Web UI；打包态仍加载后端静态托管的 <code>http://127.0.0.1:8081</code>；Electron 对后端请求注入 <code>X-Curated-Client: desktop-electron</code>、版本 header 与桌面 OS header，使后端可在已连接客户端中显示 <code>Curated Desktop</code> 而不是普通 Chrome，并能显示 Windows 11 而不是 Chromium 兼容 UA 中的 <code>Windows NT 10.0</code>；关闭窗口时隐藏到托盘，使后端与 Web 入口继续运行；preload 只暴露 <code>window.javLibrary.pickDirectory()</code>，用于原生目录选择，不承载业务 API。</p>
-  <p>生产安装包的默认入口已经切换为 Electron：顶层 <code>Curated.exe</code> 是 Electron 桌面壳，Go release 后端位于 <code>resources/app/curated.exe</code>，Electron 以 <code>-mode http</code> 启动自己拥有的后端并加载 <code>http://127.0.0.1:8081</code>。BrowserWindow 的入口 URL 带当前应用版本查询参数；后端对 <code>index.html</code> 与 SPA fallback 返回 <code>no-store</code>，对带哈希的 <code>/assets/*</code> 返回 immutable 长缓存；installer 覆盖升级前删除安装目录内受管理的新旧 <code>frontend-dist</code>，三者共同避免旧 Electron 缓存跨版本继续加载。开发与 release 后端默认都只绑定 loopback；设置页「网络」可把 <code>lanEnabled: true</code> 写入 <code>library-config.cfg</code>（不要求 PIN），完全退出后重新打开会把同端口改绑到 <code>0.0.0.0</code>。主运行时 JSON 的非 loopback <code>httpAddr</code> 仍必须显式设置 <code>lanEnabled: true</code>，否则拒绝启动 HTTP 服务。Host / CORS 校验跟当前真实监听走，保存偏好但尚未改绑时不放宽私网 Host。窗口关闭默认隐藏到托盘，只有托盘退出或系统级 quit 才会停止 Electron 自己 spawn 的后端；attach 到已有后端时不停止该进程。</p>
-  <p>桌面包的前端资源已按离线运行约束打包：中文采用随包提供的 HarmonyOS Sans SC 原始字体，英文采用 Noto Sans，日语采用 Noto Sans JP；<code>html lang</code> 决定中日字形优先顺序。浏览器缺少原生 HLS 时按需动态导入官方 npm 轻量构建 <code>hls.js/light</code>。当前后端输出单一的本地 rendition，前端只依赖 light build 保留的 MSE、XHR、事件与 level API，不需要完整版额外的字幕、EME/DRM、alternate audio 或 CMCD 控制器；运行时不依赖 Google Fonts 或 CDN script。</p>
+  <p><strong>Curated</strong> 是本地优先的资料库：Vue 3 + TypeScript + Vite 提供 Web UI，Go Server 提供 HTTP API、SQLite、扫描、刮削与转码。Electron Desktop 是独立客户端，先打开随包连接页，通过手动地址或 SSDP 选择 Server，再加载该 Server 的 Web UI。客户端不启动或停止 Go/Vite；退出 Desktop 不影响 Server。连接会话按地址和安装身份隔离；远端桥 <code>window.curatedDesktop</code> 仅提供版本、当前连接和更换入口，不提供本机目录或进程能力。</p>
+  <p>拆分构建包含 Full、Server-only、Desktop-only 三种安装模板。Server 包持有 Go、Web UI 和 FFmpeg，Desktop 包持有 Electron 与连接页；Full 复用两个独立安装器，默认同时安装。旧 <code>resources/app/curated.exe</code> 是历史一体包布局。Windows 安装验收、旧包迁移和更新源隔离尚未完成，当前不具备正式发布条件。Server 默认 loopback，LAN 与 SSDP 开关由服务端配置持久化，修改后重启 Server；Host/CORS 仍按实际监听校验。入口 no-store 和哈希资源 immutable 缓存策略保留。</p>
+  <p>Server 业务前端资源随包提供，Desktop 加载该页面：中文采用随包提供的 HarmonyOS Sans SC 原始字体，英文采用 Noto Sans，日语采用 Noto Sans JP；<code>html lang</code> 决定中日字形优先顺序。浏览器缺少原生 HLS 时按需动态导入官方 npm 轻量构建 <code>hls.js/light</code>。当前后端输出单一的本地 rendition，前端只依赖 light build 保留的 MSE、XHR、事件与 level API，不需要完整版额外的字幕、EME/DRM、alternate audio 或 CMCD 控制器；运行时不依赖 Google Fonts 或 CDN script。</p>
   <div class="flow">
     <span>浏览器</span> → <span>直连 Go :8080（loopback 开发）或 Vite <code>/api</code> 代理</span> → <span>SQLite + 文件系统</span>
   </div>
@@ -553,7 +553,7 @@
   </tbody></table>
   <p>代码入口：backend/internal/app/wishlist*.go、storage/wishlist*.go、server/wishlist_handlers.go、internal/wishlistassets、src/views/Wishlist*.vue。详见 <a href="../plan/2026-09-22-wishlist.md">实施记录</a>及 <a href="../guide.md#wishlist">使用说明</a>。</p>
 <section><h2>Server 连接身份（2026-09-25）</h2><p>已实现 GET /api/server-info 最小公开连接合约，稳定身份保存在数据库旁的 .server-id 文件，不随数据库备份复制。Desktop 解耦、SSDP 与三包发行仍在实施中。</p></section>
-<section><h2>Desktop 客户端启动（2026-09-25）</h2><p>已实现本地连接页、手动连接、切换与按服务器隔离会话。客户端不启动或结束 Go 进程，Server 独立运行。SSDP、安装包与迁移仍在实施中。</p></section>
+<section><h2>Desktop 客户端启动（2026-09-25）</h2><p>已实现本地连接页、手动连接、切换与按服务器隔离会话。客户端不启动或结束 Go 进程，Server 独立运行；本机真实 Electron/Go 链路验证通过。SSDP 和三包构建代码已实现；真实两机、Windows 安装和旧版迁移仍待完成，详见实施计划第 11 节。</p></section>
 <section><h2>SSDP（2026-09-25）</h2><p>已接入 Go IPv4 公告和 Desktop 有界搜索。LAN 监听与 discoveryEnabled 控制，真实两机/防火墙验收待执行；手工连接始终可用。</p></section>
 <section><h2>设置与远程操作边界</h2><p>网络页已接入 discoveryEnabled，保存后重启 Server 应用；关于页提供 Desktop 版本及更换入口。服务器目录与客户端文件选择分离，host-only 程序操作拒绝远程调用。</p></section>
 <section><h2>组件发行（2026-09-25）</h2><p>已接入 full/server/desktop 组件组装、安装脚本和精确组件更新选择。Windows EXE 编译及安装验收、旧版自动迁移和 feed 隔离发布尚未完成，当前不是可发布版本。</p></section>

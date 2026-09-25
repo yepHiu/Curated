@@ -209,7 +209,7 @@ The complete shipped/target catalog is [docs/features/2026-05-03-feature-invento
 | Curated frames | Queued captures with preview/retry/undo, source-file frames, cursor browsing, JPG/WebP/PNG/ZIP export and GIF/MP4/WebM motion |
 | Homepage / insights | Daily recommendations with reason codes and local feedback; Personal Insights ranges and actor/studio/tag breakdowns |
 | Security | Optional PIN App Lock, HTTP-only sessions, trusted-forever devices, idle lock, Settings LAN access toggle |
-| Desktop | Electron tray shell, Windows installer/portable, FFmpeg bundle, GitHub update check |
+| Desktop | Client-only Electron shell, bundled connection page, manual/SSDP server selection, isolated sessions; independent Server supplies Web UI and FFmpeg |
 
 On the homepage, scroll to the end of the recent, recommendation, and continue-watching sections, then keep scrolling down to open the Movies library. The library slides up over the homepage and starts at the top; the sidebar selection follows the Movies route. The “Continue to Movies” button at the bottom provides the same action for touch and keyboard use. The former Taste Radar section is no longer shown.
 
@@ -278,15 +278,15 @@ Root-directory policy:
 
 ## 8. Release and packaging
 
-Official Windows installer and portable packages are published on [GitHub Releases](https://github.com/yepHiu/Curated/releases). Prefer the [latest release](https://github.com/yepHiu/Curated/releases/latest): `Curated-Setup-<version>.exe` for normal installs, `Curated-<version>-windows-x64.zip` for a portable copy. Installed apps can check and download a newer installer from Settings → About & updates.
+Previously published Windows packages on [GitHub Releases](https://github.com/yepHiu/Curated/releases) use the combined layout: `Curated-Setup-<version>.exe` and `Curated-<version>-windows-x64.zip`. This branch implements independent Server/Desktop components. Its three-package build is not yet release-ready: Windows installation, legacy migration, and update-feed isolation remain pending. See [the implementation record](plan/2026-09-25-desktop-server-connection-and-ssdp.md#11-实施记录2026-09-25).
 
-Recommended packaging entry:
+Local component build entry (does not upload a release):
 
 ```powershell
 pnpm release:publish
 ```
 
-Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
+Production versioning is owned by `scripts/release/version.json`. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The component flow stages Server and Desktop separately, then generates Full, Server-only and Desktop-only installers. Server owns Go, the business Web UI and FFmpeg; Desktop owns Electron and the connection page. Missing Inno Setup produces scripts only, not EXEs. The old `resources/app/curated.exe` layout belongs to historic combined packages; do not use the legacy low-level installer/portable commands to release this branch.
 
 The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About & updates → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
 
@@ -450,7 +450,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 
 ## Desktop 连接管理（2026-09-25，实施中）
 
-`pnpm build:electron` 构建 Electron 与独立本地连接页，`pnpm dev:electron` 只运行客户端。需要单独运行提供 Web UI 的 Server；开发时可先构建 Web API 前端并由 Go 静态托管。Desktop 支持 HTTP/HTTPS 根地址、端口、最近连接、重连与菜单更换入口；不启动或停止 Server。地址与安装身份共同隔离 Electron 会话；服务器路径手动输入，不调用客户端目录选择。旧版 Server 可经 health 识别后受限手动连接。三种发布包、SSDP 和旧版迁移仍在实施，现阶段不应发布旧的一体包链路。
+`pnpm build:electron` 构建 Electron 与独立本地连接页，`pnpm dev:electron` 只运行客户端。需要单独运行提供 Web UI 的 Server；开发时可先构建 Web API 前端并由 Go 静态托管。Desktop 支持 HTTP/HTTPS 根地址、端口、最近连接、重连与菜单更换入口；不启动或停止 Server。地址与安装身份共同隔离 Electron 会话；服务器路径手动输入，不调用客户端目录选择。旧版 Server 可经 health 识别后受限手动连接。SSDP 与三包构建代码已实现，真实两机和 Windows 安装验收、旧版迁移仍未完成，现阶段不应发布旧的一体包链路。
 
 ## SSDP 发现（2026-09-25，待真实两机验收）
 

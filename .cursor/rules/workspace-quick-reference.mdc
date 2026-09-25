@@ -11,7 +11,7 @@ alwaysApply: true
 - **前端启动**：仓库根目录运行 `pnpm dev`，默认 `http://localhost:5173`。
 - **后端启动**：`cd backend && go run ./cmd/curated`，开发默认地址 `127.0.0.1:8080`（仅 loopback），健康名 `curated-dev`。
 - **开发态 Windows 后端二进制**：`pnpm backend:build:dev`，产物必须是 `backend/runtime/curated-dev.exe`，不要生成开发态 `curated.exe`。
-- **Electron Desktop（拆分实施中）**：`pnpm build:electron` 仅构建 Electron 和本地连接页；`pnpm dev:electron` 启动客户端，不再构建/启动 Go 或 Vite。单独运行 Server，Desktop 填写其地址后加载服务端 Web UI。退出 Desktop 不停止 Server。新桥接为 `window.curatedDesktop`，不提供服务端目录的本机选择。发布安装器仍在下一阶段拆分。
+- **Electron Desktop（拆分实施中）**：`pnpm build:electron` 仅构建 Electron 和本地连接页；`pnpm dev:electron` 启动客户端，不再构建/启动 Go 或 Vite。单独运行 Server，Desktop 填写其地址后加载服务端 Web UI。退出 Desktop 不停止 Server。新桥接为 `window.curatedDesktop`，不提供服务端目录的本机选择。三包构建脚本已落地，Windows 安装与旧版迁移尚未验收。
 - **release 构建默认地址**：`-tags release` 时默认 `127.0.0.1:8081`（仅 loopback），健康名 `curated`。设置页「网络」可把 `lanEnabled` 写入 `library-config.cfg`（不要求 PIN）；完全退出后重新打开会把同端口改绑到 `0.0.0.0`。主运行时 JSON 的非 loopback `httpAddr` 仍必须 `lanEnabled: true`，否则拒绝启动 HTTP 服务。
 - **Mock / Web API 切换**：根目录 `.env` 设置 `VITE_USE_WEB_API=true` 时走真实 API；否则走 Mock。
 - **Vite 代理 / 直连后端**：`vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`（长上传关闭 proxy 超时）；仅本地 loopback Web API 开发态下，`src/api/http-client.ts` 和播放器媒体流会直连开发后端 `:8080`，避免大文件上传/大视频流经过 Vite proxy；release `:8081` 静态托管继续走同源 `/api`。
@@ -29,7 +29,7 @@ alwaysApply: true
 - **新的本地临时目录优先放到**：`.workspace/`
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
-- **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
+- **release 构建现状**：`pnpm release:publish` 默认执行 `component_packaging.py` 的三包本地构建，输出到独立 `release/components-<version>-<stamp>/`，不上传 Release。Server 包含 Web/Go/真实 FFmpeg，Desktop 包含 Electron/本地连接页；缺 Inno 只生成安装脚本。旧 `release/Curated/` 一体组装链仅保留为历史低层入口，不适用于当前拆分版本。Go 构建缓存使用仓库外目录，FFmpeg 仍拒绝 Scoop shim。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## 配置与持久化
@@ -45,6 +45,7 @@ alwaysApply: true
   - `launchAtLogin`
   - `browserPluginEnabled`（设置 → 网络与设备 → 浏览器插件联动，默认关闭，保存立即生效，无需凭证）
   - `lanEnabled`（设置 → 网络与设备；不要求 PIN，改监听要完全退出）
+  - `discoveryEnabled`（SSDP 自动发现，随 LAN 默认启用；修改后重启 Server）
   - `backupDirectory`
   - `proxy`
   - `aiProvider` / `aiGovernance`（正式 Settings → AI；缺省禁用，治理经 `/api/ai/settings` 保存）
