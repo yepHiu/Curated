@@ -318,6 +318,8 @@ Web 前端与 Server 不是同一个技术组件，但作为同一发行物交�
 
 ### 连接页 UI 修正框架
 
+macOS 窗口集成：按用户要求，连接窗口采用原生 `titleBarStyle: hidden` 和红黄绿按钮定位，去掉独立系统标题栏。按钮与 Outfit 字标处于同一无边框背景，字标区域可拖动、主题按钮排除拖动；窄窗口预留按钮空间。顶部字标行固定以避开原生按钮，列表内容继续内部滚动。Windows/Linux 和远端业务窗口的原生标题栏保持原行为。
+
 后续试用调整：按用户要求去除固定顶部栏与底部栏及其背景/分隔线。Outfit 同字号主题色字标、主题切换和版本/更新入口融入居中内容带，随连接卡片一起滚动；这取代下文初版固定头尾布局。
 
 用户要求试用 Outfit：仅连接页顶部「Curated Desktop」字标采用本地打包的 Outfit Variable，正文及 Server Web UI 保持现有字体；这是客户端局部试用，不修改全局 `font-curated` 规范。字体固定为 `@fontsource-variable/outfit` 5.3.0，SIL OFL 许可通过连接页的 `rel=license` 资源一同保留。
