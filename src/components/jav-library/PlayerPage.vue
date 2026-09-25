@@ -3262,7 +3262,7 @@ const videoPreloadMode = computed(() =>
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
       >
         <div class="flex w-full flex-col gap-4">
-          <div class="flex items-center justify-between gap-3 text-sm text-white/70">
+          <div class="relative top-2.5 flex items-center justify-between gap-3 text-sm text-white/70">
             <span>{{ formatClock(displayedCurrentTimeSec) }}</span>
             <span>{{ totalDurationSec > 0 ? formatClock(totalDurationSec) : "\u2014" }}</span>
           </div>
