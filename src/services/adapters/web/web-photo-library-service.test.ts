@@ -12,6 +12,7 @@ const photoApiMocks = vi.hoisted(() => ({
   getPhoto: vi.fn(),
   replacePhotoTags: vi.fn(),
   patchPhoto: vi.fn(),
+  deletePhoto: vi.fn(),
   getPhotoComment: vi.fn(),
   putPhotoComment: vi.fn(),
   importPhotos: vi.fn(),
@@ -106,6 +107,19 @@ beforeEach(() => {
 })
 
 describe("webPhotoLibraryService", () => {
+  it("updates favorites and removes only the deleted photo from the cache", async () => {
+    const { webPhotoLibraryService: service } = await import("./web-photo-library-service")
+    photoApiMocks.listPhotos.mockResolvedValueOnce({ items: [photoListItem("photo-1"), photoListItem("photo-2")], total: 2, limit: 500, offset: 0 })
+    await service.reloadPhotosFromApi()
+    photoApiMocks.patchPhoto.mockResolvedValueOnce({ ...photoListItem("photo-1"), isFavorite: true, pages: [] })
+    await service.patchPhoto("photo-1", { favorite: true })
+    expect(photoApiMocks.patchPhoto).toHaveBeenCalledWith("photo-1", { favorite: true })
+    expect(service.getPhotoById("photo-1")?.isFavorite).toBe(true)
+    photoApiMocks.deletePhoto.mockResolvedValueOnce(undefined)
+    await service.deletePhoto("photo-1")
+    expect(service.getPhotoById("photo-1")).toBeUndefined()
+    expect(service.getPhotoById("photo-2")).toBeDefined()
+  })
   it("updates the shared photo cache only after tags save successfully", async () => {
     const { webPhotoLibraryService: service } = await import('./web-photo-library-service')
     photoApiMocks.replacePhotoTags.mockResolvedValueOnce({ id: 'photo-1', title: 'Photo', tags: ['landscape'], pages: [] })

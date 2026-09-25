@@ -36,6 +36,8 @@ export interface PhotoLibraryService {
   replacePhotoTags(photoId: string, tags: string[]): Promise<PhotoBook>
   /** Web：PATCH /library/photos/{id}；Mock：内存 + localStorage */
   patchPhoto(photoId: string, patch: PhotoPatch): Promise<PhotoBook>
+  /** Remove the indexed photo book, keeping its source archive. */
+  deletePhoto(photoId: string): Promise<void>
   /** Web：GET /library/photos/books/{id}/comment；Mock：localStorage */
   getPhotoComment(photoId: string): Promise<BookCommentDTO>
   /** Web：PUT /library/photos/books/{id}/comment；Mock：localStorage */

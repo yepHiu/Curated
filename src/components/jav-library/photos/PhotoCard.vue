@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Images, Star } from "lucide-vue-next"
+import { Check, Images, Star } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -14,10 +14,14 @@ import {
 const props = withDefaults(
   defineProps<{
     photo: PhotoBook
+    batchMode?: boolean
+    batchChecked?: boolean
     posterLoading?: "lazy" | "eager"
     posterFetchPriority?: "high" | "low" | "auto"
   }>(),
   {
+    batchMode: false,
+    batchChecked: false,
     posterLoading: "lazy",
     posterFetchPriority: "auto",
   },
@@ -26,6 +30,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   openDetails: [photoId: string]
   openViewer: [photoId: string, pageIndex: number]
+  toggleBatchSelect: [photoId: string]
 }>()
 
 const { t } = useI18n()
@@ -51,6 +56,10 @@ const hiddenTagCount = computed(() => Math.max(0, props.photo.tags.length - visi
 
 /** 单击封面或正文打开写真详情。 */
 function openDetails() {
+  if (props.batchMode) {
+    emit("toggleBatchSelect", props.photo.id)
+    return
+  }
   emit("openDetails", props.photo.id)
 }
 </script>
@@ -59,21 +68,28 @@ function openDetails() {
   <Card
     data-photo-card
     :data-photo-card-id="photo.id"
-    class="group gap-0 overflow-hidden rounded-[1.2rem] border-0 bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 hover:ring-1 hover:ring-inset hover:ring-primary/50 hover:shadow-lg motion-reduce:transition-none"
+    class="group gap-0 overflow-hidden rounded-[1.2rem] bg-card/80 py-0 shadow-md shadow-black/5 transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none"
+    :class="props.batchChecked ? 'border-2 border-primary shadow-lg shadow-primary/20' : 'border-0 hover:ring-1 hover:ring-inset hover:ring-primary/50 hover:shadow-lg'"
   >
     <button
       type="button"
       data-photo-card-open
       :aria-label="photo.title"
+      :aria-pressed="props.batchMode ? props.batchChecked : undefined"
       class="flex w-full flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       @click="openDetails"
-      @dblclick.stop="emit('openViewer', photo.id, photo.currentPageIndex)"
+      @dblclick.stop="!props.batchMode && emit('openViewer', photo.id, photo.currentPageIndex)"
     >
       <div class="p-[var(--movie-card-padding)] pb-0">
         <div
           data-photo-poster
           class="relative flex w-full items-start overflow-hidden rounded-[0.95rem] border border-border/60 bg-muted/30 aspect-[358/537]"
         >
+          <span v-if="props.batchMode" class="absolute top-2 right-2 z-[4] flex size-8 items-center justify-center rounded-md border border-border/45 bg-background/75 shadow-sm backdrop-blur-md" aria-hidden="true">
+            <span class="flex size-4 items-center justify-center rounded border border-primary bg-background text-primary-foreground" :class="props.batchChecked ? 'bg-primary' : ''">
+              <Check v-if="props.batchChecked" class="size-3" />
+            </span>
+          </span>
           <img
             v-if="coverSrc"
             :src="coverSrc"

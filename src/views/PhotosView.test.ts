@@ -41,6 +41,9 @@ const serviceMocks = vi.hoisted(() => ({
   refreshSettings: vi.fn(),
   reloadPhotosFromApi: vi.fn(),
   ensurePhotosLoaded: vi.fn(),
+  patchPhoto: vi.fn(),
+  replacePhotoTags: vi.fn(),
+  deletePhoto: vi.fn(),
 }))
 
 vi.mock("vue-i18n", () => ({
@@ -66,22 +69,38 @@ vi.mock("@/services/photo-library-service", () => ({
     refreshSettings: serviceMocks.refreshSettings,
     reloadPhotosFromApi: serviceMocks.reloadPhotosFromApi,
     ensurePhotosLoaded: serviceMocks.ensurePhotosLoaded,
+    patchPhoto: serviceMocks.patchPhoto,
+    replacePhotoTags: serviceMocks.replacePhotoTags,
+    deletePhoto: serviceMocks.deletePhoto,
   }),
 }))
 
 vi.mock("@/components/jav-library/photos/PhotoLibraryPage.vue", () => ({
   default: {
     name: "PhotoLibraryPage",
-    props: ["photos", "activeSort"],
-    emits: ["openDetails", "openViewer", "update:sort"],
+    props: ["photos", "activeSort", "batchMode", "batchSelectedIds"],
+    emits: ["openDetails", "openViewer", "update:sort", "enterBatchMode", "exitBatchMode", "selectAllVisibleInBatch", "toggleBatchSelect"],
     template: `
-      <section data-photo-library-page :data-active-sort="activeSort">
+      <section data-photo-library-page :data-active-sort="activeSort" :data-batch-mode="batchMode ? 'true' : 'false'" :data-selected="(batchSelectedIds || []).join(',')">
+        <button data-enter-batch @click="$emit('enterBatchMode')" />
+        <button data-select-all @click="$emit('selectAllVisibleInBatch')" />
+        <button v-for="photo in photos" :key="'select-' + photo.id" :data-select-photo="photo.id" @click="$emit('toggleBatchSelect', photo.id)" />
         <article v-for="photo in photos" :key="photo.id" :data-photo-id="photo.id">{{ photo.title }}</article>
         <button data-sort-filename @click="$emit('update:sort', 'fileName')" />
         <button v-for="photo in photos" :key="'open-' + photo.id" :data-open-photo="photo.id" @click="$emit('openDetails', photo.id)" />
         <button v-for="photo in photos" :key="'view-' + photo.id" :data-view-photo="photo.id" @click="$emit('openViewer', photo.id, photo.currentPageIndex)" />
       </section>
     `,
+  },
+}))
+
+vi.mock("@/composables/use-app-toast", () => ({ pushAppToast: vi.fn() }))
+vi.mock("@/components/jav-library/photos/PhotoBatchActionBar.vue", () => ({
+  default: {
+    name: "PhotoBatchActionBar",
+    props: ["selectedCount", "operationBusy"],
+    emits: ["addFavorite", "removeFavorite", "addTag", "deletePhotos"],
+    template: `<div data-photo-batch-bar :data-selected-count="selectedCount"><button data-batch-favorite @click="$emit('addFavorite')" /><button data-batch-tag @click="$emit('addTag', 'batch-tag')" /><button data-batch-delete @click="$emit('deletePhotos')" /></div>`,
   },
 }))
 
@@ -102,6 +121,47 @@ describe("PhotosView", () => {
     serviceMocks.reloadPhotosFromApi.mockResolvedValue(undefined)
     serviceMocks.ensurePhotosLoaded.mockReset()
     serviceMocks.ensurePhotosLoaded.mockResolvedValue(undefined)
+    serviceMocks.patchPhoto.mockReset()
+    serviceMocks.patchPhoto.mockResolvedValue(undefined)
+    serviceMocks.replacePhotoTags.mockReset()
+    serviceMocks.replacePhotoTags.mockResolvedValue(undefined)
+    serviceMocks.deletePhoto.mockReset()
+    serviceMocks.deletePhoto.mockResolvedValue(undefined)
+  })
+
+  it("selects visible photos and applies favorite, tag and delete operations", async () => {
+    const wrapper = mount(PhotosView)
+    await flushPromises()
+    await wrapper.get("[data-enter-batch]").trigger("click")
+    await wrapper.get("[data-select-all]").trigger("click")
+    expect(wrapper.get("[data-photo-batch-bar]").attributes("data-selected-count")).toBe("2")
+    await wrapper.get("[data-batch-favorite]").trigger("click")
+    await flushPromises()
+    expect(serviceMocks.patchPhoto).toHaveBeenCalledWith("photo-1", { favorite: true })
+    expect(serviceMocks.patchPhoto).toHaveBeenCalledWith("photo-2", { favorite: true })
+    await wrapper.get("[data-batch-tag]").trigger("click")
+    await flushPromises()
+    expect(serviceMocks.replacePhotoTags).toHaveBeenCalledWith("photo-1", ["batch-tag"])
+    expect(serviceMocks.replacePhotoTags).toHaveBeenCalledWith("photo-2", ["batch-tag"])
+    await wrapper.get("[data-batch-delete]").trigger("click")
+    await flushPromises()
+    expect(serviceMocks.deletePhoto).toHaveBeenCalledWith("photo-1")
+    expect(serviceMocks.deletePhoto).toHaveBeenCalledWith("photo-2")
+    expect(wrapper.get("[data-photo-library-page]").attributes("data-batch-mode")).toBe("false")
+  })
+
+  it("keeps failed deletes selected for retry", async () => {
+    serviceMocks.deletePhoto.mockImplementation(async (id: string) => {
+      if (id === "photo-2") throw new Error("delete failed")
+    })
+    const wrapper = mount(PhotosView)
+    await flushPromises()
+    await wrapper.get("[data-enter-batch]").trigger("click")
+    await wrapper.get("[data-select-all]").trigger("click")
+    await wrapper.get("[data-batch-delete]").trigger("click")
+    await flushPromises()
+    expect(wrapper.get("[data-photo-library-page]").attributes("data-batch-mode")).toBe("true")
+    expect(wrapper.get("[data-photo-library-page]").attributes("data-selected")).toBe("photo-2")
   })
 
   it("hydrates the photo wall through ensurePhotosLoaded instead of forcing a reload", async () => {

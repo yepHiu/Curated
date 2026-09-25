@@ -4,6 +4,8 @@ afterEach(() => {
   localStorage.removeItem("curated-mock-photo-tags")
   localStorage.removeItem("curated-mock-photo-ratings-v1")
   localStorage.removeItem("curated-mock-photo-titles-v1")
+  localStorage.removeItem("curated-mock-photo-favorites-v1")
+  localStorage.removeItem("curated-mock-photo-deleted-v1")
   vi.resetModules()
 })
 
@@ -53,4 +55,14 @@ it('persists photo display titles across service reloads', async () => {
   vi.resetModules()
   const { mockPhotoLibraryService: reloaded } = await import('./mock-photo-library-service')
   expect((await reloaded.loadPhotoDetail('mock-photo-1'))!.title).toBe('展示写真')
+})
+
+it('persists photo favorites and deleted indexes across service reloads', async () => {
+  const { mockPhotoLibraryService: service } = await import('./mock-photo-library-service')
+  await service.patchPhoto('mock-photo-2', { favorite: true })
+  await service.deletePhoto('mock-photo-1')
+  vi.resetModules()
+  const { mockPhotoLibraryService: reloaded } = await import('./mock-photo-library-service')
+  expect(reloaded.getPhotoById('mock-photo-2')?.isFavorite).toBe(true)
+  expect(reloaded.getPhotoById('mock-photo-1')).toBeUndefined()
 })

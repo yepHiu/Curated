@@ -25,12 +25,17 @@ import { buildMovieGridChunkStyle } from "@/lib/movie-grid-template"
 
 const props = defineProps<{
   photos: readonly PhotoBook[]
+  batchMode?: boolean
+  batchSelectedIds?: readonly string[]
 }>()
 
 const emit = defineEmits<{
   openDetails: [photoId: string]
   openViewer: [photoId: string, pageIndex: number]
+  toggleBatchSelect: [photoId: string]
 }>()
+
+const batchSelectedSet = computed(() => new Set(props.batchSelectedIds ?? []))
 
 const rootEl = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
@@ -201,10 +206,13 @@ function onScrollerScroll(event: Event) {
               >
                 <PhotoCard
                   :photo="photo"
+                  :batch-mode="props.batchMode"
+                  :batch-checked="batchSelectedSet.has(photo.id)"
                   :poster-loading="posterLoadPolicyForChunk(index).loading"
                   :poster-fetch-priority="posterLoadPolicyForChunk(index).fetchPriority"
                   @open-details="emit('openDetails', $event)"
                   @open-viewer="(photoId, pageIndex) => emit('openViewer', photoId, pageIndex)"
+                  @toggle-batch-select="emit('toggleBatchSelect', $event)"
                 />
               </div>
             </div>

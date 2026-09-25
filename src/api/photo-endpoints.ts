@@ -87,6 +87,10 @@ export const photoApi = {
     return httpClient.patch<PhotoBookDetailDTO>(`/library/photos/${encodeURIComponent(id)}`, body)
   },
 
+  deletePhoto(id: string): Promise<void> {
+    return httpClient.delete<void>(`/library/photos/${encodeURIComponent(id)}`)
+  },
+
   replacePhotoTags(id: string, tags: string[]): Promise<PhotoBookDetailDTO> {
     return httpClient.patch<PhotoBookDetailDTO>(`/library/photos/books/${encodeURIComponent(id)}/tags`, { tags })
   },

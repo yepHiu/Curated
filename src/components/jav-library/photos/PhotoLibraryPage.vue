@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
+import { CheckSquare, ListChecks, X } from "lucide-vue-next"
 import type { PhotoBook } from "@/domain/photo/types"
 import type { BookLibrarySortValue } from "@/lib/book-library-query"
 import BookLibraryToolbar from "@/components/jav-library/books/BookLibraryToolbar.vue"
@@ -19,6 +20,8 @@ const props = withDefaults(
     hasConstraints?: boolean
     loading?: boolean
     loadError?: string
+    batchMode?: boolean
+    batchSelectedIds?: readonly string[]
   }>(),
   {
     searchQuery: "",
@@ -26,6 +29,8 @@ const props = withDefaults(
     hasConstraints: false,
     loadError: "",
     loading: false,
+    batchMode: false,
+    batchSelectedIds: () => [],
   },
 )
 
@@ -37,6 +42,10 @@ const emit = defineEmits<{
   "update:sort": [value: BookLibrarySortValue]
   openDetails: [photoId: string]
   openViewer: [photoId: string, pageIndex: number]
+  enterBatchMode: []
+  exitBatchMode: []
+  selectAllVisibleInBatch: []
+  toggleBatchSelect: [photoId: string]
 }>()
 
 const { t } = useI18n()
@@ -62,10 +71,24 @@ function openViewer(photoId: string, pageIndex: number) {
       :sort="activeSort"
       :search-query="searchQuery"
       :tag="tag"
+      :batch-mode="props.batchMode"
+      :batch-selected-count="props.batchSelectedIds.length"
       @sort="emit('update:sort', $event)"
       @clear-search="emit('updateSearch', '')"
       @clear-tag="emit('clearTag')"
-    />
+    >
+      <Button v-if="!props.batchMode" type="button" variant="outline" data-photo-enter-batch class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8" @click="emit('enterBatchMode')">
+        <ListChecks data-icon="inline-start" aria-hidden="true" />{{ t('photos.batchManage') }}
+      </Button>
+      <template v-else>
+        <Button type="button" variant="outline" data-photo-select-visible class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8" :disabled="props.photos.length === 0" @click="emit('selectAllVisibleInBatch')">
+          <CheckSquare data-icon="inline-start" aria-hidden="true" />{{ t('photos.batchSelectVisible') }}
+        </Button>
+        <Button type="button" variant="ghost" data-photo-exit-batch class="min-h-11 shrink-0 rounded-full px-3 sm:min-h-8" @click="emit('exitBatchMode')">
+          <X data-icon="inline-start" aria-hidden="true" />{{ t('photos.batchExitToolbar') }}
+        </Button>
+      </template>
+    </BookLibraryToolbar>
 
     <Alert v-if="props.loadError" data-photo-load-error variant="destructive"><AlertDescription>{{ props.loadError }}<Button variant="outline" class="mt-3 min-h-11 w-fit rounded-full sm:min-h-8" @click="emit('retry')">{{ t('common.retry') }}</Button></AlertDescription></Alert>
     <div v-if="props.loading && !props.loadError && !props.photos.length" data-book-library-loading class="grid w-full overflow-x-hidden" :style="{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, var(--movie-grid-min-track)), 1fr))', columnGap: 'var(--movie-grid-gap)', rowGap: 'var(--movie-grid-gap)' }" role="status" :aria-label="t('photos.detailLoading')"><Skeleton v-for="index in 8" :key="index" class="aspect-[358/537] rounded-[1.2rem]" /></div>
@@ -77,8 +100,11 @@ function openViewer(photoId: string, pageIndex: number) {
     >
       <VirtualPhotoGrid
         :photos="props.photos"
+        :batch-mode="props.batchMode"
+        :batch-selected-ids="props.batchSelectedIds"
         @open-details="emit('openDetails', $event)"
         @open-viewer="openViewer"
+        @toggle-batch-select="emit('toggleBatchSelect', $event)"
       />
     </div>
 

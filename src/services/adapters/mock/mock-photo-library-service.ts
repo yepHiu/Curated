@@ -87,6 +87,23 @@ try {
   }
 } catch { /* Missing or invalid local preferences leave the sample tags intact. */ }
 
+const photoFavoritesStorageKey = "curated-mock-photo-favorites-v1"
+const photoDeletedStorageKey = "curated-mock-photo-deleted-v1"
+try {
+  const favorites: unknown = JSON.parse(localStorage.getItem(photoFavoritesStorageKey) ?? "{}")
+  const deleted: unknown = JSON.parse(localStorage.getItem(photoDeletedStorageKey) ?? "[]")
+  if (favorites && typeof favorites === "object" && !Array.isArray(favorites)) {
+    for (const photo of photosState.value) {
+      const value = (favorites as Record<string, unknown>)[photo.id]
+      if (typeof value === "boolean") photo.isFavorite = value
+    }
+  }
+  if (Array.isArray(deleted)) {
+    const ids = new Set(deleted.filter((id): id is string => typeof id === "string"))
+    photosState.value = photosState.value.filter((photo) => !ids.has(photo.id))
+  }
+} catch { /* Invalid local preferences leave sample photos intact. */ }
+
 const photoRatingsStorageKey = "curated-mock-photo-ratings-v1"
 const photoTitlesStorageKey = "curated-mock-photo-titles-v1"
 
@@ -240,7 +257,7 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
     }
     const rating = patch.rating !== undefined ? patch.rating : photo.rating
     const title = patch.title !== undefined ? patch.title.trim() : photo.title
-    const updated = { ...photo, title, rating, updatedAt: new Date().toISOString() }
+    const updated = { ...photo, title, rating, isFavorite: patch.favorite ?? photo.isFavorite, updatedAt: new Date().toISOString() }
     photosState.value = photosState.value.map((item) => (item.id === photo.id ? updated : item))
     const saved = readMockPhotoRatings()
     if (rating === null) {
@@ -254,7 +271,21 @@ export const mockPhotoLibraryService: PhotoLibraryService = {
       titles[photo.id] = title
       localStorage.setItem(photoTitlesStorageKey, JSON.stringify(titles))
     }
+    if (patch.favorite !== undefined) {
+      const favorites = Object.fromEntries(photosState.value.map((item) => [item.id, item.isFavorite]))
+      localStorage.setItem(photoFavoritesStorageKey, JSON.stringify(favorites))
+    }
     return updated
+  },
+  async deletePhoto(photoId: string) {
+    const id = photoId.trim()
+    if (!photosState.value.some((photo) => photo.id === id)) throw new Error("Photo not found")
+    photosState.value = photosState.value.filter((photo) => photo.id !== id)
+    let deleted: unknown = []
+    try { deleted = JSON.parse(localStorage.getItem(photoDeletedStorageKey) ?? "[]") } catch { /* reset invalid saved IDs */ }
+    const ids = new Set(Array.isArray(deleted) ? deleted.filter((item): item is string => typeof item === "string") : [])
+    ids.add(id)
+    localStorage.setItem(photoDeletedStorageKey, JSON.stringify([...ids]))
   },
   /** Mock 读取一本写真的本地备注。 */
   async getPhotoComment(photoId: string) {

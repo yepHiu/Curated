@@ -106,6 +106,9 @@ function photoPatchToBody(patch: PhotoPatch): PatchPhotoBookBody {
   if (patch.title !== undefined) {
     body.title = patch.title
   }
+  if (patch.favorite !== undefined) {
+    body.favorite = patch.favorite
+  }
   if (patch.rating !== undefined) {
     body.ratingSet = true
     if (patch.rating === null) {
@@ -311,6 +314,12 @@ function createWebPhotoLibraryService(): PhotoLibraryService {
       const detail = mapPhotoDetail(await photoApi.patchPhoto(photoId.trim(), photoPatchToBody(patch)))
       mergePhotoIntoCache(detail)
       return detail
+    },
+
+    async deletePhoto(photoId: string) {
+      const id = photoId.trim()
+      await photoApi.deletePhoto(id)
+      photosState.value = photosState.value.filter((photo) => photo.id !== id)
     },
 
     /** 通过写真 API 读取个人备注。 */

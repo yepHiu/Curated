@@ -438,6 +438,7 @@ export interface PatchComicBookBody {
 /** 写真展示标题与本地评分 PATCH body；清除评分时同时带 ratingSet 与 ratingClear。 */
 export interface PatchPhotoBookBody {
   title?: string
+  favorite?: boolean
   ratingSet?: boolean
   ratingClear?: boolean
   rating?: number

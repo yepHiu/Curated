@@ -29,6 +29,11 @@ describe("photoApi", () => {
       title: "展示写真",
     })
   })
+  it("deletes a photo index through the photo book endpoint", async () => {
+    const del = vi.spyOn(httpClient, "delete").mockResolvedValueOnce(undefined)
+    await photoApi.deletePhoto("photo/1")
+    expect(del).toHaveBeenCalledWith("/library/photos/photo%2F1")
+  })
   it("uploads archives only to the photo import endpoint with progress", async () => {
     const upload = vi.spyOn(httpClient, "postFormWithProgress").mockResolvedValueOnce({ taskId: "photo-import" })
     const file = new File(["zip"], "Photo.zip")
