@@ -42,17 +42,24 @@ interface DirectoryDialogResult {
   filePaths: string[]
 }
 
+/** 选择平台支持的图标；macOS/Linux 不使用 Windows ICO。 */
 export function resolveAppIconPath(
   appPath: string,
   pathExists: (candidate: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
 ): string | undefined {
-  const candidates = [
+  const windowsIcons = [
     path.join(appPath, "curated.ico"),
     path.join(appPath, "backend", "internal", "assets", "curated.ico"),
+  ]
+  const pngIcons = [
+    path.join(appPath, "curated.png"),
     path.join(appPath, "public", "Curated-icon.png"),
     path.join(appPath, "icon", "curated-appicon.png"),
   ]
+  const candidates = platform === "win32" ? [...windowsIcons, ...pngIcons] : pngIcons
 
+  // 按平台优先级选择实际存在的文件。
   return candidates.find((candidate) => pathExists(candidate))
 }
 

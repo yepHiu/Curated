@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, Tray, type IpcMainInvokeEvent } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray, type IpcMainInvokeEvent } from "electron"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { checkDesktopUpdate } from "./updates.js"
@@ -27,9 +27,14 @@ else {
     registerIPC()
     const icon = resolveAppIconPath(app.getAppPath())
     if (icon) {
-      tray = new Tray(icon)
-      tray.setToolTip("Curated Desktop")
-      tray.on("click", () => showWindow())
+      // 图标解码失败不应阻止离线连接页；macOS 菜单栏需使用小尺寸图标。
+      const trayImage = nativeImage.createFromPath(icon)
+      if (!trayImage.isEmpty()) {
+        tray = new Tray(process.platform === "darwin" ? trayImage.resize({ width: 18, height: 18 }) : trayImage)
+        tray.setToolTip("Curated Desktop")
+        // 点击托盘恢复当前业务窗口或连接页。
+        tray.on("click", () => showWindow())
+      }
     }
     refreshMenus()
     showLauncher()

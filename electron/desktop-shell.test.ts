@@ -27,7 +27,7 @@ describe("Electron desktop shell integration", () => {
     const appPath = "C:/repo"
     const preferredIcon = path.join(appPath, "backend", "internal", "assets", "curated.ico")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === preferredIcon)
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === preferredIcon, "win32")
 
     expect(iconPath).toBe(preferredIcon)
   })
@@ -36,7 +36,7 @@ describe("Electron desktop shell integration", () => {
     const appPath = "C:/Program Files/Curated/resources/app"
     const packagedIcon = path.join(appPath, "curated.ico")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon)
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon, "win32")
 
     expect(iconPath).toBe(packagedIcon)
   })
@@ -48,6 +48,18 @@ describe("Electron desktop shell integration", () => {
     const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === fallbackIcon)
 
     expect(iconPath).toBe(fallbackIcon)
+  })
+
+  // 防止仓库同时有 ICO 与 PNG 时 macOS 再次选中不可解码的 ICO。
+  it("selects PNG on macOS and Linux even when a Windows icon exists", () => {
+    const appPath = "/repo"
+    const png = path.join(appPath, "public", "Curated-icon.png")
+    // 模拟开发目录的两种图标同时存在。
+    const exists = (candidate: string) => candidate.endsWith(".ico") || candidate === png
+    expect(resolveAppIconPath(appPath, exists, "darwin")).toBe(png)
+    expect(resolveAppIconPath(appPath, exists, "linux")).toBe(png)
+    // 仅有 Windows 资源时允许无托盘启动。
+    expect(resolveAppIconPath(appPath, candidate => candidate.endsWith(".ico"), "darwin")).toBeUndefined()
   })
 
   it("returns the first selected folder from the native directory dialog", () => {
