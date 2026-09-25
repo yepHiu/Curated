@@ -451,3 +451,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 ## Desktop 连接管理（2026-09-25，实施中）
 
 `pnpm build:electron` 构建 Electron 与独立本地连接页，`pnpm dev:electron` 只运行客户端。需要单独运行提供 Web UI 的 Server；开发时可先构建 Web API 前端并由 Go 静态托管。Desktop 支持 HTTP/HTTPS 根地址、端口、最近连接、重连与菜单更换入口；不启动或停止 Server。地址与安装身份共同隔离 Electron 会话；服务器路径手动输入，不调用客户端目录选择。旧版 Server 可经 health 识别后受限手动连接。三种发布包、SSDP 和旧版迁移仍在实施，现阶段不应发布旧的一体包链路。
+
+## SSDP 发现（2026-09-25，待真实两机验收）
+
+Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类型 `urn:curated:service:Library:1`，组播 `239.255.255.250:1900`，描述为 `GET /discovery/description.xml`。默认随 LAN 启用；可在主配置或 `library-config.cfg` 设置 `discoveryEnabled: false`，重启 Server 生效。Desktop 本地页可搜索、刷新和选择服务器，按 serverId 合并多网卡结果；每次扫描有界、结果按 120 秒上限过期，身份探测不携带 Cookie。公网、跨 VLAN 与 Docker bridge 不保证发现；始终支持手工连接。当前开关通过配置文件设置，设置页开关尚未接入。

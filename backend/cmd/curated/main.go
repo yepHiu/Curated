@@ -22,6 +22,7 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
+	"curated-backend/internal/discovery"
 	"curated-backend/internal/logging"
 	"curated-backend/internal/maintenance"
 	"curated-backend/internal/processlock"
@@ -264,7 +265,21 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 	if err := boot.cfg.ValidateHTTPExposure(); err != nil {
 		return err
 	}
-	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, serverListeningReporter())
+	var stopDiscovery func()
+	ready := func(addr string) {
+		if report := serverListeningReporter(); report != nil {
+			report(addr)
+		}
+		if boot.cfg.LANEnabled && boot.cfg.DiscoveryOn() && !config.HTTPAddrIsLoopback(addr) {
+			stopDiscovery = discovery.Start(ctx, discovery.Options{ID: boot.cfg.ServerID, HTTPAddr: addr, Logger: boot.logger})
+		}
+	}
+	defer func() {
+		if stopDiscovery != nil {
+			stopDiscovery()
+		}
+	}()
+	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, ready)
 }
 
 func serverListeningReporter() func(string) {

@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 interface Connection { url: string; name: string; serverId: string }
+interface Discovered { serverId: string; name: string; version: string; urls: string[]; expiresAt: number }
 interface ConnectionAPI {
+  discover(): Promise<Discovered[]>
   list(): Promise<{ connections: Connection[]; lastUrl?: string; activeUrl?: string; desktopVersion: string }>
   connect(url: string): Promise<{ ok: boolean; error?: string }>
   cancel(): Promise<void>
@@ -16,6 +18,23 @@ const connections = ref<Connection[]>([])
 const busy = ref(false)
 const error = ref("")
 const version = ref("")
+const found = ref<Discovered[]>([])
+const scanning = ref(false)
+let expiry: ReturnType<typeof setTimeout> | undefined
+async function discover() {
+  scanning.value = true
+  found.value = []
+  try {
+    found.value = await api.discover()
+    clearTimeout(expiry)
+    const expire = () => {
+      found.value = found.value.filter(item => item.expiresAt > Date.now())
+      if (found.value.length) expiry = setTimeout(expire, Math.max(1, Math.min(...found.value.map(item => item.expiresAt)) - Date.now()))
+    }
+    expire()
+  } catch (reason) { error.value = String(reason) }
+  finally { scanning.value = false }
+}
 async function refresh() {
   const state = await api.list()
   connections.value = state.connections
@@ -38,6 +57,7 @@ onMounted(async () => {
   try {
     const state = await refresh()
     address.value = state.lastUrl ?? ""
+    void discover()
     if (state.lastUrl && !state.activeUrl) await connect(state.lastUrl)
   } catch (reason) { error.value = String(reason) }
 })
@@ -59,6 +79,22 @@ onMounted(async () => {
         <Button v-if="busy" type="button" variant="outline" @click="api.cancel()">取消</Button>
       </div>
     </form>
+    <section aria-labelledby="discovery-title" class="space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="discovery-title" class="text-sm font-semibold">局域网服务器</h2>
+        <Button variant="outline" :disabled="scanning" @click="discover">{{ scanning ? '正在搜索…' : '刷新' }}</Button>
+      </div>
+      <p v-if="!scanning && !found.length" role="status" class="text-sm text-muted-foreground">未发现服务器，仍可手动输入地址连接。</p>
+      <ul v-if="found.length" class="divide-y divide-border rounded-xl border border-border">
+        <li v-for="item in found" :key="item.serverId" class="space-y-2 p-4">
+          <p class="font-medium">{{ item.name }} <span class="text-xs text-muted-foreground">{{ item.version }}</span></p>
+          <div v-for="url in item.urls" :key="url" class="flex items-center gap-3">
+            <span class="min-w-0 flex-1 truncate text-sm text-muted-foreground">{{ url }}</span>
+            <Button variant="outline" :disabled="busy || item.expiresAt <= Date.now()" @click="connect(url)">连接</Button>
+          </div>
+        </li>
+      </ul>
+    </section>
     <section v-if="connections.length" aria-labelledby="recent-title" class="space-y-3">
       <h2 id="recent-title" class="text-sm font-semibold">最近连接</h2>
       <ul class="divide-y divide-border rounded-xl border border-border">

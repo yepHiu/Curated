@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, Tray, type IpcMainInvokeEvent } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, Tray, type IpcMainInvokeEvent } from "electron"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { discoverServers } from "./discovery.js"
 import { ConnectionStore, connectionPartition, normalizeServerUrl, probeServer, type SavedConnection } from "./connections.js"
 import { resolveAppIconPath, withCuratedDesktopVersion, withCuratedDesktopRequestHeaders } from "./desktop-shell.js"
 
@@ -14,6 +15,7 @@ let store: ConnectionStore
 let current: SavedConnection | undefined
 let attempt: AbortController | undefined
 let quitting = false
+let discoveryScan: AbortController | undefined
 
 // Desktop owns only its windows and discovery sockets, never Server processes.
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -33,7 +35,7 @@ else {
   }).catch(error => { dialog.showErrorBox("Curated Desktop", String(error)); app.quit() })
 }
 app.on("activate", () => showWindow())
-app.on("before-quit", () => { quitting = true; attempt?.abort() })
+app.on("before-quit", () => { quitting = true; attempt?.abort(); discoveryScan?.abort() })
 app.on("window-all-closed", () => { if (!tray && process.platform !== "darwin") app.quit() })
 
 function showWindow(): void {
@@ -74,6 +76,14 @@ function requireLibrary(event: IpcMainInvokeEvent): void {
   if (!library || !current || event.sender !== library.webContents || event.senderFrame !== library.webContents.mainFrame || new URL(event.senderFrame.url).origin !== current.url) throw new Error("Unauthorized desktop request")
 }
 function registerIPC(): void {
+  ipcMain.handle("curated:discover", async event => {
+    requireLauncher(event)
+    discoveryScan?.abort()
+    const scan = new AbortController()
+    discoveryScan = scan
+    try { return await discoverServers(scan.signal) }
+    finally { if (discoveryScan === scan) discoveryScan = undefined }
+  })
   ipcMain.handle("curated:connections", event => {
     requireLauncher(event)
     return { ...store.read(), desktopVersion: app.getVersion(), activeUrl: current?.url }
@@ -89,6 +99,12 @@ function registerIPC(): void {
     if (typeof value !== "string") throw new Error("Invalid server address")
     const url = normalizeServerUrl(value)
     if (url === current?.url) throw new Error("请先更换服务器，再忘记当前连接。")
+    const saved = store.read().connections.find(item => item.url === url)
+    if (saved) {
+      const isolated = session.fromPartition(connectionPartition(saved))
+      await isolated.clearStorageData()
+      await isolated.clearCache()
+    }
     store.forget(url)
   })
   ipcMain.handle("curated:change-server", event => { requireLibrary(event); showLauncher() })

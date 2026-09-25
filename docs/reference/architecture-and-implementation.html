@@ -554,5 +554,6 @@
   <p>代码入口：backend/internal/app/wishlist*.go、storage/wishlist*.go、server/wishlist_handlers.go、internal/wishlistassets、src/views/Wishlist*.vue。详见 <a href="../plan/2026-09-22-wishlist.md">实施记录</a>及 <a href="../guide.md#wishlist">使用说明</a>。</p>
 <section><h2>Server 连接身份（2026-09-25）</h2><p>已实现 GET /api/server-info 最小公开连接合约，稳定身份保存在数据库旁的 .server-id 文件，不随数据库备份复制。Desktop 解耦、SSDP 与三包发行仍在实施中。</p></section>
 <section><h2>Desktop 客户端启动（2026-09-25）</h2><p>已实现本地连接页、手动连接、切换与按服务器隔离会话。客户端不启动或结束 Go 进程，Server 独立运行。SSDP、安装包与迁移仍在实施中。</p></section>
+<section><h2>SSDP（2026-09-25）</h2><p>已接入 Go IPv4 公告和 Desktop 有界搜索。LAN 监听与 discoveryEnabled 控制，真实两机/防火墙验收待执行；手工连接始终可用。</p></section>
 </body>
 </html>

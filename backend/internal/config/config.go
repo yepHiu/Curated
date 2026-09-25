@@ -16,7 +16,9 @@ type Config struct {
 	// ServerID is loaded under the runtime lock, never accepted from user JSON.
 	ServerID   string `json:"-"`
 	ServerName string `json:"serverName,omitempty"`
-	LogLevel   string `json:"logLevel"`
+	// DiscoveryEnabled defaults on only when LAN access is explicitly enabled.
+	DiscoveryEnabled *bool  `json:"discoveryEnabled,omitempty"`
+	LogLevel         string `json:"logLevel"`
 	// LogDir stores the effective backend log directory. Empty config values are normalized
 	// to the build-specific default (dev: project runtime/logs; release: app-data logs).
 	LogDir string `json:"logDir,omitempty"`
@@ -476,3 +478,6 @@ func (c Config) LibraryWatchDebounce() time.Duration {
 	}
 	return time.Duration(ms) * time.Millisecond
 }
+
+// DiscoveryOn reports whether LAN discovery is enabled. HTTP exposure is checked separately.
+func (c Config) DiscoveryOn() bool { return c.DiscoveryEnabled == nil || *c.DiscoveryEnabled }

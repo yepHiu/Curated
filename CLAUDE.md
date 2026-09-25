@@ -650,3 +650,7 @@ Migration 0055 preserves the original source URL separately from scraped metadat
 ## 2026-09-25 Server 连接身份（拆分第一阶段）
 
 `GET /api/server-info` 是无需解锁的最小身份接口，返回 serverId、名称、版本、连接/桌面桥协议版本，不返回资料库路径或凭据。服务启动持有数据库运行锁后，在 `<databasePath>.server-id` 创建稳定安装身份；损坏时启动失败，不静默替换。身份不属于数据库备份，恢复到新安装生成新身份。主运行配置可指定 `serverName`。完整目录复制到第二台机器时，应在停止该副本后移除副本的 `.server-id` 再启动，原安装保持不动。Desktop / SSDP / 三包发行仍按实施计划推进，不能视为已经完成。
+
+## SSDP 发现（2026-09-25，待真实两机验收）
+
+Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类型 `urn:curated:service:Library:1`，组播 `239.255.255.250:1900`，描述为 `GET /discovery/description.xml`。默认随 LAN 启用；可在主配置或 `library-config.cfg` 设置 `discoveryEnabled: false`，重启 Server 生效。Desktop 本地页可搜索、刷新和选择服务器，按 serverId 合并多网卡结果；每次扫描有界、结果按 120 秒上限过期，身份探测不携带 Cookie。公网、跨 VLAN 与 Docker bridge 不保证发现；始终支持手工连接。当前开关通过配置文件设置，设置页开关尚未接入。

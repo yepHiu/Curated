@@ -500,6 +500,7 @@ func (h *Handler) Routes() http.Handler {
 
 	mux.HandleFunc("GET /api/health", h.handleHealth)
 	mux.HandleFunc("GET /api/server-info", h.handleServerInfo)
+	mux.HandleFunc("GET /discovery/description.xml", h.handleDiscoveryDescription)
 	mux.HandleFunc("GET /api/auth/status", h.handleAuthStatus)
 	mux.HandleFunc("POST /api/auth/setup-pin", h.handleSetupPIN)
 	mux.HandleFunc("POST /api/auth/unlock", h.handleUnlockPIN)

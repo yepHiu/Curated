@@ -109,3 +109,7 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 ## 浏览器插件联动（2026-09-23）
 
 `library-config.cfg` 的 `browserPluginEnabled` 默认为 `false`，在设置 → 网络修改，经 GET/PATCH `/api/settings` 读写。保存后立即控制插件请求，无需重启。开启后无需凭证提交愿望单；关闭保留已有条目并返回 `403 BROWSER_PLUGIN_DISABLED`。该偏好与 `lanEnabled` 独立，不改变 HTTP 监听地址。
+
+## SSDP 发现（2026-09-25，待真实两机验收）
+
+Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类型 `urn:curated:service:Library:1`，组播 `239.255.255.250:1900`，描述为 `GET /discovery/description.xml`。默认随 LAN 启用；可在主配置或 `library-config.cfg` 设置 `discoveryEnabled: false`，重启 Server 生效。Desktop 本地页可搜索、刷新和选择服务器，按 serverId 合并多网卡结果；每次扫描有界、结果按 120 秒上限过期，身份探测不携带 Cookie。公网、跨 VLAN 与 Docker bridge 不保证发现；始终支持手工连接。当前开关通过配置文件设置，设置页开关尚未接入。
