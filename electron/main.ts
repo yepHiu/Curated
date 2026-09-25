@@ -50,9 +50,12 @@ function showWindow(): void {
   if (window.isMinimized()) window.restore()
   window.show(); window.focus()
 }
+/** 打开本地连接窗口；macOS 原生红黄绿按钮叠放在应用内容顶部。 */
 function showLauncher(): void {
   if (!launcher || launcher.isDestroyed()) {
-    launcher = new BrowserWindow({ width: 720, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop", webPreferences: {
+    launcher = new BrowserWindow({ width: 720, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop",
+      ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 33 } } : {}),
+      webPreferences: {
       preload: path.join(directory, "launcher-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true,
     } })
     launcher.webContents.setWindowOpenHandler(() => ({ action: "deny" }))

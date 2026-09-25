@@ -5,3 +5,19 @@
 .desktop-wordmark {
   font-family: "Outfit Variable", "Noto Sans Variable", sans-serif;
 }
+
+/* 原生窗口按钮与字标共享同一背景；拖动区域排除主题按钮。 */
+.desktop-window-heading {
+  -webkit-app-region: drag;
+}
+
+.desktop-window-heading button {
+  -webkit-app-region: no-drag;
+}
+
+/* 预留原生红黄绿按钮宽度，窄窗口也不与字标重叠。 */
+.desktop-window-heading-mac {
+  max-width: none;
+  padding-left: max(104px, calc((100% - 576px) / 2 + 24px));
+  padding-right: max(24px, calc((100% - 576px) / 2 + 24px));
+}
