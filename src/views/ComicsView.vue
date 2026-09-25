@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
-import ComicBatchActionBar from "@/components/jav-library/comics/ComicBatchActionBar.vue"
+import MediaBatchActionBar from "@/components/jav-library/MediaBatchActionBar.vue"
 import ComicLibraryPage from "@/components/jav-library/comics/ComicLibraryPage.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
 import type { ComicReadStatus } from "@/domain/comic/types"
@@ -308,7 +308,8 @@ async function runBatchDeleteComics() {
       />
     </div>
 
-    <ComicBatchActionBar
+    <MediaBatchActionBar
+      kind="comics"
       v-if="batchMode"
       :selected-count="batchSelectedCount"
       :operation-busy="batchOperationBusy"
@@ -316,7 +317,7 @@ async function runBatchDeleteComics() {
       @add-favorite="runBatchAddFavorite"
       @remove-favorite="runBatchRemoveFavorite"
       @add-tag="runBatchAddTag"
-      @delete-comics="runBatchDeleteComics"
+      @delete-selection="runBatchDeleteComics"
     />
   </div>
 </template>

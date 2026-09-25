@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from "vue"
 import { useI18n } from "vue-i18n"
-import PhotoBatchActionBar from "@/components/jav-library/photos/PhotoBatchActionBar.vue"
+import MediaBatchActionBar from "@/components/jav-library/MediaBatchActionBar.vue"
 import PhotoLibraryPage from "@/components/jav-library/photos/PhotoLibraryPage.vue"
 import { pushAppToast } from "@/composables/use-app-toast"
 import { useRoute, useRouter } from "vue-router"
@@ -203,6 +203,6 @@ function runBatchDeletePhotos() {
         @toggle-batch-select="toggleBatchSelect"
       />
     </div>
-    <PhotoBatchActionBar v-if="batchMode" :selected-count="batchSelectedCount" :operation-busy="batchOperationBusy" @clear-selection="clearBatchSelection" @add-favorite="runBatchAddFavorite" @remove-favorite="runBatchRemoveFavorite" @add-tag="runBatchAddTag" @delete-photos="runBatchDeletePhotos" />
+    <MediaBatchActionBar kind="photos" v-if="batchMode" :selected-count="batchSelectedCount" :operation-busy="batchOperationBusy" @clear-selection="clearBatchSelection" @add-favorite="runBatchAddFavorite" @remove-favorite="runBatchRemoveFavorite" @add-tag="runBatchAddTag" @delete-selection="runBatchDeletePhotos" />
   </div>
 </template>

@@ -120,9 +120,9 @@ vi.mock("@/components/jav-library/comics/ComicLibraryPage.vue", () => ({
   },
 }))
 
-vi.mock("@/components/jav-library/comics/ComicBatchActionBar.vue", () => ({
+vi.mock("@/components/jav-library/MediaBatchActionBar.vue", () => ({
   default: {
-    name: "ComicBatchActionBar",
+    name: "MediaBatchActionBar",
     props: ["selectedCount", "operationBusy"],
     emits: [
       "exit",
@@ -131,7 +131,7 @@ vi.mock("@/components/jav-library/comics/ComicBatchActionBar.vue", () => ({
       "addFavorite",
       "removeFavorite",
       "addTag",
-      "deleteComics",
+      "deleteSelection",
     ],
     template: `
       <div
@@ -142,7 +142,7 @@ vi.mock("@/components/jav-library/comics/ComicBatchActionBar.vue", () => ({
         <button data-batch-add-favorite @click="$emit('addFavorite')" />
         <button data-batch-remove-favorite @click="$emit('removeFavorite')" />
         <button data-batch-add-tag @click="$emit('addTag', 'batch-tag')" />
-        <button data-batch-delete @click="$emit('deleteComics')" />
+        <button data-batch-delete @click="$emit('deleteSelection')" />
         <button data-batch-select-all @click="$emit('selectAllVisible')" />
         <button data-batch-clear @click="$emit('clearSelection')" />
         <button data-batch-exit @click="$emit('exit')" />

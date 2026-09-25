@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
-import ComicBatchActionBar from "./ComicBatchActionBar.vue"
+import MediaBatchActionBar from "./MediaBatchActionBar.vue"
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -62,10 +62,27 @@ vi.mock("@/components/ui/input", () => ({
   },
 }))
 
-describe("ComicBatchActionBar", () => {
+describe("MediaBatchActionBar", () => {
+  it("uses photo labels and selection actions for the photo library", async () => {
+    const wrapper = mount(MediaBatchActionBar, {
+      props: { kind: "photos", selectedCount: 2, operationBusy: false },
+    })
+
+    expect(wrapper.get('[role="toolbar"]').attributes("aria-label")).toBe("photos.batchToolbarAria")
+    await wrapper.get("[data-photo-batch-open-tag]").trigger("click")
+    await wrapper.get("[data-photo-batch-tag-input]").setValue(" portrait ")
+    await wrapper.get("[data-photo-batch-submit-tag]").trigger("click")
+    await wrapper.get("[data-photo-batch-open-delete]").trigger("click")
+    await wrapper.get("[data-photo-batch-confirm-delete]").trigger("click")
+
+    expect(wrapper.emitted("addTag")).toEqual([["portrait"]])
+    expect(wrapper.emitted("deleteSelection")).toHaveLength(1)
+  })
+
   it("uses the library batch toolbar shape and emits comic batch actions", async () => {
-    const wrapper = mount(ComicBatchActionBar, {
+    const wrapper = mount(MediaBatchActionBar, {
       props: {
+        kind: "comics",
         selectedCount: 2,
         operationBusy: false,
       },
@@ -88,8 +105,9 @@ describe("ComicBatchActionBar", () => {
   })
 
   it("submits tags and confirms deletion from the comic batch toolbar", async () => {
-    const wrapper = mount(ComicBatchActionBar, {
+    const wrapper = mount(MediaBatchActionBar, {
       props: {
+        kind: "comics",
         selectedCount: 2,
         operationBusy: false,
       },
@@ -102,6 +120,6 @@ describe("ComicBatchActionBar", () => {
     await wrapper.get("[data-comic-batch-confirm-delete]").trigger("click")
 
     expect(wrapper.emitted("addTag")).toEqual([["artist:alpha"]])
-    expect(wrapper.emitted("deleteComics")).toHaveLength(1)
+    expect(wrapper.emitted("deleteSelection")).toHaveLength(1)
   })
 })

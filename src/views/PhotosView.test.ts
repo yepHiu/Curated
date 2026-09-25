@@ -95,12 +95,12 @@ vi.mock("@/components/jav-library/photos/PhotoLibraryPage.vue", () => ({
 }))
 
 vi.mock("@/composables/use-app-toast", () => ({ pushAppToast: vi.fn() }))
-vi.mock("@/components/jav-library/photos/PhotoBatchActionBar.vue", () => ({
+vi.mock("@/components/jav-library/MediaBatchActionBar.vue", () => ({
   default: {
-    name: "PhotoBatchActionBar",
+    name: "MediaBatchActionBar",
     props: ["selectedCount", "operationBusy"],
-    emits: ["addFavorite", "removeFavorite", "addTag", "deletePhotos"],
-    template: `<div data-photo-batch-bar :data-selected-count="selectedCount"><button data-batch-favorite @click="$emit('addFavorite')" /><button data-batch-tag @click="$emit('addTag', 'batch-tag')" /><button data-batch-delete @click="$emit('deletePhotos')" /></div>`,
+    emits: ["addFavorite", "removeFavorite", "addTag", "deleteSelection"],
+    template: `<div data-photo-batch-bar :data-selected-count="selectedCount"><button data-batch-favorite @click="$emit('addFavorite')" /><button data-batch-tag @click="$emit('addTag', 'batch-tag')" /><button data-batch-delete @click="$emit('deleteSelection')" /></div>`,
   },
 }))
 
