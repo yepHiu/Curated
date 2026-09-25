@@ -144,7 +144,7 @@ onMounted(async () => {
           <Moon v-else aria-hidden="true" />
         </Button>
       </div>
-      <Card class="gap-4 border-border py-5 shadow-sm">
+      <Card class="gap-4 border-0 py-5 shadow-none">
         <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] grid-rows-1 items-center gap-x-2.5 px-5 pb-0">
           <span class="flex size-9 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary" aria-hidden="true"><Server class="size-4" /></span>
           <h1 class="min-w-0 text-lg font-semibold tracking-tight">{{ t('title') }}</h1>
@@ -195,7 +195,7 @@ onMounted(async () => {
       </section>
 
       <section aria-labelledby="discovery-title">
-        <Card class="gap-3 border-border py-4 shadow-sm">
+        <Card class="gap-3 border-0 py-4 shadow-none">
           <CardHeader class="flex flex-row items-center justify-between gap-3 px-5 pb-0">
             <div class="flex min-w-0 items-center gap-2"><Network class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><h2 id="discovery-title" class="text-sm font-semibold">{{ t('discovery') }}</h2></div>
             <Button variant="ghost" size="sm" class="min-h-11 rounded-full text-muted-foreground sm:min-h-8" :disabled="scanning || !api" @click="discover"><RefreshCw :class="{ 'motion-safe:animate-spin': scanning }" aria-hidden="true" />{{ t('refresh') }}</Button>
