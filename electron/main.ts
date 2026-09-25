@@ -12,6 +12,7 @@ const launcherURL = pathToFileURL(launcherPath).href
 let launcher: BrowserWindow | undefined
 let library: BrowserWindow | undefined
 let tray: Tray | undefined
+let appIcon: Electron.NativeImage | undefined
 let store: ConnectionStore
 let current: SavedConnection | undefined
 let attempt: AbortController | undefined
@@ -30,6 +31,9 @@ else {
       // 图标解码失败不应阻止离线连接页；macOS 菜单栏需使用小尺寸图标。
       const trayImage = nativeImage.createFromPath(icon)
       if (!trayImage.isEmpty()) {
+        // Dock 使用原始品牌图标，不能复用菜单栏缩小后的位图。
+        appIcon = trayImage
+        if (process.platform === "darwin") app.dock?.setIcon(appIcon)
         tray = new Tray(process.platform === "darwin" ? trayImage.resize({ width: 18, height: 18 }) : trayImage)
         tray.setToolTip("Curated Desktop")
         // 点击托盘恢复当前业务窗口或连接页。
@@ -53,7 +57,7 @@ function showWindow(): void {
 /** 打开本地连接窗口；macOS 原生红黄绿按钮叠放在应用内容顶部。 */
 function showLauncher(): void {
   if (!launcher || launcher.isDestroyed()) {
-    launcher = new BrowserWindow({ width: 520, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop",
+    launcher = new BrowserWindow({ width: 520, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop", icon: appIcon,
       ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 16 } } : {}),
       webPreferences: {
       preload: path.join(directory, "launcher-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -150,7 +154,7 @@ async function connect(raw: string): Promise<{ ok: boolean; error?: string }> {
     }
     controller.signal.throwIfAborted()
     const selected = { url, serverId: info.serverId, name: info.name }
-    candidate = new BrowserWindow({ width: 1280, height: 820, minWidth: 960, minHeight: 640, show: false, title: "Curated", webPreferences: {
+    candidate = new BrowserWindow({ width: 1280, height: 820, minWidth: 960, minHeight: 640, show: false, title: "Curated", icon: appIcon, webPreferences: {
       partition: connectionPartition(selected), preload: path.join(directory, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false,
     } })
     const window = candidate
