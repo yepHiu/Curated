@@ -201,7 +201,7 @@ onMounted(async () => {
           <Card class="gap-3 border-0 py-4 shadow-none">
             <CardHeader class="flex flex-row items-center justify-between gap-3 px-5 pb-0">
               <div class="flex min-w-0 items-center gap-2"><Network class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><h2 id="discovery-title" class="text-sm font-semibold">{{ t('discovery') }}</h2></div>
-              <Button variant="ghost" size="sm" class="min-h-11 rounded-full text-muted-foreground sm:min-h-8" :disabled="scanning || !api" @click="discover"><RefreshCw :class="{ 'motion-safe:animate-spin': scanning }" aria-hidden="true" />{{ t('refresh') }}</Button>
+              <Button variant="ghost" size="sm" class="h-[29px] rounded-full py-0 text-muted-foreground" :disabled="scanning || !api" @click="discover"><RefreshCw :class="{ 'motion-safe:animate-spin': scanning }" aria-hidden="true" />{{ t('refresh') }}</Button>
             </CardHeader>
             <CardContent class="px-5 pt-0">
               <div v-if="scanning" role="status" class="flex min-h-28 items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle class="size-4 motion-safe:animate-spin" aria-hidden="true" />{{ t('searching') }}</div>
