@@ -658,3 +658,116 @@ c9ba0bf7 feat(backend): add comic scanner
 14c975a1 feat(backend): add comic archive reader
 b62647da feat(backend): add comic repositories
 ab814699 feat(backend): add comic schema and settings",versionSource=auto-patch; BuildStamp=20260915.161823; portable=versionSource=explicit; installer=versionSource=explicit
+2026-09-25,1.5.7,69986453,master,release:publish,release/manifest/release.json,失败,wujiahui,"69986453 style(player): align capture toolbar with truncated title
+c3bf26f5 style(player): move time labels closer to progress bar
+c556755d docs(photos): describe batch management and API
+0f6bea4b feat(photos): add library batch management
+59bf85ad feat(photos): support favorite updates and index deletion
+a7a9bfc7 style(library): align comic and photo card hover borders
+a1e63b5e style(library): highlight movie cards on hover
+5fdcf18a style(library): remove unselected movie card border
+ca6412b3 style: remove borders from insights rankings
+08505d8a style: remove borders from insights summary cards
+3c04f4f9 fix: bound GIF palette encoding to clip input
+d5edd384 fix: end stalled clip capture feedback
+47dbf7fc docs(ai): explain detail page translation previews
+39d821ae feat(detail): translate movie title and summary in place
+aa2fb929 style(library): truncate movie tag text from the right
+629ffe4d docs(home): explain scroll to library transition
+aac99789 feat(home): open library with bottom drawer transition
+3bc97cdb feat(home): remove taste radar section
+18c3e39a feat(library): link movie card codes to JavDB search
+0f7d5c2a style(home): remove hero action borders
+e289dcf3 style(home): reveal backdrop through hero play button
+36a9a040 style(home): restyle hero detail and play actions
+ae8e8b6a style(home): bring hero code divider closer to text
+df854c1c style(home): thicken hero code divider and remove hover color
+3a53fe9d style(home): add hero code underline and hover reveal
+4fc911c5 style(home): move hero code closer to title
+b9f12b4f style(home): enlarge hero codes and bring them closer to titles
+a8e6587f style(home): unbox hero movie codes
+4e187a0e fix(home): keep hero previews continuous across wrap
+2b49358e style(settings): use theme color for group headings
+000c5a1e style(settings): add inset dividers under group headings
+591e3561 docs(settings): record new settings categories
+72174820 feat(settings): reorganize navigation and sections
+3532cd90 docs(settings): record third-party license inventory
+99e2a39a feat(settings): list key third-party open-source licenses
+08502319 docs(settings): align license section title
+bfc84fa9 style(settings): rename About license section
+0c5e313a docs(settings): describe About license section
+6e6781da feat(settings): show concise usage licenses in About
+44e45093 docs(typography): record multilingual font rollout
+5807cacc feat(typography): adopt local HarmonyOS and Noto fonts
+8e864bcb docs(typography): compare Japanese font options
+4311ad11 docs(typography): add font comparison prototype
+6fa2e744 style(sidebar): hide navigation scrollbar
+2863e5dc docs(curated-frames): note removal of visual review
+ae04c9fe fix(curated-frames): remove visual similarity review
+6b4993cd style(insights): remove ranking descriptions
+cbf3c3ab style(insights): remove summary scope hint
+9d31ed6f style(insights): remove redundant guidance
+a9fd0949 docs(insights): align plan with implementation
+a2a37dd9 style(insights): apply compact personal insights layout
+8332082a docs(insights): add interactive UI prototype
+c2bb2346 docs(wishlist): assess cross-site playback lookup feasibility
+807a90df style(wishlist): place playback check beside title
+79060f84 style(wishlist): show icon-only playback check action
+527de239 style(wishlist): align playback action with status bottom
+505b6bda style(wishlist): use icon for manual playback link
+2aec0731 fix(wishlist): prevent playback status and action overlap
+dc5be384 style(wishlist): constrain playback site card widths
+1ab830a7 docs(wishlist): update playback check button label
+b8e776cc style(wishlist): compact playback check header
+5f056595 docs(wishlist): clarify site challenge results
+9eaa01b5 fix(wishlist): explain blocked playback checks and offer manual links
+baf9b570 docs(wishlist): narrow watch-site scope to two providers
+ec2ddad2 fix(wishlist): limit playback checks to Jable and MISSAV
+c0ce2833 docs(wishlist): document watch-site availability checks
+7a9b1f7e feat(wishlist): check external playback availability on details
+5dcc392d docs(agent): evaluate web search integration options
+4f39d530 docs(wishlist): document saved source page links
+fd5aba66 feat(wishlist): preserve source pages and display named links
+aa5fa50f fix(settings): show proxy test results inside buttons
+dc2c4a04 docs(settings): record plugin integration UI alignment
+398cd3c6 fix(settings): align browser plugin section with settings UI
+28e623ce docs(wishlist): document token-free browser plugin integration
+49ec338c feat(wishlist): replace browser credentials with plugin integration toggle
+e9ac0eef docs(wishlist): record simplified status and shared movie details
+f42e7e95 refactor(wishlist): reuse existing movie detail page
+caec436a fix(wishlist): simplify plugin status to a compact online indicator
+39a0face fix(wishlist): remove sidebar count and its polling
+1dc92535 docs(wishlist): record library UI alignment and plugin status behavior
+af70e0e2 feat(wishlist): align library layout and show plugin connection status
+8476921d feat(plugin): identify extension traffic in connected clients
+bd734e5b docs(plugin): replace split builds with a developer settings toggle
+b6eef478 docs(plugin): record isolated development mode and backend defaults
+b653b99d docs(wishlist): document setup implementation and verification evidence
+ce9a3a8b fix(backup): describe wishlist image coverage in settings
+43f41c89 fix(wishlist): complete navigation counts and runtime coverage
+acbb40ed fix(wishlist): retry asset copies without repeating metadata scraping
+2b2549a6 fix(wishlist): rebuild automatic links after movie identity changes
+390846ee feat(backup): preserve wishlist images in portable backups
+ac8b7fa1 feat(wishlist): reconcile library imports and reuse saved metadata
+6b6779f5 feat(wishlist): add poster wall details and plugin connection settings
+82735823 feat(wishlist): enrich catalog codes and persist poster assets
+339e1a8f feat(wishlist): persist code-only intake with scoped integration tokens
+283b074f docs(wishlist): record implementation plan and requirement
+0118abdd fix(player): remove undo action from capture receipts
+3e07902b fix(player): dismiss failed capture receipts after thirty seconds
+03a10f0e fix(player): dismiss capture success receipt after two seconds
+9b033d42 fix(player): shorten capture success receipt duration
+3b068982 docs(agent): document context capacity settings and validation
+fcc917e3 feat(agent): configure model context capacity and presets
+ffd77abf docs(agent): document context continuity and open-source research
+a4d64216 feat(agent): compact context and persist conversation checkpoints
+86f9a688 docs: record book agent and LAN review fixes
+f2126f24 fix(settings): show restart hint when disabling live LAN access
+282c26ed fix(agent): persist book write receipts atomically
+f0251dd9 fix(books): check AI note preconditions inside write transactions
+494455e8 fix(agent): filter book source filenames from private tool results
+d48d57d5 docs: record LAN access settings and PIN independence
+54034ab6 feat(settings): allow LAN access without requiring a PIN
+ffb32bbb chore(release): record published Curated 1.5.6",versionSource=auto-patch; BuildStamp=20260925.054725; error=pnpm exec vite build --configLoader native failed with exit code 1
+2026-09-25,1.5.7,69986453,master,release:publish,release/manifest/release.json,失败,wujiahui,无代码差异（同一提交重复打包）,versionSource=explicit; BuildStamp=20260925.055329; error=pnpm exec vite build --configLoader native failed with exit code 1
+2026-09-25,1.5.7,80c46d6c,master,release:publish,release/portable/Curated-1.5.7-windows-x64.zip; release/installer/Curated-Setup-1.5.7.exe; release/manifest/release.json,成功,wujiahui,80c46d6c refactor(library): share comic and photo batch toolbar,versionSource=explicit; BuildStamp=20260925.055548; portable=versionSource=explicit; installer=versionSource=explicit
