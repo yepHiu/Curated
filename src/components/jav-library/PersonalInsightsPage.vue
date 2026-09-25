@@ -442,7 +442,7 @@ async function generateNarrative() {
               :key="metric.key"
               :data-insights-metric="metric.key"
               :data-emphasis="metric.emphasis ? '' : undefined"
-              class="min-w-0 gap-2 p-4 data-[emphasis]:border-primary/30 data-[emphasis]:bg-primary/5 sm:p-5"
+              class="min-w-0 gap-2 border-0 p-4 data-[emphasis]:bg-primary/5 sm:p-5"
             >
               <CardHeader class="grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-0">
                 <CardDescription class="text-xs font-medium sm:text-sm">{{ metric.label }}</CardDescription>
