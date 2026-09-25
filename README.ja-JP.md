@@ -90,6 +90,8 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 
 ソース、テスト、必要な素材、すべての文書とプロトタイプを Git に保持し、ローカル生成物は[リポジトリ管理方針](docs/guide.md#repository-tracking-policy)に従います。
 
+ビルドサイズは通常の増加を許容し、急増を警告し、重大な上限超過のみ停止します。[レポートと基準](docs/guide.md#build-size-monitoring)を参照してください。
+
 ## 注意
 
 - 現在の段階は Web 優先 + 最小 Electron シェルです。より深い IPC、mpv、広範なネイティブ橋渡しは今後の目標です。

@@ -33,7 +33,7 @@
 | Lint | `pnpm lint` | `npm run lint` |
 | 测试 | `pnpm test` | `npm run test` |
 | 构建 | `pnpm build` | `npm run build` |
-| 单文件 Vitest | `pnpm test -- <file>` | `npm run test -- <file>` |
+| 单文件 Vitest | `pnpm test <file>` | `npm run test -- <file>` |
 
 若用 **`npm`** 管理依赖并需提交锁文件，应维护 **`package-lock.json`**；**不要**在同一 PR 里混改 `pnpm-lock.yaml` 与 `package-lock.json` 且无说明，以免团队混乱。
 
@@ -104,14 +104,33 @@ pnpm dev
 | 轻量运行时 e2e（Chromium） | `pnpm test:e2e` |
 | 生产构建 | `pnpm build`（内部含 `typecheck` + `vite build`） |
 
-`pnpm build` 同时执行 Bundle hard budget；超出任一预算会直接构建失败，并在成功构建时生成 `dist/bundle-analysis.json`。当前预算为：首屏静态 JS 闭包不超过 **500 kB raw / 165 kB gzip**，全部 JS 不超过 **2250 kB raw / 750 kB gzip**；`hls-player`、`pinyin-search`、入口 `index` 与 `SettingsView` 另有具名 chunk 预算。`hls-player` 允许作为独立动态大 chunk（上限 **525 kB raw / 165 kB gzip**），但不得进入 HTML modulepreload 或首屏静态依赖闭包。
+`pnpm build` 执行分级体积监管，配置集中在 `bundle-policy.json`。正常增长放行；超过关注线、单次突增或累计增长只提醒；仅超过绝对严重上限才失败。取消逐个具名 chunk 的硬预算与“chunk 缺失即失败”规则，单块超过 1 MB 或 HLS 进入首屏只提示检查懒加载。
 
-调整分块时不得通过重新增加 catch-all `vendor`、单纯调高 `chunkSizeWarningLimit` 或放宽 hard budget 来绕过回归。`chunkSizeWarningLimit: 525` 与 HLS 的显式 hard budget 对齐，仅避免对已知动态媒体播放器重复告警。
+| 指标 | 关注线（不阻断） | 严重上限（阻断） |
+|---|---:|---:|
+| 首屏静态 JS raw / gzip | 900 / 300 kB | 1500 / 500 kB |
+| 全部 JS raw / gzip | 5000 / 1600 kB | 8000 / 2500 kB |
+| 全部 CSS raw | 500 kB | 1500 kB |
+| 前端产物总量 raw | 100 MB | 150 MB |
+
+阈值严格使用 `>`，等于阈值不升级等级。单位为十进制字节。首屏包括入口的静态依赖闭包，动态导入不计入；总量包含字体、图片、JSON、public 复制文件等，排除报告自身。gzip 为逐 JS 文件压缩估算，不代表真实网络传输；范围不含 Electron、Go、FFmpeg 或最终安装包。
+
+增长提醒采用双基线：
+
+- 最近主分支 **frontend-quality 作业成功**的 Web 构建：增加量同时超过 **20%** 和绝对噪声门槛时提醒。
+- 版本控制中的人工确认基线 `bundle-baseline.json`：增加量同时超过 **50%** 和两倍绝对噪声门槛时提醒，防止每次小幅增长不断累计。
+- 各指标噪声门槛依次为首屏 raw 100 kB / gzip 30 kB、总 JS raw 300 kB / gzip 100 kB、CSS 100 kB、全部产物 10 MB。缩小不报警。基线不自动抬高绝对上限。
+
+`dist/bundle-analysis.json` 提供完整机器报告（指标、策略、对比快照、分块及大模块、资源排行），`dist/bundle-report.md` 提供可读摘要。报告在严重超限报错前写出。GitHub Actions 自动写入作业 Summary、显示 warning/error，并上传报告保留 90 天。只有主分支 push 且前端质量作业成功才保存下一次比较缓存；PR 只读。缓存可能因首次运行、过期或驱逐不可用，报告会注明，绝对上限及人工基线仍执行；Web/Mock 不跨模式比较。没有同模式人工基线时明确注明未进行累计比较。
+
+人工更新基线：先在 Web API 模式运行 `pnpm build`，审阅报告及新增功能合理性，再运行 `pnpm bundle:baseline` 并提交 `bundle-baseline.json`。该命令拒绝 Mock、损坏的报告和绝对严重超限，不改变 `bundle-policy.json`；读取的是最近一次本机 `dist` 报告，必须确保重新构建后再运行。不要把该命令加入每次构建或 CI，以免掩盖累计增长。调整策略阈值需在修改中说明原因，不能为了消除提醒而自动上调。
+
+新增监管测试：`pnpm test src/lib/bundle-policy.test.ts`。该测试覆盖真实 Vite 构建，包括提醒放行、超限失败后保留报告，以及 public/CSS 统计和动态导入排除。
 
 **单测文件**（示例）：
 
 ```bash
-pnpm test -- path/to/file.test.ts
+pnpm test path/to/file.test.ts
 ```
 
 `pnpm test:e2e` 会自动在独立的 4173（Mock）与 4174（Web API stub）端口启动 Vite，覆盖 Mock 导航不访问后端、锁定启动不请求受保护资源、解锁后只 hydrate 一次等日常运行时流程。它不依赖本机 5173/8080 开发服务。`pnpm test:display` 是独立的跨浏览器/多 viewport 长耗时套件，仍需按 UI 规范获得明确同意后才能运行，不纳入日常 CI。
@@ -187,7 +206,7 @@ cd backend && go test ./...
 
 GitHub Actions 的 `.github/workflows/ci.yml` 在 pull request 与 `master` push 上执行以上质量门禁，并额外运行生产依赖 high 漏洞审计、前端/Electron 构建和发布脚本测试。display-scaling 套件保持人工选择，不在该工作流中运行。
 
-CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows 生产包保持一致；仓库检出不依赖开发机未跟踪的 `.env`。Mock 模式继续由独立的运行时 e2e 服务覆盖。复现生产构建时，在 PowerShell 中先执行 `$env:VITE_USE_WEB_API = 'true'`，再运行 `pnpm build`，不得通过放宽 bundle budget 绕过模式差异。
+CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows 生产包保持一致；仓库检出不依赖开发机未跟踪的 `.env`。Mock 模式继续由独立的运行时 e2e 服务覆盖。复现生产构建时，在 PowerShell 中先执行 `$env:VITE_USE_WEB_API = 'true'`，再运行 `pnpm build`；Web/Mock 报告必须按模式隔离，不可通过交换基线绕过差异。
 
 ---
 

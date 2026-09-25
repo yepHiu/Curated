@@ -267,7 +267,7 @@ alwaysApply: true
 - `PATCH /api/settings` permits enabling before adding paths; scans still require configured valid paths. Closing a Beta hides its content navigation/configuration while keeping the settings switch available, blocks content/scanning endpoints and stops its watcher without deleting settings, indexes, progress or source archives. Web settings persist to `config/library-config.cfg`; Mock enable flags are session-only.
 - Migrations are `0046_comic_library.sql`, `0047_photo_library.sql`, `0048_photo_books.sql`, `0049_comic_photo_comments.sql`, `0050_comic_photo_user_title.sql`; existing experimental tables use idempotent creation. No runtime databases are copied from the old worktree.
 - Photo Beta supports ZIP/CBZ scanning, list/detail and page viewing only. Photo import, per-book progress/preferences APIs and concrete photo cache cleanup are not implemented. Thumbnails currently serve the original image; photo cache limits are reserved persisted settings.
-- Production builds extract pinyin-pro pure dictionaries into a hashed same-origin JSON asset via `vite.pinyin-data.ts`, retaining the existing match algorithm and bundle budgets. See `docs/plan/2026-09-10-comic-photo-beta-integration.md` for integration evidence.
+- Production builds extract pinyin-pro pure dictionaries into a hashed same-origin JSON asset via `vite.pinyin-data.ts`, retaining the existing match algorithm. Bundle governance now uses `bundle-policy.json` tiered warnings/absolute limits and recent/reviewed baselines; reports include the complete frontend output. See `docs/ops/2026-04-08-agent-build-and-test.md` (2026-09-25 policy). See `docs/plan/2026-09-10-comic-photo-beta-integration.md` for integration evidence.
 
 ## AI Agent 与漫画 / 写真库（2026-09-12）
 

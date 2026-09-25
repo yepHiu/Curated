@@ -62,6 +62,13 @@ alwaysApply: true
 - SSE 每 15 秒心跳；每次模型调用 2 分钟。工具步数仍遵循设置（0 表示不限）。历史保存已发布正文与来源快照，不保存未校验草稿、不授予旧引用权限。
 - 无新增配置或数据库迁移；后端重新运行新代码后生效。独立 Action 与来源元数据准确性不在此保证内。详见 `docs/guide.md` 与 milestone plan §16.6。
 
+## 构建体积监管（2026-09-25）
+
+- `pnpm build` 按 `bundle-policy.json` 执行分级监管：正常增长放行、关注/突增/累计增长提醒、绝对严重超限才失败。旧逐 chunk 硬预算退役。
+- 报告：`dist/bundle-report.md` / `bundle-analysis.json`，CI Summary 与 Artifact 留存 90 天；范围仅前端，不含 Electron/Go/FFmpeg/安装包。
+- 主分支成功前端质量作业缓存用于 20% 单次增长比较，人工 `bundle-baseline.json` 用于 50% 累计增长比较，两者均有绝对字节噪声门槛。基线/缓存缺失或模式不同不关闭绝对限制。
+- `pnpm bundle:baseline` 仅在重新执行 Web API 生产构建并审阅后手动更新、提交；禁止每次构建自动更新或自动上调阈值。完整规则见 `docs/ops/2026-04-08-agent-build-and-test.md`。
+
 ## 常见操作
 
 - **重启前后端**：先释放 `5173` 与后端端口（开发 `8080` / release `8081` 或配置里的 `httpAddr`），再分别启动。

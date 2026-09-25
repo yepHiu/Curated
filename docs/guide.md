@@ -6,6 +6,12 @@ Public HTTP API remains in root [`API.md`](../API.md). Folder policy for new doc
 
 If this handbook and current code disagree, treat the code as the source of truth.
 
+## Build size monitoring
+
+Builds allow reasonable feature growth. `bundle-policy.json` defines warning levels and generous absolute failure limits for initial JavaScript, all JavaScript, CSS, and the complete frontend output. A spike relative to the latest successful master frontend-quality job or cumulative growth since the reviewed `bundle-baseline.json` produces a warning, not a failure. Only an absolute severe limit blocks a build; named chunks no longer have individual hard caps.
+
+Read `dist/bundle-report.md` after `pnpm build`, or the GitHub Actions job Summary and uploaded bundle-size artifact (retained for 90 days). The JSON report includes the largest files and modules for investigation. CI saves comparison snapshots only from successful master frontend-quality jobs; missing or incompatible snapshots are reported and never disable absolute limits. Limits do not increase automatically. After reviewing a fresh production Web API build, maintainers can explicitly run `pnpm bundle:baseline` and commit the reviewed baseline. This monitors frontend output, including fonts and public assets; Electron, Go, FFmpeg and installer sizes are outside its scope. See [thresholds and comparison rules](ops/2026-04-08-agent-build-and-test.md#4-前端类型检查--lint--测试--构建).
+
 ## Repository tracking policy
 
 Git tracks application source, tests, dependency locks, CI/release scripts, required fonts and licenses, shared project rules, and **all documentation and prototypes**. Build output, runtime data, machine-specific configuration and optional local tools stay on the developer's machine. In particular, `backend/frontend-dist/`, `.claude/settings.local.json` and `.agents/` are not part of a fresh checkout. Build the frontend from source when needed; release packaging assembles its own frontend output.

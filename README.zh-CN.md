@@ -90,6 +90,8 @@ icon/       品牌源文件（wordmark / appicon / mark）
 
 源码、测试、必需资源以及全部文档和原型保留在 Git；本地产物遵循[仓库跟踪规则](docs/guide.md#repository-tracking-policy)。
 
+构建体积监管允许正常增长、提醒异常增长，仅在严重超限时阻断；详见[体积报告与规则](docs/guide.md#build-size-monitoring)。
+
 ## 说明
 
 - 当前阶段是 Web 优先 + 最小 Electron 壳。更深的 IPC、mpv 与广泛原生桥接仍是目标方向。
