@@ -480,7 +480,7 @@ async function generateNarrative() {
               v-for="definition in breakdownDefinitions"
               :key="definition.dimension"
               :data-insights-breakdown="definition.dimension"
-              class="min-w-0 gap-3"
+              class="min-w-0 gap-3 border-0"
             >
               <CardHeader class="grid-cols-[minmax(0,1fr)_auto] items-start gap-2 pb-0">
                 <CardTitle class="min-w-0 text-base">{{ t(definition.titleKey) }}</CardTitle>
@@ -509,7 +509,7 @@ async function generateNarrative() {
                 <div
                   v-for="item in breakdownPending[definition.dimension] || breakdownErrors[definition.dimension] ? [] : visibleBreakdownItems(definition.dimension)"
                   :key="item.name"
-                  class="flex min-w-0 flex-col gap-2 border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+                  class="flex min-w-0 flex-col gap-2"
                 >
                   <div class="flex min-w-0 items-start justify-between gap-3">
                     <span class="min-w-0 truncate text-sm font-medium" :title="item.name">{{ item.name }}</span>
