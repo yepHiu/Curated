@@ -53,7 +53,7 @@ function showWindow(): void {
 /** 打开本地连接窗口；macOS 原生红黄绿按钮叠放在应用内容顶部。 */
 function showLauncher(): void {
   if (!launcher || launcher.isDestroyed()) {
-    launcher = new BrowserWindow({ width: 720, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop",
+    launcher = new BrowserWindow({ width: 520, height: 740, minWidth: 520, minHeight: 540, title: "Curated Desktop",
       ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 20, y: 16 } } : {}),
       webPreferences: {
       preload: path.join(directory, "launcher-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true,
