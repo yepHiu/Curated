@@ -204,7 +204,7 @@ const handleFavoriteChange = (nextValue: boolean) => {
     :class="
       props.batchChecked
         ? 'border-2 border-primary shadow-lg shadow-primary/20'
-        : 'border border-border/70 hover:border-primary/25 hover:shadow-lg'
+        : 'border-0 hover:shadow-lg'
     "
     :data-movie-card-id="movie.id"
     :data-movie-card-selected="props.batchChecked ? 'true' : undefined"
