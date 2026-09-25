@@ -2978,20 +2978,37 @@ const videoPreloadMode = computed(() =>
     >
       <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div
-        class="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:p-5"
+        class="absolute inset-x-0 top-0 z-20 flex flex-wrap items-center gap-2 bg-gradient-to-b from-black/85 via-black/40 to-transparent p-4 sm:flex-nowrap sm:gap-3 sm:p-5"
         :class="[CHROME_LAYER_TRANSITION, chromeLayerVisibleClass]"
       >
-        <div class="min-w-0 text-left">
-          <p class="truncate text-lg font-semibold leading-tight text-white sm:text-xl">
+        <div class="min-w-0 w-full text-left sm:w-auto sm:flex-1">
+          <p class="flex min-w-0 items-baseline text-lg font-semibold leading-tight text-white sm:text-xl">
             <span
               v-if="movie.code"
               data-player-heading-code
-              class="mr-2 font-medium text-white/70"
+              class="mr-2 max-w-[35%] shrink-0 truncate font-medium text-white/70"
             >
               {{ movie.code }}
             </span>
-            <span data-player-heading-title>{{ movie.title }}</span>
+            <span data-player-heading-title class="min-w-0 truncate" :title="movie.title">{{ movie.title }}</span>
           </p>
+        </div>
+        <div v-if="playbackSrc && chromeVisible" data-player-capture-toolbar class="flex max-w-full shrink-0 flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
+          <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
+          <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
+          <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
+          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase() }}</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child><Button size="icon-sm" variant="ghost" :disabled="clipCapturePhase !== 'idle'" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent :portal-to="surfaceRef ?? undefined">
+              <DropdownMenuRadioGroup v-model="clipFormat">
+                <DropdownMenuRadioItem value="gif">GIF</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mp4">MP4</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="webm">WebM</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
         </div>
       </div>
 
@@ -3174,23 +3191,6 @@ const videoPreloadMode = computed(() =>
           :class="curatedShutterActive ? 'curated-shutter-ring' : ''"
           aria-hidden="true"
         />
-        <div v-if="playbackSrc && chromeVisible" class="absolute right-3 top-16 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1 rounded-lg bg-background/90 p-1 text-foreground max-sm:[&_button]:min-h-11" @click.stop @pointerdown.stop>
-          <Button size="sm" variant="ghost" @click="stepFrame(-1)" :aria-label="t('curated.previousFrame')"><SkipBack /></Button>
-          <Button size="sm" variant="ghost" @click="captureSingleFrame"><Camera />{{ t('curated.captureAction') }}</Button>
-          <Button v-if="libraryService.supportsSourceFrame" size="sm" variant="ghost" @click="extractSourceFrame">{{ t('curated.captureSource') }}</Button>
-          <Button size="sm" variant="ghost" @click="toggleClipRecording" :disabled="clipCapturePhase === 'processing'">{{ clipCaptureIsRecording ? t('curated.stopClip') : clipFormat.toUpperCase() }}</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child><Button size="icon-sm" variant="ghost" :disabled="clipCapturePhase !== 'idle'" :aria-label="t('curated.clipFormat')"><ChevronDown /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent :portal-to="surfaceRef ?? undefined">
-              <DropdownMenuRadioGroup v-model="clipFormat">
-                <DropdownMenuRadioItem value="gif">GIF</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mp4">MP4</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="webm">WebM</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" variant="ghost" @click="stepFrame(1)" :aria-label="t('curated.nextFrame')"><SkipForward /></Button>
-        </div>
         <video
           v-if="playbackSrc"
           ref="videoRef"
