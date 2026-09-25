@@ -165,8 +165,8 @@ onMounted(async () => {
                 <AlertDescription class="break-words">{{ error }}</AlertDescription>
               </Alert>
               <div class="flex flex-wrap items-center justify-end gap-2">
-                <Button v-if="busy" type="button" variant="outline" class="h-9 rounded-full" @click="cancel">{{ t('cancel') }}</Button>
-                <Button type="submit" class="h-9 rounded-full px-5" :disabled="busy || !api || !address.trim()">
+                <Button v-if="busy" type="button" variant="outline" class="h-[29px] rounded-full px-5 py-0" @click="cancel">{{ t('cancel') }}</Button>
+                <Button type="submit" class="h-[29px] min-w-24 rounded-full px-6 py-0 has-[>svg]:px-6" :disabled="busy || !api || !address.trim()">
                   <LoaderCircle v-if="busy" class="motion-safe:animate-spin" aria-hidden="true" />
                   {{ busy ? t('connecting') : t('connect') }}
                   <ArrowRight v-if="!busy" aria-hidden="true" />
