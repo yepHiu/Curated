@@ -298,6 +298,14 @@ func (s *SQLiteStore) PatchPhotoBook(ctx context.Context, photoID string, patch 
 		sets = append(sets, "user_title = ?")
 		args = append(args, title)
 	}
+	if patch.Favorite != nil {
+		v := 0
+		if *patch.Favorite {
+			v = 1
+		}
+		sets = append(sets, "is_favorite = ?")
+		args = append(args, v)
+	}
 	if patch.RatingSet {
 		if patch.RatingClear || patch.Rating == nil {
 			sets = append(sets, "user_rating = NULL")
@@ -343,4 +351,24 @@ func (s *SQLiteStore) PatchPhotoBook(ctx context.Context, photoID string, patch 
 		return contracts.PhotoBookDetailDTO{}, err
 	}
 	return s.GetPhotoBookDetail(ctx, photoID)
+}
+
+// DeletePhotoBookIndex removes the indexed photo book and dependent metadata, never its source archive.
+func (s *SQLiteStore) DeletePhotoBookIndex(ctx context.Context, photoID string) error {
+	photoID = strings.TrimSpace(photoID)
+	if photoID == "" {
+		return ErrPhotoBookNotFound
+	}
+	result, err := s.db.ExecContext(ctx, `DELETE FROM photo_books WHERE id = ?`, photoID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrPhotoBookNotFound
+	}
+	return nil
 }

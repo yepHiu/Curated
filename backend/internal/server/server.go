@@ -600,6 +600,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /api/library/photos", h.handleListPhotos)
 	mux.HandleFunc("GET /api/library/photos/{photoId}", h.handleGetPhoto)
 	mux.HandleFunc("PATCH /api/library/photos/{photoId}", h.handlePatchPhoto)
+	mux.HandleFunc("DELETE /api/library/photos/{photoId}", h.handleDeletePhoto)
 	mux.HandleFunc("PATCH /api/library/photos/books/{photoId}/tags", h.handleReplacePhotoTags)
 	mux.HandleFunc("GET /api/library/photos/books/{photoId}/comment", h.handleGetPhotoComment)
 	mux.HandleFunc("PUT /api/library/photos/books/{photoId}/comment", h.handlePutPhotoComment)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,8 +20,12 @@ import (
 func TestPhotoRatingHandlersPersistAndRejectInvalid(t *testing.T) {
 	root := t.TempDir()
 	store := newImportTestStore(t, root)
+	source := filepath.Join(root, "photo.cbz")
+	if err := os.WriteFile(source, []byte("archive"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	book, err := store.UpsertPhotoBook(t.Context(), storage.PhotoBookUpsert{
-		Location: filepath.Join(root, "photo.cbz"),
+		Location: source,
 		Title:    "Photo",
 	})
 	if err != nil {
@@ -88,5 +93,35 @@ func TestPhotoRatingHandlersPersistAndRejectInvalid(t *testing.T) {
 	}
 	if w := request(h.Routes(), http.MethodPatch, url, `{"title":"  "}`); w.Code != http.StatusBadRequest {
 		t.Fatalf("empty title: %d %s", w.Code, w.Body.String())
+	}
+
+	w = request(h.Routes(), http.MethodPatch, url, `{"favorite":true}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("favorite photo: %d %s", w.Code, w.Body.String())
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil || !detail.IsFavorite {
+		t.Fatalf("favorite detail: %#v, %v", detail, err)
+	}
+	w = request(h.Routes(), http.MethodPatch, url, `{"favorite":false}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unfavorite photo: %d %s", w.Code, w.Body.String())
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &detail); err != nil || detail.IsFavorite {
+		t.Fatalf("unfavorite detail: %#v, %v", detail, err)
+	}
+	if w := request(disabled.Routes(), http.MethodDelete, url, ""); w.Code != http.StatusBadRequest {
+		t.Fatalf("disabled delete: %d %s", w.Code, w.Body.String())
+	}
+	if w := request(h.Routes(), http.MethodDelete, url, ""); w.Code != http.StatusNoContent {
+		t.Fatalf("delete photo: %d %s", w.Code, w.Body.String())
+	}
+	if w := request(h.Routes(), http.MethodGet, url, ""); w.Code != http.StatusNotFound {
+		t.Fatalf("get deleted photo: %d %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Stat(source); err != nil {
+		t.Fatalf("source archive must remain: %v", err)
+	}
+	if w := request(h.Routes(), http.MethodDelete, url, ""); w.Code != http.StatusNotFound {
+		t.Fatalf("delete missing photo: %d %s", w.Code, w.Body.String())
 	}
 }

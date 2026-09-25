@@ -99,6 +99,7 @@ type PutPhotoCommentRequest struct {
 // PatchPhotoBookRequest updates writable photo-book fields. Rating uses the same set/clear flags as comics.
 type PatchPhotoBookRequest struct {
 	Title       *string  `json:"title,omitempty"`
+	Favorite    *bool    `json:"favorite,omitempty"`
 	RatingSet   bool     `json:"ratingSet,omitempty"`
 	RatingClear bool     `json:"ratingClear,omitempty"`
 	Rating      *float64 `json:"rating,omitempty"`

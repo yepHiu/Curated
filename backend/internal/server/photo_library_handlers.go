@@ -107,6 +107,22 @@ func (h *Handler) handlePatchPhoto(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, detail)
 }
 
+func (h *Handler) handleDeletePhoto(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePhotoLibraryEnabled(w) {
+		return
+	}
+	photoID := strings.TrimSpace(r.PathValue("photoId"))
+	if err := h.store.DeletePhotoBookIndex(r.Context(), photoID); err != nil {
+		if errors.Is(err, storage.ErrPhotoBookNotFound) {
+			writeAppError(w, http.StatusNotFound, contracts.ErrorCodePhotoBookNotFound, "photo not found")
+			return
+		}
+		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to delete photo index")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) handleListPhotoPages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
