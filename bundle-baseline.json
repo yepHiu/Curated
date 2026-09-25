@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "mode": "web",
+  "metrics": {
+    "initialRaw": 411276,
+    "initialGzip": 145446,
+    "jsRaw": 2258337,
+    "jsGzip": 699589,
+    "cssRaw": 319422,
+    "distRaw": 33619065
+  },
+  "generatedAt": "2026-09-25T12:49:33.633Z",
+  "sourceCommit": "c1e97ba5ef683cc4916ece1a74199c4a884c4ba4"
+}

@@ -67,10 +67,29 @@ jobs:
       - name: Run Electron unit tests
         run: pnpm test:electron
 
+      - name: Restore recent successful master bundle
+        uses: actions/cache/restore@v4
+        with:
+          path: .workspace/bundle-baseline
+          key: bundle-v2-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            bundle-v2-${{ runner.os }}-
+
       - name: Build frontend
         env:
           VITE_USE_WEB_API: "true"
         run: pnpm build
+
+      - name: Upload bundle size reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size-${{ github.sha }}
+          path: |
+            dist/bundle-analysis.json
+            dist/bundle-report.md
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Build Electron main process
         run: pnpm build:electron:main
@@ -80,6 +99,19 @@ jobs:
 
       - name: Test release build steps
         run: python -m unittest scripts.release.tests.test_build_steps
+
+      - name: Prepare successful master bundle snapshot
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          mkdir -p .workspace/bundle-baseline
+          cp dist/bundle-analysis.json .workspace/bundle-baseline/bundle-analysis.json
+
+      - name: Save successful master bundle snapshot
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: .workspace/bundle-baseline
+          key: bundle-v2-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
   backend-quality:
     name: Go test and vet

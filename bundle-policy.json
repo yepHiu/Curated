@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "metrics": {
+    "initialRaw": { "label": "首屏 JS（raw）", "warn": 900000, "fail": 1500000, "growthFloor": 100000 },
+    "initialGzip": { "label": "首屏 JS（gzip）", "warn": 300000, "fail": 500000, "growthFloor": 30000 },
+    "jsRaw": { "label": "全部 JS（raw）", "warn": 5000000, "fail": 8000000, "growthFloor": 300000 },
+    "jsGzip": { "label": "全部 JS（gzip）", "warn": 1600000, "fail": 2500000, "growthFloor": 100000 },
+    "cssRaw": { "label": "全部 CSS（raw）", "warn": 500000, "fail": 1500000, "growthFloor": 100000 },
+    "distRaw": { "label": "前端产物总量（raw）", "warn": 100000000, "fail": 150000000, "growthFloor": 10000000 }
+  },
+  "growth": { "recentRatio": 0.2, "reviewedRatio": 0.5, "reviewedFloorMultiplier": 2 },
+  "chunkWarningBytes": 1000000
+}

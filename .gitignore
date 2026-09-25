@@ -24,6 +24,7 @@ blob-report/
 scripts/
 !scripts/
 scripts/*
+!scripts/build/
 !scripts/dev/
 scripts/dev/*
 !scripts/dev/copy-electron-preload.cjs
