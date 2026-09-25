@@ -72,6 +72,8 @@ alwaysApply: true
 
 ## 常见操作
 
+- **macOS Desktop 开发名称**：`pnpm dev:electron` 通过 `scripts/dev/start-electron.cjs` 启动 `.workspace/electron-dev/<electron-version>/Curated.app`。独立 bundle 名称和开发标识用于 Dock 展示；不直接修改 `node_modules` 内 Electron.app，连接记录目录不变。
+
 - **重启前后端**：先释放 `5173` 与后端端口（开发 `8080` / release `8081` 或配置里的 `httpAddr`），再分别启动。
 - **测试托盘模式**：Windows 下可运行 `go run ./cmd/curated -mode tray`；二次启动会复用现有实例并重新打开浏览器。
 - **修改 API 行为**：优先改 `backend/internal/server` 与 `backend/internal/app`，前端路径集中在 `src/api/endpoints.ts`。
