@@ -522,3 +522,9 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 归属：服务器列表是 Desktop；语言/外观、前端日志、萃取快捷键/保存策略/反馈音/本机导出目录及原生播放器协议模板是客户端本地。开机启动、自动下载更新、三库及阅读器默认配置、元数据、代理/LAN、插件联动、连接设备、PIN、AI、维护、后端日志均由 Server 管理。播放与萃取帧卡片显示双标签，并在内部具体配置标题标注；关于页的更新区按实际目标标注，许可证等通用信息不强行归类。覆盖加载/只读/禁用状态，复用固定归属标签，不把在线状态或权限与归属混为一谈。无全局颜色或密度令牌变更。
 
 验证：设置组件原有 187 项测试与新增归属标签 3 项测试通过（修复受新增 Badge 影响的局部 UI mock；Node 运行时使用 `NODE_OPTIONS=--no-experimental-webstorage` 避免实验性 localStorage 覆盖 DOM 测试环境）。类型检查、相关 ESLint、Web API 生产构建通过，体积 0 提醒/超限。Playwright 注入 Desktop 测试桥接，检查通用、网络、萃取帧的归属标签及深浅色、1280×720 和 375×812 默认缩放布局，未发现标题/标签重叠；未修改真实配置，未重启 Desktop。证据位于 `.workspace/server-connections/settings-scope-*.png`；未运行 `pnpm test:display` 或完整跨平台/DPR/缩放矩阵。
+
+### 15.5 设置说明收进悬浮提示（2026-09-26）
+
+按用户要求，设置页的常驻解释性文案改为设置标题上的 Tooltip，复用 Reka Tooltip 与既有 popover 语义令牌。标题悬停约 350ms 或键盘聚焦展示，点击/Enter/Space 可切换，Escape/移开关闭；触屏可点标题查看。提示宽度随视口收缩，可移入阅读，不新增整排问号或说明行。卡片说明附着对应卡片标题，字段/选项说明附着各自标题，不改变开关/输入/保存行为。错误、实时状态、受限原因及危险确认框内容继续就地显示。保留表单 aria-describedby 所需的隐藏说明；无全局令牌变更。
+
+验证：设置相关 193 项测试通过（含 Tooltip 默认隐藏、聚焦/点击/键盘展示、Escape 关闭与保留原按钮键盘行为），类型检查、相关 ESLint、Web API 生产构建通过，体积 0 提醒/超限。Playwright 在独立浏览器检查播放/网络/AI/萃取帧默认布局及标题悬停；1280×720 和 375×812、DPR 1、默认缩放的深色 tip 正常，窄屏浮层限宽并避让视口边缘，Escape 实测关闭。证据 `.workspace/settings-hints/`。未修改业务配置或重启 Desktop，未运行完整跨平台/深浅色/显示缩放矩阵与 `pnpm test:display`。

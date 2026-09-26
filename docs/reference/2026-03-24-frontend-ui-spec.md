@@ -49,13 +49,15 @@
 **信息架构**
 
 - **卡片级 `CardTitle`**：只写**短标题**（分区名），不写长说明。
-- **`CardDescription`**：**可选**；若下方各 nested 块已自带说明，**勿**再加大段顶栏描述，以免重复。
+- **`CardDescription`**：普通说明收进标题 Tooltip；只有需要当下处理的状态或后果才就地显示。
 
 **卡片标题行（`CardHeader`）**
 
 - 布局：`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5`；左 **`size-9`** 图标区（弱 primary 表面），右 **`CardTitle`**：`text-lg tracking-tight` + `min-w-0`；装饰图标 `aria-hidden="true"`。
 
 设置归属标签统一复用 `SettingsScopeBadge`（outline Badge），置于卡片短标题右侧，标题行 `flex flex-wrap items-center gap-2`。`Server` 按当前服务器的真实配置/数据归属判断；桌面壳配置为 `Desktop`；客户端存储偏好在桌面显示 `Desktop`，浏览器显示 `Browser`。播放、萃取帧等混合卡片用双标签并标明内部字段；同一归属的 nested 块不重复堆标签。标签用语义边框/弱底色/次要文字，不采用在线状态色，不改变权限和保存逻辑。许可证等通用信息不强行归类。
+
+设置页的普通解释性文案默认收进 `SettingsHint`（Reka Tooltip）：附着于对应设置标题/选项名称，悬停 350ms、键盘聚焦或点击可查看，Escape 关闭；使用 popover 语义色、视口限宽和 collision padding，不增加常驻说明段或整排问号。原有按钮/链接的键盘行为不被提示拦截。表单描述 ID 可保留 `sr-only` 供辅助技术读取；错误、保存/连接状态、不可用原因、待重启提示与危险确认说明继续就地显示，不按文字颜色批量隐藏。
 
 **垂直节奏**
 
