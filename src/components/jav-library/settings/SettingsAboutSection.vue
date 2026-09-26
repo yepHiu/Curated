@@ -44,13 +44,21 @@ const aboutRepositoryHref = computed(() =>
 
 const licenseItems = computed(() => [
   { name: "Curated", detail: t("settings.aboutLicenseValue"), url: curatedLicenseUrl },
-  { name: "HarmonyOS Sans SC", detail: t("settings.aboutHarmonyFontNotice"), url: harmonySansLicenseUrl },
-  { name: "Noto Sans", detail: "SIL Open Font License 1.1", url: notoSansLicenseUrl },
-  { name: "Noto Sans JP", detail: "SIL Open Font License 1.1", url: notoSansJpLicenseUrl },
-  { name: "Outfit", detail: "SIL Open Font License 1.1", url: outfitLicenseUrl },
 ])
 
-const thirdPartyGroups = [
+const thirdPartyGroups = computed<Array<{
+  titleKey: string
+  items: Array<{ name: string; license: string; url?: string; detail?: string }>
+}>>(() => [
+  {
+    titleKey: "settings.aboutThirdPartyFonts",
+    items: [
+      { name: "HarmonyOS Sans SC", license: "HarmonyOS Sans Fonts License", detail: t("settings.aboutHarmonyFontNotice"), url: harmonySansLicenseUrl },
+      { name: "Noto Sans", license: "SIL Open Font License 1.1", url: notoSansLicenseUrl },
+      { name: "Noto Sans JP", license: "SIL Open Font License 1.1", url: notoSansJpLicenseUrl },
+      { name: "Outfit", license: "SIL Open Font License 1.1", url: outfitLicenseUrl },
+    ],
+  },
   {
     titleKey: "settings.aboutThirdPartyFrontend",
     items: [
@@ -81,9 +89,9 @@ const thirdPartyGroups = [
       { name: "FFmpeg", license: "GPL-3.0-or-later" },
     ],
   },
-]
+])
 
-const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.items.length, 0)
+const thirdPartyCount = computed(() => thirdPartyGroups.value.reduce((count, group) => count + group.items.length, 0))
 </script>
 
 <template>
@@ -310,7 +318,16 @@ const thirdPartyCount = thirdPartyGroups.reduce((count, group) => count + group.
                   class="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 text-xs leading-relaxed sm:text-sm"
                 >
                   <span class="shrink-0 text-foreground">{{ item.name }}</span>
-                  <span class="shrink-0 text-muted-foreground">{{ item.license }}</span>
+                  <a
+                    v-if="item.url"
+                    :href="item.url"
+                    :aria-label="t('settings.aboutViewLicenseFor', { name: item.name })"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >{{ item.license }}</a>
+                  <span v-else class="shrink-0 text-muted-foreground">{{ item.license }}</span>
+                  <span v-if="item.detail" class="w-full text-muted-foreground">{{ item.detail }}</span>
                 </li>
               </ul>
             </div>

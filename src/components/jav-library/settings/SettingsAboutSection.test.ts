@@ -67,7 +67,13 @@ describe("SettingsAboutSection", () => {
     expect(wrapper.text()).toContain("settings.aboutHarmonyFontNotice")
     expect(wrapper.findAll('a[href*="LICENSE"]')).toHaveLength(5)
     expect(wrapper.get("details summary").text()).toContain("settings.aboutThirdPartyTitle")
-    expect(wrapper.findAll("details li")).toHaveLength(15)
+    expect(wrapper.findAll("details li")).toHaveLength(19)
+    expect(wrapper.get("details summary").text()).toContain('"count":19')
+    for (const font of ["HarmonyOS Sans SC", "Noto Sans", "Noto Sans JP", "Outfit"]) {
+      const row = wrapper.findAll("details li").find((item) => item.text().includes(font))
+      expect(row?.find("a").exists()).toBe(true)
+    }
+    expect(wrapper.findAll('details a[href*="LICENSE"]')).toHaveLength(4)
     expect(wrapper.text()).toContain("FFmpeg")
     expect(wrapper.get('details a[href*="ThirdParty_NOTICES"]').text()).toBe(
       "settings.aboutThirdPartyNoticesLink",

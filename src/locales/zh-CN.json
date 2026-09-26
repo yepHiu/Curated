@@ -1428,6 +1428,7 @@
     "aboutViewLicense": "查看许可",
     "aboutViewLicenseFor": "查看 {name} 的使用许可",
     "aboutThirdPartyTitle": "更多开源组件（{count}）",
+    "aboutThirdPartyFonts": "字体",
     "aboutThirdPartyFrontend": "前端",
     "aboutThirdPartyBackend": "后端",
     "aboutThirdPartyDesktop": "桌面运行时",

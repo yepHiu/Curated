@@ -1428,6 +1428,7 @@
     "aboutViewLicense": "ライセンスを見る",
     "aboutViewLicenseFor": "{name} のライセンスを見る",
     "aboutThirdPartyTitle": "その他のオープンソースコンポーネント（{count}件）",
+    "aboutThirdPartyFonts": "フォント",
     "aboutThirdPartyFrontend": "フロントエンド",
     "aboutThirdPartyBackend": "バックエンド",
     "aboutThirdPartyDesktop": "デスクトップ実行環境",

@@ -1440,6 +1440,7 @@
     "aboutViewLicense": "View license",
     "aboutViewLicenseFor": "View the {name} license",
     "aboutThirdPartyTitle": "More open-source components ({count})",
+    "aboutThirdPartyFonts": "Fonts",
     "aboutThirdPartyFrontend": "Frontend",
     "aboutThirdPartyBackend": "Backend",
     "aboutThirdPartyDesktop": "Desktop runtime",
