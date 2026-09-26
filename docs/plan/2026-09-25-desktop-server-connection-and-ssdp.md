@@ -4,6 +4,14 @@
 
 ## 1. 需求与当前事实
 
+### 2026-09-26 关于页版本与包名核对
+
+- 当前关于页展示 Server 版本及安装包版本，没有独立 Desktop 版本行。Electron 的 `app.getVersion()` 已用于请求头和入口查询参数，但没有通过可信桌面桥接提供给关于页；开发仓库版本为 `0.0.1-master`。
+- 当前更新检查由 Go `internal/appupdate` 执行，以 `version.PackageVersion()` 比较 GitHub 最新发布。开发态回退值为 `0.0.0`；该值不是本机 Desktop 版本。不能把现有「安装包版本」直接改名为「Desktop 版本」。
+- 现有资产解析只选择 EXE，并优先名称含 setup/installer 的资产，没有按 Desktop / Server、客户端平台和架构独立匹配。因此 macOS Desktop 不能把现有后端检查结果当作自身更新；没有匹配产物时应明确说明未提供更新包。
+- 已落地的 Windows 一体安装包名为 `Curated-Setup-<version>.exe`，便携包为 `Curated-<version>-windows-x64.zip`。当前发布版本文件为 `1.5.7`。打包时 Electron 的 `curated-desktop` package 版本被写成同批发布版本；它是内部包标识，不是独立 Desktop 安装包已实现的证据。
+- 第 10 节的 Full / Server / Desktop 三包名称仍是建议，尚未由脚本实现；macOS 的 DMG/PKG 形式、架构和最终名称也未落地。本次只核对并补记事实，没有实施独立 Desktop 更新器或更改发布命名。
+
 用户希望桌面端能够独立连接其他机器上的 Curated 服务端：首次未连接时填写地址和端口，之后能够更换服务器，并增加 SSDP 自动发现。本轮仅讨论需求。
 
 代码核对：
