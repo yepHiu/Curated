@@ -558,6 +558,6 @@
 <section><h2>Desktop 此设备设置（2026-09-26）</h2><p>连接页「打开设置」提供本机代理与 Desktop 登录自启动。代理配置独立保存在 userData/desktop-settings.json，重启客户端后应用于连接检查、业务页面与更新检查；SSDP 仍直连。macOS/Windows 自启动使用系统登录项，不管理 Server。仅本地连接页可访问设置 IPC；Windows 登录启动及真实注销/登录尚未实测。</p></section>
 <section><h2>设置与远程操作边界</h2><p>网络页已接入 discoveryEnabled，保存后重启 Server 应用；关于页提供 Desktop 版本及更换入口。服务器目录与客户端文件选择分离，host-only 程序操作拒绝远程调用。</p></section>
 <section><h2>组件发行（2026-09-25）</h2><p>已接入 full/server/desktop 组件组装、安装脚本和精确组件更新选择。Windows EXE 编译及安装验收、旧版自动迁移和 feed 隔离发布尚未完成，当前不是可发布版本。</p></section>
-<section><h2>跨平台 CI 构建（2026-09-26）</h2><p>新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 EXE、macOS 15+ arm64/x64 PKG 各支持 Full/Server/Desktop，默认九包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；Server 以 curated-server 命令独立运行，尚无 macOS 托盘/服务。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。</p></section>
+<section><h2>跨平台 CI 构建（2026-09-26）</h2><p>新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 提供 Full/Server/Desktop 三个 EXE；macOS 15+ 仅提供 Apple Silicon Desktop PKG，默认共四包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；不构建 macOS Server、Full 或 Intel 包。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。</p></section>
 </body>
 </html>

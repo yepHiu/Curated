@@ -101,4 +101,4 @@ alwaysApply: true
 
 ## 跨平台 CI 打包（2026-09-26）
 
-新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 EXE、macOS 15+ arm64/x64 PKG 各支持 Full/Server/Desktop，默认九包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；Server 以 curated-server 命令独立运行，尚无 macOS 托盘/服务。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。
+新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 提供 Full/Server/Desktop 三个 EXE；macOS 15+ 仅提供 Apple Silicon Desktop PKG，默认共四包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；不构建 macOS Server、Full 或 Intel 包。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。

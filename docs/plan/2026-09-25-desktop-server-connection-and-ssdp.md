@@ -388,11 +388,12 @@ macOS 窗口集成：按用户要求，连接窗口采用原生 `titleBarStyle: 
 
 ### 11.6 GitHub Actions Windows / macOS 构建链（2026-09-26）
 
-已新增手动工作流 `Build installers`，明确版本号、平台及组件输入，使用 windows-2022、macos-15（arm64）、macos-15-intel（x64）。默认九个安装包：每种目标环境各 Full、Server、Desktop。Full 复用独立组件；只选单组件只构建所需资源。
+按用户确认收窄范围：Server 不支持 macOS，macOS Desktop 仅支持 Apple Silicon，不构建 Intel 包。手动工作流 `Build installers` 使用 windows-2022 和 macos-15（arm64）；默认 **Windows Full/Server/Desktop 三包 + macOS Desktop 一包，共四包**。
 
-- Windows 复用现有三包脚本，准备 Inno 与真实 FFmpeg，缺少编译器导致的 scripts-only 在上传前判失败。
-- macOS 增加原生 Go Server 编译、Curated.app 品牌/图标、FFmpeg 动态依赖迁移和原生检查、pkgbuild/productbuild 安装包。Full 使用固定组件 receipt；安装器不启动进程、服务或设置登录项。最低 macOS 15，Server 通过 curated-server 命令启动，默认 8081；与 Desktop 分离。
-- app 只作 ad-hoc 签名，安装器未签名/未公证；Apple Developer ID、公证、系统服务、卸载工具及应用内 macOS 更新不在已完成范围。不可将云端编译成功当成正式分发与安装验收完成。
-- 显式版本避免临时 checkout 各自自动递增；每次输出到新目录，保留已有产物。manifest 与实际文件、目标平台、SHA-256 一起核验后上传 Actions artifacts，保留 14 天。构建日志即使失败也上传；仓库权限只读，不发布 Release。
-- 首次使用需将工作流推送并让默认分支具备定义，然后选择待构建分支。当前没有推送或运行远端 Actions；Windows/Intel 原生结果待云端验收。
-- 已验证：发布脚本 23 项通过，actionlint 检查通过。本机 macOS 15.5 Apple Silicon 完整构建出 Server、Desktop、Full 三个 PKG，manifest/三包 SHA-256 校验通过；迁移后的 FFmpeg/ffprobe 运行、Curated.app codesign 完整性和 Electron 原生执行通过；打包后 Server 使用临时数据启动，版本 1.5.8、server-info 与随包 Web UI 实测通过，进程已停止。未安装到系统目录。验证包位于 `.workspace/macos-packaging-check2/components-1.5.8-20260926.041259-macos-arm64/installer/`，未修改正式版本文件。
+- Windows 复用三包脚本和相同组件身份，Full 保留依赖组件包；准备 Inno 与真实 FFmpeg，缺编译器导致的 scripts-only 会在上传前判失败。
+- macOS 仅编译 Electron/本地连接页，打包 Curated.app 品牌/图标与 pkgbuild/productbuild；不安装 Go/FFmpeg，移除 macOS Server 编译、FFmpeg 动态依赖迁移和 Full/Intel 分支。最低 macOS 15，安装位置 /Applications/Curated.app。
+- 构建矩阵：all/all 为四包；all/server 或 all/full 仅 Windows；all/desktop 为两平台 Desktop；macos/all 或 macos/desktop 为单个 Apple Silicon Desktop；macos/server、macos/full 与 Intel CLI 请求在生成文件/分配版本前报错。发布脚本和 manifest 检查同样限制支持范围。
+- app 只作 ad-hoc 签名，安装器未签名/未公证；Apple Developer ID、公证及应用内 macOS 更新仍未完成。云端编译成功不等价于真实安装验收。
+- 显式版本，每次输出至新目录，保留已有产物；核验 manifest/平台/数量/SHA-256 后上传 Actions artifacts，保留 14 天。失败日志也上传；只读仓库权限，不发布 Release、不自动推送。
+- 首次使用需将工作流推送并让默认分支具备定义，再选择待构建分支。当前没有推送或运行远端 Actions，Windows 实机与云端首次构建待验证。
+- 范围收窄验证：发布脚本 24 项通过，构建矩阵覆盖四包默认值、Windows-only 组合及不支持组合拒绝；actionlint 通过；本机使用 `--platform macos --variant all`（省略 arch）完整构建，仅生成一个 arm64 Desktop PKG，manifest 与 SHA-256 校验通过。验证产物位于 `.workspace/macos-desktop-only-check/`，未安装到系统目录。此前三包验证产物保留，但 macOS Server/Full 已不属于支持范围。
