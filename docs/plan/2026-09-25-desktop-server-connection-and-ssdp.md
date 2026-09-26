@@ -539,3 +539,19 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 远端保存只提交可见服务端偏好，不夹带硬件/HLS/FFmpeg 字段或 backend nativePlayerCommand；隐藏字段也不参与自动保存的脏值比较，避免其它设备更新底层配置后被旧草稿覆盖。客户端协议模板仍存当前客户端，其他播放偏好仍沿用服务端持久化。此次仅调整界面与提交内容，不新增 HTTP 权限规则、API、配置字段或迁移；其它设置分区尚未整体收敛。
 
 验证：20 项相关测试、类型检查与相关 ESLint 通过；测试涵盖本机 Web/Desktop、远程 Web/Desktop、旧服务端/故障降级、远端保存不覆盖底层配置、打开远程页面不因隐藏字段归一化产生写入。Playwright 在现有开发服务验证本机 health 信号与模拟远程 Desktop 桥接，1280×720 默认缩放下选项显示正确、无横向溢出，截图 .workspace/remote-playback/remote-desktop.png。未重启现有服务、未做真实双机联调或完整跨平台显示缩放矩阵，未打包发布。
+
+
+## 12. 2026-09-27：三包与 CD 实施修正
+
+此前未落实的原因已核实：Windows CD 仍调用 legacy `release_cli.py publish`；命名规划器没有接到 Windows 实际组装，新增 Mac job 也没有改变旧 Windows 分发。此节记录真实实现，取代前文的“独立安装器尚未实现”状态。
+
+- 新 `component_cd.py` 和 `windows_components.py` 构建独立 Server/Desktop，Full 作为离线组合安装器复用这两个 EXE。固定组件身份、当前用户目录、独立卸载入口；默认不提权。独立包拒绝降级，Full 复用同版/新版，失败保留已成功组件并返回失败码。
+- 初次拆分版本为 Server 1.6.0 / Desktop 0.1.0 / Full 1.6.0。Windows 三种 EXE 和三种 ZIP，Mac 仅 Desktop arm64 DMG/ZIP；Full ZIP 为离线安装套件。所有包按 §11 命名，manifest 明确组件身份和 Full 组合版本。
+- Desktop 不启动/停止 Server；Server 保持同一用户的数据根及托盘/登录启动方式。Full 初次启动仅给空连接档案引入 Server 实际监听地址，经 health 验证后保存，不覆盖已有偏好。
+- 独立组件走 `release-channels` manifest；Server 不读取旧 latest、不复用旧更新缓存。Desktop 本地连接窗口可检查/打开自身下载。旧 `/releases/latest` 固定保留兼容一体包，组件稳定发布使用 `make_latest=false`，发布前后 API 验证隔离；失败撤回 draft。不能仅靠 tag 前缀宣称隔离。
+- 同组件同版已公开时复用原字节/原下载 URL，重新组装 Full 不重打或递增组件；拒绝同版异内容与通道降级。已公开 Release 不覆盖。发布后通道写入失败可单独校验并恢复。
+- 旧安装器检测阻止直接重叠安装；迁移手册要求备份、退出、停旧自启、卸载旧程序并保留数据，再以同用户安装。任意自定义配置和跨账户静默迁移没有实现，不假称阶段 6 全自动完成。SSDP 仍在后续范围。
+
+验证安排：Python 发布/内容/隔离/不可变性测试、Electron 测试及编译、Server feed/cache 测试、本机 Apple Silicon 真实构建启动；Windows CD 实际编译并安装，覆盖 Full 部分失败/重试、版本复用、防降级、卸载保留数据、独立 Server Web 和 Desktop 连接/退出生命周期。测试结果与首次 CD 结论在本节后续追加。
+
+本机验证：50 项发布 Python 测试、59 项 Electron 测试、23 项相关前端测试、前端类型检查、Electron 编译、相关 Go test/vet 和 release version 测试通过；actionlint 通过。Apple Silicon 新版 DMG/ZIP 构建、codesign/hdiutil 校验及打包应用启动成功，连接页含独立更新入口。Windows 编译、安装及生命周期检查待首次组件 CD 执行，不将本机通过等同于 Windows 验收完成。

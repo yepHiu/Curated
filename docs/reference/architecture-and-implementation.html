@@ -564,5 +564,6 @@
     <tr><td>验证边界</td><td>本地 Go、前端、浏览器回归和插件合成测试通过。真实站点扩展全链路待验收；人工关联选择 UI、逐图错误展示和通用任务中心投影尚未实现。</td></tr>
   </tbody></table>
   <p>代码入口：backend/internal/app/wishlist*.go、storage/wishlist*.go、server/wishlist_handlers.go、internal/wishlistassets、src/views/Wishlist*.vue。详见 <a href="../plan/2026-09-22-wishlist.md">实施记录</a>及 <a href="../guide.md#wishlist">使用说明</a>。</p>
+<section><h2>Split distribution — 2026-09-27</h2><p>Windows Full / Server / Desktop packages now use independent component identities and versions. Full runs the exact standalone installers; Server owns Web UI, FFmpeg and data, while Desktop only connects. Apple Silicon Desktop DMG/ZIP is included. Component manifests are isolated from legacy latest, with per-component update matching. Windows installer and lifecycle smoke checks gate CD. Legacy migration requires backup and same-user manual transition; SSDP and automatic custom-configuration migration remain pending. See docs/guide.md §8.</p></section>
 </body>
 </html>

@@ -243,3 +243,8 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 ## Apple Silicon Desktop 打包
 
 Apple Silicon macOS 在仓库根目录执行 `pnpm release:macos-desktop`。首次安装依赖后需 `node node_modules/electron/install.js` 下载当前平台的锁定 Electron runtime。打包只编译 Electron main，生成独立客户端 DMG/ZIP，不调用 Windows PowerShell/Go/FFmpeg 链路；输出 `release/macos-desktop/`，已有文件拒绝覆盖。验证脚本：`python3 -m unittest discover -s scripts/release/tests -p "test_*.py"`；workflow 用 actionlint 校验。CD 的 macos-15 job 与 Windows 并行，最终统一校验和发布。
+
+
+## Split release implementation (2026-09-27)
+
+Windows Full/Server/Desktop installers and ZIPs are now implemented in `component_cd.py` / `windows_components.py`; Apple Silicon Desktop DMG/ZIP shares the Desktop version. Full embeds the exact standalone installers, uses their component identities, preserves newer installations and reports partial failures. Server runs independently in the current-user tray; Desktop only connects. Component releases use `full-v` / `server-v` / `desktop-v` tags and isolated stable manifests on `release-channels`; legacy `/releases/latest` stays on the compatible all-in-one package. Server rejects legacy installer cache; local Desktop connections expose independent Desktop update checks. Initial versions: Server 1.6.0, Desktop 0.1.0, Full 1.6.0. Old-install detection requires the documented backup/manual migration; automated custom/account/session migration and SSDP remain pending. Windows real installer/lifecycle smoke checks gate CD. See guide §8 for exact names, update isolation and recovery.

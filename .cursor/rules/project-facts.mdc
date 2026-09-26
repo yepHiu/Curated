@@ -377,3 +377,8 @@ Desktop/Full 版本源位于 `scripts/release/versions/`，Server 位于 `backen
 
 - 按用户修正，Curated Plugin 仅一个版本、名称及 dist 输出。`npm run dev` 监听与 `npm run build` 压缩构建共用同一设置，不再有 dist-dev/Curated Plugin Dev 或构建期服务器区分。
 - 设置页「开发者模式」开启可自定义默认服务端（建议开发后端 8080），关闭使用本机 8081；保存后生效并保留自定义地址。原自定义地址兼容，不再存取插件凭证。Chrome 源码更新后仍需重新加载扩展与网页。见愿望单实施计划 §15。
+
+
+## Split release implementation (2026-09-27)
+
+Windows Full/Server/Desktop installers and ZIPs are now implemented in `component_cd.py` / `windows_components.py`; Apple Silicon Desktop DMG/ZIP shares the Desktop version. Full embeds the exact standalone installers, uses their component identities, preserves newer installations and reports partial failures. Server runs independently in the current-user tray; Desktop only connects. Component releases use `full-v` / `server-v` / `desktop-v` tags and isolated stable manifests on `release-channels`; legacy `/releases/latest` stays on the compatible all-in-one package. Server rejects legacy installer cache; local Desktop connections expose independent Desktop update checks. Initial versions: Server 1.6.0, Desktop 0.1.0, Full 1.6.0. Old-install detection requires the documented backup/manual migration; automated custom/account/session migration and SSDP remain pending. Windows real installer/lifecycle smoke checks gate CD. See guide §8 for exact names, update isolation and recovery.
