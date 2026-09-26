@@ -239,3 +239,7 @@ CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows
 ## Production pinyin dictionary asset
 
 `vite.pinyin-data.ts` extracts the five pure dictionary literals from the locked `pinyin-pro` ESM source into a content-hashed JSON asset. The optional pinyin chunk fetches it from the same origin before initializing its existing synchronous matching exports. Deploy the complete `dist` directory, including JSON assets. A changed upstream dictionary format fails the build; a missing runtime asset rejects the import explicitly. This reduces executable JavaScript, not total dictionary data. Existing JS budgets stay unchanged. `src/lib/pinyin-data-build.test.ts` checks extraction and rejects executable literals; real production-browser matching was checked during the media Beta integration.
+
+## Apple Silicon Desktop 打包
+
+Apple Silicon macOS 在仓库根目录执行 `pnpm release:macos-desktop`。首次安装依赖后需 `node node_modules/electron/install.js` 下载当前平台的锁定 Electron runtime。打包只编译 Electron main，生成独立客户端 DMG/ZIP，不调用 Windows PowerShell/Go/FFmpeg 链路；输出 `release/macos-desktop/`，已有文件拒绝覆盖。验证脚本：`python3 -m unittest discover -s scripts/release/tests -p "test_*.py"`；workflow 用 actionlint 校验。CD 的 macos-15 job 与 Windows 并行，最终统一校验和发布。

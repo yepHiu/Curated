@@ -1,6 +1,26 @@
 # Curated 生产打包、配置、版本与发布计划
 
-## 2026-09-27：Windows CD 已实现
+## 2026-09-27：Apple Silicon Desktop 构建
+
+已加入同一 `cd-release.yml`，workflow 名称为 **CD - Windows and Mac Desktop**。标签、手动 draft/publish 和固定提交质量门禁延续原约定。Windows 与 `macos-15`（arm64）并行构建；两者都成功才上传同一个 Release。仅 Apple Silicon，无 Intel / Universal 构建。已经触发的 v1.5.8 仍使用旧提交，不会自动追加新平台或移动标签。
+
+Mac 使用独立 Desktop 版本源 `scripts/release/versions/desktop.json`（当前 0.1.0），产物：
+
+- `Curated-Desktop-0.1.0-macos-arm64.dmg`
+- `Curated-Desktop-0.1.0-macos-arm64.zip`
+- `desktop-macos.json`：组件版本、平台/架构、固定源码提交、签名状态与两包 SHA-256。
+
+Mac 附件随整次 `vX.Y.Z` 发布交付，文件名仍表示独立 Desktop 版本。Desktop 源码发生变化后应在下次发版准备中调整组件版本，不能把一体包版本当作 Desktop 版本。独立 `desktop-vX.Y.Z` 触发、独立更新 feed、自动安装仍未接入。
+
+`release_cli.py package-macos-desktop` 调用 `release_lib/macos_desktop.py`，只能在 Apple Silicon macOS 执行。使用锁定 Electron runtime，编译 Electron main，复制客户端及本地连接页、图标与许可证，不打包 Go、FFmpeg、媒体库、服务器配置或服务器 Vue 资源。仅修改打包副本中的 metadata 为 `distribution: desktop`，不改变开发配置或 Windows legacy 包；首次启动显示服务器列表，连接已有 Server。
+
+复制 `.app` 保留 framework symlink 与执行权限，生成 ICNS，设定 `com.curated.desktop` 和组件版本，验证 runtime 为 arm64；执行 ad-hoc codesign 和严格签名验证，以 ditto 生成 ZIP、hdiutil 生成并验证 DMG。无 Developer ID 证书或 Apple 公证，下载用户仍可能看到 macOS 安全提示。已有同版本生产文件拒绝覆盖；中间 staging 位于系统临时目录。
+
+最终发布 job 按 Windows/Mac 的精确 artifact 名分别下载，验证 Mac commit、组件版本、arm64、DMG/ZIP 完整性和 checksum，再合并 SHA256SUMS；任一平台缺失/不符则不公开 Release。公开正文追加独立 Mac Desktop 的使用范围与签名说明。
+
+验证：本机 Apple Silicon 实际生成 DMG/ZIP，codesign 和 hdiutil 校验通过；解压 ZIP 启动正式客户端，显示空服务器列表，确认 `isPackaged=true` / version 0.1.0。43 项发布脚本测试和 actionlint 通过。新增 Mac job 首次云端运行仍待后续发布标签。
+
+## 2026-09-27：Windows CD 基础（后续 Mac 扩展见上）
 
 状态：workflow 与发布校验已实现并通过本地测试；首次 GitHub Windows runner 构建与实际上传仍待运行验证。取代 2026-09-25 的触发方式建议。本次不递增产品版本、不创建发布标签。
 

@@ -30,7 +30,7 @@ alwaysApply: true
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
 - **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
-- **Windows CD**：`.github/workflows/cd-release.yml` 在 `vX.Y.Z` tag push 上正式发布；手动运行需既有 tag，默认 draft。复用 CI 校验固定 commit，版本文件/Release Notes 必须与 tag 同步；只上传完整且校验通过的 Windows 一体包，已公开版本不覆盖。详见 `docs/guide.md` §8。
+- **Windows / Mac Desktop CD**：`.github/workflows/cd-release.yml` 在 `vX.Y.Z` tag push 上正式发布；手动运行需既有 tag，默认 draft。复用 CI 校验固定 commit，版本文件/Release Notes 必须与 tag 同步；等待 Windows 一体包与 Mac Apple Silicon 独立 Desktop DMG/ZIP 均通过后统一上传，已公开版本不覆盖。详见 `docs/guide.md` §8。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## Server 版本
@@ -102,3 +102,5 @@ health 的 `version` 为数字 SemVer（当前 1.5.8），`buildStamp` 单独保
 ## 远程设置管理（2026-09-27）
 
 远程设置仅保留客户端偏好和只读信息；全局配置、安全、AI 管理及备份维护须在 Server 本机操作，接口同步限制，远程不返回 AI/代理凭据。详见 `docs/guide.md` 的 Remote settings access。 新后端重启、客户端刷新后生效；`PATCH /api/settings` 远程统一返回 `403 SERVER_SETTINGS_READ_ONLY`，当前会话解锁/锁定及上传等业务操作保留。
+
+- **Mac Desktop 本地打包**：Apple Silicon 主机执行 `pnpm release:macos-desktop`；仅客户端，版本 desktop.json，ad-hoc 签名，输出 release/macos-desktop；同版本文件拒绝覆盖。
