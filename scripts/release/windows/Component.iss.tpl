@@ -47,7 +47,7 @@ begin
   if __LEGACY_CHECK__ and (RegKeyExists(HKLM64, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1') or
      RegKeyExists(HKLM32, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1') or
      RegKeyExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8C9E9E66-7058-4D09-9F9A-8AFD060A7E1B}_is1')) then begin
-    SuppressibleMsgBox('An older all-in-one Curated installation was found. Back up your library, exit the old Curated, and uninstall its program before installing Server. Keep your library data and custom configuration. See the migration guide in the release notes.', mbError, MB_OK, IDOK);
+    SuppressibleMsgBox('An older all-in-one Curated installation was found. Use Curated Full 1.7.2 or later to back up and upgrade this installation automatically. Fully exit Curated before running Full. See the migration guide for custom configurations.', mbError, MB_OK, IDOK);
     exit;
   end;
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\__APP_ID___is1', 'DisplayVersion', Installed) then begin

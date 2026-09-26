@@ -1,0 +1,18 @@
+{
+  "artifacts": [
+    {
+      "tag": "v1.5.8",
+      "version": "1.5.8",
+      "fileName": "Curated-Setup-1.5.8.exe",
+      "url": "https://github.com/yepHiu/Curated/releases/download/v1.5.8/Curated-Setup-1.5.8.exe",
+      "sha256": "356544667e7999a33172712b8d02db2ec22ab1a8d1408b81adb7b2e6c072ab8c"
+    },
+    {
+      "tag": "v1.4.13",
+      "version": "1.4.13",
+      "fileName": "Curated-Setup-1.4.13.exe",
+      "url": "https://github.com/yepHiu/Curated/releases/download/v1.4.13/Curated-Setup-1.4.13.exe",
+      "sha256": "c674fdd5def52035d7581d3f2bbf2a951d4836c06d68568fd26955c357f5ad79"
+    }
+  ]
+}

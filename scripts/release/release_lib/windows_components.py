@@ -137,9 +137,12 @@ def package_windows(root: Path, output: Path, component: str = 'full') -> Path:
                     if file.is_file():
                         archive.write(file, file.relative_to(payload))
         if component == 'full':
+            helper = work / 'curated-migrate.exe'
+            _run(['go', 'build', '-tags', 'release', '-o', str(helper), './cmd/curated-migrate'], cwd=root / 'backend')
             installers = {c: output / artifact_name(c, current[c], 'windows', 'x64', 'exe') for c in selected}
             compile_installer(root, work, output, 'full', current['full'], {
                 'SERVER_INSTALLER': str(installers['server']), 'DESKTOP_INSTALLER': str(installers['desktop']),
+                'MIGRATION_HELPER': str(helper),
                 'SERVER_VERSION': current['server'], 'DESKTOP_VERSION': current['desktop'],
             })
             # Full ZIP is the offline installer kit, not a second coupled runtime.

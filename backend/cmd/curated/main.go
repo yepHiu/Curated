@@ -23,6 +23,7 @@ import (
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
 	"curated-backend/internal/discovery"
+	"curated-backend/internal/launchprofile"
 	"curated-backend/internal/logging"
 	"curated-backend/internal/maintenance"
 	"curated-backend/internal/processlock"
@@ -71,6 +72,26 @@ func main() {
 	allowMissingPaths := flag.Bool("allow-missing-paths", false, "Allow path migration when mapped targets are missing or cannot be checked on this OS")
 	confirmPathMigration := flag.Bool("confirm-path-migration", false, "Required confirmation for path-migrate-apply")
 	flag.Parse()
+
+	if runtime.GOOS == "windows" && version.Channel == "release" && version.Distribution == "server" {
+		profile, err := launchprofile.Resolve(launchprofile.Path(os.Getenv("LOCALAPPDATA")), *configPath, os.Getenv("CURATED_DATA_DIR"))
+		if err != nil {
+			exitWithInitError("failed to load migrated Server startup profile", err)
+		}
+		if profile != nil {
+			if err := os.Setenv("CURATED_DATA_DIR", profile.DataRoot); err != nil {
+				exitWithInitError("failed to select migrated data directory", err)
+			}
+			*configPath = profile.ConfigPath
+			cfg, err := config.Load(*configPath)
+			if err != nil {
+				exitWithInitError("failed to load migrated configuration", err)
+			}
+			if cfg.DatabasePath != profile.DatabasePath {
+				exitWithInitError("migrated database location changed", fmt.Errorf("use an explicit -config to select a different database"))
+			}
+		}
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()

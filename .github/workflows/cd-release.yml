@@ -156,6 +156,19 @@ jobs:
             python scripts/build/report-test-failure.py "$env:RUNNER_TEMP/component-smoke.log"
             exit 1
           }
+      - name: Upgrade the real old all-in-one installation with Full
+        if: needs.prepare.outputs.component == 'full'
+        run: |
+          python scripts/release/windows_legacy_smoke.py 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/legacy-smoke.log"
+          if ($LASTEXITCODE -ne 0) {
+            python scripts/build/report-test-failure.py "$env:RUNNER_TEMP/legacy-smoke.log"
+            exit 1
+          }
+      - name: Upgrade the earlier all-in-one baseline with Full
+        if: needs.prepare.outputs.component == 'full'
+        run: |
+          python scripts/release/windows_legacy_smoke.py --baseline 1.4.13
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Preserve verified distribution
         uses: actions/upload-artifact@v4
         with:

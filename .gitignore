@@ -39,6 +39,8 @@ scripts/prd/*
 !scripts/release/recover_release.py
 !scripts/release/recovery-request.json
 !scripts/release/windows_smoke.py
+!scripts/release/windows_legacy_smoke.py
+!scripts/release/legacy-upgrade-baseline.json
 !scripts/release/desktop_smoke.cjs
 !scripts/release/desktop_upgrade_smoke.cjs
 !scripts/release/download_upgrade_baseline.py
