@@ -514,6 +514,7 @@ Remote uploads continue to use the configured Server destination. Directory read
 
 ## Desktop server connections
 
+- **Settings → Network & devices → Server connections** shows the current server name/address and health status, plus saved servers with a current-connection badge. **Add server** and **Manage servers** open the local manager; returning to settings refreshes the list. Other saved rows can request a switch, using the same native confirmation. The card requires the new Desktop bridge and is hidden in browsers/older Desktop versions.
 - Open **服务器 / Servers** at the bottom of the Desktop sidebar or in the tray; macOS also provides an application-menu entry. Older Server UIs can use the tray even without the new sidebar button. The bundled management window works while disconnected or PIN-locked.
 - Add a name and HTTP/HTTPS root address, for example `http://192.168.1.10:8081` or `https://nas.example.com`. Bare `host:port` defaults to HTTP; an omitted port uses the protocol default. Subpaths, URL credentials, queries and fragments are rejected. Saving does not require the server to be online.
 - Select **连接** to validate Curated health and load its UI. A switch confirmation explains that playback, uploads and unsaved edits will stop; tasks already accepted by Server continue. Failed health/page loading preserves the current page. Unlock with the target Server's PIN when requested.

@@ -488,3 +488,11 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 
 
 验证：Electron 58 项单测、侧栏 13 项单测、前端类型检查与相关 ESLint、Electron 编译通过；Web API 生产构建通过，体积 0 提醒/超限。使用独立临时 userData 的真实 macOS Electron，连接两个本地 HTTP 测试服务器，实测添加/保存、A→B、同主机不同端口 Cookie/localStorage 隔离、加载期 Desktop metadata、远端无列表管理桥接、离线目标失败保留 B、重启恢复 B。760×692 CSS px / DPR 2 / 默认 100% 缩放的浅色列表与失败态截图已检查，无重叠，证据在 `.workspace/server-connections/`。未触碰现有桌面配置，未重启用户现有 Server/Desktop；未验证真实跨机器网络、Windows 安装包、PIN 端到端与完整跨平台/深色/显示缩放矩阵，未执行 `pnpm test:display`、未生成或发布安装包。
+
+
+### 15.1 设置内的连接概览与列表（2026-09-26）
+
+用户要求在设置显示连接情况、当前服务器及已保存列表。设计归属为「设置 → 网络与设备」首张卡片，沿用 SettingsNetworkSection 的 Card/Header/Input/语义状态色：当前名称/地址和在线状态优先，保存列表次之，添加/管理为局部操作。Desktop 新增只读列表桥接，保存仍在本地管理窗口，列表选择只能传已保存 ID 并经原生切换确认。Web/旧桥接隐藏此桌面专属区；读取中、空列表、读取失败/重试、连接中、离线均有状态。窗口重新获得焦点及分区挂载期间轮询刷新保存列表，退出清理监听与计时器。没有全局令牌变更。
+
+
+验证：设置相关 22 项单测（含新增区块 7 项）、Electron 58 项、类型检查与相关 ESLint 通过；Web API 生产构建通过，体积无提醒。独立临时 userData 的真实 Electron 验证只读列表 IPC、无效 ID 拒绝、由 Server renderer 发起已保存 ID 切换及既有隔离/失败恢复回归。Playwright 在现有开发页注入 Desktop 桥接，1280×720 / DPR 1 / 默认缩放的深色设置卡片截图检查正常；点击添加、连接分别传入管理入口与准确保存 ID，截图 `.workspace/server-connections/settings.png`。未重启用户现有 Desktop/Server；未运行完整跨平台显示缩放矩阵、未打包发布。
