@@ -528,3 +528,14 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 按用户要求，设置页的常驻解释性文案改为设置标题上的 Tooltip，复用 Reka Tooltip 与既有 popover 语义令牌。标题悬停约 350ms 或键盘聚焦展示，点击/Enter/Space 可切换，Escape/移开关闭；触屏可点标题查看。提示宽度随视口收缩，可移入阅读，不新增整排问号或说明行。卡片说明附着对应卡片标题，字段/选项说明附着各自标题，不改变开关/输入/保存行为。错误、实时状态、受限原因及危险确认框内容继续就地显示。保留表单 aria-describedby 所需的隐藏说明；无全局令牌变更。
 
 验证：设置相关 193 项测试通过（含 Tooltip 默认隐藏、聚焦/点击/键盘展示、Escape 关闭与保留原按钮键盘行为），类型检查、相关 ESLint、Web API 生产构建通过，体积 0 提醒/超限。Playwright 在独立浏览器检查播放/网络/AI/萃取帧默认布局及标题悬停；1280×720 和 375×812、DPR 1、默认缩放的深色 tip 正常，窄屏浮层限宽并避让视口边缘，Escape 实测关闭。证据 `.workspace/settings-hints/`。未修改业务配置或重启 Desktop，未运行完整跨平台/深浅色/显示缩放矩阵与 `pnpm test:display`。
+
+
+### 15.6 远端播放偏好精简（2026-09-26）
+
+按用户要求，先收敛播放偏好中的底层服务端配置：硬件加速、编码器优先方式、HLS 开关、测试环境强制 HLS 和 FFmpeg 命令仅在确认服务端本机连接（Web / Desktop）及 Mock 中显示；远程或无法确认的连接隐藏这些设置，保留原生播放器开关/类型/协议模板/偏好与前后步长。继续使用现有 Card、nested 区块和响应式布局，不新增常驻说明或全局样式。
+
+抽出 useServerLocalAccess 共享原路径管理的判定：health.canManageLibraryPaths 的请求级 loopback 信号联合实际 API origin、页面 origin 和 Desktop 主进程 serverOrigin。探测前、失败、旧服务端缺失信号时默认隐藏；本机 LAN 别名等不能确认的目标也保守隐藏。目录管理保持原行为。
+
+远端保存只提交可见服务端偏好，不夹带硬件/HLS/FFmpeg 字段或 backend nativePlayerCommand；隐藏字段也不参与自动保存的脏值比较，避免其它设备更新底层配置后被旧草稿覆盖。客户端协议模板仍存当前客户端，其他播放偏好仍沿用服务端持久化。此次仅调整界面与提交内容，不新增 HTTP 权限规则、API、配置字段或迁移；其它设置分区尚未整体收敛。
+
+验证：20 项相关测试、类型检查与相关 ESLint 通过；测试涵盖本机 Web/Desktop、远程 Web/Desktop、旧服务端/故障降级、远端保存不覆盖底层配置、打开远程页面不因隐藏字段归一化产生写入。Playwright 在现有开发服务验证本机 health 信号与模拟远程 Desktop 桥接，1280×720 默认缩放下选项显示正确、无横向溢出，截图 .workspace/remote-playback/remote-desktop.png。未重启现有服务、未做真实双机联调或完整跨平台显示缩放矩阵，未打包发布。

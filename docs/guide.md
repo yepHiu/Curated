@@ -236,6 +236,8 @@ Web frames remain in SQLite; migration 0045 adds stable ordering indexes. Mock I
 
 ### Playback recovery
 
+Settings → Playback shows hardware acceleration, encoder selection, HLS enablement, test-only forced HLS, and the FFmpeg command only for a verified Server-local Web or Desktop connection (and Mock). Remote or unverified connections keep the everyday native-player and seek-step preferences. Saving from that reduced view omits the hidden infrastructure fields and backend native-player command. Existing preference storage remains unchanged; this is a UI/save-payload boundary, not a new HTTP authorization rule. Locality requires both the request-local health signal and the actual API/Desktop target; older or unreachable servers default to the reduced view.
+
 Opening a curated frame passes its requested position into the first playback request. Each HLS playback session is independent, so opening the same movie on another device keeps the first device's session intact. A failed replacement can return to the previous stream until the replacement's first frame data arrives.
 
 HLS network and media failures get bounded recovery attempts before reporting an error; use the play button to retry after recovery is exhausted. An expired session is recreated at the current position. Short seeks wait at most four seconds for encoding to catch up, with the decision based on encoder speed. Startup waits for contiguous downloaded data ahead of the current position, accounting for playback speed.
