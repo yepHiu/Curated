@@ -1,18 +1,46 @@
 # Curated Full 1.6.0
 
-本次发行将 Curated 拆分为独立 Server 和 Desktop。完整安装包默认安装 Server 1.6.0 + Desktop 0.1.0；退出 Desktop 不再停止 Server。
+## GitHub Release Body
 
-- Windows x64：Full、Server、Desktop 各提供独立命名的 EXE 和 ZIP。Full EXE 内含原版组件安装器，Full ZIP 是离线安装套件。
-- macOS：Desktop 0.1.0 仅支持 Apple Silicon，提供 DMG/ZIP；连接已有 Server，不含 Go、FFmpeg 或业务 Web UI。应用仅 ad-hoc 签名，未进行 Apple 公证。
-- Server 与 Desktop 独立更新；Desktop 连接窗口在没有连接服务器时也能检查自身更新。Full 复用已安装的同版/更高版本组件。
-- 所有下载的组件、版本、平台、架构与 SHA-256 记录在 `release.json`、组件 manifest 和 `SHA256SUMS.txt`。
+Curated Full 1.6.0 introduces independently installed Server and Desktop apps, adds an Apple Silicon Desktop client, and lets the Server keep running when you close Desktop.
 
-Windows 推荐下载 `Curated-Full-Setup-1.6.0-windows-x64.exe`。仅运行服务端可下载 `Curated-Server-Setup-1.6.0-windows-x64.exe`；已有 Server 的电脑使用 `Curated-Desktop-Setup-0.1.0-windows-x64.exe`。Mac 使用 `Curated-Desktop-0.1.0-macos-arm64.dmg`。
+### What's Changed
 
-旧客户端的 Latest 通道仍保留兼容一体包；本发行使用独立组件更新源，并不是旧一体包的自动覆盖安装。
+**Independent Server and Desktop apps**
 
-## 旧版迁移
+- Install Server to host your library, Desktop to connect to an existing Server, or Full to install both on Windows.
+- Full includes Server 1.6.0 and Desktop 0.1.0. It uses the same installers as the standalone downloads and reuses components already installed at the same or a newer version.
+- Keep Server running independently in the Windows tray. Quitting Desktop no longer stops your library service.
 
-先创建并验证备份，记录数据目录、自定义配置和端口；停用旧登录启动，完整退出旧 Curated，再卸载旧程序并保留资料库。以原用户安装 Full，默认沿用 `%LOCALAPPDATA%\Curated`。如原先使用自定义 `CURATED_DATA_DIR` 或 `-config`，安装时使用 `/NOLAUNCH=1`，先带原配置启动 Server，再连接 Desktop。安装器检测到旧安装身份会阻止直接重叠安装；不会自动迁移另一账户或复制旧认证令牌。
+**Downloads and updates**
 
-详细说明及恢复步骤：[发布与迁移手册](https://github.com/yepHiu/Curated/blob/full-v1.6.0/docs/guide.md#8-release-and-packaging)。
+- Windows x64 now has separate Full, Server, and Desktop installers and ZIP downloads. The Full ZIP contains the offline component installers.
+- Desktop 0.1.0 is available for Apple Silicon Macs as a DMG or ZIP. It connects to an existing Server and does not include a local Server.
+- Server and Desktop use separate update channels. Desktop can check for its own updates from the connection window before connecting to a Server.
+
+### Upgrade Notes
+
+- This is the first split distribution. Existing all-in-one installations at 1.5.8 or earlier require manual migration; in-app or direct in-place upgrades to Full are not supported.
+- Create and verify a backup, record your data directory, configuration and port, disable the old login startup entry, and fully quit Curated. Uninstall the old program while keeping your library, then install Full under the same user account. The default data directory remains `%LOCALAPPDATA%\Curated`.
+- If you use `CURATED_DATA_DIR` or a custom `-config`, install with `/NOLAUNCH=1`, start Server with your original configuration, then connect Desktop. Cross-account data and old authentication sessions are not migrated automatically.
+- The installer blocks overlapping legacy installations. GitHub Latest remains on the compatible all-in-one release for old update clients; split components use their own update feeds.
+- Windows packages remain unsigned; Server includes FFmpeg. macOS Desktop supports Apple Silicon only, is ad-hoc signed, and is not notarized by Apple. Verify downloads with `SHA256SUMS.txt`.
+
+See the [upgrade and migration guide](https://github.com/yepHiu/Curated/blob/full-v1.6.0/docs/guide.md) for configuration and recovery details.
+
+### Downloads
+
+- [Windows Full installer](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Full-Setup-1.6.0-windows-x64.exe)
+- [Windows Full offline ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Full-1.6.0-windows-x64.zip)
+- [Windows Server installer](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Server-Setup-1.6.0-windows-x64.exe)
+- [Windows Server portable ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Server-1.6.0-windows-x64.zip)
+- [Windows Desktop installer](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-Setup-0.1.0-windows-x64.exe)
+- [Windows Desktop portable ZIP](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-0.1.0-windows-x64.zip)
+- [macOS Desktop DMG (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-0.1.0-macos-arm64.dmg)
+- [macOS Desktop ZIP (Apple Silicon)](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-0.1.0-macos-arm64.zip)
+- [Release manifest](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/release.json)
+- [SHA-256 checksums](https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/SHA256SUMS.txt)
+
+### Full Changelog
+
+[v1.5.8...full-v1.6.0](https://github.com/yepHiu/Curated/compare/v1.5.8...full-v1.6.0)
