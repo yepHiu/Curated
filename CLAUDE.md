@@ -658,3 +658,9 @@ Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类
 ## Server 与此设备操作边界（2026-09-25）
 
 设置 → 网络提供 SSDP 自动发现开关，`GET/PATCH /api/settings` 的 `discoveryEnabled` 持久化到 library-config.cfg，重启 Server 后应用；只影响发现，不关闭 HTTP。Desktop 关于页显示桌面版本及服务器地址并可更换服务器；更新面板明确属于 Curated Server。客户端目录选择不用于资料库/备份路径。服务器文件管理器与原生播放器接口仅接受无转发头的 loopback 请求；远端返回 403，Desktop 的外部播放器交接入口暂不提供，Web 内置播放不受影响。
+
+## Desktop 本机设置 IPC（2026-09-26）
+
+连接页底部「打开设置」仅提供此设备的代理和开机自启动。代理支持跟随系统（默认）、不使用代理、手动 HTTP/HTTPS/SOCKS5（不支持账号密码），保存至 Electron userData 下的 `desktop-settings.json`，重启 Desktop 后应用到连接检查、服务器页面和更新检查。手动代理绕过常见本机/私网地址；SSDP 及发现探测仍直连。自启动读取 macOS/Windows 系统登录项，保存立即更新；只启动 Desktop，不启动 Server。其他平台显示不可用。
+
+`curated:settings-read` / `curated:settings-save` 仅向本地连接页暴露，验证窗口、顶层 frame 与来源；远端 `curatedDesktop` 桥无权修改这些设置。代理校验与原子持久化位于 `electron/settings.ts`，不新增 Server HTTP API，也不修改 `library-config.cfg`。

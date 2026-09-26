@@ -354,10 +354,16 @@ Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类
 
 `python scripts/release/release_cli.py publish --variant all` 在一次版本分配内构建 Full、Server、Desktop 三种安装包；`--variant server|desktop|full` 可单独选择。该命令只构建本地产物，不上传 Release。输出位于新的 `release/components-<version>-<stamp>/`，不覆盖已有包。Desktop 纯客户端不需要 Go/FFmpeg；Server 包含 Web UI 与 FFmpeg，不需要 Electron。完整包默认串行安装两个独立组件，复用组件安装身份和卸载入口。
 
-Windows 组件按当前用户安装至 `%LOCALAPPDATA%/Programs/Curated/Server|Desktop`；Server 数据仍在原数据根（默认 `%LOCALAPPDATA%/Curated`），独立于程序目录。Server 就绪后写入本机地址提示，Desktop 仅在无连接记录/无输入时建议该地址，不替代身份检查。自启继续为 Server 的用户登录托盘模式，不是系统服务。
+Windows 组件按当前用户安装至 `%LOCALAPPDATA%/Programs/Curated/Server|Desktop`；Server 数据仍在原数据根（默认 `%LOCALAPPDATA%/Curated`），独立于程序目录。Server 就绪后写入本机地址提示，Desktop 仅在无连接记录/无输入时建议该地址，不替代身份检查。Server 自启继续为用户登录托盘模式，不是系统服务；Desktop 自启由连接页的此设备设置独立管理。
 
 跨平台构建 Go 显式使用 windows/amd64；打包 Desktop 时需要 Windows Electron runtime，可用 `CURATED_ELECTRON_RUNTIME_DIR` 指向它。没有 Inno Setup 时只输出 `.iss` 和 `scripts-only` manifest，不算已生成 EXE。已组装的 payload 可通过 `package-components --version X.Y.Z --components-dir <payloads> --output-dir <installer> --variant all` 生成/编译安装器。旧 `package-installer` / `package-portable` 是历史单包低层入口，不能用于发布当前客户端拆分版本。
 
 Server 更新只接受精确命名的 Server 安装包，旧缓存中的整包或 Desktop 包会被拒绝；Desktop 本地连接页提供官方下载入口，不由远端执行客户端更新。当前仍读取既有官方 Release 接口，新三包**不得直接挂到旧客户端的 latest feed**；新旧 feed 隔离发布流程尚未落地。manifest 已标注这一限制，`publish` 不执行外部发布。
 
 当前安装器会阻止直接覆盖旧一体包，并给出备份/迁移提示；自动迁移、Windows 实机安装/升级/卸载、真实两机 SSDP 仍待完成。不要将本实现当作已通过生产发布验收。
+
+## Desktop 此设备设置（2026-09-26）
+
+连接页底部「打开设置」仅提供此设备的代理和开机自启动。代理支持跟随系统（默认）、不使用代理、手动 HTTP/HTTPS/SOCKS5（不支持账号密码），保存至 Electron userData 下的 `desktop-settings.json`，重启 Desktop 后应用到连接检查、服务器页面和更新检查。手动代理绕过常见本机/私网地址；SSDP 及发现探测仍直连。自启动读取 macOS/Windows 系统登录项，保存立即更新；只启动 Desktop，不启动 Server。其他平台显示不可用。
+
+macOS 开发 bundle 内置指向当前 worktree 的默认入口，确保无 CLI 参数启动也能进入连接页；移动或删除 worktree 后需重新运行 `pnpm dev:electron`。Windows 登录启动与真实注销/登录仍待实机验收。

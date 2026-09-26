@@ -555,6 +555,7 @@
 <section><h2>Server 连接身份（2026-09-25）</h2><p>已实现 GET /api/server-info 最小公开连接合约，稳定身份保存在数据库旁的 .server-id 文件，不随数据库备份复制。Desktop 解耦、SSDP 与三包发行仍在实施中。</p></section>
 <section><h2>Desktop 客户端启动（2026-09-25）</h2><p>已实现本地连接页、手动连接、切换与按服务器隔离会话。客户端不启动或结束 Go 进程，Server 独立运行；本机真实 Electron/Go 链路验证通过。SSDP 和三包构建代码已实现；真实两机、Windows 安装和旧版迁移仍待完成，详见实施计划第 11 节。</p></section>
 <section><h2>SSDP（2026-09-25）</h2><p>已接入 Go IPv4 公告和 Desktop 有界搜索。LAN 监听与 discoveryEnabled 控制，真实两机/防火墙验收待执行；手工连接始终可用。</p></section>
+<section><h2>Desktop 此设备设置（2026-09-26）</h2><p>连接页「打开设置」提供本机代理与 Desktop 登录自启动。代理配置独立保存在 userData/desktop-settings.json，重启客户端后应用于连接检查、业务页面与更新检查；SSDP 仍直连。macOS/Windows 自启动使用系统登录项，不管理 Server。仅本地连接页可访问设置 IPC；Windows 登录启动及真实注销/登录尚未实测。</p></section>
 <section><h2>设置与远程操作边界</h2><p>网络页已接入 discoveryEnabled，保存后重启 Server 应用；关于页提供 Desktop 版本及更换入口。服务器目录与客户端文件选择分离，host-only 程序操作拒绝远程调用。</p></section>
 <section><h2>组件发行（2026-09-25）</h2><p>已接入 full/server/desktop 组件组装、安装脚本和精确组件更新选择。Windows EXE 编译及安装验收、旧版自动迁移和 feed 隔离发布尚未完成，当前不是可发布版本。</p></section>
 </body>

@@ -21,6 +21,8 @@
 
 Curated is a local-first media library: Vue 3 frontend, Go + SQLite backend, and an Electron desktop shell. The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**.
 
+Desktop’s connection page includes local proxy and login-startup settings; see [the device settings guide](docs/guide.md#desktop-此设备设置2026-09-26).
+
 This README is the short public entry. For setup details, configuration, packaging, and links into the rest of `docs/`, see **[docs/guide.md](docs/guide.md)**. The HTTP API reference is **[API.md](API.md)**.
 
 ## Download

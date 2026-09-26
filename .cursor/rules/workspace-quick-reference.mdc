@@ -94,3 +94,7 @@ alwaysApply: true
 真实试用需 `VITE_USE_WEB_API=true` 并运行新版后端。进入「设置 → 资料库 → 漫画库 / 写真库」，分别启用对应 Beta，再添加该库的绝对路径并通过路径「更多操作」扫描 ZIP/CBZ。关闭只隐藏内容入口和配置、停止该库监听，保留已有数据；设置入口仍可用于重新启用。Mock 开关仅当前会话有效。
 
 - **Desktop/Server 拆分分支（2026-09-25）**：`release_cli.py publish --variant all|full|server|desktop` 已接入组件包构建，未上传发布；缺 Inno Setup 只生成脚本。旧一体包迁移和 Windows 实机安装仍未验收，不运行历史单包链路发布此版本。详见 guide 与当日实施记录。
+
+## Desktop 本机设置
+
+连接页「打开设置」可改客户端代理（保存后重启 Desktop）及系统登录后自启动。配置不写入 Server。macOS 开发 bundle 提供默认入口，正常启动不再依赖 CLI 项目参数。
