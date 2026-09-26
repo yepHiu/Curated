@@ -217,6 +217,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mac-desktop-smoke"
           ditto -x -k release/macos-desktop/Curated-Desktop-*-macos-arm64.zip "$RUNNER_TEMP/mac-desktop-smoke"
           node scripts/release/desktop_smoke.cjs "$RUNNER_TEMP/mac-desktop-smoke/Curated Desktop.app/Contents/MacOS/Curated Desktop"
+      - name: Verify previous Desktop profile and Server compatibility
+        run: |
+          python scripts/release/download_upgrade_baseline.py --platform macos --output "$RUNNER_TEMP/desktop-baseline"
+          ditto -x -k "$RUNNER_TEMP/desktop-baseline/Curated-Desktop-0.1.0-macos-arm64.zip" "$RUNNER_TEMP/desktop-baseline/app"
+          node scripts/release/desktop_upgrade_smoke.cjs "$RUNNER_TEMP/desktop-baseline/app/Curated Desktop.app/Contents/MacOS/Curated Desktop" "$RUNNER_TEMP/mac-desktop-smoke/Curated Desktop.app/Contents/MacOS/Curated Desktop"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.RELEASE_ARTIFACT }}

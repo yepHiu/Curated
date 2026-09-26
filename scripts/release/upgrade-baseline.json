@@ -1,0 +1,46 @@
+{
+  "tag": "full-v1.6.0",
+  "artifacts": [
+    {
+      "component": "server",
+      "variant": "standalone",
+      "version": "1.6.0",
+      "channel": "stable",
+      "platform": "windows",
+      "arch": "x64",
+      "format": "exe",
+      "fileName": "Curated-Server-Setup-1.6.0-windows-x64.exe",
+      "sha256": "9069cc81a9d0c5b525527049f4eb641642d00d828c70f1deee70de5ab2cf347c",
+      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Server-Setup-1.6.0-windows-x64.exe"
+    },
+    {
+      "component": "desktop",
+      "variant": "standalone",
+      "version": "0.1.0",
+      "channel": "stable",
+      "platform": "windows",
+      "arch": "x64",
+      "format": "exe",
+      "fileName": "Curated-Desktop-Setup-0.1.0-windows-x64.exe",
+      "sha256": "ff1c0491a733e8252d466572fb1b6fd62dd16eecfe712a2cb1c321a8a3e74372",
+      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-Setup-0.1.0-windows-x64.exe"
+    },
+    {
+      "fileName": "Curated-Desktop-0.1.0-macos-arm64.zip",
+      "sha256": "e70f8a8cc233fc5088ecb936ac737c924a07c73fc1e6907342fdb901f7d55f64",
+      "component": "desktop",
+      "variant": "standalone",
+      "channel": "stable",
+      "version": "0.1.0",
+      "platform": "macos",
+      "arch": "arm64",
+      "format": "zip",
+      "signing": "ad-hoc",
+      "notarized": false,
+      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Desktop-0.1.0-macos-arm64.zip"
+    }
+  ]
+}

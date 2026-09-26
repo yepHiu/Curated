@@ -1,5 +1,7 @@
 """Installer integration checks on the disposable Windows runner; no app is launched."""
 import argparse
+import hashlib
+import sqlite3
 import os
 from pathlib import Path
 import subprocess
@@ -49,6 +51,45 @@ def main():
         marker.write_text('existing library')
         os.environ['CURATED_DATA_DIR'] = str(data)
         try:
+            # Install the real previously published components first, then upgrade.
+            baseline = json.loads((ROOT / 'scripts/release/upgrade-baseline.json').read_text())
+            old_locations = {}
+            config = base / 'server.json'
+            config.write_text(json.dumps({'httpAddr': '127.0.0.1:18881', 'databasePath': str(data / 'curated.db'),
+                'cacheDir': str(data / 'cache'), 'logDir': str(data / 'logs'), 'libraryPaths': []}))
+            for c in selected:
+                artifact = next(a for a in baseline['artifacts'] if a['component'] == c)
+                previous = base / artifact['fileName']
+                urllib.request.urlretrieve(artifact['url'], previous)
+                assert hashlib.sha256(previous.read_bytes()).hexdigest() == artifact['sha256']
+                run(previous)
+                old_locations[c] = installed(c)[1]
+                assert installed(c)[0] == artifact['version']
+            if 'server' in selected:
+                prior = subprocess.Popen([str(old_locations['server'] / 'curated.exe'), '-mode', 'http', '-config', str(config)], cwd=old_locations['server'])
+                try:
+                    for attempt in range(60):
+                        try:
+                            with urllib.request.urlopen('http://127.0.0.1:18881/api/health', timeout=2) as response:
+                                assert json.load(response)['version'] == '1.6.0'
+                            break
+                        except Exception:
+                            if prior.poll() is not None or attempt == 59: raise
+                            time.sleep(0.5)
+                finally:
+                    prior.terminate(); prior.wait(timeout=20)
+                with sqlite3.connect(data / 'curated.db') as db:
+                    db.execute('CREATE TABLE upgrade_smoke_marker (value TEXT NOT NULL)')
+                    db.execute("INSERT INTO upgrade_smoke_marker VALUES ('original library')")
+            run(setup(args.component))
+            for c in selected:
+                assert installed(c) == (current[c], old_locations[c]), (c, installed(c))
+            if 'server' in selected:
+                with sqlite3.connect(data / 'curated.db') as db:
+                    assert db.execute('SELECT value FROM upgrade_smoke_marker').fetchone() == ('original library',)
+                    assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
+            for c in selected:
+                run(installed(c)[1] / 'unins000.exe')
             if args.component == 'full':
                 # Failure after Server succeeds must retain Server and report nonzero.
                 desktop_key = KEY.format('desktop'.title())
@@ -95,6 +136,9 @@ def main():
                 if server is not None:
                     assert server.poll() is None, 'Desktop exit stopped independent Server'
                     assert health()['version'] == current['server']
+                    with sqlite3.connect(data / 'curated.db') as db:
+                        assert db.execute('SELECT value FROM upgrade_smoke_marker').fetchone() == ('original library',)
+                        assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
             finally:
                 if server is not None:
                     server.terminate()
