@@ -14,6 +14,7 @@ import curatedLicenseUrl from "@/assets/licenses/Curated_LICENSE.txt?url&no-inli
 import harmonySansLicenseUrl from "@/assets/fonts/HarmonyOS_Sans_SC_LICENSE.txt?url&no-inline"
 import notoSansLicenseUrl from "@/assets/fonts/NotoSans_LICENSE.txt?url"
 import notoSansJpLicenseUrl from "@/assets/fonts/NotoSansJP_LICENSE.txt?url"
+import outfitLicenseUrl from "@fontsource-variable/outfit/LICENSE?url&no-inline"
 import thirdPartyNoticesUrl from "@/assets/licenses/ThirdParty_NOTICES.txt?url&no-inline"
 import SettingsAppUpdateSection from "@/components/jav-library/settings/SettingsAppUpdateSection.vue"
 
@@ -46,6 +47,7 @@ const licenseItems = computed(() => [
   { name: "HarmonyOS Sans SC", detail: t("settings.aboutHarmonyFontNotice"), url: harmonySansLicenseUrl },
   { name: "Noto Sans", detail: "SIL Open Font License 1.1", url: notoSansLicenseUrl },
   { name: "Noto Sans JP", detail: "SIL Open Font License 1.1", url: notoSansJpLicenseUrl },
+  { name: "Outfit", detail: "SIL Open Font License 1.1", url: outfitLicenseUrl },
 ])
 
 const thirdPartyGroups = [

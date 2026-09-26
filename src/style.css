@@ -37,7 +37,7 @@
 
 @theme inline {
   --font-sans: var(--app-font-stack);
-  --font-curated: "Noto Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-curated: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

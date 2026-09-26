@@ -4,7 +4,7 @@ Scope: key components used by the current frontend, Go backend, and Windows desk
 The complete dependency graph is larger; this file is not an exhaustive SBOM.
 Versions reflect package.json, backend/go.mod, and the inspected Windows FFmpeg binary on 2026-09-25.
 FFmpeg licensing depends on the exact binary. The inspected bundled binary enables GPL and version3; its bundled LICENSE is reproduced below.
-HarmonyOS Sans SC, Noto Sans, and Noto Sans JP are listed separately in Settings > About.
+HarmonyOS Sans SC, Noto Sans, Noto Sans JP, and Outfit are listed separately in Settings > About.
 
 ==============================================================================
 Frontend | vue | 3.5.30 | MIT

@@ -1,6 +1,7 @@
 import { createApp } from "vue"
 import "@fontsource-variable/noto-sans/wght.css"
 import "@fontsource-variable/noto-sans-jp/wght.css"
+import "@fontsource-variable/outfit/wght.css"
 import "vue-sonner/style.css"
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css"
 import App from "./App.vue"
