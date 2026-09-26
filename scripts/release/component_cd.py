@@ -208,12 +208,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('check', 'windows', 'macos', 'stage', 'publish', 'channels'))
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--source-root', type=Path, help='Exact original tag checkout when recovering already verified artifacts')
     parser.add_argument('--mode', choices=('draft', 'publish'), default='draft')
     parser.add_argument('--output', type=Path, default=Path('.workspace/component-cd'))
     parser.add_argument('--windows', type=Path, default=Path('release/windows-components'))
     parser.add_argument('--macos', type=Path, default=Path('release/macos-desktop'))
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[2]
+    root = args.source_root.resolve() if args.source_root else Path(__file__).resolve().parents[2]
+    if args.source_root and args.command not in ('stage', 'publish', 'channels'):
+        raise ValueError('Separate source checkout is only supported for artifact recovery')
     meta = metadata(root, args.tag)
     if args.command == 'check':
         body(root, meta)
