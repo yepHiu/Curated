@@ -24,11 +24,15 @@ from scripts.release.release_lib.build_steps import (
     utc_build_stamp,
 )
 from scripts.release.release_lib.components import COMPONENTS, component_plan
+from scripts.release.release_lib.macos_desktop import package_macos_desktop
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Curated release tooling")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    mac_parser = subparsers.add_parser("package-macos-desktop", help="Build standalone Apple Silicon Desktop DMG and ZIP")
+    mac_parser.add_argument("--output-dir", type=Path, default=Path("release/macos-desktop"))
 
     plan_parser = subparsers.add_parser("plan-component", help="Inspect split release names without building or allocating versions")
     plan_parser.add_argument("--component", choices=COMPONENTS, required=True)
@@ -90,6 +94,10 @@ def main() -> None:
     migrate_parser.add_argument("--csv-path", default="docs/ops/package-build-history.csv")
 
     args = parser.parse_args()
+
+    if args.command == "package-macos-desktop":
+        print(package_macos_desktop(REPO_ROOT, args.output_dir))
+        return
 
     if args.command == "plan-component":
         try:

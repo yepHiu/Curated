@@ -1,4 +1,4 @@
-"""Validation and GitHub publication for the legacy Windows CD workflow.
+"""Validation and GitHub publication for Windows and Mac Desktop CD.
 
 Builds remain in release_cli.py. This helper never allocates versions or moves tags.
 """
@@ -14,6 +14,10 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.release.release_lib.macos_desktop import desktop_version, mac_artifact_names
 
 
 TAG_PATTERN = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
@@ -107,6 +111,8 @@ def stage(root: Path, tag: str, output: Path) -> None:
 def verify_staged(output: Path, metadata: dict) -> None:
     assets = output / "assets"
     names = artifact_names(metadata["version"])
+    if "desktopVersion" in metadata:
+        names += mac_artifact_names(metadata["desktopVersion"]) + ["desktop-macos.json"]
     if {p.name for p in assets.iterdir()} != {*names, "SHA256SUMS.txt"}:
         raise ValueError("Unexpected or missing staged release assets")
     expected = "".join(f"{sha256(assets / name)}  {name}\n" for name in names)
@@ -115,6 +121,34 @@ def verify_staged(output: Path, metadata: dict) -> None:
     manifest = json.loads((assets / "release.json").read_text(encoding="utf-8"))
     if manifest.get("version") != metadata["version"] or manifest.get("sourceCommit") != metadata["commit"]:
         raise ValueError("Downloaded artifacts do not belong to the selected source commit")
+
+
+def merge_macos(root: Path, output: Path, macos: Path, metadata: dict) -> dict:
+    verify_staged(output, metadata)
+    version = desktop_version(root)
+    names = mac_artifact_names(version)
+    manifest = json.loads((macos / "desktop-macos.json").read_text(encoding="utf-8"))
+    required = {"schema": 1, "component": "desktop", "version": version, "platform": "macos",
+                "arch": "arm64", "distribution": "desktop", "sourceCommit": metadata["commit"]}
+    if any(manifest.get(key) != value for key, value in required.items()):
+        raise ValueError("Mac Desktop manifest does not match the release source/version/architecture")
+    entries = manifest.get("artifacts", [])
+    if len(entries) != 2 or {entry.get("fileName") for entry in entries} != set(names):
+        raise ValueError("Mac Desktop requires both DMG and ZIP")
+    for entry in entries:
+        path = macos / entry["fileName"]
+        if not path.is_file() or path.stat().st_size == 0 or sha256(path) != entry.get("sha256"):
+            raise ValueError("Mac Desktop artifact checksum mismatch")
+    assets = output / "assets"
+    for name in [*names, "desktop-macos.json"]:
+        if (assets / name).exists():
+            raise FileExistsError(assets / name)
+        shutil.copy2(macos / name, assets / name)
+    all_names = artifact_names(metadata["version"]) + names + ["desktop-macos.json"]
+    (assets / "SHA256SUMS.txt").write_text("".join(f"{sha256(assets / name)}  {name}\n" for name in all_names), encoding="utf-8")
+    metadata = {**metadata, "desktopVersion": version}
+    (output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    return metadata
 
 
 def api(path: str, payload: dict | None = None, method: str | None = None):
@@ -188,12 +222,19 @@ def verify_uploaded(release: dict, assets: Path) -> None:
             raise ValueError(f"GitHub upload verification failed: {path.name}")
 
 
-def publish(root: Path, tag: str, output: Path, mode: str) -> None:
+def publish(root: Path, tag: str, output: Path, mode: str, macos: Path | None = None) -> None:
     metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
     if metadata != {"tag": tag, "version": version_from_tag(tag), "commit": source_commit(root, tag)}:
         raise ValueError("Release metadata does not match the checked-out tag")
+    if macos is not None:
+        metadata = merge_macos(root, output, macos, metadata)
     verify_staged(output, metadata)
     body = release_body(root, metadata["version"]) + "\n" + source_marker(metadata) + "\n"
+    if macos is not None:
+        body += "\n### macOS Desktop (Apple Silicon)\n\n"
+        body += f"Standalone Desktop {metadata['desktopVersion']} connects to an existing Curated Server. "
+        body += "Requires Apple Silicon; Intel Macs are not supported. Ad-hoc signed, not Apple notarized.\n\n"
+        body += "\n".join(f"- `{name}`" for name in mac_artifact_names(metadata['desktopVersion'])) + "\n"
     release = check_release(metadata)
     payload = {"tag_name": tag, "target_commitish": metadata["commit"],
                "name": f"Curated {tag}", "body": body, "draft": True, "prerelease": False}
@@ -221,12 +262,13 @@ def main() -> None:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--output", type=Path, default=Path(".workspace/cd-release"))
     parser.add_argument("--mode", choices=("draft", "publish"), default="draft")
+    parser.add_argument("--macos-dir", type=Path, help="Required Mac Desktop artifacts for combined CD publication")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     if args.command == "stage":
         stage(root, args.tag, args.output)
     elif args.command == "publish":
-        publish(root, args.tag, args.output, args.mode)
+        publish(root, args.tag, args.output, args.mode, args.macos_dir)
     else:
         metadata = prepare(root, args.tag, args.output)
         if args.command == "check":

@@ -11,13 +11,13 @@ COMPONENTS = ("desktop", "server", "full")
 def artifact_name(component: str, version: str, platform: str, arch: str, format: str) -> str:
     if component not in COMPONENTS or not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
         raise ValueError("Expected a release component and numeric SemVer.")
-    supported_formats = {"windows": ("exe", "zip"), "macos": ("dmg", "pkg"), "linux": ("tar.gz",)}
+    supported_formats = {"windows": ("exe", "zip"), "macos": ("dmg", "zip", "pkg"), "linux": ("tar.gz",)}
     if platform not in supported_formats or format not in supported_formats[platform]:
         raise ValueError("Unsupported platform / format combination.")
     if arch not in ("x64", "arm64") and not (platform == "macos" and arch == "universal"):
         raise ValueError("Unsupported platform / architecture combination.")
-    if platform == "macos" and ((format == "dmg") != (component == "desktop")):
-        raise ValueError("macOS Desktop uses DMG; Server / Full reserve PKG.")
+    if platform == "macos" and ((format in ("dmg", "zip")) != (component == "desktop")):
+        raise ValueError("macOS Desktop uses DMG/ZIP; Server / Full reserve PKG.")
     setup = "-Setup" if format in ("exe", "pkg") else ""
     return f"Curated-{component.title()}{setup}-{version}-{platform}-{arch}.{format}"
 

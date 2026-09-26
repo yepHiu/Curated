@@ -23,6 +23,7 @@
     "preview": "vite preview",
     "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
     "release:backend": "python scripts/release/release_cli.py build-backend --version 0.0.0-local",
+    "release:macos-desktop": "python3 scripts/release/release_cli.py package-macos-desktop",
     "release:electron-main": "python scripts/release/release_cli.py build-electron-main",
     "release:portable": "python scripts/release/release_cli.py package-portable",
     "release:installer": "python scripts/release/release_cli.py package-installer",
