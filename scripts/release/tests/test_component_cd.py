@@ -40,6 +40,28 @@ class ComponentReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cd.validate_entries(self.meta, bad, [self.root])
 
+    def test_stage_and_verify_combined_distribution(self):
+        entries = self.fixture()
+        windows = self.root / 'windows'
+        macos = self.root / 'macos'
+        windows.mkdir(); macos.mkdir()
+        for entry in entries:
+            directory = windows if entry['platform'] == 'windows' else macos
+            (self.root / entry['fileName']).rename(directory / entry['fileName'])
+        (windows / 'windows-components.json').write_text(json.dumps({'sourceCommit': 'abc',
+            'artifacts': [e for e in entries if e['platform'] == 'windows']}))
+        (macos / 'desktop-macos.json').write_text(json.dumps({'schema': 1, 'component': 'desktop',
+            'version': '0.1.0', 'platform': 'macos', 'arch': 'arm64', 'distribution': 'desktop',
+            'sourceCommit': 'abc', 'artifacts': [e for e in entries if e['platform'] == 'macos']}))
+        output = self.root / 'output'
+        cd.stage(self.root, self.meta, windows, macos, output)
+        manifest = cd.verify_distribution(self.meta, output / 'assets')
+        self.assertEqual(len(manifest['artifacts']), 8)
+        desktop = output / 'assets/desktop.json'
+        desktop.write_text('{}')
+        with self.assertRaises(ValueError):
+            cd.verify_distribution(self.meta, output / 'assets')
+
     def test_wrong_component_arch_and_corrupt_binary_fail(self):
         entries = self.fixture()
         for key, value in [('component', 'desktop'), ('arch', 'arm64'), ('version', '1.6.0'), ('sha256', '0'*64)]:
@@ -93,6 +115,7 @@ class ComponentReleaseTests(unittest.TestCase):
              patch.dict('os.environ', {'GITHUB_REPOSITORY': 'yepHiu/Curated'}):
             cd.publish(self.root, self.meta, self.root / 'output', 'publish')
             payloads = [call.args for call in api.call_args_list if len(call.args) > 1]
+            self.assertNotIn('target_commitish', next(args[1] for args in payloads if args[0] == 'releases'))
             self.assertIn(('releases/10', {'make_latest': 'true'}, 'PATCH'), payloads)
             self.assertIn(('releases/20', {'draft': False, 'make_latest': 'false'}, 'PATCH'), payloads)
             self.assertFalse(any(args[0] == 'releases/20' and args[1].get('make_latest') == 'true' for args in payloads))
