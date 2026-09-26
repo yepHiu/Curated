@@ -33,6 +33,7 @@ scripts/dev/*
 scripts/release/*
 scripts/prd/*
 !scripts/release/release_cli.py
+!scripts/release/cd_release.py
 !scripts/release/release_lib/
 !scripts/release/release_lib/**
 !scripts/release/tests/

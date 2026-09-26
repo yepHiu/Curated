@@ -1,6 +1,12 @@
 name: CI
 
 on:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Immutable source commit supplied by CD
+        required: true
+        type: string
   pull_request:
   push:
     branches:
@@ -10,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ inputs.source_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,6 +27,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Reject tracked local artifacts
         shell: bash
@@ -62,6 +71,8 @@ jobs:
         run: pnpm lint
 
       - name: Run frontend unit tests
+        env:
+          NODE_OPTIONS: --no-experimental-webstorage
         run: pnpm test
 
       - name: Run Electron unit tests
@@ -84,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bundle-size-${{ github.sha }}
+          name: bundle-size-${{ inputs.source_ref || github.sha }}-${{ github.run_attempt }}
           path: |
             dist/bundle-analysis.json
             dist/bundle-report.md
@@ -97,8 +108,8 @@ jobs:
       - name: Test release scripts
         run: python -m unittest discover -s scripts -p "test_*.py"
 
-      - name: Test release build steps
-        run: python -m unittest scripts.release.tests.test_build_steps
+      - name: Test release pipeline
+        run: python -m unittest discover -s scripts/release/tests -p "test_*.py"
 
       - name: Prepare successful master bundle snapshot
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -123,6 +134,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -143,6 +157,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -168,7 +185,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-runtime-diagnostics
+          name: playwright-runtime-diagnostics-${{ github.run_attempt }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7

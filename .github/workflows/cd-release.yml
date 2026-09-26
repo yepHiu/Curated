@@ -1,0 +1,184 @@
+name: CD - Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+      mode:
+        description: Keep a draft or publish after checks pass
+        type: choice
+        options:
+          - draft
+          - publish
+        default: draft
+
+permissions:
+  contents: read
+
+# Serialize tag and manual runs for the same version, including draft retries.
+concurrency:
+  group: cd-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release source and notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Resolve immutable tag commit
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Expected a release tag vMAJOR.MINOR.PATCH'
+            exit 1
+          fi
+          commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
+          if [[ "$EVENT_NAME" == push && "$commit" != "$EVENT_SHA" ]]; then
+            echo '::error::Tag no longer matches the triggering commit'
+            exit 1
+          fi
+          git checkout --detach "$commit"
+      - name: Validate version, notes and release availability
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release/cd_release.py check --tag "$RELEASE_TAG"
+
+  quality:
+    name: Check the exact release commit
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.commit }}
+
+  build:
+    name: Build Windows x64 packages
+    needs: [prepare, quality]
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      artifact_name: ${{ env.RELEASE_ARTIFACT }}
+    env:
+      RELEASE_ARTIFACT: windows-release-${{ needs.prepare.outputs.tag }}-${{ github.run_attempt }}
+      VITE_USE_WEB_API: 'true'
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Install frontend and Electron dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # pnpm intentionally does not run Electron's install script implicitly.
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install Windows packaging tools
+        run: |
+          if (!(Test-Path 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe') -and !(Test-Path 'C:/Program Files/Inno Setup 6/ISCC.exe')) {
+            choco install innosetup --version=6.3.3 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          choco install ffmpeg --version=7.1.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $ffmpeg = Get-ChildItem "$env:ChocolateyInstall/lib/ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+          if (!$ffmpeg) { throw 'Real FFmpeg executable not found' }
+          $ffprobe = Join-Path $ffmpeg.DirectoryName 'ffprobe.exe'
+          if (!(Test-Path $ffprobe)) { throw 'FFprobe executable not found' }
+          $ffmpeg.DirectoryName >> $env:GITHUB_PATH
+          & $ffmpeg.FullName -version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe') -and !(Test-Path 'C:/Program Files/Inno Setup 6/ISCC.exe') -and !(Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            throw 'Inno Setup compiler not found'
+          }
+      - name: Build release with the tag version
+        run: python scripts/release/release_cli.py publish --version "$env:RELEASE_VERSION"
+      - name: Verify complete packages and prepare checksums
+        run: python scripts/release/cd_release.py stage --tag "$env:RELEASE_TAG"
+      - name: Preserve verified distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RELEASE_ARTIFACT }}
+          path: .workspace/cd-release/
+          if-no-files-found: error
+          include-hidden-files: true
+          compression-level: 0
+          retention-days: 14
+      - name: Preserve build ledger and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-diagnostics-${{ needs.prepare.outputs.tag }}-${{ github.run_attempt }}
+          path: |
+            docs/ops/package-build-history.csv
+            dist/bundle-analysis.json
+            dist/bundle-report.md
+          if-no-files-found: ignore
+          retention-days: 90
+
+  publish:
+    name: Upload and verify GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: .workspace/cd-release/
+      - name: Publish verified assets (manual runs default to draft)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_MODE: ${{ github.event_name == 'push' && 'publish' || inputs.mode }}
+        run: python scripts/release/cd_release.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE"
