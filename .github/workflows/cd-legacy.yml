@@ -156,48 +156,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
-  build-macos:
-    name: Build Mac Desktop (Apple Silicon)
-    needs: [prepare, quality]
-    runs-on: macos-15
-    timeout-minutes: 30
-    outputs:
-      artifact_name: ${{ env.RELEASE_ARTIFACT }}
-    env:
-      RELEASE_ARTIFACT: macos-desktop-${{ needs.prepare.outputs.tag }}-${{ github.run_attempt }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.commit }}
-          persist-credentials: false
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.0.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install locked Apple Silicon Electron runtime
-        run: |
-          test "$(uname -m)" = arm64
-          pnpm install --frozen-lockfile
-          node node_modules/electron/install.js
-      - name: Build standalone Desktop DMG and ZIP
-        run: python scripts/release/release_cli.py package-macos-desktop
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.RELEASE_ARTIFACT }}
-          path: release/macos-desktop/
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 14
-
   publish:
     name: Upload and verify GitHub Release
-    needs: [prepare, build, build-macos]
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -215,13 +176,9 @@ jobs:
         with:
           name: ${{ needs.build.outputs.artifact_name }}
           path: .workspace/cd-release/
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build-macos.outputs.artifact_name }}
-          path: .workspace/cd-macos/
       - name: Publish verified assets (manual runs default to draft)
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_MODE: ${{ github.event_name == 'push' && 'publish' || inputs.mode }}
-        run: python scripts/release/cd_release.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE" --macos-dir .workspace/cd-macos
+        run: python scripts/release/cd_release.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE"
