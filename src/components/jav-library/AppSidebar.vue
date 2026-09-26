@@ -317,7 +317,7 @@ const getNavigationTarget = (page: AppPage) => {
     </div>
 
     <div class="app-sidebar-scroll min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-      <div class="flex flex-col pt-3.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5'">
+      <div class="flex flex-col pt-1.5" :class="props.compact ? 'gap-3 pb-1' : 'gap-5'">
         <template v-for="(section, sectionIndex) in sidebarSections" :key="section.key">
           <section
             class="flex flex-col gap-2"
