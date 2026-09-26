@@ -1,4 +1,6 @@
 export interface DesktopInfo {
+  /** Actual backend origin selected by main; absent on older Desktop versions. */
+  serverOrigin?: string
   version: string
   buildStamp: string
   development: boolean

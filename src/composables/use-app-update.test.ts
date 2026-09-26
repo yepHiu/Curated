@@ -42,7 +42,11 @@ beforeEach(() => {
   vi.resetModules()
   vi.unstubAllEnvs()
   vi.useRealTimers()
+  delete window.javLibrary
   apiMocks.getAppUpdateStatus.mockReset()
+  apiMocks.getAppUpdateStatus.mockResolvedValue({
+    supported: true, localUpdateAllowed: true, status: "up-to-date",
+  })
   apiMocks.checkAppUpdateNow.mockReset()
   apiMocks.getSettings.mockReset()
   apiMocks.downloadAppUpdateInstaller.mockReset()
@@ -52,6 +56,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  delete window.javLibrary
   vi.unstubAllEnvs()
   vi.useRealTimers()
 })
@@ -73,6 +78,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       installedVersion: "1.0.0",
@@ -97,6 +103,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.checkAppUpdateNow.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "up-to-date",
       hasUpdate: false,
       installedVersion: "1.0.0",
@@ -119,6 +126,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       installedVersion: "1.0.0",
@@ -160,6 +168,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.downloadAppUpdateInstaller.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       latestVersion: "1.4.5",
@@ -186,6 +195,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.installAppUpdate.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       artifactStatus: "install-launched",
       installReady: false,
@@ -205,6 +215,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "up-to-date",
       hasUpdate: false,
       installedVersion: "1.0.0",
@@ -230,6 +241,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       installedVersion: "1.0.0",
@@ -255,6 +267,7 @@ describe("useAppUpdate", () => {
     vi.stubEnv("VITE_USE_WEB_API", "true")
     apiMocks.getAppUpdateStatus.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       installedVersion: "1.0.0",
@@ -267,6 +280,7 @@ describe("useAppUpdate", () => {
     })
     apiMocks.downloadAppUpdateInstaller.mockResolvedValueOnce({
       supported: true,
+      localUpdateAllowed: true,
       status: "update-available",
       hasUpdate: true,
       latestVersion: "1.1.0",
@@ -282,5 +296,64 @@ describe("useAppUpdate", () => {
     expect(apiMocks.downloadAppUpdateInstaller).toHaveBeenCalledTimes(1)
     expect(state.summary.value?.artifactStatus).toBe("verified")
     expect(state.summary.value?.installReady).toBe(true)
+  })
+})
+
+
+describe("remote update isolation", () => {
+  it.each([false, undefined])("blocks all installer mutations when server permission is %s", async (allowed) => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    apiMocks.getAppUpdateStatus.mockResolvedValue({ supported: true, status: "update-available", localUpdateAllowed: allowed, installReady: true, artifactStatus: "verified" })
+    const state = await loadUseAppUpdate()
+    await state.downloadInstaller()
+    await state.installUpdate()
+    await state.clearDownloadedInstaller()
+    expect(state.localUpdateAllowed.value).toBe(false)
+    expect(apiMocks.downloadAppUpdateInstaller).not.toHaveBeenCalled()
+    expect(apiMocks.installAppUpdate).not.toHaveBeenCalled()
+    expect(apiMocks.clearDownloadedAppUpdateInstaller).not.toHaveBeenCalled()
+  })
+
+  it.each(["remote", "old-bridge", "failed-bridge", "standalone", "remote-api"])("does not mutate Server with a %s target even if it reports local permission", async (kind) => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    if (kind === "remote-api") vi.stubEnv("VITE_API_BASE_URL", "https://nas.example/api")
+    window.javLibrary = kind === "old-bridge" ? {} : {
+      getDesktopInfo: kind === "failed-bridge" ? vi.fn().mockRejectedValue(new Error("offline")) : vi.fn().mockResolvedValue({
+        version: "0.1.0", development: false, distribution: kind === "standalone" ? "desktop" : "legacy",
+        serverOrigin: kind === "remote" ? "https://nas.example" : "http://localhost:8080",
+      }),
+    }
+    const state = await loadUseAppUpdate()
+    await state.downloadInstaller()
+    await state.installUpdate()
+    await state.clearDownloadedInstaller()
+    expect(apiMocks.downloadAppUpdateInstaller).not.toHaveBeenCalled()
+    expect(apiMocks.installAppUpdate).not.toHaveBeenCalled()
+    expect(apiMocks.clearDownloadedAppUpdateInstaller).not.toHaveBeenCalled()
+  })
+
+  it("does not auto-download or announce a Server update on a remote Desktop", async () => {
+    vi.useFakeTimers()
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    window.javLibrary = { getDesktopInfo: vi.fn().mockResolvedValue({ distribution: "legacy", serverOrigin: "http://192.168.1.20:8081" }) }
+    apiMocks.getAppUpdateStatus.mockResolvedValue({ supported: true, status: "update-available", localUpdateAllowed: true, hasUpdate: true, latestVersion: "2.0.0", installerDownloadUrl: "https://example.com/full.exe", installerSha256: "a".repeat(64) })
+    apiMocks.getSettings.mockResolvedValue({ autoDownloadUpdates: true })
+    const state = await loadUseAppUpdate()
+    await vi.advanceTimersByTimeAsync(12000)
+    expect(state.hasUpdateBadge.value).toBe(false)
+    expect(apiMocks.getSettings).not.toHaveBeenCalled()
+    expect(apiMocks.downloadAppUpdateInstaller).not.toHaveBeenCalled()
+    expect(notificationMocks.addNotification).not.toHaveBeenCalled()
+  })
+
+  it("rechecks permission before installing an already verified artifact", async () => {
+    vi.stubEnv("VITE_USE_WEB_API", "true")
+    const state = await loadUseAppUpdate()
+    state.ensureLoaded()
+    await flushPromises()
+    expect(state.localUpdateAllowed.value).toBe(true)
+    apiMocks.getAppUpdateStatus.mockResolvedValue({ supported: true, status: "update-available", localUpdateAllowed: false, installReady: true, artifactStatus: "verified" })
+    await state.installUpdate()
+    expect(apiMocks.installAppUpdate).not.toHaveBeenCalled()
   })
 })

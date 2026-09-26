@@ -124,6 +124,8 @@ type DevPerformanceSummaryDTO struct {
 
 // AppUpdateStatusDTO reports the packaged-app update state vs the latest GitHub Release.
 type AppUpdateStatusDTO struct {
+	// HTTP request capability, never persisted or inferred from the installed version.
+	LocalUpdateAllowed   bool   `json:"localUpdateAllowed"`
 	Supported            bool   `json:"supported"`
 	Status               string `json:"status"`
 	InstalledVersion     string `json:"installedVersion,omitempty"`
@@ -1926,6 +1928,7 @@ const (
 	ErrorCodePhotoBookNotFound        = "PHOTO_BOOK_NOT_FOUND"
 	ErrorCodePhotoPageNotFound        = "PHOTO_PAGE_NOT_FOUND"
 
+	ErrorCodeAppUpdateRemoteDisabled = "APP_UPDATE_REMOTE_DISABLED"
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"
 

@@ -1,9 +1,28 @@
 import { computed, readonly, ref } from "vue"
 import { api } from "@/api/endpoints"
-import { HttpClientError } from "@/api/http-client"
+import { HttpClientError, resolveApiBaseUrl } from "@/api/http-client"
 import type { AppUpdateInstallBody, AppUpdateStatusDTO } from "@/api/types"
 import { i18n } from "@/i18n"
 import { useNotificationCenter } from "@/composables/use-notification-center"
+
+import type { DesktopInfo } from "../../electron/desktop-contract"
+import { isLocalUpdateTarget } from "@/lib/app-update-target"
+
+const desktopInfo = ref<DesktopInfo | null>(null)
+const localTarget = computed(() => isLocalUpdateTarget(
+  resolveApiBaseUrl(import.meta.env), window.location.origin, !!window.javLibrary, desktopInfo.value,
+))
+const localUpdateAllowed = computed(() => localTarget.value && summary.value?.localUpdateAllowed === true)
+
+async function refreshDesktopTarget() {
+  desktopInfo.value = null
+  if (!window.javLibrary?.getDesktopInfo) return
+  try {
+    desktopInfo.value = await window.javLibrary.getDesktopInfo()
+  } catch {
+    // Old or unavailable bridges cannot authorize server updates.
+  }
+}
 
 const USE_WEB = import.meta.env.VITE_USE_WEB_API === "true"
 const AUTO_CHECK_DELAY_MS = 12_000
@@ -38,7 +57,7 @@ const notifiedUpdateVersions = new Set<string>()
 const autoDownloadAttemptedVersions = new Set<string>()
 
 function maybeRecordUpdateAvailableNotification(next: AppUpdateStatusDTO) {
-  if (next.status !== "update-available" || next.hasUpdate !== true) {
+  if (!localUpdateAllowed.value || next.status !== "update-available" || next.hasUpdate !== true) {
     return
   }
   const version = next.latestVersion?.trim() || next.releaseUrl?.trim() || "unknown"
@@ -108,6 +127,7 @@ async function runRequest(kind: "status" | "check", options?: { silent?: boolean
   }
 
   try {
+    await refreshDesktopTarget()
     const next =
       kind === "check" ? await api.checkAppUpdateNow() : await api.getAppUpdateStatus()
     if (requestId !== requestSeq) {
@@ -158,6 +178,16 @@ async function runMutation(
   busyRef.value = true
 
   try {
+    await refreshDesktopTarget()
+    if (!localTarget.value) {
+      throw new Error(i18n.global.t("settings.serverUpdateLocalOnly"))
+    }
+    const permission = await api.getAppUpdateStatus()
+    if (requestId !== requestSeq) return summary.value
+    applySummary(permission)
+    if (!localUpdateAllowed.value) {
+      throw new Error(i18n.global.t("settings.serverUpdateLocalOnly"))
+    }
     const next = await request()
     if (requestId !== requestSeq) {
       return summary.value
@@ -228,7 +258,7 @@ function canAutoDownloadInstaller(next: AppUpdateStatusDTO | null): next is AppU
 }
 
 async function maybeAutoDownloadInstaller(next: AppUpdateStatusDTO | null) {
-  if (!canAutoDownloadInstaller(next)) {
+  if (!localUpdateAllowed.value || !canAutoDownloadInstaller(next)) {
     return
   }
   const versionKey = autoDownloadVersionKey(next)
@@ -266,6 +296,7 @@ export function useAppUpdate() {
 
   return {
     useWebApi: USE_WEB,
+    localUpdateAllowed: readonly(localUpdateAllowed),
     summary: readonly(summary),
     status: readonly(status),
     loading: readonly(loading),
@@ -273,8 +304,9 @@ export function useAppUpdate() {
     installing: readonly(installing),
     loaded: readonly(loaded),
     errorMessage: readonly(errorMessage),
-    hasUpdateBadge: computed(() => status.value === "update-available" && summary.value?.hasUpdate === true),
+    hasUpdateBadge: computed(() => localUpdateAllowed.value && status.value === "update-available" && summary.value?.hasUpdate === true),
     ensureLoaded,
+    refreshStatus: () => runRequest("status"),
     checkNow,
     checkNowSilent,
     downloadInstaller,

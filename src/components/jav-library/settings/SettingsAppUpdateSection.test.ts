@@ -15,6 +15,7 @@ const appUpdateSummaryRef = vi.hoisted(() => ({ current: null as { value: AppUpd
 const appUpdateSummarySeed = vi.hoisted(() => ({ current: null as AppUpdateSummary | null }))
 
 type AppUpdateSummary = {
+  localUpdateAllowed?: boolean
   supported: boolean
   status: "unsupported" | "up-to-date" | "update-available" | "error"
   installedVersion?: string
@@ -39,6 +40,7 @@ type AppUpdateSummary = {
 function createAppUpdateSummary(overrides: Partial<AppUpdateSummary> = {}): AppUpdateSummary {
   return {
     supported: true,
+    localUpdateAllowed: true,
     status: "update-available",
     installedVersion: "0.0.0",
     latestVersion: "1.2.8",
@@ -89,6 +91,9 @@ vi.mock("@/composables/use-app-update", () => ({
     const summary = ref(appUpdateSummarySeed.current ?? createAppUpdateSummary())
     appUpdateSummaryRef.current = summary
     return {
+      useWebApi: true,
+      refreshStatus: vi.fn(),
+      localUpdateAllowed: computed(() => summary.value.localUpdateAllowed === true),
       summary: computed(() => summary.value),
       status: computed(() => summary.value.status),
       loading: ref(false),
@@ -294,5 +299,44 @@ describe("SettingsAppUpdateSection", () => {
         }),
       }),
     )
+  })
+})
+
+
+describe("Desktop-only updates", () => {
+  afterEach(() => { delete window.javLibrary })
+  it.each(["update-available", "up-to-date", "no-artifact", "bundled"] as const)("shows Desktop %s without offering the verified Server installer", async (desktopStatus) => {
+    checkNowMock.mockReset()
+    downloadInstallerMock.mockReset()
+    installUpdateMock.mockReset()
+    appUpdateSummarySeed.current = createAppUpdateSummary({ localUpdateAllowed: false, artifactStatus: "verified", installReady: true })
+    const checkDesktopUpdate = vi.fn().mockResolvedValue({ status: desktopStatus, latestVersion: "0.2.0", ...(desktopStatus === "update-available" ? { downloadUrl: "https://example.com/desktop.dmg" } : {}) })
+    window.javLibrary = { getDesktopInfo: vi.fn().mockResolvedValue({ version: "0.1.0", distribution: "desktop", development: false }), checkDesktopUpdate }
+    const wrapper = mount(SettingsAppUpdateSection, { props: { backendVersionDisplay: "1.5.7" } })
+    await flushPromises()
+    await wrapper.get("[data-app-update-check]").trigger("click")
+    await flushPromises()
+    expect(checkDesktopUpdate).toHaveBeenCalledOnce()
+    expect(checkNowMock).not.toHaveBeenCalled()
+    expect(wrapper.find("[data-app-update-install]").exists()).toBe(false)
+    expect(wrapper.find("[data-app-update-download-installer]").exists()).toBe(false)
+    expect(wrapper.find("[data-app-update-release]").exists()).toBe(false)
+    expect(wrapper.find("[data-app-update-release-notes]").exists()).toBe(false)
+    expect(wrapper.text()).toContain("1.5.7")
+    expect(wrapper.text()).not.toContain("1.2.8")
+    expect(wrapper.find("[data-desktop-download]").exists()).toBe(desktopStatus === "update-available")
+    if (desktopStatus === "update-available") expect(wrapper.get("[data-desktop-download] a").attributes("href")).toBe("https://example.com/desktop.dmg")
+    if (desktopStatus === "bundled") expect(wrapper.text()).toContain("settings.desktopStandaloneUnavailable")
+    wrapper.unmount()
+  })
+
+  it("offers no Desktop installation in a remote browser", () => {
+    delete window.javLibrary
+    appUpdateSummarySeed.current = createAppUpdateSummary({ localUpdateAllowed: false })
+    const wrapper = mount(SettingsAppUpdateSection)
+    expect(wrapper.text()).toContain("settings.serverUpdateLocalOnly")
+    expect(wrapper.find("[data-app-update-download-installer]").exists()).toBe(false)
+    expect(wrapper.find("[data-desktop-update-section]").exists()).toBe(false)
+    wrapper.unmount()
   })
 })

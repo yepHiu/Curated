@@ -29,13 +29,16 @@ const props = withDefaults(
 
 const { t } = useI18n()
 const {
+  useWebApi,
   summary,
+  localUpdateAllowed,
   status,
   loading,
   downloading,
   installing,
   hasUpdateBadge,
   ensureLoaded,
+  refreshStatus,
   checkNow,
   checkNowSilent,
   downloadInstaller,
@@ -59,7 +62,11 @@ onMounted(() => {
   void loadDesktopInfo()
 })
 
+const desktopOnly = computed(() => !localUpdateAllowed.value)
+const desktopHasUpdate = computed(() => desktopResult.value?.status === "update-available")
+const showUpdateBadge = computed(() => desktopOnly.value ? desktopHasUpdate.value : hasUpdateBadge.value || desktopHasUpdate.value)
 const panelTone = computed(() => {
+  if (desktopOnly.value) return desktopHasUpdate.value ? "warning" : "info"
   switch (status.value) {
     case "update-available":
       return "warning"
@@ -73,6 +80,7 @@ const panelTone = computed(() => {
 })
 
 const title = computed(() => {
+  if (desktopOnly.value) return t(desktopAvailable ? "settings.desktopUpdateOnlyTitle" : "settings.serverUpdateLocalOnlyTitle")
   switch (status.value) {
     case "checking":
       return t("settings.appUpdateChecking")
@@ -90,6 +98,7 @@ const title = computed(() => {
 })
 
 const description = computed(() => {
+  if (desktopOnly.value) return t(desktopAvailable ? "settings.desktopUpdateOnlyHint" : "settings.serverUpdateLocalOnly")
   const current = summary.value
   switch (status.value) {
     case "checking":
@@ -145,8 +154,12 @@ async function handleCheckNow() {
   if (checkingUpdates.value) return
   checkingAll.value = true
   try {
+    if (!desktopAvailable && !localUpdateAllowed.value) {
+      await refreshStatus()
+      return
+    }
     await Promise.allSettled([
-      status.value !== "unsupported" ? handleInstallerCheck() : Promise.resolve(),
+      localUpdateAllowed.value && status.value !== "unsupported" ? handleInstallerCheck() : Promise.resolve(),
       checkDesktopUpdate(),
     ])
   } finally {
@@ -185,6 +198,7 @@ async function handleInstallerCheck() {
 }
 
 async function handleDownloadInstaller() {
+  if (!localUpdateAllowed.value) return
   const next = await downloadInstaller()
   if (next?.artifactStatus === "verified" && next.installReady) {
     pushAppToast(t("settings.appUpdateInstallReadyAction"), { variant: "success" })
@@ -198,6 +212,7 @@ async function handleDownloadInstaller() {
 }
 
 async function handleInstallUpdate() {
+  if (!localUpdateAllowed.value) return
   const next = await installUpdate("interactive")
   if (next?.artifactStatus === "install-launched") {
     pushAppToast(t("settings.appUpdateInstallingAction"), { variant: "success" })
@@ -225,7 +240,7 @@ async function handleInstallUpdate() {
               {{ t("settings.appUpdateSectionTitle") }}
             </p>
             <Badge
-              v-if="hasUpdateBadge"
+              v-if="showUpdateBadge"
               variant="secondary"
               class="max-h-5 shrink-0 !h-5 !min-h-0 !py-0 rounded-full border border-amber-600/35 bg-amber-500/20 px-1.5 text-[10px] font-semibold uppercase leading-none tracking-normal text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100"
             >
@@ -235,14 +250,14 @@ async function handleInstallUpdate() {
           <p :class="cn('text-sm font-medium', statusTextClass(panelTone))">
             {{ title }}
           </p>
-          <p v-if="status !== 'update-available'" class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <p v-if="desktopOnly || status !== 'update-available'" class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {{ description }}
           </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
           <Button
-            v-if="installReady"
+            v-if="localUpdateAllowed && installReady"
             type="button"
             class="rounded-2xl"
             :disabled="installing"
@@ -255,7 +270,7 @@ async function handleInstallUpdate() {
           </Button>
 
           <Button
-            v-else-if="canDownloadInstaller"
+            v-else-if="localUpdateAllowed && canDownloadInstaller"
             type="button"
             class="rounded-2xl"
             :disabled="downloading"
@@ -272,7 +287,7 @@ async function handleInstallUpdate() {
           </Button>
 
           <TooltipProvider :delay-duration="280">
-            <TooltipRoot v-if="status !== 'unsupported' || desktopAvailable">
+            <TooltipRoot v-if="useWebApi || desktopAvailable">
               <TooltipTrigger as-child>
                 <Button
                   type="button"
@@ -295,7 +310,7 @@ async function handleInstallUpdate() {
               </TooltipPortal>
             </TooltipRoot>
 
-            <TooltipRoot v-if="releaseUrl">
+            <TooltipRoot v-if="localUpdateAllowed && releaseUrl">
               <TooltipTrigger as-child>
                 <Button
                   as-child
@@ -330,6 +345,7 @@ async function handleInstallUpdate() {
           :info="desktopInfo"
           :info-error="desktopInfoError"
           :result="desktopResult"
+          :desktop-only="desktopOnly"
         />
 
         <dl
@@ -356,7 +372,7 @@ async function handleInstallUpdate() {
       </div>
 
       <div
-        v-if="releaseTitle || releaseNotesSnippet"
+        v-if="localUpdateAllowed && (releaseTitle || releaseNotesSnippet)"
         class="rounded-lg border border-dashed border-border/60 bg-background/25 px-3 py-3"
       >
         <p v-if="releaseTitle" class="text-sm font-semibold text-foreground">

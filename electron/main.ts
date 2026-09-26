@@ -315,7 +315,7 @@ function registerDesktopIpc(): void {
   }
   ipcMain.handle(desktopInfoChannel, (event) => {
     assertSender(event)
-    return desktopInfo
+    return { ...desktopInfo, serverOrigin: managedBackend?.baseUrl }
   })
   ipcMain.handle(desktopUpdateChannel, (event) => {
     assertSender(event)

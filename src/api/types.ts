@@ -120,6 +120,8 @@ export interface AuthSessionsDTO {
 }
 
 export interface AppUpdateStatusDTO {
+  /** Missing on older servers: fail closed. */
+  localUpdateAllowed?: boolean
   supported: boolean
   status: "unsupported" | "up-to-date" | "update-available" | "error"
   installedVersion?: string

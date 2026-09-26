@@ -6,6 +6,7 @@ import type { DesktopInfo, DesktopUpdateResult } from "../../../../electron/desk
 
 const { t } = useI18n()
 defineProps<{
+  desktopOnly?: boolean
   info: DesktopInfo | null
   infoError: boolean
   result: DesktopUpdateResult | null
@@ -28,10 +29,13 @@ defineProps<{
       {{ t('settings.buildStampLabel') }} <span class="font-mono">{{ info.buildStamp }}</span>
     </p>
     <p v-if="result && result.status !== 'development'" class="mt-2 text-xs leading-relaxed text-muted-foreground" role="status" data-desktop-update-status>
-      {{ t(`settings.desktopUpdateStatus.${result.status}`, { version: result.latestVersion }) }}
+      {{ t(desktopOnly && result.status === 'bundled' ? 'settings.desktopStandaloneUnavailable' : `settings.desktopUpdateStatus.${result.status}`, { version: result.latestVersion }) }}
     </p>
-    <Button v-if="result?.status === 'update-available' && result.downloadUrl" as-child variant="outline" class="mt-2 rounded-2xl">
+    <Button v-if="result?.status === 'update-available' && result.downloadUrl" as-child variant="outline" class="mt-2 rounded-2xl" data-desktop-download>
       <a :href="result.downloadUrl" target="_blank" rel="noopener noreferrer">{{ t('settings.desktopDownloadAction') }}</a>
     </Button>
+    <p v-if="result?.status === 'update-available' && result.downloadUrl" class="mt-2 text-xs leading-relaxed text-muted-foreground">
+      {{ t('settings.desktopManualInstallHint') }}
+    </p>
   </div>
 </template>

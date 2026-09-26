@@ -2,6 +2,7 @@
 import { useI18n } from "vue-i18n"
 import { RefreshCw } from "lucide-vue-next"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppUpdate } from "@/composables/use-app-update"
 import { Switch } from "@/components/ui/switch"
 
 defineProps<{
@@ -15,10 +16,15 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { localUpdateAllowed } = useAppUpdate()
+
+function changePreference(value: boolean) {
+  if (localUpdateAllowed.value) emit("change", value)
+}
 </script>
 
 <template>
-  <Card class="gap-2 rounded-xl border border-border bg-card shadow-sm">
+  <Card v-if="localUpdateAllowed" class="gap-2 rounded-xl border border-border bg-card shadow-sm">
     <CardHeader class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1 pb-0">
       <span
         class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
@@ -47,7 +53,7 @@ const { t } = useI18n()
           class="motion-safe:transition-colors motion-safe:duration-200"
           :model-value="enabled"
           :aria-label="t('settings.autoDownloadUpdatesSwitch')"
-          @update:model-value="emit('change', $event)"
+          @update:model-value="changePreference($event)"
         />
       </div>
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>

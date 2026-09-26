@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -18,7 +21,7 @@ func (h *Handler) handleGetAppUpdateStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.appUpdateProvider == nil {
-		writeJSON(w, http.StatusOK, unsupportedAppUpdateStatus())
+		writeAppUpdateStatus(w, r, unsupportedAppUpdateStatus())
 		return
 	}
 
@@ -31,7 +34,7 @@ func (h *Handler) handleGetAppUpdateStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, dto)
+	writeAppUpdateStatus(w, r, dto)
 }
 
 func (h *Handler) handleCheckAppUpdate(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +43,7 @@ func (h *Handler) handleCheckAppUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.appUpdateProvider == nil {
-		writeJSON(w, http.StatusOK, unsupportedAppUpdateStatus())
+		writeAppUpdateStatus(w, r, unsupportedAppUpdateStatus())
 		return
 	}
 
@@ -53,7 +56,7 @@ func (h *Handler) handleCheckAppUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, dto)
+	writeAppUpdateStatus(w, r, dto)
 }
 
 func (h *Handler) handleDownloadAppUpdateInstaller(w http.ResponseWriter, r *http.Request) {
@@ -61,8 +64,12 @@ func (h *Handler) handleDownloadAppUpdateInstaller(w http.ResponseWriter, r *htt
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
+	if !allowsLocalAppUpdate(r) {
+		writeAppError(w, http.StatusForbidden, contracts.ErrorCodeAppUpdateRemoteDisabled, "Update Server on its own machine; remote updates are not supported")
+		return
+	}
 	if h.appUpdateProvider == nil {
-		writeJSON(w, http.StatusOK, unsupportedAppUpdateStatus())
+		writeAppUpdateStatus(w, r, unsupportedAppUpdateStatus())
 		return
 	}
 
@@ -74,7 +81,7 @@ func (h *Handler) handleDownloadAppUpdateInstaller(w http.ResponseWriter, r *htt
 		writeAppError(w, http.StatusConflict, contracts.ErrorCodeAppUpdateDownloadFailed, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, dto)
+	writeAppUpdateStatus(w, r, dto)
 }
 
 func (h *Handler) handleInstallAppUpdate(w http.ResponseWriter, r *http.Request) {
@@ -82,8 +89,12 @@ func (h *Handler) handleInstallAppUpdate(w http.ResponseWriter, r *http.Request)
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
+	if !allowsLocalAppUpdate(r) {
+		writeAppError(w, http.StatusForbidden, contracts.ErrorCodeAppUpdateRemoteDisabled, "Update Server on its own machine; remote updates are not supported")
+		return
+	}
 	if h.appUpdateProvider == nil {
-		writeJSON(w, http.StatusOK, unsupportedAppUpdateStatus())
+		writeAppUpdateStatus(w, r, unsupportedAppUpdateStatus())
 		return
 	}
 
@@ -104,7 +115,7 @@ func (h *Handler) handleInstallAppUpdate(w http.ResponseWriter, r *http.Request)
 		writeAppError(w, http.StatusConflict, contracts.ErrorCodeAppUpdateInstallFailed, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, dto)
+	writeAppUpdateStatus(w, r, dto)
 }
 
 func (h *Handler) handleClearDownloadedAppUpdateInstaller(w http.ResponseWriter, r *http.Request) {
@@ -112,8 +123,12 @@ func (h *Handler) handleClearDownloadedAppUpdateInstaller(w http.ResponseWriter,
 		writeAppError(w, http.StatusMethodNotAllowed, contracts.ErrorCodeBadRequest, "method not allowed")
 		return
 	}
+	if !allowsLocalAppUpdate(r) {
+		writeAppError(w, http.StatusForbidden, contracts.ErrorCodeAppUpdateRemoteDisabled, "Update Server on its own machine; remote updates are not supported")
+		return
+	}
 	if h.appUpdateProvider == nil {
-		writeJSON(w, http.StatusOK, unsupportedAppUpdateStatus())
+		writeAppUpdateStatus(w, r, unsupportedAppUpdateStatus())
 		return
 	}
 
@@ -125,7 +140,7 @@ func (h *Handler) handleClearDownloadedAppUpdateInstaller(w http.ResponseWriter,
 		writeAppError(w, http.StatusInternalServerError, contracts.ErrorCodeInternal, "failed to clear downloaded app update installer")
 		return
 	}
-	writeJSON(w, http.StatusOK, dto)
+	writeAppUpdateStatus(w, r, dto)
 }
 
 func unsupportedAppUpdateStatus() contracts.AppUpdateStatusDTO {
@@ -136,4 +151,44 @@ func unsupportedAppUpdateStatus() contracts.AppUpdateStatusDTO {
 		Source:       "github-releases",
 		ErrorMessage: "app update checker is not configured",
 	}
+}
+
+// A local update requires a direct loopback request. Forwarded requests and
+// ambiguous LAN/hostname connections cannot authorize a server-side installer.
+func allowsLocalAppUpdate(r *http.Request) bool {
+	peer, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || !isAppUpdateLoopback(peer) {
+		return false
+	}
+	target, err := url.Parse("http://" + r.Host)
+	if err != nil || target.User != nil || !isAppUpdateLoopback(target.Hostname()) {
+		return false
+	}
+	for name := range r.Header {
+		name = strings.ToLower(name)
+		if name == "forwarded" || name == "x-real-ip" || strings.HasPrefix(name, "x-forwarded-") {
+			return false
+		}
+	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		parsed, err := url.Parse(origin)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || !isAppUpdateLoopback(parsed.Hostname()) {
+			return false
+		}
+	}
+	return true
+}
+
+func isAppUpdateLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func writeAppUpdateStatus(w http.ResponseWriter, r *http.Request, dto contracts.AppUpdateStatusDTO) {
+	dto.LocalUpdateAllowed = dto.Supported && allowsLocalAppUpdate(r)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, dto)
 }

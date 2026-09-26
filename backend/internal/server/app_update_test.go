@@ -356,3 +356,72 @@ func TestAppUpdateClearDownloadedInstallerUsesProvider(t *testing.T) {
 		t.Fatalf("clearCount = %d, want 1", provider.clearCount)
 	}
 }
+
+func TestAppUpdateRemoteRequestsCannotMutateServer(t *testing.T) {
+	cases := []struct {
+		name, peer, host, origin, header string
+	}{
+		{"remote peer", "192.168.1.30:4321", "127.0.0.1:8081", "", ""},
+		{"LAN target", "127.0.0.1:4321", "192.168.1.20:8081", "", ""},
+		{"remote origin", "127.0.0.1:4321", "127.0.0.1:8081", "https://nas.example", ""},
+		{"forwarded", "127.0.0.1:4321", "127.0.0.1:8081", "", "Forwarded"},
+		{"proxy", "127.0.0.1:4321", "127.0.0.1:8081", "", "X-Forwarded-For"},
+		{"real ip", "127.0.0.1:4321", "127.0.0.1:8081", "", "X-Real-IP"},
+		{"unknown", "", "localhost:8081", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &stubAppUpdateProvider{dto: contracts.AppUpdateStatusDTO{Supported: true, Status: "update-available", InstallReady: true}}
+			h := NewHandler(Deps{AppUpdateProvider: provider})
+			for _, operation := range []struct {
+				method  string
+				handler http.HandlerFunc
+			}{
+				{http.MethodPost, h.handleDownloadAppUpdateInstaller},
+				{http.MethodPost, h.handleInstallAppUpdate},
+				{http.MethodDelete, h.handleClearDownloadedAppUpdateInstaller},
+			} {
+				r := httptest.NewRequest(operation.method, "http://"+tc.host+"/api/app-update/install", nil)
+				r.RemoteAddr = tc.peer
+				if tc.origin != "" {
+					r.Header.Set("Origin", tc.origin)
+				}
+				if tc.header != "" {
+					r.Header.Set(tc.header, "127.0.0.1")
+				}
+				w := httptest.NewRecorder()
+				operation.handler(w, r)
+				if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "APP_UPDATE_REMOTE_DISABLED") {
+					t.Fatalf("response = %d %s", w.Code, w.Body.String())
+				}
+			}
+			if provider.downloadCount+provider.installCount+provider.clearCount != 0 {
+				t.Fatal("remote request reached update provider")
+			}
+		})
+	}
+}
+
+func TestAppUpdateCapabilityIsComputedPerRequest(t *testing.T) {
+	provider := &stubAppUpdateProvider{dto: contracts.AppUpdateStatusDTO{Supported: true, Status: "up-to-date"}}
+	h := NewHandler(Deps{AppUpdateProvider: provider})
+	for _, peer := range []string{"127.0.0.1:1234", "192.168.1.30:1234", "[::1]:1234"} {
+		r := httptest.NewRequest(http.MethodGet, "http://localhost:8081/api/app-update/status", nil)
+		r.RemoteAddr = peer
+		w := httptest.NewRecorder()
+		h.handleGetAppUpdateStatus(w, r)
+		var dto contracts.AppUpdateStatusDTO
+		if err := json.Unmarshal(w.Body.Bytes(), &dto); err != nil {
+			t.Fatal(err)
+		}
+		if dto.LocalUpdateAllowed != (peer != "192.168.1.30:1234") {
+			t.Fatalf("wrong capability for %s", peer)
+		}
+		if w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("capability must not be cached")
+		}
+	}
+	if provider.dto.LocalUpdateAllowed {
+		t.Fatal("request capability leaked into provider state")
+	}
+}
