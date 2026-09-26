@@ -287,7 +287,7 @@ async function handleInstallUpdate() {
           <Button
             v-if="releaseUrl"
             as-child
-            class="rounded-2xl"
+            class="rounded-2xl border border-border"
             :variant="status === 'update-available' ? 'secondary' : 'outline'"
           >
             <a
