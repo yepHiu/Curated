@@ -206,6 +206,8 @@ cd backend && go test ./...
 
 GitHub Actions 的 `.github/workflows/ci.yml` 在 pull request 与 `master` push 上执行以上质量门禁，并额外运行生产依赖 high 漏洞审计、前端/Electron 构建和发布脚本测试。display-scaling 套件保持人工选择，不在该工作流中运行。
 
+CD 的 `.github/workflows/cd-release.yml` 通过 `workflow_call` 复用 CI，并传入固定标签 commit；三个 checkout 均使用该 commit。前端 Vitest 设置 `NODE_OPTIONS=--no-experimental-webstorage`，避免 Node 原生 localStorage 与 jsdom 冲突。发布脚本门禁运行 `python -m unittest discover -s scripts/release/tests -p "test_*.py"`，包含版本、打包、CD 校验与发布失败恢复测试。本地可用 actionlint 检查两个 workflow，首次 Windows 打包仍需 GitHub runner 验收。详见生产打包计划中的 2026-09-27 CD 实现。
+
 CI 的生产前端构建步骤显式设置 `VITE_USE_WEB_API=true`，与 Windows 生产包保持一致；仓库检出不依赖开发机未跟踪的 `.env`。Mock 模式继续由独立的运行时 e2e 服务覆盖。复现生产构建时，在 PowerShell 中先执行 `$env:VITE_USE_WEB_API = 'true'`，再运行 `pnpm build`；Web/Mock 报告必须按模式隔离，不可通过交换基线绕过差异。
 
 ---

@@ -289,7 +289,13 @@ Root-directory policy:
 
 Official Windows installer and portable packages are published on [GitHub Releases](https://github.com/yepHiu/Curated/releases). Prefer the [latest release](https://github.com/yepHiu/Curated/releases/latest): `Curated-Setup-<version>.exe` for normal installs, `Curated-<version>-windows-x64.zip` for a portable copy. Installed apps can check and download a newer installer from Settings → About & updates.
 
-Recommended packaging entry:
+Automated Windows CD is defined in `.github/workflows/cd-release.yml`. After the workflow is pushed to the default branch, pushing a canonical `vMAJOR.MINOR.PATCH` tag publishes a release after checks pass. The tag must contain the workflow/scripts, matching `scripts/release/version.json`, and exactly one versioned release note with a nonempty `## GitHub Release Body`. CI runs again against the exact tag commit before Windows packaging. Ordinary branch pushes only run CI.
+
+For recovery of an existing unpublished tag, use Actions → **CD - Windows release** → **Run workflow**, enter the tag, and choose `draft` (default) or `publish`. A tag push starts a public release; a later manual draft run cannot turn that run into a preview. Published releases cannot be overwritten. Failed drafts may be retried only for the same commit. Fix source/notes with a new version/tag rather than moving an existing tag.
+
+CD uses the built-in GitHub token; only the upload job has release write permission. It verifies both Windows packages, publishes `release.json` and `SHA256SUMS.txt`, and checks uploaded digests before making the release public. Packages remain in Actions artifacts for 14 days; the runner's CSV ledger and bundle reports remain for 90 days and are not committed back automatically. Independent Desktop/Server/Full packages remain outside this workflow. See the [CD implementation and recovery instructions](plan/2026-03-31-production-packaging-and-config-strategy.md).
+
+Local packaging entry:
 
 ```powershell
 pnpm release:publish

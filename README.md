@@ -67,7 +67,7 @@ pnpm dev
 - Desktop shell: `pnpm dev:electron`.
 - Windows dev binary: `pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`.
 
-Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md).
+Backup, restore, path migration, configuration keys, and release packaging are documented in [docs/guide.md](docs/guide.md). Windows CD supports version-tag releases and manual draft runs; see [release operations](docs/guide.md#8-release-and-packaging).
 
 ## Documentation
 

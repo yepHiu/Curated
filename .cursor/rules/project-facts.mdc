@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-09-27 Windows 自动发布流程
+
+`.github/workflows/cd-release.yml` 实现 canonical `vX.Y.Z` 标签正式发布与手动既有标签 draft/publish。CI 可由 workflow_call 对固定 commit 运行；发布前校验版本和唯一非空 Release Notes，Windows runner 构建旧一体包。`cd_release.py` 校验完整产物与上传 SHA-256，先草稿后公开，拒绝覆盖已公开版本，只恢复同 commit 草稿。内置 token 仅最终 job 获得写权限；组件拆包仍未实现。首次 GitHub Windows runner 实跑待验收，操作见 guide §8 与生产打包计划。
+
 ## 2026-09-27 远程设置管理边界
 
 远程设置仅保留客户端偏好和只读信息；全局配置、安全、AI 管理及备份维护须在 Server 本机操作，接口同步限制，远程不返回 AI/代理凭据。详见 `docs/guide.md` 的 Remote settings access。

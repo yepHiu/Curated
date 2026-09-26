@@ -30,6 +30,7 @@ alwaysApply: true
 - **不要**继续随意增加新的根目录临时目录
 - **禁止**在仓库内主动创建 Go 构建缓存目录：`.gocache/`、`.tmp-go/`、`.tmp-go-modcache/`
 - **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
+- **Windows CD**：`.github/workflows/cd-release.yml` 在 `vX.Y.Z` tag push 上正式发布；手动运行需既有 tag，默认 draft。复用 CI 校验固定 commit，版本文件/Release Notes 必须与 tag 同步；只上传完整且校验通过的 Windows 一体包，已公开版本不覆盖。详见 `docs/guide.md` §8。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
 ## Server 版本

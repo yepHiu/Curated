@@ -69,7 +69,7 @@ pnpm dev
 - デスクトップシェル：`pnpm dev:electron`。
 - Windows 開発バイナリ：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。
+バックアップ、復元、パス移行、設定キー、リリース手順は [docs/guide.md](docs/guide.md) を参照してください。Windows CD はバージョンタグによる公開と手動のドラフト実行に対応しています。[リリース操作](docs/guide.md#8-release-and-packaging)を参照してください。
 
 ## ドキュメント
 

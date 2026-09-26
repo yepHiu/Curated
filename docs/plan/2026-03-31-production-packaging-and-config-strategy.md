@@ -1,32 +1,55 @@
 # Curated 生产打包、配置、版本与发布计划
 
-## 2026-09-25：GitHub CD 触发方式建议
+## 2026-09-27：Windows CD 已实现
 
-状态：proposed（触发方式讨论，尚未实现 CD workflow）
+状态：workflow 与发布校验已实现并通过本地测试；首次 GitHub Windows runner 构建与实际上传仍待运行验证。取代 2026-09-25 的触发方式建议。本次不递增产品版本、不创建发布标签。
 
-当前 `.github/workflows/ci.yml` 只做 CI。`release_cli.py publish` 组装 Windows 安装包、便携包与 manifest，不上传 GitHub Release；未显式指定版本时递增本地 `version.json`。CD 必须另行加入上传步骤、生产 Web API 环境、Windows 打包依赖与发布检查。
+入口为 `.github/workflows/cd-release.yml`，继续发布现有 Windows x64 一体包；不改变安装身份、自动更新下载名称，不产出规划中的独立 Desktop / Server / Full 安装器，也不产出 macOS / Linux 包。
 
-| 入口 | 使用方式 | 版本与源码 | 适用场景 |
-|---|---|---|---|
-| 版本标签 push | 将例如 `v1.5.8` 的标签推送到 GitHub 后触发 | 标签指定提交，版本来自标签；本地创建标签或普通分支 push 不触发这条规则 | 正式发版，版本和代码容易追溯 |
-| 手动 `workflow_dispatch` | Actions 中点击 Run workflow，也可通过 CLI/API 调用 | 可选分支/标签并提供输入；建议输入既有版本标签并解析固定提交 | 首次调试、按需打包、失败恢复 |
+| 入口 | 行为 | 源码与版本 |
+|---|---|---|
+| push `vMAJOR.MINOR.PATCH` 标签 | 检查、打包、上传、验证后公开为正式 Release | 标签解析为固定 commit，版本显式传给 `publish --version` |
+| Actions → CD - Windows release → Run workflow | `tag` 必填，`mode` 默认 `draft`，可选 `publish` | 使用已经存在的标签，不使用所选分支的最新业务代码 |
 
-两者都在 GitHub runner 执行同一套自动打包/发布步骤；差别是启动入口，不决定是否公开发布、是否需要审批或是否等待 CI。手动入口的 workflow 需先存在于默认分支。标签可能指向未通过 CI 的提交，发布流程必须自己检查对应提交或运行所需检查。
+手动入口须先进入 GitHub 默认分支，目标标签也必须包含发布脚本。普通 master push 只触发 CI。推送版本标签即表示正式发布；手动 `draft` 不会撤销已启动的标签发布，适合未发布标签的失败恢复。两种入口按标签串行，正在运行的发版不被同版本新任务中断。
 
-建议同时支持：标签用于正式发布，手动入口默认只构建或生成草稿，且可指定同一个既有标签。推送标签只是明确发版入口，正式 Release、预发布与草稿应由 workflow 明确决定。自动更新能否发现版本取决于应用现有更新规则，不能把上传 Artifact 当成发布 Release。
+### 源码和质量门禁
 
-CD 将标签中的版本显式传入 `publish --version`，避免云端自动加 patch 与标签不一致；版本文件的同步需纳入发版准备。失败应重跑原标签对应任务，不移动版本标签；同版本并发需串行，已正式发布的同名包默认拒绝覆盖。两种入口共用实现，避免产物和版本策略分叉。以上为建议，待确定发布方式后实施。
+1. 拒绝无效标签、移动过的标签、与 `scripts/release/version.json` 不一致的版本。组件版本源独立管理，不由 CD 自动递增；发版准备时按实际组件改动同步。
+2. 必须恰好存在一份 `docs/release-notes/YYYY-MM-DD-release-X.Y.Z-notes.md`，且包含唯一、非空的 `## GitHub Release Body`。其中三级标题保留，后续二级章节不进入公开正文；不能以自动提交列表替代用户说明。
+3. 通过 `workflow_call` 复用 CI，对该 commit 运行生产依赖审计、类型检查、Lint、前端和 Electron 单测、运行时 E2E、Go test/vet、构建和全部 release 脚本测试。禁止只依据“master 最近一次成功”放行。
+4. Windows runner 固定 `VITE_USE_WEB_API=true`，安装锁文件依赖，显式下载 Electron runtime；使用 runner 已有 Inno Setup 6，缺失时安装 Chocolatey 6.3.3；安装 FFmpeg 7.1.1 并使用真实 exe 路径。已核对这两个 Chocolatey 包版本存在。安装或下载失败即停止。
 
-### 每个版本必须提供 Release Notes
+### 产物与发布
 
-用户已明确要求每个发布版本编写 Release Notes；此要求适用于标签触发与手动触发。沿用 `docs/release-notes/README.md` 和 `.cursor/rules/release-notes.mdc` 的格式，不新建第二套发布说明来源。
+`release_cli.py publish --version X.Y.Z` 生成安装包、便携包和 manifest；新 helper `scripts/release/cd_release.py` 必须验证两种包均存在、非空、名称正确且 SHA-256 与 manifest 一致。缺少 Inno Setup 只生成 `.iss` 的旧脚本部分成功结果不能发布。
 
-1. 发版前编写并提交 `docs/release-notes/YYYY-MM-DD-release-X.Y.Z-notes.md`，与版本文件一起进入待打标签的提交。内容包含用户可见新增功能、重要修复、升级注意事项及产物名称。
-2. CD 从标签锁定的提交读取说明，要求恰好有一个与版本匹配的文件，且存在非空 `## GitHub Release Body` 段落。缺失、同版本重复或正文为空时，在打包/上传前失败并明确提示；不能以自动生成的提交列表代替。
-3. GitHub Release 正文使用该段落的最终可发布文案；即使生成的是 GitHub 草稿 Release，正文也不是占位草稿。构建后的校验和应来自本次实际产物，可附加到正文或独立校验和附件，不在构建前填写猜测值。
-4. 修复遗漏的说明需将其提交后纳入待发布版本；失败重跑读取同一固定提交，不从最新 master 偷换说明或覆盖已发布版本。已有标签无法包含后补提交时，应明确处理版本准备流程，不自动移动标签。
+公开附件：
 
-当前仅将要求写入发布规划；实际校验和上传仍待 CD workflow 实现。
+- `Curated-Setup-X.Y.Z.exe`
+- `Curated-X.Y.Z-windows-x64.zip`
+- `release.json`：保留原字段，清除 runner 绝对路径，增加 `sourceCommit`。
+- `SHA256SUMS.txt`：根据本次真实附件生成。
+
+只在最终上传 job 授予 `contents: write`，使用 Actions 内置 `GITHUB_TOKEN`，无需个人 PAT。先创建草稿并上传附件，再读取 GitHub 返回的附件大小和 SHA-256 digest，全部匹配后才公开；API、权限或网络错误不视为“版本不存在”。手动 draft 保持草稿。已正式发布的版本拒绝覆盖；同标签且正文隐藏的 `curated-cd-source` 标记为同一固定 commit 的草稿允许重传（GitHub 对已存在标签可能忽略 `target_commitish`），其他草稿拒绝接管。上传后、公开前再次校验远端标签未移动。
+
+Actions 附件按 run attempt 命名，最终 job 使用 build 输出的完整附件名下载，兼容重跑全部任务和仅重跑失败任务。验证通过的完整产物保存到 Actions Artifact 14 天；打包台账和体积报告保留 90 天。台账保存 runner 生成的 CSV，不自动推回 master。默认 runner 为一次性目录，不触碰开发机已有生产包。
+
+### 操作与恢复
+
+先按最小单元提交版本文件和真实用户 Release Notes，再打标签；标签中必须包含 CD 与对应发布脚本。将 workflow 推送到 master 后，标签 push 即触发正式发布。手动失败恢复示例：
+
+```sh
+gh workflow run cd-release.yml --ref master -f tag=v1.5.8 -f mode=draft
+```
+
+`v1.5.8` 仅为示例，不表示已经准备或发布。检查 Actions 中的失败步骤后，环境临时故障可以重跑原任务；已公开版本不可重跑覆盖。需要修改源码、版本或说明时应准备新版本和新标签，不移动旧标签。草稿模式不进入应用的正式更新源。
+
+### 验证记录
+
+- actionlint 校验 CI/CD workflow。
+- Python 测试覆盖标签和固定提交、版本不匹配、说明缺失/重复/空正文、包缺失/篡改、传输校验、草稿重试、已发布版本拒绝覆盖、远端标签变更、上传 digest 不匹配时保持草稿，以及 API 403/500 不吞错。
+- 本机为 macOS，Windows 安装器和 GitHub 发布需首次远程运行验收；不将本地脚本测试描述为已发布成功。
 
 ## 1. 文档定位
 

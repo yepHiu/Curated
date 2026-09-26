@@ -69,7 +69,7 @@ pnpm dev
 - 桌面壳：`pnpm dev:electron`。
 - Windows 开发二进制：`pnpm backend:build:dev` → `backend/runtime/curated-dev.exe`。
 
-备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。
+备份、恢复、路径迁移、配置项和发布打包见 [docs/guide.md](docs/guide.md)。Windows CD 支持版本标签发布和手动草稿运行，详见[发布操作](docs/guide.md#8-release-and-packaging)。
 
 ## 文档
 
