@@ -90,8 +90,9 @@ type App struct {
 	browserPluginEnabled bool
 	browserPluginMu      sync.RWMutex
 	// lanEnabled changes the HTTP bind after the next process start.
-	lanEnabled   bool
-	lanEnabledMu sync.RWMutex
+	discoveryEnabled bool
+	lanEnabled       bool
+	lanEnabledMu     sync.RWMutex
 	// curatedFrameExportFormat controls curated-frame export output format via Settings.
 	curatedFrameExportFormat   string
 	curatedFrameExportFormatMu sync.RWMutex
@@ -242,6 +243,7 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, store *stor
 		autoDownloadUpdates:             cfg.AutoDownloadUpdates,
 		launchAtLogin:                   cfg.LaunchAtLogin,
 		lanEnabled:                      cfg.LANEnabled,
+		discoveryEnabled:                cfg.DiscoveryOn(),
 		browserPluginEnabled:            cfg.BrowserPluginEnabled,
 		curatedFrameExportFormat:        config.NormalizeCuratedFrameExportFormat(cfg.CuratedFrameExportFormat),
 		curatedFrameExportMode:          config.NormalizeCuratedFrameExportMode(cfg.CuratedFrameExportMode),
@@ -3792,6 +3794,7 @@ func (a *App) HTTPHandler() http.Handler {
 			AutoDownloadUpdatesCtl:           a,
 			LaunchAtLoginCtl:                 a,
 			LANAccessCtl:                     a,
+			DiscoveryCtl:                     a,
 			BrowserPluginCtl:                 a,
 			CuratedFrameExportFormatCtl:      a,
 			CuratedFrameExportModeCtl:        a,

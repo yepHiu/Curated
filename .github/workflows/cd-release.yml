@@ -1,6 +1,14 @@
 name: CD - Full, Server and Desktop
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      mode:
+        type: string
+        default: draft
   push:
     tags:
       - 'full-v*'
@@ -247,7 +255,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_MODE: ${{ github.event_name == 'push' && 'publish' || inputs.mode }}
+          RELEASE_MODE: ${{ inputs.mode || 'publish' }}
         run: |
           python scripts/release/component_cd.py stage --tag "$RELEASE_TAG"
           python scripts/release/component_cd.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE"

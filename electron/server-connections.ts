@@ -3,7 +3,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync } from "
 import path from "node:path"
 import { isCuratedHealthPayload } from "./backend-process.js"
 
-export interface SavedServer { id: string; name: string; url: string }
+export interface SavedServer { id: string; name: string; url: string; serverId?: string; partition?: string }
 export interface ServerConnections { schema: 1; servers: SavedServer[]; lastServerId?: string }
 
 export function normalizeServerUrl(input: unknown): string {
@@ -24,13 +24,36 @@ export function serverSessionPartition(url: string): string {
 export class ServerConnectionStore {
   private state: ServerConnections = { schema: 1, servers: [] }
   constructor(private readonly file: string) {
-    if (!existsSync(file)) return
+    if (!existsSync(file)) {
+      const previous = path.join(path.dirname(file), "connections.json")
+      if (existsSync(previous)) {
+        const old = JSON.parse(readFileSync(previous, "utf8"))
+        if (old.version !== 1 || !Array.isArray(old.connections) || old.connections.length > 100) throw new Error("旧连接配置损坏，请保留文件后修复。")
+        const seen = new Set<string>()
+        const migrated: ServerConnections = { schema: 1, servers: [] }
+        for (const entry of old.connections) {
+          if (!entry || typeof entry.name !== "string" || !entry.name.trim() || entry.name.length > 80 || typeof entry.serverId !== "string" || !entry.serverId || entry.serverId.length > 2100) throw new Error("旧连接配置损坏。")
+          const url = normalizeServerUrl(entry.url)
+          if (seen.has(url)) throw new Error("旧连接配置损坏。")
+          seen.add(url)
+          const saved = { id: randomUUID(), name: entry.name.trim(), url, serverId: entry.serverId,
+            partition: `persist:curated-server-${createHash("sha256").update(`${url}\n${entry.serverId}`).digest("hex")}` }
+          migrated.servers.push(saved)
+          if (old.lastUrl === url) migrated.lastServerId = saved.id
+        }
+        if (old.lastUrl !== undefined && !migrated.lastServerId) throw new Error("上次连接配置无效。")
+        this.commit(migrated)
+      }
+      return
+    }
     const data = JSON.parse(readFileSync(file, "utf8")) as ServerConnections
     if (data.schema !== 1 || !Array.isArray(data.servers) || data.servers.length > 100) throw new Error("服务器列表文件无效，请保留原文件并检查。")
     const ids = new Set<string>()
     const urls = new Set<string>()
     for (const item of data.servers) {
       if (!item || typeof item.id !== "string" || !item.id || typeof item.name !== "string" || !item.name.trim() || item.name.length > 80 || normalizeServerUrl(item.url) !== item.url || ids.has(item.id) || urls.has(item.url)) throw new Error("服务器列表文件无效，请保留原文件并检查。")
+      if (item.serverId !== undefined && (typeof item.serverId !== "string" || !item.serverId || item.serverId.length > 2100)) throw new Error("服务器身份无效。")
+      if (item.partition !== undefined && !/^persist:curated-server-[a-f0-9]{64}$/.test(item.partition)) throw new Error("服务器会话无效。")
       ids.add(item.id); urls.add(item.url)
     }
     if (data.lastServerId !== undefined && !ids.has(data.lastServerId)) throw new Error("上次连接记录无效。")
@@ -60,10 +83,18 @@ export class ServerConnectionStore {
     if (value.id !== undefined && !existing) throw new Error("服务器记录不存在。")
     if (next.servers.some(s => s.url === url && s.id !== existing?.id)) throw new Error("该地址已保存在列表中。")
     if (!existing && next.servers.length >= 100) throw new Error("最多保存 100 台服务器。")
-    const saved = { id: existing?.id ?? randomUUID(), name: value.name.trim(), url }
+    const saved = { ...(existing?.url === url ? existing : {}), id: existing?.id ?? randomUUID(), name: value.name.trim(), url }
     next.servers = existing ? next.servers.map(s => s.id === saved.id ? saved : s) : [...next.servers, saved]
     this.commit(next)
     return saved
+  }
+  bindIdentity(id: string, serverId: string, partition: string): void {
+    const next = this.snapshot()
+    const target = next.servers.find(server => server.id === id)
+    if (!target) throw new Error("服务器记录不存在。")
+    target.serverId = serverId
+    target.partition = partition
+    this.commit(next)
   }
   remove(id: string): void {
     const next = this.snapshot()

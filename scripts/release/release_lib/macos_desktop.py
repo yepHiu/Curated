@@ -37,7 +37,7 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
     payload = resources / 'app'
     payload.mkdir()
     compiled = root / 'electron-dist'
-    for required in ('main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs',
+    for required in ('launcher/index.html', 'launcher-preload.cjs', 'main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs',
                      'connections-ui.js', 'connections.css', 'connections-tokens.css'):
         if not (compiled / required).is_file():
             raise FileNotFoundError(f'Missing Desktop build asset: {required}')

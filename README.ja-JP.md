@@ -113,3 +113,5 @@ icon/       ブランド原資料（wordmark / appicon / mark）
 - GPT 5.5
 - GPT 5.6 Terra sol
 - Grok 4.6
+
+Server identity and LAN discovery, Desktop device settings, upgrade compatibility and release packaging: [guide](docs/guide.md).

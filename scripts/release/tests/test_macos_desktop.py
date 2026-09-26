@@ -29,7 +29,7 @@ class MacDesktopTests(unittest.TestCase):
         self.write(runtime + 'Electron.app/Contents/Resources/default_app.asar')
         self.write(runtime + 'LICENSE')
         self.write(runtime + 'LICENSES.chromium.html')
-        for name in ('main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs', 'connections-ui.js', 'connections.css', 'connections-tokens.css'):
+        for name in ('launcher/index.html', 'launcher-preload.cjs', 'main.js', 'preload.cjs', 'connections.html', 'connections-preload.cjs', 'connections-ui.js', 'connections.css', 'connections-tokens.css'):
             self.write('electron-dist/' + name)
         self.write('electron-dist/main.js.map')
         self.write('electron-dist/desktop-release.json', b'{"distribution":"legacy"}')

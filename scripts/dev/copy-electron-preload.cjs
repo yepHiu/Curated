@@ -35,3 +35,5 @@ const light = theme.match(/:root\s*\{([^}]+)\}/)?.[1]
 const dark = theme.match(/\.dark\s*\{([^}]+)\}/)?.[1]
 if (!light || !dark) throw new Error("Missing canonical connection-page theme tokens")
 fs.writeFileSync(path.join(targetDir, "connections-tokens.css"), `:root {${light}}\n@media (prefers-color-scheme: dark) { :root {${dark}} }\n`)
+
+fs.copyFileSync(path.join(repoRoot, "electron", "launcher-preload.cjs"), path.join(targetDir, "launcher-preload.cjs"))

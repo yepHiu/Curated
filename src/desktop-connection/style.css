@@ -1,0 +1,17 @@
+@import "../style.css";
+@source "../components/ui";
+
+/* 连接页字标的局部字体试用；不改变业务界面 font-curated 或正文字体。 */
+.desktop-wordmark {
+  font-family: "Outfit Variable", "Noto Sans Variable", sans-serif;
+}
+
+/* 原生窗口按钮独占顶部拖动区；字标位于下方，主题按钮排除拖动。 */
+.desktop-window-controls,
+.desktop-window-heading {
+  -webkit-app-region: drag;
+}
+
+.desktop-window-heading button {
+  -webkit-app-region: no-drag;
+}

@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -23,10 +22,12 @@ import (
 	"curated-backend/internal/config"
 	"curated-backend/internal/contracts"
 	"curated-backend/internal/desktop"
+	"curated-backend/internal/discovery"
 	"curated-backend/internal/logging"
 	"curated-backend/internal/maintenance"
 	"curated-backend/internal/processlock"
 	"curated-backend/internal/server"
+	"curated-backend/internal/serveridentity"
 	"curated-backend/internal/shellopen"
 	"curated-backend/internal/storage"
 	"curated-backend/internal/version"
@@ -156,6 +157,13 @@ func initialize(ctx context.Context, configPath string) (*bootstrap, error) {
 		return nil, fmt.Errorf("acquire database runtime lock: %w", err)
 	}
 
+	cfg.ServerID, err = serveridentity.LoadOrCreate(cfg.DatabasePath)
+	if err != nil {
+		_ = dataLock.Release()
+		_ = logger.Sync()
+		return nil, fmt.Errorf("initialize server identity: %w", err)
+	}
+
 	startupFields := []zap.Field{
 		zap.String("version", version.ProductVersion()),
 		zap.String("buildStamp", version.Stamp()),
@@ -258,24 +266,29 @@ func runHTTP(ctx context.Context, boot *bootstrap) error {
 	if err := boot.cfg.ValidateHTTPExposure(); err != nil {
 		return err
 	}
-	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, serverListeningReporter())
+	var stopDiscovery func()
+	ready := func(addr string) {
+		if version.Channel == "release" {
+			if err := serveridentity.WriteConnectionHint(addr); err != nil {
+				boot.logger.Warn("write local connection hint failed", zap.Error(err))
+			}
+		}
+		if report := serverListeningReporter(); report != nil {
+			report(addr)
+		}
+		if boot.cfg.LANEnabled && boot.cfg.DiscoveryOn() && !config.HTTPAddrIsLoopback(addr) {
+			stopDiscovery = discovery.Start(ctx, discovery.Options{ID: boot.cfg.ServerID, HTTPAddr: addr, Logger: boot.logger})
+		}
+	}
+	defer func() {
+		if stopDiscovery != nil {
+			stopDiscovery()
+		}
+	}()
+	return server.ListenAndServeWithReady(ctx, boot.cfg.HttpAddr, boot.backendApp.HTTPHandler(), boot.logger, ready)
 }
 
 func serverListeningReporter() func(string) {
-	if version.Distribution == "server" && runtime.GOOS == "windows" {
-		return func(addr string) {
-			// Account-local hint, independent of a custom library data root. Desktop
-			// probes this address before saving it and never reads library credentials.
-			directory := filepath.Join(os.Getenv("LOCALAPPDATA"), "Curated")
-			data, _ := json.Marshal(map[string]any{"schema": 1, "url": desktop.ResolveBaseURL(addr)})
-			if err := os.MkdirAll(directory, 0700); err == nil {
-				temporary := filepath.Join(directory, "server-connection.json.tmp")
-				if os.WriteFile(temporary, data, 0600) == nil {
-					_ = os.Rename(temporary, filepath.Join(directory, "server-connection.json"))
-				}
-			}
-		}
-	}
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("CURATED_HOSTED_BY")), "electron") &&
 		strings.TrimSpace(os.Getenv("CURATED_ELECTRON_READY_EVENT")) != "1" {
 		return nil

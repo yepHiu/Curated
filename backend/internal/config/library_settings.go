@@ -84,6 +84,13 @@ func MergeLibrarySettingsFile(cfg *Config, path string) error {
 		}
 		cfg.BrowserPluginEnabled = b
 	}
+	if v, ok := m["discoveryEnabled"]; ok {
+		b, err := parseJSONBool(v, "discoveryEnabled")
+		if err != nil {
+			return err
+		}
+		cfg.DiscoveryEnabled = &b
+	}
 	if v, ok := m["lanEnabled"]; ok {
 		b, err := parseJSONBool(v, "lanEnabled")
 		if err != nil {

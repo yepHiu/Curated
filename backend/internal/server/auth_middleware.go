@@ -50,7 +50,7 @@ func isAuthPublicPath(method string, path string) bool {
 		return true
 	}
 	switch path {
-	case "/api/health":
+	case "/api/health", "/api/server-info":
 		return method == http.MethodGet
 	case "/api/auth/status":
 		return method == http.MethodGet

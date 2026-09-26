@@ -23,6 +23,10 @@ Desktop can add servers through an in-page Settings dialog, and manage or switch
 
 Curated is a local-first media library: Vue 3 frontend, Go + SQLite backend, and an Electron desktop shell. The product name is **Curated**. The repository folder and npm package may still use **`jav-shadcn`**.
 
+Desktop’s connection page includes local proxy and login-startup settings; see [the device settings guide](docs/guide.md).
+
+Manual GitHub Actions builds provide Windows x64 component installers and an Apple Silicon macOS Desktop installer as test artifacts; see [packaging instructions](docs/guide.md).
+
 This README is the short public entry. For setup details, configuration, packaging, and links into the rest of `docs/`, see **[docs/guide.md](docs/guide.md)**. The HTTP API reference is **[API.md](API.md)**.
 
 ## Download
@@ -116,3 +120,5 @@ When a later large language model takes over work in this repository, add its na
 - GPT 5.5
 - GPT 5.6 Terra sol
 - Grok 4.6
+
+Server identity and LAN discovery, Desktop device settings, upgrade compatibility and release packaging: [guide](docs/guide.md).

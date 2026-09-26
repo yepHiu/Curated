@@ -564,3 +564,10 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 最终结果：恢复 run **36262630789** 成功。公开发行 https://github.com/yepHiu/Curated/releases/tag/full-v1.6.0 含 **8 个包 + 3 个组件 manifest + release.json + SHA256SUMS.txt**；Server 1.6.0（2 个资产）、Desktop 0.1.0（4 个资产）、Full 1.6.0（2 个资产）的在线通道逐项与已发布 manifest 一致。最终发布脚本测试 **52 项**通过；旧 latest 仍为 v1.5.8。
 
 补充实测：已打包的 macOS Desktop 0.1.0 在无 Server 连接的本地连接页点击“检查 Desktop 更新”，通过真实线上组件 feed 返回“Desktop 已是最新版本。”
+
+
+## 13. 2026-09-27：worktree 合并与兼容性验收
+
+合并 `codex/desktop-server-split`（c2164011）全部提交到 master，保留主分支已发布三包身份、独立版本、更新 manifest 和 CD 恢复。整合 worktree 的 Server 身份、SSDP、Vue 本地连接页、代理与登录启动设置、开发品牌 bundle；重复的旧单版本打包器由已验证的组件链路取代，不重新引入错名、Mac Server/Full 或旧 latest 更新。
+
+验收重点：0.1.0 的 servers.json 与已存连接/会话保留；新版 Desktop 连接旧 health-only Server；旧一体包安全迁移边界；已有数据库/自定义配置不被覆盖；remote 操作限制、身份变更提示、发现不可用时手动连接。完成全量 CI、真实 macOS 打包启动，以及 Windows CD 干净安装和上一版本原地升级测试后发布新版本。保留 worktree 中未提交的生产打包计划草稿，不擅自提交过时文档。

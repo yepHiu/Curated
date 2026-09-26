@@ -76,3 +76,41 @@ describe('Desktop server connections', () => {
     await expect(probeServer('nas.local', vi.fn<typeof fetch>().mockRejectedValue(new Error('offline')))).rejects.toThrow('无法连接服务器')
   })
 })
+
+it('upgrades a released 0.1.0 profile without changing IDs, names, last selection or its origin session', () => {
+  const { file } = fixture()
+  const prior = { schema: 1, servers: [{ id: 'original-id', name: 'My NAS', url: 'http://nas.local:8081' }], lastServerId: 'original-id' }
+  writeFileSync(file, JSON.stringify(prior))
+  const store = new ServerConnectionStore(file)
+  expect(store.snapshot()).toEqual(prior)
+  const partition = serverSessionPartition(prior.servers[0].url)
+  store.bindIdentity('original-id', '18a31111-36e0-424b-9f9f-d1e9cfb74ed2', partition)
+  store.save({ ...prior.servers[0], name: 'Renamed' })
+  expect(new ServerConnectionStore(file).snapshot()).toMatchObject({ lastServerId: 'original-id', servers: [{ id: 'original-id', name: 'Renamed', partition }] })
+})
+
+it('imports development connections atomically and keeps the original file and identity session', async () => {
+  const { connectionPartition } = await import('./connections')
+  const { file } = fixture()
+  const previousFile = path.join(path.dirname(file), 'connections.json')
+  const connection = { url: 'http://nas.local:8081', name: 'NAS', serverId: '18a31111-36e0-424b-9f9f-d1e9cfb74ed2' }
+  const previous = JSON.stringify({ version: 1, connections: [connection], lastUrl: connection.url })
+  writeFileSync(previousFile, previous)
+  const state = new ServerConnectionStore(file).snapshot()
+  expect(state.servers[0]).toMatchObject({ ...connection, partition: connectionPartition(connection) })
+  expect(state.lastServerId).toBe(state.servers[0].id)
+  expect(readFileSync(previousFile, 'utf8')).toBe(previous)
+  writeFileSync(previousFile, 'invalid')
+  expect(new ServerConnectionStore(file).snapshot()).toEqual(state)
+})
+
+it('does not persist a partial development migration when a later record is corrupt', async () => {
+  const { existsSync } = await import('node:fs')
+  const { file } = fixture()
+  const previousFile = path.join(path.dirname(file), 'connections.json')
+  const prior = JSON.stringify({ version: 1, connections: [{ url: 'http://nas.local', name: 'NAS', serverId: 'old' }, { url: 'bad/path', name: 'bad', serverId: 'old2' }] })
+  writeFileSync(previousFile, prior)
+  expect(() => new ServerConnectionStore(file)).toThrow()
+  expect(existsSync(file)).toBe(false)
+  expect(readFileSync(previousFile, 'utf8')).toBe(prior)
+})

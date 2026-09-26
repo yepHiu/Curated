@@ -1,0 +1,16 @@
+name: Build installers
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing full-v / server-v / desktop-v tag; builds verified packages as a draft
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  package:
+    uses: ./.github/workflows/cd-release.yml
+    with:
+      tag: ${{ inputs.tag }}
+      mode: draft

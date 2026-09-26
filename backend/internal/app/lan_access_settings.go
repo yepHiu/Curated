@@ -50,3 +50,22 @@ func (a *App) SetLANEnabled(v bool) error {
 	a.lanEnabledMu.Unlock()
 	return nil
 }
+
+// DiscoveryEnabled is the persisted preference; binding changes take effect after restart.
+func (a *App) DiscoveryEnabled() bool {
+	a.lanEnabledMu.RLock()
+	defer a.lanEnabledMu.RUnlock()
+	return a.discoveryEnabled
+}
+func (a *App) SetDiscoveryEnabled(value bool) error {
+	if a.librarySettingsPath == "" {
+		return fmt.Errorf("library settings path not configured")
+	}
+	if err := config.WriteLibrarySettingsMerge(a.librarySettingsPath, func(m map[string]any) error { m["discoveryEnabled"] = value; return nil }); err != nil {
+		return err
+	}
+	a.lanEnabledMu.Lock()
+	a.discoveryEnabled = value
+	a.lanEnabledMu.Unlock()
+	return nil
+}

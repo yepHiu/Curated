@@ -28,6 +28,7 @@ scripts/*
 !scripts/dev/
 scripts/dev/*
 !scripts/dev/copy-electron-preload.cjs
+!scripts/dev/start-electron.cjs
 !scripts/release/
 !scripts/prd/
 scripts/release/*

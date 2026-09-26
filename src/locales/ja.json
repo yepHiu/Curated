@@ -899,7 +899,8 @@
   },
   "pickDir": {
     "unsupported": "現在の環境ではディスクの絶対パスを自動で読み取れません。ローカルのファイルマネージャーでこのフォルダーを開き、アドレスバーの完全なパスを「絶対パス」入力欄へコピーしてください。",
-    "selected": "フォルダー「{name}」を選択しました。ブラウザーのセキュリティ制限により、Web ページからローカルの絶対パスは読み取れません。ファイルマネージャーでこのフォルダーを開き、アドレスバーのパスを上の「絶対パス」欄へコピーしてください。"
+    "selected": "フォルダー「{name}」を選択しました。ブラウザーのセキュリティ制限により、Web ページからローカルの絶対パスは読み取れません。ファイルマネージャーでこのフォルダーを開き、アドレスバーのパスを上の「絶対パス」欄へコピーしてください。",
+    "serverPath": "サーバー上の絶対パスを入力してください。この端末のフォルダーはサーバーからアクセスできない場合があります。"
   },
   "scan": {
     "statusLabel": "スキャン状態",
@@ -1550,7 +1551,7 @@
     "navGroupAccess": "アクセスと接続",
     "navGroupSystem": "システム",
     "navAI": "AI アシスタント",
-    "navComics": "漫画ライブラリ",
+    "navComics": "コミックライブラリ",
     "navPhotos": "写真ライブラリ",
     "watchTimeTitle": "日別視聴時間",
     "watchTimeDesc": "過去 3 か月の有効な視聴時間統計です。",
@@ -1698,10 +1699,8 @@
     "launchAtLoginHint": "有効にすると、Windows はトレイアプリとローカルサーバーをバックグラウンドで起動します。フル UI はトレイまたは手動起動から開けます。",
     "launchAtLoginUnsupportedHint": "現在の実行環境では Windows のログイン時起動を安全に登録できません。一時的な開発プロセスではなく、ビルド済みの Curated 実行ファイルを使ってください。",
     "launchAtLoginMockHint": "デモモードにはバックエンドプロセスがないため、ここではログイン時起動を設定できません。",
-    "navComics": "コミックライブラリ",
     "backendLogDesc": "設定とともに保存されます。ログファイルへの反映を完了するには Curated を再起動してください。フォルダを空にすると、この PC 既定のログ保存場所が使われます。",
     "clientLogDesc": "このブラウザで記録する診断メッセージの詳しさを選べます。変更はすぐに反映されます。",
-    "navPhotos": "写真ライブラリ",
     "comicLibraryTitle": "コミックライブラリ",
     "comicLibraryDesc": "zip/cbz 形式のコミック用設定です。動画ライブラリとは独立して扱います。",
     "comicLibraryEnabledTitle": "コミックライブラリは有効です",
@@ -1808,7 +1807,10 @@
     "photoLibraryPathRemove": "削除",
     "photoDefaultImportPath": "既定の写真インポート先",
     "photoDefaultImportPathDesc": "写真の取り込み先です。動画・コミックのパスとは独立しています。",
-    "photoDefaultImportPathNone": "既定パスを選択"
+    "photoDefaultImportPathNone": "既定パスを選択",
+    "changeServer": "サーバーを変更",
+    "discoveryTitle": "LAN 自動検出",
+    "discoveryHint": "Desktop からこのサーバーを検出できます。LAN アクセスを有効にし、変更後に Server を再起動してください。"
   },
   "lock": {
     "title": "Curated はロックされています",

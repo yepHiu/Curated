@@ -899,7 +899,8 @@
   },
   "pickDir": {
     "unsupported": "Cannot read the absolute disk path in this environment. Open the folder in your local file manager and copy the full path into the Absolute path field.",
-    "selected": "Selected folder \"{name}\". The web page cannot read the absolute local path due to browser security limits. Open this folder in your file manager and copy the address-bar path into the Absolute path field above."
+    "selected": "Selected folder \"{name}\". The web page cannot read the absolute local path due to browser security limits. Open this folder in your file manager and copy the address-bar path into the Absolute path field above.",
+    "serverPath": "Enter an absolute path on the server. A folder on this device may not be accessible to the server."
   },
   "scan": {
     "statusLabel": "Scan status",
@@ -1699,10 +1700,8 @@
     "launchAtLoginHint": "When enabled, Windows starts the tray app and local server in the background. You can still open the full UI from the tray or by launching Curated manually.",
     "launchAtLoginUnsupportedHint": "This runtime cannot safely register Windows login startup. Use a built Curated executable instead of a temporary dev process.",
     "launchAtLoginMockHint": "Demo mode has no backend process, so login startup cannot be configured here.",
-    "navComics": "Comic library",
     "backendLogDesc": "These options are saved with your settings. Restart Curated for changes to fully apply to log files on disk. Leave the folder blank to use the default log location on this computer.",
     "clientLogDesc": "Choose how detailed diagnostic messages are in this browser. Changes apply immediately.",
-    "navPhotos": "Photo library",
     "comicLibraryTitle": "Comic library",
     "comicLibraryDesc": "Optional zip/cbz comic library settings. Comics stay separate from the video library.",
     "comicLibraryEnabledTitle": "Comic library is enabled",
@@ -1808,7 +1807,10 @@
     "photoLibraryPathRemove": "Remove",
     "photoDefaultImportPath": "Default photo import path",
     "photoDefaultImportPathDesc": "New photo imports use this path, independently of movies and comics.",
-    "photoDefaultImportPathNone": "Choose default path"
+    "photoDefaultImportPathNone": "Choose default path",
+    "changeServer": "Change server",
+    "discoveryTitle": "LAN discovery",
+    "discoveryHint": "Let Desktop discover this server. Requires LAN access; restart Server after changing."
   },
   "lock": {
     "title": "Curated is locked",

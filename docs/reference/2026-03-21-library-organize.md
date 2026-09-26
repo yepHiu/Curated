@@ -118,3 +118,8 @@ Web 模式的开关和偏好由 `PATCH /api/settings` 原子持久化。写真�
 ## 远程配置边界（2026-09-27）
 
 `library-config.cfg` 中的全局配置经 `PATCH /api/settings` 修改时要求 Server 本机直连；远程端返回 `403 SERVER_SETTINGS_READ_ONLY`，在任何字段写入前拒绝整个请求。整理、监听、刮削、代理、AI、播放/阅读默认值、缓存、日志、导出及更新开关不再在远程设置提供编辑入口。当前设备偏好和常规业务操作保留。配置格式不变，无迁移；详见 [操作手册](../guide.md#remote-settings-access)。
+
+
+### 1.7.0 discovery preference
+
+`library-config.cfg` additionally persists `discoveryEnabled` (default true). It only advertises when LAN is enabled and actually listening; restart Server after changing. This setting does not grant access or replace PIN authentication. Desktop proxy/login preferences are separate local settings.

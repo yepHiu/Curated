@@ -84,6 +84,7 @@ const autoDownloadUpdatesState = ref(false)
 const launchAtLoginState = ref(false)
 const launchAtLoginSupportedState = ref(false)
 const browserPluginEnabledState = ref(false)
+const discoveryEnabledState = ref(true)
 const lanEnabledState = ref(false)
 const lanListeningState = ref(false)
 const lanAccessUrlsState = ref<string[]>([])
@@ -396,6 +397,7 @@ async function refreshLibraryPathsFromApi() {
     launchAtLoginState.value = Boolean(settings.launchAtLogin)
     launchAtLoginSupportedState.value = Boolean(settings.launchAtLoginSupported)
     browserPluginEnabledState.value = Boolean(settings.browserPluginEnabled)
+    discoveryEnabledState.value = settings.discoveryEnabled !== false
     lanEnabledState.value = Boolean(settings.lanEnabled)
     lanListeningState.value = Boolean(settings.lanListening)
     lanAccessUrlsState.value = Array.isArray(settings.lanAccessUrls) ? [...settings.lanAccessUrls] : []
@@ -457,6 +459,11 @@ function createWebLibraryService(): LibraryService {
     async setBrowserPluginEnabled(value: boolean) {
       const next = await api.patchSettings({ browserPluginEnabled: value })
       browserPluginEnabledState.value = Boolean(next.browserPluginEnabled)
+    },
+    discoveryEnabled: computed(() => discoveryEnabledState.value),
+    async setDiscoveryEnabled(value: boolean) {
+      const next = await api.patchSettings({ discoveryEnabled: value })
+      discoveryEnabledState.value = next.discoveryEnabled !== false
     },
     lanEnabled: computed(() => lanEnabledState.value),
     lanListening: computed(() => lanListeningState.value),

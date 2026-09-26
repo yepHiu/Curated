@@ -38,3 +38,21 @@ func TestSetLANEnabled_PersistsWithoutPIN(t *testing.T) {
 		t.Fatalf("expected lanEnabled true in file, got %s", string(raw))
 	}
 }
+
+func TestDiscoveryPreferencePersistsWithoutChangingLiveBind(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "library-config.cfg")
+	a := &App{cfg: config.Default(), librarySettingsPath: file, discoveryEnabled: true}
+	if err := a.SetDiscoveryEnabled(false); err != nil {
+		t.Fatal(err)
+	}
+	if a.DiscoveryEnabled() {
+		t.Fatal("preference not saved")
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil || !strings.Contains(string(raw), `"discoveryEnabled": false`) {
+		t.Fatalf("%s %v", raw, err)
+	}
+	if !a.cfg.DiscoveryOn() {
+		t.Fatal("live discovery configuration changed before restart")
+	}
+}

@@ -17,9 +17,9 @@
     "test:display": "playwright test tests/display-scaling/display-scaling.spec.ts",
     "build": "pnpm typecheck && vite build --configLoader native",
     "bundle:baseline": "node scripts/build/update-bundle-baseline.ts",
-    "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs",
-    "build:electron": "pnpm build && pnpm backend:build:dev && pnpm build:electron:main",
-    "dev:electron": "pnpm backend:build:dev && pnpm build:electron:main && electron .",
+    "build:electron:main": "tsc -p electron/tsconfig.json && node scripts/dev/copy-electron-preload.cjs && pnpm build:desktop-ui",
+    "build:electron": "pnpm build:electron:main",
+    "dev:electron": "pnpm build:electron && node scripts/dev/start-electron.cjs",
     "preview": "vite preview",
     "release:frontend": "python scripts/release/release_cli.py build-frontend --version 0.0.0-local",
     "release:backend": "python scripts/release/release_cli.py build-backend --version 0.0.0-local",
@@ -30,7 +30,8 @@
     "release:publish": "python scripts/release/release_cli.py publish",
     "release:version:show": "python scripts/release/release_cli.py show-version",
     "release:version:set-base": "python scripts/release/release_cli.py set-version-base",
-    "release:history:migrate": "python scripts/release/release_cli.py migrate-history"
+    "release:history:migrate": "python scripts/release/release_cli.py migrate-history",
+    "build:desktop-ui": "vite build --config vite.desktop.config.ts --configLoader native"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "5.3.0",

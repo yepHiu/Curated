@@ -899,7 +899,8 @@
   },
   "pickDir": {
     "unsupported": "当前环境无法自动读取磁盘绝对路径。请在本机资源管理器中打开该文件夹，将地址栏中的完整路径复制到「绝对路径」输入框。",
-    "selected": "已选择文件夹「{name}」。网页出于安全限制无法读取本机绝对路径，请在资源管理器中进入该文件夹，将地址栏路径复制到上方「绝对路径」。"
+    "selected": "已选择文件夹「{name}」。网页出于安全限制无法读取本机绝对路径，请在资源管理器中进入该文件夹，将地址栏路径复制到上方「绝对路径」。",
+    "serverPath": "请填写服务器上的绝对目录路径。此设备的目录不一定能被服务器访问。"
   },
   "scan": {
     "statusLabel": "扫描状态",
@@ -1698,8 +1699,6 @@
     "launchAtLoginHint": "开启后，Windows 会在后台启动托盘和本地服务。你仍然可以从托盘或手动启动 Curated 来打开完整界面。",
     "launchAtLoginUnsupportedHint": "当前运行时无法安全注册 Windows 开机启动。请使用构建后的 Curated 可执行文件，而不是临时开发进程。",
     "launchAtLoginMockHint": "演示模式没有后端进程，因此这里不能配置开机启动。",
-    "navComics": "漫画库",
-    "navPhotos": "写真库",
     "backendLogDesc": "日志目录与保留策略会随设置保存；要完全应用到写入磁盘的日志文件，请重启 Curated。目录留空时使用本机为应用分配的默认日志位置。",
     "clientLogDesc": "调整本浏览器内诊断信息的详细程度，更改后立即生效。",
     "comicLibraryTitle": "漫画库",
@@ -1808,7 +1807,10 @@
     "photoLibraryPathRemove": "移除",
     "photoDefaultImportPath": "默认写真导入路径",
     "photoDefaultImportPathDesc": "新写真导入使用此路径。与影片和漫画路径相互独立。",
-    "photoDefaultImportPathNone": "选择默认路径"
+    "photoDefaultImportPathNone": "选择默认路径",
+    "changeServer": "更换服务器",
+    "discoveryTitle": "局域网自动发现",
+    "discoveryHint": "允许 Desktop 搜索此服务器。需启用局域网访问，修改后重启 Server 生效。"
   },
   "lock": {
     "title": "Curated 已锁定",
