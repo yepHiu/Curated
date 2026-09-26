@@ -26,5 +26,5 @@ class ComponentTests(unittest.TestCase):
         plan = component_plan(root, "full", "windows", "x64", "exe")
         self.assertEqual(plan["status"], "planned")
         self.assertEqual(plan["components"]["desktop"], "0.1.0")
-        self.assertEqual(plan["components"]["server"], "1.5.7")
+        self.assertEqual(plan["components"]["server"], "1.5.8")
         self.assertEqual(before, {p: p.read_bytes() for p in sources})
