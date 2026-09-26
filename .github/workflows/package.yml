@@ -1,0 +1,166 @@
+name: Build installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (major.minor.patch, e.g. 1.6.0)'
+        required: true
+        type: string
+      platform:
+        description: Build platforms
+        type: choice
+        default: all
+        options: [all, windows, macos]
+      variant:
+        description: Components (Full also builds its two component installers)
+        type: choice
+        default: all
+        options: [all, full, server, desktop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installers-${{ github.ref }}-${{ inputs.platform }}-${{ inputs.variant }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - name: Validate inputs and select native runners
+        id: targets
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          PACKAGE_PLATFORM: ${{ inputs.platform }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          if not re.fullmatch(r'\d+\.\d+\.\d+', os.environ['PACKAGE_VERSION']):
+              raise SystemExit('Version must be major.minor.patch')
+          targets = [
+              {'os': 'windows-2022', 'platform': 'windows', 'arch': 'x64'},
+              {'os': 'macos-15', 'platform': 'macos', 'arch': 'arm64'},
+              {'os': 'macos-15-intel', 'platform': 'macos', 'arch': 'x64'},
+          ]
+          selected = [t for t in targets if os.environ['PACKAGE_PLATFORM'] in ('all', t['platform'])]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('matrix=' + json.dumps({'include': selected}) + '\n')
+          PY
+
+  package:
+    needs: prepare
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PACKAGE_VARIANT: ${{ inputs.variant }}
+      PACKAGE_PLATFORM: ${{ matrix.platform }}
+      PACKAGE_ARCH: ${{ matrix.arch }}
+      PACKAGE_OUTPUT: .workspace/ci-packages
+      PYTHONUNBUFFERED: '1'
+      NODE_OPTIONS: --no-experimental-webstorage
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Download locked native Electron runtime
+        if: inputs.variant != 'server'
+        # pnpm's allowBuilds policy does not run Electron's install hook automatically.
+        run: node node_modules/electron/install.js
+      - name: Prepare Windows packaging tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          if ($env:PACKAGE_VARIANT -ne 'desktop') {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'FFmpeg installation failed' }
+            # Package actual binaries, never Chocolatey command shims.
+            $ffmpeg = Get-ChildItem "$env:ChocolateyInstall/lib/ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+            if (!$ffmpeg -or !(Test-Path (Join-Path $ffmpeg.DirectoryName 'ffprobe.exe'))) { throw 'FFmpeg runtime missing' }
+            $ffmpeg.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+      - name: Prepare native macOS FFmpeg
+        if: runner.os == 'macOS' && inputs.variant != 'desktop'
+        run: |
+          brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+          brew --prefix ffmpeg
+          ffmpeg -version
+          ffprobe -version
+      - name: Validate release scripts and Electron contracts
+        run: |
+          python -m unittest discover -s scripts/release/tests -p 'test_*.py'
+          pnpm test:electron
+      - name: Build and verify installers
+        run: |
+          set -o pipefail
+          mkdir -p .workspace/package-logs
+          python scripts/release/release_cli.py publish \
+            --version "$PACKAGE_VERSION" --variant "$PACKAGE_VARIANT" \
+            --platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCH" \
+            --output-dir "$PACKAGE_OUTPUT" \
+            --history-path .workspace/package-logs/build-history.csv \
+            2>&1 | tee .workspace/package-logs/build.log
+          python scripts/release/verify_artifacts.py \
+            --root "$PACKAGE_OUTPUT" --version "$PACKAGE_VERSION" \
+            --platform "$PACKAGE_PLATFORM" --arch "$PACKAGE_ARCH" --variant "$PACKAGE_VARIANT"
+      - name: Upload verified installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Curated-${{ inputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ inputs.variant }}-${{ github.run_attempt }}
+          path: |
+            .workspace/ci-packages/components-*/installer/*.exe
+            .workspace/ci-packages/components-*/installer/*.pkg
+            .workspace/ci-packages/components-*/installer/components-manifest.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaging-logs-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.run_attempt }}
+          path: |
+            .workspace/package-logs/
+            .workspace/ci-packages/components-*/installer/*.iss
+            .workspace/ci-packages/components-*/installer/components-manifest.json
+            .workspace/ci-packages/components-*/payloads/server/**/runtime-provenance.json
+            dist/bundle-report.md
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Summarize result
+        if: success()
+        run: |
+          {
+            echo "Built Curated $PACKAGE_VERSION — $PACKAGE_PLATFORM $PACKAGE_ARCH ($PACKAGE_VARIANT)."
+            echo 'Download installers from this run’s Artifacts. No GitHub Release was created.'
+            echo 'Packages are unsigned test builds; macOS applications are ad-hoc signed and not notarized.'
+          } >> "$GITHUB_STEP_SUMMARY"
