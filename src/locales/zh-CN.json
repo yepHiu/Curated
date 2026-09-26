@@ -1027,7 +1027,7 @@
   },
   "settings": {
     "serverConnections": {
-      "title": "服务器连接 · 此桌面端",
+      "title": "服务器列表",
       "current": "当前服务器",
       "disconnected": "未连接",
       "unnamed": "Curated Server",

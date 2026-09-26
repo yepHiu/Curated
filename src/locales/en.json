@@ -1027,7 +1027,7 @@
   },
   "settings": {
     "serverConnections": {
-      "title": "Server connections · This Desktop",
+      "title": "Server list",
       "current": "Current server",
       "disconnected": "Disconnected",
       "unnamed": "Curated Server",

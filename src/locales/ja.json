@@ -1027,7 +1027,7 @@
   },
   "settings": {
     "serverConnections": {
-      "title": "サーバー接続 · この Desktop",
+      "title": "サーバー一覧",
       "current": "現在のサーバー",
       "disconnected": "未接続",
       "unnamed": "Curated Server",
