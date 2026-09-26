@@ -10,6 +10,14 @@
 
 ---
 
+### 2026-09-26 居中资源同步记录
+
+- 发现 `public/Curated-icon.png` 的粉色图案向下偏移 15 px，Windows ICO 也继承了偏移；`src/icon/curated-appicon.png` 仍是不同尺寸的旧版资源。
+- 统一以已经居中的 `icon/curated-appicon.png` 为源，覆盖 `src/icon/` 与 `public/` 应用图标及本地 `dist/`、`backend/frontend-dist/` 中的副本，重新生成 ICO 的全部 9 个尺寸。
+- 透明标志副本同步自 `icon/curated-mark.png`；横向字标保持原有组合排版。
+- 删除未使用的模板 favicon 及本地构建目录中的对应副本，更新入口图标 URL 的版本参数，避免浏览器沿用旧图标缓存。
+- 验收以粉色图案外接框为准：源图上下留白 79 / 79 px、左右 78 / 79 px；栅格尺寸奇偶差允许最多半像素的中心偏差。维护规则见 `icon/README.md`。
+
 ### Task 1: Record the canonical icon source
 
 **Files:**
