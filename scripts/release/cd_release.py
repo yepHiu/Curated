@@ -166,6 +166,8 @@ def api(path: str, payload: dict | None = None, method: str | None = None):
     except urllib.error.HTTPError as error:
         if error.code == 404 and path.startswith("releases/tags/") and payload is None:
             return None
+        detail = error.read(8192).decode('utf-8', errors='replace') if error.fp is not None else ''
+        error.add_note(f'GitHub API {method or ("POST" if payload is not None else "GET")} {path}: {detail}')
         raise
 
 
