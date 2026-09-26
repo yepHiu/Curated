@@ -1026,6 +1026,15 @@
   },
   "settings": {
     "serverConnections": {
+      "addDescription": "サーバー名とアドレスを入力し、このパソコンに保存します。",
+      "nameLabel": "名前",
+      "namePlaceholder": "例：自宅 NAS",
+      "addressLabel": "サーバーアドレス",
+      "save": "保存",
+      "invalidAddress": "認証情報、パス、クエリを含まない HTTP/HTTPS のルートアドレスを入力してください。",
+      "duplicateAddress": "このアドレスは保存済みです。一覧から選択してください。",
+      "saveError": "保存できませんでした。入力を保持しています。再試行してください。",
+      "restartRequired": "Desktop を完全に終了して再起動するとサーバーを追加できます。",
       "online": "サーバーオンライン",
       "title": "サーバー一覧",
       "current": "現在のサーバー",

@@ -357,6 +357,13 @@ function registerDesktopIpc(): void {
     })
     return pendingDesktopCheck
   })
+  ipcMain.handle("curated:add-server", (event, input: unknown) => {
+    assertSender(event)
+    if (event.sender.id !== mainWindow?.webContents.id) throw new Error("无效的连接请求。")
+    if (!serverStore) throw new Error("无法读取服务器列表。")
+    if (connecting) throw new Error("正在连接，请稍候。")
+    serverStore.add(input)
+  })
   ipcMain.handle("curated:server-connections", (event) => {
     assertSender(event)
     if (!serverStore) throw new Error("无法读取服务器列表。")

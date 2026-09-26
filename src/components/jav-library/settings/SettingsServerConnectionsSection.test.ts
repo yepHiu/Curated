@@ -49,11 +49,11 @@ describe("Desktop servers in settings", () => {
     await wrapper.findAll('[data-saved-server]')[1]!.get('button').trigger('click')
     expect(api.openServerConnections).toHaveBeenCalledWith("office")
   })
-  it("opens local management to add servers and refreshes when focus returns", async () => {
+  it("opens local management and refreshes when focus returns", async () => {
     const api = bridge()
     const wrapper = render()
     await flushPromises()
-    const add = wrapper.findAll('button').find(button => button.text().includes('serverConnections.add'))!
+    const add = wrapper.findAll('button').find(button => button.text().includes('serverConnections.manage'))!
     await add.trigger('click')
     await flushPromises()
     expect(api.openServerConnections).toHaveBeenCalledWith(undefined)

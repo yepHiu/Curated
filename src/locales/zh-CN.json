@@ -1026,6 +1026,15 @@
   },
   "settings": {
     "serverConnections": {
+      "addDescription": "填写服务器名称和地址，保存到此电脑。",
+      "nameLabel": "名称",
+      "namePlaceholder": "例如：家庭 NAS",
+      "addressLabel": "服务器地址",
+      "save": "保存",
+      "invalidAddress": "请输入 HTTP/HTTPS 根地址，不包含账号、路径或查询参数。",
+      "duplicateAddress": "该服务器地址已保存，请从列表中选择。",
+      "saveError": "保存失败，请重试。输入内容已保留。",
+      "restartRequired": "请完全退出并重新打开 Desktop，以启用添加服务器。",
       "online": "服务器在线",
       "title": "服务器列表",
       "current": "当前服务器",

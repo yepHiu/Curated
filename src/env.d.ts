@@ -4,6 +4,7 @@
 interface Window {
   javLibrary?: {
     openServerConnections?: (serverId?: string) => Promise<void>
+    addServer?: (input: { name: string; url: string }) => Promise<void>
     getServerConnections?: () => Promise<import("../electron/desktop-contract").DesktopServerConnections>
     readonly windowChrome?: "macos" | "native"
     getDesktopInfo?: () => Promise<import("../electron/desktop-contract").DesktopInfo>

@@ -14,6 +14,15 @@ function fixture() {
 afterEach(() => dirs.splice(0).forEach(dir => rmSync(dir, { recursive: true, force: true })))
 
 describe('Desktop server connections', () => {
+  it('adds without overwriting existing records, ids or the last connected server', () => {
+    const { store, file } = fixture()
+    const first = store.add({ name: 'Home', url: 'nas.local:8081' })
+    store.remember(first.id)
+    expect(() => store.add({ name: 'Overwrite', url: 'http://nas.local:8081/' })).toThrow()
+    expect(() => store.add({ id: first.id, name: 'Overwrite', url: 'other.local' })).toThrow()
+    const second = store.add({ name: 'Office', url: 'office.local' })
+    expect(new ServerConnectionStore(file).snapshot()).toEqual({ schema: 1, servers: [first, second], lastServerId: first.id })
+  })
   it('normalizes host/port, HTTPS and IPv6 without dropping non-root paths', () => {
     expect(normalizeServerUrl(' NAS.local:8081/ ')).toBe('http://nas.local:8081')
     expect(normalizeServerUrl('https://NAS.local:443/')).toBe('https://nas.local')

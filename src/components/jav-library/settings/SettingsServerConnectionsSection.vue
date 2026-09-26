@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { useI18n } from "vue-i18n"
-import { Plus, RefreshCw, Server } from "lucide-vue-next"
+import { RefreshCw, Server } from "lucide-vue-next"
+import SettingsServerAddDialog from "./SettingsServerAddDialog.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -87,10 +88,7 @@ function recheck() {
           {{ t('settings.serverConnections.refresh') }}
         </Button>
         <Button variant="outline" class="rounded-full" :disabled="busy" @click="openManager()">{{ t('settings.serverConnections.manage') }}</Button>
-        <Button class="rounded-full" :disabled="busy" @click="openManager()">
-          <Plus class="size-4" aria-hidden="true" />
-          {{ t('settings.serverConnections.add') }}
-        </Button>
+        <SettingsServerAddDialog :disabled="Boolean(busy)" @saved="refresh" />
       </div>
     </CardContent>
   </Card>

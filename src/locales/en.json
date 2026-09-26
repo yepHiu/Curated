@@ -1026,6 +1026,15 @@
   },
   "settings": {
     "serverConnections": {
+      "addDescription": "Enter a server name and address to save on this computer.",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Home NAS",
+      "addressLabel": "Server address",
+      "save": "Save",
+      "invalidAddress": "Enter an HTTP/HTTPS root address without credentials, paths or query parameters.",
+      "duplicateAddress": "This server address is already saved. Select it from the list.",
+      "saveError": "Could not save. Please retry; your input is preserved.",
+      "restartRequired": "Fully quit and reopen Desktop to enable adding servers.",
       "online": "Server online",
       "title": "Server list",
       "current": "Current server",

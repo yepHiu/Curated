@@ -43,6 +43,13 @@ export class ServerConnectionStore {
     renameSync(`${this.file}.tmp`, this.file)
     this.state = next
   }
+  add(input: unknown): SavedServer {
+    if (!input || typeof input !== "object" || "id" in input) throw new Error("服务器信息无效。")
+    const value = input as Partial<SavedServer>
+    const url = normalizeServerUrl(value.url)
+    if (this.state.servers.some(server => server.url === url)) throw new Error("该地址已保存在列表中。")
+    return this.save({ name: value.name, url })
+  }
   save(input: unknown): SavedServer {
     if (!input || typeof input !== "object") throw new Error("服务器信息无效。")
     const value = input as Partial<SavedServer>

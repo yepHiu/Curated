@@ -42,15 +42,16 @@ describe("Electron preload bridge", () => {
 
     expect(Object.keys(exposed)).toEqual(["javLibrary"])
 
-    const api = exposed.javLibrary as { windowChrome: string; getServerConnections: () => Promise<unknown>; openServerConnections: (serverId?: string) => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
-    expect(Object.keys(api).sort()).toEqual(["checkDesktopUpdate", "getDesktopInfo", "getServerConnections", "openServerConnections", "pickDirectory", "windowChrome"])
+    const api = exposed.javLibrary as { addServer: (input: { name: string; url: string }) => Promise<unknown>; windowChrome: string; getServerConnections: () => Promise<unknown>; openServerConnections: (serverId?: string) => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
+    expect(Object.keys(api).sort()).toEqual(["addServer", "checkDesktopUpdate", "getDesktopInfo", "getServerConnections", "openServerConnections", "pickDirectory", "windowChrome"])
     expect(api.windowChrome).toBe(platform === "darwin" ? "macos" : "native")
     await expect(api.pickDirectory()).resolves.toEqual({ path: "D:/Media" })
     await api.getDesktopInfo()
     await api.checkDesktopUpdate()
+    await api.addServer({ name: "NAS", url: "http://nas.local:8081" })
     await api.getServerConnections()
     await api.openServerConnections("saved-server-id")
     expect(invokedArgs.at(-1)).toEqual(["saved-server-id"])
-    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:server-connections", "curated:open-servers"])
+    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:add-server", "curated:server-connections", "curated:open-servers"])
   })
 })
