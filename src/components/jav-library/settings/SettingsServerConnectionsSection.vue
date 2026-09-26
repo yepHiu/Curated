@@ -32,7 +32,7 @@ function recheck() {
       </span>
       <CardTitle class="min-w-0 text-lg tracking-tight">{{ t('settings.serverConnections.title') }}</CardTitle>
     </CardHeader>
-    <CardContent class="flex min-w-0 flex-col gap-4 pt-0">
+    <CardContent class="flex min-w-0 flex-col gap-3 pt-0">
       <div v-if="snapshot" class="flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-sm font-semibold">{{ t('settings.serverConnections.current') }}</h3>
@@ -48,24 +48,40 @@ function recheck() {
       </div>
       <p v-else-if="loading" class="text-sm text-muted-foreground" role="status">{{ t('settings.serverConnections.loading') }}</p>
       <p v-if="failed" class="text-sm text-destructive" role="alert">{{ t('settings.serverConnections.loadError') }}</p>
-      <div v-if="snapshot" class="min-w-0 space-y-3">
-        <h3 class="text-sm font-semibold">{{ t('settings.serverConnections.saved') }}</h3>
+      <section v-if="snapshot" class="@container flex min-w-0 flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4" :aria-label="t('settings.serverConnections.saved')">
+        <h3 class="text-sm font-semibold text-foreground">{{ t('settings.serverConnections.saved') }}</h3>
         <p v-if="!snapshot.servers.length" class="text-sm text-muted-foreground">{{ t('settings.serverConnections.empty') }}</p>
-        <ul v-else class="divide-y divide-border/60">
-          <li v-for="server in snapshot.servers" :key="server.id" class="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3" data-saved-server>
-            <div class="min-w-0 flex-1 basis-40">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="break-all text-sm font-medium">{{ server.name }}</p>
-                <Badge v-if="server.url === snapshot.currentServerUrl" variant="secondary">{{ t('settings.serverConnections.selected') }}</Badge>
-              </div>
-              <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{{ server.url }}</p>
+        <ul v-else class="min-w-0 overflow-hidden rounded-lg border border-border/50 bg-background/30 divide-y divide-border/50">
+          <li
+            v-for="server in snapshot.servers"
+            :key="server.id"
+            class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+            data-saved-server
+          >
+            <Server class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="grid min-w-0 gap-1 @lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] @lg:items-center @lg:gap-3">
+              <p class="truncate text-sm font-medium text-foreground" :title="server.name">{{ server.name }}</p>
+              <p class="truncate text-xs text-muted-foreground" :title="server.url">{{ server.url }}</p>
             </div>
-            <Button v-if="server.url !== snapshot.currentServerUrl" variant="outline" class="shrink-0 rounded-full" :disabled="busy || failed" :aria-label="t('settings.serverConnections.connectTo', { name: server.name })" @click="openManager(server.id)">
-              {{ t('settings.serverConnections.connect') }}
-            </Button>
+            <div class="flex w-24 shrink-0 justify-end">
+              <Badge v-if="server.url === snapshot.currentServerUrl" variant="secondary" class="whitespace-nowrap">{{ t('settings.serverConnections.selected') }}</Badge>
+              <Button
+                v-else
+                type="button"
+                size="sm"
+                variant="outline"
+                class="h-auto min-h-11 shrink-0 rounded-full sm:min-h-8"
+                data-settings-comfortable-control
+                :disabled="busy || failed"
+                :aria-label="t('settings.serverConnections.connectTo', { name: server.name })"
+                @click="openManager(server.id)"
+              >
+                {{ t('settings.serverConnections.connect') }}
+              </Button>
+            </div>
           </li>
         </ul>
-      </div>
+      </section>
       <p v-if="busy" class="text-sm text-muted-foreground" role="status">{{ t('settings.serverConnections.switching') }}</p>
       <p v-if="actionFailed" class="text-sm text-destructive" role="alert">{{ t('settings.serverConnections.actionError') }}</p>
       <div class="flex flex-wrap items-center justify-end gap-2">
