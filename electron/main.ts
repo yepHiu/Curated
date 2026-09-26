@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  net,
   Menu,
   shell,
   Tray,
@@ -10,7 +11,10 @@ import {
   type OpenDialogOptions,
 } from "electron"
 import path from "node:path"
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import type { DesktopInfo, DesktopUpdateResult } from "./desktop-contract.js"
+import { checkDesktopUpdate, desktopInfoChannel, desktopUpdateChannel, isTrustedDesktopSender, isVersion } from "./desktop-updates.js"
 
 import { startBackend, type ManagedBackend } from "./backend-process.js"
 import {
@@ -36,6 +40,18 @@ import {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const desktopRelease = JSON.parse(readFileSync(path.join(__dirname, "desktop-release.json"), "utf8"))
+if (desktopRelease.schema !== 1 || !isVersion(desktopRelease.version) || !["legacy", "desktop"].includes(desktopRelease.distribution) || !(desktopRelease.updateFeed === null || typeof desktopRelease.updateFeed === "string")) {
+  throw new Error("Invalid Desktop release metadata")
+}
+const desktopInfo: DesktopInfo = {
+  version: desktopRelease.version,
+  development: !app.isPackaged,
+  distribution: desktopRelease.distribution,
+  platform: process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : process.platform,
+  arch: process.arch,
+}
+let pendingDesktopCheck: Promise<DesktopUpdateResult> | undefined
 
 let mainWindow: BrowserWindow | undefined
 let managedBackend: ManagedBackend | undefined
@@ -200,7 +216,7 @@ function installDesktopClientMarker(window: BrowserWindow, backendBaseUrl: strin
       return
     }
     callback({
-      requestHeaders: withCuratedDesktopRequestHeaders(details.requestHeaders, app.getVersion()),
+      requestHeaders: withCuratedDesktopRequestHeaders(details.requestHeaders, desktopInfo.version),
     })
   })
 }
@@ -291,6 +307,22 @@ function quitFromTray(): void {
 }
 
 function registerDesktopIpc(): void {
+  const assertSender = (event: Electron.IpcMainInvokeEvent) => {
+    if (!isTrustedDesktopSender(event.sender.id, mainWindow?.webContents.id, event.senderFrame?.url, event.senderFrame === event.sender.mainFrame, rendererBaseUrl)) {
+      throw new Error("Untrusted Desktop IPC sender")
+    }
+  }
+  ipcMain.handle(desktopInfoChannel, (event) => {
+    assertSender(event)
+    return desktopInfo
+  })
+  ipcMain.handle(desktopUpdateChannel, (event) => {
+    assertSender(event)
+    pendingDesktopCheck ??= checkDesktopUpdate(desktopInfo, desktopRelease.updateFeed, net.fetch.bind(net)).finally(() => {
+      pendingDesktopCheck = undefined
+    })
+    return pendingDesktopCheck
+  })
   ipcMain.handle(pickDirectoryChannel, async () => {
     const owner = BrowserWindow.getFocusedWindow() ?? mainWindow
     const options: OpenDialogOptions = {

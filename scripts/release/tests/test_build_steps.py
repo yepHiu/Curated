@@ -191,6 +191,8 @@ class BuildStepsTests(unittest.TestCase):
         compiled_main.mkdir()
         (compiled_main / "main.js").write_text("console.log('main')", encoding="utf-8")
         (compiled_main / "preload.cjs").write_text("", encoding="utf-8")
+        desktop_metadata = {"schema": 1, "version": "0.1.0", "distribution": "legacy", "updateFeed": None}
+        (compiled_main / "desktop-release.json").write_text(json.dumps(desktop_metadata), encoding="utf-8")
 
         asset_dir = self.temp_root / "backend" / "internal" / "assets"
         asset_dir.mkdir(parents=True)
@@ -246,6 +248,7 @@ class BuildStepsTests(unittest.TestCase):
         self.assertTrue((app_dir / "frontend-dist" / "index.html").is_file())
         self.assertTrue((app_dir / "electron-dist" / "main.js").is_file())
         self.assertTrue((app_dir / "electron-dist" / "preload.cjs").is_file())
+        self.assertEqual(json.loads((app_dir / "electron-dist" / "desktop-release.json").read_text(encoding="utf-8")), desktop_metadata)
         self.assertTrue((app_dir / "third_party" / "ffmpeg" / "bin" / self.ffmpeg_name).is_file())
         staged_example = json.loads(
             (app_dir / "runtime" / "config" / "library-config.example.cfg").read_text(encoding="utf-8")

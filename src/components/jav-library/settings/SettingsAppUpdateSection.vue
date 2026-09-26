@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { statusPanelClass, statusTextClass } from "@/lib/ui/status-tone"
 import { cn } from "@/lib/utils"
+import SettingsDesktopUpdateSection from "./SettingsDesktopUpdateSection.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -280,6 +281,8 @@ async function handleInstallUpdate() {
           </Button>
         </div>
       </div>
+
+      <SettingsDesktopUpdateSection />
 
       <dl class="grid gap-3 sm:grid-cols-2">
         <div

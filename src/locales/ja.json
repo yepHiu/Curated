@@ -1025,6 +1025,21 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
+    "desktopDevelopment": "開発版",
+    "desktopInfoLoading": "バージョンを読み込み中…",
+    "desktopInfoError": "Desktop のバージョンを取得できません",
+    "desktopCheckAction": "Desktop の更新を確認",
+    "desktopDownloadAction": "インストーラーをダウンロード",
+    "desktopUpdateStatus": {
+      "development": "開発版では正式版の更新を受信しません。",
+      "bundled": "Desktop は現在の一体型インストーラーで更新されます。",
+      "not-configured": "Desktop の更新元が未設定です。",
+      "unsupported": "このシステムまたはアーキテクチャの更新は未対応です。",
+      "no-artifact": "このシステムとアーキテクチャ用のインストーラーはありません。",
+      "up-to-date": "Desktop は最新です。",
+      "update-available": "Desktop {version} を利用できます。",
+      "error": "Desktop の更新を確認できません。後でもう一度お試しください。"
+    },
     "language": "表示言語",
     "appearance": "外観",
     "themeLight": "ライト",

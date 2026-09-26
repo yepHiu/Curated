@@ -1025,6 +1025,21 @@
     "imageOf": "Image {i}"
   },
   "settings": {
+    "desktopDevelopment": "Development",
+    "desktopInfoLoading": "Reading version…",
+    "desktopInfoError": "Could not read Desktop version",
+    "desktopCheckAction": "Check Desktop updates",
+    "desktopDownloadAction": "Download installer",
+    "desktopUpdateStatus": {
+      "development": "Development builds do not receive release updates.",
+      "bundled": "Desktop updates with the current all-in-one installer.",
+      "not-configured": "No Desktop update source is configured.",
+      "unsupported": "Updates are not supported on this system or architecture.",
+      "no-artifact": "No installer is available for this system and architecture.",
+      "up-to-date": "Desktop is up to date.",
+      "update-available": "Desktop {version} is available.",
+      "error": "Could not check Desktop updates. Please try again."
+    },
     "language": "Interface language",
     "appearance": "Appearance",
     "themeLight": "Light",

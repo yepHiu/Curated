@@ -209,6 +209,9 @@ def assemble_release(
         raise FileNotFoundError(f"Electron runtime not found: {resolved_electron_runtime_dir / 'electron.exe'}")
     if not (resolved_electron_main_dir / "main.js").is_file():
         raise FileNotFoundError(f"Electron main build not found: {resolved_electron_main_dir / 'main.js'}")
+    desktop_metadata = json.loads((resolved_electron_main_dir / "desktop-release.json").read_text(encoding="utf-8"))
+    if desktop_metadata.get("schema") != 1 or desktop_metadata.get("distribution") != "legacy":
+        raise ValueError("The legacy all-in-one packager requires legacy Desktop release metadata.")
 
     print("==> Assembling release directory")
     print(f"Version : {version}")

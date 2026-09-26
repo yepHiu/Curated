@@ -8,3 +8,19 @@ const target = path.join(targetDir, "preload.cjs")
 
 fs.mkdirSync(targetDir, { recursive: true })
 fs.copyFileSync(source, target)
+
+const versionState = JSON.parse(fs.readFileSync(path.join(repoRoot, "scripts/release/versions/desktop.json"), "utf8"))
+const parts = [versionState.current?.major, versionState.current?.minor, versionState.current?.patch]
+if (versionState.schema !== 1 || !parts.every((part) => Number.isSafeInteger(part) && part >= 0)) {
+  throw new Error("Invalid Desktop version source")
+}
+const config = JSON.parse(fs.readFileSync(path.join(repoRoot, "electron/release-config.json"), "utf8"))
+if (!["legacy", "desktop"].includes(config.distribution) || !(config.updateFeed === null || typeof config.updateFeed === "string")) {
+  throw new Error("Invalid Desktop release configuration")
+}
+fs.writeFileSync(path.join(targetDir, "desktop-release.json"), JSON.stringify({
+  schema: 1,
+  version: parts.join("."),
+  distribution: config.distribution,
+  updateFeed: config.updateFeed,
+}, null, 2) + "\n")

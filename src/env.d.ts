@@ -4,6 +4,8 @@
 interface Window {
   javLibrary?: {
     readonly windowChrome?: "macos" | "native"
+    getDesktopInfo?: () => Promise<import("../electron/desktop-contract").DesktopInfo>
+    checkDesktopUpdate?: () => Promise<import("../electron/desktop-contract").DesktopUpdateResult>
     pickDirectory?: () => Promise<{ path: string } | null | undefined>
   }
   /** File System Access API（Chromium）；类型定义可能未随 lib 一并更新 */

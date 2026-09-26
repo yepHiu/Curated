@@ -1025,6 +1025,21 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
+    "desktopDevelopment": "开发版",
+    "desktopInfoLoading": "正在读取版本…",
+    "desktopInfoError": "无法读取桌面版本",
+    "desktopCheckAction": "检查 Desktop 更新",
+    "desktopDownloadAction": "下载安装包",
+    "desktopUpdateStatus": {
+      "development": "开发版不参与正式更新。",
+      "bundled": "桌面端随当前一体安装包更新。",
+      "not-configured": "尚未配置 Desktop 更新源。",
+      "unsupported": "暂不支持此系统或架构的更新。",
+      "no-artifact": "暂无适用于此系统和架构的安装包。",
+      "up-to-date": "Desktop 已是最新版本。",
+      "update-available": "Desktop {version} 可用。",
+      "error": "无法检查 Desktop 更新，请稍后重试。"
+    },
     "language": "界面语言",
     "appearance": "外观",
     "themeLight": "浅色",
