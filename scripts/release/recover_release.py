@@ -47,8 +47,11 @@ def main():
             for i in selected[-35:]:
                 line = lines[i].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                 print('::warning::Previous CD: ' + line)
+    releases = gh(f'repos/{repo}/releases?per_page=100')
+    published = next((release for release in releases if release['tag_name'] == tag and not release['draft']), None)
+    command = 'channels' if published else 'publish'
     attempt = run['run_attempt']
-    fields = {'run_id': run_id, 'tag': tag, 'commit': run['head_sha'], 'mode': mode,
+    fields = {'command': command, 'run_id': run_id, 'tag': tag, 'commit': run['head_sha'], 'mode': mode,
               'component': tag.split('-v')[0], 'windows_artifact': f'windows-release-{tag}-{attempt}',
               'macos_artifact': f'macos-desktop-{tag}-{attempt}'}
     with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:

@@ -166,12 +166,16 @@ def advance_channels(changes: dict[str, str], meta: dict) -> None:
     # Use the Git Data API: a fast-forward-only ref update prevents lost concurrent writes.
     refs = legacy.api('git/matching-refs/heads/release-channels')
     refs = [r for r in refs if r['ref'] == 'refs/heads/release-channels']
-    parent = refs[0]['object']['sha'] if refs else meta['commit']
-    commit = legacy.api(f'git/commits/{parent}')
-    tree = legacy.api('git/trees', {'base_tree': commit['tree']['sha'], 'tree': [
-        {'path': name, 'mode': '100644', 'type': 'blob', 'content': content} for name, content in changes.items()]})
+    parent = refs[0]['object']['sha'] if refs else None
+    tree_payload = {'tree': [
+        {'path': name, 'mode': '100644', 'type': 'blob', 'content': content} for name, content in changes.items()]}
+    if parent:
+        tree_payload['base_tree'] = legacy.api(f'git/commits/{parent}')['tree']['sha']
+    # This branch contains only public manifests, never source or workflows.
+    # The initial commit is orphaned, so contents:write does not need workflow scope.
+    tree = legacy.api('git/trees', tree_payload)
     next_commit = legacy.api('git/commits', {'message': f"release: advance component channels for {meta['tag']}",
-        'tree': tree['sha'], 'parents': [parent]})
+        'tree': tree['sha'], 'parents': [parent] if parent else []})
     if refs:
         legacy.api('git/refs/heads/release-channels', {'sha': next_commit['sha'], 'force': False}, 'PATCH')
     else:

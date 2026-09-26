@@ -65,11 +65,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.source.outputs.tag }}
           RELEASE_MODE: ${{ steps.source.outputs.mode }}
+          RELEASE_COMMAND: ${{ steps.source.outputs.command }}
         run: |
           set -o pipefail
           {
             python scripts/release/component_cd.py stage --tag "$RELEASE_TAG" --source-root .workspace/release-source
-            python scripts/release/component_cd.py publish --tag "$RELEASE_TAG" --source-root .workspace/release-source --mode "$RELEASE_MODE"
+            python scripts/release/component_cd.py "$RELEASE_COMMAND" --tag "$RELEASE_TAG" --source-root .workspace/release-source --mode "$RELEASE_MODE"
           } 2>&1 | tee "$RUNNER_TEMP/recovery.log"
       - name: Report recovery failures
         if: failure()

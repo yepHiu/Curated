@@ -120,6 +120,23 @@ class ComponentReleaseTests(unittest.TestCase):
             self.assertIn(('releases/20', {'draft': False, 'make_latest': 'false'}, 'PATCH'), payloads)
             self.assertFalse(any(args[0] == 'releases/20' and args[1].get('make_latest') == 'true' for args in payloads))
 
+    def test_initial_channel_branch_contains_only_manifests_without_source_history(self):
+        def response(endpoint, payload=None, method=None):
+            if endpoint == 'git/matching-refs/heads/release-channels': return []
+            if endpoint == 'git/trees':
+                self.assertNotIn('base_tree', payload)
+                self.assertEqual([e['path'] for e in payload['tree']], ['server.json'])
+                return {'sha': 'tree'}
+            if endpoint == 'git/commits':
+                self.assertEqual(payload['parents'], [])
+                return {'sha': 'channel'}
+            if endpoint == 'git/refs':
+                self.assertEqual(payload, {'ref': 'refs/heads/release-channels', 'sha': 'channel'})
+                return {}
+            self.fail(endpoint)
+        with patch.object(cd.legacy, 'api', side_effect=response):
+            cd.advance_channels({'server.json': '{}'}, self.meta)
+
     def test_server_payload_cannot_contain_electron(self):
         for name in ('curated.exe', 'frontend-dist/index.html', 'third_party/ffmpeg/bin/ffmpeg.exe', 'third_party/ffmpeg/bin/ffprobe.exe'):
             file = self.root / name
