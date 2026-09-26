@@ -9,6 +9,10 @@ from pathlib import Path
 
 def verify(root: Path, version: str, platform: str, arch: str, variant: str) -> list[Path]:
     """Validate the complete manifest and each installer before uploading."""
+    if platform == "macos":
+        if arch != "arm64" or variant not in ("all", "desktop"):
+            raise ValueError("macOS supports Apple Silicon Desktop only")
+        variant = "desktop"
     manifests = list(root.glob("components-*/installer/components-manifest.json"))
     if len(manifests) != 1:
         raise ValueError(f"Expected one build manifest, found {len(manifests)}")

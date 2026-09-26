@@ -75,7 +75,7 @@ def main() -> None:
     publish_parser = subparsers.add_parser("publish")
     publish_parser.add_argument("--variant", choices=["all", "full", "server", "desktop"], default="all")
     publish_parser.add_argument("--platform", choices=["windows", "macos"], default="windows")
-    publish_parser.add_argument("--arch", choices=["x64", "arm64"], default="x64")
+    publish_parser.add_argument("--arch", choices=["x64", "arm64"], help="Default: Windows x64, macOS arm64")
     publish_parser.add_argument("--version", "--Version", dest="version")
     publish_parser.add_argument("--build-stamp", default=utc_build_stamp())
     publish_parser.add_argument("--output-dir", default="release")
@@ -152,8 +152,8 @@ def main() -> None:
         if args.platform == "macos":
             from scripts.release.release_lib.macos_packaging import publish_macos
             publisher = publish_macos
-            extra["arch"] = args.arch
-        elif args.arch != "x64":
+            extra["arch"] = args.arch or "arm64"
+        elif args.arch not in (None, "x64"):
             parser.error("Windows packages currently support x64 only")
         publisher(
             **extra,

@@ -13,7 +13,7 @@ on:
         default: all
         options: [all, windows, macos]
       variant:
-        description: Components (Full also builds its two component installers)
+        description: Components (Server/Full are Windows only; macOS supports Desktop)
         type: choice
         default: all
         options: [all, full, server, desktop]
@@ -31,22 +31,22 @@ jobs:
     outputs:
       matrix: ${{ steps.targets.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate inputs and select native runners
         id: targets
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
           PACKAGE_PLATFORM: ${{ inputs.platform }}
+          PACKAGE_VARIANT: ${{ inputs.variant }}
         run: |
           python - <<'PY'
           import json, os, re
           if not re.fullmatch(r'\d+\.\d+\.\d+', os.environ['PACKAGE_VERSION']):
               raise SystemExit('Version must be major.minor.patch')
-          targets = [
-              {'os': 'windows-2022', 'platform': 'windows', 'arch': 'x64'},
-              {'os': 'macos-15', 'platform': 'macos', 'arch': 'arm64'},
-              {'os': 'macos-15-intel', 'platform': 'macos', 'arch': 'x64'},
-          ]
-          selected = [t for t in targets if os.environ['PACKAGE_PLATFORM'] in ('all', t['platform'])]
+          from scripts.release.release_lib.build_targets import selected_targets
+          selected = selected_targets(os.environ['PACKAGE_PLATFORM'], os.environ['PACKAGE_VARIANT'])
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('matrix=' + json.dumps({'include': selected}) + '\n')
           PY
@@ -61,7 +61,7 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
-      PACKAGE_VARIANT: ${{ inputs.variant }}
+      PACKAGE_VARIANT: ${{ matrix.variant }}
       PACKAGE_PLATFORM: ${{ matrix.platform }}
       PACKAGE_ARCH: ${{ matrix.arch }}
       PACKAGE_OUTPUT: .workspace/ci-packages
@@ -85,13 +85,14 @@ jobs:
         with:
           python-version: '3.12'
       - uses: actions/setup-go@v5
+        if: matrix.platform == 'windows' && matrix.variant != 'desktop'
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Download locked native Electron runtime
-        if: inputs.variant != 'server'
+        if: matrix.variant != 'server'
         # pnpm's allowBuilds policy does not run Electron's install hook automatically.
         run: node node_modules/electron/install.js
       - name: Prepare Windows packaging tools
@@ -108,13 +109,6 @@ jobs:
             if (!$ffmpeg -or !(Test-Path (Join-Path $ffmpeg.DirectoryName 'ffprobe.exe'))) { throw 'FFmpeg runtime missing' }
             $ffmpeg.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           }
-      - name: Prepare native macOS FFmpeg
-        if: runner.os == 'macOS' && inputs.variant != 'desktop'
-        run: |
-          brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
-          brew --prefix ffmpeg
-          ffmpeg -version
-          ffprobe -version
       - name: Validate release scripts and Electron contracts
         run: |
           python -m unittest discover -s scripts/release/tests -p 'test_*.py'
@@ -135,7 +129,7 @@ jobs:
       - name: Upload verified installers
         uses: actions/upload-artifact@v4
         with:
-          name: Curated-${{ inputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ inputs.variant }}-${{ github.run_attempt }}
+          name: Curated-${{ inputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ matrix.variant }}-${{ github.run_attempt }}
           path: |
             .workspace/ci-packages/components-*/installer/*.exe
             .workspace/ci-packages/components-*/installer/*.pkg
@@ -152,7 +146,6 @@ jobs:
             .workspace/package-logs/
             .workspace/ci-packages/components-*/installer/*.iss
             .workspace/ci-packages/components-*/installer/components-manifest.json
-            .workspace/ci-packages/components-*/payloads/server/**/runtime-provenance.json
             dist/bundle-report.md
           if-no-files-found: ignore
           retention-days: 14
