@@ -1031,7 +1031,6 @@
     "desktopInfoError": "无法读取桌面版本",
     "desktopDownloadAction": "下载 Desktop 安装包",
     "desktopUpdateOnlyTitle": "更新此电脑上的 Desktop",
-    "desktopUpdateOnlyHint": "仅更新此电脑上的 Desktop，服务器继续运行。",
     "serverUpdateLocalOnlyTitle": "请在服务器所在电脑上更新",
     "serverUpdateLocalOnly": "当前连接不支持更新 Server，请在服务器所在电脑上操作。",
     "desktopStandaloneUnavailable": "当前一体包尚不支持独立更新 Desktop。",

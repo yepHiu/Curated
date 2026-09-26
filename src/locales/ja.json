@@ -1031,7 +1031,6 @@
     "desktopInfoError": "Desktop のバージョンを取得できません",
     "desktopDownloadAction": "Desktop インストーラーをダウンロード",
     "desktopUpdateOnlyTitle": "このパソコンの Desktop を更新",
-    "desktopUpdateOnlyHint": "このパソコンの Desktop のみを更新します。Server は動作を続けます。",
     "serverUpdateLocalOnlyTitle": "Server が動作するパソコンで更新してください",
     "serverUpdateLocalOnly": "この接続では Server を更新できません。Server が動作するパソコンで操作してください。",
     "desktopStandaloneUnavailable": "この一体型パッケージでは Desktop の個別更新はまだ利用できません。",

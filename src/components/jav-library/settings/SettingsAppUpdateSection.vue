@@ -98,7 +98,7 @@ const title = computed(() => {
 })
 
 const description = computed(() => {
-  if (desktopOnly.value) return t(desktopAvailable ? "settings.desktopUpdateOnlyHint" : "settings.serverUpdateLocalOnly")
+  if (desktopOnly.value) return desktopAvailable ? "" : t("settings.serverUpdateLocalOnly")
   const current = summary.value
   switch (status.value) {
     case "checking":
@@ -250,7 +250,7 @@ async function handleInstallUpdate() {
           <p :class="cn('text-sm font-medium', statusTextClass(panelTone))">
             {{ title }}
           </p>
-          <p v-if="desktopOnly || status !== 'update-available'" class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+          <p v-if="description && (desktopOnly || status !== 'update-available')" class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {{ description }}
           </p>
         </div>

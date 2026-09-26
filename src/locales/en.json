@@ -1031,7 +1031,6 @@
     "desktopInfoError": "Could not read Desktop version",
     "desktopDownloadAction": "Download Desktop installer",
     "desktopUpdateOnlyTitle": "Update Desktop on this computer",
-    "desktopUpdateOnlyHint": "Only Desktop on this computer is updated. Server keeps running.",
     "serverUpdateLocalOnlyTitle": "Update on the Server computer",
     "serverUpdateLocalOnly": "This connection cannot update Server. Update it on the Server computer.",
     "desktopStandaloneUnavailable": "This bundled installation does not support independent Desktop updates yet.",
