@@ -45,10 +45,13 @@ interface DirectoryDialogResult {
 export function resolveAppIconPath(
   appPath: string,
   pathExists: (candidate: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
 ): string | undefined {
   const candidates = [
-    path.join(appPath, "curated.ico"),
-    path.join(appPath, "backend", "internal", "assets", "curated.ico"),
+    ...(platform === "win32" ? [
+      path.join(appPath, "curated.ico"),
+      path.join(appPath, "backend", "internal", "assets", "curated.ico"),
+    ] : []),
     path.join(appPath, "public", "Curated-icon.png"),
     path.join(appPath, "icon", "curated-appicon.png"),
   ]

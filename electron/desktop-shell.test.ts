@@ -27,7 +27,7 @@ describe("Electron desktop shell integration", () => {
     const appPath = "C:/repo"
     const preferredIcon = path.join(appPath, "backend", "internal", "assets", "curated.ico")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === preferredIcon)
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === preferredIcon, "win32")
 
     expect(iconPath).toBe(preferredIcon)
   })
@@ -36,7 +36,7 @@ describe("Electron desktop shell integration", () => {
     const appPath = "C:/Program Files/Curated/resources/app"
     const packagedIcon = path.join(appPath, "curated.ico")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon)
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === packagedIcon, "win32")
 
     expect(iconPath).toBe(packagedIcon)
   })
@@ -45,9 +45,17 @@ describe("Electron desktop shell integration", () => {
     const appPath = "C:/repo"
     const fallbackIcon = path.join(appPath, "public", "Curated-icon.png")
 
-    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === fallbackIcon)
+    const iconPath = resolveAppIconPath(appPath, (candidate) => candidate === fallbackIcon, "win32")
 
     expect(iconPath).toBe(fallbackIcon)
+  })
+
+  it.each(["darwin", "linux"] as const)("uses PNG instead of unsupported ICO on %s", (platform) => {
+    const appPath = "/repo"
+    expect(resolveAppIconPath(appPath, () => true, platform))
+      .toBe(path.join(appPath, "public", "Curated-icon.png"))
+    expect(resolveAppIconPath(appPath, (candidate) => candidate.endsWith(".ico"), platform))
+      .toBeUndefined()
   })
 
   it("returns the first selected folder from the native directory dialog", () => {
