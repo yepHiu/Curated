@@ -97,6 +97,7 @@ def build_backend(
     build_stamp: str,
     output_dir: str = "release/backend",
     binary_name: str = "curated.exe",
+    distribution: str = "legacy",
 ) -> Path:
     repo_root = get_repo_root()
     backend_root = repo_root / "backend"
@@ -128,7 +129,8 @@ def build_backend(
     ldflags = (
         "-H=windowsgui "
         f"-X curated-backend/internal/version.BuildStamp={build_stamp} "
-        f"-X curated-backend/internal/version.InstallerVersion={version}"
+        f"-X curated-backend/internal/version.InstallerVersion={version} "
+        f"-X curated-backend/internal/version.Distribution={distribution}"
     )
     _run(
         ["go", "build", "-tags", "release", "-ldflags", ldflags, "-o", str(binary_path), "./cmd/curated"],

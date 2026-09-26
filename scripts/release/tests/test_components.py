@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 
 from scripts.release.release_lib.components import artifact_name, component_plan
@@ -25,6 +26,7 @@ class ComponentTests(unittest.TestCase):
         before = {p: p.read_bytes() for p in sources}
         plan = component_plan(root, "full", "windows", "x64", "exe")
         self.assertEqual(plan["status"], "planned")
-        self.assertEqual(plan["components"]["desktop"], "0.1.0")
-        self.assertEqual(plan["components"]["server"], "1.5.8")
+        for component, source in (("desktop", root / "scripts/release/versions/desktop.json"), ("server", root / "backend/internal/version/server.json")):
+            state = json.loads(before[source])["current"]
+            self.assertEqual(plan["components"][component], ".".join(str(state[key]) for key in ("major", "minor", "patch")))
         self.assertEqual(before, {p: p.read_bytes() for p in sources})

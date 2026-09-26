@@ -44,7 +44,7 @@ class MacDesktopTests(unittest.TestCase):
         payload = app / 'Contents/Resources/app'
         metadata = json.loads((payload / 'electron-dist/desktop-release.json').read_text())
         self.assertEqual(metadata['distribution'], 'desktop')
-        self.assertIsNone(metadata['updateFeed'])
+        self.assertEqual(metadata['updateFeed'], 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json')
         self.assertEqual(metadata['version'], '0.1.0')
         self.assertEqual(json.loads((self.root / 'electron-dist/desktop-release.json').read_text())['distribution'], 'legacy')
         self.assertEqual({p.name for p in payload.iterdir()}, {'package.json', 'electron-dist', 'public'})

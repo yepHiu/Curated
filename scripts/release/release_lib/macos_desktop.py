@@ -43,7 +43,7 @@ def stage_app(root: Path, app: Path, version: str, stamp: str) -> None:
             raise FileNotFoundError(f'Missing Desktop build asset: {required}')
     shutil.copytree(compiled, payload / 'electron-dist', ignore=shutil.ignore_patterns('*.map'))
     metadata = {'schema': 1, 'version': version, 'buildStamp': stamp,
-                'distribution': 'desktop', 'updateFeed': None}
+                'distribution': 'desktop', 'updateFeed': 'https://raw.githubusercontent.com/yepHiu/Curated/release-channels/desktop.json'}
     (payload / 'electron-dist/desktop-release.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (payload / 'package.json').write_text(json.dumps({
         'name': 'curated-desktop', 'productName': 'Curated Desktop', 'version': version,

@@ -1,15 +1,13 @@
-name: CD - Full, Server and Desktop
+name: CD - Legacy all-in-one
 
 on:
   push:
     tags:
-      - 'full-v*'
-      - 'server-v*'
-      - 'desktop-v*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing component tag (full-v, server-v or desktop-vMAJOR.MINOR.PATCH)
+        description: Existing release tag (vMAJOR.MINOR.PATCH)
         required: true
         type: string
       mode:
@@ -36,7 +34,6 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-      component: ${{ steps.release.outputs.component }}
       commit: ${{ steps.release.outputs.commit }}
     steps:
       - uses: actions/checkout@v4
@@ -53,8 +50,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SHA: ${{ github.sha }}
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^(full|server|desktop)-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo '::error::Expected a component tag: full-v, server-v or desktop-vMAJOR.MINOR.PATCH'
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Expected a release tag vMAJOR.MINOR.PATCH'
             exit 1
           fi
           commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
@@ -68,7 +65,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
           GH_TOKEN: ${{ github.token }}
-        run: python scripts/release/component_cd.py check --tag "$RELEASE_TAG"
+        run: python scripts/release/cd_release.py check --tag "$RELEASE_TAG"
 
   quality:
     name: Check the exact release commit
@@ -135,24 +132,14 @@ jobs:
             throw 'Inno Setup compiler not found'
           }
       - name: Build release with the tag version
-        run: |
-          python scripts/release/component_cd.py windows --tag "$env:RELEASE_TAG" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/component-build.log"
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content "$env:RUNNER_TEMP/component-build.log" -Tail 18 | ForEach-Object { Write-Output "::error::$_" }
-            exit 1
-          }
-      - name: Exercise independent installers and Full composition
-        run: |
-          python scripts/release/windows_smoke.py --component "${{ needs.prepare.outputs.component }}" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/component-smoke.log"
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content "$env:RUNNER_TEMP/component-smoke.log" -Tail 18 | ForEach-Object { Write-Output "::error::$_" }
-            exit 1
-          }
+        run: python scripts/release/release_cli.py publish --version "$env:RELEASE_VERSION"
+      - name: Verify complete packages and prepare checksums
+        run: python scripts/release/cd_release.py stage --tag "$env:RELEASE_TAG"
       - name: Preserve verified distribution
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.RELEASE_ARTIFACT }}
-          path: release/windows-components/
+          path: .workspace/cd-release/
           if-no-files-found: error
           include-hidden-files: true
           compression-level: 0
@@ -171,7 +158,6 @@ jobs:
 
   build-macos:
     name: Build Mac Desktop (Apple Silicon)
-    if: needs.prepare.outputs.component != 'server'
     needs: [prepare, quality]
     runs-on: macos-15
     timeout-minutes: 30
@@ -183,7 +169,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.commit }}
-          fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
@@ -201,14 +186,7 @@ jobs:
           pnpm install --frozen-lockfile
           node node_modules/electron/install.js
       - name: Build standalone Desktop DMG and ZIP
-        env:
-          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-        run: python scripts/release/component_cd.py macos --tag "$RELEASE_TAG"
-      - name: Verify packaged Mac Desktop starts without a Server
-        run: |
-          mkdir -p "$RUNNER_TEMP/mac-desktop-smoke"
-          ditto -x -k release/macos-desktop/Curated-Desktop-*-macos-arm64.zip "$RUNNER_TEMP/mac-desktop-smoke"
-          node scripts/release/desktop_smoke.cjs "$RUNNER_TEMP/mac-desktop-smoke/Curated Desktop.app/Contents/MacOS/Curated Desktop"
+        run: python scripts/release/release_cli.py package-macos-desktop
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.RELEASE_ARTIFACT }}
@@ -219,7 +197,6 @@ jobs:
 
   publish:
     name: Upload and verify GitHub Release
-    if: always() && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.build-macos.result == 'success' || needs.build-macos.result == 'skipped')
     needs: [prepare, build, build-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -237,26 +214,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build.outputs.artifact_name }}
-          path: release/windows-components/
+          path: .workspace/cd-release/
       - uses: actions/download-artifact@v4
-        if: needs.prepare.outputs.component != 'server'
         with:
           name: ${{ needs.build-macos.outputs.artifact_name }}
-          path: release/macos-desktop/
+          path: .workspace/cd-macos/
       - name: Publish verified assets (manual runs default to draft)
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_MODE: ${{ github.event_name == 'push' && 'publish' || inputs.mode }}
-        run: |
-          python scripts/release/component_cd.py stage --tag "$RELEASE_TAG"
-          python scripts/release/component_cd.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE"
-      - name: Preserve release manifests for recovery
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: component-release-${{ needs.prepare.outputs.tag }}-${{ github.run_attempt }}
-          path: .workspace/component-cd/
-          include-hidden-files: true
-          if-no-files-found: ignore
-          compression-level: 0
+        run: python scripts/release/cd_release.py publish --tag "$RELEASE_TAG" --mode "$RELEASE_MODE" --macos-dir .workspace/cd-macos
