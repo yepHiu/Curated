@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import sqlite3
+from contextlib import closing
 import os
 from pathlib import Path
 import subprocess
@@ -78,14 +79,15 @@ def main():
                             time.sleep(0.5)
                 finally:
                     prior.terminate(); prior.wait(timeout=20)
-                with sqlite3.connect(data / 'curated.db') as db:
+                with closing(sqlite3.connect(data / 'curated.db')) as db:
                     db.execute('CREATE TABLE upgrade_smoke_marker (value TEXT NOT NULL)')
                     db.execute("INSERT INTO upgrade_smoke_marker VALUES ('original library')")
+                    db.commit()
             run(setup(args.component))
             for c in selected:
                 assert installed(c) == (current[c], old_locations[c]), (c, installed(c))
             if 'server' in selected:
-                with sqlite3.connect(data / 'curated.db') as db:
+                with closing(sqlite3.connect(data / 'curated.db')) as db:
                     assert db.execute('SELECT value FROM upgrade_smoke_marker').fetchone() == ('original library',)
                     assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
             for c in selected:
@@ -136,7 +138,7 @@ def main():
                 if server is not None:
                     assert server.poll() is None, 'Desktop exit stopped independent Server'
                     assert health()['version'] == current['server']
-                    with sqlite3.connect(data / 'curated.db') as db:
+                    with closing(sqlite3.connect(data / 'curated.db')) as db:
                         assert db.execute('SELECT value FROM upgrade_smoke_marker').fetchone() == ('original library',)
                         assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
             finally:
