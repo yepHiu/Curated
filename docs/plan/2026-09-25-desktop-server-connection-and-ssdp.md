@@ -555,3 +555,12 @@ Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed
 验证安排：Python 发布/内容/隔离/不可变性测试、Electron 测试及编译、Server feed/cache 测试、本机 Apple Silicon 真实构建启动；Windows CD 实际编译并安装，覆盖 Full 部分失败/重试、版本复用、防降级、卸载保留数据、独立 Server Web 和 Desktop 连接/退出生命周期。测试结果与首次 CD 结论在本节后续追加。
 
 本机验证：50 项发布 Python 测试、59 项 Electron 测试、23 项相关前端测试、前端类型检查、Electron 编译、相关 Go test/vet 和 release version 测试通过；actionlint 通过。Apple Silicon 新版 DMG/ZIP 构建、codesign/hdiutil 校验及打包应用启动成功，连接页含独立更新入口。Windows 编译、安装及生命周期检查待首次组件 CD 执行，不将本机通过等同于 Windows 验收完成。
+
+远端验收：`full-v1.6.0` 固定 commit `ebca8d16` 的 CD（run 36261150485）已通过完整 CI、Mac arm64 DMG/ZIP 构建与应用启动、Windows 三种 EXE/ZIP 编译和实际安装/重试/复用/防降级/卸载检查。Windows 隔离测试资料库的 Server Web 与 Desktop 连接成功，Desktop 退出后 Server 仍响应。发布上传及组件通道结果另记。
+
+
+发布修复记录：GitHub 对带 `target_commitish` 的草稿创建返回 `403 Resource not accessible by integration`。标签已存在并验证后移除多余参数，原始 8 个已验收产物成功发布到 `full-v1.6.0`，发布前后 `/releases/latest` 均为兼容 `v1.5.8`。通道初始分支不能从含 workflow 的源码提交建树，改为只含三个 manifest 的 orphan commit；后续 fast-forward 更新。新增 `cd-recover.yml`：验证原失败 run 的 CI/Windows/Mac 成功门禁、取回原产物、固定原 tag checkout，只恢复发布/通道，不重打、不移动标签、不覆盖公开资产。新增错误摘要帮助诊断 GitHub 权限拒绝。
+
+最终结果：恢复 run **36262630789** 成功。公开发行 https://github.com/yepHiu/Curated/releases/tag/full-v1.6.0 含 **8 个包 + 3 个组件 manifest + release.json + SHA256SUMS.txt**；Server 1.6.0（2 个资产）、Desktop 0.1.0（4 个资产）、Full 1.6.0（2 个资产）的在线通道逐项与已发布 manifest 一致。最终发布脚本测试 **52 项**通过；旧 latest 仍为 v1.5.8。
+
+补充实测：已打包的 macOS Desktop 0.1.0 在无 Server 连接的本地连接页点击“检查 Desktop 更新”，通过真实线上组件 feed 返回“Desktop 已是最新版本。”
