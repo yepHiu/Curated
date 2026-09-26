@@ -141,7 +141,7 @@ function createMainWindow(
     title: "Curated",
     ...(process.platform === "darwin" ? {
       titleBarStyle: "hiddenInset" as const,
-      trafficLightPosition: { x: 16, y: 26 },
+      trafficLightPosition: { x: 16, y: 14 },
     } : {}),
     ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {

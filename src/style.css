@@ -377,16 +377,33 @@
   }
 }
 
-/* Native macOS controls occupy the first 96 CSS px of the integrated header.
-   The preload capability keeps ordinary browsers and other desktop platforms unchanged. */
-.desktop-fallback-titlebar,
-.desktop-reader-titlebar {
+/* Native macOS controls sit above the brand and workspace toolbar.
+   The strip inherits each column's surface rather than drawing a separate titlebar. */
+.desktop-fallback-titlebar {
   display: none;
 }
 
 html[data-window-chrome="macos"] {
-  --app-header-min-height: 64px;
-  --app-sidebar-collapsed-width: 96px;
+  --app-window-controls-height: 40px;
+}
+
+html[data-window-chrome="macos"] [data-shell-sidebar] {
+  position: relative;
+  padding-top: var(--app-window-controls-height);
+}
+
+html[data-window-chrome="macos"] [data-shell-sidebar]::before,
+html[data-window-chrome="macos"] [data-shell-workspace]::before {
+  content: "";
+  display: block;
+  height: var(--app-window-controls-height);
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+html[data-window-chrome="macos"] [data-shell-sidebar]::before {
+  position: absolute;
+  inset: 0 0 auto;
 }
 
 html[data-window-chrome="macos"] :is([data-shell-header], [data-shell-sidebar] [data-sidebar-header]) {
@@ -399,44 +416,17 @@ html[data-window-chrome="macos"] [data-sidebar-brand-link] {
   -webkit-app-region: no-drag;
 }
 
-html[data-window-chrome="macos"] [data-shell-sidebar] [data-sidebar-header] {
-  height: var(--app-header-min-height);
-  padding-block: 0;
-  padding-left: 82px;
-}
-
-html[data-window-chrome="macos"] [data-shell-sidebar] [data-sidebar-compact="true"] [data-sidebar-header] {
-  padding-inline: 0;
-}
-
-html[data-window-chrome="macos"] [data-shell-sidebar] [data-sidebar-compact="true"] [data-sidebar-brand-link] {
-  display: none;
-}
-
-html[data-window-chrome="macos"] .desktop-reader-titlebar {
-  display: block;
-  height: var(--app-header-min-height);
-  flex-shrink: 0;
-  -webkit-app-region: drag;
-}
-
 html[data-window-chrome="macos"] body:not(:has([data-shell-layout])) .desktop-fallback-titlebar {
   display: block;
   position: fixed;
   inset: 0 0 auto;
-  height: var(--app-header-min-height);
+  height: var(--app-window-controls-height);
   z-index: 10;
   -webkit-app-region: drag;
 }
 
-@media (width < 1024px) {
-  html[data-window-chrome="macos"] [data-shell-mobile-drawer] {
-    padding-top: var(--app-header-min-height);
-  }
-
-  html[data-window-chrome="macos"] [data-shell-header] {
-    padding-left: 96px;
-  }
+html[data-window-chrome="macos"] [data-shell-mobile-drawer] {
+  padding-top: var(--app-window-controls-height);
 }
 
 @layer components {

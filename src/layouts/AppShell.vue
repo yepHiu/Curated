@@ -788,9 +788,9 @@ function clearActorsSearch() {
         </div>
 
         <section
+          data-shell-workspace
           class="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background/95"
         >
-          <div v-if="isBookReaderRoute" class="desktop-reader-titlebar" aria-hidden="true" />
           <!-- 桌面由共享顶栏高度控制并垂直居中，避免控件高度加 padding 和边框撑低分隔线。 -->
           <div
             v-if="!isBookReaderRoute"
