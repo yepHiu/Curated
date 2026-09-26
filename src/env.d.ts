@@ -3,7 +3,8 @@
 /** Electron / 桌面壳注入：返回本机绝对路径 */
 interface Window {
   javLibrary?: {
-    openServerConnections?: () => Promise<void>
+    openServerConnections?: (serverId?: string) => Promise<void>
+    getServerConnections?: () => Promise<import("../electron/desktop-contract").DesktopServerConnections>
     readonly windowChrome?: "macos" | "native"
     getDesktopInfo?: () => Promise<import("../electron/desktop-contract").DesktopInfo>
     checkDesktopUpdate?: () => Promise<import("../electron/desktop-contract").DesktopUpdateResult>

@@ -1026,6 +1026,24 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
+    "serverConnections": {
+      "title": "服务器连接 · 此桌面端",
+      "current": "当前服务器",
+      "disconnected": "未连接",
+      "unnamed": "Curated Server",
+      "loading": "正在读取连接列表…",
+      "loadError": "无法刷新服务器列表，请重试。",
+      "saved": "已保存的服务器",
+      "empty": "尚未保存服务器。",
+      "selected": "当前连接",
+      "connectTo": "连接到 {name}",
+      "connect": "连接",
+      "switching": "正在切换服务器…",
+      "actionError": "无法完成操作，请在本地连接窗口查看原因并重试。",
+      "refresh": "刷新状态",
+      "manage": "管理服务器",
+      "add": "添加服务器"
+    },
     "buildStampLabel": "构建时间戳（UTC）",
     "desktopDevelopment": "开发版",
     "desktopInfoLoading": "正在读取版本…",

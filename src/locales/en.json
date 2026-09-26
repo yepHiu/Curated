@@ -1026,6 +1026,24 @@
     "imageOf": "Image {i}"
   },
   "settings": {
+    "serverConnections": {
+      "title": "Server connections · This Desktop",
+      "current": "Current server",
+      "disconnected": "Disconnected",
+      "unnamed": "Curated Server",
+      "loading": "Loading connections…",
+      "loadError": "Could not refresh servers. Please retry.",
+      "saved": "Saved servers",
+      "empty": "No saved servers.",
+      "selected": "Current",
+      "connectTo": "Connect to {name}",
+      "connect": "Connect",
+      "switching": "Switching servers…",
+      "actionError": "Could not complete the action. Check the local connection window and retry.",
+      "refresh": "Refresh status",
+      "manage": "Manage servers",
+      "add": "Add server"
+    },
     "buildStampLabel": "Build timestamp (UTC)",
     "desktopDevelopment": "Development",
     "desktopInfoLoading": "Reading version…",

@@ -69,6 +69,7 @@ import SettingsHomepageDevTools from "@/components/jav-library/settings/Settings
 import SettingsAutoUpdateSection from "@/components/jav-library/settings/SettingsAutoUpdateSection.vue"
 /** 浏览器插件联动设置按需加载。 */
 const SettingsWishlistSection = defineAsyncComponent(() => import("@/components/jav-library/settings/SettingsWishlistSection.vue"))
+import SettingsServerConnectionsSection from "@/components/jav-library/settings/SettingsServerConnectionsSection.vue"
 import SettingsNetworkSection from "@/components/jav-library/settings/SettingsNetworkSection.vue"
 const SettingsComicLibrarySection = defineAsyncComponent(
   () => import("@/components/jav-library/settings/SettingsComicLibrarySection.vue"),
@@ -2257,6 +2258,7 @@ async function runMetadataRefreshForSelected() {
       :aria-label="t('settings.navNetwork')"
     >
     <h2 class="sr-only">{{ t("settings.navNetwork") }}</h2>
+      <SettingsServerConnectionsSection v-if="activeSlug === 'network'" />
       <SettingsWishlistSection />
       <SettingsNetworkSection
         v-model:proxy-enabled="proxyEnabledDraft"

@@ -1026,6 +1026,24 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
+    "serverConnections": {
+      "title": "サーバー接続 · この Desktop",
+      "current": "現在のサーバー",
+      "disconnected": "未接続",
+      "unnamed": "Curated Server",
+      "loading": "接続一覧を読み込み中…",
+      "loadError": "一覧を更新できません。再試行してください。",
+      "saved": "保存済みサーバー",
+      "empty": "保存済みサーバーはありません。",
+      "selected": "現在の接続",
+      "connectTo": "{name} に接続",
+      "connect": "接続",
+      "switching": "サーバーを切り替え中…",
+      "actionError": "操作できませんでした。ローカル接続ウィンドウで確認して再試行してください。",
+      "refresh": "状態を更新",
+      "manage": "サーバー管理",
+      "add": "サーバーを追加"
+    },
     "buildStampLabel": "ビルドタイムスタンプ（UTC）",
     "desktopDevelopment": "開発版",
     "desktopInfoLoading": "バージョンを読み込み中…",

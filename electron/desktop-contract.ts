@@ -16,3 +16,10 @@ export interface DesktopUpdateResult {
   latestVersion?: string
   downloadUrl?: string
 }
+
+/** Read-only connection summary exposed to the selected Server UI. */
+export interface DesktopServerConnections {
+  servers: { id: string; name: string; url: string }[]
+  currentServerUrl?: string
+  connecting: boolean
+}

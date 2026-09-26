@@ -357,9 +357,24 @@ function registerDesktopIpc(): void {
     })
     return pendingDesktopCheck
   })
-  ipcMain.handle("curated:open-servers", (event) => {
+  ipcMain.handle("curated:server-connections", (event) => {
     assertSender(event)
+    if (!serverStore) throw new Error("无法读取服务器列表。")
+    return { servers: serverStore.snapshot().servers, currentServerUrl: loadingConnection?.window.webContents.id === event.sender.id ? loadingConnection.server : currentServerUrl, connecting }
+  })
+  ipcMain.handle("curated:open-servers", async (event, serverId: unknown) => {
+    assertSender(event)
+    if (serverId === undefined) { showConnections(); return }
+    if (event.sender.id !== mainWindow?.webContents.id || typeof serverId !== "string") throw new Error("无效的连接请求。")
+    const target = serverStore?.snapshot().servers.find(server => server.id === serverId)
+    if (!target) throw new Error("服务器记录不存在，请刷新列表。")
+    if (connecting) throw new Error("正在连接，请稍候。")
     showConnections()
+    try { await connectServer(target, true) }
+    catch (error) {
+      connectionError = error instanceof Error ? error.message : "连接失败，请重试。"
+      throw error
+    }
   })
   ipcMain.handle("curated:connections", async (event, action: unknown, value: unknown) => {
     if (event.sender.id !== connectionWindow?.webContents.id || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== connectionPageUrl) throw new Error("Untrusted connection manager")

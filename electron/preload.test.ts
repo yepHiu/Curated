@@ -14,6 +14,7 @@ describe("Electron preload bridge", () => {
   it.each(["darwin", "win32", "linux"])("exposes the directory picker and a read-only chrome capability on %s", async (platform) => {
     const exposed: Record<string, unknown> = {}
     const invokedChannels: string[] = []
+    const invokedArgs: unknown[][] = []
     const code = readFileSync(path.join(__dirname, "preload.cjs"), "utf8")
 
     vm.runInNewContext(code, {
@@ -29,7 +30,8 @@ describe("Electron preload bridge", () => {
             },
           },
           ipcRenderer: {
-            invoke: async (channel: string) => {
+            invoke: async (channel: string, ...args: unknown[]) => {
+              invokedArgs.push(args)
               invokedChannels.push(channel)
               return { path: "D:/Media" }
             },
@@ -40,13 +42,15 @@ describe("Electron preload bridge", () => {
 
     expect(Object.keys(exposed)).toEqual(["javLibrary"])
 
-    const api = exposed.javLibrary as { windowChrome: string; openServerConnections: () => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
-    expect(Object.keys(api).sort()).toEqual(["checkDesktopUpdate", "getDesktopInfo", "openServerConnections", "pickDirectory", "windowChrome"])
+    const api = exposed.javLibrary as { windowChrome: string; getServerConnections: () => Promise<unknown>; openServerConnections: (serverId?: string) => Promise<unknown>; pickDirectory: () => Promise<unknown>; getDesktopInfo: () => Promise<unknown>; checkDesktopUpdate: () => Promise<unknown> }
+    expect(Object.keys(api).sort()).toEqual(["checkDesktopUpdate", "getDesktopInfo", "getServerConnections", "openServerConnections", "pickDirectory", "windowChrome"])
     expect(api.windowChrome).toBe(platform === "darwin" ? "macos" : "native")
     await expect(api.pickDirectory()).resolves.toEqual({ path: "D:/Media" })
     await api.getDesktopInfo()
     await api.checkDesktopUpdate()
-    await api.openServerConnections()
-    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:open-servers"])
+    await api.getServerConnections()
+    await api.openServerConnections("saved-server-id")
+    expect(invokedArgs.at(-1)).toEqual(["saved-server-id"])
+    expect(invokedChannels).toEqual([pickDirectoryChannel, "curated:desktop-info", "curated:desktop-check-update", "curated:server-connections", "curated:open-servers"])
   })
 })
