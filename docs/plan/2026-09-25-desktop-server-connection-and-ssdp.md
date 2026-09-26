@@ -391,3 +391,5 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 当前 `electron/release-config.json` 仍为 `distribution: legacy, updateFeed: null`。旧 `pnpm release:publish` 的包名、版本来源和更新源保持兼容；旧 assembler 拒绝混入独立 Desktop 身份。独立三包生成、安装身份迁移、Server 独立更新、macOS DMG/签名和正式 feed 发布仍待阶段 5，不应通过单独把配置改为 desktop 来宣布拆分完成。
 
 验证：发行 Python 测试 19 项、Electron 测试 43 项、关于页组件测试 7 项通过；Electron 编译、前端 Web API 生产构建和相关 ESLint 通过，构建体积无提醒。已重启 macOS Electron 开发桌面，在关于页实际确认 0.1.0、开发版标识和检查按钮返回的开发态说明；当前深色窗口无文字/按钮重叠。未生成或发布正式安装包；跨平台、DPR、90%–150% 缩放与浅色完整矩阵未执行。
+
+2026-09-26 交互调整：关于页仅保留一个「检查更新」按钮，并行检查安装包和 Desktop，等待两项结束后恢复可用；Desktop 区块保留版本及检查结果，移除独立检查按钮。安装包不支持检查时仍可检查 Desktop；Web 只检查安装包。组件测试 8 项、类型检查和相关 ESLint 通过，macOS 开发桌面实测统一按钮及结果布局正常；未扩展显示缩放矩阵。

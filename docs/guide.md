@@ -450,7 +450,7 @@ Load `dist` in Chrome and reload the extension and source website after code cha
 
 ### Desktop version and component release planning
 
-About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge, via the trusted main-process bridge. Browsers omit this section. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
+About & Updates shows the local Desktop component version (currently `0.1.0`) with a separate development badge, via the trusted main-process bridge. Browsers omit this section. One shared Check updates button checks both the installation package and Desktop in parallel, stays busy until both settle, and preserves each result separately. `pnpm build:electron:main` generates `electron-dist/desktop-release.json` from the component source and `electron/release-config.json`; restart Electron after changing it. The old npm/app package version remains the legacy installation identity, not the displayed Desktop component version.
 
 Preview a future package name without building, publishing or incrementing versions:
 
