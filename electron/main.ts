@@ -139,6 +139,10 @@ function createMainWindow(
     autoHideMenuBar: true,
     show: false,
     title: "Curated",
+    ...(process.platform === "darwin" ? {
+      titleBarStyle: "hiddenInset" as const,
+      trafficLightPosition: { x: 16, y: 26 },
+    } : {}),
     ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       contextIsolation: true,

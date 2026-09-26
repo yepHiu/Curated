@@ -3,6 +3,7 @@
 /** Electron / 桌面壳注入：返回本机绝对路径 */
 interface Window {
   javLibrary?: {
+    readonly windowChrome?: "macos" | "native"
     pickDirectory?: () => Promise<{ path: string } | null | undefined>
   }
   /** File System Access API（Chromium）；类型定义可能未随 lib 一并更新 */

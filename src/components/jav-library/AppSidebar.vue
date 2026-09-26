@@ -278,10 +278,12 @@ const getNavigationTarget = (page: AppPage) => {
 
 <template>
   <aside
+    :data-sidebar-compact="props.compact"
     class="flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden bg-sidebar text-sidebar-foreground motion-reduce:transition-none"
     :class="props.compact ? 'px-2 pb-3 pt-0' : 'px-3.5 pb-3.5 pt-0'"
   >
     <div
+      data-sidebar-header
       class="flex min-h-[var(--app-header-min-height)] shrink-0 items-center border-b border-sidebar-border/80"
       :class="props.compact ? 'justify-center py-[var(--app-header-py)] lg:py-[var(--app-header-py-lg)]' : 'justify-between gap-2 px-2 py-[var(--app-header-py)] sm:px-2 lg:px-2 lg:py-[var(--app-header-py-lg)]'"
     >

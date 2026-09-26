@@ -32,6 +32,7 @@ function reloadApp() {
 </script>
 
 <template>
+  <div class="desktop-fallback-titlebar" aria-hidden="true" />
   <main
     v-if="appFault"
     data-app-fault

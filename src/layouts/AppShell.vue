@@ -778,6 +778,7 @@ function clearActorsSearch() {
       >
         <div
           v-if="isLgUp"
+          data-shell-sidebar
           class="min-h-0 min-w-0 overflow-hidden border-r border-sidebar-border/80 bg-sidebar/95"
         >
           <AppSidebar
@@ -789,6 +790,7 @@ function clearActorsSearch() {
         <section
           class="flex min-h-0 min-w-0 flex-col overflow-hidden bg-background/95"
         >
+          <div v-if="isBookReaderRoute" class="desktop-reader-titlebar" aria-hidden="true" />
           <!-- 桌面由共享顶栏高度控制并垂直居中，避免控件高度加 padding 和边框撑低分隔线。 -->
           <div
             v-if="!isBookReaderRoute"
@@ -1056,6 +1058,7 @@ function clearActorsSearch() {
           @click="mobileSidebarOpen = false"
         />
         <aside
+          data-shell-mobile-drawer
           class="absolute top-0 bottom-0 left-0 flex w-[var(--app-sidebar-mobile-width)] max-w-full flex-col border-r border-border/60 bg-sidebar/98 shadow-2xl shadow-black/30 backdrop-blur-md transition-transform duration-200 ease-out"
           :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
           role="dialog"

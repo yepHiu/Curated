@@ -13,6 +13,10 @@ import "./style.css"
 
 initClientLogger()
 
+if (window.javLibrary?.windowChrome === "macos") {
+  document.documentElement.dataset.windowChrome = "macos"
+}
+
 async function boot() {
   await ensureLocaleMessages(initialLocale)
   const app = createApp(App)
