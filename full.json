@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "component": "full",
+  "version": "1.6.0",
+  "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+  "artifacts": [
+    {
+      "component": "full",
+      "variant": "bundle",
+      "version": "1.6.0",
+      "channel": "stable",
+      "platform": "windows",
+      "arch": "x64",
+      "format": "exe",
+      "fileName": "Curated-Full-Setup-1.6.0-windows-x64.exe",
+      "sha256": "50ab037171c0b5dc16f511f119fcb5845a3d21f0de23c2cfb740a9ecd9bbf707",
+      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+      "components": {
+        "server": "1.6.0",
+        "desktop": "0.1.0"
+      },
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Full-Setup-1.6.0-windows-x64.exe"
+    },
+    {
+      "component": "full",
+      "variant": "bundle",
+      "version": "1.6.0",
+      "channel": "stable",
+      "platform": "windows",
+      "arch": "x64",
+      "format": "zip",
+      "fileName": "Curated-Full-1.6.0-windows-x64.zip",
+      "sha256": "462bd93e00d0722bcbdabb6667283c1e0637737814c9d2f544fee5f7af1bc487",
+      "sourceCommit": "ebca8d16559913f180202473531acdd86519602d",
+      "components": {
+        "server": "1.6.0",
+        "desktop": "0.1.0"
+      },
+      "url": "https://github.com/yepHiu/Curated/releases/download/full-v1.6.0/Curated-Full-1.6.0-windows-x64.zip"
+    }
+  ]
+}
