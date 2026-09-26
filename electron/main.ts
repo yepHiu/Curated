@@ -11,7 +11,7 @@ import {
   type OpenDialogOptions,
 } from "electron"
 import path from "node:path"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import type { DesktopInfo, DesktopUpdateResult } from "./desktop-contract.js"
 import { checkDesktopUpdate, desktopInfoChannel, desktopUpdateChannel, isTrustedDesktopSender, isVersion } from "./desktop-updates.js"
@@ -82,7 +82,9 @@ if (!singleInstanceLock) {
       }
       appIconPath = resolveAppIconPath(app.getAppPath())
       if (process.platform === "darwin" && appIconPath) {
-        app.dock?.setIcon(appIconPath)
+        // Dock artwork needs transparent margins to match other macOS app icons.
+        const dockIconPath = path.join(app.getAppPath(), "public", "Curated-icon-macos.png")
+        app.dock?.setIcon(existsSync(dockIconPath) ? dockIconPath : appIconPath)
       }
       registerDesktopIpc()
       managedBackend = await startBackend({
