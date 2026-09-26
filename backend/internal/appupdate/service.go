@@ -291,7 +291,7 @@ func (s *Service) Install(ctx context.Context, req contracts.AppUpdateInstallReq
 	if err != nil {
 		return contracts.AppUpdateStatusDTO{}, err
 	}
-	if !ok || !snapshot.InstallReady || snapshot.ArtifactStatus != "verified" {
+	if !ok || !s.acceptsSnapshot(snapshot) || !snapshot.InstallReady || snapshot.ArtifactStatus != "verified" {
 		return contracts.AppUpdateStatusDTO{}, errors.New("verified installer is not ready")
 	}
 	if strings.TrimSpace(snapshot.DownloadedFilePath) == "" {
@@ -355,7 +355,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 		if err != nil {
 			return contracts.AppUpdateStatusDTO{}, err
 		}
-		if ok && snapshot.InstalledVersion == installedVersion && s.isSnapshotFresh(snapshot.CheckedAt) && !hasLegacyReleaseNotesSnippet(snapshot) {
+		if ok && s.acceptsSnapshot(snapshot) && snapshot.InstalledVersion == installedVersion && s.isSnapshotFresh(snapshot.CheckedAt) && !hasLegacyReleaseNotesSnippet(snapshot) {
 			return snapshotToDTO(snapshot), nil
 		}
 	}
@@ -365,6 +365,9 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 		return contracts.AppUpdateStatusDTO{}, err
 	}
 
+	if !s.acceptsSnapshot(existing) {
+		existing = storage.AppUpdateStatusSnapshot{}
+	}
 	release, err := s.fetchLatestRelease(ctx)
 	if err != nil {
 		snapshot := storage.AppUpdateStatusSnapshot{
@@ -377,7 +380,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 			ReleaseURL:           firstNonEmpty(existing.ReleaseURL, s.releasePageURL),
 			InstallerDownloadURL: existing.InstallerDownloadURL,
 			ReleaseNotesSnippet:  existing.ReleaseNotesSnippet,
-			Source:               updateSourceGitHubReleases,
+			Source:               s.updateSource(),
 			ErrorMessage:         err.Error(),
 		}
 		if saveErr := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); saveErr != nil {
@@ -398,7 +401,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 			ReleaseURL:           firstNonEmpty(strings.TrimSpace(release.HTMLURL), s.releasePageURL),
 			InstallerDownloadURL: installer.DownloadURL,
 			InstallerSHA256:      installer.SHA256,
-			Source:               updateSourceGitHubReleases,
+			Source:               s.updateSource(),
 			ErrorMessage:         err.Error(),
 		}
 		if saveErr := s.store.UpsertAppUpdateStatusSnapshot(ctx, snapshot); saveErr != nil {
@@ -424,7 +427,7 @@ func (s *Service) getStatus(ctx context.Context, force bool) (contracts.AppUpdat
 		InstallerDownloadURL: installer.DownloadURL,
 		InstallerSHA256:      installer.SHA256,
 		ReleaseNotesSnippet:  normalizeReleaseNotesForCache(release.Body),
-		Source:               updateSourceGitHubReleases,
+		Source:               s.updateSource(),
 	}
 	if existing.DownloadedVersion == latestVersion && existing.ArtifactStatus != "" {
 		copyArtifactState(&snapshot, existing)
@@ -490,6 +493,9 @@ func normalizeReleaseNotesTitle(value string) string {
 }
 
 func (s *Service) fetchLatestRelease(ctx context.Context) (latestReleaseResponse, error) {
+	if version.Distribution == "server" {
+		return s.fetchServerRelease(ctx)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.latestReleaseAPIURL, nil)
 	if err != nil {
 		return latestReleaseResponse{}, err

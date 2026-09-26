@@ -18,7 +18,7 @@ export function isLocalServerTarget(apiUrl: string, pageOrigin: string, desktop:
   }
 }
 
-/** Standalone Desktop always uses its own update channel, even on the same host. */
-export function isLocalUpdateTarget(apiUrl: string, pageOrigin: string, desktop: boolean, info: DesktopInfo | null): boolean {
-  return (!desktop || info?.distribution === "legacy") && isLocalServerTarget(apiUrl, pageOrigin, desktop, info)
+/** Standalone Desktop may update a local standalone Server, never its legacy installer. */
+export function isLocalUpdateTarget(apiUrl: string, pageOrigin: string, desktop: boolean, info: DesktopInfo | null, source?: string): boolean {
+  return (!desktop || info?.distribution === "legacy" || source === "curated-server-stable") && isLocalServerTarget(apiUrl, pageOrigin, desktop, info)
 }

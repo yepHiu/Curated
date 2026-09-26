@@ -12,6 +12,13 @@ describe("update target", () => {
     }
   })
 
+  it("allows standalone Desktop to update only a matching local standalone Server", () => {
+    const desktop = { ...info, distribution: "desktop" as const }
+    expect(isLocalUpdateTarget("http://127.0.0.1:8080/api", "http://127.0.0.1:5173", true, desktop, "curated-server-stable")).toBe(true)
+    expect(isLocalUpdateTarget("http://127.0.0.1:8080/api", "http://127.0.0.1:5173", true, desktop, "github-releases")).toBe(false)
+    expect(isLocalUpdateTarget("https://nas.example/api", "https://nas.example", true, desktop, "curated-server-stable")).toBe(false)
+  })
+
   it("rejects remote, ambiguous, old-bridge and standalone update targets", () => {
     for (const target of ["https://nas.example/api", "http://192.168.1.20:8081/api", "http://localhost.evil/api", "file:///api"]) {
       expect(isLocalUpdateTarget(target, "http://localhost:5173", false, null)).toBe(false)

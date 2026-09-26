@@ -62,6 +62,9 @@ var BuildStamp = ""
 // (for example, the version allocated from scripts/release/version.json during publish).
 var InstallerVersion = ""
 
+// Distribution isolates standalone Server updates from the legacy all-in-one feed.
+var Distribution = "legacy"
+
 const devFallbackPackageVersion = "0.0.0"
 
 var (

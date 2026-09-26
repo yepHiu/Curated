@@ -11,7 +11,7 @@ import { isLocalUpdateTarget } from "@/lib/app-update-target"
 
 const desktopInfo = ref<DesktopInfo | null>(null)
 const localTarget = computed(() => !devRemoteSimulation.value && isLocalUpdateTarget(
-  resolveApiBaseUrl(import.meta.env), window.location.origin, !!window.javLibrary, desktopInfo.value,
+  resolveApiBaseUrl(import.meta.env), window.location.origin, !!window.javLibrary, desktopInfo.value, summary.value?.source,
 ))
 const localUpdateAllowed = computed(() => localTarget.value && summary.value?.localUpdateAllowed === true)
 
