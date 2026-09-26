@@ -251,4 +251,10 @@ def main() -> None:
         publish(root, meta, args.output, args.mode)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        import traceback
+        detail = traceback.format_exc()[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        print('::error title=Release diagnostics::' + detail, flush=True)
+        raise

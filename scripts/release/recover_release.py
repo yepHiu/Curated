@@ -35,7 +35,11 @@ def main():
             raise ValueError(f'Required gate did not pass: {name}')
     for job in jobs:
         if job['conclusion'] == 'failure':
-            logs = gh(f"repos/{repo}/actions/jobs/{job['id']}/logs", raw=True)
+            try:
+                logs = gh(f"repos/{repo}/actions/jobs/{job['id']}/logs", raw=True)
+            except subprocess.CalledProcessError:
+                print('::warning::Previous log download unavailable; continuing artifact verification')
+                continue
             # Only error/traceback vicinity, capped to avoid exposing verbose job logs.
             lines = logs.splitlines()
             indexes = [i for i, line in enumerate(lines) if any(word in line for word in ('Traceback', 'Error:', 'ValueError', 'HTTPError', 'Exception'))]
@@ -52,4 +56,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        import traceback
+        detail = traceback.format_exc()[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        print('::error title=Release diagnostics::' + detail, flush=True)
+        raise
