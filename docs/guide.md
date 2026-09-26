@@ -26,7 +26,7 @@ This policy changes future commits, not Git history or existing GitHub uploads. 
 
 Curated is a local-first media library: a Vue 3 SPA, a Go + SQLite HTTP backend, and an Electron desktop shell. The product name is **Curated**. The repository folder and npm package may still use `jav-shadcn`. The Go module is `curated-backend`; the server entrypoint is `backend/cmd/curated`.
 
-Current architecture is **web-first plus a minimal desktop shell**. Business APIs stay on HTTP. Electron starts or reuses the Go backend, loads the existing Web UI, hides to tray on window close, and exposes only `window.javLibrary.pickDirectory()`. Deeper IPC, mpv, and broad native bridges remain target-direction work.
+Current architecture is **web-first plus a minimal desktop shell**. Business APIs stay on HTTP. Electron starts or reuses the Go backend, loads the existing Web UI, hides to tray on window close, and exposes `window.javLibrary.pickDirectory()` plus a read-only `windowChrome` styling capability. Deeper IPC, mpv, and broad native bridges remain target-direction work.
 
 Longer product and architecture writing:
 
@@ -120,6 +120,8 @@ Vite usually serves `http://localhost:5173`.
 - Optional `VITE_API_BASE_URL` overrides the API base. Optional `VITE_LOG_LEVEL` sets the default browser log level.
 
 ### Electron
+
+On macOS, native window buttons share the application header and follow its background. Drag the empty header area to move the window; search and toolbar controls remain interactive. Collapsed navigation reserves space for the system buttons. See [window chrome notes](plan/2026-09-26-macos-integrated-titlebar.md).
 
 ```powershell
 pnpm dev:electron

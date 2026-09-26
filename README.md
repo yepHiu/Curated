@@ -36,6 +36,7 @@ Installed apps can also check and download a newer installer from Settings → A
 
 - Optional comic and photo library **Beta**, disabled by default under Settings → Libraries → Comic library / Photo library. Enable each library to reveal its configuration; see [Beta guidance](docs/guide.md#comic-and-photo-library-beta).
 - Local-first Vue 3 SPA, Go HTTP API, SQLite, and a Windows-oriented Electron tray shell.
+- macOS desktop uses an integrated titlebar with native window controls.
 - Dual-mode development: real Web API or Mock UI behind the same service layer.
 - Library browsing, scraping, import, playback, curated frames, actor identities, recommendations, and personal insights.
 - A wishlist with named source-page links, on-demand watch-site availability checks, background metadata enrichment, persistent posters, library matching and browser-plugin intake controlled by a switch in Settings → Network & devices, with no token required; see [wishlist setup](docs/guide.md#wishlist).
