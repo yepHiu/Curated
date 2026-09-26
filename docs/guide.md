@@ -172,6 +172,8 @@ Matching is path-segment aware. The whitelist is `library_paths.path`, `movies.l
 
 Runtime config is split between frontend environment variables and backend JSON.
 
+Movie library paths are stored in SQLite and managed in Settings → Library. The main runtime config's `libraryPaths` only seeds a fresh database once; it does not refill a list emptied by the user. Migration `0056` preserves existing installations' path lists, including empty lists. Scans without explicit paths use only the stored list. If an older version already restored deleted paths, remove those paths again after starting the updated backend; subsequent restarts keep them removed.
+
 Library-level settings live in `config/library-config.cfg` and are merged on startup. `PATCH /api/settings` writes them atomically. Release packaging copies only the tracked `config/library-config.example.cfg`; the machine-specific file is never shipped.
 
 Common keys:

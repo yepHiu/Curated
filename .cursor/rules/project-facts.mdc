@@ -3,6 +3,10 @@ description: 仓库当前实现事实（前后端、目录、契约）
 alwaysApply: true
 ---
 
+## 2026-09-26 资料库路径删除持久化
+
+影片库路径以 SQLite `library_paths` 为准，包括主动删除后的空列表。迁移 `0056_library_paths_initialization.sql` 持久化初始化状态：仅全新数据库首次启动从主运行时配置 `libraryPaths` 导入，导入与标记同事务；已有数据库升级保留原列表（含空列表）。启动不再因列表为空重新填入默认路径，未指定路径的扫描也不再回退到主配置。此前已被旧版重新填回的路径，需要在新版中再次删除；不自动判断哪些现有路径应被移除。
+
 ## 2026-09-26 更新目标隔离
 
 关于页远程／未确认同机时仅显示 Desktop 更新操作，不展示 Server 安装动作、一体包链接／说明和更新徽标；后台自动下载与手动下载／安装／清理共用限制，每次写操作前重新核对权限。`getDesktopInfo()` 新增主进程实际 `serverOrigin`；前端要求页面与 API 均为 loopback、Desktop 为 legacy 且 Server origin 与 API 匹配，再结合 HTTP `localUpdateAllowed === true` 放行旧本机安装器。standalone Desktop 始终走自身通道。旧桥接／旧 Server 缺字段均不放行。
