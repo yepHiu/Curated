@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -220,11 +219,6 @@ function updateProxyPassword(value: unknown) {
           <CardTitle class="min-w-0 text-lg tracking-tight">
             {{ t("settings.proxyTitle") }}
           </CardTitle>
-          <CardDescription
-            class="col-start-2 text-xs leading-relaxed text-pretty text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.proxyDesc") }}
-          </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3 pt-0">
           <p
@@ -348,12 +342,6 @@ function updateProxyPassword(value: unknown) {
               </div>
             </div>
           </div>
-          <p
-            v-if="useWebApi"
-            class="text-xs leading-relaxed text-muted-foreground sm:text-sm"
-          >
-            {{ t("settings.proxyConnectivityTestHint") }}
-          </p>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <Button
               v-if="useWebApi"
