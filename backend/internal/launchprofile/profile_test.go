@@ -46,3 +46,20 @@ func TestResolveMissingAndCorruptProfile(t *testing.T) {
 		t.Fatal("corruption ignored")
 	}
 }
+
+func TestMissingProfileWithMigrationJournalCannotOpenDefaultEmptyLibrary(t *testing.T) {
+	root := t.TempDir()
+	journal := filepath.Join(root, "installer-migrations", "legacy.json")
+	if err := os.MkdirAll(filepath.Dir(journal), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(journal, []byte(`{"schema":1,"stage":"complete"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve(filepath.Join(root, "server-startup.json"), "", ""); err == nil {
+		t.Fatal("lost migrated startup profile silently fell back to defaults")
+	}
+	if actual, err := Resolve(filepath.Join(root, "server-startup.json"), "explicit.json", ""); err != nil || actual != nil {
+		t.Fatal("explicit recovery config was blocked", err)
+	}
+}

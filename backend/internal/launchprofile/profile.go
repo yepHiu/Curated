@@ -35,6 +35,12 @@ func Resolve(path, explicitConfig, dataRoot string) (*Profile, error) {
 	}
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
+		journal := filepath.Join(filepath.Dir(path), "installer-migrations", "legacy.json")
+		if _, journalErr := os.Stat(journal); journalErr == nil {
+			return nil, fmt.Errorf("migrated Server startup profile is missing; restore %s before starting Server", path)
+		} else if !os.IsNotExist(journalErr) {
+			return nil, journalErr
+		}
 		return nil, nil
 	}
 	if err != nil {
