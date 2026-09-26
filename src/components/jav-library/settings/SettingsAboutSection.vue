@@ -140,7 +140,7 @@ const thirdPartyCount = computed(() => thirdPartyGroups.value.reduce((count, gro
                   <span v-else>-</span>
                 </dd>
               </div>
-              <div class="rounded-lg bg-muted/5 p-4">
+              <div class="rounded-lg bg-muted/5 px-4 pt-4 pb-2">
                 <dl class="space-y-4">
                   <div
                     class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
@@ -224,7 +224,7 @@ const thirdPartyCount = computed(() => thirdPartyGroups.value.reduce((count, gro
                 <span v-else>-</span>
               </p>
             </div>
-            <div class="rounded-lg bg-muted/5 p-4">
+            <div class="rounded-lg bg-muted/5 px-4 pt-4 pb-2">
               <dl class="space-y-4">
                 <div
                   class="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
