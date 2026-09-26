@@ -386,12 +386,13 @@ macOS 窗口集成：按用户要求，连接窗口采用原生 `titleBarStyle: 
 - 验证：Electron 8 文件 42 项、连接页/设置弹窗 2 文件 5 项、组件打包 3 项通过；typecheck、定向 ESLint、Electron/连接页构建通过。真实 Electron + 临时 HTTP 代理验证身份探测及页面经过代理、本机/私网 bypass、更新请求注入；macOS 默认入口启动与 520px 弹窗实测通过。
 - 限制：未更改用户现有代理/登录项做验收；真实注销/登录、Windows 自启动和系统禁用登录项场景尚未实测。未运行需用户明确同意的 display-scaling 专项套件。
 
-### 11.6 GitHub Actions 打包建议（待实施）
+### 11.6 GitHub Actions Windows / macOS 构建链（2026-09-26）
 
-当前仅有 `.github/workflows/ci.yml` 质量检查，未接入 Windows 三包安装器构建。可新增手动触发的 `workflow_dispatch` 工作流，使用 Windows x64 runner，提供明确版本号与 `all/server/desktop/full` 输入。
+已新增手动工作流 `Build installers`，明确版本号、平台及组件输入，使用 windows-2022、macos-15（arm64）、macos-15-intel（x64）。默认九个安装包：每种目标环境各 Full、Server、Desktop。Full 复用独立组件；只选单组件只构建所需资源。
 
-- 准备 Node、pnpm、Python、Go、Inno Setup 和真实 Windows FFmpeg/ffprobe；锁文件安装依赖，并校验依赖来源和版本。Windows runner 安装的 Electron 直接提供 Windows runtime。
-- 复用 `python scripts/release/release_cli.py publish --version <version> --variant <variant>`；显式版本避免每次临时 checkout 自动递增后产生重复版本误解，不自动提交版本文件。
-- 强制核验 manifest 的 `status=built`、预期 EXE 数量与 SHA-256，不能把 `scripts-only` 判为成功；默认 all 生成 Full、Server、Desktop 三包。
-- 将 EXE、manifest 和诊断日志上传为 Actions artifacts，用户在该次运行中下载。现阶段不创建 GitHub Release、不上传旧 latest feed，维持最小只读仓库权限。
-- 工作流需要先提交并推送至 GitHub，首次手动入口通常需在默认分支提供工作流定义；届时可选择目标分支构建。Windows 安装/升级/迁移验收仍独立执行；编译成功不等价于生产发布完成。签名需另外配置证书及 secrets，普通打包无需签名凭据。
+- Windows 复用现有三包脚本，准备 Inno 与真实 FFmpeg，缺少编译器导致的 scripts-only 在上传前判失败。
+- macOS 增加原生 Go Server 编译、Curated.app 品牌/图标、FFmpeg 动态依赖迁移和原生检查、pkgbuild/productbuild 安装包。Full 使用固定组件 receipt；安装器不启动进程、服务或设置登录项。最低 macOS 15，Server 通过 curated-server 命令启动，默认 8081；与 Desktop 分离。
+- app 只作 ad-hoc 签名，安装器未签名/未公证；Apple Developer ID、公证、系统服务、卸载工具及应用内 macOS 更新不在已完成范围。不可将云端编译成功当成正式分发与安装验收完成。
+- 显式版本避免临时 checkout 各自自动递增；每次输出到新目录，保留已有产物。manifest 与实际文件、目标平台、SHA-256 一起核验后上传 Actions artifacts，保留 14 天。构建日志即使失败也上传；仓库权限只读，不发布 Release。
+- 首次使用需将工作流推送并让默认分支具备定义，然后选择待构建分支。当前没有推送或运行远端 Actions；Windows/Intel 原生结果待云端验收。
+- 已验证：发布脚本 23 项通过，actionlint 检查通过。本机 macOS 15.5 Apple Silicon 完整构建出 Server、Desktop、Full 三个 PKG，manifest/三包 SHA-256 校验通过；迁移后的 FFmpeg/ffprobe 运行、Curated.app codesign 完整性和 Electron 原生执行通过；打包后 Server 使用临时数据启动，版本 1.5.8、server-info 与随包 Web UI 实测通过，进程已停止。未安装到系统目录。验证包位于 `.workspace/macos-packaging-check2/components-1.5.8-20260926.041259-macos-arm64/installer/`，未修改正式版本文件。

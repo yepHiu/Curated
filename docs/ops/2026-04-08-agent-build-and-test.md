@@ -251,3 +251,7 @@ Windows 组件按当前用户安装至 `%LOCALAPPDATA%/Programs/Curated/Server|D
 Server 更新只接受精确命名的 Server 安装包，旧缓存中的整包或 Desktop 包会被拒绝；Desktop 本地连接页提供官方下载入口，不由远端执行客户端更新。当前仍读取既有官方 Release 接口，新三包**不得直接挂到旧客户端的 latest feed**；新旧 feed 隔离发布流程尚未落地。manifest 已标注这一限制，`publish` 不执行外部发布。
 
 当前安装器会阻止直接覆盖旧一体包，并给出备份/迁移提示；自动迁移、Windows 实机安装/升级/卸载、真实两机 SSDP 仍待完成。不要将本实现当作已通过生产发布验收。
+
+## 跨平台 CI 打包（2026-09-26）
+
+新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 EXE、macOS 15+ arm64/x64 PKG 各支持 Full/Server/Desktop，默认九包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；Server 以 curated-server 命令独立运行，尚无 macOS 托盘/服务。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。

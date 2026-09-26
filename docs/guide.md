@@ -477,3 +477,31 @@ Server 更新只接受精确命名的 Server 安装包，旧缓存中的整包�
 连接页底部「打开设置」仅提供此设备的代理和开机自启动。代理支持跟随系统（默认）、不使用代理、手动 HTTP/HTTPS/SOCKS5（不支持账号密码），保存至 Electron userData 下的 `desktop-settings.json`，重启 Desktop 后应用到连接检查、服务器页面和更新检查。手动代理绕过常见本机/私网地址；SSDP 及发现探测仍直连。自启动读取 macOS/Windows 系统登录项，保存立即更新；只启动 Desktop，不启动 Server。其他平台显示不可用。
 
 macOS 开发 bundle 内置指向当前 worktree 的默认入口，确保无 CLI 参数启动也能进入连接页；移动或删除 worktree 后需重新运行 `pnpm dev:electron`。Windows 登录启动与真实注销/登录仍待实机验收。
+
+## GitHub Actions 安装包构建（2026-09-26）
+
+工作流 `.github/workflows/package.yml` 名称为 **Build installers**，仅手动触发。工作流定义需先进入 GitHub 默认分支，随后在 Actions → Build installers → Run workflow 选择目标分支，填写纯数字 `major.minor.patch` 版本号，并选择 `platform=all/windows/macos`、`variant=all/full/server/desktop`。本地未推送的 worktree 内容不会参与云端构建。显式版本不修改仓库版本文件，构建历史随诊断 artifact 保留。
+
+| 构建任务 | 原生 runner | 默认安装包 |
+|---|---|---|
+| Windows x64 | windows-2022 | Full、Server、Desktop `.exe` |
+| macOS Apple Silicon | macos-15 | Full、Server、Desktop `-macos-arm64.pkg` |
+| macOS Intel | macos-15-intel | Full、Server、Desktop `-macos-x64.pkg` |
+
+默认 `all/all` 共输出九个安装包，分为三个 Actions artifacts；Full 依赖同批 Server/Desktop 组件包，因此 `variant=full` 也保留三个安装包。单独选择 server 或 desktop 时每个平台只出对应一个包。产物和诊断日志保留 14 天。通过 manifest、目标平台、文件数量和 SHA-256 检查后才上传安装包；Windows 缺 Inno Setup 的 `scripts-only` 状态会判失败。
+
+Windows 准备 Inno Setup 和实际 FFmpeg/ffprobe 二进制；macOS 收集 Homebrew FFmpeg 动态库、改写为包内相对引用并进行原生运行验证，附带依赖来源与可用许可证材料。Node/pnpm、Electron、Go 依赖按现有版本/锁文件安装；系统工具由 runner/包管理器提供，尚非字节级可复现构建。
+
+macOS 测试包最低系统为 **macOS 15**，按 CPU 分别构建，尚无 Universal 合并包。安装需要管理员权限：Desktop 位于 `/Applications/Curated.app`；Server 位于 `/usr/local/lib/curated-server`，入口 `/usr/local/bin/curated-server`。安装不自动启动进程或创建 launchd 服务。运行 `curated-server` 后默认在 `http://127.0.0.1:8081` 提供 Web UI，Ctrl+C 停止；Desktop 填写此地址连接。Server 数据保存到 `~/Library/Application Support/Curated`，与程序目录分离。Full 默认安装两组件且复用相同 receipt ID。
+
+当前安装器**未签名**；macOS app 仅 ad-hoc 签名以保证 bundle 完整性，未使用 Developer ID，也未公证。Gatekeeper 可能阻止安装或运行，工作流不关闭安全检查。正式外部分发前需接入开发者证书、公证和真实安装/升级/卸载验收。Server macOS 托盘/自启动尚未实现，Desktop 登录启动保留独立设置。macOS 包暂不接入现有应用内更新匹配。
+
+工作流只上传 Actions artifacts，不创建 GitHub Release、不接旧 latest feed、不自动提交或推送。首次 GitHub 云端运行尚待完成；本地验证证据见拆分计划 §11.6。
+
+本机等价命令（需在对应 OS/CPU 上准备依赖）：
+
+```bash
+python scripts/release/release_cli.py publish --platform windows --arch x64 --variant all --version 1.6.0
+python scripts/release/release_cli.py publish --platform macos --arch arm64 --variant all --version 1.6.0
+python scripts/release/release_cli.py publish --platform macos --arch x64 --variant all --version 1.6.0
+```

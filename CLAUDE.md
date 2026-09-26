@@ -664,3 +664,7 @@ Server 的 IPv4 SSDP 仅在 LAN 实际监听且发现启用时启动，服务类
 连接页底部「打开设置」仅提供此设备的代理和开机自启动。代理支持跟随系统（默认）、不使用代理、手动 HTTP/HTTPS/SOCKS5（不支持账号密码），保存至 Electron userData 下的 `desktop-settings.json`，重启 Desktop 后应用到连接检查、服务器页面和更新检查。手动代理绕过常见本机/私网地址；SSDP 及发现探测仍直连。自启动读取 macOS/Windows 系统登录项，保存立即更新；只启动 Desktop，不启动 Server。其他平台显示不可用。
 
 `curated:settings-read` / `curated:settings-save` 仅向本地连接页暴露，验证窗口、顶层 frame 与来源；远端 `curatedDesktop` 桥无权修改这些设置。代理校验与原子持久化位于 `electron/settings.ts`，不新增 Server HTTP API，也不修改 `library-config.cfg`。
+
+## Cross-platform packaging (2026-09-26)
+
+新增手动 `Build installers` 工作流（`.github/workflows/package.yml`），Windows x64 EXE、macOS 15+ arm64/x64 PKG 各支持 Full/Server/Desktop，默认九包；显式版本，核验 manifest/校验和后上传 Actions artifacts，不发布 Release。macOS app 仅 ad-hoc 签名、安装器未签名未公证；Server 以 curated-server 命令独立运行，尚无 macOS 托盘/服务。详见 docs/guide.md「GitHub Actions 安装包构建」。云端首次运行及真实安装验收待完成。 No HTTP API or library configuration changes.
