@@ -43,7 +43,7 @@ describe("Desktop servers in settings", () => {
     await flushPromises()
     expect(wrapper.text()).toContain("家庭 NAS")
     expect(wrapper.text()).toContain("http://nas.local:8081")
-    expect(wrapper.text()).toContain("nav.backendOnline")
+    expect(wrapper.text()).toContain("settings.serverConnections.online")
     expect(wrapper.findAll('[data-saved-server]')).toHaveLength(2)
     expect(wrapper.findAll('[data-saved-server]')[0]!.find('button').exists()).toBe(false)
     await wrapper.findAll('[data-saved-server]')[1]!.get('button').trigger('click')

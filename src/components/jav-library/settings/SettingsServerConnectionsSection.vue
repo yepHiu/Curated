@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useBackendHealth } from "@/composables/use-backend-health"
 import { useServerConnections } from "@/composables/use-server-connections"
-import { statusDotClass } from "@/lib/ui/status-tone"
 
 const { t } = useI18n()
 const { available, snapshot, currentServer, loading, failed, actionFailed, opening, refresh, openManager } = useServerConnections()
@@ -15,9 +14,10 @@ const { status, probing, checkNow } = useBackendHealth()
 const busy = computed(() => opening.value || snapshot.value?.connecting)
 const statusLabel = computed(() => {
   if (!snapshot.value?.currentServerUrl) return t("settings.serverConnections.disconnected")
-  return t(`nav.${{ online: "backendOnline", offline: "backendOffline", checking: "backendChecking", mock: "backendMock" }[status.value]}`)
+  if (status.value === "online") return t("settings.serverConnections.online")
+  return t(`nav.${{ offline: "backendOffline", checking: "backendChecking", mock: "backendMock" }[status.value]}`)
 })
-const dotClass = computed(() => status.value === "online" ? statusDotClass("success") : status.value === "offline" ? statusDotClass("danger") : "bg-muted-foreground")
+const statusVariant = computed(() => !snapshot.value?.currentServerUrl ? "secondary" : status.value === "online" ? "success" : status.value === "offline" ? "danger" : "secondary")
 function recheck() {
   void refresh()
   checkNow()
@@ -39,10 +39,9 @@ function recheck() {
           <p class="min-w-0 max-w-full truncate text-sm font-medium" :title="currentServer?.name || t('settings.serverConnections.unnamed')">{{ currentServer?.name || t('settings.serverConnections.unnamed') }}</p>
           <p class="min-w-0 flex-1 basis-40 truncate text-xs text-muted-foreground" :title="snapshot.currentServerUrl">{{ snapshot.currentServerUrl }}</p>
         </template>
-        <span class="ml-auto inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground" role="status">
-          <span class="size-2 rounded-full" :class="snapshot.currentServerUrl ? dotClass : 'bg-muted-foreground'" aria-hidden="true" />
+        <Badge :variant="statusVariant" class="ml-auto" role="status">
           {{ statusLabel }}
-        </span>
+        </Badge>
       </div>
       <p v-else-if="loading" class="text-sm text-muted-foreground" role="status">{{ t('settings.serverConnections.loading') }}</p>
       <p v-if="failed" class="text-sm text-destructive" role="alert">{{ t('settings.serverConnections.loadError') }}</p>

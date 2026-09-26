@@ -1026,6 +1026,7 @@
   },
   "settings": {
     "serverConnections": {
+      "online": "サーバーオンライン",
       "title": "サーバー一覧",
       "current": "現在のサーバー",
       "disconnected": "未接続",

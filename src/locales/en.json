@@ -1026,6 +1026,7 @@
   },
   "settings": {
     "serverConnections": {
+      "online": "Server online",
       "title": "Server list",
       "current": "Current server",
       "disconnected": "Disconnected",
