@@ -7,7 +7,7 @@ alwaysApply: true
 
 Desktop 自带 `connections.html` 本地管理窗口，设置中的「服务器列表」、托盘与 macOS 应用菜单可打开。名称和 HTTP/HTTPS 根地址保存在 `app.getPath("userData")/servers.json`，支持保存、去重、编辑、删除和重连；上次成功连接启动时恢复。当前连接可改名，需先切换才能改地址或删除。连接前检查 `/api/health` 的 Curated 身份，失败保留原页面；成功加载后销毁旧 renderer，停止旧页面客户端活动。PIN 仍由 Server UI 解锁。会话按 origin（含端口）分配持久 partition，首次升级可能需要重新解锁；不迁移旧共享 Cookie。
 
-列表写入 IPC 仅精确本地窗口主 frame 可调用；当前可信 Server 页面可经 `getServerConnections()` 读取名称/地址/当前连接快照，经 `openServerConnections(savedId?)` 打开本地窗口或发起已保存 ID 的原生确认切换，不能写入列表。设置 → 网络与设备顶部新增连接卡片，显示当前名称/地址、实时 health 状态和保存列表；添加/管理打开本地窗口，返回焦点与每 5 秒刷新列表，离开分区卸载。页面导航限已选 origin，外部打开限 HTTP/HTTPS，远端目录选择被拒绝。8 秒 health / 15 秒页面超时；不支持子路径、凭证 URL 或 SSDP。仅 legacy 默认本机目标保留启动/复用 Go 与开发 Vite；已保存远端和显式环境地址失败不启动本机服务。首次无记录的 legacy 默认启动本机；standalone 无记录显示列表。独立安装包和 Server 生命周期拆分仍待完成。
+编辑/删除 IPC 仅精确本地管理窗口主 frame 可调用；当前可信主窗口主 frame 可经 `addServer({name,url})` 仅新增服务器（拒绝 ID 覆写和重复地址），经 `getServerConnections()` 读取名称/地址/当前连接快照，经 `openServerConnections(savedId?)` 打开本地窗口或发起已保存 ID 的原生确认切换。设置 → 网络与设备顶部新增连接卡片，显示当前名称/地址、实时 health 状态和保存列表；添加使用页面内 Dialog，保存成功刷新列表且不自动连接；管理打开本地窗口，返回焦点与每 5 秒刷新列表，离开分区卸载。页面导航限已选 origin，外部打开限 HTTP/HTTPS，远端目录选择被拒绝。8 秒 health / 15 秒页面超时；不支持子路径、凭证 URL 或 SSDP。仅 legacy 默认本机目标保留启动/复用 Go 与开发 Vite；已保存远端和显式环境地址失败不启动本机服务。首次无记录的 legacy 默认启动本机；standalone 无记录显示列表。独立安装包和 Server 生命周期拆分仍待完成。
 
 ## 2026-09-26 资料库路径删除持久化
 

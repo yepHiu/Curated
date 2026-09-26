@@ -75,7 +75,7 @@ health 的 `version` 为数字 SemVer（当前 1.5.7），`buildStamp` 单独保
 
 ## Desktop 服务器连接
 
-设置 → 网络与设备顶部显示当前服务器、连接状态和保存列表，添加/管理进入本地窗口；托盘「服务器」也可打开；服务器名称、HTTP/HTTPS 根地址及上次成功连接保存到 userData/servers.json，按 origin（含端口）隔离登录会话。切换先探测并加载新页面，失败保留旧页面，成功后关闭旧页面并提示播放/上传/未保存编辑影响。升级隔离会话后可能需重新输入 PIN。legacy 默认本机连接保留 Go/Vite 启动；远端连接失败不拉起本机后端。旧 Server UI 没有设置列表时仍可用托盘。详情见 guide 的 Desktop server connections。
+设置 → 网络与设备顶部显示当前服务器、连接状态和保存列表，添加使用页面内弹框填写名称/地址，保存后刷新列表；管理进入本地窗口；托盘「服务器」也可打开；服务器名称、HTTP/HTTPS 根地址及上次成功连接保存到 userData/servers.json，按 origin（含端口）隔离登录会话。切换先探测并加载新页面，失败保留旧页面，成功后关闭旧页面并提示播放/上传/未保存编辑影响。升级隔离会话后可能需重新输入 PIN。legacy 默认本机连接保留 Go/Vite 启动；远端连接失败不拉起本机后端。旧 Server UI 没有设置列表时仍可用托盘。详情见 guide 的 Desktop server connections。
 
 ## 常见操作
 
