@@ -370,7 +370,7 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 
 ### 11.4 版本来源、更新与验收边界
 
-- 发布实现拟增加独立组件版本源，例如 `scripts/release/versions/server.json`、`desktop.json`、`full.json`；现有 `version.json` 在旧更新通道退役前保留为 legacy 来源。构建读取对应源并生成 Electron package、Server 链接版本及 manifest，不能手工维护多份互相矛盾的版本。
+- 发布实现拟增加独立组件版本源，`backend/internal/version/server.json`、`scripts/release/versions/desktop.json`、`scripts/release/versions/full.json`；现有 `version.json` 在旧更新通道退役前保留为 legacy 来源。构建读取对应源并生成 Electron package、Server 链接版本及 manifest，不能手工维护多份互相矛盾的版本。
 - manifest 至少含 `component/variant/version/platform/arch/format/url/sha256`；Full 再包含两组件准确版本。更新器按组件、平台、架构及通道匹配，不依靠文件名猜组件、不回退到任意 EXE。
 - Release tag 规划为 `desktop-v<version>`、`server-v<version>`、`full-v<version>`。tag 前缀本身不能隔离 GitHub `/releases/latest`：旧 feed 继续只有兼容完整包，新组件必须使用隔离 feed 或组件 manifest；在迁移前不能把新三包随意放入旧客户端读取的 latest。
 - 关于页分别显示本机 `Curated Desktop`（可信主进程 `app.getVersion()`）和当前连接的 `Curated Server`（health）。浏览器不显示 Desktop 行。Desktop 在可信本地流程检查自身版本，Server 独立检查自身版本；开发态、离线、无匹配系统/架构包均要准确说明。
@@ -381,7 +381,7 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 
 已实现：
 
-- `scripts/release/versions/{desktop,server,full}.json` 分别维护数字版本，当前开发目标为 `0.1.0` / `1.5.7` / `1.6.0`；这不代表这些组件已有公开发行。Server 未提前升至 1.6.0。
+- `scripts/release/versions/{desktop,full}.json` 和 `backend/internal/version/server.json` 分别维护数字版本，当前开发目标为 `0.1.0` / `1.5.7` / `1.6.0`；这不代表这些组件已有公开发行。Server 未提前升至 1.6.0。
 - `release_cli.py plan-component` 只读生成组件包名、tag、平台、架构与格式；Full 同时记录两组件的准确版本。输出带 `status: planned`，不会构建安装包、递增版本或发布。拒绝 beta 后缀及错误平台/格式组合。
 - `pnpm build:electron:main` 从 Desktop 版本源和 `electron/release-config.json` 生成 `electron-dist/desktop-release.json`，随现有一体包复制；主进程通过受当前窗口主 frame / origin 校验的 `getDesktopInfo` IPC 提供 `0.1.0`。关于页独立显示 Desktop 版本与「开发版」标签，浏览器隐藏此块。客户端请求 header 同步使用组件版本。
 - **对 11.4 的过渡期实现修订**：现有一体安装包 `app.getVersion()` 仍属于旧安装身份，不能为了 Desktop 组件显示改成 0.1.0。当前组件版本来自本地构建元数据；根 npm 包版本也不再用作 Desktop 展示版本。独立 Desktop 安装器将来必须从同一组件源写入 Electron package，让 `app.getVersion()` 与组件版本一致。入口缓存参数继续使用原安装身份版本。
@@ -393,3 +393,14 @@ macOS Desktop 首选 DMG；内部应用显示为 `Curated Desktop.app`。若后�
 验证：发行 Python 测试 19 项、Electron 测试 43 项、关于页组件测试 7 项通过；Electron 编译、前端 Web API 生产构建和相关 ESLint 通过，构建体积无提醒。已重启 macOS Electron 开发桌面，在关于页实际确认 0.1.0、开发版标识和检查按钮返回的开发态说明；当前深色窗口无文字/按钮重叠。未生成或发布正式安装包；跨平台、DPR、90%–150% 缩放与浅色完整矩阵未执行。
 
 2026-09-26 交互调整：关于页仅保留一个「检查更新」按钮，并行检查安装包和 Desktop，等待两项结束后恢复可用；Desktop 区块保留版本及检查结果，移除独立检查按钮。安装包不支持检查时仍可检查 Desktop；Web 只检查安装包。组件测试 8 项、类型检查和相关 ESLint 通过，macOS 开发桌面实测统一按钮及结果布局正常；未扩展显示缩放矩阵。
+
+
+### 11.6 Server 三段版本与独立构建信息
+
+按用户确认，Server 与 Desktop 均维护三段数字版本；Server 当前 1.5.7，Desktop 当前 0.1.0。Server health 的 `version` 从时间戳改为产品 SemVer，新增 `buildStamp` 保留 UTC 构建戳，`channel` 与旧 `installerVersion` 独立保留，HTTP/stdio 一致。关于页用主行显示产品版本、独立开发版标签，次行显示构建时间戳。侧栏显示产品版本，启动日志与导出身份保留产品版本和时间戳。
+
+Server 唯一来源迁至 `backend/internal/version/server.json` 并由 Go embed，组件包名生成器同步读取；这让直接 go run / go build 也有正确版本，不依赖预生成或手工维护第二份版本常量。正式构建继续注入 BuildStamp；普通 Go 构建缺少注入时仍回退 vcs.time / revision / unknown，不能把 Git 提交时间视为编译时刻。旧版本字段类型不变；依赖其时间戳语义的调用方需改读 buildStamp。
+
+验证：Go version/server/app 测试及 release 标签的 version 测试通过；前端相关 18 项测试、类型检查、ESLint 通过；发行脚本 19 项测试通过。关于页许可测试同步补齐此前已添加的 Outfit 许可数量。完整跨平台显示缩放矩阵未执行。
+
+已重新编译并重启开发桌面：实际 `/api/health` 返回 `version: 1.5.7`、`buildStamp: 20260926.123433`（UTC）、`channel: dev`，侧栏显示 `1.5.7 (dev)`。Web API 生产构建通过且体积无提醒。

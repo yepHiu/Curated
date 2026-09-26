@@ -32,6 +32,10 @@ alwaysApply: true
 - **release 构建现状**：`scripts/release/release_cli.py` / `scripts/release/release_lib/build_steps.py` 已切到系统临时目录承载 Go build cache，不再写 repo 内缓存目录；`pnpm release:publish` 会构建前端、release Go 后端和 Electron main process，并组装 Electron runtime 为 `release/Curated/Curated.exe`；安装器覆盖升级前会删除 `{app}/frontend-dist` 与 `{app}/resources/app/frontend-dist` 两处受管理前端产物，再复制新构建，避免旧哈希资源残留；打包会将真实 FFmpeg 放入 `resources/app/third_party/ffmpeg/bin/`，拒绝复制 Scoop shim，找不到真实运行时时失败。
 - **生产包保留规则**：未得到用户明确要求时，禁止删除已经打出的生产包产物；`release/installer/*.exe` 与 `release/portable/*.zip` 都必须保留，即使准备重新打包或同版本重打，也不能主动清理既有 installer / portable 包。
 
+## Server 版本
+
+health 的 `version` 为数字 SemVer（当前 1.5.7），`buildStamp` 单独保留构建时间戳；关于页分开展示。Server 源为 `backend/internal/version/server.json`，Desktop 源为 `scripts/release/versions/desktop.json`（0.1.0）。
+
 ## 配置与持久化
 
 - **资料库级 JSON 配置文件**：`config/library-config.cfg`

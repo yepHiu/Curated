@@ -289,7 +289,7 @@ Recommended packaging entry:
 pnpm release:publish
 ```
 
-Legacy all-in-one production versioning is owned by `scripts/release/version.json`. Independent component targets live in `scripts/release/versions/{desktop,server,full}.json`; split installers are not yet built by the legacy publish command. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
+Legacy all-in-one production versioning is owned by `scripts/release/version.json`. Independent component targets live in `scripts/release/versions/{desktop,full}.json` and `backend/internal/version/server.json`; split installers are not yet built by the legacy publish command. `pnpm release:*` is orchestrated by `python scripts/release/release_cli.py`. The installed `Curated.exe` is the Electron shell; the Go backend is `resources/app/curated.exe`.
 
 The packaged frontend includes local HarmonyOS Sans SC, Noto Sans, and Noto Sans JP assets. The full `dist` directory must be shipped so Chinese, English, and Japanese typography remains available offline. Settings → About & updates → Open-source project licenses links to the app's MIT license, all three font licenses, and a local notice file for selected frontend, backend, and desktop components. The [license inventory](plan/2026-09-25-open-source-license-inventory.md) records its scope and FFmpeg build-specific terms.
 
@@ -476,3 +476,12 @@ Desktop checks run in the main process. Development builds return a development 
 ```
 
 This is a format example, not an active feed. The checker rejects redirects, limits the feed to 1 MiB with a 15-second timeout, and matches component, variant, channel, platform, architecture and installer format before numerical version comparison. No matching artifact, no configured feed, and network errors have distinct statuses. Available updates offer a manual installer link; automatic download, file hash verification, installation and restart are not implemented. Keep split feeds isolated from the legacy GitHub latest endpoint.
+
+
+### Server version and build timestamp
+
+`GET /api/health` and stdio `system.health` now return `version: "1.5.7"` (independent Server SemVer), `buildStamp: "YYYYMMDD.HHMMSS"` (UTC), and `channel` separately. About shows the numeric Server version, a separate development badge, and the timestamp below it. The sidebar uses the product version; logs and export metadata retain both identities. `installerVersion` remains the legacy installer version used by its updater.
+
+The Server version source is `backend/internal/version/server.json`, moved from `scripts/release/versions/server.json` so Go can embed the same source during ordinary `go run` / `go build`. The component release planner reads this same file; there is no generated duplicate. Desktop remains `scripts/release/versions/desktop.json` at `0.1.0`. Bump each component only for its own releases.
+
+Release tooling continues injecting `-X curated-backend/internal/version.BuildStamp=<UTC timestamp>`. For direct Go builds without that flag, the existing fallback is Git commit time, then revision / unknown; that fallback is not the actual compilation time. Older clients still receive a string in `version`; consumers that used it as a timestamp must switch to `buildStamp`.
