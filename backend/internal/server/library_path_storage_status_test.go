@@ -130,6 +130,7 @@ func TestHandleRebindLibraryPathStorage(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/library/paths/library-2/storage-binding/rebind", http.NoBody)
+	req.RemoteAddr = "127.0.0.1:12345"
 	req.Host = "127.0.0.1:8080"
 	rr := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rr, req)

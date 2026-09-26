@@ -77,13 +77,15 @@ type AppError struct {
 
 // HealthDTO reports backend identity, version, and runtime information.
 type HealthDTO struct {
-	Name             string `json:"name"`
-	Version          string `json:"version"`    // Independent numeric Server SemVer
-	BuildStamp       string `json:"buildStamp"` // UTC build stamp; vcs.time / git.* / unknown fallback
-	Channel          string `json:"channel"`    // "dev" or "release" (-tags release)
-	InstallerVersion string `json:"installerVersion,omitempty"`
-	Transport        string `json:"transport"`
-	DatabasePath     string `json:"databasePath"`
+	// HTTP request capability, not persisted; false for nonlocal connections.
+	CanManageLibraryPaths bool   `json:"canManageLibraryPaths"`
+	Name                  string `json:"name"`
+	Version               string `json:"version"`    // Independent numeric Server SemVer
+	BuildStamp            string `json:"buildStamp"` // UTC build stamp; vcs.time / git.* / unknown fallback
+	Channel               string `json:"channel"`    // "dev" or "release" (-tags release)
+	InstallerVersion      string `json:"installerVersion,omitempty"`
+	Transport             string `json:"transport"`
+	DatabasePath          string `json:"databasePath"`
 }
 
 // ConnectedClientDTO is one client that accessed the HTTP API during this backend process lifetime.
@@ -1928,6 +1930,7 @@ const (
 	ErrorCodePhotoBookNotFound        = "PHOTO_BOOK_NOT_FOUND"
 	ErrorCodePhotoPageNotFound        = "PHOTO_PAGE_NOT_FOUND"
 
+	ErrorCodeLibraryPathsReadOnly    = "LIBRARY_PATHS_READ_ONLY"
 	ErrorCodeAppUpdateRemoteDisabled = "APP_UPDATE_REMOTE_DISABLED"
 	ErrorCodeAppUpdateDownloadFailed = "APP_UPDATE_DOWNLOAD_FAILED"
 	ErrorCodeAppUpdateInstallFailed  = "APP_UPDATE_INSTALL_FAILED"

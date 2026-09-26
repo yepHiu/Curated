@@ -2,7 +2,7 @@ import type { DesktopInfo } from "../../electron/desktop-contract"
 
 /** A local-looking renderer can proxy a remote server. Check the actual API
  * target and, in Desktop, the target owned by main. Unknown means read-only. */
-export function isLocalUpdateTarget(apiUrl: string, pageOrigin: string, desktop: boolean, info: DesktopInfo | null): boolean {
+export function isLocalServerTarget(apiUrl: string, pageOrigin: string, desktop: boolean, info: DesktopInfo | null): boolean {
   try {
     const target = new URL(apiUrl, pageOrigin)
     const page = new URL(pageOrigin)
@@ -12,9 +12,13 @@ export function isLocalUpdateTarget(apiUrl: string, pageOrigin: string, desktop:
     if (!loopback(target) || !loopback(page)) return false
     if (!desktop) return true
     if (!info?.serverOrigin) return false
-    // Standalone Desktop must use its own update channel, even on the same host.
-    return info.distribution === "legacy" && new URL(info.serverOrigin).origin === target.origin
+    return new URL(info.serverOrigin).origin === target.origin
   } catch {
     return false
   }
+}
+
+/** Standalone Desktop always uses its own update channel, even on the same host. */
+export function isLocalUpdateTarget(apiUrl: string, pageOrigin: string, desktop: boolean, info: DesktopInfo | null): boolean {
+  return (!desktop || info?.distribution === "legacy") && isLocalServerTarget(apiUrl, pageOrigin, desktop, info)
 }

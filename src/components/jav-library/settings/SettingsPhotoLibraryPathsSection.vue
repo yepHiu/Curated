@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useLibraryPathAccess } from "@/composables/use-library-path-access"
+import SettingsReadOnlyLibraryPaths from "./SettingsReadOnlyLibraryPaths.vue"
 import { useI18n } from "vue-i18n"
 import { FolderArchive } from "lucide-vue-next"
 import type { PhotoLibrarySetting } from "@/domain/photo/types"
@@ -42,6 +44,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { canManagePaths } = useLibraryPathAccess()
 
 const defaultImportPathSelectValue = computed(() =>
   props.paths.some((path) => path.id === props.defaultImportLibraryPathId)
@@ -70,7 +73,13 @@ function onDefaultChange(value: unknown) {
 </script>
 
 <template>
-  <div
+  <SettingsReadOnlyLibraryPaths
+    v-if="!canManagePaths"
+    :title="t('settings.photoLibraryPathsTitle')"
+    :paths="paths"
+    :default-import-library-path-id="defaultImportLibraryPathId"
+  />
+  <div v-else
     data-photo-paths
     class="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/5 p-4"
   >

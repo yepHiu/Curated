@@ -1055,6 +1055,8 @@
     "langJa": "日本語",
     "pageTitle": "Library settings",
     "pageSubtitle": "Storage paths, playback and metadata options; scans are manual only (full or per path).",
+    "libraryPathsReadOnly": "Read only",
+    "libraryPathsReadOnlyEmpty": "No storage directories configured. Add them on the Server computer.",
     "storageCardTitle": "Storage directories",
     "storageStatusRecheck": "Check storage",
     "storageStatusChecking": "Checking storage...",

@@ -12,6 +12,8 @@ export interface ApiError {
 }
 
 export interface HealthDTO {
+  /** Missing on older servers: storage directory management remains read-only. */
+  canManageLibraryPaths?: boolean
   name: string
   /** Server 独立三段数字版本；旧后端可能仍返回构建戳 */
   version: string

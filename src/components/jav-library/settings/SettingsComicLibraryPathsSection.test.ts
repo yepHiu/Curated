@@ -1,6 +1,14 @@
+import { computed } from "vue"
 import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import SettingsPhotoLibraryPathsSection from "./SettingsPhotoLibraryPathsSection.vue"
 import SettingsComicLibraryPathsSection from "./SettingsComicLibraryPathsSection.vue"
+
+const access = vi.hoisted(() => ({ allowed: true }))
+vi.mock("@/composables/use-library-path-access", () => ({
+  useLibraryPathAccess: () => ({ canManagePaths: computed(() => access.allowed) }),
+}))
+beforeEach(() => { access.allowed = true })
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -183,4 +191,28 @@ describe("SettingsComicLibraryPathsSection", () => {
     expect(wrapper.find("[data-scan-comic-path='comic-path-a']").exists()).toBe(true)
     expect(wrapper.find("[data-remove-comic-path='comic-path-a']").exists()).toBe(true)
   })
+})
+
+
+it("shows only server path information remotely even when edit dialogs were open", () => {
+  access.allowed = false
+  const wrapper = mount(SettingsComicLibraryPathsSection, {
+    props: { ...baseProps, addPathDialogOpen: true },
+  })
+  expect(wrapper.find("[data-readonly-library-paths]").exists()).toBe(true)
+  expect(wrapper.find("button, input, select, [role=combobox]").exists()).toBe(false)
+  for (const path of baseProps.paths) expect(wrapper.text()).toContain(path.path)
+  expect(wrapper.text()).toContain("settings.libraryPathsReadOnly")
+  expect(wrapper.emitted()).toEqual({})
+  wrapper.unmount()
+})
+
+
+it("also makes photo directories and the default import target read-only remotely", () => {
+  access.allowed = false
+  const wrapper = mount(SettingsPhotoLibraryPathsSection, { props: { ...baseProps, addPathDialogOpen: true } })
+  expect(wrapper.find("[data-readonly-library-paths]").exists()).toBe(true)
+  expect(wrapper.find("button, input, select, [role=combobox]").exists()).toBe(false)
+  for (const path of baseProps.paths) expect(wrapper.text()).toContain(path.path)
+  wrapper.unmount()
 })

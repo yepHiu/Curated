@@ -1055,6 +1055,8 @@
     "langJa": "日本語",
     "pageTitle": "资料库设置",
     "pageSubtitle": "存储路径、播放与元数据相关选项；扫描仅通过手动触发（全库或单路径）。",
+    "libraryPathsReadOnly": "只读",
+    "libraryPathsReadOnlyEmpty": "尚未配置存储目录，请在服务器所在电脑上添加。",
     "storageCardTitle": "存储目录",
     "storageStatusRecheck": "检查存储",
     "storageStatusChecking": "检查中...",

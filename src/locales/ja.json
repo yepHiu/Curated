@@ -1055,6 +1055,8 @@
     "langJa": "日本語",
     "pageTitle": "ライブラリ設定",
     "pageSubtitle": "保存パス、再生・メタデータ関連。スキャンは手動のみ（全庫またはパス単位）。",
+    "libraryPathsReadOnly": "読み取り専用",
+    "libraryPathsReadOnlyEmpty": "保存先が未設定です。Server が動作するパソコンで追加してください。",
     "storageCardTitle": "ストレージディレクトリ",
     "storageStatusRecheck": "ストレージ確認",
     "storageStatusChecking": "確認中...",

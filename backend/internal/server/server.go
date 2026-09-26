@@ -580,22 +580,22 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/import/movies/uploads/{uploadId}/commit", h.handleCommitMovieImportUpload)
 	mux.HandleFunc("POST /api/import/comics", h.handleImportComics)
 	mux.HandleFunc("POST /api/import/photos", h.handleImportPhotos)
-	mux.HandleFunc("POST /api/library/paths", h.handleAddLibraryPath)
+	mux.HandleFunc("POST /api/library/paths", localLibraryPathManagement(h.handleAddLibraryPath))
 	mux.HandleFunc("GET /api/library/paths/storage-status", h.handleGetLibraryPathStorageStatus)
 	mux.HandleFunc("POST /api/library/paths/storage-status/check", h.handleCheckLibraryPathStorageStatus)
-	mux.HandleFunc("POST /api/library/paths/{id}/reveal", h.handleRevealLibraryPathInFileManager)
-	mux.HandleFunc("POST /api/library/paths/{id}/storage-binding/rebind", h.handleRebindLibraryPathStorage)
-	mux.HandleFunc("PATCH /api/library/paths/{id}", h.handlePatchLibraryPath)
-	mux.HandleFunc("DELETE /api/library/paths/{id}", h.handleDeleteLibraryPath)
+	mux.HandleFunc("POST /api/library/paths/{id}/reveal", localLibraryPathManagement(h.handleRevealLibraryPathInFileManager))
+	mux.HandleFunc("POST /api/library/paths/{id}/storage-binding/rebind", localLibraryPathManagement(h.handleRebindLibraryPathStorage))
+	mux.HandleFunc("PATCH /api/library/paths/{id}", localLibraryPathManagement(h.handlePatchLibraryPath))
+	mux.HandleFunc("DELETE /api/library/paths/{id}", localLibraryPathManagement(h.handleDeleteLibraryPath))
 	mux.HandleFunc("POST /api/scans", h.handleStartScan)
 	mux.HandleFunc("GET /api/library/comics/paths", h.handleListComicLibraryPaths)
-	mux.HandleFunc("POST /api/library/comics/paths", h.handleAddComicLibraryPath)
-	mux.HandleFunc("PATCH /api/library/comics/paths/{id}", h.handlePatchComicLibraryPath)
-	mux.HandleFunc("DELETE /api/library/comics/paths/{id}", h.handleDeleteComicLibraryPath)
+	mux.HandleFunc("POST /api/library/comics/paths", localLibraryPathManagement(h.handleAddComicLibraryPath))
+	mux.HandleFunc("PATCH /api/library/comics/paths/{id}", localLibraryPathManagement(h.handlePatchComicLibraryPath))
+	mux.HandleFunc("DELETE /api/library/comics/paths/{id}", localLibraryPathManagement(h.handleDeleteComicLibraryPath))
 	mux.HandleFunc("GET /api/library/photos/paths", h.handleListPhotoLibraryPaths)
-	mux.HandleFunc("POST /api/library/photos/paths", h.handleAddPhotoLibraryPath)
-	mux.HandleFunc("PATCH /api/library/photos/paths/{id}", h.handlePatchPhotoLibraryPath)
-	mux.HandleFunc("DELETE /api/library/photos/paths/{id}", h.handleDeletePhotoLibraryPath)
+	mux.HandleFunc("POST /api/library/photos/paths", localLibraryPathManagement(h.handleAddPhotoLibraryPath))
+	mux.HandleFunc("PATCH /api/library/photos/paths/{id}", localLibraryPathManagement(h.handlePatchPhotoLibraryPath))
+	mux.HandleFunc("DELETE /api/library/photos/paths/{id}", localLibraryPathManagement(h.handleDeletePhotoLibraryPath))
 	mux.HandleFunc("POST /api/library/photos/scans", h.handleStartPhotoScan)
 	mux.HandleFunc("GET /api/library/photos", h.handleListPhotos)
 	mux.HandleFunc("GET /api/library/photos/{photoId}", h.handleGetPhoto)
@@ -670,15 +670,17 @@ func (h *Handler) Routes() http.Handler {
 	return WithAccessLog(h.logger, withClientTracking(h.withRequestSecurity(h.withAuthLock(mux)), h.clientTracker))
 }
 
-func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, contracts.HealthDTO{
-		Name:             version.BackendName(),
-		Version:          version.ProductVersion(),
-		BuildStamp:       version.Stamp(),
-		Channel:          version.Channel,
-		InstallerVersion: version.PackageVersion(),
-		Transport:        "http",
-		DatabasePath:     h.cfg.DatabasePath,
+		CanManageLibraryPaths: isDirectLocalRequest(r),
+		Name:                  version.BackendName(),
+		Version:               version.ProductVersion(),
+		BuildStamp:            version.Stamp(),
+		Channel:               version.Channel,
+		InstallerVersion:      version.PackageVersion(),
+		Transport:             "http",
+		DatabasePath:          h.cfg.DatabasePath,
 	})
 }
 
@@ -2271,6 +2273,12 @@ func (h *Handler) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeAppError(w, http.StatusBadRequest, contracts.ErrorCodeBadRequest, "invalid json body")
+			return
+		}
+	}
+
+	if body.DefaultImportLibraryPathID != nil || body.DefaultComicImportLibraryPathID != nil || body.DefaultPhotoImportLibraryPathID != nil {
+		if !requireLocalLibraryPathManagement(w, r) {
 			return
 		}
 	}

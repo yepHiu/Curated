@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useLibraryPathAccess } from "@/composables/use-library-path-access"
+import SettingsReadOnlyLibraryPaths from "./SettingsReadOnlyLibraryPaths.vue"
 import { useI18n } from "vue-i18n"
 import { Database, Download, RefreshCw } from "lucide-vue-next"
 import type { LibraryPathDTO, LibraryPathStorageStatusDTO } from "@/api/types"
@@ -89,6 +91,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { canManagePaths } = useLibraryPathAccess()
 
 const defaultImportPathSelectValue = computed(() =>
   props.paths.some((path) => path.id === props.defaultImportLibraryPathId)
@@ -119,7 +122,14 @@ function onDefaultImportPathChange(value: unknown) {
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-6">
+  <SettingsReadOnlyLibraryPaths
+    v-if="!canManagePaths"
+    :title="t('settings.storageCardTitle')"
+    :paths="paths"
+    :default-import-library-path-id="defaultImportLibraryPathId"
+    :storage-statuses="storageStatuses"
+  />
+  <div v-else class="flex w-full flex-col gap-6">
     <p
       v-if="scanFeedbackError"
       class="rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"

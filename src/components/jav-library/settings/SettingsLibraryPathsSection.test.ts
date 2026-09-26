@@ -1,6 +1,13 @@
+import { computed } from "vue"
 import { mount } from "@vue/test-utils"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsLibraryPathsSection from "./SettingsLibraryPathsSection.vue"
+
+const access = vi.hoisted(() => ({ allowed: true }))
+vi.mock("@/composables/use-library-path-access", () => ({
+  useLibraryPathAccess: () => ({ canManagePaths: computed(() => access.allowed) }),
+}))
+beforeEach(() => { access.allowed = true })
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -346,4 +353,18 @@ describe("SettingsLibraryPathsSection", () => {
 
     expect(wrapper.text()).toContain("export failed")
   })
+})
+
+
+it("shows only server path information remotely even when edit dialogs were open", () => {
+  access.allowed = false
+  const wrapper = mount(SettingsLibraryPathsSection, {
+    props: { ...baseProps, addPathDialogOpen: true, removePathDialogOpen: true, editingLibraryPathId: libraryPath.id },
+  })
+  expect(wrapper.find("[data-readonly-library-paths]").exists()).toBe(true)
+  expect(wrapper.find("button, input, select, [role=combobox]").exists()).toBe(false)
+  for (const path of baseProps.paths) expect(wrapper.text()).toContain(path.path)
+  expect(wrapper.text()).toContain("settings.libraryPathsReadOnly")
+  expect(wrapper.emitted()).toEqual({})
+  wrapper.unmount()
 })
