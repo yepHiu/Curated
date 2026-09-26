@@ -19,6 +19,7 @@ COMPONENT_IDS = {
     "desktop": "19806309-7967-4C86-A2CF-CF106D97B5AE",
 }
 VARIANTS = ("full", "server", "desktop")
+DESKTOP_FILES = ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "settings.js", "preload.cjs", "launcher-preload.cjs")
 
 
 def validate_version(version: str) -> str:
@@ -66,7 +67,7 @@ def stage_components(repo: Path, output: Path, version: str, *, server_binary: P
         # Explicit whitelist: no obsolete backend process launcher in the client package.
         main = app / "electron-dist"
         main.mkdir()
-        for name in ("main.js", "desktop-shell.js", "connections.js", "discovery.js", "updates.js", "settings.js", "preload.cjs", "launcher-preload.cjs"):
+        for name in DESKTOP_FILES:
             shutil.copy2(electron_main / name, main / name)
         shutil.copytree(electron_main / "launcher", main / "launcher")
         shutil.copy2(icon, app / "curated.ico")

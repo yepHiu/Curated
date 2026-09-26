@@ -34,6 +34,7 @@ scripts/dev/*
 scripts/release/*
 scripts/prd/*
 !scripts/release/release_cli.py
+!scripts/release/verify_artifacts.py
 !scripts/release/release_lib/
 !scripts/release/release_lib/**
 !scripts/release/tests/

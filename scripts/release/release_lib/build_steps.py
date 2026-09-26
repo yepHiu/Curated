@@ -98,7 +98,11 @@ def build_backend(
     build_stamp: str,
     output_dir: str = "release/backend",
     binary_name: str = "curated.exe",
+    *, target_os: str = "windows", target_arch: str = "amd64",
 ) -> Path:
+    """Build the requested Server target while keeping Windows as the legacy default."""
+    if target_os not in ("windows", "darwin") or target_arch not in ("amd64", "arm64"):
+        raise ValueError("Unsupported Server target")
     repo_root = get_repo_root()
     backend_root = repo_root / "backend"
     resolved_output_dir = resolve_release_path(output_dir, repo_root)
@@ -126,11 +130,11 @@ def build_backend(
     env["GOCACHE"] = go_cache_dir
     env["GOTMPDIR"] = go_tmp_dir
     env["GOTELEMETRY"] = "off"
-    env["GOOS"] = "windows"
-    env["GOARCH"] = "amd64"
+    env["GOOS"] = target_os
+    env["GOARCH"] = target_arch
     env["CGO_ENABLED"] = "0"
     ldflags = (
-        "-H=windowsgui "
+        ("-H=windowsgui " if target_os == "windows" else "") +
         f"-X curated-backend/internal/version.BuildStamp={build_stamp} "
         f"-X curated-backend/internal/version.InstallerVersion={version}"
     )
