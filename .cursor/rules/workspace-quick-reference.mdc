@@ -73,6 +73,10 @@ health 的 `version` 为数字 SemVer（当前 1.5.7），`buildStamp` 单独保
 - 主分支成功前端质量作业缓存用于 20% 单次增长比较，人工 `bundle-baseline.json` 用于 50% 累计增长比较，两者均有绝对字节噪声门槛。基线/缓存缺失或模式不同不关闭绝对限制。
 - `pnpm bundle:baseline` 仅在重新执行 Web API 生产构建并审阅后手动更新、提交；禁止每次构建自动更新或自动上调阈值。完整规则见 `docs/ops/2026-04-08-agent-build-and-test.md`。
 
+## Desktop 服务器连接
+
+侧栏/托盘「服务器」打开随 Desktop 打包的本地窗口；服务器名称、HTTP/HTTPS 根地址及上次成功连接保存到 userData/servers.json，按 origin（含端口）隔离登录会话。切换先探测并加载新页面，失败保留旧页面，成功后关闭旧页面并提示播放/上传/未保存编辑影响。升级隔离会话后可能需重新输入 PIN。legacy 默认本机连接保留 Go/Vite 启动；远端连接失败不拉起本机后端。旧 Server UI 没有侧栏入口时仍可用托盘。详情见 guide 的 Desktop server connections。
+
 ## 常见操作
 
 - **重启前后端**：先释放 `5173` 与后端端口（开发 `8080` / release `8081` 或配置里的 `httpAddr`），再分别启动。

@@ -17,10 +17,12 @@ alwaysApply: true
 
 ## Desktop Shell Boundaries
 
-- Electron now has an MVP shell under `electron/`: it starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, uses the Curated app icon and tray, loads the existing Web UI in BrowserWindow, and hides to tray when the window is closed. Packaged runtime still loads the backend-hosted static UI on `http://127.0.0.1:8081`.
+- Electron now has an MVP shell under `electron/`: for the default local legacy target it starts or reuses the Go HTTP backend, waits for `/api/health`, starts or reuses Vite at `http://127.0.0.1:5173` in development, uses the Curated app icon and tray, loads the existing Web UI in BrowserWindow, and hides to tray when the window is closed. Packaged runtime still loads the backend-hosted static UI on `http://127.0.0.1:8081`.
 - Update actions distinguish local legacy installations from remote/unknown targets. `getDesktopInfo()` includes main-owned `serverOrigin`; HTTP app-update responses carry request-local `localUpdateAllowed`, and remote download/install/cache-delete calls are rejected. Standalone Desktop uses its own update channel; current Desktop delivery remains manual-download-only.
 - Electron preload/main process IPC remains deliberately narrow: current code exposes `window.javLibrary.pickDirectory()` for native directory selection, a read-only `windowChrome` capability for platform-specific window styling, plus `getDesktopInfo()` / `checkDesktopUpdate()` for local component metadata and manifest checking (current development / legacy builds do not enter standalone update feeds). Business APIs remain on HTTP. Deep business IPC, mpv process control, and broader desktop file/permission bridges remain future desktop concerns unless current code proves otherwise.
 - Vue renderer code must not assume Electron, mpv, PotPlayer, or any native-player executable exists.
+
+- Desktop connection management is local and independent of Server UI: `servers.json` in userData, a bundled connection window, origin-scoped persistent sessions, probe/load-before-switch and offline recovery. Remote pages may open that window; only its exact local main frame can manage saved records. Saved remote targets never trigger local backend fallback. SSDP and independent installers remain pending.
 
 ## Storage Directory Ownership
 

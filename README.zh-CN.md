@@ -19,6 +19,8 @@
 
 # Curated
 
+Desktop 可从侧栏或托盘保存、管理和切换服务器；详见[服务器连接说明](docs/guide.md#desktop-server-connections)。
+
 萃取帧现支持截图预览、重试与撤销、源文件高清帧，以及 GIF/MP4/WebM 片段；详见[操作手册](docs/guide.md#curated-capture-and-inspection)。
 
 Curated 是本地优先的媒体资料库：Vue 3 前端、Go + SQLite 后端，以及 Electron 桌面壳。产品正式名称是 **Curated**。仓库目录和 npm 包名仍可能使用 **`jav-shadcn`**。
