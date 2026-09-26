@@ -1025,7 +1025,7 @@
     "imageOf": "{i}枚目"
   },
   "settings": {
-    "serverBuildStampLabel": "ビルドタイムスタンプ（UTC）",
+    "buildStampLabel": "ビルドタイムスタンプ（UTC）",
     "desktopDevelopment": "開発版",
     "desktopInfoLoading": "バージョンを読み込み中…",
     "desktopInfoError": "Desktop のバージョンを取得できません",
@@ -1413,7 +1413,7 @@
     "configCardBody": "将来のデスクトップ連携では、シェルを書き換えず型付き契約にバインドできます。",
     "aboutCardTitle": "Curated について",
     "aboutCardDesc": "製品と動作モードの説明。",
-    "aboutVersionLabel": "Curated Server バージョン",
+    "aboutVersionLabel": "Curated Server",
     "aboutVersionLoading": "バックエンドのバージョンを取得中…",
     "aboutVersionFetchFailed": "バックエンドのバージョンを取得できませんでした",
     "aboutVersionMock": "Mock モード（Web API 無効）— バックエンドのバージョンはありません",

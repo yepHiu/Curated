@@ -24,6 +24,9 @@ defineProps<{
         </div>
       </div>
     </div>
+    <p v-if="info?.buildStamp" class="mt-1 break-all text-xs text-muted-foreground" data-desktop-build-stamp>
+      {{ t('settings.buildStampLabel') }} <span class="font-mono">{{ info.buildStamp }}</span>
+    </p>
     <p v-if="result" class="mt-2 text-xs leading-relaxed text-muted-foreground" role="status" data-desktop-update-status>
       {{ t(`settings.desktopUpdateStatus.${result.status}`, { version: result.latestVersion }) }}
     </p>

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { checkDesktopUpdate, isTrustedDesktopSender, selectDesktopUpdate } from "./desktop-updates"
 import type { DesktopInfo } from "./desktop-contract"
 
-const info: DesktopInfo = { version: "0.1.0", development: false, distribution: "desktop", platform: "macos", arch: "arm64" }
+const info: DesktopInfo = { version: "0.1.0", buildStamp: "20260926.123433", development: false, distribution: "desktop", platform: "macos", arch: "arm64" }
 const asset = { component: "desktop", variant: "standalone", channel: "stable", version: "0.2.0", platform: "macos", arch: "arm64", format: "dmg", url: "https://downloads.example.com/desktop.dmg", sha256: "a".repeat(64) }
 const feed = "https://updates.example.com/desktop.json"
 

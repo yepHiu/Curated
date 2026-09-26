@@ -70,7 +70,7 @@ vi.mock("vue-i18n", () => ({
         "settings.appUpdateInstallReadyAction": "立即安装",
         "settings.appUpdateInstallingAction": "正在启动…",
         "settings.appUpdateOpenReleaseAction": "打开 Release 页面",
-        "settings.aboutVersionLabel": "Curated Server 版本号",
+        "settings.aboutVersionLabel": "Curated Server",
         "settings.aboutInstallerVersionLabel": "安装包版本号",
         "settings.appUpdateReleaseNotesExpand": "展开全文",
         "settings.appUpdateReleaseNotesCollapse": "收起全文",
@@ -126,7 +126,7 @@ describe("SettingsAppUpdateSection", () => {
       finishDesktop = () => resolve({ status: "up-to-date" })
     }))
     window.javLibrary = {
-      getDesktopInfo: vi.fn().mockResolvedValue({ version: "0.1.0", development: false, distribution: "desktop", platform: "macos", arch: "arm64" }),
+      getDesktopInfo: vi.fn().mockResolvedValue({ version: "0.1.0", buildStamp: "20260926.123433", development: false, distribution: "desktop", platform: "macos", arch: "arm64" }),
       checkDesktopUpdate: desktopCheck,
     }
     checkNowMock.mockResolvedValueOnce(createAppUpdateSummary())
@@ -185,7 +185,7 @@ describe("SettingsAppUpdateSection", () => {
     const text = wrapper.text()
 
     expect(wrapper.find("[data-desktop-update-section]").exists()).toBe(false)
-    expect(text).toContain("Curated Server 版本号")
+    expect(text).toContain("Curated Server")
     expect(text).toContain("1.5.7")
     expect(wrapper.get("[data-server-build-stamp]").text()).toContain("20260419.102030")
     expect(text).not.toContain("安装包版本号")

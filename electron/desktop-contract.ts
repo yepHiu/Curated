@@ -1,5 +1,6 @@
 export interface DesktopInfo {
   version: string
+  buildStamp: string
   development: boolean
   distribution: "legacy" | "desktop"
   platform: string

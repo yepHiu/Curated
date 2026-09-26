@@ -21,6 +21,7 @@ if (!["legacy", "desktop"].includes(config.distribution) || !(config.updateFeed 
 fs.writeFileSync(path.join(targetDir, "desktop-release.json"), JSON.stringify({
   schema: 1,
   version: parts.join("."),
+  buildStamp: new Date().toISOString().replace(/[-:]/g, "").replace("T", ".").slice(0, 15),
   distribution: config.distribution,
   updateFeed: config.updateFeed,
 }, null, 2) + "\n")

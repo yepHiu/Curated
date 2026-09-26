@@ -191,7 +191,7 @@ class BuildStepsTests(unittest.TestCase):
         compiled_main.mkdir()
         (compiled_main / "main.js").write_text("console.log('main')", encoding="utf-8")
         (compiled_main / "preload.cjs").write_text("", encoding="utf-8")
-        desktop_metadata = {"schema": 1, "version": "0.1.0", "distribution": "legacy", "updateFeed": None}
+        desktop_metadata = {"schema": 1, "version": "0.1.0", "buildStamp": "20260514.010203", "distribution": "legacy", "updateFeed": None}
         (compiled_main / "desktop-release.json").write_text(json.dumps(desktop_metadata), encoding="utf-8")
 
         asset_dir = self.temp_root / "backend" / "internal" / "assets"

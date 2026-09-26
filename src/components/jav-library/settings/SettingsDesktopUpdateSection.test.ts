@@ -11,11 +11,12 @@ function render(props: InstanceType<typeof SettingsDesktopUpdateSection>["$props
 describe("Desktop version and updates", () => {
   it("shows numeric version, development badge and result without a separate check button", () => {
     const wrapper = render({
-      info: { version: "0.1.0", development: true, distribution: "legacy", platform: "macos", arch: "arm64" },
+      info: { version: "0.1.0", buildStamp: "20260926.123433", development: true, distribution: "legacy", platform: "macos", arch: "arm64" },
       infoError: false,
       result: { status: "development" },
     })
     expect(wrapper.get("[data-desktop-version]").text()).toBe("0.1.0")
+    expect(wrapper.get("[data-desktop-build-stamp]").text()).toContain("20260926.123433")
     expect(wrapper.text()).toContain("开发版")
     expect(wrapper.text()).not.toContain("beta")
     expect(wrapper.find("[data-desktop-update-check]").exists()).toBe(false)

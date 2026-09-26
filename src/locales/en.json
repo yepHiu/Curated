@@ -1025,7 +1025,7 @@
     "imageOf": "Image {i}"
   },
   "settings": {
-    "serverBuildStampLabel": "Build timestamp (UTC)",
+    "buildStampLabel": "Build timestamp (UTC)",
     "desktopDevelopment": "Development",
     "desktopInfoLoading": "Reading version…",
     "desktopInfoError": "Could not read Desktop version",
@@ -1425,7 +1425,7 @@
     "configCardBody": "Future desktop integration can bind these controls to typed contracts without rewriting the shell.",
     "aboutCardTitle": "About Curated",
     "aboutCardDesc": "Product and runtime notes.",
-    "aboutVersionLabel": "Curated Server version",
+    "aboutVersionLabel": "Curated Server",
     "aboutVersionLoading": "Loading backend version…",
     "aboutVersionFetchFailed": "Could not load backend version",
     "aboutVersionMock": "Mock mode (Web API off) — no backend version",

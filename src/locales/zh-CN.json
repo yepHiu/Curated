@@ -1025,7 +1025,7 @@
     "imageOf": "第 {i} 张"
   },
   "settings": {
-    "serverBuildStampLabel": "构建时间戳（UTC）",
+    "buildStampLabel": "构建时间戳（UTC）",
     "desktopDevelopment": "开发版",
     "desktopInfoLoading": "正在读取版本…",
     "desktopInfoError": "无法读取桌面版本",
@@ -1413,7 +1413,7 @@
     "configCardBody": "未来桌面集成可将这些控件绑定到类型化契约，而无需重写视觉结构或外层页面壳。",
     "aboutCardTitle": "关于 Curated",
     "aboutCardDesc": "产品与运行方式说明。",
-    "aboutVersionLabel": "Curated Server 版本号",
+    "aboutVersionLabel": "Curated Server",
     "aboutVersionLoading": "正在获取后端版本…",
     "aboutVersionFetchFailed": "无法获取后端版本",
     "aboutVersionMock": "Mock 模式（未启用 Web API），无后端版本信息",

@@ -41,11 +41,12 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const desktopRelease = JSON.parse(readFileSync(path.join(__dirname, "desktop-release.json"), "utf8"))
-if (desktopRelease.schema !== 1 || !isVersion(desktopRelease.version) || !["legacy", "desktop"].includes(desktopRelease.distribution) || !(desktopRelease.updateFeed === null || typeof desktopRelease.updateFeed === "string")) {
+if (desktopRelease.schema !== 1 || !isVersion(desktopRelease.version) || typeof desktopRelease.buildStamp !== "string" || !/^\d{8}\.\d{6}$/.test(desktopRelease.buildStamp) || !["legacy", "desktop"].includes(desktopRelease.distribution) || !(desktopRelease.updateFeed === null || typeof desktopRelease.updateFeed === "string")) {
   throw new Error("Invalid Desktop release metadata")
 }
 const desktopInfo: DesktopInfo = {
   version: desktopRelease.version,
+  buildStamp: desktopRelease.buildStamp,
   development: !app.isPackaged,
   distribution: desktopRelease.distribution,
   platform: process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : process.platform,
