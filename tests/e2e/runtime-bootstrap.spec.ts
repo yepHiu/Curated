@@ -405,6 +405,7 @@ test("maintenance backup flow creates verifies and preflights without online res
           name: "curated-e2e",
           version: "e2e",
           channel: "test",
+          canManageLibraryPaths: true,
           transport: "http",
           databasePath: "D:\\Curated\\curated.db",
         },
